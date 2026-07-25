@@ -1,0 +1,9 @@
+{
+  "name": "commit-rules-guard",
+  "description": "git commit の直前にコミットルールを想起させ、動機の混在を気づかせる PreToolUse フック",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}

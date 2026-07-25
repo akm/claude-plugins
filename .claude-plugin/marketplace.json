@@ -1,0 +1,25 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "akm-claude-plugins",
+  "description": "akm のチーム共有 Claude Code プラグイン集",
+  "owner": {
+    "name": "akm"
+  },
+  "plugins": [
+    {
+      "name": "commit-rules-guard",
+      "description": "git commit の直前にコミットルールを想起させ、動機の混在を気づかせるフック",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "commit-rules-guard",
+        "ref": "main"
+      },
+      "tags": ["git", "commit", "hooks", "workflow"]
+    }
+  ]
+}

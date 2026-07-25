@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-commit-rules.py\"",
+            "timeout": 10,
+            "statusMessage": "コミットルールを確認しています..."
+          }
+        ]
+      }
+    ]
+  }
+}
