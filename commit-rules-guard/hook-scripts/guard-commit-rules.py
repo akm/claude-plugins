@@ -227,20 +227,24 @@ def staged_entries(repo):
     return entries
 
 
-def _matches_any(path, globs):
+def _matches_one(path, g):
     base = path.rsplit("/", 1)[-1]
-    for g in globs:
-        if fnmatch.fnmatch(path, g) or fnmatch.fnmatch(base, g):
-            return True
-        # "migrations/*" のようなディレクトリ prefix パターンにも当てる。
-        if g.endswith("/*") and (path == g[:-2] or path.startswith(g[:-1])):
-            return True
+    if fnmatch.fnmatch(path, g) or fnmatch.fnmatch(base, g):
+        return True
+    # "migrations/*" のようなディレクトリ prefix パターンにも当てる。
+    if g.endswith("/*") and (path == g[:-2] or path.startswith(g[:-1])):
+        return True
     return False
+
+
+def _matches_any(path, globs):
+    return any(_matches_one(path, g) for g in globs)
 
 
 def _custom_rule_hints(entries, config):
     """config の custom_rules を評価する。when_all_present の全パターンがステージ内の
-    いずれかのパスにマッチしたら、その message をヒントに加える。"""
+    いずれかのパスにマッチしたら、その message をヒントに加える。config は正規化済み
+    （_load_project_config 経由）を前提とするが、単体でも安全に扱う。"""
     hints = []
     paths = [p for _, p in entries]
     for rule in config.get("custom_rules", []):
@@ -250,7 +254,7 @@ def _custom_rule_hints(entries, config):
         message = rule.get("message", "")
         if not patterns or not message:
             continue
-        if all(any(_matches_any(p, [pat]) for p in paths) for pat in patterns):
+        if all(any(_matches_one(p, pat) for p in paths) for pat in patterns):
             hints.append(message)
     return hints
 
