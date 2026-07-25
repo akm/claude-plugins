@@ -18,7 +18,7 @@
   - generated_globs: 生成物とみなす追加パターンの配列。例: ["*.pb.go", "db/schema.sql"]
   - custom_rules: [{ id, when_all_present: [pattern...], message }]。when_all_present の
     全パターンがステージ内のいずれかのパスにマッチしたとき message をヒントに加える。
-    lappds の「db/schema.sql と migrations/ の混在」のような固有ケースをここで宣言する。
+    「db/schema.sql（生成物）と migrations/（手書き）の混在」のような固有ケースをここで宣言する。
 
 汎用化のための設定（環境変数。未設定でも動く）:
   - COMMIT_GUARD_GENERATED_GLOBS: 生成物とみなす追加パターンを「:」区切りで指定できる。
