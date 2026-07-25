@@ -57,7 +57,7 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
     "https://github.com/akm/claude-plugins/blob/main/.claude-plugin/marketplace.json"
   ],
   "enabledPlugins": [
-    "akm-claude-plugins:commit-rules-guard@0.1.0"
+    "akm-claude-plugins:commit-rules-guard@0.2.0"
   ]
 }
 ```
@@ -74,12 +74,48 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 ルールファイルの探索順: `COMMIT_GUARD_RULES_FILE` → `~/.claude/rules/commit-rules.md` →
 プラグイン同梱の `rules/commit-rules.md`。
 
-### プロジェクト固有パターンの注入
+## プロジェクト固有ルール (config.json / 任意)
 
-このプラグインは言語横断で普遍的な生成物パターンだけを扱います。プロジェクト固有の生成物
-(例: `db/schema.sql` は生成物だが `migrations/` は手書き、といった細かい区別) は、
-プラグインでは再現しきれません。そうした固有の検知が要るプロジェクトでは、リポジトリ内の
-PreToolUse フック (`.claude/hooks/`) を併用してください。
+このプラグインは言語横断で普遍的な生成物パターンだけを本体で扱います。プロジェクト固有の生成物
+(例: `db/schema.sql` は生成物だが `migrations/` は手書き、といった細かい区別) は、コミット対象
+リポジトリのトップに置く設定ファイルで宣言できます。プラグイン本体 (ロジック) を一元管理したまま、
+コードを足さずにプロジェクトごとの固有ルールを扱えます。
+
+設定ファイルのパス (コミット対象リポジトリの git トップレベルからの相対):
+
+```
+.claude/akm-claude-plugins/commit-rules-guard/config.json
+```
+
+`<marketplace>/<plugin>/` の階層にすることで名前空間が衝突しません。リポジトリ内に PreToolUse
+フックを別途置く必要はありません (フックの二重発火を避けられます)。
+
+### スキーマ
+
+```json
+{
+  "generated_globs": ["*.pb.go", "*_grpc.pb.go", "db/schema.sql"],
+  "custom_rules": [
+    {
+      "id": "schema-migration-mix",
+      "when_all_present": ["db/schema.sql", "migrations/*"],
+      "message": "db/schema.sql (schema-dump の生成物) と migrations/ (手書き) が同時にステージされています。手書きのマイグレーションと生成物はコミットの動機を分けてください。"
+    }
+  ]
+}
+```
+
+| キー | 説明 |
+| --- | --- |
+| `generated_globs` | 生成物とみなす追加パターンの配列。既定パターン + 環境変数 `COMMIT_GUARD_GENERATED_GLOBS` と合成される。 |
+| `custom_rules[].id` | ルールの識別子 (任意。可読性のためのラベル)。 |
+| `custom_rules[].when_all_present` | パターンの配列。列挙した各パターンが、ステージ内のいずれかのパスにマッチする。すべて満たされたら `message` をヒントに加える。 |
+| `custom_rules[].message` | 上の条件が満たされたときにヒントとして表示する文言。 |
+
+`when_all_present` の各パターンは、汎用の生成物パターンと同じマッチ規則で評価されます
+(フルパス / ベース名 / `migrations/*` のようなディレクトリ prefix)。
+
+設定ファイルが無い・JSON が壊れているときは、汎用パターンのみで動作します (本体は止まりません)。
 
 ## 前提
 

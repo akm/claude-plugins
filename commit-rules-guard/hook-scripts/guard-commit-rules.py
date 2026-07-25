@@ -12,9 +12,17 @@
     再実行すると通過する。混在の推定はブロック理由ではなく「気づきのヒント」で、誤検知でも
     合図を付ければ必ず通る。
 
+リポジトリ固有ルール（config.json。任意）:
+  commit 対象リポジトリのトップに置く
+  `.claude/akm-claude-plugins/commit-rules-guard/config.json` を読み、次を適用する。
+  - generated_globs: 生成物とみなす追加パターンの配列。例: ["*.pb.go", "db/schema.sql"]
+  - custom_rules: [{ id, when_all_present: [pattern...], message }]。when_all_present の
+    全パターンがステージ内のいずれかのパスにマッチしたとき message をヒントに加える。
+    lappds の「db/schema.sql と migrations/ の混在」のような固有ケースをここで宣言する。
+
 汎用化のための設定（環境変数。未設定でも動く）:
   - COMMIT_GUARD_GENERATED_GLOBS: 生成物とみなす追加パターンを「:」区切りで指定できる。
-    例: "*.pb.go:db/schema.sql:migrations/*"。プロジェクト固有の生成物をここで足す。
+    config.json の generated_globs と併用可。
   - COMMIT_GUARD_RULES_FILE: 表示するルールファイルのパス。既定は
     ~/.claude/rules/commit-rules.md → プラグイン同梱の rules/commit-rules.md の順に探す。
 
@@ -48,13 +56,18 @@ _GENERATED_DEFAULT = [
 ]
 
 
-def _generated_globs():
+def _generated_globs(config=None):
+    """生成物パターン。既定 + 環境変数 + リポジトリ固有 config の generated_globs を合成する。"""
     globs = list(_GENERATED_DEFAULT)
     extra = os.environ.get("COMMIT_GUARD_GENERATED_GLOBS", "")
     for g in extra.split(":"):
         g = g.strip()
         if g:
             globs.append(g)
+    if config:
+        for g in config.get("generated_globs", []):
+            if isinstance(g, str) and g.strip():
+                globs.append(g.strip())
     return globs
 
 
@@ -85,6 +98,38 @@ def git(repo, *args):
     if repo and repo != "__special__":
         base += ["-C", repo]
     return subprocess.run(base + list(args), capture_output=True, text=True)
+
+
+# リポジトリ固有ルールの設定ファイル。commit 対象リポジトリのトップからの相対パス。
+_PROJECT_CONFIG_REL = ".claude/akm-claude-plugins/commit-rules-guard/config.json"
+
+
+def _repo_toplevel(repo):
+    """commit 対象リポジトリの git トップレベルの絶対パスを返す。取れなければ None。"""
+    if repo == "__special__":
+        return None
+    r = git(repo if repo else None, "rev-parse", "--show-toplevel")
+    if r.returncode != 0:
+        return None
+    top = r.stdout.strip()
+    return top or None
+
+
+def _load_project_config(repo):
+    """commit 対象リポジトリの config.json を読む。無ければ空 dict。壊れていても空 dict。"""
+    top = _repo_toplevel(repo)
+    if not top:
+        return {}
+    path = os.path.join(top, _PROJECT_CONFIG_REL)
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        # 設定が壊れていても本体を止めない（汎用パターンのみで続行）。
+        return {}
 
 
 def find_git(tokens):
@@ -145,10 +190,28 @@ def _matches_any(path, globs):
     return False
 
 
-def classify(entries):
+def _custom_rule_hints(entries, config):
+    """config の custom_rules を評価する。when_all_present の全パターンがステージ内の
+    いずれかのパスにマッチしたら、その message をヒントに加える。"""
     hints = []
     paths = [p for _, p in entries]
-    globs = _generated_globs()
+    for rule in config.get("custom_rules", []):
+        if not isinstance(rule, dict):
+            continue
+        patterns = rule.get("when_all_present", [])
+        message = rule.get("message", "")
+        if not patterns or not message:
+            continue
+        if all(any(_matches_any(p, [pat]) for p in paths) for pat in patterns):
+            hints.append(message)
+    return hints
+
+
+def classify(entries, config=None):
+    config = config or {}
+    hints = []
+    paths = [p for _, p in entries]
+    globs = _generated_globs(config)
 
     generated = [p for p in paths if _matches_any(p, globs)]
     handwritten = [p for p in paths if not _matches_any(p, globs)]
@@ -176,6 +239,9 @@ def classify(entries):
             "改名・移動（R）と新規追加（A）が同時にステージされています。"
             "リファクタリングと機能追加は別の動機です。混在していないか確認してください。"
         )
+
+    # リポジトリ固有ルール（config.json の custom_rules）を最後に足す。
+    hints.extend(_custom_rule_hints(entries, config))
 
     return hints
 
@@ -241,7 +307,8 @@ def evaluate_segment(seg):
     entries = staged_entries(repo)
     if entries is not None and len(entries) == 0:
         return ALLOW
-    hints = classify(entries) if entries else []
+    config = _load_project_config(repo)
+    hints = classify(entries, config) if entries else []
     sys.stderr.write(build_message(entries or [], hints) + "\n")
     return BLOCK
 
