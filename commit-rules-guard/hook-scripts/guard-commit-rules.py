@@ -93,11 +93,22 @@ def tokenize(seg):
         return seg.split()
 
 
+class _GitFail:
+    """git 実行に失敗したときのダミー結果。returncode!=0 として扱える。"""
+    returncode = 1
+    stdout = ""
+    stderr = ""
+
+
 def git(repo, *args):
     base = ["git"]
     if repo and repo != "__special__":
         base += ["-C", repo]
-    return subprocess.run(base + list(args), capture_output=True, text=True)
+    try:
+        return subprocess.run(base + list(args), capture_output=True, text=True)
+    except OSError:
+        # git が PATH に無い等でも本体を止めない（呼び出し側は returncode!=0 で扱う）。
+        return _GitFail()
 
 
 # リポジトリ固有ルールの設定ファイル。commit 対象リポジトリのトップからの相対パス。
@@ -115,8 +126,45 @@ def _repo_toplevel(repo):
     return top or None
 
 
+def _string_list(value):
+    """value が list ならその中の非空 str だけを返す。それ以外（str 単体・数値・dict 等）は空。
+
+    JSON の型ミス（例: "db/schema.sql" を配列にし忘れた、数値を書いた）で
+    下流の反復処理が例外を投げ、本体全体が黙って無効化されるのを防ぐ。
+    """
+    if not isinstance(value, list):
+        return []
+    return [v.strip() for v in value if isinstance(v, str) and v.strip()]
+
+
+def _normalize_config(data):
+    """ユーザー由来 config を、下流が安全に反復できる形へ正規化する。
+
+    型が仕様外でも例外を投げず、その項目を無視する（汎用パターンのみで続行できる）。
+    """
+    if not isinstance(data, dict):
+        return {}
+    config = {"generated_globs": _string_list(data.get("generated_globs"))}
+    rules = []
+    raw_rules = data.get("custom_rules")
+    if isinstance(raw_rules, list):
+        for rule in raw_rules:
+            if not isinstance(rule, dict):
+                continue
+            patterns = _string_list(rule.get("when_all_present"))
+            message = rule.get("message")
+            if patterns and isinstance(message, str) and message.strip():
+                rules.append({"when_all_present": patterns, "message": message})
+    config["custom_rules"] = rules
+    return config
+
+
 def _load_project_config(repo):
-    """commit 対象リポジトリの config.json を読む。無ければ空 dict。壊れていても空 dict。"""
+    """commit 対象リポジトリの config.json を読み、正規化して返す。
+
+    無い・壊れている・型が仕様外のいずれでも、例外を投げず正規化済み dict を返す
+    （汎用パターンのみで本体は止まらない）。
+    """
     top = _repo_toplevel(repo)
     if not top:
         return {}
@@ -126,10 +174,10 @@ def _load_project_config(repo):
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
     except Exception:
         # 設定が壊れていても本体を止めない（汎用パターンのみで続行）。
         return {}
+    return _normalize_config(data)
 
 
 def find_git(tokens):
