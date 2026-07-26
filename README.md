@@ -46,15 +46,43 @@ claude plugin install commit-rules-guard
 
 このリポジトリの `main` に PR がマージされてプラグインが更新された場合、手元には自動では反映されません。以下の手順で最新を取り込みます。
 
+**1. インストール先のスコープを確認する**
+
+更新コマンドはスコープを取り違えると失敗するため、先に現状を確認します。
+
 ```bash
-claude plugin marketplace update akm-claude-plugins
-claude plugin update commit-rules-guard
+claude plugin list
 ```
 
-- 1 行目でマーケットプレイス定義 (収録プラグインの一覧) を取得元から取り直します。マーケットプレイス名を省略すると、登録済みのすべてのマーケットプレイスが更新されます。
-- 2 行目で個々のプラグイン本体を最新に更新します。
+```
+❯ commit-rules-guard@akm-claude-plugins
+  Version: 0.1.0
+  Scope: project        ← このスコープを次の手順で使う
+```
 
-`marketplace update` だけではプラグイン本体は更新されないため、両方を実行してください。
+**2. マーケットプレイス定義を更新する**
+
+```bash
+claude plugin marketplace update akm-claude-plugins
+```
+
+マーケットプレイス定義 (収録プラグインの一覧) を取得元から取り直します。マーケットプレイス名を省略すると、登録済みのすべてのマーケットプレイスが更新されます。
+
+**3. プラグイン本体を更新する**
+
+`marketplace update` だけではプラグイン本体は更新されないため、続けて実行します。**プラグイン名は `プラグイン名@マーケットプレイス名` の形式で指定してください。** 短い名前 (`commit-rules-guard`) だけでは解決できず `Plugin "..." not found` になります。
+
+user スコープ (既定) の場合:
+
+```bash
+claude plugin update commit-rules-guard@akm-claude-plugins
+```
+
+project / local スコープの場合は、**`--scope` の指定と、そのプロジェクトのディレクトリでの実行**が必要です。`plugin update` の既定は user スコープのため、指定しないと `not installed at scope user` になります。
+
+```bash
+claude plugin update commit-rules-guard@akm-claude-plugins --scope project
+```
 
 **更新後は Claude Code の再起動が必要です。** 再起動するまで、実行中のセッションには更新内容が反映されません。
 
