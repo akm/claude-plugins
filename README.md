@@ -6,7 +6,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 
 | プラグイン | 説明 |
 | --- | --- |
-| [commit-rules-guard](commit-rules-guard/README.md) | `git commit` の直前にコミットルールを想起させ、動機の混在を気づかせる |
+| [commit-rules-guard](commit-rules-guard/README.md) | コミットルールを想起させ、動機の混在を気づかせる (セッション開始時・作業着手時・`git commit` 直前) |
 
 ## 使い方
 

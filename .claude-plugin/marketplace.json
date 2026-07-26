@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "commit-rules-guard",
-      "description": "git commit の直前にコミットルールを想起させ、動機の混在を気づかせるフック",
+      "description": "コミットルールを想起させ、動機の混在を気づかせるフック集 (セッション開始時・作業着手時・git commit 直前)",
       "author": {
         "name": "akm"
       },
