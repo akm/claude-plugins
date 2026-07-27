@@ -91,6 +91,8 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 }
 ```
 
+`settings.json` の詳しい説明については [公式ドキュメント](https://code.claude.com/docs/en/settings#plugin-settings) を参照してください。
+
 ## 設定 (任意の環境変数)
 
 いずれも未設定で動きます。

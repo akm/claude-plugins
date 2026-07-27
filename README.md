@@ -44,6 +44,8 @@ claude plugin install commit-rules-guard
 - `extraKnownMarketplaces` はマーケットプレイス名をキーとするオブジェクトで、値の `source` にマーケットプレイスの取得元を指定します。
 - `enabledPlugins` は `プラグイン名@マーケットプレイス名` をキー、有効/無効を表す真偽値を値とするオブジェクトです。
 
+`settings.json` の詳しい説明については [公式ドキュメント](https://code.claude.com/docs/en/settings#plugin-settings) を参照してください。
+
 `.claude/settings.json` は git 管理下に置くとチーム全体で共有されます。一方、自分だけで有効化したい場合や個人的にオーバーライドしたい場合は、同じ内容を `.claude/settings.local.json` に記述することもできます。`.claude/settings.local.json` は通常 gitignore され、`.claude/settings.json` よりも優先されます。
 
 ### 最新版に更新する
