@@ -64,7 +64,7 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 1. マーケットプレイスを登録する。
 
    ```bash
-   claude plugin marketplace add https://github.com/akm/claude-plugins/blob/main/.claude-plugin/marketplace.json
+   claude plugin marketplace add akm/claude-plugins
    ```
 
 2. プラグインをインストールする。
@@ -77,12 +77,17 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 
 ```json
 {
-  "extraKnownMarketplaces": [
-    "https://github.com/akm/claude-plugins/blob/main/.claude-plugin/marketplace.json"
-  ],
-  "enabledPlugins": [
-    "akm-claude-plugins:commit-rules-guard@0.2.0"
-  ]
+  "extraKnownMarketplaces": {
+    "akm-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "akm/claude-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "commit-rules-guard@akm-claude-plugins": true
+  }
 }
 ```
 
