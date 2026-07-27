@@ -15,9 +15,11 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 自分の環境全体で使う場合は、以下のコマンドでインストールします。
 
 ```bash
-claude plugin marketplace add https://github.com/akm/claude-plugins/blob/main/.claude-plugin/marketplace.json
+claude plugin marketplace add akm/claude-plugins
 claude plugin install commit-rules-guard
 ```
+
+`marketplace add` はリポジトリを clone するため、`owner/repo` 形式か clone 可能な URL (`https://….git` / `git@…`) を指定します。GitHub のブラウザ用の閲覧 URL (`https://github.com/…/blob/…/marketplace.json`) は clone できないため使えません。
 
 ### リポジトリに明示的に設定する
 
@@ -33,12 +35,16 @@ claude plugin install commit-rules-guard
       }
     }
   },
-  "enabledPlugins": ["commit-rules-guard@akm-claude-plugins"]
+  "enabledPlugins": {
+    "commit-rules-guard@akm-claude-plugins": true
+  }
 }
 ```
 
 - `extraKnownMarketplaces` はマーケットプレイス名をキーとするオブジェクトで、値の `source` にマーケットプレイスの取得元を指定します。
-- `enabledPlugins` は有効化するプラグインの配列で、`プラグイン名@マーケットプレイス名` の形式で指定します。
+- `enabledPlugins` は `プラグイン名@マーケットプレイス名` をキー、有効/無効を表す真偽値を値とするオブジェクトです。
+
+`settings.json` の詳しい説明については [公式ドキュメント](https://code.claude.com/docs/en/settings#plugin-settings) を参照してください。
 
 `.claude/settings.json` は git 管理下に置くとチーム全体で共有されます。一方、自分だけで有効化したい場合や個人的にオーバーライドしたい場合は、同じ内容を `.claude/settings.local.json` に記述することもできます。`.claude/settings.local.json` は通常 gitignore され、`.claude/settings.json` よりも優先されます。
 
