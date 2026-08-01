@@ -24,8 +24,46 @@ PRIORITY = (MUST, SHOULD, IGNORE)
 _RANK = {name: i for i, name in enumerate(PRIORITY)}
 
 
+def _bracket(pattern, start):
+    """`[...]` を正規表現の文字クラスに変換する。
+
+    戻り値: (変換後の文字列, 次に読む位置)。閉じ括弧が無ければ (None, start)。
+
+    glob と正規表現で**否定の記号が違う**のが要点。glob は `[!abc]`、正規表現は
+    `[^abc]` で否定する。そのままコピーすると `!` がリテラルの感嘆符として解釈され、
+    「abc 以外」が「! か a か b か c」になって**判定が正反対**になる。
+    """
+    i = start + 1
+    negate = False
+    if i < len(pattern) and pattern[i] in ("!", "^"):
+        negate = True
+        i += 1
+
+    # 否定記号の直後の `]` はリテラル（`[!]abc]` は「] a b c 以外」）。
+    body_start = i
+    if i < len(pattern) and pattern[i] == "]":
+        i += 1
+
+    j = pattern.find("]", i)
+    if j < 0:
+        return None, start  # 閉じていない。呼び出し側がリテラル `[` として扱う。
+
+    body = pattern[body_start:j]
+    if not body:
+        return None, start  # `[]` は文字クラスとして意味を成さない。
+
+    # `*` と同じく、文字クラスも階層を越えさせない。`[a/b]` が `/` に一致すると
+    # `src/[a/b]*.go` のようなパターンがディレクトリ境界を跨いでしまう。
+    body = body.replace("/", "")
+    if not body:
+        return None, start
+
+    return ("[" + ("^" if negate else "") + body + "]"), j + 1
+
+
 def _translate(pattern):
     """glob を正規表現に変換する。`**` は階層を越え、`*` と `?` は越えない。"""
+    # 実装は _bracket と合わせて読む（文字クラスの否定記号が glob と正規表現で違う）。
     i = 0
     out = ["^"]
     n = len(pattern)
@@ -49,10 +87,10 @@ def _translate(pattern):
             i += 1
             continue
         if c == "[":
-            j = pattern.find("]", i)
-            if j > i:
-                out.append(pattern[i : j + 1])
-                i = j + 1
+            body, j = _bracket(pattern, i)
+            if body is not None:
+                out.append(body)
+                i = j
                 continue
         out.append(re.escape(c))
         i += 1

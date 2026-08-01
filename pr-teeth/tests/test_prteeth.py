@@ -112,6 +112,67 @@ class TestScopeGlob(unittest.TestCase):
         entry = {"must_review": ["src/**"]}
         self.assertEqual(scope.classify_file("other.txt", entry, scope.IGNORE), scope.IGNORE)
 
+    def test_character_class_matches(self):
+        entry = {"must_review": ["src/[abc].go"]}
+        self.assertEqual(scope.classify_file("src/a.go", entry), scope.MUST)
+        self.assertEqual(scope.classify_file("src/d.go", entry), scope.SHOULD)
+
+    def test_character_range_matches(self):
+        entry = {"must_review": ["src/[a-c].go"]}
+        self.assertEqual(scope.classify_file("src/b.go", entry), scope.MUST)
+        self.assertEqual(scope.classify_file("src/z.go", entry), scope.SHOULD)
+
+    def test_negated_class_is_not_inverted(self):
+        # glob は [!x]、正規表現は [^x] で否定する。そのままコピーすると `!` が
+        # リテラル扱いになり、判定が正反対になる。
+        entry = {"must_review": ["src/[!t]*.py"]}
+        self.assertEqual(scope.classify_file("src/main.py", entry), scope.MUST)
+        self.assertEqual(scope.classify_file("src/test_auth.py", entry), scope.SHOULD)
+
+    def test_caret_also_negates(self):
+        # gitignore / bash / POSIX と同じく ^ も否定として受ける。
+        entry = {"must_review": ["src/[^t]*.py"]}
+        self.assertEqual(scope.classify_file("src/main.py", entry), scope.MUST)
+        self.assertEqual(scope.classify_file("src/test_auth.py", entry), scope.SHOULD)
+
+    def test_bracket_right_after_negation_is_literal(self):
+        # `[!]x]` は「] か x 以外」。閉じ括弧の位置を誤判定しない。
+        self.assertTrue(scope._translate("[!]x]a").match("ba"))
+        self.assertFalse(scope._translate("[!]x]a").match("]a"))
+        self.assertFalse(scope._translate("[!]x]a").match("xa"))
+
+    def test_character_class_does_not_cross_directories(self):
+        # クラス内の / を許すと、パターンが階層境界を跨いでしまう。
+        self.assertFalse(scope._translate("[a/b].go").match("a/b.go"))
+
+    def test_unclosed_bracket_is_literal(self):
+        # 閉じていない `[` で落ちない（リテラルとして扱う）。
+        self.assertTrue(scope._translate("src/[abc.go").match("src/[abc.go"))
+
+    def test_character_classes_match_fnmatch(self):
+        """文字クラスの解釈が標準の glob と一致することを突き合わせる。
+
+        `*` の扱いは**意図的に fnmatch と異なる**（fnmatch は `*` が `/` を越えるが、
+        ここでは越えさせない。test_star_does_not_cross_directories 参照）ため、
+        突き合わせるのは文字クラスを含むパターンだけにする。
+        """
+        import fnmatch
+
+        cases = [
+            ("[!t]main.py", ["main.py", "tmain.py"]),
+            ("[abc].go", ["a.go", "d.go"]),
+            ("[a-c].go", ["b.go", "z.go"]),
+            ("[!]x]a", ["]a", "xa", "ba"]),
+            ("[0-9][0-9].txt", ["12.txt", "1a.txt"]),
+        ]
+        for pattern, paths in cases:
+            for path in paths:
+                self.assertEqual(
+                    bool(scope._translate(pattern).match(path)),
+                    fnmatch.fnmatchcase(path, pattern),
+                    msg=pattern + " vs " + path,
+                )
+
 
 class TestClassifyFiles(unittest.TestCase):
     def test_unconfigured_repo_is_should_review(self):
