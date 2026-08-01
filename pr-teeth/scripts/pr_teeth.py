@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, glossary, labels, render, scope, state, store,
+    agent_input, auth, config, document, glossary, labels, render, scope, state, store,
 )
 
 
@@ -258,27 +258,23 @@ def cmd_render(args):
     config_dir, paths, cfg = _load(args, warnings)
 
     with open(args.input, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    data.setdefault("language", config.default_language(cfg, args.lang))
-    data.setdefault("generated_at", _now())
-    data["warnings"] = list(data.get("warnings") or []) + warnings
-
-    # ignore のみの PR は1行に畳む（第7節）。
-    for pr in data.get("prs") or []:
-        if pr.get("collapsed") is None:
-            pr["collapsed"] = pr.get("priority") == scope.IGNORE
-    data["prs"] = sorted(
-        data.get("prs") or [],
-        key=lambda p: scope.sort_key({"priority": p.get("priority") or scope.SHOULD}),
-    )
+        payload = json.load(f)
+    # キー名の誤りや必須の欠落はここで弾く。黙って空のセクションを出さない。
+    # 畳み込みと並び替えも from_payload が行う。
+    doc = document.from_payload(payload)
+    if not doc.language:
+        doc.language = config.default_language(cfg, args.lang)
+    if not doc.generated_at:
+        doc.generated_at = _now()
+    doc.warnings = list(doc.warnings) + warnings
 
     os.makedirs(paths["out"], exist_ok=True)
     name = args.output or ("pr-teeth-" + _now().replace(":", "").replace("-", "") + ".html")
     path = name if os.path.isabs(name) else os.path.join(paths["out"], name)
     with open(path, "w", encoding="utf-8") as f:
-        f.write(render.render(data))
+        f.write(render.render(doc))
 
-    return _emit({"path": path, "count": len(data["prs"]), "warnings": data["warnings"]})
+    return _emit({"path": path, "count": len(doc.prs), "warnings": doc.warnings})
 
 
 def cmd_glossary_html(args):
@@ -390,9 +386,17 @@ def main(argv=None):
 
     sp = sub.add_parser("render", help="解説を自己完結 HTML にする")
     common(sp)
-    sp.add_argument("--input", required=True, help="解説データ JSON")
+    sp.add_argument(
+        "--input",
+        required=True,
+        help='解説データ JSON: {"prs": [{"repo": "<owner/repo>", "number": <番号>, '
+             '"title": "...", "priority": "must_review|should_review|ignore", '
+             '"language", "author", "counts", "summary", "background", "recommendation", '
+             '"changes": [], "review_points": [], "terms": [{"term","definition","status","evidence"}], '
+             '"diagram", "note"}]}。必須は repo / number / title / priority。'
+             "url は repo と number から導出するので渡さない。詳細は SKILL.md。",
+    )
     sp.add_argument("--output", default=None)
-    sp.add_argument("--open", action="store_true", help="（互換のため受けるが何もしない）")
     sp.set_defaults(func=cmd_render)
 
     sp = sub.add_parser("glossary-html", help="用語ポートフォリオを HTML にする")
@@ -416,7 +420,7 @@ def main(argv=None):
         }, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         return 1
-    except agent_input.InvalidInput as e:
+    except (agent_input.InvalidInput, document.InvalidDocument) as e:
         # 入力の形が違う。期待する形は例外メッセージに含まれている。
         json.dump({"error": str(e)}, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")

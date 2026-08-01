@@ -126,74 +126,71 @@ def _render_terms(terms, L):
         return ""
     out = ["<h3>" + _e(L["terms"]) + "</h3>"]
     for t in terms:
-        status = t.get("status") or ""
         # known は説明しない語なので、そもそも渡ってこない想定。来ても出さない。
-        if status == "known":
+        if t.status == "known":
             continue
         out.append('<div class="term">')
-        out.append('<span class="t">' + _e(t.get("term")) + "</span>")
-        if status:
-            out.append('<span class="s">' + _e(status) + "</span>")
-        out.append("<div>" + _e(t.get("definition")) + "</div>")
-        if t.get("evidence"):
-            out.append('<div class="src">' + _e(L["evidence"]) + ": " + _e(t["evidence"]) + "</div>")
+        out.append('<span class="t">' + _e(t.term) + "</span>")
+        if t.status:
+            out.append('<span class="s">' + _e(t.status) + "</span>")
+        out.append("<div>" + _e(t.definition) + "</div>")
+        if t.evidence:
+            out.append('<div class="src">' + _e(L["evidence"]) + ": " + _e(t.evidence) + "</div>")
         out.append("</div>")
     return "\n".join(out)
 
 
 def _render_pr(pr):
-    lang = pr.get("language") or "ja"
+    lang = pr.language or "ja"
     # 見出しもその PR の言語に合わせる。本文だけ英語で見出しが日本語だと読めない。
     L = labels.for_language(lang)
-    counts = pr.get("counts") or {}
-    priority = pr.get("priority") or "should_review"
-    cls = _SCOPE_CLASS.get(priority, "should")
-    label = L.get(priority, L["should_review"])
-    collapsed = bool(pr.get("collapsed"))
+    cls = _SCOPE_CLASS.get(pr.priority, "should")
+    label = L.get(pr.priority, L["should_review"])
+    collapsed = bool(pr.collapsed)
 
     out = []
     out.append('<article class="pr' + (" collapsed" if collapsed else "") + '" lang="' + _e(lang) + '">')
-    title = _e(pr.get("title"))
-    url = pr.get("url")
-    heading = '<a href="' + _e(url) + '">' + title + "</a>" if url else title
+    # url は repo と number から導出される（document.PullRequest.url）。
+    # エージェントから受け取らないので、href に任意の文字列が入る経路が無い。
+    heading = '<a href="' + _e(pr.url) + '">' + _e(pr.title) + "</a>"
     out.append("<h2>" + heading + '<span class="badge ' + cls + '">' + _e(label) + "</span></h2>")
-    out.append('<div class="meta">' + _e(pr.get("repo")) + " #" + _e(pr.get("number")))
-    if pr.get("author"):
-        out.append(" · " + _e(pr["author"]))
+    out.append('<div class="meta">' + _e(pr.repo) + " #" + _e(pr.number))
+    if pr.author:
+        out.append(" · " + _e(pr.author))
     out.append("</div>")
 
-    summary = _scope_summary(counts, L)
+    summary = _scope_summary(pr.counts, L)
     if summary:
         out.append('<div class="scope">' + summary + "</div>")
 
     if collapsed:
         # ignore のみの PR は1行に畳む。リンクは残す（第7節）。
-        if pr.get("summary"):
-            out.append("<div>" + _e(pr["summary"]) + "</div>")
+        if pr.summary:
+            out.append("<div>" + _e(pr.summary) + "</div>")
         out.append("</article>")
         return "\n".join(out)
 
-    if pr.get("recommendation"):
-        out.append("<p>" + _e(pr["recommendation"]) + "</p>")
-    if pr.get("summary"):
-        out.append("<h3>" + _e(L["summary"]) + "</h3><p>" + _e(pr["summary"]) + "</p>")
-    if pr.get("background"):
-        out.append("<h3>" + _e(L["background"]) + "</h3><p>" + _e(pr["background"]) + "</p>")
-    if pr.get("diagram"):
-        out.append('<pre class="mermaid-src">' + _e(pr["diagram"]) + "</pre>")
-    if pr.get("changes"):
+    if pr.recommendation:
+        out.append("<p>" + _e(pr.recommendation) + "</p>")
+    if pr.summary:
+        out.append("<h3>" + _e(L["summary"]) + "</h3><p>" + _e(pr.summary) + "</p>")
+    if pr.background:
+        out.append("<h3>" + _e(L["background"]) + "</h3><p>" + _e(pr.background) + "</p>")
+    if pr.diagram:
+        out.append('<pre class="mermaid-src">' + _e(pr.diagram) + "</pre>")
+    if pr.changes:
         out.append("<h3>" + _e(L["changes"]) + "</h3><ul>")
-        for c in pr["changes"]:
+        for c in pr.changes:
             out.append("<li>" + _e(c) + "</li>")
         out.append("</ul>")
-    if pr.get("review_points"):
+    if pr.review_points:
         out.append("<h3>" + _e(L["review_points"]) + "</h3><ul>")
-        for c in pr["review_points"]:
+        for c in pr.review_points:
             out.append("<li>" + _e(c) + "</li>")
         out.append("</ul>")
-    out.append(_render_terms(pr.get("terms"), L))
-    if pr.get("note"):
-        out.append('<div class="warn">' + _e(pr["note"]) + "</div>")
+    out.append(_render_terms(pr.terms, L))
+    if pr.note:
+        out.append('<div class="warn">' + _e(pr.note) + "</div>")
     out.append("</article>")
     return "\n".join(out)
 
@@ -256,16 +253,17 @@ def render_glossary(data):
 def render(data):
     """解説データ全体を自己完結 HTML にする。
 
-    data:
-      title, language, generated_at, warnings[], prs[]
+    data: document.Document（dict ではない）。
+    キー名の誤りは document.from_payload の時点で弾かれているので、
+    ここで欠落を気にする必要はない。
     """
-    lang = data.get("language") or "ja"
+    lang = data.language or "ja"
     # ページ全体の地の文はユーザー既定の言語（第5.3節）。
     L = labels.for_language(lang)
-    prs = data.get("prs") or []
-    warnings = data.get("warnings") or []
-    has_diagram = any(p.get("diagram") for p in prs)
-    title = data.get("title") or L["page_title"]
+    prs = data.prs
+    warnings = data.warnings
+    has_diagram = any(p.diagram for p in prs)
+    title = data.title or L["page_title"]
 
     out = ['<!doctype html>', '<html lang="' + _e(lang) + '">', "<head>",
            '<meta charset="utf-8">',
@@ -274,8 +272,8 @@ def render(data):
            "<style>" + _CSS + "</style>", "</head>", "<body>", "<main>"]
     out.append("<h1>" + _e(title) + "</h1>")
     sub = []
-    if data.get("generated_at"):
-        sub.append(_e(data["generated_at"]))
+    if data.generated_at:
+        sub.append(_e(data.generated_at))
     sub.append(str(len(prs)) + L["count_suffix"])
     out.append('<div class="sub">' + " · ".join(sub) + "</div>")
 

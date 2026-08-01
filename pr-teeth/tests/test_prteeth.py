@@ -20,7 +20,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, glossary, labels, render, scope, state, store,
+    agent_input, auth, config, document, glossary, labels, render, scope, state, store,
 )
 
 
@@ -582,20 +582,97 @@ class TestLabels(unittest.TestCase):
         self.assertEqual(labels.for_language("")["summary"], "Summary")
 
 
+class TestDocument(unittest.TestCase):
+    """解説データの型（scripts/prteeth/document.py）。
+
+    素の dict を .get() で読むと、キー名を間違えても None が空文字になり、
+    セクションが黙って消える。型で必須を持つことで組み立て時点で検出する。
+    """
+
+    def _pr(self, **kw):
+        pr = {"repo": "o/r", "number": 1, "title": "T", "priority": "should_review"}
+        pr.update(kw)
+        return {"prs": [pr]}
+
+    def test_accepts_minimal_pr(self):
+        doc = document.from_payload(self._pr())
+        self.assertEqual(len(doc.prs), 1)
+        self.assertEqual(doc.prs[0].repo, "o/r")
+
+    def test_url_is_derived_not_accepted(self):
+        # url を渡す経路が無いので、href に任意の文字列が入らない（#6）。
+        doc = document.from_payload(self._pr())
+        self.assertEqual(doc.prs[0].url, "https://github.com/o/r/pull/1")
+        with self.assertRaises(document.InvalidDocument) as cm:
+            document.from_payload(self._pr(url="javascript:alert(1)"))
+        self.assertIn("url", str(cm.exception))
+
+    def test_missing_required_key_is_an_error(self):
+        # 従来は空文字になって黙って欠落していた。
+        for missing in ("repo", "number", "title", "priority"):
+            payload = self._pr()
+            del payload["prs"][0][missing]
+            with self.assertRaises(document.InvalidDocument) as cm:
+                document.from_payload(payload)
+            self.assertIn(missing, str(cm.exception))
+
+    def test_typo_in_optional_key_is_an_error(self):
+        # main_changes のようなタイポを黙って捨てるとセクションが消える。
+        with self.assertRaises(document.InvalidDocument) as cm:
+            document.from_payload(self._pr(main_changes=["x"]))
+        self.assertIn("main_changes", str(cm.exception))
+
+    def test_error_message_lists_usable_keys(self):
+        with self.assertRaises(document.InvalidDocument) as cm:
+            document.from_payload(self._pr(body="x"))
+        self.assertIn("summary", str(cm.exception))  # 正しいキーを示す
+
+    def test_invalid_priority_is_an_error(self):
+        with self.assertRaises(document.InvalidDocument):
+            document.from_payload(self._pr(priority="urgent"))
+
+    def test_missing_prs_key_is_an_error(self):
+        with self.assertRaises(document.InvalidDocument) as cm:
+            document.from_payload({"pull_requests": []})
+        self.assertIn("prs", str(cm.exception))
+
+    def test_term_without_term_key_is_an_error(self):
+        with self.assertRaises(document.InvalidDocument):
+            document.from_payload(self._pr(terms=[{"definition": "x"}]))
+
+    def test_ignore_only_pr_is_collapsed(self):
+        doc = document.from_payload(self._pr(priority="ignore"))
+        self.assertTrue(doc.prs[0].collapsed)
+
+    def test_explicit_collapsed_is_respected(self):
+        doc = document.from_payload(self._pr(priority="ignore", collapsed=False))
+        self.assertFalse(doc.prs[0].collapsed)
+
+    def test_prs_are_sorted_by_priority(self):
+        doc = document.from_payload({"prs": [
+            {"repo": "o/r", "number": 3, "title": "c", "priority": "ignore"},
+            {"repo": "o/r", "number": 1, "title": "a", "priority": "must_review"},
+            {"repo": "o/r", "number": 2, "title": "b", "priority": "should_review"},
+        ]})
+        self.assertEqual([p.number for p in doc.prs], [1, 2, 3])
+
+    def test_number_zero_is_not_treated_as_missing(self):
+        # 0 は falsy だが有効な値。required 判定で誤って弾かない。
+        doc = document.from_payload(self._pr(number=0))
+        self.assertEqual(doc.prs[0].number, 0)
+
+
 class TestRender(unittest.TestCase):
-    def _doc(self, **kw):
-        base = {
-            "language": "ja",
-            "prs": [
-                {
-                    "repo": "o/r", "number": 1, "title": "T", "language": "en",
-                    "priority": "should_review", "counts": {"should_review": 1},
-                    "summary": "S", "changes": ["c"],
-                }
-            ],
+    def _doc(self, pr_overrides=None, **kw):
+        pr = {
+            "repo": "o/r", "number": 1, "title": "T", "language": "en",
+            "priority": "should_review", "counts": {"should_review": 1},
+            "summary": "S", "changes": ["c"],
         }
-        base.update(kw)
-        return base
+        pr.update(pr_overrides or {})
+        payload = {"language": "ja", "prs": [pr]}
+        payload.update(kw)
+        return document.from_payload(payload)
 
     def test_pr_chrome_uses_pr_language(self):
         # 本文が英語なのに見出しが日本語だと読めない（第5.3節）。
@@ -609,32 +686,32 @@ class TestRender(unittest.TestCase):
         self.assertIn('lang="en"', h)  # PR 側は自分の言語
 
     def test_escapes_html_in_content(self):
-        d = self._doc()
-        d["prs"][0]["summary"] = "<script>alert(1)</script>"
-        h = render.render(d)
+        h = render.render(self._doc({"summary": "<script>alert(1)</script>"}))
         self.assertNotIn("<script>alert(1)</script>", h)
         self.assertIn("&lt;script&gt;", h)
 
     def test_known_terms_are_not_rendered(self):
-        d = self._doc()
-        d["prs"][0]["terms"] = [
+        h = render.render(self._doc({"terms": [
             {"term": "SSoT", "status": "known", "definition": "x"},
             {"term": "jitter", "status": "new", "definition": "y"},
-        ]
-        h = render.render(d)
+        ]}))
         self.assertIn("jitter", h)
         self.assertNotIn("SSoT", h)
 
-    def test_no_external_assets_without_diagram(self):
-        # 図が無ければ CDN も読まない（完全にオフラインで開ける）。
+    def test_pr_link_is_derived_from_repo_and_number(self):
+        # url をエージェントから受け取らないので、href に任意の文字列が入らない。
         h = render.render(self._doc())
-        self.assertNotIn("http://", h)
-        self.assertNotIn("https://", h)
+        self.assertIn('<a href="https://github.com/o/r/pull/1">', h)
+
+    def test_no_external_assets_other_than_github_links(self):
+        # 図が無ければ CDN を読まない（オフラインで開ける）。
+        # PR へのリンクは残るが、これは遷移先であって読み込み対象ではない。
+        h = render.render(self._doc())
+        self.assertNotIn("<script", h)
+        self.assertNotIn("cdnjs", h)
 
     def test_diagram_code_survives_when_mermaid_unavailable(self):
-        d = self._doc()
-        d["prs"][0]["diagram"] = "flowchart LR\n A-->B"
-        h = render.render(d)
+        h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
         self.assertIn("mermaid-src", h)
         self.assertIn("flowchart LR", h)
 

@@ -167,10 +167,53 @@ HTML を生成する。
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
   --plugin-source "github.com/akm/claude-plugins" \
-  --input <解説をまとめたJSON> --open
+  --input <解説をまとめたJSON>
 ```
 
-入力 JSON の形は `render --help` を参照。生成された HTML の**パスを必ず伝える**。
+入力 JSON の形は次のとおり。
+
+```json
+{
+  "language": "<ページ全体の言語。省略時は設定から>",
+  "prs": [
+    {
+      "repo": "<owner/repo>",
+      "number": 123,
+      "title": "<タイトルをその PR の言語で要約したもの>",
+      "priority": "must_review",
+      "language": "<その PR の言語>",
+      "author": "<作者>",
+      "counts": {"must_review": 3, "should_review": 5, "ignore": 4},
+      "recommendation": "<推奨アクション。手順 3 の範囲サマリから>",
+      "summary": "<何をする PR か。1〜3文>",
+      "background": "<なぜ必要か>",
+      "changes": ["<主な変更点>"],
+      "review_points": ["<見るべき点>"],
+      "terms": [
+        {"term": "<語>", "definition": "<説明>", "status": "new",
+         "evidence": "<裏取りした根拠 file:line>"}
+      ],
+      "diagram": "<Mermaid のコード。単純なら省略>",
+      "note": "<取得や解析に失敗した場合の注記>"
+    }
+  ]
+}
+```
+
+| キー | 必須 | 内容 |
+| --- | --- | --- |
+| `repo` / `number` | ○ | `gh` から取得したもの。**PR の URL はここから導出される** |
+| `title` | ○ | その PR の言語で要約したタイトル |
+| `priority` | ○ | 手順 3 の `classify` が返した値をそのまま |
+| `counts` | | 手順 3 の `classify` が返した値をそのまま |
+| その他 | | 省略可。空なら該当セクションが出ない |
+
+- **`url` は渡さない。** `repo` と `number` から導出される。
+- **未知のキーを含めるとエラーになる。** タイポを黙って捨てると、そのセクションが
+  消えたまま成功したように見えるため。上表以外のキーは使えない。
+- `priority` が `ignore` の PR は自動で1行に畳まれる。並び替えも自動。
+
+生成された HTML の**パスを必ず伝える**。
 
 続いて用語集と状態を保存する。
 
