@@ -787,11 +787,32 @@ class TestRender(unittest.TestCase):
         self.assertIn('<a href="https://github.com/o/r/pull/1">', h)
 
     def test_no_external_assets_other_than_github_links(self):
-        # 図が無ければ CDN を読まない（オフラインで開ける）。
+        # 図が無ければ CDN を読まない（完全にオフラインで開ける）。
         # PR へのリンクは残るが、これは遷移先であって読み込み対象ではない。
         h = render.render(self._doc())
         self.assertNotIn("<script", h)
         self.assertNotIn("cdnjs", h)
+
+    def test_cdn_script_has_integrity(self):
+        # CDN が別の内容を返した場合にブラウザが拒否できるようにする。
+        h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
+        self.assertIn("cdnjs", h)
+        self.assertIn('integrity="sha512-', h)
+        self.assertIn('crossorigin="anonymous"', h)
+
+    def test_cdn_version_and_sri_are_consistent(self):
+        # バージョンだけ上げて SRI を更新し忘れると、図が黙って出なくなる。
+        h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
+        self.assertIn(render._MERMAID_VERSION + "/mermaid.min.js", h)
+        self.assertIn(render._MERMAID_SRI, h)
+        self.assertNotIn("__VER__", h)
+        self.assertNotIn("__SRI__", h)
+
+    def test_mermaid_security_level_is_explicit(self):
+        # 図のラベルは PR 由来の文字列を含みうる。ライブラリ既定値に依存しない。
+        h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
+        self.assertIn("securityLevel: 'strict'", h)
+        self.assertIn("htmlLabels: false", h)
 
     def test_diagram_code_survives_when_mermaid_unavailable(self):
         h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))

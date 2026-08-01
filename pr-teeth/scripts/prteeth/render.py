@@ -82,14 +82,33 @@ pre code { background: none; padding: 0; }
 footer { color: var(--muted); font-size: .85rem; margin-top: 3rem; text-align: center; }
 """
 
-# Mermaid は CDN から。読めなくても本文は読めるよう、失敗時は元のコードを残す。
+# Mermaid は CDN から読む。ライブラリは 3.2MB あり、図は補助でしかない（単純なら
+# 省略する）ため、PR ごとに埋め込むのは割に合わない。読めなくても本文は読めるよう、
+# 失敗時は元のコードを <pre> のまま残す。
+#
+# integrity は改竄検知のため。値は cdnjs が公開している sha512 と一致することを
+# 確認済み。**バージョンを上げるときは integrity も必ず更新する**（不一致だと
+# ブラウザが読み込みを拒否し、図が出なくなる）。
+_MERMAID_VERSION = "10.9.1"
+_MERMAID_SRI = (
+    "sha512-6a80OTZVmEJhqYJUmYd5z8yHUCDlYnj6q9XwB/gKOEyNQV/Q8u+"
+    "XeSG59a2ZKFEHGTYzgfOQKYEBtrZV7vBr+Q=="
+)
 _MERMAID = """
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/__VER__/mermaid.min.js"
+        integrity="__SRI__" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 (function () {
-  if (!window.mermaid) return;  // オフライン等。<pre> のまま残す。
+  if (!window.mermaid) return;  // オフライン・SRI 不一致等。<pre> のまま残す。
   var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' });
+  // securityLevel は明示する。図のラベルは PR 由来の文字列を含みうるため、
+  // ライブラリ既定値に依存せず HTML を無効化しておく。
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: dark ? 'dark' : 'default',
+    securityLevel: 'strict',
+    htmlLabels: false
+  });
   document.querySelectorAll('pre.mermaid-src').forEach(function (el, i) {
     var code = el.textContent;
     var box = document.createElement('div');
@@ -102,7 +121,7 @@ _MERMAID = """
   });
 })();
 </script>
-"""
+""".replace("__VER__", _MERMAID_VERSION).replace("__SRI__", _MERMAID_SRI)
 
 
 def _e(text):
