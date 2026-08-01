@@ -51,7 +51,7 @@
 
 なお**本文そのものの差分表示は未対応**です。本文が変わったことは検知して解説を
 作り直しますが、「本文のどこが変わったか」は示しません
-([CONCEPTS.md 第15節](CONCEPTS.md) の将来対応)。
+([#11](https://github.com/akm/claude-plugins/issues/11))。
 
 ## 導入
 
