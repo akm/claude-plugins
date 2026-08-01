@@ -55,7 +55,7 @@ def cmd_prepare(args):
     if not token:
         warnings.append(
             "GitHub のトークンが見つかりません。環境変数 GH_TOKEN / GITHUB_TOKEN、"
-            "`gh auth login`、または " + paths["glossary"].replace("glossary.json", "token.txt")
+            "`gh auth login`、または " + os.path.join(config_dir, "token.txt")
             + " のいずれかを設定してください。"
         )
 
@@ -204,13 +204,14 @@ def cmd_glossary_html(args):
     language = config.default_language(user_cfg, args.lang)
 
     L = labels.for_language(language)
-    groups = {glossary.KNOWN: [], glossary.LEARNING: [], glossary.NEW: []}
+    by_status = {glossary.KNOWN: [], glossary.LEARNING: [], glossary.NEW: []}
     for entry in (g.get("terms") or {}).values():
-        groups.setdefault(entry.get("status") or glossary.NEW, []).append(entry)
+        by_status.setdefault(entry.get("status") or glossary.NEW, []).append(entry)
 
-    prs = []
+    groups = []
+    # 到達度が分かるよう known を先頭に、以降 learning → new の順で並べる。
     for status in (glossary.KNOWN, glossary.LEARNING, glossary.NEW):
-        items = sorted(groups.get(status) or [], key=lambda e: str(e.get("term") or ""))
+        items = sorted(by_status.get(status) or [], key=lambda e: str(e.get("term") or "").lower())
         if not items:
             continue
         terms = []
@@ -223,32 +224,22 @@ def cmd_glossary_html(args):
                 text = "(" + other[0] + ") " + other[1]
             terms.append({
                 "term": e.get("term"),
-                "status": "",
                 "definition": text or L["no_definition"],
+                "occurrences": e.get("occurrences") or 0,
                 "evidence": e.get("provenance"),
             })
-        label = L.get(status, status)
-        prs.append({
-            "repo": label,
-            "number": len(items),
-            "title": label + " " + str(len(items)) + L["terms_count"],
-            "priority": scope.MUST if status == glossary.KNOWN else scope.SHOULD,
-            "language": language,
-            "counts": {},
-            "terms": terms,
-        })
+        groups.append({"status": status, "terms": terms})
 
     data = {
-        "title": L["glossary_title"],
         "language": language,
         "generated_at": _now(),
         "warnings": warnings,
-        "prs": prs,
+        "groups": groups,
     }
     os.makedirs(paths["out"], exist_ok=True)
     path = args.output or os.path.join(paths["out"], "pr-glossary.html")
     with open(path, "w", encoding="utf-8") as f:
-        f.write(render.render(data))
+        f.write(render.render_glossary(data))
     return _emit({"path": path, "counts": glossary.counts(g), "warnings": warnings})
 
 

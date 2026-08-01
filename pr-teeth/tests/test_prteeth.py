@@ -339,5 +339,33 @@ class TestRender(unittest.TestCase):
         self.assertIn("flowchart LR", h)
 
 
+class TestRenderGlossary(unittest.TestCase):
+    def _data(self, language="ja"):
+        return {
+            "language": language,
+            "groups": [
+                {"status": "known", "terms": [{"term": "SSoT", "definition": "x", "occurrences": 0}]},
+                {"status": "learning", "terms": [{"term": "backoff", "definition": "y", "occurrences": 3}]},
+            ],
+        }
+
+    def test_has_no_pr_chrome(self):
+        # PR 用の描画を流用すると「必須」バッジなど無関係な体裁が付く。
+        h = render.render_glossary(self._data())
+        self.assertNotIn("必須", h)
+        self.assertNotIn("Must review", h)
+
+    def test_groups_are_labelled_in_language(self):
+        self.assertIn("理解済み", render.render_glossary(self._data("ja")))
+        self.assertIn("Known", render.render_glossary(self._data("en")))
+
+    def test_shows_occurrences(self):
+        self.assertIn("×3", render.render_glossary(self._data()))
+
+    def test_is_offline(self):
+        h = render.render_glossary(self._data())
+        self.assertNotIn("https://", h)
+
+
 if __name__ == "__main__":
     unittest.main()

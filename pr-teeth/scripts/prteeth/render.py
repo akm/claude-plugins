@@ -62,6 +62,10 @@ a { color: var(--accent); }
 .badge.must { color: var(--must); }
 .badge.should { color: var(--should); }
 .badge.ignore { color: var(--ignore); }
+/* 用語ポートフォリオのステータス別 */
+.badge.known { color: var(--accent); }
+.badge.learning { color: var(--should); }
+.badge.new { color: var(--muted); }
 .scope { font-size: .9rem; margin: .75rem 0; }
 .scope span { margin-right: 1rem; white-space: nowrap; }
 .term { border-left: 3px solid var(--line); padding-left: .9rem; margin: .75rem 0; }
@@ -191,6 +195,61 @@ def _render_pr(pr):
     if pr.get("note"):
         out.append('<div class="warn">' + _e(pr["note"]) + "</div>")
     out.append("</article>")
+    return "\n".join(out)
+
+
+def render_glossary(data):
+    """用語ポートフォリオの HTML（第8節 /pr-glossary）。
+
+    PR 用の描画を流用すると「必須」バッジや PR 件数といった無関係な体裁が付くため、
+    専用の描画にする。
+    """
+    lang = data.get("language") or "ja"
+    L = labels.for_language(lang)
+    groups = data.get("groups") or []
+    warnings = data.get("warnings") or []
+    total = sum(len(g.get("terms") or []) for g in groups)
+
+    out = ['<!doctype html>', '<html lang="' + _e(lang) + '">', "<head>",
+           '<meta charset="utf-8">',
+           '<meta name="viewport" content="width=device-width, initial-scale=1">',
+           "<title>" + _e(L["glossary_title"]) + "</title>",
+           "<style>" + _CSS + "</style>", "</head>", "<body>", "<main>"]
+    out.append("<h1>" + _e(L["glossary_title"]) + "</h1>")
+    sub = []
+    if data.get("generated_at"):
+        sub.append(_e(data["generated_at"]))
+    sub.append(str(total) + L["terms_count"])
+    out.append('<div class="sub">' + " · ".join(sub) + "</div>")
+
+    if warnings:
+        out.append('<div class="warn"><strong>' + _e(L["warning"]) + "</strong><ul>")
+        for w in warnings:
+            out.append("<li>" + _e(w) + "</li>")
+        out.append("</ul></div>")
+
+    for group in groups:
+        terms = group.get("terms") or []
+        if not terms:
+            continue
+        status = group.get("status") or ""
+        out.append('<section class="pr">')
+        out.append(
+            "<h2>" + _e(L.get(status, status))
+            + '<span class="badge ' + _e(status) + '">' + str(len(terms)) + "</span></h2>"
+        )
+        for t in terms:
+            out.append('<div class="term">')
+            out.append('<span class="t">' + _e(t.get("term")) + "</span>")
+            if t.get("occurrences"):
+                out.append('<span class="s">×' + _e(t["occurrences"]) + "</span>")
+            out.append("<div>" + _e(t.get("definition")) + "</div>")
+            if t.get("evidence"):
+                out.append('<div class="src">' + _e(L["evidence"]) + ": " + _e(t["evidence"]) + "</div>")
+            out.append("</div>")
+        out.append("</section>")
+
+    out.append("</main></body></html>")
     return "\n".join(out)
 
 
