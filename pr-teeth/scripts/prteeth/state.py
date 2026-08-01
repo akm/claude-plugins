@@ -88,18 +88,31 @@ def select_targets(state, prs):
     return out
 
 
-def record_notified(state, prs):
+def record_notified(state, prs, prune_to=None):
     """通知済みとして記録した新しい state を返す。
 
-    オープンな依頼に無いエントリは掃除する（第11節）。閉じた PR の記録を
-    残し続けると、再オープン時に「変化なし」と誤判定しうる。
+    prs: 今回処理した PR。既存の記録に**マージ**する（置き換えない）。
+    prune_to: オープンな依頼の**全件**。渡された場合のみ、ここに無い記録を掃除する。
+
+    マージを既定にしているのは、渡された一覧が「完全」とは限らないため。
+    `gh` の取得が途中で失敗した・`--limit` で切り詰められた・エージェントが
+    解説した分だけ渡した、のいずれでも一覧は不完全になる。それを完全なものと
+    みなして全置換すると、**まだオープンな PR の記録が消えて再通知される**。
+
+    掃除は「完全な一覧を渡せた」と呼び出し側が言い切れるときだけ行う。閉じた PR の
+    記録を残し続けると再オープン時に「変化なし」と誤判定しうるため、掃除自体は要る。
     """
-    notified = {}
+    notified = dict(load_notified(state))
     for pr in prs:
         notified[key(pr.get("repo"), pr.get("number"))] = {
             "sha": pr.get("sha"),
             "updated_at": pr.get("updated_at"),
         }
+
+    if prune_to is not None:
+        alive = {key(pr.get("repo"), pr.get("number")) for pr in prune_to}
+        notified = {k: v for k, v in notified.items() if k in alive}
+
     new_state = dict(state or {})
     new_state["notified"] = notified
     return new_state

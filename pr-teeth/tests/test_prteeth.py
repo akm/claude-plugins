@@ -522,10 +522,32 @@ class TestState(unittest.TestCase):
         legacy = {"notified": {"o/r#1": "aaa"}}
         self.assertEqual(state.select_targets(legacy, [self._pr(updated="9999")]), [])
 
-    def test_record_prunes_closed_prs(self):
-        # 閉じた PR の記録を残すと、再オープン時に誤判定しうる。
+    def test_record_merges_by_default(self):
+        # 渡された一覧が完全とは限らない（取得失敗・件数上限・処理分だけ）。
+        # 全置換すると、まだオープンな PR の記録が消えて再通知される。
+        prev = {"notified": {"o/r#1": {"sha": "a"}, "o/r#2": {"sha": "b"}}}
+        new = state.record_notified(prev, [self._pr(sha="a2")])
+        self.assertEqual(new["notified"]["o/r#1"]["sha"], "a2")  # 更新される
+        self.assertIn("o/r#2", new["notified"])                  # 消えない
+
+    def test_partial_list_does_not_cause_renotification(self):
+        prev = state.record_notified({}, [
+            {"repo": "o/r", "number": 1, "sha": "a", "updated_at": "t"},
+            {"repo": "o/r", "number": 2, "sha": "b", "updated_at": "t"},
+        ])
+        # #1 だけ渡す（#2 の取得に失敗した想定）
+        after = state.record_notified(prev, [{"repo": "o/r", "number": 1, "sha": "a", "updated_at": "t"}])
+        targets = state.select_targets(after, [
+            {"repo": "o/r", "number": 1, "sha": "a", "updated_at": "t"},
+            {"repo": "o/r", "number": 2, "sha": "b", "updated_at": "t"},
+        ])
+        self.assertEqual(targets, [])  # どちらも再通知されない
+
+    def test_prune_to_removes_closed_prs(self):
+        # 完全な一覧を宣言したときだけ掃除する。閉じた PR の記録を残し続けると
+        # 再オープン時に「変化なし」と誤判定しうるため、掃除自体は要る。
         prev = {"notified": {"o/r#1": {"sha": "a"}, "o/r#99": {"sha": "z"}}}
-        new = state.record_notified(prev, [self._pr()])
+        new = state.record_notified(prev, [self._pr()], prune_to=[self._pr()])
         self.assertIn("o/r#1", new["notified"])
         self.assertNotIn("o/r#99", new["notified"])
 

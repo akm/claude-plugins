@@ -235,12 +235,34 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
 返り値の **`terms_recorded` を必ず確認する。** 記録した語数と一致しなければ、
 入力が意図どおりでない。`terms_skipped` と `warnings` に理由が出る。
 
-`mode=changes-only` のときだけ `--state <PR一覧のJSON>` も渡す。形式は手順 3 の
-`select` と同じ `[{"repo","number","sha","updated_at"}]` で、**その時点でオープンな
-依頼の全件**を渡す（解説した分だけではない）。ここに無い記録は掃除されるため、
-閉じた PR の記録が残り続けない。
+`mode=changes-only` のときは、状態の保存も行う。形式は手順 3 の `select` と同じ
+`[{"repo","number","sha","updated_at"}]`。**引数を2つに分けている**ので、渡す一覧が
+何なのかで使い分ける。
 
-`mode=full` では state を変更しない。
+| 引数 | 渡すもの | 挙動 |
+| --- | --- | --- |
+| `--notified` | **今回処理した PR**（部分でよい） | 既存の記録にマージする |
+| `--open-prs` | **オープンな依頼の全件** | ここに無い記録を掃除する |
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
+  --plugin-source "github.com/akm/claude-plugins" \
+  --input <出現語と定義のJSON> \
+  --notified <今回処理したPRのJSON> \
+  --open-prs <オープンな依頼の全件のJSON>
+```
+
+**`--open-prs` は「全件を確かに取得できた」ときだけ渡す。** 次のいずれかに当てはまる
+場合は**渡さないこと**。渡すと、まだオープンな PR の記録が消えて次回に再通知される。
+
+- 手順 2 の `gh` が途中で失敗した
+- `--limit` の上限に達して切り詰められた可能性がある
+- 一部のリポジトリだけを対象にした
+
+`--open-prs` を渡さなければ記録は消えないので、**迷ったら渡さない**のが安全。
+閉じた PR の記録は、次に全件取得できたときに掃除される。
+
+`mode=full` では状態を変更しない（どちらの引数も渡さない）。
 
 プッシュ通知（使える環境なら）は件数と各 PR の1行要約。地の文は `default_language`、
 各 PR の要約はその PR の言語で書く。

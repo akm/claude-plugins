@@ -204,18 +204,29 @@ def cmd_record(args):
         )
     store.save_json(paths["glossary"], g)
 
+    def _read_prs(path):
+        with open(path, "r", encoding="utf-8") as f:
+            accepted, bad = agent_input.prs(json.load(f))
+        warnings.extend(bad)
+        return accepted
+
     saved_state = False
     state_recorded = 0
-    if args.state:
+    state_pruned = 0
+    if args.notified or args.open_prs:
         # state は changes-only のときだけ更新する（第11節）。
-        with open(args.state, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        prs, state_skipped = agent_input.prs(raw)
-        warnings.extend(state_skipped)
-        # オープンな依頼の全件を渡す。ここに無い記録は掃除される。
-        store.save_json(paths["state"], state.record_notified({}, prs))
+        # --notified は部分でよい（マージ）。--open-prs は完全な一覧の宣言で、
+        # 渡されたときだけ、そこに無い記録を掃除する。
+        saved = store.load_precious(paths["state"], {})
+        recorded = _read_prs(args.notified) if args.notified else []
+        prune_to = _read_prs(args.open_prs) if args.open_prs else None
+        before = set(state.load_notified(saved))
+        updated = state.record_notified(saved, recorded, prune_to=prune_to)
+        after = set(state.load_notified(updated))
+        store.save_json(paths["state"], updated)
         saved_state = True
-        state_recorded = len(prs)
+        state_recorded = len(recorded)
+        state_pruned = len(before - after)
 
     return _emit({
         "glossary_path": paths["glossary"],
@@ -225,6 +236,7 @@ def cmd_record(args):
         "counts": glossary.counts(g),
         "state_saved": saved_state,
         "state_recorded": state_recorded,
+        "state_pruned": state_pruned,
         "warnings": warnings,
     })
 
@@ -366,10 +378,18 @@ def main(argv=None):
     common(sp)
     sp.add_argument("--input", required=True, help='{"terms":[{"term","language","definition"}]}')
     sp.add_argument(
-        "--state",
+        "--notified",
         default=None,
-        help='changes-only のときだけ渡す。[{"repo","number","sha","updated_at"}] '
-             "(オープンな依頼の全件。ここに無い記録は掃除される)",
+        help='changes-only のときだけ渡す。今回処理した PR: '
+             '[{"repo","number","sha","updated_at"}]。既存の記録にマージする'
+             "（部分的な一覧でよい）",
+    )
+    sp.add_argument(
+        "--open-prs",
+        default=None,
+        help="オープンな依頼の**全件**を渡せたときだけ指定する。同じ形式。"
+             "ここに無い記録を掃除する（閉じた PR の記録を消すため）。"
+             "取得が途中で失敗した・件数上限で切り詰めた場合は渡さないこと",
     )
     sp.set_defaults(func=cmd_record)
 
