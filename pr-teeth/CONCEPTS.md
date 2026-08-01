@@ -86,18 +86,26 @@
 
 | ファイル | 役割 |
 | --- | --- |
-| `config.yaml` | ユーザー全体の設定(出力言語など)。第5.2節 |
-| `repos.yml` | リポジトリ別のレビュー範囲・言語上書き。第7節 |
+| `config.toml` | 設定一式(出力言語・リポジトリ別のレビュー範囲と言語)。第5.2節・第7節 |
 | `glossary.json` | ユーザー用語集。第8節 |
 | `state.json` | 通知済み状態(フェーズ2)。第11節 |
 
 ### 5.2 出力言語の設定
 
-`config.yaml` にユーザー全体の既定を書く。
+設定は `config.toml` 1枚にまとめる。ユーザー全体の既定も、リポジトリ別の上書きも同じファイルに書く。
 
-```yaml
-language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Hant ...)
+```toml
+# 出力言語(ユーザー全体の既定)。BCP 47 の言語タグ(ja, en, ko, zh-Hant ...)
+language = "ja"
 ```
+
+**形式に TOML を使う理由:** 設定はユーザーが手で書くので構造化テキストが要るが、YAML は
+標準ライブラリに無い。当初は PyYAML があればそれを使い、無ければ同梱の簡易パーサに落とす
+二重実装にしたが、両者を永続的に一致させ続けるのは現実的でなく、実際に食い違った
+(リスト項目を親キーと同じインデントに置く正当な YAML を簡易パーサが拒否し、レビュー範囲設定が
+丸ごと無効化された)。しかも PyYAML の有無で挙動が変わるため、利用者のマシン構成によって
+発現する不具合になっていた。`tomllib` は Python 3.11 以降の標準ライブラリなので、
+依存ゼロのまま実装を1つにできる。
 
 - **未設定・ファイルなしの場合の既定は `ja`(日本語)。**
 - 値は BCP 47 の言語タグで受け取る。skill 側で対応言語を列挙して制限はしない
@@ -106,9 +114,9 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
 ### 5.3 言語の解決順序(優先度: 高 → 低)
 
 1. **実行時引数** — `/pr-teeth lang=en`(第10節)。その実行にだけ効き、設定ファイルは書き換えない。
-2. **リポジトリ単位設定** — `repos.yml` の `repos.<owner>/<repo>.language`(第7節)。
+2. **リポジトリ単位設定** — `config.toml` の `[repos."<owner>/<repo>"]` の `language`(第7節)。
    そのリポジトリのPRの解説だけがこの言語になる。
-3. **ユーザー既定** — `config.yaml` の `language`。
+3. **ユーザー既定** — `config.toml` の最上位 `language`。
 4. **組み込み既定** — `ja`。
 
 - 解説本文・レビュー範囲サマリ・用語解説・プッシュ通知・`/pr-glossary` のダッシュボードは、
@@ -150,7 +158,7 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
 出力言語もリポジトリ単位で上書きできるようにする。
 
 - これは「そのリポジトリでの、そのユーザー個人の役割・好み」を表す設定なので、リポジトリ本体ではなく
-  **ユーザーの設定**として持つ(置き場所: 設定ディレクトリの `repos.yml`。第5.1節)。
+  **ユーザーの設定**として持つ(置き場所: 設定ディレクトリの `config.toml`。第5.1節)。
   対象リポジトリ内に同等ファイル(例 `.github/review-scope.yml`)があれば、そちらを優先的に読む対応をしてもよい(任意)。
   ただし**言語設定はユーザー個人の好みなので、リポジトリ内ファイルからは読まない。**
 - 3つの範囲を定義する:
@@ -159,37 +167,35 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
   - `ignore`(見なくてよい)
 - 設定例:
 
-  ```yaml
-  repos:
-    owner/service-api:
-      must_review:            # レビュー必須
-        - "src/payments/**"
-        - "src/auth/**"
-      should_review:          # 見たほうが良い
-        - "src/api/**"
-      ignore:                 # 見なくてよい
-        - "docs/**"
-        - "**/*.md"
-        - "test/fixtures/**"
-    owner/frontend:
-      must_review:
-        - "src/components/checkout/**"
-      ignore:
-        - "**/*.stories.tsx"
-    someorg/oss-library:
-      language: en            # このリポジトリのPRだけ英語で解説する
-      should_review:
-        - "src/**"
-  defaults:
-    unmatched: should_review  # どの範囲にも一致しない変更の既定分類
+  ```toml
+  # リポジトリ別設定の既定値
+  [repo_defaults]
+  unmatched = "should_review"   # どの範囲にも一致しない変更の既定分類
+
+  [repos."owner/service-api"]
+  must_review  = ["src/payments/**", "src/auth/**"]   # レビュー必須
+  should_review = ["src/api/**"]                      # 見たほうが良い
+  ignore = ["docs/**", "**/*.md", "test/fixtures/**"] # 見なくてよい
+
+  [repos."owner/frontend"]
+  must_review = ["src/components/checkout/**"]
+  ignore = ["**/*.stories.tsx"]
+
+  [repos."someorg/oss-library"]
+  language = "en"               # このリポジトリのPRだけ英語で解説する
+  should_review = ["src/**"]
   ```
 
-- `language` を書かないリポジトリは `config.yaml` のユーザー既定に従う(第5.3節)。
+  リポジトリ名は `owner/repo` 形式で `/` を含むため、テーブル名は `[repos."owner/repo"]` と
+  引用符で囲む。既定値のテーブルを `[repo_defaults]` としているのは、**リポジトリ別設定の既定値**
+  であることを名前で示すため(`[repos.defaults]` だと `defaults` という名前のリポジトリと区別できない)。
+
+- `language` を書かないリポジトリは最上位の `language`(ユーザー既定)に従う(第5.3節)。
 - **判定ルール**:
   - PRの変更ファイル一覧(`gh pr view --json files` 等)を取得し、各ファイルを glob で分類。
   - 1ファイルが複数範囲に一致したら **優先度 must_review > should_review > ignore** で最上位を採用
     (重要な範囲を ignore で誤って隠さないため)。
-  - どの範囲にも一致しないファイルは `defaults.unmatched`(既定 `should_review`)として扱う。
+  - どの範囲にも一致しないファイルは `repo_defaults.unmatched`(既定 `should_review`)として扱う。
   - リポジトリ自体が未設定なら、全ファイルを `should_review` 扱い(安全側)。
 - **出力への反映**:
   - 各PRの解説に「レビュー範囲サマリ」を付ける。例:
@@ -283,7 +289,7 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
 処理の流れ:
 
 1. **認証取得**(第6節)。無ければ通知して終了。
-2. **設定・状態の読み込み** — 設定ディレクトリ(第5.1節)から `config.yaml`(第5.2節)、`repos.yml`(第7節)、
+2. **設定・状態の読み込み** — 設定ディレクトリ(第5.1節)から `config.toml`(第5.2節・第7節)、
    `glossary.json`(第8節)、`state.json`(第11節)を読む(無ければ空/既定)。
    ここで**ユーザー既定の出力言語**を確定する(第5.3節)。
 3. **PR一覧取得(軽い段)** — `is:pr review-requested:@me state:open archived:false` を検索し、各PRの
@@ -337,8 +343,7 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
 (このリポジトリ由来なら `$HOME/config/github.com/akm/claude-plugins/pr-teeth/`。
 環境変数 `PR_TEETH_CONFIG_DIR` で上書き可)
 
-- `config.yaml` … ユーザー全体の設定。出力言語の既定など(第5.2節)。ユーザーが編集。
-- `repos.yml` … リポジトリ別のレビュー範囲・言語上書き(第7節)。ユーザーが編集。
+- `config.toml` … 設定一式。出力言語の既定、リポジトリ別のレビュー範囲と言語(第5.2節・第7節)。ユーザーが編集。
 - `glossary.json` … ユーザー用語集(第8節)。skill が更新、`/pr-glossary` で編集。
 - `state.json` … 通知済みの記録(第2/10節、フェーズ2の重複抑制)。
   `mode=full` では変更しない。オープンな依頼に無いエントリは掃除してよい。
@@ -370,8 +375,8 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
 
 - [ ] `/pr-teeth` で on-demand 実行でき、現在のレビュー依頼PRが全件解説される。
 - [ ] **設定が無い状態でも動き、解説が日本語で出る**(既定 `ja`)。
-- [ ] `config.yaml` に `language: en` を書くと、**全PRの解説・用語解説・通知が英語になる。**
-- [ ] `repos.yml` の `repos.<owner>/<repo>.language` を書いたリポジトリのPRだけがその言語になり、
+- [ ] `config.toml` に `language = "en"` を書くと、**全PRの解説・用語解説・通知が英語になる。**
+- [ ] `[repos."<owner>/<repo>"]` に `language` を書いたリポジトリのPRだけがその言語になり、
       他のPRはユーザー既定の言語のままになる。
 - [ ] `/pr-teeth lang=<言語タグ>` が設定より優先され、その実行だけ全PRがその言語になる(設定ファイルは変わらない)。
 - [ ] 出力言語が変わっても `known` 語の説明省略は同じように効き、**用語のステータス・出現回数が言語間で共有される。**
@@ -382,7 +387,7 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
       配布元は SKILL.md のリテラル、上書きは `PR_TEETH_CONFIG_DIR` のみで決まる。
 - [ ] 出力が**自己完結HTML**で、**ローカルブラウザで開ける**(外部依存最小・オフラインで開ける)。
 - [ ] PR/Issueの関係や文脈上の構造が非自明なPRで**図(Mermaid)**が生成され、**単純なケース(Issue↔PR 1対1で他に関係なし等)では省略**される。
-- [ ] 各PRに、`repos.yml` に基づく**レビュー範囲サマリ**(必須/推奨/対象外の該当)が表示される。
+- [ ] 各PRに、`config.toml` に基づく**レビュー範囲サマリ**(必須/推奨/対象外の該当)が表示される。
 - [ ] PRが範囲優先度(必須→推奨→対象外)で並び、対象外のみのPRは1行に畳まれる。
 - [ ] 深掘り・用語裏取りが must/should 範囲を中心に行われる。
 - [ ] 各PRで、少なくとも1語の文脈依存語について、ブランチ上のソース/ドキュメントを検索した根拠付き解説が出る。
@@ -404,7 +409,7 @@ language: ja          # 出力言語。BCP 47 の言語タグ(ja, en, ko, zh-Han
 
 - スケジュールタスク(1時間ごと、または平日日中のみ)を作り、プロンプトは実質「この skill を `mode=changes-only` で実行」だけにする。
 - 認証・設定・状態・用語集・通知は skill 側にあるため、スケジュール側は薄く保つ。
-- **出力言語は設定ファイル(`config.yaml` / `repos.yml`)だけで決まる。**
+- **出力言語は設定ファイル(`config.toml`)だけで決まる。**
   スケジュール側で `lang=` を渡す必要はなく、第5.3節の 2〜4 段だけで解決する。
 - 頻度は運用しながら調整(通知過多・コスト対策として「2〜3時間ごと」「平日日中のみ」も検討)。
 

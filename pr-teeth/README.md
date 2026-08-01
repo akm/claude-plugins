@@ -91,7 +91,7 @@
 
 ## 前提
 
-- `python3` が PATH にあること。
+- `python3` (3.11 以降) が PATH にあること。設定の読み込みに標準ライブラリの `tomllib` を使います。
 - `gh` (GitHub CLI) があること。無い場合は `curl` で REST API を直接叩きます。
 - `git` が使えること (PR のブランチをチェックアウトして中身を確認するため)。
 
@@ -141,46 +141,44 @@ $HOME/config/github.com/akm/claude-plugins/pr-teeth/
 
 ## 出力言語
 
-`config.yaml` でユーザー全体の既定を決めます。
+設定は `config.toml` 1枚です。ユーザー全体の既定を最上位に書きます。
 
-```yaml
-language: ja          # BCP 47 の言語タグ (ja, en, ko, zh-Hant ...)
+```toml
+language = "ja"       # BCP 47 の言語タグ (ja, en, ko, zh-Hant ...)
 ```
 
-リポジトリごとに変えたい場合は `repos.yml` で上書きします。社内リポジトリは日本語、
-OSS は英語、といった使い分けができます。
+リポジトリごとに変えたい場合は同じファイルの `[repos."owner/repo"]` で上書きします。
+社内リポジトリは日本語、OSS は英語、といった使い分けができます。
 
 優先度は次のとおりです(高い順)。
 
 1. 実行時引数 `lang=`
-2. `repos.yml` の `repos.<owner>/<repo>.language`
-3. `config.yaml` の `language`
+2. `[repos."<owner>/<repo>"]` の `language`
+3. 最上位の `language`
 4. 既定 `ja`
 
 解説本文・見出し・用語解説・通知は、解決された言語で出力されます。
 
 ## レビュー範囲の設定
 
-リポジトリごとに、自分が見るべき範囲を glob で設定します (`repos.yml`)。
+リポジトリごとに、自分が見るべき範囲を glob で設定します (同じ `config.toml`)。
 
-```yaml
-repos:
-  owner/service-api:
-    must_review:            # レビュー必須
-      - "src/payments/**"
-      - "src/auth/**"
-    should_review:          # 見たほうが良い
-      - "src/api/**"
-    ignore:                 # 見なくてよい
-      - "docs/**"
-      - "**/*.md"
-  someorg/oss-library:
-    language: en            # このリポジトリの PR だけ英語で解説する
-    should_review:
-      - "src/**"
-defaults:
-  unmatched: should_review  # どの範囲にも一致しない変更の既定分類
+```toml
+# リポジトリ別設定の既定値
+[repo_defaults]
+unmatched = "should_review"   # どの範囲にも一致しない変更の既定分類
+
+[repos."owner/service-api"]
+must_review   = ["src/payments/**", "src/auth/**"]  # レビュー必須
+should_review = ["src/api/**"]                      # 見たほうが良い
+ignore        = ["docs/**", "**/*.md"]              # 見なくてよい
+
+[repos."someorg/oss-library"]
+language      = "en"          # このリポジトリの PR だけ英語で解説する
+should_review = ["src/**"]
 ```
+
+リポジトリ名は `/` を含むため、テーブル名を `[repos."owner/repo"]` と引用符で囲みます。
 
 - 1ファイルが複数範囲に一致したら **必須 > 推奨 > 対象外** で最上位を採ります
   (重要な範囲を `ignore` で誤って隠さないため)。
@@ -213,8 +211,7 @@ defaults:
 
 | ファイル | 役割 | 編集 |
 | --- | --- | --- |
-| `config.yaml` | 出力言語などのユーザー設定 | ユーザー |
-| `repos.yml` | リポジトリ別のレビュー範囲・言語 | ユーザー |
+| `config.toml` | 設定一式(出力言語・リポジトリ別のレビュー範囲と言語) | ユーザー |
 | `glossary.json` | 用語集 | skill と `/pr-glossary` |
 | `state.json` | 通知済みの記録 (`mode=changes-only` 用) | skill |
 
@@ -235,8 +232,8 @@ defaults:
 python3 -m unittest discover -s pr-teeth/tests
 ```
 
-標準ライブラリだけで動きます。PyYAML があれば使い、無ければ同梱の簡易パーサで
-`repos.yml` を読みます(どちらでも結果が変わらないようにしています)。
+標準ライブラリだけで動きます(設定の読み込みは Python 3.11 以降の `tomllib`)。
+外部パッケージのインストールは不要です。
 
 ## 設計
 

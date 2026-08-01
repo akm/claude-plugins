@@ -61,7 +61,10 @@ def _translate(pattern):
 
 
 def _matches(path, patterns):
-    for p in patterns or []:
+    # 設定は利用者が手で書くので、リストでない値（スカラー等）が来ても落とさない。
+    if isinstance(patterns, str) or not isinstance(patterns, (list, tuple)):
+        patterns = [patterns] if isinstance(patterns, str) else []
+    for p in patterns:
         if not isinstance(p, str) or not p.strip():
             continue
         pat = p.strip()
@@ -83,7 +86,7 @@ def classify_file(path, repo_entry, unmatched_default=SHOULD):
     return unmatched_default
 
 
-def classify_files(paths, repo, repos_config):
+def classify_files(paths, repo, config):
     """PR の変更ファイル一覧を分類する。
 
     戻り値: {"by_file": {path: 範囲}, "counts": {範囲: 件数}, "priority": 範囲}
@@ -92,10 +95,18 @@ def classify_files(paths, repo, repos_config):
     リポジトリ自体が未設定なら全ファイルを should_review 扱いにする（安全側）。
     ignore に倒すと、設定し忘れたリポジトリの重要な変更を黙って隠してしまう。
     """
-    cfg = repos_config or {}
-    entry = (cfg.get("repos") or {}).get(repo)
-    defaults = cfg.get("defaults") or {}
-    unmatched = defaults.get("unmatched") or SHOULD
+    cfg = config or {}
+    repos = cfg.get("repos")
+    entry = repos.get(repo) if isinstance(repos, dict) else None
+    if not isinstance(entry, dict):
+        entry = None
+
+    # [repo_defaults] はリポジトリ別設定の既定値。名前で役割が分かるようにしている
+    # （[repos.defaults] だと "defaults" という名前のリポジトリと区別できない）。
+    defaults = cfg.get("repo_defaults")
+    if not isinstance(defaults, dict):
+        defaults = {}
+    unmatched = defaults.get("unmatched")
     if unmatched not in _RANK:
         unmatched = SHOULD
 

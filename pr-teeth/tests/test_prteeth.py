@@ -9,7 +9,7 @@
   - 言語の解決順序（第5.3節）
   - レビュー範囲の glob 判定と優先度（第7節）
   - 用語集のステータス遷移と言語別定義（第8節）
-  - repos.yml の簡易 YAML パース
+  - 設定 (config.toml) の読み込み
 """
 
 import os
@@ -46,35 +46,40 @@ class TestConfigDir(unittest.TestCase):
 
 
 class TestLanguageResolution(unittest.TestCase):
+    """言語の解決順序（第5.3節）。設定は config.toml 1枚に統合されている。"""
+
     def test_defaults_to_japanese(self):
-        self.assertEqual(config.resolve_language("o/r", {}, {}), "ja")
+        self.assertEqual(config.resolve_language("o/r", {}), "ja")
 
     def test_user_default(self):
-        self.assertEqual(config.resolve_language("o/r", {"language": "en"}, {}), "en")
+        self.assertEqual(config.resolve_language("o/r", {"language": "en"}), "en")
 
     def test_repo_overrides_user(self):
-        repos = {"repos": {"o/r": {"language": "ko"}}}
-        self.assertEqual(config.resolve_language("o/r", {"language": "en"}, repos), "ko")
+        cfg = {"language": "en", "repos": {"o/r": {"language": "ko"}}}
+        self.assertEqual(config.resolve_language("o/r", cfg), "ko")
 
     def test_repo_without_language_falls_back(self):
-        repos = {"repos": {"o/r": {"must_review": ["src/**"]}}}
-        self.assertEqual(config.resolve_language("o/r", {"language": "en"}, repos), "en")
+        cfg = {"language": "en", "repos": {"o/r": {"must_review": ["src/**"]}}}
+        self.assertEqual(config.resolve_language("o/r", cfg), "en")
 
     def test_cli_beats_everything(self):
-        repos = {"repos": {"o/r": {"language": "ko"}}}
-        self.assertEqual(
-            config.resolve_language("o/r", {"language": "en"}, repos, cli_lang="fr"), "fr"
-        )
+        cfg = {"language": "en", "repos": {"o/r": {"language": "ko"}}}
+        self.assertEqual(config.resolve_language("o/r", cfg, cli_lang="fr"), "fr")
 
     def test_scheduled_run_uses_files_only(self):
         # 第14節: 無人実行では cli_lang が無く、2〜4段だけで決まる。
-        repos = {"repos": {"o/r": {"language": "ko"}}}
-        self.assertEqual(config.resolve_language("o/r", {"language": "en"}, repos, None), "ko")
+        cfg = {"language": "en", "repos": {"o/r": {"language": "ko"}}}
+        self.assertEqual(config.resolve_language("o/r", cfg, None), "ko")
 
     def test_default_language_ignores_repo_setting(self):
         # 通知の地の文はユーザー既定。リポジトリ単位設定に引きずられない。
-        repos = {"repos": {"o/r": {"language": "ko"}}}
-        self.assertEqual(config.default_language({"language": "en"}, None), "en")
+        cfg = {"language": "en", "repos": {"o/r": {"language": "ko"}}}
+        self.assertEqual(config.default_language(cfg, None), "en")
+
+    def test_malformed_config_does_not_crash(self):
+        # 利用者が手で書くファイルなので、想定外の型でも落とさず既定へ倒す。
+        for bad in ({"repos": "nope"}, {"repos": {"o/r": "nope"}}, {"language": 42}):
+            self.assertEqual(config.resolve_language("o/r", bad), "ja")
 
 
 class TestScopeGlob(unittest.TestCase):
@@ -116,7 +121,7 @@ class TestClassifyFiles(unittest.TestCase):
     def test_priority_and_counts(self):
         repos = {
             "repos": {"o/r": {"must_review": ["src/auth/**"], "ignore": ["docs/**"]}},
-            "defaults": {"unmatched": "should_review"},
+            "repo_defaults": {"unmatched": "should_review"},
         }
         r = scope.classify_files(
             ["src/auth/a.go", "src/api/b.go", "docs/c.md", "docs/d.md"], "o/r", repos
@@ -195,57 +200,82 @@ class TestGlossary(unittest.TestCase):
         glossary.record(g, "widget", language="ja", definition="部品")
         self.assertEqual(glossary.other_language_definitions(g, "widget", "en"), {"ja": "部品"})
 
+class TestToml(unittest.TestCase):
+    """設定の読み込み（第5節）。
 
-class TestSimpleYaml(unittest.TestCase):
-    def test_parses_concepts_example(self):
-        text = """
-repos:
-  owner/service-api:
-    must_review:            # レビュー必須
-      - "src/payments/**"
-      - "src/auth/**"
-    ignore:
-      - "docs/**"
-  someorg/oss-library:
-    language: en
-    should_review:
-      - "src/**"
-defaults:
-  unmatched: should_review
-"""
-        d = store.parse_simple_yaml(text)
-        self.assertEqual(d["repos"]["owner/service-api"]["must_review"], ["src/payments/**", "src/auth/**"])
-        self.assertEqual(d["repos"]["owner/service-api"]["ignore"], ["docs/**"])
-        self.assertEqual(d["repos"]["someorg/oss-library"]["language"], "en")
-        self.assertEqual(d["defaults"]["unmatched"], "should_review")
+    以前は PyYAML があればそれを、無ければ同梱の簡易パーサを使う二重実装だった。
+    両者は実際に食い違い（リスト項目を親キーと同じインデントに置く正当な YAML を
+    簡易パーサが拒否し、レビュー範囲設定が丸ごと無効化された）、しかも PyYAML の
+    有無で挙動が変わるため、利用者のマシン構成に依存する不具合になっていた。
+    tomllib は標準ライブラリなので実装は1つで済み、この種の食い違いが起きない。
+    """
+
+    def _write(self, d, text):
+        p = os.path.join(d, "config.toml")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(text)
+        return p
+
+    def test_parses_documented_example(self):
+        text = "\n".join([
+            'language = "ja"',
+            "",
+            "[repo_defaults]",
+            'unmatched = "should_review"',
+            "",
+            '[repos."owner/service-api"]',
+            'must_review = ["src/payments/**", "src/auth/**"]',
+            'ignore = ["docs/**"]',
+            "",
+            '[repos."someorg/oss-library"]',
+            'language = "en"',
+            'should_review = ["src/**"]',
+            "",
+        ])
+        with tempfile.TemporaryDirectory() as d:
+            cfg = store.load_toml(self._write(d, text), {})
+        self.assertEqual(cfg["language"], "ja")
+        self.assertEqual(
+            cfg["repos"]["owner/service-api"]["must_review"],
+            ["src/payments/**", "src/auth/**"],
+        )
+        self.assertEqual(cfg["repos"]["someorg/oss-library"]["language"], "en")
+        self.assertEqual(cfg["repo_defaults"]["unmatched"], "should_review")
+
+    def test_repo_names_with_slashes_round_trip(self):
+        # リポジトリ名は owner/repo 形式なので、キーに引用符が要る。
+        with tempfile.TemporaryDirectory() as d:
+            cfg = store.load_toml(
+                self._write(d, '[repos."o/r"]\nignore = ["docs/**"]\n'), {}
+            )
+        self.assertEqual(cfg["repos"]["o/r"]["ignore"], ["docs/**"])
+
+    def test_list_style_that_broke_the_old_parser(self):
+        # 旧簡易パーサはこの形（複数行の配列）を扱えず、設定を丸ごと捨てていた。
+        text = '[repos."o/r"]\nmust_review = [\n  "src/auth/**",\n  "src/api/**",\n]\n'
+        with tempfile.TemporaryDirectory() as d:
+            cfg = store.load_toml(self._write(d, text), {})
+        self.assertEqual(cfg["repos"]["o/r"]["must_review"], ["src/auth/**", "src/api/**"])
 
     def test_hash_inside_quotes_is_kept(self):
-        d = store.parse_simple_yaml('a: "x#y"\n')
-        self.assertEqual(d["a"], "x#y")
-
-    def test_config_yaml(self):
-        d = store.parse_simple_yaml("language: ja   # 出力言語\n")
-        self.assertEqual(d["language"], "ja")
-
-    def test_flow_syntax_fails_loudly(self):
-        # 黙って文字列として取り込むと設定が無視され、原因が分かりにくい。
-        with self.assertRaises(ValueError):
-            store.parse_simple_yaml("repos: {a: 1}\n")
-
-    def test_list_at_same_indent_as_key(self):
-        d = store.parse_simple_yaml('repos:\n  o/r:\n    ignore:\n    - "a/**"\n')
-        self.assertEqual(d["repos"]["o/r"]["ignore"], ["a/**"])
-
-    def test_valueless_key_matches_pyyaml_backend(self):
-        # PyYAML の有無で結果が変わると、環境によって挙動が変わってしまう。
-        # どちらの経路でも値なしキーは空マッピングに揃える。
         with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, "repos.yml")
-            with open(p, "w", encoding="utf-8") as f:
-                f.write("repos:\n  o/r:\ndefaults:\n  unmatched: ignore\n")
-            loaded = store.load_yaml(p, {})
-        self.assertEqual(loaded["repos"]["o/r"], {})
-        self.assertEqual(loaded["defaults"]["unmatched"], "ignore")
+            cfg = store.load_toml(self._write(d, 'a = "x#y"  # コメント\n'), {})
+        self.assertEqual(cfg["a"], "x#y")
+
+    def test_missing_file_returns_default(self):
+        self.assertEqual(store.load_toml("/nonexistent/config.toml", {"a": 1}), {"a": 1})
+
+    def test_broken_toml_warns_and_defaults(self):
+        # 壊れていても落とさないが、黙って握りつぶさず理由を残す。
+        with tempfile.TemporaryDirectory() as d:
+            warnings = []
+            cfg = store.load_toml(self._write(d, "this is not toml ==\n"), {}, warnings)
+        self.assertEqual(cfg, {})
+        self.assertTrue(warnings)
+
+    def test_empty_file_returns_default(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(store.load_toml(self._write(d, "\n"), {"a": 1}), {"a": 1})
 
 
 class TestStore(unittest.TestCase):

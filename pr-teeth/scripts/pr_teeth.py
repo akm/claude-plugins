@@ -21,8 +21,7 @@ from prteeth import auth, config, glossary, labels, render, scope, state, store 
 
 def _paths(config_dir):
     return {
-        "config": os.path.join(config_dir, "config.yaml"),
-        "repos": os.path.join(config_dir, "repos.yml"),
+        "config": os.path.join(config_dir, "config.toml"),
         "glossary": os.path.join(config_dir, "glossary.json"),
         "state": os.path.join(config_dir, "state.json"),
         "out": os.path.join(config_dir, "out"),
@@ -31,9 +30,13 @@ def _paths(config_dir):
 
 
 def _load(args, warnings):
+    """設定ディレクトリ・パス一覧・設定内容を返す。
+
+    設定は config.toml 1枚にまとまっている（言語もリポジトリ別設定も同じファイル）。
+    """
     d = config.config_dir(args.plugin_source)
     p = _paths(d)
-    return d, p, store.load_yaml(p["config"], {}, warnings), store.load_yaml(p["repos"], {}, warnings)
+    return d, p, store.load_toml(p["config"], {}, warnings)
 
 
 def _now():
@@ -49,7 +52,7 @@ def _emit(obj):
 def cmd_prepare(args):
     """設定を読み、言語と認証の有無を返す。skill の最初に呼ぶ。"""
     warnings = []
-    config_dir, paths, user_cfg, repos_cfg = _load(args, warnings)
+    config_dir, paths, cfg = _load(args, warnings)
 
     token, source, token_error = auth.resolve()
     if not token:
@@ -68,7 +71,7 @@ def cmd_prepare(args):
         "config_dir": config_dir,
         "paths": paths,
         "mode": args.mode,
-        "default_language": config.default_language(user_cfg, args.lang),
+        "default_language": config.default_language(cfg, args.lang),
         # トークンの値は返さない。入手元だけ。
         "token_source": source,
         "has_token": bool(token),
@@ -84,7 +87,7 @@ def cmd_select(args):
     出力: 対象のみ。status(new/updated) と base_sha(差分の起点) が付く。
     """
     warnings = []
-    _, paths, _, _ = _load(args, warnings)
+    _, paths, _ = _load(args, warnings)
     saved = store.load_json(paths["state"], {}, warnings)
 
     with open(args.input, "r", encoding="utf-8") as f:
@@ -104,7 +107,7 @@ def cmd_select(args):
 def cmd_classify(args):
     """PR の変更ファイルを範囲分類し、その PR の出力言語を決める。"""
     warnings = []
-    _, _, user_cfg, repos_cfg = _load(args, warnings)
+    _, _, cfg = _load(args, warnings)
 
     if args.files_from:
         raw = store.load_json(args.files_from, None, warnings)
@@ -120,9 +123,9 @@ def cmd_classify(args):
     files = [x.get("path") if isinstance(x, dict) else x for x in raw]
     files = [f for f in files if f]
 
-    result = scope.classify_files(files, args.repo, repos_cfg)
+    result = scope.classify_files(files, args.repo, cfg)
     result["repo"] = args.repo
-    result["language"] = config.resolve_language(args.repo, user_cfg, repos_cfg, args.lang)
+    result["language"] = config.resolve_language(args.repo, cfg, args.lang)
     result["warnings"] = warnings
     return _emit(result)
 
@@ -130,7 +133,7 @@ def cmd_classify(args):
 def cmd_lookup(args):
     """語のステータスと、その言語の既存定義を引く。"""
     warnings = []
-    config_dir, paths, _, _ = _load(args, warnings)
+    config_dir, paths, _ = _load(args, warnings)
     g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
 
     out = []
@@ -148,7 +151,7 @@ def cmd_lookup(args):
 def cmd_record(args):
     """出現した語と新しく書いた定義を用語集に反映する。state も必要なら更新。"""
     warnings = []
-    config_dir, paths, _, _ = _load(args, warnings)
+    config_dir, paths, _ = _load(args, warnings)
     g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
 
     with open(args.input, "r", encoding="utf-8") as f:
@@ -188,7 +191,7 @@ def cmd_record(args):
 def cmd_promote(args):
     """ユーザーの確認を経たステータス変更を確定する。"""
     warnings = []
-    config_dir, paths, _, _ = _load(args, warnings)
+    config_dir, paths, _ = _load(args, warnings)
     g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
     entry = glossary.set_status(g, args.term, args.status, now=_now())
     store.save_json(paths["glossary"], g)
@@ -198,11 +201,11 @@ def cmd_promote(args):
 def cmd_render(args):
     """解説データを自己完結 HTML にして保存する。"""
     warnings = []
-    config_dir, paths, user_cfg, _ = _load(args, warnings)
+    config_dir, paths, cfg = _load(args, warnings)
 
     with open(args.input, "r", encoding="utf-8") as f:
         data = json.load(f)
-    data.setdefault("language", config.default_language(user_cfg, args.lang))
+    data.setdefault("language", config.default_language(cfg, args.lang))
     data.setdefault("generated_at", _now())
     data["warnings"] = list(data.get("warnings") or []) + warnings
 
@@ -227,9 +230,9 @@ def cmd_render(args):
 def cmd_glossary_html(args):
     """用語集をポートフォリオ HTML にする（/pr-glossary）。"""
     warnings = []
-    config_dir, paths, user_cfg, _ = _load(args, warnings)
+    config_dir, paths, cfg = _load(args, warnings)
     g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
-    language = config.default_language(user_cfg, args.lang)
+    language = config.default_language(cfg, args.lang)
 
     L = labels.for_language(language)
     by_status = {glossary.KNOWN: [], glossary.LEARNING: [], glossary.NEW: []}
