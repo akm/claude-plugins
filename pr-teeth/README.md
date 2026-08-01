@@ -31,6 +31,48 @@
 - `mode=changes-only` … 新規・更新分のみ(定期実行向け)
 - `lang=<言語タグ>` … その実行だけ出力言語を上書き
 
+## 導入
+
+1. マーケットプレイスを登録する。
+
+   ```bash
+   claude plugin marketplace add akm/claude-plugins
+   ```
+
+2. プラグインをインストールする。
+
+   ```bash
+   claude plugin install pr-teeth
+   ```
+
+または `settings.json` に直接書く。
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "akm-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "akm/claude-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "pr-teeth@akm-claude-plugins": true
+  }
+}
+```
+
+`settings.json` の詳しい説明については [公式ドキュメント](https://code.claude.com/docs/en/settings#plugin-settings) を参照してください。
+
+インストール後、次の「準備」で GitHub トークンを設定すれば使えます。
+
+## 前提
+
+- `python3` が PATH にあること。
+- `gh` (GitHub CLI) があること。無い場合は `curl` で REST API を直接叩きます。
+- `git` が使えること (PR のブランチをチェックアウトして中身を確認するため)。
+
 ## 準備
 
 ### 1. GitHub トークン
