@@ -12,6 +12,8 @@
   - 設定 (config.toml) の読み込み
 """
 
+import argparse
+import json
 import os
 import sys
 import tempfile
@@ -735,12 +737,38 @@ class TestPRSpec(unittest.TestCase):
     def test_url_without_scheme(self):
         self.assertEqual(prspec.parse_one("github.com/o/r/pull/9")["repo"], "o/r")
 
-    def test_enterprise_host_is_accepted(self):
-        # ホスト名を縛ると GHE の利用者が使えなくなる。
+    def test_any_host_parses_but_host_is_discarded(self):
+        # ホストは照合するだけで捨てる。GHE の URL を貼っても、リンクは
+        # document.GITHUB_HOST（公開 github.com）から組まれる。GHE 対応は
+        # そちらが未対応なので、ここで受けても対応にはならない。
         self.assertEqual(
             prspec.parse_one("https://ghe.example.com/o/r/pull/5"),
             {"repo": "o/r", "number": 5},
         )
+
+    def test_hostlike_prefix_does_not_become_the_repo(self):
+        # 素のパスの先頭がホストとして食われると、打っていないリポジトリに
+        # 解決される（`foo/bar/baz/pull/9` -> `bar/baz`）。これが起きると
+        # 「別の PR の解説が正しい体裁で出る」= 読み手が誤りに気づけない。
+        for bad in ("foo/bar/baz/pull/9", "orgs/owner/repo/pull/5"):
+            with self.assertRaises(prspec.InvalidSpec):
+                prspec.parse_one(bad)
+
+    def test_schemeless_url_fragment_does_not_fall_through_to_short_form(self):
+        # `github.com/akm/123` が _SHORT に落ちると `github.com/akm` になる。
+        # owner にドットを許さないことで塞いでいる。
+        with self.assertRaises(prspec.InvalidSpec):
+            prspec.parse_one("github.com/akm/123")
+
+    def test_repo_case_is_normalized(self):
+        # GitHub は大文字小文字を区別しないが、設定の引き当ては素の辞書引き。
+        # 揃えないと [repos."owner/repo"] を取りこぼし、出力言語とレビュー範囲が
+        # 黙って既定値に落ちる。
+        self.assertEqual(prspec.parse_one("Akm/Claude-Plugins#1")["repo"], "akm/claude-plugins")
+
+    def test_case_variants_are_deduplicated(self):
+        targets, _ = prspec.parse(["Akm/Claude-Plugins#1", "akm/claude-plugins#1"])
+        self.assertEqual(len(targets), 1)
 
     def test_slash_form_when_hash_is_eaten_by_shell(self):
         self.assertEqual(prspec.parse_one("owner/repo/123"), {"repo": "owner/repo", "number": 123})
@@ -1021,6 +1049,116 @@ class TestOutputPath(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.mod._out_path(self._paths(d), None, "x.html")
             self.assertTrue(os.path.isdir(os.path.join(d, "out")))
+
+
+class TestCliCommands(unittest.TestCase):
+    """CLI の配線（scripts/pr_teeth.py）。
+
+    prspec / labels 単体のテストでは、引数の受け渡しの取り違えが見つからない。
+    番号指定では `--context` の渡し忘れがそのまま「マージ済み PR にレビュー必須と
+    出る」不具合になるため、ここで配線ごと確かめる。
+    """
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+        import pr_teeth
+
+        self.mod = pr_teeth
+        self._dir = tempfile.TemporaryDirectory()
+        os.environ[config.CONFIG_DIR_ENV] = self._dir.name
+
+    def tearDown(self):
+        os.environ.pop(config.CONFIG_DIR_ENV, None)
+        self._dir.cleanup()
+
+    def _run(self, fn, **kw):
+        """サブコマンドを呼び、stdout に出た JSON を返す。"""
+        import contextlib
+        import io
+
+        kw.setdefault("plugin_source", "github.com/akm/claude-plugins")
+        kw.setdefault("lang", None)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            fn(argparse.Namespace(**kw))
+        return json.loads(buf.getvalue())
+
+    def _write(self, name, payload):
+        path = os.path.join(self._dir.name, name)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        return path
+
+    def test_resolve_reports_counts_and_language(self):
+        out = self._run(self.mod.cmd_resolve, specs=["o/r#1", "https://github.com/a/b/pull/2"])
+        self.assertEqual(out["resolved"], 2)
+        self.assertEqual(out["requested"], 2)
+        self.assertEqual([t["repo"] for t in out["targets"]], ["o/r", "a/b"])
+        self.assertTrue(all(t["language"] for t in out["targets"]))
+
+    def test_resolve_keeps_valid_specs_when_one_is_invalid(self):
+        # 1件の誤りで全体を止めない。
+        out = self._run(self.mod.cmd_resolve, specs=["bogus", "o/r#1"])
+        self.assertEqual(out["resolved"], 1)
+        self.assertEqual(len(out["invalid"]), 1)
+
+    def test_resolve_does_not_duplicate_errors_into_warnings(self):
+        # SKILL.md は invalid と warnings の両方を出すよう指示している。
+        # 同じ文言を両方に積むと、利用者には2回並んで見える。
+        out = self._run(self.mod.cmd_resolve, specs=["bogus"])
+        self.assertEqual(len(out["invalid"]), 1)
+        self.assertEqual(out["warnings"], [])
+
+    def test_resolve_uses_repo_language_override(self):
+        with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
+            f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
+        out = self._run(self.mod.cmd_resolve, specs=["o/r#1", "other/x#2"])
+        by_repo = {t["repo"]: t["language"] for t in out["targets"]}
+        self.assertEqual(by_repo["o/r"], "en")
+        self.assertEqual(by_repo["other/x"], "ja")
+
+    def test_resolve_mixed_case_spec_finds_repo_config(self):
+        # 打った表記の揺れで設定を取りこぼすと、出力言語が黙って変わる。
+        with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
+            f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
+        out = self._run(self.mod.cmd_resolve, specs=["O/R#1"])
+        self.assertEqual(out["targets"][0]["language"], "en")
+
+    def _render(self, context, payload_context=None):
+        payload = {"prs": [{"repo": "o/r", "number": 1, "title": "T",
+                            "priority": "must_review", "language": "ja"}]}
+        if payload_context:
+            payload["context"] = payload_context
+        path = self._write("doc.json", payload)
+        out = self._run(self.mod.cmd_render, input=path, output=None, context=context)
+        with open(out["path"], encoding="utf-8") as f:
+            return out, f.read()
+
+    def test_render_context_flag_switches_labels(self):
+        _, html = self._render("pick")
+        self.assertIn("重点", html)
+        self.assertNotIn("必須", html)
+
+    def test_render_defaults_to_patrol_labels(self):
+        _, html = self._render(None)
+        self.assertIn("必須", html)
+        self.assertNotIn("重点", html)
+
+    def test_render_flag_overrides_payload_context(self):
+        # コマンド側が文脈を知っているので、フラグが勝つ。
+        _, html = self._render("pick", payload_context="patrol")
+        self.assertIn("重点", html)
+
+    def test_render_payload_context_applies_without_flag(self):
+        _, html = self._render(None, payload_context="pick")
+        self.assertIn("重点", html)
+
+    def test_render_output_filename_marks_the_context(self):
+        # 巡回と番号指定の生成物が out/ に混ざったとき、名前で見分けられるように。
+        pick, _ = self._render("pick")
+        patrol, _ = self._render(None)
+        self.assertIn("pr-teeth-pick-", os.path.basename(pick["path"]))
+        self.assertNotIn("pick", os.path.basename(patrol["path"]))
 
 
 class TestRenderGlossary(unittest.TestCase):

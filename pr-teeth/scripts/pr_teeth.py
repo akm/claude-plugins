@@ -131,8 +131,10 @@ def cmd_resolve(args):
     warnings = []
     _, _, cfg = _load(args, warnings)
 
+    # 解釈できなかった指定は `invalid` だけに入れる。`warnings` にも同じものを
+    # 積むと、SKILL.md が両方を出すよう指示しているため同じ文言が2回並ぶ。
+    # `warnings` は他のコマンドと同じく設定読み込みの問題のために取っておく。
     targets, errors = prspec.parse(args.specs)
-    warnings.extend(errors)
     for t in targets:
         t["language"] = config.resolve_language(t["repo"], cfg, args.lang)
 

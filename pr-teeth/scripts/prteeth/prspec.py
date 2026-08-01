@@ -15,21 +15,41 @@ CONCEPTS.md 第16節（番号指定の解説）の実装。
 
 見分けが付かない入力は**捨てずに理由付きで返す**。黙って落とすと、渡したはずの
 PR が出力に無いことに気づけない。
+
+ホストの扱い:
+  URL のホスト部分は**照合するだけで捨てる**。取り出すのは owner / repo / number
+  だけで、リンクは `document.GITHUB_HOST` から組み立てられる。つまり GitHub
+  Enterprise の URL を貼っても、公開 github.com の同名リポジトリを指す。
+  GHE は `document.GITHUB_HOST` 側が未対応（設定で持つ想定のまま固定値）なので、
+  **ここだけホストを受け入れても対応したことにならない。** 対応する場合は
+  ホストを設定に持たせ、この関数の戻り値にも載せて `gh --hostname` まで通す
+  必要がある。今はその手前で loud に失敗する（`gh` が引けずエラーになる）。
 """
 
 import re
 
+# owner / repo に許す文字。GitHub のアカウント名は英数字とハイフンだけで、
+# **ドットを含まない**。この制約が「ホストらしい文字列を owner と誤認しない」
+# 保証になっている（下の _SHORT の項を参照）。
+_OWNER = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+_REPO = r"[A-Za-z0-9._-]+"
+
 # https://github.com/owner/repo/pull/123 とその派生（/files, ?w=1, #discussion_r... 等）。
-# ホストは github.com とその Enterprise 相当を想定し、ホスト名自体は縛らない
-# （縛ると GHE の利用者が使えなくなる。owner/repo/pull/number の並びで十分特定できる）。
+# **ホストは必ずドットを含むか、スキームが付いていること**を要求する。
+# ここを `[^/\s]+` と緩くすると、`foo/bar/baz/pull/9` のような素のパスの先頭が
+# ホストとして食われ、`bar/baz` という**打っていないリポジトリ**に解決される。
 _URL = re.compile(
-    r"^(?:https?://)?[^/\s]+/"
-    r"(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/pull(?:s)?/(?P<number>\d+)"
+    r"^(?:https?://[^/\s]+|[^/\s]*\.[^/\s]+)/"
+    r"(?P<owner>" + _OWNER + r")/(?P<repo>" + _REPO + r")/pull(?:s)?/(?P<number>\d+)"
     r"(?:[/?#].*)?$"
 )
 
-# owner/repo#123 と owner/repo/123。`#` は shell で消えやすいので後者も受ける。
-_SHORT = re.compile(r"^(?P<owner>[^/\s#]+)/(?P<repo>[^/\s#]+)(?:#|/)(?P<number>\d+)$")
+# owner/repo#123 と owner/repo/123。`#` は引用符を付け忘れると渡らないことがあるので
+# 後者も受ける。owner にドットを許さないので、`github.com/akm/123` のような
+# スキーム無しの URL 断片がここに落ちてきて `github.com/akm` に化けることはない。
+_SHORT = re.compile(
+    r"^(?P<owner>" + _OWNER + r")/(?P<repo>" + _REPO + r")(?:#|/)(?P<number>\d+)$"
+)
 
 _EXPECTED = "owner/repo#123 または https://github.com/owner/repo/pull/123"
 
@@ -55,7 +75,13 @@ def parse_one(text):
             repo = repo[: -len(".git")]
         if not owner or not repo:
             continue
-        return {"repo": owner + "/" + repo, "number": int(m.group("number"))}
+        # **大文字小文字を畳む。** GitHub は owner/repo を区別しないが、この先の
+        # 設定引き当て（config.toml の [repos."owner/repo"]）と範囲判定は素の辞書
+        # 引きなので、`Akm/Claude-Plugins` と打つと設定を取りこぼし、出力言語と
+        # レビュー範囲が黙って既定値に落ちる。巡回は `gh search prs` が返す正規の
+        # 表記を使うためこの問題が無く、番号指定だけが利用者の打った文字列を
+        # そのまま流す。ここが識別子を確定させる唯一の場所なので、ここで揃える。
+        return {"repo": (owner + "/" + repo).lower(), "number": int(m.group("number"))}
 
     raise InvalidSpec("「" + raw + "」を PR の指定として解釈できません。期待する形: " + _EXPECTED)
 
