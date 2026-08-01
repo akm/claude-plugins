@@ -19,7 +19,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from prteeth import config, glossary, scope, store  # noqa: E402
+from prteeth import config, glossary, labels, render, scope, store  # noqa: E402
 
 
 class TestConfigDir(unittest.TestCase):
@@ -266,6 +266,77 @@ class TestStore(unittest.TestCase):
             p = os.path.join(d, "sub", "g.json")
             store.save_json(p, {"terms": {"あ": {"term": "あ"}}})
             self.assertEqual(store.load_json(p, {})["terms"]["あ"]["term"], "あ")
+
+
+class TestLabels(unittest.TestCase):
+    def test_known_languages(self):
+        self.assertEqual(labels.for_language("ja")["summary"], "概要")
+        self.assertEqual(labels.for_language("en")["summary"], "Summary")
+
+    def test_region_tag_matches_primary(self):
+        self.assertEqual(labels.for_language("ja-JP")["summary"], "概要")
+
+    def test_unknown_language_falls_back_to_english(self):
+        # 日本語に倒すと、日本語を読めない利用者に読めない画面を出すことになる。
+        self.assertEqual(labels.for_language("ko")["summary"], "Summary")
+        self.assertEqual(labels.for_language("")["summary"], "Summary")
+
+
+class TestRender(unittest.TestCase):
+    def _doc(self, **kw):
+        base = {
+            "language": "ja",
+            "prs": [
+                {
+                    "repo": "o/r", "number": 1, "title": "T", "language": "en",
+                    "priority": "should_review", "counts": {"should_review": 1},
+                    "summary": "S", "changes": ["c"],
+                }
+            ],
+        }
+        base.update(kw)
+        return base
+
+    def test_pr_chrome_uses_pr_language(self):
+        # 本文が英語なのに見出しが日本語だと読めない（第5.3節）。
+        h = render.render(self._doc())
+        self.assertIn("<h3>Summary</h3>", h)
+        self.assertNotIn("<h3>概要</h3>", h)
+
+    def test_page_chrome_uses_default_language(self):
+        h = render.render(self._doc())
+        self.assertIn('<html lang="ja"', h)
+        self.assertIn('lang="en"', h)  # PR 側は自分の言語
+
+    def test_escapes_html_in_content(self):
+        d = self._doc()
+        d["prs"][0]["summary"] = "<script>alert(1)</script>"
+        h = render.render(d)
+        self.assertNotIn("<script>alert(1)</script>", h)
+        self.assertIn("&lt;script&gt;", h)
+
+    def test_known_terms_are_not_rendered(self):
+        d = self._doc()
+        d["prs"][0]["terms"] = [
+            {"term": "SSoT", "status": "known", "definition": "x"},
+            {"term": "jitter", "status": "new", "definition": "y"},
+        ]
+        h = render.render(d)
+        self.assertIn("jitter", h)
+        self.assertNotIn("SSoT", h)
+
+    def test_no_external_assets_without_diagram(self):
+        # 図が無ければ CDN も読まない（完全にオフラインで開ける）。
+        h = render.render(self._doc())
+        self.assertNotIn("http://", h)
+        self.assertNotIn("https://", h)
+
+    def test_diagram_code_survives_when_mermaid_unavailable(self):
+        d = self._doc()
+        d["prs"][0]["diagram"] = "flowchart LR\n A-->B"
+        h = render.render(d)
+        self.assertIn("mermaid-src", h)
+        self.assertIn("flowchart LR", h)
 
 
 if __name__ == "__main__":
