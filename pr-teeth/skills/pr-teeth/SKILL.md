@@ -40,11 +40,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 - `warnings` … 設定ファイルが壊れている等。**あれば最終出力の冒頭に必ず載せる**
   （黙って既定値で動くと、設定したのに効いていないことに気づけない）
 - `token_source` … 見つかった認証の入手元。`null` なら**その旨だけ伝えて終了する**
+  （`GITHUB_TOKEN` → `GITHUB_TOKEN_FILE` → `gh auth token` の順に探した結果。
+  探索や回避を自分で試みない）
 
 ### 2. PR 一覧の取得
 
 `gh` があれば使い、無ければ `curl` で REST API を叩く。トークンは環境変数で渡し、
-**値をログ・生成物・通知に出さない。**
+**値をログ・生成物・通知に出さない。** 表示してよいのは `token_source` だけ。
 
 ```bash
 gh search prs --review-requested=@me --state=open --json repository,number,title,author,updatedAt --limit 50

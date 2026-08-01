@@ -19,7 +19,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from prteeth import config, glossary, labels, render, scope, store  # noqa: E402
+from prteeth import auth, config, glossary, labels, render, scope, store  # noqa: E402
 
 
 class TestConfigDir(unittest.TestCase):
@@ -266,6 +266,101 @@ class TestStore(unittest.TestCase):
             p = os.path.join(d, "sub", "g.json")
             store.save_json(p, {"terms": {"あ": {"term": "あ"}}})
             self.assertEqual(store.load_json(p, {})["terms"]["あ"]["term"], "あ")
+
+
+class TestAuth(unittest.TestCase):
+    """トークンの探索順序（第6節）。
+
+    `gh auth token` を実際に呼ぶと実行環境の認証状態に左右されるため、
+    その段だけ差し替えて順序を検証する。
+    """
+
+    def setUp(self):
+        self._saved = {k: os.environ.get(k) for k in (auth.ENV_TOKEN, auth.ENV_TOKEN_FILE)}
+        for k in self._saved:
+            os.environ.pop(k, None)
+        self._real_gh = auth._from_gh_cli
+        auth._from_gh_cli = lambda: (None, None)
+
+    def tearDown(self):
+        auth._from_gh_cli = self._real_gh
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_env_token_wins(self):
+        os.environ[auth.ENV_TOKEN] = "tok-env"
+        auth._from_gh_cli = lambda: ("tok-gh", "gh auth token")
+        token, source, err = auth.resolve()
+        self.assertEqual(token, "tok-env")
+        self.assertIn(auth.ENV_TOKEN, source)
+        self.assertIsNone(err)
+
+    def test_token_file_used_when_env_absent(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "t")
+            with open(p, "w") as f:
+                f.write("tok-file")
+            os.environ[auth.ENV_TOKEN_FILE] = p
+            token, source, err = auth.resolve()
+        self.assertEqual(token, "tok-file")
+        self.assertIn(auth.ENV_TOKEN_FILE, source)
+
+    def test_env_beats_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "t")
+            with open(p, "w") as f:
+                f.write("tok-file")
+            os.environ[auth.ENV_TOKEN] = "tok-env"
+            os.environ[auth.ENV_TOKEN_FILE] = p
+            token, _, _ = auth.resolve()
+        self.assertEqual(token, "tok-env")
+
+    def test_gh_cli_is_last(self):
+        auth._from_gh_cli = lambda: ("tok-gh", "gh auth token")
+        token, source, _ = auth.resolve()
+        self.assertEqual(token, "tok-gh")
+        self.assertEqual(source, "gh auth token")
+
+    def test_missing_everything_is_an_error(self):
+        token, source, err = auth.resolve()
+        self.assertIsNone(token)
+        self.assertIsNone(source)
+
+    def test_whitespace_is_trimmed(self):
+        # 改行付きのままヘッダに入れると認証が通らず、原因も分かりにくい。
+        os.environ[auth.ENV_TOKEN] = "  tok-env\n"
+        self.assertEqual(auth.resolve()[0], "tok-env")
+
+    def test_token_file_trailing_newline_is_trimmed(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "t")
+            with open(p, "w") as f:
+                f.write("tok-file\n\n")
+            os.environ[auth.ENV_TOKEN_FILE] = p
+            self.assertEqual(auth.resolve()[0], "tok-file")
+
+    def test_empty_env_falls_through(self):
+        # 空文字を「設定済み」と誤認して止まらない。
+        os.environ[auth.ENV_TOKEN] = "   "
+        auth._from_gh_cli = lambda: ("tok-gh", "gh auth token")
+        self.assertEqual(auth.resolve()[0], "tok-gh")
+
+    def test_unreadable_token_file_reports_reason(self):
+        # 指定されたのに読めないのは設定ミス。黙って進むと原因が分からない。
+        os.environ[auth.ENV_TOKEN_FILE] = "/nonexistent/token"
+        token, _, err = auth.resolve()
+        self.assertIsNone(token)
+        self.assertIn(auth.ENV_TOKEN_FILE, err)
+
+    def test_unreadable_file_still_falls_back_to_gh(self):
+        os.environ[auth.ENV_TOKEN_FILE] = "/nonexistent/token"
+        auth._from_gh_cli = lambda: ("tok-gh", "gh auth token")
+        token, _, err = auth.resolve()
+        self.assertEqual(token, "tok-gh")
+        self.assertIsNone(err)
 
 
 class TestLabels(unittest.TestCase):

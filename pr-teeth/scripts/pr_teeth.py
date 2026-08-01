@@ -51,12 +51,15 @@ def cmd_prepare(args):
     warnings = []
     config_dir, paths, user_cfg, repos_cfg = _load(args, warnings)
 
-    token, source = auth.resolve(config_dir)
+    token, source, token_error = auth.resolve()
     if not token:
+        if token_error:
+            warnings.append(token_error)
         warnings.append(
-            "GitHub のトークンが見つかりません。環境変数 GH_TOKEN / GITHUB_TOKEN、"
-            "`gh auth login`、または " + os.path.join(config_dir, "token.txt")
-            + " のいずれかを設定してください。"
+            "GitHub のトークンが見つかりません。次のいずれかを設定してください: "
+            "環境変数 " + auth.ENV_TOKEN + "、"
+            "環境変数 " + auth.ENV_TOKEN_FILE + "（トークンを書いたファイルのパス）、"
+            "または `gh auth login`。"
         )
 
     state = store.load_json(paths["state"], {}, warnings) if args.mode == "changes-only" else {}

@@ -5,23 +5,55 @@ CONCEPTS.md 第6節の実装。
 `review-requested:@me` はトークン所有者本人としての認証が要る。備え付けの環境トークンは
 repo 限定スコープに縛られグローバル検索が弾かれるため使えない。
 
+探索順序:
+  1. 環境変数 GITHUB_TOKEN … 値をそのまま使う
+  2. 環境変数 GITHUB_TOKEN_FILE … そのファイルの中身を使う
+  3. `gh auth token` … 正常終了したらその出力を使う
+  4. 見つからなければエラー（呼び出し側がその旨だけ伝えて終了する）
+
+トークンを設定ディレクトリに置く経路は設けない。設定ディレクトリに秘密情報が混ざると、
+バックアップや同期の対象にしたときに漏れる。ファイルで渡したい場合は
+GITHUB_TOKEN_FILE で任意の場所を指す。
+
 トークンの値は返すが、**呼び出し側はログ・生成物・通知・コミットに出してはならない。**
-どこから取れたか（token_source）だけを表示に使う。
+どこから取れたか（source）だけを表示に使う。
 """
 
 import os
 import subprocess
 
-# 優先度順に見る環境変数。
-_ENV_VARS = ("GH_TOKEN", "GITHUB_TOKEN")
+ENV_TOKEN = "GITHUB_TOKEN"
+ENV_TOKEN_FILE = "GITHUB_TOKEN_FILE"
+
+
+def _clean(value):
+    """前後の空白・改行を落とす。
+
+    ファイルや `gh auth token` の出力は末尾に改行が付く。そのまま HTTP ヘッダに
+    入れると認証が通らず、原因も分かりにくいため、入口で必ず落とす。
+    """
+    if not value:
+        return None
+    value = value.strip()
+    return value or None
 
 
 def _from_env():
-    for name in _ENV_VARS:
-        value = (os.environ.get(name) or "").strip()
-        if value:
-            return value, "env:" + name
-    return None, None
+    return _clean(os.environ.get(ENV_TOKEN)), "env:" + ENV_TOKEN
+
+
+def _from_env_file():
+    path = _clean(os.environ.get(ENV_TOKEN_FILE))
+    if not path:
+        return None, None
+    path = os.path.expanduser(path)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return _clean(f.read()), ENV_TOKEN_FILE + ":" + path
+    except OSError as e:
+        # 指定されたのに読めないのは設定ミス。黙って次に進むと原因が分からないため、
+        # 理由を添えて呼び出し側に返す。
+        return None, "error:" + ENV_TOKEN_FILE + " を読めません (" + str(e) + ")"
 
 
 def _from_gh_cli():
@@ -36,32 +68,27 @@ def _from_gh_cli():
         return None, None
     if r.returncode != 0:
         return None, None
-    value = (r.stdout or "").strip()
-    if not value:
-        return None, None
-    return value, "gh auth"
+    return _clean(r.stdout), "gh auth token"
 
 
-def _from_file(config_dir):
-    path = os.path.join(config_dir, "token.txt")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            value = f.read().strip()
-    except OSError:
-        return None, None
-    if not value:
-        return None, None
-    # 1行目だけを使う（末尾の改行やメモ書きを拾わない）。
-    return value.splitlines()[0].strip(), "token.txt"
+def resolve():
+    """トークンと入手元を返す。
 
-
-def resolve(config_dir):
-    """トークンと入手元を返す。見つからなければ (None, None)。
-
-    順序は第6節のとおり: 環境変数 → gh auth → 設定ディレクトリの token.txt。
+    戻り値: (token, source, error)
+      token が None のとき error に理由が入ることがある（読めないファイルの指定など）。
     """
-    for getter in (_from_env, _from_gh_cli):
-        value, source = getter()
-        if value:
-            return value, source
-    return _from_file(config_dir)
+    token, source = _from_env()
+    if token:
+        return token, source, None
+
+    token, source = _from_env_file()
+    if token:
+        return token, source, None
+    # ファイル指定が壊れている場合だけ、その理由を持ち越す。
+    file_error = source[len("error:"):] if source and source.startswith("error:") else None
+
+    token, source = _from_gh_cli()
+    if token:
+        return token, source, None
+
+    return None, None, file_error
