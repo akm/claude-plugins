@@ -16,7 +16,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from prteeth import auth, config, glossary, labels, render, scope, state, store  # noqa: E402
+from prteeth import (  # noqa: E402
+    agent_input, auth, config, glossary, labels, render, scope, state, store,
+)
 
 
 def _paths(config_dir):
@@ -65,7 +67,17 @@ def cmd_prepare(args):
             "または `gh auth login`。"
         )
 
-    saved = store.load_json(paths["state"], {}, warnings) if args.mode == "changes-only" else {}
+    saved = {}
+    if args.mode == "changes-only":
+        # prepare は読むだけで保存しないため、壊れていても続行してよい。
+        # ただし黙って空扱いにすると全件が新規に見えるので、必ず理由を伝える。
+        try:
+            saved = store.load_precious(paths["state"], {})
+        except store.Corrupt as e:
+            warnings.append(
+                str(e) + "。全件が新規として扱われます。"
+                "意図しない場合は state.json を退避または修復してください。"
+            )
 
     return _emit({
         "config_dir": config_dir,
@@ -88,17 +100,19 @@ def cmd_select(args):
     """
     warnings = []
     _, paths, _ = _load(args, warnings)
-    saved = store.load_json(paths["state"], {}, warnings)
+    # state も蓄積データ。壊れていれば止める（空扱いすると全件を再通知してしまう）。
+    saved = store.load_precious(paths["state"], {})
 
     with open(args.input, "r", encoding="utf-8") as f:
-        prs = json.load(f)
-    if isinstance(prs, dict):
-        prs = prs.get("prs") or []
+        raw = json.load(f)
+    prs, skipped = agent_input.prs(raw)
+    warnings.extend(skipped)
 
     targets = state.select_targets(saved, prs)
     return _emit({
         "targets": targets,
         "total": len(prs),
+        "skipped": len(skipped),
         "selected": len(targets),
         "warnings": warnings,
     })
@@ -134,7 +148,16 @@ def cmd_lookup(args):
     """語のステータスと、その言語の既存定義を引く。"""
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
-    g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
+    # lookup は読むだけで保存しない。壊れていても続行できるが、全語が new に
+    # 見えてしまうため、既知の語まで再説明されないよう理由を必ず伝える。
+    try:
+        g = _load_glossary(paths)
+    except store.Corrupt as e:
+        warnings.append(
+            str(e) + "。すべての語が未登録として扱われます。"
+            "説明が増えるのを避けるには glossary.json を退避または修復してください。"
+        )
+        g = glossary.load_or_seed({})
 
     out = []
     for term in args.terms:
@@ -148,20 +171,32 @@ def cmd_lookup(args):
     return _emit({"language": args.language, "terms": out, "warnings": warnings})
 
 
+def _load_glossary(paths):
+    """用語集を読む。壊れていれば Corrupt が上がり、保存に進まない。
+
+    無い場合は seed を作る（正常な初回実行）。壊れている場合に seed で上書きすると
+    蓄積した学習を失うため、そこは区別する。docs/design/data-integrity.md 参照。
+    """
+    return glossary.load_or_seed(store.load_precious(paths["glossary"], {}))
+
+
 def cmd_record(args):
     """出現した語と新しく書いた定義を用語集に反映する。state も必要なら更新。"""
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
-    g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
+    g = _load_glossary(paths)
 
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
+    # 形が違えば例外で止まる。黙って0件記録して成功を返さない。
+    items, skipped = agent_input.terms(payload)
+    warnings.extend(skipped)
 
     now = _now()
-    for item in payload.get("terms") or []:
+    for item in items:
         glossary.record(
             g,
-            item.get("term"),
+            item["term"],
             language=item.get("language"),
             definition=item.get("definition"),
             provenance=item.get("provenance"),
@@ -170,20 +205,26 @@ def cmd_record(args):
     store.save_json(paths["glossary"], g)
 
     saved_state = False
+    state_recorded = 0
     if args.state:
         # state は changes-only のときだけ更新する（第11節）。
         with open(args.state, "r", encoding="utf-8") as f:
-            prs = json.load(f)
-        if isinstance(prs, dict):
-            prs = prs.get("prs") or []
+            raw = json.load(f)
+        prs, state_skipped = agent_input.prs(raw)
+        warnings.extend(state_skipped)
         # オープンな依頼の全件を渡す。ここに無い記録は掃除される。
         store.save_json(paths["state"], state.record_notified({}, prs))
         saved_state = True
+        state_recorded = len(prs)
 
     return _emit({
         "glossary_path": paths["glossary"],
+        # 受理件数を返す。0 件なら入力が意図どおりでなかったと気づける。
+        "terms_recorded": len(items),
+        "terms_skipped": len(skipped),
         "counts": glossary.counts(g),
         "state_saved": saved_state,
+        "state_recorded": state_recorded,
         "warnings": warnings,
     })
 
@@ -192,10 +233,23 @@ def cmd_promote(args):
     """ユーザーの確認を経たステータス変更を確定する。"""
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
-    g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
+    g = _load_glossary(paths)
+    existed = glossary.get(g, args.term) is not None
     entry = glossary.set_status(g, args.term, args.status, now=_now())
     store.save_json(paths["glossary"], g)
-    return _emit({"term": args.term, "status": entry.get("status"), "counts": glossary.counts(g)})
+    if not existed:
+        # 綴り違いを黙って新規作成すると、直したつもりの語が別エントリになる。
+        warnings.append(
+            "「" + args.term + "」は用語集にありませんでした。新規に登録しています"
+            "（綴りが違っていないか確認してください）。"
+        )
+    return _emit({
+        "term": args.term,
+        "status": entry.get("status"),
+        "created": not existed,
+        "counts": glossary.counts(g),
+        "warnings": warnings,
+    })
 
 
 def cmd_render(args):
@@ -231,7 +285,16 @@ def cmd_glossary_html(args):
     """用語集をポートフォリオ HTML にする（/pr-glossary）。"""
     warnings = []
     config_dir, paths, cfg = _load(args, warnings)
-    g = glossary.load_or_seed(store.load_json(paths["glossary"], {}, warnings))
+    # 表示するだけなので続行できるが、空のポートフォリオを黙って見せると
+    # 「学習が消えた」と誤解させるため、理由を必ず添える。
+    try:
+        g = _load_glossary(paths)
+    except store.Corrupt as e:
+        warnings.append(
+            str(e) + "。用語集を読めないため空で表示しています。"
+            "ファイルを退避または修復してください（この画面では上書きしていません）。"
+        )
+        g = glossary.load_or_seed({})
     language = config.default_language(cfg, args.lang)
 
     L = labels.for_language(language)
@@ -342,6 +405,22 @@ def main(argv=None):
         return args.func(args)
     except BrokenPipeError:
         return 0
+    except store.Corrupt as e:
+        # 蓄積データが壊れている。保存には進んでいないので、元ファイルは無事。
+        json.dump({
+            "error": str(e),
+            "hint": "上書きを避けるため保存していません。"
+                    + e.path + " を退避（別名にコピー）してから削除するか、"
+                    "JSON として直せる場合は修復してください。",
+            "path": e.path,
+        }, sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+        return 1
+    except agent_input.InvalidInput as e:
+        # 入力の形が違う。期待する形は例外メッセージに含まれている。
+        json.dump({"error": str(e)}, sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+        return 1
     except Exception as e:
         json.dump({"error": str(e)}, sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")

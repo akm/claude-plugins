@@ -39,8 +39,25 @@ def _read_text(path):
         return None
 
 
+class Corrupt(Exception):
+    """蓄積データが壊れていて読めない。
+
+    「ファイルが無い」（正常な初回実行）と区別するための型。呼び出し側は
+    これを捕まえて保存を中止する。詳細は docs/design/data-integrity.md。
+    """
+
+    def __init__(self, path, reason):
+        self.path = path
+        self.reason = reason
+        super().__init__(path + " を読めません（" + reason + "）")
+
+
 def load_json(path, default, warnings=None):
-    """JSON を読む。無ければ default、壊れていれば default + warnings に理由。"""
+    """JSON を読む。無ければ default、壊れていれば default + warnings に理由。
+
+    **設定・一時データ向け。** 蓄積データ（用語集・状態）には load_precious を使う。
+    こちらは壊れていても既定値を返すため、そのまま保存すると元データを上書きする。
+    """
     text = _read_text(path)
     if text is None:
         return default
@@ -52,6 +69,27 @@ def load_json(path, default, warnings=None):
         if warnings is not None:
             warnings.append(path + " を読めませんでした（JSON として不正: " + str(e) + "）。既定値で続行します。")
         return default
+
+
+def load_precious(path, default):
+    """蓄積データ（用語集・状態）を読む。壊れていれば Corrupt を投げる。
+
+    無い場合は default を返す（正常な初回実行）。壊れている場合に既定値を返すと、
+    呼び出し側がそれを保存して**元データを失わせる**ため、ここで止める。
+    docs/design/data-integrity.md「蓄積データ — 壊れているなら触らない」。
+    """
+    text = _read_text(path)
+    if text is None:
+        return default
+    if not text.strip():
+        return default
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        raise Corrupt(path, "JSON として不正: " + str(e))
+    if not isinstance(data, dict):
+        raise Corrupt(path, "最上位がオブジェクトではありません")
+    return data
 
 
 def load_toml(path, default, warnings=None):

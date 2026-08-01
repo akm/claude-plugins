@@ -19,7 +19,9 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from prteeth import auth, config, glossary, labels, render, scope, state, store  # noqa: E402
+from prteeth import (  # noqa: E402
+    agent_input, auth, config, glossary, labels, render, scope, state, store,
+)
 
 
 class TestConfigDir(unittest.TestCase):
@@ -296,6 +298,125 @@ class TestStore(unittest.TestCase):
             p = os.path.join(d, "sub", "g.json")
             store.save_json(p, {"terms": {"あ": {"term": "あ"}}})
             self.assertEqual(store.load_json(p, {})["terms"]["あ"]["term"], "あ")
+
+
+class TestPreciousData(unittest.TestCase):
+    """蓄積データの読み込み（docs/design/data-integrity.md）。
+
+    壊れているのに既定値を返すと、呼び出し側がそれを保存して元データを失わせる。
+    「無い」（正常な初回実行）と「壊れている」を区別できることが要点。
+    """
+
+    def _write(self, d, text, name="glossary.json"):
+        p = os.path.join(d, name)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(text)
+        return p
+
+    def test_missing_file_is_not_corrupt(self):
+        # 初回実行を止めない。
+        self.assertEqual(store.load_precious("/nonexistent/g.json", {"a": 1}), {"a": 1})
+
+    def test_empty_file_is_not_corrupt(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(store.load_precious(self._write(d, ""), {"a": 1}), {"a": 1})
+
+    def test_broken_json_raises_corrupt(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(d, "{not json")
+            with self.assertRaises(store.Corrupt) as cm:
+                store.load_precious(p, {})
+        self.assertEqual(cm.exception.path, p)
+
+    def test_non_object_raises_corrupt(self):
+        # 用語集は常にオブジェクト。配列なら別物を読んでいる。
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(store.Corrupt):
+                store.load_precious(self._write(d, "[1,2,3]"), {})
+
+    def test_valid_file_round_trips(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(d, '{"terms": {"a": {"term": "a"}}}')
+            self.assertEqual(store.load_precious(p, {})["terms"]["a"]["term"], "a")
+
+    def test_load_json_still_fails_soft_for_config(self):
+        # 設定向けの load_json は従来どおり既定値を返す（種別で態度を変える）。
+        with tempfile.TemporaryDirectory() as d:
+            warnings = []
+            self.assertEqual(store.load_json(self._write(d, "{bad"), {}, warnings), {})
+            self.assertTrue(warnings)
+
+
+class TestAgentInput(unittest.TestCase):
+    """エージェント入力の検証（docs/design/data-integrity.md）。
+
+    エージェントが毎回組み立てるため、設定ファイルより間違いが起きやすい。
+    形が違えば止め、項目単位の不備はスキップして件数を返す。
+    """
+
+    def test_accepts_valid_terms(self):
+        items, skipped = agent_input.terms(
+            {"terms": [{"term": "a", "language": "ja", "definition": "x"}]}
+        )
+        self.assertEqual(len(items), 1)
+        self.assertEqual(skipped, [])
+
+    def test_missing_terms_key_is_an_error(self):
+        # 黙って0件記録して成功を返すと、記録できたと誤解される。
+        with self.assertRaises(agent_input.InvalidInput) as cm:
+            agent_input.terms({"glossary": []})
+        self.assertIn("terms", str(cm.exception))
+        self.assertIn("glossary", str(cm.exception))  # 実際のキーも示す
+
+    def test_bare_array_is_an_error(self):
+        with self.assertRaises(agent_input.InvalidInput):
+            agent_input.terms([{"term": "a"}])
+
+    def test_terms_not_a_list_is_an_error(self):
+        with self.assertRaises(agent_input.InvalidInput):
+            agent_input.terms({"terms": "a"})
+
+    def test_error_message_shows_expected_shape(self):
+        # エージェントが自力で直せるよう、期待する形を必ず含める。
+        with self.assertRaises(agent_input.InvalidInput) as cm:
+            agent_input.terms({})
+        self.assertIn('"terms"', str(cm.exception))
+
+    def test_item_without_term_is_skipped_not_fatal(self):
+        # 1件の不備で正常な語まで失わない。
+        items, skipped = agent_input.terms({"terms": [
+            {"term": "good", "definition": "x"},
+            {"definition": "term キーなし"},
+            {"term": "   "},
+        ]})
+        self.assertEqual([i["term"] for i in items], ["good"])
+        self.assertEqual(len(skipped), 2)
+
+    def test_skip_reason_names_the_index(self):
+        _, skipped = agent_input.terms({"terms": [{"term": "ok"}, {"bad": 1}]})
+        self.assertIn("terms[1]", skipped[0])
+
+    def test_prs_accepts_wrapped_and_bare(self):
+        pr = {"repo": "o/r", "number": 1, "sha": "a"}
+        for payload in ([pr], {"prs": [pr]}):
+            items, skipped = agent_input.prs(payload)
+            self.assertEqual(len(items), 1)
+            self.assertEqual(skipped, [])
+
+    def test_prs_without_sha_or_updated_at_is_skipped(self):
+        # どちらも無いと更新判定ができず、永遠に「変化なし」になる。
+        items, skipped = agent_input.prs([{"repo": "o/r", "number": 1}])
+        self.assertEqual(items, [])
+        self.assertIn("更新を判定できません", skipped[0])
+
+    def test_prs_missing_repo_is_skipped(self):
+        items, skipped = agent_input.prs([{"number": 1, "sha": "a"}])
+        self.assertEqual(items, [])
+        self.assertTrue(skipped)
+
+    def test_prs_non_list_is_an_error(self):
+        with self.assertRaises(agent_input.InvalidInput):
+            agent_input.prs("nope")
 
 
 class TestState(unittest.TestCase):
