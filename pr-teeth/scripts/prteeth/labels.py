@@ -7,6 +7,13 @@ CONCEPTS.md 第5.3節「解説本文・レビュー範囲サマリ・用語解�
 同梱するのは日本語と英語だけ。**未知の言語は英語にフォールバックする**（日本語に
 倒すと、日本語を読めない利用者に読めない画面を出すことになるため）。
 本文はモデルが任意の言語で書くので、見出しだけ英語になる状態は許容する。
+
+文脈（CONTEXT_PATROL / CONTEXT_PICK）について:
+  レビュー範囲の内部の値（must_review 等）は**どちらの文脈でも同じ**で、分類ロジックも
+  共通。変えるのは表示だけにする。番号指定でマージ済み PR を読むときに「レビュー必須」と
+  出るのは意味がずれる（レビューはもう終わっている）が、分類そのものは大きい PR で
+  どこを読むべきかの手がかりとして有用なので、**読み方の指標として見せる**。
+  内部の値まで分けると分類・並び替え・保存のすべてに文脈が波及するため、そうしない。
 """
 
 _JA = {
@@ -55,14 +62,51 @@ _EN = {
 
 _TABLES = {"ja": _JA, "en": _EN}
 
+# 文脈。巡回（レビュー待ちの消化）と番号指定（読んで理解する）で、
+# レビュー範囲の見せ方だけが変わる。
+CONTEXT_PATROL = "patrol"
+CONTEXT_PICK = "pick"
 
-def for_language(language):
+# 番号指定時に差し替える文言。**キーは _JA / _EN と同じ**で、値だけが違う。
+# ここに無いキーは巡回時のものがそのまま使われる。
+_PICK_JA = {
+    "page_title": "指定した PR",
+    "count_suffix": " 件",
+    "no_prs": "対象の PR はありません。",
+    "must_review": "重点",
+    "should_review": "参考",
+    "ignore": "周辺",
+    "review_points": "読むときの手がかり",
+}
+
+_PICK_EN = {
+    "page_title": "Selected pull requests",
+    "count_suffix": " PRs",
+    "no_prs": "No pull requests to show.",
+    "must_review": "Focus",
+    "should_review": "Context",
+    "ignore": "Periphery",
+    "review_points": "What to look at while reading",
+}
+
+_PICK_OVERRIDES = {"ja": _PICK_JA, "en": _PICK_EN}
+
+
+def for_language(language, context=CONTEXT_PATROL):
     """言語タグに対応する文言表を返す。
 
     `ja-JP` のような地域付きタグも先頭で照合する。未知の言語は英語。
+
+    context が CONTEXT_PICK なら、レビュー範囲まわりの文言を番号指定向けに
+    差し替えた表を返す（内部の値は変えない。冒頭の説明を参照）。
     """
     tag = (language or "").strip().lower()
-    if tag in _TABLES:
-        return _TABLES[tag]
-    primary = tag.split("-")[0]
-    return _TABLES.get(primary, _EN)
+    primary = tag if tag in _TABLES else tag.split("-")[0]
+    base = _TABLES.get(primary, _EN)
+    if context != CONTEXT_PICK:
+        return base
+    # フォールバックした言語の上書き表を使う。base が _EN なら英語の上書き。
+    key = primary if primary in _TABLES else "en"
+    merged = dict(base)
+    merged.update(_PICK_OVERRIDES[key])
+    return merged

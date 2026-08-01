@@ -159,10 +159,10 @@ def _render_terms(terms, L):
     return "\n".join(out)
 
 
-def _render_pr(pr):
+def _render_pr(pr, context=labels.CONTEXT_PATROL):
     lang = pr.language or "ja"
     # 見出しもその PR の言語に合わせる。本文だけ英語で見出しが日本語だと読めない。
-    L = labels.for_language(lang)
+    L = labels.for_language(lang, context)
     cls = _SCOPE_CLASS.get(pr.priority, "should")
     label = L.get(pr.priority, L["should_review"])
     collapsed = bool(pr.collapsed)
@@ -277,8 +277,9 @@ def render(data):
     ここで欠落を気にする必要はない。
     """
     lang = data.language or "ja"
+    context = data.context or labels.CONTEXT_PATROL
     # ページ全体の地の文はユーザー既定の言語（第5.3節）。
-    L = labels.for_language(lang)
+    L = labels.for_language(lang, context)
     prs = data.prs
     warnings = data.warnings
     has_diagram = any(p.diagram for p in prs)
@@ -305,7 +306,7 @@ def render(data):
     if not prs:
         out.append("<p>" + _e(L["no_prs"]) + "</p>")
     for pr in prs:
-        out.append(_render_pr(pr))
+        out.append(_render_pr(pr, context))
 
     out.append("</main>")
     if has_diagram:

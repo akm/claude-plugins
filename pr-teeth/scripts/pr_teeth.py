@@ -17,7 +17,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, render, scope, state, store,
+    agent_input, auth, config, document, glossary, labels, prspec, render, scope, state,
+    store,
 )
 
 
@@ -114,6 +115,35 @@ def cmd_select(args):
         "total": len(prs),
         "skipped": len(skipped),
         "selected": len(targets),
+        "warnings": warnings,
+    })
+
+
+def cmd_resolve(args):
+    """PR の指定（`owner/repo#123` や URL）を repo / number に解釈する。
+
+    番号指定コマンド（/pr-teeth-pick）の入口。解釈をモデルに任せると、URL の末尾や
+    フラグメントの取り違えで**別の PR を正しい体裁で解説してしまう**（読み手には
+    誤りと分からない）。ここで機械的に確定させる。
+
+    解釈できなかった指定は `invalid` に理由付きで返す。黙って捨てない。
+    """
+    warnings = []
+    _, _, cfg = _load(args, warnings)
+
+    # 解釈できなかった指定は `invalid` だけに入れる。`warnings` にも同じものを
+    # 積むと、SKILL.md が両方を出すよう指示しているため同じ文言が2回並ぶ。
+    # `warnings` は他のコマンドと同じく設定読み込みの問題のために取っておく。
+    targets, errors = prspec.parse(args.specs)
+    for t in targets:
+        t["language"] = config.resolve_language(t["repo"], cfg, args.lang)
+
+    return _emit({
+        "targets": targets,
+        "requested": len(args.specs),
+        "resolved": len(targets),
+        "invalid": errors,
+        "default_language": config.default_language(cfg, args.lang),
         "warnings": warnings,
     })
 
@@ -285,6 +315,9 @@ def cmd_render(args):
         payload = json.load(f)
     # キー名の誤りや必須の欠落はここで弾く。黙って空のセクションを出さない。
     # 畳み込みと並び替えも from_payload が行う。
+    # --context は入力 JSON の context より優先する（コマンド側が文脈を知っている）。
+    if args.context:
+        payload = dict(payload, context=args.context)
     doc = document.from_payload(payload)
     if not doc.language:
         doc.language = config.default_language(cfg, args.lang)
@@ -292,8 +325,11 @@ def cmd_render(args):
         doc.generated_at = _now()
     doc.warnings = list(doc.warnings) + warnings
 
+    # 既定のファイル名に文脈を入れる。巡回と番号指定の生成物が out/ に混ざったとき、
+    # ファイル名だけでどちらか分かるようにする。
+    prefix = "pr-teeth-pick-" if doc.context == labels.CONTEXT_PICK else "pr-teeth-"
     path = _out_path(
-        paths, args.output, "pr-teeth-" + _now().replace(":", "").replace("-", "") + ".html"
+        paths, args.output, prefix + _now().replace(":", "").replace("-", "") + ".html"
     )
     with open(path, "w", encoding="utf-8") as f:
         f.write(render.render(doc))
@@ -373,6 +409,16 @@ def main(argv=None):
     sp.add_argument("--mode", default="full", choices=["full", "changes-only"])
     sp.set_defaults(func=cmd_prepare)
 
+    sp = sub.add_parser("resolve", help="PR の指定を repo / number に解釈する")
+    common(sp)
+    sp.add_argument(
+        "specs",
+        nargs="+",
+        help="PR の指定。owner/repo#123 または https://github.com/owner/repo/pull/123。"
+             "`#` が shell で消える場合は owner/repo/123 でもよい",
+    )
+    sp.set_defaults(func=cmd_resolve)
+
     sp = sub.add_parser("classify", help="変更ファイルを範囲分類する")
     common(sp)
     sp.add_argument("--repo", required=True, help="owner/repo")
@@ -428,6 +474,14 @@ def main(argv=None):
              "url は repo と number から導出するので渡さない。詳細は SKILL.md。",
     )
     sp.add_argument("--output", default=None)
+    sp.add_argument(
+        "--context",
+        default=None,
+        choices=[labels.CONTEXT_PATROL, labels.CONTEXT_PICK],
+        help="レビュー範囲の表示文言を切り替える。既定は " + labels.CONTEXT_PATROL
+             + "（巡回）。番号指定 (/pr-teeth-pick) では " + labels.CONTEXT_PICK
+             + " を渡し、「重点 / 参考 / 周辺」で表示する。分類の値そのものは変わらない",
+    )
     sp.set_defaults(func=cmd_render)
 
     sp = sub.add_parser("glossary-html", help="用語ポートフォリオを HTML にする")

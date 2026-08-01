@@ -12,6 +12,8 @@
   - 設定 (config.toml) の読み込み
 """
 
+import argparse
+import json
 import os
 import sys
 import tempfile
@@ -20,7 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, render, scope, state, store,
+    agent_input, auth, config, document, glossary, labels, prspec, render, scope, state,
+    store,
 )
 
 
@@ -665,6 +668,149 @@ class TestLabels(unittest.TestCase):
         self.assertEqual(labels.for_language("")["summary"], "Summary")
 
 
+class TestLabelContext(unittest.TestCase):
+    """文脈別ラベル（#16）。
+
+    番号指定でマージ済み PR を読むときに「レビュー必須」と出るのは意味がずれる。
+    表示だけを差し替え、分類の内部の値は変えない。
+    """
+
+    def test_patrol_is_the_default(self):
+        self.assertEqual(labels.for_language("ja")["must_review"], "必須")
+
+    def test_pick_relabels_scopes(self):
+        L = labels.for_language("ja", labels.CONTEXT_PICK)
+        self.assertEqual(L["must_review"], "重点")
+        self.assertEqual(L["should_review"], "参考")
+        self.assertEqual(L["ignore"], "周辺")
+
+    def test_pick_relabels_in_english_too(self):
+        L = labels.for_language("en", labels.CONTEXT_PICK)
+        self.assertEqual(L["must_review"], "Focus")
+        self.assertEqual(L["ignore"], "Periphery")
+
+    def test_pick_keeps_unrelated_labels(self):
+        # 上書き表に無いキーは巡回時のものがそのまま使われる。
+        self.assertEqual(labels.for_language("ja", labels.CONTEXT_PICK)["summary"], "概要")
+
+    def test_pick_has_its_own_page_title(self):
+        L = labels.for_language("ja", labels.CONTEXT_PICK)
+        self.assertEqual(L["page_title"], "指定した PR")
+
+    def test_unknown_language_gets_english_pick_labels(self):
+        # 未知の言語は英語にフォールバックする。文脈の上書きも英語側を使う。
+        self.assertEqual(labels.for_language("ko", labels.CONTEXT_PICK)["must_review"], "Focus")
+
+    def test_region_tag_gets_japanese_pick_labels(self):
+        self.assertEqual(labels.for_language("ja-JP", labels.CONTEXT_PICK)["must_review"], "重点")
+
+    def test_pick_table_has_no_unknown_keys(self):
+        # 上書き表にタイポがあると、そのキーだけ差し替わらず巡回時の文言が残る。
+        base = set(labels.for_language("ja"))
+        for lang in ("ja", "en"):
+            self.assertEqual(set(labels._PICK_OVERRIDES[lang]) - base, set())
+
+
+class TestPRSpec(unittest.TestCase):
+    """PR 指定の解釈（#16）。
+
+    URL からの取り違えは、**別の PR の解説を正しい体裁で出す**という気づけない
+    誤りになるため、モデルに任せず機械的に確定させる。
+    """
+
+    def test_short_form(self):
+        self.assertEqual(prspec.parse_one("owner/repo#123"), {"repo": "owner/repo", "number": 123})
+
+    def test_url_form(self):
+        self.assertEqual(
+            prspec.parse_one("https://github.com/owner/repo/pull/123"),
+            {"repo": "owner/repo", "number": 123},
+        )
+
+    def test_url_with_trailing_path_is_the_same_pr(self):
+        # /files や /commits を貼られても番号は変わらない。
+        for suffix in ("/files", "/commits", "/", "?w=1", "#discussion_r1"):
+            self.assertEqual(
+                prspec.parse_one("https://github.com/o/r/pull/123" + suffix)["number"], 123
+            )
+
+    def test_url_without_scheme(self):
+        self.assertEqual(prspec.parse_one("github.com/o/r/pull/9")["repo"], "o/r")
+
+    def test_any_host_parses_but_host_is_discarded(self):
+        # ホストは照合するだけで捨てる。GHE の URL を貼っても、リンクは
+        # document.GITHUB_HOST（公開 github.com）から組まれる。GHE 対応は
+        # そちらが未対応なので、ここで受けても対応にはならない。
+        self.assertEqual(
+            prspec.parse_one("https://ghe.example.com/o/r/pull/5"),
+            {"repo": "o/r", "number": 5},
+        )
+
+    def test_hostlike_prefix_does_not_become_the_repo(self):
+        # 素のパスの先頭がホストとして食われると、打っていないリポジトリに
+        # 解決される（`foo/bar/baz/pull/9` -> `bar/baz`）。これが起きると
+        # 「別の PR の解説が正しい体裁で出る」= 読み手が誤りに気づけない。
+        for bad in ("foo/bar/baz/pull/9", "orgs/owner/repo/pull/5"):
+            with self.assertRaises(prspec.InvalidSpec):
+                prspec.parse_one(bad)
+
+    def test_schemeless_url_fragment_does_not_fall_through_to_short_form(self):
+        # `github.com/akm/123` が _SHORT に落ちると `github.com/akm` になる。
+        # owner にドットを許さないことで塞いでいる。
+        with self.assertRaises(prspec.InvalidSpec):
+            prspec.parse_one("github.com/akm/123")
+
+    def test_repo_case_is_normalized(self):
+        # GitHub は大文字小文字を区別しないが、設定の引き当ては素の辞書引き。
+        # 揃えないと [repos."owner/repo"] を取りこぼし、出力言語とレビュー範囲が
+        # 黙って既定値に落ちる。
+        self.assertEqual(prspec.parse_one("Akm/Claude-Plugins#1")["repo"], "akm/claude-plugins")
+
+    def test_case_variants_are_deduplicated(self):
+        targets, _ = prspec.parse(["Akm/Claude-Plugins#1", "akm/claude-plugins#1"])
+        self.assertEqual(len(targets), 1)
+
+    def test_slash_form_when_hash_is_eaten_by_shell(self):
+        self.assertEqual(prspec.parse_one("owner/repo/123"), {"repo": "owner/repo", "number": 123})
+
+    def test_git_suffix_is_stripped(self):
+        self.assertEqual(prspec.parse_one("https://github.com/o/r.git/pull/3")["repo"], "o/r")
+
+    def test_surrounding_whitespace_is_ignored(self):
+        self.assertEqual(prspec.parse_one("  owner/repo#1  ")["number"], 1)
+
+    def test_unparseable_spec_raises(self):
+        for bad in ("", "   ", "just-text", "owner/repo", "owner/repo#abc", "#123"):
+            with self.assertRaises(prspec.InvalidSpec):
+                prspec.parse_one(bad)
+
+    def test_error_message_shows_expected_shape(self):
+        with self.assertRaises(prspec.InvalidSpec) as cm:
+            prspec.parse_one("nonsense")
+        self.assertIn("owner/repo#123", str(cm.exception))
+
+    def test_parse_keeps_order_and_reports_errors(self):
+        targets, errors = prspec.parse(["o/r#2", "bogus", "o/r#1"])
+        self.assertEqual([t["number"] for t in targets], [2, 1])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("bogus", errors[0])
+
+    def test_invalid_spec_does_not_drop_the_valid_ones(self):
+        # 1件の誤りで全体を止めない（取得・解析の失敗と同じ扱い）。
+        targets, _ = prspec.parse(["bogus", "o/r#1"])
+        self.assertEqual(len(targets), 1)
+
+    def test_duplicates_are_collapsed_first_wins(self):
+        # 同じ PR を2回解説しても情報が増えない。
+        targets, errors = prspec.parse(["o/r#1", "https://github.com/o/r/pull/1"])
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(errors, [])  # 利用者の誤りではないので警告にしない
+
+    def test_same_number_in_different_repos_is_not_a_duplicate(self):
+        targets, _ = prspec.parse(["a/r#1", "b/r#1"])
+        self.assertEqual(len(targets), 2)
+
+
 class TestDocument(unittest.TestCase):
     """解説データの型（scripts/prteeth/document.py）。
 
@@ -744,6 +890,22 @@ class TestDocument(unittest.TestCase):
         doc = document.from_payload(self._pr(number=0))
         self.assertEqual(doc.prs[0].number, 0)
 
+    def test_context_defaults_to_patrol(self):
+        self.assertEqual(document.from_payload(self._pr()).context, labels.CONTEXT_PATROL)
+
+    def test_context_can_be_pick(self):
+        payload = self._pr()
+        payload["context"] = labels.CONTEXT_PICK
+        self.assertEqual(document.from_payload(payload).context, labels.CONTEXT_PICK)
+
+    def test_invalid_context_is_an_error(self):
+        # 黙って巡回扱いにすると、番号指定なのに「必須」と出る。
+        payload = self._pr()
+        payload["context"] = "browsing"
+        with self.assertRaises(document.InvalidDocument) as cm:
+            document.from_payload(payload)
+        self.assertIn("browsing", str(cm.exception))
+
 
 class TestRender(unittest.TestCase):
     def _doc(self, pr_overrides=None, **kw):
@@ -819,6 +981,38 @@ class TestRender(unittest.TestCase):
         self.assertIn("mermaid-src", h)
         self.assertIn("flowchart LR", h)
 
+    def test_patrol_context_shows_review_labels(self):
+        h = render.render(self._doc({"language": "ja", "priority": "must_review",
+                                     "counts": {"must_review": 1}}))
+        self.assertIn("必須", h)
+        self.assertNotIn("重点", h)
+
+    def test_pick_context_shows_reading_labels(self):
+        # マージ済み PR に「レビュー必須」と出るのは意味がずれる（#16）。
+        doc = self._doc({"language": "ja", "priority": "must_review",
+                         "counts": {"must_review": 1}}, context="pick")
+        h = render.render(doc)
+        self.assertIn("重点", h)
+        self.assertNotIn("必須", h)
+
+    def test_pick_context_changes_page_title(self):
+        h = render.render(self._doc(context="pick"))
+        self.assertIn("指定した PR", h)
+        self.assertNotIn("レビュー依頼の PR", h)
+
+    def test_pick_context_applies_to_pr_language_not_page_language(self):
+        # ページは ja、PR は en。文脈は両方に効き、言語はそれぞれのものを使う。
+        doc = self._doc({"language": "en", "priority": "must_review",
+                         "counts": {"must_review": 1}}, context="pick")
+        h = render.render(doc)
+        self.assertIn("Focus", h)          # PR 側は英語の pick ラベル
+        self.assertIn("指定した PR", h)     # ページ側は日本語の pick ラベル
+
+    def test_priority_classification_is_unchanged_by_context(self):
+        # 表示だけを変え、内部の値は変えない（分類・並び替えは共通）。
+        doc = self._doc({"priority": "must_review"}, context="pick")
+        self.assertEqual(doc.prs[0].priority, "must_review")
+
 
 class TestOutputPath(unittest.TestCase):
     """HTML の出力先解決（render / glossary-html で規則を揃える）。
@@ -855,6 +1049,116 @@ class TestOutputPath(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.mod._out_path(self._paths(d), None, "x.html")
             self.assertTrue(os.path.isdir(os.path.join(d, "out")))
+
+
+class TestCliCommands(unittest.TestCase):
+    """CLI の配線（scripts/pr_teeth.py）。
+
+    prspec / labels 単体のテストでは、引数の受け渡しの取り違えが見つからない。
+    番号指定では `--context` の渡し忘れがそのまま「マージ済み PR にレビュー必須と
+    出る」不具合になるため、ここで配線ごと確かめる。
+    """
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+        import pr_teeth
+
+        self.mod = pr_teeth
+        self._dir = tempfile.TemporaryDirectory()
+        os.environ[config.CONFIG_DIR_ENV] = self._dir.name
+
+    def tearDown(self):
+        os.environ.pop(config.CONFIG_DIR_ENV, None)
+        self._dir.cleanup()
+
+    def _run(self, fn, **kw):
+        """サブコマンドを呼び、stdout に出た JSON を返す。"""
+        import contextlib
+        import io
+
+        kw.setdefault("plugin_source", "github.com/akm/claude-plugins")
+        kw.setdefault("lang", None)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            fn(argparse.Namespace(**kw))
+        return json.loads(buf.getvalue())
+
+    def _write(self, name, payload):
+        path = os.path.join(self._dir.name, name)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        return path
+
+    def test_resolve_reports_counts_and_language(self):
+        out = self._run(self.mod.cmd_resolve, specs=["o/r#1", "https://github.com/a/b/pull/2"])
+        self.assertEqual(out["resolved"], 2)
+        self.assertEqual(out["requested"], 2)
+        self.assertEqual([t["repo"] for t in out["targets"]], ["o/r", "a/b"])
+        self.assertTrue(all(t["language"] for t in out["targets"]))
+
+    def test_resolve_keeps_valid_specs_when_one_is_invalid(self):
+        # 1件の誤りで全体を止めない。
+        out = self._run(self.mod.cmd_resolve, specs=["bogus", "o/r#1"])
+        self.assertEqual(out["resolved"], 1)
+        self.assertEqual(len(out["invalid"]), 1)
+
+    def test_resolve_does_not_duplicate_errors_into_warnings(self):
+        # SKILL.md は invalid と warnings の両方を出すよう指示している。
+        # 同じ文言を両方に積むと、利用者には2回並んで見える。
+        out = self._run(self.mod.cmd_resolve, specs=["bogus"])
+        self.assertEqual(len(out["invalid"]), 1)
+        self.assertEqual(out["warnings"], [])
+
+    def test_resolve_uses_repo_language_override(self):
+        with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
+            f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
+        out = self._run(self.mod.cmd_resolve, specs=["o/r#1", "other/x#2"])
+        by_repo = {t["repo"]: t["language"] for t in out["targets"]}
+        self.assertEqual(by_repo["o/r"], "en")
+        self.assertEqual(by_repo["other/x"], "ja")
+
+    def test_resolve_mixed_case_spec_finds_repo_config(self):
+        # 打った表記の揺れで設定を取りこぼすと、出力言語が黙って変わる。
+        with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
+            f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
+        out = self._run(self.mod.cmd_resolve, specs=["O/R#1"])
+        self.assertEqual(out["targets"][0]["language"], "en")
+
+    def _render(self, context, payload_context=None):
+        payload = {"prs": [{"repo": "o/r", "number": 1, "title": "T",
+                            "priority": "must_review", "language": "ja"}]}
+        if payload_context:
+            payload["context"] = payload_context
+        path = self._write("doc.json", payload)
+        out = self._run(self.mod.cmd_render, input=path, output=None, context=context)
+        with open(out["path"], encoding="utf-8") as f:
+            return out, f.read()
+
+    def test_render_context_flag_switches_labels(self):
+        _, html = self._render("pick")
+        self.assertIn("重点", html)
+        self.assertNotIn("必須", html)
+
+    def test_render_defaults_to_patrol_labels(self):
+        _, html = self._render(None)
+        self.assertIn("必須", html)
+        self.assertNotIn("重点", html)
+
+    def test_render_flag_overrides_payload_context(self):
+        # コマンド側が文脈を知っているので、フラグが勝つ。
+        _, html = self._render("pick", payload_context="patrol")
+        self.assertIn("重点", html)
+
+    def test_render_payload_context_applies_without_flag(self):
+        _, html = self._render(None, payload_context="pick")
+        self.assertIn("重点", html)
+
+    def test_render_output_filename_marks_the_context(self):
+        # 巡回と番号指定の生成物が out/ に混ざったとき、名前で見分けられるように。
+        pick, _ = self._render("pick")
+        patrol, _ = self._render(None)
+        self.assertIn("pr-teeth-pick-", os.path.basename(pick["path"]))
+        self.assertNotIn("pick", os.path.basename(patrol["path"]))
 
 
 class TestRenderGlossary(unittest.TestCase):

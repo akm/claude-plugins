@@ -8,7 +8,8 @@ description: pr-teeth が蓄積した用語集を、理解済み・学習中・�
 pr-teeth の用語集を確認・編集する。
 
 用語のステータスは説明の厚みを決める（`new`=フル説明 / `learning`=軽い再掲 /
-`known`=説明を省略）。ここでの変更は、以降の `/pr-teeth` の出力に効く。
+`known`=説明を省略）。ここでの変更は、以降の `/pr-teeth` と `/pr-teeth-pick` の
+出力に効く（用語集は全リポジトリ・全コマンド横断でひとつ）。
 
 ## 引数
 
@@ -79,5 +80,5 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 
 ## fork する場合
 
-`--plugin-source` の値は `/pr-teeth` 側と**必ず同じ値**にする。片方だけ書き換えると
-設定ディレクトリが分かれ、用語集を見失う。
+`--plugin-source` の値は `/pr-teeth`・`/pr-teeth-pick` 側と**必ず同じ値**にする。
+一部だけ書き換えると設定ディレクトリが分かれ、用語集を見失う。
