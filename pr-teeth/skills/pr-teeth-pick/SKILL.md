@@ -96,11 +96,14 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" resolve \
 
 ```bash
 gh pr view <番号> --repo <owner/repo> \
-  --json files,headRefOid,title,author,body,state,merged,mergedAt,labels,closingIssuesReferences
+  --json files,headRefOid,title,author,body,state,mergedAt,labels,closingIssuesReferences
 ```
 
-`state` / `merged` は解説の書き分けに使う（後述の手順 6）。取得に失敗した PR は
-**注記を付けて残し、他の PR の処理は止めない。**
+`state` は `OPEN` / `MERGED` / `CLOSED` のいずれかで、**これだけでマージ済みか
+クローズのみかが分かる**（`merged` というフィールドは存在しない。指定すると
+`Unknown JSON field` でコマンドごと失敗する）。解説の書き分けに使う（手順 7）。
+
+取得に失敗した PR は**注記を付けて残し、他の PR の処理は止めない。**
 
 ### 4. 範囲分類と言語解決
 
@@ -165,11 +168,11 @@ PR ごとに、**その PR の解決済み言語**で書く。構成は `/pr-tee
 次の2点が違う。
 
 - **「前回からの変更」は出さない。** 毎回全体を解説する。
-- **マージ済み・クローズ済みの PR では、その事実を書く。** 手順 3 の `state` /
-  `merged` / `mergedAt` から、「マージ済み（YYYY-MM-DD）」のように冒頭に示す。
+- **マージ済み・クローズ済みの PR では、その事実を書く。** 手順 3 の `state` と
+  `mergedAt` から、「マージ済み（YYYY-MM-DD）」のように冒頭に示す。
   読み手が「これはもう入っている変更か、まだ議論中か」を最初に把握できるようにする。
-  **マージされずクローズされた PR は特にそう明記する**（入っていない変更を、
-  入ったものとして読ませない）。
+  **`state` が `CLOSED`（マージされずに閉じられた）の PR は特にそう明記する**
+  （入っていない変更を、入ったものとして読ませない）。
 
 書く項目:
 
