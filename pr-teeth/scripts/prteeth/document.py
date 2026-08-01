@@ -18,7 +18,7 @@ url を持たない理由:
 
 from dataclasses import dataclass, field
 
-from . import scope
+from . import labels, scope
 
 # PR の URL はこのホストから導出する。GitHub Enterprise が必要になったら
 # config.toml に設定を足す（今は使わないので固定）。
@@ -73,13 +73,18 @@ class PullRequest:
 
 @dataclass
 class Document:
-    """1回の実行で出す解説全体。"""
+    """1回の実行で出す解説全体。
+
+    context は表示文言の切り替えだけに使う（labels 参照）。ページ単位で持つのは、
+    1回の実行が「巡回」か「番号指定」かのどちらかであり、PR ごとに混ざらないため。
+    """
 
     prs: list = field(default_factory=list)
     language: str = "ja"
     title: str = ""
     generated_at: str = ""
     warnings: list = field(default_factory=list)
+    context: str = labels.CONTEXT_PATROL
 
 
 _PR_REQUIRED = ("repo", "number", "title", "priority")
@@ -197,10 +202,19 @@ def from_payload(payload):
 
     prs.sort(key=lambda p: scope.sort_key({"priority": p.priority}))
 
+    context = payload.get("context") or labels.CONTEXT_PATROL
+    if context not in (labels.CONTEXT_PATROL, labels.CONTEXT_PICK):
+        # 誤った値を黙って巡回扱いにすると、番号指定なのに「必須」と出る。
+        raise InvalidDocument(
+            "context は " + labels.CONTEXT_PATROL + " / " + labels.CONTEXT_PICK
+            + " のいずれかです（実際: " + str(context) + "）"
+        )
+
     return Document(
         prs=prs,
         language=payload.get("language") or "ja",
         title=payload.get("title") or "",
         generated_at=payload.get("generated_at") or "",
         warnings=list(payload.get("warnings") or []),
+        context=context,
     )
