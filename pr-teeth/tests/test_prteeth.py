@@ -19,7 +19,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from prteeth import auth, config, glossary, labels, render, scope, store  # noqa: E402
+from prteeth import auth, config, glossary, labels, render, scope, state, store  # noqa: E402
 
 
 class TestConfigDir(unittest.TestCase):
@@ -266,6 +266,60 @@ class TestStore(unittest.TestCase):
             p = os.path.join(d, "sub", "g.json")
             store.save_json(p, {"terms": {"あ": {"term": "あ"}}})
             self.assertEqual(store.load_json(p, {})["terms"]["あ"]["term"], "あ")
+
+
+class TestState(unittest.TestCase):
+    """更新の判定（第10節ステップ4）。"""
+
+    def _state(self, sha="aaa", updated="2026-08-01T00:00:00Z"):
+        return {"notified": {"o/r#1": {"sha": sha, "updated_at": updated}}}
+
+    def _pr(self, sha="aaa", updated="2026-08-01T00:00:00Z"):
+        return {"repo": "o/r", "number": 1, "sha": sha, "updated_at": updated}
+
+    def test_unknown_pr_is_new(self):
+        t = state.select_targets({}, [self._pr()])
+        self.assertEqual(t[0]["status"], state.NEW)
+        self.assertIsNone(t[0]["base_sha"])
+
+    def test_unchanged_is_excluded(self):
+        self.assertEqual(state.select_targets(self._state(), [self._pr()]), [])
+
+    def test_new_commit_is_an_update(self):
+        t = state.select_targets(self._state(), [self._pr(sha="bbb")])
+        self.assertEqual(t[0]["status"], state.UPDATED)
+        # 差分の起点として前回の SHA を渡す。
+        self.assertEqual(t[0]["base_sha"], "aaa")
+
+    def test_updated_at_change_alone_is_an_update(self):
+        # 本文の書き直しやレビューコメントはコミットを伴わない。
+        # sha だけ見ていると取りこぼす。
+        t = state.select_targets(self._state(), [self._pr(updated="2026-08-02T00:00:00Z")])
+        self.assertEqual(t[0]["status"], state.UPDATED)
+
+    def test_legacy_string_state_is_readable(self):
+        # 旧形式（値が SHA の文字列）でも読める。利用者に再設定を求めない。
+        legacy = {"notified": {"o/r#1": "aaa"}}
+        self.assertEqual(state.select_targets(legacy, [self._pr()]), [])
+        t = state.select_targets(legacy, [self._pr(sha="bbb")])
+        self.assertEqual(t[0]["status"], state.UPDATED)
+
+    def test_legacy_state_does_not_mass_update_on_migration(self):
+        # 旧形式には updated_at が無い。比較できないものを「変わった」とみなすと
+        # 移行直後に全件が更新扱いになってしまう。
+        legacy = {"notified": {"o/r#1": "aaa"}}
+        self.assertEqual(state.select_targets(legacy, [self._pr(updated="9999")]), [])
+
+    def test_record_prunes_closed_prs(self):
+        # 閉じた PR の記録を残すと、再オープン時に誤判定しうる。
+        prev = {"notified": {"o/r#1": {"sha": "a"}, "o/r#99": {"sha": "z"}}}
+        new = state.record_notified(prev, [self._pr()])
+        self.assertIn("o/r#1", new["notified"])
+        self.assertNotIn("o/r#99", new["notified"])
+
+    def test_record_stores_both_fields(self):
+        new = state.record_notified({}, [self._pr(sha="s", updated="u")])
+        self.assertEqual(new["notified"]["o/r#1"], {"sha": "s", "updated_at": "u"})
 
 
 class TestAuth(unittest.TestCase):

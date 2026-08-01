@@ -71,8 +71,22 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 戻り値の `priority`（`must_review` / `should_review` / `ignore`）で PR を並べ、
 `language` をその PR の解説言語として使う。
 
-`mode=changes-only` のときは `state.json` と比べ、新規または head SHA が変わった
-PR だけを対象にする。対象が 0 件なら**何も通知せず静かに終了する**。
+`mode=changes-only` のときは、対象を絞り込む。
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
+  --plugin-source "github.com/akm/claude-plugins" \
+  --input <PR一覧のJSON>
+```
+
+入力は `[{"repo","number","sha","updated_at"}]`。返る `targets` の各要素には
+次が付く。**`selected` が 0 なら何も通知せず静かに終了する。**
+
+- `status` … `new`（初めて見る）／ `updated`（前回から変わった）
+- `base_sha` … `updated` のときの**差分の起点**。手順 4・6 で使う
+
+`sha` と `updated_at` のどちらかが変われば更新と判定される。コミットを伴わない
+更新（PR 本文の書き直し、レビューコメントの追加）も拾うため。
 
 ### 4. 深掘り
 
@@ -82,6 +96,14 @@ PR だけを対象にする。対象が 0 件なら**何も通知せず静かに
 1. リポジトリを clone（既存なら fetch）し、PR のブランチを checkout する。
    作業場所は `config_dir` の `repos/` 配下を使う。
 2. 差分と PR 本文を読む。
+   **`status` が `updated` の PR では、`base_sha` からの差分を中心に見る。**
+
+   ```bash
+   git diff <base_sha>..<現在のSHA>
+   ```
+
+   `base_sha` がローカルに無い場合（fetch していない等）は、その旨を注記して
+   全体を対象にする。無理に差分を作らない。
 3. **文脈依存の語は憶測せず、そのブランチ上で裏取りする。**
    `rg` で定義・使われ方・呼び出し元を検索し、一次情報で意味を確定する。
    根拠が見つからなければ「（コード上で定義を確認できず）」と明記する。
@@ -116,6 +138,11 @@ PR ごとに、**その PR の解決済み言語**で書く。
 
 - 見出し … `owner/repo #番号 「タイトルをその言語で要約したもの」`
 - レビュー範囲サマリ … 必須・推奨・対象外の件数と推奨アクション
+- **前回からの変更**（`status` が `updated` のときだけ。新規では出さない）
+  … `base_sha` からのコード差分で、何がどう変わったかを先に示す。
+  そのうえで以下の全体解説を続ける。時間が空くと前回の内容を覚えていないため、
+  差分だけでは読めない。
+  - **本文（description）の差分は現時点では対象外**。コードの差分のみを扱う。
 - 何をする PR か（1〜3文）／なぜ必要か・背景
 - 図（後述。単純なら省略）
 - 主な変更点（必須・推奨範囲を厚めに）
@@ -153,7 +180,11 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
   --input <出現語と定義のJSON>
 ```
 
-`mode=changes-only` のときだけ `--state <PRと head SHA のJSON>` も渡す。
+`mode=changes-only` のときだけ `--state <PR一覧のJSON>` も渡す。形式は手順 3 の
+`select` と同じ `[{"repo","number","sha","updated_at"}]` で、**その時点でオープンな
+依頼の全件**を渡す（解説した分だけではない）。ここに無い記録は掃除されるため、
+閉じた PR の記録が残り続けない。
+
 `mode=full` では state を変更しない。
 
 プッシュ通知（使える環境なら）は件数と各 PR の1行要約。地の文は `default_language`、

@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from prteeth import auth, config, glossary, labels, render, scope, store  # noqa: E402
+from prteeth import auth, config, glossary, labels, render, scope, state, store  # noqa: E402
 
 
 def _paths(config_dir):
@@ -62,7 +62,7 @@ def cmd_prepare(args):
             "または `gh auth login`。"
         )
 
-    state = store.load_json(paths["state"], {}, warnings) if args.mode == "changes-only" else {}
+    saved = store.load_json(paths["state"], {}, warnings) if args.mode == "changes-only" else {}
 
     return _emit({
         "config_dir": config_dir,
@@ -72,7 +72,31 @@ def cmd_prepare(args):
         # トークンの値は返さない。入手元だけ。
         "token_source": source,
         "has_token": bool(token),
-        "notified": (state or {}).get("notified") or {},
+        "notified": state.load_notified(saved),
+        "warnings": warnings,
+    })
+
+
+def cmd_select(args):
+    """PR 一覧から、新規・更新のものだけを選ぶ（mode=changes-only）。
+
+    入力: [{"repo","number","sha","updated_at", ...}]
+    出力: 対象のみ。status(new/updated) と base_sha(差分の起点) が付く。
+    """
+    warnings = []
+    _, paths, _, _ = _load(args, warnings)
+    saved = store.load_json(paths["state"], {}, warnings)
+
+    with open(args.input, "r", encoding="utf-8") as f:
+        prs = json.load(f)
+    if isinstance(prs, dict):
+        prs = prs.get("prs") or []
+
+    targets = state.select_targets(saved, prs)
+    return _emit({
+        "targets": targets,
+        "total": len(prs),
+        "selected": len(targets),
         "warnings": warnings,
     })
 
@@ -146,10 +170,11 @@ def cmd_record(args):
     if args.state:
         # state は changes-only のときだけ更新する（第11節）。
         with open(args.state, "r", encoding="utf-8") as f:
-            notified = json.load(f)
-        if isinstance(notified, dict) and "notified" not in notified:
-            notified = {"notified": notified}
-        store.save_json(paths["state"], notified)
+            prs = json.load(f)
+        if isinstance(prs, dict):
+            prs = prs.get("prs") or []
+        # オープンな依頼の全件を渡す。ここに無い記録は掃除される。
+        store.save_json(paths["state"], state.record_notified({}, prs))
         saved_state = True
 
     return _emit({
@@ -278,8 +303,18 @@ def main(argv=None):
     sp = sub.add_parser("record", help="出現語と定義を用語集に反映する")
     common(sp)
     sp.add_argument("--input", required=True, help='{"terms":[{"term","language","definition"}]}')
-    sp.add_argument("--state", default=None, help="changes-only のときだけ渡す")
+    sp.add_argument(
+        "--state",
+        default=None,
+        help='changes-only のときだけ渡す。[{"repo","number","sha","updated_at"}] '
+             "(オープンな依頼の全件。ここに無い記録は掃除される)",
+    )
     sp.set_defaults(func=cmd_record)
+
+    sp = sub.add_parser("select", help="新規・更新の PR だけを選ぶ (changes-only)")
+    common(sp)
+    sp.add_argument("--input", required=True, help='[{"repo","number","sha","updated_at"}]')
+    sp.set_defaults(func=cmd_select)
 
     sp = sub.add_parser("promote", help="ステータスを確定する（要ユーザー確認）")
     common(sp)
