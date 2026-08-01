@@ -214,6 +214,10 @@ should_review = ["src/**"]
 | `config.toml` | 設定一式(出力言語・リポジトリ別のレビュー範囲と言語) | ユーザー |
 | `glossary.json` | 用語集 | skill と `/pr-glossary` |
 | `state.json` | 通知済みの記録 (`mode=changes-only` 用) | skill |
+| `out/` | 生成された HTML の置き場所 | skill |
+
+生成物は `out/` の下に出ます。作業中のリポジトリに散らからないよう、出力先を
+相対パスで指定した場合もここに解決されます(絶対パスを指定したときはその場所)。
 
 ## fork する場合
 

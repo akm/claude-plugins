@@ -799,6 +799,43 @@ class TestRender(unittest.TestCase):
         self.assertIn("flowchart LR", h)
 
 
+class TestOutputPath(unittest.TestCase):
+    """HTML の出力先解決（render / glossary-html で規則を揃える）。
+
+    利用者は作業中のリポジトリでコマンドを呼ぶ。相対パスを素直に解決すると
+    生成物がそのリポジトリに散らかるため、設定ディレクトリの out/ に寄せる。
+    """
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+        import pr_teeth
+
+        self.mod = pr_teeth
+
+    def _paths(self, d):
+        return {"out": os.path.join(d, "out")}
+
+    def test_relative_goes_under_out_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self.mod._out_path(self._paths(d), "report.html", "default.html")
+        self.assertEqual(p, os.path.join(d, "out", "report.html"))
+
+    def test_absolute_is_used_as_is(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self.mod._out_path(self._paths(d), "/tmp/x/abs.html", "default.html")
+        self.assertEqual(p, "/tmp/x/abs.html")
+
+    def test_default_name_also_goes_under_out_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self.mod._out_path(self._paths(d), None, "pr-glossary.html")
+        self.assertEqual(p, os.path.join(d, "out", "pr-glossary.html"))
+
+    def test_out_dir_is_created(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.mod._out_path(self._paths(d), None, "x.html")
+            self.assertTrue(os.path.isdir(os.path.join(d, "out")))
+
+
 class TestRenderGlossary(unittest.TestCase):
     def _data(self, language="ja"):
         return {

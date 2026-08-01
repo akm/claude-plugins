@@ -171,6 +171,18 @@ def cmd_lookup(args):
     return _emit({"language": args.language, "terms": out, "warnings": warnings})
 
 
+def _out_path(paths, name, default_name):
+    """HTML の出力先を決める。
+
+    相対パスは設定ディレクトリの `out/` 配下に解決する。利用者は作業中のリポジトリで
+    コマンドを呼ぶため、素直に相対解決すると生成物がそのリポジトリに散らかる。
+    絶対パスを渡されたときだけ、その場所をそのまま使う。
+    """
+    os.makedirs(paths["out"], exist_ok=True)
+    name = name or default_name
+    return name if os.path.isabs(name) else os.path.join(paths["out"], name)
+
+
 def _load_glossary(paths):
     """用語集を読む。壊れていれば Corrupt が上がり、保存に進まない。
 
@@ -280,9 +292,9 @@ def cmd_render(args):
         doc.generated_at = _now()
     doc.warnings = list(doc.warnings) + warnings
 
-    os.makedirs(paths["out"], exist_ok=True)
-    name = args.output or ("pr-teeth-" + _now().replace(":", "").replace("-", "") + ".html")
-    path = name if os.path.isabs(name) else os.path.join(paths["out"], name)
+    path = _out_path(
+        paths, args.output, "pr-teeth-" + _now().replace(":", "").replace("-", "") + ".html"
+    )
     with open(path, "w", encoding="utf-8") as f:
         f.write(render.render(doc))
 
@@ -338,8 +350,7 @@ def cmd_glossary_html(args):
         "warnings": warnings,
         "groups": groups,
     }
-    os.makedirs(paths["out"], exist_ok=True)
-    path = args.output or os.path.join(paths["out"], "pr-glossary.html")
+    path = _out_path(paths, args.output, "pr-glossary.html")
     with open(path, "w", encoding="utf-8") as f:
         f.write(render.render_glossary(data))
     return _emit({"path": path, "counts": glossary.counts(g), "warnings": warnings})
