@@ -20,6 +20,21 @@
         "ref": "main"
       },
       "tags": ["git", "commit", "hooks", "workflow"]
+    },
+    {
+      "name": "pr-teeth",
+      "description": "レビュー依頼が来ている GitHub の PR を巡回し、リポジトリ別のレビュー範囲に照らして噛み砕いた解説を HTML で作る (出力言語は設定可能、既定は日本語)",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "pr-teeth",
+        "ref": "main"
+      },
+      "tags": ["github", "pull-request", "review", "i18n", "skills"]
     }
   ]
 }

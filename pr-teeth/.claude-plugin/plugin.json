@@ -1,0 +1,9 @@
+{
+  "name": "pr-teeth",
+  "description": "レビュー依頼が来ている GitHub の PR を巡回し、リポジトリ別のレビュー範囲に照らして噛み砕いた解説を HTML で作る (出力言語は設定可能、既定は日本語)",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}
