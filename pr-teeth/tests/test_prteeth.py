@@ -1056,8 +1056,44 @@ class TestBodies(unittest.TestCase):
     def test_diff_is_capped(self):
         # 本文全体を貼り直すのではなく、変わった箇所を示す。
         d = bodies.diff("\n".join(str(i) for i in range(500)), "\n".join("x" for _ in range(500)))
-        self.assertLessEqual(len(d.splitlines()), bodies.MAX_DIFF_LINES + 1)
-        self.assertIn("省略", d)
+        self.assertLessEqual(len(d.splitlines()), bodies.MAX_DIFF_LINES)
+        self.assertIn("中略", d)
+
+    def test_capped_diff_keeps_both_deletions_and_additions(self):
+        # 先頭から一律に切ると削除行だけが残り、「全部消された」と読めてしまう。
+        # 本文を書き直した PR で誤解を生むため、前後の両方を残す。
+        d = bodies.diff("\n".join("old %d" % i for i in range(300)),
+                        "\n".join("new %d" % i for i in range(300)))
+        lines = d.splitlines()
+        self.assertTrue(any(ln.startswith("-") and not ln.startswith("---")
+                            for ln in lines), "削除行が残っていない")
+        self.assertTrue(any(ln.startswith("+") and not ln.startswith("+++")
+                            for ln in lines), "追加行が残っていない")
+
+    def test_diff_is_capped_by_bytes_too(self):
+        # 行数だけを縛ってもバイト数は縛れない。長い行が数本あれば、
+        # 行数の上限に達しないままモデルの文脈を圧迫する。
+        prev = "\n".join("A" * 20000 for _ in range(10))
+        cur = "\n".join("B" * 20000 for _ in range(10))
+        d = bodies.diff(prev, cur)
+        self.assertLessEqual(len(d.encode("utf-8")), bodies.MAX_DIFF_BYTES)
+
+    def test_long_lines_are_clipped(self):
+        d = bodies.diff("短い行", "x" * 5000)
+        for line in d.splitlines():
+            self.assertLessEqual(len(line), bodies.MAX_DIFF_LINE_CHARS + 20)
+
+    def test_diff_keeps_the_header(self):
+        # どちらが前回でどちらが今回か分からなくなると読めない。
+        d = bodies.diff("\n".join("old %d" % i for i in range(300)),
+                        "\n".join("new %d" % i for i in range(300)))
+        self.assertIn("前回の本文", d)
+        self.assertIn("今回の本文", d)
+
+    def test_short_diff_is_not_clipped(self):
+        d = bodies.diff("一行目\n二行目", "一行目\n二行目\n三行目")
+        self.assertNotIn("中略", d)
+        self.assertIn("+三行目", d)
 
 
 class TestRepoCache(unittest.TestCase):

@@ -95,8 +95,16 @@ def remove(bodies_dir, repo, number):
 # 差分として返す最大行数。本文全体を貼り直すのではなく、変わった箇所を示す。
 MAX_DIFF_LINES = 200
 
+# 差分として返す最大バイト数。行数だけを縛ってもバイト数は縛れない
+# （長い行が数本あれば、200 行以内でも数百 KB になる）。モデルの文脈を圧迫しない。
+MAX_DIFF_BYTES = 8 * 1024
 
-def diff(previous, current, max_lines=MAX_DIFF_LINES):
+# 1行の最大文字数。これを超える行は途中で省略する。折り返しの無い長大な行は、
+# それ自体では「どこが変わったか」を伝えないうえ、他の行を押し出す。
+MAX_DIFF_LINE_CHARS = 500
+
+
+def diff(previous, current, max_lines=MAX_DIFF_LINES, max_bytes=None):
     """本文の差分を unified diff で返す。変化が無ければ空文字。
 
     previous が None（保存が無い）の場合も空文字を返す。「前回の本文が無い」と
@@ -104,6 +112,8 @@ def diff(previous, current, max_lines=MAX_DIFF_LINES):
 
     差分の判断はここで完結させる。モデルに2つの本文を渡して「どこが変わったか
     考えさせる」と、実行のたびに揺れるうえ見落としも起きる。
+
+    長い差分は先頭と末尾を残して中略する（_clip_diff 参照）。
     """
     if previous is None:
         return ""
@@ -115,10 +125,53 @@ def diff(previous, current, max_lines=MAX_DIFF_LINES):
     lines = list(difflib.unified_diff(
         before, after, fromfile="前回の本文", tofile="今回の本文", lineterm="", n=2,
     ))
-    if len(lines) > max_lines:
-        lines = lines[:max_lines]
-        lines.append("... (差分が長いため以降を省略)")
-    return "\n".join(lines)
+    lines = [_clip_line(ln) for ln in lines]
+    return "\n".join(_clip_diff(lines, max_lines, max_bytes))
+
+
+def _clip_line(line):
+    """長すぎる1行を切り詰める。"""
+    if len(line) <= MAX_DIFF_LINE_CHARS:
+        return line
+    return line[:MAX_DIFF_LINE_CHARS] + " …(行が長いため省略)"
+
+
+_ELLIPSIS = "... (差分が長いため中略)"
+
+
+def _clip_diff(lines, max_lines, max_bytes):
+    """差分を先頭と末尾に分けて切り詰める。
+
+    先頭から一律に切ると、unified diff の並び上、削除行だけが残って追加行が
+    すべて落ちる。本文を書き直した PR では「全部消された」という誤った印象に
+    なるため、**先頭と末尾の両方を残す**。
+
+    行数だけでなくバイト数でも縛る。長い行が数本あれば、行数の上限に達しないまま
+    モデルの文脈を数百 KB 圧迫しうるため。
+    """
+    max_bytes = MAX_DIFF_BYTES if max_bytes is None else max_bytes
+
+    def _fits(chunk):
+        return len("\n".join(chunk).encode("utf-8")) <= max_bytes
+
+    if len(lines) <= max_lines and _fits(lines):
+        return lines
+
+    # ヘッダ（--- / +++）は残す。どちらの本文かが分からなくなるため。
+    header = [ln for ln in lines[:2] if ln.startswith(("---", "+++"))]
+    body = lines[len(header):]
+
+    # 返す総行数が max_lines を超えないようにする。ヘッダと中略行もその内数。
+    budget = max_lines - len(header) - 1
+    while budget > 0:
+        head_n = budget // 2
+        tail_n = budget - head_n
+        candidate = header + body[:head_n] + [_ELLIPSIS] + body[-tail_n:]
+        if _fits(candidate):
+            return candidate
+        # バイト数に収まらなければ、前後を均等に削る。
+        budget -= 2
+    return header + [_ELLIPSIS]
 
 
 def prune(bodies_dir, alive=None, max_bodies=None):
