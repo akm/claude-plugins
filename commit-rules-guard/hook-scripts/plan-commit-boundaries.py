@@ -63,6 +63,7 @@ _PLAN_KEYS = ("todos", "plan", "tasks", "subject", "prompt", "description")
 _TASK_KEYS = ("content", "subject", "title", "task", "description")
 
 
+
 def _state_dir():
     base = os.environ.get("COMMIT_GUARD_STATE_DIR") or tempfile.gettempdir()
     return os.path.join(base, "commit-rules-guard")
@@ -119,9 +120,21 @@ def has_plan_content(tool_input):
     いたが、TaskCreate が 1 呼び出しで 1 タスクを作るため、タスクごとに別の計画と
     見なされて発火していた。いまはセッション単位で数えるので、ここは「中身がある
     か」だけを見ればよい。
+
+    ただし**平らな dict に status が付いていれば状態更新**とみなす。TaskUpdate は
+    {subject, status} のように、どのタスクかを示すために subject を添えて状態だけを
+    変える。これを「中身あり」と数えると、セッションに 1 回しかない通知を状態更新で
+    使い切り、**その後に来る本当の計画で促せなくなる**（促す機会を最も要らない
+    タイミングで消費する）。
     """
     if not isinstance(tool_input, dict):
         return False
+
+    # 状態遷移のための呼び出し。subject 等は「どのタスクか」の指示でしかない。
+    # todos/plan/tasks のような計画そのものを持つ場合は、下のループで拾う。
+    if isinstance(tool_input.get("status"), str) and tool_input["status"].strip():
+        if not any(k in tool_input for k in ("todos", "plan", "tasks")):
+            return False
 
     for key in _PLAN_KEYS:
         value = tool_input.get(key)
