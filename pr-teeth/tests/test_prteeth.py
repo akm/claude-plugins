@@ -22,8 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, prspec, render, scope, state,
-    store,
+    agent_input, auth, config, document, glossary, labels, prspec, render, repos, scope,
+    state, store,
 )
 
 
@@ -909,6 +909,198 @@ class TestPRSpec(unittest.TestCase):
     def test_same_number_in_different_repos_is_not_a_duplicate(self):
         targets, _ = prspec.parse(["a/r#1", "b/r#1"])
         self.assertEqual(len(targets), 2)
+
+
+class TestRepoCache(unittest.TestCase):
+    """作業リポジトリの管理（scripts/prteeth/repos.py）。
+
+    ネットワークは使わない。ローカルに作った git リポジトリを origin にして、
+    clone / fetch の実際の挙動を確かめる。
+    """
+
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.root = self._dir.name
+        self.repos_dir = os.path.join(self.root, "repos")
+
+    def tearDown(self):
+        self._dir.cleanup()
+
+    def _git(self, *args, cwd=None):
+        import subprocess
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@e",
+                   GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@e")
+        return subprocess.run(["git"] + list(args), cwd=cwd, env=env,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+    def _origin(self, name="src"):
+        """clone 元になるローカルリポジトリを1つ作る。"""
+        path = os.path.join(self.root, name)
+        os.makedirs(path)
+        self._git("init", "-q", "-b", "main", cwd=path)
+        with open(os.path.join(path, "a.txt"), "w") as f:
+            f.write("hello\n")
+        self._git("add", "a.txt", cwd=path)
+        self._git("commit", "-qm", "first", cwd=path)
+        return path
+
+    def test_validate_rejects_path_traversal(self):
+        # パスの組み立てに使う値。.. や絶対パスが混ざる経路を作らない。
+        for bad in ("../../etc", "/etc/passwd", "owner", "a/b/c", ""):
+            with self.assertRaises(repos.RepoError):
+                repos.validate(bad)
+
+    def test_validate_accepts_normal_names(self):
+        self.assertEqual(repos.validate("Owner/repo.js"), "Owner/repo.js")
+
+    def test_path_is_split_by_owner(self):
+        p = repos.path_for(self.repos_dir, "o/r")
+        self.assertEqual(p, os.path.join(self.repos_dir, "o", "r"))
+
+    def test_clone_then_fetch(self):
+        origin = self._origin()
+        path, action = repos.ensure(self.repos_dir, "o/r", url=origin)
+        self.assertEqual(action, "cloned")
+        self.assertTrue(os.path.isdir(os.path.join(path, ".git")))
+
+        # 2回目は clone し直さない。
+        path2, action2 = repos.ensure(self.repos_dir, "o/r", url=origin)
+        self.assertEqual(action2, "fetched")
+        self.assertEqual(path, path2)
+
+    def test_clone_is_blobless(self):
+        # 全履歴の blob まで取ると、大きなモノレポでディスクと時間を浪費する。
+        origin = self._origin()
+        path, _ = repos.ensure(self.repos_dir, "o/r", url=origin)
+        with open(os.path.join(path, ".git", "config"), encoding="utf-8") as f:
+            self.assertIn("partialclonefilter", f.read().replace(" ", "").lower())
+
+    def test_fetch_sees_new_commits(self):
+        origin = self._origin()
+        repos.ensure(self.repos_dir, "o/r", url=origin)
+        with open(os.path.join(origin, "b.txt"), "w") as f:
+            f.write("second\n")
+        self._git("add", "b.txt", cwd=origin)
+        self._git("commit", "-qm", "second", cwd=origin)
+
+        path, action = repos.ensure(self.repos_dir, "o/r", url=origin)
+        self.assertEqual(action, "fetched")
+        log = self._git("log", "--oneline", "origin/main", cwd=path).stdout.decode()
+        self.assertIn("second", log)
+
+    def test_broken_clone_is_replaced(self):
+        # 途中で失敗した clone の残骸を掴んだまま fetch し続けない。
+        origin = self._origin()
+        path = repos.path_for(self.repos_dir, "o/r")
+        os.makedirs(path)
+        with open(os.path.join(path, "junk"), "w") as f:
+            f.write("leftover\n")
+
+        _, action = repos.ensure(self.repos_dir, "o/r", url=origin)
+        self.assertEqual(action, "cloned")
+        self.assertTrue(os.path.isdir(os.path.join(path, ".git")))
+        self.assertFalse(os.path.exists(os.path.join(path, "junk")))
+
+    def test_failure_raises_repo_error(self):
+        # 1件の失敗で巡回全体を止めない形にする（呼び出し側が握れる型）。
+        with self.assertRaises(repos.RepoError):
+            repos.ensure(self.repos_dir, "o/r",
+                         url=os.path.join(self.root, "nonexistent"))
+
+    def test_listing_reports_each_repo(self):
+        origin = self._origin()
+        repos.ensure(self.repos_dir, "o/r", url=origin)
+        repos.ensure(self.repos_dir, "other/x", url=origin)
+        names = [e["repo"] for e in repos.list_repos(self.repos_dir)]
+        self.assertEqual(names, ["o/r", "other/x"])
+
+    def test_listing_is_empty_before_any_clone(self):
+        self.assertEqual(repos.list_repos(self.repos_dir), [])
+
+    def test_touch_records_use(self):
+        origin = self._origin()
+        path, _ = repos.ensure(self.repos_dir, "o/r", url=origin)
+        os.utime(path, (0, 0))
+        repos.touch(path)
+        self.assertGreater(repos.used_at(path), 0)
+
+    def _fake(self, repo, used_at=None, size=0):
+        """clone せずに作業リポジトリらしきものを作る（掃除の判定用）。"""
+        path = repos.path_for(self.repos_dir, repo)
+        os.makedirs(os.path.join(path, ".git"), exist_ok=True)
+        if size:
+            with open(os.path.join(path, "big"), "wb") as f:
+                f.write(b"x" * size)
+        if used_at is not None:
+            stamp = os.path.join(path, ".pr-teeth-used")
+            with open(stamp, "w") as f:
+                f.write("")
+            os.utime(stamp, (used_at, used_at))
+        return path
+
+    def test_cleanup_removes_oldest_over_the_count_limit(self):
+        # 次に使う可能性が最も低いものから消す。
+        for i in range(5):
+            self._fake("o/r" + str(i), used_at=1000 + i)
+        out = repos.cleanup(self.repos_dir, max_repos=3, max_age_days=10 ** 6, now=2000)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/r0", "o/r1"])
+        self.assertEqual(out["kept"], ["o/r2", "o/r3", "o/r4"])
+
+    def test_cleanup_keeps_everything_under_the_limit(self):
+        self._fake("o/r", used_at=1000)
+        out = repos.cleanup(self.repos_dir, max_repos=3, max_age_days=10 ** 6, now=2000)
+        self.assertEqual(out["removed"], [])
+        self.assertEqual(out["kept"], ["o/r"])
+
+    def test_cleanup_removes_stale_repos_even_under_the_limit(self):
+        # 一度きり見た PR のリポジトリを、以後ずっと持ち続けない。
+        now = 100 * 86400
+        self._fake("o/old", used_at=now - 40 * 86400)
+        self._fake("o/fresh", used_at=now - 1 * 86400)
+        out = repos.cleanup(self.repos_dir, max_repos=99, max_age_days=30, now=now)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/old"])
+        self.assertEqual([r["reason"] for r in out["removed"]], ["age"])
+
+    def test_cleanup_respects_the_size_limit(self):
+        # 大きなモノレポが数個あると、件数の上限では効かない。
+        self._fake("o/a", used_at=1000, size=4000)
+        self._fake("o/b", used_at=2000, size=4000)
+        out = repos.cleanup(self.repos_dir, max_repos=99, max_bytes=5000,
+                            max_age_days=10 ** 6, now=3000)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/a"])
+        self.assertEqual([r["reason"] for r in out["removed"]], ["size"])
+        self.assertLessEqual(out["total_bytes"], 5000)
+
+    def test_cleanup_never_removes_protected_repos(self):
+        # いま解説中のものを消すと、直後に clone し直すことになる。
+        self._fake("o/current", used_at=0)
+        self._fake("o/other", used_at=5000)
+        out = repos.cleanup(self.repos_dir, max_repos=1, max_age_days=10 ** 6,
+                            now=6000, keep=["o/current"])
+        self.assertEqual(out["kept"], ["o/current"])
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/other"])
+
+    def test_cleanup_actually_deletes_from_disk(self):
+        path = self._fake("o/gone", used_at=0)
+        repos.cleanup(self.repos_dir, max_repos=0, max_age_days=10 ** 6, now=1000)
+        self.assertFalse(os.path.exists(path))
+
+    def test_cleanup_prunes_empty_owner_dirs(self):
+        self._fake("o/only", used_at=0)
+        repos.cleanup(self.repos_dir, max_repos=0, max_age_days=10 ** 6, now=1000)
+        self.assertFalse(os.path.exists(os.path.join(self.repos_dir, "o")))
+
+    def test_cleanup_is_safe_on_empty_dir(self):
+        out = repos.cleanup(self.repos_dir)
+        self.assertEqual(out["removed"], [])
+        self.assertEqual(out["kept"], [])
+
+    def test_cleanup_order_is_stable_for_equal_timestamps(self):
+        # 同着を実行ごとに揺らすと、消えるものが実行のたびに変わる。
+        for name in ("o/c", "o/a", "o/b"):
+            self._fake(name, used_at=1000)
+        out = repos.cleanup(self.repos_dir, max_repos=1, max_age_days=10 ** 6, now=2000)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/a", "o/b"])
 
 
 class TestDocument(unittest.TestCase):

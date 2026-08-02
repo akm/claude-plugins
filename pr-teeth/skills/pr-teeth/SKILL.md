@@ -93,8 +93,25 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
 `must_review` / `should_review` に該当する変更を中心に調べる。
 `ignore` のみの PR は軽く要約するだけでよく、clone もしない。
 
-1. リポジトリを clone（既存なら fetch）し、PR のブランチを checkout する。
-   作業場所は `config_dir` の `repos/` 配下を使う。
+1. 作業リポジトリを用意する。**`git clone` を直接実行しない**
+   （置き場所・取得量・掃除をコード側で決めるため）。
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" repo \
+     --repo "<owner/repo>"
+   ```
+
+   返り値の `path` が作業場所。既にあれば fetch される。上限を超えた古い
+   リポジトリの掃除もここで行われるため、別途消す必要はない。
+   `removed` が空でなければ、何を消したか最終出力に含めてよい。
+
+   用意できたら PR のブランチを checkout する。clone は `--no-checkout` の
+   部分クローンなので、**まず対象のコミットを取得する**。
+
+   ```bash
+   git -C "<path>" fetch origin "pull/<番号>/head"
+   git -C "<path>" checkout FETCH_HEAD
+   ```
 2. 差分と PR 本文を読む。
    **`status` が `updated` の PR では、`base_sha` からの差分を中心に見る。**
 
@@ -109,7 +126,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
    根拠が見つからなければ「（コード上で定義を確認できず）」と明記する。
    用語集で `known` の語は裏取りも説明も省いてよい。
 
-巨大な PR は中心的な変更に絞る。無制限に clone・解析してディスクと時間を使わない。
+巨大な PR は中心的な変更に絞る。無制限に解析してディスクと時間を使わない
+（clone の量と保持数は `repo` 側で抑えている）。
 
 ### 5. 用語の扱い
 

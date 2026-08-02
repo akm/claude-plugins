@@ -127,24 +127,33 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 
 `/pr-teeth` の手順 4 と同じ。**ただし「前回からの差分」は見ない**（毎回全体が対象）。
 
-1. リポジトリを clone（既存なら fetch）し、PR のブランチを checkout する。
-   作業場所は `config_dir` の `repos/` 配下を使う。
+1. 作業リポジトリを用意する。**`git clone` を直接実行しない**
+   （置き場所・取得量・掃除をコード側で決めるため）。
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" repo \
+     --repo "<owner/repo>"
+   ```
+
+   返り値の `path` が作業場所。上限を超えた古いリポジトリの掃除もここで行われる。
 
    マージ済み・クローズ済みの PR でも、head は取得できる。
 
    ```bash
-   git fetch origin pull/<番号>/head:pr-<番号> && git checkout pr-<番号>
+   git -C "<path>" fetch origin pull/<番号>/head:pr-<番号>
+   git -C "<path>" checkout pr-<番号>
    ```
 
    head が消えている場合（fork が削除された等）は、その旨を注記して
-   **差分だけで解説する**（`gh pr diff <番号> --repo <owner/repo>`）。無理に clone しない。
+   **差分だけで解説する**（`gh pr diff <番号> --repo <owner/repo>`）。無理に取得しない。
 2. 差分と PR 本文を読む。
 3. **文脈依存の語は憶測せず、そのブランチ上で裏取りする。**
    `rg` で定義・使われ方・呼び出し元を検索し、一次情報で意味を確定する。
    根拠が見つからなければ「（コード上で定義を確認できず）」と明記する。
    用語集で `known` の語は裏取りも説明も省いてよい。
 
-巨大な PR は中心的な変更に絞る。無制限に clone・解析してディスクと時間を使わない。
+巨大な PR は中心的な変更に絞る。無制限に解析してディスクと時間を使わない
+（clone の量と保持数は `repo` 側で抑えている）。
 
 ### 6. 用語の扱い
 
