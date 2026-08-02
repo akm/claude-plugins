@@ -421,6 +421,88 @@ class TestPreciousData(unittest.TestCase):
             p = self._write(d, '{"terms": {"a": {"term": "a"}}}')
             self.assertEqual(store.load_precious(p, {})["terms"]["a"]["term"], "a")
 
+    def test_lock_is_exclusive_between_processes(self):
+        # ロックが効いていなければ、子プロセスが即座に取得できてしまう。
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "g.json")
+            with store.locked(p):
+                self.assertFalse(self._child_can_lock(p))
+            # 解放後は取れる。
+            self.assertTrue(self._child_can_lock(p))
+
+    def test_lock_times_out_instead_of_hanging(self):
+        # 取れないまま無限に待つと、利用者からは固まったようにしか見えない。
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "g.json")
+            holder = self._spawn_holder(p, hold=3.0)
+            try:
+                self._wait_until_locked(p)
+                with self.assertRaises(store.Busy):
+                    with store.locked(p, timeout=0.2):
+                        pass
+            finally:
+                holder.kill()
+                holder.wait()
+
+    def test_lock_is_released_when_the_body_raises(self):
+        # 例外で抜けたあとロックが残ると、以降の実行が全部 Busy になる。
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "g.json")
+            with self.assertRaises(RuntimeError):
+                with store.locked(p):
+                    raise RuntimeError("boom")
+            self.assertTrue(self._child_can_lock(p))
+
+    def test_lock_survives_the_atomic_replace(self):
+        # save_json は os.replace で inode を差し替える。データファイル自体を
+        # ロック対象にしていると、置換後のファイルには何も保証が無い。
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "g.json")
+            with store.locked(p):
+                store.save_json(p, {"terms": {}})
+                self.assertFalse(self._child_can_lock(p))
+
+    def _lock_snippet(self, path, body):
+        scripts = os.path.join(os.path.dirname(__file__), "..", "scripts")
+        return [sys.executable, "-c", "\n".join([
+            "import sys, time",
+            "sys.path.insert(0, " + repr(scripts) + ")",
+            "from prteeth import store",
+            body.replace("<PATH>", repr(path)),
+        ])]
+
+    def _child_can_lock(self, path):
+        """別プロセスがロックを取れるか。取れれば exit=0。"""
+        import subprocess
+        cmd = self._lock_snippet(path, "\n".join([
+            "try:",
+            "    with store.locked(<PATH>, timeout=0.2):",
+            "        sys.exit(0)",
+            "except store.Busy:",
+            "    sys.exit(3)",
+        ]))
+        return subprocess.run(cmd, capture_output=True).returncode == 0
+
+    def _spawn_holder(self, path, hold):
+        """ロックを掴んだまま待つ子プロセスを起こす。"""
+        import subprocess
+        cmd = self._lock_snippet(path, "\n".join([
+            "with store.locked(<PATH>):",
+            "    open(<PATH> + '.held', 'w').close()",
+            "    time.sleep(" + str(hold) + ")",
+        ]))
+        return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _wait_until_locked(self, path, timeout=5.0):
+        """子がロックを掴むまで待つ。掴んだ合図はファイルの出現で受ける。"""
+        import time
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if os.path.exists(path + ".held"):
+                return
+            time.sleep(0.02)
+        self.fail("子プロセスがロックを取得しませんでした")
+
     def test_load_json_still_fails_soft_for_config(self):
         # 設定向けの load_json は従来どおり既定値を返す（種別で態度を変える）。
         with tempfile.TemporaryDirectory() as d:
@@ -1257,6 +1339,63 @@ class TestCliCommands(unittest.TestCase):
         patrol, _ = self._render(None)
         self.assertIn("pr-teeth-pick-", os.path.basename(pick["path"]))
         self.assertNotIn("pick", os.path.basename(patrol["path"]))
+
+    def _record_in_subprocess(self, terms, delay=0.0):
+        """実際の CLI を別プロセスで動かして record させる。
+
+        _run は同一プロセス内で関数を呼ぶため、プロセスを跨ぐ競合を再現できない。
+        delay は「読み込みの直後に保存が遅れる」状況を作り、ロックが無ければ
+        必ず lost update になる窓を開けるためのもの。
+        """
+        import subprocess
+
+        cli = os.path.join(os.path.dirname(__file__), "..", "scripts", "pr_teeth.py")
+        payload = self._write("terms-" + terms[0] + ".json", {"terms": [
+            {"term": t, "language": "ja", "definition": "d"} for t in terms
+        ]})
+        env = dict(os.environ, PR_TEETH_CONFIG_DIR=self._dir.name)
+        env.pop("PYTHONPATH", None)  # 遅延させない側に hook を継承させない
+        if delay:
+            # save_json を遅らせる。sitecustomize は子の起動時に自動で読まれる。
+            # hook は専用ディレクトリに置く。設定ディレクトリに置くと、
+            # PYTHONPATH を渡さない側の子もこれを読む経路が生まれうる。
+            hook_dir = os.path.join(self._dir.name, "hook")
+            os.makedirs(hook_dir, exist_ok=True)
+            hook = os.path.join(hook_dir, "sitecustomize.py")
+            with open(hook, "w", encoding="utf-8") as f:
+                f.write("\n".join([
+                    "import sys, time",
+                    "sys.path.insert(0, " + repr(os.path.dirname(cli)) + ")",
+                    "from prteeth import store",
+                    "_orig = store.save_json",
+                    "def _slow(path, data):",
+                    "    time.sleep(" + str(delay) + ")",
+                    "    return _orig(path, data)",
+                    "store.save_json = _slow",
+                ]))
+            env["PYTHONPATH"] = hook_dir
+        return subprocess.Popen(
+            [sys.executable, cli, "record", "--input", payload],
+            env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+    def test_concurrent_record_keeps_both_terms(self):
+        # Issue #13 の再現。ロックが無いと後から保存したほうが勝ち、
+        # 片方のプロセスが足した語が消える。
+        import time
+
+        slow = self._record_in_subprocess(["alpha"], delay=0.6)
+        # 先行プロセスが「読み終えたが、まだ保存していない」窓に後続を入れる。
+        # ここを待たずに起こすと両者が順に走ってしまい、競合を再現できない。
+        time.sleep(0.2)
+        fast = self._record_in_subprocess(["beta"])
+        self.assertEqual(slow.wait(), 0)
+        self.assertEqual(fast.wait(), 0)
+
+        with open(os.path.join(self._dir.name, "glossary.json"), encoding="utf-8") as f:
+            terms = json.load(f)["terms"]
+        self.assertIn("alpha", terms)
+        self.assertIn("beta", terms)
 
     def test_render_returns_a_command_that_opens_the_html(self):
         # パスだけでは「どう開くか」が利用者に委ねられる。そのまま実行できる形で返す。
