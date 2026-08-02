@@ -44,10 +44,28 @@ class TestConfigDir(unittest.TestCase):
         os.environ[config.CONFIG_DIR_ENV] = "/tmp/pr-teeth-test"
         self.assertEqual(config.config_dir("github.com/akm/claude-plugins"), "/tmp/pr-teeth-test")
 
-    def test_empty_source_is_an_error(self):
-        # 黙って変な場所に書くより、はっきり失敗させる。
-        with self.assertRaises(ValueError):
-            config.config_dir("")
+    def test_defaults_to_the_bundled_plugin_source(self):
+        # SKILL.md からは渡さない運用。書き換え箇所を config.py の1箇所に保つ（#15）。
+        self.assertEqual(config.config_dir(), config.config_dir(config.PLUGIN_SOURCE))
+
+    def test_empty_source_falls_back_to_the_constant(self):
+        # 空でも設定ディレクトリが分かれない。以前は例外にしていた。
+        self.assertEqual(config.config_dir(""), config.config_dir(config.PLUGIN_SOURCE))
+
+    def test_plugin_source_is_not_duplicated_in_skills(self):
+        # 3つの SKILL.md に散ると fork 時の書き換え漏れを招き、コマンドによって
+        # 別の設定ディレクトリを見る状態になる（#15）。
+        skills = os.path.join(os.path.dirname(__file__), "..", "skills")
+        offenders = []
+        for root, _, names in os.walk(skills):
+            for name in names:
+                if not name.endswith(".md"):
+                    continue
+                path = os.path.join(root, name)
+                with open(path, encoding="utf-8") as f:
+                    if "--plugin-source" in f.read():
+                        offenders.append(os.path.relpath(path, skills))
+        self.assertEqual(offenders, [])
 
 
 class TestLanguageResolution(unittest.TestCase):

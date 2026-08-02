@@ -268,10 +268,13 @@ PR ごとに埋め込むのは割に合わないという判断です。
 
 ## fork する場合
 
-設定ディレクトリの場所は、各 `SKILL.md` の `--plugin-source` にリテラルで
-書かれています (`github.com/akm/claude-plugins`)。fork して別のマーケットプレイスから
-配布する場合は、**両方の SKILL.md で同じ値に**書き換えてください。片方だけ変えると
-設定ディレクトリが分かれ、用語集を見失います。
+設定ディレクトリの場所は、`scripts/prteeth/config.py` の `PLUGIN_SOURCE` に
+リテラルで書かれています (`github.com/akm/claude-plugins`)。fork して別の
+マーケットプレイスから配布する場合は、**この 1 箇所だけ**を書き換えてください。
+
+```python
+PLUGIN_SOURCE = "github.com/akm/claude-plugins"   # ← fork 時はここだけ
+```
 
 実行時に配布元を推定する方法は採っていません。`${CLAUDE_PLUGIN_ROOT}` はインストール先
 しか返さず、そこから配布元を辿る経路 (`known_marketplaces.json` やキャッシュのパス構造) は

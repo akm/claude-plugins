@@ -47,12 +47,10 @@ description: 番号やURLで指定したGitHubのPRを、オープン・クロ�
 
 ### 1. 準備（設定の読み込み）
 
-次を実行する。`--plugin-source` の値は**このプラグインの配布元**であり、
-設定ディレクトリの場所を決める。
+次を実行する。
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
-  --plugin-source "github.com/akm/claude-plugins" \
   --mode full
 ```
 
@@ -75,7 +73,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" resolve \
-  --plugin-source "github.com/akm/claude-plugins" \
   "owner/repo#123" "https://github.com/owner/repo/pull/456"
 ```
 
@@ -117,7 +114,6 @@ PR ごとに、変更ファイル一覧を渡して分類する。手順は `/pr
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
-  --plugin-source "github.com/akm/claude-plugins" \
   --repo "<owner/repo>" --files-from <ファイル一覧のJSON>
 ```
 
@@ -158,7 +154,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" lookup \
-  --plugin-source "github.com/akm/claude-plugins" \
   --language <その PR の言語> --terms "語1" "語2"
 ```
 
@@ -201,7 +196,6 @@ HTML を生成する。**`--context pick` を必ず付ける**（付け忘れる
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
-  --plugin-source "github.com/akm/claude-plugins" \
   --context pick \
   --input <解説をまとめたJSON>
 ```
@@ -248,7 +242,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
-  --plugin-source "github.com/akm/claude-plugins" \
   --input <出現語と定義のJSON>
 ```
 
@@ -275,7 +268,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
-  --plugin-source "github.com/akm/claude-plugins" \
   --term "<語>" --status known
 ```
 
@@ -300,9 +292,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 
 ## fork する場合
 
-`--plugin-source` の値（`github.com/akm/claude-plugins`）は、`/pr-teeth` および
-`/pr-glossary` と**必ず同じ値**にする。片方だけ書き換えると設定ディレクトリが分かれ、
-用語集を見失う。
+配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の置き場所**。
+fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md 側には書かない）。
 
 実行時に配布元を推定する手段は採らない（`${CLAUDE_PLUGIN_ROOT}` はインストール先しか
 返さず、そこから配布元を辿る経路は非公式で、壊れると設定と用語集を見失うため）。

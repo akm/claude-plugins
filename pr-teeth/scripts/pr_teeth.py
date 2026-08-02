@@ -426,8 +426,9 @@ def main(argv=None):
     def common(sp):
         sp.add_argument(
             "--plugin-source",
-            required=True,
-            help="配布元 (<host>/<owner>/<repo>)。SKILL.md のリテラル値を渡す。",
+            default=None,
+            help="配布元 (<host>/<owner>/<repo>)。省略時は config.PLUGIN_SOURCE。"
+                 "fork 時の書き換えは config.py の 1 箇所で済むため、通常は渡さない。",
         )
         sp.add_argument("--lang", default=None, help="実行時の言語上書き")
 
