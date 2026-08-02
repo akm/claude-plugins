@@ -15,14 +15,20 @@
 「コミット境界を計画に織り込む」よう促す。分割が容易なうちに意識づけするのが狙い。
 
 方針:
-  - **同じセッションでは一度だけ**注入する。TodoWrite はステータス更新のたびに
-    呼ばれるため、素朴に実装すると数分おきに同じ文言が出てノイズになり、
+  - **1 セッションにつき 1 回だけ**注入する。何度も出すとノイズになり、
     「慣れ（無視）」を招く。それは注入そのものを無力化する。
-  - 内容が**実質的に変わったとき**は再度注入してよい。計画が作り直された場合は
-    境界の再検討が要るため。タスクの状態遷移（in_progress → completed）だけの
-    変化は「実質的な変化」に含めない。
+  - 判定に**計画の内容を使わない。** 当初は「計画の内容が変わったら再度促す」
+    設計にしていたが、これは実環境で破綻していた。TaskCreate は
+    **1 呼び出しで 1 タスク**を作るため、6 タスクの計画では 6 回発火する
+    （実測で確認）。タスクを 1 件足す・削る・並べ替えるだけでも再発火していた。
+    内容ベースの判定は「同じ計画かどうか」を表現できない。
   - リポジトリ外では何もしない。コミットの話が無関係なため。
   - 想定外で落ちても本体を止めない（return 0）。
+
+再度促さないことの割り切り:
+  計画を作り直したときも 2 回目は出ない。促す機会は減るが、鳴りすぎて無視される
+  ほうが失敗として重い。セッションの入口では SessionStart フックが、コミットの
+  瞬間には PreToolUse ガードが別途効く。
 
 状態の持ち方:
   セッションごとに一時ディレクトリへマーカーを置く。プロセスが分かれるフックでは
@@ -50,7 +56,11 @@ _PLANNING_TOOLS = {
 }
 
 # 計画の内容を表すとみなすキー。ツールごとに名前が違う。
-_PLAN_KEYS = ("todos", "plan", "tasks", "prompt", "description")
+# TaskCreate/TaskUpdate は subject・description を平らな dict で送る。
+_PLAN_KEYS = ("todos", "plan", "tasks", "subject", "prompt", "description")
+
+# タスク 1 件の中で「何をするか」を表すキー。状態（status / activeForm）は見ない。
+_TASK_KEYS = ("content", "subject", "title", "task", "description")
 
 
 def _state_dir():
@@ -58,62 +68,75 @@ def _state_dir():
     return os.path.join(base, "commit-rules-guard")
 
 
-def _marker_path(session_id, digest):
-    """このセッション・この計画内容に対する注入済みマーカー。
+def _marker_path(session_id):
+    """このセッションの注入済みマーカー。
 
-    内容のダイジェストを名前に含めるため、計画が作り直されれば別のマーカーになり、
-    再度注入される。状態遷移だけの更新では digest が変わらず、注入されない。
+    **計画の内容は名前に含めない。** 内容ごとに分けると、TaskCreate のように
+    1 呼び出しで 1 タスクを作るツールでタスク数だけ発火する。
+
+    セッション ID は**読みやすい部分＋ハッシュ**にする。記号を落とすだけだと
+    `abc/def` と `abcdef` が同じ名前になり、別セッションの通知を打ち消しうる
+    （64 文字で切る処理でも同じことが起きる）。一意性はハッシュが担う。
     """
-    safe = "".join(c for c in str(session_id) if c.isalnum() or c in "-_")[:64]
-    return os.path.join(_state_dir(), (safe or "nosession") + "-" + digest + ".seen")
+    raw = str(session_id) if session_id else ""
+    fingerprint = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+    readable = "".join(c for c in raw if c.isalnum() or c in "-_")[:32]
+    stem = (readable + "-" + fingerprint) if readable else ("nosession-" + fingerprint)
+    return os.path.join(_state_dir(), stem + ".seen")
 
 
-def _already_notified(path):
-    return os.path.exists(path)
+def claim(path):
+    """このマーカーを自分のものにできたら True。既に在れば False。
 
+    存在確認と作成を **1 つの原子的な操作**にする。`os.path.exists` で見てから
+    `open` すると、その隙間に別プロセスが入り、同じセッションで複数回通知が出る
+    （並列に 4 回呼ぶと 3〜4 回発火することを確認済み）。
 
-def _mark(path):
+    マーカーを置けない場合（読み取り専用・容量不足等）は False を返して**黙る**。
+    ここで True を返すと、以後すべての呼び出しで通知が出続けて慣れ（無視）を招く。
+    鳴り続けるより、黙るほうが害が小さい。
+    """
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("")
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        # O_EXCL: 既に在れば FileExistsError。作成できた側だけが通知する。
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return False
     except OSError:
-        # マーカーを置けなくても注入自体は成立する（次回また出るだけ）。
-        pass
+        # 置けないなら黙る（鳴り続けるより良い）。
+        return False
+    os.close(fd)
+    return True
 
 
-def plan_digest(tool_input):
-    """計画の「実質的な内容」のダイジェストを返す。
+def has_plan_content(tool_input):
+    """促す対象になる中身があるか。
 
-    タスクの状態（status / activeForm 等）は除く。in_progress → completed の
-    遷移のたびに注入すると、同じ文言が数分おきに出てノイズになるため。
-    内容が空なら None（注入しない）。
+    状態だけを更新する呼び出し（TaskUpdate の {task_id, status} 等）では False。
+    促す対象が無いのに鳴らさないため。
+
+    **内容の同一性は判定しない。** 以前は内容のハッシュで「同じ計画か」を判定して
+    いたが、TaskCreate が 1 呼び出しで 1 タスクを作るため、タスクごとに別の計画と
+    見なされて発火していた。いまはセッション単位で数えるので、ここは「中身がある
+    か」だけを見ればよい。
     """
     if not isinstance(tool_input, dict):
-        return None
+        return False
 
-    parts = []
     for key in _PLAN_KEYS:
         value = tool_input.get(key)
-        if value is None:
-            continue
-        if isinstance(value, str):
-            parts.append(value.strip())
-        elif isinstance(value, list):
+        if isinstance(value, str) and value.strip():
+            return True
+        if isinstance(value, list):
             for item in value:
-                if isinstance(item, str):
-                    parts.append(item.strip())
-                elif isinstance(item, dict):
-                    # タスク1件。状態ではなく「何をするか」だけを見る。
-                    for k in ("content", "title", "task", "description"):
+                if isinstance(item, str) and item.strip():
+                    return True
+                if isinstance(item, dict):
+                    for k in _TASK_KEYS:
                         v = item.get(k)
                         if isinstance(v, str) and v.strip():
-                            parts.append(v.strip())
-                            break
-    text = "\n".join(p for p in parts if p)
-    if not text.strip():
-        return None
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+                            return True
+    return False
 
 
 def _in_git_repo(cwd):
@@ -140,7 +163,7 @@ def build_message():
     lines.append("- **分割は後からできません。** 全部書き終えてから分けようとすると、")
     lines.append("  作業のやり直しになります。")
     lines.append("")
-    lines.append("この確認は同じ計画に対して一度だけ出ます。")
+    lines.append("この確認は 1 セッションにつき一度だけ出ます。")
     return "\n".join(lines)
 
 
@@ -155,19 +178,23 @@ def main():
         if data.get("tool_name") not in _PLANNING_TOOLS:
             return 0
 
-        digest = plan_digest(data.get("tool_input"))
-        if digest is None:
+        if not has_plan_content(data.get("tool_input")):
             # 中身の無い呼び出し（状態更新のみ等）。促す対象が無い。
+            return 0
+
+        # 通知済みかどうかを先に見る。git の起動はここを通った場合だけにする
+        # （状態更新は最も頻度が高く、そのたびにプロセスを起こす必要は無い）。
+        marker = _marker_path(data.get("session_id"))
+        if os.path.exists(marker):
             return 0
 
         cwd = data.get("cwd") or os.getcwd()
         if not _in_git_repo(cwd):
             return 0
 
-        marker = _marker_path(data.get("session_id"), digest)
-        if _already_notified(marker):
+        # 取得できた側だけが通知する（存在確認と作成は原子的）。
+        if not claim(marker):
             return 0
-        _mark(marker)
 
         # PostToolUse ではツールは既に実行済み。exit 2 は「取り消し」ではなく
         # 「実行後のフィードバック」として Claude に届く。

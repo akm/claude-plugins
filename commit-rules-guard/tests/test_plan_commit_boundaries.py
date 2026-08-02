@@ -6,9 +6,10 @@
   python3 -m unittest discover -s commit-rules-guard/tests
 
 ここでテストするのは、モデルの裁量ではなく決定的に決まるべき部分:
-  - 発火頻度の間引き（同じ計画で二度出さない / 作り直されたら出す）
-  - 対象ツールの判定
-  - リポジトリ外では黙る
+  - 発火頻度の間引き（1 セッションにつき 1 回だけ）
+  - 各ツールの**実際の形**で発火すること
+  - 間引けないとき（書き込めない・並列）に鳴り続けないこと
+  - 対象ツールの判定、リポジトリ外では黙ること
 """
 
 import importlib.util
@@ -37,40 +38,44 @@ NOTIFIED = 2
 SILENT = 0
 
 
-class TestPlanDigest(unittest.TestCase):
-    """計画の「実質的な内容」の取り出し。"""
+class TestPlanContent(unittest.TestCase):
+    """促す対象になる中身があるかの判定。
 
-    def test_same_content_same_digest(self):
-        a = {"todos": [{"content": "A を直す", "status": "pending"}]}
-        b = {"todos": [{"content": "A を直す", "status": "pending"}]}
-        self.assertEqual(plan.plan_digest(a), plan.plan_digest(b))
+    内容の同一性は見ない（セッション単位で数えるため）。ここで見るのは
+    「状態を変えただけの呼び出しで鳴らさない」ことだけ。
+    """
 
-    def test_status_change_does_not_change_digest(self):
-        # TodoWrite は状態更新のたびに呼ばれる。ここで digest が変わると、
-        # 同じ文言が数分おきに出てノイズになり「慣れ」を招く。
-        before = {"todos": [{"content": "A を直す", "status": "pending"}]}
-        after = {"todos": [{"content": "A を直す", "status": "completed"}]}
-        self.assertEqual(plan.plan_digest(before), plan.plan_digest(after))
+    def test_todo_list_has_content(self):
+        self.assertTrue(plan.has_plan_content(
+            {"todos": [{"content": "A を直す", "status": "pending"}]}))
 
-    def test_different_content_differs(self):
-        a = {"todos": [{"content": "A を直す"}]}
-        b = {"todos": [{"content": "B を直す"}]}
-        self.assertNotEqual(plan.plan_digest(a), plan.plan_digest(b))
+    def test_task_create_flat_shape_has_content(self):
+        # TaskCreate は 1 タスクを平らな dict で送る。
+        self.assertTrue(plan.has_plan_content(
+            {"subject": "#7 を実装", "description": "フックを足す",
+             "activeForm": "実装中"}))
 
-    def test_added_task_changes_digest(self):
-        # 計画が作り直されたら境界の再検討が要るので、再度促してよい。
-        a = {"todos": [{"content": "A を直す"}]}
-        b = {"todos": [{"content": "A を直す"}, {"content": "B も直す"}]}
-        self.assertNotEqual(plan.plan_digest(a), plan.plan_digest(b))
+    def test_task_update_status_only_has_no_content(self):
+        # TaskUpdate の状態遷移だけの呼び出し。促す対象が無い。
+        self.assertFalse(plan.has_plan_content(
+            {"task_id": "t-1", "status": "completed"}))
 
-    def test_empty_input_has_no_digest(self):
-        self.assertIsNone(plan.plan_digest({}))
-        self.assertIsNone(plan.plan_digest({"todos": []}))
-        self.assertIsNone(plan.plan_digest(None))
+    def test_exit_plan_mode_plain_text(self):
+        self.assertTrue(plan.has_plan_content({"plan": "まず X をして、次に Y"}))
 
-    def test_plain_text_plan(self):
-        # ExitPlanMode は文字列で計画を渡す。
-        self.assertIsNotNone(plan.plan_digest({"plan": "まず X をして、次に Y"}))
+    def test_empty_input_has_no_content(self):
+        self.assertFalse(plan.has_plan_content({}))
+        self.assertFalse(plan.has_plan_content({"todos": []}))
+        self.assertFalse(plan.has_plan_content(None))
+        self.assertFalse(plan.has_plan_content({"todos": [{"content": "   "}]}))
+
+    def test_non_dict_items_do_not_crash(self):
+        self.assertFalse(plan.has_plan_content({"todos": [1, None, ["x"]]}))
+        self.assertTrue(plan.has_plan_content({"todos": [1, {"content": "実タスク"}]}))
+
+    def test_non_dict_input_is_safe(self):
+        self.assertFalse(plan.has_plan_content("文字列"))
+        self.assertFalse(plan.has_plan_content([1, 2, 3]))
 
 
 class TestHookBehavior(unittest.TestCase):
@@ -98,6 +103,7 @@ class TestHookBehavior(unittest.TestCase):
         return p.returncode, p.stderr
 
     def _payload(self, tool_name="TodoWrite", todos=None, session="s1"):
+        """TodoWrite の形（リスト全体を渡す）。"""
         # todos=[] を「既定値」に差し替えないよう None とは区別する。
         if todos is None:
             todos = [{"content": "A を直す", "status": "pending"}]
@@ -109,10 +115,43 @@ class TestHookBehavior(unittest.TestCase):
             "tool_input": {"todos": todos},
         }
 
+    def _task_create(self, subject, session="s1"):
+        """TaskCreate の実際の形（1 呼び出しで 1 タスク）。"""
+        return {
+            "session_id": session,
+            "cwd": self.repo,
+            "hook_event_name": "PostToolUse",
+            "tool_name": "TaskCreate",
+            "tool_input": {"subject": subject, "description": subject + " の作業",
+                           "activeForm": subject + "中"},
+        }
+
     def test_notifies_once_for_a_new_plan(self):
         code, err = self._run(self._payload())
         self.assertEqual(code, NOTIFIED)
         self.assertIn("コミット境界", err)
+
+    def test_multi_task_plan_notifies_exactly_once(self):
+        # 本フックの最重要の保証。TaskCreate は 1 呼び出しで 1 タスクを作るため、
+        # 内容ごとに数えるとタスク数だけ発火し、慣れ（無視）を招く。
+        fired = 0
+        for subject in ("フックを実装", "テストを書く", "README 更新",
+                        "設計文書更新", "動作確認", "PR 作成"):
+            if self._run(self._task_create(subject))[0] == NOTIFIED:
+                fired += 1
+        self.assertEqual(fired, 1, "6 タスクの計画で " + str(fired) + " 回発火した")
+
+    def test_adding_a_task_later_does_not_renotify(self):
+        # 作業中にサブタスクを見つけて足すのはよくある。そのたびに鳴らさない。
+        self.assertEqual(self._run(self._payload())[0], NOTIFIED)
+        grown = self._payload(todos=[{"content": "A を直す"}, {"content": "B も直す"}])
+        self.assertEqual(self._run(grown)[0], SILENT)
+
+    def test_reordering_does_not_renotify(self):
+        self.assertEqual(self._run(self._payload(
+            todos=[{"content": "A"}, {"content": "B"}]))[0], NOTIFIED)
+        self.assertEqual(self._run(self._payload(
+            todos=[{"content": "B"}, {"content": "A"}]))[0], SILENT)
 
     def test_does_not_repeat_for_the_same_plan(self):
         # ここが本フックの成否を分ける。繰り返すと無視されるようになる。
@@ -128,10 +167,12 @@ class TestHookBehavior(unittest.TestCase):
         done = self._payload(todos=[{"content": "A を直す", "status": "completed"}])
         self.assertEqual(self._run(done)[0], SILENT)
 
-    def test_notifies_again_when_the_plan_is_rewritten(self):
+    def test_a_rewritten_plan_does_not_renotify(self):
+        # 割り切り: 計画を作り直しても 2 回目は出ない。促す機会は減るが、
+        # 鳴りすぎて無視されるほうが失敗として重い。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         rewritten = self._payload(todos=[{"content": "まったく別の作業"}])
-        self.assertEqual(self._run(rewritten)[0], NOTIFIED)
+        self.assertEqual(self._run(rewritten)[0], SILENT)
 
     def test_separate_sessions_each_get_one(self):
         self.assertEqual(self._run(self._payload(session="s1"))[0], NOTIFIED)
@@ -142,9 +183,31 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(self._payload(tool_name="Read"))[0], SILENT)
 
     def test_handles_the_other_planning_tools(self):
-        for name in ("ExitPlanMode", "TaskCreate", "TaskUpdate"):
-            code, _ = self._run(self._payload(tool_name=name, session="s-" + name))
-            self.assertEqual(code, NOTIFIED, name + " で発火しなかった")
+        # それぞれの実際の形で送る（tool_name だけ差し替えると、そのツールが
+        # 送らない形で通ってしまい、テストが誤りを隠す）。
+        cases = [
+            ("ExitPlanMode", {"plan": "まず X をして、次に Y"}),
+            ("TaskCreate", {"subject": "実装する", "description": "詳細"}),
+            ("TaskUpdate", {"subject": "実装する", "status": "in_progress"}),
+        ]
+        for name, tool_input in cases:
+            payload = {
+                "session_id": "s-" + name, "cwd": self.repo,
+                "hook_event_name": "PostToolUse",
+                "tool_name": name, "tool_input": tool_input,
+            }
+            self.assertEqual(self._run(payload)[0], NOTIFIED,
+                             name + " の実際の形で発火しなかった")
+
+    def test_task_update_without_content_is_silent(self):
+        # 状態遷移だけの呼び出しには促す対象が無い。
+        payload = {
+            "session_id": "s-upd", "cwd": self.repo,
+            "hook_event_name": "PostToolUse",
+            "tool_name": "TaskUpdate",
+            "tool_input": {"task_id": "t-1", "status": "completed"},
+        }
+        self.assertEqual(self._run(payload)[0], SILENT)
 
     def test_silent_outside_a_repository(self):
         # コミットの話が無関係な場所では黙る。
@@ -170,6 +233,56 @@ class TestHookBehavior(unittest.TestCase):
         del payload["session_id"]
         self.assertEqual(self._run(payload)[0], NOTIFIED)
         self.assertEqual(self._run(payload)[0], SILENT)
+
+    def test_unwritable_state_dir_stays_silent(self):
+        # マーカーを置けないと間引けない。鳴り続けるより黙るほうが害が小さい
+        # （以前は毎回発火し、慣れ＝無視を招いていた）。
+        os.makedirs(self.state, exist_ok=True)
+        os.chmod(self.state, 0o500)
+        try:
+            codes = [self._run(self._payload())[0] for _ in range(3)]
+        finally:
+            os.chmod(self.state, 0o700)
+        self.assertEqual(codes, [SILENT, SILENT, SILENT])
+
+    def test_concurrent_calls_notify_only_once(self):
+        # 存在確認と作成が原子的でないと、並列で複数回発火する。
+        import threading
+
+        results = []
+        lock = threading.Lock()
+
+        def _fire():
+            code = self._run(self._payload())[0]
+            with lock:
+                results.append(code)
+
+        threads = [threading.Thread(target=_fire) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(results.count(NOTIFIED), 1,
+                         "4 並列で " + str(results.count(NOTIFIED)) + " 回発火した")
+
+    def test_similar_session_ids_do_not_collide(self):
+        # 記号を落とすだけだと abc/def と abcdef が同じマーカーになり、
+        # 別セッションの通知を打ち消す。
+        self.assertEqual(self._run(self._payload(session="abc/def"))[0], NOTIFIED)
+        self.assertEqual(self._run(self._payload(session="abcdef"))[0], NOTIFIED)
+
+    def test_long_session_ids_do_not_collide(self):
+        base = "s" * 80
+        self.assertEqual(self._run(self._payload(session=base + "A"))[0], NOTIFIED)
+        self.assertEqual(self._run(self._payload(session=base + "B"))[0], NOTIFIED)
+
+    def test_marker_is_not_world_readable(self):
+        self.assertEqual(self._run(self._payload())[0], NOTIFIED)
+        state = os.path.join(self.state, "commit-rules-guard")
+        names = os.listdir(state)
+        self.assertEqual(len(names), 1)
+        mode = os.stat(os.path.join(state, names[0])).st_mode & 0o077
+        self.assertEqual(mode, 0, "マーカーが他ユーザーから読める")
 
 
 if __name__ == "__main__":
