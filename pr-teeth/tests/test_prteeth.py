@@ -999,6 +999,29 @@ class TestBodies(unittest.TestCase):
         leftovers = [n for n in os.listdir(self.dir) if n.startswith(".tmp-")]
         self.assertEqual(leftovers, [])
 
+    def test_diff_shows_added_lines(self):
+        d = bodies.diff("## 背景\n古い説明", "## 背景\n古い説明\n\n## 追記\n新しい段落")
+        self.assertIn("+## 追記", d)
+        self.assertIn("+新しい段落", d)
+
+    def test_diff_shows_removed_lines(self):
+        d = bodies.diff("残る行\n消える行", "残る行")
+        self.assertIn("-消える行", d)
+
+    def test_diff_is_empty_when_unchanged(self):
+        # 変わっていないのに「本文が変わった」と出すと、読み手を惑わせる。
+        self.assertEqual(bodies.diff("同じ本文", "同じ本文"), "")
+
+    def test_diff_is_empty_without_a_previous_body(self):
+        # 初回は全体を説明する。差分の出しようが無い。
+        self.assertEqual(bodies.diff(None, "本文"), "")
+
+    def test_diff_is_capped(self):
+        # 本文全体を貼り直すのではなく、変わった箇所を示す。
+        d = bodies.diff("\n".join(str(i) for i in range(500)), "\n".join("x" for _ in range(500)))
+        self.assertLessEqual(len(d.splitlines()), bodies.MAX_DIFF_LINES + 1)
+        self.assertIn("省略", d)
+
 
 class TestRepoCache(unittest.TestCase):
     """作業リポジトリの管理（scripts/prteeth/repos.py）。
@@ -1677,6 +1700,76 @@ class TestCliCommands(unittest.TestCase):
             terms = json.load(f)["terms"]
         self.assertIn("alpha", terms)
         self.assertIn("beta", terms)
+
+    def _record_body(self, body, sha="s1", updated_at="t1"):
+        notified = self._write("notified.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": sha, "updated_at": updated_at,
+             "body": body},
+        ]})
+        terms = self._write("terms.json", {"terms": []})
+        return self._run(self.mod.cmd_record, input=terms, notified=notified,
+                         open_prs=None)
+
+    def _select(self, body, sha="s2", updated_at="t2"):
+        payload = self._write("select.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": sha, "updated_at": updated_at,
+             "body": body},
+        ]})
+        return self._run(self.mod.cmd_select, input=payload)
+
+    def test_body_diff_round_trips_through_record_and_select(self):
+        # #11 の目的。前回の本文を保管し、次回に「どこが変わったか」を出す。
+        out = self._record_body("## 背景\n最初の説明")
+        self.assertEqual(out["bodies_saved"], 1)
+
+        got = self._select("## 背景\n最初の説明\n\n## 追記\nレビューを受けて補足")
+        target = got["targets"][0]
+        self.assertEqual(target["status"], "updated")
+        self.assertTrue(target["body_diff_available"])
+        self.assertIn("+## 追記", target["body_diff"])
+
+    def test_body_diff_is_empty_when_only_code_changed(self):
+        # 本文が変わっていないのに差分を出すと、読み手を惑わせる。
+        self._record_body("同じ本文")
+        target = self._select("同じ本文")["targets"][0]
+        self.assertTrue(target["body_diff_available"])
+        self.assertEqual(target["body_diff"], "")
+
+    def test_body_diff_is_unavailable_on_first_encounter(self):
+        # 初回は前回の本文が無い。異常ではなく、全体を説明すればよい。
+        target = self._select("初めての本文", sha="s1", updated_at="t1")["targets"][0]
+        self.assertEqual(target["status"], "new")
+        self.assertFalse(target["body_diff_available"])
+
+    def test_body_is_not_stored_in_state_json(self):
+        # state.json は人が開いて確認できる大きさに保つ（#11 の設計判断）。
+        self._record_body("x" * 3000)
+        with open(os.path.join(self._dir.name, "state.json"), encoding="utf-8") as f:
+            raw = f.read()
+        self.assertNotIn("x" * 100, raw)
+        self.assertIn("o/r#1", raw)
+
+    def test_bodies_are_pruned_with_the_state(self):
+        # 閉じた PR の本文を残し続けない。
+        self._record_body("残る", sha="s1")
+        notified = self._write("n2.json", {"prs": [
+            {"repo": "o/other", "number": 9, "sha": "s9", "updated_at": "t9",
+             "body": "別の PR"},
+        ]})
+        open_prs = self._write("open.json", {"prs": [
+            {"repo": "o/other", "number": 9, "sha": "s9", "updated_at": "t9"},
+        ]})
+        terms = self._write("t2.json", {"terms": []})
+        out = self._run(self.mod.cmd_record, input=terms, notified=notified,
+                        open_prs=open_prs)
+        self.assertEqual(out["bodies_pruned"], 1)
+        self.assertIsNone(bodies.load(
+            os.path.join(self._dir.name, "bodies"), "o/r", 1))
+
+    def test_long_body_is_reported_as_truncated(self):
+        # 黙って切り詰めると、次回の差分がずれた理由が分からない。
+        out = self._record_body("あ" * (bodies.MAX_BODY_BYTES))
+        self.assertTrue(any("先頭のみ保存" in w for w in out["warnings"]))
 
     def test_render_returns_a_command_that_opens_the_html(self):
         # パスだけでは「どう開くか」が利用者に委ねられる。そのまま実行できる形で返す。

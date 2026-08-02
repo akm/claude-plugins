@@ -17,8 +17,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, prspec, render, repos, scope,
-    state, store,
+    agent_input, auth, bodies, config, document, glossary, labels, prspec, render, repos,
+    scope, state, store,
 )
 
 
@@ -112,6 +112,21 @@ def cmd_select(args):
     warnings.extend(skipped)
 
     targets = state.select_targets(saved, prs)
+
+    # 本文の差分を添える。判断をここで済ませ、モデルには結果だけ渡す
+    # （2つの本文を渡して「どこが変わったか考えさせる」と実行のたびに揺れる）。
+    for item in targets:
+        item["body_diff"] = ""
+        item["body_diff_available"] = False
+        if item.get("status") != state.UPDATED:
+            continue
+        previous = bodies.load(paths["bodies_dir"], item.get("repo"), item.get("number"))
+        if previous is None:
+            # 初回・掃除済み・保存に失敗した回。異常ではないので黙って続行する。
+            continue
+        item["body_diff_available"] = True
+        item["body_diff"] = bodies.diff(previous, item.get("body") or "")
+
     return _emit({
         "targets": targets,
         "total": len(prs),
@@ -278,6 +293,8 @@ def cmd_record(args):
     saved_state = False
     state_recorded = 0
     state_pruned = 0
+    bodies_saved = 0
+    bodies_pruned = 0
     if args.notified or args.open_prs:
         # state は changes-only のときだけ更新する（第11節）。
         # --notified は部分でよい（マージ）。--open-prs は完全な一覧の宣言で、
@@ -296,6 +313,23 @@ def cmd_record(args):
         state_recorded = len(recorded)
         state_pruned = len(before - after)
 
+        # 次回の差分の材料として本文を残す。state の記録と歩調を合わせ、
+        # 掃除された PR の本文は残さない。
+        for pr in recorded:
+            if pr.get("body") is not None:
+                _, truncated = bodies.save(
+                    paths["bodies_dir"], pr.get("repo"), pr.get("number"), pr.get("body"))
+                bodies_saved += 1
+                if truncated:
+                    warnings.append(
+                        str(pr.get("repo")) + "#" + str(pr.get("number"))
+                        + " の本文が長いため先頭のみ保存しました"
+                        "（次回の差分は途中までの比較になります）。"
+                    )
+        if prune_to is not None:
+            alive = {(p.get("repo"), p.get("number")) for p in prune_to}
+            bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
+
     return _emit({
         "glossary_path": paths["glossary"],
         # 受理件数を返す。0 件なら入力が意図どおりでなかったと気づける。
@@ -303,6 +337,8 @@ def cmd_record(args):
         "terms_skipped": len(skipped),
         "counts": glossary.counts(g),
         "state_saved": saved_state,
+        "bodies_saved": bodies_saved,
+        "bodies_pruned": bodies_pruned,
         "state_recorded": state_recorded,
         "state_pruned": state_pruned,
         "warnings": warnings,

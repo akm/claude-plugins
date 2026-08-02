@@ -17,6 +17,7 @@ GitHub から取り直せるので、無ければ「前回の本文が無い」�
 よく、壊れていたら捨ててよい。用語集と同じ「壊れていたら触らない」は適用しない。
 """
 
+import difflib
 import hashlib
 import os
 import re
@@ -89,6 +90,35 @@ def remove(bodies_dir, repo, number):
         os.unlink(path_for(bodies_dir, repo, number))
     except OSError:
         pass
+
+
+# 差分として返す最大行数。本文全体を貼り直すのではなく、変わった箇所を示す。
+MAX_DIFF_LINES = 200
+
+
+def diff(previous, current, max_lines=MAX_DIFF_LINES):
+    """本文の差分を unified diff で返す。変化が無ければ空文字。
+
+    previous が None（保存が無い）の場合も空文字を返す。「前回の本文が無い」と
+    「本文が変わっていない」は呼び出し側で区別する（has_previous を見る）。
+
+    差分の判断はここで完結させる。モデルに2つの本文を渡して「どこが変わったか
+    考えさせる」と、実行のたびに揺れるうえ見落としも起きる。
+    """
+    if previous is None:
+        return ""
+    before = (previous or "").splitlines()
+    after = (current or "").splitlines()
+    if before == after:
+        return ""
+
+    lines = list(difflib.unified_diff(
+        before, after, fromfile="前回の本文", tofile="今回の本文", lineterm="", n=2,
+    ))
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines.append("... (差分が長いため以降を省略)")
+    return "\n".join(lines)
 
 
 def prune(bodies_dir, alive, max_bodies=MAX_BODIES):
