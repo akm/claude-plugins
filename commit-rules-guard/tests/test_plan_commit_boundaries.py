@@ -263,16 +263,21 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(payload)[0], SILENT)
 
     @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が効かない")
-    def test_unwritable_state_dir_stays_silent(self):
-        # マーカーを置けないと間引けない。鳴り続けるより黙るほうが害が小さい
-        # （以前は毎回発火し、慣れ＝無視を招いていた）。
+    def test_unwritable_state_dir_still_notifies(self):
+        # 状態を保存できないと間引けない。ここで黙ると、フックは永久に無言になり、
+        # しかも利用者はそれを正常な間引きと区別できない。静かに死ぬより鳴らす。
         os.makedirs(self.state, exist_ok=True)
         os.chmod(self.state, 0o500)
         try:
             codes = [self._run(self._payload())[0] for _ in range(3)]
         finally:
             os.chmod(self.state, 0o700)
-        self.assertEqual(codes, [SILENT, SILENT, SILENT])
+        self.assertEqual(codes, [NOTIFIED, NOTIFIED, NOTIFIED])
+
+    def test_normal_throttling_is_unaffected(self):
+        # 「置けない」を鳴らす側に倒しても、「既に在る」の間引きは効いたまま。
+        self.assertEqual(self._run(self._payload())[0], NOTIFIED)
+        self.assertEqual(self._run(self._payload())[0], SILENT)
 
     def test_concurrent_calls_notify_only_once(self):
         # 存在確認と作成が原子的でないと、並列で複数回発火する。
