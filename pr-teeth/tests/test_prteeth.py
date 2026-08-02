@@ -945,6 +945,46 @@ class TestBodies(unittest.TestCase):
         self.assertEqual(bodies.load(self.dir, "o/r", 1), "first")
         self.assertEqual(bodies.load(self.dir, "o/r", 2), "second")
 
+    def test_separator_ambiguity_does_not_collide(self):
+        # acme/web-api と acme-web/api はどちらも正当な GitHub のリポジトリ。
+        # 区切りを潰すと同名になり、一方の本文が他方の差分の基準に使われる（#9）。
+        bodies.save(self.dir, "acme/web-api", 1, "web-api の本文")
+        bodies.save(self.dir, "acme-web/api", 1, "api の本文")
+        self.assertEqual(bodies.load(self.dir, "acme/web-api", 1), "web-api の本文")
+        self.assertEqual(bodies.load(self.dir, "acme-web/api", 1), "api の本文")
+
+    def test_case_difference_does_not_collide(self):
+        bodies.save(self.dir, "o/r", 1, "小文字")
+        bodies.save(self.dir, "O/R", 1, "大文字")
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "小文字")
+        self.assertEqual(bodies.load(self.dir, "O/R", 1), "大文字")
+
+    def test_number_and_repo_boundary_does_not_collide(self):
+        # `o/r-1` #2 と `o/r` #"1-2" は、区切りを潰すと同じ綴りになりうる。
+        bodies.save(self.dir, "o/r-1", 2, "A")
+        bodies.save(self.dir, "o/r", "1-2", "B")
+        self.assertEqual(bodies.load(self.dir, "o/r-1", 2), "A")
+        self.assertEqual(bodies.load(self.dir, "o/r", "1-2"), "B")
+
+    def test_degenerate_names_still_get_distinct_files(self):
+        # 記号だけのリポジトリ名でも、ハッシュがあるので同じファイルに集まらない。
+        bodies.save(self.dir, "///", 1, "A")
+        bodies.save(self.dir, "@@@", 1, "B")
+        self.assertEqual(bodies.load(self.dir, "///", 1), "A")
+        self.assertEqual(bodies.load(self.dir, "@@@", 1), "B")
+
+    def test_name_has_no_parent_directory_segments(self):
+        # os.path.join では無害だが、ファイル名に .. が残ると紛らわしい。
+        self.assertNotIn("..", bodies._name("a/../../b", 1))
+        self.assertNotIn("..", bodies._name("..", 1))
+
+    def test_name_matches_the_state_key(self):
+        # state の記録と本文の対応が定義上ずれないよう、鍵を共有する。
+        import hashlib
+        key = state.key("o/r", 7)
+        expected = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+        self.assertIn(expected, bodies._name("o/r", 7))
+
     def test_long_body_is_truncated(self):
         # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを止める。
         body = "x" * (bodies.MAX_BODY_BYTES + 5000)
@@ -1015,7 +1055,10 @@ class TestBodies(unittest.TestCase):
             path, _ = bodies.save(self.dir, "o/r", i, "b")
             os.utime(path, (1000 + i, 1000 + i))
         removed = bodies.prune(self.dir, None, max_bodies=2)
-        self.assertEqual(sorted(removed), ["o-r-0.md", "o-r-1.md"])
+        # ファイル名の綴りではなく「どの PR が消えたか」を見る。
+        self.assertEqual(sorted(removed),
+                         sorted([bodies._name("o/r", 0), bodies._name("o/r", 1)]))
+        self.assertIsNone(bodies.load(self.dir, "o/r", 0))
         self.assertEqual(bodies.load(self.dir, "o/r", 3), "b")
 
     def test_prune_without_alive_keeps_everything_under_the_limit(self):

@@ -22,7 +22,7 @@ import hashlib
 import os
 import re
 
-from . import store
+from . import state, store
 
 # 1件あたりの保存上限（バイト）。実測では本文は中央値 1.4KB・最大 5KB 程度で、
 # 通常は掛からない。異常に長い本文（自動生成のログ貼り付け等）で state ディレクトリ
@@ -33,15 +33,36 @@ MAX_BODY_BYTES = 64 * 1024
 MAX_BODIES = 200
 
 _SAFE = re.compile(r"[^A-Za-z0-9._-]")
+_DOTS = re.compile(r"\.{2,}")
+
+# 人が読むための部分の長さ。これ自体は一意性を担わない（末尾のハッシュが担う）。
+_STEM_CHARS = 60
+
+# 一意性を担うハッシュの長さ。16 桁 (64bit) あれば、保管上限の 200 件に対して
+# 衝突は現実的に起こらない。
+_DIGEST_CHARS = 16
 
 
 def _name(repo, number):
     """保存名。owner/repo#番号 を1つのファイル名に潰す。
 
-    パスの組み立てに使う値なので、英数字とハイフン等以外は落とす。
+    英数字とハイフン等以外を落とすだけでは**別の PR が同じ名前になる**。
+    `acme/web-api#1` と `acme-web/api#1` はどちらも正当な GitHub のリポジトリだが、
+    区切りを潰すと両方 `acme-web-api-1` になり、一方の本文がもう一方の差分の基準に
+    使われる（利用者には気づけない誤った解説になる）。
+
+    そこで**末尾に鍵のハッシュを付けて一意にする**。鍵は state.key と同じ
+    `owner/repo#番号` にし、state の記録と本文の対応が定義上ずれないようにする。
+    先頭の読みやすい部分は人がファイルを見分けるためのもので、一意性は担わない。
     """
-    raw = str(repo or "") + "-" + str(number)
-    return _SAFE.sub("-", raw).strip("-").lower() + ".md"
+    key = state.key(repo, number)
+    fingerprint = hashlib.sha256(key.encode("utf-8")).hexdigest()[:_DIGEST_CHARS]
+    stem = _SAFE.sub("-", key).lower()
+    # `..` はパスとしては os.path.join で無害だが、ファイル名に残ると紛らわしい。
+    # 一意性はハッシュが担うので、読みやすさのために潰してよい。
+    stem = _DOTS.sub(".", stem).strip("-.")[:_STEM_CHARS].strip("-.")
+    # stem が空になる場合（repo が記号だけ等）でも、ハッシュだけで成立させる。
+    return ((stem + "-") if stem else "") + fingerprint + ".md"
 
 
 def path_for(bodies_dir, repo, number):
