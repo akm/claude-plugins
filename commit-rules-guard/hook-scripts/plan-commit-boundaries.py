@@ -62,6 +62,9 @@ _PLAN_KEYS = ("todos", "plan", "tasks", "subject", "prompt", "description")
 # タスク 1 件の中で「何をするか」を表すキー。状態（status / activeForm）は見ない。
 _TASK_KEYS = ("content", "subject", "title", "task", "description")
 
+# git の判定を打ち切るまでの秒数。hooks.json の全体上限より短くする。
+_GIT_TIMEOUT = 5
+
 
 
 def _state_dir():
@@ -153,12 +156,17 @@ def has_plan_content(tool_input):
 
 
 def _in_git_repo(cwd):
+    # timeout はプロセス側でも持つ。hooks.json の 10 秒はフック全体の上限で、
+    # そこで殺されると git の子プロセスが取り残されうる。ネットワーク上の
+    # リポジトリや index のロック待ちで固まる経路があるため、自分で打ち切る。
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
             capture_output=True, text=True, cwd=cwd or None,
+            timeout=_GIT_TIMEOUT,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
+        # 判定できないならリポジトリ外と同じ扱い（黙る）。
         return False
     return r.returncode == 0 and r.stdout.strip() == "true"
 
