@@ -73,6 +73,27 @@ class TestPlanContent(unittest.TestCase):
         self.assertFalse(plan.has_plan_content({"todos": [1, None, ["x"]]}))
         self.assertTrue(plan.has_plan_content({"todos": [1, {"content": "実タスク"}]}))
 
+    def test_invisible_only_tasks_have_no_content(self):
+        # 見た目が空のタスクで、セッションに 1 回しかない通知枠を使わない。
+        # str.strip() はゼロ幅文字を落とさないため、明示的に取り除く。
+        for label, text in (
+            ("ゼロ幅スペース", "\u200b"),
+            ("BOM", "\ufeff"),
+            ("ZWJ", "\u200d"),
+            ("空白とゼロ幅の混在", " \u200b \u200b "),
+            ("NBSP", "\u00a0"),
+        ):
+            self.assertFalse(
+                plan.has_plan_content({"todos": [{"content": text}]}),
+                label + " が中身ありと判定された")
+
+    def test_invisible_chars_do_not_hide_real_content(self):
+        # 除去は判定のためだけ。実タスクにゼロ幅文字が混ざっていても中身あり。
+        self.assertTrue(plan.has_plan_content(
+            {"todos": [{"content": "\u200b実タスク\u200b"}]}))
+        self.assertTrue(plan.has_plan_content(
+            {"todos": [{"content": "実\u200bタスク"}]}))
+
     def test_non_dict_input_is_safe(self):
         self.assertFalse(plan.has_plan_content("文字列"))
         self.assertFalse(plan.has_plan_content([1, 2, 3]))

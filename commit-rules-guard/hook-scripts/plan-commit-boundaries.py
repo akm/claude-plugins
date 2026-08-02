@@ -85,6 +85,26 @@ MAX_MARKER_AGE_DAYS = 7
 # マーカーの拡張子。掃除の対象をこれに限り、他のファイルには触らない。
 _MARKER_SUFFIX = ".seen"
 
+# 見た目に何も表示しない文字。str.strip() はこれらを落とさないため、
+# ゼロ幅文字だけのタスクが「中身あり」と判定されてしまう。
+# エスケープで書く（原文字はソース上で見えず、編集で壊れやすい）。
+_INVISIBLE = "\u200b\u200c\u200d\u2060\ufeff"
+_INVISIBLE_MAP = {ord(c): None for c in _INVISIBLE}
+
+
+def _is_meaningful(value):
+    """人が読める中身があるか。空白とゼロ幅文字だけなら False。
+
+    引数なしの str.strip() は Unicode の空白（NBSP 等）まで落とすが、ゼロ幅文字は
+    落とさない。逆に引数を渡すとその集合だけになり、NBSP を取りこぼす。
+
+    strip は端しか削らないため、` <ZWSP> ` のように混ざると 2 段階でも残る。
+    **ゼロ幅文字は位置を問わず取り除いてから**空白を判定する。
+    """
+    if not isinstance(value, str):
+        return False
+    return value.translate(_INVISIBLE_MAP).strip() != ""
+
 
 
 def _state_dir():
@@ -207,28 +227,29 @@ def has_plan_content(tool_input):
     変える。これを「中身あり」と数えると、セッションに 1 回しかない通知を状態更新で
     使い切り、**その後に来る本当の計画で促せなくなる**（促す機会を最も要らない
     タイミングで消費する）。
+
+    中身の有無は _is_meaningful で見る。見た目が空のタスクで通知枠を使わないため。
     """
     if not isinstance(tool_input, dict):
         return False
 
     # 状態遷移のための呼び出し。subject 等は「どのタスクか」の指示でしかない。
     # todos/plan/tasks のような計画そのものを持つ場合は、下のループで拾う。
-    if isinstance(tool_input.get("status"), str) and tool_input["status"].strip():
+    if _is_meaningful(tool_input.get("status")):
         if not any(k in tool_input for k in ("todos", "plan", "tasks")):
             return False
 
     for key in _PLAN_KEYS:
         value = tool_input.get(key)
-        if isinstance(value, str) and value.strip():
+        if _is_meaningful(value):
             return True
         if isinstance(value, list):
             for item in value:
-                if isinstance(item, str) and item.strip():
+                if _is_meaningful(item):
                     return True
                 if isinstance(item, dict):
                     for k in _TASK_KEYS:
-                        v = item.get(k)
-                        if isinstance(v, str) and v.strip():
+                        if _is_meaningful(item.get(k)):
                             return True
     return False
 
