@@ -108,8 +108,9 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ├── commit-rules-guard/           # プラグイン本体 (フック)
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
-│   ├── hook-scripts/guard-commit-rules.py
+│   ├── hook-scripts/              # 各フックの本体 (4 本)
 │   ├── rules/commit-rules.md      # 同梱の既定ルール
+│   ├── tests/                     # python3 -m unittest discover -s commit-rules-guard/tests
 │   └── README.md
 └── pr-teeth/                     # プラグイン本体 (skill)
     ├── .claude-plugin/plugin.json
