@@ -1001,6 +1001,16 @@ class TestBodies(unittest.TestCase):
         self.assertTrue(loaded.startswith("あ"))
         self.assertNotIn("�", loaded)
 
+    def test_truncated_body_currently_yields_a_spurious_diff(self):
+        # 既知の問題(#25)。切り詰めた前回と完全な今回を比較するため、本文が
+        # 変わっていなくても差分が出る。実測では上限に遠く現実にはほぼ起きないため
+        # 未対応。**直したらこのテストを「差分が出ない」に変える。**
+        body = "あ" * (bodies.MAX_BODY_BYTES // 2)
+        bodies.save(self.dir, "o/r", 1, body)
+        stored = bodies.load(self.dir, "o/r", 1)
+        self.assertNotEqual(stored, body)  # 切り詰められている
+        self.assertNotEqual(bodies.diff(stored, body), "")
+
     def test_normal_body_is_not_truncated(self):
         # 実測では中央値 1.4KB・最大 5KB 程度。通常は掛からない。
         _, truncated = bodies.save(self.dir, "o/r", 1, "x" * 5000)

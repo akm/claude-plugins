@@ -73,6 +73,10 @@ def save(bodies_dir, repo, number, body):
     """本文を保存する。長すぎる場合は先頭だけ残す。
 
     戻り値は (path, truncated)。
+
+    既知の問題: 切り詰めた本文を保存すると、次回は「切り詰めた前回」と「完全な今回」を
+    比較するため、本文が変わっていなくても差分が出る（#25）。実測では本文は中央値
+    1.4KB・最大 5.3KB で上限の 64KB には遠く、現実にはほぼ起きないため未対応。
     """
     os.makedirs(bodies_dir, exist_ok=True)
     text = body or ""
