@@ -1,7 +1,7 @@
 {
   "name": "pr-teeth",
   "description": "GitHub の PR を噛み砕いて解説する。レビュー依頼の巡回と、番号や URL で指定した PR (マージ済みも可) の解説に対応し、リポジトリ別のレビュー範囲に照らした解説を HTML で作る (出力言語は設定可能、既定は日本語)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "akm"
   },
