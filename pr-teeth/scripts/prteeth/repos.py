@@ -26,6 +26,18 @@ CLONE_TIMEOUT = 300
 # fetch は clone より軽い（差分だけ）。同じ上限にすると異常時の待ちが長すぎる。
 FETCH_TIMEOUT = 120
 
+# 保持するリポジトリ数の上限。超えたら最終利用が古い順に消す。
+# フェーズ2 ではレビュー依頼のたびに増えるため、件数で歯止めをかける。
+MAX_REPOS = 20
+
+# 合計ディスク使用量の上限（バイト）。大きなモノレポが数個あると件数上限では
+# 効かないため、容量でも歯止めをかける。
+MAX_TOTAL_BYTES = 5 * 1024 * 1024 * 1024  # 5 GiB
+
+# この日数だけ触っていないものは、上限に収まっていても消す。
+# 一度きり見た PR のリポジトリを、以後ずっと持ち続けない。
+MAX_AGE_DAYS = 30
+
 # owner/repo の形。ここを通さないものはパスに使わない。
 _REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
@@ -165,3 +177,89 @@ def disk_usage(path):
             except OSError:
                 continue
     return total
+
+
+def cleanup(repos_dir, max_repos=MAX_REPOS, max_bytes=MAX_TOTAL_BYTES,
+            max_age_days=MAX_AGE_DAYS, now=None, keep=()):
+    """上限を超えた作業リポジトリを消す。
+
+    消す順序は**最終利用が古い順**。次に使う可能性が最も低いものから消す。
+
+    3つの基準を順に適用する。
+      1. max_age_days を超えて触っていないもの（上限内でも消す）
+      2. max_repos を超えた分
+      3. 合計が max_bytes を超えている間
+
+    keep に挙げたリポジトリは消さない。いま解説中のものを消すと、直後に
+    clone し直すことになるため。
+
+    作業リポジトリは**再取得できる**ので、蓄積データと違い消してよい
+    （docs/design/data-integrity.md の区分では蓄積データに当たらない）。
+    """
+    import time
+
+    now = now if now is not None else time.time()
+    protected = {validate(r) for r in keep}
+    entries = list_repos(repos_dir)
+    # 古い順。同着はリポジトリ名で決めて、結果を実行ごとに揺らさない。
+    entries.sort(key=lambda e: (e["used_at"], e["repo"]))
+
+    removed = []
+
+    def _drop(entry, reason):
+        _remove(entry["path"])
+        removed.append({"repo": entry["repo"], "reason": reason})
+
+    # 1. 古すぎるもの。
+    survivors = []
+    age_limit = now - max_age_days * 86400
+    for e in entries:
+        if e["repo"] not in protected and e["used_at"] < age_limit:
+            _drop(e, "age")
+        else:
+            survivors.append(e)
+
+    # 2. 件数の上限。
+    over = len(survivors) - max_repos
+    if over > 0:
+        remaining = []
+        for e in survivors:
+            if over > 0 and e["repo"] not in protected:
+                _drop(e, "count")
+                over -= 1
+            else:
+                remaining.append(e)
+        survivors = remaining
+
+    # 3. 容量の上限。合計が収まるまで古い順に消す。
+    sizes = {e["repo"]: disk_usage(e["path"]) for e in survivors}
+    total = sum(sizes.values())
+    if total > max_bytes:
+        remaining = []
+        for e in survivors:
+            if total > max_bytes and e["repo"] not in protected:
+                total -= sizes[e["repo"]]
+                _drop(e, "size")
+            else:
+                remaining.append(e)
+        survivors = remaining
+
+    _prune_empty_owners(repos_dir)
+    return {
+        "removed": removed,
+        "kept": [e["repo"] for e in survivors],
+        "total_bytes": sum(disk_usage(e["path"]) for e in survivors),
+    }
+
+
+def _prune_empty_owners(repos_dir):
+    """リポジトリを消して空になった owner ディレクトリを片付ける。"""
+    if not os.path.isdir(repos_dir):
+        return
+    for owner in os.listdir(repos_dir):
+        path = os.path.join(repos_dir, owner)
+        if os.path.isdir(path) and not os.listdir(path):
+            try:
+                os.rmdir(path)
+            except OSError:
+                pass

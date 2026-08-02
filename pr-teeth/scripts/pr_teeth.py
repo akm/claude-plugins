@@ -346,10 +346,33 @@ def cmd_repo(args):
     path, action = repos.ensure(repos_dir, args.repo)
     repos.touch(path)
 
+    # 掃除はここで自動的に行う。別コマンドにしてエージェントの裁量に委ねると、
+    # 呼ばれないまま溜まり続ける（散文の指示に強制力が無いのが元の問題）。
+    # いま用意したものは keep で守る。直後に消して clone し直さないため。
+    cleaned = repos.cleanup(repos_dir, keep=[args.repo])
+
     return _emit({
         "repo": args.repo,
         "path": path,
         "action": action,
+        "removed": cleaned["removed"],
+        "total_bytes": cleaned["total_bytes"],
+        "warnings": warnings,
+    })
+
+
+def cmd_repo_cleanup(args):
+    """作業リポジトリを掃除する。上限の確認・手動の掃除に使う。"""
+    warnings = []
+    config_dir, paths, _ = _load(args, warnings)
+    before = repos.list_repos(paths["repos_dir"])
+    cleaned = repos.cleanup(paths["repos_dir"])
+    return _emit({
+        "repos_dir": paths["repos_dir"],
+        "before": len(before),
+        "removed": cleaned["removed"],
+        "kept": cleaned["kept"],
+        "total_bytes": cleaned["total_bytes"],
         "warnings": warnings,
     })
 
@@ -524,6 +547,10 @@ def main(argv=None):
     common(sp)
     sp.add_argument("--repo", required=True, help="owner/repo")
     sp.set_defaults(func=cmd_repo)
+
+    sp = sub.add_parser("repo-cleanup", help="作業リポジトリを掃除する")
+    common(sp)
+    sp.set_defaults(func=cmd_repo_cleanup)
 
     sp = sub.add_parser("render", help="解説を自己完結 HTML にする")
     common(sp)

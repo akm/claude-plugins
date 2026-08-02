@@ -1024,6 +1024,84 @@ class TestRepoCache(unittest.TestCase):
         repos.touch(path)
         self.assertGreater(repos.used_at(path), 0)
 
+    def _fake(self, repo, used_at=None, size=0):
+        """clone せずに作業リポジトリらしきものを作る（掃除の判定用）。"""
+        path = repos.path_for(self.repos_dir, repo)
+        os.makedirs(os.path.join(path, ".git"), exist_ok=True)
+        if size:
+            with open(os.path.join(path, "big"), "wb") as f:
+                f.write(b"x" * size)
+        if used_at is not None:
+            stamp = os.path.join(path, ".pr-teeth-used")
+            with open(stamp, "w") as f:
+                f.write("")
+            os.utime(stamp, (used_at, used_at))
+        return path
+
+    def test_cleanup_removes_oldest_over_the_count_limit(self):
+        # 次に使う可能性が最も低いものから消す。
+        for i in range(5):
+            self._fake("o/r" + str(i), used_at=1000 + i)
+        out = repos.cleanup(self.repos_dir, max_repos=3, max_age_days=10 ** 6, now=2000)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/r0", "o/r1"])
+        self.assertEqual(out["kept"], ["o/r2", "o/r3", "o/r4"])
+
+    def test_cleanup_keeps_everything_under_the_limit(self):
+        self._fake("o/r", used_at=1000)
+        out = repos.cleanup(self.repos_dir, max_repos=3, max_age_days=10 ** 6, now=2000)
+        self.assertEqual(out["removed"], [])
+        self.assertEqual(out["kept"], ["o/r"])
+
+    def test_cleanup_removes_stale_repos_even_under_the_limit(self):
+        # 一度きり見た PR のリポジトリを、以後ずっと持ち続けない。
+        now = 100 * 86400
+        self._fake("o/old", used_at=now - 40 * 86400)
+        self._fake("o/fresh", used_at=now - 1 * 86400)
+        out = repos.cleanup(self.repos_dir, max_repos=99, max_age_days=30, now=now)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/old"])
+        self.assertEqual([r["reason"] for r in out["removed"]], ["age"])
+
+    def test_cleanup_respects_the_size_limit(self):
+        # 大きなモノレポが数個あると、件数の上限では効かない。
+        self._fake("o/a", used_at=1000, size=4000)
+        self._fake("o/b", used_at=2000, size=4000)
+        out = repos.cleanup(self.repos_dir, max_repos=99, max_bytes=5000,
+                            max_age_days=10 ** 6, now=3000)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/a"])
+        self.assertEqual([r["reason"] for r in out["removed"]], ["size"])
+        self.assertLessEqual(out["total_bytes"], 5000)
+
+    def test_cleanup_never_removes_protected_repos(self):
+        # いま解説中のものを消すと、直後に clone し直すことになる。
+        self._fake("o/current", used_at=0)
+        self._fake("o/other", used_at=5000)
+        out = repos.cleanup(self.repos_dir, max_repos=1, max_age_days=10 ** 6,
+                            now=6000, keep=["o/current"])
+        self.assertEqual(out["kept"], ["o/current"])
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/other"])
+
+    def test_cleanup_actually_deletes_from_disk(self):
+        path = self._fake("o/gone", used_at=0)
+        repos.cleanup(self.repos_dir, max_repos=0, max_age_days=10 ** 6, now=1000)
+        self.assertFalse(os.path.exists(path))
+
+    def test_cleanup_prunes_empty_owner_dirs(self):
+        self._fake("o/only", used_at=0)
+        repos.cleanup(self.repos_dir, max_repos=0, max_age_days=10 ** 6, now=1000)
+        self.assertFalse(os.path.exists(os.path.join(self.repos_dir, "o")))
+
+    def test_cleanup_is_safe_on_empty_dir(self):
+        out = repos.cleanup(self.repos_dir)
+        self.assertEqual(out["removed"], [])
+        self.assertEqual(out["kept"], [])
+
+    def test_cleanup_order_is_stable_for_equal_timestamps(self):
+        # 同着を実行ごとに揺らすと、消えるものが実行のたびに変わる。
+        for name in ("o/c", "o/a", "o/b"):
+            self._fake(name, used_at=1000)
+        out = repos.cleanup(self.repos_dir, max_repos=1, max_age_days=10 ** 6, now=2000)
+        self.assertEqual([r["repo"] for r in out["removed"]], ["o/a", "o/b"])
+
 
 class TestDocument(unittest.TestCase):
     """解説データの型（scripts/prteeth/document.py）。
