@@ -78,6 +78,13 @@ _TASK_KEYS = ("content", "subject", "title", "task", "description")
 # git の判定を打ち切るまでの秒数。hooks.json の全体上限より短くする。
 _GIT_TIMEOUT = 5
 
+# マーカーを保持する日数。これを過ぎたセッションの記録は意味を持たない。
+# 容量の問題ではない（0 バイト）。期限切れの状態を残さないための掃除。
+MAX_MARKER_AGE_DAYS = 7
+
+# マーカーの拡張子。掃除の対象をこれに限り、他のファイルには触らない。
+_MARKER_SUFFIX = ".seen"
+
 
 
 def _state_dir():
@@ -130,6 +137,47 @@ def claim(path):
         return True
     os.close(fd)
     return True
+
+
+def sweep(state_dir, max_age_days=MAX_MARKER_AGE_DAYS, now=None):
+    """期限切れのマーカーを消す。消した名前のリストを返す。
+
+    マーカーは 0 バイトなので容量の問題ではない。消す理由は**期限切れの状態を
+    残さない**こと。古いマーカーが残っていると、セッション ID が再利用されたときに
+    生きたセッションを黙らせうる。
+
+    姉妹モジュール pr-teeth の repos.py / bodies.py が同じ「溜まり続けるキャッシュ」に
+    上限を持っているのに揃える。
+
+    掃除の失敗はフックの判断に影響させない（呼び出し側で握る）。ここで例外を
+    上げると、掃除できない環境で通知そのものが止まってしまう。
+    """
+    import time
+
+    now = now if now is not None else time.time()
+    cutoff = now - max_age_days * 86400
+    removed = []
+    try:
+        names = os.listdir(state_dir)
+    except OSError:
+        return removed
+
+    for name in names:
+        if not name.endswith(_MARKER_SUFFIX):
+            # 自分が作ったもの以外には触らない。
+            continue
+        path = os.path.join(state_dir, name)
+        try:
+            if not os.path.isfile(path):
+                continue
+            if os.path.getmtime(path) >= cutoff:
+                continue
+            os.unlink(path)
+            removed.append(name)
+        except OSError:
+            # 消せないものは放っておく。掃除は best-effort。
+            continue
+    return removed
 
 
 def has_plan_content(tool_input):
@@ -235,6 +283,13 @@ def main():
         # 取得できた側だけが通知する（存在確認と作成は原子的）。
         if not claim(marker):
             return 0
+
+        # 期限切れのマーカーを掃除する。ここまで来るのはセッションに 1 回だけなので、
+        # 頻度もコストも無視できる。掃除の失敗は通知を妨げない。
+        try:
+            sweep(_state_dir())
+        except Exception:
+            pass
 
         # PostToolUse ではツールは既に実行済み。exit 2 は「取り消し」ではなく
         # 「実行後のフィードバック」として Claude に届く。

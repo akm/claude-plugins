@@ -78,6 +78,48 @@ class TestPlanContent(unittest.TestCase):
         self.assertFalse(plan.has_plan_content([1, 2, 3]))
 
 
+class TestSweep(unittest.TestCase):
+    """期限切れマーカーの掃除。"""
+
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.state = self._dir.name
+
+    def tearDown(self):
+        self._dir.cleanup()
+
+    def _marker(self, name, age_days=0, now=1_000_000.0):
+        path = os.path.join(self.state, name)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("")
+        stamp = now - age_days * 86400
+        os.utime(path, (stamp, stamp))
+        return path
+
+    def test_removes_expired_markers(self):
+        old = self._marker("old.seen", age_days=30)
+        removed = plan.sweep(self.state, max_age_days=7, now=1_000_000.0)
+        self.assertEqual(removed, ["old.seen"])
+        self.assertFalse(os.path.exists(old))
+
+    def test_keeps_fresh_markers(self):
+        fresh = self._marker("fresh.seen", age_days=1)
+        self.assertEqual(plan.sweep(self.state, max_age_days=7, now=1_000_000.0), [])
+        self.assertTrue(os.path.exists(fresh))
+
+    def test_does_not_touch_other_files(self):
+        # 自分が作ったもの以外には触らない。
+        other = os.path.join(self.state, "someone-elses.txt")
+        with open(other, "w") as f:
+            f.write("x")
+        os.utime(other, (0, 0))
+        self.assertEqual(plan.sweep(self.state, max_age_days=7, now=1_000_000.0), [])
+        self.assertTrue(os.path.exists(other))
+
+    def test_missing_dir_is_safe(self):
+        self.assertEqual(plan.sweep(os.path.join(self.state, "nope")), [])
+
+
 class TestHookBehavior(unittest.TestCase):
     """フック本体の入出力（実際にプロセスとして起動する）。"""
 
@@ -273,6 +315,23 @@ class TestHookBehavior(unittest.TestCase):
         finally:
             os.chmod(self.state, 0o700)
         self.assertEqual(codes, [NOTIFIED, NOTIFIED, NOTIFIED])
+
+    def test_old_markers_are_swept_on_notify(self):
+        # 通知した回に掃除が走る。古いセッションの記録を残し続けない。
+        state = os.path.join(self.state, "commit-rules-guard")
+        os.makedirs(state, exist_ok=True)
+        stale = os.path.join(state, "ancient.seen")
+        with open(stale, "w") as f:
+            f.write("")
+        os.utime(stale, (0, 0))  # 1970 年
+
+        self.assertEqual(self._run(self._payload())[0], NOTIFIED)
+        self.assertFalse(os.path.exists(stale), "古いマーカーが残った")
+
+    def test_sweep_does_not_remove_the_marker_just_claimed(self):
+        # 掃除がいま取ったマーカーを消すと、間引きが効かなくなる。
+        self.assertEqual(self._run(self._payload())[0], NOTIFIED)
+        self.assertEqual(self._run(self._payload())[0], SILENT)
 
     def test_normal_throttling_is_unaffected(self):
         # 「置けない」を鳴らす側に倒しても、「既に在る」の間引きは効いたまま。
