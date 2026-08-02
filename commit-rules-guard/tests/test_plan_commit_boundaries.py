@@ -304,6 +304,20 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(payload)[0], NOTIFIED)
         self.assertEqual(self._run(payload)[0], SILENT)
 
+    def test_falsy_session_ids_currently_share_one_marker(self):
+        # 既知の割り切り。falsy な session_id はすべて同じマーカーになるため、
+        # 別セッションどうしが打ち消し合う。実際の session_id は UUID なので
+        # 到達しない。**直したらこのテストを「別々に鳴る」に変える。**
+        first = self._payload(session="s")
+        del first["session_id"]
+        self.assertEqual(self._run(first)[0], NOTIFIED)
+
+        for falsy in ("", 0, False):
+            payload = self._payload()
+            payload["session_id"] = falsy
+            self.assertEqual(self._run(payload)[0], SILENT,
+                             repr(falsy) + " が別セッションとして扱われた")
+
     @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が効かない")
     def test_unwritable_state_dir_still_notifies(self):
         # 状態を保存できないと間引けない。ここで黙ると、フックは永久に無言になり、
