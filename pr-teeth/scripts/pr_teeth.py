@@ -243,25 +243,29 @@ def cmd_record(args):
     """出現した語と新しく書いた定義を用語集に反映する。state も必要なら更新。"""
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
-    g = _load_glossary(paths)
 
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
     # 形が違えば例外で止まる。黙って0件記録して成功を返さない。
+    # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待たせない）。
     items, skipped = agent_input.terms(payload)
     warnings.extend(skipped)
 
     now = _now()
-    for item in items:
-        glossary.record(
-            g,
-            item["term"],
-            language=item.get("language"),
-            definition=item.get("definition"),
-            provenance=item.get("provenance"),
-            now=now,
-        )
-    store.save_json(paths["glossary"], g)
+    # 読み込みから保存までをロックで囲む。ここを開けると、同時に走った実行の
+    # どちらか一方の記録が丸ごと失われる（#13）。
+    with store.locked(paths["glossary"]):
+        g = _load_glossary(paths)
+        for item in items:
+            glossary.record(
+                g,
+                item["term"],
+                language=item.get("language"),
+                definition=item.get("definition"),
+                provenance=item.get("provenance"),
+                now=now,
+            )
+        store.save_json(paths["glossary"], g)
 
     def _read_prs(path):
         with open(path, "r", encoding="utf-8") as f:
@@ -276,13 +280,16 @@ def cmd_record(args):
         # state は changes-only のときだけ更新する（第11節）。
         # --notified は部分でよい（マージ）。--open-prs は完全な一覧の宣言で、
         # 渡されたときだけ、そこに無い記録を掃除する。
-        saved = store.load_precious(paths["state"], {})
         recorded = _read_prs(args.notified) if args.notified else []
         prune_to = _read_prs(args.open_prs) if args.open_prs else None
-        before = set(state.load_notified(saved))
-        updated = state.record_notified(saved, recorded, prune_to=prune_to)
-        after = set(state.load_notified(updated))
-        store.save_json(paths["state"], updated)
+        # state も用語集と同じ read-modify-write。巡回どうしが重なると
+        # 通知済みの記録が失われ、同じ PR を再通知する。
+        with store.locked(paths["state"]):
+            saved = store.load_precious(paths["state"], {})
+            before = set(state.load_notified(saved))
+            updated = state.record_notified(saved, recorded, prune_to=prune_to)
+            after = set(state.load_notified(updated))
+            store.save_json(paths["state"], updated)
         saved_state = True
         state_recorded = len(recorded)
         state_pruned = len(before - after)
@@ -304,10 +311,13 @@ def cmd_promote(args):
     """ユーザーの確認を経たステータス変更を確定する。"""
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
-    g = _load_glossary(paths)
-    existed = glossary.get(g, args.term) is not None
-    entry = glossary.set_status(g, args.term, args.status, now=_now())
-    store.save_json(paths["glossary"], g)
+    # ステータス変更は上書き意味論。record と重なったとき、こちらの確定操作が
+    # 相手の読み込み済みデータで巻き戻らないようロックの中で読み直す（#13）。
+    with store.locked(paths["glossary"]):
+        g = _load_glossary(paths)
+        existed = glossary.get(g, args.term) is not None
+        entry = glossary.set_status(g, args.term, args.status, now=_now())
+        store.save_json(paths["glossary"], g)
     if not existed:
         # 綴り違いを黙って新規作成すると、直したつもりの語が別エントリになる。
         warnings.append(
@@ -529,6 +539,16 @@ def main(argv=None):
             "hint": "上書きを避けるため保存していません。"
                     + e.path + " を退避（別名にコピー）してから削除するか、"
                     "JSON として直せる場合は修復してください。",
+            "path": e.path,
+        }, sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+        return 1
+    except store.Busy as e:
+        # 他の実行が更新中。保存には進んでいないので、元ファイルは無事。
+        json.dump({
+            "error": str(e),
+            "hint": "記録が失われるのを避けるため保存していません。"
+                    "他の pr-teeth の実行が終わってから再実行してください。",
             "path": e.path,
         }, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
