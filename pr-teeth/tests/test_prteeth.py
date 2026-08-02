@@ -1160,6 +1160,16 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("pr-teeth-pick-", os.path.basename(pick["path"]))
         self.assertNotIn("pick", os.path.basename(patrol["path"]))
 
+    def test_render_returns_a_command_that_opens_the_html(self):
+        # パスだけでは「どう開くか」が利用者に委ねられる。そのまま実行できる形で返す。
+        out, _ = self._render(None)
+        self.assertIn(out["path"], out["open_command"])
+
+    def test_open_command_quotes_the_path(self):
+        # 設定ディレクトリは利用者のホーム配下にあり、空白を含みうる。
+        cmd = self.mod._open_command("/a b/c.html")
+        self.assertIn('"/a b/c.html"', cmd)
+
 
 class TestRenderGlossary(unittest.TestCase):
     def _data(self, language="ja"):

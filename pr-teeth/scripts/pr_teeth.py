@@ -213,6 +213,23 @@ def _out_path(paths, name, default_name):
     return name if os.path.isabs(name) else os.path.join(paths["out"], name)
 
 
+def _open_command(path):
+    """生成した HTML を開くコマンドを返す。
+
+    パスにはタイムスタンプが入り設定ディレクトリ配下にあるため、手で打つには長い。
+    そのまま実行できる形で返し、利用者が「どう開くか」を考えずに済むようにする。
+    プラットフォームの判定をモデルに委ねると実行のたびに揺れるため、ここで決める。
+    """
+    if sys.platform == "darwin":
+        opener = "open"
+    elif sys.platform == "win32":
+        opener = "start"
+    else:
+        # Linux / WSL。WSL でも xdg-open は既定のブラウザに渡せる。
+        opener = "xdg-open"
+    return opener + ' "' + path + '"'
+
+
 def _load_glossary(paths):
     """用語集を読む。壊れていれば Corrupt が上がり、保存に進まない。
 
@@ -334,7 +351,12 @@ def cmd_render(args):
     with open(path, "w", encoding="utf-8") as f:
         f.write(render.render(doc))
 
-    return _emit({"path": path, "count": len(doc.prs), "warnings": doc.warnings})
+    return _emit({
+        "path": path,
+        "open_command": _open_command(path),
+        "count": len(doc.prs),
+        "warnings": doc.warnings,
+    })
 
 
 def cmd_glossary_html(args):
@@ -389,7 +411,12 @@ def cmd_glossary_html(args):
     path = _out_path(paths, args.output, "pr-glossary.html")
     with open(path, "w", encoding="utf-8") as f:
         f.write(render.render_glossary(data))
-    return _emit({"path": path, "counts": glossary.counts(g), "warnings": warnings})
+    return _emit({
+        "path": path,
+        "open_command": _open_command(path),
+        "counts": glossary.counts(g),
+        "warnings": warnings,
+    })
 
 
 def main(argv=None):
