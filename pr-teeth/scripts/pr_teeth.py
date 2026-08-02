@@ -120,12 +120,22 @@ def cmd_select(args):
         item["body_diff_available"] = False
         if item.get("status") != state.UPDATED:
             continue
+        # 「本文が空」と「body を渡し忘れた」を区別する。混同すると、渡し忘れが
+        # 「本文が全部消された」という差分になって出る（本文は消えていない）。
+        current = item.get("body")
+        if not isinstance(current, str):
+            if current is not None:
+                warnings.append(
+                    str(item.get("repo")) + "#" + str(item.get("number"))
+                    + " の body が文字列ではないため、本文の差分を出しません。"
+                )
+            continue
         previous = bodies.load(paths["bodies_dir"], item.get("repo"), item.get("number"))
         if previous is None:
             # 初回・掃除済み・保存に失敗した回。異常ではないので黙って続行する。
             continue
         item["body_diff_available"] = True
-        item["body_diff"] = bodies.diff(previous, item.get("body") or "")
+        item["body_diff"] = bodies.diff(previous, current)
 
     return _emit({
         "targets": targets,
@@ -316,19 +326,33 @@ def cmd_record(args):
         # 次回の差分の材料として本文を残す。state の記録と歩調を合わせ、
         # 掃除された PR の本文は残さない。
         for pr in recorded:
-            if pr.get("body") is not None:
+            body = pr.get("body")
+            if body is None:
+                continue
+            label = str(pr.get("repo")) + "#" + str(pr.get("number"))
+            if not isinstance(body, str):
+                warnings.append(label + " の body が文字列ではないため保存しませんでした。")
+                continue
+            # 本文はキャッシュ。保存に失敗しても、確定済みの用語集と state を
+            # 巻き添えにしない（次回は「前回の本文が無い」として全体を説明する）。
+            try:
                 _, truncated = bodies.save(
-                    paths["bodies_dir"], pr.get("repo"), pr.get("number"), pr.get("body"))
-                bodies_saved += 1
-                if truncated:
-                    warnings.append(
-                        str(pr.get("repo")) + "#" + str(pr.get("number"))
-                        + " の本文が長いため先頭のみ保存しました"
-                        "（次回の差分は途中までの比較になります）。"
-                    )
+                    paths["bodies_dir"], pr.get("repo"), pr.get("number"), body)
+            except OSError as e:
+                warnings.append(label + " の本文を保存できませんでした（" + str(e) + "）。")
+                continue
+            bodies_saved += 1
+            if truncated:
+                warnings.append(
+                    label + " の本文が長いため先頭のみ保存しました"
+                    "（次回の差分は途中までの比較になります）。"
+                )
         if prune_to is not None:
             alive = {(p.get("repo"), p.get("number")) for p in prune_to}
-            bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
+            try:
+                bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
+            except OSError as e:
+                warnings.append("本文の掃除に失敗しました（" + str(e) + "）。")
 
     return _emit({
         "glossary_path": paths["glossary"],

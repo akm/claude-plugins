@@ -1766,6 +1766,48 @@ class TestCliCommands(unittest.TestCase):
         self.assertIsNone(bodies.load(
             os.path.join(self._dir.name, "bodies"), "o/r", 1))
 
+    def test_missing_body_does_not_look_like_a_deleted_description(self):
+        # body の渡し忘れが「本文が全部消された」差分になって出ていた。
+        # 利用者には嘘の説明として届くため、差分を出さないほうが正しい。
+        self._record_body("## 背景\n消えていない本文")
+        payload = self._write("nobody.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": "s2", "updated_at": "t2"},
+        ]})
+        target = self._run(self.mod.cmd_select, input=payload)["targets"][0]
+        self.assertEqual(target["status"], "updated")
+        self.assertFalse(target["body_diff_available"])
+        self.assertEqual(target["body_diff"], "")
+
+    def test_empty_body_is_still_diffed(self):
+        # 「渡し忘れ」と違い、本当に空にした場合は削除として出す。
+        self._record_body("消される本文")
+        target = self._select("")["targets"][0]
+        self.assertTrue(target["body_diff_available"])
+        self.assertIn("-消される本文", target["body_diff"])
+
+    def test_non_string_body_does_not_abort_the_run(self):
+        # state と用語集は確定済み。本文はキャッシュなので巻き添えにしない。
+        notified = self._write("bad.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": "s1", "updated_at": "t1",
+             "body": {"text": "oops"}},
+        ]})
+        terms = self._write("t.json", {"terms": []})
+        out = self._run(self.mod.cmd_record, input=terms, notified=notified,
+                        open_prs=None)
+        self.assertTrue(out["state_saved"])
+        self.assertEqual(out["bodies_saved"], 0)
+        self.assertTrue(any("文字列ではない" in w for w in out["warnings"]))
+
+    def test_non_string_body_is_skipped_in_select(self):
+        self._record_body("前回の本文")
+        payload = self._write("badsel.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": "s2", "updated_at": "t2",
+             "body": ["not", "a", "string"]},
+        ]})
+        out = self._run(self.mod.cmd_select, input=payload)
+        self.assertFalse(out["targets"][0]["body_diff_available"])
+        self.assertTrue(any("文字列ではない" in w for w in out["warnings"]))
+
     def test_long_body_is_reported_as_truncated(self):
         # 黙って切り詰めると、次回の差分がずれた理由が分からない。
         out = self._record_body("あ" * (bodies.MAX_BODY_BYTES))
