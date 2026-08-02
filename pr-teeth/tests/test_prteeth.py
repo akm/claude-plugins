@@ -1867,6 +1867,81 @@ class TestCliCommands(unittest.TestCase):
         out = self._record_body("あ" * (bodies.MAX_BODY_BYTES))
         self.assertTrue(any("先頭のみ保存" in w for w in out["warnings"]))
 
+    def test_record_holds_the_state_lock_while_writing_bodies(self):
+        # state の記録と本文は対で意味を持つ（記録に対応する本文が次回の差分の
+        # 基準）。本文の保存がロックの外にあると、state を書き終えてから本文を
+        # 書くまでの間に、並走した実行の掃除が入りうる（#4）。
+        #
+        # 競合そのものは実行のたびに再現するとは限らないため、ここでは
+        # 「本文を書いている間ロックを保持しているか」という不変条件を直接見る。
+        import threading
+
+        observed = []
+        original = bodies.save
+
+        def _watching_save(bodies_dir, repo, number, body):
+            # 本文を書いている最中に、別スレッドがロックを取れてしまわないか。
+            def _probe():
+                try:
+                    with store.locked(
+                        os.path.join(self._dir.name, "state.json"), timeout=0.2
+                    ):
+                        observed.append("acquired")
+                except store.Busy:
+                    observed.append("busy")
+
+            t = threading.Thread(target=_probe)
+            t.start()
+            t.join()
+            return original(bodies_dir, repo, number, body)
+
+        bodies.save = _watching_save
+        try:
+            self._record_body("本文", sha="s1", updated_at="t1")
+        finally:
+            bodies.save = original
+
+        self.assertEqual(
+            observed, ["busy"],
+            "本文の書き込み中に state ロックが取得できた"
+            "（保存がロックの外にある）",
+        )
+
+    def test_select_holds_the_state_lock_while_reading_bodies(self):
+        # 読む側も同じ。record の途中の state と本文の組み合わせを読まない。
+        import threading
+
+        self._record_body("前回の本文")
+        observed = []
+        original = bodies.load
+
+        def _watching_load(bodies_dir, repo, number):
+            def _probe():
+                try:
+                    with store.locked(
+                        os.path.join(self._dir.name, "state.json"), timeout=0.2
+                    ):
+                        observed.append("acquired")
+                except store.Busy:
+                    observed.append("busy")
+
+            t = threading.Thread(target=_probe)
+            t.start()
+            t.join()
+            return original(bodies_dir, repo, number)
+
+        bodies.load = _watching_load
+        try:
+            self._select("今回の本文")
+        finally:
+            bodies.load = original
+
+        self.assertEqual(
+            observed, ["busy"],
+            "本文の読み込み中に state ロックが取得できた"
+            "（読み込みがロックの外にある）",
+        )
+
     def test_render_returns_a_command_that_opens_the_html(self):
         # パスだけでは「どう開くか」が利用者に委ねられる。そのまま実行できる形で返す。
         out, _ = self._render(None)

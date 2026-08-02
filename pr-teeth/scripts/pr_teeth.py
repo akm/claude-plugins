@@ -103,18 +103,39 @@ def cmd_select(args):
     """
     warnings = []
     _, paths, _ = _load(args, warnings)
-    # state も蓄積データ。壊れていれば止める（空扱いすると全件を再通知してしまう）。
-    saved = store.load_precious(paths["state"], {})
 
     with open(args.input, "r", encoding="utf-8") as f:
         raw = json.load(f)
     prs, skipped = agent_input.prs(raw)
     warnings.extend(skipped)
 
-    targets = state.select_targets(saved, prs)
+    # state と本文は対で意味を持つ（記録に対応する本文が差分の基準）。読む側も
+    # 同じロックで囲み、record の途中の state と本文の組み合わせを読まない。
+    # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待たせない）。
+    with store.locked(paths["state"]):
+        # state も蓄積データ。壊れていれば止める（空扱いすると全件を再通知してしまう）。
+        saved = store.load_precious(paths["state"], {})
+        targets = state.select_targets(saved, prs)
+        _attach_body_diffs(targets, paths, warnings)
 
-    # 本文の差分を添える。判断をここで済ませ、モデルには結果だけ渡す
-    # （2つの本文を渡して「どこが変わったか考えさせる」と実行のたびに揺れる）。
+    return _emit({
+        "targets": targets,
+        "total": len(prs),
+        "skipped": len(skipped),
+        "selected": len(targets),
+        "warnings": warnings,
+    })
+
+
+def _attach_body_diffs(targets, paths, warnings):
+    """更新された PR に本文の差分を添える。
+
+    呼び出し側が state ロックを保持している前提。本文の読み込みは state の読み込みと
+    同じ臨界区間に入れる（対応しない組み合わせを読まないため）。
+
+    判断はここで済ませ、モデルには結果だけ渡す（2つの本文を渡して「どこが変わったか
+    考えさせる」と実行のたびに揺れる）。
+    """
     for item in targets:
         item["body_diff"] = ""
         item["body_diff_available"] = False
@@ -136,14 +157,6 @@ def cmd_select(args):
             continue
         item["body_diff_available"] = True
         item["body_diff"] = bodies.diff(previous, current)
-
-    return _emit({
-        "targets": targets,
-        "total": len(prs),
-        "skipped": len(skipped),
-        "selected": len(targets),
-        "warnings": warnings,
-    })
 
 
 def cmd_resolve(args):
@@ -313,50 +326,56 @@ def cmd_record(args):
         prune_to = _read_prs(args.open_prs) if args.open_prs else None
         # state も用語集と同じ read-modify-write。巡回どうしが重なると
         # 通知済みの記録が失われ、同じ PR を再通知する。
+        #
+        # 本文の保存・掃除も同じロックの中で行う。state の記録と本文は対で意味を
+        # 持つため（「通知済み」の記録に対応する本文が次回の差分の基準になる）、
+        # 別々に更新すると片方だけが進む。特に、並走した実行の掃除が、こちらが
+        # 今書いた本文を消しうる。ローカルファイルのみで 12 件でも 4ms 程度なので、
+        # 臨界区間を伸ばす costs は無視できる。用語集ロックとは入れ子にならない。
         with store.locked(paths["state"]):
             saved = store.load_precious(paths["state"], {})
             before = set(state.load_notified(saved))
             updated = state.record_notified(saved, recorded, prune_to=prune_to)
             after = set(state.load_notified(updated))
             store.save_json(paths["state"], updated)
-        saved_state = True
-        state_recorded = len(recorded)
-        state_pruned = len(before - after)
+            saved_state = True
+            state_recorded = len(recorded)
+            state_pruned = len(before - after)
 
-        # 次回の差分の材料として本文を残す。state の記録と歩調を合わせ、
-        # 掃除された PR の本文は残さない。
-        for pr in recorded:
-            body = pr.get("body")
-            if body is None:
-                continue
-            label = str(pr.get("repo")) + "#" + str(pr.get("number"))
-            if not isinstance(body, str):
-                warnings.append(label + " の body が文字列ではないため保存しませんでした。")
-                continue
-            # 本文はキャッシュ。保存に失敗しても、確定済みの用語集と state を
-            # 巻き添えにしない（次回は「前回の本文が無い」として全体を説明する）。
+            # 次回の差分の材料として本文を残す。
+            for pr in recorded:
+                body = pr.get("body")
+                if body is None:
+                    continue
+                label = str(pr.get("repo")) + "#" + str(pr.get("number"))
+                if not isinstance(body, str):
+                    warnings.append(label + " の body が文字列ではないため保存しませんでした。")
+                    continue
+                # 本文はキャッシュ。保存に失敗しても、確定済みの用語集と state を
+                # 巻き添えにしない（次回は「前回の本文が無い」として全体を説明する）。
+                try:
+                    _, truncated = bodies.save(
+                        paths["bodies_dir"], pr.get("repo"), pr.get("number"), body)
+                except OSError as e:
+                    warnings.append(label + " の本文を保存できませんでした（" + str(e) + "）。")
+                    continue
+                bodies_saved += 1
+                if truncated:
+                    warnings.append(
+                        label + " の本文が長いため先頭のみ保存しました"
+                        "（次回の差分は途中までの比較になります）。"
+                    )
+
+            # 掃除は毎回行う。--open-prs が渡されたときは閉じた PR の分も消せるが、
+            # SKILL.md は「迷ったら渡さない」と指示しているため、渡される保証は無い。
+            # ここを --open-prs 有りに限ると、件数の上限が通常の経路で効かなくなる。
+            alive = None
+            if prune_to is not None:
+                alive = {(p.get("repo"), p.get("number")) for p in prune_to}
             try:
-                _, truncated = bodies.save(
-                    paths["bodies_dir"], pr.get("repo"), pr.get("number"), body)
+                bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
             except OSError as e:
-                warnings.append(label + " の本文を保存できませんでした（" + str(e) + "）。")
-                continue
-            bodies_saved += 1
-            if truncated:
-                warnings.append(
-                    label + " の本文が長いため先頭のみ保存しました"
-                    "（次回の差分は途中までの比較になります）。"
-                )
-        # 掃除は毎回行う。--open-prs が渡されたときは閉じた PR の分も消せるが、
-        # SKILL.md は「迷ったら渡さない」と指示しているため、渡される保証は無い。
-        # ここを --open-prs 有りに限ると、件数の上限が通常の経路で効かなくなる。
-        alive = None
-        if prune_to is not None:
-            alive = {(p.get("repo"), p.get("number")) for p in prune_to}
-        try:
-            bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
-        except OSError as e:
-            warnings.append("本文の掃除に失敗しました（" + str(e) + "）。")
+                warnings.append("本文の掃除に失敗しました（" + str(e) + "）。")
 
     return _emit({
         "glossary_path": paths["glossary"],
