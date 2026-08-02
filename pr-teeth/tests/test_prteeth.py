@@ -1069,10 +1069,6 @@ class TestBodies(unittest.TestCase):
     def test_prune_is_safe_on_missing_dir(self):
         self.assertEqual(bodies.prune(self.dir, set()), [])
 
-    def test_digest_detects_change(self):
-        self.assertEqual(bodies.digest("a"), bodies.digest("a"))
-        self.assertNotEqual(bodies.digest("a"), bodies.digest("b"))
-
     def test_save_is_atomic(self):
         # 途中で中断されても既存の本文を壊さない。
         bodies.save(self.dir, "o/r", 1, "original")

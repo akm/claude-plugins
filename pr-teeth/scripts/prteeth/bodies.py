@@ -69,11 +69,6 @@ def path_for(bodies_dir, repo, number):
     return os.path.join(bodies_dir, _name(repo, number))
 
 
-def digest(body):
-    """本文のハッシュ。保存せずに「変わったか」だけ見たいときに使う。"""
-    return hashlib.sha256((body or "").encode("utf-8")).hexdigest()
-
-
 def save(bodies_dir, repo, number, body):
     """本文を保存する。長すぎる場合は先頭だけ残す。
 
@@ -104,13 +99,6 @@ def load(bodies_dir, repo, number):
             return f.read()
     except (OSError, ValueError):
         return None
-
-
-def remove(bodies_dir, repo, number):
-    try:
-        os.unlink(path_for(bodies_dir, repo, number))
-    except OSError:
-        pass
 
 
 # 差分として返す最大行数。本文全体を貼り直すのではなく、変わった箇所を示す。
