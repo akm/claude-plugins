@@ -199,16 +199,18 @@ def load_toml(path, default, warnings=None):
     return data
 
 
-def save_json(path, data):
-    """JSON を原子的に書く。途中で中断されても既存ファイルを壊さない。"""
+def _save_atomic(path, write, suffix):
+    """一時ファイルに書いてから os.replace で差し替える。
+
+    途中で中断されても既存ファイルを壊さない。書き込み本体は write(f) に委ねる。
+    """
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=directory or ".", prefix=".tmp-", suffix=".json")
+    fd, tmp = tempfile.mkstemp(dir=directory or ".", prefix=".tmp-", suffix=suffix)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
-            f.write("\n")
+            write(f)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)
@@ -218,3 +220,17 @@ def save_json(path, data):
         except OSError:
             pass
         raise
+
+
+def save_json(path, data):
+    """JSON を原子的に書く。途中で中断されても既存ファイルを壊さない。"""
+    def _write(f):
+        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
+        f.write("\n")
+
+    _save_atomic(path, _write, ".json")
+
+
+def save_text(path, text):
+    """テキストを原子的に書く。PR 本文の保管に使う。"""
+    _save_atomic(path, lambda f: f.write(text or ""), ".txt")

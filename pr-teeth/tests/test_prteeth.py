@@ -22,8 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, prspec, render, repos, scope,
-    state, store,
+    agent_input, auth, bodies, config, document, glossary, labels, prspec, render, repos,
+    scope, state, store,
 )
 
 
@@ -911,6 +911,240 @@ class TestPRSpec(unittest.TestCase):
         self.assertEqual(len(targets), 2)
 
 
+class TestBodies(unittest.TestCase):
+    """PR 本文の保管（scripts/prteeth/bodies.py）。
+
+    本文は state.json に入れず 1件1ファイルで持つ。state を人が開いて確認できる
+    大きさに保ち、本文だけを独立して消せるようにするため（#11）。
+    """
+
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.dir = os.path.join(self._dir.name, "bodies")
+
+    def tearDown(self):
+        self._dir.cleanup()
+
+    def test_round_trips(self):
+        bodies.save(self.dir, "o/r", 1, "## 背景\n本文")
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "## 背景\n本文")
+
+    def test_missing_body_is_none_not_an_error(self):
+        # 無いことは異常ではない（初回・掃除済み）。呼び出し側は全体を説明する。
+        self.assertIsNone(bodies.load(self.dir, "o/r", 999))
+
+    def test_file_name_is_sanitized(self):
+        # パスの組み立てに使う値。.. や / が混ざる経路を作らない。
+        p = bodies.path_for(self.dir, "Owner/repo.js", 7)
+        self.assertEqual(os.path.dirname(p), self.dir)
+        self.assertNotIn("/", os.path.basename(p).replace(".md", ""))
+
+    def test_different_prs_do_not_collide(self):
+        bodies.save(self.dir, "o/r", 1, "first")
+        bodies.save(self.dir, "o/r", 2, "second")
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "first")
+        self.assertEqual(bodies.load(self.dir, "o/r", 2), "second")
+
+    def test_separator_ambiguity_does_not_collide(self):
+        # acme/web-api と acme-web/api はどちらも正当な GitHub のリポジトリ。
+        # 区切りを潰すと同名になり、一方の本文が他方の差分の基準に使われる（#9）。
+        bodies.save(self.dir, "acme/web-api", 1, "web-api の本文")
+        bodies.save(self.dir, "acme-web/api", 1, "api の本文")
+        self.assertEqual(bodies.load(self.dir, "acme/web-api", 1), "web-api の本文")
+        self.assertEqual(bodies.load(self.dir, "acme-web/api", 1), "api の本文")
+
+    def test_case_difference_does_not_collide(self):
+        bodies.save(self.dir, "o/r", 1, "小文字")
+        bodies.save(self.dir, "O/R", 1, "大文字")
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "小文字")
+        self.assertEqual(bodies.load(self.dir, "O/R", 1), "大文字")
+
+    def test_number_and_repo_boundary_does_not_collide(self):
+        # `o/r-1` #2 と `o/r` #"1-2" は、区切りを潰すと同じ綴りになりうる。
+        bodies.save(self.dir, "o/r-1", 2, "A")
+        bodies.save(self.dir, "o/r", "1-2", "B")
+        self.assertEqual(bodies.load(self.dir, "o/r-1", 2), "A")
+        self.assertEqual(bodies.load(self.dir, "o/r", "1-2"), "B")
+
+    def test_degenerate_names_still_get_distinct_files(self):
+        # 記号だけのリポジトリ名でも、ハッシュがあるので同じファイルに集まらない。
+        bodies.save(self.dir, "///", 1, "A")
+        bodies.save(self.dir, "@@@", 1, "B")
+        self.assertEqual(bodies.load(self.dir, "///", 1), "A")
+        self.assertEqual(bodies.load(self.dir, "@@@", 1), "B")
+
+    def test_name_has_no_parent_directory_segments(self):
+        # os.path.join では無害だが、ファイル名に .. が残ると紛らわしい。
+        self.assertNotIn("..", bodies._name("a/../../b", 1))
+        self.assertNotIn("..", bodies._name("..", 1))
+
+    def test_name_matches_the_state_key(self):
+        # state の記録と本文の対応が定義上ずれないよう、鍵を共有する。
+        import hashlib
+        key = state.key("o/r", 7)
+        expected = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+        self.assertIn(expected, bodies._name("o/r", 7))
+
+    def test_long_body_is_truncated(self):
+        # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを止める。
+        body = "x" * (bodies.MAX_BODY_BYTES + 5000)
+        _, truncated = bodies.save(self.dir, "o/r", 1, body)
+        self.assertTrue(truncated)
+        self.assertLessEqual(
+            len(bodies.load(self.dir, "o/r", 1).encode("utf-8")), bodies.MAX_BODY_BYTES)
+
+    def test_truncation_does_not_break_utf8(self):
+        # マルチバイトの途中で切ると読めない文字が残る。
+        body = "あ" * bodies.MAX_BODY_BYTES
+        bodies.save(self.dir, "o/r", 1, body)
+        loaded = bodies.load(self.dir, "o/r", 1)
+        self.assertTrue(loaded.startswith("あ"))
+        self.assertNotIn("�", loaded)
+
+    def test_truncated_body_currently_yields_a_spurious_diff(self):
+        # 既知の問題(#25)。切り詰めた前回と完全な今回を比較するため、本文が
+        # 変わっていなくても差分が出る。実測では上限に遠く現実にはほぼ起きないため
+        # 未対応。**直したらこのテストを「差分が出ない」に変える。**
+        body = "あ" * (bodies.MAX_BODY_BYTES // 2)
+        bodies.save(self.dir, "o/r", 1, body)
+        stored = bodies.load(self.dir, "o/r", 1)
+        self.assertNotEqual(stored, body)  # 切り詰められている
+        self.assertNotEqual(bodies.diff(stored, body), "")
+
+    def test_normal_body_is_not_truncated(self):
+        # 実測では中央値 1.4KB・最大 5KB 程度。通常は掛からない。
+        _, truncated = bodies.save(self.dir, "o/r", 1, "x" * 5000)
+        self.assertFalse(truncated)
+
+    def test_prune_removes_bodies_for_dead_prs(self):
+        # 閉じた PR の本文を残し続けない（state の掃除と歩調を合わせる）。
+        bodies.save(self.dir, "o/r", 1, "alive")
+        bodies.save(self.dir, "o/r", 2, "closed")
+        removed = bodies.prune(self.dir, {("o/r", 1)})
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "alive")
+        self.assertIsNone(bodies.load(self.dir, "o/r", 2))
+
+    def test_prune_enforces_the_count_limit(self):
+        for i in range(5):
+            path, _ = bodies.save(self.dir, "o/r", i, "b")
+            os.utime(path, (1000 + i, 1000 + i))
+        alive = {("o/r", i) for i in range(5)}
+        bodies.prune(self.dir, alive, max_bodies=3)
+        # 古い順に消える。
+        self.assertIsNone(bodies.load(self.dir, "o/r", 0))
+        self.assertIsNone(bodies.load(self.dir, "o/r", 1))
+        self.assertEqual(bodies.load(self.dir, "o/r", 4), "b")
+
+    def test_prune_does_not_delete_in_flight_temp_files(self):
+        # store の原子的書き込みは一時ファイル + os.replace。ここで消すと、
+        # 並走する保存が replace に失敗する（#22 で入れた保証が崩れる）。
+        bodies.save(self.dir, "o/r", 1, "alive")
+        tmp = os.path.join(self.dir, ".tmp-abc123.txt")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write("書き込み中")
+        removed = bodies.prune(self.dir, {("o/r", 1)})
+        self.assertEqual(removed, [])
+        self.assertTrue(os.path.exists(tmp))
+
+    def test_prune_temp_files_do_not_consume_the_count_limit(self):
+        # 一時ファイルを件数に数えると、生きた本文が上限で追い出される。
+        for i in range(3):
+            path, _ = bodies.save(self.dir, "o/r", i, "b")
+            os.utime(path, (1000 + i, 1000 + i))
+        with open(os.path.join(self.dir, ".tmp-xyz.txt"), "w") as f:
+            f.write("x")
+        bodies.prune(self.dir, {("o/r", i) for i in range(3)}, max_bodies=3)
+        for i in range(3):
+            self.assertEqual(bodies.load(self.dir, "o/r", i), "b")
+
+    def test_prune_without_alive_applies_only_the_count_limit(self):
+        # alive が分からない場合でも件数の上限は効かせる。ただし生死による
+        # 削除はしない（どれが閉じたか分からないため）。
+        for i in range(4):
+            path, _ = bodies.save(self.dir, "o/r", i, "b")
+            os.utime(path, (1000 + i, 1000 + i))
+        removed = bodies.prune(self.dir, None, max_bodies=2)
+        # ファイル名の綴りではなく「どの PR が消えたか」を見る。
+        self.assertEqual(sorted(removed),
+                         sorted([bodies._name("o/r", 0), bodies._name("o/r", 1)]))
+        self.assertIsNone(bodies.load(self.dir, "o/r", 0))
+        self.assertEqual(bodies.load(self.dir, "o/r", 3), "b")
+
+    def test_prune_without_alive_keeps_everything_under_the_limit(self):
+        bodies.save(self.dir, "o/r", 1, "b")
+        self.assertEqual(bodies.prune(self.dir, None, max_bodies=200), [])
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "b")
+
+    def test_prune_is_safe_on_missing_dir(self):
+        self.assertEqual(bodies.prune(self.dir, set()), [])
+
+    def test_save_is_atomic(self):
+        # 途中で中断されても既存の本文を壊さない。
+        bodies.save(self.dir, "o/r", 1, "original")
+        leftovers = [n for n in os.listdir(self.dir) if n.startswith(".tmp-")]
+        self.assertEqual(leftovers, [])
+
+    def test_diff_shows_added_lines(self):
+        d = bodies.diff("## 背景\n古い説明", "## 背景\n古い説明\n\n## 追記\n新しい段落")
+        self.assertIn("+## 追記", d)
+        self.assertIn("+新しい段落", d)
+
+    def test_diff_shows_removed_lines(self):
+        d = bodies.diff("残る行\n消える行", "残る行")
+        self.assertIn("-消える行", d)
+
+    def test_diff_is_empty_when_unchanged(self):
+        # 変わっていないのに「本文が変わった」と出すと、読み手を惑わせる。
+        self.assertEqual(bodies.diff("同じ本文", "同じ本文"), "")
+
+    def test_diff_is_empty_without_a_previous_body(self):
+        # 初回は全体を説明する。差分の出しようが無い。
+        self.assertEqual(bodies.diff(None, "本文"), "")
+
+    def test_diff_is_capped(self):
+        # 本文全体を貼り直すのではなく、変わった箇所を示す。
+        d = bodies.diff("\n".join(str(i) for i in range(500)), "\n".join("x" for _ in range(500)))
+        self.assertLessEqual(len(d.splitlines()), bodies.MAX_DIFF_LINES)
+        self.assertIn("中略", d)
+
+    def test_capped_diff_keeps_both_deletions_and_additions(self):
+        # 先頭から一律に切ると削除行だけが残り、「全部消された」と読めてしまう。
+        # 本文を書き直した PR で誤解を生むため、前後の両方を残す。
+        d = bodies.diff("\n".join("old %d" % i for i in range(300)),
+                        "\n".join("new %d" % i for i in range(300)))
+        lines = d.splitlines()
+        self.assertTrue(any(ln.startswith("-") and not ln.startswith("---")
+                            for ln in lines), "削除行が残っていない")
+        self.assertTrue(any(ln.startswith("+") and not ln.startswith("+++")
+                            for ln in lines), "追加行が残っていない")
+
+    def test_diff_is_capped_by_bytes_too(self):
+        # 行数だけを縛ってもバイト数は縛れない。長い行が数本あれば、
+        # 行数の上限に達しないままモデルの文脈を圧迫する。
+        prev = "\n".join("A" * 20000 for _ in range(10))
+        cur = "\n".join("B" * 20000 for _ in range(10))
+        d = bodies.diff(prev, cur)
+        self.assertLessEqual(len(d.encode("utf-8")), bodies.MAX_DIFF_BYTES)
+
+    def test_long_lines_are_clipped(self):
+        d = bodies.diff("短い行", "x" * 5000)
+        for line in d.splitlines():
+            self.assertLessEqual(len(line), bodies.MAX_DIFF_LINE_CHARS + 20)
+
+    def test_diff_keeps_the_header(self):
+        # どちらが前回でどちらが今回か分からなくなると読めない。
+        d = bodies.diff("\n".join("old %d" % i for i in range(300)),
+                        "\n".join("new %d" % i for i in range(300)))
+        self.assertIn("前回の本文", d)
+        self.assertIn("今回の本文", d)
+
+    def test_short_diff_is_not_clipped(self):
+        d = bodies.diff("一行目\n二行目", "一行目\n二行目\n三行目")
+        self.assertNotIn("中略", d)
+        self.assertIn("+三行目", d)
+
+
 class TestRepoCache(unittest.TestCase):
     """作業リポジトリの管理（scripts/prteeth/repos.py）。
 
@@ -1588,6 +1822,210 @@ class TestCliCommands(unittest.TestCase):
             terms = json.load(f)["terms"]
         self.assertIn("alpha", terms)
         self.assertIn("beta", terms)
+
+    def _record_body(self, body, sha="s1", updated_at="t1"):
+        notified = self._write("notified.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": sha, "updated_at": updated_at,
+             "body": body},
+        ]})
+        terms = self._write("terms.json", {"terms": []})
+        return self._run(self.mod.cmd_record, input=terms, notified=notified,
+                         open_prs=None)
+
+    def _select(self, body, sha="s2", updated_at="t2"):
+        payload = self._write("select.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": sha, "updated_at": updated_at,
+             "body": body},
+        ]})
+        return self._run(self.mod.cmd_select, input=payload)
+
+    def test_body_diff_round_trips_through_record_and_select(self):
+        # #11 の目的。前回の本文を保管し、次回に「どこが変わったか」を出す。
+        out = self._record_body("## 背景\n最初の説明")
+        self.assertEqual(out["bodies_saved"], 1)
+
+        got = self._select("## 背景\n最初の説明\n\n## 追記\nレビューを受けて補足")
+        target = got["targets"][0]
+        self.assertEqual(target["status"], "updated")
+        self.assertTrue(target["body_diff_available"])
+        self.assertIn("+## 追記", target["body_diff"])
+
+    def test_body_diff_is_empty_when_only_code_changed(self):
+        # 本文が変わっていないのに差分を出すと、読み手を惑わせる。
+        self._record_body("同じ本文")
+        target = self._select("同じ本文")["targets"][0]
+        self.assertTrue(target["body_diff_available"])
+        self.assertEqual(target["body_diff"], "")
+
+    def test_body_diff_is_unavailable_on_first_encounter(self):
+        # 初回は前回の本文が無い。異常ではなく、全体を説明すればよい。
+        target = self._select("初めての本文", sha="s1", updated_at="t1")["targets"][0]
+        self.assertEqual(target["status"], "new")
+        self.assertFalse(target["body_diff_available"])
+
+    def test_body_is_not_stored_in_state_json(self):
+        # state.json は人が開いて確認できる大きさに保つ（#11 の設計判断）。
+        self._record_body("x" * 3000)
+        with open(os.path.join(self._dir.name, "state.json"), encoding="utf-8") as f:
+            raw = f.read()
+        self.assertNotIn("x" * 100, raw)
+        self.assertIn("o/r#1", raw)
+
+    def test_body_count_limit_applies_without_open_prs(self):
+        # SKILL.md は「迷ったら渡さない」と指示しているので、--open-prs 無しが
+        # 通常の経路。そこで上限が効かないと、README に書いた 200 件が成立しない。
+        bodies_dir = os.path.join(self._dir.name, "bodies")
+        for i in range(5):
+            path, _ = bodies.save(bodies_dir, "o/r", i, "old")
+            os.utime(path, (1000 + i, 1000 + i))
+        original = bodies.MAX_BODIES
+        bodies.MAX_BODIES = 3
+        try:
+            out = self._record_body("新しい本文", sha="s9", updated_at="t9")
+        finally:
+            bodies.MAX_BODIES = original
+        self.assertTrue(out["state_saved"])
+        self.assertGreater(out["bodies_pruned"], 0)
+        self.assertLessEqual(len(os.listdir(bodies_dir)), 3)
+
+    def test_bodies_are_pruned_with_the_state(self):
+        # 閉じた PR の本文を残し続けない。
+        self._record_body("残る", sha="s1")
+        notified = self._write("n2.json", {"prs": [
+            {"repo": "o/other", "number": 9, "sha": "s9", "updated_at": "t9",
+             "body": "別の PR"},
+        ]})
+        open_prs = self._write("open.json", {"prs": [
+            {"repo": "o/other", "number": 9, "sha": "s9", "updated_at": "t9"},
+        ]})
+        terms = self._write("t2.json", {"terms": []})
+        out = self._run(self.mod.cmd_record, input=terms, notified=notified,
+                        open_prs=open_prs)
+        self.assertEqual(out["bodies_pruned"], 1)
+        self.assertIsNone(bodies.load(
+            os.path.join(self._dir.name, "bodies"), "o/r", 1))
+
+    def test_missing_body_does_not_look_like_a_deleted_description(self):
+        # body の渡し忘れが「本文が全部消された」差分になって出ていた。
+        # 利用者には嘘の説明として届くため、差分を出さないほうが正しい。
+        self._record_body("## 背景\n消えていない本文")
+        payload = self._write("nobody.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": "s2", "updated_at": "t2"},
+        ]})
+        target = self._run(self.mod.cmd_select, input=payload)["targets"][0]
+        self.assertEqual(target["status"], "updated")
+        self.assertFalse(target["body_diff_available"])
+        self.assertEqual(target["body_diff"], "")
+
+    def test_empty_body_is_still_diffed(self):
+        # 「渡し忘れ」と違い、本当に空にした場合は削除として出す。
+        self._record_body("消される本文")
+        target = self._select("")["targets"][0]
+        self.assertTrue(target["body_diff_available"])
+        self.assertIn("-消される本文", target["body_diff"])
+
+    def test_non_string_body_does_not_abort_the_run(self):
+        # state と用語集は確定済み。本文はキャッシュなので巻き添えにしない。
+        notified = self._write("bad.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": "s1", "updated_at": "t1",
+             "body": {"text": "oops"}},
+        ]})
+        terms = self._write("t.json", {"terms": []})
+        out = self._run(self.mod.cmd_record, input=terms, notified=notified,
+                        open_prs=None)
+        self.assertTrue(out["state_saved"])
+        self.assertEqual(out["bodies_saved"], 0)
+        self.assertTrue(any("文字列ではない" in w for w in out["warnings"]))
+
+    def test_non_string_body_is_skipped_in_select(self):
+        self._record_body("前回の本文")
+        payload = self._write("badsel.json", {"prs": [
+            {"repo": "o/r", "number": 1, "sha": "s2", "updated_at": "t2",
+             "body": ["not", "a", "string"]},
+        ]})
+        out = self._run(self.mod.cmd_select, input=payload)
+        self.assertFalse(out["targets"][0]["body_diff_available"])
+        self.assertTrue(any("文字列ではない" in w for w in out["warnings"]))
+
+    def test_long_body_is_reported_as_truncated(self):
+        # 黙って切り詰めると、次回の差分がずれた理由が分からない。
+        out = self._record_body("あ" * (bodies.MAX_BODY_BYTES))
+        self.assertTrue(any("先頭のみ保存" in w for w in out["warnings"]))
+
+    def test_record_holds_the_state_lock_while_writing_bodies(self):
+        # state の記録と本文は対で意味を持つ（記録に対応する本文が次回の差分の
+        # 基準）。本文の保存がロックの外にあると、state を書き終えてから本文を
+        # 書くまでの間に、並走した実行の掃除が入りうる（#4）。
+        #
+        # 競合そのものは実行のたびに再現するとは限らないため、ここでは
+        # 「本文を書いている間ロックを保持しているか」という不変条件を直接見る。
+        import threading
+
+        observed = []
+        original = bodies.save
+
+        def _watching_save(bodies_dir, repo, number, body):
+            # 本文を書いている最中に、別スレッドがロックを取れてしまわないか。
+            def _probe():
+                try:
+                    with store.locked(
+                        os.path.join(self._dir.name, "state.json"), timeout=0.2
+                    ):
+                        observed.append("acquired")
+                except store.Busy:
+                    observed.append("busy")
+
+            t = threading.Thread(target=_probe)
+            t.start()
+            t.join()
+            return original(bodies_dir, repo, number, body)
+
+        bodies.save = _watching_save
+        try:
+            self._record_body("本文", sha="s1", updated_at="t1")
+        finally:
+            bodies.save = original
+
+        self.assertEqual(
+            observed, ["busy"],
+            "本文の書き込み中に state ロックが取得できた"
+            "（保存がロックの外にある）",
+        )
+
+    def test_select_holds_the_state_lock_while_reading_bodies(self):
+        # 読む側も同じ。record の途中の state と本文の組み合わせを読まない。
+        import threading
+
+        self._record_body("前回の本文")
+        observed = []
+        original = bodies.load
+
+        def _watching_load(bodies_dir, repo, number):
+            def _probe():
+                try:
+                    with store.locked(
+                        os.path.join(self._dir.name, "state.json"), timeout=0.2
+                    ):
+                        observed.append("acquired")
+                except store.Busy:
+                    observed.append("busy")
+
+            t = threading.Thread(target=_probe)
+            t.start()
+            t.join()
+            return original(bodies_dir, repo, number)
+
+        bodies.load = _watching_load
+        try:
+            self._select("今回の本文")
+        finally:
+            bodies.load = original
+
+        self.assertEqual(
+            observed, ["busy"],
+            "本文の読み込み中に state ロックが取得できた"
+            "（読み込みがロックの外にある）",
+        )
 
     def test_render_returns_a_command_that_opens_the_html(self):
         # パスだけでは「どう開くか」が利用者に委ねられる。そのまま実行できる形で返す。
