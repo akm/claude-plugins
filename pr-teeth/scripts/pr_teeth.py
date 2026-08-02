@@ -29,6 +29,8 @@ def _paths(config_dir):
         "state": os.path.join(config_dir, "state.json"),
         "out": os.path.join(config_dir, "out"),
         "repos_dir": os.path.join(config_dir, "repos"),
+        # PR 本文は state.json に混ぜず 1件1ファイルで持つ（第15節）。
+        "bodies_dir": os.path.join(config_dir, "bodies"),
     }
 
 

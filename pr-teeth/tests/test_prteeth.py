@@ -22,8 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, prspec, render, repos, scope,
-    state, store,
+    agent_input, auth, bodies, config, document, glossary, labels, prspec, render, repos,
+    scope, state, store,
 )
 
 
@@ -909,6 +909,95 @@ class TestPRSpec(unittest.TestCase):
     def test_same_number_in_different_repos_is_not_a_duplicate(self):
         targets, _ = prspec.parse(["a/r#1", "b/r#1"])
         self.assertEqual(len(targets), 2)
+
+
+class TestBodies(unittest.TestCase):
+    """PR 本文の保管（scripts/prteeth/bodies.py）。
+
+    本文は state.json に入れず 1件1ファイルで持つ。state を人が開いて確認できる
+    大きさに保ち、本文だけを独立して消せるようにするため（#11）。
+    """
+
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.dir = os.path.join(self._dir.name, "bodies")
+
+    def tearDown(self):
+        self._dir.cleanup()
+
+    def test_round_trips(self):
+        bodies.save(self.dir, "o/r", 1, "## 背景\n本文")
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "## 背景\n本文")
+
+    def test_missing_body_is_none_not_an_error(self):
+        # 無いことは異常ではない（初回・掃除済み）。呼び出し側は全体を説明する。
+        self.assertIsNone(bodies.load(self.dir, "o/r", 999))
+
+    def test_file_name_is_sanitized(self):
+        # パスの組み立てに使う値。.. や / が混ざる経路を作らない。
+        p = bodies.path_for(self.dir, "Owner/repo.js", 7)
+        self.assertEqual(os.path.dirname(p), self.dir)
+        self.assertNotIn("/", os.path.basename(p).replace(".md", ""))
+
+    def test_different_prs_do_not_collide(self):
+        bodies.save(self.dir, "o/r", 1, "first")
+        bodies.save(self.dir, "o/r", 2, "second")
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "first")
+        self.assertEqual(bodies.load(self.dir, "o/r", 2), "second")
+
+    def test_long_body_is_truncated(self):
+        # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを止める。
+        body = "x" * (bodies.MAX_BODY_BYTES + 5000)
+        _, truncated = bodies.save(self.dir, "o/r", 1, body)
+        self.assertTrue(truncated)
+        self.assertLessEqual(
+            len(bodies.load(self.dir, "o/r", 1).encode("utf-8")), bodies.MAX_BODY_BYTES)
+
+    def test_truncation_does_not_break_utf8(self):
+        # マルチバイトの途中で切ると読めない文字が残る。
+        body = "あ" * bodies.MAX_BODY_BYTES
+        bodies.save(self.dir, "o/r", 1, body)
+        loaded = bodies.load(self.dir, "o/r", 1)
+        self.assertTrue(loaded.startswith("あ"))
+        self.assertNotIn("�", loaded)
+
+    def test_normal_body_is_not_truncated(self):
+        # 実測では中央値 1.4KB・最大 5KB 程度。通常は掛からない。
+        _, truncated = bodies.save(self.dir, "o/r", 1, "x" * 5000)
+        self.assertFalse(truncated)
+
+    def test_prune_removes_bodies_for_dead_prs(self):
+        # 閉じた PR の本文を残し続けない（state の掃除と歩調を合わせる）。
+        bodies.save(self.dir, "o/r", 1, "alive")
+        bodies.save(self.dir, "o/r", 2, "closed")
+        removed = bodies.prune(self.dir, {("o/r", 1)})
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "alive")
+        self.assertIsNone(bodies.load(self.dir, "o/r", 2))
+
+    def test_prune_enforces_the_count_limit(self):
+        for i in range(5):
+            path, _ = bodies.save(self.dir, "o/r", i, "b")
+            os.utime(path, (1000 + i, 1000 + i))
+        alive = {("o/r", i) for i in range(5)}
+        bodies.prune(self.dir, alive, max_bodies=3)
+        # 古い順に消える。
+        self.assertIsNone(bodies.load(self.dir, "o/r", 0))
+        self.assertIsNone(bodies.load(self.dir, "o/r", 1))
+        self.assertEqual(bodies.load(self.dir, "o/r", 4), "b")
+
+    def test_prune_is_safe_on_missing_dir(self):
+        self.assertEqual(bodies.prune(self.dir, set()), [])
+
+    def test_digest_detects_change(self):
+        self.assertEqual(bodies.digest("a"), bodies.digest("a"))
+        self.assertNotEqual(bodies.digest("a"), bodies.digest("b"))
+
+    def test_save_is_atomic(self):
+        # 途中で中断されても既存の本文を壊さない。
+        bodies.save(self.dir, "o/r", 1, "original")
+        leftovers = [n for n in os.listdir(self.dir) if n.startswith(".tmp-")]
+        self.assertEqual(leftovers, [])
 
 
 class TestRepoCache(unittest.TestCase):
