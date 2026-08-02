@@ -99,6 +99,46 @@ class TestPlanContent(unittest.TestCase):
         self.assertFalse(plan.has_plan_content([1, 2, 3]))
 
 
+class TestStateDir(unittest.TestCase):
+    """マーカーの置き場所。共有の一時ディレクトリを使わない。"""
+
+    def setUp(self):
+        self._saved = {k: os.environ.get(k) for k in
+                       ("COMMIT_GUARD_STATE_DIR", "XDG_STATE_HOME", "HOME")}
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_uses_xdg_state_home(self):
+        os.environ.pop("COMMIT_GUARD_STATE_DIR", None)
+        os.environ["XDG_STATE_HOME"] = "/xdg/state"
+        self.assertEqual(plan._state_dir(), "/xdg/state/commit-rules-guard")
+
+    def test_falls_back_to_local_state(self):
+        os.environ.pop("COMMIT_GUARD_STATE_DIR", None)
+        os.environ.pop("XDG_STATE_HOME", None)
+        os.environ["HOME"] = "/home/someone"
+        self.assertEqual(plan._state_dir(),
+                         "/home/someone/.local/state/commit-rules-guard")
+
+    def test_explicit_override_wins(self):
+        os.environ["COMMIT_GUARD_STATE_DIR"] = "/explicit"
+        os.environ["XDG_STATE_HOME"] = "/xdg/state"
+        self.assertEqual(plan._state_dir(), "/explicit/commit-rules-guard")
+
+    def test_does_not_default_to_the_shared_temp_dir(self):
+        # Linux の /tmp は誰でも書ける。マーカー名は session_id から計算できるため、
+        # 先回りして置かれるとリマインダを黙らせられる。
+        os.environ.pop("COMMIT_GUARD_STATE_DIR", None)
+        os.environ.pop("XDG_STATE_HOME", None)
+        os.environ["HOME"] = "/home/someone"
+        self.assertNotIn(tempfile.gettempdir(), plan._state_dir())
+
+
 class TestSweep(unittest.TestCase):
     """期限切れマーカーの掃除。"""
 

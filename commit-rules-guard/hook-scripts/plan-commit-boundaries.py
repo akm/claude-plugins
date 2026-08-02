@@ -44,12 +44,13 @@
   フックがルール全文を再注入するので、コミットルール自体は想起される。
 
 状態の持ち方:
-  セッションごとに一時ディレクトリへマーカーを置く。プロセスが分かれるフックでは
-  メモリに持てないため。`session_id` が取れない環境では注入を 1 回に留める
+  セッションごとに**利用者専用のディレクトリ**へマーカーを置く。プロセスが分かれる
+  フックではメモリに持てないため。`session_id` が取れない環境では注入を 1 回に留める
   （毎回注入するよりノイズが少ない側に倒す）。
 
 環境変数:
-  - COMMIT_GUARD_STATE_DIR: マーカーの置き場所。既定は tempfile.gettempdir()。
+  - COMMIT_GUARD_STATE_DIR: マーカーの置き場所。既定は
+    `$XDG_STATE_HOME/commit-rules-guard`（無ければ `~/.local/state/...`）。
 """
 
 import hashlib
@@ -108,7 +109,31 @@ def _is_meaningful(value):
 
 
 def _state_dir():
-    base = os.environ.get("COMMIT_GUARD_STATE_DIR") or tempfile.gettempdir()
+    """マーカーの置き場所。**利用者専用のディレクトリ**に置く。
+
+    一時ディレクトリ（/tmp）は使わない。理由は 2 つある。
+
+    - Linux の /tmp は誰でも書ける（1777）。マーカー名は session_id から決定的に
+      計算できるため、別の利用者が先回りして置くとそのセッションのリマインダを
+      黙らせられる。os.makedirs(mode=0o700) は**既存のディレクトリには効かない**
+      ので、緩い権限のディレクトリが在れば矯正もされない。
+    - マーカーは 7 日保持する状態であって一時ファイルではない。/tmp は OS が任意の
+      タイミングで消すため、置き場所として意味が合わない。
+
+    XDG_STATE_HOME があればそれに従い、無ければ ~/.local/state を使う。
+    ホームが解決できない環境では一時ディレクトリに退避する（動かないより良い）。
+    """
+    override = os.environ.get("COMMIT_GUARD_STATE_DIR")
+    if override:
+        return os.path.join(override, "commit-rules-guard")
+
+    base = os.environ.get("XDG_STATE_HOME")
+    if not base:
+        home = os.path.expanduser("~")
+        # expanduser は解決できないと "~" のまま返す。
+        base = os.path.join(home, ".local", "state") if home != "~" else ""
+    if not base:
+        base = tempfile.gettempdir()
     return os.path.join(base, "commit-rules-guard")
 
 
