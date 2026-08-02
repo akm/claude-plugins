@@ -121,20 +121,27 @@ def diff(previous, current, max_lines=MAX_DIFF_LINES):
     return "\n".join(lines)
 
 
-def prune(bodies_dir, alive, max_bodies=MAX_BODIES):
+def prune(bodies_dir, alive=None, max_bodies=None):
     """不要になった本文を消す。
 
     alive: いま記録が生きている (repo, number) の集合。ここに無いものは消す。
            state の掃除と歩調を合わせ、閉じた PR の本文を残し続けない。
+           **None なら件数の上限だけを適用する**（どれが生きているか分からない
+           ので、生死による削除はしない）。
 
-    件数が上限を超えている場合は、更新が古い順にさらに消す。
+    件数が上限を超えている場合は、最終更新が古い順にさらに消す。
 
     戻り値は消したファイル名のリスト。
     """
     if not os.path.isdir(bodies_dir):
         return []
 
-    keep = {_name(repo, number) for repo, number in alive}
+    # 既定値は呼び出し時に読む。定義時に束縛すると、MAX_BODIES を差し替えても
+    # 反映されない（設定から上限を変えられるようにする際にも効く）。
+    if max_bodies is None:
+        max_bodies = MAX_BODIES
+
+    keep = None if alive is None else {_name(repo, number) for repo, number in alive}
     removed = []
     entries = []
     for name in sorted(os.listdir(bodies_dir)):
@@ -146,7 +153,7 @@ def prune(bodies_dir, alive, max_bodies=MAX_BODIES):
         # （書き込み側は消えたファイルを replace しようとして失敗する）。
         if name.startswith(".tmp-"):
             continue
-        if name not in keep:
+        if keep is not None and name not in keep:
             try:
                 os.unlink(path)
                 removed.append(name)

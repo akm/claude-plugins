@@ -347,12 +347,16 @@ def cmd_record(args):
                     label + " の本文が長いため先頭のみ保存しました"
                     "（次回の差分は途中までの比較になります）。"
                 )
+        # 掃除は毎回行う。--open-prs が渡されたときは閉じた PR の分も消せるが、
+        # SKILL.md は「迷ったら渡さない」と指示しているため、渡される保証は無い。
+        # ここを --open-prs 有りに限ると、件数の上限が通常の経路で効かなくなる。
+        alive = None
         if prune_to is not None:
             alive = {(p.get("repo"), p.get("number")) for p in prune_to}
-            try:
-                bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
-            except OSError as e:
-                warnings.append("本文の掃除に失敗しました（" + str(e) + "）。")
+        try:
+            bodies_pruned = len(bodies.prune(paths["bodies_dir"], alive))
+        except OSError as e:
+            warnings.append("本文の掃除に失敗しました（" + str(e) + "）。")
 
     return _emit({
         "glossary_path": paths["glossary"],

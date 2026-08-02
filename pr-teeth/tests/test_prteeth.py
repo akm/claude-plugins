@@ -1008,6 +1008,21 @@ class TestBodies(unittest.TestCase):
         for i in range(3):
             self.assertEqual(bodies.load(self.dir, "o/r", i), "b")
 
+    def test_prune_without_alive_applies_only_the_count_limit(self):
+        # alive が分からない場合でも件数の上限は効かせる。ただし生死による
+        # 削除はしない（どれが閉じたか分からないため）。
+        for i in range(4):
+            path, _ = bodies.save(self.dir, "o/r", i, "b")
+            os.utime(path, (1000 + i, 1000 + i))
+        removed = bodies.prune(self.dir, None, max_bodies=2)
+        self.assertEqual(sorted(removed), ["o-r-0.md", "o-r-1.md"])
+        self.assertEqual(bodies.load(self.dir, "o/r", 3), "b")
+
+    def test_prune_without_alive_keeps_everything_under_the_limit(self):
+        bodies.save(self.dir, "o/r", 1, "b")
+        self.assertEqual(bodies.prune(self.dir, None, max_bodies=200), [])
+        self.assertEqual(bodies.load(self.dir, "o/r", 1), "b")
+
     def test_prune_is_safe_on_missing_dir(self):
         self.assertEqual(bodies.prune(self.dir, set()), [])
 
@@ -1770,6 +1785,23 @@ class TestCliCommands(unittest.TestCase):
             raw = f.read()
         self.assertNotIn("x" * 100, raw)
         self.assertIn("o/r#1", raw)
+
+    def test_body_count_limit_applies_without_open_prs(self):
+        # SKILL.md は「迷ったら渡さない」と指示しているので、--open-prs 無しが
+        # 通常の経路。そこで上限が効かないと、README に書いた 200 件が成立しない。
+        bodies_dir = os.path.join(self._dir.name, "bodies")
+        for i in range(5):
+            path, _ = bodies.save(bodies_dir, "o/r", i, "old")
+            os.utime(path, (1000 + i, 1000 + i))
+        original = bodies.MAX_BODIES
+        bodies.MAX_BODIES = 3
+        try:
+            out = self._record_body("新しい本文", sha="s9", updated_at="t9")
+        finally:
+            bodies.MAX_BODIES = original
+        self.assertTrue(out["state_saved"])
+        self.assertGreater(out["bodies_pruned"], 0)
+        self.assertLessEqual(len(os.listdir(bodies_dir)), 3)
 
     def test_bodies_are_pruned_with_the_state(self):
         # 閉じた PR の本文を残し続けない。
