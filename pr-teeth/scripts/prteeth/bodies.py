@@ -141,6 +141,11 @@ def prune(bodies_dir, alive, max_bodies=MAX_BODIES):
         path = os.path.join(bodies_dir, name)
         if not os.path.isfile(path):
             continue
+        # 他プロセスが書き込み中の一時ファイルには触らない。store の原子的書き込みは
+        # 一時ファイル + os.replace で成り立っているため、ここで消すとその保証が崩れる
+        # （書き込み側は消えたファイルを replace しようとして失敗する）。
+        if name.startswith(".tmp-"):
+            continue
         if name not in keep:
             try:
                 os.unlink(path)

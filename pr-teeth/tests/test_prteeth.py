@@ -986,6 +986,28 @@ class TestBodies(unittest.TestCase):
         self.assertIsNone(bodies.load(self.dir, "o/r", 1))
         self.assertEqual(bodies.load(self.dir, "o/r", 4), "b")
 
+    def test_prune_does_not_delete_in_flight_temp_files(self):
+        # store の原子的書き込みは一時ファイル + os.replace。ここで消すと、
+        # 並走する保存が replace に失敗する（#22 で入れた保証が崩れる）。
+        bodies.save(self.dir, "o/r", 1, "alive")
+        tmp = os.path.join(self.dir, ".tmp-abc123.txt")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write("書き込み中")
+        removed = bodies.prune(self.dir, {("o/r", 1)})
+        self.assertEqual(removed, [])
+        self.assertTrue(os.path.exists(tmp))
+
+    def test_prune_temp_files_do_not_consume_the_count_limit(self):
+        # 一時ファイルを件数に数えると、生きた本文が上限で追い出される。
+        for i in range(3):
+            path, _ = bodies.save(self.dir, "o/r", i, "b")
+            os.utime(path, (1000 + i, 1000 + i))
+        with open(os.path.join(self.dir, ".tmp-xyz.txt"), "w") as f:
+            f.write("x")
+        bodies.prune(self.dir, {("o/r", i) for i in range(3)}, max_bodies=3)
+        for i in range(3):
+            self.assertEqual(bodies.load(self.dir, "o/r", i), "b")
+
     def test_prune_is_safe_on_missing_dir(self):
         self.assertEqual(bodies.prune(self.dir, set()), [])
 
