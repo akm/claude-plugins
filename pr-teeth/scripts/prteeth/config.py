@@ -11,6 +11,14 @@ CONCEPTS.md 第5節の実装。
 
 import os
 
+# ★ このプラグインの配布元（CONCEPTS.md 第5.1節）。**fork したらここだけ書き換える。**
+#
+# 設定ディレクトリ `$HOME/config/<PLUGIN_SOURCE>/pr-teeth/` の場所を決める値。
+# 以前は各 SKILL.md の --plugin-source にリテラルで書いていたが、3 ファイルに
+# 散って fork 時の書き換え漏れを招いた。漏れると /pr-teeth と /pr-glossary が
+# 別の設定ディレクトリを見て、利用者には「用語集が消えた」ように見える。
+PLUGIN_SOURCE = "github.com/akm/claude-plugins"
+
 # 言語未設定時の既定（CONCEPTS.md 第5.2節）。
 DEFAULT_LANGUAGE = "ja"
 
@@ -18,21 +26,17 @@ DEFAULT_LANGUAGE = "ja"
 CONFIG_DIR_ENV = "PR_TEETH_CONFIG_DIR"
 
 
-def config_dir(plugin_source):
+def config_dir(plugin_source=None):
     """設定ディレクトリの絶対パスを返す。
 
     plugin_source: 配布元を "<host>/<owner>/<repo>" で表した文字列。
-                   SKILL.md にリテラルで書かれた値を渡す（第5.1節）。
+                   省略時は PLUGIN_SOURCE を使う（第5.1節）。SKILL.md からは
+                   渡さない運用にして、書き換え箇所を 1 つに保つ。
     """
     override = os.environ.get(CONFIG_DIR_ENV, "").strip()
     if override:
         return os.path.abspath(os.path.expanduser(override))
-    source = (plugin_source or "").strip().strip("/")
-    if not source:
-        raise ValueError(
-            "plugin_source が空です。SKILL.md のリテラル値（例 github.com/akm/claude-plugins）"
-            "を渡すか、環境変数 " + CONFIG_DIR_ENV + " を設定してください。"
-        )
+    source = (plugin_source or "").strip().strip("/") or PLUGIN_SOURCE
     return os.path.join(os.path.expanduser("~"), "config", source, "pr-teeth")
 
 

@@ -22,8 +22,7 @@ pr-teeth の用語集を確認・編集する。
 ### 表示する
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" glossary-html \
-  --plugin-source "github.com/akm/claude-plugins"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" glossary-html
 ```
 
 出力された `path` をユーザーに伝える。併せて、返り値の `open_command` を
@@ -38,7 +37,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" glossary-html \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
-  --plugin-source "github.com/akm/claude-plugins" \
   --term "<語>" --status known
 ```
 
@@ -61,8 +59,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 `glossary.json` を直接編集する。場所は次で確認できる。
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
-  --plugin-source "github.com/akm/claude-plugins"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare
 ```
 
 `definitions` は言語タグをキーにしたマッピングで、言語ごとに説明文を持つ。
@@ -82,5 +79,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 
 ## fork する場合
 
-`--plugin-source` の値は `/pr-teeth`・`/pr-teeth-pick` 側と**必ず同じ値**にする。
-一部だけ書き換えると設定ディレクトリが分かれ、用語集を見失う。
+配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の置き場所**。
+fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md 側には書かない）。
+以前は各 SKILL.md にリテラルで書いており、一部だけ書き換えると設定ディレクトリが
+分かれて用語集を見失う状態だった。

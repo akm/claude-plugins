@@ -26,12 +26,10 @@ description: 自分にレビュー依頼が来ているGitHubのPRを巡回し�
 
 ### 1. 準備（設定の読み込み）
 
-次を実行する。`--plugin-source` の値は**このプラグインの配布元**であり、
-設定ディレクトリの場所を決める。
+次を実行する。
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
-  --plugin-source "github.com/akm/claude-plugins" \
   --mode full
 ```
 
@@ -68,7 +66,6 @@ PR ごとに、変更ファイル一覧を渡して分類する。
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
-  --plugin-source "github.com/akm/claude-plugins" \
   --repo "<owner/repo>" --files-from <ファイル一覧のJSON>
 ```
 
@@ -79,7 +76,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
-  --plugin-source "github.com/akm/claude-plugins" \
   --input <PR一覧のJSON>
 ```
 
@@ -121,7 +117,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" lookup \
-  --plugin-source "github.com/akm/claude-plugins" \
   --language <その PR の言語> --terms "語1" "語2"
 ```
 
@@ -170,7 +165,6 @@ HTML を生成する。
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
-  --plugin-source "github.com/akm/claude-plugins" \
   --input <解説をまとめたJSON>
 ```
 
@@ -225,7 +219,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
-  --plugin-source "github.com/akm/claude-plugins" \
   --input <出現語と定義のJSON>
 ```
 
@@ -252,7 +245,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
-  --plugin-source "github.com/akm/claude-plugins" \
   --input <出現語と定義のJSON> \
   --notified <今回処理したPRのJSON> \
   --open-prs <オープンな依頼の全件のJSON>
@@ -287,7 +279,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
-  --plugin-source "github.com/akm/claude-plugins" \
   --term "<語>" --status known
 ```
 
@@ -311,13 +302,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 
 ## fork する場合
 
-`--plugin-source` の値（`github.com/akm/claude-plugins`）は、このファイル内の
-**すべての実行例で同じ値を使っている。** fork して別のマーケットプレイスから配布する
-場合は、この値を fork 側の配布元に一括で書き換えること。設定ディレクトリの場所が
-変わるため、既存利用者には移行を案内する。
+配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の置き場所**で、
+設定ディレクトリの場所を決める。fork して別のマーケットプレイスから配布する場合は、
+**そこ 1 箇所だけを** fork 側の配布元に書き換える。設定ディレクトリの場所が変わるため、
+既存利用者には移行を案内する。
 
-書き換えは `/pr-teeth-pick` と `/pr-glossary` の SKILL.md でも**必ず同じ値に**する。
-一部だけ変えると設定ディレクトリが分かれ、用語集を見失う。
+SKILL.md 側に配布元は書かない（3 ファイルに散ると書き換え漏れが起き、
+`/pr-teeth` と `/pr-glossary` が別の設定ディレクトリを見て用語集を見失う）。
 
 実行時に配布元を推定する手段は採らない（`${CLAUDE_PLUGIN_ROOT}` はインストール先しか
 返さず、そこから配布元を辿る経路は非公式で、壊れると設定と用語集を見失うため）。
