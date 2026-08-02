@@ -70,6 +70,21 @@ class PullRequest:
         """GitHub 上の PR ページ。repo と number から導出する。"""
         return GITHUB_HOST + "/" + self.repo + "/pull/" + str(self.number)
 
+    @property
+    def anchor(self):
+        """ページ内リンクの飛び先。repo と number から導出する。
+
+        url と同じく**エージェントから受け取らない**。任意の文字列が id に入る経路を
+        作らないため。英数字とハイフン以外は落とす（`/` や `.` はリポジトリ名に
+        現れるが、CSS セレクタでのエスケープが要る文字になる）。
+        """
+        raw = str(self.repo or "") + "-" + str(self.number)
+        safe = "".join(c if c.isalnum() or c == "-" else "-" for c in raw.lower())
+        # 連続したハイフンを畳む。`owner/repo.js#1` のような名前でも読める id にする。
+        while "--" in safe:
+            safe = safe.replace("--", "-")
+        return "pr-" + safe.strip("-")
+
 
 @dataclass
 class Document:
