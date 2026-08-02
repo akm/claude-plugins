@@ -17,8 +17,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prteeth import (  # noqa: E402
-    agent_input, auth, config, document, glossary, labels, prspec, render, scope, state,
-    store,
+    agent_input, auth, config, document, glossary, labels, prspec, render, repos, scope,
+    state, store,
 )
 
 
@@ -333,6 +333,27 @@ def cmd_promote(args):
     })
 
 
+def cmd_repo(args):
+    """PR を読むための作業リポジトリを用意する（clone / fetch）。
+
+    置き場所と取得量をコード側で決める。散文の指示だとリポジトリが際限なく増え、
+    取得量も実行のたびに揺れるため（第12節）。
+    """
+    warnings = []
+    config_dir, paths, _ = _load(args, warnings)
+    repos_dir = paths["repos_dir"]
+
+    path, action = repos.ensure(repos_dir, args.repo)
+    repos.touch(path)
+
+    return _emit({
+        "repo": args.repo,
+        "path": path,
+        "action": action,
+        "warnings": warnings,
+    })
+
+
 def cmd_render(args):
     """解説データを自己完結 HTML にして保存する。"""
     warnings = []
@@ -499,6 +520,11 @@ def main(argv=None):
     sp.add_argument("--status", required=True, choices=["new", "learning", "known"])
     sp.set_defaults(func=cmd_promote)
 
+    sp = sub.add_parser("repo", help="作業リポジトリを用意する（clone / fetch）")
+    common(sp)
+    sp.add_argument("--repo", required=True, help="owner/repo")
+    sp.set_defaults(func=cmd_repo)
+
     sp = sub.add_parser("render", help="解説を自己完結 HTML にする")
     common(sp)
     sp.add_argument(
@@ -550,6 +576,14 @@ def main(argv=None):
             "hint": "記録が失われるのを避けるため保存していません。"
                     "他の pr-teeth の実行が終わってから再実行してください。",
             "path": e.path,
+        }, sys.stdout, ensure_ascii=False, indent=2)
+        sys.stdout.write("\n")
+        return 1
+    except repos.RepoError as e:
+        # 取得の失敗。1件で巡回全体を止めないよう、呼び出し側は注記して続行する。
+        json.dump({
+            "error": str(e),
+            "hint": "この PR は取得できません。注記して他の PR の解説を続けてください。",
         }, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         return 1
