@@ -6,7 +6,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 
 | プラグイン | 説明 |
 | --- | --- |
-| [commit-rules-guard](commit-rules-guard/README.md) | コミットルールを想起させ、動機の混在を気づかせる (セッション開始時・作業着手時・`git commit` 直前) |
+| [commit-rules-guard](commit-rules-guard/README.md) | コミットルールを想起させ、動機の混在を気づかせる (セッション開始時・作業着手時・計画作成時・`git commit` 直前) |
 | [pr-teeth](pr-teeth/README.md) | レビュー依頼が来ている GitHub の PR を巡回し、レビュー範囲に照らして噛み砕いた解説を HTML で作る (出力言語は設定可能) |
 
 ## 使い方
@@ -108,8 +108,9 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ├── commit-rules-guard/           # プラグイン本体 (フック)
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
-│   ├── hook-scripts/guard-commit-rules.py
+│   ├── hook-scripts/              # 各フックの本体 (4 本)
 │   ├── rules/commit-rules.md      # 同梱の既定ルール
+│   ├── tests/                     # python3 -m unittest discover -s commit-rules-guard/tests
 │   └── README.md
 └── pr-teeth/                     # プラグイン本体 (skill)
     ├── .claude-plugin/plugin.json
