@@ -836,6 +836,18 @@ class TestDocument(unittest.TestCase):
             document.from_payload(self._pr(url="javascript:alert(1)"))
         self.assertIn("url", str(cm.exception))
 
+    def test_anchor_is_derived_not_accepted(self):
+        # url と同じく、任意の文字列が id に入る経路を作らない（#19）。
+        doc = document.from_payload(self._pr())
+        self.assertEqual(doc.prs[0].anchor, "pr-o-r-1")
+        with self.assertRaises(document.InvalidDocument):
+            document.from_payload(self._pr(anchor="x"))
+
+    def test_anchor_sanitizes_repo_names(self):
+        # リポジトリ名に使える文字はそのまま id に置けない。
+        doc = document.from_payload(self._pr(repo="Owner/repo.js"))
+        self.assertEqual(doc.prs[0].anchor, "pr-owner-repo-js-1")
+
     def test_missing_required_key_is_an_error(self):
         # 従来は空文字になって黙って欠落していた。
         for missing in ("repo", "number", "title", "priority"):
@@ -947,6 +959,74 @@ class TestRender(unittest.TestCase):
         # url をエージェントから受け取らないので、href に任意の文字列が入らない。
         h = render.render(self._doc())
         self.assertIn('<a href="https://github.com/o/r/pull/1">', h)
+
+    def _multi(self, prs, **kw):
+        payload = {"language": "ja", "prs": prs}
+        payload.update(kw)
+        return document.from_payload(payload)
+
+    def _two(self, **kw):
+        return self._multi([
+            {"repo": "o/r", "number": 1, "title": "First", "language": "ja",
+             "priority": "must_review"},
+            {"repo": "o/other", "number": 2, "title": "Second", "language": "ja",
+             "priority": "ignore"},
+        ], **kw)
+
+    def test_index_links_to_each_pr(self):
+        # 上から順に並べただけでは、目当ての PR がどこにあるか分からない。
+        h = render.render(self._two())
+        self.assertIn('<a href="#pr-o-r-1">First</a>', h)
+        self.assertIn('<a href="#pr-o-other-2">Second</a>', h)
+
+    def test_index_anchors_match_article_ids(self):
+        # 飛び先が無いとリンクが黙って効かなくなる。
+        h = render.render(self._two())
+        self.assertIn('id="pr-o-r-1"', h)
+        self.assertIn('id="pr-o-other-2"', h)
+
+    def test_index_is_omitted_for_a_single_pr(self):
+        # 1件では意味を持たず、縦を消費するだけになる。
+        self.assertNotIn('class="index"', render.render(self._doc()))
+
+    def test_index_shows_scope_distribution(self):
+        # 開いた時点で優先度の分布が分かるようにする。
+        h = render.render(self._two())
+        head = h.split('<article')[0]
+        self.assertIn("必須: 1", head)
+        self.assertIn("対象外: 1", head)
+
+    def test_index_includes_collapsed_prs(self):
+        # ignore は1行に畳まれるが、画面に在ることは目次から分かるべき。
+        h = render.render(self._two())
+        self.assertIn("Second", h.split('<article')[0])
+
+    def test_index_titles_carry_their_own_language(self):
+        # 各行のタイトルはその PR の言語で書かれている（地の文の言語とは別）。
+        h = render.render(self._multi([
+            {"repo": "o/r", "number": 1, "title": "First", "language": "en",
+             "priority": "must_review"},
+            {"repo": "o/r", "number": 2, "title": "二番目", "language": "ja",
+             "priority": "must_review"},
+        ]))
+        head = h.split('<article')[0]
+        self.assertIn('<li lang="en">', head)
+        self.assertIn('<li lang="ja">', head)
+
+    def test_index_badges_follow_the_context(self):
+        # 番号指定でマージ済み PR に「必須」と出るのは意味がずれる。
+        head = render.render(self._two(context="pick")).split('<article')[0]
+        self.assertIn("重点", head)
+        self.assertNotIn("必須", head)
+
+    def test_index_escapes_titles(self):
+        h = render.render(self._multi([
+            {"repo": "o/r", "number": 1, "title": "<script>alert(1)</script>",
+             "language": "ja", "priority": "must_review"},
+            {"repo": "o/r", "number": 2, "title": "T", "language": "ja",
+             "priority": "must_review"},
+        ]))
+        self.assertNotIn("<script>alert(1)</script>", h)
 
     def test_no_external_assets_other_than_github_links(self):
         # 図が無ければ CDN を読まない（完全にオフラインで開ける）。

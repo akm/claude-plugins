@@ -48,10 +48,21 @@ a { color: var(--accent); }
   padding: .75rem 1rem; margin: 0 0 1.5rem; border-radius: 4px;
 }
 .warn ul { margin: .5rem 0 0; padding-left: 1.2rem; }
+.index {
+  border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.5rem;
+  margin-bottom: 2rem; background: var(--card);
+}
+.index h2 { font-size: 1rem; color: var(--muted); margin-bottom: .5rem; }
+.index .scope { margin: 0 0 .75rem; }
+.index ol { margin: 0; padding-left: 1.4rem; }
+.index li { margin: .35rem 0; line-height: 1.6; }
+.index .src { margin-left: .5rem; white-space: nowrap; }
 .pr {
   border: 1px solid var(--line); border-radius: 8px; padding: 1.25rem 1.5rem;
   margin-bottom: 1.5rem; background: var(--card);
 }
+/* インデックスから飛んだとき、見出しが画面上端に貼り付かないようにする。 */
+.pr:target { scroll-margin-top: 1.5rem; }
 .pr.collapsed { padding: .75rem 1.5rem; }
 .meta { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
 .badge {
@@ -140,6 +151,53 @@ def _scope_summary(counts, L):
     return "".join(parts)
 
 
+def _render_index(prs, L, context):
+    """ページ冒頭の PR インデックス。
+
+    解説を上から順に並べただけでは、どのリポジトリが何件あるか・どこに目当ての PR が
+    あるかがスクロールしないと分からない（第9節の趣旨に反する）。件数が増えるほど効く。
+
+    1件のときは出さない。インデックスが意味を持たず、縦を消費するだけになるため。
+    畳まれた PR も載せる（画面に在ることは目次から分かるべき）。
+    """
+    if len(prs) < 2:
+        return ""
+
+    out = ['<nav class="index">']
+    out.append("<h2>" + _e(L["index"]) + "</h2>")
+
+    # 範囲別の件数。開いた時点で優先度の分布が分かるようにする。
+    counts = {}
+    for pr in prs:
+        counts[pr.priority] = counts.get(pr.priority, 0) + 1
+    summary = []
+    for key in ("must_review", "should_review", "ignore"):
+        n = counts.get(key) or 0
+        if not n:
+            continue
+        summary.append(
+            '<span class="' + _SCOPE_CLASS[key] + '">' + _e(L[key]) + ": " + str(n) + "</span>"
+        )
+    if summary:
+        out.append('<div class="scope">' + "".join(summary) + "</div>")
+
+    out.append("<ol>")
+    for pr in prs:
+        # タイトルはその PR の言語で書かれている。地の文の言語とは別に lang を付ける
+        # （_render_pr が article に付けているのと同じ理由）。
+        lang = pr.language or "ja"
+        PL = labels.for_language(lang, context)
+        cls = _SCOPE_CLASS.get(pr.priority, "should")
+        label = PL.get(pr.priority, PL["should_review"])
+        out.append('<li lang="' + _e(lang) + '">')
+        out.append('<a href="#' + _e(pr.anchor) + '">' + _e(pr.title) + "</a>")
+        out.append('<span class="badge ' + cls + '">' + _e(label) + "</span>")
+        out.append('<span class="src">' + _e(pr.repo) + " #" + _e(pr.number) + "</span>")
+        out.append("</li>")
+    out.append("</ol></nav>")
+    return "\n".join(out)
+
+
 def _render_terms(terms, L):
     if not terms:
         return ""
@@ -168,7 +226,12 @@ def _render_pr(pr, context=labels.CONTEXT_PATROL):
     collapsed = bool(pr.collapsed)
 
     out = []
-    out.append('<article class="pr' + (" collapsed" if collapsed else "") + '" lang="' + _e(lang) + '">')
+    # id は repo と number から導出される（document.PullRequest.anchor）。
+    # url と同様、エージェントから受け取らないので任意の文字列が id に入る経路が無い。
+    out.append(
+        '<article id="' + _e(pr.anchor) + '" class="pr' + (" collapsed" if collapsed else "")
+        + '" lang="' + _e(lang) + '">'
+    )
     # url は repo と number から導出される（document.PullRequest.url）。
     # エージェントから受け取らないので、href に任意の文字列が入る経路が無い。
     heading = '<a href="' + _e(pr.url) + '">' + _e(pr.title) + "</a>"
@@ -305,6 +368,9 @@ def render(data):
 
     if not prs:
         out.append("<p>" + _e(L["no_prs"]) + "</p>")
+    index = _render_index(prs, L, context)
+    if index:
+        out.append(index)
     for pr in prs:
         out.append(_render_pr(pr, context))
 
