@@ -16,8 +16,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
-	"strings"
 )
 
 func main() {
@@ -39,9 +39,10 @@ func run(args []string) error {
 		return err
 	}
 
-	// 末尾のスラッシュを必ず付ける。照合は HasPrefix なので、無いと
-	// docs/review-triage-old/ のような別ディレクトリまで拾う。
-	reviewTriageDir = strings.TrimSuffix(filepath.ToSlash(*recordDir), "/") + "/"
+	// path.Clean で表記の揺れ (".", "./rec", "rec//") を畳む。照合は
+	// inReviewTriageDir が両辺を clean して行うので、ここでの末尾のスラッシュは
+	// エラーメッセージの見た目のためだけに付ける。
+	reviewTriageDir = path.Clean(filepath.ToSlash(*recordDir)) + "/"
 
 	if *writeSummary {
 		return writeReviewTriageSummaries(reviewTriageDir)

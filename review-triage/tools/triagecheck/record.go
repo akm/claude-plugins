@@ -28,10 +28,19 @@ import (
 // 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が黙って外れる。
 //
 // 既定は docs/review-triage/ で、-record-dir で上書きできる (リポジトリごとに
-// 置き場が違うため)。末尾のスラッシュは main が正規化して必ず付ける —
-// HasPrefix の照合が接頭辞の一致に依存しており、無いと docs/review-triage-old/
-// のような別ディレクトリまで拾う。
+// 置き場が違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
+// path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
 var reviewTriageDir = "docs/review-triage/"
+
+// inReviewTriageDir は f が記録の置き場の直下にあるかを返す。
+//
+// 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧側 (listReviewTriageFiles)
+// は path.Join でパスを clean するため、置き場の表記だけを整えて接頭辞で照合すると
+// "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま緑になった。
+// 両辺を path.Clean に通せば、どちらの表記でも同じ判定になる。
+func inReviewTriageDir(f string) bool {
+	return path.Dir(f) == path.Clean(reviewTriageDir)
+}
 
 // --- スキーマ (意味の正本は docs/review-triage/README.md) ---
 
@@ -130,7 +139,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 	var stems []string
 	var mds []string
 	for _, f := range files {
-		if !strings.HasPrefix(f, reviewTriageDir) || path.Base(f) == "README.md" {
+		if !inReviewTriageDir(f) || path.Base(f) == "README.md" {
 			continue
 		}
 		switch {

@@ -664,6 +664,39 @@ func TestListReviewTriageFiles(t *testing.T) {
 	}
 }
 
+// TestInReviewTriageDirNotationVariants は、置き場の表記が揺れても検査の対象が
+// 変わらないことを固定する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
+// "." / "./rec" / "rec//" で一覧側 (path.Join が clean する) と前置が一致せず、
+// 検査が 1 件も走らないまま緑になった。
+func TestInReviewTriageDirNotationVariants(t *testing.T) {
+	saved := reviewTriageDir
+	t.Cleanup(func() { reviewTriageDir = saved })
+
+	for _, tt := range []struct {
+		dir  string
+		file string
+		want bool
+	}{
+		{"rec/", "rec/feat-x.yaml", true},
+		{"rec", "rec/feat-x.yaml", true},
+		{"./rec", "rec/feat-x.yaml", true},
+		{"rec//", "rec/feat-x.yaml", true},
+		{".", "feat-x.yaml", true},
+		{"./", "feat-x.yaml", true},
+		// 別ディレクトリと下位ディレクトリは対象外のまま。
+		{"rec/", "rec-old/feat-x.yaml", false},
+		{"rec", "rec-old/feat-x.yaml", false},
+		{"rec/", "rec/sub/feat-x.yaml", false},
+		{".", "rec/feat-x.yaml", false},
+	} {
+		reviewTriageDir = tt.dir
+		if got := inReviewTriageDir(tt.file); got != tt.want {
+			t.Errorf("置き場 %q で %q: inReviewTriageDir = %v, want %v",
+				tt.dir, tt.file, got, tt.want)
+		}
+	}
+}
+
 func TestListReviewTriageFilesMissingDir(t *testing.T) {
 	got, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"))
 	if got != nil || err != nil {
