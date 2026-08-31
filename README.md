@@ -11,6 +11,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [doc-dag](doc-dag/README.md) | 文書群の依存と重複を調べ、mermaid 図で示して DAG になるよう修正する (mermaid-preview と併用) |
 | [mermaid-preview](mermaid-preview/README.md) | mermaid の図を含む HTML を生成してブラウザで見せる (他のスキルからの図の提示にも使う) |
 | [commit-squash](commit-squash/README.md) | 未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす |
+| [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 
 ## 使い方
 
@@ -135,11 +136,18 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   │   ├── SKILL.md
 │   │   └── references/
 │   └── README.md
-└── doc-dag/                      # プラグイン本体 (skill 型)
+├── doc-dag/                      # プラグイン本体 (skill 型)
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/doc-dag/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   └── README.md
+└── work-log-gh-comment/          # プラグイン本体 (skill 型)
     ├── .claude-plugin/plugin.json
-    ├── skills/doc-dag/
+    ├── skills/work-log-gh-comment/
     │   ├── SKILL.md
-    │   └── references/
+    │   ├── references/
+    │   └── evals/                 # make -C work-log-gh-comment/skills/work-log-gh-comment/evals
     └── README.md
 ```
 

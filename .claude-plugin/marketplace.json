@@ -80,6 +80,21 @@
         "ref": "main"
       },
       "tags": ["documentation", "dag", "mermaid", "skill"]
+    },
+    {
+      "name": "work-log-gh-comment",
+      "description": "実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する skill",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "work-log-gh-comment",
+        "ref": "main"
+      },
+      "tags": ["github", "logging", "documentation", "skill"]
     }
   ]
 }
