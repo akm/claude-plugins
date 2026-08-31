@@ -8,6 +8,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | --- | --- |
 | [commit-rules-guard](commit-rules-guard/README.md) | コミットルールを想起させ、動機の混在を気づかせる (セッション開始時・作業着手時・計画作成時・`git commit` 直前) |
 | [pr-teeth](pr-teeth/README.md) | レビュー依頼が来ている GitHub の PR を巡回し、レビュー範囲に照らして噛み砕いた解説を HTML で作る (出力言語は設定可能) |
+| [mermaid-preview](mermaid-preview/README.md) | mermaid の図を含む HTML を生成してブラウザで見せる (他のスキルからの図の提示にも使う) |
 
 ## 使い方
 
@@ -105,19 +106,27 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 .
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイス定義 (収録プラグインの一覧)
-├── commit-rules-guard/           # プラグイン本体 (フック)
+├── commit-rules-guard/           # プラグイン本体 (hooks 型)
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
 │   ├── hook-scripts/              # 各フックの本体 (4 本)
 │   ├── rules/commit-rules.md      # 同梱の既定ルール
 │   ├── tests/                     # python3 -m unittest discover -s commit-rules-guard/tests
 │   └── README.md
-└── pr-teeth/                     # プラグイン本体 (skill)
+├── pr-teeth/                     # プラグイン本体 (skill 型)
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/pr-teeth/SKILL.md
+│   ├── skills/pr-glossary/SKILL.md
+│   ├── scripts/                   # 判定・保存・HTML 生成
+│   ├── tests/                     # python3 -m unittest discover -s pr-teeth/tests
+│   ├── CONCEPTS.md                # 設計
+│   └── README.md
+└── mermaid-preview/              # プラグイン本体 (skill 型)
     ├── .claude-plugin/plugin.json
-    ├── skills/pr-teeth/SKILL.md
-    ├── skills/pr-glossary/SKILL.md
-    ├── scripts/                   # 判定・保存・HTML 生成
-    ├── tests/                     # python3 -m unittest discover -s pr-teeth/tests
-    ├── CONCEPTS.md                # 設計
+    ├── skills/mermaid-preview/
+    │   ├── SKILL.md
+    │   └── template.html
     └── README.md
 ```
+
+プラグインは 2 つの型があります。**hooks 型**は Claude Code の動作に自動で割り込むもの、**skill 型**は依頼に応じて呼び出されるものです。skill 型はプラグイン直下の `skills/<スキル名>/SKILL.md` に置きます。
