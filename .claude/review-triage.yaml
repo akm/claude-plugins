@@ -1,0 +1,93 @@
+# review-triage の対象の分類
+#
+# このリポジトリは Claude Code のプラグイン集 (マーケットプレイス) である。
+# 成果物は「利用者の環境で動くプラグイン」なので、被害者は次のように読み替える。
+#
+#   operator  … プラグインを導入して使う人。フック・skill・同梱ツールが誤動作すると
+#               直接困る。判定フロー D7 の「製品の利用者」に当たる。
+#   developer … このリポジトリを開発・保守する人。壊れても利用者には届かない範囲。
+#
+# admin / provider はこのリポジトリには該当する対象が無いため使わない
+# (config-schema.md が許す語彙のうち、実際に割り当てるのは operator と developer だけ)。
+#
+# 並び順が意味を持つ: 上から順に照合し、最初に当たった分類を採る。
+# 狭いものを上に、広い受け皿を下に置くこと。
+
+categories:
+  # --- テスト・評価 (先に置く: 下の production パターンにも当たるため) ---
+  - id: test
+    patterns:
+      - "**/tests/**"
+      - "**/*_test.go"
+      - "**/test_*.py"
+    audience: developer
+
+  - id: eval
+    patterns:
+      - "**/evals/**"
+    audience: developer
+
+  # --- 利用者の環境で実行されるもの ---
+  - id: hook-script
+    patterns:
+      - "commit-rules-guard/hook-scripts/**"
+      - "commit-rules-guard/hooks/**"
+    audience: operator
+
+  - id: plugin-code
+    patterns:
+      - "pr-teeth/scripts/**"
+      - "review-triage/tools/**"
+    audience: operator
+
+  - id: skill
+    patterns:
+      - "**/skills/**"
+    audience: operator
+
+  # --- 配布と設定の定義 ---
+  - id: marketplace
+    patterns:
+      - ".claude-plugin/**"
+      - "**/.claude-plugin/**"
+    audience: operator
+
+  - id: plugin-rules
+    patterns:
+      - "commit-rules-guard/rules/**"
+    audience: operator
+
+  # --- 利用者が読む文書 ---
+  - id: doc-user
+    patterns:
+      - "README.md"
+      - "*/README.md"
+      - "**/README.md"
+    audience: operator
+
+  # --- 開発者だけが読む文書 ---
+  - id: doc-dev
+    patterns:
+      - "CONCEPTS.md"
+      - "**/CONCEPTS.md"
+      - "docs/**"
+      - "**/docs/**"
+    audience: developer
+
+  # --- 開発環境まわり ---
+  - id: dev-env
+    patterns:
+      - ".gitignore"
+      - "**/.gitignore"
+      - "**/Makefile"
+      - "**/go.mod"
+      - "**/go.sum"
+      - "**/.tool-versions"
+      - "LICENSE"
+    audience: developer
+
+  # --- 受け皿 (種類不明を 0 件にするため。必ず最後) ---
+  - id: shared
+    patterns:
+      - "**"
+    audience: developer
