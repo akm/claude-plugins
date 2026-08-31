@@ -50,6 +50,21 @@
         "ref": "main"
       },
       "tags": ["mermaid", "diagram", "documentation", "skill"]
+    },
+    {
+      "name": "commit-squash",
+      "description": "未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす skill (rebase を使わず起点から積み直す)",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "commit-squash",
+        "ref": "main"
+      },
+      "tags": ["git", "commit", "history", "skill"]
     }
   ]
 }
