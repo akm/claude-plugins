@@ -1,0 +1,780 @@
+// record.go はレビュー指摘のトリアージ記録 (docs/review-triage/*.yaml) の
+// スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
+//
+// 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
+// 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・ピン値の
+// 誤りが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
+// 偽赤になる」穴を生んだ。数えるものを書かせないことで、この類を発生源から消す。
+// スキーマの意味の正本は docs/review-triage/README.md。
+package main
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+// reviewTriageDir はトリアージの記録の置き場。この変数が唯一の定義 —
+// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が黙って外れる。
+//
+// 既定は docs/review-triage/ で、-record-dir で上書きできる (リポジトリごとに
+// 置き場が違うため)。末尾のスラッシュは main が正規化して必ず付ける —
+// HasPrefix の照合が接頭辞の一致に依存しており、無いと docs/review-triage-old/
+// のような別ディレクトリまで拾う。
+var reviewTriageDir = "docs/review-triage/"
+
+// --- スキーマ (意味の正本は docs/review-triage/README.md) ---
+
+type recordDoc struct {
+	Runs []recordRun `yaml:"runs"`
+}
+
+type recordRun struct {
+	Date     string          `yaml:"date"`
+	Skill    string          `yaml:"skill"`
+	RunID    string          `yaml:"run_id"`
+	Model    string          `yaml:"model"`
+	Level    string          `yaml:"level"`
+	Scope    string          `yaml:"scope"`
+	Head     string          `yaml:"head"`
+	Findings []recordFinding `yaml:"findings"`
+	Plans    []recordPlan    `yaml:"plans"`
+	Notes    string          `yaml:"notes"`
+}
+
+type recordFinding struct {
+	ID              int               `yaml:"id"`
+	File            string            `yaml:"file"`
+	Line            int               `yaml:"line"`
+	Summary         string            `yaml:"summary"`
+	Category        string            `yaml:"category"`
+	Audience        string            `yaml:"audience"`
+	AudienceInitial string            `yaml:"audience_initial"`
+	Consequence     recordConsequence `yaml:"consequence"`
+	PremiseCheck    recordPremise     `yaml:"premise_check"`
+	GatesFired      []string          `yaml:"gates_fired"`
+	Verdict         string            `yaml:"verdict"`
+	VerdictReason   string            `yaml:"verdict_reason"`
+	PlanRef         *recordPlanRef    `yaml:"plan_ref"`
+	Attrs           map[string]any    `yaml:"attrs"`
+}
+
+type recordConsequence struct {
+	Condition     string `yaml:"condition"`
+	Who           string `yaml:"who"`
+	What          string `yaml:"what"`
+	Detectability string `yaml:"detectability"`
+}
+
+type recordPremise struct {
+	Stages string `yaml:"stages"`
+	Result string `yaml:"result"`
+}
+
+// recordPlanRef は採択の束ね先 (どの回のどの問題で直すか) の構造化参照。
+// 回をまたいで同因の指摘を束ねたとき (並列レビューの運用)、対応関係を
+// 自由記述でなく機械で辿れる形で残す。run は同じファイル内の 1 始まりの回番号。
+type recordPlanRef struct {
+	Run     int    `yaml:"run"`
+	Problem string `yaml:"problem"`
+}
+
+type recordPlan struct {
+	ProblemID  string   `yaml:"problem_id"`
+	Cause      string   `yaml:"cause"`
+	FindingIDs []int    `yaml:"finding_ids"`
+	Approach   string   `yaml:"approach"`
+	Options    string   `yaml:"options"`
+	Order      int      `yaml:"order"`
+	DependsOn  []string `yaml:"depends_on"`
+	SHA        string   `yaml:"sha"`
+	Status     string   `yaml:"status"`
+}
+
+// recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
+// 残存が「エラーなしで空」に化ける型を避けるため。attrs だけは任意のキーを許す
+// (上流固有の属性のパススルー)。
+var recordAllowedKeys = map[string]map[string]bool{
+	"トップレベル": {"runs": true},
+	"実行": {"date": true, "skill": true, "run_id": true, "model": true, "level": true,
+		"scope": true, "head": true, "findings": true, "plans": true, "notes": true},
+	"指摘": {"id": true, "file": true, "line": true, "summary": true, "category": true,
+		"audience": true, "audience_initial": true, "consequence": true, "premise_check": true,
+		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "attrs": true},
+	"束ね先":   {"run": true, "problem": true},
+	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
+	"根拠の検証": {"stages": true, "result": true},
+	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
+		"options": true, "order": true, "depends_on": true, "sha": true, "status": true},
+}
+
+// reviewTriageRecordProblems は docs/review-triage/ の記録 YAML を検査する。
+// README.md は対象外。検査は (1) スキーマ (未知キー・必須キー・列挙値・参照の整合)、
+// (2) サマリの鮮度 (YAML から生成した内容と *.md の一致)、(3) 孤児のサマリ。
+func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, error)) []string {
+	var problems []string
+	fileSet := make(map[string]bool, len(files))
+	for _, f := range files {
+		fileSet[f] = true
+	}
+	var stems []string
+	var mds []string
+	for _, f := range files {
+		if !strings.HasPrefix(f, reviewTriageDir) || path.Base(f) == "README.md" {
+			continue
+		}
+		switch {
+		case strings.HasSuffix(f, ".yaml"):
+			stems = append(stems, strings.TrimSuffix(f, ".yaml"))
+		case strings.HasSuffix(f, ".md"):
+			mds = append(mds, f)
+		}
+	}
+	sort.Strings(stems)
+	stemSet := make(map[string]bool, len(stems))
+	for _, s := range stems {
+		stemSet[s] = true
+	}
+
+	for _, stem := range stems {
+		yf := stem + ".yaml"
+		data, err := readFile(yf)
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%s: 読み込みに失敗しました: %v", yf, err))
+			continue
+		}
+		ps, doc := recordProblemsInYAML(yf, data)
+		problems = append(problems, ps...)
+
+		// サマリの鮮度。スキーマに問題がある間は比較しない (直せば両方直る)。
+		mdPath := stem + ".md"
+		if !fileSet[mdPath] {
+			problems = append(problems, fmt.Sprintf(
+				"%s: サマリ %s がありません (`make docs-review-triage-summary` で生成してコミットする)", yf, mdPath))
+			continue
+		}
+		if len(ps) > 0 || doc == nil {
+			continue
+		}
+		want := renderReviewTriageSummaryDoc(yf, doc)
+		got, err := readFile(mdPath)
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%s: 読み込みに失敗しました: %v", mdPath, err))
+			continue
+		}
+		if string(got) != want {
+			problems = append(problems, fmt.Sprintf(
+				"%s: サマリが正本 (%s) と食い違っています (`make docs-review-triage-summary` で再生成する)", mdPath, yf))
+		}
+	}
+
+	sort.Strings(mds)
+	for _, md := range mds {
+		if !stemSet[strings.TrimSuffix(md, ".md")] {
+			problems = append(problems, fmt.Sprintf(
+				"%s: 対応する YAML (正本) がありません。記録の正本は <ブランチ名>.yaml で、サマリはその生成物", md))
+		}
+	}
+	return problems
+}
+
+// recordLineCommentProblems は行内コメント (LineComment) を持つノードを検出する。
+// YAML の素のスカラーは半角スペースに続く # 以降をコメントとして落とすため、
+// 引用符の無い値に # を書くと値が黙って切り詰められる (実測で cause が「PR」だけに
+// なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る —
+// 生テキストの正規表現で字句規則を再現する方式は、キーの形・空白・ブロックスカラー・
+// 値全体のコメントと境界のたびに穴が開いた (列挙する検査は穴を再生産する既知の型)。
+// ブロックスカラーの本文の # は内容でありコメントにならないので、構造的に区別される。
+// 行頭コメント (HeadComment) は値を壊さないため対象にしない。
+func recordLineCommentProblems(f string, root *yaml.Node) []string {
+	var problems []string
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n.LineComment != "" {
+			problems = append(problems, fmt.Sprintf(
+				"%s:%d: 行内コメント (%q) は使えません — YAML は ' #' 以降をコメントとして落とし、値が黙って切り詰められる。値に # を含めるときは引用符で囲む",
+				f, n.Line, n.LineComment))
+		}
+		for _, c := range n.Content {
+			walk(c)
+		}
+	}
+	walk(root)
+	return problems
+}
+
+// recordProblemsInYAML は 1 ファイル分のスキーマ検査を行い、問題と (読めた場合の) 文書を返す。
+func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
+	var root yaml.Node
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	if err := dec.Decode(&root); err != nil {
+		// 空・コメントのみ・空白のみは EOF になる。生の文言では実際の状態が読めない。
+		if errors.Is(err, io.EOF) {
+			return []string{fmt.Sprintf("%s: 記録が空です (runs がありません)", f)}, nil
+		}
+		return []string{fmt.Sprintf("%s: YAML を解析できません: %v", f, err)}, nil
+	}
+	// 記録は単一ドキュメント。--- 区切りの 2 つ目以降は読まれずに消えるため、存在自体を弾く。
+	var extra yaml.Node
+	if err := dec.Decode(&extra); err == nil {
+		return []string{fmt.Sprintf(
+			"%s: --- 区切りの 2 つ目のドキュメントがあります — 記録は単一ドキュメントで、2 つ目以降は読まれず消える", f)}, nil
+	} else if !errors.Is(err, io.EOF) {
+		return []string{fmt.Sprintf("%s: 2 つ目のドキュメントの解析に失敗しました: %v", f, err)}, nil
+	}
+	if len(root.Content) == 0 ||
+		(root.Content[0].Kind == yaml.ScalarNode && root.Content[0].Tag == "!!null") {
+		// null・~・--- だけのファイルは null スカラーのルートとして解析され、
+		// EOF にも空 Content にもならない。実質的に空なので同じ文言に揃える。
+		return []string{fmt.Sprintf("%s: 記録が空です (runs がありません)", f)}, nil
+	}
+	problems := recordLineCommentProblems(f, &root)
+	problems = append(problems, recordUnknownKeyProblems(f, root.Content[0])...)
+	var doc recordDoc
+	if err := root.Decode(&doc); err != nil {
+		problems = append(problems, fmt.Sprintf("%s: スキーマに合いません: %v", f, err))
+		return problems, nil
+	}
+	problems = append(problems, recordSemanticProblems(f, &doc)...)
+	return problems, &doc
+}
+
+// recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーを列挙する。
+// 未知のキーが見つかっても走査を続け、他の問題の報告を妨げない。
+func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
+	var problems []string
+	var walkMap func(n *yaml.Node, kind string)
+	walkSeq := func(n *yaml.Node, kind string) {
+		if n == nil || n.Kind != yaml.SequenceNode {
+			return
+		}
+		for _, item := range n.Content {
+			walkMap(item, kind)
+		}
+	}
+	walkMap = func(n *yaml.Node, kind string) {
+		if n == nil || n.Kind != yaml.MappingNode {
+			return
+		}
+		allowed := recordAllowedKeys[kind]
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			k, v := n.Content[i], n.Content[i+1]
+			if !allowed[k.Value] {
+				problems = append(problems, fmt.Sprintf(
+					"%s:%d: %sに未知のキー %q。旧いキー名の残存か置き場の誤り (上流固有の属性は attrs へ) を疑う",
+					f, k.Line, kind, k.Value))
+				continue
+			}
+			switch k.Value {
+			case "runs":
+				walkSeq(v, "実行")
+			case "findings":
+				walkSeq(v, "指摘")
+			case "plans":
+				walkSeq(v, "修正計画")
+			case "consequence":
+				walkMap(v, "帰結")
+			case "premise_check":
+				walkMap(v, "根拠の検証")
+			case "plan_ref":
+				walkMap(v, "束ね先")
+			}
+		}
+	}
+	walkMap(n, "トップレベル")
+	return problems
+}
+
+var recordDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// recordAudiences は被害者の列挙 (glossary のロール + 開発者)。設定 (.claude/review-triage.yaml)
+// の audience と同じ値域。
+var recordAudiences = map[string]bool{
+	"operator": true, "admin": true, "provider": true, "developer": true,
+}
+
+// recordSemanticProblems は必須キー・列挙値・参照の整合を検査する。
+func recordSemanticProblems(f string, doc *recordDoc) []string {
+	var problems []string
+	add := func(format string, args ...any) {
+		problems = append(problems, f+": "+fmt.Sprintf(format, args...))
+	}
+	if len(doc.Runs) == 0 {
+		add("runs がありません (実行が 1 つも無い)")
+	}
+	// 回ごとの問題 id の索引 (plan_ref の解決と被覆の検査に使う)。
+	plansByRun := make([]map[string]bool, len(doc.Runs))
+	for ri, run := range doc.Runs {
+		plansByRun[ri] = map[string]bool{}
+		for _, pl := range run.Plans {
+			plansByRun[ri][pl.ProblemID] = true
+		}
+	}
+	for ri, run := range doc.Runs {
+		rn := fmt.Sprintf("runs[%d] (%s %s)", ri, run.Date, run.Skill)
+		if !recordDateRe.MatchString(run.Date) {
+			add("%s: date が YYYY-MM-DD ではありません: %q", rn, run.Date)
+		}
+		if run.Skill == "" {
+			add("%s: skill がありません", rn)
+		}
+		if run.Model == "" {
+			add("%s: model がありません (レビューを実行したモデルを必ず残す)", rn)
+		}
+		if run.Scope != "incremental" && run.Scope != "full" {
+			add("%s: scope は incremental / full のいずれか: %q", rn, run.Scope)
+		}
+		if run.Head == "" {
+			add("%s: head がありません (レビュー時点の短縮 SHA)", rn)
+		}
+
+		verdictByID := map[int]string{}
+		for fi, fd := range run.Findings {
+			fn := fmt.Sprintf("%s: findings[%d] (id %d)", rn, fi, fd.ID)
+			if fd.ID <= 0 {
+				add("%s: id は正の整数にする", fn)
+			} else if _, dup := verdictByID[fd.ID]; dup {
+				add("%s: id が同じ回の中で重複しています", fn)
+			}
+			verdictByID[fd.ID] = fd.Verdict
+			for _, kv := range []struct{ key, val string }{
+				{"file", fd.File}, {"summary", fd.Summary},
+				{"category", fd.Category}, {"audience", fd.Audience},
+			} {
+				if kv.val == "" {
+					add("%s: %s がありません", fn, kv.key)
+				}
+			}
+			// audience の列挙。列挙外の値が黙って通ると D7 (被害者の判定) の入力が壊れる。
+			if fd.Audience != "" && !recordAudiences[fd.Audience] {
+				add("%s: audience は operator / admin / provider / developer のいずれか: %q", fn, fd.Audience)
+			}
+			if fd.AudienceInitial != "" && !recordAudiences[fd.AudienceInitial] {
+				add("%s: audience_initial は operator / admin / provider / developer のいずれか: %q", fn, fd.AudienceInitial)
+			}
+			for _, kv := range []struct{ key, val string }{
+				{"condition", fd.Consequence.Condition}, {"who", fd.Consequence.Who},
+				{"what", fd.Consequence.What}, {"detectability", fd.Consequence.Detectability},
+			} {
+				if kv.val == "" {
+					add("%s: consequence.%s がありません (帰結の 4 項目は必須)", fn, kv.key)
+				}
+			}
+			switch fd.PremiseCheck.Stages {
+			case "none", "A", "A+B":
+			default:
+				add("%s: premise_check.stages は none / A / A+B のいずれか: %q", fn, fd.PremiseCheck.Stages)
+			}
+			switch fd.PremiseCheck.Result {
+			case "verified", "wrong", "unverifiable", "skipped":
+			default:
+				add("%s: premise_check.result は verified / wrong / unverifiable / skipped のいずれか: %q",
+					fn, fd.PremiseCheck.Result)
+			}
+			if (fd.PremiseCheck.Stages == "none") != (fd.PremiseCheck.Result == "skipped") {
+				add("%s: stages が none のときだけ result は skipped (stages %q / result %q)",
+					fn, fd.PremiseCheck.Stages, fd.PremiseCheck.Result)
+			}
+			switch fd.Verdict {
+			case "adopted", "held", "rejected":
+			default:
+				add("%s: verdict は adopted / held / rejected のいずれか: %q", fn, fd.Verdict)
+			}
+			if fd.VerdictReason == "" {
+				add("%s: verdict_reason がありません (判定の経路をノード ID で書く)", fn)
+			}
+			if fd.PlanRef != nil {
+				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
+					add("%s: plan_ref の run %d は存在しません (回は 1〜%d)", fn, fd.PlanRef.Run, len(doc.Runs))
+				} else if !plansByRun[fd.PlanRef.Run-1][fd.PlanRef.Problem] {
+					add("%s: plan_ref の問題 %q は回 %d の plans にありません", fn, fd.PlanRef.Problem, fd.PlanRef.Run)
+				}
+			}
+		}
+
+		problemIDs := map[string]bool{}
+		for _, pl := range run.Plans {
+			if pl.ProblemID != "" && problemIDs[pl.ProblemID] {
+				add("%s: problem_id %q が重複しています", rn, pl.ProblemID)
+			}
+			problemIDs[pl.ProblemID] = true
+		}
+		for pi, pl := range run.Plans {
+			pn := fmt.Sprintf("%s: plans[%d] (%s)", rn, pi, pl.ProblemID)
+			for _, kv := range []struct{ key, val string }{
+				{"problem_id", pl.ProblemID}, {"cause", pl.Cause}, {"approach", pl.Approach},
+			} {
+				if kv.val == "" {
+					add("%s: %s がありません", pn, kv.key)
+				}
+			}
+			if len(pl.FindingIDs) == 0 {
+				add("%s: finding_ids がありません (1 つ以上)", pn)
+			}
+			for _, id := range pl.FindingIDs {
+				v, ok := verdictByID[id]
+				if !ok {
+					add("%s: finding_ids の %d は同じ回の findings にありません", pn, id)
+				} else if v != "adopted" {
+					add("%s: finding_ids の %d は採択 (adopted) ではありません (verdict %s)。修正計画は採択だけを束ねる", pn, id, v)
+				}
+			}
+			switch pl.Status {
+			case "pending", "awaiting-human":
+				if pl.SHA != "" {
+					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+				}
+				if pl.Status == "awaiting-human" && pl.Options == "" {
+					add("%s: status awaiting-human には options (選択肢とトレードオフ) が必須", pn)
+				}
+			case "done":
+				if pl.SHA == "" {
+					add("%s: status done には sha (短縮 SHA) が必須", pn)
+				}
+			default:
+				add("%s: status は pending / awaiting-human / done のいずれか: %q", pn, pl.Status)
+			}
+			for _, d := range pl.DependsOn {
+				if d == pl.ProblemID {
+					add("%s: depends_on が自己参照しています", pn)
+					continue
+				}
+				if !problemIDs[d] {
+					add("%s: depends_on の %q は同じ回の plans にありません", pn, d)
+				}
+			}
+		}
+		// 被覆: 修正計画を書いた回では、採択は自回の plans か plan_ref で覆われる。
+		// 覆われない採択は、対処しないまま黙って消える。plans が無い回は fix 前なので
+		// 要求しない。
+		if len(run.Plans) > 0 {
+			covered := map[int]bool{}
+			for _, pl := range run.Plans {
+				for _, id := range pl.FindingIDs {
+					covered[id] = true
+				}
+			}
+			for _, fd := range run.Findings {
+				if fd.Verdict != "adopted" || covered[fd.ID] {
+					continue
+				}
+				if fd.PlanRef != nil {
+					continue // 参照自体の実在は上の finding ループで検査済み
+				}
+				add("%s: findings id %d: 採択が修正計画に載っていません (自回の plans にも plan_ref にも無い)", rn, fd.ID)
+			}
+		}
+		for _, cycle := range recordDependsOnCycles(run.Plans) {
+			add("%s: depends_on が循環しています (%s)。順序が定まらない — 同じ原因の 1 問題に束ねるべきものを分けていないかを疑う",
+				rn, strings.Join(cycle, " → "))
+		}
+	}
+	return problems
+}
+
+// recordDependsOnCycles は plans の depends_on の循環を検出する。自己参照は
+// 個別に報告するのでここでは扱わない。同じ循環は 1 度だけ返す。
+func recordDependsOnCycles(plans []recordPlan) [][]string {
+	deps := make(map[string][]string, len(plans))
+	for _, pl := range plans {
+		for _, d := range pl.DependsOn {
+			if d != pl.ProblemID {
+				deps[pl.ProblemID] = append(deps[pl.ProblemID], d)
+			}
+		}
+	}
+	const (
+		visiting = 1
+		done     = 2
+	)
+	state := map[string]int{}
+	var cycles [][]string
+	var stack []string
+	var visit func(id string)
+	visit = func(id string) {
+		state[id] = visiting
+		stack = append(stack, id)
+		for _, d := range deps[id] {
+			switch state[d] {
+			case 0:
+				visit(d)
+			case visiting:
+				// stack の d 以降が循環。
+				for i, s := range stack {
+					if s == d {
+						cycle := append(append([]string{}, stack[i:]...), d)
+						cycles = append(cycles, cycle)
+						break
+					}
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		state[id] = done
+	}
+	for _, pl := range plans {
+		if state[pl.ProblemID] == 0 {
+			visit(pl.ProblemID)
+		}
+	}
+	return cycles
+}
+
+// --- サマリの生成 ---
+
+// renderReviewTriageSummary は記録 YAML から人が読むサマリ (Markdown) を生成する。
+// 件数はすべてここで計算する — 人が書いた集計をどこからも読まない。
+func renderReviewTriageSummary(yamlPath string, data []byte) (string, error) {
+	var doc recordDoc
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return "", fmt.Errorf("%s: YAML を読めません: %w", yamlPath, err)
+	}
+	return renderReviewTriageSummaryDoc(yamlPath, &doc), nil
+}
+
+func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
+	base := path.Base(yamlPath)
+	stem := strings.TrimSuffix(base, ".yaml")
+	var b strings.Builder
+	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。正本は %s — `make docs-review-triage-summary` で再生成する。 -->\n\n", base)
+	fmt.Fprintf(&b, "# %s のトリアージ記録\n\n", stem)
+	fmt.Fprintf(&b, "正本は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
+
+	b.WriteString("## 推移\n\n")
+	b.WriteString("| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+	for i, run := range doc.Runs {
+		adopted, held, rejected := 0, 0, 0
+		for _, fd := range run.Findings {
+			switch fd.Verdict {
+			case "adopted":
+				adopted++
+			case "held":
+				held++
+			case "rejected":
+				rejected++
+			}
+		}
+		// 自由文字列の欄 (skill・model など) は recordCell で無害化する — 縦棒が
+		// 入ると桁がずれ、偽の数字が集計値の手前に並ぶ (列挙で守られない欄は検査も
+		// 捕まえない)。
+		fmt.Fprintf(&b, "| %d | %s | `%s` | `%s` | %s | %d | %d | %d | %d |\n",
+			i+1, recordCell(run.Date), recordCell(run.Skill), recordCell(run.Model),
+			recordCell(run.Scope), len(run.Findings), adopted, held, rejected)
+	}
+
+	for i, run := range doc.Runs {
+		fmt.Fprintf(&b, "\n## 回 %d: %s `%s`", i+1, recordCell(run.Date), recordCell(run.Skill))
+		if run.RunID != "" {
+			fmt.Fprintf(&b, " (%s)", recordCell(run.RunID))
+		}
+		b.WriteString("\n\n")
+		fmt.Fprintf(&b, "- HEAD `%s` / model `%s` / scope %s",
+			recordCell(run.Head), recordCell(run.Model), recordCell(run.Scope))
+		if run.Level != "" {
+			b.WriteString(" / level " + recordCell(run.Level))
+		}
+		b.WriteString("\n\n")
+
+		b.WriteString("| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |\n")
+		b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
+		for _, fd := range run.Findings {
+			b.WriteString(recordRow(renderFindingCells(fd)))
+		}
+
+		if len(run.Plans) > 0 {
+			b.WriteString("\n### 修正計画\n\n")
+			b.WriteString("| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | SHA |\n")
+			b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
+			for _, pl := range run.Plans {
+				b.WriteString(recordRow(renderPlanCells(pl)))
+			}
+			for _, pl := range run.Plans {
+				if pl.Status == "awaiting-human" {
+					fmt.Fprintf(&b, "\n- **%s は選択待ち (人間が選ぶ)**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Options))
+				}
+			}
+		}
+
+		if run.Notes != "" {
+			b.WriteString("\n### 観察\n\n" + strings.TrimRight(run.Notes, "\n") + "\n")
+		}
+	}
+	return b.String()
+}
+
+// recordRow はセルの列から表の 1 行を組み立てる。
+func recordRow(cells []string) string {
+	return "| " + strings.Join(cells, " | ") + " |\n"
+}
+
+// renderFindingCells は指摘 1 件の表のセル列を返す。行を 1 つの書式文字列で
+// 組み立てると、テストがセル単位で分岐を検証できず、存在確認のアサーションが
+// 別のセルへの偶然一致で通り抜ける (実測で 3 度起きた型)。
+func renderFindingCells(fd recordFinding) []string {
+	loc := fd.File
+	if fd.Line > 0 {
+		loc = fmt.Sprintf("%s:%d", fd.File, fd.Line)
+	}
+	aud := fd.Audience
+	if fd.AudienceInitial != "" && fd.AudienceInitial != fd.Audience {
+		aud = fd.AudienceInitial + " → " + fd.Audience
+	}
+	premise := "対象外"
+	if fd.PremiseCheck.Stages != "none" {
+		premise = fd.PremiseCheck.Stages + ": " + fd.PremiseCheck.Result
+	}
+	gates := "—"
+	if len(fd.GatesFired) > 0 {
+		gates = strings.Join(fd.GatesFired, ", ")
+	}
+	return []string{
+		strconv.Itoa(fd.ID),
+		"`" + recordCell(loc) + "` " + recordCell(fd.Summary),
+		recordCell(fd.Category) + " / " + recordCell(aud),
+		recordCell(fd.Consequence.Condition) + " / " + recordCell(fd.Consequence.What) +
+			" / " + recordCell(fd.Consequence.Detectability),
+		premise,
+		recordCell(gates),
+		renderVerdictCell(fd),
+	}
+}
+
+// renderVerdictCell は判定セル (判定 — 経路。束ね先があれば添える) を返す。
+func renderVerdictCell(fd recordFinding) string {
+	cell := recordVerdictJa(fd.Verdict) + " — " + recordCell(fd.VerdictReason)
+	if fd.PlanRef != nil {
+		cell += fmt.Sprintf(" (束ね先: 回 %d の %s)", fd.PlanRef.Run, recordCell(fd.PlanRef.Problem))
+	}
+	return cell
+}
+
+// renderPlanCells は修正計画 1 件の表のセル列を返す。
+func renderPlanCells(pl recordPlan) []string {
+	var ids []string
+	for _, id := range pl.FindingIDs {
+		ids = append(ids, "#"+strconv.Itoa(id))
+	}
+	order := "—"
+	if pl.Order > 0 {
+		order = strconv.Itoa(pl.Order)
+	}
+	if len(pl.DependsOn) > 0 {
+		order += " (" + recordCell(strings.Join(pl.DependsOn, ", ")) + " の後)"
+	}
+	sha := "—"
+	if pl.SHA != "" {
+		sha = "`" + recordCell(pl.SHA) + "`"
+	}
+	return []string{
+		recordCell(pl.ProblemID),
+		recordCell(pl.Cause),
+		strings.Join(ids, " "),
+		recordCell(pl.Approach),
+		order,
+		recordStatusJa(pl.Status),
+		sha,
+	}
+}
+
+// recordCell は表のセルに入れる文字列を 1 行に整える。
+func recordCell(s string) string {
+	return strings.NewReplacer("|", "\\|", "\n", " ").Replace(strings.TrimSpace(s))
+}
+
+func recordVerdictJa(v string) string {
+	switch v {
+	case "adopted":
+		return "**採択**"
+	case "held":
+		return "**保留**"
+	case "rejected":
+		return "**却下**"
+	}
+	return v
+}
+
+func recordStatusJa(s string) string {
+	switch s {
+	case "pending":
+		return "未着手"
+	case "awaiting-human":
+		return "**選択待ち**"
+	case "done":
+		return "済"
+	}
+	return s
+}
+
+// listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
+// 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
+// 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
+// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って緑の型) を塞ぐため。
+// ディレクトリが無いリポジトリ (スキル未導入) では nil を返す。
+func listReviewTriageFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		// ディレクトリが無いのはスキル未導入の正常な状態。それ以外 (権限・I/O) の
+		// エラーを「記録 0 件」に潰すと、守りが黙って外れる。判定は judgment_flow.go と
+		// 同じ errors.Is に揃える (ラップされたエラーも正しく分類するため)。
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		// README.* は記録ではない — README.md は手書きの規範文書で、README.yaml を
+		// 記録と見なすと生成器が README.md を上書きしてしまう (検査側の除外と対称にする)。
+		if strings.TrimSuffix(strings.TrimSuffix(name, ".md"), ".yaml") == "README" {
+			continue
+		}
+		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".md") {
+			files = append(files, path.Join(dir, name))
+		}
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+// writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
+// (`make docs-review-triage-summary`)。
+func writeReviewTriageSummaries(dir string) error {
+	files, err := listReviewTriageFiles(dir)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if !strings.HasSuffix(f, ".yaml") {
+			continue
+		}
+		data, err := os.ReadFile(f)
+		if err != nil {
+			return err
+		}
+		summary, err := renderReviewTriageSummary(f, data)
+		if err != nil {
+			return err
+		}
+		mdPath := strings.TrimSuffix(f, ".yaml") + ".md"
+		if err := os.WriteFile(mdPath, []byte(summary), 0o644); err != nil {
+			return err
+		}
+		fmt.Printf("生成: %s (正本: %s)\n", mdPath, f)
+	}
+	return nil
+}

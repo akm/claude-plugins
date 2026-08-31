@@ -1,0 +1,978 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// validRecordYAML はスキーマに沿った記録のフィクスチャ。採択・保留・却下を 1 件ずつ持つ。
+const validRecordYAML = `runs:
+  - date: "2026-08-30"
+    skill: code-review
+    run_id: ""
+    model: sonnet-5
+    level: medium
+    scope: full
+    head: abc1234
+    findings:
+      - id: 1
+        file: docs/foo.md
+        line: 10
+        summary: 数の食い違い
+        category: doc-other
+        audience: developer
+        consequence:
+          condition: 検算するとき
+          who: developer
+          what: 分母を誤る
+          detectability: 気づかない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: ゲート 0 件で採択 (A2)
+      - id: 2
+        file: internal/bar.go
+        summary: 仕様違反の主張
+        category: production
+        audience: operator
+        consequence:
+          condition: 運用中
+          who: operator
+          what: 配信が止まる
+          detectability: 気づかない
+        premise_check:
+          stages: A+B
+          result: unverifiable
+        verdict: held
+        verdict_reason: 根拠を確かめられず保留 (H3)
+        attrs:
+          severity: P2
+      - id: 3
+        file: tools/baz_test.go
+        summary: 一時ファイルの削除が雑
+        category: test
+        audience: developer
+        consequence:
+          condition: disk full のとき
+          who: developer
+          what: テストが落ちる
+          detectability: 気づく
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [developer-domain]
+        verdict: rejected
+        verdict_reason: 開発者の領域で却下 (R3)
+    plans:
+      - problem_id: P1
+        cause: 数えずに書いた
+        finding_ids: [1]
+        approach: 数え直して単位を書く
+        order: 1
+        sha: ""
+        status: pending
+    notes: 最初の回。
+`
+
+// recordFiles はフィクスチャ 1 組 (yaml + 生成済みサマリ) の files と readFile を作る。
+func recordFiles(t *testing.T, yamlContent string) ([]string, func(string) ([]byte, error)) {
+	t.Helper()
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	mdPath := reviewTriageDir + "feat-x.md"
+	summary, err := renderReviewTriageSummary(yamlPath, []byte(yamlContent))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	contents := map[string]string{
+		yamlPath: yamlContent,
+		mdPath:   summary,
+	}
+	read := func(p string) ([]byte, error) {
+		c, ok := contents[p]
+		if !ok {
+			t.Fatalf("想定外の読み込み: %s", p)
+		}
+		return []byte(c), nil
+	}
+	return []string{yamlPath, mdPath, reviewTriageDir + "README.md"}, read
+}
+
+func TestReviewTriageRecordValidPasses(t *testing.T) {
+	files, read := recordFiles(t, validRecordYAML)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("正しい記録で問題が出た: %v", problems)
+	}
+}
+
+func TestReviewTriageRecordSchemaViolations(t *testing.T) {
+	cases := []struct {
+		name string
+		old  string // validRecordYAML の中で置き換える文字列
+		new  string
+		want string // 問題文に含まれるべき語
+	}{
+		{"model の欠落", "    model: sonnet-5\n", "", "model"},
+		{"scope の列挙値違反", "scope: full", "scope: whole", "scope"},
+		{"id の重複", "id: 2\n", "id: 1\n", "id"},
+		{"帰結の項目の欠落", "          what: 分母を誤る\n", "", "what"},
+		{"premise の整合 (none でないのに skipped)", "stages: A\n          result: verified\n        verdict: adopted", "stages: A\n          result: skipped\n        verdict: adopted", "skipped"},
+		{"verdict の列挙値違反", "verdict: held", "verdict: pending", "verdict"},
+		{"audience の列挙値違反", "audience: operator", "audience: user", "audience"},
+		{"audience_initial の列挙値違反", "        audience: operator\n", "        audience: operator\n        audience_initial: user\n", "audience_initial"},
+		{"存在しない指摘への参照", "finding_ids: [1]", "finding_ids: [9]", "finding_ids"},
+		{"採択でない指摘への参照", "finding_ids: [1]", "finding_ids: [2]", "採択"},
+		{"pending なのに sha がある", `sha: ""`, "sha: abc1234", "sha"},
+		{"awaiting-human なのに options が無い", "status: pending", "status: awaiting-human", "options"},
+		{"depends_on の宙参照", "order: 1\n", "order: 1\n        depends_on: [P9]\n", "depends_on"},
+		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
+		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
+		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
+		{"date が空", "- date: \"2026-08-30\"\n", "- date: \"\"\n", "date"},
+		{"id が正の整数でない", "- id: 1\n", "- id: 0\n", "id"},
+		{"引用符の無い # を含む値", "cause: 数えずに書いた", "cause: PR #333 を一般化した", "引用符"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := strings.Replace(validRecordYAML, tc.old, tc.new, 1)
+			if mutated == validRecordYAML {
+				t.Fatalf("フィクスチャの置換が効いていない: %q", tc.old)
+			}
+			yamlPath := reviewTriageDir + "feat-x.yaml"
+			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+			problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+			found := false
+			for _, p := range problems {
+				if strings.Contains(p, tc.want) {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
+			}
+		})
+	}
+}
+
+// ' #' 検査の境界: コロン後の空白の揺れ・値全体がコメント・シーケンス先頭キーの
+// ブロックスカラーの兄弟・インデント指示子。正規表現では列挙的に穴が開いた型
+// (LineComment 走査への置き換えで構造的に守る)。
+func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
+	cases := []struct {
+		name    string
+		old     string
+		new     string
+		flagged bool // 引用符の問題が出るべきか
+	}{
+		{"コロン後の空白 2 個でも検出する",
+			"    notes: 最初の回。\n", "    notes:  PR #333 の件\n", true},
+		{"値全体がコメントでも検出する (任意項目が黙って null になる)",
+			"    notes: 最初の回。\n", "    notes: #おぼえがき\n", true},
+		{"シーケンス先頭キーのブロックスカラーの兄弟は検査される",
+			"      - problem_id: P1\n        cause: 数えずに書いた\n",
+			"      - notes_like: |-\n          本文\n        problem_id: P1\n        cause: PR #333 を直す\n",
+			true},
+		{"インデント指示子つきブロックスカラーの本文は偽陽性にしない",
+			"    notes: 最初の回。\n", "    notes: |2-\n      memo: 詳細は PR #333 を見る\n", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := strings.Replace(validRecordYAML, tc.old, tc.new, 1)
+			if mutated == validRecordYAML {
+				t.Fatalf("フィクスチャの置換が効いていない: %q", tc.old)
+			}
+			yamlPath := reviewTriageDir + "feat-x.yaml"
+			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+			problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+			flagged := false
+			for _, p := range problems {
+				if strings.Contains(p, "引用符") {
+					flagged = true
+				}
+			}
+			if flagged != tc.flagged {
+				t.Fatalf("引用符の問題の有無が期待と違う (期待 %v)。出た問題: %v", tc.flagged, problems)
+			}
+		})
+	}
+}
+
+// LineComment 方式固有の境界の実測ピン: 複数行の素のスカラーの継続行と
+// フロー値の後の ' #' は検出され、フロー内の ' #' は解析エラーとして報告される
+// (いずれも素通りしない)。
+func TestReviewTriageRecordHashNewMethodEdges(t *testing.T) {
+	cases := []struct {
+		name string
+		old  string
+		new  string
+		want string
+	}{
+		{"複数行の素のスカラーの継続行の #",
+			"    notes: 最初の回。\n", "    notes: 一行目\n      続きの行 #途中のシャープ\n", "行内コメント"},
+		{"フロー値の後の #",
+			"gates_fired: [developer-domain]", "gates_fired: [developer-domain] #フロー後", "行内コメント"},
+		{"フロー内の # は解析エラーになる",
+			"gates_fired: [developer-domain]", "gates_fired: [developer-domain #中]", "解析できません"},
+		{"引用符付きの値の後ろのコメントも検出する (行内コメントの全面禁止)",
+			"cause: 数えずに書いた", "cause: \"数えずに書いた\" # 補足", "行内コメント"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := strings.Replace(validRecordYAML, tc.old, tc.new, 1)
+			if mutated == validRecordYAML {
+				t.Fatalf("フィクスチャの置換が効いていない: %q", tc.old)
+			}
+			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+			found := false
+			for _, p := range problems {
+				if strings.Contains(p, tc.want) {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
+			}
+		})
+	}
+}
+
+// 自由文字列の欄 (skill・model・head など) に縦棒が入っても表の桁が崩れない。
+func TestReviewTriageSummaryEscapesFreeStrings(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "skill: code-review", "skill: a|b", 1)
+	mutated = strings.Replace(mutated, "head: abc1234", "head: h|1", 1)
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(mutated))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if !strings.Contains(summary, `a\|b`) {
+		t.Fatalf("skill の縦棒が無害化されていない:\n%s", summary)
+	}
+	if strings.Contains(summary, "| h|1") || strings.Contains(summary, "`h|1`") {
+		t.Fatalf("head の縦棒が無害化されていない:\n%s", summary)
+	}
+}
+
+// 修正計画を書いた回では、採択は自回の plans か plan_ref (束ね先の構造化参照) で
+// 覆われる。覆われない採択は「対処しないまま黙って消える」ので検査で捕まえる。
+func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
+	extra := `      - id: 4
+        file: docs/extra.md
+        summary: 束ね忘れの例
+        category: doc-other
+        audience: developer
+        consequence:
+          condition: c
+          who: developer
+          what: w
+          detectability: d
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: A2
+`
+	base := strings.Replace(validRecordYAML, "    plans:\n", extra+"    plans:\n", 1)
+	if base == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+
+	t.Run("覆われない採択は報告される", func(t *testing.T) {
+		read := func(_ string) ([]byte, error) { return []byte(base), nil }
+		problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+		found := false
+		for _, p := range problems {
+			if strings.Contains(p, "修正計画に載っていません") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("覆われない採択が報告されない。出た問題: %v", problems)
+		}
+	})
+
+	t.Run("plan_ref で覆われれば報告されない", func(t *testing.T) {
+		covered := strings.Replace(base, "        verdict_reason: A2\n    plans:",
+			"        verdict_reason: A2\n        plan_ref:\n          run: 1\n          problem: P1\n    plans:", 1)
+		if covered == base {
+			t.Fatal("フィクスチャの置換が効いていない")
+		}
+		read := func(_ string) ([]byte, error) { return []byte(covered), nil }
+		for _, p := range reviewTriageRecordProblems([]string{yamlPath}, read) {
+			if strings.Contains(p, "修正計画に載っていません") {
+				t.Fatalf("plan_ref で覆われた採択が報告された: %v", p)
+			}
+		}
+	})
+
+	t.Run("plans の無い回は被覆を要求しない", func(t *testing.T) {
+		noPlans := base[:strings.Index(base, "    plans:")] + "    notes: fix 前の回。\n"
+		read := func(_ string) ([]byte, error) { return []byte(noPlans), nil }
+		for _, p := range reviewTriageRecordProblems([]string{yamlPath}, read) {
+			if strings.Contains(p, "修正計画に載っていません") {
+				t.Fatalf("plans の無い回で被覆が要求された: %v", p)
+			}
+		}
+	})
+
+	t.Run("plan_ref の宙参照は報告される", func(t *testing.T) {
+		for _, ref := range []string{
+			"        plan_ref:\n          run: 9\n          problem: P1\n",
+			"        plan_ref:\n          run: 1\n          problem: P9\n",
+		} {
+			dangling := strings.Replace(base, "        verdict_reason: A2\n    plans:",
+				"        verdict_reason: A2\n"+ref+"    plans:", 1)
+			read := func(_ string) ([]byte, error) { return []byte(dangling), nil }
+			problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+			found := false
+			for _, p := range problems {
+				if strings.Contains(p, "plan_ref") {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("plan_ref の宙参照 (%q) が報告されない。出た問題: %v", ref, problems)
+			}
+		}
+	})
+}
+
+// セル単位のテーブル駆動テスト。行に紐付かない部分文字列の照合は別のセルへの
+// 偶然一致で通り抜けるため (ミューテーションで実証された 3 度目の同型)、
+// セルの値そのものを検証する。
+func TestRenderFindingCells(t *testing.T) {
+	base := recordFinding{
+		ID: 1, File: "docs/foo.md", Summary: "s", Category: "test", Audience: "developer",
+		Consequence:  recordConsequence{Condition: "c", Who: "developer", What: "w", Detectability: "d"},
+		PremiseCheck: recordPremise{Stages: "A", Result: "verified"},
+		Verdict:      "adopted", VerdictReason: "A2",
+	}
+	cases := []struct {
+		name   string
+		mutate func(*recordFinding)
+		col    int
+		want   string
+	}{
+		{"premise は stages A なら段と結果", nil, 4, "A: verified"},
+		{"premise は stages none なら対象外", func(f *recordFinding) {
+			f.PremiseCheck = recordPremise{Stages: "none", Result: "skipped"}
+		}, 4, "対象外"},
+		{"gates 空はダッシュ", nil, 5, "—"},
+		{"gates ありは結合", func(f *recordFinding) {
+			f.GatesFired = []string{"already-visible", "developer-domain"}
+		}, 5, "already-visible, developer-domain"},
+		{"audience 上書きは矢印", func(f *recordFinding) {
+			f.AudienceInitial = "developer"
+			f.Audience = "operator"
+		}, 2, "test / developer → operator"},
+		{"audience 同値は矢印なし", func(f *recordFinding) {
+			f.AudienceInitial = "developer"
+		}, 2, "test / developer"},
+		{"行番号ありの位置", func(f *recordFinding) { f.Line = 12 }, 1, "`docs/foo.md:12` s"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fd := base
+			if tc.mutate != nil {
+				tc.mutate(&fd)
+			}
+			cells := renderFindingCells(fd)
+			if cells[tc.col] != tc.want {
+				t.Fatalf("セル %d = %q, want %q", tc.col, cells[tc.col], tc.want)
+			}
+		})
+	}
+}
+
+// セルに入る自由文字列は残らず recordCell を通る — loc (file)・depends_on の
+// 結合・sha・選択待ち行の problem_id (D3 の取りこぼし 4 箇所)。
+func TestRenderCellsEscapeAllFreeStrings(t *testing.T) {
+	fd := recordFinding{
+		ID: 1, File: "docs/a|b.md", Line: 3, Summary: "s", Category: "test", Audience: "developer",
+		Consequence:  recordConsequence{Condition: "c", Who: "developer", What: "w", Detectability: "d"},
+		PremiseCheck: recordPremise{Stages: "A", Result: "verified"},
+		Verdict:      "adopted", VerdictReason: "A2",
+	}
+	if cells := renderFindingCells(fd); !strings.Contains(cells[1], `a\|b`) {
+		t.Fatalf("file の縦棒が無害化されていない: %q", cells[1])
+	}
+	pl := recordPlan{ProblemID: "P1", Cause: "c", FindingIDs: []int{1}, Approach: "a",
+		Order: 2, DependsOn: []string{"P|9"}, SHA: "a|b", Status: "done"}
+	cells := renderPlanCells(pl)
+	if !strings.Contains(cells[4], `P\|9`) {
+		t.Fatalf("depends_on の縦棒が無害化されていない: %q", cells[4])
+	}
+	if !strings.Contains(cells[6], `a\|b`) {
+		t.Fatalf("sha の縦棒が無害化されていない: %q", cells[6])
+	}
+	// 選択待ち行の problem_id
+	src := strings.Replace(validRecordYAML, "problem_id: P1", "problem_id: P|1", 1)
+	src = strings.Replace(src, "status: pending",
+		"status: awaiting-human\n        options: 案 a / 案 b", 1)
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if !strings.Contains(summary, `**P\|1 は選択待ち`) {
+		t.Fatalf("選択待ち行の problem_id の縦棒が無害化されていない:\n%s", summary)
+	}
+}
+
+func TestRenderPlanCells(t *testing.T) {
+	pl := recordPlan{ProblemID: "P1", Cause: "c", FindingIDs: []int{1, 2}, Approach: "a",
+		Order: 2, DependsOn: []string{"P9"}, SHA: "abc1234", Status: "done"}
+	cells := renderPlanCells(pl)
+	for col, want := range map[int]string{2: "#1 #2", 4: "2 (P9 の後)", 5: "済", 6: "`abc1234`"} {
+		if cells[col] != want {
+			t.Fatalf("セル %d = %q, want %q", col, cells[col], want)
+		}
+	}
+	empty := recordPlan{ProblemID: "P2", Cause: "c", FindingIDs: []int{1}, Approach: "a", Status: "pending"}
+	cells = renderPlanCells(empty)
+	for col, want := range map[int]string{4: "—", 5: "未着手", 6: "—"} {
+		if cells[col] != want {
+			t.Fatalf("空値のセル %d = %q, want %q", col, cells[col], want)
+		}
+	}
+}
+
+// ブロックスカラーの本文は ' #' の検査の対象外 (自由記述の偽陽性を出さない)。
+func TestReviewTriageRecordHashInBlockScalarAllowed(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML,
+		"    notes: 最初の回。\n",
+		"    notes: |-\n      最初の回。\n      memo: 詳細は PR #333 を見る\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	for _, p := range reviewTriageRecordProblems([]string{yamlPath}, read) {
+		if strings.Contains(p, "引用符") {
+			t.Fatalf("ブロックスカラー本文の # が偽陽性になった: %v", p)
+		}
+	}
+}
+
+// シーケンス項目の先頭キー (- cause: … の形) でも ' #' は検出される (偽陰性を残さない)。
+func TestReviewTriageRecordHashOnSequenceFirstKey(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML,
+		"      - problem_id: P1\n        cause: 数えずに書いた\n",
+		"      - cause: PR #333 を一般化した\n        problem_id: P1\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "引用符") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("シーケンス先頭キーの ' #' が検出されない。出た問題: %v", problems)
+	}
+}
+
+// サマリの表示分岐 (run_id・audience の上書き・premise 対象外・order 無し・depends_on)
+// を固定する。実装済みの挙動の固定 (退行防止)。
+func TestReviewTriageSummaryRenderBranches(t *testing.T) {
+	src := `runs:
+  - date: "2026-08-30"
+    skill: code-review
+    run_id: run-xyz
+    model: opus-5
+    scope: incremental
+    head: abc1234
+    findings:
+      - id: 1
+        file: docs/foo.md
+        summary: 上書きの例
+        category: test
+        audience: operator
+        audience_initial: developer
+        consequence:
+          condition: c
+          who: operator
+          what: w
+          detectability: d
+        premise_check:
+          stages: none
+          result: skipped
+        verdict: held
+        verdict_reason: H2
+      - id: 2
+        file: docs/bar.md
+        summary: 採択
+        category: test
+        audience: developer
+        consequence:
+          condition: c
+          who: developer
+          what: w
+          detectability: d
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: A2
+      - id: 3
+        file: docs/baz.md
+        summary: 上書きしない例
+        category: test
+        audience: developer
+        audience_initial: developer
+        consequence:
+          condition: c
+          who: developer
+          what: w
+          detectability: d
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: A2
+    plans:
+      - problem_id: P1
+        cause: c1
+        finding_ids: [2]
+        approach: a1
+        sha: ""
+        status: pending
+      - problem_id: P2
+        cause: c2
+        finding_ids: [2]
+        approach: a2
+        order: 2
+        depends_on: [P1]
+        sha: abc9999
+        status: done
+`
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	for _, want := range []string{
+		"(run-xyz)",            // run_id の表示
+		"developer → operator", // audience の上書きの表示
+		"| 対象外 |",              // premise stages none のセル (summary の語との誤一致を避けて列で照合)
+		"| P1 | c1 | #2 | a1 | — | 未着手 | — |",               // order 無しの行全体 (他列の — との誤一致を避ける)
+		"| P2 | c2 | #2 | a2 | 2 (P1 の後) | 済 | `abc9999` |", // depends_on と sha 真側の行全体
+	} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("%q がサマリに無い:\n%s", want, summary)
+		}
+	}
+	// 偽側: audience_initial == audience の指摘 (id 3) には上書きの矢印を出さない。
+	if strings.Count(summary, "→") != 1 {
+		t.Fatalf("上書きの矢印は 1 箇所 (id 1) だけのはず:\n%s", summary)
+	}
+}
+
+// 循環する plan と循環しない plan が混在しても、循環だけが報告される。
+func TestReviewTriageRecordMixedCyclePlans(t *testing.T) {
+	plans := "    plans:\n" +
+		recordCyclePlan("P1", "        depends_on: [P2]\n") +
+		recordCyclePlan("P2", "        depends_on: [P1]\n") +
+		recordCyclePlan("P3", "")
+	mutated := replaceRecordPlans(t, plans)
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	var hasCycle, p3InCycle bool
+	for _, p := range problems {
+		if strings.Contains(p, "循環") {
+			hasCycle = true
+			if strings.Contains(p, "P3") {
+				p3InCycle = true
+			}
+		}
+	}
+	if !hasCycle {
+		t.Fatalf("混在時に循環が報告されない。出た問題: %v", problems)
+	}
+	if p3InCycle {
+		t.Fatalf("循環していない P3 が循環として報告された。出た問題: %v", problems)
+	}
+}
+
+// 空・コメントのみ・空白のみの記録は「記録が空です」と報告される (EOF の生の文言にしない)。
+func TestReviewTriageRecordEmptyFile(t *testing.T) {
+	for _, content := range []string{"", "# コメントだけ\n", "   \n\n", "null\n", "~\n", "---\n"} {
+		yamlPath := reviewTriageDir + "feat-x.yaml"
+		read := func(_ string) ([]byte, error) { return []byte(content), nil }
+		problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+		found := false
+		for _, p := range problems {
+			if strings.Contains(p, "記録が空です") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("空の記録 (%q) が「記録が空です」と報告されない。出た問題: %v", content, problems)
+		}
+	}
+}
+
+// --- 区切りの 2 つ目のドキュメントは検出される (2 つ目以降は読まれず消えるため)。
+func TestReviewTriageRecordMultiDocument(t *testing.T) {
+	mutated := validRecordYAML + "---\nruns: []\n"
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "ドキュメント") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("2 つ目のドキュメントが報告されない。出た問題: %v", problems)
+	}
+}
+
+// 記録の走査は git 追跡でなくファイルシステムを見る。追跡前 (git add 前) の
+// 最初の記録が検査も生成もされず素通りする穴を塞ぐため。
+func TestListReviewTriageFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"feat-x.yaml", "feat-x.md", "README.md", "README.yaml", "note.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := listReviewTriageFiles(dir)
+	if err != nil {
+		t.Fatalf("一覧に失敗: %v", err)
+	}
+	// README.* は記録ではない (README.md は手書きの規範、README.yaml を記録と
+	// 見なすと生成器が README.md を上書きする) ので一覧に入れない。
+	want := []string{
+		filepath.Join(dir, "feat-x.md"),
+		filepath.Join(dir, "feat-x.yaml"),
+	}
+	if len(got) != len(want) {
+		t.Fatalf("一覧が期待と違う: got %v want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("一覧が期待と違う: got %v want %v", got, want)
+		}
+	}
+}
+
+func TestListReviewTriageFilesMissingDir(t *testing.T) {
+	got, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"))
+	if got != nil || err != nil {
+		t.Fatalf("無いディレクトリはスキル未導入としてスキップする (nil, nil) べき: %v, %v", got, err)
+	}
+}
+
+// ディレクトリが「無い」以外の読み取りエラー (ENOTDIR など) は握りつぶさず返す —
+// 権限や I/O のエラーを「記録 0 件」= 緑に化けさせない。
+func TestListReviewTriageFilesErrorReported(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := listReviewTriageFiles(file); err == nil {
+		t.Fatalf("ディレクトリでないパスの読み取りエラーが握りつぶされた")
+	}
+}
+
+// README.yaml を置いても、生成器が規範文書 README.md を上書きしない。
+func TestWriteReviewTriageSummariesSkipsReadme(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "README.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	norm := "# 手書きの規範\n"
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(norm), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeReviewTriageSummaries(dir); err != nil {
+		t.Fatalf("生成に失敗: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != norm {
+		t.Fatalf("README.md が上書きされた:\n%s", got)
+	}
+}
+
+// 生成器はファイルシステム上のすべての記録 YAML からサマリを作る (追跡状況に依らない)。
+func TestWriteReviewTriageSummaries(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "feat-x.yaml")
+	if err := os.WriteFile(yamlPath, []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeReviewTriageSummaries(dir); err != nil {
+		t.Fatalf("生成に失敗: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "feat-x.md"))
+	if err != nil {
+		t.Fatalf("サマリが生成されていない: %v", err)
+	}
+	want, err := renderReviewTriageSummary(yamlPath, []byte(validRecordYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("生成内容が render と一致しない")
+	}
+}
+
+// depends_on の循環 (P1 → P2 → P1) は検出される。循環すると修正の順序が定まらない。
+func TestReviewTriageRecordDependsOnCycle(t *testing.T) {
+	cyclePlans := `    plans:
+      - problem_id: P1
+        cause: c1
+        finding_ids: [1]
+        approach: a1
+        depends_on: [P2]
+        sha: ""
+        status: pending
+      - problem_id: P2
+        cause: c2
+        finding_ids: [1]
+        approach: a2
+        depends_on: [P1]
+        sha: ""
+        status: pending
+`
+	origPlans := `    plans:
+      - problem_id: P1
+        cause: 数えずに書いた
+        finding_ids: [1]
+        approach: 数え直して単位を書く
+        order: 1
+        sha: ""
+        status: pending
+`
+	mutated := strings.Replace(validRecordYAML, origPlans, cyclePlans, 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "循環") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("depends_on の循環が報告されない。出た問題: %v", problems)
+	}
+}
+
+// recordCyclePlan は循環テスト用の plans 要素を組み立てる。
+func recordCyclePlan(id string, deps string) string {
+	return "      - problem_id: " + id + "\n" +
+		"        cause: c\n        finding_ids: [1]\n        approach: a\n" +
+		deps +
+		"        sha: \"\"\n        status: pending\n"
+}
+
+// 間接循環 (P1 → P2 → P3 → P1) も検出される。
+func TestReviewTriageRecordIndirectCycle(t *testing.T) {
+	plans := "    plans:\n" +
+		recordCyclePlan("P1", "        depends_on: [P2]\n") +
+		recordCyclePlan("P2", "        depends_on: [P3]\n") +
+		recordCyclePlan("P3", "        depends_on: [P1]\n")
+	mutated := replaceRecordPlans(t, plans)
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "循環") && strings.Contains(p, "P3") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("間接循環 (3 ノード) が報告されない。出た問題: %v", problems)
+	}
+}
+
+// 合流するが循環しない依存 (ダイヤモンド: P1 → P2/P3 → P4) は検出されない。
+func TestReviewTriageRecordDiamondIsNotCycle(t *testing.T) {
+	plans := "    plans:\n" +
+		recordCyclePlan("P1", "        depends_on: [P2, P3]\n") +
+		recordCyclePlan("P2", "        depends_on: [P4]\n") +
+		recordCyclePlan("P3", "        depends_on: [P4]\n") +
+		recordCyclePlan("P4", "")
+	mutated := replaceRecordPlans(t, plans)
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	for _, p := range reviewTriageRecordProblems([]string{yamlPath}, read) {
+		if strings.Contains(p, "循環") {
+			t.Fatalf("循環でないダイヤモンドの依存が循環と報告された: %v", p)
+		}
+	}
+}
+
+// replaceRecordPlans は validRecordYAML の plans 節を差し替える。
+func replaceRecordPlans(t *testing.T, plans string) string {
+	t.Helper()
+	origPlans := `    plans:
+      - problem_id: P1
+        cause: 数えずに書いた
+        finding_ids: [1]
+        approach: 数え直して単位を書く
+        order: 1
+        sha: ""
+        status: pending
+`
+	mutated := strings.Replace(validRecordYAML, origPlans, plans, 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの plans の置換が効いていない")
+	}
+	return mutated
+}
+
+// 未知のキーがあっても他の検査は続く (最初の問題で止めない)。
+func TestReviewTriageRecordUnknownKeyDoesNotAbort(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML,
+		"        verdict: adopted\n",
+		"        verdict: adopted\n        severity: P1\n", 1)
+	mutated = strings.Replace(mutated, "verdict: held", "verdict: maybe", 1)
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	var hasUnknown, hasVerdict bool
+	for _, p := range problems {
+		if strings.Contains(p, "severity") {
+			hasUnknown = true
+		}
+		if strings.Contains(p, "maybe") || strings.Contains(p, "verdict") {
+			hasVerdict = true
+		}
+	}
+	if !hasUnknown || !hasVerdict {
+		t.Fatalf("未知キーと列挙値違反の両方が報告されるべき。出た問題: %v", problems)
+	}
+}
+
+func TestReviewTriageRecordSummaryMissing(t *testing.T) {
+	yamlPath := reviewTriageDir + "feat-x.yaml"
+	read := func(_ string) ([]byte, error) { return []byte(validRecordYAML), nil }
+	problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "feat-x.md") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("サマリの不在が報告されない。出た問題: %v", problems)
+	}
+}
+
+func TestReviewTriageRecordSummaryStale(t *testing.T) {
+	files, read := recordFiles(t, validRecordYAML)
+	mdPath := reviewTriageDir + "feat-x.md"
+	staleRead := func(p string) ([]byte, error) {
+		if p == mdPath {
+			return []byte("# 古いサマリ\n"), nil
+		}
+		return read(p)
+	}
+	problems := reviewTriageRecordProblems(files, staleRead)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "feat-x.md") && strings.Contains(p, "docs-review-triage-summary") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("古いサマリが報告されない。出た問題: %v", problems)
+	}
+}
+
+// 対応する yaml の無いサマリ (孤児) は報告される。README.md は対象外。
+func TestReviewTriageRecordOrphanSummary(t *testing.T) {
+	orphan := reviewTriageDir + "old-branch.md"
+	read := func(_ string) ([]byte, error) { return []byte("# x\n"), nil }
+	problems := reviewTriageRecordProblems([]string{orphan, reviewTriageDir + "README.md"}, read)
+	var hasOrphan, hasReadme bool
+	for _, p := range problems {
+		if strings.Contains(p, "old-branch.md") {
+			hasOrphan = true
+		}
+		if strings.Contains(p, "README.md") {
+			hasReadme = true
+		}
+	}
+	if !hasOrphan {
+		t.Fatalf("孤児のサマリが報告されない。出た問題: %v", problems)
+	}
+	if hasReadme {
+		t.Fatalf("README.md が対象になっている。出た問題: %v", problems)
+	}
+}
+
+// 推移の表の件数は YAML から計算される (全件 3 / 採択 1 / 保留 1 / 却下 1)。
+func TestReviewTriageSummaryCounts(t *testing.T) {
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(validRecordYAML))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if !strings.Contains(summary, "| 3 | 1 | 1 | 1 |") {
+		t.Fatalf("推移の表に計算された件数 (3/1/1/1) が無い:\n%s", summary)
+	}
+	if !strings.Contains(summary, "生成物") {
+		t.Fatalf("生成物であることの注記が無い:\n%s", summary)
+	}
+	// 選択待ちの表示は awaiting-human の行があるときだけ (このフィクスチャは pending のみ)。
+	if strings.Contains(summary, "選択待ち") {
+		t.Fatalf("pending だけの記録に選択待ちの表示が出ている:\n%s", summary)
+	}
+	// gates_fired の結合表示 (真側)。
+	if !strings.Contains(summary, "developer-domain") {
+		t.Fatalf("gates_fired の表示が無い:\n%s", summary)
+	}
+	// run_id 空の見出しに括弧を付けない・depends_on 空の順序セルに接尾辞を付けない (偽側)。
+	if !strings.Contains(summary, "`code-review`\n") {
+		t.Fatalf("run_id 空の見出しに余計な表示が付いている:\n%s", summary)
+	}
+	if strings.Contains(summary, "の後)") {
+		t.Fatalf("depends_on 空なのに接尾辞が出ている:\n%s", summary)
+	}
+}
+
+// awaiting-human の問題は、サマリに選択待ちの明示と options (選択肢) が出る。
+func TestReviewTriageSummaryAwaitingHuman(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "status: pending",
+		"status: awaiting-human\n        options: 案 a は最小修正 / 案 b は構造の変更", 1)
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(mutated))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if !strings.Contains(summary, "選択待ち") {
+		t.Fatalf("awaiting-human の問題に選択待ちの表示が無い:\n%s", summary)
+	}
+	if !strings.Contains(summary, "案 a は最小修正") {
+		t.Fatalf("options (選択肢) がサマリに出ていない:\n%s", summary)
+	}
+}
+
+// docs/review-triage/ の外のファイルと README.md は対象外。
+func TestReviewTriageRecordIgnoresOtherFiles(t *testing.T) {
+	read := func(_ string) ([]byte, error) { return []byte("x: 1\n"), nil }
+	problems := reviewTriageRecordProblems([]string{
+		"docs/design/00-architecture.md",
+		"docs/manual/units/dependencies.yaml",
+		reviewTriageDir + "README.md",
+	}, read)
+	if len(problems) != 0 {
+		t.Fatalf("対象外のファイルで問題が出た: %v", problems)
+	}
+}
