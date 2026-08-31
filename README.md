@@ -11,6 +11,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [doc-dag](doc-dag/README.md) | 文書群の依存と重複を調べ、mermaid 図で示して DAG になるよう修正する (mermaid-preview と併用) |
 | [mermaid-preview](mermaid-preview/README.md) | mermaid の図を含む HTML を生成してブラウザで見せる (他のスキルからの図の提示にも使う) |
 | [commit-squash](commit-squash/README.md) | 未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす |
+| [review-triage](review-triage/README.md) | レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直す (Go が必要) |
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 
 ## 使い方
@@ -142,12 +143,18 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   │   ├── SKILL.md
 │   │   └── references/
 │   └── README.md
-└── work-log-gh-comment/          # プラグイン本体 (skill 型)
+├── work-log-gh-comment/          # プラグイン本体 (skill 型)
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/work-log-gh-comment/
+│   │   ├── SKILL.md
+│   │   ├── references/
+│   │   └── evals/                 # make -C work-log-gh-comment/skills/work-log-gh-comment/evals
+│   └── README.md
+└── review-triage/                # プラグイン本体 (skill 型)
     ├── .claude-plugin/plugin.json
-    ├── skills/work-log-gh-comment/
-    │   ├── SKILL.md
-    │   ├── references/
-    │   └── evals/                 # make -C work-log-gh-comment/skills/work-log-gh-comment/evals
+    ├── skills/review-triage/      # 指摘の選り分け
+    ├── skills/review-triage-fix/  # 採択した指摘の修正
+    ├── tools/triagecheck/         # 記録と判定フローの検査 (Go)
     └── README.md
 ```
 

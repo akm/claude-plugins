@@ -1,0 +1,9 @@
+{
+  "name": "review-triage",
+  "description": "レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直す skill 2 つと、記録を検査する Go ツール",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}
