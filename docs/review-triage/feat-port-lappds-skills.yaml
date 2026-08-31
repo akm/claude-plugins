@@ -212,3 +212,24 @@ runs:
       レビュア自身が「rebase 前から表とツリーの順序は異なっており、統合で新たに生じた
       食い違いではない」「順序が違って壊れるものは無い」と結論しており、指摘として
       数えない扱いに同意する。
+  - date: "2026-09-01"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: ""
+    scope: incremental
+    head: 79b8490
+    findings: []
+    notes: >-
+      修正 (回 1 の P1・P2、回 2 の P1) の後の再レビュー。範囲は bf16d7d..79b8490 の増分。
+      指摘 0 件。上流は報告のみで実行済み (HEAD・作業ツリーとも不変を確認)。
+      出力先は review-triage/tools/triagecheck/tmp/ だった (レビュア側の cwd が Go ツールの
+      ディレクトリだったため)。依頼様式が指す tmp/ はリポジトリ直下なので、次からは
+      置き場を明示する。
+      residual の 4 行に目を通した。うち 2 つは設定 (.claude/review-triage.yaml) への観察で、
+      レビュア自身が実害なしと結論している — 追認した: 現在の追跡ファイル 103 件で
+      種類不明は 0 件。ただし 1 件 (.claude/review-triage.yaml 自身) が受け皿の shared に
+      落ちており、設定の分類を後で見直す余地がある (判定への影響は無い。audience は
+      developer で、この回に指摘は無い)。
+      残る 2 つ (finding_ids の回内一意による束ね方、README の 84 件の数え方) も
+      レビュアが解消経路・数え方の併記を確認済みで、いずれも欠陥ではない。
