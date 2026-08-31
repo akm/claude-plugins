@@ -151,8 +151,6 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     └── README.md
 ```
 
-(commit-squash・doc-dag・work-log-gh-comment も skill 型で、構成は mermaid-preview と同じです。)
-
 プラグインは 2 つの型があります。**hooks 型**は Claude Code の動作に自動で割り込むもの、**skill 型**は依頼に応じて呼び出されるものです。skill 型はプラグイン直下の `skills/<スキル名>/SKILL.md` に置きます。1 つのプラグインが複数の skill を持つこともあります (`review-triage`)。
 
 ## プロジェクト固有の設定
