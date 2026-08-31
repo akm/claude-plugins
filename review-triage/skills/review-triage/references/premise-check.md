@@ -48,7 +48,7 @@ sub-agent を要するので重い。次のいずれかに当たる指摘だけ�
 
 ### 確かめること
 
-[6 則の規則 2 (新要素ゲート)](https://github.com/tecowl/lappds/blob/main/docs/solutions/workflow-issues/doc-fix-regression-chain-needs-dependency-closure.md) をそのまま使う。同記録は `release_id` の事故が「このゲートだけで防げた」と書いている。
+lappds の記録「6 則の規則 2 (新要素ゲート)」 をそのまま使う。同記録は `release_id` の事故が「このゲートだけで防げた」と書いている。
 
 | 問い | どこを見るか |
 | --- | --- |
@@ -59,7 +59,7 @@ sub-agent を要するので重い。次のいずれかに当たる指摘だけ�
 
 **「既存の仕組みが無い」を証明しようとしない。** 悪魔の証明になる。**探した範囲を書き、その範囲で見つからなかったことを示す。** 範囲を書けなければ `unverifiable`。
 
-**「調べたが分からなかった」を「正しい」として扱わない** ([診断ツールの偽陰性](https://github.com/tecowl/lappds/blob/main/docs/solutions/best-practices/diagnostic-tool-false-negatives-2026-08-02.md))。
+**「調べたが分からなかった」を「正しい」として扱わない** (lappds の記録「診断ツールの偽陰性」)。
 
 ## sub-agent に依頼する場合
 

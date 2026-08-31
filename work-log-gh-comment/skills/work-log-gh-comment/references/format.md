@@ -67,7 +67,7 @@ Initializing the backend...
 | `> [!WARNING]` | 問題を避けるため、すぐ注意が要る | 判断を誤らせる挙動。次の手順に影響する未完了 |
 | `> [!CAUTION]` | 行動のリスク・悪い結果 | 失敗したコマンド。不可逆な操作の副作用 |
 
-5 種類の使い分けを、実際の作業から挙げる (lappds という Go 製の配信基盤で、Terraform と gcloud を使って検証環境を作り直したときの記録。[tecowl/lappds#328](https://github.com/tecowl/lappds/issues/328))。**題材はこのプラグインと無関係だが、Alert の選び分けは題材によらない。**
+5 種類の使い分けを、実際の作業から挙げる (lappds で検証環境を作り直したときの記録)。**題材はこのプラグインと無関係だが、Alert の選び分けは題材によらない。**
 
 ```markdown
 > [!TIP]

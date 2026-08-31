@@ -13,7 +13,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 
 - **指摘の数だけ直さない。原因で束ねる** ([references/grouping.md](references/grouping.md))。指摘は現れた場所ごとに立つので、1 つの原因が複数の指摘になる。指摘ごとに直すと、同じ原因への修正が複数のコミットに散り、コミットの動機が「レビューで指摘されたから」に縮退する — **レビュー由来の修正でも動機は原因の側にある。**
 - **指摘の文面をそのまま実装しない。** 指摘は現象を指すが、直す対象は原因である。現象に合わせて直すと、同じ原因の別の現れが残る。
-- **修正が別の欠陥を生む連鎖に注意する** ([設計文書の修正が次の欠陥を生む連鎖は、依存の辺を歩く 6 則で断つ](https://github.com/tecowl/lappds/blob/main/docs/solutions/workflow-issues/doc-fix-regression-chain-needs-dependency-closure.md))。機械検査が捕まえない型は [references/verification.md](references/verification.md) の型 A〜F で守る。
+- **修正が別の欠陥を生む連鎖に注意する** (lappds の記録「設計文書の修正が次の欠陥を生む連鎖は、依存の辺を歩く 6 則で断つ」)。機械検査が捕まえない型は [references/verification.md](references/verification.md) の型 A〜F で守る。
 
 ## 手順
 

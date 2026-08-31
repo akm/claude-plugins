@@ -18,7 +18,7 @@ sed -e 's/\x1b\[[0-9;]*m//g' <ログ> > <除去後のログ>
 head -3 <除去後のログ>
 ```
 
-**元のログは消さない。** 除去は貼るためのもので、判定には使わない。判定で `grep` を使う場合、エスケープの有無で結果が変わる ([terraform destroy は途中で失敗しても終了コード 0 を返すことがある](https://github.com/tecowl/lappds/blob/main/docs/solutions/integration-issues/terraform-destroy-exits-zero-on-failure-2026-08-28.md))。
+**元のログは消さない。** 除去は貼るためのもので、判定には使わない。判定で `grep` を使う場合、エスケープの有無で結果が変わる (lappds の記録「terraform destroy は途中で失敗しても終了コード 0 を返すことがある」)。
 
 > **色を出させない選択もある。** `terraform` なら `-no-color` を付ければエスケープ自体が出ない。ただし**マニュアルの手順に無いオプションを勝手に足さない。** 手順どおりに実行した記録を残すのが目的なので、記録の都合で実行を変えない。除去は貼る側で行う。
 
