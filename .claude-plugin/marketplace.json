@@ -65,6 +65,21 @@
         "ref": "main"
       },
       "tags": ["git", "commit", "history", "skill"]
+    },
+    {
+      "name": "doc-dag",
+      "description": "文書群のセクション単位の依存と重複を調べ、mermaid 図で示して DAG になるよう修正する skill",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "doc-dag",
+        "ref": "main"
+      },
+      "tags": ["documentation", "dag", "mermaid", "skill"]
     }
   ]
 }

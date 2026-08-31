@@ -1,0 +1,9 @@
+{
+  "name": "doc-dag",
+  "description": "文書群のセクション単位の依存と重複を調べ、mermaid 図で示して DAG になるよう修正する skill",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}
