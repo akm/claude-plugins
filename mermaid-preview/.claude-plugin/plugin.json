@@ -1,0 +1,9 @@
+{
+  "name": "mermaid-preview",
+  "description": "mermaid の図を含む HTML を生成してブラウザで見せる skill (他のスキルからの図の提示にも使う)",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}

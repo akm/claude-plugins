@@ -8,6 +8,11 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | --- | --- |
 | [commit-rules-guard](commit-rules-guard/README.md) | コミットルールを想起させ、動機の混在を気づかせる (セッション開始時・作業着手時・計画作成時・`git commit` 直前) |
 | [pr-teeth](pr-teeth/README.md) | レビュー依頼が来ている GitHub の PR を巡回し、レビュー範囲に照らして噛み砕いた解説を HTML で作る (出力言語は設定可能) |
+| [doc-dag](doc-dag/README.md) | 文書群の依存と重複を調べ、mermaid 図で示して DAG になるよう修正する (mermaid-preview と併用) |
+| [mermaid-preview](mermaid-preview/README.md) | mermaid の図を含む HTML を生成してブラウザで見せる (他のスキルからの図の提示にも使う) |
+| [commit-squash](commit-squash/README.md) | 未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす |
+| [review-triage](review-triage/README.md) | レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直す (Go が必要) |
+| [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 
 ## 使い方
 
@@ -105,19 +110,57 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 .
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイス定義 (収録プラグインの一覧)
-├── commit-rules-guard/           # プラグイン本体 (フック)
+├── commit-rules-guard/           # hooks 型
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
 │   ├── hook-scripts/              # 各フックの本体 (4 本)
 │   ├── rules/commit-rules.md      # 同梱の既定ルール
 │   ├── tests/                     # python3 -m unittest discover -s commit-rules-guard/tests
 │   └── README.md
-└── pr-teeth/                     # プラグイン本体 (skill)
+├── pr-teeth/                     # skill 型
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/pr-teeth/SKILL.md
+│   ├── skills/pr-glossary/SKILL.md
+│   ├── scripts/                   # 判定・保存・HTML 生成
+│   ├── tests/                     # python3 -m unittest discover -s pr-teeth/tests
+│   ├── CONCEPTS.md                # 設計
+│   └── README.md
+├── mermaid-preview/              # skill 型
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/mermaid-preview/
+│   │   ├── SKILL.md
+│   │   └── template.html
+│   └── README.md
+├── commit-squash/                # skill 型
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/commit-squash/     # SKILL.md と references/
+│   └── README.md
+├── doc-dag/                      # skill 型
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/doc-dag/           # SKILL.md と references/
+│   └── README.md
+├── work-log-gh-comment/          # skill 型
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/work-log-gh-comment/  # SKILL.md、references/、evals/
+│   └── README.md
+└── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json
-    ├── skills/pr-teeth/SKILL.md
-    ├── skills/pr-glossary/SKILL.md
-    ├── scripts/                   # 判定・保存・HTML 生成
-    ├── tests/                     # python3 -m unittest discover -s pr-teeth/tests
-    ├── CONCEPTS.md                # 設計
+    ├── skills/review-triage/      # SKILL.md と references/
+    ├── skills/review-triage-fix/
+    ├── tools/triagecheck/         # 記録を検査する Go ツール
     └── README.md
 ```
+
+プラグインは 2 つの型があります。**hooks 型**は Claude Code の動作に自動で割り込むもの、**skill 型**は依頼に応じて呼び出されるものです。skill 型はプラグイン直下の `skills/<スキル名>/SKILL.md` に置きます。1 つのプラグインが複数の skill を持つこともあります (`review-triage`)。
+
+## プロジェクト固有の設定
+
+いくつかのプラグインは、リポジトリごとに違う値を `.claude/akm-claude-plugins/<プラグイン名>/config.json` から読みます。**プラグインは共通の規則を持ち、リポジトリ固有の宣言だけを設定に置く**という分け方です。
+
+| プラグイン | 主な設定 |
+| --- | --- |
+| `commit-rules-guard` | `generated_globs`・`custom_rules` |
+| `doc-dag` | `frozen_paths`・`doc_check_command` |
+| `review-triage` | `record_dir`・`gates`・`triage_check_command` ほか |
+
+いずれも**設定が無くても動きます** (該当の判断を人間に確認するか、その手順を飛ばして報告します)。詳細は各プラグインの README を参照してください。

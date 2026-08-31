@@ -1,0 +1,9 @@
+{
+  "name": "work-log-gh-comment",
+  "description": "実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する skill",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}
