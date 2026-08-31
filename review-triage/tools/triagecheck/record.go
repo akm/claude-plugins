@@ -463,10 +463,16 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				}
 			}
 		}
-		// 被覆: 修正計画を書いた回では、採択は自回の plans か plan_ref で覆われる。
-		// 覆われない採択は、対処しないまま黙って消える。plans が無い回は fix 前なので
-		// 要求しない。
-		if len(run.Plans) > 0 {
+		// 被覆: 採択は自回の plans か plan_ref で覆われる。覆われない採択は、
+		// 対処しないまま黙って消える。
+		//
+		// 免除するのは「plans がまだ無い最後の回」だけ — fix 前の状態を指す。
+		// 後続の回が追記された時点でその回はもう fix 前ではないので、免除を解く。
+		// 全回で len(run.Plans) > 0 を条件にしていた頃は、plans を書かないまま
+		// 次の回に進んだ過去の回の採択が、検査からも review-triage-fix (最後の回の
+		// findings しか見ない) からも見えなくなり、黙って消えていた。
+		isLastRun := ri == len(doc.Runs)-1
+		if len(run.Plans) > 0 || !isLastRun {
 			covered := map[int]bool{}
 			for _, pl := range run.Plans {
 				for _, id := range pl.FindingIDs {

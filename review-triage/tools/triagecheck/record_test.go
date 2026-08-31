@@ -308,13 +308,39 @@ func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
 		}
 	})
 
-	t.Run("plans の無い回は被覆を要求しない", func(t *testing.T) {
+	t.Run("plans の無い最後の回は被覆を要求しない", func(t *testing.T) {
 		noPlans := base[:strings.Index(base, "    plans:")] + "    notes: fix 前の回。\n"
 		read := func(_ string) ([]byte, error) { return []byte(noPlans), nil }
 		for _, p := range reviewTriageRecordProblems([]string{yamlPath}, read) {
 			if strings.Contains(p, "修正計画に載っていません") {
-				t.Fatalf("plans の無い回で被覆が要求された: %v", p)
+				t.Fatalf("plans の無い最後の回で被覆が要求された: %v", p)
 			}
+		}
+	})
+
+	// plans を書かないまま次の回が追記されたら、その回はもう fix 前ではない。
+	// 免除を解かないと、採択が検査からも review-triage-fix からも見えなくなる。
+	t.Run("plans の無い過去の回は被覆を要求する", func(t *testing.T) {
+		noPlans := base[:strings.Index(base, "    plans:")] + "    notes: fix 前のまま次へ進んだ回。\n"
+		next := `  - date: "2026-09-01"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: ""
+    scope: incremental
+    head: abc1234
+    findings: []
+`
+		read := func(_ string) ([]byte, error) { return []byte(noPlans + next), nil }
+		problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+		found := false
+		for _, p := range problems {
+			if strings.Contains(p, "修正計画に載っていません") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("plans の無い過去の回で被覆が要求されない。出た問題: %v", problems)
 		}
 	})
 
