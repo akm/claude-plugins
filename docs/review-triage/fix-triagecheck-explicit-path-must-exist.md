@@ -1,0 +1,30 @@
+<!-- 生成物。手で編集しない。正本は fix-triagecheck-explicit-path-must-exist.yaml — `make docs-review-triage-summary` で再生成する。 -->
+
+# fix-triagecheck-explicit-path-must-exist のトリアージ記録
+
+正本は [fix-triagecheck-explicit-path-must-exist.yaml](fix-triagecheck-explicit-path-must-exist.yaml)。読み方と収束の目安は [README](README.md)。
+
+## 推移
+
+| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 2026-09-02 | `code-review` | `opus-5` | full | 8 | 8 | 0 | 0 |
+
+## 回 1: 2026-09-02 `code-review`
+
+- HEAD `450dc70` / model `opus-5` / scope full / level high
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `review-triage/tools/triagecheck/main.go:72` 相対パスの -record-dir が、実在する置き場に対して「存在しません」と誤報して非 0 になる。 go run -C がカレントをツール側へ移すため相対パスが誤解決され、不在をエラーにしたことで 偽陽性の失敗として表面化した。 | plugin-code / operator | -record-dir に相対パスを渡して go run -C 経由で実行したとき / 置き場が実在するのに「存在しません」と報告して非 0 で終わる。記録の検査が まったく行われず、CI が赤で止まる / 気づくが、原因にたどり着けない。メッセージは実在する置き場を「存在しない」と言うため、 利用者は自分の指定が正しいのに疑うことになる | A: verified | — | **採択** — A2 — 段 A で再現した。一時ディレクトリに recs を作り go run -C 経由で -record-dir recs を渡すと exit 1、同じ状態で絶対パスなら exit 0。 修正前 (6dbc66f) を git archive で展開して同じ呼び出しを行うと exit 0 で、 0 -> 1 の退行であることも確かめた。全ゲートを評価して発火 0 件 (再現済みで仮定でない / 環境の異常でなく対象は利用者が使うツール / 修正は相対パスの絶対化で対象より小さい / 赤くなる関門を挙げられない) |
+| 2 | `review-triage/tools/triagecheck/wrapper.go:60` 相対 -record-dir で生成したラッパーは指摘 1 の経路をそのまま踏むため、生成直後から 常に偽陽性で落ちる。生成済みラッパーを持つ利用者が、自分の側を変えていないのに CI が赤くなる。 | plugin-code / operator | -install-wrapper に相対の -record-dir を渡して生成したラッパーを使っているとき / 利用側が何も変えていないのに CI が赤くなり、記録の検査は一切行われない / 気づく (CI が赤くなる) が、プラグインを更新しただけで壊れるため原因が分かりにくい。 wrapper_test.go は生成物の文字列だけを検査して実行しないので、この破壊を検出しない | A: verified | — | **採択** — A2 — 段 A で端から端まで再現した。プラグインキャッシュ配置を実体のコピーで模し、 -record-dir docs/review-triages (相対) でラッパーを生成、実在する置き場を持つ リポジトリで実行して exit 1 を確認した。wrapper.go のコメントが相対指定を 意図的に尊重すると述べており、wrapper_test.go も相対パスを渡している。 全ゲートを評価して発火 0 件。指摘 1 と同じ原因なので修正時は束ねる |
+| 3 | `review-triage/tools/triagecheck/main.go:103` -judgment-flow は flag.Visit ではなく空文字比較で指定の有無を判定しているため、 -judgment-flow "" と明示指定すると「指定なし」に化け、不在が黙って通る。 | plugin-code / operator | -judgment-flow に空文字を明示指定し、CLAUDE_PLUGIN_ROOT が未設定のとき / 判定フローの検査が一切走らないまま緑になる。この修正が塞いだはずの穴が残る / 気づかない。exit 0 で検査名まで出力されるため、走ったのか走らなかったのか区別できない | A: verified | — | **採択** — A2 — 段 A で再現した。env -u CLAUDE_PLUGIN_ROOT で -judgment-flow "" を渡すと exit 0、 /nonexistent を渡すと exit 1。main.go:45-48 のコメントが -record-dir について まさにこの型を避けると宣言しているのに、もう一方のフラグに同じ穴が残っている。 全ゲートを評価して発火 0 件 |
+| 4 | `review-triage/tools/triagecheck/main.go:61` -record-dir "" を明示指定すると path.Clean("") が "." に畳まれ、カレントは常に実在するため 不在検査が空振りし、記録 0 件のまま緑になる。 | plugin-code / operator | -record-dir に空文字を明示指定したとき / 指定した置き場が検査されないまま合格する。この修正が塞ごうとした失敗の形が そのまま残る / 気づかない。exit 0 で検査名まで出力される | A: verified | — | **採択** — A2 — 段 A で再現した。記録の無い一時ディレクトリで -record-dir "" を渡すと exit 0。 explicit["record-dir"] は true になるが (flag.Visit は値を見ない)、"." が実在するため ErrNotExist の分岐に入らない。全ゲートを評価して発火 0 件 |
+| 5 | `review-triage/tools/triagecheck/main_test.go:64` -write-summary が explicit を受け渡す配線 (main.go:64) を検査するテストが無く、 配線を壊しても全テストが通る。 | test / developer → operator | 将来この配線を壊す変更が入ったとき / -write-summary で明示指定した置き場が無いのに黙って成功する挙動が復活し、 テストは緑のまま通る / 気づかない。既存の TestWriteReviewTriageSummariesMissingDirExplicit は writeReviewTriageSummaries を直接呼ぶので、run 経由の配線の破壊を捕まえない | A: verified | already-visible | **採択** — A1 — 免除条項。条件 1: 指摘は関門 (テスト) が配線の破壊を検出しないこと、すなわち 検出能力の欠落を主張している。条件 2: 3 層から候補を挙げていずれも検出しない — Makefile はこのリポジトリに存在しない / 検査項目は review-triage-record と judgment-flow の 2 つでどちらもツール自身の配線を見ない / テスト関数は TestWriteReviewTriageSummariesMissingDirExplicit が直接呼び出しのみで run を経由しない。 自分でもミューテーションを実行し、配線を false に固定しても全テストが通ることを確認した。 audience は developer が初期値だが、配線の破壊が利用者の検査を無効化するので operator へ上書き |
+| 6 | `review-triage/tools/triagecheck/README.md:50` README の「既定のまま実行する場合の挙動は変わらない」が、CLAUDE_PLUGIN_ROOT が 設定された環境では偽になる。直前の表は例外を書いているのに、この一文が打ち消している。 | doc-user / operator | CLAUDE_PLUGIN_ROOT が設定された環境で、フラグを付けずに実行したとき / README を読んで「既定のままなら安全」と判断した利用者の CI が、更新後に非 0 で落ちる。 意図した非互換なのに、文書が予告していない / 気づく (CI が赤くなる) が、README が安全と書いているため原因の切り分けが遅れる | A: verified | — | **採択** — A2 — 段 A で矛盾する 2 箇所を逐語で確認した。README:47 は 「CLAUDE_PLUGIN_ROOT から解決した \| 報告して非 0 で終わる」、README:50 は 「既定のまま実行する場合の挙動は変わらない」。フラグ無しで CLAUDE_PLUGIN_ROOT=/nonexistent を与えると exit 1、env -u なら exit 0 を自分で再現した。 全ゲートを評価して発火 0 件 |
+| 7 | `review-triage/tools/triagecheck/main.go:72` -record-dir の不在が error で即 return するため、-judgment-flow も同時に不在のとき 判定フローの問題が 1 件も報告されない。片方を直して再実行するまで気づけない。 | plugin-code / operator | -record-dir と -judgment-flow の両方に不在のパスを指定したとき / judgment-flow の不在が報告されず、record-dir を直して再実行するまで もう一方も壊れていることを知れない / 気づく (非 0 で落ちる) が、問題が 1 つだと誤認する。往復が増えるだけで守りは外れない | A: verified | — | **採択** — A2 — 段 A で再現した。両方を不在で指定すると出力は record-dir の 1 行だけで、 judgment-flow の報告は含まれない。片方だけ不在なら judgment-flow は報告される。 judgment-flow 側は problems に積んで検査を続ける設計なので、非対称が実害を生む。 全ゲートを評価して発火 0 件 |
+| 8 | `review-triage/tools/triagecheck/README.md:123` README のテスト件数が実際と食い違う (89 と書いてあるが実際は 121)。 テストを追加したのに件数の記述を更新していない。 | doc-user / operator | README のテスト件数を信じて数を引用・検算するとき / 実際と違う数を読む。README 自身が数え方のコマンドを書いているのでその場で偽と分かる / 気づく。README が指定するコマンドを実行すれば即座に食い違いが出る | A: verified | — | **採択** — A2 — 段 A で README が指定するコマンド (go test -v ./... \| grep -c 'PASS:') を 実行し 121 を得た。README:123 は 89。全ゲートを評価して発火 0 件 (実行で再現でき仮定でない / 対象は利用者が読む文書 / 修正は数字 1 つで不相応でない / この食い違いを検出する関門を挙げられない — 件数を検算する検査は無い) |
+
+### 観察
+
+レビューは報告のみで走った (head 450dc70 が現在の HEAD と一致、作業ツリーは不変)。 8 件すべてを自分で再現して段 A を通した。指摘 1 と 2 は同じ原因 (相対パスが go run -C のカレント移動で誤解決される) で、修正が「黙って緑」を「誤って赤」に 変えた退行である。修正前の緑は検査を何もしていない状態だったので、直すべきは 不在の判定ではなく相対パスの解決の側にある。 依頼文で重点として挙げた 4 点はすべて指摘になった — 後方互換の主張 (#1 #6)、 ラッパーとの相互作用 (#2)、エラー経路の非対称 (#7)、テストの取りこぼし (#5)。 踏み込んだ点として挙げた 3 つのうち、flag.Visit の採用自体は正しかったが、 同じ判断を -judgment-flow に適用し忘れていた (#3)。 residual の 3 件に目を通した。1 つ目 (-record-dir の不在メッセージがパスを本文に 持たず呼び出し元の接頭辞に依存) は writeReviewTriageSummaries 経由でパスが出ない という指摘で、#1 の修正と同じ箇所を触るので併せて見る。2 つ目 (origin を型で狭める) はリファクタ提案として 1 件のみ挙げられたもの。3 つ目 (-record-dir がファイルを指すと ENOTDIR が露出) はメッセージの一貫性のみで守りは外れない。
