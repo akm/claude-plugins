@@ -126,6 +126,11 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"採択でない指摘への参照", "finding_ids: [1]", "finding_ids: [2]", "採択"},
 		{"pending なのに sha がある", `sha: ""`, "sha: abc1234", "sha"},
 		{"awaiting-human なのに options が無い", "status: pending", "status: awaiting-human", "options"},
+		{"done-external なのに sha がある",
+			"        sha: \"\"\n        status: pending\n",
+			"        sha: abc1234\n        status: done-external\n        notes: PR 本文へ反映\n", "sha"},
+		{"done-external なのに反映先が無い", "status: pending", "status: done-external", "applied_external_url"},
+		{"status の列挙値違反", "status: pending", "status: done-ext", "status"},
 		{"depends_on の宙参照", "order: 1\n", "order: 1\n        depends_on: [P9]\n", "depends_on"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
@@ -1020,6 +1025,101 @@ func TestReviewTriageSummaryAwaitingHuman(t *testing.T) {
 	}
 	if !strings.Contains(summary, "案 a は最小修正") {
 		t.Fatalf("options (選択肢) がサマリに出ていない:\n%s", summary)
+	}
+}
+
+// done-external は sha を書けない代わりに applied_external_url か notes の
+// どちらかがあれば通る。URL を必須にすると、URL を持たない対象 (ローカルの
+// 外部ツール設定など) で done にできない行き詰まりが再発する。
+func TestReviewTriageRecordDoneExternalPasses(t *testing.T) {
+	cases := []struct {
+		name string
+		new  string
+	}{
+		{"URL だけ", "        status: done-external\n" +
+			"        applied_external_url: \"https://github.com/o/r/pull/123\"\n"},
+		{"notes だけ (URL を持たない対象)", "        status: done-external\n" +
+			"        notes: ローカルの外部ツール設定へ反映し、再実行して反映を確認した\n"},
+		{"URL と notes の両方", "        status: done-external\n" +
+			"        applied_external_url: \"https://github.com/o/r/pull/123\"\n" +
+			"        notes: PR 本文を書き換え、Files changed と読み比べて一致を確認した\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := strings.Replace(validRecordYAML,
+				"        sha: \"\"\n        status: pending\n", tc.new, 1)
+			if mutated == validRecordYAML {
+				t.Fatal("フィクスチャの置換が効いていない")
+			}
+			files, read := recordFiles(t, mutated)
+			if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+				t.Fatalf("正しい done-external で問題が出た: %v", problems)
+			}
+		})
+	}
+}
+
+// done-external の問題は、サマリで状態がリポジトリ外と分かり、証拠の欄に
+// 反映先の URL が、表の外に反映を確認した方法 (notes) が出る。
+func TestReviewTriageSummaryDoneExternal(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML,
+		"        sha: \"\"\n        status: pending\n",
+		"        status: done-external\n"+
+			"        applied_external_url: \"https://github.com/o/r/pull/123\"\n"+
+			"        notes: PR 本文を書き換え、Files changed と読み比べて一致を確認した\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(mutated))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	for _, want := range []string{
+		"済 (リポジトリ外)",
+		"`https://github.com/o/r/pull/123`",
+		"**P1 はリポジトリ外へ反映済み**: PR 本文を書き換え、Files changed と読み比べて一致を確認した",
+	} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("%q がサマリに出ていない:\n%s", want, summary)
+		}
+	}
+}
+
+// 証拠の欄は sha が優先で、done-external では URL、どちらも無ければ「—」。
+func TestRenderPlanCellsExternalEvidence(t *testing.T) {
+	base := recordPlan{ProblemID: "P1", Cause: "c", FindingIDs: []int{1}, Approach: "a"}
+	cases := []struct {
+		name string
+		plan recordPlan
+		want string
+	}{
+		{"done-external は URL を出す", func() recordPlan {
+			pl := base
+			pl.Status, pl.AppliedExternalURL = "done-external", "https://example.com/pr/1"
+			return pl
+		}(), "`https://example.com/pr/1`"},
+		{"URL の縦棒を無害化する", func() recordPlan {
+			pl := base
+			pl.Status, pl.AppliedExternalURL = "done-external", "https://example.com/a|b"
+			return pl
+		}(), `https://example.com/a\|b`},
+		{"URL が無ければダッシュ", func() recordPlan {
+			pl := base
+			pl.Status, pl.Notes = "done-external", "反映済み"
+			return pl
+		}(), "—"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if cells := renderPlanCells(tc.plan); !strings.Contains(cells[6], tc.want) {
+				t.Fatalf("証拠のセル = %q, want %q を含む", cells[6], tc.want)
+			}
+		})
+	}
+	pl := base
+	pl.Status, pl.Notes = "done-external", "反映済み"
+	if cells := renderPlanCells(pl); cells[5] != "済 (リポジトリ外)" {
+		t.Fatalf("状態のセル = %q, want %q", cells[5], "済 (リポジトリ外)")
 	}
 }
 
