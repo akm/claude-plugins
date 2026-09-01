@@ -31,7 +31,7 @@
 
 ```json
 {
-  "record_dir": "docs/review-triage",
+  "record_dir": "docs/review-triages",
   "frozen_paths": ["docs/brainstorms/", "docs/plans/", "docs/solutions/"],
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",

@@ -8,7 +8,7 @@
 
 ```json
 {
-  "record_dir": "docs/review-triage",
+  "record_dir": "docs/review-triages",
   "frozen_paths": ["docs/brainstorms/", "docs/plans/", "docs/solutions/"],
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",
@@ -18,7 +18,7 @@
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `record_dir` | 記録 (YAML と生成サマリ) の置き場 | `docs/review-triage` |
+| `record_dir` | 記録 (YAML と生成サマリ) の置き場 | `docs/review-triages` |
 | `frozen_paths` | 当時の記録として書き換えない文書のパス接頭辞 | 凍結扱いのパスは無いものとする |
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を走らせるコマンド | 検査を走らせず、**走らせていないことを報告に明記する** |
@@ -56,7 +56,7 @@
 .PHONY: triage-check
 triage-check: ## トリアージ記録を検査する
 	go run -C $(REVIEW_TRIAGE_ROOT)/tools/triagecheck . \
-	  -record-dir $(CURDIR)/docs/review-triage \
+	  -record-dir $(CURDIR)/docs/review-triages \
 	  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md
 ```
 

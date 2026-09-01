@@ -25,7 +25,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 ```sh
 go run -C <プラグインの展開先>/tools/triagecheck . \
-  -record-dir <リポジトリ>/docs/review-triage \
+  -record-dir <リポジトリ>/docs/review-triages \
   -judgment-flow <プラグインの展開先>/skills/review-triage/references/judgment-flow.md
 ```
 
@@ -33,7 +33,7 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 
 | フラグ | 既定 | 内容 |
 | --- | --- | --- |
-| `-record-dir` | `docs/review-triage/` | 記録の置き場。末尾のスラッシュは補う |
+| `-record-dir` | `docs/review-triages/` | 記録の置き場。末尾のスラッシュは補う |
 | `-judgment-flow` | `CLAUDE_PLUGIN_ROOT` から解決 | 判定フローの正本のパス |
 | `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す |
 
@@ -48,7 +48,7 @@ PLUGIN_CACHE = $(HOME)/.claude/plugins/cache/akm-claude-plugins/review-triage
 REVIEW_TRIAGE_ROOT ?= $(shell ls -d $(PLUGIN_CACHE)/*/ 2>/dev/null | sort -V | tail -1)
 
 TRIAGECHECK = go run -C $(REVIEW_TRIAGE_ROOT)/tools/triagecheck . \
-  -record-dir $(CURDIR)/docs/review-triage \
+  -record-dir $(CURDIR)/docs/review-triages \
   -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md
 
 .PHONY: triage-check
@@ -79,7 +79,7 @@ triage-summary: ## トリアージ記録から生成サマリを書き出す
 # .gitignore 済みの置き場 (例: bin/review-triage-check) を指定する。
 go run -C <プラグインの展開先>/tools/triagecheck . \
   -install-wrapper <path> \
-  -record-dir <リポジトリ>/docs/review-triage
+  -record-dir <リポジトリ>/docs/review-triages
 ```
 
 生成される `<path>` は実行権限つきのシェルスクリプトで、実行のたびに
