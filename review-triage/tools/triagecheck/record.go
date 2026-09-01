@@ -795,14 +795,24 @@ func recordStatusJa(s string) string {
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
 // git add 前の最初の記録が素通りする穴 (0 件マッチで黙って緑の型) を塞ぐため。
-// ディレクトリが無いリポジトリ (スキル未導入) では nil を返す。
-func listReviewTriageFiles(dir string) ([]string, error) {
+//
+// ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
+// (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。
+// 未指定 (既定値) のまま不在なのはスキル未導入の正常な状態で、nil を返す。
+// 判定を分けないと、置き場を移した時点で検査が黙って無効になる
+// (judgment_flow.go の explicit と同じ理由)。
+func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		// ディレクトリが無いのはスキル未導入の正常な状態。それ以外 (権限・I/O) の
-		// エラーを「記録 0 件」に潰すと、守りが黙って外れる。判定は judgment_flow.go と
-		// 同じ errors.Is に揃える (ラップされたエラーも正しく分類するため)。
+		// ディレクトリが無いのはスキル未導入の正常な状態 (明示指定のときを除く)。
+		// それ以外 (権限・I/O) のエラーを「記録 0 件」に潰すと、守りが黙って外れる。
+		// 判定は judgment_flow.go と同じ errors.Is に揃える (ラップされたエラーも
+		// 正しく分類するため)。
 		if errors.Is(err, fs.ErrNotExist) {
+			if explicit {
+				return nil, fmt.Errorf(
+					"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま緑になるため報告する)")
+			}
 			return nil, nil
 		}
 		return nil, err
@@ -827,9 +837,10 @@ func listReviewTriageFiles(dir string) ([]string, error) {
 }
 
 // writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
-// (`make docs-review-triage-summary`)。
-func writeReviewTriageSummaries(dir string) error {
-	files, err := listReviewTriageFiles(dir)
+// (`make docs-review-triage-summary`)。explicit は listReviewTriageFiles と同じ意味 —
+// 明示指定した置き場が無いなら、0 件生成して黙って成功させない。
+func writeReviewTriageSummaries(dir string, explicit bool) error {
+	files, err := listReviewTriageFiles(dir, explicit)
 	if err != nil {
 		return err
 	}

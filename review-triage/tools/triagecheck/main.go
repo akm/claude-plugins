@@ -42,6 +42,13 @@ func run(args []string) error {
 		return err
 	}
 
+	// 明示的に渡されたフラグを拾う。既定値との一致では判定しない — 利用者が
+	// 既定と同じ値を明示的に渡すことがあり、そのとき「指定していない」と誤って
+	// 扱うと、不在を報告すべき経路が黙って通る。flag.Visit は実際に指定された
+	// フラグだけを回すので、意思表示の有無をそのまま読める。
+	explicit := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
+
 	// -install-wrapper は record-dir をそのまま (呼び出し元の意図した相対/絶対の
 	// 形のまま) ラッパーに焼き込む。以降の検査処理に入る前に分岐する。
 	if *installWrapperPath != "" {
@@ -54,19 +61,23 @@ func run(args []string) error {
 	reviewTriageDir = path.Clean(filepath.ToSlash(*recordDir)) + "/"
 
 	if *writeSummary {
-		return writeReviewTriageSummaries(reviewTriageDir)
+		return writeReviewTriageSummaries(reviewTriageDir, explicit["record-dir"])
 	}
 
-	if p := resolveJudgmentFlowPath(*flowPath); p != "" {
+	p, flowOrigin := resolveJudgmentFlowPath(*flowPath)
+	if p != "" {
 		judgmentFlowPath = p
 	}
 
-	recordFiles, err := listReviewTriageFiles(reviewTriageDir)
+	recordFiles, err := listReviewTriageFiles(reviewTriageDir, explicit["record-dir"])
 	if err != nil {
 		return fmt.Errorf("%s: 記録の一覧に失敗しました: %w", reviewTriageDir, err)
 	}
 	problems := reviewTriageRecordProblems(recordFiles, os.ReadFile)
-	problems = append(problems, judgmentFlowProblems(nil, os.ReadFile)...)
+	// 判定フローは -judgment-flow だけでなく CLAUDE_PLUGIN_ROOT からも解決される。
+	// どちらも「この場所を検査せよ」という指定なので、実在を要求する対象に含める
+	// (解決できず既定のままのときだけ、未導入として通す)。
+	problems = append(problems, judgmentFlowProblems(nil, os.ReadFile, flowOrigin)...)
 
 	if len(problems) > 0 {
 		for _, p := range problems {
@@ -84,13 +95,18 @@ func run(args []string) error {
 // 見つからなかったときに空文字を返して既定のままにするのは、判定フローが
 // 無い状態を「検査対象が無い」として通す判断が judgmentFlowProblems 側に
 // あるため。ここでエラーにすると、記録の検査まで巻き添えで落ちる。
-func resolveJudgmentFlowPath(explicit string) string {
+//
+// 2 つ目の戻り値は在り処を指定したものの名前 (origin)。-judgment-flow と
+// CLAUDE_PLUGIN_ROOT のどちらも、その場所を検査せよという指定なので名前を返す。
+// 既定に落ちたときだけ空で、そのとき不在は未導入として通る。名前を返すのは、
+// 不在の報告にどちらを直せばよいかを載せるため。
+func resolveJudgmentFlowPath(explicit string) (flowPath, origin string) {
 	if explicit != "" {
-		return explicit
+		return explicit, "-judgment-flow"
 	}
 	root := os.Getenv("CLAUDE_PLUGIN_ROOT")
 	if root == "" {
-		return ""
+		return "", ""
 	}
-	return filepath.Join(root, "skills", "review-triage", "references", "judgment-flow.md")
+	return filepath.Join(root, "skills", "review-triage", "references", "judgment-flow.md"), "CLAUDE_PLUGIN_ROOT"
 }

@@ -49,12 +49,28 @@ var judgmentFlowDecorations = map[string]bool{
 
 // judgmentFlowProblems は図と表の ID 集合を照合する。対象は git 追跡でなく
 // ファイルの実在で決める — 追跡前の判定フローが素通りする「0 件マッチで黙って緑」の
-// 型 (B1 と同じ) を塞ぐ。ファイルが無いのはスキル未導入の正常な状態で、何もしない。
+// 型 (B1 と同じ) を塞ぐ。
+//
+// ファイルが無いときの扱いは origin で分かれる。origin は在り処を指定したものの
+// 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。在り処を指定する
+// ことは「そこを検査せよ」という意思表示なので、不在は問題として報告する。指定が
+// 無いまま不在なのはスキル未導入の正常な状態で、何もしない。1 つの入口に 2 つの
+// 意味を担わせると、プラグイン側がファイルを移動・改名した時点で利用側の検査が
+// 黙って無効になり、「走って合格した」と「そもそも走らなかった」が区別できなくなる
+// (rejection-gates.md の「診断ツールの偽陰性」)。
+//
+// origin を真偽値でなく名前にするのは、報告を読む人が直す先を特定できるようにする
+// ため — 解決の経路が 2 つあるので、どちらを直せばよいかが分からないと調べ直しになる。
 // files は他の検査とシグネチャを揃えるための引数で、使わない。
-func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error)) []string {
+func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), origin string) []string {
 	data, err := readFile(judgmentFlowPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			if origin != "" {
+				return []string{fmt.Sprintf(
+					"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま緑になるため報告する)",
+					judgmentFlowPath, origin)}
+			}
 			return nil
 		}
 		return []string{fmt.Sprintf("%s: 読み込みに失敗しました: %v", judgmentFlowPath, err)}
