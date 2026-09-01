@@ -47,7 +47,10 @@
 
 記録のスキーマ検査 (`triage_check_command`) は、必須キーの欠落・列挙値の誤り・参照の不整合を捕まえる。**走らせなければ、壊れた記録がそのまま残る。**
 
-同梱の `triagecheck` を使う場合、リポジトリ側にターゲットを 1 つ置くのが分かりやすい。
+同梱の `triagecheck` を使う場合、2 通りの置き方がある。
+
+- **Makefile にターゲットを 1 つ置く**（リポジトリの Makefile をそのまま検査コマンドの置き場にする）
+- **`-install-wrapper` でラッパースクリプトを生成する**（`.claude/akm-claude-plugins/review-triage/config.json` のようにリポジトリごとの設定として管理したくない・Makefile に手を入れたくない場合）
 
 ```makefile
 .PHONY: triage-check
@@ -57,6 +60,6 @@ triage-check: ## トリアージ記録を検査する
 	  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md
 ```
 
-`REVIEW_TRIAGE_ROOT` はプラグインの展開先 (`CLAUDE_PLUGIN_ROOT` と同じ場所) で、**版ごとにディレクトリが分かれる**。展開先の求め方を含む呼び出し方の詳細は、プラグインの `tools/triagecheck/README.md` にある。
+`REVIEW_TRIAGE_ROOT` はプラグインの展開先 (`CLAUDE_PLUGIN_ROOT` と同じ場所) で、**版ごとにディレクトリが分かれる**。展開先の求め方を含む呼び出し方の詳細と、`-install-wrapper` を使う方法は、プラグインの `tools/triagecheck/README.md` にある。
 
 **検査を走らせなかった回は、報告にそう書く。** 「検査で問題が出なかった」と「検査を走らせていない」は別の事実で、混同すると次の読み手が通ったものと誤解する。
