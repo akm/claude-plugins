@@ -94,6 +94,41 @@ runs:
         attrs:
           severity: P2
           confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          証拠の欄の役割を SHA から証拠に広げたとき、セルを埋めるコードだけを直し、
+          同じ関数の呼び出し元にある見出しの文字列に追随しなかった
+        finding_ids: [1]
+        approach: >-
+          サマリの修正計画の表の見出しを SHA から 証拠 (SHA / URL) に変え、列が 2 つの型を
+          取ることを見出しで示す。既存の記録のサマリは再生成で追随する
+        order: 1
+        sha: ""
+        status: pending
+      - problem_id: P2
+        cause: >-
+          status の枝ごとにキーを検査する既存の形にキーを足したとき、
+          done-external のときだけ書くという排他をスキーマ表に書いておきながら、検査に写さなかった
+        finding_ids: [2]
+        approach: >-
+          done-external 以外の枝で applied_external_url と notes が空であることを検査する。
+          排他を検査する既存の sha (pending / awaiting-human の枝) と同じ形に揃える
+        order: 2
+        sha: ""
+        status: pending
+      - problem_id: P3
+        cause: >-
+          URL か notes のどちらかを必須にするという検査の規則を決めた後、同じ節に前から
+          書いてあった「だから notes に反映を確認した方法を書く」という無条件の文を読み直さなかった
+        finding_ids: [3]
+        approach: >-
+          規範の文言を検査に合わせて緩める (人間が選択)。notes を無条件に要求する文を、
+          URL があっても確認方法を残すことを推奨する文に改め、必須なのは
+          「URL か notes のどちらか」であることを明記する。検査は変えない
+        order: 3
+        sha: ""
+        status: pending
     notes: >-
       レビューは報告のみで走った (head 9654d3a が現在の HEAD と一致、作業ツリーは不変)。
       指摘 3 件はいずれも、この差分自身が「正本と実装の乖離」を直す変更であるにもかかわらず、
@@ -104,3 +139,7 @@ runs:
       2 つ目 (notes が run 直下と plans 直下の両方にある) は階層が違い YAML として曖昧にならない。
       3 つ目 (.tool-versions が指す golang 1.25.4 が未インストール) はこの差分と無関係だが、
       レビュアがテストを走らせられるよう依頼文で 1.25.1 の直接指定を案内した。
+      P3 は規範と検査のどちらを動かすかの設計判断を含むため review-triage-fix が
+      人間に返し、「規範の文言を検査に合わせて緩める」が選ばれた。もう一方の案
+      (検査を厳しくして notes を無条件に必須にする) は、URL を持たない対象のために
+      notes を逃がし弁として残した設計と衝突するため採らなかった。
