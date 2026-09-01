@@ -23,7 +23,7 @@
 
 バイナリは配らず `go run` で都度実行します。`go install` したバイナリを使う運用にすると、プラグインを更新してもバイナリが古いまま残り、**新しいスキーマを検査せず素通りします。**
 
-詳しい呼び出し方と Makefile の例は [tools/triagecheck/README.md](tools/triagecheck/README.md) を参照してください。
+詳しい呼び出し方 (Makefile に置く例、および呼び出し用のラッパースクリプトを生成する `-install-wrapper`) は [tools/triagecheck/README.md](tools/triagecheck/README.md) を参照してください。
 
 ## プロジェクト固有の設定
 
@@ -31,7 +31,7 @@
 
 ```json
 {
-  "record_dir": "docs/review-triage",
+  "record_dir": "docs/review-triages",
   "frozen_paths": ["docs/brainstorms/", "docs/plans/", "docs/solutions/"],
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",

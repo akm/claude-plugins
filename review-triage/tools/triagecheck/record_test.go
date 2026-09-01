@@ -1023,7 +1023,7 @@ func TestReviewTriageSummaryAwaitingHuman(t *testing.T) {
 	}
 }
 
-// docs/review-triage/ の外のファイルと README.md は対象外。
+// docs/review-triages/ の外のファイルと README.md は対象外。
 func TestReviewTriageRecordIgnoresOtherFiles(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return []byte("x: 1\n"), nil }
 	problems := reviewTriageRecordProblems([]string{

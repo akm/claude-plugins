@@ -2,13 +2,13 @@
 
 **この文書が、記録の様式・スキーマ・状態の正本。** `review-triage` が判定を追記し、`review-triage-fix` が修正計画を追記する。**2 つのスキルの間のデータの受け渡しは、この記録だけで行う** (受け渡しの契約)。
 
-記録の置き場はリポジトリごとに決める (既定は `docs/review-triage/`)。置き場と検査コマンドの設定は [project-config.md](project-config.md) が定める。
+記録の置き場はリポジトリごとに決める (既定は `docs/review-triages/`)。置き場と検査コマンドの設定は [project-config.md](project-config.md) が定める。
 
 **なぜ残すか。** 却下は「対処しなかった欠陥」を作る操作で、誤った却下は黙って残る。採択は修正と再レビューで検証されるが、**却下を検証する経路は記録しかない**。指摘を減らすほど成功に見えるので、誤った却下は成果に計上されてしまう。
 
 ## ファイルの単位
 
-**1 ブランチ 1 ファイル。** 正本は YAML (`<記録の置き場>/<ブランチ名>.yaml`。置き場は設定の `record_dir`、既定は `docs/review-triage/`)。ブランチ名の `/` は `-` に置き換える (例: `feat/foo` → `feat-foo.yaml`)。ブランチ名が取れないとき (detached HEAD など) は `detached-<短縮 SHA>.yaml`。
+**1 ブランチ 1 ファイル。** 正本は YAML (`<記録の置き場>/<ブランチ名>.yaml`。置き場は設定の `record_dir`、既定は `docs/review-triages/`)。ブランチ名の `/` は `-` に置き換える (例: `feat/foo` → `feat-foo.yaml`)。ブランチ名が取れないとき (detached HEAD など) は `detached-<短縮 SHA>.yaml`。
 
 **人が読むサマリ (`<ブランチ名>.md`) は YAML からの生成物。** 手で編集せず、設定の `triage_summary_command` で再生成する ([project-config.md](project-config.md))。**スキーマと生成サマリの鮮度は `triage_check_command` の検査が守る** — 同梱の `triagecheck` がその実体。
 
