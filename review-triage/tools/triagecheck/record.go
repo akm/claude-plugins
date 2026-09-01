@@ -108,6 +108,18 @@ type recordPlan struct {
 	DependsOn  []string `yaml:"depends_on"`
 	SHA        string   `yaml:"sha"`
 	Status     string   `yaml:"status"`
+	// AppliedExternalURL / Notes は status: done-external の反映先の記録。
+	// リポジトリ外の成果物 (PR 本文・Issue のコメント・外部 Wiki など) への修正は
+	// コミットが立たないので sha を書けない。URL を必須にすると、URL を持たない
+	// 対象 (ローカルの外部ツール設定など) で同じ行き詰まりが起きるため、
+	// 「URL か notes のどちらか」を必須にする。
+	//
+	// URL は sha ほど強い証拠にならない — sha はリポジトリがある限り不変だが、
+	// PR 本文の URL は現在の本文を返すので、後から修正の前後を判別できない。
+	// applied_external_url は「反映先を指すもの」であって「反映内容を固定するもの」
+	// ではない。だから notes には反映を確認した方法を書く。
+	AppliedExternalURL string `yaml:"applied_external_url"`
+	Notes              string `yaml:"notes"`
 }
 
 // recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
@@ -124,7 +136,8 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証": {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
-		"options": true, "order": true, "depends_on": true, "sha": true, "status": true},
+		"options": true, "order": true, "depends_on": true, "sha": true, "status": true,
+		"applied_external_url": true, "notes": true},
 }
 
 // reviewTriageRecordProblems は docs/review-triages/ の記録 YAML を検査する。
@@ -438,8 +451,25 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: finding_ids の %d は採択 (adopted) ではありません (verdict %s)。修正計画は採択だけを束ねる", pn, id, v)
 				}
 			}
+			// externalOnly は done-external 専用のキーが空であることを検査する。
+			// スキーマ表が「done-external のときだけ書く」と定める排他で、書かせる
+			// だけで検査しないと、done でコミット済みなのに外部 URL が残る記録が
+			// 黙って通る (sha の排他は前から検査されていた)。列挙外の status では
+			// 呼ばない — default が列挙違反を報告するので、そこへ重ねると 1 つの
+			// 誤字が 2 つの問題になる。
+			externalOnly := func() {
+				for _, kv := range []struct{ key, val string }{
+					{"applied_external_url", pl.AppliedExternalURL}, {"notes", pl.Notes},
+				} {
+					if kv.val != "" {
+						add("%s: status %s なのに %s %q があります。%s は status done-external 専用",
+							pn, pl.Status, kv.key, kv.val, kv.key)
+					}
+				}
+			}
 			switch pl.Status {
 			case "pending", "awaiting-human":
+				externalOnly()
 				if pl.SHA != "" {
 					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
 				}
@@ -447,11 +477,23 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: status awaiting-human には options (選択肢とトレードオフ) が必須", pn)
 				}
 			case "done":
+				externalOnly()
 				if pl.SHA == "" {
-					add("%s: status done には sha (短縮 SHA) が必須", pn)
+					add("%s: status done には sha (短縮 SHA) が必須。リポジトリ外の成果物への反映で"+
+						"コミットが立たないなら status: done-external にする", pn)
+				}
+			case "done-external":
+				// コミットが無いのだから sha を書けるはずがない。書けているなら
+				// リポジトリ内の修正なので done が正しい。
+				if pl.SHA != "" {
+					add("%s: status done-external なのに sha %q があります。コミットがあるなら status: done にする", pn, pl.SHA)
+				}
+				if pl.AppliedExternalURL == "" && pl.Notes == "" {
+					add("%s: status done-external には applied_external_url (反映先の URL) か "+
+						"notes (反映先と、反映を確認した方法) のどちらかが必須", pn)
 				}
 			default:
-				add("%s: status は pending / awaiting-human / done のいずれか: %q", pn, pl.Status)
+				add("%s: status は pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
 			}
 			for _, d := range pl.DependsOn {
 				if d == pl.ProblemID {
@@ -609,7 +651,10 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 
 		if len(run.Plans) > 0 {
 			b.WriteString("\n### 修正計画\n\n")
-			b.WriteString("| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | SHA |\n")
+			// 最終列の見出しは「証拠」— コミットの SHA とリポジトリ外の反映先の URL の
+			// 2 つの型を取る (renderPlanCells の証拠の欄)。見出しを SHA のままにすると、
+			// done-external の行に出る URL を SHA として読ませることになる。
+			b.WriteString("| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |\n")
 			b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
 			for _, pl := range run.Plans {
 				b.WriteString(recordRow(renderPlanCells(pl)))
@@ -617,6 +662,13 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			for _, pl := range run.Plans {
 				if pl.Status == "awaiting-human" {
 					fmt.Fprintf(&b, "\n- **%s は選択待ち (人間が選ぶ)**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Options))
+				}
+			}
+			// リポジトリ外への反映は、コミットを辿っても内容を確かめられない。
+			// 反映を確認した方法 (notes) を表の外に出して、後から追えるようにする。
+			for _, pl := range run.Plans {
+				if pl.Status == "done-external" && pl.Notes != "" {
+					fmt.Fprintf(&b, "\n- **%s はリポジトリ外へ反映済み**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Notes))
 				}
 			}
 		}
@@ -687,9 +739,15 @@ func renderPlanCells(pl recordPlan) []string {
 	if len(pl.DependsOn) > 0 {
 		order += " (" + recordCell(strings.Join(pl.DependsOn, ", ")) + " の後)"
 	}
+	// 証拠の欄。コミットがあれば SHA、リポジトリ外への反映なら反映先の URL を出す。
+	// URL をコードスパンで包むのは、記録が引用を含む文書で、リンク記法にすると
+	// リンク切れ検査に引っかかるため (record-schema.md の「表記の機械検査から外す」)。
 	sha := "—"
-	if pl.SHA != "" {
+	switch {
+	case pl.SHA != "":
 		sha = "`" + recordCell(pl.SHA) + "`"
+	case pl.AppliedExternalURL != "":
+		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
 	return []string{
 		recordCell(pl.ProblemID),
@@ -727,6 +785,8 @@ func recordStatusJa(s string) string {
 		return "**選択待ち**"
 	case "done":
 		return "済"
+	case "done-external":
+		return "済 (リポジトリ外)"
 	}
 	return s
 }

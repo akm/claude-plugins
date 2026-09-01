@@ -39,3 +39,5 @@
 ## コミット後に記録へ書く
 
 **コミットしたら、記録 YAML の該当の問題を `status: done`・`sha` に更新しておく。** 途中で止まったとき、どこまで進んだかが記録に残る。記録とサマリのコミットは区切りで行う (分け方の正本は [記録 README のコミット節](../../review-triage/references/record-schema.md#コミット))。
+
+**リポジトリ外の成果物への反映はコミットが立たない。** その問題は `status: done-external` にする。**対象の範囲と、何を書くかの正本は [記録 README のリポジトリ外への反映](../../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない (規則を写すと、正本が変わったときに片方だけ古くなる)。
