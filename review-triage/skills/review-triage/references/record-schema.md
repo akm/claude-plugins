@@ -65,8 +65,8 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `order` | | コミットの順序 |
 | `depends_on` | | 依存する問題の `problem_id` |
 | `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空** |
-| `applied_external_url` | | リポジトリ外の反映先の URL。`status: done-external` のときだけ書く |
-| `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` で `applied_external_url` が無いとき必須** |
+| `applied_external_url` | | リポジトリ外の反映先の URL。**`status: done-external` 専用 — 他の状態では空** |
+| `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` 専用 — 他の状態では空。`applied_external_url` が無いとき必須** |
 | `status` | ✓ | 下の表のとおり |
 
 ### 状態 (`status`)

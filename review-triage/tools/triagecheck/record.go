@@ -451,8 +451,25 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: finding_ids の %d は採択 (adopted) ではありません (verdict %s)。修正計画は採択だけを束ねる", pn, id, v)
 				}
 			}
+			// externalOnly は done-external 専用のキーが空であることを検査する。
+			// スキーマ表が「done-external のときだけ書く」と定める排他で、書かせる
+			// だけで検査しないと、done でコミット済みなのに外部 URL が残る記録が
+			// 黙って通る (sha の排他は前から検査されていた)。列挙外の status では
+			// 呼ばない — default が列挙違反を報告するので、そこへ重ねると 1 つの
+			// 誤字が 2 つの問題になる。
+			externalOnly := func() {
+				for _, kv := range []struct{ key, val string }{
+					{"applied_external_url", pl.AppliedExternalURL}, {"notes", pl.Notes},
+				} {
+					if kv.val != "" {
+						add("%s: status %s なのに %s %q があります。%s は status done-external 専用",
+							pn, pl.Status, kv.key, kv.val, kv.key)
+					}
+				}
+			}
 			switch pl.Status {
 			case "pending", "awaiting-human":
+				externalOnly()
 				if pl.SHA != "" {
 					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
 				}
@@ -460,6 +477,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: status awaiting-human には options (選択肢とトレードオフ) が必須", pn)
 				}
 			case "done":
+				externalOnly()
 				if pl.SHA == "" {
 					add("%s: status done には sha (短縮 SHA) が必須。リポジトリ外の成果物への反映で"+
 						"コミットが立たないなら status: done-external にする", pn)

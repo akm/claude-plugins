@@ -131,6 +131,14 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"        sha: abc1234\n        status: done-external\n        notes: PR 本文へ反映\n", "sha"},
 		{"done-external なのに反映先が無い", "status: pending", "status: done-external", "applied_external_url"},
 		{"status の列挙値違反", "status: pending", "status: done-ext", "status"},
+		// done-external 専用のキーの排他 (スキーマ表が「done-external のときだけ書く」と定める)。
+		{"pending なのに applied_external_url がある", "        status: pending\n",
+			"        status: pending\n        applied_external_url: \"https://example.com/x\"\n", "done-external 専用"},
+		{"done なのに applied_external_url がある",
+			"        sha: \"\"\n        status: pending\n",
+			"        sha: abc1234\n        status: done\n        applied_external_url: \"https://example.com/x\"\n", "done-external 専用"},
+		{"awaiting-human なのに notes がある", "        status: pending\n",
+			"        status: awaiting-human\n        options: 案 a / 案 b\n        notes: どこかへ反映した\n", "done-external 専用"},
 		{"depends_on の宙参照", "order: 1\n", "order: 1\n        depends_on: [P9]\n", "depends_on"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
@@ -1056,6 +1064,24 @@ func TestReviewTriageRecordDoneExternalPasses(t *testing.T) {
 				t.Fatalf("正しい done-external で問題が出た: %v", problems)
 			}
 		})
+	}
+}
+
+// 列挙外の status に done-external 専用のキーが付いていても、報告するのは
+// 列挙違反の 1 件だけ。1 つの誤字を 2 つの問題に増やさない。
+func TestReviewTriageRecordUnknownStatusReportsOnce(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML,
+		"        status: pending\n",
+		"        status: done-ext\n        applied_external_url: \"https://example.com/x\"\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+	for _, p := range problems {
+		if strings.Contains(p, "done-external 専用") {
+			t.Fatalf("列挙外の status に排他の問題を重ねている: %v", problems)
+		}
 	}
 }
 
