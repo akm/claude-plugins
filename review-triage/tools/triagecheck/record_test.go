@@ -1059,6 +1059,29 @@ func TestReviewTriageRecordDoneExternalPasses(t *testing.T) {
 	}
 }
 
+// 修正計画の表の最終列は SHA と URL の 2 つの型を取るので、見出しは「証拠」で
+// なければならない。見出しを SHA に戻すと、done-external の行の URL を SHA として
+// 読ませることになる (セルを埋める側だけ直して見出しに追随しなかった型)。
+func TestReviewTriageSummaryPlanEvidenceHeader(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML,
+		"        sha: \"\"\n        status: pending\n",
+		"        status: done-external\n"+
+			"        applied_external_url: \"https://example.com/pr/1\"\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(mutated))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if !strings.Contains(summary, "| 順 | 状態 | 証拠 (SHA / URL) |") {
+		t.Fatalf("修正計画の表の最終列の見出しが「証拠」でない:\n%s", summary)
+	}
+	if strings.Contains(summary, "| 順 | 状態 | SHA |") {
+		t.Fatalf("最終列の見出しが SHA のまま残っている:\n%s", summary)
+	}
+}
+
 // done-external の問題は、サマリで状態がリポジトリ外と分かり、証拠の欄に
 // 反映先の URL が、表の外に反映を確認した方法 (notes) が出る。
 func TestReviewTriageSummaryDoneExternal(t *testing.T) {

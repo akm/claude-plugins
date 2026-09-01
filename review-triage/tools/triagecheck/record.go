@@ -633,7 +633,10 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 
 		if len(run.Plans) > 0 {
 			b.WriteString("\n### 修正計画\n\n")
-			b.WriteString("| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | SHA |\n")
+			// 最終列の見出しは「証拠」— コミットの SHA とリポジトリ外の反映先の URL の
+			// 2 つの型を取る (renderPlanCells の証拠の欄)。見出しを SHA のままにすると、
+			// done-external の行に出る URL を SHA として読ませることになる。
+			b.WriteString("| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |\n")
 			b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
 			for _, pl := range run.Plans {
 				b.WriteString(recordRow(renderPlanCells(pl)))
