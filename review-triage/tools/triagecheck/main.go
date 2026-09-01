@@ -10,6 +10,7 @@
 //	triagecheck                          # 既定の置き場を検査する
 //	triagecheck -record-dir docs/rt/     # 記録の置き場を指定する
 //	triagecheck -write-summary           # 記録から生成サマリ (.md) を書き出す
+//	triagecheck -install-wrapper <path>  # 呼び出し用のラッパースクリプトを書き出す
 package main
 
 import (
@@ -35,8 +36,16 @@ func run(args []string) error {
 		"判定フローの正本 (judgment-flow.md) のパス。省略時は CLAUDE_PLUGIN_ROOT から解決する")
 	writeSummary := fs.Bool("write-summary", false,
 		"検査せず、記録から生成サマリ (.md) を書き出す")
+	installWrapperPath := fs.String("install-wrapper", "",
+		"検査せず、-record-dir と -judgment-flow の値を焼き込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	// -install-wrapper は record-dir をそのまま (呼び出し元の意図した相対/絶対の
+	// 形のまま) ラッパーに焼き込む。以降の検査処理に入る前に分岐する。
+	if *installWrapperPath != "" {
+		return installWrapper(*installWrapperPath, *recordDir, *flowPath)
 	}
 
 	// path.Clean で表記の揺れ (".", "./rec", "rec//") を畳む。照合は
