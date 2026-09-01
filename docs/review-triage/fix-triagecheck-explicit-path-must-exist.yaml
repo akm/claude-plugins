@@ -236,6 +236,68 @@ runs:
         attrs:
           severity: P3
           confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          -record-dir を絶対化しないまま使い、go run -C がカレントをツール側へ移すことを
+          考慮しなかった。修正前は不在が nil, nil に潰れて表面化しなかったが、不在を
+          エラーにしたことで偽陽性の失敗として現れた
+        finding_ids: [1, 2]
+        approach: >-
+          -record-dir をプロセス起動時のカレント基準で絶対化してから reviewTriageDir に入れる。
+          誤解決そのものを断つので、修正前から残っていた「相対指定では何も検査していない」状態も
+          同時に直る。ラッパー (#2) は同じ経路を踏むだけなので、この修正で直る。
+          相対指定が正しく検査されることの回帰テストを足す
+        order: 1
+        sha: ""
+        status: pending
+      - problem_id: P2
+        cause: >-
+          指定の有無を「値が空か」で判定する箇所を残した。flag.Visit を -record-dir にだけ
+          適用し、-judgment-flow と空文字の畳み込みに同じ判断を適用しなかった
+        finding_ids: [3, 4]
+        approach: >-
+          -judgment-flow も explicit["judgment-flow"] で判定し、空文字の明示指定を
+          「指定なし」に化けさせない。-record-dir "" は path.Clean が "." に畳む前に
+          指定として扱う。両方の空文字指定の回帰テストを足す
+        order: 2
+        depends_on: [P1]
+        sha: ""
+        status: pending
+      - problem_id: P3
+        cause: >-
+          関数を直接呼ぶテストしか書かず、run から検査へ explicit を渡す配線を通る経路を
+          固定しなかった
+        finding_ids: [5]
+        approach: >-
+          run 経由で -write-summary と不在の -record-dir を渡してエラーになることを
+          main_test.go で固定する。配線を false に固定すると落ちることを確認する
+        order: 3
+        sha: ""
+        status: pending
+      - problem_id: P4
+        cause: >-
+          挙動を変えたのに README を追随させなかった。後方互換の主張は例外を書いた表の直後で
+          それを打ち消しており、テスト件数はテストを足したのに古い値のまま残った
+        finding_ids: [6, 8]
+        approach: >-
+          「既定のまま実行する場合の挙動は変わらない」を、CLAUDE_PLUGIN_ROOT が設定された
+          環境は例外だと明記する文に直す。テスト件数は README 自身が指定するコマンドで
+          数え直す。2 件は同じ「文書を追随させなかった」原因なので 1 問題にする
+        order: 4
+        sha: ""
+        status: pending
+      - problem_id: P5
+        cause: >-
+          置き場の不在だけを error で即 return する形にし、problems に積む judgment-flow 側と
+          扱いを揃えなかった
+        finding_ids: [7]
+        approach: >-
+          置き場の不在も problems に積み、両方の不在を 1 回の実行で報告する。
+          両方不在のとき 2 件報告されることのテストを足す
+        order: 5
+        sha: ""
+        status: pending
     notes: >-
       レビューは報告のみで走った (head 450dc70 が現在の HEAD と一致、作業ツリーは不変)。
       8 件すべてを自分で再現して段 A を通した。指摘 1 と 2 は同じ原因 (相対パスが
