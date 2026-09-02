@@ -25,7 +25,7 @@
 
 ## commit-rules-guard との関係
 
-グループ分けの基準は「コミットは変更した動機でグルーピングする」という考え方に立っています。同じ考え方を `git commit` の直前に想起させるのが [commit-rules-guard](../commit-rules-guard/README.md) です。**併用すると、動機を混ぜないことを事前 (guard) と事後 (squash) の両方で守れます。**
+グループ分けの基準は「コミットは変更した動機でグルーピングする」という考え方に立っています。同じ考え方を `git commit` の直前に想起させるのが [commit-rules-guard](../commit-rules-guard/README.md) です。**併用すると、動機を混ぜないことを事前 (guard) と事後 (squash) の両方で検査できます。**
 
 ## 使い方
 
