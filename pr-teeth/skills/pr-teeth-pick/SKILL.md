@@ -247,7 +247,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
 コマンドは返り値のものをそのまま使う。プラットフォーム別の判定は済んでいる。
 
 続いて用語集を保存する。**`--notified` と `--open-prs` は渡さない**
-（state を変更しないため。渡すと巡回時の記録を汚す）。
+（state を変更しないため。渡すと巡回時の記録に書き込んでしまう）。
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \

@@ -54,7 +54,7 @@
    - スキルなし: 同じ `prompt` だけを渡す
    - 出力先: `iteration-<N>/eval-<ID>-<名前>/{with_skill,without_skill}/outputs/comment.md`
 
-   **`gh` を実行させないこと。** 実際の Issue / PR を汚さないため、投稿する本文をファイルに書かせるだけにする。
+   **`gh` を実行させないこと。** 実際の Issue / PR に書き込まないため、投稿する本文をファイルに書かせるだけにする。
 
 3. 各ディレクトリに `eval_metadata.json` を置く (`evals.json` の該当エントリから作る)
 
