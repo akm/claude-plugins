@@ -17,11 +17,12 @@ import (
 
 // wrapperTemplate はラッパースクリプトの雛形。%s は順に
 // (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値 (script_dir からの相対),
-// (3) -judgment-flow に焼き込む値 (空なら省略) が入る。
+// (3) -summary-command に焼き込む値 (シェルの単一引用符で包んだもの),
+// (4) -judgment-flow に焼き込む値 (空なら省略) が入る。
 //
-// -summary-command は焼き込まず、実行時に "$0 -write-summary" を組み立てて渡す。
-// サマリの 1 行目に入る案内なので、実際に叩ける形でなければ意味が無い —
-// -record-dir と同じ理由で、絶対パスを焼き込むと移動・再クローンで外れる。
+// -summary-command は生成時に決めた値を焼き込む。実行時の $0 から組み立てない —
+// $0 は叩いた形そのものなので、コミットされるサマリの 1 行目が叩き方ごとに
+// 変わる。値の決め方 (リポジトリ相対) は resolveInputs のコメントを参照。
 //
 // 基準には $PWD ではなく script_dir (ラッパー自身の実体の位置) を使う。$PWD は
 // シェルが更新する慣習にすぎず、非シェルの親 (CI ランナー・cron・make -C) が
@@ -56,12 +57,6 @@ while [ -L "$script_src" ]; do
 done
 script_dir=$(cd -P "$(dirname "$script_src")" && pwd)
 
-# サマリの再生成手段としてツールに案内させる文字列。利用者がこのラッパーを
-# 叩いた形 ($0) をそのまま渡す — 焼き込んだ固定のパスだと、リポジトリを
-# 移動・再クローンしたときや、リンク経由で叩かれたときに、案内が実際の
-# 呼び出し方と食い違う。
-summary_command="$0 -write-summary"
-
 plugin_cache=%q
 root=$(ls -d "$plugin_cache"/*/ 2>/dev/null | sort -V | tail -1)
 if [ -z "$root" ]; then
@@ -72,7 +67,7 @@ fi
 exec go run -C "$root/tools/triagecheck" . \
   -current-dir "$script_dir" \
   -record-dir %q \
-  -summary-command "$summary_command" \
+  -summary-command %s \
 %s  "$@"
 `
 
@@ -90,7 +85,12 @@ exec go run -C "$root/tools/triagecheck" . \
 // プラグイン展開先の既定パス (skills/review-triage/references/judgment-flow.md) を
 // 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
 // resolveInputs が弾く。
-func installWrapper(path, recordDir, judgmentFlow string) error {
+//
+// summaryCommand は決定済みの案内 (resolveInputs が決める)。ここでは値を作らず、
+// シェルの単一引用符で包んで焼き込むだけ。%q (Go の引用) は使わない — bash の
+// 二重引用符とは規則が違い、`make $(TARGET)` のような値を焼き込むと実行時に
+// $(TARGET) が展開されて消える (実測)。
+func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error {
 	pluginCache, err := pluginCacheDir()
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func installWrapper(path, recordDir, judgmentFlow string) error {
 		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", judgmentFlow)
 	}
 
-	script := fmt.Sprintf(wrapperTemplate, pluginCache, recordDir, judgmentFlowLine)
+	script := fmt.Sprintf(wrapperTemplate, pluginCache, recordDir, shellSingleQuote(summaryCommand), judgmentFlowLine)
 
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -125,6 +125,13 @@ func installWrapper(path, recordDir, judgmentFlow string) error {
 	}
 	fmt.Printf("生成: %s (record-dir: %s)\n", path, recordDir)
 	return nil
+}
+
+// shellSingleQuote は s をシェルの単一引用符で包む。単一引用符の中では展開も
+// エスケープも起きないので、中の ' だけを '\” (閉じる・引用符を置く・開き直す) に
+// 置き換えれば任意の文字列をそのまま渡せる。
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // pluginCacheDir はこのプロセス自身の実行位置 (go run -C <展開先>/tools/triagecheck)

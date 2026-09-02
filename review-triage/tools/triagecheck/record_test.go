@@ -1205,3 +1205,23 @@ func TestReviewTriageRecordIgnoresOtherFiles(t *testing.T) {
 		t.Fatalf("対象外のファイルで問題が出た: %v", problems)
 	}
 }
+
+// 生成サマリの 1 行目は、既定のまま生成すると既定の案内を含む決まった形になる。
+// 1 行目はコミットされる値なので、組み立て方の変更をここで捕まえる。可変の
+// summaryCommand ではなく定数と突き合わせる (run が書き換えた後の値を既定と
+// 取り違えないため)。
+func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
+	saved := summaryCommand
+	summaryCommand = defaultSummaryCommand
+	t.Cleanup(func() { summaryCommand = saved })
+
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(validRecordYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, _, _ := strings.Cut(summary, "\n")
+	want := "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `" + defaultSummaryCommand + "` で再生成する。 -->"
+	if first != want {
+		t.Errorf("1 行目が既定の形ではない:\n got: %s\nwant: %s", first, want)
+	}
+}

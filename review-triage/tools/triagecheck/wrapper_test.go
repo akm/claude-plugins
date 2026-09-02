@@ -102,7 +102,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 	}
 
 	withWorkingDir(t, versionDir, func() {
-		if err := installWrapper(outPath, recDir, ""); err != nil {
+		if err := installWrapper(outPath, recDir, "", "bin/rtc -write-summary"); err != nil {
 			t.Fatalf("installWrapper: %v", err)
 		}
 	})
@@ -168,7 +168,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	}
 
 	withWorkingDir(t, versionDir, func() {
-		if err := installWrapper(outPath, recDir, customFlow); err != nil {
+		if err := installWrapper(outPath, recDir, customFlow, "bin/rtc -write-summary"); err != nil {
 			t.Fatalf("installWrapper: %v", err)
 		}
 	})
@@ -202,7 +202,7 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 	}
 
 	withWorkingDir(t, versionDir, func() {
-		if err := installWrapper(outPath, recDir, ""); err != nil {
+		if err := installWrapper(outPath, recDir, "", "bin/rtc -write-summary"); err != nil {
 			t.Fatalf("installWrapper: %v", err)
 		}
 	})
@@ -251,7 +251,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 
 	// 生成は「展開先の tools/triagecheck から」行う (pluginCacheDir の前提)。
 	t.Chdir(filepath.Join(version, "tools", "triagecheck"))
-	if err := installWrapper(wrapper, recDir, ""); err != nil {
+	if err := installWrapper(wrapper, recDir, "", "bin/rtc -write-summary"); err != nil {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}
 
@@ -330,11 +330,12 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	}
 }
 
-// ラッパー経由で書き出した生成サマリの 1 行目には、そのラッパーの叩き方が入る。
+// ラッパー経由で書き出した生成サマリの 1 行目には、生成時に焼き込んだ
+// リポジトリ相対の案内が入り、叩き方 (相対・絶対) に依らず同じになる。
 //
-// -summary-command を焼き込まず実行時に "$0 -write-summary" で組み立てるので、
-// 叩いた形がそのまま案内になる。文字列だけを見ると、渡し忘れても
-// テンプレートに行があるだけで通ってしまうので、実際に走らせて生成物を読む。
+// 生成は相対 (./bin/rtc)、検査は絶対パスで叩く。実行時の $0 から組み立てる
+// 実装だと、この 2 つで 1 行目が食い違い、生成直後のサマリが検査に落ちる
+// (実測)。文字列だけを見ると渡し忘れても通ってしまうので、実際に走らせる。
 func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
@@ -367,7 +368,8 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	wrapper := filepath.Join(repo, "bin", "rtc")
 
 	t.Chdir(filepath.Join(version, "tools", "triagecheck"))
-	if err := installWrapper(wrapper, recDir, ""); err != nil {
+	// run が決める既定 (リポジトリ相対) と同じ値を渡す。
+	if err := installWrapper(wrapper, recDir, "", "bin/rtc -write-summary"); err != nil {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}
 
@@ -383,16 +385,39 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), "`./bin/rtc -write-summary`") {
-		t.Errorf("生成サマリがラッパーの叩き方を案内していない:\n%s", string(got)[:min(200, len(got))])
+	if !strings.Contains(string(got), "`bin/rtc -write-summary`") {
+		t.Errorf("生成サマリがラッパーのリポジトリ相対の案内になっていない:\n%s", string(got)[:min(200, len(got))])
 	}
 
-	// 生成したサマリは、同じラッパーの検査で鮮度が合うこと (案内が食い違うと
-	// 生成した直後のサマリが古いと報告される)。
-	check := exec.Command("./bin/rtc")
+	// 生成したサマリは、別の叩き方 (絶対パス。CI・エディタ・PATH 経由の起動が
+	// これに当たる) の検査でも鮮度が合うこと。案内が叩き方に依存すると、
+	// 生成した直後のサマリが古いと報告される。
+	check := exec.Command(wrapper)
 	check.Dir = repo
 	check.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := check.CombinedOutput(); err != nil {
-		t.Fatalf("生成した直後のサマリが検査を通らない: %v\n%s", err, out)
+		t.Fatalf("生成した直後のサマリが、絶対パスで叩いた検査を通らない: %v\n%s", err, out)
+	}
+}
+
+// 焼き込む案内はシェルの単一引用符で包む。%q (Go の引用) で書くと、$ を含む値
+// (Makefile 変数など) が実行時に展開されて消える。
+func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
+	toolDir := filepath.Join(realTempDir(t), "cache", "review-triage", "0.0.1", "tools", "triagecheck")
+	if err := os.MkdirAll(toolDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(toolDir)
+	recDir := realTempDir(t)
+	outPath := filepath.Join(t.TempDir(), "w")
+	if err := installWrapper(outPath, recDir, "", `make $(TARGET) it's`); err != nil {
+		t.Fatal(err)
+	}
+	script, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `-summary-command 'make $(TARGET) it'\''s'`; !strings.Contains(string(script), want) {
+		t.Errorf("案内が単一引用符で焼き込まれていない (want %s):\n%s", want, script)
 	}
 }

@@ -45,8 +45,9 @@ func run(args []string) error {
 		"検査せず、記録から生成サマリ (.md) を書き出す")
 	installWrapperPath := fs.String("install-wrapper", "",
 		"検査せず、-record-dir と -judgment-flow の値を焼き込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
-	summaryCmd := fs.String("summary-command", summaryCommand,
-		"サマリの再生成手段として案内する文字列 (エラー文と生成サマリの 1 行目に入る)")
+	summaryCmd := fs.String("summary-command", defaultSummaryCommand,
+		"サマリの再生成手段として案内する文字列 (エラー文と生成サマリの 1 行目に入る)。"+
+			"-install-wrapper で省略すると、-current-dir から見たラッパーの相対パスで組み立てる")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -68,14 +69,12 @@ func run(args []string) error {
 		return fmt.Errorf("-write-summary は %w (生成の経路では使われません)", errFlagUnusedWithInstallWrapper)
 	}
 
-	// 案内の文言は、経路の分岐より前に一度だけ据える。検査 (エラー文) と
-	// -write-summary (生成サマリの 1 行目) の両方が同じ値を読むので、経路ごとに
-	// 渡すと片方だけ古い案内を出す組み合わせができる。空白だけの指定は弾く —
-	// 通すと「再生成する手段は空欄です」と案内することになり、指定しないより悪い。
+	// 空白だけの -summary-command は弾く — 通すと「再生成する手段は空欄です」と
+	// 案内することになり、指定しないより悪い。値そのものの決定は、パスの規則と
+	// 一緒に resolveInputs で行う (案内はパスの形をした値なので、同じ規則に乗せる)。
 	if explicit["summary-command"] && isBlankPath(*summaryCmd) {
 		return fmt.Errorf("-summary-command に%w", errEmptySummaryCommand)
 	}
-	summaryCommand = *summaryCmd
 
 	// パスの規則は、経路 (検査 / -write-summary / -install-wrapper) で分岐する前に
 	// 1 か所で当てる。経路ごとに書くと、規則を 1 つ足すたびに他の経路へ書き忘れ、
@@ -87,11 +86,17 @@ func run(args []string) error {
 		currentDir:     *currentDir,
 		judgmentFlow:   *flowPath,
 		installWrapper: *installWrapperPath,
+		summaryCommand: *summaryCmd,
 		explicit:       explicit,
 	})
 	if err != nil {
 		return err
 	}
+
+	// 案内の文言も、経路の分岐より前に一度だけ据える。検査 (エラー文) と
+	// -write-summary (生成サマリの 1 行目) と -install-wrapper (焼き込み) が
+	// 同じ値を読むので、経路ごとに渡すと片方だけ違う案内を出す組み合わせができる。
+	summaryCommand = in.summaryCommand
 
 	// 明示した在り処の不在は、経路を問わず「指定したのに検査できない」なので
 	// ここで止める。置き場と判定フローの両方が無いときは 1 回の実行で両方を
@@ -114,7 +119,7 @@ func run(args []string) error {
 
 	// 以降は経路ごとの処理。パスは上で解決済みなので、どの経路も値を検査しない。
 	if in.installWrapper != "" {
-		return installWrapper(in.installWrapper, in.recordDir, in.embedJudgmentFlow)
+		return installWrapper(in.installWrapper, in.recordDir, in.embedJudgmentFlow, in.summaryCommand)
 	}
 	if *writeSummary {
 		return writeReviewTriageSummaries(reviewTriageDir, true)
@@ -147,6 +152,9 @@ type pathInputs struct {
 	currentDir     string
 	judgmentFlow   string
 	installWrapper string
+	// summaryCommand は -summary-command の生の値 (既定値を含む)。明示されたかは
+	// explicit で見る。
+	summaryCommand string
 	explicit       map[string]bool
 }
 
@@ -167,6 +175,10 @@ type resolvedInputs struct {
 	embedJudgmentFlow string
 	// installWrapper はラッパーの出力先の絶対パス。明示されたときだけ非空。
 	installWrapper string
+	// summaryCommand は案内する再生成コマンド。明示されればその値、-install-wrapper
+	// で省略されれば -current-dir から見たラッパーの相対パスで組み立てた値、
+	// それ以外は既定値。
+	summaryCommand string
 }
 
 // resolveInputs は、明示された各パスに同じ規則を同じ順で当てる。
@@ -246,6 +258,43 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 		out.installWrapper = absOut
 	}
 
+	// 案内する再生成コマンド。明示があればそのまま。-install-wrapper で省略されたら
+	// 「ラッパー自身をリポジトリのルートから叩く形」を組み立てて焼き込む。
+	//
+	// 実行時の $0 から組み立てない — $0 は叩いた形 (./bin/rtc、絶対パス、リンク名)
+	// そのもので、コミットされるサマリの 1 行目が叩き方ごとに変わり、生成直後の
+	// サマリが別の叩き方の検査で「食い違う」と報告される (実測)。絶対パスも
+	// 焼き込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットが
+	// 場所によって赤くなる。コミットされる値は、リポジトリ相対でなければならない。
+	//
+	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する —
+	// -record-dir と同じ規則で、案内というパスの形をした値にも同じ規則を当てる。
+	// ラッパーの basename だけで案内する案は「PATH に居るはず」という推測になる
+	// ので採らない。
+	switch {
+	case in.explicit["summary-command"]:
+		out.summaryCommand = in.summaryCommand
+	case in.explicit["install-wrapper"]:
+		if base == "" {
+			return out, errSummaryCommandNeedsBase
+		}
+		rel, err := filepath.Rel(base, out.installWrapper)
+		if err != nil {
+			return out, fmt.Errorf(
+				"%s: ラッパーの位置を -current-dir (%s) からの相対パスにできません: %w", out.installWrapper, base, err)
+		}
+		rel = filepath.ToSlash(rel)
+		// 区切りを含まない (ルート直下に置いた) ときだけ ./ を前置する。区切りを
+		// 含む相対パスはそのまま実行できるので、文書の表記 (bin/<名前>) に合わせる。
+		if !strings.Contains(rel, "/") {
+			rel = "./" + rel
+		}
+		out.summaryCommand = rel + " -write-summary"
+		baseUsed = true
+	default:
+		out.summaryCommand = defaultSummaryCommand
+	}
+
 	if in.explicit["current-dir"] && !baseUsed {
 		return out, errCurrentDirUnused
 	}
@@ -311,6 +360,12 @@ var (
 	// errEmptySummaryCommand は -summary-command に空 (空白・不可視だけを含む)
 	// が明示指定されたことを表す。
 	errEmptySummaryCommand = errors.New("空の文字列が指定されました")
+	// errSummaryCommandNeedsBase は、-install-wrapper で案内を組み立てるのに
+	// 基準 (-current-dir) も明示 (-summary-command) も無いことを表す。
+	errSummaryCommandNeedsBase = errors.New(
+		"-install-wrapper で焼き込む再生成コマンドの案内を組み立てられません: " +
+			"ラッパーをリポジトリ相対で案内するには -current-dir が要ります " +
+			"(リポジトリのルートで -current-dir \"$(pwd)\" を渡すか、案内の文字列を -summary-command で渡してください)")
 )
 
 // resolveBaseDir は -current-dir の値を検証して返す。指定が無ければ空を返す

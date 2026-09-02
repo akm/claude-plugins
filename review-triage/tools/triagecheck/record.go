@@ -39,12 +39,17 @@ var reviewTriageDir = "docs/review-triages/"
 // 生成したラッパー・go run の直呼び) ので、特定のコマンド名を焼き込まない。
 // 既定は「このツール自身をどう呼んでいるかに依らない」一般的な言い方にして、
 // -summary-command で利用側の実際の呼び出し方を渡せるようにする
-// (ラッパーは生成時に自分のパスを焼き込むので、-install-wrapper 経由なら
-// bin/<名前> -write-summary が自動で入る)。
+// (-install-wrapper 経由なら、生成時にラッパー自身のリポジトリ相対パスを
+// 案内として焼き込む。値の決め方は resolveInputs)。
 //
 // この値は生成サマリの 1 行目としてコミットされるため、変えると既存サマリの
 // 鮮度検査に差分が出る。再生成で吸収する。
-var summaryCommand = "triagecheck -write-summary"
+//
+// 既定値は定数に分ける。テストが既定を検査するとき、run が書き換えた後の
+// 変数ではなく定数を読めるようにするため。
+const defaultSummaryCommand = "triagecheck -write-summary"
+
+var summaryCommand = defaultSummaryCommand
 
 // inReviewTriageDir は f が記録の置き場の直下にあるかを返す。
 //

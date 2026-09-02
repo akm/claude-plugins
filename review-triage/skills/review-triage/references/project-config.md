@@ -29,7 +29,7 @@
 **同梱の `triagecheck` は `config.json` を読まない。** 案内する再生成手段は `-summary-command` で渡す (省略時は `triagecheck -write-summary`)。**この値がサマリの 1 行目に入ってコミットされる**ので、`triage_summary_command` と食い違うと、記録を読んだ人が実在しないコマンドを案内されることになる。
 
 - Makefile などから呼ぶなら、`triage_summary_command` と同じ文字列を `-summary-command` に渡す
-- `-install-wrapper` で生成したラッパーを使うなら、ラッパーが自分の叩き方を自動で渡すので設定は要らない (`triage_summary_command` には `bin/<名前> -write-summary` を書く)
+- `-install-wrapper` で生成したラッパーを使うなら、生成時に案内が焼き込まれる — `-summary-command` を渡さなければ `-current-dir` から見たラッパーの相対パス (`bin/<名前> -write-summary`) になるので、`triage_summary_command` にも同じ文字列を書く
 
 詳細は [triagecheck の README](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md)。
 
