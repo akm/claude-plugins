@@ -123,7 +123,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 
 	// -record-dir は script_dir (ラッパーの置き場) からの相対で焼き込まれる。
 	// 生成時のカレント (プラグインの展開先) 基準ではない。
-	if !strings.Contains(got, `-record-dir "../docs/review-triages"`) {
+	if !strings.Contains(got, `-record-dir '../docs/review-triages'`) {
 		t.Errorf("生成物に script_dir 基準の -record-dir が見当たらない:\n%s", got)
 	}
 	// 基準は $PWD でなく script_dir。$PWD だと叩く場所で見る先が変わる。
@@ -134,7 +134,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 		t.Errorf("生成物が $PWD に依存している:\n%s", got)
 	}
 	// plugin_cache は版ディレクトリの 1 つ上を指す。
-	wantCache := `plugin_cache="` + pluginRoot + `"`
+	wantCache := `plugin_cache='` + pluginRoot + `'`
 	if !strings.Contains(got, wantCache) {
 		t.Errorf("生成物に想定した plugin_cache が見当たらない (want substring %q):\n%s", wantCache, got)
 	}
@@ -178,7 +178,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	got := string(data)
-	if !strings.Contains(got, `-judgment-flow "`+customFlow+`"`) {
+	if !strings.Contains(got, `-judgment-flow '`+customFlow+`'`) {
 		t.Errorf("生成物に明示した -judgment-flow の焼き込みが見当たらない:\n%s", got)
 	}
 	// 明示したときは $root からの既定パスを使わない (二重に書かれない)。
@@ -419,5 +419,43 @@ func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
 	}
 	if want := `-summary-command 'make $(TARGET) it'\''s'`; !strings.Contains(string(script), want) {
 		t.Errorf("案内が単一引用符で焼き込まれていない (want %s):\n%s", want, script)
+	}
+}
+
+// 焼き込む値はすべて単一引用符で包む。-summary-command だけでなく plugin_cache・
+// -record-dir・明示の -judgment-flow も同じ — %q のままだと $(...) が実行時に
+// 展開され、別の置き場を検査する。
+func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
+	base := realTempDir(t)
+	toolDir := filepath.Join(base, "cache$(echo X)", "review-triage", "0.0.1", "tools", "triagecheck")
+	if err := os.MkdirAll(toolDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(toolDir)
+	recDir := filepath.Join(base, "docs$(echo Y)", "rt")
+	flow := filepath.Join(base, "flow$(echo Z).md")
+	outPath := filepath.Join(base, "bin", "w")
+	if err := installWrapper(outPath, recDir, flow, "bin/w -write-summary"); err != nil {
+		t.Fatal(err)
+	}
+	script, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(script)
+	for _, want := range []string{
+		"plugin_cache='" + filepath.Join(base, "cache$(echo X)", "review-triage") + "'",
+		"-record-dir '../docs$(echo Y)/rt'",
+		"-judgment-flow '" + flow + "'",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("焼き込み値が単一引用符で包まれていない (want %s):\n%s", want, got)
+		}
+	}
+	// 展開させる側は二重引用符のまま (焼き込み値と取り違えて単一にすると展開されない)。
+	for _, want := range []string{`-current-dir "$script_dir"`, `-C "$root/tools/triagecheck"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("実行時に展開する箇所が二重引用符でなくなっている (want %s):\n%s", want, got)
+		}
 	}
 }

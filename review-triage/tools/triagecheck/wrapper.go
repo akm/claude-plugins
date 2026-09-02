@@ -17,8 +17,15 @@ import (
 
 // wrapperTemplate はラッパースクリプトの雛形。%s は順に
 // (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値 (script_dir からの相対),
-// (3) -summary-command に焼き込む値 (シェルの単一引用符で包んだもの),
-// (4) -judgment-flow に焼き込む値 (空なら省略) が入る。
+// (3) -summary-command に焼き込む値, (4) -judgment-flow の行 (明示が無ければ
+// $root からの既定) が入る。(1)〜(3) と明示の (4) は生成時に決まった値なので、
+// installWrapper がシェルの単一引用符で包んでから差し込む。
+//
+// テンプレート内の二重引用符は「実行時に展開させる」箇所だけに使う —
+// "$script_dir"・"$root/..." がそれで、焼き込む値には使わない。二重引用符の中では
+// $(...)・バックティック・$VAR が展開されるので、値にそれらを含むパスが実行時に
+// 別のパスに化ける。焼き込む値と展開させる変数を、引用符の種類で見分けられる
+// ようにしておく。
 //
 // -summary-command は生成時に決めた値を焼き込む。実行時の $0 から組み立てない —
 // $0 は叩いた形そのものなので、コミットされるサマリの 1 行目が叩き方ごとに
@@ -57,7 +64,7 @@ while [ -L "$script_src" ]; do
 done
 script_dir=$(cd -P "$(dirname "$script_src")" && pwd)
 
-plugin_cache=%q
+plugin_cache=%s
 root=$(ls -d "$plugin_cache"/*/ 2>/dev/null | sort -V | tail -1)
 if [ -z "$root" ]; then
   echo "review-triage プラグインが見つかりません ($plugin_cache)" >&2
@@ -66,7 +73,7 @@ fi
 
 exec go run -C "$root/tools/triagecheck" . \
   -current-dir "$script_dir" \
-  -record-dir %q \
+  -record-dir %s \
   -summary-command %s \
 %s  "$@"
 `
@@ -86,10 +93,12 @@ exec go run -C "$root/tools/triagecheck" . \
 // 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
 // resolveInputs が弾く。
 //
-// summaryCommand は決定済みの案内 (resolveInputs が決める)。ここでは値を作らず、
-// シェルの単一引用符で包んで焼き込むだけ。%q (Go の引用) は使わない — bash の
-// 二重引用符とは規則が違い、`make $(TARGET)` のような値を焼き込むと実行時に
-// $(TARGET) が展開されて消える (実測)。
+// summaryCommand は決定済みの案内 (resolveInputs が決める)。ここでは値を作らない。
+//
+// 焼き込む値はすべてシェルの単一引用符で包む (shellSingleQuote)。%q (Go の引用) は
+// 使わない — bash の二重引用符とは規則が違い、`make $(TARGET)` のような値を
+// 焼き込むと実行時に $(TARGET) が展開されて消える (実測)。パスも同じで、
+// docs/$(echo x) のような置き場は別の場所に化ける。
 func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error {
 	pluginCache, err := pluginCacheDir()
 	if err != nil {
@@ -109,10 +118,11 @@ func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error 
 	if judgmentFlow != "" {
 		// 判定フローはリポジトリの外 (プラグインの展開先) にあるので、script_dir
 		// 基準の相対にしても意味が無い。絶対パスで焼き込む。
-		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", judgmentFlow)
+		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %s \\\n", shellSingleQuote(judgmentFlow))
 	}
 
-	script := fmt.Sprintf(wrapperTemplate, pluginCache, recordDir, shellSingleQuote(summaryCommand), judgmentFlowLine)
+	script := fmt.Sprintf(wrapperTemplate,
+		shellSingleQuote(pluginCache), shellSingleQuote(recordDir), shellSingleQuote(summaryCommand), judgmentFlowLine)
 
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {

@@ -664,10 +664,10 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 				got := string(script)
 				// 置き場はラッパーの位置からの相対、判定フローは利用者の基準で
 				// 解決した絶対パス (展開先の囮ではない)。
-				if !strings.Contains(got, `-record-dir "../docs/rt"`) {
+				if !strings.Contains(got, `-record-dir '../docs/rt'`) {
 					t.Errorf("-record-dir が script_dir 基準の相対で焼き込まれていない:\n%s", got)
 				}
-				if !strings.Contains(got, `-judgment-flow "`+flow+`"`) {
+				if !strings.Contains(got, `-judgment-flow '`+flow+`'`) {
 					t.Errorf("-judgment-flow が -current-dir 基準で解決されていない:\n%s", got)
 				}
 				return
