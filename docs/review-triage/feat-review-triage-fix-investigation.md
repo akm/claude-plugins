@@ -10,6 +10,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 2026-09-03 | `code-review` | `opus-5` | full | 3 | 2 | 0 | 1 |
 | 2 | 2026-09-03 | `code-review` | `opus-5` | incremental | 1 | 1 | 0 | 0 |
+| 3 | 2026-09-03 | `code-review` | `opus-5` | incremental | 0 | 0 | 0 | 0 |
 
 ## 回 1: 2026-09-03 `code-review`
 
@@ -55,3 +56,14 @@
 ### 観察
 
 2 回目 (増分 64fa3b2..08cf572、別セッションのレビュー結果を tmp/review-code-review-opus-5-7th.yaml で受領)。head は現在の HEAD と一致し、 レビュー前後で HEAD と作業ツリーが不変であることを確認した。 指摘 1 件は P2 の修正の 2 行上に残った同型の記述で、修正した節 (冒頭) の全体を 読み直さなかった型 B の取りこぼし。P2 の investigation.scope の grep には 掛かっていたので、調査の範囲ではなく読み方の問題。 residual 7 件のうち記録に残す価値があるもの: (a) 「特に見てほしい点」1・2・4 はレビュア側の実測で問題なし — consequence / premise_check の null は既存の検査だけが報告し新検査と重ならない、attrs / gates_fired / depends_on の null は「無ければ省略」の意味どおり、08cf572 で足した リンクとアンカーはすべて実在。 (b) record-schema.md:61 → grouping.md の辺で、ファイル単位では grouping.md:30 → record-schema.md と相互参照になるが、節単位では別の節どうしなので DAG 条件は 破らない (doc-dag の結果と一致)。 (c) record.go:8・64 のコメントが正本を存在しない docs/review-triages/README.md と 指す取り残しは、P1 の excluded のとおり今回は含めない。
+
+## 回 3: 2026-09-03 `code-review`
+
+- HEAD `927f639` / model `opus-5` / scope incremental
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+
+### 観察
+
+3 回目 (増分 08cf572..927f639、別セッションのレビュー結果を tmp/review-code-review-opus-5-8th.yaml で受領)。head は現在の HEAD と一致し、 レビュー前後で HEAD と作業ツリーが不変であることを確認した。指摘 0 件。 residual 3 件はいずれも既知か整理の好み: (a) investigation.md:3 が型の範囲 (A〜F) を書いているので verification.md が型を 増減すると古びうるが、放置して壊れるものは無い。 (b) verification.md:1 の題「修正の後の検証」と 11 行目の緊張は増分の外で、 回 2 の P1 の excluded のとおり。 (c) record.go:8・64 の正本を指すコメントの取り残しは回 1 の P1 の excluded と 回 2 の notes のとおり。 増分レビューが 0 件に収束したので、このブランチのレビューはここで区切る。
