@@ -167,6 +167,47 @@ runs:
         attrs:
           severity: low
           verdict: CONFIRMED
+    plans:
+      - problem_id: P1
+        cause: >-
+          案内の値を「経路の分岐より前で 1 回決める」規則を置かず、-install-wrapper の
+          経路では決めきらずに実行時の $0 に委ね、利用者の -summary-command は
+          その経路で捨てた。パスの規則を 3 経路で揃えた設計を、案内という
+          1 つのパス値には当てていなかった
+        finding_ids: [1, 2]
+        approach: >-
+          run() で案内の値を経路の分岐より前に 1 回決める — -summary-command が
+          明示されればその値、明示が無く -install-wrapper があるときは
+          filepath.Rel(-current-dir, ラッパーの絶対パス) + " -write-summary"
+          (区切りを含まないときだけ ./ を前置。baseUsed を立てる)、明示も
+          -current-dir も無いときはエラーで要求する (errSummaryCommandNeedsBase。
+          エラー文に -current-dir と -summary-command の両方の直し方を書く)。
+          installWrapper に案内を引数で渡し、シェルの単一引用符で焼き込む。
+          テンプレートの summary_command="$0 -write-summary" の行を削る。
+          既定値を定数 defaultSummaryCommand に切り出し、生成サマリ 1 行目を
+          その定数と突き合わせるテストを置く。
+          TestInstallWrapperSummaryCommandPointsAtWrapper は検査側を絶対パスで
+          叩く形に変え、叩き方に依らないことを固定する。-install-wrapper と
+          -summary-command の併記で値が焼き込まれることを固定するテストと、
+          基準無しの既定でエラーになるテストを足す。
+          README 56 行目と project-config.md 32 行目 (自動で渡す・設定は要らない)
+          を焼き込みの記述に改める。
+          このリポジトリ自身のサマリ 1 行目は既定値のままなので変わらない
+          (変わるのはラッパー経由で生成した利用側のサマリだけ)。
+          順序: P2 が使う定数をここで導入するので P1 が先
+        order: 1
+        status: pending
+      - problem_id: P2
+        cause: >-
+          既定値の検査を、run() が書き換える可変のパッケージ変数を読む形で書き、
+          自身は withRunGlobals も呼ばなかった
+        finding_ids: [3]
+        approach: >-
+          TestSummaryCommandDefaultIsGeneric を、可変の summaryCommand ではなく
+          P1 で切り出した定数 defaultSummaryCommand に対して検査する形に変える
+        order: 2
+        depends_on: [P1]
+        status: pending
     notes: >-
       このブランチの初回トリアージ。レビューは code-review high で報告のみ
       (--fix 無し) で走らせ、実行前後で HEAD (33c62b8) と作業ツリーが不変で
