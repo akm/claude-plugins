@@ -118,15 +118,20 @@ type recordPlanRef struct {
 }
 
 type recordPlan struct {
-	ProblemID  string   `yaml:"problem_id"`
-	Cause      string   `yaml:"cause"`
-	FindingIDs []int    `yaml:"finding_ids"`
-	Approach   string   `yaml:"approach"`
-	Options    string   `yaml:"options"`
-	Order      int      `yaml:"order"`
-	DependsOn  []string `yaml:"depends_on"`
-	SHA        string   `yaml:"sha"`
-	Status     string   `yaml:"status"`
+	ProblemID  string `yaml:"problem_id"`
+	Cause      string `yaml:"cause"`
+	FindingIDs []int  `yaml:"finding_ids"`
+	Approach   string `yaml:"approach"`
+	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
+	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
+	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
+	// 調査の手順の正本は review-triage-fix の references/investigation.md。
+	Investigation *recordInvestigation `yaml:"investigation"`
+	Options       string               `yaml:"options"`
+	Order         int                  `yaml:"order"`
+	DependsOn     []string             `yaml:"depends_on"`
+	SHA           string               `yaml:"sha"`
+	Status        string               `yaml:"status"`
 	// AppliedExternalURL / Notes は status: done-external の反映先の記録。
 	// リポジトリ外の成果物 (PR 本文・Issue のコメント・外部 Wiki など) への修正は
 	// コミットが立たないので sha を書けない。URL を必須にすると、URL を持たない
@@ -139,6 +144,16 @@ type recordPlan struct {
 	// ではない。だから notes には反映を確認した方法を書く。
 	AppliedExternalURL string `yaml:"applied_external_url"`
 	Notes              string `yaml:"notes"`
+}
+
+// recordInvestigation は plans[].investigation — 直す前の調査の範囲と結果。
+// scope は調べた範囲 (実行したコマンドと目で読んだ対象)、included は同じ原因の
+// 別の現れとして問題に含めた箇所、excluded は見つけたが含めなかった箇所と理由。
+// included / excluded が両方空なら「調べたが波及先は無かった」。
+type recordInvestigation struct {
+	Scope    string   `yaml:"scope"`
+	Included []string `yaml:"included"`
+	Excluded []string `yaml:"excluded"`
 }
 
 // recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
@@ -155,8 +170,9 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証": {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
-		"options": true, "order": true, "depends_on": true, "sha": true, "status": true,
-		"applied_external_url": true, "notes": true},
+		"investigation": true, "options": true, "order": true, "depends_on": true, "sha": true,
+		"status": true, "applied_external_url": true, "notes": true},
+	"調査": {"scope": true, "included": true, "excluded": true},
 }
 
 // reviewTriageRecordProblems は docs/review-triages/ の記録 YAML を検査する。
@@ -329,6 +345,8 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "根拠の検証")
 			case "plan_ref":
 				walkMap(v, "束ね先")
+			case "investigation":
+				walkMap(v, "調査")
 			}
 		}
 	}
@@ -514,6 +532,23 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			default:
 				add("%s: status は pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
 			}
+			// 調査は任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
+			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
+			if inv := pl.Investigation; inv != nil {
+				if strings.TrimSpace(inv.Scope) == "" {
+					add("%s: investigation.scope がありません (調べた範囲 — 実行したコマンドと目で読んだ対象)。範囲を書かない調査は未調査と区別できない", pn)
+				}
+				for _, kv := range []struct {
+					key  string
+					vals []string
+				}{{"included", inv.Included}, {"excluded", inv.Excluded}} {
+					for i, v := range kv.vals {
+						if strings.TrimSpace(v) == "" {
+							add("%s: investigation.%s[%d] が空です (箇所を書くか要素を消す)", pn, kv.key, i)
+						}
+					}
+				}
+			}
 			for _, d := range pl.DependsOn {
 				if d == pl.ProblemID {
 					add("%s: depends_on が自己参照しています", pn)
@@ -690,6 +725,14 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 					fmt.Fprintf(&b, "\n- **%s はリポジトリ外へ反映済み**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Notes))
 				}
 			}
+			// 直す前の調査の範囲と結果。次のレビューで同じ型の指摘が来たとき、前回の
+			// 調査漏れ (範囲の外だった) か新規かを判別する材料なので表の外に出す。
+			// 無い問題は出さない — 無いことが「未調査」の表現。
+			for _, pl := range run.Plans {
+				if pl.Investigation != nil {
+					fmt.Fprintf(&b, "\n- **%s の調査**: %s\n", recordCell(pl.ProblemID), renderInvestigation(pl.Investigation))
+				}
+			}
 		}
 
 		if run.Notes != "" {
@@ -777,6 +820,30 @@ func renderPlanCells(pl recordPlan) []string {
 		recordStatusJa(pl.Status),
 		sha,
 	}
+}
+
+// renderInvestigation は調査の範囲と結果を 1 行にする。included / excluded が
+// 両方空なら「波及先なし」と明示する — 範囲だけ出すと、調べて無かったのか
+// 結果を書き忘れたのかが読めない。
+func renderInvestigation(inv *recordInvestigation) string {
+	s := "範囲: " + recordCell(inv.Scope)
+	if len(inv.Included) == 0 && len(inv.Excluded) == 0 {
+		return s + " / 波及先なし"
+	}
+	join := func(items []string) string {
+		cells := make([]string, 0, len(items))
+		for _, it := range items {
+			cells = append(cells, recordCell(it))
+		}
+		return strings.Join(cells, "; ")
+	}
+	if len(inv.Included) > 0 {
+		s += " / 含めた: " + join(inv.Included)
+	}
+	if len(inv.Excluded) > 0 {
+		s += " / 含めなかった: " + join(inv.Excluded)
+	}
+	return s
 }
 
 // recordCell は表のセルに入れる文字列を 1 行に整える。

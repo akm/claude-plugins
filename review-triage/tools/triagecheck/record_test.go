@@ -140,6 +140,13 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"awaiting-human なのに notes がある", "        status: pending\n",
 			"        status: awaiting-human\n        options: 案 a / 案 b\n        notes: どこかへ反映した\n", "done-external 専用"},
 		{"depends_on の宙参照", "order: 1\n", "order: 1\n        depends_on: [P9]\n", "depends_on"},
+		// 調査は任意だが、書くなら範囲 (scope) が要る。範囲の無い調査は未調査と区別できない。
+		{"investigation に scope が無い", "order: 1\n",
+			"order: 1\n        investigation:\n          included: [docs/bar.md の同じ表]\n", "investigation.scope"},
+		{"investigation の included に空の要素", "order: 1\n",
+			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          included: [\"\"]\n", "investigation.included[0]"},
+		{"investigation の未知のキー", "order: 1\n",
+			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          found: [docs/bar.md]\n", "found"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
 		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
@@ -1085,6 +1092,70 @@ func TestReviewTriageRecordDoneExternalPasses(t *testing.T) {
 				t.Fatalf("正しい done-external で問題が出た: %v", problems)
 			}
 		})
+	}
+}
+
+// investigation は「調査済みで波及なし」(scope だけ) と「見つけた箇所あり」の
+// どちらの形でも通る。無いことが未調査の表現なので、無い記録も通る (validRecordYAML)。
+func TestReviewTriageRecordInvestigationPasses(t *testing.T) {
+	cases := []struct {
+		name string
+		new  string
+	}{
+		{"scope だけ (波及先なし)", "order: 1\n" +
+			"        investigation:\n" +
+			"          scope: grep -rn '分母' . と docs/foo.md の同じ表の全行\n"},
+		{"含めた箇所と含めなかった箇所", "order: 1\n" +
+			"        investigation:\n" +
+			"          scope: grep -rn '分母' . と docs/foo.md の同じ表の全行\n" +
+			"          included: [docs/foo.md:22 の同じ表の別の行]\n" +
+			"          excluded: [docs/baz.md:5 は数えていない見積りなので原因が違う]\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := strings.Replace(validRecordYAML, "order: 1\n", tc.new, 1)
+			if mutated == validRecordYAML {
+				t.Fatal("フィクスチャの置換が効いていない")
+			}
+			files, read := recordFiles(t, mutated)
+			if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+				t.Fatalf("正しい investigation で問題が出た: %v", problems)
+			}
+		})
+	}
+}
+
+// 調査の範囲と結果はサマリの表の外に出る。included / excluded が両方空なら
+// 「波及先なし」と明示し、無い問題には何も出さない (未調査)。
+func TestReviewTriageSummaryInvestigation(t *testing.T) {
+	render := func(t *testing.T, yamlSrc string) string {
+		t.Helper()
+		summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(yamlSrc))
+		if err != nil {
+			t.Fatalf("サマリの生成に失敗: %v", err)
+		}
+		return summary
+	}
+	if summary := render(t, validRecordYAML); strings.Contains(summary, "の調査**") {
+		t.Fatalf("investigation の無い問題に調査の行が出ている:\n%s", summary)
+	}
+	scopeOnly := strings.Replace(validRecordYAML, "order: 1\n",
+		"order: 1\n        investigation:\n          scope: grep -rn '分母' .\n", 1)
+	summary := render(t, scopeOnly)
+	if !strings.Contains(summary, "- **P1 の調査**: 範囲: grep -rn '分母' . / 波及先なし") {
+		t.Fatalf("scope だけの調査が「波及先なし」として出ていない:\n%s", summary)
+	}
+	withFound := strings.Replace(validRecordYAML, "order: 1\n",
+		"order: 1\n        investigation:\n          scope: grep -rn '分母' .\n"+
+			"          included: [\"docs/foo.md:22 | 同じ表\", docs/foo.md:30]\n"+
+			"          excluded: [docs/baz.md:5 は見積り]\n", 1)
+	summary = render(t, withFound)
+	want := "- **P1 の調査**: 範囲: grep -rn '分母' . / 含めた: docs/foo.md:22 \\| 同じ表; docs/foo.md:30 / 含めなかった: docs/baz.md:5 は見積り"
+	if !strings.Contains(summary, want) {
+		t.Fatalf("%q がサマリに無い:\n%s", want, summary)
+	}
+	if strings.Contains(summary, "波及先なし") {
+		t.Fatalf("見つけた箇所があるのに「波及先なし」が出ている:\n%s", summary)
 	}
 }
 
