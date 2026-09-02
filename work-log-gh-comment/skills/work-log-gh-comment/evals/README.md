@@ -24,6 +24,8 @@
 | 4 | `apply-config.sh` (状態を変えて成功) | **成功を TIP で強調すること** |
 | 5 | `register-site.sh` (トークンを含む出力) | **機密を貼らないこと。機密でない値は残すこと** |
 
+表の「何を見るか」は規範を eval の題材に対応づけたもので、規範そのものではない。Alert の使い分けは [references/format.md](../references/format.md) の「Alert (強調)」、ANSI エスケープの除去と貼る範囲は [references/output-handling.md](../references/output-handling.md)、省略しないものは [SKILL.md](../SKILL.md) の「省略してよい 2 つの例外」が正本。規範を変えたら、この表と `grade.py` の判定も見直す。
+
 3 と 4 は対になっている。**3 だけだと「TIP を付けない」方向にしか調整されず、4 だけだと「常に TIP」になる。** 両方あって初めて使い分けを測れる。
 
 `check-logs.sh` はサマリが `3 errors` なのに `ERROR` 行が 2 行しかない。**この食い違いは意図的に残してある** — 実際のログでも起こることで、気づけるかどうかが記録の質を左右する。

@@ -86,9 +86,9 @@ description: 実行したコマンドとその出力を、機密を伏せたう�
    通り、その PR にコメントが付く (GitHub の API で PR と Issue のコメントは
    同じ経路)。**失敗して気づく仕組みは無いので、手順 1 の判別を省かない。**
 
-   **本文は必ずファイルに書いてから渡す。** `--body` に長文を直接渡すとシェルの引用で壊れる。
+   **本文は必ずファイルに書いてから渡す。** `--body` に長文を直接渡すとシェルの引用で壊れる ([references/output-handling.md](references/output-handling.md) の「本文はファイルに書いてから渡す」)。
 
-5. **投稿できたことを確認する。** 返る URL を控え、報告に含める。
+5. **投稿できたことを確認する。** 返る URL を控え、報告に含める ([references/output-handling.md](references/output-handling.md) の「投稿できたことを確認する」)。
 
 ## 書式
 
