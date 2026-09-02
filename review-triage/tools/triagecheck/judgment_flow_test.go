@@ -29,7 +29,7 @@ func judgmentFlowRead(content string) func(string) ([]byte, error) {
 }
 
 func TestJudgmentFlowConsistentPasses(t *testing.T) {
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(judgmentFlowFixture))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(judgmentFlowFixture), "")
 	if len(problems) != 0 {
 		t.Fatalf("一致しているのに問題が出た: %v", problems)
 	}
@@ -39,7 +39,7 @@ func TestJudgmentFlowDiagramOnlyID(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture,
 		"  D1 -- 当たる --> A2\n",
 		"  D1 -- 当たる --> A2\n  A2 --> D9\n", 1)
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "D9") && strings.Contains(p, "図") {
@@ -53,7 +53,7 @@ func TestJudgmentFlowDiagramOnlyID(t *testing.T) {
 
 func TestJudgmentFlowTableOnlyID(t *testing.T) {
 	content := judgmentFlowFixture + "| H9 | 決着 | 保留 | verdict |\n"
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "H9") && strings.Contains(p, "表") {
@@ -67,7 +67,7 @@ func TestJudgmentFlowTableOnlyID(t *testing.T) {
 
 func TestJudgmentFlowDuplicateTableRow(t *testing.T) {
 	content := judgmentFlowFixture + "| A2 | 決着 | 重複 | verdict |\n"
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "A2") && strings.Contains(p, "重複") {
@@ -88,7 +88,7 @@ func TestJudgmentFlowIgnoresCommentsAndColors(t *testing.T) {
 	content = strings.Replace(content,
 		"  style A2 fill:#16a34a2e\n",
 		"  style A2 fill:#A12,stroke:#16A34A2E\n", 1)
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	if len(problems) != 0 {
 		t.Fatalf("コメント行の D9 や色コード #A12 が ID として数えられた: %v", problems)
 	}
@@ -99,7 +99,7 @@ func TestJudgmentFlowIgnoresCommentsAndColors(t *testing.T) {
 func TestJudgmentFlowStyleOnlyNodeIsNotSatisfied(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture, "  A2[\"A2: 採択\"]\n", "", 1)
 	content = strings.Replace(content, "  D1 -- 当たる --> A2\n", "", 1)
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "A2") && strings.Contains(p, "図にありません") {
@@ -117,7 +117,7 @@ func TestJudgmentFlowTabSeparatedDecoration(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture, "  A2[\"A2: 採択\"]\n", "", 1)
 	content = strings.Replace(content, "  D1 -- 当たる --> A2\n", "", 1)
 	content = strings.Replace(content, "  style A2 fill:#16a34a2e\n", "  style\tA2 fill:#16a34a2e\n", 1)
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "A2") && strings.Contains(p, "図にありません") {
@@ -134,7 +134,7 @@ func TestJudgmentFlowTableSpacingVariants(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture,
 		"| D1 | 判定 | 分類に当たるか | category |\n",
 		"|D1| 判定 | 分類に当たるか | category |\n", 1)
-	if problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content)); len(problems) != 0 {
+	if problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), ""); len(problems) != 0 {
 		t.Fatalf("空白を詰めた表の行の ID が収集されない: %v", problems)
 	}
 }
@@ -145,7 +145,7 @@ func TestJudgmentFlowHeaderRowNotCounted(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture,
 		"| ID | 種類 | 条件・内容 | 記録に書くもの |\n",
 		"| D1 | 種類 | 条件・内容 | 記録に書くもの |\n", 1)
-	problems := judgmentFlowProblems(nil, judgmentFlowRead(content))
+	problems := judgmentFlowProblems(nil, judgmentFlowRead(content), "")
 	for _, p := range problems {
 		if strings.Contains(p, "重複") {
 			t.Fatalf("見出し行の D1 が本体行として数えられ、偽の重複が報告された: %v", p)
@@ -155,7 +155,7 @@ func TestJudgmentFlowHeaderRowNotCounted(t *testing.T) {
 
 func TestJudgmentFlowMissingDiagram(t *testing.T) {
 	content := "# 判定フロー\n\n| ID | 種類 |\n| --- | --- |\n| D1 | 判定 |\n"
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	if len(problems) == 0 {
 		t.Fatalf("mermaid の図が無いのに問題が出ない")
 	}
@@ -164,7 +164,7 @@ func TestJudgmentFlowMissingDiagram(t *testing.T) {
 // readFile の失敗は問題として報告される (黙って緑にしない)。
 func TestJudgmentFlowReadError(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, os.ErrPermission }
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, read)
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, read, "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "読み込みに失敗") {
@@ -179,7 +179,7 @@ func TestJudgmentFlowReadError(t *testing.T) {
 // mermaid はあるが決定表の行が 1 つも無い場合は報告される。
 func TestJudgmentFlowMissingTable(t *testing.T) {
 	content := "# 判定フロー\n\n```mermaid\nflowchart TD\n  D1{\"D1: x\"}\n```\n"
-	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content))
+	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")
 	found := false
 	for _, p := range problems {
 		if strings.Contains(p, "決定表") {
@@ -194,17 +194,39 @@ func TestJudgmentFlowMissingTable(t *testing.T) {
 // git 追跡に依らず、ファイルが読めれば検査する — 追跡前の判定フローが
 // 素通りする「0 件マッチで黙って緑」の型 (B1 と同じ) を塞ぐ。
 func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
-	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"))
+	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"), "")
 	if len(problems) == 0 {
 		t.Fatalf("追跡外でも読める判定フローが検査されない")
 	}
 }
 
 // ファイルがそもそも無いリポジトリ (スキル未導入) では検査は黙って通る。
+// 在り処の指定が無い (origin が空) ときだけの扱いであることは、次のテストが対にする。
 func TestJudgmentFlowAbsentFileSkipped(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, fs.ErrNotExist }
-	problems := judgmentFlowProblems(nil, read)
+	problems := judgmentFlowProblems(nil, read, "")
 	if len(problems) != 0 {
 		t.Fatalf("対象ファイルが無いのに問題が出た: %v", problems)
+	}
+}
+
+// 在り処を指定したのにファイルが無いなら報告する。指定は「そこを検査せよ」という
+// 意思表示なので、黙って通すと検査が無効になったことに気づけない (診断ツールの偽陰性)。
+// 報告にはどちらの指定を直せばよいか (origin) を載せる — 解決の経路が 2 つあるため。
+func TestJudgmentFlowAbsentFileReportedWhenOriginGiven(t *testing.T) {
+	read := func(_ string) ([]byte, error) { return nil, fs.ErrNotExist }
+	for _, origin := range []string{"-judgment-flow", "CLAUDE_PLUGIN_ROOT"} {
+		t.Run(origin, func(t *testing.T) {
+			problems := judgmentFlowProblems(nil, read, origin)
+			if len(problems) != 1 {
+				t.Fatalf("指定したパスが不在なのに報告が 1 件でない: %v", problems)
+			}
+			if !strings.Contains(problems[0], origin) {
+				t.Fatalf("報告に指定の出所 %q が無い: %q", origin, problems[0])
+			}
+			if !strings.Contains(problems[0], judgmentFlowPath) {
+				t.Fatalf("報告に対象のパスが無い: %q", problems[0])
+			}
+		})
 	}
 }

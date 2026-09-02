@@ -16,8 +16,23 @@ import (
 )
 
 // wrapperTemplate はラッパースクリプトの雛形。%s は順に
-// (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値, (3) -judgment-flow に
-// 焼き込む値 (空なら省略) が入る。
+// (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値 (script_dir からの相対),
+// (3) -judgment-flow に焼き込む値 (空なら省略) が入る。
+//
+// 基準には $PWD ではなく script_dir (ラッパー自身の実体の位置) を使う。$PWD は
+// シェルが更新する慣習にすぎず、非シェルの親 (CI ランナー・cron・make -C) が
+// chdir すると古いままになるので、利用者が叩いた場所を指すとは限らない。
+// ラッパーはリポジトリの中に置かれるので自分の位置を知っており、推測が要らない。
+//
+// ただし「自分の位置」は実体の位置でなければならない。dirname "$0" はリンクを
+// 解決しないので、PATH 上などに張ったリンク経由で起動すると基準がリンクの置き場に
+// なり、その隣に別の置き場があるとそちらを検査して緑を返す (基準が検査対象から
+// 切り離される点で、絶対パスを焼き込む案を退けたのと同じ型)。リンクを辿ってから
+// 基準を求める。realpath 一発でも解けるが POSIX ではなく古い macOS に無いため、
+// bash 組み込みと readlink だけで済むループを使う。
+//
+// 置き場を絶対パスで焼き込む案は採らない。リポジトリを移動・再クローンすると
+// 移動元を検査して緑を返し、移動先の壊れた記録を見逃す (実測)。
 //
 // PLUGIN_CACHE の解決 (最新版を拾う) は Makefile の例と同じロジック。ここを
 // 変えるときは README の「Makefile に置く例」も合わせて直す。
@@ -25,6 +40,17 @@ const wrapperTemplate = `#!/usr/bin/env bash
 # review-triage/tools/triagecheck -install-wrapper が生成した。手で編集しない
 # (再生成すると上書きされる)。
 set -eu -o pipefail
+
+# 基準はこのスクリプト自身の位置。$PWD は叩いた場所によって変わるので使わない。
+# シンボリックリンク経由で起動されても実体の位置を採る — dirname "$0" だけでは
+# リンクの置き場が基準になり、その隣に別の置き場があるとそちらを検査してしまう。
+script_src=$0
+while [ -L "$script_src" ]; do
+  link_dir=$(cd -P "$(dirname "$script_src")" && pwd)
+  script_src=$(readlink "$script_src")
+  case $script_src in /*) ;; *) script_src=$link_dir/$script_src;; esac
+done
+script_dir=$(cd -P "$(dirname "$script_src")" && pwd)
 
 plugin_cache=%q
 root=$(ls -d "$plugin_cache"/*/ 2>/dev/null | sort -V | tail -1)
@@ -34,26 +60,44 @@ if [ -z "$root" ]; then
 fi
 
 exec go run -C "$root/tools/triagecheck" . \
+  -current-dir "$script_dir" \
   -record-dir %q \
 %s  "$@"
 `
 
-// installWrapper はラッパースクリプトを path に書き出す。recordDir は
-// 呼び出し時点の -record-dir の値をそのまま焼き込む (相対パスならカレント
-// ディレクトリ基準のまま埋め込まれる — 呼び出し元が意図して相対指定した
-// ときにそれを尊重するため、ここで絶対パス化はしない)。
+// installWrapper はラッパースクリプトを path に書き出す。
 //
-// judgmentFlow が明示されていれば同様に焼き込み、空なら
-// -judgment-flow は付けず、プラグイン展開先の既定パス
-// (skills/review-triage/references/judgment-flow.md) を使わせる。
+// 3 つの引数はすべて解決済みの絶対パス (規則は run の resolveInputs が経路の
+// 分岐より前に当てる)。ここではパスを検査しない — 検査を持つと、検査の経路と
+// 別の条件で同じ規則を書き直すことになり、同じ入力に経路ごとに違う契約ができる。
+//
+// recordDir は「ラッパーの置き場 (script_dir) から見た相対パス」に変換して
+// 焼き込む。絶対パスを焼き込まないのは、リポジトリを移動・再クローンすると
+// 移動元を検査して緑を返すため。
+//
+// judgmentFlow が非空なら絶対パスのまま焼き込み、空なら -judgment-flow は付けず、
+// プラグイン展開先の既定パス (skills/review-triage/references/judgment-flow.md) を
+// 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
+// resolveInputs が弾く。
 func installWrapper(path, recordDir, judgmentFlow string) error {
 	pluginCache, err := pluginCacheDir()
 	if err != nil {
 		return err
 	}
 
+	// 焼き込む -record-dir を script_dir 基準の相対にする。
+	scriptDir := filepath.Dir(path)
+	relRecordDir, err := filepath.Rel(scriptDir, recordDir)
+	if err != nil {
+		return fmt.Errorf(
+			"%s: 記録の置き場をラッパーの位置 (%s) からの相対パスにできません: %w", recordDir, scriptDir, err)
+	}
+	recordDir = filepath.ToSlash(relRecordDir)
+
 	judgmentFlowLine := "  -judgment-flow \"$root/skills/review-triage/references/judgment-flow.md\" \\\n"
 	if judgmentFlow != "" {
+		// 判定フローはリポジトリの外 (プラグインの展開先) にあるので、script_dir
+		// 基準の相対にしても意味が無い。絶対パスで焼き込む。
 		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", judgmentFlow)
 	}
 

@@ -683,7 +683,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := listReviewTriageFiles(dir)
+	got, err := listReviewTriageFiles(dir, false)
 	if err != nil {
 		t.Fatalf("一覧に失敗: %v", err)
 	}
@@ -737,9 +737,30 @@ func TestInReviewTriageDirNotationVariants(t *testing.T) {
 }
 
 func TestListReviewTriageFilesMissingDir(t *testing.T) {
-	got, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"))
+	got, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"), false)
 	if got != nil || err != nil {
 		t.Fatalf("無いディレクトリはスキル未導入としてスキップする (nil, nil) べき: %v, %v", got, err)
+	}
+}
+
+// 置き場を明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
+// 意思表示なので、記録 0 件として黙って緑を返すと、置き場を移した時点で検査が
+// 無効になったことに気づけない (診断ツールの偽陰性)。
+func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
+	_, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"), true)
+	if err == nil {
+		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")
+	}
+	if !strings.Contains(err.Error(), "-record-dir") {
+		t.Fatalf("エラーにどの指定を直せばよいかが無い: %v", err)
+	}
+}
+
+// -write-summary も同じ — 明示指定した置き場が無いなら、0 件生成して
+// 黙って成功させない (生成されなかったことに気づけないため)。
+func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
+	if err := writeReviewTriageSummaries(filepath.Join(t.TempDir(), "no-such"), true); err == nil {
+		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")
 	}
 }
 
@@ -750,7 +771,7 @@ func TestListReviewTriageFilesErrorReported(t *testing.T) {
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := listReviewTriageFiles(file); err == nil {
+	if _, err := listReviewTriageFiles(file, false); err == nil {
 		t.Fatalf("ディレクトリでないパスの読み取りエラーが握りつぶされた")
 	}
 }
@@ -765,7 +786,7 @@ func TestWriteReviewTriageSummariesSkipsReadme(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(norm), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeReviewTriageSummaries(dir); err != nil {
+	if err := writeReviewTriageSummaries(dir, false); err != nil {
 		t.Fatalf("生成に失敗: %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(dir, "README.md"))
@@ -784,7 +805,7 @@ func TestWriteReviewTriageSummaries(t *testing.T) {
 	if err := os.WriteFile(yamlPath, []byte(validRecordYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeReviewTriageSummaries(dir); err != nil {
+	if err := writeReviewTriageSummaries(dir, false); err != nil {
 		t.Fatalf("生成に失敗: %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(dir, "feat-x.md"))

@@ -1,0 +1,2864 @@
+runs:
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: full
+    head: 450dc70
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main.go
+        line: 72
+        summary: >-
+          相対パスの -record-dir が、実在する置き場に対して「存在しません」と誤報して非 0 になる。
+          go run -C がカレントをツール側へ移すため相対パスが誤解決され、不在をエラーにしたことで
+          偽陽性の失敗として表面化した。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -record-dir に相対パスを渡して go run -C 経由で実行したとき
+          who: operator
+          what: >-
+            置き場が実在するのに「存在しません」と報告して非 0 で終わる。記録の検査が
+            まったく行われず、CI が赤で止まる
+          detectability: >-
+            気づくが、原因にたどり着けない。メッセージは実在する置き場を「存在しない」と言うため、
+            利用者は自分の指定が正しいのに疑うことになる
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。一時ディレクトリに recs を作り go run -C 経由で
+          -record-dir recs を渡すと exit 1、同じ状態で絶対パスなら exit 0。
+          修正前 (6dbc66f) を git archive で展開して同じ呼び出しを行うと exit 0 で、
+          0 -> 1 の退行であることも確かめた。全ゲートを評価して発火 0 件
+          (再現済みで仮定でない / 環境の異常でなく対象は利用者が使うツール /
+          修正は相対パスの絶対化で対象より小さい / 赤くなる関門を挙げられない)
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 60
+        summary: >-
+          相対 -record-dir で生成したラッパーは指摘 1 の経路をそのまま踏むため、生成直後から
+          常に偽陽性で落ちる。生成済みラッパーを持つ利用者が、自分の側を変えていないのに CI が赤くなる。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -install-wrapper に相対の -record-dir を渡して生成したラッパーを使っているとき
+          who: operator
+          what: 利用側が何も変えていないのに CI が赤くなり、記録の検査は一切行われない
+          detectability: >-
+            気づく (CI が赤くなる) が、プラグインを更新しただけで壊れるため原因が分かりにくい。
+            wrapper_test.go は生成物の文字列だけを検査して実行しないので、この破壊を検出しない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で端から端まで再現した。プラグインキャッシュ配置を実体のコピーで模し、
+          -record-dir docs/review-triages (相対) でラッパーを生成、実在する置き場を持つ
+          リポジトリで実行して exit 1 を確認した。wrapper.go のコメントが相対指定を
+          意図的に尊重すると述べており、wrapper_test.go も相対パスを渡している。
+          全ゲートを評価して発火 0 件。指摘 1 と同じ原因なので修正時は束ねる
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/main.go
+        line: 103
+        summary: >-
+          -judgment-flow は flag.Visit ではなく空文字比較で指定の有無を判定しているため、
+          -judgment-flow "" と明示指定すると「指定なし」に化け、不在が黙って通る。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -judgment-flow に空文字を明示指定し、CLAUDE_PLUGIN_ROOT が未設定のとき
+          who: operator
+          what: 判定フローの検査が一切走らないまま緑になる。この修正が塞いだはずの穴が残る
+          detectability: >-
+            気づかない。exit 0 で検査名まで出力されるため、走ったのか走らなかったのか区別できない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。env -u CLAUDE_PLUGIN_ROOT で -judgment-flow "" を渡すと exit 0、
+          /nonexistent を渡すと exit 1。main.go:45-48 のコメントが -record-dir について
+          まさにこの型を避けると宣言しているのに、もう一方のフラグに同じ穴が残っている。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 4
+        file: review-triage/tools/triagecheck/main.go
+        line: 61
+        summary: >-
+          -record-dir "" を明示指定すると path.Clean("") が "." に畳まれ、カレントは常に実在するため
+          不在検査が空振りし、記録 0 件のまま緑になる。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -record-dir に空文字を明示指定したとき
+          who: operator
+          what: >-
+            指定した置き場が検査されないまま合格する。この修正が塞ごうとした失敗の形が
+            そのまま残る
+          detectability: 気づかない。exit 0 で検査名まで出力される
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。記録の無い一時ディレクトリで -record-dir "" を渡すと exit 0。
+          explicit["record-dir"] は true になるが (flag.Visit は値を見ない)、"." が実在するため
+          ErrNotExist の分岐に入らない。全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 5
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 64
+        summary: >-
+          -write-summary が explicit を受け渡す配線 (main.go:64) を検査するテストが無く、
+          配線を壊しても全テストが通る。
+        category: test
+        audience: operator
+        audience_initial: developer
+        consequence:
+          condition: 将来この配線を壊す変更が入ったとき
+          who: operator
+          what: >-
+            -write-summary で明示指定した置き場が無いのに黙って成功する挙動が復活し、
+            テストは緑のまま通る
+          detectability: >-
+            気づかない。既存の TestWriteReviewTriageSummariesMissingDirExplicit は
+            writeReviewTriageSummaries を直接呼ぶので、run 経由の配線の破壊を捕まえない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門 (テスト) が配線の破壊を検出しないこと、すなわち
+          検出能力の欠落を主張している。条件 2: 3 層から候補を挙げていずれも検出しない —
+          Makefile はこのリポジトリに存在しない / 検査項目は review-triage-record と
+          judgment-flow の 2 つでどちらもツール自身の配線を見ない / テスト関数は
+          TestWriteReviewTriageSummariesMissingDirExplicit が直接呼び出しのみで run を経由しない。
+          自分でもミューテーションを実行し、配線を false に固定しても全テストが通ることを確認した。
+          audience は developer が初期値だが、配線の破壊が利用者の検査を無効化するので operator へ上書き
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 6
+        file: review-triage/tools/triagecheck/README.md
+        line: 50
+        summary: >-
+          README の「既定のまま実行する場合の挙動は変わらない」が、CLAUDE_PLUGIN_ROOT が
+          設定された環境では偽になる。直前の表は例外を書いているのに、この一文が打ち消している。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: CLAUDE_PLUGIN_ROOT が設定された環境で、フラグを付けずに実行したとき
+          who: operator
+          what: >-
+            README を読んで「既定のままなら安全」と判断した利用者の CI が、更新後に非 0 で落ちる。
+            意図した非互換なのに、文書が予告していない
+          detectability: >-
+            気づく (CI が赤くなる) が、README が安全と書いているため原因の切り分けが遅れる
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で矛盾する 2 箇所を逐語で確認した。README:47 は
+          「CLAUDE_PLUGIN_ROOT から解決した | 報告して非 0 で終わる」、README:50 は
+          「既定のまま実行する場合の挙動は変わらない」。フラグ無しで
+          CLAUDE_PLUGIN_ROOT=/nonexistent を与えると exit 1、env -u なら exit 0 を自分で再現した。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 7
+        file: review-triage/tools/triagecheck/main.go
+        line: 72
+        summary: >-
+          -record-dir の不在が error で即 return するため、-judgment-flow も同時に不在のとき
+          判定フローの問題が 1 件も報告されない。片方を直して再実行するまで気づけない。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -record-dir と -judgment-flow の両方に不在のパスを指定したとき
+          who: operator
+          what: >-
+            judgment-flow の不在が報告されず、record-dir を直して再実行するまで
+            もう一方も壊れていることを知れない
+          detectability: >-
+            気づく (非 0 で落ちる) が、問題が 1 つだと誤認する。往復が増えるだけで守りは外れない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。両方を不在で指定すると出力は record-dir の 1 行だけで、
+          judgment-flow の報告は含まれない。片方だけ不在なら judgment-flow は報告される。
+          judgment-flow 側は problems に積んで検査を続ける設計なので、非対称が実害を生む。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 8
+        file: review-triage/tools/triagecheck/README.md
+        line: 123
+        summary: >-
+          README のテスト件数が実際と食い違う (89 と書いてあるが実際は 121)。
+          テストを追加したのに件数の記述を更新していない。
+        category: doc-user
+        audience: operator
+        audience_initial: operator
+        consequence:
+          condition: README のテスト件数を信じて数を引用・検算するとき
+          who: operator
+          what: 実際と違う数を読む。README 自身が数え方のコマンドを書いているのでその場で偽と分かる
+          detectability: >-
+            気づく。README が指定するコマンドを実行すれば即座に食い違いが出る
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で README が指定するコマンド (go test -v ./... | grep -c 'PASS:') を
+          実行し 121 を得た。README:123 は 89。全ゲートを評価して発火 0 件
+          (実行で再現でき仮定でない / 対象は利用者が読む文書 / 修正は数字 1 つで不相応でない /
+          この食い違いを検出する関門を挙げられない — 件数を検算する検査は無い)
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          -record-dir を絶対化しないまま使い、go run -C がカレントをツール側へ移すことを
+          考慮しなかった。修正前は不在が nil, nil に潰れて表面化しなかったが、不在を
+          エラーにしたことで偽陽性の失敗として現れた
+        finding_ids: [1, 2]
+        approach: >-
+          -record-dir をプロセス起動時のカレント基準で絶対化してから reviewTriageDir に入れる。
+          誤解決そのものを断つので、修正前から残っていた「相対指定では何も検査していない」状態も
+          同時に直る。ラッパー (#2) は同じ経路を踏むだけなので、この修正で直る。
+          相対指定が正しく検査されることの回帰テストを足す
+        order: 1
+        sha: 2a982b7
+        status: done
+      - problem_id: P2
+        cause: >-
+          指定の有無を「値が空か」で判定する箇所を残した。flag.Visit を -record-dir にだけ
+          適用し、-judgment-flow と空文字の畳み込みに同じ判断を適用しなかった
+        finding_ids: [3, 4]
+        approach: >-
+          -judgment-flow も explicit["judgment-flow"] で判定し、空文字の明示指定を
+          「指定なし」に化けさせない。-record-dir "" は path.Clean が "." に畳む前に
+          指定として扱う。両方の空文字指定の回帰テストを足す
+        order: 2
+        depends_on: [P1]
+        sha: 40b9b3e
+        status: done
+      - problem_id: P3
+        cause: >-
+          関数を直接呼ぶテストしか書かず、run から検査へ explicit を渡す配線を通る経路を
+          固定しなかった
+        finding_ids: [5]
+        approach: >-
+          run 経由で -write-summary と不在の -record-dir を渡してエラーになることを
+          main_test.go で固定する。配線を false に固定すると落ちることを確認する
+        order: 3
+        sha: e55662c
+        status: done
+      - problem_id: P4
+        cause: >-
+          挙動を変えたのに README を追随させなかった。後方互換の主張は例外を書いた表の直後で
+          それを打ち消しており、テスト件数はテストを足したのに古い値のまま残った
+        finding_ids: [6, 8]
+        approach: >-
+          「既定のまま実行する場合の挙動は変わらない」を、CLAUDE_PLUGIN_ROOT が設定された
+          環境は例外だと明記する文に直す。テスト件数は README 自身が指定するコマンドで
+          数え直す。2 件は同じ「文書を追随させなかった」原因なので 1 問題にする
+        order: 4
+        sha: a9ad0d8
+        status: done
+      - problem_id: P5
+        cause: >-
+          置き場の不在だけを error で即 return する形にし、problems に積む judgment-flow 側と
+          扱いを揃えなかった
+        finding_ids: [7]
+        approach: >-
+          置き場の不在も problems に積み、両方の不在を 1 回の実行で報告する。
+          両方不在のとき 2 件報告されることのテストを足す
+        order: 5
+        sha: ca8fafe
+        status: done
+    notes: >-
+      レビューは報告のみで走った (head 450dc70 が現在の HEAD と一致、作業ツリーは不変)。
+      8 件すべてを自分で再現して段 A を通した。指摘 1 と 2 は同じ原因 (相対パスが
+      go run -C のカレント移動で誤解決される) で、修正が「黙って緑」を「誤って赤」に
+      変えた退行である。修正前の緑は検査を何もしていない状態だったので、直すべきは
+      不在の判定ではなく相対パスの解決の側にある。
+      依頼文で重点として挙げた 4 点はすべて指摘になった — 後方互換の主張 (#1 #6)、
+      ラッパーとの相互作用 (#2)、エラー経路の非対称 (#7)、テストの取りこぼし (#5)。
+      踏み込んだ点として挙げた 3 つのうち、flag.Visit の採用自体は正しかったが、
+      同じ判断を -judgment-flow に適用し忘れていた (#3)。
+      residual の 3 件に目を通した。1 つ目 (-record-dir の不在メッセージがパスを本文に
+      持たず呼び出し元の接頭辞に依存) は writeReviewTriageSummaries 経由でパスが出ない
+      という指摘で、#1 の修正と同じ箇所を触るので併せて見る。2 つ目 (origin を型で狭める)
+      はリファクタ提案として 1 件のみ挙げられたもの。3 つ目 (-record-dir がファイルを指すと
+      ENOTDIR が露出) はメッセージの一貫性のみで守りは外れない。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: c8904d7
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main.go
+        line: 143
+        summary: >-
+          $PWD が呼び出し元の実カレントと食い違う状況で、検査対象が別のディレクトリへ
+          すり替わり緑のまま素通りする。シェルを経ない親 (CI ランナー・cron) が chdir すると
+          $PWD は更新されないため、作為なしに起きる。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            シェルを経ない親プロセスが chdir してから起動したとき ($PWD が更新されない)。
+            CI ランナー・cron・ラッパースクリプト経由の実行が該当する
+          who: operator
+          what: >-
+            実カレントと違う場所を検査して緑になる。実測では repoB を検査すべき実行が
+            repoA を見て exit 0 になり、repoB にある 3 件の実問題が報告されなかった
+          detectability: >-
+            気づかない。exit 0 で検査名まで出力され、指定した置き場が見られていないことを
+            知らせる経路が無い。TestAbsFromCallerDir は $PWD を使う現在の挙動を固定する側なので
+            検出しない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で 2 通り再現した。(1) PWD だけ差し替えると、recs を持たないカレントから
+          実行しても decoy 側を見て exit 0。(2) python3 で os.chdir してから起動する
+          (非シェルの親) と、実カレント repoB でなく $PWD の repoA を検査して exit 0 になり、
+          同じ repoB を絶対パスで検査すると 3 件報告される。全ゲートを評価して発火 0 件
+          (再現済みで仮定でない / 環境の異常でなく通常の CI の起動形態 / 修正は基準の
+          決め方を変えるだけで対象より小さい / 赤くなる関門を挙げられない)。
+          この修正が塞ごうとした「黙って緑」を、別の経路で作り直している
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/main.go
+        line: 150
+        summary: >-
+          $PWD が無い / 相対 / 実在しないときのフォールバック (filepath.Abs) は、
+          go run -C が移した先であるツール自身のディレクトリを基準にする。
+          P1 で断ったはずの誤解決がフォールバックに落ちた瞬間に復活する。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: env -u PWD など $PWD が使えない状態で相対の -record-dir を渡したとき
+          who: operator
+          what: >-
+            ツールのディレクトリ配下を検査する。偶然そこに同名のディレクトリがあれば
+            誤った場所を検査して緑になり、無ければ実在する置き場を不在と誤報する
+          detectability: 誤報側は気づくが原因が分からない。緑になる側は気づかない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。env -u PWD で相対指定すると、解決先が
+          ツール側の tools/triagecheck/recs/ になり呼び出し元の実在する recs に届かない。
+          同じ関数の doc コメント自身が「Getwd はツール側を指す」と述べており、
+          そこへ意図的に落としている。全ゲートを評価して発火 0 件。指摘 1 と同じ原因
+          (基準の決め方) なので修正時は束ねる
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/main.go
+        line: 59
+        summary: >-
+          空のパスを弾く検査が -install-wrapper の分岐より手前にあるため、
+          -install-wrapper -judgment-flow "" が拒否される。wrapper.go では空の judgmentFlow が
+          「$root からの既定パスを使う」正当な意味を持つ。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -install-wrapper に -judgment-flow "" を明示して渡したとき
+          who: operator
+          what: >-
+            450dc70 では通っていた正当な呼び出しが非 0 で落ちる。空の judgmentFlow は
+            検査する場所ではなく「既定を使え」の意味なので、弾く理由が無い
+          detectability: 気づく (非 0 で落ちる) が、なぜ拒否されるかは分からない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。-install-wrapper -judgment-flow "" は現在 exit 1、
+          450dc70 のソースでは exit 0 で正しい既定パスを焼き込んでいた。
+          wrapper.go:55-58 が空を既定の意味で扱っていることも逐語で確認した。
+          全ゲートを評価して発火 0 件。空文字を弾く判断自体は検査経路では正しく、
+          -install-wrapper がパスを検査しない経路であることを見落としたもの
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 4
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 38
+        summary: >-
+          TestRunFailsOnMissingExplicitPaths が報告メッセージの文言に結合しており、
+          挙動を変えない表記の変更だけで落ちる (過検出)。
+        category: test
+        audience: developer
+        consequence:
+          condition: 報告の書式を挙動を変えずに書き換えたとき
+          who: developer
+          what: 無関係なテストが落ち、変更が壊したのか文言に結合しているだけかの切り分けが要る
+          detectability: 気づく (テストが落ちる) が、偽の赤なので原因の切り分けに時間を取られる
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で確認した。件数・exit code・stderr の内容を変えずに書式だけを
+          変えると当該テストだけが落ち、TestRunReportsBothMissingPaths は通ったまま。
+          判定の第 1 項 (フラグ名を含む) は problems 経由の報告では成立しないので、
+          実質は文言依存になっている。全ゲートを評価して発火 0 件。免除条項は条件 1 を
+          満たさない — 指摘は検出能力の欠落ではなく過検出を述べているため
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 5
+        file: review-triage/tools/triagecheck/README.md
+        line: 125
+        summary: >-
+          README のテスト件数が実測と 1 件食い違う。前回 #8 で 89 から 132 に直したが、
+          同じ増分内で追加したテストの分だけ再びずれた。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: README のテスト件数を信じて数を引用・検算するとき
+          who: operator
+          what: 実際と違う数を読む。README 自身が数え方を書いているのでその場で偽と分かる
+          detectability: 気づく。README が指定するコマンドを実行すれば即座に出る
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で README が指定するコマンドを実行し 133 を得た。README:125 は 132。
+          全ゲートを評価して発火 0 件 (件数を検算する関門は無い)。
+          前回の修正時に数え直した値が、同じ増分で足したテストの分だけ古くなった
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P6
+        cause: >-
+          相対パスの基準を、プロセス自身が知る事実 (実カレント) ではなく外から渡される
+          環境変数 ($PWD) に求めた。go run -C がカレントを移す制約への対処を、
+          呼び出し元の情報を推測する方向で解こうとした
+        finding_ids: [1, 2]
+        approach: >-
+          $PWD への依存をやめ、基準が要るなら呼び出し元に明示させる。-current-dir を足し、
+          パスは絶対で解決できなければエラーにする。人間が選んだ仕様は次のとおり —
+          -record-dir が絶対なら単独で使う (-current-dir を併記したらエラー)。
+          相対なら -current-dir が必須 (無ければエラー)。-current-dir 自体は絶対で
+          実在するディレクトリでなければエラー。-judgment-flow も同じ規則だが、
+          CLAUDE_PLUGIN_ROOT から絶対パスで解決できるので省略は引き続き可。
+          -record-dir の既定値 docs/review-triages/ は廃止して必須にする — 既定値が
+          相対である限り「基準なしの相対」を許すことになり、規則が崩れるため。
+          互換性は問わない方針 (人間の判断)。未導入リポジトリで何もせず通す配慮も、
+          フラグ必須化と両立しないので廃止する。文書の例では引き続き
+          docs/review-triages/ を想定して書く。ラッパーは -current-dir "$(pwd)" を
+          焼き込むので、利用者は相対のまま使える
+        options: >-
+          採用: -current-dir を足して基準を明示させる (下の案 a を、相対パスの
+          脱出口つきにした形)。呼び出し元しか知らない情報を呼び出し元に書かせるので、
+          ツールは推測しない。
+          案 a: 相対パスの解決をやめ、絶対パスだけを受ける。推測は消えるが相対が使えない。
+          案 b: -install-wrapper が生成時に絶対化して焼き込む。ラッパー経由は直るが
+          直接 go run -C する利用者の相対指定は誤解決のまま残る。
+          案 c: ラッパー側で cd してから起動し Getwd を基準にする。ラッパー未使用は救えない。
+          案 d: $PWD 基準のまま Inode 比較で Getwd との同一性を検査する。非互換は無いが
+          推測が残り、シンボリックリンク経由の cd で偽陽性が出うる。
+          採らなかった理由: b と c は推測が当たる経路を増やすだけで推測自体は残る。
+          d は推測を残したまま検出を足す形。-current-dir を必須にする案も検討したが、
+          呼び出し側が -current-dir "$PWD" と書けば依存が呼び出し側へ移るだけで、
+          しかもツール側から検証できない。相対のときだけ必須にすることで、
+          明示された基準以外は使わない形にした
+        order: 1
+        sha: a8a5746
+        status: done
+      - problem_id: P7
+        cause: >-
+          空文字を弾く検査を、パスを検査する経路とパスを焼き込むだけの経路
+          (-install-wrapper) を区別せずに手前へ置いた
+        finding_ids: [3]
+        approach: >-
+          空文字の検査を -install-wrapper の分岐より後ろへ移す。-install-wrapper は
+          パスを検査せず値を焼き込むだけで、空の judgmentFlow は「$root からの既定パスを
+          使う」正当な入力である。検査経路でだけ空文字を弾く。回帰テストを足す
+        order: 2
+        sha: 46d65f8
+        status: done
+      - problem_id: P8
+        cause: エラーの識別を型ではなく報告メッセージの文言の一致で書いた
+        finding_ids: [4]
+        approach: >-
+          TestRunFailsOnMissingExplicitPaths の判定を文言から外す。報告の本文は stderr に
+          出るので、エラーが返ること自体と、報告の件数が意図どおりであることで判定する。
+          挙動を変えない書式の変更で落ちないことを確かめる
+        order: 3
+        sha: f9ecbab
+        status: done
+      - problem_id: P9
+        cause: 数を書き換えた後、同じ増分でテストを足したのに数え直さなかった
+        finding_ids: [5]
+        approach: >-
+          README のテスト件数を、README 自身が指定するコマンドで数え直す。
+          他の修正でテストを増減させたら最後に数え直す (この問題は最後に直す)
+        order: 4
+        sha: d06279a
+        status: done
+    notes: >-
+      前回の 8 件を直した増分 (450dc70..c8904d7) の再レビュー。5 件すべてを自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 が重い — 依頼文の重点 1 ($PWD への依存が妥当か) への回答として、
+      シェルを経ない親が chdir する通常の CI の起動形態で検査対象がすり替わり、
+      実問題 3 件が隠れて緑になることが実測で示された。この修正が塞ごうとした
+      「黙って緑」を別の経路で作り直しており、$PWD を基準にする設計そのものを
+      見直す必要がある。指摘 2 はその裏面 (フォールバックが誤解決へ戻る) で同じ原因。
+      指摘 3 は重点 4 (空文字を弾いて壊れる正当な呼び出しが無いか) への回答で、
+      -install-wrapper がパスを検査しない経路であることを見落としていた。
+      指摘 4 は重点 6 (過検出) への回答。指摘 5 は前回の修正時に数え直した値が
+      同じ増分で古くなったもの。
+      residual の 4 件に目を通した。1 つ目 (-write-summary の不在エラーに対象パスが
+      載らない) と 2 つ目 (権限エラーは即 return のままで非対称が残る) は、どちらも
+      指摘 1 の修正で同じ箇所を触るので併せて見る。3 つ目 (Inode 比較で呼び出し元との
+      同一性を確かめる) はリファクタ提案として 1 件のみ挙げられたもの。4 つ目は重点 3
+      (CLAUDE_PLUGIN_ROOT の相対指定) で問題を確認できなかったという報告。
+      出力先のファイル名は依頼した名前と違ったが (review-issue31-inc-code-review-opus-5.yaml)、
+      base と head は一致しているので対象として扱った。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: c791762
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 42
+        summary: >-
+          ラッパーは -current-dir "$PWD" を無条件に焼き込むため、-record-dir を絶対で
+          生成すると全パスが絶対になり「-current-dir が一度も使われない」規則に自分で
+          抵触して必ず非 0 で終わる。README の -install-wrapper の例が絶対パスなので、
+          手順どおりに作ったラッパーは生成直後から一度も動かない。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: README の例どおり絶対の -record-dir で -install-wrapper したとき
+          who: operator
+          what: >-
+            生成したラッパーが常に非 0 で終わり、記録の検査が一度も走らない。
+            -write-summary も同じ
+          detectability: >-
+            気づく (必ず落ちる) が、自分の指定が正しいのに落ちるので原因が分からない。
+            ラッパーの契約を検査するテストが無く、生成物を実行する検査も無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。プラグインキャッシュ配置を模し README の例どおり絶対の
+          -record-dir で生成すると、生成物に -current-dir "$PWD" と絶対の -record-dir が
+          並び、実行して exit 1。相対で生成したラッパーは通る。全ゲートを評価して発火 0 件
+          (再現済みで仮定でない / 環境の異常でなく利用者の標準の導入手順 / 修正は
+          焼き込みの条件を変えるだけ / 赤くなる関門を挙げられない)。
+          この増分で入れた規則と、同じ増分で変えた生成物が食い違っている
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 42
+        summary: >-
+          ラッパーが渡す -current-dir の契約を検査するテストが無い。テンプレートから
+          その行を削除しても全テストが通り、相対パスを焼き込んだラッパーが一切動かなく
+          なる退行を捕まえられない。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: 将来ラッパーのテンプレートから -current-dir の行が失われたとき
+          who: operator
+          what: >-
+            相対の -record-dir を焼き込んだラッパーが「基準を -current-dir で指定するか」
+            で必ず落ちる。テストは緑のまま通る
+          detectability: >-
+            気づかない。wrapper_test.go は生成物の文字列だけを検査し、-current-dir には
+            触れず、生成物を実行する検査も無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門 (テスト) がラッパーの契約の破壊を検出しない
+          ことを主張している。条件 2: 3 層から候補を挙げていずれも検出しない — Makefile は
+          このリポジトリに無い / 検査項目は review-triage-record と judgment-flow の 2 つで
+          どちらもラッパーの生成物を見ない / テスト関数は wrapper_test.go の 5 つがいずれも
+          生成物の文字列だけを検査し実行しない。自分でも -current-dir の行を削除して
+          全テストが通ることを確認した
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/main.go
+        line: 116
+        summary: >-
+          CLAUDE_PLUGIN_ROOT 由来の judgment-flow を例外扱いする分岐を削除しても全テストが
+          通る。この例外は挙動を変える意味のある分岐なので、無検査のまま置くと将来の整理で
+          黙って外れる。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: 将来この例外が整理・削除されたとき
+          who: operator
+          what: >-
+            相対の CLAUDE_PLUGIN_ROOT が -current-dir 基準で解決されるようになり、
+            意図しない場所の判定フローを検査する。テストは緑のまま通る
+          detectability: 気づかない。分岐のどちらの側もテストが固定していない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門がこの分岐の削除を検出しないことを主張している。
+          条件 2: 3 層から候補を挙げていずれも検出しない — Makefile は無い / 検査項目 2 つは
+          どちらもツール自身の分岐を見ない / テスト関数に CLAUDE_PLUGIN_ROOT と -current-dir を
+          組み合わせるものが無い。自分でも例外を削除して全テストが通ることを確認した。
+          分岐が結果を変えること (相対 CLAUDE_PLUGIN_ROOT の扱いが変わる) も再現済み
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 4
+        file: review-triage/tools/triagecheck/main.go
+        line: 119
+        summary: >-
+          CLAUDE_PLUGIN_ROOT が相対のとき、エラーが -judgment-flow の名前で報告される。
+          利用者はそのフラグを渡しておらず、案内された対処 (-current-dir を渡す) を
+          行っても解決しない。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: CLAUDE_PLUGIN_ROOT に相対パスを設定している環境で実行したとき
+          who: operator
+          what: >-
+            渡していないフラグの名前で叱られ、案内どおり -current-dir を足しても
+            同じエラーが出続ける。直すべき環境変数にたどり着けない
+          detectability: >-
+            気づく (非 0 で落ちる) が、案内が誤っているので原因の切り分けに時間を取られる
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。CLAUDE_PLUGIN_ROOT=relplugin で実行すると
+          「-judgment-flow が相対パスです。基準を -current-dir で指定するか」と出るが、
+          コマンドラインに -judgment-flow は無い。案内どおり -current-dir を足しても
+          同じ文言で落ちる (例外により flowBase が空にされるため)。
+          全ゲートを評価して発火 0 件。resolvePath に固定の flagName を渡しており、
+          値の出所を報告に反映していないのが原因
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P10
+        cause: >-
+          ラッパーが何を焼き込むかという契約を決めたのに、その契約を検査するテストを書かず、
+          README が例示する組み合わせ (絶対の -record-dir) で動かして確かめもしなかった。
+          規則 R と生成物を同じ増分で変えたのに、両者の突き合わせをしていない
+        finding_ids: [1, 2]
+        approach: >-
+          案 X を実装する (人間が決定)。ラッパーは $PWD ではなく自分自身の位置から基準を出す —
+          script_dir=$(cd "$(dirname "$0")" && pwd) を求め、-current-dir に渡す。
+          $PWD は非シェルの親が chdir すると更新されないので、ラッパーからも依存を消す。
+          -record-dir は script_dir から見た相対パスを生成時に計算して焼き込む。
+          あわせてラッパーの契約を検査するテストを足す — 生成物の文字列だけでなく、
+          生成したラッパーを実際に実行して正しい置き場を検査することを固定する。
+          案 Y (生成時に絶対化して焼き込む) は、リポジトリを移動すると移動元を検査して
+          緑を返すため採らない (実測: 移動先の壊れた記録を見逃す)。
+          案 Z (規則 R を緩める) は「渡したのに効いていない」を黙って通す形に戻るため採らない
+        order: 1
+        sha: 500e8e0
+        status: done
+      - problem_id: P11
+        cause: >-
+          CLAUDE_PLUGIN_ROOT 由来の judgment-flow を例外扱いする分岐を足したのに、
+          その分岐の両側を固定するテストを書かなかった
+        finding_ids: [3]
+        approach: >-
+          例外分岐の両側をテストで固定する — CLAUDE_PLUGIN_ROOT が相対のとき
+          -current-dir 基準で解決されないこと (現状の意図) を、削除すると落ちる形で書く。
+          自分でミューテーションを実行し、分岐を消すとテストが落ちることを確かめる
+        order: 2
+        sha: 6d4c1f1
+        status: done
+      - problem_id: P12
+        cause: >-
+          resolvePath に固定のフラグ名 ("-judgment-flow") を渡し、値の出所
+          (フラグか CLAUDE_PLUGIN_ROOT か) を報告に反映しなかった
+        finding_ids: [4]
+        approach: >-
+          resolvePath に渡す名前を、値の出所に応じて変える。CLAUDE_PLUGIN_ROOT 由来なら
+          その名前で報告し、案内も環境変数を直す向きにする。フラグを渡していない利用者に
+          フラグ名で叱らせない。回帰テストを足す
+        order: 3
+        sha: b417b43
+        status: done
+    notes: >-
+      P6 を実装した増分 (c8904d7..c791762) の再レビュー。4 件すべてを自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 は依頼文の重点 1 (「一度も使われなかったらエラー」の判定に穴が残っていないか) への
+      回答で、まさにそこが破れた。実装の途中で一度作り直した箇所を重点に挙げたのは当たったが、
+      作り直した後の検証で相対 -record-dir のラッパーしか試さず、README が例示する絶対の
+      ラッパーを試していなかった。規則と生成物を同じ増分で変えたのに、両者の組み合わせを
+      確かめていない。
+      指摘 2 と 3 は免除条項で採択した。どちらも「意味のある分岐がテストで固定されていない」型で、
+      ミューテーションを自分で実行して全テストが通ることを確認した。
+      指摘 4 は重点 2 (CLAUDE_PLUGIN_ROOT の例外) から派生したもので、例外そのものではなく
+      エラーの案内が誤っている点を突いている。
+      residual の 5 件に目を通した。2 つ目は重点 5 (前回の文言結合が再発していないか) への
+      回答で、書式を変えても全テストが通ることを確認したという報告。3 つ目は重点 3
+      ($PWD 依存が本体から消えたか) への回答で、本体の os.Getenv は CLAUDE_PLUGIN_ROOT のみ、
+      os.Getwd は -install-wrapper 専用の pluginCacheDir のみと確かめられている。
+      1 つ目 (-record-dir の必須検査を消しても挙動が変わらない多重防御) と 4 つ目
+      (権限エラーの非対称は増分が作ったものではない) は欠陥ではない。5 つ目
+      (errCurrentDirUnused の文言が指摘 1 の状況では選べない案内になる) は
+      指摘 1 の修正で同じ箇所を触るので併せて見る。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: eb3a670
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 39
+        summary: >-
+          script_dir を dirname "$0" で求めているためシンボリックリンクを解決せず、
+          リンク経由で起動すると基準がリンクの置き場になる。隣に別の置き場が実在すると
+          そちらを検査して緑を返す。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            ラッパーへのシンボリックリンクを PATH 上などに張って起動し、リンクの親から見た
+            相対位置に別の置き場が実在するとき
+          who: operator
+          what: >-
+            自分のリポジトリでない置き場を検査して exit 0 を返す。実測では同一のラッパー実体が
+            直接起動では 3 件検出、リンク経由では緑になった
+          detectability: >-
+            気づかない。緑が返るうえ、ラッパーの実体は同じなので設定の誤りにも見えない。
+            リンク経由の起動を検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。$T/repo/bin/rtc を直接叩くと壊れた記録を検出して exit 1、
+          $T/localbin/rtc (同じ実体へのリンク) から叩くと exit 0。script_dir の実測値も
+          直接なら $T/repo/bin、リンク経由なら $T/localbin で、リンクを解決していないことを
+          確かめた。全ゲートを評価して発火 0 件 (再現済みで仮定でない / PATH にリンクを張るのは
+          通常の運用 / 修正は script_dir の求め方を変えるだけ / 赤くなる関門を挙げられない)。
+          案 Y を退けた理由 (基準が検査対象から切り離されて緑になる) と同じ性質が経路を変えて残っている
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/README.md
+        line: 158
+        summary: >-
+          README が「どこから叩いても・リポジトリを移動しても、ラッパーは常に自分と同じ
+          リポジトリの置き場を検査する」と無条件に書いているが、指摘 1 の経路で成り立たない。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: README のこの保証を前提に、ラッパーへのリンクを PATH 上へ張るとき
+          who: operator
+          what: 文書が保証した性質が成り立たず、緑を信じて誤った確信を持つ
+          detectability: >-
+            気づかない。文書が明示的に保証しているので、疑う理由が無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で矛盾する 2 箇所を逐語で確認した。README:158-159 の無条件の保証と、
+          リンクを解決しない wrapper.go:39。指摘 1 と同じ原因なので修正時に束ねる。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 3
+        file: docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md
+        line: 286
+        summary: >-
+          設計判断の記録が契約テストの 3 箇所の内訳を「リポジトリのサブディレクトリ」と
+          書いているが、実装が使うのはリポジトリの親ディレクトリである。
+        category: doc-dev
+        audience: developer
+        consequence:
+          condition: この記録を読んで契約テストの内容を把握しようとしたとき
+          who: developer
+          what: >-
+            テストが覆う範囲を誤って理解する。サブディレクトリからの起動が固定されていると
+            思い込み、実際には固定されていない
+          detectability: >-
+            気づかない。実装を読み比べない限り分からず、文書と実装の一致を検査する関門も無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で文書 (:285-286) と実装 (wrapper_test.go:234 の repo/elsewhere/base、
+          205 行と 219 行から base は repo の親) を逐語で照合した。サブディレクトリからの
+          起動自体は正しく動くので、欠陥は文書の記述のみ。全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 4
+        file: docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md
+        line: 293
+        summary: >-
+          同じ記録が「3 箇所すべてで壊れた記録を検出する」と書いているが、実装で検出させて
+          いるのは 2 箇所だけ。契約テストの強さを実際より広く読ませる。
+        category: doc-dev
+        audience: developer
+        consequence:
+          condition: この記録を読んで契約テストの強さを見積もったとき
+          who: developer
+          what: テストが実際より強いと誤解し、足りない検証を足す機会を失う
+          detectability: 気づかない。実装のループを読み比べない限り分からない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で文書 (:293) と実装 (wrapper_test.go:249 の repo/elsewhere) を逐語で
+          照合した。3 箇所を回すのは正常系のループ (234 行) の方で、壊れた記録を検出させる
+          ループは 2 箇所。全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P13
+        cause: >-
+          「ラッパーはリポジトリの中にあるので基準も一緒に動く」と考え、リンクは実体と
+          別の場所に置けることを検証しなかった。README にはその想定を無条件の保証として書いた
+        finding_ids: [1, 2]
+        approach: >-
+          script_dir をリンク解決してから求める。$0 がリンクである間 readlink で辿り、
+          相対リンクは辿った時点のディレクトリ基準で解く定型のループを使う。realpath 一発でも
+          解決できるが POSIX ではなく古い macOS に無いため、bash 組み込みと readlink だけで
+          済むループを採る (ラッパーは元々 #!/usr/bin/env bash なので bash 依存は増えない)。
+          多段リンクでも実体に辿り着くことを実測で確認済み。
+          README の無条件の保証は、リンク経由でも成り立つようになった時点で真になるが、
+          「自分の実体の位置」を基準にしていることが読み取れる書き方に改める。
+          リンク経由の起動を契約テストに足す — 直接起動とリンク経由で同じ置き場を検査すること
+        order: 1
+        sha: be5f185
+        status: done
+      - problem_id: P14
+        cause: >-
+          設計判断の記録を書くとき、契約テストのループを読み違えたまま確かめずに書いた
+        finding_ids: [3, 4]
+        approach: >-
+          文書の記述を実装に合わせる。3 箇所の内訳を「リポジトリのルート / リポジトリの外 /
+          リポジトリの親」に直し、壊れた記録を検出させているのが 2 箇所であることを明記する。
+          P13 でリンク経由の起動を足すので、その分も反映する (P13 の後に直す)
+        order: 2
+        depends_on: [P13]
+        sha: 856e0fd
+        status: done
+    notes: >-
+      P10〜P12 を直し、設計判断の記録と用語集を足した増分 (c791762..eb3a670) の再レビュー。
+      4 件すべてを自分で再現した。レビューは報告のみで走った (head が現在の HEAD と一致、
+      作業ツリーは不変)。
+      指摘 1 は依頼文の重点 1 (案 X の実装が退けた案の欠陥を持ち込んでいないか) への回答で、
+      まさにそこが破れた。案 Y を「基準が検査対象から切り離される」ため退けたのに、
+      シンボリックリンク経由という別の経路で同じ性質が残っていた。実装時に
+      「script_dir はリポジトリの中にあるので一緒に動く」と考えたが、リンクは実体と
+      別の場所に置けるという経路を見落としている。
+      指摘 3 と 4 は、この増分で足した設計判断の記録自身の誤りである。依頼文の重点 5 で
+      「文書が誤っていれば次に読む人が誤った前提で判断する」と挙げた箇所からそのまま出た。
+      residual の 7 件に目を通した。重点 2 (契約テストの実効性)・重点 4 (出所の反映の網羅)・
+      重点 3 (絶対パス要求の文書化)・重点 6 (CONCEPTS.md の展開先) はいずれも
+      「確認したが問題なし」の報告で、欠陥ではない。P11 / P12 がテストで固定されていることも
+      ミューテーションで確かめられている。最後の 1 件 (script_dir を realpath / cd -P で
+      リンク解決する形に寄せる) はリファクタ提案として挙げられたもので、指摘 1 の修正候補と
+      重なるので併せて見る。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 2b9940a
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 45
+        summary: >-
+          ハードリンク経由の起動で基準が検査対象から切り離される。readlink は
+          ハードリンクを辿れないため基準がハードリンクの置き場になり、その隣に別の置き場が
+          あるとそちらを検査して緑を返す。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            ラッパーへのハードリンクを別の場所に張って起動し、リンクの親から見た相対位置に
+            別の置き場が実在するとき
+          who: operator
+          what: >-
+            実体側の置き場でなく、リンクの隣の置き場を検査して exit 0 を返す。実測では
+            同一 inode の 2 経路で、実体側は exit 1、ハードリンク側は exit 0 になった
+          detectability: >-
+            気づかない。緑が返るうえ、ハードリンクは実体そのものなので「実体を基準にする」
+            という説明とも矛盾して見えない。ハードリンクを検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。stat -f "%i %N" で両経路の inode が同一 (408920349) で
+          あることを確かめたうえで、実体経路は exit 1、ハードリンク経路は exit 0。
+          全ゲートを評価して発火 0 件 (再現済みで仮定でない / ハードリンクでの配置は
+          通常の運用の範囲 / 赤くなる関門を挙げられない)。
+          「基準が検査対象から切り離される」型の 4 巡目である — 絶対パスの焼き込み →
+          $PWD → シンボリックリンク → ハードリンク。経路を 1 つずつ塞ぐ形が続いている
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/README.md
+        line: 162
+        summary: >-
+          README の「どこから叩いても・リンク経由でも…自分の実体と同じリポジトリの置き場を
+          検査する」が、ハードリンク経由では成り立たない。ハードリンクは実体そのものなので、
+          「自分の実体と同じ」という表現がまさに反例に当たる。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: README のこの保証を前提にハードリンクで配置したとき
+          who: operator
+          what: 文書が保証した性質が成り立たず、緑を信じて誤った確信を持つ
+          detectability: 気づかない。文書が明示的に保証している
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で矛盾する 2 箇所を逐語で確認した。README:161-163 の保証と、
+          シンボリックリンクしか辿らない wrapper.go:46 の [ -L ]。
+          新設した箇条書き (README:157-159) もシンボリックリンクにしか言及がない。
+          指摘 1 と同じ原因なので修正時に束ねる。全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 47
+        summary: >-
+          cd -P を cd -L に変えても全テストが通る。-P は解決先を変える意味のある指定なので、
+          無検査のまま置くと将来の整理で黙って外れ、基準が切り離される経路が戻る。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: 将来 cd -P が cd -L に整理されたとき
+          who: operator
+          what: >-
+            bin ディレクトリ自体がシンボリックリンクの配置で解決先が割れ、囮側を検査する。
+            テストは緑のまま通る
+          detectability: 気づかない。分岐のどちらの側もテストが固定していない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門がこの指定の破壊を検出しないことを主張している。
+          条件 2: 3 層から候補を挙げていずれも検出しない — Makefile は無い / 検査項目 2 つは
+          ラッパーの生成物を見ない / テスト関数に bin ディレクトリがリンクの配置を作るものが無い。
+          自分でも cd -P を cd -L に置換して全テストが通ることを確認した。
+          -P が解決先を変えることもレビュア側が実測で示している
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P15
+        cause: >-
+          ラッパーの配置として何をサポートするかの範囲を決めずに実装し、README には
+          「どこから叩いても」という無条件の保証を書いた。サポートする範囲を決めていないので、
+          新しい経路が見つかるたびに保証だけが偽になる
+        finding_ids: [1, 2]
+        approach: >-
+          ハードリンクをサポートの範囲外だと文書で明示する (人間が決定)。実装は変えない。
+          理由も残す — ラッパーは -install-wrapper で再生成する道具だが、ハードリンクは
+          再生成に追随せず古い内容のまま取り残される (実測で確認)。つまり配置方法として
+          そもそも成立しておらず、利用者が選ぶ理由が無い。ファイルシステムを跨げない制約もある。
+          realpath 等で実体の同一性まで見る案は採らない — 実用ケースが無いものに、
+          3 巡目で「POSIX でなく古い macOS に無い」として退けた依存を持ち込む価値が薄い。
+          README の無条件の保証を、サポートする範囲を述べる形に改める。
+          「どこから叩いても」は範囲を書かない限り必ず反例が出る書き方なので、
+          サポートする配置 (直接・シンボリックリンク・移動) と、しない配置 (ハードリンク) を
+          明示して、なぜサポートしないかも書く。
+          なお経路のディレクトリのハードリンクは OS が禁じており作れないので、対象外
+        order: 1
+        sha: 8bacca3
+        status: done
+      - problem_id: P16
+        cause: cd -P を選んだのに、その選択を固定するテストを書かなかった
+        finding_ids: [3]
+        approach: >-
+          bin ディレクトリ自体がシンボリックリンクの配置を作り、実体側の置き場を検査することを
+          固定する。cd -L に変えると落ちることを確かめる。
+          ディレクトリのシンボリックリンクは実際に作れて -P の有無で解決先が割れるので、
+          P15 で範囲外とするハードリンクとは違い、サポートする対象である
+        order: 2
+        sha: 5e728ed
+        status: done
+    notes: >-
+      P13 / P14 を直した増分 (eb3a670..2b9940a) の再レビュー。3 件すべてを自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 は依頼文の重点 1 (「基準が切り離される」経路の 4 つ目を探せ) への回答で、
+      ハードリンクという形で見つかった。シンボリックリンクと違い実体そのものなので、
+      「実体の位置を基準にする」という今回の方針では原理的に一意に定まらない —
+      同じ inode が複数のディレクトリに現れうるため。経路を 1 つずつ塞ぐ形が
+      4 巡続いており、塞ぎ方そのものを見直す必要があるかもしれない。
+      residual の 8 件に目を通した。重点 2 (ループの正しさ) は、循環リンクがループ単体では
+      無限ループになるが実際の起動経路では bash が先に落ちるため到達不能、多段・相対リンクは
+      正しく解決、と確認されている。重点 1 の他の候補 (exec -a・PATH 検索・置き場だけのリンク・
+      bin ディレクトリがリンク) はいずれも問題なし。重点 4 (文書と実装の一致) と
+      重点 5 (bash の書き方) も問題なしと確認された。
+      最後の 1 件 (ハードリンクまで閉じるには実体の同一性を確かめる手立てが要るが、
+      POSIX の範囲では容易でなく realpath を避けた判断と衝突する) は、指摘 1 の
+      修正方針に直結するので併せて見る。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 08399a2
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/README.md
+        line: 172
+        summary: >-
+          サポート表がハードリンクを「✗ しない」とだけ書き、その帰結が「黙って緑を返す」ことを
+          どこにも述べていない。表を読んだ利用者が「サポート外 = 弾かれる」と誤読すると、
+          検査されないまま緑を信じることになる。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: 表を読んでハードリンクの扱いを判断したとき
+          who: operator
+          what: >-
+            「サポート外なら弾かれる」と誤読し、実際には黙って緑を返す状態に気づけない。
+            このリポジトリが一貫して最悪と扱ってきた失敗の形が、文書の側から見えない
+          detectability: >-
+            気づかない。exit 0 で検査名まで出力され、文書にも帰結が書かれていない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で確認した。README でハードリンクに触れるのは 172 / 174 / 182 行の
+          3 箇所のみで、いずれの周辺にも「緑」「見逃す」「エラー」の語が無い。
+          対比として同じ節の箇条書き (156-160 行) は他の 2 経路について
+          「移動元を検査して緑を返し」「見逃す」と帰結を明記しており、ハードリンクの行だけが
+          帰結を欠く。実測でも帰結は緑 (ハードリンク経由で exit 0、実体経路は exit 1)。
+          全ゲートを評価して発火 0 件 (再現済み / 対象は利用者が読む文書 /
+          修正は 1 文で不相応でない / 文書の主張と実装の一致を検査する関門は無い)。
+          レビュアは「実装で閉じよ」の再提案ではないと明記しており、3 つの理由は
+          成り立つと判断したうえで文書に帰結を足すことだけを求めている
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md
+        line: 306
+        summary: >-
+          設計判断の記録が契約を「どこから叩いても・リンク経由でも」と無条件のまま書いている。
+          README は同じ主張を「シンボリックリンク経由でも」に限定しサポート範囲の表を新設したが、
+          記録側は更新されていない。
+        category: doc-dev
+        audience: developer
+        consequence:
+          condition: この記録を読んでラッパーの契約を把握しようとしたとき
+          who: developer
+          what: >-
+            範囲外の配置が存在すること自体を知らないまま、無条件の契約を前提にする。
+            実測ではその契約はハードリンク経由で成り立たない
+          detectability: >-
+            気づかない。README を読み比べない限り分からず、文書間の一致を検査する関門も無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で矛盾する 2 箇所を逐語で確認した。記録の 306 行は無条件の
+          「リンク経由でも」、README:66-67 はこの増分で「シンボリックリンク経由でも」へ
+          限定済み。記録内に「ハードリンク」「サポート」を含む行は 0 件で、範囲外の配置が
+          あること自体が書かれていない。全ゲートを評価して発火 0 件。
+          同じ主張を持つ複数箇所のうち片方だけ更新した型で、このスキル自身が扱う型である
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P17
+        cause: >-
+          範囲を明示する修正をしたが、範囲外に落ちたときに何が起きるかを書かなかった。
+          同じ節の他の 2 経路 (絶対パスの焼き込み・シンボリックリンク) には帰結を
+          書いているので、方針ではなく書き漏らし
+        finding_ids: [1]
+        approach: >-
+          サポート表の直後に、範囲外の帰結を明記する。「サポートしない」は「弾かれる」では
+          なく「黙って緑を返す」ことを書き、他の 2 経路と同じ粒度で揃える。
+          表の「✗ しない」だけでは、読み手が「サポート外なら弾かれる」と誤読しうる —
+          このリポジトリが一貫して最悪と扱ってきた失敗の形なので、そこを曖昧にしない
+        order: 1
+        sha: f38737c
+        status: done
+      - problem_id: P18
+        cause: >-
+          README の主張を「リンク経由でも」から「シンボリックリンク経由でも」へ限定したとき、
+          同じ主張を持つ設計判断の記録に反映しなかった
+        finding_ids: [2]
+        approach: >-
+          記録側の無条件の契約を、README と同じ範囲に揃える。サポート範囲という概念が
+          存在すること自体を書き、正本 (README) を参照させる。記録は「なぜその設計にしたか」を
+          残す文書なので、範囲の一覧を複製せず参照にとどめる — 複製すると今回と同じ
+          「片方だけ更新する」型を作り込む。
+          P17 で README に帰結を書くので、その後に反映する
+        order: 2
+        depends_on: [P17]
+        sha: 53c0f5b
+        status: done
+    notes: >-
+      P15 / P16 と言い換えを行った増分 (2b9940a..08399a2) の再レビュー。2 件とも自分で
+      再現した。レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 は依頼文の重点 2 (「サポートしない」と書いたことで誤読の余地が生まれていないか) への
+      回答で、まさにそこが当たった。範囲を明示する修正をしながら、その範囲外に落ちたときの
+      帰結を書かなかった。同じ節の他の 2 経路には帰結を書いているので、書き漏らしである。
+      指摘 2 は、README で narrow した主張を docs/solutions 側に反映しなかったもの。
+      「同じ主張を持つ複数箇所のうち片方だけ更新する」型で、このスキル自身が扱う型が
+      また出た。
+      residual の 8 件に目を通した。重点 1 (表の 5 行と実装の一致) は全行が実測で一致し、
+      表に無い配置でも壊れるものは見つからなかったと報告されている。重点 3 (P16 が
+      cd -P を固定しているか) は 2 箇所とも -L にしても script_dir 側だけ -L にしても
+      落ちることが確かめられ、過検出も無い。重点 4 (言い換えの取りこぼし) と重点 5 (構成) も
+      問題なし。link_dir 側の cd -P だけを -L にすると生き残る件は、最終行が経路を
+      正規化するための多重防御であり欠陥ではないという判断に同意する。
+      最後の 1 件 (表に帰結の列を足す案) は指摘 1 の修正候補と重なるので併せて見る。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: full
+    head: 5feedd4
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main.go
+        line: 98
+        summary: >-
+          -write-summary の経路は相対の -judgment-flow に基準を要求せず exit 0 で終わる。
+          検査の経路は同じ入力をエラーで弾くので、同一の入力に 2 つの契約がある。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -write-summary に相対の -judgment-flow を渡したとき
+          who: operator
+          what: >-
+            指定したのに基準が要求されず、検査の経路とは違う結果になる。
+            「指定したのに検査されない」型が生成の経路に残る
+          detectability: >-
+            気づかない。exit 0 で生成が進む。この経路を検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。同じフラグの組み合わせで、検査の経路は
+          「-judgment-flow が相対パスです」で exit 1、-write-summary の経路は
+          生成に成功して exit 0。全ゲートを評価して発火 0 件。
+          このブランチが一貫して塞いできた「経路によって契約が違う」型である
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/main.go
+        line: 8
+        summary: >-
+          package のドキュメントコメントが「既定の置き場を検査する」と旧仕様のままで、
+          54 行下の「-record-dir は必須」の実装と食い違う。同じファイルの中で主張が割れている。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: main.go を読んで使い方を把握しようとしたとき
+          who: operator
+          what: >-
+            引数なしで動くと誤解する。例示の -record-dir docs/rt/ も基準の無い相対パスで、
+            現在の契約に反する
+          detectability: >-
+            気づく (実行すればエラーになる) が、正本が同じファイル内で割れている
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A でコメント (main.go:8-13) と実装 (main.go:62-67) を逐語で照合し、
+          引数なしの実行が「-record-dir は必須です」で落ちることを確かめた。
+          README:36 の表は必須と正しく書いており、食い違うのはこのコメントだけ。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 310
+        summary: >-
+          TestRunRejectsEmptyExplicitPaths の -current-dir のケースが意図した検査を踏まず、
+          その検査を外しても別のエラーが立つためテストが緑のまま通る。
+        category: test
+        audience: operator
+        audience_initial: developer
+        consequence:
+          condition: 将来この空文字の検査から current-dir が外れたとき
+          who: operator
+          what: >-
+            -current-dir "" の扱いが変わってもテストが緑のまま通る。文言の部分一致で
+            判定しているため、別のエラーでも条件を満たしてしまう
+          detectability: 気づかない。テストが緑になる
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門がこの検査の破壊を検出しないことを主張している。
+          条件 2: 3 層から候補を挙げていずれも検出しない — Makefile は無い / 検査項目 2 つは
+          ツール自身の分岐を見ない / テスト関数は当該ケースが文言の部分一致でしか見ていない。
+          自分でもミューテーション (対象から current-dir を外す) を実行し、全 150 件が
+          通ることを確認した
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 4
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 89
+        summary: >-
+          installWrapper の「-record-dir は絶対パス」の検査を無効化しても全テストが通る。
+          設計判断の記録が明示的に採った規則が、壊しても落ちない状態にある。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: 将来この検査が整理・削除されたとき
+          who: operator
+          what: >-
+            相対の -record-dir で生成したラッパーが、生成時のカレント (プラグインの展開先)
+            を基準に解決された無意味なパスを焼き込む。テストは緑のまま通る
+          detectability: 気づかない。この分岐に入るテストが 1 件も無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門がこの規則の破壊を検出しないことを主張している。
+          条件 2: 3 層から候補を挙げていずれも検出しない — Makefile は無い / 検査項目 2 つは
+          ラッパーの生成を見ない / wrapper_test.go の 6 関数はいずれも絶対パスしか渡さない。
+          自分でも条件を無効化して全 150 件が通ることを確認した。
+          規則は 3 箇所 (実装・README・設計判断の記録) に書かれているのに、守らせる関門が無い
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 5
+        file: review-triage/tools/triagecheck/main.go
+        line: 58
+        summary: >-
+          -install-wrapper と同時に指定した -current-dir / -write-summary が、
+          エラーにも警告にもならず無視される。「指定したのに効かない」経路が残っている。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: -install-wrapper に -current-dir や -write-summary を併記したとき
+          who: operator
+          what: >-
+            指定が黙って無視され、意図と違う生成物ができる。このブランチが -current-dir に
+            ついて明示的に禁じた形 (errCurrentDirUnused) と同じ種類
+          detectability: 気づかない。exit 0 で生成が成功する
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。-install-wrapper に -current-dir /tmp を併記しても exit 0 で
+          生成され、生成物の -current-dir 行は "$script_dir" のまま。-write-summary も同様。
+          installWrapper のシグネチャに currentDir も writeSummary も無い。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 6
+        file: review-triage/tools/triagecheck/README.md
+        line: 66
+        summary: >-
+          ラッパー経由で -record-dir を絶対パスで上書きすると errCurrentDirUnused で必ず
+          失敗する。ラッパーが常に -current-dir を渡すためだが、README にこの制約が無い。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: 生成したラッパーに絶対パスの -record-dir を追加引数で渡したとき
+          who: operator
+          what: >-
+            必ずエラーになる。README は追加引数を渡す使い方を例示しているのに、
+            絶対パスでは使えないことを書いていない
+          detectability: >-
+            気づく (エラーで落ちる) が、なぜ拒否されるかは README から分からない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。ラッパーに絶対の -record-dir を渡すと
+          「-current-dir を指定しましたが、パスがすべて絶対なので使われません」で exit 1。
+          相対なら通るが script_dir 基準で解決される。README:132-138 は追加引数の例
+          (-write-summary) を挙げており、渡す使い方自体は想定されている。
+          偽の緑にはならないので severity は低い。全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 7
+        file: review-triage/.claude-plugin/plugin.json
+        line: 4
+        summary: >-
+          意図した非互換を 3 つ含む変更に対してパッチ版 (0.3.0 -> 0.3.1) の上げ方をしており、
+          利用者の既存の呼び出しが壊れることが版番号からも文書からも予告されていない。
+        category: marketplace
+        audience: operator
+        consequence:
+          condition: 利用者がプラグインを更新したとき
+          who: operator
+          what: >-
+            引数なしの実行・相対パスの指定・相対の -install-wrapper がいずれも動かなくなるが、
+            パッチ版なので予告として機能しない。CHANGELOG も無い
+          detectability: >-
+            気づく (エラーで落ちる) が、更新前に知る手立てが無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で 3 つの非互換をいずれも実行で確かめ、review-triage 配下・
+          docs/solutions・CONCEPTS.md に「非互換」「破壊的」の記述が無いこと、
+          CHANGELOG が存在しないことを確認した。1.0 未満の運用なので semver の厳密な
+          適用は前提でないが、版番号が唯一の伝達手段である以上、パッチ版は非互換を伝えない。
+          全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P19
+        cause: >-
+          本流 (検査の経路) にだけ規則を課し、脇の経路に及ぼさなかった。
+          -write-summary は判定フローの解決より手前で分岐し、-install-wrapper は
+          currentDir も writeSummary も受け取らないまま抜ける
+        finding_ids: [1, 5]
+        approach: >-
+          判定フローの解決を -write-summary の分岐より手前へ寄せ、両経路で同じ規則を課す。
+          あわせて -install-wrapper に -current-dir / -write-summary を併記したらエラーにする —
+          errCurrentDirUnused と同じ「指定したのに効かないなら黙って通さない」規則を
+          この経路にも及ぼす。両経路の回帰テストを足す。
+          residual のリファクタ提案 (重複した -current-dir の未使用検査を 1 箇所に畳む) も
+          同じ箇所を触るので併せて行う
+        order: 1
+        sha: 45408f3
+        status: done
+      - problem_id: P20
+        cause: 規則を書いたが、それを守らせる関門を作らなかった
+        finding_ids: [3, 4]
+        approach: >-
+          #3 は文言の部分一致をやめ、-current-dir "" のときだけ立つ条件で判定する。
+          いまは別のエラーが立ってもその文言に -current-dir が含まれるため素通りする。
+          #4 は相対の -record-dir を installWrapper に渡してエラーになることを固定する。
+          どちらもミューテーションで落ちることを確かめる — 通るだけのテストは無いのと同じ
+        order: 2
+        sha: 54bf2ea
+        status: done
+      - problem_id: P21
+        cause: 実装や制約を変えたとき、その場の文書を直さなかった
+        finding_ids: [2, 6]
+        approach: >-
+          #2 は main.go のドキュメントコメントを現在の契約に合わせる。例示の
+          -record-dir docs/rt/ も基準の無い相対パスなので、絶対パスか -current-dir つきに直す。
+          #6 は README に、ラッパーへ絶対パスの -record-dir を追加引数で渡すと
+          errCurrentDirUnused で失敗することを書く。偽の緑にはならない (エラーで落ちる) ので
+          実装は変えず文書で足りる
+        order: 3
+        sha: 03500b5
+        status: done
+      - problem_id: P22
+        cause: 非互換を入れたが、利用者へ伝える手立てを用意しなかった
+        finding_ids: [7]
+        approach: >-
+          このスキルの外で決着済み。利用者が現時点で 1 人なので通知は不要と人間が判断した。
+          残る課題 (版を固定する手立てが無い) は Issue #33 に切り出し、README に
+          「版は固定できない。常にキャッシュ内の最新版が使われる」を明記した (9319269)。
+          Claude Code 側に利用者が版を選ぶ仕組みは無く、plugin.json の version は
+          配布側が更新を配る合図であることを調査で確かめている。
+          版番号は 0.3.1 のまま据え置く (人間の判断)
+        order: 4
+        sha: "9319269"
+        status: done
+    notes: >-
+      マージ前の最終確認 (全量)。7 件すべてを自分で再現した。レビューは報告のみで走った
+      (head が現在の HEAD と一致、作業ツリーは不変)。
+      増分レビューが構造上見られなかった型が複数出た。#1 と #5 は「経路によって契約が違う」
+      型で、このブランチが一貫して塞いできたものが -write-summary と -install-wrapper の
+      経路に残っていた。#3 と #4 は「規則を 3 箇所に書いたのに守らせる関門が無い」型で、
+      どちらもミューテーションで全 150 件が通ることを自分で確かめた。
+      #2 は main.go 自身のドキュメントコメントが旧仕様のまま残っていたもので、
+      同じファイルの中で主張が割れている。
+      依頼文の重点 1 (「基準が切り離される」型の塞ぎ残し) は指摘に至らなかった。
+      重点 2 (4 つの正本の食い違い) は #2 と #6 が該当する。
+      residual の 6 件に目を通した。ラッパーの版解決が sort -V であることと、
+      installWrapper が置き場の実在を検査しないことは、いずれも偽の緑にならないと
+      確かめられている。ハードリンクが緑になることを固定するテストが無いという指摘は、
+      範囲外の判断が決着済みなので記録として残すのみ。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 47ba63c
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 233
+        summary: >-
+          TestRunRequiresRecordDir が P20 で直したのと同じ文言の部分一致で判定しており、
+          -record-dir の必須検査を無効化しても 154 件すべて通る。隣のテストで同じ偽の合格を
+          潰したのに、こちらは直っていない。
+        category: test
+        audience: operator
+        audience_initial: developer
+        consequence:
+          condition: 将来 -record-dir の必須検査が外れたとき
+          who: operator
+          what: >-
+            既定値の廃止という設計判断が黙って崩れ、テストは緑のまま通る。
+            「必須である」ことを守る関門が実質無い
+          detectability: >-
+            気づかない。必須検査を外すと別のエラー (相対パスの基準要求) が立ち、
+            その文言にも -record-dir が含まれるため部分一致を通る
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項。条件 1: 指摘は関門がこの検査の破壊を検出しないことを主張している。
+          条件 2: 3 層から候補を挙げていずれも検出しない — Makefile は無い /
+          検査項目 2 つはツール自身の分岐を見ない / テスト関数はこの規則を守るものが
+          TestRunRequiresRecordDir だけで、それ自体が部分一致で素通りする。
+          自分でも必須検査を無効化して 154 件すべて通ることを確認した。
+          P20 (54bf2ea) で隣接するテストの同じ結合を直したのに、この関数を読み直さなかった —
+          verification.md の型 B (変更した箇所の並びを読み直す) の取りこぼしである
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/README.md
+        line: 34
+        summary: >-
+          P19 で足した -install-wrapper の併用禁止が README に書かれていない。
+          フラグ表に -install-wrapper の行自体が無く、併用できないことを知る手立てが無い。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: -install-wrapper に -current-dir や -write-summary を併記したとき
+          who: operator
+          what: 予告なくエラーになる。なぜ拒否されるかを README から知れない
+          detectability: 気づく (エラーで落ちる) が、文書に記載が無いので理由が分からない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で確認した。README に「併用できません」の記述は 0 件、フラグ表
+          (34-39 行) は 4 行で -install-wrapper の行が無い。実装 (main.go:58-68) は
+          実測でエラーを返す。同じ増分で「追加引数で -record-dir を上書きするなら相対で」
+          という別の制約は書き足しているので、制約を書く方針は採られており、
+          新設した制約だけが漏れている。全ゲートを評価して発火 0 件
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/main.go
+        line: 63
+        summary: >-
+          併用禁止が flag.Visit の「指定したか」だけで判定するため、既定値と同じ
+          -write-summary=false を渡してもエラーになる。何も要求していない呼び出しが拒否される。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            スクリプトから -write-summary=$FLAG の形で組み立てて -install-wrapper を
+            呼び、FLAG が false のとき
+          who: operator
+          what: >-
+            生成しないことを要求しただけなのに拒否される。-install-wrapper の既定の
+            挙動そのものを頼んでいるので、拒否する理由が無い
+          detectability: 気づく (エラーで落ちる) が、理由が理解しにくい
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。-write-summary=false を渡すと
+          「-write-summary は -install-wrapper と併用できません」で exit 1。
+          他の 4 フラグでは同じ問題が起きないこと (文字列フラグの空文字は別途弾かれ、
+          -record-dir / -judgment-flow は実際に使われる) もレビュア側が確かめている。
+          全ゲートを評価して発火 0 件。P19 で足した検査が過剰だった
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P23
+        cause: >-
+          P20 で同じ型 (エラーの識別を文言の部分一致で書く) を直したとき、同じファイルの
+          並びを読み直さなかった。verification.md の型 B が実例つきで戒めている型そのもの
+        finding_ids: [1]
+        approach: >-
+          TestRunRequiresRecordDir の判定を「必須検査のときだけ出る文言」に変える。
+          P20 で隣のテストに施したのと同じ形。必須検査を無効化すると落ちることを
+          ミューテーションで確かめる。
+          あわせて、同じ型が他に残っていないかを機械的に確認した — 実装が持つ 5 つの規則を
+          1 つずつ無効化してテストを走らせ、守られていないのは #1 の 1 件だけであることを
+          確かめている (他の 4 つはいずれも落ちる)
+        order: 1
+        sha: 998bc8a
+        status: done
+      - problem_id: P24
+        cause: >-
+          P19 で併用禁止の規則を足したとき、周辺の詰めをしなかった。文書へ反映せず、
+          判定も「指定したか」だけで書いた
+        finding_ids: [2, 3]
+        approach: >-
+          #2 は README のフラグ表に -install-wrapper の行を足し、併用できないことを書く。
+          #3 は -write-summary を「値が true のときだけ」弾く。=false は生成しないことを
+          頼んでいるだけで、-install-wrapper の既定の挙動そのものなので拒否する理由が無い。
+          bool フラグを対象から外す案は採らない — -write-summary=true が黙って無視され、
+          「指定したのに効かない」に戻るため。
+          同じ型が他に残っていないかも確認済み — bool フラグは -write-summary の 1 つだけで、
+          文字列フラグは空文字を明示的に弾くので同じ問題は起きない (#3 は唯一の該当)。
+          実装が持つエラー条件を README と突き合わせ、記載が漏れているのは併用禁止だけで
+          あることも確かめた (#2 は唯一の該当)
+        order: 2
+        sha: b959078
+        status: done
+    notes: >-
+      P19〜P22 を直した増分 (5feedd4..47ba63c) の再レビュー。3 件すべてを自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 が重い。P20 で TestRunRejectsEmptyExplicitPaths の文言結合を直したのに、
+      同じファイルの隣にある TestRunRequiresRecordDir を読み直さなかった。
+      verification.md の型 B (変更した箇所の並びを読み直す) が守れていない —
+      直した型と同じものが、すぐ隣に残っていた。
+      指摘 2 と 3 はどちらも P19 で足した併用禁止に伴うもの。新しい規則を足したときに
+      文書へ反映せず (2)、判定を「指定したか」だけで書いた (3)。
+      依頼文の重点 1 (制御フローの移動で別の経路が壊れていないか) は指摘に至らなかった。
+      residual に、CLAUDE_PLUGIN_ROOT が相対のときの -write-summary の挙動が
+      base では exit 0 だったが head では exit 1 になる、という報告がある。
+      これは P19 が狙った契約の統一そのもの (検査の経路は base でも exit 1 だった) で、
+      生成物が書かれる前に中断することも確かめられているので、意図した収束である。
+      重点 3 (P20 のテストの堅さ) と重点 4 (P21 の例の正しさ) はいずれも問題なしと
+      確認された。最後の 1 件 (空文字検査と併用禁止を 1 つの仕組みに畳む) は
+      指摘 3 の修正候補と重なるので併せて見る。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 2e3aa09
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 97
+        summary: >-
+          resolveBaseDir の「-current-dir は絶対パス」の規則に関門が無い。テストが実在しない
+          相対パス "rel/dir" を使うため、IsAbs の検査を無効化しても後続の os.Stat が代わりに
+          失敗し、検査が成功したように見える。
+        category: test
+        audience_initial: developer
+        audience: operator
+        consequence:
+          condition: >-
+            IsAbs の検査が (改修・リファクタリングなどで) 失われたまま、
+            利用者が相対の -current-dir を渡したとき
+          who: operator
+          what: >-
+            相対の基準が利用者に知らせず受け入れられ、プロセスのカレント基準で解決される。
+            このブランチが塞いだ「基準が起動場所に依存する」状態に戻り、
+            意図しない置き場を検査して exit 0 を返す
+          detectability: >-
+            気づけない。テスト一式は 156 件すべて通り、検査も成功したように見える。
+            利用者側でも exit 0 で「問題は見つかりませんでした」と出るため、
+            検査対象がすり替わったことを知る手がかりが無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項の 2 条件がともに成立。段 A で再現した。IsAbs の検査を
+          if false && で無効化しても go test ./... が 156 件すべて通り
+          (ASDF_GOLANG_VERSION=1.25.1)、t.TempDir 内に実在する "sub" を渡すプローブでは
+          ミューテーション下で FAIL することも確かめた。ミューテーションとプローブは削除し、
+          git status が空・HEAD が 2e3aa09 であることを確認済み。
+          免除条項の条件 1: 成立。指摘は関門 (TestResolveBaseDir の「相対はエラー」) が
+          IsAbs の規則を検出しなくなっていることを主張している。
+          条件 2: 成立。3 層から候補を挙げ、いずれも検出しない。
+          make ターゲットの層はリポジトリ直下に Makefile が無く (evals 用の 1 つのみ) 存在しない。
+          機械検査の個別項目は review-triage-record と judgment-flow の 2 つで、
+          どちらも記録 YAML と判定フロー文書を対象にし Go の実装を見ない。
+          テスト関数は 4 つを挙げた — TestResolveBaseDir は "rel/dir" が実在しないため
+          os.Stat が代わりに立ち検出しない、
+          TestRunRejectsRelativeRecordDirWithoutCurrentDir は -record-dir 側の規則で
+          -current-dir を見ない、TestRunAcceptsRelativeRecordDirWithCurrentDir は
+          絶対の -current-dir しか渡さない、TestInstallWrapperRejectsRelativeRecordDir は
+          生成の経路で resolveBaseDir を通らない。4 つとも grep の完全一致で実在を確認済み。
+          全 4 ゲートを評価して発火 0 件 — hypothetical はミューテーションとプローブで
+          再現できるため発火せず、developer-domain は対象が *_test.go だが壊れると
+          利用者が使うツールの入力検証の欠落を隠すため発火せず、
+          disproportionate-cost は修正が既存テストの入力を実在する相対パスに変える数行で
+          対象の resolveBaseDir (約 15 行) より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない (156 件すべて通ることを実測)。
+          免除が無くても D6 が 0 件で A2 に至る
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/main.go
+        line: 58
+        summary: >-
+          -install-wrapper "" を明示的に渡すと、生成もエラー報告もされないまま検査の経路へ
+          落ちる。併用禁止の検査も飛ばされるので、-install-wrapper "" と -write-summary=true を
+          並べると、ラッパーの生成を頼んだのに利用者に知らせず生成サマリが書き出される。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            スクリプトから -install-wrapper "$OUT" の形で組み立て、OUT が未設定・空のまま
+            -write-summary=true と並べて呼んだとき
+          who: operator
+          what: >-
+            ラッパーは作られず、エラーも出ず、代わりに記録の .md が書き換えられる。
+            頼んだ操作と実際に起きる操作が別物になる
+          detectability: >-
+            気づけない。exit 0 で終わり、標準出力には「生成: <置き場>/....md」と出るが、
+            これは要求した生成物ではない。同じくパスを取る -judgment-flow / -current-dir は
+            空文字を弾くので、利用者は install-wrapper も弾かれると期待する
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。-install-wrapper "" -record-dir <置き場> -write-summary=true を
+          実行すると exit 0 で記録 3 件の .md が書き出され、ラッパーは作られなかった。
+          同じ呼び出しで -judgment-flow "" は exit 1 になることも確かめ、
+          パスを取る 3 フラグの非対称を実測した。
+          免除条項の条件 1 は成立せず — 対象は関門ではなく実装の分岐で、
+          検出能力の欠落・消失を主張していない (条件 2 は評価せず)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は 3 フラグの比較を実測したため発火せず、
+          developer-domain は対象が利用者の実行するツールの実装で環境の異常も要らないため発火せず、
+          disproportionate-cost は main.go:89-93 の既存の列挙に install-wrapper を足す数行で
+          対象の run 関数より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない —
+          TestRunRejectsEmptyExplicitPaths は judgment-flow / current-dir だけを対象にし、
+          TestRunInstallWrapperRejectsUnusedFlags は install-wrapper に非空の値を渡す
+          (どちらも grep の完全一致で実在を確認済み)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 236
+        summary: >-
+          P23 は文言結合を外すために別の文言結合を入れた形になっている。挙動を変えない
+          メッセージの書き換えでテストが落ちる。同じ回で導入した errCurrentDirUnused 形式の
+          センチネルエラーを使えば結合せずに判定できる。
+        category: test
+        audience: developer
+        consequence:
+          condition: >-
+            -record-dir が必須であるという挙動を変えないまま、エラーメッセージの
+            文言だけを書き換えたとき
+          who: developer
+          what: >-
+            TestRunRequiresRecordDir が落ちる。壊れていない挙動に対してテストが赤くなるので、
+            開発者はテストの側を直すことになる
+          detectability: >-
+            気づく。文言を変えた開発者の手元で即座に赤くなる。
+            利用者には届かない (テストの結合であり、ツールの挙動は変わらない)
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [developer-domain, already-visible]
+        verdict: rejected
+        verdict_reason: >-
+          R3 — 発火したゲートは developer-domain と already-visible の 2 つ。
+          被害者は開発者だけで、製品の利用者は含まれない。段 A で再現済み
+          (文言だけを書き換えると TestRunRequiresRecordDir が落ち、他は落ちない) なので
+          指摘そのものは成り立つが、顕在化しても文言を変えた開発者の手元で
+          即座に赤くなり、調べて対処できる。誤って却下しても利用者に届かない。
+          免除条項の条件 1 は成立せず — 指摘は関門が検出しなくなることではなく、
+          関門が挙動以外にも反応することを主張しており、向きが逆 (条件 2 は評価せず)。
+          全 4 ゲートを評価した。
+          hypothetical は発火せず — 文言を書き換えるミューテーションで
+          TestRunRequiresRecordDir の FAIL を再現した。
+          developer-domain は発火 — 対象は main_test.go で、落ちるのは文言を書き換えた
+          開発者の手元だけ。結合が過剰な向き (挙動が変わらないのに落ちる) であって
+          検出できなくなる向きではないため、プロダクションの欠陥を覆い隠さない。
+          disproportionate-cost は発火せず — errRecordDirMissing 形式のセンチネルを 1 つ足し
+          errors.Is に置き換える数行で、対象のテスト関数と同程度。
+          already-visible は発火 — この欠陥が顕在化したら TestRunRequiresRecordDir が
+          赤くなる (grep の完全一致で実在を確認済み)
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P25
+        cause: >-
+          P23 で「同じ種類の問題が他に残っていないか」を機械的に確かめたとき、
+          実装が持つ規則を 5 つと数えた。resolveBaseDir の絶対パスの検査が
+          その数の外にあり、無効化しても落ちないことを確かめる対象に入らなかった。
+          数え上げの単位を先に決めず、目に付いた規則を数えたことが原因
+        finding_ids: [1]
+        approach: >-
+          TestResolveBaseDir の「相対はエラー」が渡す入力を、実在しない "rel/dir" から
+          t.TempDir 内に実在する "sub" に変える (t.Chdir でそこへ移動してから渡す)。
+          実在の検査が通過するので、絶対パスの検査だけがエラーを立てる担当になる。
+          IsAbs を if false && で無効化すると落ちることをミューテーションで確かめる
+        order: 1
+        sha: edf195f
+        status: done
+      - problem_id: P26
+        cause: >-
+          P24 で規則を数えたとき「規則に関門があるか」を単位にしたため、
+          分岐の条件式そのものの非対称 (値で見るか explicit で見るか) が数の外に残った。
+          P25 と原因の形は同じ (数え上げの単位のずれ) だが、直す対象が実装の分岐で、
+          修正の動機が別なので問題を分ける
+        finding_ids: [2]
+        approach: >-
+          -install-wrapper の空文字を、経路が分かれる前に弾く。分岐そのものは
+          explicit["install-wrapper"] で判定する。
+          当初は 3 つのパスのフラグの空文字を分岐より前でまとめて弾く案だったが、
+          既存の TestRunInstallWrapperAcceptsEmptyJudgmentFlow が落ちたため取りやめた —
+          生成の経路では -judgment-flow "" が「既定パスを使う」正当な入力だと
+          そのテストが契約として定めている。-current-dir はそもそも併用できない。
+          3 つは経路ごとに意味が違うので、他の 2 つの空文字の検査は検査の経路に残す。
+          テストを 2 つ足す — TestRunRejectsEmptyExplicitPaths に -install-wrapper の場合を
+          加え、TestRunEmptyInstallWrapperDoesNotFallThroughToCheck で
+          生成サマリの .md が書き出されないことも見る (エラーの有無だけでなく副作用を見る)。
+          あわせて、却下した指摘 #3 (エラーの識別を文言の部分一致で書く) も直した。
+          「判定の根拠を、文字列ではなく識別できるものに寄せる」という同じ方向の変更で、
+          却下は「単独では直す必要が無い」であって「直してはいけない」ではないため。
+          errRecordDirRequired / errEmptyPath / errFlagUnusedWithInstallWrapper を
+          既存の errCurrentDirUnused と同じ形で足し、テストは errors.Is で判定する
+          (#3 の evidence が「この形は他に 2 箇所ある」と挙げているので 3 つとも直した)。
+          動機が別なのでコミットは分けた (39d40a7)。利用者に出るエラーの文言は変えていない
+        order: 2
+        sha: 4a4fb14
+        status: done
+    notes: >-
+      P23・P24 を直した増分 (47ba63c..2e3aa09) の再レビュー。3 件すべてを自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 が重い。「守られていないのは 1 件だけ」という前回の網羅の確認が、
+      規則を 5 つと数えていたため 6 つ目 (IsAbs) が数の外に残っていた。
+      規則の数え上げ自体を疑う経路が無いことが、同じ型を繰り返している原因に見える。
+      指摘 2 は、規則を「関門があるか」だけで数え、分岐の条件式 (explicit か値か) の
+      非対称を数の外に置いたもの。指摘 1 と原因が同じで、どちらも
+      「網羅の確認で何を 1 単位として数えたか」の取りこぼし。
+      指摘 3 は却下したが、上流のリファクタ提案 (residual の 1 件) が
+      指摘 2 と 3 をまとめて「判定の根拠を値でなくセンチネル・explicit に寄せる」
+      1 つの変更として扱えると述べている。指摘 2 を直すときに 3 も併せて直すのは自然で、
+      却下は「直してはいけない」ではなく「これ単独では直す必要がない」という意味である。
+      residual の他の 6 件は目を通した。wrapper テンプレートの guard・
+      -write-summary の bool 表記の網羅・-current-dir の非対称・README のフラグ表は
+      いずれも上流が実行して確認済みで、記録に残す指摘は無かった。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 5e838ff
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main.go
+        line: 65
+        summary: >-
+          P26 で新しく入れた -install-wrapper の空文字検査は TrimSpace を含むが、
+          空白のみの値を渡すテストが無い。TrimSpace を外すと -install-wrapper "   " が
+          検査を通り、空白だけの名前のファイルとしてラッパーが書き出されるのに、
+          テストは 158 件すべて通る。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            TrimSpace が (改修・リファクタリングなどで) 失われたまま、
+            利用者が -install-wrapper に空白だけの値を渡したとき。
+            スクリプトから -install-wrapper "$OUT" の形で組み立て、
+            OUT に空白が混じった場合に起きる
+          who: operator
+          what: >-
+            空白だけの名前で実行可能ファイルが書き出され、exit 0 で終わる。
+            シェルから名前を指定して実行するのが難しく、ls にも見分けのつかない
+            行として現れる。頼んだ場所にラッパーは作られない
+          detectability: >-
+            気づけない。テスト一式は 158 件すべて通り、利用者側でも exit 0 で
+            「生成: 」と出る (パスの部分が空白なので、どこに作られたか読み取れない)。
+            この状態を報告する関門が 1 つも無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項の 2 条件がともに成立。段 A で再現した。
+          TrimSpace を外して go test ./... を走らせると 158 件すべて通り、
+          その状態で -install-wrapper "   " を実行すると exit 0 で
+          空白 3 文字の名前の実行可能ファイルが書き出された (ls で確認)。
+          HEAD では同じ呼び出しが「-install-wrapper に空のパスが指定されました」で
+          exit 1 になる。ミューテーションは戻し、git status が空・
+          HEAD が 5e838ff であることを確認済み。
+          免除条項の条件 1: 成立。指摘は関門が TrimSpace の規則を
+          検出しないことを主張している。
+          条件 2: 成立。3 層から候補を挙げ、いずれも検出しない。
+          make ターゲットの層はリポジトリ直下に Makefile が無く存在しない。
+          機械検査の個別項目は review-triage-record と judgment-flow の 2 つで、
+          どちらも記録 YAML と判定フロー文書を対象にし Go の実装を見ない。
+          テスト関数は 5 つを挙げた — TestRunRejectsEmptyExplicitPaths と
+          TestRunEmptyInstallWrapperDoesNotFallThroughToCheck は空文字だけを渡し
+          空白のみを渡さない、TestRunInstallWrapperAcceptsEmptyJudgmentFlow は
+          judgment-flow 側で install-wrapper には非空の値を渡す、
+          TestInstallWrapperGeneratesRunnableScript と
+          TestInstallWrapperWritesExecutableScript は生成物の中身を見るテストで
+          出力先の名前を検査しない。5 つとも grep の完全一致で実在を確認済み。
+          空白のみの入力を渡すテストが 1 つも無いことも grep で確かめた。
+          全 4 ゲートを評価して発火 0 件 — hypothetical はミューテーションと
+          プローブで再現できるため発火せず、developer-domain は対象が
+          利用者の実行するツールの実装で環境の異常も要らないため発火せず、
+          disproportionate-cost は既存のテストに空白のみの場合を足す数行で
+          対象の検査より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない (158 件すべて通ることを実測)。
+          免除が無くても D6 が 0 件で A2 に至る
+        attrs:
+          severity: P2
+          confidence: high
+    plans:
+      - problem_id: P28
+        cause: >-
+          P26 で空文字の検査に TrimSpace を書いたとき、その規則を見張るテストを
+          足さなかった。既存の TestRunRejectsEmptyExplicitPaths に -install-wrapper の
+          行を加えたが、渡す入力は空文字のままで、空白のみの入力を通していない。
+          「フラグを 1 つ足した」ことは数えたが、「入力の種類が 1 つ増えた」ことを
+          数えていない — 数え上げの単位が、フラグの数であって規則の数ではなかった
+        finding_ids: [1]
+        approach: >-
+          TestRunRejectsEmptyExplicitPaths の表を、フラグ名だけの表から
+          フラグ名と入力値の組の表に変える。入力は空文字と空白のみの 2 種類にし、
+          3 つのフラグそれぞれに両方を通す。
+          レビューの residual が挙げるとおり、同じ欠落は judgment-flow / current-dir 側
+          (main.go:107) にもあり、こちらは base 2e3aa09 の時点から存在する。
+          原因が同じ (TrimSpace の規則を見張るテストが無い) なので 1 つの問題として直す —
+          指摘は install-wrapper の側にしか立っていないが、現象に合わせて片方だけ直すと
+          同じ原因の別の現れが残る。
+          2 箇所の TrimSpace をそれぞれ外すミューテーションで、両方が落ちることを確かめる
+        order: 1
+        sha: 08c6a37
+        status: done
+    notes: >-
+      P25〜P27 を直した増分 (2e3aa09..5e838ff) の再レビュー。1 件を自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      重点として挙げた 5 点のうち 4 点は問題なしと確認された —
+      経路ごとの空文字検査の分け方 (-current-dir "" を併記すると併用禁止が先に立つのは妥当)、
+      %w の包み方 (助詞を挟んでもメッセージと errors.Is の両方を満たす)、
+      t.Chdir の副作用 (サブテスト終了時に Go が復元し、t.Parallel は 1 つも無い)、
+      新規テストの有効性 (エラー系の assertion を無効化しても .md の検査だけで FAIL する)。
+      重点 5 (規則の数え上げ) には「何を 1 単位として数えるか」を先に明示させた。
+      レビュアは「早期 return または制御フローを変える条件ガード」を単位として
+      run() と resolveBaseDir() から 22 個を数え、生存が 5 つ、うち増分が
+      導入したのは指摘 1 の 1 件だけと報告している。残り 4 つは base 2e3aa09 でも
+      生存することを確かめたうえで residual に回されており、
+      前回・前々回の取りこぼしとは違って数え上げの単位が明示されている。
+      residual の 2 番目 (judgment-flow / current-dir 側でも TrimSpace を外すと
+      158 件すべて通る) は自分でも再現した。指摘 1 と同じ種類の欠落で、
+      直すなら 3 フラグまとめて 1 つのテストで見るのが自然である。
+      residual の 5 番目 (分岐を explicit から値に戻しても通る) は、
+      空白のみを直前の検査が弾くので HEAD では論理的に等価という指摘で、妥当である。
+      ただしこれは指摘 1 を直すと変わる — TrimSpace の関門ができれば、
+      値に戻すミューテーションも別の形で捕まる可能性がある。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: bd926be
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 325
+        summary: >-
+          「空白のみ」の入力値に半角スペースだけを選んだため、strings.TrimSpace が
+          削らない不可視文字 (ゼロ幅スペース U+200B など) が関門の外に残っている。
+          -install-wrapper に U+200B を渡すと exit 0 で不可視の名前のファイルが
+          書き出され、これは P28 が塞ごうとした被害そのものである。
+        category: test
+        audience_initial: developer
+        audience: operator
+        consequence:
+          condition: >-
+            スクリプトから -install-wrapper "$OUT" の形で組み立て、OUT に
+            不可視文字 (U+200B / U+2060 / U+FEFF) だけが入っていたとき。
+            文字列を別の場所からコピーしたり、BOM 付きの値を経由したときに起きる
+          who: operator
+          what: >-
+            不可視の名前で実行可能ファイルが書き出され、exit 0 で終わる。
+            ls では見分けのつかない行として現れ、シェルから名前を指定して
+            実行するのが難しい。頼んだ場所にラッパーは作られない
+          detectability: >-
+            気づけない。テスト一式は 161 件すべて通り、利用者側でも exit 0 で
+            「生成: 」と出る (パスの部分が不可視なので、どこに作られたか読み取れない)。
+            この状態を報告する関門が 1 つも無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A1 — 免除条項の 2 条件がともに成立。段 A で再現した。HEAD のまま
+          -install-wrapper に U+200B を渡すと exit 0 で書き出され、
+          ls -b が \342\200\213 を示した (ミューテーション不要)。
+          あわせて TrimSpace が削る文字を機械的に調べ、レビューが挙げた候補
+          (タブ・改行・NBSP・全角スペース U+3000・NEL) はいずれも既に
+          弾かれることを確かめた。削らないのは U+200B / U+2060 / U+FEFF の 3 つで、
+          これらは空白ではなくフォーマット文字 (Cf) である。
+          免除条項の条件 1: 成立。指摘は関門が不可視文字の場合を
+          検出しないことを主張している。
+          条件 2: 成立。3 層から候補を挙げ、いずれも検出しない。
+          make ターゲットの層はリポジトリ直下に Makefile が無く存在しない。
+          機械検査の個別項目は review-triage-record と judgment-flow の 2 つで、
+          どちらも記録 YAML と判定フロー文書を対象にし Go の実装を見ない。
+          テスト関数は 4 つを挙げた — TestRunRejectsEmptyExplicitPaths は
+          空文字と半角スペースだけを渡す、
+          TestRunEmptyInstallWrapperDoesNotFallThroughToCheck は空文字だけを渡す、
+          TestInstallWrapperGeneratesRunnableScript と
+          TestInstallWrapperRejectsRelativeRecordDir は出力先の名前を検査しない。
+          4 つとも grep の完全一致で実在を確認済み。
+          U+200B 等を渡すテストが 1 つも無いことも grep で確かめた。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は HEAD のまま再現できるため
+          発火せず、developer-domain は対象が *_test.go だが壊れると利用者が使う
+          ツールの入力検証の欠落を隠すため発火せず、
+          disproportionate-cost は入力値の表に 1 行足す変更で対象より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない (161 件すべて通ることを実測)。
+          免除が無くても D6 が 0 件で A2 に至る
+        plan_ref:
+          run: 13
+          problem: P29
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/README.md
+        line: 85
+        summary: >-
+          README:85 が挙げる -record-dir "" は「空のパスの検査」で弾かれるのではなく
+          必須の検査で弾かれる。かつ -record-dir だけは空白のみの値に対する
+          空のパスの検査を持たないため、この行の例は実装の規則を誤って伝えている。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: >-
+            利用者が README:85 を読んで、-record-dir にも空のパスの検査が
+            働くと理解したとき。スクリプトから -record-dir "$DIR" を組み立て、
+            DIR が空白だけになる場合に頼りにする
+          who: operator
+          what: >-
+            -record-dir が空白だけの値でも、その名前のディレクトリが実在すれば
+            検査対象として解決され exit 0 で終わる。README が「その場でエラーに
+            する」と約束した振る舞いが得られない
+          detectability: >-
+            気づけない。exit 0 で「問題は見つかりませんでした」と出るため、
+            意図した置き場が検査されなかったことを知る手がかりが無い。
+            README の記述を実装と突き合わせる機械検査も無い (grep で確認)
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。-record-dir "" は errRecordDirRequired
+          (「-record-dir は必須です」) で弾かれ、errEmptyPath ではない。
+          空白 3 文字の名前のディレクトリを作って -current-dir 経由で
+          -record-dir "   " を渡すと exit 0 で「問題は見つかりませんでした」と出た。
+          README:85 の「検査する場所を決められないのでその場でエラーにする」と
+          食い違う。この文は P28 (08c6a37) で書き換えたものなので、増分が
+          持ち込んだ誤りである。
+          免除条項の条件 1 は成立せず — 対象は文書であり、
+          関門の検出能力の欠落・消失を主張していない (条件 2 は評価せず)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は 2 つの呼び出しを
+          実測したため発火せず、developer-domain は README が利用者向けの文書で
+          環境の異常も要らないため発火せず、
+          disproportionate-cost は 1 行の書き換えで対象より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない
+          (README の記述を実装と突き合わせる機械検査が無いことを grep で確認)
+        plan_ref:
+          run: 13
+          problem: P30
+        attrs:
+          severity: P3
+          confidence: high
+    notes: >-
+      P28 を直した増分 (5e838ff..bd926be) の再レビュー。2 件とも自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      この増分は実装 (main.go) を変えておらず、テストと文書だけの変更である。
+      重点として挙げた 5 点のうち 3 点は問題なしと確認された —
+      表の構造を変えても検査の範囲は狭まっておらず (3 サブテスト → 6 サブテストで
+      旧 3 件をすべて含む)、生存ガードは前回の 5 つから 4 つに減り
+      (main.go:107 の TrimSpace が KILLED に転じた)、記録 YAML にも矛盾が無い。
+      重点 2 (入力値の選び方) と重点 4 (README と実装の一致) がそれぞれ指摘になった。
+      指摘 1 は、P28 で「入力の種類が 1 つ増えたことを数えていない」を直したのに、
+      その入力の種類を「半角スペース」に限ってしまった形である。
+      TrimSpace が削るのは Unicode の空白類 (unicode.IsSpace) なので、
+      レビューが候補に挙げたタブ・全角スペース等は既に覆われていた。
+      残るのは空白ではないフォーマット文字 (Cf) — U+200B / U+2060 / U+FEFF の 3 つで、
+      これは「空白のみ」という単位の取り方が Unicode の分類と一致していなかったことによる。
+      指摘 2 は、P28 で README:85 を書き換えたときに、実装を実行して確かめずに
+      例を足したもの。verification.md の型 A (実行で確かめられる主張は実行してから書く)
+      が守れていない。前回の判定で「README:85 の記述と実装が一致する」と報告したが、
+      そのとき確かめたのは -judgment-flow "   " の側だけで、
+      文の先頭に置いた -record-dir "" を確かめていなかった。
+      residual の 6 番目にリファクタ提案が 1 件ある (main.go:65 と main.go:107 の
+      空のパスの判定を 1 つの述語に寄せる)。指摘 1 を直すと判定基準が変わるので、
+      その修正と併せて見るのが自然である。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: full
+    head: 3de8b1d
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 113
+        summary: >-
+          検査の経路が errEmptyPath で弾く空白だけの -judgment-flow を、-install-wrapper の
+          経路は弾かずに絶対パスへ変換して焼き込む。同じ入力に経路ごとに違う契約があり、
+          生成されたラッパーは実行するたび必ず非 0 で落ちる状態で書き出される。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            -install-wrapper に、空白だけの -judgment-flow を渡したとき。スクリプトから
+            -judgment-flow "$FLOW" の形で組み立て、FLOW が空白だけになった場合に起きる
+          who: operator
+          what: >-
+            生成は exit 0 で「生成: …」と報告されるが、生成物には
+            「<展開先>/tools/triagecheck/   」(末尾に空白 3 つ) が -judgment-flow として
+            焼き込まれる。そのラッパーは叩くたびに「判定フローの正本が存在しません」で
+            exit 1 になり、記録の検査も走らない。空文字なら既定パスになり、
+            検査の経路なら errEmptyPath で止まるので、同じ「空のパス」が
+            3 通りに扱われる。README:85 の「空のパスを明示指定した場合はその場で
+            エラーにする」とも食い違う
+          detectability: >-
+            気づく (ラッパーを 1 度実行すればエラーで止まる) が、生成の時点では
+            成功と報告され、エラーの文言に現れるパスの末尾が空白なので、
+            利用者が原因 (空白だけの値を渡した) にたどり着きにくい。
+            この状態を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。展開先の形 (<cache>/review-triage/0.3.1/tools/triagecheck)
+          を作業ディレクトリの外に作り、HEAD のビルドを実行した。
+          検査の経路に -judgment-flow "   " を渡すと
+          「-judgment-flow に空のパスが指定されました」で exit 1、
+          -install-wrapper に同じ値を渡すと exit 0 で生成され、生成物の 27 行目は
+          `-judgment-flow "<展開先>/tools/triagecheck/   "` だった。
+          そのラッパーを実行すると「-judgment-flow が指す判定フローの正本が存在しません」
+          で exit 1。空文字を渡した対照では既定パス ($root/skills/…) が焼き込まれた。
+          wrapper.go:113 の分岐は `if judgmentFlow != ""` で TrimSpace を通しておらず、
+          main.go:107 の検査 (TrimSpace) と条件が違うことも逐語で確かめた。
+          免除条項の条件 1 は成立せず — 対象は実装の分岐で、関門の検出能力の
+          欠落・消失を主張していない (条件 2 は評価せず)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は HEAD のまま再現できるため
+          発火せず、developer-domain は環境の異常ではなく対象が利用者の使うツールなので
+          発火せず、disproportionate-cost は分岐の条件を TrimSpace に寄せる 1 行
+          (または main.go:107 と同じ検査を生成の経路に置く数行) で
+          installWrapper (wrapper.go:79-137) より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない —
+          TestRunInstallWrapperAcceptsEmptyJudgmentFlow は空文字だけを渡し、
+          TestInstallWrapperEmbedsExplicitJudgmentFlow は非空の実パスだけを渡し、
+          TestRunRejectsEmptyExplicitPaths は -install-wrapper 自身の値と
+          検査の経路の -judgment-flow を見るが、-install-wrapper と空白だけの
+          -judgment-flow の組は通していない (3 つとも本体を読んで確認。
+          grep 'func Test' の一覧に他の候補は無い)。
+          レビューは複製上のミューテーション (wrapper.go:113 に TrimSpace を足しても
+          161 件すべて通る) でも関門の不在を示している。
+        plan_ref:
+          run: 13
+          problem: P29
+        attrs:
+          severity: P2
+          confidence: high
+    notes: >-
+      ブランチを 3de8b1d (回 11 の判定を記録した直後) へ reset した後の全量 (main..3de8b1d)
+      の再確認。回 11 で採択した 2 件は未修正のままで、それに対する修正計画もまだ無い。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      指摘 1 は自分で再現した。これは回 7 の指摘 1 (-write-summary の経路が相対の
+      -judgment-flow に基準を要求しない) と同じ「経路によって契約が違う」型で、
+      P19 で検査と -write-summary の 2 経路をそろえたときに、-install-wrapper の
+      経路の -judgment-flow が対象に入らなかったもの。
+      同じ入力 (空のパス) が、検査の経路ではエラー・空文字なら既定・空白のみなら
+      焼き込み、と 3 通りに扱われている。
+      回 11 の指摘 1 (不可視文字) と合わせると、「空のパス」の判定が main.go:65・
+      main.go:107・wrapper.go:113 の 3 箇所に別々の条件で書かれていることが原因の
+      共通部分であり、直すときは 1 つの述語に寄せる (回 11 の residual のリファクタ提案)
+      のが自然である。
+      residual の 3 件に目を通した。1 つ目 (-install-wrapper の -judgment-flow が
+      相対でも生成時のカレント基準で絶対化され、-record-dir と違ってエラーにならない)
+      は、指摘 1 を直すときに同じ分岐を触るので併せて見る価値がある —
+      実害の入力を挙げられなかったのでレビューが findings に入れなかった判断は妥当。
+      2 つ目 (README のテスト件数 161 が実測と一致) と 3 つ目 (plugin.json の版は
+      P22 で人間が据え置きを判断済み) は対処不要。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: full
+    head: "3f62af0"
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 79
+        summary: >-
+          -install-wrapper の経路は -judgment-flow と -record-dir の実在を一切検査せず、
+          誤った値をそのままラッパーへ焼き込んで exit 0 で成功と報告する。検査の経路は
+          同じ値をすべて非 0 で弾く。空白だけの値に限らず、綴りの誤りや空変数の展開でも起きる。
+        category: plugin-code
+        audience_initial: operator
+        audience: operator
+        consequence:
+          condition: >-
+            利用者がリポジトリに検査コマンドを設置する初回セットアップで、-install-wrapper を
+            使う道を選び (project-config.md:53 が挙げる 2 択の片方)、かつ -judgment-flow を
+            明示的に渡し、その値が正本を指していないとき。最も現実的な経路は
+            README:96 の Makefile 例と同じ $(REVIEW_TRIAGE_ROOT)/skills/... の形で
+            変数が空に展開される場合で、README:110 自身がこの変数について
+            「空のまま実行すると分かりにくいエラーになる」と警告している。
+            綴りの誤り (judgement-flow.md) や実在しない -record-dir でも同じく起きる
+          who: operator
+          what: >-
+            生成は exit 0 で「生成: …」と報告されるが、誤った値がそのまま焼き込まれる。
+            そのラッパーは以後叩くたびに「判定フローの正本が存在しません」で exit 1 になり、
+            記録の検査も走らない。焼き込まれた値は固定なので、リポジトリごとに一度の
+            セットアップで作った関門が、最初から一度も機能しないまま残る
+          detectability: >-
+            生成の時点では気づけない (exit 0 で成功と報告される)。後でラッパーを実行すれば
+            エラーで止まるので気づくが、そのときには生成時の入力から離れており、
+            原因にたどり着きにくい。この状態を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。現 HEAD (3f62af0) でビルドし直し、展開先の形
+          (<cache>/review-triage/0.0.1/tools/triagecheck) を作業ツリーの外に作って
+          4 通りの入力を両経路に与えた。生成の経路はいずれも exit 0 で焼き込み、
+          検査の経路はいずれも exit 1 で報告した —
+          (a) 綴りの誤り judgement-flow.md、
+          (b) $ROOT が空に展開された /skills/review-triage/references/judgment-flow.md
+          (生成物の 27 行目を逐語で確認)、
+          (c) 実在しない -record-dir (../no-such-dir を焼き込む)、
+          (d) 空白だけの "   "。
+          空文字 "" だけは既定パス ($root/skills/...) になり、これは P13 で意図的に
+          決めた入力である。wrapper.go:113 の分岐は `if judgmentFlow != ""` で、
+          TrimSpace も実在検査も通さないことを逐語で確かめた。
+          3de8b1d..3f62af0 の差分はトリアージ記録 2 ファイルのみで実装の変更が無いことも
+          git diff --stat で確認している。
+          免除条項の条件 1 は成立せず — 対象は実装の分岐 (installWrapper) であり、
+          関門の検出能力の欠落・消失を主張していない (条件 2 は評価せず)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は HEAD のまま 4 通りとも
+          再現できるため発火せず、developer-domain は環境の異常を要さず対象が
+          利用者の使うツールなので発火せず、disproportionate-cost は生成の経路に
+          実在検査を置く数行 (検査の経路の judgmentFlowProblems / errRecordDirMissing と
+          同じ形) で installWrapper (wrapper.go:79-137、59 行) より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない。
+          関門は 3 層すべてを列挙した — make ターゲットの層はリポジトリ直下に
+          Makefile が無く存在しない (ls で確認)。機械検査の個別項目は
+          review-triage-record と judgment-flow の 2 つで、どちらも記録 YAML と
+          判定フロー文書を対象にし Go の実装を見ない。テスト関数は 84 件を
+          grep -rh '^func Test' で列挙し、-install-wrapper に関わる 6 件の本体を読んだ。
+          決定的なのは TestInstallWrapperEmbedsExplicitJudgmentFlow で、
+          実在しない "/custom/judgment-flow.md" を渡して「焼き込まれること」を
+          アサートしている — つまり実在を検査しない挙動を契約として固定しており、
+          この指摘を検出しないどころか現状を守る側にある。
+          残る 5 件も TestInstallWrapperRejectsRelativeRecordDir が相対パスだけ、
+          TestRunInstallWrapperAcceptsEmptyJudgmentFlow が空文字だけ、
+          TestRunRejectsEmptyExplicitPaths が -install-wrapper 自身の値と
+          検査の経路の -judgment-flow だけを見ており、いずれも実在を見ない。
+          複製上のミューテーション (wrapper.go:113 に TrimSpace を足す) でも
+          161 件すべて通ることを実測している。
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/README.md
+        line: 85
+        summary: >-
+          README:85 が「空のパスを明示指定した場合はその場でエラーにする」と経路を限定せずに
+          書いているが、この規則が成り立つのは検査の経路だけで、-install-wrapper の経路は
+          同じ値を通す。読み手は生成の経路でも弾かれると読む。
+        category: doc-user
+        audience_initial: operator
+        audience: operator
+        consequence:
+          condition: >-
+            利用者が README:85 を読んで、-install-wrapper でも空のパスが弾かれると理解し、
+            スクリプトから -install-wrapper ... -judgment-flow "$FLOW" を組み立てて
+            FLOW が空白だけになる場合に、その検査を頼りにしたとき
+          who: operator
+          what: >-
+            README が「その場でエラーにする」と約束した振る舞いが得られず、exit 0 で
+            ラッパーが生成される。README:85 が例として挙げている -judgment-flow "   "
+            そのものが、生成の経路では弾かれない
+          detectability: >-
+            生成の時点では気づけない。README の記述を実装と突き合わせる機械検査も無い
+            (関門の 3 層を列挙して確認済み)
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で矛盾する 2 箇所を逐語で確認した。README.md:85 は
+          「なお**空のパス (`-record-dir ""` や、空白だけの `-judgment-flow "   "` など) を
+          明示指定した場合は、検査する場所を決められないのでその場でエラーにする。**」で、
+          主語に経路の限定が無い。実装は wrapper.go:113 が `if judgmentFlow != ""` の
+          素の比較で、指摘 1 の (d) のとおり -install-wrapper に "   " を渡すと
+          exit 0 で生成される。
+          この文は P28 (08c6a37) で書き換え、回 11 の指摘 2 で -record-dir の部分を
+          直した箇所だが、そのとき確かめたのは検査の経路だけで、生成の経路に同じ例が
+          当てはまらないことは見ていない。同じ文が 2 回続けて不正確なまま残っている。
+          免除条項の条件 1 は成立せず — 対象は文書であり、関門の検出能力の欠落・消失を
+          主張していない (条件 2 は評価せず)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は実測で再現したため発火せず、
+          developer-domain は README が利用者向けの文書で環境の異常も要らないため発火せず、
+          disproportionate-cost は 1 文の書き換えで対象より小さいため発火せず、
+          already-visible は赤くなる関門を挙げられない (README の記述を実装と
+          突き合わせる機械検査が無いことを 3 層の列挙で確認)。
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P29
+        cause: >-
+          P19 で「経路によって契約が違う」型を直したとき、検査と -write-summary の 2 経路は
+          そろえたが、-install-wrapper の経路を対象に入れなかった。生成の経路は値を
+          焼き込むだけで検査しないという当初の設計をそのまま残しており、
+          「在り処を指定したのに検査できないならその場でエラーにする」という
+          このブランチの規則がこの経路にだけ及んでいない。
+          回 12 では同じ欠陥を「空白だけの値」という症状の側から捉えたため、
+          範囲が狭すぎた — ここで実在検査の有無へ広げ直す
+        finding_ids:
+          - 1
+        approach: >-
+          生成の経路でも -judgment-flow の実在を検査する。空文字は今までどおり
+          $root の既定パスに落とす (P13 の判断を壊さない) ので、対象は「非空だが
+          正本を指さない値」になる。これで綴りの誤り・空変数の展開・空白だけの値の
+          3 つが同じ 1 つの検査で弾ける。
+          -record-dir については「これから作る置き場」を指定する使い方があり得るため、
+          -judgment-flow と同じ扱いにしてよいかを先に決める (人間の判断が要る論点)。
+          テストは実在しない -judgment-flow を -install-wrapper に渡してエラーになることを
+          足し、ミューテーション (実在検査を外す) で落ちることを確かめる。
+          既存の TestInstallWrapperEmbedsExplicitJudgmentFlow は実在しない
+          "/custom/judgment-flow.md" を渡して焼き込みをアサートしており、この修正で
+          落ちる。テストの意図 (明示した値が既定パスに優先すること) は保ったまま、
+          渡す値を実在するファイルに変える。
+          あわせて回 11 の指摘 1 (不可視のフォーマット文字が空の判定を通り抜ける) も
+          この問題で直す。原因は同じ「空のパスの判定が経路ごとに別の条件で書かれている」
+          ことで、判定を 1 つの述語 (不可視文字を除くと空になるか — U+200B / U+2060 /
+          U+FEFF を含む Cf と Unicode の空白類) に切り出し、main.go:65・main.go:107 と
+          生成の経路の 3 箇所から呼ぶ。U+200B を 3 つのフラグそれぞれに渡すテストを足し、
+          述語を TrimSpace に戻すミューテーションで落ちることを確かめる
+        order: 1
+        options: >-
+          -record-dir を -judgment-flow と同じく生成時に実在検査するかどうか。
+          案 1 (両方を検査する): 4 通りの誤りをすべて生成時に弾ける。ただし
+          「置き場をこれから作る」段取り (ラッパーを先に用意してから docs/review-triages を
+          作る) が使えなくなる。案 2 (-judgment-flow だけ検査する): 段取りの自由度は
+          残るが、実在しない -record-dir を焼き込んだラッパーは検査の経路で
+          errRecordDirMissing になるまで気づけない。なお検査の経路は現在すでに
+          -record-dir の不在をエラーにしているので、案 2 でも「ラッパーを実行した時点」で
+          必ず気づける (黙って緑にはならない)。
+          この差は利用者の段取りの好みに関わるため、人間の判断を待つ。
+          → 人間が案 1 (両方を検査する) を選んだ。README に「置き場を後から作る
+          段取りは取れない」ことを明記した
+        status: done
+        sha: ae2e40f
+      - problem_id: P30
+        cause: >-
+          README:85 の文を書き換えるとき、検査の経路だけを実行して確かめ、
+          生成の経路に同じ例を当てはめて読み直していない。回 11 の指摘 2 で
+          -record-dir の部分を直したときも同じ確かめ方をしており、同じ文が
+          2 回続けて不正確なまま残った
+        finding_ids:
+          - 2
+        approach: >-
+          README:85 の規則がどの経路のものかを明示する。P29 で生成の経路にも
+          実在検査を入れるなら、経路によらず成り立つ形に書き直せる。
+          入れない判断になった場合は、規則を検査の経路に限定し、生成の経路は
+          値を検証せず焼き込むことを別に書く。
+          どちらにせよ、書いた内容は 2 つの経路それぞれで実行して確かめてから書く
+          (verification.md の型 A)
+        order: 2
+        depends_on:
+          - P29
+        status: done
+        sha: fc9a559
+    notes: >-
+      この回は、回 12 (head 3de8b1d) と同じレビューの差し替えである。回 12 で採択した
+      指摘 1 (空白だけの -judgment-flow が経路で割れる) は、レビュア自身の再確認により
+      「症状の一例であって原因ではない」ことが分かり、範囲を広げた形で報告し直された。
+      判定もこの回のものを正とする — 回 12 の P29 として計画する範囲を、空白だけの値から
+      「生成の経路が実在を検査しない」全体へ広げる必要がある。
+      3de8b1d..3f62af0 の差分はトリアージ記録 2 ファイルのみで実装の変更は無いため、
+      回 12 の判定を取り消すのではなく、対象範囲を訂正する扱いになる。
+      指摘 1 の already-visible の評価で、TestInstallWrapperEmbedsExplicitJudgmentFlow が
+      実在しないパス "/custom/judgment-flow.md" を渡して焼き込みをアサートしていることが
+      分かった。これは「実在を検査しない」ことを契約として固定しているので、修正するときは
+      このテストの意図 (明示した値が既定パスに優先することの確認) を保ちながら、
+      渡す値を実在するものに変える必要がある。
+      指摘 2 は、同じ README:85 の文が回 11 の指摘 2 に続いて 2 回目の誤りとして現れた。
+      1 回目は -record-dir の例が誤り、2 回目は経路の限定が無いこと。文を直すたびに
+      検査の経路だけを確かめており、生成の経路に当てはめて読み直していない。
+      residual の 1 つ目 (修正時に TrimSpace を足すだけで閉じると綴りの誤りと
+      空変数の展開が残る) は、この回の指摘 1 の本体そのものなので記録に取り込んだ。
+      2 つ目 (-record-dir に「これから作る置き場」を指定する使い方があり得るため、
+      生成時に実在を要求するかは -judgment-flow と別に判断が要る) は修正計画で扱う論点。
+      3 つ目 (空のパスの判定が main.go:65・main.go:107・wrapper.go:113 の 3 箇所に
+      別々の条件で書かれている) は回 12 の notes が挙げたリファクタ提案だが、
+      指摘 1 のとおり本体は空判定ではなく実在検査の有無なので、述語を 1 つに寄せるだけでは
+      閉じない。4 つ目 (テスト件数 161 が実測と一致) と 5 つ目 (版番号は P22 で
+      人間が据え置きを判断済み) は対処不要。
+      なお出力先 tmp/ には過去の回のファイルが 18 件あり、head が現在の HEAD と一致する
+      ものは 1 件だけだった。うち 1 件 (p30、head 26a08a2) は現在の HEAD の祖先でない
+      コミットを指す — P29・P30 を修正しかけた作業が reset で捨てられた形跡で、
+      そこでは 104f05b が README:85 から -record-dir を外す修正を、8bc8055 が
+      不可視の値を弾く修正を入れていた。現在の HEAD にはどちらも含まれていない。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: dd469bb
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 123
+        summary: >-
+          -install-wrapper は相対の -judgment-flow に基準を要求せず、プラグイン展開先の
+          tools/triagecheck を暗黙の基準にして解決する。検査の経路は同じ入力を
+          「基準を -current-dir で指定するか、絶対パスにしてください」で非 0 で弾くので、
+          同一の入力に 2 つの契約が残っている。-record-dir には 91 行目に IsAbs の関門が
+          あるが、-judgment-flow には無い。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            -install-wrapper に相対の -judgment-flow を渡したとき。利用者は自分のリポジトリや
+            叩いた場所を基準に書くが、実装は展開先の tools/triagecheck を基準に解決する。
+            その場所にたまたま同名のファイルがある場合 (展開先の tools/triagecheck には
+            README.md や main.go が実在する) に顕在化する
+          who: operator
+          what: >-
+            同名のファイルが無ければ「指す先が存在しません」で止まるが、報告されるのは
+            利用者が書いていない展開先基準のパスで、「相対だから」とは言われない。
+            同名のファイルがあれば exit 0 で生成され、版のディレクトリ (0.3.1 など) を
+            含む固定の絶対パスが焼き込まれる。ラッパー本体は sort -V で最新の版を拾うのに
+            -judgment-flow だけがその版に固定されるので、プラグインを更新して版の
+            ディレクトリが入れ替わった時点で、そのラッパーは叩くたびに必ず失敗する
+          detectability: >-
+            気づく (いずれも非 0 で止まる) が、原因にたどり着きにくい。不在の場合は
+            利用者の書いた値と別のパスが報告され、存在した場合は生成時には成功と報告され、
+            失敗が現れるのはプラグイン更新後である。この経路の相対パスを検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。展開先の形 (<cache>/review-triage/0.0.1/tools/triagecheck)
+          を作業ツリーの外に作り、HEAD のビルドを実行した。
+          検査の経路と -write-summary の経路は -judgment-flow "rel/flow.md" を
+          「-judgment-flow が相対パスです。基準を -current-dir で指定するか、
+          絶対パスにしてください」で exit 1。生成の経路は同じ値を展開先基準で解決し、
+          不在なら「指す先が存在しません: <展開先>/tools/triagecheck/rel/flow.md」で exit 1、
+          展開先に rel/flow.md を置くと exit 0 で生成され、生成物の 27 行目に
+          版 0.0.1 を含む絶対パスが焼き込まれた。
+          wrapper.go:91-95 の IsAbs の関門が -record-dir にだけあり、
+          wrapper.go:122-126 の -judgment-flow は filepath.Abs に直接渡していることを
+          逐語で確かめた。wrapper.go:87-90 のコメントが関門の理由を
+          「検査の経路で相対に基準を要求するのと同じ理由」と書いており、
+          その理由は -judgment-flow にも当たる。
+          免除条項の条件 1 は成立せず — 対象は実装の分岐で、関門の検出能力の
+          欠落・消失を主張していない (条件 2 は評価せず)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は HEAD のまま再現でき、
+          テストでも t.Chdir と 1 ファイルの作成で作れるため発火せず、
+          developer-domain は環境の異常ではなく対象が利用者の使うツールなので発火せず、
+          disproportionate-cost は -record-dir と同じ IsAbs の検査 (wrapper.go:91-95 の
+          5 行) を -judgment-flow にも置く変更で installWrapper (wrapper.go:79-152)
+          より小さいため発火せず、already-visible は赤くなる関門を挙げられない —
+          TestInstallWrapperRejectsRelativeRecordDir は -record-dir だけを見る、
+          TestInstallWrapperRequiresPathsToExist の 4 入力に相対パスは無い、
+          TestInstallWrapperEmbedsExplicitJudgmentFlow は実在する絶対パスを渡す
+          (3 つとも本体を読んで確認。wrapper_test.go の func Test 一覧に他の候補は無い)。
+          回 12 の residual (相対の -judgment-flow が生成時のカレント基準で絶対化される)
+          は「実害の入力を挙げられない」ため指摘にしなかったが、この回は
+          暗黙の基準に同名のファイルが実在する入力を挙げて再現しており、指摘として成立する。
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/wrapper.go
+        line: 164
+        summary: >-
+          空白だけの -judgment-flow "   " に対し、生成の経路の報告が利用者の渡していない
+          パス (展開先 + 空白 3 文字) を指す。検査の経路は「空のパスが指定されました」と
+          値の性質を名指しするので、同じ入力に対する案内が経路で食い違い、生成の側は
+          直す先が分からない。
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: >-
+            -install-wrapper に空白だけの -judgment-flow を渡したとき (スクリプトの変数が
+            空白だけに展開された場合)
+          who: operator
+          what: >-
+            exit 1 で止まるので生成はされないが、報告されるのは
+            「<展開先>/tools/triagecheck/   」という利用者が書いていないパスで、
+            末尾の空白は表示上見えない。検査の経路なら「空のパスが指定されました」と
+            出るので、同じ値に対する案内が経路で違う
+          detectability: >-
+            気づく (非 0 で止まる) が、報告からは「渡した値が空白だけだった」ことを
+            読み取れない。報告の文言を経路間で突き合わせる関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。生成の経路に -judgment-flow "   " を渡すと
+          「-judgment-flow が指す先が存在しません (…): <展開先>/tools/triagecheck/   」
+          で exit 1 (sed -n l で末尾の空白 3 文字を確認)。検査の経路は同じ値を
+          「-judgment-flow に空のパスが指定されました」で exit 1。
+          requireExists (wrapper.go:161-168) が絶対化した後の path を報告することを
+          逐語で確かめた。README:87 は「空白だけの値は実在の検査で弾かれる」と
+          現状の挙動どおりに書いているので、契約の食い違いではなく報告の質の問題である。
+          免除条項の条件 1 は成立せず (対象は実装の報告文言)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は再現済みで発火せず、
+          developer-domain は対象が利用者の使うツールで発火せず、
+          disproportionate-cost は requireExists の手前で空白だけの値を
+          errEmptyPath で弾く 3 行ほどの変更で対象より小さく発火せず、
+          already-visible は赤くなる関門を挙げられない —
+          TestInstallWrapperRequiresPathsToExist の「judgment-flow が空白だけ」は
+          現状の errInstallWrapperPathMissing を期待しており、この欠陥を検出する側ではなく
+          現状を契約として固定している側である (直すときはこのケースの期待を変える必要がある)。
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P31
+        cause: >-
+          -install-wrapper の経路が、パスの解決 (main.go:98 以降) より前で分岐して
+          戻るため、検査の経路が持つ規則が 1 つも届かず、同じ規則を wrapper.go に
+          別の条件で書き直してきた。さらに 2 つの特例 (回 7 の指摘 5 で入れた
+          -current-dir の併用禁止と、P13 で入れた -judgment-flow "" を既定とみなす扱い)
+          が「生成の経路だけ違う」を固定しているので、規則を 1 つ足すたびに
+          生成の経路の例外処理が要る。回 7 以降の採択の大半は、この
+          規則 × 経路 × フラグ の表を 1 マスずつ埋めた結果で、指摘 1 (相対に
+          基準を要求しない) も指摘 2 (空白だけの値の報告が経路で違う) も
+          同じ表の空いたマスである
+        finding_ids:
+          - 1
+          - 2
+        approach: >-
+          パスの規則を経路の分岐より前の 1 か所に寄せる。フラグを読んだ直後に、
+          明示された各パス (-record-dir / -judgment-flow / -current-dir /
+          -install-wrapper) へ同じ順で規則を当てる — (1) 空・空白・不可視
+          (Unicode の空白類と Cf) なら errEmptyPath、(2) 相対なら -current-dir を
+          基準に解決 (無ければ既存の resolvePath のエラー)、(3) -current-dir を
+          渡したのに使われなければ errCurrentDirUnused、(4) 入力のパス
+          (-record-dir と判定フロー) は実在を要求 (不在は全件をまとめて報告)。
+          解決済みの絶対パスだけを 3 つの経路に渡し、installWrapper は
+          焼き込むだけで検査を持たない (IsAbs・requireExists・
+          errInstallWrapperPathMissing を wrapper.go から外す)。
+          特例 2 つを外す — -install-wrapper と -current-dir の併用禁止をやめ
+          (単に相対パスの基準として使う。-write-summary=true との併用禁止は
+          経路の衝突なので残す)、「既定の判定フローを使う」は -judgment-flow "" では
+          なく省略で表す (明示した空は経路を問わず errEmptyPath)。
+          生成の経路で焼き込む判定フローは明示された値だけで、CLAUDE_PLUGIN_ROOT
+          からは解決しない (省略時の既定はラッパーが実行時に $root から解決する
+          設計のまま)。これは規則の違いではなく既定の違いなので、コメントに書く。
+          -install-wrapper の出力先も同じ規則に乗せる (相対なら -current-dir が要る。
+          出力なので実在は要求しない)。README の例は -current-dir "$(pwd)" と
+          相対パスの組み合わせに書き換える。
+          テストは経路 × フラグ × 入力 (空 / 空白 / U+200B / 相対 / 不在) の表を
+          run() 経由で通す形に組み替える。installWrapper を直接呼んで検査を
+          見ていたテスト (TestInstallWrapperRejectsRelativeRecordDir、
+          TestInstallWrapperRequiresPathsToExist) は run() 経由に移し、
+          TestRunInstallWrapperAcceptsEmptyJudgmentFlow は「省略で既定」に、
+          TestRunInstallWrapperRejectsUnusedFlags は -write-summary だけに変える。
+          規則を 1 つずつ無効化するミューテーションで、対応するケースが落ちることを
+          確かめる。文書は README (フラグ表・併用の注記・空のパスの節・
+          -install-wrapper の例と末尾の 2 段落)、main.go のパッケージコメント、
+          docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md
+          の「-install-wrapper は絶対パスを要求する」の段落を実装に合わせる。
+          この方針は人間が選んだ (2026-09-02 の会話で、構造ごと直して
+          このブランチの仕上げにする案を採った)
+        order: 1
+        options: >-
+          案 1 (構造ごと直す: 解決を分岐の前に 1 か所へ寄せ、特例 2 つを外す) と
+          案 2 (Issue #31 の範囲で切り、指摘 1・2 だけを wrapper.go に足して閉じ、
+          経路の統一は別 Issue に送る)。案 2 は差分が小さいが、表の空いたマスが
+          残る限り同じ型の指摘が続く。人間が案 1 を選んだ
+        status: done
+        sha: a4ffb54
+    notes: >-
+      P29・P30 を直した増分 (3f62af0..dd469bb) の再レビュー。2 件とも自分で再現した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      重点として挙げた 5 点のうち、既存テストの入力を実在するパスに変えたことによる
+      検査範囲の縮小・ミューテーションで落ちること・README の新しい記述と実挙動の一致は
+      問題なしと確認された (residual の 2 つ目・3 つ目もそれを裏づける)。
+      指摘 1 は、P29 で「実在の検査」を生成の経路に入れたが、検査の経路が持つもう 1 つの
+      規則 (相対パスには基準が要る) はそろえていない、という残りである。
+      回 12 の residual で「実害の入力を挙げられない」とされたものが、
+      暗黙の基準 (展開先の tools/triagecheck) に同名のファイルが実在する入力で
+      実害に変わった。焼き込まれるのが版のディレクトリを含む固定パスなので、
+      ラッパー本体が最新の版を拾う設計 (sort -V) と食い違い、プラグインの更新で壊れる。
+      指摘 2 は指摘 1 と同じ分岐の話で、空白だけの値は IsAbs でも false になるため、
+      指摘 1 を -record-dir と同じ IsAbs の検査で直すと「相対パスです」の報告に変わる。
+      「空のパス」と名指しするには、さらにその手前で main.go:107 と同じ検査を置く。
+      どちらにせよ TestInstallWrapperRequiresPathsToExist の「空白だけ」のケースは
+      現状の番兵を期待しているので、修正では期待する番兵を変えるか、
+      ケースを相対・空白の契約ごとに分ける (residual の 1 つ目の指摘どおり)。
+      residual の 1 つ目 (実在検査のテストの表が、相対パスの契約を区別していない) は
+      指摘 1 を直すときの修正計画に含めるべき内容なので、ここに写した。
+      2 つ目 (README の mkdir -p の段取りと実挙動の一致) と 3 つ目 (テスト件数 166 が
+      実測と一致) は対処不要。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 92efdb0
+    findings: []
+    notes: >-
+      P31 (パスの規則を経路の分岐より前の 1 か所に寄せる) を直した増分 (dd469bb..92efdb0)
+      の再レビュー。指摘 0 件。レビューは報告のみで走った (head が現在の HEAD と一致、
+      作業ツリーは不変)。
+      residual の 10 件に目を通した。レビューは 3 つの経路に同じ入力 (空文字 / 空白 /
+      U+200B / 相対 (基準なし) / 不在) を渡して終了コードと文言が全 20 組で一致することを
+      実測し、前回の指摘 1・2 が解消していることと、特例を外した非互換 3 件がいずれも
+      README に書かれていることを確認している。README の -install-wrapper の例を逐語どおり
+      実行し、削除した 2 テストの見ていた壊し方が新しい表で検出されることも
+      ミューテーションで確かめている。
+      記録に値するのは 6 つ目 — TestRunFailsOnMissingExplicitPaths /
+      TestRunWriteSummaryFailsOnMissingExplicitRecordDir /
+      TestRunFailsWhenPluginRootFlowMissing の 3 つは、missingPathProblems を無効化しても
+      通る (アサーションが err == nil だけで、下層の listReviewTriageFiles /
+      judgmentFlowProblems が代わりに立てるエラーで満たされる)。実挙動は 3 経路とも非 0 の
+      ままで、まとめて報告する振る舞いの消失は TestRunReportsBothMissingPaths が検出する
+      ので、放置して壊れるものは無い。名前が示す規則と実際に見張る対象がずれているだけ
+      なので、指摘ではなく観察として残す。
+      回 7 から 14 まで続いた「経路によって契約が違う」型の指摘は、この回で止まった。
+      修正の単位を「指摘 1 件 = 表の 1 マス」から「規則 × 経路 × フラグ の表そのもの」に
+      変えたことが効いている (P31 の cause)。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: full
+    head: 6e1ba73
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/wrapper_test.go
+        line: 239
+        summary: >-
+          生成物の契約を実行して確かめる唯一のテスト TestInstallWrapperGeneratesRunnableScript が、
+          パッケージの親の親に skills/ があるという「このリポジトリの配置」に依存している。
+          配布された展開先 (tools/triagecheck の 2 つ上に skills が無い形) でテストを走らせると、
+          壊れたシンボリックリンクを張ってしまい、実装が正しくても FAIL する。
+        category: test
+        audience: developer
+        consequence:
+          condition: >-
+            tools/triagecheck をリポジトリからも展開先からも切り離して単体で置き、
+            そこで go test を走らせたとき
+          who: developer
+          what: >-
+            ../../skills が無いので壊れたリンクが張られ、生成したラッパーが判定フローを
+            見つけられず、実装が正しくてもこのテストだけ落ちる
+          detectability: >-
+            気づく (赤くなり、報告に判定フローの不在が出る)。利用者には届かない
+        premise_check:
+          stages: A
+          result: wrong
+        gates_fired: [hypothetical]
+        verdict: rejected
+        verdict_reason: >-
+          R1 — 根拠が誤っている。指摘は「配布された展開先は tools/triagecheck の 2 つ上に
+          skills が無い形」と主張するが、実際の展開先は <版>/tools/triagecheck と <版>/skills が
+          並ぶ配置で、tools/triagecheck から見た ../../skills は実在する
+          (~/.claude/plugins/cache/akm-claude-plugins/review-triage/0.1.0 と 0.2.0 で ls により確認。
+          どちらも README.md / skills / tools の 3 つが並ぶ)。展開先と同じ配置に複製して
+          go test を走らせると ok になり、リポジトリでも ok なので、落ちるのは
+          レビューが用意した「パッケージ単体を切り出した配置」だけである。
+          それはリポジトリでも展開先でもなく、テストを走らせる形として想定されていない。
+          評価はすべて記録する — 段 A で複製を 2 通り (単体 / 展開先と同じ配置) 作って
+          実測し、主張と逆の結果を得た。免除条項の条件 1 は成立しない
+          (関門の検出能力の欠落ではなく、関門が偽の赤になる主張)。
+          全 4 ゲートを評価して発火 1 件 — hypothetical: 再現に要る条件
+          (パッケージ単体を切り出した配置) は実際の運用に無く、テストで作る理由も無い。
+          developer-domain は環境の異常ではないので発火せず、disproportionate-cost は
+          相対参照を無くす変更が数行で対象より小さいため発火せず、already-visible は
+          赤くなる関門を挙げられない。判定は D4 で決まる (R1)。
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/main_test.go
+        line: 714
+        summary: >-
+          TestRunInstallWrapperAcceptsFalseWriteSummary だけが CLAUDE_PLUGIN_ROOT を
+          設定せずに run() を呼ぶため、実行環境にこの変数が設定されていると、
+          実装が正しくても FAIL する。この変数はプラグインとして動く際の通常の環境なので、
+          利用者の手元や CI の設定次第で偽の赤になる。
+        category: test
+        audience: developer
+        consequence:
+          condition: >-
+            CLAUDE_PLUGIN_ROOT が設定された環境 (Claude Code のフックやスキルの中、
+            それを引き継いだ CI) で go test を走らせたとき
+          who: developer
+          what: >-
+            このテストだけが「指定した在り処が存在しません」で落ち、実装の正しさと
+            無関係に検査が赤くなる。他のテストは変数を明示的に設定またはクリアしているので
+            落ちない
+          detectability: >-
+            気づく (赤くなる) が、報告は判定フローの不在を指すので、原因が環境変数の
+            引き継ぎだと読み取るには他のテストとの差を見る必要がある
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で再現した。CLAUDE_PLUGIN_ROOT=/nonexistent-root で go test を走らせると
+          このテストだけが落ち、設定しなければ ok。main_test.go の Setenv("CLAUDE_PLUGIN_ROOT")
+          は 22 箇所あり、このテストには無いことを逐語で確かめた (main_test.go:714-735)。
+          P31 で resolveInputs が環境変数由来の判定フローにも実在を要求するようにした
+          (生成の経路でも同じ規則を課す) ことで、この取りこぼしが顕在化した。
+          免除条項の条件 1 は成立しない (偽の赤の主張で、検出能力の欠落ではない)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は再現済みで、環境変数を設定した
+          テストとして作れるため発火せず、developer-domain は環境変数が設定されているのは
+          異常ではなく通常の状態なので発火せず、disproportionate-cost は t.Setenv の 1 行で
+          対象より小さいため発火せず、already-visible は赤くなる関門を挙げられない
+          (既定の環境では全テストが通る)
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 3
+        file: docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md
+        line: 261
+        summary: >-
+          solutions 文書の Go の抜粋が、現在の実装に無い変数 (absPath) と処理
+          (filepath.Abs による絶対化) を示している。同じ文書自身が「パスの解決は
+          resolveInputs が経路の分岐より前に当て、installWrapper は焼き込むだけ」と
+          述べており、抜粋と本文が食い違う。
+        category: doc-dev
+        audience: developer
+        consequence:
+          condition: >-
+            この文書を読んで triagecheck の実装、または同じ型のツールの設計を
+            確かめようとしたとき
+          who: developer
+          what: >-
+            抜粋は installWrapper の中で絶対化する古い形を示し、同じ文書の本文と
+            2 つ下の抜粋 (焼き込むだけ) と矛盾する。どちらが現在の形か文書からは
+            決められず、実装を読み直すか、古い形を真似ることになる
+          detectability: >-
+            気づかない。文書の抜粋と実装を突き合わせる機械検査は無く、
+            読み比べて初めて分かる
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で逐語照合した。文書の抜粋 (:262-266) に absPath と filepath.Abs が
+          あり、wrapper.go:88-95 にはどちらも無い (grep で確認)。同じ文書の
+          「採った形」の箇条書きと「規則は経路の分岐より前に 1 か所で当てる」の抜粋が
+          現在の形を述べているので、文書の中で主張が割れている。P31 で同じ文書の本文と
+          コード例 1 つを直したとき、Examples の節の残りの抜粋を読み直していない
+          (review-triage-fix の verification.md の型 B: 変更した節の並びを読み直す、の取りこぼし)。
+          免除条項の条件 1 は成立しない (対象は文書)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical は逐語で確かめた矛盾なので発火せず、
+          developer-domain は環境の異常ではないので発火せず、disproportionate-cost は
+          抜粋 4 行の書き換えで対象より小さいため発火せず、already-visible は
+          文書の抜粋を実装と突き合わせる機械検査が無く発火しない
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P32
+        cause: >-
+          P31 で環境変数 (CLAUDE_PLUGIN_ROOT) 由来の判定フローにも実在を要求するようにしたとき、
+          run() を呼ぶテストの並びを「環境変数を制御しているか」で読み直さなかった
+          (verification.md の型 B の取りこぼし)。走査すると、環境変数を設定もクリアもせずに
+          run() を呼ぶテストは指摘の 1 つではなく 5 つある。落ちるのは 1 つだけだが、
+          残り 3 つ (TestRunFailsOnMissingExplicitPaths / TestRunReportsBothMissingPaths /
+          TestRunWriteSummaryFailsOnMissingExplicitRecordDir) は環境変数が設定されていると
+          別の理由 (環境変数の判定フローの不在) で赤になり、見張っている規則を無効化しても
+          通ってしまう。指摘の 1 か所を直すだけでは、この 4 つと、次に足すテストで再発する
+        finding_ids:
+          - 2
+        approach: >-
+          run() を呼ぶテストが最初に呼ぶ共通の入口 withRunGlobals で
+          t.Setenv("CLAUDE_PLUGIN_ROOT", "") を行い、規則を 1 か所に集める
+          (P31 と同じ「分岐の前に 1 か所で当てる」形)。run() を呼ぶ 19 のテストはすべて
+          withRunGlobals を呼び、Setenv が withRunGlobals より前にある関数は無いので、
+          環境変数を意図的に使うテストの上書きは消えない。t.Parallel は使われていない。
+          この修正を守る機械の関門は無いので、README の「テスト」節に
+          CLAUDE_PLUGIN_ROOT=/nonexistent-root go test ./... を「環境変数が設定されていても
+          通ることの確認」として書き、コミット前に既定の環境と両方を通す。
+          TestMain でパッケージ全体をクリアする案は、直接呼びのテストが環境変数を読む意図を
+          見えにくくするので採らない。テストは足さないので件数 190 は変わらない。
+          順序: 依存は無い。影響範囲の広いテストの修正を先にする
+        order: 1
+        status: done
+        sha: 3f55826
+      - problem_id: P33
+        cause: >-
+          P31 で solutions 文書の本文と抜粋 1 つを直したとき、Examples の節の残りの抜粋を
+          読み直さなかった (verification.md の型 B の取りこぼし。P30 で README:85 を
+          2 回続けて直し損ねたのと同じ形)。文書の Go/bash の抜粋を 1 行ずつ実装から検索して
+          確かめたところ、実装と食い違うのは指摘の :263-265 の 1 か所だけである
+          (:228-229 は「採らなかった形」として意図的に古い形、:255 は生成物の実例、
+          :278 は要約であることが分かる書き方)
+        finding_ids:
+          - 3
+        approach: >-
+          :262-266 の抜粋を wrapper.go の現在の形 (絶対化は無く、filepath.Rel で script_dir
+          からの相対にするだけ) に差し替え、直前の説明文の前提 (「渡された値をそのまま
+          埋めると」) を「解決済みの絶対パスを受け取り」に合わせる。抜粋の各行が実装から
+          grep で引けることを確かめる。Examples の節全体を読み直し、「採らなかった形」の
+          見出しが古い形の抜粋と区別できていることも見る。doc-dag の向き (solutions → README)
+          は変えない。
+          あわせて観察を残す (直さない): 「最新の版を拾って go run -C する」定型が
+          wrapper.go の雛形・README の Makefile 例・
+          skills/review-triage/references/project-config.md の Makefile 例の 3 か所にある。
+          project-config.md の写しは詳細を README に委ねる向きがあるが、wrapper.go の
+          コメントは README しか知らない。今回の指摘の範囲外なので触らない
+        order: 2
+        status: done
+        sha: 163121d
+    notes: >-
+      マージ前の最終確認 (全量、main..6e1ba73)。3 件のうち 2 件を自分で再現し、
+      1 件は前提が誤っていることを実測で確かめて却下した。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      3 件とも被害者は developer で、利用者の使う経路には実害が無い。
+      回 7 から 14 まで続いた「経路によって契約が違う」型の指摘は、全量で見直しても
+      出なかった (レビューは 3 経路の一致・README の表の各行・サポートする配置の表を
+      実行で照合し、食い違い無しと報告している)。
+      却下した指摘 1 の中身には、テストがリポジトリと展開先に共通の配置
+      (tools/triagecheck の 2 つ上に skills) を前提にしているという正しい観察が含まれる。
+      その前提は両方の配置で成り立つので直す必要は無いが、配置を変えるときは
+      このテストも動くことを覚えておく。
+      residual の 3 件 (テスト件数の一致・go が無いと t.Skip する経路・resolveInputs の
+      ループ化の提案) は対処不要。3 つ目のリファクタ提案は、判定フローだけ基準と出所の
+      扱いが違うためまとめても分岐が中に入るだけ、というレビュー自身の評価に同意する。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: high
+    scope: incremental
+    head: f484bb3
+    findings: []
+    notes: >-
+      P32・P33 を直した増分 (6e1ba73..f484bb3) の再レビュー。指摘 0 件。
+      レビューは報告のみで走った (head が現在の HEAD と一致、作業ツリーは不変)。
+      residual の 2 件に目を通した。1 つ目は観察として残す —
+      TestRunPluginRootFlowIgnoresCurrentDir は、実装が CLAUDE_PLUGIN_ROOT を一切読まない
+      ミューテーションを当てても 2 つのサブテストとも通る (第 1 はエラーを期待するので
+      別経路のエラーで満たされ、第 2 は判定フローが未導入扱いで通る)。増分前 (6e1ba73) でも
+      同じなので、この増分が壊したものではない。環境変数の経路そのものは
+      TestRunFailsWhenPluginRootFlowMissing / TestResolveJudgmentFlowPath /
+      TestRunReportsOriginOfBadPluginRoot / TestRunInstallWrapperSharesPathRules が
+      同じミューテーションで落ちるので押さえている。このテストの名前が示す規則
+      (環境変数由来のパスに -current-dir の基準を使わない) を見張るには、第 2 サブテストが
+      判定フローの検査が実際に走ったことまで確かめる必要がある。放置して壊れるものは無い。
+      2 つ目 (README に新設した環境変数つきの確認を機械的に走らせる関門が無い) は
+      README 自身が明記しており、レビューは withRunGlobals のクリアを外すミューテーションで
+      この確認だけが検出することを実測している。対処不要。
+      これで、回 16 (最終確認・全量) の採択 2 件の修正が増分で確かめられ、
+      未処理の採択・保留・未着手の計画は無い。
+      go のバージョンは .tool-versions が 1.25.4 を指すが未インストールのため、
+      ASDF_GOLANG_VERSION=1.25.1 で走らせた。
