@@ -196,7 +196,8 @@ runs:
           (変わるのはラッパー経由で生成した利用側のサマリだけ)。
           順序: P2 が使う定数をここで導入するので P1 が先
         order: 1
-        status: pending
+        status: done
+        sha: aef68ce
       - problem_id: P2
         cause: >-
           既定値の検査を、run() が書き換える可変のパッケージ変数を読む形で書き、
@@ -207,7 +208,8 @@ runs:
           P1 で切り出した定数 defaultSummaryCommand に対して検査する形に変える
         order: 2
         depends_on: [P1]
-        status: pending
+        status: done
+        sha: 2faba65
     notes: >-
       このブランチの初回トリアージ。レビューは code-review high で報告のみ
       (--fix 無し) で走らせ、実行前後で HEAD (33c62b8) と作業ツリーが不変で
