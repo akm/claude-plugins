@@ -135,10 +135,10 @@ language = "ja"
 ## 6. 認証(読み取り専用PAT)
 
 - `review-requested:@me` はトークン所有者本人としての認証が必要。**備え付けの環境トークンでは不可**
-  (repo 限定スコープに縛られ、グローバル検索が弾かれることを確認済み)。
+  (repo 限定スコープに縛られ、グローバル検索が拒否されることを確認済み)。
 - ユーザー本人の **読み取り専用 PAT**:
   - Fine-grained: `Contents: Read-only`, `Pull requests: Read-only`, `Metadata: Read-only`(対象リポジトリにアクセス可)
-  - fine-grained で `review-requested:@me` 検索が空振りする場合は `repo`(read相当)の classic token にフォールバック
+  - fine-grained で `review-requested:@me` 検索の結果が空になる場合は `repo`(read相当)の classic token にフォールバック
 - **トークンの受け渡し(平文をプロンプト/コードに書かない)。次の順に探す:**
   1. 環境変数 `GITHUB_TOKEN` … 値を直接使う。
   2. 環境変数 `GITHUB_TOKEN_FILE` … そのファイルの中身を使う。

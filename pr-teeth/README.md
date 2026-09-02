@@ -136,7 +136,7 @@ PR は番号でも URL でも指定でき、複数まとめて渡せます(1ペ�
 PAT を用意してください。
 
 - Fine-grained: `Contents: Read-only`, `Pull requests: Read-only`, `Metadata: Read-only`
-- fine-grained で検索が空振りする場合は `repo` (read 相当) の classic token
+- fine-grained で検索の結果が空になる場合は `repo` (read 相当) の classic token
 
 次の順で探します。
 
