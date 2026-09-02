@@ -5,7 +5,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 
 # review-triage-fix: 採択した指摘を原因で束ねて直す
 
-**このスキルは判断しない。** 採否は [review-triage](../review-triage/SKILL.md) が済ませている。**採択されたものだけを直す。** 保留と却下には手を出さない。
+**このスキルは判断しない。** 採否は [review-triage](../review-triage/SKILL.md) が済ませている。**採択されたものだけを直す。** 保留と却下は対象にしない。
 
 入力は記録 YAML — 2 つのスキルの受け渡しはこの記録だけで行い、様式・スキーマ・状態 (`status`) の正本は [record-schema.md](../review-triage/references/record-schema.md)。
 
