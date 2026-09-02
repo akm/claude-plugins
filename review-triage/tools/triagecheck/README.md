@@ -38,10 +38,24 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 | `-judgment-flow` | | 判定フローの正本のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
 | `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す |
 | `-install-wrapper` | | 検査せず、呼び出し用のラッパースクリプトを書き出す。相対パスなら `-current-dir` も要る |
+| `-summary-command` | | サマリの再生成手段として案内する文字列。既定は `triagecheck -write-summary` |
 
 **パスの規則は 3 つの経路 (検査 / `-write-summary` / `-install-wrapper`) で同じ。** 規則は経路で分岐する前に 1 か所で当てるので、どの経路でも「パスの渡し方」と「対象が見つからないとき」の節がそのまま成り立つ。
 
 **`-install-wrapper` は `-write-summary` と併用できない** (何を書き出すかが食い違うため、指定するとエラーになる)。`-write-summary=false` は「生成しない」という既定の挙動と同じなので通る。
+
+### 再生成コマンドの案内 (-summary-command)
+
+**サマリの再生成手段はリポジトリごとに違う** (Makefile のターゲット・`-install-wrapper` で生成したラッパー・`go run` の直呼び) ため、このツールは特定のコマンド名を持たない。`-summary-command` に渡した文字列が次の 2 か所へ入る。
+
+- サマリが無い / 正本と食い違うときのエラー文 (「`<値>` で再生成する」)
+- 生成サマリ (`.md`) の 1 行目のコメント
+
+省略すると `triagecheck -write-summary` になる。**空文字や空白だけの指定はエラー** (再生成の手段を空欄で案内することになるため)。
+
+**`-install-wrapper` で生成したラッパーは、この値を自動で渡す。** 焼き込むのではなく実行時に `"$0 -write-summary"` を組み立てるので、叩いた形 (`bin/review-triage-check -write-summary` など) がそのまま案内になる。ラッパーを使うなら設定は要らない。
+
+**この値は生成サマリの 1 行目としてコミットされる。** 変えると既存サマリが鮮度検査で「正本と食い違う」と報告されるので、`-write-summary` で再生成して吸収する。
 
 ### パスの渡し方
 
@@ -99,7 +113,8 @@ REVIEW_TRIAGE_ROOT ?= $(shell ls -d $(PLUGIN_CACHE)/*/ 2>/dev/null | sort -V | t
 
 TRIAGECHECK = go run -C $(REVIEW_TRIAGE_ROOT)/tools/triagecheck . \
   -record-dir $(CURDIR)/docs/review-triages \
-  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md
+  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md \
+  -summary-command "make triage-summary"
 
 .PHONY: triage-check
 triage-check: ## トリアージ記録を検査する
