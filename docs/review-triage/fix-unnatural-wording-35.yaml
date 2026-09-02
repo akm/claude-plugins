@@ -263,6 +263,34 @@ runs:
         attrs:
           severity: P3
           confidence: medium
+    plans:
+      - problem_id: P1
+        cause: >-
+          言い回しを置換するとき、補った語 (「警告なく」「利用者に」「このように」) を
+          同じ文・同じ節の周辺と読み合わせなかった。置換は語の単位で行い、置換後の文を
+          節の表や文の後半と突き合わせる観点 B の読み直しを省いた
+        finding_ids: [1, 2, 6]
+        approach: >-
+          config-schema.md:15 は副詞を落として「全件が保留になるのに」とし、表の
+          「件数を報告に出す」と矛盾しない形にする。review-request.md:50 は主体を補わず
+          「痕跡を残さずに捨てさせない」とし、後半の「1 行の痕跡を残す」と呼応させる。
+          gate-examples.md:33 の括弧内は観測した事実として「1 回目の試行では、条件 1 をこの形で
+          置いたために実際に区別が通らなくなった」と書き直し、括弧の外の帰結の言い直しにしない。
+          3 箇所は原因が同じなので 1 コミット。P2 とは独立で、影響範囲が広い (3 ファイル) こちらを先にする
+        order: 1
+        status: pending
+      - problem_id: P2
+        cause: >-
+          「近くの辺」の定義を verification.md に新設したとき、初出で説明を添える原則を
+          優先して ordering.md にも定義文を書き、正本を 1 か所にする方針と両立させなかった
+        finding_ids: [3]
+        approach: >-
+          ordering.md:31 の括弧内は例示 (同じ表の並んだ行・同じ節の前後) だけを残し、
+          定義文を削って「用語の定義は verification.md の観点 B」と正本を指す参照に変える。
+          verification.md:29 の定義はそのまま正本として残す。
+          正本 (verification.md) は変えず参照側だけを直すので、順序の制約は無い
+        order: 2
+        status: pending
     notes: >-
       入力は tmp/review-issue35-code-review-opus-5.yaml (head 103e08d、現在の HEAD と一致。
       レビューは報告のみで、作業ツリーは不変だった)。
