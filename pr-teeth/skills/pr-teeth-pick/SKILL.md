@@ -77,7 +77,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" resolve \
 ```
 
 返る `targets` の各要素に `repo` / `number` / `language` が付く。同じ PR を2回
-指定した場合は1件に畳まれる。
+指定した場合は1件にまとめられる。
 
 - **`invalid` が空でなければ、その内容を最終出力に必ず載せる。** 解釈できなかった
   指定を知らせずに捨てると、渡したはずの PR が出力に無いことに気づけない。
