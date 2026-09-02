@@ -47,7 +47,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 
 ### 2. PR 一覧の取得
 
-`gh` があれば使い、無ければ `curl` で REST API を叩く。トークンは環境変数で渡し、
+`gh` があれば使い、無ければ `curl` で REST API を呼び出す。トークンは環境変数で渡し、
 **値をログ・生成物・通知に出さない。** 表示してよいのは `token_source` だけ。
 
 ```bash
