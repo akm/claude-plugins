@@ -95,8 +95,14 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
+	// 焼き込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
+	recDir := filepath.Join(base, "docs", "review-triages")
+	if err := os.MkdirAll(recDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
 	withWorkingDir(t, versionDir, func() {
-		if err := installWrapper(outPath, filepath.Join(base, "docs", "review-triages"), ""); err != nil {
+		if err := installWrapper(outPath, recDir, ""); err != nil {
 			t.Fatalf("installWrapper: %v", err)
 		}
 	})
@@ -146,8 +152,23 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	}
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
+	// 焼き込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
+	// このテストが見るのは「明示した値が既定パスに優先すること」なので、
+	// 値が実在するかどうかは意図の外 — 実在させたうえで優先を確かめる。
+	recDir := filepath.Join(base, "docs", "review-triages")
+	if err := os.MkdirAll(recDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	customFlow := filepath.Join(base, "custom", "judgment-flow.md")
+	if err := os.MkdirAll(filepath.Dir(customFlow), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(customFlow, []byte("# 判定フロー\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
 	withWorkingDir(t, versionDir, func() {
-		if err := installWrapper(outPath, filepath.Join(base, "docs", "review-triages"), "/custom/judgment-flow.md"); err != nil {
+		if err := installWrapper(outPath, recDir, customFlow); err != nil {
 			t.Fatalf("installWrapper: %v", err)
 		}
 	})
@@ -157,7 +178,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	got := string(data)
-	if !strings.Contains(got, `-judgment-flow "/custom/judgment-flow.md"`) {
+	if !strings.Contains(got, `-judgment-flow "`+customFlow+`"`) {
 		t.Errorf("生成物に明示した -judgment-flow の焼き込みが見当たらない:\n%s", got)
 	}
 	// 明示したときは $root からの既定パスを使わない (二重に書かれない)。
@@ -173,10 +194,15 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	// bin/ はまだ存在しない。installWrapper が作る必要がある。
+	// 作られるのは出力先の親だけで、焼き込む値 (-record-dir) は実在を要求される。
 	outPath := filepath.Join(base, "not-yet-created", "bin", "review-triage-check")
+	recDir := filepath.Join(base, "docs", "review-triages")
+	if err := os.MkdirAll(recDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
 
 	withWorkingDir(t, versionDir, func() {
-		if err := installWrapper(outPath, filepath.Join(base, "docs", "review-triages"), ""); err != nil {
+		if err := installWrapper(outPath, recDir, ""); err != nil {
 			t.Fatalf("installWrapper: %v", err)
 		}
 	})

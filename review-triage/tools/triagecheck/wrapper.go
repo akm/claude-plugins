@@ -67,42 +67,27 @@ exec go run -C "$root/tools/triagecheck" . \
 
 // installWrapper はラッパースクリプトを path に書き出す。
 //
-// recordDir は「ラッパーの置き場 (script_dir) から見た相対パス」に変換して
-// 焼き込む。生成時のカレントとラッパーの置き場は違いうるので (例:
-// プラグインの展開先から -install-wrapper <リポジトリ>/bin/rtc を実行する)、
-// 渡された値をそのまま埋めると、実行時に script_dir 基準で解決されたときに
-// 別の場所を指す。両方を絶対にしてから差を取る。
+// 3 つの引数はすべて解決済みの絶対パス (規則は run の resolveInputs が経路の
+// 分岐より前に当てる)。ここではパスを検査しない — 検査を持つと、検査の経路と
+// 別の条件で同じ規則を書き直すことになり、同じ入力に経路ごとに違う契約ができる。
 //
-// judgmentFlow が明示されていれば絶対パスにして焼き込み、空なら
-// -judgment-flow は付けず、プラグイン展開先の既定パス
-// (skills/review-triage/references/judgment-flow.md) を使わせる。
+// recordDir は「ラッパーの置き場 (script_dir) から見た相対パス」に変換して
+// 焼き込む。絶対パスを焼き込まないのは、リポジトリを移動・再クローンすると
+// 移動元を検査して緑を返すため。
+//
+// judgmentFlow が非空なら絶対パスのまま焼き込み、空なら -judgment-flow は付けず、
+// プラグイン展開先の既定パス (skills/review-triage/references/judgment-flow.md) を
+// 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
+// resolveInputs が弾く。
 func installWrapper(path, recordDir, judgmentFlow string) error {
 	pluginCache, err := pluginCacheDir()
 	if err != nil {
 		return err
 	}
 
-	// -install-wrapper は「展開先の tools/triagecheck から」実行する決まりなので
-	// (pluginCacheDir がその形を要求する)、生成時のカレントはプラグイン側を指す。
-	// そこからの相対と解釈しても利用者の意図には当たらないので、推測せずに弾く —
-	// 検査の経路で相対に基準を要求するのと同じ理由。
-	if !filepath.IsAbs(recordDir) {
-		return fmt.Errorf(
-			"-install-wrapper の -record-dir は絶対パスで指定してください (生成時のカレントは"+
-				"プラグインの展開先なので、相対パスの基準になりません): %s", recordDir)
-	}
-
 	// 焼き込む -record-dir を script_dir 基準の相対にする。
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return fmt.Errorf("%s: ラッパーの置き場を解決できません: %w", path, err)
-	}
-	scriptDir := filepath.Dir(absPath)
-	absRecordDir, err := filepath.Abs(recordDir)
-	if err != nil {
-		return fmt.Errorf("%s: 記録の置き場を解決できません: %w", recordDir, err)
-	}
-	relRecordDir, err := filepath.Rel(scriptDir, absRecordDir)
+	scriptDir := filepath.Dir(path)
+	relRecordDir, err := filepath.Rel(scriptDir, recordDir)
 	if err != nil {
 		return fmt.Errorf(
 			"%s: 記録の置き場をラッパーの位置 (%s) からの相対パスにできません: %w", recordDir, scriptDir, err)
@@ -113,11 +98,7 @@ func installWrapper(path, recordDir, judgmentFlow string) error {
 	if judgmentFlow != "" {
 		// 判定フローはリポジトリの外 (プラグインの展開先) にあるので、script_dir
 		// 基準の相対にしても意味が無い。絶対パスで焼き込む。
-		absFlow, err := filepath.Abs(judgmentFlow)
-		if err != nil {
-			return fmt.Errorf("%s: 判定フローのパスを解決できません: %w", judgmentFlow, err)
-		}
-		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", absFlow)
+		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", judgmentFlow)
 	}
 
 	script := fmt.Sprintf(wrapperTemplate, pluginCache, recordDir, judgmentFlowLine)

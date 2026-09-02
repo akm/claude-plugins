@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,10 +11,17 @@ import (
 
 // run はパッケージ変数 (reviewTriageDir / judgmentFlowPath) を書き換えるので、
 // テストの間だけ退避して戻す。戻さないと後続のテストが前のテストの指定を引き継ぐ。
+//
+// あわせて、run が読む環境変数 CLAUDE_PLUGIN_ROOT をここでクリアする。run を呼ぶ
+// テストは必ずこの関数を最初に呼ぶので、環境に依存しない状態をこの 1 か所で作れる
+// (経路ごとに書くと、書き忘れたテストだけが環境依存になる — 実測で、この変数が
+// 設定された環境で 1 つだけ落ち、3 つが別の理由で赤になっていた)。環境変数を
+// 意図的に使うテストは、この関数の後で t.Setenv して上書きする。
 func withRunGlobals(t *testing.T) {
 	t.Helper()
 	dir, flow := reviewTriageDir, judgmentFlowPath
 	t.Cleanup(func() { reviewTriageDir, judgmentFlowPath = dir, flow })
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 }
 
 // 指定した置き場・判定フローが存在しないなら、run は非 0 (error) で終わる。
@@ -94,8 +102,14 @@ func TestResolveBaseDir(t *testing.T) {
 			t.Fatalf("got (%q, %v)", got, err)
 		}
 	})
+	// 実在する相対パスを渡す。実在しない値だと、絶対パスの検査を外しても
+	// 次の os.Stat が代わりにエラーを返し、この検査が失われたことに気づけない。
 	t.Run("相対はエラー", func(t *testing.T) {
-		if _, err := resolveBaseDir("rel/dir"); err == nil {
+		if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Chdir(dir)
+		if _, err := resolveBaseDir("sub"); err == nil {
 			t.Fatal("相対の -current-dir が通った")
 		}
 	})
@@ -230,8 +244,11 @@ func TestRunRequiresRecordDir(t *testing.T) {
 	if err == nil {
 		t.Fatal("-record-dir を省略しても通った")
 	}
-	if !strings.Contains(err.Error(), "-record-dir") {
-		t.Fatalf("エラーが -record-dir を案内していない: %v", err)
+	// 文言ではなく番兵で識別する。必須検査を外すと空の recordDir が先へ進んで
+	// 別のエラー (相対パスの基準要求) が立ち、その文言にも -record-dir が
+	// 含まれるため、部分一致だと検査が失われたことに気づけない。
+	if !errors.Is(err, errRecordDirRequired) {
+		t.Fatalf("必須検査ではないエラーが返っている: %v", err)
 	}
 }
 
@@ -294,41 +311,113 @@ func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 	}
 }
 
-// 空のパスを明示指定したら、その場で弾く。通すと -record-dir "" は path.Clean が
-// "." に畳んでカレント (常に実在する) を検査したことにし、-judgment-flow "" は
-// 「指定なし」に化けて検査が走らないまま緑になる — どちらもこの検査が塞ごうと
-// している「指定したのに検査されない」型そのもの。
+// 空のパス (空文字・空白だけ・不可視のフォーマット文字だけの値) を明示指定したら、
+// どの経路でもその場で弾く。通すと -judgment-flow "" は「指定なし」として扱われ
+// 検査が走らないまま成功し、空白や不可視の値は展開先を基準にした無関係なパスに
+// なる — どちらも「指定したのに検査されない」型そのもの。
+//
+// 規則は経路の分岐より前の 1 か所 (resolveInputs) にあるので、表は
+// 経路 × フラグ × 入力 で回す。経路ごとに別のテストを書くと、規則を経路ごとに
+// 書いていた頃と同じ抜け方 (片方の経路だけ見張られない) をする。
 func TestRunRejectsEmptyExplicitPaths(t *testing.T) {
 	recs := filepath.Join(t.TempDir(), "recs")
 	if err := os.MkdirAll(recs, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// -record-dir は必須なので、他のフラグを試すときも渡しておく。
-	cases := map[string][]string{
-		"-record-dir":    {"-record-dir", ""},
-		"-judgment-flow": {"-record-dir", recs, "-judgment-flow", ""},
-		"-current-dir":   {"-record-dir", recs, "-current-dir", ""},
+	out := filepath.Join(t.TempDir(), "bin", "rtc")
+	routes := []struct {
+		name  string
+		extra []string
+	}{
+		{"検査", nil},
+		{"write-summary", []string{"-write-summary"}},
+		{"install-wrapper", []string{"-install-wrapper", out}},
 	}
-	for name, args := range cases {
-		t.Run(name, func(t *testing.T) {
+	values := []struct{ label, value string }{
+		{"空文字", ""},
+		{"空白のみ", "   "},
+		{"不可視のみ", "\u200b"},
+	}
+	assertEmpty := func(t *testing.T, err error, flag, label string) {
+		t.Helper()
+		if err == nil {
+			t.Fatalf("%s に%sを渡したのに緑になった", flag, label)
+		}
+		// 文言ではなく番兵で識別する。この検査を外しても別のエラー
+		// (相対パスの基準要求など) が立ち、その文言にもフラグ名が
+		// 含まれるため、部分一致だと検査が失われたことに気づけない。
+		if !errors.Is(err, errEmptyPath) {
+			t.Fatalf("空のパスの検査ではないエラーが返っている: %v", err)
+		}
+		if !strings.Contains(err.Error(), flag) {
+			t.Fatalf("エラーがどのフラグかを示していない: %v", err)
+		}
+	}
+	for _, route := range routes {
+		for _, v := range values {
+			// 経路を選ぶフラグ以外のパスのフラグ。
+			for _, flag := range []string{"-judgment-flow", "-current-dir"} {
+				t.Run(route.name+"/"+flag+"/"+v.label, func(t *testing.T) {
+					withRunGlobals(t)
+					t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+					args := append([]string{"-record-dir", recs, flag, v.value}, route.extra...)
+					assertEmpty(t, run(args), flag, v.label)
+				})
+			}
+			// -record-dir の空文字だけは省略と区別できないので必須の検査が先に立つ
+			// (TestRunRequiresRecordDir)。空白と不可視は空のパスとして弾く。
+			if v.value != "" {
+				t.Run(route.name+"/-record-dir/"+v.label, func(t *testing.T) {
+					withRunGlobals(t)
+					t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+					args := append([]string{"-record-dir", v.value}, route.extra...)
+					assertEmpty(t, run(args), "-record-dir", v.label)
+				})
+			}
+		}
+	}
+	// 経路を選ぶフラグ自身の値。
+	for _, v := range values {
+		t.Run("-install-wrapper/"+v.label, func(t *testing.T) {
 			withRunGlobals(t)
 			t.Setenv("CLAUDE_PLUGIN_ROOT", "")
-			err := run(args)
-			if err == nil {
-				t.Fatalf("%s に空文字を渡したのに緑になった", name)
-			}
-			if !strings.Contains(err.Error(), name) {
-				t.Fatalf("エラーがどのフラグかを示していない: %v", err)
-			}
+			assertEmpty(t, run([]string{"-install-wrapper", v.value, "-record-dir", recs}), "-install-wrapper", v.label)
 		})
 	}
 }
 
-// -install-wrapper は空の -judgment-flow を受け付ける。あちらはパスを検査せず
-// 値を焼き込むだけの経路で、空は「$root からの既定パスを使う」正当な入力である。
-// 空文字を弾く検査を検査経路と共有させると、この呼び出しを理由なく拒否する。
-func TestRunInstallWrapperAcceptsEmptyJudgmentFlow(t *testing.T) {
+func TestRunEmptyInstallWrapperDoesNotFallThroughToCheck(t *testing.T) {
 	withRunGlobals(t)
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+	recs := filepath.Join(t.TempDir(), "recs")
+	if err := os.MkdirAll(recs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 生成サマリの対象になる記録を 1 つ置く。中身は検査を通す必要が無い —
+	// 見るのは .md が作られるかどうかだけ。
+	if err := os.WriteFile(filepath.Join(recs, "rec.yaml"), []byte("runs: []\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := run([]string{"-install-wrapper", "", "-record-dir", recs, "-write-summary=true"})
+	if err == nil {
+		t.Fatal("空の -install-wrapper と -write-summary=true が通った")
+	}
+	if !strings.Contains(err.Error(), "-install-wrapper") {
+		t.Fatalf("-install-wrapper の空文字として弾かれていない: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(recs, "rec.md")); !os.IsNotExist(err) {
+		t.Fatalf("頼んでいない生成サマリが書き出された (err=%v)", err)
+	}
+}
+
+// -judgment-flow を省略したときだけ、ラッパーは $root からの既定パスを使う。
+// 「既定を使う」は省略で表す — 明示した空は他の経路と同じく弾かれる
+// (TestRunRejectsEmptyExplicitPaths)。空文字を「既定」の意味に使うと、
+// 空のパスの規則に生成の経路だけの例外ができ、規則を足すたびに例外の処理が要る。
+func TestRunInstallWrapperOmittedJudgmentFlowUsesDefault(t *testing.T) {
+	withRunGlobals(t)
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 	// installWrapper は go run -C <展開先>/tools/triagecheck の位置からしか動かないので、
 	// その形を満たすディレクトリを作ってそこから実行する。
 	root := filepath.Join(t.TempDir(), "cache", "review-triage", "0.0.1")
@@ -338,26 +427,22 @@ func TestRunInstallWrapperAcceptsEmptyJudgmentFlow(t *testing.T) {
 	}
 	t.Chdir(toolDir)
 	out := filepath.Join(t.TempDir(), "wrapper.sh")
-
-	// -install-wrapper の -record-dir は絶対パス (生成時のカレントはプラグインの
-	// 展開先なので、相対の基準にならない)。
 	recDir := filepath.Join(t.TempDir(), "docs", "rt")
-	if err := run([]string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", ""}); err != nil {
-		t.Fatalf("空の -judgment-flow で -install-wrapper が拒否された: %v", err)
+	if err := os.MkdirAll(recDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"-install-wrapper", out, "-record-dir", recDir}); err != nil {
+		t.Fatalf("-judgment-flow を省略した -install-wrapper が拒否された: %v", err)
 	}
 	script, err := os.ReadFile(out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 空のときは $root からの既定パスが焼き込まれる (wrapper.go の judgmentFlowLine)。
 	if !strings.Contains(string(script), `-judgment-flow "$root/skills/review-triage/references/judgment-flow.md"`) {
 		t.Fatalf("既定の判定フローのパスが焼き込まれていない:\n%s", script)
 	}
 }
 
-// -judgment-flow の指定の有無は値ではなく flag.Visit で判定する。値が空かどうかで
-// 見ると、明示指定が「指定なし」に化けて不在が黙って通る (-record-dir で避けた型)。
-// 空文字は上のテストのとおり手前で弾かれるので、ここでは判定の経路そのものを固定する。
 func TestResolveJudgmentFlowPathUsesSpecifiedNotValue(t *testing.T) {
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "/plugin")
 	// specified が真なら、値が空でも「指定あり」として扱い、
@@ -459,5 +544,199 @@ func TestRunReportsOriginOfBadPluginRoot(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "-current-dir") {
 		t.Fatalf("直らない対処 (-current-dir) を案内している: %v", err)
+	}
+}
+
+// -write-summary の経路も、検査の経路と同じパスの解決規則に従う。
+// 判定フローの解決より手前で分岐すると、相対の -judgment-flow に基準を要求しないまま
+// 生成が進み、同じ入力に対して経路ごとに違う契約を持つことになる。
+func TestRunWriteSummarySharesPathRules(t *testing.T) {
+	withRunGlobals(t)
+	recs := realTempDir(t)
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+
+	err := run([]string{"-record-dir", recs, "-judgment-flow", "rel/flow.md", "-write-summary"})
+	if err == nil {
+		t.Fatal("-write-summary が相対の -judgment-flow に基準を要求せず通った")
+	}
+	if !strings.Contains(err.Error(), "-judgment-flow") {
+		t.Fatalf("報告が -judgment-flow を示していない: %v", err)
+	}
+}
+
+// -install-wrapper と -write-summary=true は「何を書き出すか」が食い違うので、
+// 黙って片方を無視せずエラーにする。無視すると「指定したのに効かない」を作る —
+// 検査の経路で errCurrentDirUnused として禁じているのと同じ型。
+// -current-dir は併用できる (相対パスの基準として、他の経路と同じ規則で使う)。
+func TestRunInstallWrapperRejectsUnusedFlags(t *testing.T) {
+	recs := filepath.Join(realTempDir(t), "docs", "rt")
+	if err := os.MkdirAll(recs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, extra := range [][]string{{"-write-summary"}, {"-write-summary=true"}} {
+		t.Run(extra[0], func(t *testing.T) {
+			withRunGlobals(t)
+			out := filepath.Join(t.TempDir(), "w")
+			args := append([]string{"-install-wrapper", out, "-record-dir", recs}, extra...)
+			err := run(args)
+			if err == nil {
+				t.Fatalf("%s を併記したのに生成が通った", extra[0])
+			}
+			if !errors.Is(err, errFlagUnusedWithInstallWrapper) {
+				t.Fatalf("併用禁止ではないエラーが返っている: %v", err)
+			}
+		})
+	}
+}
+
+// -install-wrapper の経路も、検査の経路と同じパスの規則に従う。規則は経路の分岐より
+// 前の 1 か所 (resolveInputs) にあり、生成の経路は解決済みの絶対パスを焼き込むだけ。
+//
+// 以前は生成の経路がパスの解決より前で分岐して戻っていたため、検査の経路の規則が
+// 1 つも届かず、同じ規則を wrapper.go に別の条件で書き直しては、その差を
+// レビューに指摘されることを回を重ねて繰り返した (相対の -judgment-flow が
+// 展開先を暗黙の基準に解決され、版のディレクトリを含む固定パスが焼き込まれる、など)。
+func TestRunInstallWrapperSharesPathRules(t *testing.T) {
+	base := realTempDir(t)
+	toolDir := filepath.Join(base, "cache", "review-triage", "0.0.1", "tools", "triagecheck")
+	if err := os.MkdirAll(toolDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 利用者のリポジトリ。置き場と判定フローを実在させる。
+	repo := filepath.Join(base, "repo")
+	recDir := filepath.Join(repo, "docs", "rt")
+	if err := os.MkdirAll(recDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	flow := filepath.Join(repo, "flow.md")
+	if err := os.WriteFile(flow, []byte("# 判定フロー\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// 展開先の tools/triagecheck に、相対の -judgment-flow が「たまたま」指す
+	// ファイルを置く。暗黙の基準で解決する実装なら、これが見つかって通る。
+	if err := os.MkdirAll(filepath.Join(toolDir, "rel"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(toolDir, "rel", "flow.md"), []byte("# 囮\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	type tc struct {
+		name string
+		args []string
+		// wantErr は期待するエラーの番兵。nil なら成功を期待する。
+		wantErr error
+		// wantHint はエラーの文言に含まれるべき語 (番兵が無い規則の識別用)。
+		wantHint string
+	}
+	out := filepath.Join(repo, "bin", "rtc")
+	cases := []tc{
+		{"相対の -judgment-flow に基準が無い", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", "rel/flow.md"}, nil, "-current-dir"},
+		{"相対の -record-dir に基準が無い", []string{"-install-wrapper", out, "-record-dir", "docs/rt"}, nil, "-current-dir"},
+		{"相対の -install-wrapper に基準が無い", []string{"-install-wrapper", "bin/rtc", "-record-dir", recDir}, nil, "-current-dir"},
+		{"全パスが絶対なのに -current-dir がある", []string{"-install-wrapper", out, "-record-dir", recDir, "-current-dir", repo}, errCurrentDirUnused, ""},
+		{"-record-dir が不在", []string{"-install-wrapper", out, "-record-dir", filepath.Join(repo, "no-such")}, errPathMissing, ""},
+		{"-judgment-flow が不在 (綴りの誤り)", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", filepath.Join(repo, "floww.md")}, errPathMissing, ""},
+		{"-judgment-flow が空に展開された変数", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", "/skills/review-triage/references/judgment-flow.md"}, errPathMissing, ""},
+		{"相対を -current-dir で解決して生成", []string{"-current-dir", repo, "-install-wrapper", "bin/rtc", "-record-dir", "docs/rt", "-judgment-flow", "flow.md"}, nil, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			withRunGlobals(t)
+			t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+			_ = os.Remove(out)
+			var err error
+			withWorkingDir(t, toolDir, func() { err = run(c.args) })
+			if c.wantErr == nil && c.wantHint == "" {
+				if err != nil {
+					t.Fatalf("生成が拒否された: %v", err)
+				}
+				script, rerr := os.ReadFile(out)
+				if rerr != nil {
+					t.Fatalf("ラッパーが書き出されていない: %v", rerr)
+				}
+				got := string(script)
+				// 置き場はラッパーの位置からの相対、判定フローは利用者の基準で
+				// 解決した絶対パス (展開先の囮ではない)。
+				if !strings.Contains(got, `-record-dir "../docs/rt"`) {
+					t.Errorf("-record-dir が script_dir 基準の相対で焼き込まれていない:\n%s", got)
+				}
+				if !strings.Contains(got, `-judgment-flow "`+flow+`"`) {
+					t.Errorf("-judgment-flow が -current-dir 基準で解決されていない:\n%s", got)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("規則に反する入力で生成が通った")
+			}
+			if c.wantErr != nil && !errors.Is(err, c.wantErr) {
+				t.Fatalf("期待した規則のエラーではない: %v", err)
+			}
+			if c.wantHint != "" && !strings.Contains(err.Error(), c.wantHint) {
+				t.Fatalf("エラーが %s を案内していない: %v", c.wantHint, err)
+			}
+			// エラーのときはラッパーを書き出さない (壊れた生成物を残さない)。
+			if _, serr := os.Stat(out); serr == nil {
+				t.Fatal("エラーなのにラッパーが書き出された")
+			}
+		})
+	}
+
+	// CLAUDE_PLUGIN_ROOT からの判定フローは焼き込まない (既定は実行時に $root から
+	// 解決する) が、実在の要求は他の経路と同じく課す。
+	t.Run("CLAUDE_PLUGIN_ROOT は焼き込まないが実在は要求する", func(t *testing.T) {
+		withRunGlobals(t)
+		plugin := filepath.Join(base, "plugin")
+		flowDir := filepath.Join(plugin, "skills", "review-triage", "references")
+		t.Setenv("CLAUDE_PLUGIN_ROOT", plugin)
+		_ = os.Remove(out)
+		var err error
+		withWorkingDir(t, toolDir, func() { err = run([]string{"-install-wrapper", out, "-record-dir", recDir}) })
+		if !errors.Is(err, errPathMissing) {
+			t.Fatalf("環境変数が指す判定フローが無いのに拒否されなかった: %v", err)
+		}
+		if err := os.MkdirAll(flowDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(flowDir, "judgment-flow.md"), []byte("# 判定フロー\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		withWorkingDir(t, toolDir, func() { err = run([]string{"-install-wrapper", out, "-record-dir", recDir}) })
+		if err != nil {
+			t.Fatalf("環境変数が指す判定フローが実在するのに拒否された: %v", err)
+		}
+		script, rerr := os.ReadFile(out)
+		if rerr != nil {
+			t.Fatal(rerr)
+		}
+		if !strings.Contains(string(script), `-judgment-flow "$root/skills/review-triage/references/judgment-flow.md"`) {
+			t.Fatalf("環境変数の値が焼き込まれ、既定の $root が使われていない:\n%s", script)
+		}
+	})
+}
+
+func TestRunInstallWrapperAcceptsFalseWriteSummary(t *testing.T) {
+	withRunGlobals(t)
+	root := filepath.Join(realTempDir(t), "cache", "review-triage", "0.0.1")
+	toolDir := filepath.Join(root, "tools", "triagecheck")
+	if err := os.MkdirAll(toolDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	recs := filepath.Join(realTempDir(t), "docs", "rt")
+	if err := os.MkdirAll(recs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "w")
+
+	withWorkingDir(t, toolDir, func() {
+		if err := run([]string{"-install-wrapper", out, "-record-dir", recs, "-write-summary=false"}); err != nil {
+			t.Fatalf("-write-summary=false で生成が拒否された: %v", err)
+		}
+	})
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("ラッパーが書き出されていない: %v", err)
 	}
 }
