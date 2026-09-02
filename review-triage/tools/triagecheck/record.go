@@ -791,6 +791,13 @@ func recordStatusJa(s string) string {
 	return s
 }
 
+// errRecordDirMissing は「明示指定した置き場が無い」ことを表す番兵。呼び出し側が
+// errors.Is で見分け、他の検査を続けたうえで報告に積めるようにする — 即座に返すと
+// 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れない。
+// 権限・I/O のエラーは続行しても意味が無いので、これとは区別して返す。
+var errRecordDirMissing = errors.New(
+	"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま緑になるため報告する)")
+
 // listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
@@ -810,8 +817,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 		// 正しく分類するため)。
 		if errors.Is(err, fs.ErrNotExist) {
 			if explicit {
-				return nil, fmt.Errorf(
-					"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま緑になるため報告する)")
+				return nil, errRecordDirMissing
 			}
 			return nil, nil
 		}

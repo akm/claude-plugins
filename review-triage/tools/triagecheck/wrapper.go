@@ -19,6 +19,11 @@ import (
 // (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値, (3) -judgment-flow に
 // 焼き込む値 (空なら省略) が入る。
 //
+// -current-dir "$PWD" を必ず渡す。ツール本体は相対パスの基準を推測しないので、
+// 相対の -record-dir を焼き込んだラッパーはこれが無いと動かない。ここでの $PWD は
+// スクリプトが動いているシェルが設定した値で、利用者が叩いた場所を指す
+// (go run -C の下で読む $PWD と違い、シェル自身が更新している)。
+//
 // PLUGIN_CACHE の解決 (最新版を拾う) は Makefile の例と同じロジック。ここを
 // 変えるときは README の「Makefile に置く例」も合わせて直す。
 const wrapperTemplate = `#!/usr/bin/env bash
@@ -34,6 +39,7 @@ if [ -z "$root" ]; then
 fi
 
 exec go run -C "$root/tools/triagecheck" . \
+  -current-dir "$PWD" \
   -record-dir %q \
 %s  "$@"
 `
