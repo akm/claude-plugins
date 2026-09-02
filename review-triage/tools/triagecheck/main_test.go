@@ -792,12 +792,16 @@ func TestRunCheckReportsSummaryCommand(t *testing.T) {
 // 既定は特定のリポジトリの事情を含まない一般的な文言。ここに具体的な
 // Makefile のターゲット名などを焼き込むと、その名前を持たない利用側で
 // 存在しないコマンドを案内することになる (Issue #36)。
+//
+// 見るのは定数であって可変の summaryCommand ではない。変数は run が書き換える
+// ので、先行するテストが残した値を既定と取り違えて、既定の回帰を見逃す
+// (または偽陽性で落ちる) ことがある。
 func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
-	if !strings.Contains(summaryCommand, "-write-summary") {
-		t.Errorf("既定の案内が -write-summary を示していない: %q", summaryCommand)
+	if !strings.Contains(defaultSummaryCommand, "-write-summary") {
+		t.Errorf("既定の案内が -write-summary を示していない: %q", defaultSummaryCommand)
 	}
-	if strings.Contains(summaryCommand, "make ") {
-		t.Errorf("既定の案内に利用側固有の呼び出し方が焼き込まれている: %q", summaryCommand)
+	if strings.Contains(defaultSummaryCommand, "make ") {
+		t.Errorf("既定の案内に利用側固有の呼び出し方が焼き込まれている: %q", defaultSummaryCommand)
 	}
 }
 
