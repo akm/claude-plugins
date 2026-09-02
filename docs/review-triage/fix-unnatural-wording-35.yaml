@@ -1,0 +1,283 @@
+runs:
+  - date: "2026-09-02"
+    skill: code-review
+    model: opus-5
+    level: ""
+    scope: full
+    head: 103e08d
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/config-schema.md
+        line: 15
+        summary: >-
+          「黙って保留に落ちる」を「警告なく保留になる」に言い換えたことで、同じ節の決定表の
+          「対象外 … 件数を報告に出す」と矛盾する主張になった。「黙って」は「気づかれない」の
+          比喩だったが、「警告なく」は「報告が出ない」という検証可能な主張に変わっている。
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config-schema.md の「読み込みは 3 値で扱う」の節を読んだ実装者・利用者が、
+            決定表 (:12) と直後の段落 (:15) を突き合わせたとき
+          who: operator
+          what: >-
+            表は「対象外は件数を報告に出す」と定めるのに、段落は「全件が警告なく保留になる」と
+            述べるので、対象外の件数を報告するかしないかが文書内で食い違う。段落だけを読んだ
+            実装が件数の報告を省くと、表の規定に反したまま検査を通る
+          detectability: >-
+            気づかない。文言の矛盾を検出する関門は無く、判定フローの検査 (judgment-flow) は
+            ノード ID の照合しか行わない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で逐語を確かめた。変更前 (f6e777f) は「黙って保留に落ちる」、変更後 (:15) は
+          「警告なく保留になる」。同ファイル :12 の表の行は「件数を報告に出す」で、指摘のとおり
+          「警告なく」と読み合わせると矛盾する。同じコミット (53d0834) の他の箇所は「気づかれないまま」を
+          選んでおり、ここだけ「警告なく」を採ったことが原因。全ゲートを評価して発火 0 件
+          (矛盾は 2 箇所の逐語で示せて仮定でない / 環境の異常でない / 修正は 1 語の置換で対象より
+          小さい / 検出する関門を挙げられない)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage/references/review-request.md
+        line: 50
+        summary: >-
+          「黙って捨てさせない」を「利用者に知らせずに捨てさせない」に言い換えたが、この文の行為者は
+          上流のレビュア、受け手はトリアージであって「利用者」ではない。被害者の語彙 (audience) と
+          衝突する誤った主体を持ち込んでいる。
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review-request.md を読んで別セッションへのレビュー依頼文を書く人が、residual の
+            段落 (:50) を読んだとき
+          who: operator
+          what: >-
+            「利用者に知らせずに」の「利用者」を、この文書群が被害者の語として定義する
+            利用者 (オペレータ・管理者・プロバイダ) と読み、residual に利用者向けの通知が
+            要るという無関係な要件を依頼文に足す。同じ文の後半は受け手を「トリアージ」と
+            明示しているので、文の中で主体が食い違う
+          detectability: >-
+            気づかない。用語の使い方を検査する関門は無い
+        premise_check:
+          stages: A+B
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で逐語を確かめた (変更前「黙って捨てさせない」、変更後「利用者に知らせずに
+          捨てさせない」。後半は「トリアージが目を通せる形で残す」)。段 B は用語の照合として自分で
+          行った — config-schema.md の「被害者の上書き (D2)」の表が「利用者 (オペレータ・管理者・
+          プロバイダ)」を被害者の語として使っており、residual を読むのは判定フローの手順 1 のとおり
+          トリアージである。指摘のとおり主体の取り違え。全ゲートを評価して発火 0 件
+          (文の前半と後半の食い違いは逐語で示せる / 環境の異常でない / 修正は語の差し替えで
+          対象より小さい / 検出する関門を挙げられない)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage-fix/references/ordering.md
+        line: 31
+        summary: >-
+          verification.md:29 に「近くの辺」「遠くの辺」の定義を新設したのと同じコミット群で、
+          ordering.md:31 にも「近くの辺」の括弧内定義を足した。同じ事実が 2 か所で別の言い方で
+          定義され、ordering.md からは正本が verification.md であることが読めない。
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            「近くの辺」の定義を後から直すとき (verification.md 側か ordering.md 側のどちらかを
+            編集したとき)
+          who: operator
+          what: >-
+            片方の定義だけが直り、もう片方が古い定義のまま残る。ordering.md の正本宣言 (:3) は
+            「順序の決め方と波及先の列挙」であって用語の定義には触れていないので、ordering.md を
+            読む人は定義の正本が verification.md だと知る手がかりが無い。verification.md の
+            観点 B がまさに戒める「並んだ箇所の片方だけが直る」取りこぼしを、この 2 ファイル間で
+            作り込む
+          detectability: >-
+            気づかない。機械検査は無い。doc-dag skill を回せば重複として現れるが、
+            定期的に回す仕組みは無い
+        premise_check:
+          stages: A+B
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で逐語を確かめた (ordering.md:31 の括弧内と verification.md:29 の定義文は
+          別の言い方で、変更前はどちらにも定義文が無かった)。段 B: 指摘が引く規定のうち
+          judgment-flow.md:6「図と表は同じ事実を二度語らない」は判定フロー内の図と表の分担、
+          verification.md:3 は「観点」の正本宣言で、どちらも用語の定義の重複を直接には禁じて
+          いない — この点は指摘の根拠の言い過ぎ。ただし重複を DAG にする方針 (doc-dag) と
+          verification.md 観点 B の趣旨から、正本を 1 か所にして他方は参照にすべき
+          という主張は成り立つ。全ゲートを評価して発火 0 件 (2 つの定義文は逐語で示せる /
+          環境の異常でない / 修正は ordering.md の括弧内を正本への参照に変えるだけで
+          対象より小さい / 検出する関門を挙げられない)。修正では初出の説明を残しつつ
+          定義の正本を verification.md に寄せる形が要る
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 4
+        file: pr-teeth/docs/design/data-integrity.md
+        line: 93
+        summary: >-
+          「POSIX では守られ」を「POSIX では保証され」に言い換えたが、何が保証されるのかを示す語が
+          文に無く、述語だけが強い語に変わったため主語のない断定になっている。
+        category: doc-dev
+        audience: developer
+        consequence:
+          condition: >-
+            pr-teeth の設計文書のロックの節で、:93 の行だけを読んだ開発者が「保証」の対象を
+            広く取ったとき
+          who: developer
+          what: >-
+            保証されるのは flock による排他だけなのに、モジュール全体が保証されると読み、
+            非 POSIX 環境の扱いを整合性の議論から外す
+          detectability: >-
+            気づかない。文書の読み方の問題で、検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [hypothetical]
+        verdict: rejected
+        verdict_reason: >-
+          R3 — 発火したゲートは hypothetical。段 A で逐語を確かめた (変更前「POSIX では守られ」、
+          変更後「POSIX では保証され」。どちらも目的語を持たず、節の主題 :86 が
+          「read-modify-write を store.locked() で囲む」なので保証の対象は排他)。
+          hypothetical で書くもの: 再現に必要な条件は「読み手が :86 の主題を無視して :93 だけを
+          読み、保証の対象をモジュール全体と取る」ことで、文脈を切り離した読み方を要するため
+          再現の形にできない。変更前の「守られ」も同じく目的語を欠いており、言い換えで
+          新たに壊れた読み方を示せていない。被害者は pr-teeth の設計文書を読む開発者だけで、
+          製品の利用者は含まれない。他のゲート: developer-domain (環境の異常でない) /
+          disproportionate-cost (修正は「排他が」を補うだけ) / already-visible (関門を
+          挙げられない) は発火しない。次にこの行を編集するときに「排他が」を補うのは妨げない
+        attrs:
+          severity: P3
+          confidence: medium
+      - id: 5
+        file: review-triage/skills/review-triage/references/premise-check.md
+        line: 78
+        summary: >-
+          見出しの語を「型」→「種類」に替えたのに、続く述部は「型」→「場合」に替えたため、
+          「防げる種類: … 成り立たない場合。」とラベルと中身の語が呼応しなくなった。
+          同じ行の中の言い換えの不統一。
+        category: skill
+        audience: operator
+        consequence:
+          condition: premise-check.md の「何が防げて、何が防げないか」の 2 項目を読んだとき
+          who: operator
+          what: >-
+            ラベル「種類」と述部「場合」の語が呼応せず、文として据わりが悪い。
+            ただし「防げる種類 = 仕様と照らすと成り立たない場合」という意味は変わらず、
+            判定や手順が変わる読み方は無い
+          detectability: 気づかない (壊れるものが無いので気づく必要も無い)
+        premise_check:
+          stages: none
+          result: skipped
+        verdict: rejected
+        verdict_reason: >-
+          R2 — 空虚。指摘は「ラベルと述部で言い換えた語がそろっていない表記の揺れ」と読んだ
+          (逐語は指摘の evidence のとおりで、変更後は「防げる種類: … 成り立たない場合。」)。
+          帰結の「何が壊れるか」を書こうとしても、意味は変更前と同じで、誤読に至る経路を
+          指摘自身も挙げていない (evidence は「呼応が切れている」「表記の揺れ」に留まる)。
+          依頼文の「整理・統一の好み (放置して壊れるものが無いもの) は報告しない」に当たる。
+          言い換えの語をそろえること自体は、同じファイルを次に編集するときに行えばよい
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 6
+        file: review-triage/skills/review-triage/references/gate-examples.md
+        line: 33
+        summary: >-
+          「縮退」を「条件がこのように意味をなさなくなった」に言い換えたが、「このように」が
+          直前の帰結文を指すため、原因と結果が同じことを言う循環した文になった。
+          rejection-gates.md:37 の同じ語の言い換えとも表現がそろっていない。
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            gate-examples.md の「成立しない例」の「外して確かめる」の段落 (:33) を、
+            ゲートを外したときに何が観測されたかを知るために読んだとき
+          who: operator
+          what: >-
+            括弧の外「区別が通らなくなる」と括弧内「条件がこのように意味をなさなくなった」が
+            同じことを言うため、括弧内が「1 回目の試行で観測された事実」なのか「帰結の言い直し」
+            なのか決められない。「外して確かめる」の記述として何を観測したことになるのかが
+            読めず、この例で確かめたい判定の変化を追認できない
+          detectability: >-
+            気づかない。文の循環を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で逐語を確かめた。変更前は「(1 回目の試行の検討で実際に起きた縮退)」で、
+          「縮退」が事象の名前として「起きた」の目的語になっていた。変更後は
+          「(1 回目の試行の検討で実際に、条件がこのように意味をなさなくなった)」で、
+          「このように」が括弧の外の「区別が通らなくなる」を指すため、指摘のとおり
+          括弧内が外の言い直しになっている。rejection-gates.md:37 の同じ語は
+          「条件が意味をなさなくなる」と言い換えており、こちらだけ「このように」を挟んだ。
+          全ゲートを評価して発火 0 件 (循環は 1 文の逐語で示せる / 環境の異常でない /
+          修正は括弧内の書き直しで対象より小さい / 検出する関門を挙げられない)
+        attrs:
+          severity: P3
+          confidence: medium
+      - id: 7
+        file: work-log-gh-comment/skills/work-log-gh-comment/evals/README.md
+        line: 79
+        summary: >-
+          「落ちるべき入力が落ちることを先に固定する」を「先に検証する」に替えたことで、
+          テストを先に書いて据えるという手順の指示が弱い表現になり、直後の
+          「そのうえで CHECKS に検査を足す」との順序関係が読み取りにくくなった。
+        category: eval
+        audience: developer
+        consequence:
+          condition: >-
+            評価器 (grade.py) に検査を足す開発者が evals/README.md:79-85 を読み、
+            「先に検証する」を「CHECKS を足した後に反例で確かめる」と読んだとき
+          who: developer
+          what: >-
+            反例のテストより先に恒真の判定を CHECKS に入れてしまい、この節が防ごうとしている
+            失敗を起こす
+          detectability: >-
+            気づきにくい。恒真の判定は eval を通してしまうので、反例のテストが無い限り
+            表面化しない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [hypothetical]
+        verdict: rejected
+        verdict_reason: >-
+          R3 — 発火したゲートは hypothetical。段 A で逐語を確かめた (変更前「先に固定する」、
+          変更後「先に検証する」、直後の :85 は「そのうえで grade.py の CHECKS に検査を足す」)。
+          hypothetical で書くもの: 指摘が挙げる壊れる読み方は「先に検証する」を「CHECKS を足した
+          後に検証する」と読むことだが、:79 の「先に」と :85 の「そのうえで」が順序を明示して
+          おり、両方を無視する読み方を要するため再現の形にできない。「固定する」が
+          「反例をテストとして先に書く」という作業の指示だったという読みは妥当で、
+          「検証する」がその含みを弱めたのは事実だが、指摘が主張する順序の逆転には至らない。
+          被害者は評価器を保守する開発者だけで、製品の利用者は含まれない。他のゲート:
+          developer-domain (環境の異常でない) / disproportionate-cost (修正は 1 語) /
+          already-visible (関門を挙げられない) は発火しない。次に編集するときに
+          「反例をテストとして先に書く」と補うのは妨げない
+        attrs:
+          severity: P3
+          confidence: medium
+    notes: >-
+      入力は tmp/review-issue35-code-review-opus-5.yaml (head 103e08d、現在の HEAD と一致。
+      レビューは報告のみで、作業ツリーは不変だった)。
+      .claude/akm-claude-plugins/review-triage/config.json はこのリポジトリに無く、
+      関門の一覧が無いので免除条項は使っていない (7 件とも免除の条件 1 に当たる指摘は無い)。
+      記録の置き場と検査・サマリ生成は、過去の回と同じく同梱の triagecheck を
+      go run で直接呼んで行った (置き場 docs/review-triage)。
+      residual 6 件のうち記録に値するもの:
+      (1) review-triage-fix/SKILL.md:30「決めずに人間に返す」と「人間に諮らずに決めない」が
+      同じ文で二重に近い — 意味は壊れていないので次に編集するときに片方を削る。
+      (2) triagecheck/README.md:196「サポートしない配置は … 合格を返す」の主語と述語の
+      不呼応は変更前からのもので、今回の言い換えで壊れたものではない。
+      (3) gate-examples.md の見出し「成立する例 / 成立しない例」は免除条項の条件の「成立」と
+      語が重なるので「該当する例 / 該当しない例」のほうが区別しやすい — 指摘 6 を直すときに
+      同じファイルを編集するので、あわせて検討する価値はある。
+      (4) 「黙って」1 語を 5 通りに訳し分けたことが指摘 1・2 の素地になったという観察は
+      当たっている — 文脈ごとに主体を明示する言い換えは、主体を取り違える危険と
+      表裏で、採択した 1・2 はその実例。
