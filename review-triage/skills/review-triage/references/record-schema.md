@@ -61,7 +61,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** (基準の正本は [grouping.md](../../review-triage-fix/references/grouping.md)) |
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
 | `approach` | ✓ | 何をどう直すか |
-| `investigation` | | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。** 「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ型の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
+| `investigation` | | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。** 「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序 |
 | `depends_on` | | 依存する問題の `problem_id` |
@@ -74,7 +74,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 
 | キー | 必須 | 内容 |
 | --- | --- | --- |
-| `scope` | ✓ | 調べた範囲 — 実行したコマンド (grep のパターンと対象) と、目で読んだ対象。**実行してから書く** ([verification.md](../../review-triage-fix/references/verification.md) の型 A)。「すべて」ではなく「ここまで」を書く |
+| `scope` | ✓ | 調べた範囲 — 実行したコマンド (grep のパターンと対象) と、目で読んだ対象。**実行してから書く** ([verification.md](../../review-triage-fix/references/verification.md) の観点 A)。「すべて」ではなく「ここまで」を書く |
 | `included` | | 見つけた箇所のうち、同じ原因の別の現れ (または修正に合わせて変える必要がある影響先) として**この問題に含めた**もの。指摘に無いものだけを書く (指摘にあるものは `finding_ids` が持つ)。無ければ省略 |
 | `excluded` | | 見つけたが**含めなかった**箇所と、その理由 (構造が似ているだけで原因が違う・変える必要が無い・凍結された過去の記録)。無ければ省略 |
 
@@ -84,7 +84,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
       - problem_id: P2
         cause: 表の見出しだけを変え、行を埋める側に追随しなかった
         finding_ids: [3]
-        approach: renderPlanCells の証拠の欄を見出しの 2 つの型に合わせる
+        approach: renderPlanCells の証拠の欄を見出しの 2 つの種類に合わせる
         investigation:
           scope: >-
             grep -rn '証拠\|SHA |' review-triage/tools/triagecheck と、
