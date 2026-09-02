@@ -40,7 +40,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 - `config_dir` … 設定ディレクトリ
 - `default_language` … 通知の地の文と HTML の `lang` に使う言語
 - `warnings` … 設定ファイルが壊れている等。**あれば最終出力の冒頭に必ず載せる**
-  （黙って既定値で動くと、設定したのに効いていないことに気づけない）
+  （知らせずに既定値で動くと、設定したのに効いていないことに気づけない）
 - `token_source` … 見つかった認証の入手元。`null` なら**その旨だけ伝えて終了する**
   （`GITHUB_TOKEN` → `GITHUB_TOKEN_FILE` → `gh auth token` の順に探した結果。
   探索や回避を自分で試みない）
@@ -81,7 +81,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
 
 入力は `[{"repo","number","sha","updated_at","body"}]`。**`body` には手順 2 で
 取得した PR 本文をそのまま入れる**（本文の差分を出すのに使う）。返る `targets` の
-各要素には次が付く。**`selected` が 0 なら何も通知せず静かに終了する。**
+各要素には次が付く。**`selected` が 0 なら何も通知せず終了する。**
 
 - `status` … `new`（初めて見る）／ `updated`（前回から変わった）
 - `base_sha` … `updated` のときの**差分の起点**。手順 4・6 で使う
@@ -238,7 +238,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" render \
 | その他 | | 省略可。空なら該当セクションが出ない |
 
 - **`url` は渡さない。** `repo` と `number` から導出される。
-- **未知のキーを含めるとエラーになる。** タイポを黙って捨てると、そのセクションが
+- **未知のキーを含めるとエラーになる。** タイポを知らせずに捨てると、そのセクションが
   消えたまま成功したように見えるため。上表以外のキーは使えない。
 - `priority` が `ignore` の PR は自動で1行に畳まれる。並び替えも自動。
 
