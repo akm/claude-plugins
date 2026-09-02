@@ -109,7 +109,7 @@ go run -C <展開先>/tools/triagecheck . \
 
 ```makefile
 # 展開先は版ごとに分かれる (cache/<マーケットプレイス>/<プラグイン>/<版>)。
-# 版を固定して書くと更新のたびに直すことになるので、最新の 1 つを拾う。
+# 版を固定して書くと更新のたびに直すことになるので、最新の 1 つを選ぶ。
 PLUGIN_CACHE = $(HOME)/.claude/plugins/cache/akm-claude-plugins/review-triage
 REVIEW_TRIAGE_ROOT ?= $(shell ls -d $(PLUGIN_CACHE)/*/ 2>/dev/null | sort -V | tail -1)
 
@@ -129,7 +129,7 @@ triage-summary: ## トリアージ記録から生成サマリを書き出す
 	$(TRIAGECHECK) -write-summary
 ```
 
-**展開先は環境によって違い、版ごとにディレクトリが分かれる。** 上の例は最新の版を拾う。`claude plugin list` で確認して `REVIEW_TRIAGE_ROOT` を直接渡せば、その実行に限り版を選べる — ただし**プラグインが更新されるとその展開先は増える一方で、古い版に留まり続ける手立てにはならない** (下の「版は固定できない」を参照)。
+**展開先は環境によって違い、版ごとにディレクトリが分かれる。** 上の例は最新の版を選ぶ。`claude plugin list` で確認して `REVIEW_TRIAGE_ROOT` を直接渡せば、その実行に限り版を選べる — ただし**プラグインが更新されるとその展開先は増える一方で、古い版に留まり続ける手立てにはならない** (下の「版は固定できない」を参照)。
 
 **空のまま実行すると `go run -C /tools/triagecheck` になり、分かりにくいエラーになる。** 上の `test -n` は、見つからないことをその場で言うためのもの。
 
@@ -158,7 +158,7 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 変わらないため。
 
 **版は固定できない。常にキャッシュ内の最新版が使われる。** ラッパーも上の Makefile の例も
-`sort -V | tail -1` で最新の 1 つを拾うので、新しい版がキャッシュに入れば次の実行から
+`sort -V | tail -1` で最新の 1 つを選ぶので、新しい版がキャッシュに入れば次の実行から
 そちらが使われる。**古い版に留まりたい場合、現状の仕組みでは実現できない**
 (検討は [Issue #33](https://github.com/akm/claude-plugins/issues/33))。
 
