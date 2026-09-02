@@ -238,6 +238,30 @@ runs:
         attrs:
           severity: P3
           confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 1 の P2 で investigation.md:5 を直したとき、同じ冒頭の節の 2 行上にある
+          包括文 (3 行目) を読み直さなかった。型 B の「節の記述を変えたら節全体を
+          読み直す」を、直した行の近傍にだけ当てて冒頭の包括文に当てなかった
+        finding_ids: [1]
+        approach: >-
+          investigation.md:3 の「コミット前の検証は verification.md が持つ」を
+          「検証 (型 A〜F) は verification.md が持つ」に改める。案内の文にフェーズを
+          書かなければ、5 行目や正本が変わっても 3 行目が古びる余地が無くなる。
+          直した後に冒頭の節 (1〜5 行目) 全体と、型を参照する 50・54・63 行目を読み直す
+        investigation:
+          scope: >-
+            両スキルの *.md で verification.md を参照する文 8 箇所を全部読み、
+            「コミット前」「書いている最中」「修正の後」で grep。このブランチで
+            足した・変えた冒頭 (見出し前) の包括文 8 文を読み直した
+          excluded:
+            - "verification.md:1 の題「修正の後の検証」は 11 行目の「書いている最中」と緊張があるが、正本自身の既存の記述で原因が別なので含めない"
+            - "SKILL.md:37「各コミットの前に…型の検証を通す」は verification.md:11 後半 (コミット前にすべて確かめたかを見る) と同じ意味の既存の文で、整合している"
+            - "committing.md:37 は「コミット前にかかるもの (B・D・E)」と正本どおりに絞っており直す必要が無い"
+            - "トリアージ記録 YAML の逐語引用は過去の回として書き換えない"
+        order: 1
+        status: pending
     notes: >-
       2 回目 (増分 64fa3b2..08cf572、別セッションのレビュー結果を
       tmp/review-code-review-opus-5-7th.yaml で受領)。head は現在の HEAD と一致し、
