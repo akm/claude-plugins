@@ -311,3 +311,159 @@ runs:
       (4) 「黙って」1 語を 5 通りに訳し分けたことが指摘 1・2 の素地になったという観察は
       当たっている — 文脈ごとに主体を明示する言い換えは、主体を取り違える危険と
       表裏で、採択した 1・2 はその実例。
+  - date: "2026-09-03"
+    skill: code-review
+    model: opus-5
+    level: ""
+    scope: incremental
+    head: 0d493c6
+    findings:
+      - id: 1
+        file: review-triage/README.md
+        line: 44
+        summary: >-
+          「詳細は skills/review-triage/references/project-config.md を参照」という解決可能な
+          パス表記を、README から解決できない裸のファイル名「project-config.md の
+          「gates — なぜ関門の一覧が要るか」」に置き換えた。README と同じ階層に
+          project-config.md は無い。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: >-
+            review-triage/README.md の「プロジェクト固有の設定」の節で、:44 の段落だけを読んで
+            「gates 未設定の扱い」の正本を探すとき
+          who: operator
+          what: >-
+            示された名前 project-config.md はリンクでもパスでもないので、その行からは辿れる先が
+            無い。同じ節の :30 に同じファイルへのリンク
+            (skills/review-triage/references/project-config.md) があるので、節を通して読めば
+            到達できる
+          detectability: >-
+            気づかない。リンク切れの検査はコードスパンの中のファイル名を見ない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [hypothetical]
+        verdict: held
+        verdict_reason: >-
+          H6 — 発火したゲートは hypothetical、被害者は operator (README は doc-user)。
+          段 A で逐語を確かめた: :44 は「`project-config.md` の「`gates` — なぜ関門の一覧が
+          要るか」を参照」で裸のコードスパン、置き換え前 (a0ad83f) は
+          「詳細は `skills/review-triage/references/project-config.md` を参照」。同じ節の
+          :30 は「様式と各キーの意味の正本は [project-config.md](skills/.../project-config.md)」と
+          リンクで書き、:46 も config-schema.md をリンクで書いている。
+          hypothetical で書くもの: 帰結が起きるには、読み手が同じ節の 14 行上にある同じファイルへの
+          リンクを読まずに :44 だけから辿ろうとすることが要る。節を通して読む・ファイル名で
+          リポジトリを検索する、のどちらでも到達できるので、到達できない状態を再現の形にできない。
+          他のゲート: developer-domain (環境の異常でない) / disproportionate-cost (修正は
+          コードスパンをリンクに変える 1 箇所) / already-visible (リンク切れの検査はコードスパンを
+          見ないので挙げられない) は発火しない。免除条項の条件 1 に当たらない。
+          衝突の内容: 帰結は再現の形にできないが、同じ節の他の 2 箇所がリンクなのにここだけ
+          裸の名前という不統一は事実で、修正は 1 箇所のリンク化で済む。
+          利用者が読む文書なので人間の判断に渡す
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage/references/hold-presentation.md
+        line: 9
+        summary: >-
+          足した「項目の定義 (帰結の 4 項目・発火したゲート・被害者) は record-schema.md の
+          findings[] と同じ」が、3 項目のうち 2 項目で誤った先を指す。record-schema.md 自身が
+          帰結の 4 項目は judgment-flow.md の D3、被害者は config-schema.md が正本だと書いている。
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            保留を提示する側が hold-presentation.md:9 の表の項目の意味を確かめようと
+            record-schema.md の findings[] を開いたとき
+          who: operator
+          what: >-
+            record-schema.md の consequence 行は 4 項目の構成 (condition / who / what /
+            detectability) を持ち、意味は judgment-flow.md の D3 へ送る。読み手は 1 段多く
+            たどるが、たどり着く先は正しい正本で、誤った意味を掴む経路は無い。表の項目は
+            記録の findings[] のキーに対応しており、その対応そのものは正しい
+          detectability: >-
+            気づく必要が無い (誤った意味に到達しないため)。用語の参照先を検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        verdict: rejected
+        verdict_reason: >-
+          R2 — 空虚。指摘は「hold-presentation.md:9 が定義の正本として record-schema.md の
+          findings[] を指すが、record-schema.md は帰結の意味を judgment-flow.md D3 に、
+          被害者の上書き規則を config-schema.md に委ねているので、2 項目について指し先が
+          正本でない」と読んだ。段 A で逐語を確かめた (hold-presentation.md:9、
+          record-schema.md:48 の consequence 行「意味の正本は判定フローの D3」、
+          config-schema.md:3 の正本宣言。いずれも指摘の引用のとおり)。
+          帰結を書こうとすると、読み手は record-schema.md から judgment-flow.md へ 1 段多く
+          たどるだけで、誤った定義を読む経路も、提示の項目が記録のキーとずれる経路も無い。
+          hold-presentation → record-schema → judgment-flow は向き付きの参照の連鎖で、
+          doc-dag が禁じる巡回でも向き無しの重複でもない。「〜と同じ」を「定義の正本」と読むと
+          指摘のとおり不正確だが、表の項目が記録の findings[] のキーに対応するという文の役割は
+          保たれている。依頼文の「整理・統一の好み (放置して壊れるものが無いもの)」に当たる。
+          次にこの行を編集するときに「記録の findings[] のキーに対応する (意味はそこから正本へ
+          たどれる)」と言い換えるのは妨げない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: commit-squash/README.md
+        line: 21
+        summary: >-
+          足した「確認の手順と止まる条件の正本は SKILL.md の「前提の確認」と手順 10」のうち、
+          手順 10 は止まる条件ではなく後片付け (バックアップブランチを削除しない) の規則で、
+          止まる条件の正本は history-rewriting.md の「止まるべきとき」にある。
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: >-
+            commit-squash/README.md の「前提」の節から、スキルが止まる条件の全体を確かめようと
+            :21 の指す先をたどったとき
+          who: operator
+          what: >-
+            「前提の確認」には 2 条件 (作業ツリーがクリーン・未 push) しか無く、手順 10 には
+            止まる条件が 1 つも無い。history-rewriting.md「止まるべきとき」が持つ残りの 2 条件
+            (最終ツリーのハッシュ不一致・ブランチの削除が必要) に到達できず、止まる条件を
+            2 つだと理解する。同じ README の「特徴」の節は push 判定の正本を history-rewriting.md と
+            書いており、README の中で同じ事柄の正本が 2 つの文書に振られている
+          detectability: >-
+            気づかない。リンク切れの検査は節名や手順番号の指し先を見ない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で逐語を確かめた。README:21 は「確認の手順と止まる条件の正本は同梱の
+          SKILL.md の「前提の確認」と手順 10」。SKILL.md:12-17 の「前提の確認」は 2 条件と
+          「1 つでも満たさなければ、そこで止めて人間に報告する」、:123 の手順 10 は後片付け
+          (バックアップブランチを削除しない) で止まる条件を含まない。
+          history-rewriting.md「止まるべきとき」は 4 条件を列挙し、README:16 はその文書を
+          push 判定の正本と書いている。指摘のとおり、手順 10 を止まる条件の正本として指すのは
+          誤りで、README 内で正本が 2 文書に割れている。原因は、README の次の段落
+          (バックアップブランチを削除しない) の正本として手順 10 を挙げたのを、
+          「止まる条件」と同じ文にまとめたこと。全ゲートを評価して発火 0 件
+          (指した節に条件が無いことは逐語で示せて仮定でない / 環境の異常でない /
+          修正は 1 文の書き直しで対象より小さい / 節名の指し先を検査する関門は無い)。
+          免除条項の条件 1 に当たらない
+        attrs:
+          severity: P3
+          confidence: high
+    notes: >-
+      入力は tmp/review-code-review-opus-5-9th.yaml (head 0d493c6、現在の HEAD と一致。
+      作業ツリーはレビュー前後で不変)。回 1 の HEAD 103e08d は rebase で履歴から消えたため、
+      増分の基点は同じ内容に当たる a0ad83f。
+      .claude/akm-claude-plugins/review-triage/config.json は引き続き無く、
+      関門の一覧が無いので免除条項は使っていない (3 件とも免除の条件 1 に当たる指摘は無い)。
+      検査とサマリ生成は同梱の triagecheck をツールのディレクトリで go run して行った
+      (リポジトリ直下では .tool-versions が無く go を解決できない)。
+      residual 4 件のうち記録に値するもの:
+      (1) investigation.md:5 の「冒頭)。 フェーズ」の句点の後の ASCII 空白は実在する
+      (od で確認)。次にこの行を編集するときに消す。
+      (2) triagecheck の judgment_flow.go:38 と judgment_flow_test.go:83 のコメントの「型 F」は
+      #35 の対象 (*.md) の外で、増分より前からのもの。verification.md に合わせて
+      「観点 F」にするのは別の機会でよい。
+      (3) config-schema.md:16 の「警告なく」を落としたのは回 1 の P1 で意図して行った変更
+      (表の「件数を報告に出す」との矛盾を消すため)。
+      (4) doc-dag/README.md の「使い方」でリンクの直後にコマンドを残す形は、
+      commit-squash・mermaid-preview・work-log-gh-comment の README と同じ形にそろえたもの。
