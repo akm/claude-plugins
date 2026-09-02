@@ -278,7 +278,8 @@ runs:
           置いたために実際に区別が通らなくなった」と書き直し、括弧の外の帰結の言い直しにしない。
           3 箇所は原因が同じなので 1 コミット。P2 とは独立で、影響範囲が広い (3 ファイル) こちらを先にする
         order: 1
-        status: pending
+        sha: 9bc1214
+        status: done
       - problem_id: P2
         cause: >-
           「近くの辺」の定義を verification.md に新設したとき、初出で説明を添える原則を
@@ -290,7 +291,8 @@ runs:
           verification.md:29 の定義はそのまま正本として残す。
           正本 (verification.md) は変えず参照側だけを直すので、順序の制約は無い
         order: 2
-        status: pending
+        sha: a84f9ed
+        status: done
     notes: >-
       入力は tmp/review-issue35-code-review-opus-5.yaml (head 103e08d、現在の HEAD と一致。
       レビューは報告のみで、作業ツリーは不変だった)。
