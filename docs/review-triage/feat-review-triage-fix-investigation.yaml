@@ -280,3 +280,24 @@ runs:
       破らない (doc-dag の結果と一致)。
       (c) record.go:8・64 のコメントが正本を存在しない docs/review-triages/README.md と
       指す取り残しは、P1 の excluded のとおり今回は含めない。
+  - date: "2026-09-03"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: ""
+    scope: incremental
+    head: 927f639
+    findings: []
+    notes: >-
+      3 回目 (増分 08cf572..927f639、別セッションのレビュー結果を
+      tmp/review-code-review-opus-5-8th.yaml で受領)。head は現在の HEAD と一致し、
+      レビュー前後で HEAD と作業ツリーが不変であることを確認した。指摘 0 件。
+      residual 3 件はいずれも既知か整理の好み:
+      (a) investigation.md:3 が型の範囲 (A〜F) を書いているので verification.md が型を
+      増減すると古びうるが、放置して壊れるものは無い。
+      (b) verification.md:1 の題「修正の後の検証」と 11 行目の緊張は増分の外で、
+      回 2 の P1 の excluded のとおり。
+      (c) record.go:8・64 の正本を指すコメントの取り残しは回 1 の P1 の excluded と
+      回 2 の notes のとおり。
+      増分レビューが 0 件に収束したので、このブランチのレビューはここで区切る。
+
