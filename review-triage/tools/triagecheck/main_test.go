@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,7 +10,7 @@ import (
 	"testing"
 )
 
-// run はパッケージ変数 (reviewTriageDir / judgmentFlowPath) を書き換えるので、
+// run はパッケージ変数 (reviewTriageDir / judgmentFlowPath / summaryCommand) を書き換えるので、
 // テストの間だけ退避して戻す。戻さないと後続のテストが前のテストの指定を引き継ぐ。
 //
 // あわせて、run が読む環境変数 CLAUDE_PLUGIN_ROOT をここでクリアする。run を呼ぶ
@@ -19,8 +20,8 @@ import (
 // 意図的に使うテストは、この関数の後で t.Setenv して上書きする。
 func withRunGlobals(t *testing.T) {
 	t.Helper()
-	dir, flow := reviewTriageDir, judgmentFlowPath
-	t.Cleanup(func() { reviewTriageDir, judgmentFlowPath = dir, flow })
+	dir, flow, cmd := reviewTriageDir, judgmentFlowPath, summaryCommand
+	t.Cleanup(func() { reviewTriageDir, judgmentFlowPath, summaryCommand = dir, flow, cmd })
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 }
 
@@ -739,4 +740,85 @@ func TestRunInstallWrapperAcceptsFalseWriteSummary(t *testing.T) {
 	if _, err := os.Stat(out); err != nil {
 		t.Fatalf("ラッパーが書き出されていない: %v", err)
 	}
+}
+
+// -summary-command で渡した文字列が、生成サマリの 1 行目にそのまま入る。
+// 焼き込みを解いた目的そのもの — 利用側の実際の再生成手段を案内させること。
+func TestRunWriteSummaryUsesSummaryCommand(t *testing.T) {
+	withRunGlobals(t)
+	recs := realTempDir(t)
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const want = "bin/rtc -write-summary"
+	if err := run([]string{"-record-dir", recs, "-summary-command", want, "-write-summary"}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(recs, "x.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "`"+want+"`") {
+		t.Errorf("生成サマリに -summary-command の値が入っていない:\n%s", firstLine(string(got)))
+	}
+}
+
+// 検査の経路のエラー文も同じ値を使う。生成と検査で違う案内を出すと、
+// 「サマリを直す方法」が場所によって食い違う。
+func TestRunCheckReportsSummaryCommand(t *testing.T) {
+	withRunGlobals(t)
+	recs := realTempDir(t)
+	// サマリの無い記録を置くと「サマリがありません」が報告される。
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const want = "make triage-summary"
+	stderr := captureStderr(t, func() {
+		if err := run([]string{"-record-dir", recs, "-summary-command", want}); err == nil {
+			t.Fatal("サマリの不在が報告されなかった")
+		}
+	})
+	if !strings.Contains(stderr, "`"+want+"`") {
+		t.Errorf("報告に -summary-command の値が入っていない:\n%s", stderr)
+	}
+}
+
+// 既定は特定のリポジトリの事情を含まない一般的な文言。ここに具体的な
+// Makefile のターゲット名などを焼き込むと、その名前を持たない利用側で
+// 存在しないコマンドを案内することになる (Issue #36)。
+func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
+	if !strings.Contains(summaryCommand, "-write-summary") {
+		t.Errorf("既定の案内が -write-summary を示していない: %q", summaryCommand)
+	}
+	if strings.Contains(summaryCommand, "make ") {
+		t.Errorf("既定の案内に利用側固有の呼び出し方が焼き込まれている: %q", summaryCommand)
+	}
+}
+
+// 空 (空白・不可視だけ) の明示指定は弾く。通すと「再生成する手段は空欄です」と
+// 案内することになり、指定しないより悪い (パスを取るフラグと同じ規則)。
+func TestRunRejectsBlankSummaryCommand(t *testing.T) {
+	recs := realTempDir(t)
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, blank := range []string{"", "   ", "\u200b"} {
+		t.Run(fmt.Sprintf("%q", blank), func(t *testing.T) {
+			withRunGlobals(t)
+			err := run([]string{"-record-dir", recs, "-summary-command", blank, "-write-summary"})
+			if err == nil {
+				t.Fatal("空の -summary-command が通った")
+			}
+			if !errors.Is(err, errEmptySummaryCommand) {
+				t.Fatalf("空指定ではないエラーが返っている: %v", err)
+			}
+		})
+	}
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }

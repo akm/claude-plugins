@@ -19,6 +19,10 @@ import (
 // (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値 (script_dir からの相対),
 // (3) -judgment-flow に焼き込む値 (空なら省略) が入る。
 //
+// -summary-command は焼き込まず、実行時に "$0 -write-summary" を組み立てて渡す。
+// サマリの 1 行目に入る案内なので、実際に叩ける形でなければ意味が無い —
+// -record-dir と同じ理由で、絶対パスを焼き込むと移動・再クローンで外れる。
+//
 // 基準には $PWD ではなく script_dir (ラッパー自身の実体の位置) を使う。$PWD は
 // シェルが更新する慣習にすぎず、非シェルの親 (CI ランナー・cron・make -C) が
 // chdir すると古いままになるので、利用者が叩いた場所を指すとは限らない。
@@ -52,6 +56,12 @@ while [ -L "$script_src" ]; do
 done
 script_dir=$(cd -P "$(dirname "$script_src")" && pwd)
 
+# サマリの再生成手段としてツールに案内させる文字列。利用者がこのラッパーを
+# 叩いた形 ($0) をそのまま渡す — 焼き込んだ固定のパスだと、リポジトリを
+# 移動・再クローンしたときや、リンク経由で叩かれたときに、案内が実際の
+# 呼び出し方と食い違う。
+summary_command="$0 -write-summary"
+
 plugin_cache=%q
 root=$(ls -d "$plugin_cache"/*/ 2>/dev/null | sort -V | tail -1)
 if [ -z "$root" ]; then
@@ -62,6 +72,7 @@ fi
 exec go run -C "$root/tools/triagecheck" . \
   -current-dir "$script_dir" \
   -record-dir %q \
+  -summary-command "$summary_command" \
 %s  "$@"
 `
 

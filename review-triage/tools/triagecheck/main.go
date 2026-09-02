@@ -45,6 +45,8 @@ func run(args []string) error {
 		"検査せず、記録から生成サマリ (.md) を書き出す")
 	installWrapperPath := fs.String("install-wrapper", "",
 		"検査せず、-record-dir と -judgment-flow の値を焼き込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
+	summaryCmd := fs.String("summary-command", summaryCommand,
+		"サマリの再生成手段として案内する文字列 (エラー文と生成サマリの 1 行目に入る)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -65,6 +67,15 @@ func run(args []string) error {
 	if explicit["install-wrapper"] && explicit["write-summary"] && *writeSummary {
 		return fmt.Errorf("-write-summary は %w (生成の経路では使われません)", errFlagUnusedWithInstallWrapper)
 	}
+
+	// 案内の文言は、経路の分岐より前に一度だけ据える。検査 (エラー文) と
+	// -write-summary (生成サマリの 1 行目) の両方が同じ値を読むので、経路ごとに
+	// 渡すと片方だけ古い案内を出す組み合わせができる。空白だけの指定は弾く —
+	// 通すと「再生成する手段は空欄です」と案内することになり、指定しないより悪い。
+	if explicit["summary-command"] && isBlankPath(*summaryCmd) {
+		return fmt.Errorf("-summary-command に%w", errEmptySummaryCommand)
+	}
+	summaryCommand = *summaryCmd
 
 	// パスの規則は、経路 (検査 / -write-summary / -install-wrapper) で分岐する前に
 	// 1 か所で当てる。経路ごとに書くと、規則を 1 つ足すたびに他の経路へ書き忘れ、
@@ -297,6 +308,9 @@ var (
 	// errPathMissing は、明示した在り処 (記録の置き場・判定フロー) が実在しない
 	// ことを表す。どれが無いかは stderr に並べた報告の行が示す。
 	errPathMissing = errors.New("指定した在り処が存在しません")
+	// errEmptySummaryCommand は -summary-command に空 (空白・不可視だけを含む)
+	// が明示指定されたことを表す。
+	errEmptySummaryCommand = errors.New("空の文字列が指定されました")
 )
 
 // resolveBaseDir は -current-dir の値を検証して返す。指定が無ければ空を返す

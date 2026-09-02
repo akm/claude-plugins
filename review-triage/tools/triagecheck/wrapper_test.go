@@ -329,3 +329,70 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 			" (cd -P が効いていない):\n%s", out)
 	}
 }
+
+// ラッパー経由で書き出した生成サマリの 1 行目には、そのラッパーの叩き方が入る。
+//
+// -summary-command を焼き込まず実行時に "$0 -write-summary" で組み立てるので、
+// 叩いた形がそのまま案内になる。文字列だけを見ると、渡し忘れても
+// テンプレートに行があるだけで通ってしまうので、実際に走らせて生成物を読む。
+func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go が PATH に無いので実行は確かめられない")
+	}
+	toolDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := realTempDir(t)
+	version := filepath.Join(base, "cache", "review-triage", "0.0.1")
+	if err := os.MkdirAll(filepath.Join(version, "tools"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(toolDir, filepath.Join(version, "tools", "triagecheck")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(toolDir, "..", "..", "skills"), filepath.Join(version, "skills")); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := filepath.Join(base, "repo")
+	recDir := filepath.Join(repo, "docs", "review-triages")
+	if err := os.MkdirAll(recDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(recDir, "feat-x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wrapper := filepath.Join(repo, "bin", "rtc")
+
+	t.Chdir(filepath.Join(version, "tools", "triagecheck"))
+	if err := installWrapper(wrapper, recDir, ""); err != nil {
+		t.Fatalf("ラッパーの生成に失敗: %v", err)
+	}
+
+	// リポジトリのルートから相対で叩く。利用者が実際に打つ形。
+	cmd := exec.Command("./bin/rtc", "-write-summary")
+	cmd.Dir = repo
+	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("ラッパー経由の -write-summary に失敗: %v\n%s", err, out)
+	}
+
+	got, err := os.ReadFile(filepath.Join(recDir, "feat-x.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "`./bin/rtc -write-summary`") {
+		t.Errorf("生成サマリがラッパーの叩き方を案内していない:\n%s", string(got)[:min(200, len(got))])
+	}
+
+	// 生成したサマリは、同じラッパーの検査で鮮度が合うこと (案内が食い違うと
+	// 生成した直後のサマリが古いと報告される)。
+	check := exec.Command("./bin/rtc")
+	check.Dir = repo
+	check.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
+	if out, err := check.CombinedOutput(); err != nil {
+		t.Fatalf("生成した直後のサマリが検査を通らない: %v\n%s", err, out)
+	}
+}
