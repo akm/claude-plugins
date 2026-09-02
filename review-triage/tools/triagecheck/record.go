@@ -306,8 +306,18 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 	return problems, &doc
 }
 
-// recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーを列挙する。
-// 未知のキーが見つかっても走査を続け、他の問題の報告を妨げない。
+// recordNullSilentKeys は、値を省いて null にすると他のどの検査でも赤くならない
+// 構造キー。キーの有無をポインタの nil で見る plan_ref / investigation は、
+// 「キーを書いて値を省いた」(書きかけ・インデントの誤り) が「キーが無い」と
+// 同一になり、書き手は書いたつもりのまま記録上は無い扱いになる (実測:
+// investigation: だけの記録が検査 0 件でサマリにも出なかった)。
+// consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
+// ここに含めない — 重ねると 1 つの書き忘れが複数の問題になる。
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true}
+
+// recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
+// 値の無い構造キー (recordNullSilentKeys) を列挙する。
+// 問題が見つかっても走査を続け、他の問題の報告を妨げない。
 func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 	var problems []string
 	var walkMap func(n *yaml.Node, kind string)
@@ -329,6 +339,12 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 			if !allowed[k.Value] {
 				problems = append(problems, fmt.Sprintf(
 					"%s:%d: %sに未知のキー %q。旧いキー名の残存か置き場の誤り (上流固有の属性は attrs へ) を疑う",
+					f, k.Line, kind, k.Value))
+				continue
+			}
+			if recordNullSilentKeys[k.Value] && v.Kind == yaml.ScalarNode && v.Tag == "!!null" {
+				problems = append(problems, fmt.Sprintf(
+					"%s:%d: %s の %s に値がありません。書くなら中身を書き、書かないならキーごと消す (値の無いキーは「無い」と同じに扱われ、書いたつもりの記録が黙って消える)",
 					f, k.Line, kind, k.Value))
 				continue
 			}
