@@ -195,3 +195,63 @@ runs:
       読めない。箇条書きの行で表のセルではないので、読みにくさに留まる。
       (d) triagecheck README の検査項目の列に investigation.scope の必須検査が明示
       されないが「必須キー」に含まれる粒度なので追随漏れとはしない。
+  - date: "2026-09-03"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: ""
+    scope: incremental
+    head: 08cf572
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-fix/references/investigation.md
+        line: 3
+        summary: >-
+          P2 が 5 行目の検証のフェーズを「書いている最中 (A・C・F) とコミット前 (B・D・E)」に
+          直したが、2 行上の 3 行目に残る「コミット前の検証は verification.md が持つ」を
+          追随させず、同一ファイル内で verification.md の守備範囲が 2 通りに書かれている
+        category: skill
+        audience: operator
+        consequence:
+          condition: 利用者 (とスキルを実行するエージェント) が investigation.md の冒頭だけを読んで、verification.md の守備範囲を把握しようとするとき
+          who: operator
+          what: >-
+            verification.md をコミット前だけの文書と読み、書いている最中に当てる型 A
+            (scope は実行してから書く) を手順 4 の最中に当てず、コミット前まで持ち越す。
+            前回の指摘 1 が直したはずの読み違いが、直した 2 行上に残る
+          detectability: 気づかない — 文の矛盾を捕まえる機械検査は無く、5 行目を読めば正しい方が分かるが 3 行目を訂正する仕組みは無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2。段 A: HEAD 08cf572 の investigation.md:3 と :5 を逐語で読み比べ、指摘どおり
+          3 行目が「コミット前の検証」と紹介し、5 行目が「書いている最中とコミット前」と
+          述べているのを確認した。P2 の調査で自分が実行した「コミット前」の grep の出力に
+          3 行目が含まれていたことも確認した — 範囲の外ではなく読み落とし (型 B の
+          「節全体を読み直す」を冒頭の包括文に当てなかった)。
+          全 4 ゲートを評価して発火 0 件 — hypothetical: 読めば再現する。
+          developer-domain: スキル文書で利用者に届く。disproportionate-cost: 修正は
+          1 句の書き換え。already-visible: 文の矛盾を検出する関門は無い。
+          免除条項は対象外
+        attrs:
+          severity: P3
+          confidence: high
+    notes: >-
+      2 回目 (増分 64fa3b2..08cf572、別セッションのレビュー結果を
+      tmp/review-code-review-opus-5-7th.yaml で受領)。head は現在の HEAD と一致し、
+      レビュー前後で HEAD と作業ツリーが不変であることを確認した。
+      指摘 1 件は P2 の修正の 2 行上に残った同型の記述で、修正した節 (冒頭) の全体を
+      読み直さなかった型 B の取りこぼし。P2 の investigation.scope の grep には
+      掛かっていたので、調査の範囲ではなく読み方の問題。
+      residual 7 件のうち記録に残す価値があるもの:
+      (a) 「特に見てほしい点」1・2・4 はレビュア側の実測で問題なし — consequence /
+      premise_check の null は既存の検査だけが報告し新検査と重ならない、attrs /
+      gates_fired / depends_on の null は「無ければ省略」の意味どおり、08cf572 で足した
+      リンクとアンカーはすべて実在。
+      (b) record-schema.md:61 → grouping.md の辺で、ファイル単位では grouping.md:30 →
+      record-schema.md と相互参照になるが、節単位では別の節どうしなので DAG 条件は
+      破らない (doc-dag の結果と一致)。
+      (c) record.go:8・64 のコメントが正本を存在しない docs/review-triages/README.md と
+      指す取り残しは、P1 の excluded のとおり今回は含めない。
