@@ -32,7 +32,7 @@
 
 **上から順に照合し、最初に当たった分類を採る。** 1 つのパスが複数の分類に当たりうるので、狭い分類を上に、広い受け皿を下に置く。
 
-例: `internal/worker/agent_test.go` は `test` にも `production` にも当たる。`test` が上にあるので `test` (被害者は開発者) になる。逆順だと `production` (被害者はオペレータ) になり、テストへの指摘が保留に倒れる。
+例: `internal/worker/agent_test.go` は `test` にも `production` にも当たる。`test` が上にあるので `test` (被害者は開発者) になる。逆順だと `production` (被害者はオペレータ) になり、テストへの指摘が保留になる。
 
 ## パターンの照合
 
