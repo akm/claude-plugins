@@ -13,7 +13,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 
 - **指摘の数だけ直さない。原因で束ねる** ([references/grouping.md](references/grouping.md))。指摘は現れた場所ごとに立つので、1 つの原因が複数の指摘になる。指摘ごとに直すと、同じ原因への修正が複数のコミットに散り、コミットの動機が「レビューで指摘されたから」に縮退する — **レビュー由来の修正でも動機は原因の側にある。**
 - **指摘の文面をそのまま実装しない。** 指摘は現象を指すが、直す対象は原因である。現象に合わせて直すと、同じ原因の別の現れが残る。別の現れを探すのが手順 4 の調査 ([references/investigation.md](references/investigation.md))。
-- **修正が別の欠陥を生む連鎖に注意する** (lappds の記録「設計文書の修正が次の欠陥を生む連鎖は、依存の辺を歩く 6 則で断つ」)。機械検査が捕まえない型は [references/verification.md](references/verification.md) の型 A〜F で守る。
+- **修正が別の欠陥を生む連鎖に注意する** (lappds の記録「設計文書の修正が次の欠陥を生む連鎖は、依存の辺を歩く 6 則で断つ」)。機械検査が捕まえない種類の欠陥は [references/verification.md](references/verification.md) の観点 A〜F で検証する。
 
 ## 手順
 
@@ -34,7 +34,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 5. **修正方法と順序を決める**: 調査の結果を踏まえて、問題ごとに何をどう直すかを決め、問題どうしの依存を確かめて並べる ([references/ordering.md](references/ordering.md))。
    - **修正方法が複数あり得て、規範や構造の設計を変える場合は、決めずに人間に返す。** その問題は `options` に選択肢とトレードオフを書き、`status: awaiting-human` にして実装しない (他の問題は依存が無ければ進めてよい)。設計のトレードオフは誤りの訂正ではないので、スキルが人間に諮らずに決めない。
 6. **計画を記録に追記する**: 整理した問題を記録の同じ回の `plans` に書く (`status: pending`)。サマリを再生成し、記録とサマリをコミットする (コミットの分け方の正本は [記録 README のコミット節](../review-triage/references/record-schema.md#コミット))。**直す前に書く** — 途中で止まっても、頭の中にしか無い計画を作らないため。
-7. **問題単位で直して、検証してからコミットする**: 手順 5 の順に、1 問題 1 コミット。各コミットの前に機械検査の関門と型の検証を通す ([references/committing.md](references/committing.md)・[references/verification.md](references/verification.md))。コミットしたら記録 YAML の該当の問題を `status: done`・`sha` に更新しておき、区切り (全問題の完了、または中断) で記録とサマリをコミットする。
+7. **問題単位で直して、検証してからコミットする**: 手順 5 の順に、1 問題 1 コミット。各コミットの前に機械検査の関門と観点 A〜F の検証を通す ([references/committing.md](references/committing.md)・[references/verification.md](references/verification.md))。コミットしたら記録 YAML の該当の問題を `status: done`・`sha` に更新しておき、区切り (全問題の完了、または中断) で記録とサマリをコミットする。
    - **修正の対象がリポジトリの外にある場合** (PR / Issue の本文やコメントなど) は、コミットが立たないので `status: done-external` にする。**`pending` のまま残さない** — 次の再開が対象として拾い、実態と食い違う。**対象の範囲と、何を書くかの正本は [記録 README のリポジトリ外への反映](../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない。
 8. **報告する**: 直した問題と、残したもの (`pending` / `awaiting-human`、保留・却下の件数) を出す。
 9. **文書の構造を確かめる**: 修正で文書を触った場合は、`doc-dag` skill を修正した文書群に回し、重複の再侵入が無いかを見る。修正ラウンドは重複が生まれやすい瞬間で、放置すると次のレビューの指摘になる。**`doc-dag` は別のプラグインなので、無ければこの手順は飛ばし、飛ばしたことを報告に書く。**
