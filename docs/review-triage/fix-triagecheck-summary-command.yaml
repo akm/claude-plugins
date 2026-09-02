@@ -438,7 +438,7 @@ runs:
           docs/solutions の生成物の写しは当時の記録なので触らない
         order: 1
         status: done
-        sha: c471354
+        sha: 39e49a5
     notes: >-
       2 回目 (増分 33c62b8..59d5e2d、別セッションのレビュー結果を
       tmp/review-code-review-opus-5-3rd.yaml で受領)。head は現在の HEAD と一致し、
@@ -575,7 +575,7 @@ runs:
           あわせて「増減させたら数え直す」の規則文も、数字を持たなくなるので削る
         order: 1
         status: done
-        sha: 769f929
+        sha: 26cba79
     notes: >-
       4 回目 (最終確認の full、main f6e777f..f085d30。別セッションのレビュー
       結果を tmp/review-code-review-opus-5-5th.yaml で受領)。head は現在の HEAD と
