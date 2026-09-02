@@ -15,6 +15,8 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 複数の動機が絡み合い、コミットされるべき変更が後続の変更に上書きされて失われます。これは事後には
 取り返せないため、他の 3 つのフックで事前に意識づけします。
 
+想起させるルールそのものの正本は同梱の [rules/commit-rules.md](rules/commit-rules.md) です (利用者の `~/.claude/rules/commit-rules.md` があればそちらを優先します。探索順は「設定」の節)。この README はフックの振る舞いを説明するもので、ルールの内容はそこから引いています。
+
 ## 事前の意識づけ (SessionStart / UserPromptSubmit)
 
 どちらも **ブロックせず、コンテキストに情報を注入するだけ**です。
@@ -109,6 +111,8 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 
 ### 検知する混在パターン (汎用)
 
+いずれも [rules/commit-rules.md](rules/commit-rules.md) の「無関係な変更は分離する」に対応します。
+
 - 生成物 (`*.pb.go` / `go.sum` / `package-lock.json` / `Cargo.lock` / `poetry.lock` など各種
   ロックファイル・生成コード) と手書きの変更が同時にステージされている。
 - ドキュメント (`docs/` 配下・`*.md` / `*.rst`) とコードが同時にステージされている。
@@ -120,37 +124,12 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 
 ## 導入
 
-1. マーケットプレイスを登録する。
+インストール手順 (マーケットプレイスの登録、`settings.json` に直接書く方法) は [リポジトリの README](../README.md#使い方) を参照してください。
 
-   ```bash
-   claude plugin marketplace add akm/claude-plugins
-   ```
-
-2. プラグインをインストールする。
-
-   ```bash
-   claude plugin install commit-rules-guard
-   ```
-
-または `settings.json` に直接書く。
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "akm-claude-plugins": {
-      "source": {
-        "source": "github",
-        "repo": "akm/claude-plugins"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "commit-rules-guard@akm-claude-plugins": true
-  }
-}
+```bash
+claude plugin marketplace add akm/claude-plugins
+claude plugin install commit-rules-guard@akm-claude-plugins
 ```
-
-`settings.json` の詳しい説明については [公式ドキュメント](https://code.claude.com/docs/en/settings#plugin-settings) を参照してください。
 
 ## 設定 (任意の環境変数)
 
@@ -177,7 +156,7 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 .claude/akm-claude-plugins/commit-rules-guard/config.json
 ```
 
-`<marketplace>/<plugin>/` の階層にすることで名前空間が衝突しません。リポジトリ内に PreToolUse
+`<marketplace>/<plugin>/` の階層にすることで名前空間が衝突しません (理由は [CONCEPTS.md](../CONCEPTS.md) の「配布元」「設定ディレクトリ」)。リポジトリ内に PreToolUse
 フックを別途置く必要はありません (フックの二重発火を避けられます)。
 
 ### スキーマ

@@ -159,7 +159,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 
 ## プロジェクト固有の設定
 
-いくつかのプラグインは、リポジトリごとに違う値を `.claude/akm-claude-plugins/<プラグイン名>/config.json` から読みます。**プラグインは共通の規則を持ち、リポジトリ固有の宣言だけを設定に置く**という分け方です。
+いくつかのプラグインは、リポジトリごとに違う値を `.claude/akm-claude-plugins/<プラグイン名>/config.json` から読みます。パスにマーケットプレイス名が入る理由は [CONCEPTS.md](CONCEPTS.md) の「配布元」「設定ディレクトリ」を参照してください。**プラグインは共通の規則を持ち、リポジトリ固有の宣言だけを設定に置く**という分け方です。
 
 | プラグイン | 主な設定 |
 | --- | --- |
