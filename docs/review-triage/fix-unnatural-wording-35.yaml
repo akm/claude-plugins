@@ -480,7 +480,7 @@ runs:
               部分集合の関係で矛盾せず、SKILL.md 冒頭が history-rewriting.md を正本と宣言しているので
               変えない
         order: 1
-        sha: 024d127
+        sha: e5e82e1
         status: done
     notes: >-
       入力は tmp/review-code-review-opus-5-9th.yaml (head 0d493c6、現在の HEAD と一致。
@@ -509,7 +509,7 @@ runs:
       4 箇所 (commit-squash/README.md:15、doc-dag/README.md:46、review-triage/README.md:57、
       work-log-gh-comment/README.md:56 の冒頭) を同じコミットで直す。
       commit-rules-guard/README.md:144 の探索順のパスは一覧であって誘導ではないので対象外。
-      指摘 1 とその類似箇所の修正コミットは 2efb388
+      指摘 1 とその類似箇所の修正コミットは 6b44e1c
   - date: "2026-09-03"
     skill: code-review
     model: opus-5
@@ -599,7 +599,7 @@ runs:
       .claude/akm-claude-plugins/review-triage/config.json は引き続き無く、免除条項は使っていない。
       検査とサマリ生成は同梱の triagecheck をツールのディレクトリで go run して行った。
       2 件とも回 2 の指摘 1 で人間が決めた「リンクで統一する」方針の取りこぼしで、判定の規則上は
-      回 2 と同じ H6 になる。人間が回 2 と同じ判断をするなら、修正は回 2 の 2efb388 と同じ動機の
+      回 2 と同じ H6 になる。人間が回 2 と同じ判断をするなら、修正は回 2 の 6b44e1c と同じ動機の
       1 コミットで行い、記録上は held のまま notes に判断とコミットを残す (回 2 と同じ扱い)。
       residual 2 件のうち記録に値するもの:
       (1) work-log-gh-comment/README.md:15 のリンク文字列 [references/sensitive-data.md] だけが
@@ -609,7 +609,7 @@ runs:
       自前のスクリプトで検査した。doc-dag と review-triage の設定に doc_check_command /
       gates として置く価値がある (別の Issue で扱う)。
       人間の判断 (2026-09-03): 指摘 1・2 は回 2 と同じく「リンクで統一する」方針で直すと決まった。
-      verdict は held のまま残し、修正は f580168 (回 2 の 2efb388 と同じ動機)。同じ形で残っていた
+      verdict は held のまま残し、修正は 6b44e1c (回 2 の修正と同じ動機で、積み直しで 1 コミットにまとめた)。同じ形で残っていた
       investigation.md:5 の「SKILL.md の手順 4」も同じコミットで直した。修正の後に統一の対象を
       取り直し、リンクでない .md 参照のうち実際の参照 (ディレクトリ木・パスの一覧・一般的な
       言及・自己言及を除く) が残っていないことを確かめた。方針の外として残したもの:
@@ -631,4 +631,7 @@ runs:
       書いているもの (investigation.md:5 の ../SKILL.md は skills/ 配下からの相対形として正しく、
       同じファイルの :47 の既存リンクと形がそろっている)。回 2 から回 4 の 3 回の増分で
       採択が 1 → 0 → 0 と減り、回 4 で 0 件に到達したので、この増分レビューは収束とみなす。
-      リンク切れの検査の関門が無い点は回 3 の notes のとおり別の Issue で扱う
+      リンク切れの検査の関門が無い点は回 3 の notes のとおり別の Issue で扱う。
+      訂正 (積み直し後): 回 2〜4 の修正コミットを commit-squash で積み直したため、判定文に残る
+      旧 SHA は履歴に無い。対応は 024d127 → e5e82e1 (P1 の修正)、2efb388 と f580168 → 6b44e1c
+      (リンクへの統一、2 コミットを 1 つにまとめた)。plans.sha と notes は新しい SHA に置き換えた
