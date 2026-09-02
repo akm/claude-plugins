@@ -13,7 +13,9 @@
 
 ## なぜ記録を残すか
 
-**却下は「対処しなかった欠陥」を作る操作で、誤った却下は黙って残ります。** 採択は修正と再レビューで検証されますが、**却下を検証する経路は記録しかありません。** 指摘を減らすほど成功に見えるので、誤った却下は成果に計上されてしまいます。
+理由の正本は [record-schema.md](skills/review-triage/references/record-schema.md) の冒頭と「ファイルの単位」です。ここは紹介として要点だけを書きます。
+
+**却下は「対処しなかった欠陥」を作る操作で、誤った却下は気づかれないまま残ります。** 採択は修正と再レビューで検証されますが、**却下を検証する経路は記録しかありません。** 指摘を減らすほど成功に見えるので、誤った却下は成果に計上されてしまいます。
 
 **件数の集計・累計は人が書きません。** 生成サマリが YAML から計算します。手書きの累計は誤りやすく、このスキルの 1 回目の試行では、その誤りが指摘の約 3 分の 1 を占めました。
 
@@ -21,13 +23,13 @@
 
 記録のスキーマと、判定フローの図・決定表の一致を機械的に検査します。**Go が必要です。**
 
-バイナリは配らず `go run` で都度実行します。`go install` したバイナリを使う運用にすると、プラグインを更新してもバイナリが古いまま残り、**新しいスキーマを検査せず素通りします。**
+バイナリは配らず `go run` で都度実行します (理由の正本は [tools/triagecheck/README.md](tools/triagecheck/README.md) の「前提」)。`go install` したバイナリを使う運用にすると、プラグインを更新してもバイナリが古いまま残り、**新しいスキーマを検査しないまま処理を続けます。**
 
 詳しい呼び出し方 (Makefile に置く例、および呼び出し用のラッパースクリプトを生成する `-install-wrapper`) は [tools/triagecheck/README.md](tools/triagecheck/README.md) を参照してください。
 
 ## プロジェクト固有の設定
 
-`.claude/akm-claude-plugins/review-triage/config.json` に置きます。
+`.claude/akm-claude-plugins/review-triage/config.json` に置きます。様式と各キーの意味の正本は [project-config.md](skills/review-triage/references/project-config.md) で、以下はその例です。
 
 ```json
 {
@@ -39,22 +41,20 @@
 }
 ```
 
-**`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、**そのリポジトリにどんな関門があるかを知らないと判定できません。** 未設定のときは免除条項を使いません — 突き合わせ先が無いまま関門名を書かせると、存在しない関門名が黙って通るためです。
+**`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
-別に、指摘の分類と被害者を宣言する `.claude/review-triage.yaml` が要ります。`review-triage --gen-config` が雛形を生成します。
+別に、指摘の分類と被害者を宣言する `.claude/review-triage.yaml` が要ります。`review-triage --gen-config` が雛形を生成します (様式の正本は [config-schema.md](skills/review-triage/references/config-schema.md))。
 
-詳細は `skills/review-triage/references/project-config.md` を参照してください。
-
-## 併用すると効くプラグイン
+## 併用すると役に立つプラグイン
 
 いずれも**別プラグインで、無くても動きます** (該当の手順を飛ばし、飛ばしたことを報告します)。
 
 - [mermaid-preview](../mermaid-preview/README.md) — 保留の判断を図で提示するときに使います
-- [doc-dag](../doc-dag/README.md) — 修正で文書を触った後、重複の再侵入を確認するのに使います
+- [doc-dag](../doc-dag/README.md) — 修正で文書を変更した後、重複が再び生じていないかを確認するのに使います
 
 ## 文中の例について
 
-`references/gate-examples.md` のファイルパスと関門名は、このスキルが生まれた lappds という Go のリポジトリのものです。**自分のリポジトリで使うときは、関門の名前を自分のリポジトリの実在するものに読み替えてください。**
+[gate-examples.md](skills/review-triage/references/gate-examples.md) のファイルパスと関門名は、このスキルが生まれた lappds という Go のリポジトリのものです。**自分のリポジトリで使うときは、関門の名前を自分のリポジトリの実在するものに読み替えてください。**
 
 ## 使い方
 

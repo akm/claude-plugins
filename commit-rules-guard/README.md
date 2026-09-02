@@ -15,6 +15,8 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 複数の動機が絡み合い、コミットされるべき変更が後続の変更に上書きされて失われます。これは事後には
 取り返せないため、他の 3 つのフックで事前に意識づけします。
 
+想起させるルールそのものの正本は同梱の [rules/commit-rules.md](rules/commit-rules.md) です (利用者の `~/.claude/rules/commit-rules.md` があればそちらを優先します。探索順は「設定」の節)。この README はフックの振る舞いを説明するもので、ルールの内容はそこから引いています。
+
 ## 事前の意識づけ (SessionStart / UserPromptSubmit)
 
 どちらも **ブロックせず、コンテキストに情報を注入するだけ**です。
@@ -34,7 +36,7 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 コミット境界を計画に織り込むよう促します。
 
 **なぜ計画時なのか。** `git commit` で止めたときには、既に全部の変更を書き終えています。そこから
-動機ごとに分けるには `git reset` で作業をやり直す必要があり、**合図を付けて通すほうが自然に
+動機ごとに分けるには `git reset` で作業をやり直す必要があり、**確認済みの合図 (後述の `Rules-Checked` トレーラ) を付けて通すほうが自然に
 見えてしまいます。** 実際、1 セッションで 5 回連続して合図だけ付けて通した記録があります
 ([#7 のコメント](https://github.com/akm/claude-plugins/issues/7))。分割が容易なうちに促すのが
 このフックの狙いです。
@@ -54,11 +56,11 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 
 **判定に計画の内容は使いません。** 当初は「内容が変わったら再度促す」設計でしたが、実環境で
 破綻していました。`TaskCreate` は **1 呼び出しで 1 タスク**を作るため、6 タスクの計画では
-6 回発火します。促す機会は減りますが、**鳴りすぎて無視されるほうが失敗として重い**という判断です。
-セッションの入口では SessionStart フックが、コミットの瞬間には PreToolUse ガードが別途効きます。
+6 回発火します。促す機会は減りますが、**通知が出すぎて無視されるほうが失敗として重い**という判断です。
+セッションの入口では SessionStart フックが、コミットの瞬間には PreToolUse ガードが別途機能します。
 
-**状態を保存できない環境では鳴らします。** ここで黙るとフックは永久に無言になり、しかも
-利用者はそれを正常な間引きと区別できません。静かに死んだガードより、数回多く鳴るほうがましです。
+**状態を保存できない環境では通知を出します。** ここで通知を出さないとフックは永久に何も出さなくなり、しかも
+利用者はそれを正常な間引きと区別できません。気づかれないまま機能しなくなったガードより、通知が数回多く出るほうがましです。
 
 間引きの状態は **`$XDG_STATE_HOME/commit-rules-guard`** (未設定なら
 `~/.local/state/commit-rules-guard`) に 1 セッション 1 ファイル (0 バイト) で置かれ、
@@ -66,8 +68,8 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 `COMMIT_GUARD_STATE_DIR` で置き場所を変えられます。
 
 共有の一時ディレクトリ (`/tmp`) は使いません。Linux では誰でも書ける場所であり、
-マーカー名はセッション ID から計算できるため、先回りして置かれるとリマインダを
-黙らせられるためです。またマーカーは 7 日保持する状態で、OS が任意のタイミングで
+マーカー名はセッション ID から計算できるため、先回りして置かれるとリマインダの
+通知を止められるためです。またマーカーは 7 日保持する状態で、OS が任意のタイミングで
 消す `/tmp` とは寿命が合いません。
 
 ### 既知の割り切り: セッション ID が取れない環境
@@ -79,8 +81,8 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 ### 既知の割り切り: 圧縮後は再武装しない
 
 コンテキスト圧縮が起きると Claude の記憶は要約に置き換わりますが、セッション ID は変わらないため
-このフックは黙ったままです。**長い自律セッションほど圧縮が起きやすく、本フックが最も要る場面で
-効かない**という構造になっています。
+このフックは通知を出さないままです。**長い自律セッションほど圧縮が起きやすく、本フックが最も要る場面で
+機能しない**という構造になっています。
 
 SessionStart フックは `compact` を対象に含めており、そこからマーカーを消せば「コンテキスト
 ウィンドウごとに 1 回」にできますが、フック間に依存が生まれるため今回は採っていません。
@@ -109,6 +111,8 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 
 ### 検知する混在パターン (汎用)
 
+いずれも [rules/commit-rules.md](rules/commit-rules.md) の「無関係な変更は分離する」に対応します。
+
 - 生成物 (`*.pb.go` / `go.sum` / `package-lock.json` / `Cargo.lock` / `poetry.lock` など各種
   ロックファイル・生成コード) と手書きの変更が同時にステージされている。
 - ドキュメント (`docs/` 配下・`*.md` / `*.rst`) とコードが同時にステージされている。
@@ -120,37 +124,12 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 
 ## 導入
 
-1. マーケットプレイスを登録する。
+インストール手順 (マーケットプレイスの登録、`settings.json` に直接書く方法) は [リポジトリの README](../README.md#使い方) を参照してください。
 
-   ```bash
-   claude plugin marketplace add akm/claude-plugins
-   ```
-
-2. プラグインをインストールする。
-
-   ```bash
-   claude plugin install commit-rules-guard
-   ```
-
-または `settings.json` に直接書く。
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "akm-claude-plugins": {
-      "source": {
-        "source": "github",
-        "repo": "akm/claude-plugins"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "commit-rules-guard@akm-claude-plugins": true
-  }
-}
+```bash
+claude plugin marketplace add akm/claude-plugins
+claude plugin install commit-rules-guard@akm-claude-plugins
 ```
-
-`settings.json` の詳しい説明については [公式ドキュメント](https://code.claude.com/docs/en/settings#plugin-settings) を参照してください。
 
 ## 設定 (任意の環境変数)
 
@@ -177,7 +156,7 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 .claude/akm-claude-plugins/commit-rules-guard/config.json
 ```
 
-`<marketplace>/<plugin>/` の階層にすることで名前空間が衝突しません。リポジトリ内に PreToolUse
+`<marketplace>/<plugin>/` の階層にすることで名前空間が衝突しません (理由は [CONCEPTS.md](../CONCEPTS.md) の「配布元」「設定ディレクトリ」)。リポジトリ内に PreToolUse
 フックを別途置く必要はありません (フックの二重発火を避けられます)。
 
 ### スキーマ
@@ -214,8 +193,8 @@ git commit -m "..." --trailer 'Rules-Checked: yes'
 
 ## 仕組みの注意
 
-これらのフックは Claude Code の実行経路にのみ効きます。フックを読まない実行経路
-(別ツール・手動の `git commit` など) では効きません。最終的な保証が要るコミット規約は、
+これらのフックは Claude Code の実行経路にのみ適用されます。フックを読まない実行経路
+(別ツール・手動の `git commit` など) では適用されません。最終的な保証が要るコミット規約は、
 CI など実行経路に依存しない仕組みで担保してください。
 
 また、SessionStart / UserPromptSubmit / PostToolUse の 3 つは**注入するだけで強制はしません**。

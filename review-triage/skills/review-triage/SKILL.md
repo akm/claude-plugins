@@ -14,7 +14,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 - **上流のレビューは報告のみで走らせる。** 指摘を見つけるたびに直すと、先に直した修正が後の判断の前提を変える (`code-review` は `--fix` 無し、`ce-code-review` は `mode:agent`)。
 - **別セッションでレビューを走らせて結果をファイルで受け取る場合、依頼文と受け渡し様式の正本は [references/review-request.md](references/review-request.md)。** 検証の前払い (evidence の必須化) と報告しない条件を依頼文に入れるほど、判定のコストが下がる。
 - **レビューの範囲は、最初の全量の後は増分にする** (規則の正本は [references/review-request.md](references/review-request.md) の「範囲の規則」)。どのモデル・範囲で走らせたかは記録の `model` / `scope` に必ず残し、粒度の違いを後から比較できるようにする。モデルの使い分けの運用ガイドは [記録 README の収束の目安](references/record-schema.md#生成サマリの読み方)。
-- **却下ゲートは仮説である** ([references/rejection-gates.md](references/rejection-gates.md))。記録を取り、効き方を後から確かめる。
+- **却下ゲートは仮説である** ([references/rejection-gates.md](references/rejection-gates.md))。記録を取り、どのゲートが機能しているかを後から確かめる。
 - **規範文書に実測値を書かない。** 件数・比率などの実測は記録 ([スキーマ](references/record-schema.md)) だけが持ち、必要なときにそこから数える。
 
 ## 手順
@@ -27,7 +27,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
    - **上流が報告のみで走ったかを確かめる** (実行前後で HEAD と作業ツリーが不変)。適用済みなら判定に進まず、その旨を報告して次から報告のみで走らせるよう案内する。
    - 指摘が見当たらなければ、レビューを先に走らせるよう案内して終了する。**勝手にレビューを走らせない。**
 2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) — 「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
-   - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録の置き場・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が黙って通る)。
+   - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録の置き場・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が検査されないまま通る)。
 3. **判定**: 指摘ごとに [references/judgment-flow.md](references/judgment-flow.md) の図に従って決着させる。
    - 帰結の 4 項目 (D3 で書くもの) は**全件に書く** — D1・D2 で決着した指摘にも記録の材料として残す。
    - 評価 (E1・E2) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
