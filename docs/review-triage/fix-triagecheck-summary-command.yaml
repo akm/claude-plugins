@@ -188,3 +188,46 @@ runs:
       「食い違っています」への一致に変えた点は、文言への結合ではあるが
       summaryCommand が可変になった以上コマンド名では判定できず、代替が
       無いため指摘として立てなかった。
+
+      修正前の追加調査 (関連箇所と影響範囲) で分かったこと。fix の設計に効くので
+      ここに残す。
+
+      (1) 指摘 2 の修正には制約がある。ラッパーは -summary-command を必ず付けて
+      渡し、生成物の末尾に "$@" があるため、利用者は `./bin/w -install-wrapper ...`
+      と叩ける。この経路では -summary-command と -install-wrapper が同時に立つ。
+      実測 (run() を直接呼ぶ probe) で、現状この組み合わせは通りラッパーが
+      生成されることを確認した。したがって「explicit の同時成立」だけで弾く
+      素朴なガードを足すと、この経路が壊れる。既存の併用ガードが
+      -write-summary=false を通すために値も見ているのと同じ配慮が要る。
+      ただしラッパーが渡す値 ("./bin/w -write-summary") と既定値
+      ("triagecheck -write-summary") は一致しないため、値だけでは
+      「ラッパー由来」と「利用者の明示」を見分けられない。ラッパー由来を示す
+      印を持たせるか、ガードの条件を別の軸で立てる必要がある。
+
+      (2) 指摘 3 と同型のグローバル依存が他にもある。可変のパッケージ変数は
+      reviewTriageDir / judgmentFlowPath / summaryCommand の 3 つで、run() が
+      いずれも書き換える。record_test.go と judgment_flow_test.go は
+      reviewTriageDir / judgmentFlowPath をパスの組み立てに広く使っており
+      (record_test.go だけで 20 箇所超)、これらは既定値のままであることを
+      前提にしている。現時点では withRunGlobals を呼ばずに run() を呼ぶテストは
+      無いことを確認したので実害は出ていないが、指摘 3 の修正を
+      「このテストだけ const と比較する」で閉じると、同型の露出は残る。
+
+      (3) サマリ 1 行目を検査するテストが 1 つも無い (grep で確認)。
+      renderReviewTriageSummaryDoc は summaryCommand を 1 行目に埋めるが、
+      その内容を期待値と突き合わせるテストは存在しない。指摘 1 の修正で
+      1 行目の組み立て方を変えるなら、ここに関門を 1 つ置くのが自然。
+
+      (4) 指摘 1 を直すと生成サマリの 1 行目がもう一度変わる。この PR で
+      既に `make docs-review-triage-summary` から `triagecheck -write-summary`
+      へ 1 度移行しており、修正は 2 度目の移行になる。このリポジトリの
+      サマリ 3 件 + 今回追加の 1 件が対象。利用側にも同じ差分が出る。
+      0.4.0 を出す前に直せば移行は 1 度で済む。
+
+      (5) 修正時に追随が要る文書。-summary-command / triage_summary_command に
+      触れているのは review-triage/README.md、tools/triagecheck/README.md
+      (特に $0 の挙動を説明した 56 行目)、skills/review-triage/SKILL.md、
+      references/project-config.md (32 行目がラッパーの自動受け渡しを前提に
+      「設定は要らない」と書いている)、references/record-schema.md。
+      指摘 1 で $0 の扱いを変えるなら、README 56 行目と project-config.md
+      32 行目は記述が実装と食い違う。
