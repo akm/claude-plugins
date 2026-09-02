@@ -8,7 +8,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 | 検査 | 内容 |
 | --- | --- |
-| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・行内コメント・`depends_on` の循環・生成サマリの鮮度 |
+| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `investigation` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度 |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
 **記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されず素通りする穴を塞ぐため。

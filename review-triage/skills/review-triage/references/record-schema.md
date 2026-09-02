@@ -50,7 +50,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `gates_fired` | | 引っかかったゲート id の列。無ければ省略 (空とみなす) |
 | `verdict` | ✓ | `adopted` (採択) / `held` (保留) / `rejected` (却下) |
 | `verdict_reason` | ✓ | 判定の経路 — どのノードでどう決まったか。ノード ID の正本は [判定フロー](judgment-flow.md) |
-| `plan_ref` | △ | 束ね先の構造化参照 `{run, problem}` — 別の回の問題で束ねた採択に書く (`run` は同じファイル内の 1 始まりの回番号)。**採択は自回の `plans` か `plan_ref` で覆われていなければならない** (機械検査が守る)。免除されるのは `plans` がまだ無い**最後の回**だけ — fix 前の状態を指す。後続の回が追記された時点でその回は fix 前ではなくなるので、免除は解ける。`review-triage-fix` が束ねるときに追記する。**検査が守るのは参照の実在まで** — 参照先の問題が本当にその指摘を扱うかは機械で確かめられないので、束ねるときは参照先の問題の `approach` にも対応する指摘 (どの回のどれか) を書く |
+| `plan_ref` | △ | 束ね先の構造化参照 `{run, problem}` — 別の回の問題で束ねた採択に書く (`run` は同じファイル内の 1 始まりの回番号)。**採択は自回の `plans` か `plan_ref` で覆われていなければならない** (機械検査が守る)。免除されるのは `plans` がまだ無い**最後の回**だけ — fix 前の状態を指す。後続の回が追記された時点でその回は fix 前ではなくなるので、免除は解ける。`review-triage-fix` が束ねるときに追記する。キーだけ書いて値を省いた形 (null) は検査が報告する (「無い」と同じに読まれ、束ね先を書いたつもりの採択が黙って覆われなくなる)。**検査が守るのは参照の実在まで** — 参照先の問題が本当にその指摘を扱うかは機械で確かめられないので、束ねるときは参照先の問題の `approach` にも対応する指摘 (どの回のどれか) を書く |
 | `attrs` | | 上流固有の属性 (`severity` / `confidence` など) のパススルー。無い属性を補完しない |
 
 ### 修正計画 (`plans[]`)
@@ -58,9 +58,10 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | キー | 必須 | 内容 |
 | --- | --- | --- |
 | `problem_id` | ✓ | 回の中で一意な識別子 (例: `P1`) |
-| `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** |
+| `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** (基準の正本は [grouping.md](../../review-triage-fix/references/grouping.md)) |
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
 | `approach` | ✓ | 何をどう直すか |
+| `investigation` | | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。** 「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ型の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序 |
 | `depends_on` | | 依存する問題の `problem_id` |
@@ -68,6 +69,32 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `applied_external_url` | | リポジトリ外の反映先の URL。**`status: done-external` 専用 — 他の状態では空** |
 | `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` 専用 — 他の状態では空。`applied_external_url` が無いとき必須** |
 | `status` | ✓ | 下の表のとおり |
+
+### 調査 (`plans[].investigation`)
+
+| キー | 必須 | 内容 |
+| --- | --- | --- |
+| `scope` | ✓ | 調べた範囲 — 実行したコマンド (grep のパターンと対象) と、目で読んだ対象。**実行してから書く** ([verification.md](../../review-triage-fix/references/verification.md) の型 A)。「すべて」ではなく「ここまで」を書く |
+| `included` | | 見つけた箇所のうち、同じ原因の別の現れ (または修正に合わせて変える必要がある影響先) として**この問題に含めた**もの。指摘に無いものだけを書く (指摘にあるものは `finding_ids` が持つ)。無ければ省略 |
+| `excluded` | | 見つけたが**含めなかった**箇所と、その理由 (構造が似ているだけで原因が違う・変える必要が無い・凍結された過去の記録)。無ければ省略 |
+
+`included` と `excluded` が両方無く `scope` だけの調査は「調べたが波及先は無かった」を表す。`investigation` 自体が無い問題は未調査。**キーだけ書いて値を省いた形 (`investigation:` の後に何も無い) は検査が報告する** — YAML では null になり「無い」と同じに読まれるので、書いたつもりの調査が黙って未調査に化ける。書くなら `scope` を、書かないならキーごと消す。**既存の `notes` は `status: done-external` 専用なので、調査の結果を書く場所には使わない。**
+
+```yaml
+      - problem_id: P2
+        cause: 表の見出しだけを変え、行を埋める側に追随しなかった
+        finding_ids: [3]
+        approach: renderPlanCells の証拠の欄を見出しの 2 つの型に合わせる
+        investigation:
+          scope: >-
+            grep -rn '証拠\|SHA |' review-triage/tools/triagecheck と、
+            同じ表の生成関数 renderPlanCells の全行
+          included:
+            - record_test.go の見出しを固定するテスト (見出しの文字列を持つ)
+          excluded:
+            - README.md の検査項目の表は列の意味が違う (見出しと行の対応ではない)
+        status: pending
+```
 
 ### 状態 (`status`)
 
