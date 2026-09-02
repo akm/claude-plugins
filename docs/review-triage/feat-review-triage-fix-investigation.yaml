@@ -115,6 +115,62 @@ runs:
         attrs:
           severity: P3
           confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          構造を持つ任意キー (investigation) の有無をポインタの nil で見たため、
+          「キーを書いて値を省いた (YAML の null)」が「キーが無い」と同一になった。
+          未知キーの walker も値が mapping でなければ何も見ずに抜ける
+        finding_ids: [2]
+        approach: >-
+          recordUnknownKeyProblems の walker で、mapping を期待するキーのうち null が
+          他の検査で赤くならないもの (plan_ref・investigation) の値が null なら
+          「値がありません (書くなら中身を、書かないならキーごと消す)」と報告する。
+          consequence / premise_check は必須サブキーの欠落として既に報告されるので
+          対象にしない (重ねると 1 つの書き忘れが 5 件になる)。
+          TestReviewTriageRecordSchemaViolations に investigation: (null) と
+          plan_ref: (null) の 2 ケースを足す。record-schema.md の調査の節と plan_ref 行に
+          「キーだけ書いて値を省いた形は検査が報告する」を足し、triagecheck README の
+          検査項目の列に「値の無い構造キー」を足す。
+          順序: 影響範囲が広い (コード・テスト・スキーマ・README) のでこちらが先
+        investigation:
+          scope: >-
+            record.go の yaml タグ付きフィールドのうち構造を持つもの全部 (ポインタ 2・
+            構造体 2・スライス 5・map 1) と walker の case 全部を読み、
+            plan_ref / investigation / consequence / premise_check を null にした
+            フィクスチャで検査とサマリ生成をプローブ (一時テスト、実施後に削除)。
+            docs/review-triage/*.yaml 5 ファイルを yaml.v3 で走査し、構造キーが
+            null の形が無いことを確認
+          included:
+            - "plan_ref (record.go:96): 同じポインタ nil の判定で、plan_ref: と書いて値を省くと plans がある回でも plans の無い最後の回でも問題 0 件 (プローブで実測)"
+            - "triagecheck README:11 の検査項目の列: 必須キーの粒度に収まらない新しい項目なので追随させる"
+          excluded:
+            - "consequence / premise_check の null: 必須サブキーの欠落として既に報告される。重ねると 1 つの書き忘れが複数の問題になる"
+            - "スライス (included / excluded / gates_fired / depends_on / plans / findings) の null: 空と同義でスキーマも「無ければ省略」としている"
+            - "record.go:8・64 のコメントが正本を docs/review-triages/README.md と指す取り残し: 移植時の別原因なので含めない"
+        order: 1
+        status: pending
+      - problem_id: P2
+        cause: >-
+          Issue #38 の「型 A〜F はコミット前の検査」という文を、正本 verification.md
+          (A・C・F は書いている最中、B・D・E はコミット前) を読み直さずに写した
+        finding_ids: [1]
+        approach: >-
+          investigation.md:5 の 1 文を、committing.md:37 と同じく正本どおりに絞った
+          言い方に直す — 調査は手順 4 (方法を決める前)、検証は書いている最中
+          (A・C・F) とコミット前 (B・D・E) で、どちらも調査の後にかかる。
+          同ファイル 63 行目 (型 A を scope の記述時に当てる) はそのまま整合する
+        investigation:
+          scope: >-
+            両スキルの *.md を「コミット前」「型 A〜F」「書いている最中」で grep し、
+            このブランチの差分で足した文のうち verification.md や型を参照する
+            7 箇所を読み直した。investigation.md:5 の参照元 (SKILL.md 手順 4・前提知識)
+            を確認
+          excluded:
+            - "investigation.md:63 と record-schema.md の scope 行 (型 A を書く時点で当てる) は正本と整合しており直さない"
+            - "トリアージ記録 YAML の逐語引用: 過去の回の記録は書き換えない"
+        order: 2
+        status: pending
     notes: >-
       このブランチの初回トリアージ (Issue #38 の対応。full、main 08479a1..64fa3b2)。
       別セッションのレビュー結果を tmp/review-code-review-opus-5-6th.yaml で受領した。
