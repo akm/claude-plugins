@@ -9,6 +9,9 @@
 | 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 2026-09-02 | `code-review` | `opus-5` | full | 4 | 3 | 0 | 1 |
+| 2 | 2026-09-02 | `code-review` | `opus-5` | incremental | 2 | 1 | 0 | 1 |
+| 3 | 2026-09-03 | `code-review` | `opus-5` | incremental | 0 | 0 | 0 | 0 |
+| 4 | 2026-09-03 | `code-review` | `opus-5` | full | 1 | 1 | 0 | 0 |
 
 ## 回 1: 2026-09-02 `code-review`
 
@@ -25,8 +28,8 @@
 
 | 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |
 | --- | --- | --- | --- | --- | --- | --- |
-| P1 | 案内の値を「経路の分岐より前で 1 回決める」規則を置かず、-install-wrapper の 経路では決めきらずに実行時の $0 に委ね、利用者の -summary-command は その経路で捨てた。パスの規則を 3 経路で揃えた設計を、案内という 1 つのパス値には当てていなかった | #1 #2 | run() で案内の値を経路の分岐より前に 1 回決める — -summary-command が 明示されればその値、明示が無く -install-wrapper があるときは filepath.Rel(-current-dir, ラッパーの絶対パス) + " -write-summary" (区切りを含まないときだけ ./ を前置。baseUsed を立てる)、明示も -current-dir も無いときはエラーで要求する (errSummaryCommandNeedsBase。 エラー文に -current-dir と -summary-command の両方の直し方を書く)。 installWrapper に案内を引数で渡し、シェルの単一引用符で焼き込む。 テンプレートの summary_command="$0 -write-summary" の行を削る。 既定値を定数 defaultSummaryCommand に切り出し、生成サマリ 1 行目を その定数と突き合わせるテストを置く。 TestInstallWrapperSummaryCommandPointsAtWrapper は検査側を絶対パスで 叩く形に変え、叩き方に依らないことを固定する。-install-wrapper と -summary-command の併記で値が焼き込まれることを固定するテストと、 基準無しの既定でエラーになるテストを足す。 README 56 行目と project-config.md 32 行目 (自動で渡す・設定は要らない) を焼き込みの記述に改める。 このリポジトリ自身のサマリ 1 行目は既定値のままなので変わらない (変わるのはラッパー経由で生成した利用側のサマリだけ)。 順序: P2 が使う定数をここで導入するので P1 が先 | 1 | 未着手 | — |
-| P2 | 既定値の検査を、run() が書き換える可変のパッケージ変数を読む形で書き、 自身は withRunGlobals も呼ばなかった | #3 | TestSummaryCommandDefaultIsGeneric を、可変の summaryCommand ではなく P1 で切り出した定数 defaultSummaryCommand に対して検査する形に変える | 2 (P1 の後) | 未着手 | — |
+| P1 | 案内の値を「経路の分岐より前で 1 回決める」規則を置かず、-install-wrapper の 経路では決めきらずに実行時の $0 に委ね、利用者の -summary-command は その経路で捨てた。パスの規則を 3 経路で揃えた設計を、案内という 1 つのパス値には当てていなかった | #1 #2 | run() で案内の値を経路の分岐より前に 1 回決める — -summary-command が 明示されればその値、明示が無く -install-wrapper があるときは filepath.Rel(-current-dir, ラッパーの絶対パス) + " -write-summary" (区切りを含まないときだけ ./ を前置。baseUsed を立てる)、明示も -current-dir も無いときはエラーで要求する (errSummaryCommandNeedsBase。 エラー文に -current-dir と -summary-command の両方の直し方を書く)。 installWrapper に案内を引数で渡し、シェルの単一引用符で焼き込む。 テンプレートの summary_command="$0 -write-summary" の行を削る。 既定値を定数 defaultSummaryCommand に切り出し、生成サマリ 1 行目を その定数と突き合わせるテストを置く。 TestInstallWrapperSummaryCommandPointsAtWrapper は検査側を絶対パスで 叩く形に変え、叩き方に依らないことを固定する。-install-wrapper と -summary-command の併記で値が焼き込まれることを固定するテストと、 基準無しの既定でエラーになるテストを足す。 README 56 行目と project-config.md 32 行目 (自動で渡す・設定は要らない) を焼き込みの記述に改める。 このリポジトリ自身のサマリ 1 行目は既定値のままなので変わらない (変わるのはラッパー経由で生成した利用側のサマリだけ)。 順序: P2 が使う定数をここで導入するので P1 が先 | 1 | 済 | `aef68ce` |
+| P2 | 既定値の検査を、run() が書き換える可変のパッケージ変数を読む形で書き、 自身は withRunGlobals も呼ばなかった | #3 | TestSummaryCommandDefaultIsGeneric を、可変の summaryCommand ではなく P1 で切り出した定数 defaultSummaryCommand に対して検査する形に変える | 2 (P1 の後) | 済 | `2faba65` |
 
 ### 観察
 
@@ -44,3 +47,62 @@
 (9) ラッパーがリポジトリ外にあるとき (../elsewhere/bin/rtc) は そのまま通す。-record-dir の焼き込みも同じ配置 (script_dir からの ../) を既に受け入れており、ここだけ規則を分けると経路ごとに違う契約になる。
 (10) 実装の細部。焼き込みの引用に %q は使えない — Go の規則であって シェルの二重引用符と食い違い、`make $(TARGET)` を焼き込むとシェルが 展開して make だけになる (実測)。単一引用符で囲み、中の ' は '\'' に する。既存の -record-dir の %q は同じ穴だが今回は触らず、ここに残す。 1 行目を検査するテストが 0 件なので、指摘 3 の修正で導入する既定値の 定数を使って 1 つ置く。TestInstallWrapperSummaryCommandPointsAtWrapper は 検査側を絶対パスで叩く形に変えれば、指摘 1 の再現がそのまま関門になる。
 (11) 束ねる順は P1 (指摘 1・2) → P2 (指摘 3)。P2 が使う定数を P1 で 導入するため。
+
+## 回 2: 2026-09-02 `code-review`
+
+- HEAD `59d5e2d` / model `opus-5` / scope incremental
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `review-triage/tools/triagecheck/main.go:281` -install-wrapper でラッパーを -current-dir の外に置くと、案内が "../" で 始まるリポジトリ外向きの相対パスになりそのままコミットされる。別マシンでは 兄弟ディレクトリが同じ位置に無く、案内が実在しないコマンドを指す。 「絶対パスを焼き込むと場所によって外れる」と同じ型の穴が残っている | plugin-code / operator | 利用者がラッパーをリポジトリの外 (兄弟ディレクトリなど) に置いて -current-dir をリポジトリのルートにして生成し、そのサマリを 別マシンで読むとき / サマリ 1 行目の案内 "../tools/rtc -write-summary" が、その配置を 持たないマシンでは叩けない。ただし鮮度検査は落ちない (焼き込んだ 文字列はマシンに依らず同じ) / 気づかない。検査は緑のまま、案内を試した人が「無い」と分かるだけ | A+B: wrong | — | **却下** — R1。段 A は verified — 引用どおり main.go:281-292 は ".." を含む結果を そのまま通し、プローブの再現も追認した。段 B (設計との照合) で根拠が 崩れる。指摘は「絶対パスを退けたのと同じ型の穴」と主張するが、退けた 理由は main.go:267-271 の直前の文が言うとおり「同じコミットが検査する 場所によって赤くなる」ことで、"../" の案内は焼き込んだ文字列として マシンに依らず同じなので検査は赤くならない — 同じ型ではない。 「案内が実在しないコマンドを指す」も、リポジトリ内の bin/rtc が README (tools/triagecheck/README.md:143-145) のとおり .gitignore 済みで 別マシンには存在しないのと同じで、リポジトリ外の配置に固有の欠陥では ない。加えてこの配置は 1 回目の notes (9) で「-record-dir が script_dir からの ../ で同じ配置を既に受け入れており、ここだけ規則を分けると 経路ごとに違う契約になる」として人間と合意のうえ受け入れた設計。 全 4 ゲートは評価して不発火 (E2 の結果は判定に使われないが残す)。 ただし main.go:270 の「リポジトリ相対でなければならない」は、目的 (検査が環境に依らない) より強く読める文言で、この指摘を誘った。 文言を目的に揃える価値はあるが欠陥ではないので、notes に残す |
+| 2 | `review-triage/tools/triagecheck/wrapper.go:112` -summary-command は shellSingleQuote で保護されたが、同じテンプレート内の -record-dir と -judgment-flow は %q のままで、bash が $(...)・ バックティック・$VAR を実行時に展開する。同じ穴の一方だけを塞いだことで テンプレート内で規則が不揃い | plugin-code / operator | 記録の置き場か判定フローのパスに $、バックティック、$( を含む ディレクトリ名があるとき / 焼き込んだパスが実行時に展開されて別のパスになり、存在しない 置き場を検査して不在のエラーになるか、展開結果がたまたま実在すれば 別の場所を検査して緑を返す / 不在なら errRecordDirMissing で気づく。実在してしまう場合は気づかない | A: verified | — | **採択** — A2。段 A verified — wrapper.go:112 と 115 の引用どおり %q が残り、 プローブで docs/$(echo PWNED) が docs/PWNED に展開されることが示された。 全 4 ゲート不発火: hypothetical はレビュアが再現済み、developer-domain は 対象が利用者の環境で走るラッパー、disproportionate-cost は修正が shellSingleQuote への置き換え 2 箇所、already-visible は TestInstallWrapperQuotesSummaryCommandForShell が -summary-command だけを見ており赤くなる関門を挙げられない。増分の外から存在した穴だが、 1 回目の notes (10) で「同じ穴だが今回は触らず残す」と記したもので、 増分が規則を不揃いにした以上ここで直す |
+
+### 修正計画
+
+| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |
+| --- | --- | --- | --- | --- | --- | --- |
+| P1 | 1 回目の修正で、焼き込み値の引用の規則 (bash では単一引用符) を -summary-command にだけ当て、同じテンプレートの他の焼き込み値 (plugin_cache・-record-dir・明示の -judgment-flow) には当てなかった。 「同じ穴だが今回は触らない」と notes に残して先送りした結果、 テンプレート内で規則が不揃いになった | #2 | 生成時に決まった値を焼き込む 3 箇所 (wrapper.go:60 plugin_cache、 69 -record-dir、112 明示の -judgment-flow) を %q から %s + shellSingleQuote に変える。実行時に展開させる二重引用符 (-current-dir "$script_dir"、既定の -judgment-flow "$root/..."、 -C "$root/...") は残し、この区別を installWrapper のコメントに書く。 テンプレート引数の説明の番号を更新する。 二重引用符形を assert する 5 箇所 (wrapper_test.go:126・137・181、 main_test.go:667・670) を単一引用符形に直し、3 箇所の焼き込み値に $(...) を含めて展開されないことを固定するテストを置く。 レビュアが挙げなかった plugin_cache も同じ原因なので含める。 docs/solutions の生成物の写しは当時の記録なので触らない | 1 | 済 | `c471354` |
+
+### 観察
+
+2 回目 (増分 33c62b8..59d5e2d、別セッションのレビュー結果を tmp/review-code-review-opus-5-3rd.yaml で受領)。head は現在の HEAD と一致し、 レビュー前後で HEAD と作業ツリーが不変であることを確認した。 residual 8 件に目を通した — いずれも「特に見てほしい点」への確認結果 (switch の網羅・baseUsed の位置・ToSlash の順・shellSingleQuote の網羅・ テストが焼き直しでないこと・記録とサマリの整合・文書と実装の一致・ 互換性変更のエラー文) で、増分の設計を追認するもの。指摘として立てる ものは無い。 指摘 1 を R1 にした判断は、1 回目の notes (9) の設計判断 (人間と合意) を 前提にしている。設計判断そのものを見直すなら、それは記録の訂正ではなく 新しい決定として扱う。main.go:270 の「リポジトリ相対でなければならない」 の文言は目的 (検査が環境に依らない) に揃えた方が誤読を防げる — 指摘 2 の 修正と同じファイル群を触るので、そのときに文言だけ直すのが安い。
+修正前の追加調査 (指摘 2 の関連箇所と影響範囲)。
+(12) 同じ穴がもう 1 箇所ある。wrapper.go:60 の plugin_cache=%q も値を bash の二重引用符に入れており、指摘 2 が挙げた -record-dir (69) と -judgment-flow (112) と同じ規則違反。レビュアは挙げていないが原因が同じ なので同じ問題に含めて直す。値はプラグインキャッシュのルート ($HOME 配下) で、$ やバックティックを含む HOME は稀だが、規則を 3 箇所のうち 2 箇所 だけ直すと今回と同じ「不揃い」を再生産する。
+(13) 機械的に %q を全部単一引用符にしてはいけない。テンプレートには 意図して実行時に展開させる二重引用符が 3 つある — -current-dir "$script_dir"、-judgment-flow "$root/skills/..." (省略時の既定行、 wrapper.go:108)、-C "$root/tools/triagecheck"。直すのは「生成時に決まった 値を焼き込む」3 箇所 (plugin_cache・-record-dir・明示の -judgment-flow) だけで、「実行時の変数を展開する」箇所は二重引用符のまま残す。 この区別を installWrapper のコメントに書く。
+(14) 生成物の引用形に依存するテストの assert が 5 箇所あり、単一引用符に 変えると壊れる — wrapper_test.go:126 (-record-dir)、137 (plugin_cache)、 181 (明示の -judgment-flow)、main_test.go:667 (-record-dir)、670 (明示の -judgment-flow)。wrapper_test.go:142 と main_test.go:442・722 は既定の "$root/..." 行を見ており、こちらは変えない (展開させる側)。あわせて TestInstallWrapperQuotesSummaryCommandForShell と同じ形で、3 箇所の 焼き込み値に $(...) を含めて展開されないことを固定するテストを置く。
+(15) docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md の 250-255 行に生成物の写し (二重引用符の形) がある。当時の記録なので 書き換えない (このリポジトリに frozen_paths の設定は無いが、docs/solutions は検討の記録として扱う)。README (tools/triagecheck) には生成物の引用形は 写っていないので追随は不要。
+(16) 修正の形: テンプレートの %q を %s に変え、installWrapper 側で shellSingleQuote を通す。焼き込み値が 3 つになるので、テンプレートの 引数の説明 (wrapper.go:18-21) の番号も更新する。
+
+## 回 3: 2026-09-03 `code-review`
+
+- HEAD `f915ad5` / model `opus-5` / scope incremental
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+
+### 観察
+
+3 回目 (増分 59d5e2d..f915ad5、別セッションのレビュー結果を tmp/review-code-review-opus-5-4th.yaml で受領。レビューの実行日は 2026-09-02)。head は現在の HEAD と一致し、レビュー前後で HEAD と作業ツリーが 不変であることを確認した。指摘 0 件。 residual 8 件はすべて「特に見てほしい点」への確認結果で、2 回目の P1 の 設計を追認するもの — 焼き込む 3 値と展開させる 3 箇所の区別に取り違えは 無い、shellSingleQuote は ' ・空白・$(...)・改行を含む plugin_cache でも `ls -d "$plugin_cache"/*/` を壊さない (実測)、ラッパーを実行する 2 テストは Skip に落ちていない、TestInstallWrapperQuotesAllBakedValuesForShell は %q に戻すミューテーションと "$script_dir" を単一にするミューテーションの 両方で FAIL する (焼き直しではない)、$(echo Y) を含む置き場で生成物を 実行しても別の場所に化けない (レビュア側のプローブ)。 最後の 1 件 ($root が ls -d 由来で末尾 / を持ち "$root/tools/triagecheck" が 二重スラッシュになる) は POSIX 上同一パスで、増分より前から存在する 挙動。指摘として立てない。 これで増分レビューが 0 件に到達した。scope の規則どおり、最終確認として full を 1 回走らせるかは人間の判断 — 1 回目の full (4 件) 以降の変更は すべて増分でレビュー済み。
+
+## 回 4: 2026-09-03 `code-review`
+
+- HEAD `f085d30` / model `opus-5` / scope full
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `review-triage/tools/triagecheck/README.md:251` README 末尾のテスト件数が 190 のまま。このブランチでテストを 17 件 増やしたのに数え直していない。README 自身が「増減させたら数え直す」と 定めている規則を破っている | doc-user / operator | README を読んだ人が件数を確かめようとして、書いてあるコマンドを 実行したとき / 190 と書かれているのに 207 が出る。README が「記憶で書くと実測と ずれる」と自ら警告している型のずれがその場で起きており、読み手は README の他の数字も疑う / 気づかない。件数を検査する関門は無い (Makefile も workflows も 無く、grep -c 'PASS' はこの行にしか現れない) | A: verified | — | **採択** — A2。段 A verified — README.md:251 の逐語は 190、HEAD で `go test -v ./... \| grep -c 'PASS:'` を実行して 207、main の同じ行も 190 で本ブランチが数え直していないことを追認した。全 4 ゲート不発火: hypothetical は実測で再現、developer-domain は対象が利用者向け README、 disproportionate-cost は修正が数字 1 つ、already-visible は件数を 検査する関門を挙げられない (レビュアの確認も同じ) |
+
+### 修正計画
+
+| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |
+| --- | --- | --- | --- | --- | --- | --- |
+| P1 | README にテストの実測値 (件数) を書き、テストを足すたびに増分の外の その行へ追随する運用にしていた。review-triage 自身の原則「規範文書に 実測値を書かない」に反しており、前のブランチで一度直した後も 同じ行が再び古くなった (2 度目) | #1 | 案 B (人間が決定)。README:251 の数字を消し、数え方のコマンド (`go test -v ./... \| grep -c 'PASS:'`) だけを残す — 「件数はこの コマンドで数える」の形にして、数字を書かないことでずれを発生源から 消す。案 A (207 に直す) は 3 度目を招くので採らない。 あわせて「増減させたら数え直す」の規則文も、数字を持たなくなるので削る | 1 | 済 | `769f929` |
+
+### 観察
+
+4 回目 (最終確認の full、main f6e777f..f085d30。別セッションのレビュー 結果を tmp/review-code-review-opus-5-5th.yaml で受領)。head は現在の HEAD と 一致し、レビュー前後で HEAD と作業ツリーが不変であることを確認した。 指摘 1 件は増分の継ぎ目で落ちたもの — 各増分はテストを足したがコード側 だけを見ており、README 末尾の件数 (増分の外) に追随しなかった。full を 最終確認に置く規則の狙いどおりの検出。 residual 4 件のうち、記録に残す価値があるもの: (a) ラッパー経由で追加引数 -record-dir を上書きすると、焼き込まれた -summary-command の案内は上書き前の置き場を前提にしたまま 1 行目に入る (実測)。README:173-176 は -record-dir 上書きの相対パス要件だけを書き、 案内には触れていない。上書きは明示的な高度用途で既定の置き場では正しく 動くため指摘にしないが、上書き時は -summary-command も併せて渡す旨を README に 1 行足す価値はある。 (b) -summary-command の空判定が -record-dir の必須判定より前に走り、 両方誤ると片方しか報告されない。missingPathProblems の「1 回で全件 報告する」方針とは揃わないが、どちらも 1 回直せば次に進める。 (c) main.go 冒頭のパッケージコメントの使い方の例に -summary-command が 無い。フラグの説明と README にあるので実害無し。 (d) リファクタ提案 1 件 — resolveInputs の案内決定 switch だけが baseUsed を 書き換え、errCurrentDirUnused の判定との依存が位置に暗黙に乗る。 壊れる入力は無い。
+修正前の追加調査 (関連箇所と影響範囲)。
+(17) 同じ欠陥が 2 度目である。前のブランチ fix-triagecheck-explicit-path-must-exist の記録 (1 回目の指摘 8) で「README のテスト件数が 89 のまま、実測 121」を 採択して直している。同じ行が、次のブランチでまた古くなった。数字を直す だけの修正は 1 ブランチしか持たない — テストを足すたびに README の末尾 (増分の外) へ追随する規則は、増分レビューでは検出されず full まで残る (今回もそうだった)。
+(18) 文書に書かれた実測値で同型のものは他に無い。skills/ 配下の数字 (gate-examples の 12 行・40 行、verification の 2 箇所・4 箇所) は例文の 中身であって測った値ではない。他のツールの README にテスト件数の行は無い。 同型の再発源はこの 1 行だけ。
+(19) 数え方は再現する。`go test -v ./... | grep -c 'PASS:'` を 2 回実行して いずれも 207 (部分テストを含む数、キャッシュや並列で揺れない)。
+(20) review-triage のスキル自身が「規範文書に実測値を書かない。実測は記録だけが 持つ」と定めている (SKILL.md の前提知識)。README のこの行はその原則に 反する形で、原則が予言したとおり 2 度ずれた。修正の選択肢は 2 つ — 数字を 207 に直す (指摘の文面どおり。次にテストを足したとき 3 度目が起きる) か、数字を消して数え方のコマンドだけ残す (「件数はこのコマンドで数える」に する。数字が無ければずれない)。後者は README の書き方を変える設計判断なので fix では決めず、人間に返す。
