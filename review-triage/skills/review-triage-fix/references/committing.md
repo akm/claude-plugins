@@ -29,7 +29,7 @@
 
 各コミットの前に関門を通す。**まとめて最後に通さない** — どのコミットで壊れたかが分からなくなる。
 
-通すのは、設定の `gates` が挙げるもののうち**変更の種類に対応するもの**と、記録を触ったなら `triage_check_command` ([project-config.md](../../review-triage/references/project-config.md))。
+通すのは、設定の `gates` が挙げるもののうち**変更の種類に対応するもの**と、記録を変更したなら `triage_check_command` ([project-config.md](../../review-triage/references/project-config.md))。
 
 - **CI に任せない。** CI が対象外にしている領域 (設定ファイル・スキル定義など) は珍しくなく、そこはローカルの関門でしか検査されない。**どの領域が CI の対象外かは、リポジトリごとに違う。**
 - **`gates` が未設定なら、関門を通していないことを報告に書く。** 通したふりをしない。

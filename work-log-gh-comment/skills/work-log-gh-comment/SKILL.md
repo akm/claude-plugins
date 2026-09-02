@@ -1,6 +1,6 @@
 ---
 name: work-log-gh-comment
-description: 実行したコマンドとその出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する。「作業ログを Issue に記録して」「実行内容を PR にコメントして」「work-log-gh-comment を実行して」のような依頼で使う。引数で記録先 (Issue / PR の番号) を指定する。実環境を触る作業や、後から経緯を追う必要がある作業の記録に使う。
+description: 実行したコマンドとその出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する。「作業ログを Issue に記録して」「実行内容を PR にコメントして」「work-log-gh-comment を実行して」のような依頼で使う。引数で記録先 (Issue / PR の番号) を指定する。実環境を変更する作業や、後から経緯を追う必要がある作業の記録に使う。
 ---
 
 # work-log-gh-comment: 作業の記録を Issue / PR のコメントに残す
