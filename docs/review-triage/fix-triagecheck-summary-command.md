@@ -1,0 +1,26 @@
+<!-- 生成物。手で編集しない。正本は fix-triagecheck-summary-command.yaml — `triagecheck -write-summary` で再生成する。 -->
+
+# fix-triagecheck-summary-command のトリアージ記録
+
+正本は [fix-triagecheck-summary-command.yaml](fix-triagecheck-summary-command.yaml)。読み方と収束の目安は [README](README.md)。
+
+## 推移
+
+| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 2026-09-02 | `code-review` | `opus-5` | full | 4 | 3 | 0 | 1 |
+
+## 回 1: 2026-09-02 `code-review`
+
+- HEAD `33c62b8` / model `opus-5` / scope full / level high
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `review-triage/tools/triagecheck/wrapper.go:63` ラッパーが渡す "$0 -write-summary" が叩いた形とカレントに依存するため、 コミットされるサマリ 1 行目が起動方法ごとに変わり、生成直後のサマリが 別の叩き方の検査で落ちる | plugin-code / operator | ラッパーを導入した利用側で、生成と検査が違う叩き方で行われるとき (相対パスで生成し CI やエディタが絶対パスで検査する、PATH に置いた リンク経由で叩く、サブディレクトリから ../bin/rtc で叩く) / サマリの内容は同一なのに 1 行目だけが食い違い、triagecheck が 「サマリが正本と食い違っています」で exit 1 になる。再生成しても 叩き方が違えば毎回差分が出続け、2 人が別の形で叩くと git 上で サマリが往復する / CI が赤くなるので気づくが、原因は分かりにくい。案内される再生成 コマンドを実行しても直らないため、利用者は記録の中身を疑う | A: verified | — | **採択** — A2。全 4 ゲートを評価していずれも不発火。hypothetical は再現テストを 実際に書いて FAIL させたので不成立。developer-domain は対象が利用者の 環境で走るラッパーなので不成立。disproportionate-cost は対象 (wrapper.go 155 行) に対し既存の同型テストが 61-112 行で釣り合うため 不成立。already-visible は赤くなる関門を名前で挙げられない (TestInstallWrapperSummaryCommandPointsAtWrapper は生成も検査も ./bin/rtc の 1 形だけを使うため、この欠陥がある状態で緑になる) ので不成立 |
+| 2 | `review-triage/tools/triagecheck/main.go:72` -install-wrapper と -summary-command を併記すると指定が黙って捨てられる。 -write-summary には同型のガードがあるのにこちらには無い | plugin-code / operator | 利用側が Makefile 経由の案内を焼き込むつもりで -install-wrapper と -summary-command を併記してラッパーを配るとき / コマンドは exit 0 で「生成: ...」と表示して成功したように見えるが、 生成されたラッパーに指定した文字列は一切入らず、案内は "$0 -write-summary" のままになる。利用者は意図と違う案内を 配ったことに気づかない / 気づかない。生成は成功して見え、生成物を開いて grep しない限り 指定が消えたことは分からない | A: verified | — | **採択** — A2。全 4 ゲートを評価していずれも不発火。hypothetical は既存の TestRunInstallWrapperRejectsUnusedFlags と同じ形で再現テストを書けるので 不成立 (実測でも exit 0 と grep 0 件を確認)。developer-domain は対象が 利用者に配るラッパーの生成なので不成立。disproportionate-cost は 既存ガードが 3 行 (条件 1 行 + return 2 行) で済んでおり不成立。 already-visible は赤くなる関門を挙げられない (併用を検査する TestRunInstallWrapperRejectsUnusedFlags は -write-summary だけを試す) ので不成立 |
+| 3 | `review-triage/tools/triagecheck/main_test.go:788` TestSummaryCommandDefaultIsGeneric が可変グローバル summaryCommand を 読むため実行順に依存し、既定の回帰を検出しなくなる | test / developer | withRunGlobals を呼ばずに run を呼ぶテストが 1 つでも増え、 そのテストがこのテストより先に走るとき (このテスト自身は withRunGlobals を呼んでいない) / 既定値ではなく先行テストが残した汚染値を検査してしまう。 record.go の既定が Issue #36 の焼き込みに戻されても、汚染値が 無害な文字列であればこのテストは緑のまま通り、回帰を見逃す。 逆に汚染値が make を含めば偽陽性で落ちる / 気づかない。テストは緑のまま通るので、検出能力が失われたことは 回帰が実際に起きるまで分からない | A: verified | already-visible | **採択** — A1 (免除条項)。全 4 ゲートを評価し already-visible のみ発火したが、 免除条項の 2 条件がともに成立するため却下しない。 条件 1: 指摘は関門 (テスト) そのものが既定の回帰を検出しなくなることを 主張しており、検出能力の消失に当たる。 条件 2: この欠落を検出する関門が 3 層のいずれにも無い — 層 1 (make ターゲット) はこのリポジトリに Makefile が無いため 0 件、 層 2 (機械検査の項目) は review-triage-record と judgment-flow の 2 つで どちらも Go テストの順序依存を見ない、層 3 (テスト関数) には order/pollution/global/isolation を扱うテストが 1 件も無い (grep で確認)。 なお already-visible の発火は go test 自体が赤くなりうる点によるが、 それは汚染値が make を含む偽陽性の場合だけで、見逃しの側は緑のまま通る |
+| 4 | `review-triage/tools/triagecheck/main.go:76` コマンド文字列の空判定に isBlankPath を再利用している。関数名と doc コメントが示す対象 (パス) と用途がずれている | plugin-code / operator | 将来 isBlankPath にパス特有の規則 (path.Clean、区切り文字の扱い、 拡張子の検査など) を足したとき / -summary-command が巻き添えで壊れ、パスとしては無効だが コマンド文字列としては正当な値が弾かれる、あるいはその逆が通る / そのときテストが赤くなるかは、足す規則しだいで分からない。 現時点では挙動は正しく、実害は出ていない | A: verified | hypothetical | **却下** — R3。全 4 ゲートを評価し hypothetical が発火した — 帰結が 「将来 isBlankPath にパス特有の規則を足したら」という仮定の条件に 依存しており、現在のコードでは再現するテストを書けない (現時点の挙動は空白・不可視の除去として正しく、実測でも空指定は errEmptySummaryCommand で正しく弾かれる)。再現には未着手の変更を 先に入れる必要があり、それはテストで作れない。 developer-domain・disproportionate-cost・already-visible は不発火。 D7 の被害者は developer — 対象は同梱ツールだが、帰結が生じるのは このリポジトリの保守者が isBlankPath を変更する場面であり、 その時点でコンパイルとテストを回す開発者が調べて対処できる。 製品の利用者に届く経路が無いため却下する |
+
+### 観察
+
+このブランチの初回トリアージ。レビューは code-review high で報告のみ (--fix 無し) で走らせ、実行前後で HEAD (33c62b8) と作業ツリーが不変で あることを確認した。 プロジェクト設定 (.claude/akm-claude-plugins/review-triage/config.json) が 無いため、記録の置き場は既存の docs/review-triage/ に合わせ、 triage_summary_command / triage_check_command は未設定として扱った (サマリ再生成と検査の実行方法は報告に記す)。 指摘 1 と 2 は同じ原因 (-summary-command を経路ごとに扱った結果、 ラッパーの経路だけ規則から外れた) を共有する。README の 「パスの規則は 3 つの経路で同じ」という設計を -summary-command には 当てていないことが根にあり、review-triage-fix では 1 つの問題として 束ねられる見込み。 PR 説明で著者が挙げた懸念のうち、summaryCommand をパッケージ変数にした 判断は指摘 3 の順序依存という形で表面化した。ラッパーの $0 設計は 指摘 1 のとおり穴があった。シェルの引用符の扱いは "$summary_command" が 単一 argv に収まることを空白・二重引用符を含むパスで実測し、問題なし。 record_test.go の TestReviewTriageRecordSummaryStale の判定を 「食い違っています」への一致に変えた点は、文言への結合ではあるが summaryCommand が可変になった以上コマンド名では判定できず、代替が 無いため指摘として立てなかった。
