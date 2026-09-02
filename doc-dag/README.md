@@ -10,6 +10,8 @@
 
 ## 何を解決するか
 
+考え方と手順の正本は同梱の [SKILL.md](skills/doc-dag/SKILL.md) です。ここは要点だけを書きます。
+
 同じ規則・値・手順が複数の文書に書かれていると、**片方を直しても、もう片方が古い事実を語り続けます。** レビュー指摘が修正のたびに再生産されるループは、たいていこの構造が発生源です。
 
 このスキルは、重複を「片方を消す」のではなく **「向きを付ける」** ことで解消します。正本を 1 つ決め、他はそこへの参照にします。読みやすさのための要約は残してよく、その場合は正本へのリンクを添えます。
@@ -25,7 +27,7 @@ claude plugin install mermaid-preview@akm-claude-plugins
 claude plugin install doc-dag@akm-claude-plugins
 ```
 
-`mermaid-preview` が無くても調査と図のソース生成までは動きますが、ブラウザでの提示はできません。
+`mermaid-preview` が無くても調査と図のソース生成までは動きますが、ブラウザでの提示はできません (無いときの振る舞いは SKILL.md の手順 3 が定めます)。
 
 ## プロジェクト固有の設定 (任意)
 
@@ -44,6 +46,8 @@ claude plugin install doc-dag@akm-claude-plugins
 詳細は同梱の `references/project-config.md` を参照してください。
 
 ## 使い方
+
+インストール手順は [リポジトリの README](../README.md#使い方) を参照してください。
 
 ```bash
 claude plugin marketplace add akm/claude-plugins
