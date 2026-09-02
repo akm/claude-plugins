@@ -116,7 +116,10 @@ func run(args []string) error {
 		if flowOrigin == "CLAUDE_PLUGIN_ROOT" {
 			flowBase = ""
 		}
-		absFlow, used, err := resolvePath(p, flowBase, "-judgment-flow")
+		// 報告には値の出所 (flowOrigin) を使う。固定のフラグ名で報告すると、
+		// CLAUDE_PLUGIN_ROOT から解決した値の誤りを、利用者が渡していない
+		// -judgment-flow の名前で叱ることになり、案内どおり直しても解決しない。
+		absFlow, used, err := resolvePath(p, flowBase, flowOrigin)
 		if err != nil {
 			return err
 		}
@@ -198,6 +201,12 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 		return p, false, nil
 	}
 	if base == "" {
+		// CLAUDE_PLUGIN_ROOT は -current-dir の基準を使わないので、そちらを案内しても
+		// 直らない。直すべきは環境変数の側だと言う。
+		if flagName == "CLAUDE_PLUGIN_ROOT" {
+			return "", false, fmt.Errorf(
+				"%s が相対パスです。絶対パスを設定してください: %s", flagName, p)
+		}
 		return "", false, fmt.Errorf(
 			"%s が相対パスです。基準を -current-dir で指定するか、絶対パスにしてください: %s", flagName, p)
 	}

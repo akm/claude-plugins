@@ -16,13 +16,23 @@ import (
 )
 
 // wrapperTemplate はラッパースクリプトの雛形。%s は順に
-// (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値, (3) -judgment-flow に
-// 焼き込む値 (空なら省略) が入る。
+// (1) PLUGIN_CACHE の値, (2) -record-dir に焼き込む値 (script_dir からの相対),
+// (3) -judgment-flow に焼き込む値 (空なら省略) が入る。
 //
-// -current-dir "$PWD" を必ず渡す。ツール本体は相対パスの基準を推測しないので、
-// 相対の -record-dir を焼き込んだラッパーはこれが無いと動かない。ここでの $PWD は
-// スクリプトが動いているシェルが設定した値で、利用者が叩いた場所を指す
-// (go run -C の下で読む $PWD と違い、シェル自身が更新している)。
+// 基準には $PWD ではなく script_dir (ラッパー自身の実体の位置) を使う。$PWD は
+// シェルが更新する慣習にすぎず、非シェルの親 (CI ランナー・cron・make -C) が
+// chdir すると古いままになるので、利用者が叩いた場所を指すとは限らない。
+// ラッパーはリポジトリの中に置かれるので自分の位置を知っており、推測が要らない。
+//
+// ただし「自分の位置」は実体の位置でなければならない。dirname "$0" はリンクを
+// 解決しないので、PATH 上などに張ったリンク経由で起動すると基準がリンクの置き場に
+// なり、その隣に別の置き場があるとそちらを検査して緑を返す (基準が検査対象から
+// 切り離される点で、絶対パスを焼き込む案を退けたのと同じ型)。リンクを辿ってから
+// 基準を求める。realpath 一発でも解けるが POSIX ではなく古い macOS に無いため、
+// bash 組み込みと readlink だけで済むループを使う。
+//
+// 置き場を絶対パスで焼き込む案は採らない。リポジトリを移動・再クローンすると
+// 移動元を検査して緑を返し、移動先の壊れた記録を見逃す (実測)。
 //
 // PLUGIN_CACHE の解決 (最新版を拾う) は Makefile の例と同じロジック。ここを
 // 変えるときは README の「Makefile に置く例」も合わせて直す。
@@ -30,6 +40,17 @@ const wrapperTemplate = `#!/usr/bin/env bash
 # review-triage/tools/triagecheck -install-wrapper が生成した。手で編集しない
 # (再生成すると上書きされる)。
 set -eu -o pipefail
+
+# 基準はこのスクリプト自身の位置。$PWD は叩いた場所によって変わるので使わない。
+# シンボリックリンク経由で起動されても実体の位置を採る — dirname "$0" だけでは
+# リンクの置き場が基準になり、その隣に別の置き場があるとそちらを検査してしまう。
+script_src=$0
+while [ -L "$script_src" ]; do
+  link_dir=$(cd -P "$(dirname "$script_src")" && pwd)
+  script_src=$(readlink "$script_src")
+  case $script_src in /*) ;; *) script_src=$link_dir/$script_src;; esac
+done
+script_dir=$(cd -P "$(dirname "$script_src")" && pwd)
 
 plugin_cache=%q
 root=$(ls -d "$plugin_cache"/*/ 2>/dev/null | sort -V | tail -1)
@@ -39,17 +60,20 @@ if [ -z "$root" ]; then
 fi
 
 exec go run -C "$root/tools/triagecheck" . \
-  -current-dir "$PWD" \
+  -current-dir "$script_dir" \
   -record-dir %q \
 %s  "$@"
 `
 
-// installWrapper はラッパースクリプトを path に書き出す。recordDir は
-// 呼び出し時点の -record-dir の値をそのまま焼き込む (相対パスならカレント
-// ディレクトリ基準のまま埋め込まれる — 呼び出し元が意図して相対指定した
-// ときにそれを尊重するため、ここで絶対パス化はしない)。
+// installWrapper はラッパースクリプトを path に書き出す。
 //
-// judgmentFlow が明示されていれば同様に焼き込み、空なら
+// recordDir は「ラッパーの置き場 (script_dir) から見た相対パス」に変換して
+// 焼き込む。生成時のカレントとラッパーの置き場は違いうるので (例:
+// プラグインの展開先から -install-wrapper <リポジトリ>/bin/rtc を実行する)、
+// 渡された値をそのまま埋めると、実行時に script_dir 基準で解決されたときに
+// 別の場所を指す。両方を絶対にしてから差を取る。
+//
+// judgmentFlow が明示されていれば絶対パスにして焼き込み、空なら
 // -judgment-flow は付けず、プラグイン展開先の既定パス
 // (skills/review-triage/references/judgment-flow.md) を使わせる。
 func installWrapper(path, recordDir, judgmentFlow string) error {
@@ -58,9 +82,42 @@ func installWrapper(path, recordDir, judgmentFlow string) error {
 		return err
 	}
 
+	// -install-wrapper は「展開先の tools/triagecheck から」実行する決まりなので
+	// (pluginCacheDir がその形を要求する)、生成時のカレントはプラグイン側を指す。
+	// そこからの相対と解釈しても利用者の意図には当たらないので、推測せずに弾く —
+	// 検査の経路で相対に基準を要求するのと同じ理由。
+	if !filepath.IsAbs(recordDir) {
+		return fmt.Errorf(
+			"-install-wrapper の -record-dir は絶対パスで指定してください (生成時のカレントは"+
+				"プラグインの展開先なので、相対パスの基準になりません): %s", recordDir)
+	}
+
+	// 焼き込む -record-dir を script_dir 基準の相対にする。
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("%s: ラッパーの置き場を解決できません: %w", path, err)
+	}
+	scriptDir := filepath.Dir(absPath)
+	absRecordDir, err := filepath.Abs(recordDir)
+	if err != nil {
+		return fmt.Errorf("%s: 記録の置き場を解決できません: %w", recordDir, err)
+	}
+	relRecordDir, err := filepath.Rel(scriptDir, absRecordDir)
+	if err != nil {
+		return fmt.Errorf(
+			"%s: 記録の置き場をラッパーの位置 (%s) からの相対パスにできません: %w", recordDir, scriptDir, err)
+	}
+	recordDir = filepath.ToSlash(relRecordDir)
+
 	judgmentFlowLine := "  -judgment-flow \"$root/skills/review-triage/references/judgment-flow.md\" \\\n"
 	if judgmentFlow != "" {
-		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", judgmentFlow)
+		// 判定フローはリポジトリの外 (プラグインの展開先) にあるので、script_dir
+		// 基準の相対にしても意味が無い。絶対パスで焼き込む。
+		absFlow, err := filepath.Abs(judgmentFlow)
+		if err != nil {
+			return fmt.Errorf("%s: 判定フローのパスを解決できません: %w", judgmentFlow, err)
+		}
+		judgmentFlowLine = fmt.Sprintf("  -judgment-flow %q \\\n", absFlow)
 	}
 
 	script := fmt.Sprintf(wrapperTemplate, pluginCache, recordDir, judgmentFlowLine)

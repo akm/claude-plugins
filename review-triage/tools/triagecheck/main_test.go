@@ -339,7 +339,10 @@ func TestRunInstallWrapperAcceptsEmptyJudgmentFlow(t *testing.T) {
 	t.Chdir(toolDir)
 	out := filepath.Join(t.TempDir(), "wrapper.sh")
 
-	if err := run([]string{"-install-wrapper", out, "-record-dir", "docs/rt", "-judgment-flow", ""}); err != nil {
+	// -install-wrapper の -record-dir は絶対パス (生成時のカレントはプラグインの
+	// 展開先なので、相対の基準にならない)。
+	recDir := filepath.Join(t.TempDir(), "docs", "rt")
+	if err := run([]string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", ""}); err != nil {
 		t.Fatalf("空の -judgment-flow で -install-wrapper が拒否された: %v", err)
 	}
 	script, err := os.ReadFile(out)
@@ -388,4 +391,73 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 			t.Fatalf("got (%q, %q), want 空", p, origin)
 		}
 	})
+}
+
+// CLAUDE_PLUGIN_ROOT 由来の判定フローは -current-dir の基準を使わない。
+// 環境変数の値は利用者が -current-dir を書いたかどうかとは無関係に決まるので、
+// そこへ基準を当てると「環境変数を設定していると -current-dir が使えない」
+// (逆に相対の環境変数が黙って解決される) ことになる。分岐の両側を固定する。
+func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
+	base := realTempDir(t)
+	recs := filepath.Join(base, "recs")
+	if err := os.MkdirAll(recs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// base 配下に、相対の CLAUDE_PLUGIN_ROOT から辿れる判定フローを置く。
+	// -current-dir を基準にすればこれが見つかってしまう配置。
+	flowDir := filepath.Join(base, "relplugin", "skills", "review-triage", "references")
+	if err := os.MkdirAll(flowDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(flowDir, "judgment-flow.md"),
+		[]byte(judgmentFlowFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("相対の環境変数は -current-dir で解決しない", func(t *testing.T) {
+		withRunGlobals(t)
+		t.Setenv("CLAUDE_PLUGIN_ROOT", "relplugin")
+		// -current-dir を渡しても、環境変数由来のパスの基準には使わない。
+		// 使ってしまうと上の judgment-flow.md が見つかり、緑になる。
+		if err := run([]string{"-record-dir", recs, "-current-dir", base}); err == nil {
+			t.Fatal("相対の CLAUDE_PLUGIN_ROOT が -current-dir 基準で解決された")
+		}
+	})
+
+	t.Run("絶対の環境変数は -current-dir の有無に関わらず通る", func(t *testing.T) {
+		withRunGlobals(t)
+		t.Setenv("CLAUDE_PLUGIN_ROOT", filepath.Join(base, "relplugin"))
+		// -record-dir が相対なので -current-dir は使われる。判定フローは絶対で
+		// 解決されるため、両者が同居しても問題にならない。
+		if err := run([]string{"-record-dir", "recs", "-current-dir", base}); err != nil {
+			t.Fatalf("絶対の CLAUDE_PLUGIN_ROOT と -current-dir の同居で落ちた: %v", err)
+		}
+	})
+}
+
+// 値の出所を報告に反映する。CLAUDE_PLUGIN_ROOT から解決した値の誤りを、
+// 利用者が渡していない -judgment-flow の名前で叱らない。案内も、直すべき側
+// (環境変数) を向いていること — -current-dir を足しても直らないため。
+func TestRunReportsOriginOfBadPluginRoot(t *testing.T) {
+	withRunGlobals(t)
+	base := realTempDir(t)
+	recs := filepath.Join(base, "recs")
+	if err := os.MkdirAll(recs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "relplugin")
+
+	err := run([]string{"-record-dir", recs})
+	if err == nil {
+		t.Fatal("相対の CLAUDE_PLUGIN_ROOT が通った")
+	}
+	if !strings.Contains(err.Error(), "CLAUDE_PLUGIN_ROOT") {
+		t.Fatalf("報告が値の出所を示していない: %v", err)
+	}
+	if strings.Contains(err.Error(), "-judgment-flow") {
+		t.Fatalf("渡していないフラグ名で報告している: %v", err)
+	}
+	if strings.Contains(err.Error(), "-current-dir") {
+		t.Fatalf("直らない対処 (-current-dir) を案内している: %v", err)
+	}
 }
