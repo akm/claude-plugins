@@ -24,6 +24,12 @@
 | `triage_check_command` | 記録のスキーマ検査を走らせるコマンド | 検査を走らせず、**走らせていないことを報告に明記する** |
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが正本として残る |
 
+## `triage_summary_command` — 同梱の triagecheck に渡す
+
+**同梱の `triagecheck` は `config.json` を読まない。** 案内する再生成手段は `-summary-command` で渡し、その値がサマリの 1 行目に入ってコミットされる。**`triage_summary_command` には、`triagecheck` が案内する文字列と同じものを書く** — 食い違うと、記録を読んだ人が実在しないコマンドを案内されることになる。
+
+`-summary-command` の既定値と、`-install-wrapper` で省略したときにツールが組み立てる値の規則は、[triagecheck の README「再生成コマンドの案内」](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md#再生成コマンドの案内--summary-command) が正本。ここでは再掲しない。
+
 ## `gates` — なぜ関門の一覧が要るか
 
 却下の免除条項は、**「この欠陥を検出する関門が無い」ことを条件にする**。条件を確かめるには、**そのリポジトリにどんな関門があるかを知る必要がある**。
@@ -52,14 +58,6 @@
 - **Makefile にターゲットを 1 つ置く**（リポジトリの Makefile をそのまま検査コマンドの置き場にする）
 - **`-install-wrapper` でラッパースクリプトを生成する**（`.claude/akm-claude-plugins/review-triage/config.json` のようにリポジトリごとの設定として管理したくない・Makefile に手を入れたくない場合）
 
-```makefile
-.PHONY: triage-check
-triage-check: ## トリアージ記録を検査する
-	go run -C $(REVIEW_TRIAGE_ROOT)/tools/triagecheck . \
-	  -record-dir $(CURDIR)/docs/review-triages \
-	  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md
-```
-
-`REVIEW_TRIAGE_ROOT` はプラグインの展開先 (`CLAUDE_PLUGIN_ROOT` と同じ場所) で、**版ごとにディレクトリが分かれる**。展開先の求め方を含む呼び出し方の詳細と、`-install-wrapper` を使う方法は、プラグインの `tools/triagecheck/README.md` にある。
+どちらの置き方も、Makefile の例 (展開先の求め方・渡すフラグ) と `-install-wrapper` の使い方は [triagecheck の README](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md) が正本。ここに写すと、渡すフラグが増えたときに片方だけ古くなる。
 
 **検査を走らせなかった回は、報告にそう書く。** 「検査で問題が出なかった」と「検査を走らせていない」は別の事実で、混同すると次の読み手が通ったものと誤解する。

@@ -1,4 +1,4 @@
-<!-- 生成物。手で編集しない。正本は fix-triagecheck-explicit-path-must-exist.yaml — `make docs-review-triage-summary` で再生成する。 -->
+<!-- 生成物。手で編集しない。正本は fix-triagecheck-explicit-path-must-exist.yaml — `triagecheck -write-summary` で再生成する。 -->
 
 # fix-triagecheck-explicit-path-must-exist のトリアージ記録
 

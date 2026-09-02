@@ -38,10 +38,26 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 | `-judgment-flow` | | 判定フローの正本のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
 | `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す |
 | `-install-wrapper` | | 検査せず、呼び出し用のラッパースクリプトを書き出す。相対パスなら `-current-dir` も要る |
+| `-summary-command` | | サマリの再生成手段として案内する文字列。既定は `triagecheck -write-summary` (`-install-wrapper` では `-current-dir` から見たラッパーの相対パス) |
 
 **パスの規則は 3 つの経路 (検査 / `-write-summary` / `-install-wrapper`) で同じ。** 規則は経路で分岐する前に 1 か所で当てるので、どの経路でも「パスの渡し方」と「対象が見つからないとき」の節がそのまま成り立つ。
 
 **`-install-wrapper` は `-write-summary` と併用できない** (何を書き出すかが食い違うため、指定するとエラーになる)。`-write-summary=false` は「生成しない」という既定の挙動と同じなので通る。
+
+### 再生成コマンドの案内 (-summary-command)
+
+**この節が、案内の値 (既定・`-install-wrapper` での組み立て・空の扱い) の規則の正本。** 他の文書 (スキルの project-config.md など) はここを参照し、規則を再掲しない。
+
+**サマリの再生成手段はリポジトリごとに違う** (Makefile のターゲット・`-install-wrapper` で生成したラッパー・`go run` の直呼び) ため、このツールは特定のコマンド名を持たない。`-summary-command` に渡した文字列が次の 2 か所へ入る。
+
+- サマリが無い / 正本と食い違うときのエラー文 (「`<値>` で再生成する」)
+- 生成サマリ (`.md`) の 1 行目のコメント
+
+省略すると `triagecheck -write-summary` になる。**空文字や空白だけの指定はエラー** (再生成の手段を空欄で案内することになるため)。
+
+**`-install-wrapper` で生成したラッパーには、この値を焼き込む。** `-summary-command` を渡せばその文字列を、省略すれば `-current-dir` から見たラッパー自身の相対パス (`bin/review-triage-check -write-summary` など) を案内として焼き込む。**省略するなら `-current-dir` が要る** (無いとエラー)。実行時の叩き方 (`$0`) や絶対パスから組み立てないのは、この値がコミットされるため — 叩き方やマシンで 1 行目が変わると、同じコミットが検査する場所によって「正本と食い違う」と報告される。
+
+**この値は生成サマリの 1 行目としてコミットされる。** 変えると既存サマリが鮮度検査で「正本と食い違う」と報告されるので、`-write-summary` で再生成して吸収する。
 
 ### パスの渡し方
 
@@ -58,7 +74,7 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 | 相対パス + `-current-dir` | 基準と組み合わせて解決する |
 | 相対パス (基準なし) | **エラー** |
 | `-current-dir` が相対 / 実在しない | **エラー** |
-| `-current-dir` を渡したが全パスが絶対 | **エラー** (指定が効かないため) |
+| `-current-dir` を渡したが全パスが絶対 | **エラー** (指定が効かないため)。例外は `-install-wrapper` で `-summary-command` を省いたとき — 案内の基準として使われる |
 | 空のパス (空文字・空白だけ・不可視の文字だけ) を明示指定 | **エラー** (検査する場所を決められないため) |
 
 ```sh
@@ -99,7 +115,8 @@ REVIEW_TRIAGE_ROOT ?= $(shell ls -d $(PLUGIN_CACHE)/*/ 2>/dev/null | sort -V | t
 
 TRIAGECHECK = go run -C $(REVIEW_TRIAGE_ROOT)/tools/triagecheck . \
   -record-dir $(CURDIR)/docs/review-triages \
-  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md
+  -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md \
+  -summary-command "make triage-summary"
 
 .PHONY: triage-check
 triage-check: ## トリアージ記録を検査する
@@ -120,9 +137,10 @@ triage-summary: ## トリアージ記録から生成サマリを書き出す
 
 **リポジトリの Makefile に手を入れたくないとき、または個人的にインストールした
 プラグインをリポジトリのビルド定義に混ぜたくないときは、上の Makefile 例の
-代わりにラッパースクリプトを生成させる。** `-record-dir` と (指定していれば)
-`-judgment-flow` の値を、プラグインの展開先を都度解決するシェルスクリプトへ
-焼き込んで書き出す。
+代わりにラッパースクリプトを生成させる。** `-record-dir`・再生成コマンドの案内
+(`-summary-command`。省略時は `-current-dir` から見たラッパーの相対パス) と
+(指定していれば) `-judgment-flow` の値を、プラグインの展開先を都度解決する
+シェルスクリプトへ焼き込んで書き出す。
 
 ```sh
 # リポジトリのルートで一度だけ実行する。<path> はリポジトリ側の
@@ -230,7 +248,7 @@ go test ./...
 CLAUDE_PLUGIN_ROOT=/nonexistent-root go test ./...
 ```
 
-190 件 (部分テストを含む数。`go test -v ./... | grep -c 'PASS:'` で数える)。**テストを増減させたら、この行はこのコマンドで数え直す** — 記憶で書くと実測とずれる。
+件数は書かない — `go test -v ./... | grep -c 'PASS:'` で数える (部分テストを含む数)。数字を置くとテストを足すたびに古くなり、実測で 2 度ずれた。
 
 ## 依存
 

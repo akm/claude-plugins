@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,7 +10,7 @@ import (
 	"testing"
 )
 
-// run はパッケージ変数 (reviewTriageDir / judgmentFlowPath) を書き換えるので、
+// run はパッケージ変数 (reviewTriageDir / judgmentFlowPath / summaryCommand) を書き換えるので、
 // テストの間だけ退避して戻す。戻さないと後続のテストが前のテストの指定を引き継ぐ。
 //
 // あわせて、run が読む環境変数 CLAUDE_PLUGIN_ROOT をここでクリアする。run を呼ぶ
@@ -19,8 +20,8 @@ import (
 // 意図的に使うテストは、この関数の後で t.Setenv して上書きする。
 func withRunGlobals(t *testing.T) {
 	t.Helper()
-	dir, flow := reviewTriageDir, judgmentFlowPath
-	t.Cleanup(func() { reviewTriageDir, judgmentFlowPath = dir, flow })
+	dir, flow, cmd := reviewTriageDir, judgmentFlowPath, summaryCommand
+	t.Cleanup(func() { reviewTriageDir, judgmentFlowPath, summaryCommand = dir, flow, cmd })
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 }
 
@@ -431,7 +432,7 @@ func TestRunInstallWrapperOmittedJudgmentFlowUsesDefault(t *testing.T) {
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := run([]string{"-install-wrapper", out, "-record-dir", recDir}); err != nil {
+	if err := run([]string{"-install-wrapper", out, "-record-dir", recDir, "-summary-command", "bin/w -write-summary"}); err != nil {
 		t.Fatalf("-judgment-flow を省略した -install-wrapper が拒否された: %v", err)
 	}
 	script, err := os.ReadFile(out)
@@ -637,10 +638,12 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 		{"相対の -judgment-flow に基準が無い", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", "rel/flow.md"}, nil, "-current-dir"},
 		{"相対の -record-dir に基準が無い", []string{"-install-wrapper", out, "-record-dir", "docs/rt"}, nil, "-current-dir"},
 		{"相対の -install-wrapper に基準が無い", []string{"-install-wrapper", "bin/rtc", "-record-dir", recDir}, nil, "-current-dir"},
-		{"全パスが絶対なのに -current-dir がある", []string{"-install-wrapper", out, "-record-dir", recDir, "-current-dir", repo}, errCurrentDirUnused, ""},
-		{"-record-dir が不在", []string{"-install-wrapper", out, "-record-dir", filepath.Join(repo, "no-such")}, errPathMissing, ""},
-		{"-judgment-flow が不在 (綴りの誤り)", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", filepath.Join(repo, "floww.md")}, errPathMissing, ""},
-		{"-judgment-flow が空に展開された変数", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", "/skills/review-triage/references/judgment-flow.md"}, errPathMissing, ""},
+		{"全パスが絶対で案内も明示なのに -current-dir がある", []string{"-install-wrapper", out, "-record-dir", recDir, "-current-dir", repo, "-summary-command", "bin/rtc -write-summary"}, errCurrentDirUnused, ""},
+		{"全パスが絶対でも案内の組み立てに -current-dir を使う", []string{"-install-wrapper", out, "-record-dir", recDir, "-current-dir", repo, "-judgment-flow", flow}, nil, ""},
+		{"全パスが絶対で基準も案内も無い", []string{"-install-wrapper", out, "-record-dir", recDir}, errSummaryCommandNeedsBase, ""},
+		{"-record-dir が不在", []string{"-install-wrapper", out, "-record-dir", filepath.Join(repo, "no-such"), "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
+		{"-judgment-flow が不在 (綴りの誤り)", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", filepath.Join(repo, "floww.md"), "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
+		{"-judgment-flow が空に展開された変数", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", "/skills/review-triage/references/judgment-flow.md", "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
 		{"相対を -current-dir で解決して生成", []string{"-current-dir", repo, "-install-wrapper", "bin/rtc", "-record-dir", "docs/rt", "-judgment-flow", "flow.md"}, nil, ""},
 	}
 	for _, c := range cases {
@@ -661,10 +664,10 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 				got := string(script)
 				// 置き場はラッパーの位置からの相対、判定フローは利用者の基準で
 				// 解決した絶対パス (展開先の囮ではない)。
-				if !strings.Contains(got, `-record-dir "../docs/rt"`) {
+				if !strings.Contains(got, `-record-dir '../docs/rt'`) {
 					t.Errorf("-record-dir が script_dir 基準の相対で焼き込まれていない:\n%s", got)
 				}
-				if !strings.Contains(got, `-judgment-flow "`+flow+`"`) {
+				if !strings.Contains(got, `-judgment-flow '`+flow+`'`) {
 					t.Errorf("-judgment-flow が -current-dir 基準で解決されていない:\n%s", got)
 				}
 				return
@@ -694,7 +697,9 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 		t.Setenv("CLAUDE_PLUGIN_ROOT", plugin)
 		_ = os.Remove(out)
 		var err error
-		withWorkingDir(t, toolDir, func() { err = run([]string{"-install-wrapper", out, "-record-dir", recDir}) })
+		withWorkingDir(t, toolDir, func() {
+			err = run([]string{"-install-wrapper", out, "-record-dir", recDir, "-summary-command", "bin/w -write-summary"})
+		})
 		if !errors.Is(err, errPathMissing) {
 			t.Fatalf("環境変数が指す判定フローが無いのに拒否されなかった: %v", err)
 		}
@@ -704,7 +709,9 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(flowDir, "judgment-flow.md"), []byte("# 判定フロー\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		withWorkingDir(t, toolDir, func() { err = run([]string{"-install-wrapper", out, "-record-dir", recDir}) })
+		withWorkingDir(t, toolDir, func() {
+			err = run([]string{"-install-wrapper", out, "-record-dir", recDir, "-summary-command", "bin/w -write-summary"})
+		})
 		if err != nil {
 			t.Fatalf("環境変数が指す判定フローが実在するのに拒否された: %v", err)
 		}
@@ -732,11 +739,165 @@ func TestRunInstallWrapperAcceptsFalseWriteSummary(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "w")
 
 	withWorkingDir(t, toolDir, func() {
-		if err := run([]string{"-install-wrapper", out, "-record-dir", recs, "-write-summary=false"}); err != nil {
+		if err := run([]string{"-install-wrapper", out, "-record-dir", recs, "-write-summary=false", "-summary-command", "bin/w -write-summary"}); err != nil {
 			t.Fatalf("-write-summary=false で生成が拒否された: %v", err)
 		}
 	})
 	if _, err := os.Stat(out); err != nil {
 		t.Fatalf("ラッパーが書き出されていない: %v", err)
 	}
+}
+
+// -summary-command で渡した文字列が、生成サマリの 1 行目にそのまま入る。
+// 焼き込みを解いた目的そのもの — 利用側の実際の再生成手段を案内させること。
+func TestRunWriteSummaryUsesSummaryCommand(t *testing.T) {
+	withRunGlobals(t)
+	recs := realTempDir(t)
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const want = "bin/rtc -write-summary"
+	if err := run([]string{"-record-dir", recs, "-summary-command", want, "-write-summary"}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(recs, "x.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "`"+want+"`") {
+		t.Errorf("生成サマリに -summary-command の値が入っていない:\n%s", firstLine(string(got)))
+	}
+}
+
+// 検査の経路のエラー文も同じ値を使う。生成と検査で違う案内を出すと、
+// 「サマリを直す方法」が場所によって食い違う。
+func TestRunCheckReportsSummaryCommand(t *testing.T) {
+	withRunGlobals(t)
+	recs := realTempDir(t)
+	// サマリの無い記録を置くと「サマリがありません」が報告される。
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const want = "make triage-summary"
+	stderr := captureStderr(t, func() {
+		if err := run([]string{"-record-dir", recs, "-summary-command", want}); err == nil {
+			t.Fatal("サマリの不在が報告されなかった")
+		}
+	})
+	if !strings.Contains(stderr, "`"+want+"`") {
+		t.Errorf("報告に -summary-command の値が入っていない:\n%s", stderr)
+	}
+}
+
+// 既定は特定のリポジトリの事情を含まない一般的な文言。ここに具体的な
+// Makefile のターゲット名などを焼き込むと、その名前を持たない利用側で
+// 存在しないコマンドを案内することになる (Issue #36)。
+//
+// 見るのは定数であって可変の summaryCommand ではない。変数は run が書き換える
+// ので、先行するテストが残した値を既定と取り違えて、既定の回帰を見逃す
+// (または偽陽性で落ちる) ことがある。
+func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
+	if !strings.Contains(defaultSummaryCommand, "-write-summary") {
+		t.Errorf("既定の案内が -write-summary を示していない: %q", defaultSummaryCommand)
+	}
+	if strings.Contains(defaultSummaryCommand, "make ") {
+		t.Errorf("既定の案内に利用側固有の呼び出し方が焼き込まれている: %q", defaultSummaryCommand)
+	}
+}
+
+// 空 (空白・不可視だけ) の明示指定は弾く。通すと「再生成する手段は空欄です」と
+// 案内することになり、指定しないより悪い (パスを取るフラグと同じ規則)。
+func TestRunRejectsBlankSummaryCommand(t *testing.T) {
+	recs := realTempDir(t)
+	if err := os.WriteFile(filepath.Join(recs, "x.yaml"), []byte(validRecordYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, blank := range []string{"", "   ", "\u200b"} {
+		t.Run(fmt.Sprintf("%q", blank), func(t *testing.T) {
+			withRunGlobals(t)
+			err := run([]string{"-record-dir", recs, "-summary-command", blank, "-write-summary"})
+			if err == nil {
+				t.Fatal("空の -summary-command が通った")
+			}
+			if !errors.Is(err, errEmptySummaryCommand) {
+				t.Fatalf("空指定ではないエラーが返っている: %v", err)
+			}
+		})
+	}
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// -install-wrapper と -summary-command を併記したら、その値がラッパーに焼き込まれる。
+// 捨てると「指定したのに効かない」を作る (既存の -write-summary のガードが防ぐのと
+// 同じ型だが、こちらは両立する要求なので弾かずに効かせる)。
+func TestRunInstallWrapperEmbedsExplicitSummaryCommand(t *testing.T) {
+	toolDir := versionedToolDir(t)
+	recs := realTempDir(t)
+	out := filepath.Join(t.TempDir(), "w")
+	const want = "make triage-summary"
+	withRunGlobals(t)
+	withWorkingDir(t, toolDir, func() {
+		if err := run([]string{"-install-wrapper", out, "-record-dir", recs, "-summary-command", want}); err != nil {
+			t.Fatalf("run: %v", err)
+		}
+	})
+	script, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(script), "-summary-command '"+want+"'") {
+		t.Errorf("ラッパーに -summary-command の値が焼き込まれていない:\n%s", script)
+	}
+	if strings.Contains(string(script), "$0 -write-summary") {
+		t.Errorf("ラッパーがまだ実行時の $0 から案内を組み立てている:\n%s", script)
+	}
+}
+
+// -summary-command を省いたら、-current-dir から見たラッパーの相対パスで案内を
+// 組み立てる。区切りを含まない (ルート直下) ときだけ ./ を前置する。
+func TestRunInstallWrapperDefaultSummaryCommandIsRepoRelative(t *testing.T) {
+	toolDir := versionedToolDir(t)
+	repo := realTempDir(t)
+	recs := filepath.Join(repo, "docs", "rt")
+	if err := os.MkdirAll(recs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ wrapper, want string }{
+		{"bin/rtc", "'bin/rtc -write-summary'"},
+		{"rtc", "'./rtc -write-summary'"},
+	} {
+		t.Run(c.wrapper, func(t *testing.T) {
+			withRunGlobals(t)
+			out := filepath.Join(repo, c.wrapper)
+			withWorkingDir(t, toolDir, func() {
+				if err := run([]string{"-current-dir", repo, "-install-wrapper", out, "-record-dir", recs}); err != nil {
+					t.Fatalf("run: %v", err)
+				}
+			})
+			script, err := os.ReadFile(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(script), "-summary-command "+c.want) {
+				t.Errorf("案内が %s になっていない:\n%s", c.want, script)
+			}
+		})
+	}
+}
+
+// versionedToolDir は installWrapper が要求する <版>/tools/triagecheck の形の
+// ディレクトリを一時領域に作って返す (pluginCacheDir が実行位置から逆算するため)。
+func versionedToolDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(realTempDir(t), "cache", "review-triage", "0.0.1", "tools", "triagecheck")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }

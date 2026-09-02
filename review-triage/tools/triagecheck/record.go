@@ -32,6 +32,25 @@ import (
 // path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
 var reviewTriageDir = "docs/review-triages/"
 
+// summaryCommand はサマリの再生成手段を利用者へ案内するときに使う文字列。
+// エラーの文言と、生成サマリの 1 行目に埋まる。
+//
+// 再生成の手段はリポジトリごとに違う (Makefile のターゲット・-install-wrapper で
+// 生成したラッパー・go run の直呼び) ので、特定のコマンド名を焼き込まない。
+// 既定は「このツール自身をどう呼んでいるかに依らない」一般的な言い方にして、
+// -summary-command で利用側の実際の呼び出し方を渡せるようにする
+// (-install-wrapper 経由なら、生成時にラッパー自身のリポジトリ相対パスを
+// 案内として焼き込む。値の決め方は resolveInputs)。
+//
+// この値は生成サマリの 1 行目としてコミットされるため、変えると既存サマリの
+// 鮮度検査に差分が出る。再生成で吸収する。
+//
+// 既定値は定数に分ける。テストが既定を検査するとき、run が書き換えた後の
+// 変数ではなく定数を読めるようにするため。
+const defaultSummaryCommand = "triagecheck -write-summary"
+
+var summaryCommand = defaultSummaryCommand
+
 // inReviewTriageDir は f が記録の置き場の直下にあるかを返す。
 //
 // 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧側 (listReviewTriageFiles)
@@ -182,7 +201,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 		mdPath := stem + ".md"
 		if !fileSet[mdPath] {
 			problems = append(problems, fmt.Sprintf(
-				"%s: サマリ %s がありません (`make docs-review-triage-summary` で生成してコミットする)", yf, mdPath))
+				"%s: サマリ %s がありません (`%s` で生成してコミットする)", yf, mdPath, summaryCommand))
 			continue
 		}
 		if len(ps) > 0 || doc == nil {
@@ -196,7 +215,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 		}
 		if string(got) != want {
 			problems = append(problems, fmt.Sprintf(
-				"%s: サマリが正本 (%s) と食い違っています (`make docs-review-triage-summary` で再生成する)", mdPath, yf))
+				"%s: サマリが正本 (%s) と食い違っています (`%s` で再生成する)", mdPath, yf, summaryCommand))
 		}
 	}
 
@@ -603,7 +622,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	base := path.Base(yamlPath)
 	stem := strings.TrimSuffix(base, ".yaml")
 	var b strings.Builder
-	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。正本は %s — `make docs-review-triage-summary` で再生成する。 -->\n\n", base)
+	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。正本は %s — `%s` で再生成する。 -->\n\n", base, summaryCommand)
 	fmt.Fprintf(&b, "# %s のトリアージ記録\n\n", stem)
 	fmt.Fprintf(&b, "正本は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
 
@@ -843,7 +862,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 }
 
 // writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
-// (`make docs-review-triage-summary`)。explicit は listReviewTriageFiles と同じ意味 —
+// (-write-summary の経路)。explicit は listReviewTriageFiles と同じ意味 —
 // 明示指定した置き場が無いなら、0 件生成して黙って成功させない。
 func writeReviewTriageSummaries(dir string, explicit bool) error {
 	files, err := listReviewTriageFiles(dir, explicit)

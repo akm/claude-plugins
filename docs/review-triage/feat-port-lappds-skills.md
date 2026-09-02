@@ -1,4 +1,4 @@
-<!-- 生成物。手で編集しない。正本は feat-port-lappds-skills.yaml — `make docs-review-triage-summary` で再生成する。 -->
+<!-- 生成物。手で編集しない。正本は feat-port-lappds-skills.yaml — `triagecheck -write-summary` で再生成する。 -->
 
 # feat-port-lappds-skills のトリアージ記録
 
