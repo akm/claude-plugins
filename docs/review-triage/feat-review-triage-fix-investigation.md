@@ -9,6 +9,7 @@
 | 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 2026-09-03 | `code-review` | `opus-5` | full | 3 | 2 | 0 | 1 |
+| 2 | 2026-09-03 | `code-review` | `opus-5` | incremental | 1 | 1 | 0 | 0 |
 
 ## 回 1: 2026-09-03 `code-review`
 
@@ -34,3 +35,15 @@
 ### 観察
 
 このブランチの初回トリアージ (Issue #38 の対応。full、main 08479a1..64fa3b2)。 別セッションのレビュー結果を tmp/review-code-review-opus-5-6th.yaml で受領した。 head は現在の HEAD と一致し、レビュー前後で HEAD と作業ツリーが不変であることを レビュア側の報告と自分の git status で確認した。 プロジェクト設定 (.claude/akm-claude-plugins/review-triage/config.json) が 無いため、記録の置き場は既存の docs/review-triage/ に合わせ、 triage_summary_command / triage_check_command は未設定として扱い、 サマリ生成と検査は tools/triagecheck を go run で直接叩いた。 関門の一覧 (gates) も無いので免除条項は使っていない (今回は対象の指摘も無い)。 residual 5 件のうち記録に残す価値があるもの: (a) investigation.md の「後ろ向きの調査」の表と verification.md の型 B / D / E の 対象が部分的に重なる。Issue #38 は型 G として足さないと決めており、重なりは 「調査で範囲に入れる対象」と「コミット前に読み直す対象」が同じものを指す構造 によるもの。doc-dag で見る対象。 (b) status: awaiting-human の問題にも investigation を書けるが、書くべきかを スキーマも SKILL.md も述べていない。手順 4 は手順 5 より前なので書けるのが自然。 規則としては未定義のまま残す — 実装しない問題の調査結果が要るかは運用で見る。 (c) renderInvestigation の要素の区切り「; 」は要素自身が「; 」を含むと境目が 読めない。箇条書きの行で表のセルではないので、読みにくさに留まる。 (d) triagecheck README の検査項目の列に investigation.scope の必須検査が明示 されないが「必須キー」に含まれる粒度なので追随漏れとはしない。
+
+## 回 2: 2026-09-03 `code-review`
+
+- HEAD `08cf572` / model `opus-5` / scope incremental
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `review-triage/skills/review-triage-fix/references/investigation.md:3` P2 が 5 行目の検証のフェーズを「書いている最中 (A・C・F) とコミット前 (B・D・E)」に 直したが、2 行上の 3 行目に残る「コミット前の検証は verification.md が持つ」を 追随させず、同一ファイル内で verification.md の守備範囲が 2 通りに書かれている | skill / operator | 利用者 (とスキルを実行するエージェント) が investigation.md の冒頭だけを読んで、verification.md の守備範囲を把握しようとするとき / verification.md をコミット前だけの文書と読み、書いている最中に当てる型 A (scope は実行してから書く) を手順 4 の最中に当てず、コミット前まで持ち越す。 前回の指摘 1 が直したはずの読み違いが、直した 2 行上に残る / 気づかない — 文の矛盾を捕まえる機械検査は無く、5 行目を読めば正しい方が分かるが 3 行目を訂正する仕組みは無い | A: verified | — | **採択** — A2。段 A: HEAD 08cf572 の investigation.md:3 と :5 を逐語で読み比べ、指摘どおり 3 行目が「コミット前の検証」と紹介し、5 行目が「書いている最中とコミット前」と 述べているのを確認した。P2 の調査で自分が実行した「コミット前」の grep の出力に 3 行目が含まれていたことも確認した — 範囲の外ではなく読み落とし (型 B の 「節全体を読み直す」を冒頭の包括文に当てなかった)。 全 4 ゲートを評価して発火 0 件 — hypothetical: 読めば再現する。 developer-domain: スキル文書で利用者に届く。disproportionate-cost: 修正は 1 句の書き換え。already-visible: 文の矛盾を検出する関門は無い。 免除条項は対象外 |
+
+### 観察
+
+2 回目 (増分 64fa3b2..08cf572、別セッションのレビュー結果を tmp/review-code-review-opus-5-7th.yaml で受領)。head は現在の HEAD と一致し、 レビュー前後で HEAD と作業ツリーが不変であることを確認した。 指摘 1 件は P2 の修正の 2 行上に残った同型の記述で、修正した節 (冒頭) の全体を 読み直さなかった型 B の取りこぼし。P2 の investigation.scope の grep には 掛かっていたので、調査の範囲ではなく読み方の問題。 residual 7 件のうち記録に残す価値があるもの: (a) 「特に見てほしい点」1・2・4 はレビュア側の実測で問題なし — consequence / premise_check の null は既存の検査だけが報告し新検査と重ならない、attrs / gates_fired / depends_on の null は「無ければ省略」の意味どおり、08cf572 で足した リンクとアンカーはすべて実在。 (b) record-schema.md:61 → grouping.md の辺で、ファイル単位では grouping.md:30 → record-schema.md と相互参照になるが、節単位では別の節どうしなので DAG 条件は 破らない (doc-dag の結果と一致)。 (c) record.go:8・64 のコメントが正本を存在しない docs/review-triages/README.md と 指す取り残しは、P1 の excluded のとおり今回は含めない。
