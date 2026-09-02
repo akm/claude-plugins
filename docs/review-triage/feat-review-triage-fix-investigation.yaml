@@ -261,7 +261,8 @@ runs:
             - "committing.md:37 は「コミット前にかかるもの (B・D・E)」と正本どおりに絞っており直す必要が無い"
             - "トリアージ記録 YAML の逐語引用は過去の回として書き換えない"
         order: 1
-        status: pending
+        status: done
+        sha: f0d3cf4
     notes: >-
       2 回目 (増分 64fa3b2..08cf572、別セッションのレビュー結果を
       tmp/review-code-review-opus-5-7th.yaml で受領)。head は現在の HEAD と一致し、
