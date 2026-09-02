@@ -41,7 +41,7 @@
 }
 ```
 
-**`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は `project-config.md` の「`gates` — なぜ関門の一覧が要るか」を参照してください。
+**`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
 別に、指摘の分類と被害者を宣言する `.claude/review-triage.yaml` が要ります。`review-triage --gen-config` が雛形を生成します (様式の正本は [config-schema.md](skills/review-triage/references/config-schema.md))。
 
@@ -54,7 +54,7 @@
 
 ## 文中の例について
 
-`references/gate-examples.md` のファイルパスと関門名は、このスキルが生まれた lappds という Go のリポジトリのものです。**自分のリポジトリで使うときは、関門の名前を自分のリポジトリの実在するものに読み替えてください。**
+[gate-examples.md](skills/review-triage/references/gate-examples.md) のファイルパスと関門名は、このスキルが生まれた lappds という Go のリポジトリのものです。**自分のリポジトリで使うときは、関門の名前を自分のリポジトリの実在するものに読み替えてください。**
 
 ## 使い方
 

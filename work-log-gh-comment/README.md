@@ -23,7 +23,7 @@
 
 ## 何が保証されるか
 
-前の 2 つは SKILL.md の「記録するもの」、後の 2 つは `references/sensitive-data.md` の「どう伏せるか」が正本です。
+前の 2 つは [SKILL.md](skills/work-log-gh-comment/SKILL.md) の「記録するもの」、後の 2 つは [sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) の「どう伏せるか」が正本です。
 
 - **失敗したコマンドと、人間に代行を依頼したコマンドを省かない。** 試行錯誤の経路そのものが、次に同じ作業をする人への情報になります。
 - **出力の中の食い違いを、解釈で均さない。** 「サマリは `3 errors` なのに `ERROR` 行が 2 行しかない」「終了コードは 0 なのに本文は失敗している」— こうした矛盾は、要約すると消えます。
@@ -53,7 +53,7 @@ python3 と make だけで動きます。
 
 ## 文中の例について
 
-`references/format.md` と `references/sensitive-data.md` の例は、lappds という配信基盤の実際の作業記録から採っています (断りの正本は `format.md` の冒頭)。**コマンドやリソース名はその題材のものなので、形と使い分けだけを読んでください。**
+[format.md](skills/work-log-gh-comment/references/format.md) と [sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) の例は、lappds という配信基盤の実際の作業記録から採っています (断りの正本は [format.md](skills/work-log-gh-comment/references/format.md) の冒頭)。**コマンドやリソース名はその題材のものなので、形と使い分けだけを読んでください。**
 
 抽象的な例に置き換えていないのは、実際の出力にしか現れない食い違いこそが、この書式の扱う対象だからです。
 

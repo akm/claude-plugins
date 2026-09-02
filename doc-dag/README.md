@@ -27,7 +27,7 @@ claude plugin install mermaid-preview@akm-claude-plugins
 claude plugin install doc-dag@akm-claude-plugins
 ```
 
-`mermaid-preview` が無くても調査と図のソース生成までは動きますが、ブラウザでの提示はできません (無いときの振る舞いは SKILL.md の手順 3 が定めます)。
+`mermaid-preview` が無くても調査と図のソース生成までは動きますが、ブラウザでの提示はできません (無いときの振る舞いは [SKILL.md](skills/doc-dag/SKILL.md) の手順 3 が定めます)。
 
 ## プロジェクト固有の設定 (任意)
 
@@ -43,7 +43,7 @@ claude plugin install doc-dag@akm-claude-plugins
 - `frozen_paths` — 当時の記録として書き換えない文書のパス接頭辞。重複の片側がここにある場合、書き換えずに済む解消案を人間に提案します。
 - `doc_check_command` — 修正後に走らせるドキュメント検査。このスキルの修正はリンクの張り替えを伴うため、**リンク切れの検査があると安全**です。未設定の場合、検査を走らせていないことを報告に明記します。
 
-詳細は同梱の `references/project-config.md` を参照してください。
+詳細は同梱の [project-config.md](skills/doc-dag/references/project-config.md) を参照してください。
 
 ## 使い方
 
