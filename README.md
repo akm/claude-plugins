@@ -153,6 +153,10 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 
 プラグインは 2 つの型があります。**hooks 型**は Claude Code の動作に自動で割り込むもの、**skill 型**は依頼に応じて呼び出されるものです。skill 型はプラグイン直下の `skills/<スキル名>/SKILL.md` に置きます。1 つのプラグインが複数の skill を持つこともあります (`review-triage`)。
 
+## 文書の書き方
+
+このリポジトリの文書を書く・直すときの規則は [CLAUDE.md](CLAUDE.md) にあります。Claude Code はこのファイルを自動で読みます。
+
 ## プロジェクト固有の設定
 
 いくつかのプラグインは、リポジトリごとに違う値を `.claude/akm-claude-plugins/<プラグイン名>/config.json` から読みます。**プラグインは共通の規則を持ち、リポジトリ固有の宣言だけを設定に置く**という分け方です。
