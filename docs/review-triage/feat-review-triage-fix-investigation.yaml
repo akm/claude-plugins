@@ -149,7 +149,8 @@ runs:
             - "スライス (included / excluded / gates_fired / depends_on / plans / findings) の null: 空と同義でスキーマも「無ければ省略」としている"
             - "record.go:8・64 のコメントが正本を docs/review-triages/README.md と指す取り残し: 移植時の別原因なので含めない"
         order: 1
-        status: pending
+        status: done
+        sha: 6126c54
       - problem_id: P2
         cause: >-
           Issue #38 の「型 A〜F はコミット前の検査」という文を、正本 verification.md
@@ -170,7 +171,8 @@ runs:
             - "investigation.md:63 と record-schema.md の scope 行 (型 A を書く時点で当てる) は正本と整合しており直さない"
             - "トリアージ記録 YAML の逐語引用: 過去の回の記録は書き換えない"
         order: 2
-        status: pending
+        status: done
+        sha: aec403f
     notes: >-
       このブランチの初回トリアージ (Issue #38 の対応。full、main 08479a1..64fa3b2)。
       別セッションのレビュー結果を tmp/review-code-review-opus-5-6th.yaml で受領した。
