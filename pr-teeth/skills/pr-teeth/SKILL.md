@@ -40,7 +40,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare \
 - `config_dir` … 設定ディレクトリ
 - `default_language` … 通知の地の文と HTML の `lang` に使う言語
 - `warnings` … 設定ファイルが壊れている等。**あれば最終出力の冒頭に必ず載せる**
-  （知らせずに既定値で動くと、設定したのに効いていないことに気づけない）
+  （知らせずに既定値で動くと、設定したのに適用されていないことに気づけない）
 - `token_source` … 見つかった認証の入手元。`null` なら**その旨だけ伝えて終了する**
   （`GITHUB_TOKEN` → `GITHUB_TOKEN_FILE` → `gh auth token` の順に探した結果。
   探索や回避を自分で試みない）
