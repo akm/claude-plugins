@@ -54,7 +54,7 @@
 
 ## 従来の目安との関係
 
-「採択が同じファイルの同じ関数 (または同じ節) を指す回が 2 回続いたら、次の修正の前に表を書く」という目安は、以前は record-schema.md の「生成サマリの読み方」にあったが、この文書の補助の条件に統合した。表 (行を規則、列を分岐、必要なら第 3 の軸を入力の種類にして、どのマスが埋まりどのマスが空いているかを書き出したもの) を書く作業は `review-triage-fix` の俯瞰が担う ([reframing.md](../../review-triage-fix/references/reframing.md))。指摘 1 件を 1 マスとして埋めると表が埋まるまで同じ型の指摘が続くことの実例は、`docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md` の「経路ごとに規則を書くと収束しない」。
+「採択が同じファイルの同じ関数 (または同じ節) を指す回が 2 回続いたら、次の修正の前に表を書く」という目安は、以前は record-schema.md の「生成サマリの読み方」にあったが、この文書の補助の条件に統合した。表を書く作業は `review-triage-fix` の俯瞰の第 2 段が担い、表の形もそちらが正本 ([reframing.md](../../review-triage-fix/references/reframing.md))。指摘 1 件を 1 マスとして埋めると表が埋まるまで同じ型の指摘が続くことの実例は、`docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md` の「経路ごとに規則を書くと収束しない」。
 
 ## 実例: 17 回の記録の回 3
 
