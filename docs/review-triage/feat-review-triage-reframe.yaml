@@ -127,7 +127,7 @@ runs:
           無い回でも根拠を書ける。欠点: 「原因が直前の回の修正作業にある」という修正由来の
           定義に対し、修正計画ではなく採択を根拠にした検知が通り、監査経路が一段弱くなる。
           検査の分岐とテストが増える
-        sha: e0d44ba
+        sha: 061f26b
         status: done
       - problem_id: P2
         cause: >-
@@ -150,7 +150,7 @@ runs:
             - "README.md:16 — 「人間と確かめてから」と条件を含む描写で、無条件ではない"
             - "recurrence-detection.md:57 — 従来の目安の引用で、表を書く作業を俯瞰に委ねる文。無条件の捉え直しを述べていない"
             - "CONCEPTS.md の参照元 4 箇所 — 用語の定義そのものは変えないので追随は不要"
-        sha: c2ec35f
+        sha: 1fc8b17
         status: done
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 全量) で、報告のみで走った
@@ -238,7 +238,7 @@ runs:
             - "record.go:715 の isReframe — plans を見ない現状が文書の意図と一致するので変えない"
             - "record-schema.md:120・reframing.md:19 — 既に『reframed なら捉え直し』と書いており追随不要"
             - "reframing.md:79 — reframed かつ plans 未記入を途中状態として生む文だが、それ自体は正しい。L39 の例外がこの状態を同じ語で指すようにする"
-        sha: 73d9580
+        sha: 061f26b
         status: done
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 増分 cbca585..3e548d4) で、
@@ -343,7 +343,7 @@ runs:
             - "捉え直し後の節の「declined なら通常の行」 — 新しい定義でも成り立つので変えない"
             - "reframing.md「対象の選び方」・record-schema.md の状態の行 — 状態の定義そのものの列挙で、同じ原因ではない"
             - "record.go・record_test.go — 照らし先の選択は検査の対象外で変更不要。residual のテストのコメントの位置ずれは別の整理として残す"
-        sha: 28be99e
+        sha: 061f26b
         status: done
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 増分 3e548d4..faa30bf) で、
