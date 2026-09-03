@@ -1513,6 +1513,60 @@ func recurrenceReframedThenRecordYAML(recurrence string) string {
 
 // fix-derived の prior は、比べた回の plans の問題の識別子か、比べた回が
 // reframed のときの「捉え直し」のどちらか。
+// 捉え直し済み (reframed) の回に plans がまだ無くても、次の回の fix-derived の根拠は
+// prior: 捉え直し で通る — recurrence-detection.md「直前の回の状態と主の条件」の
+// 捉え直し済みの行 (plans の有無を問わない) を固定する。実装済みの挙動の回帰テスト。
+// reframing.md の「記録に書いてから束ねに進む」の直後は、この状態が普通に起きる。
+func TestReviewTriageRecordRecurrencePriorReframedWithoutPlans(t *testing.T) {
+	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
+		"      evidence:\n" +
+		"        - condition: fix-derived\n" +
+		"          finding_id: 1\n" +
+		"          prior_run: 2\n" +
+		"          prior: 捉え直し\n" +
+		"          reason: 回 2 の捉え直しで寄せた規則を別の表に当て忘れた\n")
+	// 回 2 の plans を外す。回 2 の採択は最後の回ではないので、回 3 の問題で覆う。
+	plans := "    plans:\n" +
+		"      - problem_id: P2\n" +
+		"        cause: 表の外に規則が無い\n" +
+		"        finding_ids: [1]\n" +
+		"        approach: 規則を 1 か所に書く\n" +
+		"        order: 1\n" +
+		"        sha: \"\"\n" +
+		"        status: pending\n"
+	if !strings.Contains(yamlSrc, plans) {
+		t.Fatal("fixture に回 2 の plans が見つからない (fixture が変わった)")
+	}
+	yamlSrc = strings.Replace(yamlSrc, plans, "", 1)
+	// 回 2 の指摘 1 に plan_ref を足す。同じ文面の指摘は回 1 (validRecordYAML) にもあるので、
+	// 回 2 の recurrence より前で最後に現れる箇所を選ぶ。
+	marker := "        verdict_reason: ゲート 0 件で採択 (A2)\n      - id: 2\n"
+	recIdx := strings.Index(yamlSrc, "    recurrence:\n      status: reframed")
+	if recIdx < 0 {
+		t.Fatal("fixture に回 2 の recurrence が見つからない (fixture が変わった)")
+	}
+	head := yamlSrc[:recIdx]
+	mIdx := strings.LastIndex(head, marker)
+	if mIdx < 0 {
+		t.Fatal("fixture に回 2 の指摘 1 の終わりが見つからない (fixture が変わった)")
+	}
+	yamlSrc = head[:mIdx] +
+		"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n          run: 3\n          problem: P3\n      - id: 2\n" +
+		head[mIdx+len(marker):] + yamlSrc[recIdx:]
+	yamlSrc += "    plans:\n" +
+		"      - problem_id: P3\n" +
+		"        cause: 表の外に規則が無い (回 2 の指摘 1 も同じ原因で束ねる)\n" +
+		"        finding_ids: [1]\n" +
+		"        approach: 規則を 1 か所に書き、回 2 の指摘 1 もここで直す\n" +
+		"        order: 1\n" +
+		"        sha: \"\"\n" +
+		"        status: pending\n"
+	files, read := recordFiles(t, yamlSrc)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("plans の無い捉え直し済みの回を指す prior 捉え直し で問題が出た: %v", problems)
+	}
+}
+
 func TestReviewTriageRecordRecurrencePriorReframed(t *testing.T) {
 	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
 		"      evidence:\n" +

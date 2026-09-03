@@ -16,7 +16,7 @@
 
 ### 図
 
-回ごとの「指摘 → 修正計画 → 次の回の指摘」を辺でつないだ図を出す。**根拠 (`recurrence.evidence`) の 1 件を 1 本の辺にする** — `prior_run` の `prior` (問題の識別子、採択、または捉え直し) から、今回の `finding_id` の指摘へ引く。節点は次のとおりに書く。
+回ごとの「指摘 → 修正計画 → 次の回の指摘」を辺でつないだ図を出す。**根拠 (`recurrence.evidence`) の 1 件を 1 本の辺にする** — `prior_run` の `prior` (修正由来なら問題の識別子か捉え直し、同じ場所なら採択。書き分けの正本は [recurrence-detection.md](../../review-triage/references/recurrence-detection.md)) から、今回の `finding_id` の指摘へ引く。節点は次のとおりに書く。
 
 | 節点 | 書くもの | 出どころ |
 | --- | --- | --- |

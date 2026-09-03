@@ -117,7 +117,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `condition` | ✓ | 発火した条件。`fix-derived` (修正由来の指摘が続いた) / `same-location` (同じ場所への採択が続いた) |
 | `finding_id` | ✓ | 今回の採択の `id`。同じ回の `verdict: adopted` の指摘だけを指せる (機械検査が保証する) |
 | `prior_run` | ✓ | 比べた過去の回の番号 (同じファイル内の 1 始まりの回番号)。1 以上かつ自回より小さいこと |
-| `prior` | ✓ | 比べた先。問題の識別子 (例: `P6`)、採択を指す文字列 (例: `指摘 3`)、直前の回の捉え直しを指す文字列 (`捉え直し`) のいずれか。どれを書くかの正本は [recurrence-detection.md](recurrence-detection.md) の「発火したときに記録に書くもの」 |
+| `prior` | ✓ | 比べた先。`condition` で形が決まる — `fix-derived` なら比べた回の問題の識別子 (例: `P6`) か、比べた回が `reframed` のときの `捉え直し` (機械検査が照合する)。`same-location` なら採択を指す文字列 (例: `指摘 3`)。書き分けの正本は [recurrence-detection.md](recurrence-detection.md) の「発火したときに記録に書くもの」 |
 | `reason` | ✓ | なぜ同じ型と読んだかの 1 文 |
 
 ### 捉え直し (`recurrence.reframe`)
