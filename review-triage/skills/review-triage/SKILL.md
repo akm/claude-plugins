@@ -15,6 +15,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 - **別セッションでレビューを走らせて結果をファイルで受け取る場合、依頼文と受け渡し様式の正本は [references/review-request.md](references/review-request.md)。** 検証の前払い (evidence の必須化) と報告しない条件を依頼文に入れるほど、判定のコストが下がる。
 - **レビューの範囲は、最初の全量の後は増分にする** (規則の正本は [references/review-request.md](references/review-request.md) の「範囲の規則」)。どのモデル・範囲で走らせたかは記録の `model` / `scope` に必ず残し、粒度の違いを後から比較できるようにする。モデルの使い分けの運用ガイドは [記録 README の収束の目安](references/record-schema.md#生成サマリの読み方)。
 - **却下ゲートは仮説である** ([references/rejection-gates.md](references/rejection-gates.md))。記録を取り、どのゲートが機能しているかを後から確かめる。
+- **同じ型の指摘が続いているか (検知) は、判定の後に直前の回と照らして判断する。** 条件と根拠の書き方の正本は [references/recurrence-detection.md](references/recurrence-detection.md)。検知の後に図で構造を確かめる作業 (俯瞰) は `review-triage-fix` の冒頭が担い、このスキルは検知の事実を記録と報告に残すまでで止まる。
 - **規範文書に実測値を書かない。** 件数・比率などの実測は記録 ([スキーマ](references/record-schema.md)) だけが持ち、必要なときにそこから数える。
 
 ## 手順
@@ -32,10 +33,11 @@ description: code-review や ce-code-review が出したレビュー指摘を一
    - 帰結の 4 項目 (D3 で書くもの) は**全件に書く** — D1・D2 で決着した指摘にも記録の材料として残す。
    - 評価 (E1・E2) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
    - 境目が判断しづらいときは [references/gate-examples.md](references/gate-examples.md) の対になった例と突き合わせる。
-4. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。
-5. **サマリの再生成**: 設定の `triage_summary_command` でサマリを再生成し、`triage_check_command` の検査が通ることを確かめる ([references/project-config.md](references/project-config.md))。**どちらも未設定なら、走らせていないことを報告に書く。**
-6. **コミット**: 記録 YAML の追記を単独でコミットし、生成サマリを別のコミットにする (規範の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
-7. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。**勝手に呼ばない** — 直すかどうかは人間が決める。
+4. **検知**: 今回の採択を [references/recurrence-detection.md](references/recurrence-detection.md) に従って直前の回と照らし、同じ型の指摘が続いているかを判断する。発火したら、手順 5 の追記に `recurrence` (`status: detected`) を含める。過去の回が無い記録では判断しない。
+5. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。
+6. **サマリの再生成**: 設定の `triage_summary_command` でサマリを再生成し、`triage_check_command` の検査が通ることを確かめる ([references/project-config.md](references/project-config.md))。**どちらも未設定なら、走らせていないことを報告に書く。**
+7. **コミット**: 記録 YAML の追記を単独でコミットし、生成サマリを別のコミットにする (規範の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
+8. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。検知があれば、その条件と根拠を出し、俯瞰 (`review-triage-fix` の冒頭) を案内する (報告の形の正本は [references/recurrence-detection.md](references/recurrence-detection.md))。**勝手に呼ばない** — 直すかどうか、俯瞰に進むかどうかは人間が決める。
 
 ## 原則
 
