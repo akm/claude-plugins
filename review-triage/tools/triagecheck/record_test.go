@@ -1430,6 +1430,13 @@ func TestReviewTriageRecordRecurrenceViolations(t *testing.T) {
 			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: claude\n", "source"},
 		{"detected なのに reframe がある", "      status: detected\n" + recurrenceEvidenceYAML +
 			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: human\n", "reframe"},
+		{"declined なのに reframe がある", "      status: declined\n" + recurrenceEvidenceYAML +
+			"      declined_reason: 回 1 の指摘は元から残っていた欠陥で、修正由来ではない\n" +
+			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: human\n", "reframe"},
+		{"fix-derived の prior が比べた回の plans に無い", "      status: detected\n" +
+			strings.Replace(recurrenceEvidenceYAML, "prior: P1", "prior: P9", 1), "plans"},
+		{"fix-derived の prior が捉え直しなのに比べた回は reframed でない", "      status: detected\n" +
+			strings.Replace(recurrenceEvidenceYAML, "prior: P1", "prior: 捉え直し", 1), "plans"},
 		{"recurrence の未知のキー", "      status: detected\n" + recurrenceEvidenceYAML + "      fired: true\n", "fired"},
 		{"evidence の未知のキー", "      status: detected\n" +
 			strings.Replace(recurrenceEvidenceYAML, "          prior: P1\n", "          prior: P1\n          where: docs/foo.md\n", 1), "where"},
@@ -1452,6 +1459,71 @@ func TestReviewTriageRecordRecurrenceViolations(t *testing.T) {
 				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
 			}
 		})
+	}
+}
+
+// recurrenceReframedThenRecordYAML は recurrenceRecordYAML の回 2 を reframed にして
+// 回 3 を足し、回 3 の recurrence に引数を置いた記録を返す。fix-derived の prior が
+// 「捉え直し」を指せるのは、比べた回が捉え直し済み (reframed) のときだけなので、
+// その形を書くには捉え直した回とそれを比べる回の 2 つが要る。回 2 は最後の回で
+// なくなるので、採択 (指摘 1) を覆う plans も足す。
+func recurrenceReframedThenRecordYAML(recurrence string) string {
+	run2 := recurrenceRecordYAML("      status: reframed\n" + recurrenceEvidenceYAML +
+		"      reframe:\n" +
+		"        pattern: 表の行ごとに規則を当てている\n" +
+		"        axes: 規則 × 表の行\n" +
+		"        root_cause: 数え方の規則が表の外に無い\n" +
+		"        fix_unit: 数え方の規則を 1 か所に書き、表の全行をそこから引く\n" +
+		"        source: human\n")
+	run2 += `    plans:
+      - problem_id: P2
+        cause: 表の外に規則が無い
+        finding_ids: [1]
+        approach: 規則を 1 か所に書く
+        order: 1
+        sha: ""
+        status: pending
+`
+	run3 := `  - date: "2026-09-01"
+    skill: code-review
+    model: sonnet-5
+    scope: incremental
+    head: 0123abc
+    findings:
+      - id: 1
+        file: docs/foo.md
+        line: 30
+        summary: 規則を 1 か所に寄せた後も別の表が旧規則のまま
+        category: doc-other
+        audience: developer
+        consequence:
+          condition: 検算するとき
+          who: developer
+          what: 分母を誤る
+          detectability: 気づかない
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: ゲート 0 件で採択 (A2)
+    recurrence:
+` + recurrence
+	return run2 + run3
+}
+
+// fix-derived の prior は、比べた回の plans の問題の識別子か、比べた回が
+// reframed のときの「捉え直し」のどちらか。
+func TestReviewTriageRecordRecurrencePriorReframed(t *testing.T) {
+	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
+		"      evidence:\n" +
+		"        - condition: fix-derived\n" +
+		"          finding_id: 1\n" +
+		"          prior_run: 2\n" +
+		"          prior: 捉え直し\n" +
+		"          reason: 回 2 の捉え直しで寄せた規則を別の表に当て忘れた\n")
+	files, read := recordFiles(t, yamlSrc)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("捉え直し済みの回を指す prior 捉え直し で問題が出た: %v", problems)
 	}
 }
 

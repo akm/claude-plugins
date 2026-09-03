@@ -649,7 +649,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 		}
 		if rec := run.Recurrence; rec != nil {
-			problems = append(problems, recordRecurrenceProblems(f, ri, rec, verdictByID)...)
+			problems = append(problems, recordRecurrenceProblems(f, ri, rec, verdictByID, doc.Runs, plansByRun)...)
 		}
 		for _, cycle := range recordDependsOnCycles(run.Plans) {
 			add("%s: depends_on が循環しています (%s)。順序が定まらない — 同じ原因の 1 問題に束ねるべきものを分けていないかを疑う",
@@ -660,14 +660,16 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 }
 
 // recordRecurrenceProblems は runs[ri].recurrence の形を検査する。ri は 0 始まりの
-// 添字で、記録上の回番号は ri+1。verdictByID は同じ回の指摘 id → verdict。
+// 添字で、記録上の回番号は ri+1。verdictByID は同じ回の指摘 id → verdict。runs と
+// plansByRun (回ごとの問題 id の集合) は、根拠の prior が比べた回に実在するかを
+// 照らすのに使う。
 //
 // status ごとに専用のキーの有無を検査する。declined の理由と reframed の捉え直しは
 // 状態遷移の証拠なので、状態と食い違う記録 (detected なのに捉え直しがある、
 // declined なのに理由が無い) を黙って通すと、review-triage-fix がどの回を
 // 未処理と読むかが記録から定まらなくなる。列挙外の status では専用キーの検査を
 // 重ねない — 1 つの誤字が複数の問題になる (plans の status と同じ扱い)。
-func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictByID map[int]string) []string {
+func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictByID map[int]string, runs []recordRun, plansByRun []map[string]bool) []string {
 	var problems []string
 	runNo := ri + 1
 	add := func(format string, args ...any) {
@@ -692,12 +694,27 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 		case v != "adopted":
 			add("%s: finding_id %d は採択 (adopted) ではありません (verdict %s)。検知の根拠は採択だけを指す", en, ev.FindingID, v)
 		}
-		if ev.PriorRun < 1 || ev.PriorRun >= runNo {
+		priorRunOK := ev.PriorRun >= 1 && ev.PriorRun < runNo
+		if !priorRunOK {
 			add("%s: prior_run %d は比べた過去の回ではありません (1〜%d)", en, ev.PriorRun, runNo-1)
 		}
 		for _, kv := range []struct{ key, val string }{{"prior", ev.Prior}, {"reason", ev.Reason}} {
 			if strings.TrimSpace(kv.val) == "" {
 				add("%s: %s がありません", en, kv.key)
+			}
+		}
+		// fix-derived の prior は比べた回の何かを指す参照 — recurrence-detection.md の
+		// 「発火したときに記録に書くもの」が、直前の回の修正作業なら問題の識別子、
+		// 直前の回の捉え直しなら「捉え直し」と定める。比べた回に無い問題や、捉え直して
+		// いない回の「捉え直し」を根拠にした検知は書き誤りで、review-triage-fix が
+		// 俯瞰で辿る先を失う。same-location の prior は採択を指す自由な文字列
+		// (「指摘 3」など) なので、空でないことだけを見る。prior_run が範囲外なら
+		// 比べる回が無いので、この照合は行わない (範囲外は上で報告済み)。
+		if ev.Condition == "fix-derived" && priorRunOK && strings.TrimSpace(ev.Prior) != "" {
+			priorRun := runs[ev.PriorRun-1]
+			isReframe := ev.Prior == "捉え直し" && priorRun.Recurrence != nil && priorRun.Recurrence.Status == "reframed"
+			if !isReframe && !plansByRun[ev.PriorRun-1][ev.Prior] {
+				add("%s: prior %q は回 %d の plans にありません (fix-derived の prior は比べた回の問題の識別子か、比べた回が reframed のときの 捉え直し)", en, ev.Prior, ev.PriorRun)
 			}
 		}
 	}
