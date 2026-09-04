@@ -453,7 +453,8 @@ runs:
             - "reframing.md:27 — 根拠の外の辺を足す文は、根拠が直前を指す規則と整合するので変えない"
             - "docs/plans/…-plan.md の U1 — 当時の計画の記録なので直さない"
             - "既存のテストの fixture と実記録 — すべて直前の回を指しており、絞っても落ちない"
-        status: pending
+        sha: 020d835
+        status: done
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 最終確認の全量 main..068efa8) で、
       報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
