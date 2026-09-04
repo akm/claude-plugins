@@ -640,7 +640,7 @@ runs:
           stages: A
           result: verified
         gates_fired: [already-visible]
-        verdict: held
+        verdict: adopted
         verdict_reason: >-
           H2。段 A: record.go:101-103 を読み、括弧で条件を添えつつ「識別子か…捉え直し」と
           並べる形であることを確認した。主張どおり。
@@ -654,10 +654,40 @@ runs:
           TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker が落ちる。
           免除条項は対象外。
           人間が被害者を開発者と確定すれば R3 (却下)、利用者と確定すれば H6 相当で
-          人間の判断、採択して 1 行直すのも可
+          人間の判断、採択して 1 行直すのも可。→ 人間が保留を読んで採択に変えた
+          (図で 3 案を比べ、写しの数そのものを減らす案 (c) を選んだ)
         attrs:
           severity: P3
           confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          規則 (prior の書き分け) の正本は 1 か所だが、それを言い直した写しがコードの
+          コメントと報告文にもあり、規則を変えるたびに写しの並びを読み直す必要があった。
+          回 1・回 5・回 6 と同じ型 (規則を変えたとき写しを直し残す) で、写しが多いこと
+          そのものが再発の構造
+        finding_ids: [1]
+        approach: >-
+          人間が選んだ案 (c)。コメントと報告文は規則を言い直さず、正本 (recurrence-detection.md
+          の表) への参照だけにする。構造体のコメント (record.go:101-103) は「形の正本は
+          recurrence-detection.md」とだけ書く。報告文 (record.go:730・:732) は違反した条件を
+          名指しするが、規則の全体は言い直さず正本を指す。様式の表と README の写しは、記録を
+          書く利用者が読む要約なので残す (正本への参照つき)。問題は 1 つ
+        investigation:
+          scope: >-
+            前向き: grep -rn '問題の識別子' を review-triage/skills・triagecheck の README・
+            record.go・record_test.go に当て、規則を言い直している箇所を列挙した (前回の
+            調査と同じ範囲)。後ろ向き: 報告文の語を部分一致で確かめるテスト
+            (TestReviewTriageRecordRecurrenceViolations の want、
+            TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker の
+            「捉え直し」「\"P2\"」) と、報告文を読む利用者
+          included:
+            - "record.go:732 の報告文の括弧 — 規則の言い直しを正本への参照に置き換える"
+          excluded:
+            - "record-schema.md:120・README.md:11 — 利用者が読む要約で、正本への参照つき。残す"
+            - "record.go:717 のコメント — 検査の意図 (なぜ照合するか) を書く文で、規則の言い直しではない"
+            - "record_test.go:1604 のコメント — 表の行を名指しする参照"
+        status: pending
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 増分 7ca7e36..c7a0d3b) で、
       報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
@@ -668,4 +698,8 @@ runs:
       ただし指摘 1 は回 6 の P1 の修正由来で、回 6 の 3 件も回 5 の P1 の修正由来だった
       ので、人間が保留を採択に変えれば主の条件 (修正由来の指摘が 2 回連続) に当たる。
       保留が採択に変わったときに検知をやり直す手順は recurrence-detection.md に無い —
-      設計の抜けとして残す
+      設計の抜けとして残す。人間が採択に変えた時点で当てると、主の条件 (修正由来の指摘が
+      2 回連続: 回 6 ← 回 5 の修正、回 7 ← 回 6 の修正) に当たる。俯瞰は図で行い、型を
+      「規則を変えたとき写しを直し残す」、修正の単位を「写しの数を減らす」と捉え直した
+      (案 (c))。検知の項目は書かない — 保留から採択への変更は判定の後で、review-triage の
+      手順の外で起きたため。この手順の抜けは別途直す
