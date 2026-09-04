@@ -704,3 +704,71 @@ runs:
       「規則を変えたとき写しを直し残す」、修正の単位を「写しの数を減らす」と捉え直した
       (案 (c))。検知の項目は書かない — 保留から採択への変更は判定の後で、review-triage の
       手順の外で起きたため。この手順の抜けは別途直す
+  - date: "2026-09-04"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 59eed18
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/record.go
+        line: 727
+        summary: >-
+          回 7 の修正は record.go から規則の言い直しを取り除いたが、捉え直し済みの行の分岐に
+          付いたコメントだけが「prior は 捉え直し に限る」と規則を言い直したまま残っている。
+          同じ switch を囲むコメントは「ここでは言い直さない」と宣言しており、宣言と中身が
+          食い違う。回 7 の修正計画の excluded にもこの箇所は無い
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: 正本の表の捉え直し済みの行の prior 列を変えたとき (印の文字列を変える、または捉え直し済みの回でも問題の識別子を許す)
+          who: developer
+          what: >-
+            case 式と報告文は目に入るが、その間のコメントは「捉え直し に限る」と旧規則を
+            主張したまま残る。回 7 の修正が断とうとした型 (規則を変えたとき写しを直し残す) が
+            この 1 か所で再発する
+          detectability: 気づかない — 古いコメントを捕まえる機械検査は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2。段 A: record.go:716-718 の宣言 (ここでは言い直さず、表どおりかを照合する) と
+          :727-728 の「prior は 捉え直し に限る」を読み比べ、後者が正本の表の捉え直し済みの
+          行の prior 列の言い直しであることを確認した。主張どおり。
+          被害者: 回 7 と同じくコードのコメントで読むのは開発者だが、回 7 で人間が
+          「規則を言い直したコメントは写しの数を減らす形で直す」と決めており、この指摘は
+          その修正 (回 7 の P1) の取り残しなので、同じ扱いで採択する。
+          全 4 ゲートを評価して発火 0 件 — hypothetical: 正本を変えれば再現する。
+          developer-domain: 環境の異常ではない。disproportionate-cost: 修正はコメント 1 行。
+          already-visible: 古いコメントを捕まえる関門は無い (回 7 では「緩めればテストが
+          落ちる」が発火したが、今回の帰結は検査の緩みではなくコメントの取り残し)。
+          免除条項は対象外
+        attrs:
+          severity: P3
+          confidence: high
+    recurrence:
+      status: detected
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 7
+          prior: P1
+          reason: >-
+            回 7 の P1 (コメントと報告文の言い直しを正本への参照に置き換えた) で、同じ switch
+            の中のコメント 1 つを直し残した。回 7 の指摘 1 も回 6 の P1 (写しを書き分けの形に
+            そろえた) の修正由来だったので、修正由来の指摘が回 7 と回 8 で連続した。補助の条件は
+            当たらない — 回 7 の指摘は record.go:102 の構造体の宣言、回 8 は :727 の照合の
+            関数で、同じファイルだが同じ関数ではない
+    notes: >-
+      レビューは別セッションの code-review (opus-5, high, 増分 c7a0d3b..59eed18) で、
+      報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
+      residual の 2 件 (報告文の簡素化は設計どおり、検知のやり直しの抜けは既に notes に
+      ある) は記録には写さない。
+      検知はこのブランチで足した手順を当てたもので、主の条件 (修正由来の指摘が 2 回連続) で
+      発火した。回 3 に続いて 2 度目。型は回 1 から続く「規則を変えたとき写しを直し残す」で、
+      回 7 で「写しの数を減らす」と捉え直したが、その修正自身が写しを 1 つ取り残した。
+      俯瞰は review-triage-fix の冒頭が担う
