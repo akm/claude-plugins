@@ -612,3 +612,60 @@ runs:
       / record_test.go / README.md なので当たらない。発火しない。ただし、修正の隣を直し
       残す型は回 1 の P1 (検査を足したとき文書を直さなかった) と同じで、回 5 の修正でも
       「prior_run の行だけ直して prior の行を残す」形で再発している
+  - date: "2026-09-04"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: c7a0d3b
+    findings:
+      - id: 1
+        file: review-triage/tools/triagecheck/record.go
+        line: 102
+        summary: >-
+          回 6 で書き換えた構造体のコメントだけが、規則を「問題の識別子か (比べた回が
+          捉え直し済みなら) 捉え直し」という選べる形のまま残っている。同じ修正で直した
+          record-schema.md と README は「なら…そうでなければ」の書き分けの形になっている
+        category: plugin-code
+        audience: operator
+        consequence:
+          condition: triagecheck を保守する開発者が Prior フィールドのコメントを読み、両方の形が許されると読んで検査を緩めたり報告文を書き換えたりしたとき
+          who: developer
+          what: >-
+            検査が正本より広くなる。ただし緩めれば TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker
+            が落ちる。コメントを読むのは開発者だけで、記録を書く利用者はこの文を読まない
+          detectability: 気づく — 緩めればテストが落ちる。コメントの古い形そのものは機械検査の対象外
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: [already-visible]
+        verdict: held
+        verdict_reason: >-
+          H2。段 A: record.go:101-103 を読み、括弧で条件を添えつつ「識別子か…捉え直し」と
+          並べる形であることを確認した。主張どおり。
+          被害者: パスの分類 (plugin-code) では利用者だが、内容はコードのコメントで、
+          読むのはツールを保守する開発者だけ。利用者 → 開発者の向きの上書きは機械的には
+          行わず、初期値のまま確定もしない規則なので、D2 で決められないとして保留。
+          全 4 ゲートを評価した (記録に残すため) — hypothetical: コメントの読み違いは
+          テストで再現できないが、読み違いの結果 (検査を緩める) はテストで捕まる。
+          developer-domain: 環境の異常ではないので当たらない。disproportionate-cost:
+          修正は 1 行の文言。already-visible: 発火 — 緩めれば
+          TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker が落ちる。
+          免除条項は対象外。
+          人間が被害者を開発者と確定すれば R3 (却下)、利用者と確定すれば H6 相当で
+          人間の判断、採択して 1 行直すのも可
+        attrs:
+          severity: P3
+          confidence: high
+    notes: >-
+      レビューは別セッションの code-review (opus-5, high, 増分 7ca7e36..c7a0d3b) で、
+      報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
+      residual の 3 件 (reframing.md:19 の「か」は読み手向けの要約、削ったテストの行の被覆は
+      ミューテーションで確認済み、record.go:730 は対称) は放置して壊れるものが無いため
+      記録には写さない。
+      検知の判断: 対象は今回の採択だけで、今回は採択が無い (保留 1 件) ので発火しない。
+      ただし指摘 1 は回 6 の P1 の修正由来で、回 6 の 3 件も回 5 の P1 の修正由来だった
+      ので、人間が保留を採択に変えれば主の条件 (修正由来の指摘が 2 回連続) に当たる。
+      保留が採択に変わったときに検知をやり直す手順は recurrence-detection.md に無い —
+      設計の抜けとして残す
