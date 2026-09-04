@@ -464,3 +464,118 @@ runs:
       検知の判断: 直前の回 (回 4) は指摘 0 件で修正計画が無く、表の「修正計画が無い」の
       行に当たるので修正由来の根拠は書けない。回 4 に採択が無いので同じ場所の条件も
       当たらない。発火しない
+  - date: "2026-09-04"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 7ca7e36
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/record-schema.md
+        line: 120
+        summary: >-
+          回 5 の修正は prior_run の行だけを正本の精度にそろえ、隣の prior の行を
+          「問題の識別子か、比べた回が reframed のときの 捉え直し」の選べる形のまま残した。
+          検査は同じ修正で「捉え直し済みの回なら 捉え直し に限る」へ狭めたので、様式の表を
+          正本として書いた記録が検査に落ちる
+        category: skill
+        audience: operator
+        consequence:
+          condition: 書き手が様式の表の prior の行を読み、捉え直し済みの回を比べた先にした修正由来の根拠に問題の識別子を書いたとき
+          who: operator
+          what: >-
+            検査が赤くなり、様式の表どおりに書いた記録が通らない。判断の正本 (表の捉え直し
+            済みの行) と様式の表のどちらが正しいかを読み手が判別できない
+          detectability: 検査が赤くなるので落ちたことには気づく。ただし、様式の表と検査のどちらを信じるべきかは気づけない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2。段 A: record-schema.md:120 の「問題の識別子 (例: P6) か、比べた回が reframed
+          のときの 捉え直し」と、record.go:725-728 の「比べた回が捉え直し済みなら prior は
+          捉え直し と書く」を読み比べ、様式の表が選べる形のまま残っていることを確認した。
+          判断の正本 (recurrence-detection.md の表の捉え直し済みの行) は 捉え直し だけを
+          書いており、検査はそれと一致する。主張どおり。
+          全 4 ゲートを評価して発火 0 件 — hypothetical: レビュアのプローブがそのまま
+          テストになる。developer-domain: 対象は利用者に届く様式の表。disproportionate-cost:
+          修正は表の 1 行の文言。already-visible: 様式の表と検査の食い違いを検出する
+          関門は無い。免除条項は対象外
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/tools/triagecheck/record_test.go
+        line: 1419
+        summary: >-
+          回 5 で足したケース「prior_run が直前でない回を指す」の入力が、直上の「prior_run が
+          0」と同一で、名前が言う「直前でない回」を通していない。検査の狭めが緩んで
+          prior_run < runNo に戻っても、このケースは 0 が範囲外であることだけで通り続ける
+        category: test
+        audience: developer
+        consequence:
+          condition: 将来、検査の条件が「直前の回に限る」から「自回より小さい」に緩められたとき
+          who: developer
+          what: >-
+            名前の上では直前でない回を守っているはずのケースが落ちず、緩んだことに
+            このケースでは気づけない (別のテスト TestReviewTriageRecordRecurrencePriorRunNotPrevious
+            が同じ分岐を踏んでいるので、検査そのものの穴にはならない)
+          detectability: 気づかない — テストが主張どおりの入力を通しているかを検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2。段 A: record_test.go:1417-1420 を読み、2 つのケースの recurrence を作る式が
+          同一で、違うのは期待する語だけであることを確認した。主張どおり。
+          全 4 ゲートを評価して発火 0 件 — hypothetical: 入力を変えれば再現する。
+          developer-domain: 環境の異常ではない。disproportionate-cost: 修正は 1 ケースの
+          入力の差し替えか削除。already-visible: テストが名前どおりの入力を通しているかを
+          見る関門は無い。免除条項は対象外。被害者は開発者だがゲートが発火していないので採択
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 3
+        file: review-triage/tools/triagecheck/README.md
+        line: 11
+        summary: >-
+          検査項目の説明を「修正由来の根拠の prior が比べた回の修正計画か捉え直しを指すこと」と
+          書いたが、同じ修正で検査は「捉え直し済みの回なら 捉え直し に限る」へ狭めた。
+          README も指摘 1 と同じ選べる形のまま残っている
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: 利用者が README の検査項目の説明から、捉え直し済みの回でも問題の識別子を書けると読んだとき
+          who: operator
+          what: 指摘 1 と同じ — 検査が赤くなり、説明と検査のどちらが正しいか判別できない
+          detectability: 検査が赤くなるので落ちたことには気づく。説明が古いことには気づけない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2。段 A: README.md:11 の「修正計画か捉え直しを指すこと」を読み、選べる形のまま
+          であることを確認した。指摘 1 と原因が同じ (prior_run の側だけ直して prior の側の
+          文言を残した)。全 4 ゲートを評価して発火 0 件 — 内容は指摘 1 と同じ。免除条項は対象外
+        attrs:
+          severity: P3
+          confidence: high
+    notes: >-
+      レビューは別セッションの code-review (opus-5, high, 増分 068efa8..7ca7e36) で、
+      報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
+      residual のうち 1 件を写す: record.go:730 の報告文も「問題の識別子か、reframed のときの
+      捉え直し」という選べる形の文言で、捉え直し済みでない回にしか届かないので誤読の経路には
+      ならないが、指摘 1・3 と同じ原因なので同じ問題で直してよい。回 1 の recurrence の
+      早期 return で他の違反が報告されない件は、plans の status と同じ扱いで放置して壊れる
+      ものが無い。
+      検知の判断: 指摘 1〜3 はいずれも回 5 の P1 (検査を狭めた修正) の修正由来だが、回 5 の
+      指摘は修正由来ではない (直前の回 4 に修正計画が無い) ので、主の条件の 2 回連続には
+      当たらない。同じ場所の条件は、回 5 が recurrence-detection.md、回 6 が record-schema.md
+      / record_test.go / README.md なので当たらない。発火しない。ただし、修正の隣を直し
+      残す型は回 1 の P1 (検査を足したとき文書を直さなかった) と同じで、回 5 の修正でも
+      「prior_run の行だけ直して prior の行を残す」形で再発している
