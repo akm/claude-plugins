@@ -103,6 +103,14 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `review-triage/skills/review-triage/references/recurrence-detection.md:9` 検知の正本は「比べる相手は直前の 1 回」と定めるが、検査は prior_run を 「1 以上かつ自回より小さい」としか見ないため、直前を飛び越して古い回を指す 根拠が検査を通り、サマリと俯瞰の第 1 段の図にそのまま出る | skill / operator | 書き手が「繰り返しの起点はもっと前の回だ」と読んで、直前でない回を prior_run に 書いたとき (たとえば直前の回の検知が declined で、その前の回を指す) / 検査は緑のまま通り、reframing.md の第 1 段の図は prior_run の prior から今回の 指摘へ辺を引くので、途中の回を飛ばした連鎖が描かれる。人間は途中の回を見ない まま「繰り返していると認めますか」に答える / 気づかない — 検査は緑で、サマリも図も飛び越しをそのまま描く | A+B: verified | — | **採択** — A2。段 A: record.go の priorRunOK (ev.PriorRun >= 1 && ev.PriorRun < runNo) を 読み、上限が自回-1 で下限が 1 なので直前でない回も通ることを確認した。段 B: recurrence-detection.md:9「比べる相手は直前の 1 回」と record-schema.md の prior_run の行「1 以上かつ自回より小さいこと」を読み比べ、様式の表は検査と同じ 広い範囲を書いていて、判断の正本 (直前の 1 回) だけが狭いことを確認した。 回 2 の residual に同じ非対称を「どちらを規範にするか」と残していたが、今回は 飛び越した辺が俯瞰の図に出るという具体の帰結が示されたので指摘として採る。 免除条項の条件 1 (検査が正本の規則を検出しない) は成り立つが、関門の一覧 (設定の gates) が未設定なので免除条項は使わない。全 4 ゲートを評価して発火 0 件 — hypothetical: レビュアのプローブがそのままテストになる。developer-domain: 検査は利用者の記録にかかる。disproportionate-cost: 直すのは検査の条件 1 行と テスト 1 ケースと様式の表の 1 行。already-visible: prior_run が直前でない回を 指すケースのテストは無い (TestReviewTriageRecordRecurrenceViolations は 0 と 自回以上だけ)。 規範は判断の正本 (直前の 1 回。計画の KTD4 で人間が選んだ) に合わせ、検査と 様式の表をそれに寄せる |
 
+### 修正計画
+
+| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |
+| --- | --- | --- | --- | --- | --- | --- |
+| P1 | 検査を書いたとき、判断の正本の prior_run の規則 (比べる相手は直前の 1 回・回 1 では 判断しない・捉え直し済みの回は prior に 捉え直し と書く) を直接写さず、「1 以上かつ 自回より小さい」という広い範囲で代用した。様式の表と README もその広い範囲を写した | #1 | 検査を正本の規則そのものに合わせる。prior_run は直前の回 (自回 - 1) に限り、回 1 の recurrence は「比べる過去の回が無い」と専用の文で弾き、比べた回が reframed なら fix-derived の prior は 捉え直し に限る (人間が含めると決めた)。様式の表の prior_run の 行と README の検査項目の説明を同じ精度にそろえ、テストを足す。問題は 1 つ | — | 未着手 | — |
+
+- **P1 の調査**: 範囲: 前向き: recurrence-detection.md の prior_run に関わる規則 (L9・L10・表の捉え直し 済みの行) と、record.go の priorRunOK・isReframe・plansByRun の照合、 record-schema.md:119 の prior_run の行、triagecheck/README.md:11 の検査項目の説明を 読み比べた。後ろ向き: record_test.go の recurrence のテスト全件 (prior_run は すべて直前の回を指す)、docs/review-triage/*.yaml の prior_run (この記録の回 3 の prior_run: 2 のみ、直前)、reframing.md:27 (根拠の外の辺を足してよい、という文)、 計画 docs/plans/…-plan.md の U1 の検査の記述 / 含めた: record-schema.md:119 の prior_run の行 — 広い範囲を写しているので直前の回に直す; record.go の回 1 の扱い — 範囲の副作用で弾いていた形を、正本どおり専用の文で弾く; record.go の捉え直し済みの回の prior — 正本は 捉え直し に限るが検査は問題の識別子も通していた。人間が含めると決めた; triagecheck/README.md:11 — 「過去の回」を「直前の回」に / 含めなかった: reframing.md:27 — 根拠の外の辺を足す文は、根拠が直前を指す規則と整合するので変えない; docs/plans/…-plan.md の U1 — 当時の計画の記録なので直さない; 既存のテストの fixture と実記録 — すべて直前の回を指しており、絞っても落ちない
+
 ### 観察
 
 レビューは別セッションの code-review (opus-5, high, 最終確認の全量 main..068efa8) で、 報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。 residual の 3 件は、根拠の重複 (図の辺が二重になるだけ)、捉え直しと修正計画の 単位の一致は検査の対象外 (計画の KTD9 どおり)、reframing.md の対象の選び方の冗長な 条件 (回 1 の観察に既出) で、いずれも放置して壊れるものが無いため記録には写さない。 検知の判断: 直前の回 (回 4) は指摘 0 件で修正計画が無く、表の「修正計画が無い」の 行に当たるので修正由来の根拠は書けない。回 4 に採択が無いので同じ場所の条件も 当たらない。発火しない
