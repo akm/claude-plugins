@@ -1416,6 +1416,8 @@ func TestReviewTriageRecordRecurrenceViolations(t *testing.T) {
 			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 2", 1), "prior_run"},
 		{"prior_run が 0", "      status: detected\n" +
 			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 0", 1), "prior_run"},
+		{"prior_run が直前でない回を指す", "      status: detected\n" +
+			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 0", 1), "直前の回"},
 		{"prior が無い", "      status: detected\n" +
 			strings.Replace(recurrenceEvidenceYAML, "          prior: P1\n", "", 1), "prior"},
 		{"reason が無い", "      status: detected\n" +
@@ -1564,6 +1566,64 @@ func TestReviewTriageRecordRecurrencePriorReframedWithoutPlans(t *testing.T) {
 	files, read := recordFiles(t, yamlSrc)
 	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
 		t.Fatalf("plans の無い捉え直し済みの回を指す prior 捉え直し で問題が出た: %v", problems)
+	}
+}
+
+// 回 1 に recurrence を書いた記録は、比べる過去の回が無いので専用の文で弾く —
+// recurrence-detection.md「過去の回が無い記録では判断しない」。範囲の検査の副作用
+// (直前の回が 0) で弾くと「直前の回 (0)」という読めない文になる。
+func TestReviewTriageRecordRecurrenceOnFirstRun(t *testing.T) {
+	yamlSrc := validRecordYAML + "    recurrence:\n      status: detected\n" + recurrenceEvidenceYAML
+	files, read := recordFiles(t, yamlSrc)
+	problems := reviewTriageRecordProblems(files, read)
+	if len(problems) != 1 || !strings.Contains(problems[0], "回 1 の recurrence") || !strings.Contains(problems[0], "過去の回が無い") {
+		t.Fatalf("回 1 の recurrence が専用の 1 件で報告されない: %v", problems)
+	}
+}
+
+// 直前でない回を指す根拠は弾く — 比べる相手は直前の 1 回 (recurrence-detection.md)。
+// 3 回の記録で、回 3 の根拠が回 1 を指す形。
+func TestReviewTriageRecordRecurrencePriorRunNotPrevious(t *testing.T) {
+	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
+		"      evidence:\n" +
+		"        - condition: fix-derived\n" +
+		"          finding_id: 1\n" +
+		"          prior_run: 1\n" +
+		"          prior: P1\n" +
+		"          reason: 回 1 の P1 の修正由来\n")
+	files, read := recordFiles(t, yamlSrc)
+	problems := reviewTriageRecordProblems(files, read)
+	found := false
+	for _, pr := range problems {
+		if strings.Contains(pr, "prior_run 1") && strings.Contains(pr, "直前の回") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("直前でない回 (回 3 から回 1) を指す prior_run が報告されない: %v", problems)
+	}
+}
+
+// 比べた回が捉え直し済み (reframed) なら、fix-derived の prior は 捉え直し と書く —
+// 表の捉え直し済みの行。問題の識別子で指す根拠は、正本と食い違うので弾く。
+func TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker(t *testing.T) {
+	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
+		"      evidence:\n" +
+		"        - condition: fix-derived\n" +
+		"          finding_id: 1\n" +
+		"          prior_run: 2\n" +
+		"          prior: P2\n" +
+		"          reason: 回 2 の P2 の修正由来\n")
+	files, read := recordFiles(t, yamlSrc)
+	problems := reviewTriageRecordProblems(files, read)
+	found := false
+	for _, pr := range problems {
+		if strings.Contains(pr, "捉え直し") && strings.Contains(pr, `"P2"`) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("捉え直し済みの回を問題の識別子で指す根拠が報告されない: %v", problems)
 	}
 }
 

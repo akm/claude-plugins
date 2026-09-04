@@ -675,6 +675,12 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 	add := func(format string, args ...any) {
 		problems = append(problems, f+": "+fmt.Sprintf("回 %d の recurrence: ", runNo)+fmt.Sprintf(format, args...))
 	}
+	// 回 1 には比べる過去の回が無い (recurrence-detection.md「過去の回が無い記録では判断しない」)。
+	// prior_run の範囲の検査に任せると「直前の回 (0)」という読めない文になるので、先に専用の文で弾く。
+	if runNo == 1 {
+		add("比べる過去の回が無いので書けません (回 1 では検知の判断そのものを行わない)")
+		return problems
+	}
 	if len(rec.Evidence) == 0 {
 		add("evidence がありません (検知の根拠は 1 件以上)")
 	}
@@ -694,9 +700,11 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 		case v != "adopted":
 			add("%s: finding_id %d は採択 (adopted) ではありません (verdict %s)。検知の根拠は採択だけを指す", en, ev.FindingID, v)
 		}
-		priorRunOK := ev.PriorRun >= 1 && ev.PriorRun < runNo
+		// 比べる相手は直前の 1 回 (recurrence-detection.md)。より前の回を指す根拠を通すと、
+		// 俯瞰の第 1 段の図に途中の回を飛ばした辺が描かれる。
+		priorRunOK := ev.PriorRun == runNo-1
 		if !priorRunOK {
-			add("%s: prior_run %d は比べた過去の回ではありません (1〜%d)", en, ev.PriorRun, runNo-1)
+			add("%s: prior_run %d は直前の回 (%d) ではありません (比べる相手は直前の 1 回)", en, ev.PriorRun, runNo-1)
 		}
 		for _, kv := range []struct{ key, val string }{{"prior", ev.Prior}, {"reason", ev.Reason}} {
 			if strings.TrimSpace(kv.val) == "" {
@@ -712,8 +720,13 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 		// 比べる回が無いので、この照合は行わない (範囲外は上で報告済み)。
 		if ev.Condition == "fix-derived" && priorRunOK && strings.TrimSpace(ev.Prior) != "" {
 			priorRun := runs[ev.PriorRun-1]
-			isReframe := ev.Prior == "捉え直し" && priorRun.Recurrence != nil && priorRun.Recurrence.Status == "reframed"
-			if !isReframe && !plansByRun[ev.PriorRun-1][ev.Prior] {
+			priorReframed := priorRun.Recurrence != nil && priorRun.Recurrence.Status == "reframed"
+			switch {
+			case priorReframed && ev.Prior != "捉え直し":
+				// 表の捉え直し済みの行 — 照らし先は修正作業ではなく捉え直しの軸なので、prior は
+				// 捉え直し に限る。問題の識別子で指すと、俯瞰が辿る先が捉え直しから外れる。
+				add("%s: 比べた回 %d は捉え直し済みなので prior は 捉え直し と書く: %q", en, ev.PriorRun, ev.Prior)
+			case !priorReframed && !plansByRun[ev.PriorRun-1][ev.Prior]:
 				add("%s: prior %q は回 %d の plans にありません (fix-derived の prior は比べた回の問題の識別子か、比べた回が reframed のときの 捉え直し)", en, ev.Prior, ev.PriorRun)
 			}
 		}
