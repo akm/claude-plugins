@@ -107,7 +107,7 @@
 
 | 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |
 | --- | --- | --- | --- | --- | --- | --- |
-| P1 | 検査を書いたとき、判断の正本の prior_run の規則 (比べる相手は直前の 1 回・回 1 では 判断しない・捉え直し済みの回は prior に 捉え直し と書く) を直接写さず、「1 以上かつ 自回より小さい」という広い範囲で代用した。様式の表と README もその広い範囲を写した | #1 | 検査を正本の規則そのものに合わせる。prior_run は直前の回 (自回 - 1) に限り、回 1 の recurrence は「比べる過去の回が無い」と専用の文で弾き、比べた回が reframed なら fix-derived の prior は 捉え直し に限る (人間が含めると決めた)。様式の表の prior_run の 行と README の検査項目の説明を同じ精度にそろえ、テストを足す。問題は 1 つ | — | 未着手 | — |
+| P1 | 検査を書いたとき、判断の正本の prior_run の規則 (比べる相手は直前の 1 回・回 1 では 判断しない・捉え直し済みの回は prior に 捉え直し と書く) を直接写さず、「1 以上かつ 自回より小さい」という広い範囲で代用した。様式の表と README もその広い範囲を写した | #1 | 検査を正本の規則そのものに合わせる。prior_run は直前の回 (自回 - 1) に限り、回 1 の recurrence は「比べる過去の回が無い」と専用の文で弾き、比べた回が reframed なら fix-derived の prior は 捉え直し に限る (人間が含めると決めた)。様式の表の prior_run の 行と README の検査項目の説明を同じ精度にそろえ、テストを足す。問題は 1 つ | — | 済 | `020d835` |
 
 - **P1 の調査**: 範囲: 前向き: recurrence-detection.md の prior_run に関わる規則 (L9・L10・表の捉え直し 済みの行) と、record.go の priorRunOK・isReframe・plansByRun の照合、 record-schema.md:119 の prior_run の行、triagecheck/README.md:11 の検査項目の説明を 読み比べた。後ろ向き: record_test.go の recurrence のテスト全件 (prior_run は すべて直前の回を指す)、docs/review-triage/*.yaml の prior_run (この記録の回 3 の prior_run: 2 のみ、直前)、reframing.md:27 (根拠の外の辺を足してよい、という文)、 計画 docs/plans/…-plan.md の U1 の検査の記述 / 含めた: record-schema.md:119 の prior_run の行 — 広い範囲を写しているので直前の回に直す; record.go の回 1 の扱い — 範囲の副作用で弾いていた形を、正本どおり専用の文で弾く; record.go の捉え直し済みの回の prior — 正本は 捉え直し に限るが検査は問題の識別子も通していた。人間が含めると決めた; triagecheck/README.md:11 — 「過去の回」を「直前の回」に / 含めなかった: reframing.md:27 — 根拠の外の辺を足す文は、根拠が直前を指す規則と整合するので変えない; docs/plans/…-plan.md の U1 — 当時の計画の記録なので直さない; 既存のテストの fixture と実記録 — すべて直前の回を指しており、絞っても落ちない
 
