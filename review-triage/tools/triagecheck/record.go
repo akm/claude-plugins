@@ -98,9 +98,9 @@ type recordRecurrence struct {
 // recordRecurrenceEvidence は検知の根拠 1 件。condition は fix-derived
 // (修正由来の指摘が続いた) / same-location (同じ場所への採択が続いた)。
 // finding_id は同じ回の採択の id、prior_run は比べた回の 1 始まりの番号、
-// prior は比べた先。condition と比べた回の状態で形が決まる — fix-derived は比べた回の
-// 問題の識別子か (比べた回が捉え直し済みなら) 捉え直し、same-location は「指摘 3」のような
-// 採択を指す文字列 (書き分けの正本は recurrence-detection.md)。
+// prior は比べた先。condition と比べた回の状態で形が決まる。形の正本は
+// recurrence-detection.md「直前の回の状態と主の条件」の表で、ここでは言い直さない
+// (言い直すと、規則を変えたとき写しを直し残す)。検査はその表を照合する。
 type recordRecurrenceEvidence struct {
 	Condition string `yaml:"condition"`
 	FindingID int    `yaml:"finding_id"`
@@ -713,13 +713,12 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 				add("%s: %s がありません", en, kv.key)
 			}
 		}
-		// fix-derived の prior は比べた回の何かを指す参照 — recurrence-detection.md の
-		// 「発火したときに記録に書くもの」が、直前の回の修正作業なら問題の識別子、
-		// 直前の回の捉え直しなら「捉え直し」と定める。比べた回に無い問題や、捉え直して
-		// いない回の「捉え直し」を根拠にした検知は書き誤りで、review-triage-fix が
-		// 俯瞰で辿る先を失う。same-location の prior は採択を指す自由な文字列
-		// (「指摘 3」など) なので、空でないことだけを見る。prior_run が範囲外なら
-		// 比べる回が無いので、この照合は行わない (範囲外は上で報告済み)。
+		// fix-derived の prior は比べた回の何かを指す参照で、比べた回の状態で形が決まる。
+		// 形の正本は recurrence-detection.md「直前の回の状態と主の条件」の表 — ここでは
+		// 言い直さず、その表どおりかを照合する。正本に無い形の根拠は書き誤りで、
+		// review-triage-fix が俯瞰で辿る先を失う。same-location の prior は採択を指す
+		// 自由な文字列なので、空でないことだけを見る。prior_run が直前でなければ比べる回が
+		// 定まらないので、この照合は行わない (上で報告済み)。
 		if ev.Condition == "fix-derived" && priorRunOK && strings.TrimSpace(ev.Prior) != "" {
 			priorRun := runs[ev.PriorRun-1]
 			priorReframed := priorRun.Recurrence != nil && priorRun.Recurrence.Status == "reframed"
@@ -727,9 +726,9 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 			case priorReframed && ev.Prior != "捉え直し":
 				// 表の捉え直し済みの行 — 照らし先は修正作業ではなく捉え直しの軸なので、prior は
 				// 捉え直し に限る。問題の識別子で指すと、俯瞰が辿る先が捉え直しから外れる。
-				add("%s: 比べた回 %d は捉え直し済みなので prior は 捉え直し と書く: %q", en, ev.PriorRun, ev.Prior)
+				add("%s: 比べた回 %d は捉え直し済みなので prior は 捉え直し と書く: %q (形の正本は recurrence-detection.md の表)", en, ev.PriorRun, ev.Prior)
 			case !priorReframed && !plansByRun[ev.PriorRun-1][ev.Prior]:
-				add("%s: prior %q は回 %d の plans にありません (捉え直し済みでない回を比べた fix-derived の prior は、比べた回の問題の識別子)", en, ev.Prior, ev.PriorRun)
+				add("%s: prior %q は回 %d の plans にありません (形の正本は recurrence-detection.md の表)", en, ev.Prior, ev.PriorRun)
 			}
 		}
 	}
