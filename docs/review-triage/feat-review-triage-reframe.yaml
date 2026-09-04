@@ -687,7 +687,8 @@ runs:
             - "record-schema.md:120・README.md:11 — 利用者が読む要約で、正本への参照つき。残す"
             - "record.go:717 のコメント — 検査の意図 (なぜ照合するか) を書く文で、規則の言い直しではない"
             - "record_test.go:1604 のコメント — 表の行を名指しする参照"
-        status: pending
+        sha: c6a02ac
+        status: done
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 増分 7ca7e36..c7a0d3b) で、
       報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
