@@ -596,7 +596,8 @@ runs:
             - "reframing.md:19 の辺の説明 — 書き分けの正本への参照つきの要約なので残す"
             - "recurrence-detection.md:53 — 表の prior の列の値を並べただけで、どちらを書くかは表の行が決める"
             - "record.go:715 のコメント — 状態ごとに書き分けた正しい形"
-        status: pending
+        sha: 00650d8
+        status: done
     notes: >-
       レビューは別セッションの code-review (opus-5, high, 増分 068efa8..7ca7e36) で、
       報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。
