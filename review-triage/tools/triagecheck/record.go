@@ -724,8 +724,6 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 			priorReframed := priorRun.Recurrence != nil && priorRun.Recurrence.Status == "reframed"
 			switch {
 			case priorReframed && ev.Prior != "捉え直し":
-				// 表の捉え直し済みの行 — 照らし先は修正作業ではなく捉え直しの軸なので、prior は
-				// 捉え直し に限る。問題の識別子で指すと、俯瞰が辿る先が捉え直しから外れる。
 				add("%s: 比べた回 %d は捉え直し済みなので prior は 捉え直し と書く: %q (形の正本は recurrence-detection.md の表)", en, ev.PriorRun, ev.Prior)
 			case !priorReframed && !plansByRun[ev.PriorRun-1][ev.Prior]:
 				add("%s: prior %q は回 %d の plans にありません (形の正本は recurrence-detection.md の表)", en, ev.Prior, ev.PriorRun)
