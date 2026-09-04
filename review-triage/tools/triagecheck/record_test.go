@@ -1416,8 +1416,6 @@ func TestReviewTriageRecordRecurrenceViolations(t *testing.T) {
 			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 2", 1), "prior_run"},
 		{"prior_run が 0", "      status: detected\n" +
 			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 0", 1), "prior_run"},
-		{"prior_run が直前でない回を指す", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 0", 1), "直前の回"},
 		{"prior が無い", "      status: detected\n" +
 			strings.Replace(recurrenceEvidenceYAML, "          prior: P1\n", "", 1), "prior"},
 		{"reason が無い", "      status: detected\n" +
@@ -1513,8 +1511,6 @@ func recurrenceReframedThenRecordYAML(recurrence string) string {
 	return run2 + run3
 }
 
-// fix-derived の prior は、比べた回の plans の問題の識別子か、比べた回が
-// reframed のときの「捉え直し」のどちらか。
 // 捉え直し済み (reframed) の回に plans がまだ無くても、次の回の fix-derived の根拠は
 // prior: 捉え直し で通る — recurrence-detection.md「直前の回の状態と主の条件」の
 // 捉え直し済みの行 (plans の有無を問わない) を固定する。実装済みの挙動の回帰テスト。
@@ -1627,6 +1623,8 @@ func TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker(t *te
 	}
 }
 
+// 捉え直し済み (reframed) の回を比べた fix-derived の根拠は、prior に 捉え直し を書く —
+// recurrence-detection.md「直前の回の状態と主の条件」の捉え直し済みの行。
 func TestReviewTriageRecordRecurrencePriorReframed(t *testing.T) {
 	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
 		"      evidence:\n" +

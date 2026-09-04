@@ -98,7 +98,9 @@ type recordRecurrence struct {
 // recordRecurrenceEvidence は検知の根拠 1 件。condition は fix-derived
 // (修正由来の指摘が続いた) / same-location (同じ場所への採択が続いた)。
 // finding_id は同じ回の採択の id、prior_run は比べた回の 1 始まりの番号、
-// prior は比べた先 (問題の識別子か「指摘 3」のような文字列)。
+// prior は比べた先。condition と比べた回の状態で形が決まる — fix-derived は比べた回の
+// 問題の識別子か (比べた回が捉え直し済みなら) 捉え直し、same-location は「指摘 3」のような
+// 採択を指す文字列 (書き分けの正本は recurrence-detection.md)。
 type recordRecurrenceEvidence struct {
 	Condition string `yaml:"condition"`
 	FindingID int    `yaml:"finding_id"`
@@ -727,7 +729,7 @@ func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictBy
 				// 捉え直し に限る。問題の識別子で指すと、俯瞰が辿る先が捉え直しから外れる。
 				add("%s: 比べた回 %d は捉え直し済みなので prior は 捉え直し と書く: %q", en, ev.PriorRun, ev.Prior)
 			case !priorReframed && !plansByRun[ev.PriorRun-1][ev.Prior]:
-				add("%s: prior %q は回 %d の plans にありません (fix-derived の prior は比べた回の問題の識別子か、比べた回が reframed のときの 捉え直し)", en, ev.Prior, ev.PriorRun)
+				add("%s: prior %q は回 %d の plans にありません (捉え直し済みでない回を比べた fix-derived の prior は、比べた回の問題の識別子)", en, ev.Prior, ev.PriorRun)
 			}
 		}
 	}
