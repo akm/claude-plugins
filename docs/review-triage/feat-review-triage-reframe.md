@@ -14,6 +14,7 @@
 | 4 | 2026-09-04 | `code-review` | `opus-5` | incremental | 0 | 0 | 0 | 0 |
 | 5 | 2026-09-04 | `code-review` | `opus-5` | full | 1 | 1 | 0 | 0 |
 | 6 | 2026-09-04 | `code-review` | `opus-5` | incremental | 3 | 3 | 0 | 0 |
+| 7 | 2026-09-04 | `code-review` | `opus-5` | incremental | 1 | 0 | 1 | 0 |
 
 ## 回 1: 2026-09-04 `code-review`
 
@@ -137,3 +138,15 @@
 ### 観察
 
 レビューは別セッションの code-review (opus-5, high, 増分 068efa8..7ca7e36) で、 報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。 residual のうち 1 件を写す: record.go:730 の報告文も「問題の識別子か、reframed のときの 捉え直し」という選べる形の文言で、捉え直し済みでない回にしか届かないので誤読の経路には ならないが、指摘 1・3 と同じ原因なので同じ問題で直してよい。回 1 の recurrence の 早期 return で他の違反が報告されない件は、plans の status と同じ扱いで放置して壊れる ものが無い。 検知の判断: 指摘 1〜3 はいずれも回 5 の P1 (検査を狭めた修正) の修正由来だが、回 5 の 指摘は修正由来ではない (直前の回 4 に修正計画が無い) ので、主の条件の 2 回連続には 当たらない。同じ場所の条件は、回 5 が recurrence-detection.md、回 6 が record-schema.md / record_test.go / README.md なので当たらない。発火しない。ただし、修正の隣を直し 残す型は回 1 の P1 (検査を足したとき文書を直さなかった) と同じで、回 5 の修正でも 「prior_run の行だけ直して prior の行を残す」形で再発している
+
+## 回 7: 2026-09-04 `code-review`
+
+- HEAD `c7a0d3b` / model `opus-5` / scope incremental / level high
+
+| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `review-triage/tools/triagecheck/record.go:102` 回 6 で書き換えた構造体のコメントだけが、規則を「問題の識別子か (比べた回が 捉え直し済みなら) 捉え直し」という選べる形のまま残っている。同じ修正で直した record-schema.md と README は「なら…そうでなければ」の書き分けの形になっている | plugin-code / operator | triagecheck を保守する開発者が Prior フィールドのコメントを読み、両方の形が許されると読んで検査を緩めたり報告文を書き換えたりしたとき / 検査が正本より広くなる。ただし緩めれば TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker が落ちる。コメントを読むのは開発者だけで、記録を書く利用者はこの文を読まない / 気づく — 緩めればテストが落ちる。コメントの古い形そのものは機械検査の対象外 | A: verified | already-visible | **保留** — H2。段 A: record.go:101-103 を読み、括弧で条件を添えつつ「識別子か…捉え直し」と 並べる形であることを確認した。主張どおり。 被害者: パスの分類 (plugin-code) では利用者だが、内容はコードのコメントで、 読むのはツールを保守する開発者だけ。利用者 → 開発者の向きの上書きは機械的には 行わず、初期値のまま確定もしない規則なので、D2 で決められないとして保留。 全 4 ゲートを評価した (記録に残すため) — hypothetical: コメントの読み違いは テストで再現できないが、読み違いの結果 (検査を緩める) はテストで捕まる。 developer-domain: 環境の異常ではないので当たらない。disproportionate-cost: 修正は 1 行の文言。already-visible: 発火 — 緩めれば TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker が落ちる。 免除条項は対象外。 人間が被害者を開発者と確定すれば R3 (却下)、利用者と確定すれば H6 相当で 人間の判断、採択して 1 行直すのも可 |
+
+### 観察
+
+レビューは別セッションの code-review (opus-5, high, 増分 7ca7e36..c7a0d3b) で、 報告のみで走った (実行前後で HEAD と作業ツリーが不変であることを確認)。 residual の 3 件 (reframing.md:19 の「か」は読み手向けの要約、削ったテストの行の被覆は ミューテーションで確認済み、record.go:730 は対称) は放置して壊れるものが無いため 記録には写さない。 検知の判断: 対象は今回の採択だけで、今回は採択が無い (保留 1 件) ので発火しない。 ただし指摘 1 は回 6 の P1 の修正由来で、回 6 の 3 件も回 5 の P1 の修正由来だった ので、人間が保留を採択に変えれば主の条件 (修正由来の指摘が 2 回連続) に当たる。 保留が採択に変わったときに検知をやり直す手順は recurrence-detection.md に無い — 設計の抜けとして残す
