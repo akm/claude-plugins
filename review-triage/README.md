@@ -6,10 +6,14 @@
 
 | スキル | 説明 |
 | --- | --- |
-| `review-triage` | 指摘を判定し、記録に残す。**修正はしない** (判断までが範囲) |
-| `review-triage-fix` | 採択した指摘を原因で束ね、問題単位で直す |
+| `review-triage` | 指摘を判定し、記録に残す。**修正はしない** (判断までが範囲)。判定の後、同じ型の指摘が続いていないかを直前の回と照らして検知する |
+| `review-triage-fix` | 採択した指摘を原因で束ね、問題単位で直す。検知があれば、束ねる前に図で繰り返しを人間と確かめて捉え直す (俯瞰) |
 
 `code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは記録 (YAML) だけで行います。**
+
+## 繰り返しを検知して捉え直す
+
+レビューと修正を繰り返すうちに、修正が次の指摘を生む連鎖に入ることがあります (同じ規則を経路ごとに書いていて、指摘のたびに 1 経路ずつ直す、など)。`review-triage` はこの繰り返しを検知して記録に残し、`review-triage-fix` は束ねる前に、履歴の連鎖と構造の軸の 2 段の図で人間と確かめてから、修正の単位を捉え直します。検知の条件の正本は [recurrence-detection.md](skills/review-triage/references/recurrence-detection.md)、俯瞰の手順の正本は [reframing.md](skills/review-triage-fix/references/reframing.md) です。
 
 ## なぜ記録を残すか
 
@@ -49,7 +53,7 @@
 
 いずれも**別プラグインで、無くても動きます** (該当の手順を飛ばし、飛ばしたことを報告します)。
 
-- [mermaid-preview](../mermaid-preview/README.md) — 保留の判断を図で提示するときに使います
+- [mermaid-preview](../mermaid-preview/README.md) — 保留の判断や、俯瞰の 2 段の図を提示するときに使います。無ければ Markdown の表と箇条書きで続けます
 - [doc-dag](../doc-dag/README.md) — 修正で文書を変更した後、重複が再び生じていないかを確認するのに使います
 
 ## 文中の例について
