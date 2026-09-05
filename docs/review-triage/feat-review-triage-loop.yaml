@@ -1,0 +1,293 @@
+runs:
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: 9e08879
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 34
+        summary: >-
+          検知の終了条件が今回の recurrence.status だけを見るのに対し、review-triage-fix の手順 2 は全回の未処理 detected で人間の回答待ちに入る。過去の回に未処理の detected が残ったまま今回発火しないと、loop が fix を呼び、fix が回答待ちで止まる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に未処理の検知 (recurrence.status: detected) が残っている記録で loop を起動し、今回の回では検知が発火しなかったとき
+          who: operator
+          what: >-
+            loop が「検知なし」と判断して review-triage-fix を呼ぶが、fix は手順 2 で全回を見て未処理の検知を見つけ、人間の回答を待って止まる。loop が自ら掲げる「検知は fix を呼ぶ前に判定して修正に進ませない」が成り立たない
+          detectability: >-
+            fix が止まるので進まないことには気づく。ただし loop の走査範囲が fix と非対称であることには気づかない (両者を突き合わせる関門が無い)
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 7
+        summary: >-
+          SKILL.md 手順 3 は未着手 (pending) を報告に出すと義務づけるが、報告の正本である reporting.md に pending の記載が無い。収束で止まると fix を呼ばないため、pending を報告する経路が他に無い
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に status: pending の問題が残っている記録で、今回の回が収束 (採択 0 件) して止まったとき
+          who: operator
+          what: >-
+            未着手の問題が誰にも知らされないまま残る。SKILL.md が報告を義務づけているのに、報告の形を定める正本に項目が無いので、実装する側はどちらに従うか決められない
+          detectability: >-
+            気づかない。pending が報告されないことを検出する関門は無く、記録を人間が直接読むまで残り続ける
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 45
+        summary: >-
+          「1 周目は全量」が無条件で、既に回のある記録に対して loop を起動すると 2 度目以降の全量レビューになる。review-request.md の範囲の規則「full は最初の 1 回と最終確認だけ」に反する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回が既に記録されているブランチで loop を起動したとき (実在: 9 回・17 回の記録がある)
+          who: operator
+          what: >-
+            2 度目以降の全量レビューが走り、テスト強化系の指摘が際限なく出続ける。同じ行が自ら挙げる失敗を、このスキル自身が起こす
+          detectability: >-
+            気づかない。全量か増分かは記録の scope に残るが、それが規則に反しているかを検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 4
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 32
+        summary: >-
+          ce-code-review の JSON から記録への対応表が model と scope を含まないのに「無い属性を補完しない」と定めている。model は記録の必須キーで、triagecheck が欠落をエラーにする
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            ce-code-review の経路で loop を回し、対応表のとおりに JSON を記録の様式へ写したとき
+          who: operator
+          what: >-
+            記録に model が入らず、triagecheck の検査 (record.go の必須キー検査) が必ず失敗する。手順 6 の検査が通らないので、その回の記録をコミットできない
+          detectability: >-
+            検査が赤くなるので気づく。ただし対応表の側が原因だとは分からず、書き手が場当たりに model を補って対応表が古いまま残る
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 5
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 16
+        summary: >-
+          「周回の途中でモデルを変えない」の理由「記録から区別できなくなる」が、記録が回ごとに model 列を持つという record-schema.md と矛盾する。同文書はむしろ回ごとにモデルを使い分ける運用を勧めている
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            loop の前提知識を読んだ人が、record-schema.md の「収束の目安」も読んだとき
+          who: operator
+          what: >-
+            規則の理由が成り立たない。記録は回ごとに model を持つので区別はできる。record-schema.md は「実害系は Opus、収束確認は Sonnet」と使い分けを勧めており、規則と運用指針が正面から食い違う
+          detectability: >-
+            気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 6
+        file: review-triage/skills/review-triage-loop/references/arguments.md
+        line: 30
+        summary: >-
+          「値の検査」の節が引数だけを検査対象にしており、設定側の max_rounds / review_skill の不正値を検査しない。設定に書いてあれば尋ねないと定めているため、設定の誤記が検査されないまま周回に入る
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config.json の loop に不正な値 (max_rounds: 0、review_skill: "codereview" など) が書かれた状態で、引数を省いて loop を起動したとき
+          who: operator
+          what: >-
+            不正値がそのまま採用される。max_rounds が 0 なら 1 周も回らず、review_skill の綴りが違えば起動する経路が無い。同じ値を引数で渡せば検査されるのに、設定経由では検査されない
+          detectability: >-
+            起動に失敗するので何かがおかしいことには気づく。ただし設定の値が検査されていないことが原因だとは分からない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 7
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 35
+        summary: >-
+          選択待ちの判定が全回対象かつ review-triage-fix の後にしかないため、過去の回に未回答の awaiting-human が残ったブランチでは、毎回かならずレビュー 1 回を消費してから 1 周で止まる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に status: awaiting-human が残ったまま回答されていないブランチで loop を起動したとき
+          who: operator
+          what: >-
+            レビューを 1 回走らせ、トリアージし、fix を呼んでから初めて選択待ちを見つけて止まる。手順 1 で記録を読めば起動前に分かることに、レビュー 1 回分のコストを払う
+          detectability: >-
+            止まった理由が報告されるので気づく。ただし、それが起動前に分かったはずだとは気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 8
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 45
+        summary: >-
+          review-request.md が full を「最初の 1 回と最終確認」の 2 箇所で求めるのに、loop は最終確認の全量レビューを持たない。loop の収束は必ず増分の回で起きる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            loop だけでレビューから修正までを回し、収束 (採択 0 件) で終わったとき
+          who: operator
+          what: >-
+            最終確認の全量レビューが一度も走らない。増分は前回の HEAD からの差分しか見ないので、周回全体を通して壊れたものが検出されないまま収束と報告される
+          detectability: >-
+            気づかない。収束の報告は「そのレビュースキル・そのモデル・その範囲で指摘が出なかった」としか言わないので、最終確認が欠けていることは読み取れない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 9
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 33
+        summary: >-
+          収束の判定が今回の findings だけを見るのに対し、review-triage-fix は全回の未覆いの採択を対象にする。過去の回に plans にも plan_ref にも覆われていない採択が残っていても、今回 0 件なら収束と報告して止まる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に plans にも plan_ref にも覆われていない採択が残った記録で、今回の回の採択が 0 件だったとき
+          who: operator
+          what: >-
+            loop が収束と報告して止まるが、実際には直されていない採択が残っている。fix を呼べば対象になるのに、loop が呼ばずに終わる
+          detectability: >-
+            気づかない。収束の報告に未覆いの採択の件数は出ないので、記録を人間が直接読むまで残る
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+      - id: 10
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 60
+        summary: >-
+          規範文書に実測値 (17 回に達した記録がある) を直書きしている。review-triage/SKILL.md が「規範文書に実測値を書かない。件数・比率などの実測は記録だけが持つ」と定めている
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            この文を読んだ人が、記録の実際の回数と突き合わせたとき
+          who: operator
+          what: >-
+            記録が増減しても文書の数値が追随せず、古い実測値が規範文書に残る。review-triage/SKILL.md が禁じた形をこのプラグイン自身の文書が持つ
+          detectability: >-
+            気づかない。規範文書の実測値を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所を読んで根拠を確かめた (verified)。免除条項は条件 1
+          (関門の検出能力の欠落・消失の主張) に当たらないので不成立。却下ゲート 4 つを
+          すべて評価していずれも発火しない: hypothetical (文書どうしの矛盾なので
+          再現条件は明示できる)、developer-domain (対象は skills/ 配下で被害者は
+          operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
+          already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
+          どうしの矛盾は検査しない)
+    notes: >-
+      review-triage-loop の初回の動作確認として、このスキル自身が追加した文書を対象に
+      走らせた回。10 件すべてが文書どうしの矛盾か規則の実行不能性で、段 A の照合だけで
+      根拠を確かめられた。residual の 5 件には目を通し、記録に写すべきものは無かった。
