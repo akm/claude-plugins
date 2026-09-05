@@ -12,7 +12,12 @@
   "frozen_paths": ["docs/brainstorms/", "docs/plans/", "docs/solutions/"],
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",
-  "triage_summary_command": "make triage-summary"
+  "triage_summary_command": "make triage-summary",
+  "loop": {
+    "max_rounds": 5,
+    "review_skill": "ce-code-review",
+    "review_args": ""
+  }
 }
 ```
 
@@ -23,6 +28,7 @@
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を走らせるコマンド | 検査を走らせず、**走らせていないことを報告に明記する** |
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが正本として残る |
+| `loop` | `review-triage-loop` の既定値 (下記) | 周回の既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に尋ねる |
 
 ## `triage_summary_command` — 同梱の triagecheck に渡す
 
@@ -40,6 +46,20 @@
 - **突き合わせは行の完全一致で行う。部分一致にしない。** 短い名前が長い名前に含まれると、実在しない関門名が実在すると誤判定される。
 
 **`gates` が空のとき、免除条項は使わない。** 突き合わせ先が無いまま名前を書かせると、存在しない関門名が検査されないまま通る。**「関門が無いことを確かめた」と「関門の一覧を持っていない」は別の事実である。**
+
+## `loop` — 周回の既定値
+
+[review-triage-loop](../../review-triage-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き。
+
+| キー | 意味 | 未設定のときの扱い |
+| --- | --- | --- |
+| `max_rounds` | 周回の上限 | 5 |
+| `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
+| `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 空 (スキルの既定に従う) |
+
+**`max_rounds` に上限を設ける理由は、収束しない周回を止めるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ型の指摘に何度も応え続けることになる (実測: 17 回に達した記録がある)。上限に達したときの扱いは `review-triage-loop` の手順が定める。
+
+**`review_skill` を推測しない。** どちらのスキルで走らせたかは記録の `skill` に残り、後から粒度を比較する材料になる。推測で決めると、記録が実態と食い違う。
 
 ## `frozen_paths` — 直さない文書
 
