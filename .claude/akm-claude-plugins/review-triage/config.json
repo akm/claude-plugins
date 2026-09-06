@@ -11,6 +11,7 @@
   "loop": {
     "max_rounds": 5,
     "review_skill": "code-review",
-    "review_args": "high"
+    "review_args": "high",
+    "review_model": ""
   }
 }
