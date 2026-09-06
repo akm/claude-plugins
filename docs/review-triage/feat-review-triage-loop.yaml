@@ -287,7 +287,3069 @@ runs:
           operator)、disproportionate-cost (修正は文書の数行で対象より小さい)、
           already-visible (triagecheck は記録のスキーマを検査するだけで、規範文書
           どうしの矛盾は検査しない)
+    plans:
+      - problem_id: P1
+        cause: >-
+          周回を「これから積む回」だけで設計し、記録に既にある回の状態を読む発想が
+          無かった。手順 1 が設定と引数しか読まないので、終了条件を書くときも
+          今回の回だけを見る形になった。選択待ちだけ全回を見るのは、
+          review-triage-fix の記述を写したためで、他の条件には及ばなかった
+        finding_ids: [1, 2, 7, 9]
+        approach: >-
+          手順 1 に記録を読む段を足し、周回に入る前に未処理の検知・選択待ち・
+          未覆いの採択・未着手があれば、レビューを走らせずに報告して終了する。
+          終了条件の表の走査範囲を、review-triage-fix と同じ「全回」にそろえる。
+          未着手 (pending) を報告の項目として reporting.md に足す
+        investigation:
+          scope: >-
+            範囲: SKILL.md の全文と reporting.md の全文を読み、review-triage-fix の
+            手順 1 (全回を 1 パスで見る 3 項目) と突き合わせた。結果: 指摘の 4 件が
+            同じ原因の別の現れで、これ以外に走査範囲の非対称は無かった
+        order: 1
+        sha: 14df295
+        status: done
+      - problem_id: P2
+        cause: >-
+          範囲 (全量か増分か) を周回の内側だけで決め、記録に既にある回を起点に
+          数えなかった。「1 周目」を「記録の回 1」と同一視したことによる
+        finding_ids: [3]
+        approach: >-
+          全量にする条件を「周回の 1 周目」から「記録に回が無いとき」に変える。
+          既に回がある記録では、1 周目から増分にする
+        investigation:
+          scope: >-
+            範囲: review-invocation.md の範囲の節と SKILL.md の手順 2 を読み、
+            review-request.md の範囲の規則と突き合わせた。docs/review-triage/ の
+            既存 7 記録の回数を数え、9 回・17 回の記録が実在することを確かめた。
+            結果: 範囲を決める記述は review-invocation.md の 1 箇所に集約済みで、
+            他に同じ原因の箇所は無かった
+        order: 2
+        sha: 22a3f2e
+        status: done
+      - problem_id: P3
+        cause: >-
+          経路と設定の文を書くとき、書き出し先 (記録のスキーマ) と読み込み元
+          (設定ファイル) の必須項目・検査項目と突き合わせなかった
+        finding_ids: [4, 6]
+        approach: >-
+          review-invocation.md の対応表に model と scope を足す (JSON に無い値を
+          どこから採るかを書く)。arguments.md の値の検査を、引数と設定の両方を
+          対象にするよう書き換える
+        investigation:
+          scope: >-
+            範囲: record-schema.md の runs[] のスキーマ表と triagecheck の
+            record.go:203 の必須キー一覧を読み、review-invocation.md の対応表と
+            突き合わせた。arguments.md の値の検査の節と project-config.md の
+            loop の表を突き合わせた。結果: 対応表に欠けるのは model と scope の 2 つで、
+            他の必須キー (date・skill・head) は表か周回の側で決まる
+        order: 3
+        sha: f390f29
+        status: done
+      - problem_id: P4
+        cause: >-
+          モデルを固定する規則の理由を、記録のスキーマを確かめずに書いた。
+          記録は回ごとに model 列を持つので「記録から区別できなくなる」は成り立たない
+        finding_ids: [5]
+        approach: >-
+          人間が (b) を選んだ。モデルを固定する規則を外し、config.json の loop に review_model、引数に --model を足して指定できる条件にする。周回が回ごとに勝手に切り替えることは引き続き禁じる。ce-code-review の経路では効かないことを明記する
+        investigation:
+          scope: >-
+            範囲: record-schema.md の runs[] の model の行と「生成サマリの読み方」の
+            モデルの使い分けの記述を読み、SKILL.md の前提知識と突き合わせた。
+            結果: 記録は回ごとに model を持ち、同文書は回ごとの使い分け (実害系は Opus、
+            収束確認は Sonnet) を勧めている。規則そのものの是非が争点になる
+        options: >-
+          (a) 規則を残し、理由を書き換える — 回ごとに変えると回どうしの比較が
+          成り立たなくなる、など成り立つ理由に差し替える。利用者は今のとおり
+          単一のモデルで回す。(b) 規則を外し、record-schema.md の使い分けに従えるよう
+          にする — 序盤は Opus、収束確認は Sonnet といった運用ができるが、
+          周回の設計に「どの回でどのモデルを使うか」の判断が入る。
+          トレードオフ: (a) は単純だが、同文書が勧める運用を loop では使えない。
+          (b) は運用の幅が広がるが、モデルの切り替え条件を誰がどう決めるかを
+          新たに定める必要がある (利用者は将来のバージョンで変えるかもと述べている)
+        sha: 4f38d82
+        status: done
+      - problem_id: P5
+        cause: >-
+          範囲の規則が full を求める 2 箇所 (最初の 1 回と最終確認) のうち、
+          最初の 1 回だけを周回に写し、最終確認を写さなかった
+        finding_ids: [8]
+        approach: >-
+          人間が (b) を選んだ。最終確認の全量は周回に含めず、収束の報告で「最終確認がまだである」ことを必ず伝える。周回に入れると収束のたびに全量が 1 回増え、上限の意味が変わるため
+        investigation:
+          scope: >-
+            範囲: review-request.md の範囲の規則と review-invocation.md の範囲の節、
+            SKILL.md の終了条件の表を読んだ。結果: loop の収束は増分の回でしか
+            起きない構造で、最終確認を入れる位置は終了条件の直前か直後の 2 通りある
+        options: >-
+          (a) 収束したら最終確認の全量を 1 回走らせ、そこで 0 件なら収束と報告する —
+          規則どおりだが、収束のたびに全量が 1 回増え、上限との関係を決める必要がある
+          (最終確認は上限に数えるか)。(b) 最終確認は loop の範囲外とし、収束の報告に
+          「最終確認の全量は別途走らせること」と明記する — loop は単純なままだが、
+          人間が忘れれば最終確認が走らない。トレードオフ: (a) は規則を loop の中で
+          完結させるが上限の意味が変わる。(b) は loop を単純に保つが、規則の遵守を
+          人間の記憶に委ねる
+        sha: 0ab4203
+        status: done
+      - problem_id: P6
+        cause: >-
+          上限を設ける理由を書くとき、説得力のある根拠として調査で数えた実測値を
+          そのまま本文に書いた。review-triage/SKILL.md の「規範文書に実測値を
+          書かない」を、自分が書いている文書にも適用しなかった
+        finding_ids: [10]
+        approach: >-
+          実測値 (17 回に達した記録がある) を本文から外し、記録から数えられる旨に
+          書き換える
+        investigation:
+          scope: >-
+            範囲: review-triage/skills/ 配下を「実測: 」「N 回に達した」で grep し、
+            project-config.md の 1 箇所だけが該当することを確かめた。
+            recurrence-detection.md:74 の「実例: 17 回の記録の回 3」は実例の見出しで、
+            規範の本文に埋め込んだ実測値ではないので対象外とした
+        order: 4
+        sha: 42565d3
+        status: done
     notes: >-
       review-triage-loop の初回の動作確認として、このスキル自身が追加した文書を対象に
       走らせた回。10 件すべてが文書どうしの矛盾か規則の実行不能性で、段 A の照合だけで
       根拠を確かめられた。residual の 5 件には目を通し、記録に写すべきものは無かった。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 6d6b968
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 27
+        summary: >-
+          入口の関門の 4 番目「plans にも plan_ref にも覆われていない採択」が手順 3 の
+          収束の条件の裏返しそのもので、既に回のある記録は入口で終了するか 1 周目の
+          レビュー後に収束で終了するかのどちらかにしかならず、周回に入れない。
+          review-triage は plans を書かないので、review-triage を単独で走らせた直後という
+          主用途が、レビューを 1 回も走らせずに終了する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review-triage を単独で走らせて採択が残っている記録に対して loop を起動したとき
+            (このスキルの主用途)
+          who: operator
+          what: >-
+            入口の関門に当たってレビューを走らせずに終了する。周回が始まらないので
+            loop がまったく使えない。しかもこの 1 件だけは関門自身が挙げる理由
+            (人間の回答か review-triage-fix の再開を待つ状態) に当てはまらない —
+            未覆いの採択は review-triage-fix の手順 1 が通常処理する新規の対象である
+          detectability: >-
+            起動してすぐ終了するので気づく。ただし、原因が入口の関門の条件の選び方に
+            あるとは分からない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で確かめた。review-triage/SKILL.md に plans の語が 1 つも無いこと
+          (grep で 0 件) と、入口の関門と手順 3 の収束の条件が同じ形であることを確認。
+          却下ゲート 4 つはいずれも発火しない
+      - id: 2
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 26
+        summary: >-
+          未着手 (status: pending) が、手順 1 では「レビューを走らせずに終了する」条件、
+          手順 3 では「終了条件にしない」と明示され、同一文書内で矛盾する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に status: pending が残った記録で loop を起動したとき
+          who: operator
+          what: >-
+            手順 1 に従えば終了し、手順 3 に従えば周回を続ける。実装する側がどちらに
+            従うか決められない。手順 3 が挙げる理由 (fix が中断した合図なので報告に出す)
+            は入口でも成り立つので、理由の側も入口の関門を支持しない
+          detectability: >-
+            気づかない。同一文書内の矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:26 と :47 の両方を読み、矛盾を確認した。
+          却下ゲート 4 つはいずれも発火しない
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 35
+        summary: >-
+          P5 で足した文が「周回のレビューは 2 回目以降すべて増分なので」と書いており、
+          P2 で外したはずの「1 周目は全量」を前提にしている。同じ増分で足した
+          review-invocation.md が名指しで禁じた読み方を、報告側の記述が呼び戻している
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            既に回のある記録で loop を回して収束したとき (その周回は 1 周目から増分)
+          who: operator
+          what: >-
+            報告の根拠が実態と食い違う。「2 回目以降すべて増分」ではなく全周が増分
+            なので、最終確認を促す理由づけが成り立たない。P2 で直した誤りが
+            別のファイルに残る
+          detectability: 気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md:35 と review-invocation.md の範囲の節を読み、
+          突き合わせた。却下ゲート 4 つはいずれも発火しない
+      - id: 4
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 10
+        summary: >-
+          P4 でモデルを周回の条件に加え SKILL.md 手順 1 の開始前の報告にはモデルを
+          足したが、報告の正本である reporting.md の「周回の条件」にモデルが無く、
+          最後の報告にモデルが出ない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review_model か --model を指定して loop を回し、報告を読むとき
+          who: operator
+          what: >-
+            どのモデルで回したかが最後の報告に出ない。同ファイルの収束の節が
+            「そのモデル」に言及しているのに、その値を報告する項目が無い
+          detectability: >-
+            報告を読んだ人がモデルを知りたいと思ったときに気づく。それまでは気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md の「必ず出すもの」の 4 項目と SKILL.md 手順 1 を
+          突き合わせた。却下ゲート 4 つはいずれも発火しない
+    plans:
+      - problem_id: P1
+        cause: >-
+          入口の関門 (手順 1) を足すとき、既存の手順 3 の終了条件と突き合わせなかった。
+          review-triage-fix の手順 1 が報告する 3 項目をそのまま関門の条件に写したが、
+          fix が「報告する」ものと loop が「周回に入る前に止める」ものは別であり、
+          その違いを考えなかった
+        finding_ids: [1, 2]
+        approach: >-
+          入口の関門から「未覆いの採択」と「未着手」を外し、人間の回答を待つ 2 つ
+          (未処理の検知・選択待ち) だけを残す。外した 2 つは周回を止める理由にならない —
+          未覆いの採択は review-triage-fix が通常処理する新規の対象、未着手は
+          手順 3 が定めるとおり報告に出すもの。関門の理由の文もそれに合わせる
+        investigation:
+          scope: >-
+            SKILL.md の手順 1 の関門 4 項目と手順 3 の終了条件の表・その下の注記を
+            読み比べ、review-triage/SKILL.md に plans の語が無いこと (grep で 0 件)、
+            review-triage-fix の手順 1 の 3 項目の扱い (すべて「報告する」) を確認した。
+            結果: 食い違うのは 4 項目のうち 2 つで、残る 2 つ (未処理の検知・選択待ち)
+            は手順 3 の終了条件とも整合する
+        order: 1
+        sha: 43eba2e
+        status: done
+      - problem_id: P2
+        cause: >-
+          P5 の修正で理由の文を書くとき、同じ増分で入れた P2 の修正 (全量にする条件を
+          記録の回数で決める) を参照しなかった。別のファイルを別の作業として直したため、
+          片方で外した前提がもう片方に残った
+        finding_ids: [3]
+        approach: >-
+          「周回のレビューは 2 回目以降すべて増分なので」を、記録に回があれば全周が
+          増分になりうる書き方に直す
+        investigation:
+          scope: >-
+            reporting.md の収束の節と review-invocation.md の範囲の節を読み比べた。
+            さらに reporting.md と arguments.md を「1 周目」「2 回目以降」で grep し、
+            他に同じ前提を置く記述が無いことを確認した (arguments.md:40 の「1 周目を
+            走らせてから」は範囲ではなく検査の時点の話なので対象外)
+        order: 2
+        sha: e01aaf3
+        status: done
+      - problem_id: P3
+        cause: >-
+          P4 でモデルを周回の条件に足したとき、条件を報告する箇所を SKILL.md の
+          手順 1 だけ直し、報告の正本 (reporting.md) と description に反映しなかった。
+          新しい条件を足す作業を、それが現れるすべての場所に及ぼさなかった
+        finding_ids: [4]
+        approach: >-
+          reporting.md の「周回の条件」にモデルを足す。あわせて、同じ原因の別の現れ
+          として SKILL.md の description に --model を足し、「回ごとにモデルを
+          変えてよい」という前提知識の見出しが、設定も引数も周回全体に 1 つの値しか
+          持てない実態と合うよう書き換える (どちらも指摘には無いが原因は同じ)
+        investigation:
+          scope: >-
+            reporting.md の「必ず出すもの」の 5 項目と SKILL.md 手順 1 の報告項目を
+            突き合わせた。review_model / --model をリポジトリ全体に grep し、
+            SKILL.md の description と前提知識の見出しに反映漏れがあることを確認した
+            (レビューの residual の 2 件と一致)
+          included:
+            - >-
+              SKILL.md の description に --model が無い (P4 の反映漏れ。指摘には無い)
+            - >-
+              SKILL.md:16 の「回ごとにモデルを変えてよい」が、設定も引数も周回全体に
+              1 つの値しか持てない実態と食い違う (P4 の反映漏れ。指摘には無い)
+        order: 3
+        sha: c337f33
+        status: done
+    notes: >-
+      回 1 の修正 (6 問題) に対する増分レビュー。4 件すべて採択で、うち 2 件 (指摘 1・2) は
+      回 1 の P1 の修正が生んだ欠陥、1 件 (指摘 3) は P5 の修正が P2 の修正と食い違った
+      もの。修正が次の欠陥を生む連鎖がそのまま現れた回。residual 4 件のうち 2 件は
+      記録に写す価値がある — description に --model が入っていないこと、「回ごとに
+      モデルを変えてよい」と書きながら設定も引数も周回全体に 1 つの値しか持てないこと。
+      どちらも P4 の修正の詰めの甘さで、次の回の対象になりうる。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: d51d458
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 27
+        summary: >-
+          入口の関門から未着手 (pending) を外した理由を「review-triage-fix が通常の
+          対象として処理するもの」としているが、収束で止まる経路では fix を呼ばない。
+          pending は plans に覆われているので収束の判定も通過し、中断した修正が
+          誰にも再開されないまま収束として報告される
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に status: pending が残った記録で loop を回し、今回の回の採択が
+            0 件で収束したとき
+          who: operator
+          what: >-
+            中断していた修正が再開されないまま収束と報告される。pending は plans に
+            覆われているので収束の判定 (未覆いの採択が無いか) を通過し、収束では
+            review-triage-fix を呼ばないので再開の機会も無い
+          detectability: >-
+            reporting.md の「残っているもの」が pending を報告するので、報告を読めば
+            気づく。ただし収束という結論と食い違うことには気づきにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:27 の理由と :31 の「収束と検知に当たれば fix を
+          呼ばずに抜ける」を読み比べ、矛盾を確認した。却下ゲート 4 つは発火しない
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 10
+        summary: >-
+          モデルを報告項目に足したが、ce-code-review の経路では review_model が
+          効かないことがこの行に及んでいない。その経路で回すと、実際には使われな
+          かったモデル名を周回の条件として報告する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            --review ce-code-review と --model を同時に指定して loop を回し、
+            報告を読むとき
+          who: operator
+          what: >-
+            報告が実態と食い違う。指定したモデルで走ったと読めるが、その経路では
+            指定が効かず、主要な 3 ペルソナは呼び出し元のモデルを継承している
+          detectability: >-
+            気づかない。報告の値と実際に走ったモデルを突き合わせる関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md:10 と review-invocation.md の ce-code-review の
+          節を読み比べた。却下ゲート 4 つは発火しない
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 35
+        summary: >-
+          前の回で外した前提の置き換え先「収束は増分の回で起きる」も成り立たない。
+          記録が空から起動すると 1 周目は全量で、それが 0 件なら収束は全量の回で
+          起きる。結論 (最終確認がまだ) は正しく、理由の側だけの誤り
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            記録が無い状態から loop を起動し、1 周目の全量レビューが採択 0 件だったとき
+          who: operator
+          what: >-
+            報告の理由が実態と食い違う。その場合の収束は全量の回で起きているので、
+            最終確認を促す理由づけが成り立たない (促すこと自体は正しい)
+          detectability: 気づかない。文書の理由づけの誤りを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md:35 と review-invocation.md の範囲の節を
+          読み比べた。却下ゲート 4 つは発火しない
+      - id: 4
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 16
+        summary: >-
+          「1 つの周回はどの回も同じモデル」と定めながら、正本として引く
+          record-schema.md が同一の収束過程内での使い分け (実害系は Opus、
+          収束確認は Sonnet) を勧めており、周回内で実行する手段が無い
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            record-schema.md の使い分けの目安に従おうとして loop を使うとき
+          who: operator
+          what: >-
+            目安に従えない。loop は周回全体に 1 つのモデルしか持てないので、
+            収束の仕上げだけ別のモデルにするには周回を分けるしかないが、
+            その手順は書かれていない
+          detectability: >-
+            使い分けようとした人が手段を探して気づく。それまでは気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:16 と record-schema.md の「生成サマリの読み方」を
+          読み比べた。却下ゲート 4 つは発火しない
+    recurrence:
+      status: declined
+      declined_reason: >-
+        採択が 10 → 4 → 4 で最初に比べれば減っているので、繰り返しではないと見做す
+        (人間の判断)。
+      evidence:
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 2
+          prior: P3
+          reason: >-
+            回 2 の P3 (モデルを条件に足した反映を残りの箇所に及ぼす) の修正が
+            reporting.md にモデルの行を足した結果、その行が ce-code-review の
+            経路の例外を取りこぼした。回 2 の P3 自体も回 1 の P4 (モデルを条件に
+            足す) の修正由来なので、修正由来の指摘が 2 回連続している
+        - condition: fix-derived
+          finding_id: 3
+          prior_run: 2
+          prior: P2
+          reason: >-
+            回 2 の P2 (収束の報告の理由から「1 周目は全量」の前提を外す) の修正が
+            置き換えた理由が、今度は記録が空のときを取りこぼした。回 2 の P2 自体も
+            回 1 の P5 の修正由来なので、修正由来の指摘が 2 回連続している
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 2
+          prior: P1
+          reason: >-
+            回 2 の P1 (入口の関門を人間の回答を待つものだけに絞る) の修正が
+            外した pending の行き先を、収束の経路について確かめなかった。
+            回 2 の P1 自体も回 1 の P1 の修正由来である
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 2 で pending を入口の関門から外すとき、「review-triage-fix が通常処理する」
+          と書いたが、fix を呼ばずに抜ける収束の経路について確かめなかった
+        finding_ids: [1]
+        approach: >-
+          収束の判定に当たっても、未着手 (pending) が残っていれば review-triage-fix を
+          呼んで再開させてから周回を抜ける。手順 2 と手順 3 の注記をそれに合わせる。
+          pending は「再開の対象」(record-schema.md の状態の表) なので、収束で
+          止まる前に再開の機会を作るのが状態の意味に沿う
+        investigation:
+          scope: >-
+            SKILL.md の手順 1・2・3 と reporting.md の「残っているもの」を読み、
+            pending が現れる経路を数え上げた (入口・収束・検知・選択待ち・上限)。
+            結果: fix を呼ばずに抜けるのは収束と検知の 2 経路で、検知は人間の回答待ち
+            なので再開しないのが正しい。直すのは収束だけ
+        order: 1
+        sha: 8bf8cc7
+        status: done
+      - problem_id: P2
+        cause: >-
+          回 2 で報告の項目にモデルを足すとき、review-invocation.md にある
+          ce-code-review の経路の例外 (review_model が効かない) と突き合わせなかった
+        finding_ids: [2]
+        approach: >-
+          reporting.md の「周回の条件」で、ce-code-review の経路では指定の有無に
+          かかわらず「継承 (指定は無効)」と書かせる
+        investigation:
+          scope: >-
+            review_model / --model / モデル を review-triage-loop 配下と
+            project-config.md で grep し、経路の例外に触れている箇所 (arguments.md・
+            review-invocation.md) と触れていない箇所 (reporting.md) を分けた。
+            結果: reporting.md の 1 箇所だけが対象
+        order: 2
+        sha: ca070ac
+        status: done
+      - problem_id: P3
+        cause: >-
+          回 2 で収束の理由を置き換えるとき、記録が空から起動して 1 周目の全量が
+          0 件になる場合を数えなかった
+        finding_ids: [3]
+        approach: >-
+          「収束は増分の回で起きる」という理由づけを外し、「周回が担う全量は最初の
+          1 回だけで、修正後の最終確認の全量は周回の外にある」という事実だけを残す。
+          結論 (最終確認がまだであることを書く) は変えない
+        investigation:
+          scope: >-
+            reporting.md の収束の節と review-invocation.md の範囲の節を読み比べ、
+            「増分の回で」「全量の回で」を review-triage-loop 配下で grep した。
+            結果: 対象は reporting.md:35 の 1 文だけ
+        order: 3
+        sha: 0148499
+        status: done
+      - problem_id: P4
+        cause: >-
+          回 2 で record-schema.md の使い分けの目安を正本として引いたが、周回全体に
+          1 つのモデルしか持てない loop でそれをどう実行するかを書かなかった
+        finding_ids: [4]
+        approach: >-
+          SKILL.md の前提知識に、使い分けの実行手段 (収束まで 1 つの周回を回し、
+          止まった後に --model を変えて次の周回を起動する) を 1 文で書く
+        investigation:
+          scope: >-
+            SKILL.md の前提知識と原則、arguments.md、project-config.md の loop の節を
+            読み、周回をまたいでモデルを変える手順が書かれた箇所を探した。
+            結果: 「周回をまたげば変えてよい」とあるだけで手順は無い
+        order: 4
+        sha: 412d012
+        status: done
+    notes: >-
+      回 2 の修正 (3 問題) に対する増分レビュー。4 件すべて採択。3 件が回 2 の修正由来で、
+      しかも回 2 の該当する問題自体が回 1 の修正由来という二重の連鎖になっている。
+      検知が発火した。同じ型は「規則や条件を 1 箇所直すとき、それが現れる他の経路・
+      場合を数え上げずに直す」— 回 1 の P4・P5、回 2 の P1・P2・P3、回 3 の 1・2・3 が
+      すべてこの型である。次は俯瞰 (review-triage-fix の手順 2) に進む。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: fable-5-1
+    level: high
+    scope: incremental
+    head: c962f6d
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 11
+        summary: >-
+          「残っているもの」の理由「収束では review-triage-fix を呼ばないので」が、
+          回 3 の P1 で足した「収束で未着手が残っていれば fix を呼んで再開させてから
+          抜ける」と矛盾する。結論 (収束でも未着手を出す) は再開後の中断で pending が
+          残りうるので正しいが、理由が偽になった
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            reporting.md の「残っているもの」を読んだ人が、SKILL.md 手順 2 の収束の
+            経路と突き合わせたとき
+          who: operator
+          what: >-
+            理由が実態と食い違う。収束でも fix を呼ぶようになったのに、呼ばないことを
+            前提にした理由が残り、報告の項目が要る根拠を読み手が誤解する
+          detectability: 気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md:11 と SKILL.md:31 を読み比べ、矛盾を確認した。
+          却下ゲート 4 つは発火しない
+      - id: 2
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 31
+        summary: >-
+          収束の経路で再開させた fix が awaiting-human を書いても、「再開させてから
+          抜ける」なので選択待ちの判定に到達しない。止まった理由は収束のまま、
+          reporting.md の選択待ちの節も発火せず、人間に返した判断が報告に出ない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            収束の経路で再開した review-triage-fix が、手順 6 で問題を awaiting-human に
+            したとき
+          who: operator
+          what: >-
+            周回は収束として止まり、選択待ちの提示 (options・どの回か) が出ない。
+            人間に返した判断が、fix 自身の報告を読まない限り気づかれない
+          detectability: >-
+            fix 自身の手順 9 の報告に出るので、それを読めば気づく。ただし SKILL.md は
+            「判定の材料は記録であって報告の文面ではない」と定めており、それに反する
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md 手順 2 の並び (収束の再開 → 抜ける、選択待ちの判定は
+          その後) を読み、到達しないことを確認した。却下ゲート 4 つは発火しない
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 10
+        summary: >-
+          ce-code-review の経路で報告を「継承 (指定は無効)」にしたが、記録の model を
+          定める review-invocation.md は「手順 1 で決めた値」のまま。その経路で --model
+          を指定すると報告と記録が食い違い、走っていないモデルを記録する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            --review ce-code-review と --model を同時に指定して loop を回したとき
+          who: operator
+          what: >-
+            記録の model に指定した値が入るが、実際にはその経路で指定は効かない。
+            record-schema.md の定義 (レビューを実行したモデル) に反する値が記録に残り、
+            後からモデル別に粒度を比較する材料が壊れる
+          detectability: 気づかない。記録の model と実際に走ったモデルを突き合わせる関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md:10 と review-invocation.md:46 を読み比べた。
+          却下ゲート 4 つは発火しない
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 3
+          prior: P1
+          reason: >-
+            回 3 の P1 (収束で止まる前に未着手を再開させる) が SKILL.md を直したとき、
+            同じ事実を理由として引く reporting.md:11 に追随しなかった。回 3 の P1 は
+            回 2 の P1 の修正由来 (回 3 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 3
+          prior: P1
+          reason: >-
+            回 3 の P1 が収束の経路に fix の呼び出しを足したとき、その fix が
+            awaiting-human を書く場合の行き先を数えなかった。上と同じく 2 回連続
+        - condition: fix-derived
+          finding_id: 3
+          prior_run: 3
+          prior: P2
+          reason: >-
+            回 3 の P2 (報告のモデルに ce-code-review の例外を反映) が reporting.md を
+            直したとき、同じ値を記録に写す review-invocation.md:46 に追随しなかった。
+            回 3 の P2 は回 2 の P3 の修正由来なので、2 回連続
+      reframe:
+        pattern: 同じ事実を場所ごとに具体で言い直している
+        axes: 事実 × 語られる場所
+        root_cause: >-
+          事実 (モデルの値と効く経路、収束の経路の振る舞い) を 1 箇所で定義せず、
+          それを使う各文書がそれぞれ具体の内容を書いているため、事実が変わるたびに
+          書いてある場所を全部数え上げて直す必要があり、数え上げが毎回漏れる
+        fix_unit: >-
+          事実を 1 箇所で定義して語を与え、他の場所はその語 (と正本への参照) だけを
+          使う。具体の内容を複数箇所に書かない
+        source: human
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — モデルの値と効く経路、収束の経路の
+          振る舞いという事実を 1 箇所で定義せず、各文書が具体の内容を書いている
+        finding_ids: [1, 3]
+        approach: >-
+          修正の単位は reframe.fix_unit。review-invocation.md に「実効モデル」(周回に
+          指定したモデルがその経路で実際に使われたもの) を 1 箇所で定義し、モデルに
+          触れる他の 5 箇所は具体の内容を書かずこの語と参照だけを使う。reporting.md
+          の「残っているもの」の理由は、手順 2 の中身を言い直さず、収束の後に残った
+          ものは次の周回か人間が引き継ぐという事実だけにする
+        investigation:
+          scope: >-
+            review-triage-loop 配下と project-config.md を「モデル / review_model /
+            --model / 継承 / mid-tier / 手順 1 で決めた値」で grep し、さらに
+            review-invocation.md・reporting.md・arguments.md・SKILL.md を通読して、
+            語が違う言い換え (「呼び出し元のモデル」など) も拾った。収束の経路の
+            言い直しは「収束では」「呼ばない」で grep した
+          included:
+            - review-invocation.md:18 (code-review でのモデルの渡し方)・:29 (ce-code-review の例外) — 定義に統合する
+            - review-invocation.md:46 (記録の model) — 指摘 3 の箇所。実効モデルを指す
+            - reporting.md:10 (周回の条件) — 具体の場合分けをやめ、指定と実効モデルを書かせる
+            - arguments.md:38 (review_model の検査) — 例外の具体を書かず、指定と実効が違えば報告する形にする
+            - SKILL.md 手順 1 の報告項目 — 指定と実効モデル
+            - project-config.md:60 (review_model の意味) — 周回に指定する値であり、使われるかは経路の正本による
+          excluded:
+            - SKILL.md:16 (前提知識のモデルの節) — 周回をまたぐ使い分けの話で、経路ごとの値の具体は書いていない。変えない
+            - project-config.md:64 (review_model は 1 つの周回に 1 つ) — 周回内での不変の規則で、経路の事実は書いていない。変えない
+        order: 1
+        sha: e32bb34
+        status: done
+      - problem_id: P2
+        cause: >-
+          回 3 の P1 で収束の経路に review-triage-fix の呼び出しを足したとき、その fix が
+          awaiting-human を書く場合の行き先 (選択待ちの判定) を数えなかった。
+          捉え直しの型 (事実の言い直し) ではなく手順の流れの穴なので別の問題にする
+        finding_ids: [2]
+        approach: >-
+          手順 2 の収束の経路で fix を再開させた後は、選択待ちの判定 (手順 3) を通して
+          から抜ける。選択待ちが出ていれば止まった理由はそちらを優先する
+        investigation:
+          scope: >-
+            SKILL.md 手順 2 の 4 段と手順 3 の表を読み、fix を呼ぶ 2 経路 (通常・収束の
+            再開) の後に選択待ちの判定があるかを確かめた。結果: 通常の経路にはあり、
+            収束の再開の経路には無い。他に fix を呼ぶ経路は無い
+        order: 2
+        sha: 8795a84
+        status: done
+    notes: >-
+      回 3 の修正 (4 問題) に対する増分レビュー。3 件すべて採択、すべて回 3 の修正由来。
+      検知の条件は機械的に成立する (直前の回の検知は人間が否定したが、記録の根拠は
+      残っており、回ごとに判断する規則のとおり今回も判断した)。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: fable-5-1
+    level: high
+    scope: incremental
+    head: 74a88a2
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 21
+        summary: >-
+          実効モデルの定義が、指定の無いときと ce-code-review の経路で「継承」という語
+          そのものを値として返す形になっており、それを写す記録の model が
+          record-schema.md の「レビューを実行したモデル」を満たさない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            --model 無しで loop を回したとき (ce-code-review の経路では --model の有無を
+            問わず)
+          who: operator
+          what: >-
+            記録の model に「継承」が入り、どのモデルで走ったかが記録から読めない。
+            粒度の違いをモデル別に比較する材料が壊れる。triagecheck は空欄しか
+            検査しないので通過する
+          detectability: >-
+            気づかない。model の値が実在のモデル名かを検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:20-23 の定義と record-schema.md の model の
+          定義を読み比べ、triagecheck が空欄しか検査しないことを record.go で確認した。
+          却下ゲート 4 つは発火しない
+    plans:
+      - problem_id: P1
+        cause: >-
+          実効モデルを定義するとき、「継承」を経路の決まり方を示す語として書き、
+          記録に写す段で実在のモデル名に解決することを書かなかった
+        finding_ids: [1]
+        approach: >-
+          定義に「継承のときは、記録と報告には呼び出し元のモデル名に解決した値を書く」
+          の 1 文を足す。定義の表の語はそのまま (経路の決まり方を示すのに要る)
+        investigation:
+          scope: >-
+            「継承」を review-triage-loop 配下と project-config.md で grep し、値として
+            写される箇所 (記録の model・報告の周回の条件・手順 1 の報告) を数えた。
+            いずれも実効モデルを参照しているので、定義の 1 文で全部に及ぶ
+        order: 1
+        sha: 8048b7a
+        status: done
+    notes: >-
+      回 4 の修正 (捉え直しの単位 + 流れの穴) に対する増分レビュー。1 件採択。
+      検知は発火しない — 直前の回は捉え直し済みなので reframe の軸 (事実 × 語られる場所)
+      と照らしたが、この指摘は定義そのものの値が未解決であることで、別の場所への言い
+      直しではない。補助の条件 (同じ場所への採択が 2 回連続) も、回 4 の指摘 3 は記録の
+      model の行、今回は定義の表で節が違うため成立しない。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: fable-5-1
+    level: high
+    scope: incremental
+    head: 66aa642
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 10
+        summary: >-
+          定義に足した「記録と報告に写すときは呼び出し元のモデル名に解決した値を書く」と、
+          報告の正本 reporting.md:10 の「指定が無ければ「継承」と書く」が、報告の
+          実効モデル欄について逆の指示を出している
+        category: skill
+        audience: operator
+        consequence:
+          condition: --model 無しで loop を回し、最後の報告を書くとき
+          who: operator
+          what: >-
+            定義に従えばモデル名、報告の正本に従えば「継承」と書くことになり、
+            どちらに従うか決められない。「継承」と書けば、報告からどのモデルで
+            走ったかが読めない
+          detectability: 気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:23 と reporting.md:10 を読み比べ、
+          「継承」を値として書かせる文が reporting.md:10 に残っていることを grep で
+          確認した。却下ゲート 4 つは発火しない
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 23
+        summary: >-
+          「呼び出し元のモデル名に解決」は code-review の経路 (sub-agent) で成り立たない
+          場合がある。Agent tool に model を渡さないと、agent 定義 → 環境変数
+          CLAUDE_CODE_SUBAGENT_MODEL → 親のモデル、の順で決まるので、環境変数がある
+          環境では記録に走っていないモデル名が入る
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            CLAUDE_CODE_SUBAGENT_MODEL が設定された環境で、--model 無しに code-review の
+            経路で loop を回したとき
+          who: operator
+          what: >-
+            sub-agent は環境変数のモデルで走るが、記録には親のモデル名が入る。
+            記録の model が実態と食い違い、モデル別の比較の材料が壊れる
+          detectability: 気づかない。記録の model と実際に走ったモデルを突き合わせる関門は無い
+        premise_check:
+          stages: A+B
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:20 と :31 を読み、段 B で公式文書
+          (sub-agents の Standard Resolution Order) を claude-code-guide に逐語で引用させ、
+          per-invocation model → agent 定義 → CLAUDE_CODE_SUBAGENT_MODEL → 親のモデルの
+          順であることを確認した。却下ゲート 4 つは発火しない
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 25
+        summary: >-
+          指定「継承」と実効「モデル名」が常に食い違うため、「指定と実効モデルが
+          違うときは報告する」を字句どおり適用すると、指定していない周回で毎回
+          「指定が効かなかった」報告が出る
+        category: skill
+        audience: operator
+        consequence:
+          condition: --model 無しで loop を回したとき
+          who: operator
+          what: >-
+            指定していないのに「指定が効かなかった」という報告が毎回出る。本来
+            伝えたい場合 (ce-code-review で指定が無視された) と区別がつかず、
+            報告の意味が失われる
+          detectability: 報告を読めば毎回出るので気づく。ただし文言の矛盾が原因だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:16・:23・:25 と arguments.md:38 を
+          読み比べた。却下ゲート 4 つは発火しない
+    recurrence:
+      status: declined
+      declined_reason: >-
+        モデルの違いがあったので予想よりも多く指摘を取得できてしまっていたことが
+        原因で、行き詰まりではない (人間の判断)。回 4〜6 の sub-agent は Fable 5.1 を
+        継承しており、回 1〜3 の Opus 5 とは粒度が違っていた。
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 5
+          prior: P1
+          reason: >-
+            回 5 の P1 (「継承」を記録に写すときはモデル名に解決する) が定義に 1 文を
+            足したとき、「定義の 1 文で全部に及ぶ」として reporting.md:10 の独自の
+            「継承と書く」を見なかった。回 5 の採択は回 4 の P1 (実効モデルの定義) の
+            修正由来なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 3
+          prior_run: 5
+          prior: P1
+          reason: >-
+            回 5 の P1 が実効モデルの値を「継承」からモデル名に変えたとき、
+            「指定と実効が違えば報告する」の比較が常に真になることを数えなかった。
+            上と同じく 2 回連続
+    plans:
+      - problem_id: P1
+        cause: >-
+          実効モデルの定義で、指定が無いときの値を「継承」という未解決の語で表した。
+          解決の順序 (環境変数が挟まる) も、「継承」とモデル名を比較したときの結果も、
+          値を決めていないので定まらなかった
+        finding_ids: [2, 3]
+        approach: >-
+          指定が無いときの既定 (呼び出し元の 1 つ前の世代) を導入し、「継承」を値から
+          外す。sub-agent には周回が決めたモデルを必ず明示して渡す。比較は「周回が
+          決めたモデルと実効モデル」の間で行う。人間の指示による設計変更 (02c2542) が
+          この 2 件を解消した
+        investigation:
+          scope: >-
+            「継承」「inherit」「呼び出し元」を review-triage-loop 配下と project-config.md
+            で grep し、値として使っている箇所と決まり方の語として使っている箇所を分けた。
+            公式文書の sub-agent の解決順序を claude-code-guide に引用させて確認した。
+            結果: 値として使う箇所は定義の節と reporting.md:10 の 2 つで、後者は P2
+        order: 1
+        sha: 02c2542
+        status: done
+      - problem_id: P2
+        cause: >-
+          回 5 の修正で「定義の 1 文で全部に及ぶ」と判断し、reporting.md:10 が独自に
+          「継承」を値として書かせる文を持っていることを確かめなかった
+        finding_ids: [1]
+        approach: >-
+          reporting.md:10 の「指定が無ければ「継承」と書く」を外し、周回が決めたモデルと
+          実効モデルをモデル名で書く、と定義を参照する形にする
+        investigation:
+          scope: >-
+            reporting.md の全文と SKILL.md 手順 1 の報告項目を読み、モデルを値として
+            書かせる文を探した。結果: reporting.md:10 の 1 箇所だけ
+        order: 2
+        sha: dc06bad
+        status: done
+    notes: >-
+      上限に達した後、人間の指示で継続した新しい周回の 1 周目 (記録の回 6)。
+      3 件すべて採択。指摘 1 は回 4 で捉え直した型 (同じ事実を場所ごとに具体で
+      言い直す) そのもので、捉え直しの単位の修正が reporting.md:10 に及んでいなかった。
+      指摘 2 は段 B で公式文書と照合した (sub-agent のモデル解決順序)。
+      訂正: 回 4〜6 の model は当初 opus-5 と書いたが、回 3 の判定の後にセッションの
+      モデルが Fable 5.1 に切り替わっており、sub-agent には model を渡していなかった
+      (環境変数 CLAUDE_CODE_SUBAGENT_MODEL は未設定) ので、継承した実効モデルは
+      fable-5-1 である。model の値を fable-5-1 に訂正した。level: high は依頼文に
+      書いた値で、sub-agent が /code-review skill をその effort で呼んだことは報告から
+      確認できていない。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: c14f8af
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/arguments.md
+        line: 38
+        summary: >-
+          報告条件が「指定と実効モデル」のままで、設計変更が導入した「周回が決めたモデル」に追随していない。指定が空で既定が使われた周回では比較対象が無く、条件が判定できない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            --model も review_model も無く既定が使われた周回で、arguments.md の報告条件を適用するとき
+          who: operator
+          what: >-
+            「指定」が空なので比較の片側が無く、報告するかどうかが決まらない。review-invocation.md の条件 (周回が決めたモデルと実効モデル) とは別の条件が残る
+          detectability: >-
+            気づかない。文書どうしの語の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所と対になる箇所を読み比べ、主張どおりであることを確かめた。
+          却下ゲート 4 つはいずれも発火しない (文書どうしの矛盾で再現条件は明示できる、
+          被害者は operator、修正は数行、triagecheck は文書の矛盾を検査しない)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 22
+        summary: >-
+          手順 1 が「指定したモデル」、reporting.md:10 が「周回が決めたモデル」と語が違う。reporting.md は「手順 1 で報告したものと同じ値」と明記しているのに、片方は空を許し片方は「空欄にしない」と禁じる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            指定が無く既定が使われた周回で、手順 1 の開始前の報告と最後の報告を書くとき
+          who: operator
+          what: >-
+            手順 1 は「指定したモデル」が空になり、reporting.md は空欄を禁じているので、「同じ値」が成り立たない
+          detectability: >-
+            気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所と対になる箇所を読み比べ、主張どおりであることを確かめた。
+          却下ゲート 4 つはいずれも発火しない (文書どうしの矛盾で再現条件は明示できる、
+          被害者は operator、修正は数行、triagecheck は文書の矛盾を検査しない)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 19
+        summary: >-
+          表の既定が「空」から計算値 (呼び出し元の 1 つ前の世代) に変わったのに、同じ文書の JSON の様式は review_model が "" のまま。空文字列を未設定と読むかの規則が無く、このリポジトリの config.json がこの状態
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config.json の review_model が "" のリポジトリで loop を起動したとき
+          who: operator
+          what: >-
+            "" を「指定あり (空のモデル名)」と読むか「未設定 (既定に従う)」と読むかが決まらず、実装によって既定が使われたり空の値が sub-agent に渡ったりする
+          detectability: >-
+            空の値が渡れば Agent tool がエラーになるので気づく。既定に倒れた場合は気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所と対になる箇所を読み比べ、主張どおりであることを確かめた。
+          却下ゲート 4 つはいずれも発火しない (文書どうしの矛盾で再現条件は明示できる、
+          被害者は operator、修正は数行、triagecheck は文書の矛盾を検査しない)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 4
+        file: review-triage/skills/review-triage-loop/references/arguments.md
+        line: 27
+        summary: >-
+          決定手順が「review_skill だけは既定が無いので人間に尋ねる」で閉じており、設計変更が足した「対応表に無い呼び出し元は人間に尋ねる」経路に入らない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            対応表に無い呼び出し元 (Fable 5.1 以外) で、--model も review_model も無く loop を起動したとき
+          who: operator
+          what: >-
+            決定手順は 3 で「キーごとの既定」に到達するが、その既定が決まらない。尋ねる経路は review_skill にしか無いので、手順どおりでは値が決まらないまま進む
+          detectability: >-
+            気づかない。決定手順と定義の節の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所と対になる箇所を読み比べ、主張どおりであることを確かめた。
+          却下ゲート 4 つはいずれも発火しない (文書どうしの矛盾で再現条件は明示できる、
+          被害者は operator、修正は数行、triagecheck は文書の矛盾を検査しない)
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 5
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 43
+        summary: >-
+          skill 呼び出しと effort を報告させる規則が、依頼文の正本である review-request.md の「依頼文に含めるもの」に無い。指示どおり review-request.md を渡すと規則が落ちる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review-invocation.md の指示どおり review-request.md の依頼文をそのまま sub-agent に渡したとき
+          who: operator
+          what: >-
+            依頼文に skill/effort の報告義務が含まれず、報告に無いので「記録の skill/level を確定できない」として毎回人間に差し戻される
+          detectability: >-
+            毎回差し戻されるので気づく。ただし依頼文の正本に規則が無いことが原因だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所と対になる箇所を読み比べ、主張どおりであることを確かめた。
+          却下ゲート 4 つはいずれも発火しない (文書どうしの矛盾で再現条件は明示できる、
+          被害者は operator、修正は数行、triagecheck は文書の矛盾を検査しない)
+        attrs:
+          severity: P2
+          confidence: medium
+      - id: 6
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 59
+        summary: >-
+          review_args の既定の参照先が「「実効モデル」の節」だが、effort の既定は別の節「effort の既定」にある
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            project-config.md から review_args の既定を調べようとしたとき
+          who: operator
+          what: >-
+            参照先の節に effort の記述が無く、読み手が別の節を探すことになる
+          detectability: >-
+            参照先を読めば無いことに気づく。ただし正しい節に辿り着けるかは読み手次第
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で該当箇所と対になる箇所を読み比べ、主張どおりであることを確かめた。
+          却下ゲート 4 つはいずれも発火しない (文書どうしの矛盾で再現条件は明示できる、
+          被害者は operator、修正は数行、triagecheck は文書の矛盾を検査しない)
+        attrs:
+          severity: P3
+          confidence: high
+    recurrence:
+      status: declined
+      declined_reason: >-
+        設計変更によって生まれた指摘なので、繰り返しとは認めない (人間の判断)。
+        02c2542 は人間の指示で機能 (既定・model の明示・報告義務) を足したコミットで、
+        その初回レビューという性格がある。
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 6
+          prior: P1
+          reason: >-
+            回 6 の P1 (設計変更 02c2542: 既定の導入・model の明示・effort の既定・skill の
+            報告義務) が実効モデルの節を書き直したとき、「指定と実効モデル」の比較文が「周回が決めたモデル」に置き換わらなかった。回 6 の採択も回 5 の
+            修正由来 (回 6 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 6
+          prior: P1
+          reason: >-
+            回 6 の P1 (設計変更 02c2542: 既定の導入・model の明示・effort の既定・skill の
+            報告義務) が実効モデルの節を書き直したとき、手順 1 の報告項目の語が「指定したモデル」のまま残った。回 6 の採択も回 5 の
+            修正由来 (回 6 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 3
+          prior_run: 6
+          prior: P1
+          reason: >-
+            回 6 の P1 (設計変更 02c2542: 既定の導入・model の明示・effort の既定・skill の
+            報告義務) が実効モデルの節を書き直したとき、JSON の様式の review_model が "" のまま残り、空文字列の読み方が決まっていない。回 6 の採択も回 5 の
+            修正由来 (回 6 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 4
+          prior_run: 6
+          prior: P1
+          reason: >-
+            回 6 の P1 (設計変更 02c2542: 既定の導入・model の明示・effort の既定・skill の
+            報告義務) が実効モデルの節を書き直したとき、決定手順に「対応表に無ければ尋ねる」経路が足されなかった。回 6 の採択も回 5 の
+            修正由来 (回 6 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 5
+          prior_run: 6
+          prior: P1
+          reason: >-
+            回 6 の P1 (設計変更 02c2542: 既定の導入・model の明示・effort の既定・skill の
+            報告義務) が実効モデルの節を書き直したとき、skill/effort の報告義務を review-invocation.md に書き、依頼文の正本 review-request.md に足さなかった。回 6 の採択も回 5 の
+            修正由来 (回 6 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 6
+          prior_run: 6
+          prior: P1
+          reason: >-
+            回 6 の P1 (設計変更 02c2542: 既定の導入・model の明示・effort の既定・skill の
+            報告義務) が実効モデルの節を書き直したとき、review_args の既定の参照先が effort の節ではなく実効モデルの節を指した。回 6 の採択も回 5 の
+            修正由来 (回 6 の根拠に記載) なので、修正由来の指摘が 2 回連続
+    plans:
+      - problem_id: P1
+        cause: >-
+          「周回が決めたモデル」という語を導入したとき、旧語「指定 (したモデル)」を
+          使っている箇所を置き換えなかった
+        finding_ids: [1, 2]
+        approach: >-
+          arguments.md の比較文と SKILL.md 手順 1 の報告項目を「周回が決めたモデル」に
+          そろえる
+        investigation:
+          scope: >-
+            「指定したモデル」「指定と実効」「指定が無ければ」を review-triage-loop 配下と
+            project-config.md で grep した。結果: arguments.md:38 と SKILL.md:22 の 2 箇所
+            だけが旧語で、他は「周回が決めたモデル」か定義への参照になっている
+        order: 1
+        sha: 4909c61
+        status: done
+      - problem_id: P2
+        cause: >-
+          既定 (呼び出し元の 1 つ前の世代) を導入したとき、設定で未設定をどう表すか
+          (空文字列の読み方) と、既定が決まらないときに尋ねる経路を、決定手順に
+          足さなかった
+        finding_ids: [3, 4]
+        approach: >-
+          project-config.md の loop の表の下に「空文字列は未設定と同じ (既定に従う)」を
+          書く。arguments.md の決定手順の 4 を、review_skill (既定が無い) と review_model
+          (対応表に無い) のどちらも人間に尋ねる形に広げる
+        investigation:
+          scope: >-
+            arguments.md の決定手順と値の検査、project-config.md の loop の節、
+            review-invocation.md の既定の節を読み、既定が決まらない経路と "" の扱いを
+            書いた箇所を探した。結果: どちらも無い。config.json の review_model は ""
+        order: 2
+        sha: fd44b64
+        status: done
+      - problem_id: P3
+        cause: >-
+          skill を呼んだことと effort を報告させる規則を review-invocation.md に書き、
+          依頼文の正本である review-request.md の「依頼文に含めるもの」に足さなかった
+        finding_ids: [5]
+        approach: >-
+          review-request.md の「依頼文に含めるもの」に 6 番目として「呼んだ skill と
+          effort の報告」を足す。review-invocation.md の節は正本を参照する形にする
+        investigation:
+          scope: >-
+            review-request.md の全節と review-invocation.md の「skill を呼んだことの
+            確認」を読み比べた。結果: 報告義務を書いた箇所は review-invocation.md だけ
+        order: 3
+        sha: 4348675
+        status: done
+      - problem_id: P4
+        cause: >-
+          実効モデルの節を 4 つの小節に分けたとき、project-config.md からの参照先の
+          節名を確かめなかった
+        finding_ids: [6]
+        approach: >-
+          project-config.md:59 の参照先を「effort の既定」の節にする
+        investigation:
+          scope: >-
+            project-config.md で review-invocation.md を参照している行を grep し、
+            参照先の節名が実在するかを確かめた。結果: :59 だけが違う節を指している
+        order: 4
+        sha: 2b0976b
+        status: done
+    notes: >-
+      回 6 の修正 (設計変更 02c2542 と reporting.md の修正) に対する増分レビュー。
+      今回から sub-agent に model: opus を明示し (呼び出し元 Fable 5.1 の 1 つ前の世代)、
+      /code-review skill を呼んだことと effort high を報告で確認した。6 件すべて採択で、
+      すべて設計変更の修正由来。設計変更が 5 つの文書に及ぶ語と規則を導入したのに、
+      それを使う箇所を数え上げて追随させなかった。検知の条件は機械的に成立する。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: 4aa3218
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 60
+        summary: >-
+          回 7 の P4 が 59 行目の参照先を「実効モデル」から「effort の既定」に書き換えた
+          結果、60 行目の 2 つの「同上」(実効モデルの正本・対応表) が「effort の既定」の
+          節を指すようになった。その節は 1 文しかなく、定義も対応表も含まない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            project-config.md の review_model の行から「同上」を辿って実効モデルの定義や
+            対応表を探すとき
+          who: operator
+          what: >-
+            「effort の既定」の節に辿り着き、定義も対応表も見つからない。60 行目は
+            増分で変更されていないが、「同上」は直前行の参照先を引き継ぐ書き方なので
+            59 行目の変更が壊した
+          detectability: 参照先を読めば無いことに気づく。壊れたのが隣の行の修正だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:59-60 と review-invocation.md の「effort の既定」
+          の節を読み、「同上」が 1 文だけの節を指すことを確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 64
+        summary: >-
+          新設した「loop の各キーで、空文字列は未設定と同じに読む」が max_rounds を
+          除外していないため、"max_rounds": "" に対して project-config.md は既定 5、
+          arguments.md の値の検査は「周回を始めずにエラー」と定め、矛盾する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config.json に "max_rounds": "" と書かれた状態で loop を起動したとき
+          who: operator
+          what: >-
+            project-config.md に従えば既定の 5 で回り、arguments.md に従えばエラーで
+            止まる。両方が自分の領域の正本なので、読んだ順で振る舞いが変わる
+          detectability: 気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:64 と arguments.md:34 を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P3
+          confidence: high
+    recurrence:
+      status: declined
+      declined_reason: >-
+        件数は減っている (6 → 2) ので、繰り返しとは認めない。指摘ごとに直して次の回へ
+        進む (人間の判断)。
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 7
+          prior: P4
+          reason: >-
+            回 7 の P4 (review_args の参照先を effort の節にする) が 59 行目だけを直し、
+            「同上」で 59 行目を引き継ぐ 60 行目を見なかった。回 7 の採択も回 6 の
+            修正由来 (回 7 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 7
+          prior: P2
+          reason: >-
+            回 7 の P2 (空文字列は未設定と同じ) が loop の全キーに掛かる書き方をし、
+            arguments.md の値の検査 (max_rounds は 1 以上の整数) と突き合わせなかった。
+            上と同じく 2 回連続
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 7 の P4 で 59 行目の参照先を書き換えたとき、「同上」で 59 行目の参照先を
+          引き継いでいる 60 行目を見なかった
+        finding_ids: [1]
+        approach: >-
+          60 行目の 2 つの「同上」を、それぞれ指すべき節 (実効モデルの定義・既定の対応表)
+          への明示の参照にする。相対参照をやめれば、隣の行の変更で壊れない
+        investigation:
+          scope: >-
+            review-triage-loop 配下と project-config.md で「同上」を grep した。
+            結果: project-config.md:60 の 2 箇所だけ
+        order: 1
+        sha: "f370983"
+        status: done
+      - problem_id: P2
+        cause: >-
+          回 7 の P2 で「空文字列は未設定と同じ」を書いたとき、loop の全キーに掛かる
+          書き方にし、arguments.md の値の検査 (max_rounds は 1 以上の整数) と
+          突き合わせなかった
+        finding_ids: [2]
+        approach: >-
+          規則の対象を文字列のキー (review_skill / review_args / review_model) に限り、
+          max_rounds は整数で、空や不正な値は値の検査 (arguments.md) がエラーにする
+          と書く
+        investigation:
+          scope: >-
+            project-config.md の loop の節と arguments.md の値の検査を読み比べ、
+            loop の 4 キーそれぞれについて空文字列の扱いを確かめた。結果: 矛盾するのは
+            max_rounds だけ
+        order: 2
+        sha: "c7e9861"
+        status: done
+    notes: >-
+      回 7 の修正 (4 問題) に対する増分レビュー。model: opus を明示し、skill と effort は
+      報告で確認した。2 件とも採択で、どちらも回 7 の修正由来。検知の条件は機械的に
+      成立する。residual の 1 件 (review-request.md の 6 が ce-code-review の経路にも
+      effort の報告を求めると読める) は、その経路には依頼文を渡さないので指摘にならないと
+      レビュアが判断しており、同意する。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: "35c5df7"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 64
+        summary: >-
+          「空文字列は未設定と同じ」が review_skill を対象に含めるのに対し、
+          arguments.md の決定手順と SKILL.md 手順 1 は尋ねる条件を「設定にも引数にも
+          無いとき」というキーの不在で述べており、「書かれているが値が空」を不在に
+          読み替える文が無い。"review_skill": "" のとき、尋ねるのか空のまま起動するのかが
+          二通りに読める
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config.json に "review_skill": "" と書かれた状態で、引数を省いて loop を
+            起動したとき
+          who: operator
+          what: >-
+            project-config.md に従えば未設定として人間に尋ねるが、arguments.md と
+            SKILL.md はキーが在るので「設定に書いてあれば尋ねない」を適用しうる。
+            後者だと空のスキル名で起動の経路が無く、値の検査 (決定の結果として採る値) にも
+            "" が未設定に正規化される読みでは掛からない
+          detectability: >-
+            起動に失敗すれば気づく。尋ねる側に倒れれば実害は無いが、どちらに倒れるかが
+            文書から決まらない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:64、arguments.md:27・:29、SKILL.md:21 を読み比べ、
+          「値が空」を「無い」に読み替える文が loop 配下に無いことを grep で確認した。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: declined
+      declined_reason: >-
+        件数は減っている (2 → 1) ので、繰り返しとは認めない。指摘ごとに直して次の回へ
+        進む (人間の判断)。
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 8
+          prior: P2
+          reason: >-
+            回 8 の P2 (空文字列の規則を文字列のキーに限る) が対象を review_skill /
+            review_args / review_model と列挙したとき、review_skill だけが持つ「無ければ
+            尋ねる」経路との関係を確かめなかった。回 8 の採択も回 7 の修正由来
+            (回 8 の根拠に記載) なので、修正由来の指摘が 2 回連続
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 8 の P2 で空文字列の規則の対象に review_skill を含めたとき、review_skill
+          だけが持つ「無ければ尋ねる」経路 (キーの不在で書かれている) と突き合わせなかった
+        finding_ids: [1]
+        approach: >-
+          arguments.md の決定手順に「値が空文字列のキーは無いものとして扱う (規則の正本は
+          project-config.md)」を 1 文足す。これで 3 箇所の「無ければ」が "" を覆う
+        investigation:
+          scope: >-
+            review-triage-loop 配下で「無ければ」「設定にも引数にも」を grep し、キーの
+            不在で書かれた箇所 (arguments.md:27・:29、SKILL.md:21) を数えた。
+            いずれも決定手順を経るので、決定手順に 1 文足せば全部に及ぶ
+        order: 1
+        sha: "7975bbf"
+        status: done
+    notes: >-
+      回 8 の修正 (2 問題) に対する増分レビュー。model: opus を明示し、skill と effort は
+      報告で確認した。1 件採択、回 8 の修正由来。検知の条件は機械的に成立する。
+      residual の 2 件 (JSON の様式に review_skill の "" の例が無い、:60 が「表に無ければ
+      尋ねる」を写していない) は、後者は正本への参照で足りるので指摘にしない。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: "b63d90b"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/arguments.md
+        line: 25
+        summary: >-
+          足した「値が空文字列のキーは無いものとして扱う」がキーを限定していないため、
+          max_rounds を対象外とする project-config.md:64 と矛盾する。"max_rounds": "" で
+          --max 省略時、arguments.md の字面では既定 5 が採られ、値の検査にも掛からない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config.json に "max_rounds": "" と書かれた状態で、--max を省いて loop を
+            起動したとき
+          who: operator
+          what: >-
+            arguments.md (自身を引数の正本と宣言) に従えば既定 5 で回り、
+            project-config.md に従えばエラー。回 8 の P2 で直した矛盾が、参照の向きを
+            逆にして再び入った
+          detectability: 気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で arguments.md:25 と project-config.md:64 を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/arguments.md
+        line: 29
+        summary: >-
+          足した 1 文の 4 行下の「設定に書いてあれば尋ねない … 尋ねるのは、設定にも
+          引数にも無いときだけ」が未修正で、同一ファイル内の反対の指示になっている。
+          この文は番号付きの決定手順の外にある独立した断定文なので、25 行目の
+          但し書きが自動的には掛からない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            config.json に "review_skill": "" と書かれた状態で loop を起動し、
+            arguments.md:29 を読んだとき
+          who: operator
+          what: >-
+            「設定に書いてある」ので尋ねない、と読める。回 9 の修正は「3 箇所とも
+            決定手順を経る」を根拠に :29 を対象から外したが、:29 は手順を経ずに
+            単独で読める
+          detectability: 気づかない。同一ファイル内の矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で arguments.md:25 と :29 を読み比べ、:29 が決定手順の番号付き
+          リストの外にあることを確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 9
+          prior: P1
+          reason: >-
+            回 9 の P1 (決定手順で空文字列のキーを無いものとして扱う) がキーを限定せずに
+            書き、回 8 の P2 で除外した max_rounds を再び対象に含めた。回 9 の採択も
+            回 8 の修正由来 (回 9 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 9
+          prior: P1
+          reason: >-
+            回 9 の P1 が「3 箇所とも決定手順を経る」と判断して :29 を対象から外したが、
+            :29 は決定手順の外の独立した文だった。上と同じく 2 回連続
+      reframe:
+        pattern: 同じ事実を場所ごとに具体で言い直している (回 4 と同じ型。対象は「未設定」の規則)
+        axes: 事実 × 語られる場所
+        root_cause: >-
+          「未設定」とは何か (キーが無い・値が空文字列・max_rounds は整数で対象外・
+          決まらなければ尋ねる) を 1 箇所で定義せず、project-config.md の規則本体・
+          arguments.md の決定手順・arguments.md の独立した断定文・SKILL.md 手順 1 が
+          それぞれの言い方で書いているため、1 箇所を直すたびに残りとの食い違いが
+          次の指摘になる (回 8〜10 で 3 回連続)
+        fix_unit: >-
+          「未設定」を project-config.md の 1 箇所で定義し、他の 3 箇所はその語と参照だけを
+          使う。具体の条件 (空文字列・max_rounds・尋ねる) を複数箇所に書かない
+        source: skill
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — 「未設定」の定義を 1 箇所に置かず、
+          4 箇所がそれぞれの言い方で書いている
+        finding_ids: [1, 2]
+        approach: >-
+          修正の単位は reframe.fix_unit。project-config.md に「未設定」の定義 (キーが無い、
+          または文字列のキーの値が空文字列。max_rounds は整数で、空や不正な値は値の検査が
+          エラーにする。未設定で既定も決まらないキーは人間に尋ねる) を 1 箇所で書く。
+          arguments.md の決定手順 2 と独立した文、SKILL.md 手順 1 は「未設定」の語と
+          project-config.md への参照だけにする
+        investigation:
+          scope: >-
+            review-triage-loop 配下と project-config.md で「無ければ」「無いとき」
+            「空文字列」「設定に書いてあれば」「尋ねる」を grep し、未設定の条件を具体で
+            書いている箇所を数えた。結果: project-config.md:64、arguments.md:25・:29、
+            SKILL.md:21 の 4 箇所。他 (reporting.md・review-invocation.md) は無い
+          included:
+            - arguments.md:29 の独立した文「設定に書いてあれば尋ねない」— 指摘 2 の箇所だが、参照に置き換える
+            - SKILL.md:21 の「設定にも引数にも無ければ」— 指摘には無いが同じ事実を具体で書いている
+        order: 1
+        sha: "e3dec44"
+        status: done
+    notes: >-
+      回 9 の修正 (1 問題) に対する増分レビュー。model: opus を明示し、skill と effort は
+      報告で確認した。2 件採択、どちらも回 9 の修正由来。検知の条件は機械的に成立する。
+      この回で周回の上限 (5 回目) に達した。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "c90fb5f"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 62
+        summary: >-
+          周回の回数の数え方が文書から一意に決まらない。project-config.md は「実際に
+          何回まで伸びたかは記録 (runs の要素数) から数える」と書き、SKILL.md の上限は
+          「周回の回数」と書くが、周回の回数が起動時に 0 から数えるものであることを
+          明示した箇所が無い。runs が 10 件ある記録に max_rounds: 5 で起動すると、
+          runs で数える読みでは即停止する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            記録に上限以上の回がある状態で loop を起動したとき (このブランチの記録が
+            それに当たる)
+          who: operator
+          what: >-
+            runs の要素数で数える読みではレビューを 1 回も走らせずに上限到達で止まり、
+            周回の内側で数える読みでは 5 周回る。文書がどちらかを明示していない
+          detectability: 即停止すれば気づく。5 周回れば気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:62 と SKILL.md の上限の行を読み、周回の回数を
+          起動時から数えることを明示した文が無いことを grep で確認した。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 85
+        summary: >-
+          全量レビューの差分の基点が未定義。範囲の節は増分の基点 (記録の最後の回の
+          head) しか定めておらず、記録に回が 1 件も無いときの全量の基点はどの参照先にも
+          無い。依頼文は base..head を必須で含めるので、初回起動時に手順 2 を参照先だけで
+          実行できない
+        category: skill
+        audience: operator
+        consequence:
+          condition: 記録が無いブランチで loop を初めて起動したとき
+          who: operator
+          what: >-
+            全量レビューの依頼文に書く base が決まらない。実装が推測で main や
+            origin/main を選ぶことになり、リポジトリによって違う基点で走る
+          detectability: 気づかない。基点の妥当性を検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md の範囲の節を読み、全量の基点を定めた文が
+          loop 配下に無いことを grep で確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/arguments.md
+        line: 27
+        summary: >-
+          ce-code-review の経路で、答えが使われない問いで周回が止まる。決定の順の 4 は
+          review_model が対応表に無いとき人間に尋ねさせるが、review-invocation.md は
+          この経路で「指定も既定も効かない」と定めており、決定の順に経路の分岐が無い
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            --review ce-code-review で、呼び出し元が対応表に無く、--model も
+            review_model も未設定のとき
+          who: operator
+          what: >-
+            使われないモデルについて人間に尋ね、答えを待って周回が止まる
+          detectability: 尋ねられるので気づく。ただし無意味な問いだとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で arguments.md:27 と review-invocation.md の ce-code-review の行を
+          読み比べた。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P3
+          confidence: high
+    recurrence:
+      status: declined
+      declined_reason: >-
+        補助の条件 (同じ節) だけの成立で、内容は回 10 の指摘 (未設定の規則) と無関係
+        (経路の分岐の欠落)。繰り返しではない (人間の判断)。
+      evidence:
+        - condition: same-location
+          finding_id: 3
+          prior_run: 10
+          prior: 指摘 1
+          reason: >-
+            回 10 の指摘 1 (arguments.md:25、決定の順の 2) と今回の指摘 3 (arguments.md:27、
+            決定の順の 4) は同じファイルの同じ節「設定と引数の優先順位」を指す。主の条件
+            (捉え直し済みの行: 回 10 の reframe の軸「未設定の規則の言い直し」と照らす) には
+            当たらず、内容も別 (経路の分岐の欠落) だが、補助の条件は場所だけで判断する
+            規則なので記録する
+    plans:
+      - problem_id: P1
+        cause: >-
+          上限の条件を「周回の回数」と書いたとき、その回数を起動時から数えることを、
+          記録の回数 (runs) と区別して書かなかった
+        finding_ids: [1]
+        approach: >-
+          SKILL.md の上限の行に「周回の回数は起動時から数える。記録の回数ではない」を
+          足す
+        investigation:
+          scope: >-
+            「周回の回数」「回数」を review-triage-loop 配下と project-config.md で grep し、
+            数え方を定めた文を探した。結果: 無い。定めるのは終了条件の表の 1 箇所で足りる
+        order: 1
+        sha: "1161f1a"
+        status: done
+      - problem_id: P2
+        cause: >-
+          範囲の節を書いたとき、増分の基点 (前の回の head) だけを定め、全量の基点を
+          定めなかった。全量は「記録が無いとき」と条件だけ書いて、何と比べるかを書かなかった
+        finding_ids: [2]
+        approach: >-
+          範囲の節に、全量の基点 (ブランチが分岐した main ブランチとの共通祖先。
+          git merge-base で求め、main ブランチが分からなければ人間に尋ねる) を書く
+        investigation:
+          scope: >-
+            review-invocation.md の範囲の節と review-request.md の「対象」を読み、
+            base の決め方を書いた箇所を探した。結果: 増分の基点だけ
+        order: 2
+        sha: "ec66be0"
+        status: done
+      - problem_id: P3
+        cause: >-
+          決定の順に「対応表に無ければ尋ねる」を足したとき、review_model が効かない
+          経路 (ce-code-review) があることと突き合わせなかった
+        finding_ids: [3]
+        approach: >-
+          決定の順の 4 に「ce-code-review の経路では review_model は効かないので尋ねない」
+          を足す
+        investigation:
+          scope: >-
+            arguments.md の決定の順と値の検査、review-invocation.md の ce-code-review の行を
+            読み比べた。結果: 尋ねる経路は決定の順の 4 だけ
+        order: 3
+        sha: "1cb885a"
+        status: done
+    notes: >-
+      周回の外で走らせた最終確認の全量レビュー (origin/main..c90fb5f)。model: opus を
+      明示し、skill と effort は報告で確認した。3 件採択。定義済みの 3 語 (実効モデル・
+      周回が決めたモデル・未設定) の言い直しは無く、終了条件と報告の対応、
+      review-request.md の 6 と単独経路の関係も問題なしとレビュアが確認した。
+      検知は補助の条件だけで成立し、主の条件 (捉え直しの型) には当たらない。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "1797520"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 66
+        summary: >-
+          回 11 の指摘 3 の修正 (ce-code-review の経路では review_model を尋ねない) が
+          arguments.md にしか入らず、「未設定」の定義の正本である project-config.md が
+          例外なしのまま。SKILL.md 手順 1 はこちらを正本として指すので、直したはずの
+          「使われないモデルについて尋ねる」が再現する
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review_skill が ce-code-review、review_model が未設定、呼び出し元が対応表に
+            無いとき (project-config.md の様式の例がそのまま示す状態)
+          who: operator
+          what: >-
+            正本 (project-config.md) に従えば尋ね、参照側 (arguments.md) に従えば尋ねない。
+            正本と参照側で逆の指示になっている
+          detectability: 気づかない。正本と参照側の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:66 と arguments.md:27 を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 20
+        summary: >-
+          同じ取りこぼしが既定の節にもある。arguments.md:27 は例外を書きつつ、尋ねる規則の
+          根拠としてこの節を名指しで参照しているので、参照を辿ると無条件の「尋ねる」に
+          行き当たり、例外が打ち消される
+        category: skill
+        audience: operator
+        consequence:
+          condition: 指摘 1 と同じ状態で、arguments.md:27 の参照を辿って規則を確かめたとき
+          who: operator
+          what: 参照先が無条件に「尋ねる」と定めており、参照元の例外と食い違う
+          detectability: 気づかない。参照元と参照先の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:20 と arguments.md:27 を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/reporting.md
+        line: 10
+        summary: >-
+          ce-code-review の経路では「周回が決めたモデル」が値として確定しないのに、
+          reporting.md:10 と SKILL.md:22 は「モデル名で書き、空欄にしない」と要求する。
+          空欄にするか尋ねるかの二択になり、どちらも別の規則が禁じている
+        category: skill
+        audience: operator
+        consequence:
+          condition: 指摘 1 と同じ状態で、開始前と最後の報告を書くとき
+          who: operator
+          what: 周回が決めたモデルの欄に書く値が無く、空欄は禁止、尋ねるのも例外で禁止
+          detectability: 報告を書く段で行き詰まるので気づく
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で reporting.md:10 と review-invocation.md の経路の表を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: medium
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 11 の P3 で ce-code-review の例外を、正本 (project-config.md の「未設定」の
+          定義、review-invocation.md の既定の節) ではなく参照側の arguments.md に書いた。
+          回 10 の捉え直しの単位 (定義は 1 箇所、他は参照だけ) に自分で反した
+        finding_ids: [1, 2, 3]
+        approach: >-
+          例外を正本の側に移す。review-invocation.md の経路の表 (ce-code-review の行) に
+          「review_model は決めない。周回が決めたモデルは無く、報告と記録には実効モデル
+          だけを書く」を置き、既定の節と project-config.md の「未設定」の定義はその行を
+          参照する。arguments.md:27 の例外は参照だけにし、reporting.md:10 は「周回が決めた
+          モデルが無い経路では「—」と書く (正本は経路の表)」にする
+        investigation:
+          scope: >-
+            「尋ね」「対応表に無い」を review-triage-loop 配下と project-config.md で grep し、
+            review_model について尋ねる規則を書いた箇所を数えた。結果: project-config.md:66、
+            review-invocation.md:20、arguments.md:27 の 3 箇所。「空欄にしない」は
+            reporting.md:10 と SKILL.md:22 の 2 箇所
+          included:
+            - SKILL.md:22 の「周回が決めたモデルと実効モデル」の報告 — 指摘には無いが reporting.md:10 と同じ要求。reporting.md を正本として参照する形なので、reporting.md を直せば足りる (変更なし)
+        order: 1
+        sha: "023097f"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 2 回目 (origin/main..1797520)。3 件採択、すべて回 11 の
+      P3 の修正由来で原因は 1 つ。検知は不成立 — 主の条件は回 11 の採択が修正由来では
+      ないため、補助の条件は指摘の節が回 11 と違うため。定義済みの 3 語の言い直しは無く、
+      手順 1〜4 は参照先だけで実行できるとレビュアが確認した。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "b0431c4"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 31
+        summary: >-
+          収束の経路で未着手を再開させるために review-triage-fix を呼ぶと定めているが、
+          呼ばれる側の review-triage-fix/SKILL.md は「採択が 0 件なら何もせずに終了する」
+          と定めている。収束時は未覆いの採択が必ず 0 件なので、再開が空振りし、
+          pending が二度と再開されない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            過去の回に status: pending が残った記録で loop を回し、収束したとき
+          who: operator
+          what: >-
+            loop は再開のつもりで fix を呼ぶが、fix は採択 0 件を理由に何もせず終了する。
+            収束の経路は他に fix を呼ばないので、pending は残ったまま収束と報告される
+          detectability: >-
+            reporting.md の「残っているもの」に pending が出るので、報告を読めば気づく。
+            再開されなかった理由は分からない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で loop の SKILL.md:31 と review-triage-fix/SKILL.md の「採択が 0 件なら
+          何もせずに終了する」を読み比べた。fix の手順 1 は未着手を「再開の対象」とも
+          書いており、「採択 0 件」が未着手の再開を含むかが曖昧である。却下ゲート 4 つは
+          発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 62
+        summary: >-
+          max_rounds の説明が「実際に何回まで伸びたかは記録 (runs の要素数) から数える」と
+          書くが、SKILL.md の上限の行は「起動時に 0 から数える — 記録の回数 (runs の
+          要素数) ではない」と明示的に否定している。既に回のある記録で起動すると、
+          どちらを読んだかで止まる時点が変わる
+        category: skill
+        audience: operator
+        consequence:
+          condition: 記録に回がある状態で loop を起動し、project-config.md の側を読んだとき
+          who: operator
+          what: >-
+            :62 は周回をまたいだ累計の数え方を言っているが、max_rounds の説明の直後に
+            置かれているので上限の数え方と読める。回 11 の修正で SKILL.md に足した否定と
+            正面から食い違う
+          detectability: 気づかない。文書どうしの矛盾を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:62 と SKILL.md の上限の行を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 3 の P1 で収束の経路に review-triage-fix の再開を足したとき、呼ばれる側の
+          「採択が 0 件なら何もせずに終了する」と突き合わせなかった。fix 側の文も
+          「採択 0 件」が未着手の再開を含むかを書いていない
+        finding_ids: [1]
+        approach: >-
+          review-triage-fix/SKILL.md の終了条件を「対象 (未覆いの採択と、再開する未着手)
+          が無ければ何もせずに終了する」に改め、未着手の再開が採択 0 件でも行われることを
+          明示する。loop 側は変えない (呼び方は正しい)
+        investigation:
+          scope: >-
+            review-triage-fix/SKILL.md の手順 1 と原則、loop の SKILL.md 手順 2・3 を読み、
+            fix が終了する条件と未着手を再開する条件を突き合わせた。結果: 矛盾は fix 側の
+            1 文だけで、loop 側の呼び方は状態の意味 (record-schema.md の「再開の対象」) に
+            沿っている
+        order: 1
+        sha: "ac61669"
+        status: done
+      - problem_id: P2
+        cause: >-
+          回 11 の P1 で上限の数え方を SKILL.md に足したとき、同じ話題 (回数の数え方) を
+          書いている project-config.md:62 を直さなかった
+        finding_ids: [2]
+        approach: >-
+          :62 の文を、周回をまたいだ累計 (記録の runs の要素数) は上限の数え方とは別で
+          あると分かる形に書き換え、上限の数え方の正本 (SKILL.md 手順 3) を参照する
+        investigation:
+          scope: >-
+            「回数」「runs の要素数」を review-triage-loop 配下と project-config.md で
+            grep した。結果: 数え方に触れるのは SKILL.md の上限の行と project-config.md:62
+            の 2 箇所
+        order: 2
+        sha: "0bceac5"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 3 回目 (origin/main..b0431c4)。2 件採択。回 12 の修正
+      (経路の表を正本にする) は参照の巡回・逆転なしと確認された。検知は不成立 —
+      主の条件は 2 件とも回 12 の修正由来ではなく (回 3・回 11 の修正に由来)、補助の
+      条件は回 12 の指摘と節が違う。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "4639c4a"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-fix/SKILL.md
+        line: 27
+        summary: >-
+          「未覆いの採択が 0 件でも未着手があれば再開する」と定めたが、再開だけの実行が
+          どの手順に進むかを定めた記述が無い。手順 3〜7 は採択した指摘を入力に取るので、
+          採択がすべて覆われた状態で呼ばれると手順 3 で空回りし、手順 8 の直す対象も
+          手順 6 が決めないため定まらない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            未覆いの採択が無く、status: pending の問題だけが残った記録で
+            review-triage-fix を呼んだとき (loop の収束の経路がこの呼び方をする)
+          who: operator
+          what: >-
+            手順 3 (原因を確かめる) に入力が無く、手順 8 で直す対象を決める手順が無い。
+            再開すると書いたのに、再開の手順が無い
+          detectability: 実行が手順 3 で止まるので気づく。手順の欠落が原因だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-triage-fix/SKILL.md:27 と手順 3〜8 を読み、references/ に
+          pending / 未着手の記述が無いことを grep で確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 31
+        summary: >-
+          手順 2 の収束の経路が fix を呼んだ後「選択待ちの判定」だけを通し、手順 3 の表が
+          同じ位置に置く「上限」の判定を通さない。通常の経路は両方を並べている
+        category: skill
+        audience: operator
+        consequence:
+          condition: 上限の回で収束し、未着手の再開のために fix を呼んだとき
+          who: operator
+          what: >-
+            上限の判定を通らずに抜けるので、止まった理由が「収束」になり、上限に達した
+            ことが報告に出ない
+          detectability: 気づかない。止まった理由を突き合わせる関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:31 と :33、手順 3 の表を読み比べた。却下ゲート 4 つは
+          発火しない
+        attrs:
+          severity: P2
+          confidence: medium
+      - id: 3
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 31
+        summary: >-
+          収束の経路が未着手の有無だけを条件に fix を呼ぶため、awaiting-human が併存する
+          記録でも呼んでしまう。手順 1 の入口は同じ状態で止めるのに、周回の途中では
+          止まらない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            status: pending と status: awaiting-human が併存する記録で収束したとき
+          who: operator
+          what: >-
+            人間の回答を待つ状態なのに fix を呼んで再開させる。入口の関門と周回の途中で
+            同じ状態の扱いが違う
+          detectability: >-
+            fix の手順 1 が選択待ちを報告するので、報告を読めば気づく
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:31 の条件と手順 1 の入口の関門を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: medium
+    recurrence:
+      status: declined
+      declined_reason: >-
+        補助の条件 (同じ節) だけの成立で、内容は回 13 の指摘 (fix の終了条件) と別
+        (収束の再開の経路の判定の抜け)。繰り返しではない (人間の判断)。
+      evidence:
+        - condition: same-location
+          finding_id: 2
+          prior_run: 13
+          prior: 指摘 1
+          reason: >-
+            回 13 の指摘 1 と今回の指摘 2・3 は、同じファイル (loop の SKILL.md) の同じ節
+            (手順 2 の収束の経路、31 行目) を指す。主の条件 (通常の行: 回 13 の plans の
+            修正作業と照らす) は、指摘 1 が回 13 の P1 の修正由来である一方、回 13 の採択が
+            直前 (回 12) の修正由来ではないため不成立。補助の条件は場所だけで判断する
+        - condition: same-location
+          finding_id: 3
+          prior_run: 13
+          prior: 指摘 1
+          reason: 上と同じ節を指す
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 13 の P1 で review-triage-fix の終了条件を広げたとき、再開だけの実行
+          (未覆いの採択が無く未着手だけ) がどの手順に進むかを書かなかった
+        finding_ids: [1]
+        approach: >-
+          fix の手順 1 に「再開だけのときは手順 2〜7 を飛ばし、その問題の plans (approach・
+          order) に従って手順 8 から続ける」を書く
+        investigation:
+          scope: >-
+            review-triage-fix/SKILL.md の手順 1〜9 と references/ を「pending」「未着手」
+            「再開」で grep し、再開の手順を書いた箇所を探した。結果: 手順 1 の
+            「finding_ids を解決する」だけで、進む先の手順は無い
+        order: 1
+        sha: "f9e3506"
+        status: done
+      - problem_id: P2
+        cause: >-
+          収束の再開の経路 (回 3 の P1 で足し、回 4 の P2 で選択待ちの判定を足した) を
+          書いたとき、通常の経路が持つ判定 (選択待ちと上限) と入口の関門が持つ条件
+          (選択待ちがあれば止める) を写さなかった
+        finding_ids: [2, 3]
+        approach: >-
+          収束の経路を、選択待ちが残っていれば fix を呼ばずにそれを止まった理由にし、
+          未着手があれば fix を呼んで再開させ、その後は通常の経路と同じく選択待ちと上限を
+          判定してから抜ける、と書き直す
+        investigation:
+          scope: >-
+            loop の SKILL.md 手順 1 の入口の関門、手順 2 の 4 段、手順 3 の表を読み比べ、
+            fix を呼ぶ 2 経路で判定の並びを突き合わせた。結果: 収束の経路だけが上限を
+            落とし、選択待ちの事前確認も無い
+        order: 2
+        sha: "0c25f8a"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 4 回目 (origin/main..4639c4a)。3 件採択。指摘 1 は回 13 の
+      P1 (fix の終了条件を広げた) の修正由来で、再開の手順を書かなかった。指摘 2・3 は
+      収束の再開の経路 (回 3 の P1 で足し、回 4 の P2 で選択待ちの判定を足した) が、
+      通常の経路と入口の関門が持つ条件を写していない。検知は補助の条件だけで成立。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "e1ef255"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 34
+        summary: >-
+          収束の経路の 3 段目が「上限に達していれば上限にする」と定めるため、収束した
+          周回が最終回に当たると止まった理由が上限になり、reporting.md の収束の節が
+          必須とする「最終確認の全量レビューがまだ」の案内が出ないまま終わる。
+          終了条件どうしの優先順位を定めた文が無い
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            max_rounds の最終回で収束が成立し、選択待ちは無く、過去の回に pending が
+            残っていたとき (2 段目で fix を呼んで再開させた後、3 段目で上限に当たる)
+          who: operator
+          what: >-
+            実際には収束しているのに上限として報告され、「継続するか俯瞰に移るか」を
+            人間に問う (直すものは無いので両方とも意味が無い)。収束の節が必須とする
+            最終確認の案内が落ち、範囲の規則が求める 2 つの full のうち片方が満たされ
+            ないまま終わる
+          detectability: >-
+            上限の問いが出るので何かがおかしいとは気づく。収束していることは推移の
+            採択 0 件から読めるが、案内の欠落には気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:34 と reporting.md の収束の節を読み比べ、終了条件の
+          優先順位を定めた文が無いことを grep で確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: declined
+      declined_reason: >-
+        全量 5 回の推移が 3 → 3 → 2 → 3 → 1 で、今回は直した文の中の優先順位という
+        局所的な 1 件。繰り返しではない (人間の判断)。
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 14
+          prior: P2
+          reason: >-
+            回 14 の P2 (収束の経路に通常の経路と同じ判定を通す) が 3 段目に
+            「上限に達していれば上限にする」を足したとき、収束と上限が同時に成立する
+            場合の優先を決めなかった。回 14 の指摘 1 は回 13 の P1 の修正由来なので、
+            修正由来の指摘が 2 回連続
+    plans:
+      - problem_id: P1
+        cause: >-
+          回 14 の P2 で収束の経路の 3 段目に「上限に達していれば上限にする」を書いたとき、
+          収束と上限が同時に成立する場合の優先を決めなかった。終了条件どうしの優先を
+          定めた文がそもそも無かった
+        finding_ids: [1]
+        approach: >-
+          手順 3 の表の下に終了条件の優先 (検知 > 選択待ち > 収束 > 上限) を定め、収束は
+          直すものが無い状態なので上限に達していても収束として報告すると書く。収束の
+          経路の 3 段目をそれに合わせる
+        investigation:
+          scope: >-
+            loop の SKILL.md 手順 2・3 と reporting.md の「止まった理由ごとに足すもの」を
+            読み、終了条件が同時に成立しうる組み合わせを数えた。結果: 収束と上限、
+            選択待ちと上限、検知と収束 (後者は到達しない) で、優先を定めた文は無い
+        order: 1
+        sha: "d1ad75e"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 5 回目 (origin/main..e1ef255)。1 件採択、回 14 の P2 の
+      修正由来。重点の収束の再開の経路は、4 状態 (pending / awaiting-human / 併存 /
+      無し) とも止まった理由が一意に決まると確認され、残るのは収束と上限の同時成立
+      だけ。手順 1〜4 の実行可能性と定義済みの 3 語の言い直しも問題なし。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "1707dc9"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 48
+        summary: >-
+          優先の規則「収束 > 上限」と、収束の条件「plans にも plan_ref にも覆われていない
+          adopted が無い」を併せて読むと、上限を判定する時点 (fix の後) では収束が常に
+          成立する (fix が処理した採択をすべて plans に書くため)。優先の規則は判定点を
+          限定していないので、上限で止まる経路が到達不能になる読みが成り立つ
+        category: skill
+        audience: operator
+        consequence:
+          condition: 上限の回で fix が全採択を plans に書いた後、上限を判定するとき
+          who: operator
+          what: >-
+            表の「いつ判定するか」に従えば収束は fix の前にしか判定しないので上限で
+            止まるが、優先の規則を字面どおりに読めば収束が常に勝って上限に到達しない。
+            前提知識の「上限に達したら採択が残っていても止める」に入らない読みが残る
+          detectability: 気づかない。読み方が 2 通りある状態を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で手順 3 の表の収束の行と優先の規則、fix の手順 7 (計画を plans に書く)
+          を読み比べた。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 23
+        summary: >-
+          入口の関門は、未処理の検知と選択待ちが両方残っているときにどちらを止まった
+          理由にするかを定めておらず、手順 3 の優先の規則を参照していない。加えて
+          「報告して終了する」とだけ書き reporting.md に接続しておらず、reporting.md の
+          「必ず出すもの」(回った回数・推移) は 0 周では満たせない
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            未処理の検知と選択待ちが両方残った記録で loop を起動し、入口の関門で止まるとき
+          who: operator
+          what: >-
+            どちらの理由で止めるかが決まらず、reporting.md の理由ごとの節のどちらを出すかも
+            決まらない。0 周で止まったときの報告の形も無い
+          detectability: 気づかない。入口の関門の報告の形を検査する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:23 と手順 3 の優先の規則、reporting.md の必ず出すものを
+          読み比べ、入口の関門から優先の規則への参照が無いことを grep で確認した。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage-fix/SKILL.md
+        line: 26
+        summary: >-
+          「再開だけのときは手順 2〜7 を飛ばす」が、直前の行「未処理の検知の扱い方は
+          手順 2」と手順 2 の「人間の回答を待つ」を無効にする。未着手と未処理の検知が
+          同時に残る記録で fix を単独で起動すると、俯瞰の関門を通らずに修正に進む
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            未覆いの採択が無く、未着手と未処理の検知が同時に残る記録で review-triage-fix を
+            単独で起動したとき (loop 経由では検知が先に止める)
+          who: operator
+          what: 俯瞰 (人間と図で確かめる) を飛ばして修正に進む
+          detectability: 気づかない。俯瞰を飛ばしたことを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-triage-fix/SKILL.md:25-26 と手順 2 を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 15
+          prior: P1
+          reason: >-
+            回 15 の P1 (終了条件の優先を定める) が「同時に成立したとき」と書いたとき、
+            判定点 (fix の前 / 後) を限定しなかった。回 15 の採択は回 14 の P2 の修正由来
+            (回 15 の根拠に記載) なので、修正由来の指摘が 2 回連続
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 15
+          prior: P1
+          reason: >-
+            回 15 の P1 が優先の規則を手順 3 に置いたとき、同じ状態で止める入口の関門
+            (手順 1) から参照させなかった。上と同じく 2 回連続
+      reframe:
+        pattern: 状態機械を散文で場所ごとに言い直している
+        axes: 状態 × 判定する場所
+        root_cause: >-
+          周回の状態 (検知・選択待ち・収束・上限・未着手) と判定点・遷移先を 1 箇所の
+          図と表で定義せず、手順 1〜3・優先の規則・reporting.md・fix の終了条件が
+          それぞれ散文で言い直しているため、条件を 1 つ足すたびに他との組み合わせが
+          抜けて次の指摘になる (全量 6 回のうち 5 回がこの領域)
+        fix_unit: >-
+          references/loop-flow.md に図 (ノードと遷移の正本) と決定表 (条件と報告の正本)
+          を置き、散文はノード ID で参照するだけにする。優先の規則・入口の関門・収束の
+          再開の経路の散文は消す。judgment-flow.md と同じ作り
+        source: skill
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — 周回の状態機械を 1 箇所で定義せず、
+          7 箇所が散文で言い直している
+        finding_ids: [1, 2, 3]
+        approach: >-
+          修正の単位は reframe.fix_unit。loop-flow.md を新設して図と決定表を置き、
+          SKILL.md 手順 1〜3 をノード ID の参照に、reporting.md の理由ごとの節を決定表の
+          参照にする。fix の再開だけの経路は図のノードから fix の手順 8 を指し、
+          俯瞰 (fix 手順 2) は飛ばさないことを図で表す
+        investigation:
+          scope: >-
+            第 2 段の表 (状態 × 判定する場所、35 マス) を作り、埋まっているマスと空いて
+            いるマスを数えた。judgment-flow.md の作り (図が遷移の正本、表が条件の正本、
+            散文は ID で参照) と triagecheck の judgment-flow 検査の対象を確かめた。
+            結果: 空いているマスは 11 で、新しい食い違いの候補。検査は judgment-flow.md
+            専用で loop-flow.md には効かない
+          excluded:
+            - triagecheck の judgment-flow 検査を loop-flow.md にも掛ける拡張 — 対象そのもの (文書) より大きい仕掛けなので、この PR では行わず報告に残す
+        order: 1
+        sha: "642ba57"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 6 回目 (origin/main..1707dc9)。3 件採択。指摘 1・2 は
+      回 15 の P1 の修正由来、指摘 3 は回 14 の P1 (再開だけのとき手順 2〜7 を飛ばす) の
+      修正由来。全量 6 回のうち 5 回で、指摘の場所が終了条件・判定点・入口の関門
+      (loop の SKILL.md 手順 1〜3) と fix の終了条件・再開に集中している。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "4fecc70"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 25
+        summary: >-
+          入口で「覆われていない採択は止めない」と定めた結果、review-triage を単独で
+          走らせた直後 (主用途) から周回を起動すると、L2 の review-triage が回 N+1 を
+          追記した瞬間に回 N の被覆免除が解け、triagecheck がエラーを出す。review-triage の
+          手順 6 は検査が通ることを確かめる手順なので、周回は 1 周目で必ず止まる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review-triage を単独で走らせて採択が残り plans が無い記録に対して loop を
+            起動したとき (SKILL.md が主用途と書く状態)
+          who: operator
+          what: >-
+            入口を通ってレビューを走らせ、review-triage が回 N+1 を追記すると、回 N の
+            採択が plans にも plan_ref にも覆われないまま「最後の回」でなくなり、
+            record-schema.md の被覆の規則 (免除は最後の回だけ) に反して検査が失敗する。
+            主用途で 1 周目に必ず止まる
+          detectability: 検査が失敗するので気づく。入口の設計が原因だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で record-schema.md の被覆の免除の規則、record.go の検査、SKILL.md:25 を
+          読み比べた。却下ゲート 4 つは発火しない (already-visible は「検査が失敗する」
+          だけでは関門名として不十分で、この設計の欠陥を検出する関門ではない)
+        attrs:
+          severity: P1
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 87
+        summary: >-
+          reporting.md の「収束」節への参照が解決しない。その節は状態機械を loop-flow.md に
+          集約したコミットで削除され、正本は決定表 S3 に移っている
+        category: skill
+        audience: operator
+        consequence:
+          condition: review-invocation.md の範囲の節から最終確認の案内の正本を辿るとき
+          who: operator
+          what: 存在しない節を指し、正本 (決定表 S3) に辿り着けない
+          detectability: 辿れば気づく。リンク切れの検査は節名までは見ない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:87 と reporting.md の節見出しを突き合わせ、
+          「収束」の節が無いことを grep で確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage-loop/references/loop-flow.md
+        line: 73
+        summary: >-
+          「図から読める優先」の 3 項目目が J6 と J5 の優先を述べるが、図の J6 の後続は
+          S2 と S3 のみで J5 に至る経路が無い。この行を根拠に F2 の後に上限の判定を
+          置くと、4 項目目 (収束の枝では上限を見ない) と矛盾する実装になる
+        category: skill
+        audience: operator
+        consequence:
+          condition: loop-flow.md の「図から読める優先」を読んで F2 の後の判定を実装するとき
+          who: operator
+          what: 散文が図に無い遷移 (J6 → J5) を示唆し、図と散文のどちらに従うかで振る舞いが変わる
+          detectability: 気づかない。図と散文の食い違いを検出する関門は無い (triagecheck は loop-flow.md を検査しない)
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で loop-flow.md:73 と図の J6 のエッジを読み比べた。却下ゲート 4 つは
+          発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 3
+          prior_run: 16
+          prior: 捉え直し
+          reason: >-
+            回 16 の捉え直し (状態機械を散文で言い直さない。図が遷移の正本) の修正で
+            loop-flow.md を作ったとき、図の下に「図から読める優先」という散文を 4 項目
+            置いた。これは図の遷移を散文で言い直したもので、捉え直しの型 (軸: 状態 ×
+            判定する場所) の表に「loop-flow.md の散文」という列が 1 つ増えた形。
+            その散文が図と食い違った。捉え直し済みの行なので条件 2 は要らない
+      reframe:
+        pattern: 状態機械を散文で場所ごとに言い直している (回 16 と同じ。今回は図の直下の散文)
+        axes: 状態 × 判定する場所
+        root_cause: >-
+          回 16 と同じ。集約先の loop-flow.md 自身の中で、図の直下に「図から読める優先」
+          という散文を置き、遷移をもう 1 度言い直した
+        fix_unit: >-
+          図だけを遷移の正本にする。図の直下の散文を消し、理由が要るものは決定表の
+          該当ノードの行に置く
+        source: skill
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — loop-flow.md の図の直下に遷移を
+          言い直す散文を置いた
+        finding_ids: [3]
+        approach: >-
+          「図から読める優先」の散文 4 項目を消し、収束の枝で上限を見ない理由を
+          決定表 S3 の行に 1 文で置く
+        investigation:
+          scope: >-
+            loop-flow.md の図以外の散文を読み、遷移を述べている文を探した。結果:
+            「図から読める優先」の 4 項目と、方針の節の「人間の回答を待つ状態は…止める」
+            (状態の扱いの方針で、遷移の順序は述べていないので残す)
+        order: 1
+        sha: "8e3cea4"
+        status: done
+      - problem_id: P2
+        cause: >-
+          入口の関門を設計したとき、記録の被覆の規則 (免除は plans がまだ無い最後の回
+          だけ。後続の回が追記されると解ける) と突き合わせなかった。主用途がこの規則に
+          当たる
+        finding_ids: [1]
+        approach: >-
+          図に G3「覆われていない採択があるか」を足し、あれば L1 の前に F1 を通す。
+          決定表に G3 の行を足し、SKILL.md 手順 2 の「ここで止めない」の理由を
+          「先に F1 を通す」に改める
+        investigation:
+          scope: >-
+            record-schema.md の plan_ref の行と record.go の免除の実装、loop-flow.md の
+            G1〜G2 と J2 を読み比べた。結果: 入口で覆われていない採択を扱う経路が無く、
+            J2 は review-triage の後にしか無い
+        order: 2
+        sha: "f8ec9f7"
+        status: done
+      - problem_id: P3
+        cause: >-
+          reporting.md の収束の節を決定表 S3 に集約したとき、その節を参照している
+          review-invocation.md を付け替えなかった
+        finding_ids: [2]
+        approach: 参照先を loop-flow.md の決定表 S3 にする
+        investigation:
+          scope: >-
+            review-triage-loop 配下と project-config.md で reporting.md の節名
+            (「収束」「検知」「選択待ち」「上限」「止まった理由ごと」) への参照を grep した。
+            結果: review-invocation.md:87 の 1 箇所だけ
+        order: 3
+        sha: "1a24e48"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 7 回目 (origin/main..4fecc70)。3 件採択。図と決定表の
+      1:1・到達可能性・出口は健全とレビュアが確認した。指摘 1 は入口の設計の欠陥
+      (被覆の免除の規則と突き合わせていなかった)、指摘 2 は集約で消した節への参照の
+      残り、指摘 3 は図の下に置いた散文が図を言い直して食い違ったもので、これが
+      捉え直しの型に当たる。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "d398a3b"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/loop-flow.md
+        line: 93
+        summary: >-
+          G3 で足した入口の F1 経路が J4 で選択待ちに当たって S2 に止まると、回した
+          回数は 0 だが、S1・S2 行と reporting.md の「回数 0 / 推移は出さない」の例外は
+          G1・G2 だけを条件にしているため、この経路が覆われていない。「推移を必ず出す」が
+          無条件に効き、回が 1 つも無いのに推移を求められる
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review-triage を単独で走らせた直後 (G3 で「ある」) に loop を起動し、入口の
+            F1 が選択待ちを出して J4 → S2 で止まったとき
+          who: operator
+          what: 回数 0 の例外に当たらず、存在しない推移を書くことになる
+          detectability: 報告を書く段で行き詰まるので気づく
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で決定表 S1・S2 の行と reporting.md:8 を読み、条件が G1・G2 だけで
+          あることを確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 35
+        summary: >-
+          35 行は「指定が効かなかったことを利用者が知るため」に周回が決めたモデルと
+          実効モデルの差の報告を求めるが、31 行が ce-code-review の経路で「周回が決めた
+          モデル」を無いものとして「—」と書くと定めるため比較が成立せず、--model の
+          無視は報告に現れない
+        category: skill
+        audience: operator
+        consequence:
+          condition: --review ce-code-review と --model を同時に指定して loop を回したとき
+          who: operator
+          what: >-
+            周回が決めたモデルが「—」なので実効モデルとの比較が成り立たず、指定が
+            無視されたことが報告されない。35 行の目的そのものが達成されない
+          detectability: 気づかない。同一ファイル内の目的と規則の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:31 と :35 を読み比べた。却下ゲート 4 つは
+          発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: review-triage/skills/review-triage-fix/SKILL.md
+        line: 40
+        summary: >-
+          F2 の再開経路は手順 3〜7 を飛ばすと定めたのに、手順 8 が「手順 6 の順に」と
+          飛ばした手順を順序の根拠にしている。order はスキーマ上必須でないため、order の
+          無い記録では再開時のコミット順の正本が無い
+        category: skill
+        audience: operator
+        consequence:
+          condition: order の無い plans が複数 pending の記録で、再開だけの経路で fix を呼んだとき
+          who: operator
+          what: 手順 8 が根拠にする手順 6 を飛ばしているので、直す順序が決まらない
+          detectability: 気づかない。順序の根拠の欠落を検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-triage-fix/SKILL.md の手順 1 の再開の文と手順 8 を読み比べ、
+          record-schema.md で order が任意であることを確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 4
+        file: review-triage/.claude-plugin/plugin.json
+        line: 3
+        summary: >-
+          README は「skill 3 つ」に直したが、利用者が見る 2 つの manifest (plugin.json と
+          marketplace.json) の description は「skill 2 つ」のまま
+        category: marketplace
+        audience: operator
+        consequence:
+          condition: プラグインの一覧や導入時に description を読んだとき
+          who: operator
+          what: 収録 skill の数が実態 (3 つ) と食い違う
+          detectability: README と見比べれば気づく。それまでは気づかない
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で plugin.json と marketplace.json の description を読んだ。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P3
+          confidence: high
+    plans:
+      - problem_id: P1
+        cause: >-
+          「回数 0」の例外をノード名 (G1・G2) で書いたため、G3 を足して回数 0 で止まる
+          経路 (入口の F1 → J4 → S2) が増えたときに条件から漏れた
+        finding_ids: [1]
+        approach: >-
+          例外の条件をノード名ではなく事実 (この起動で回した回数が 0) で書く。決定表
+          S1・S2 の行と reporting.md の「回った回数」の項を直す
+        investigation:
+          scope: >-
+            「回数 0」を review-triage-loop 配下で grep した。結果: 決定表 S1・S2 と
+            reporting.md:8 の 3 箇所で、いずれもノード名で条件を書いている
+        order: 1
+        sha: "cbdc005"
+        status: done
+      - problem_id: P2
+        cause: >-
+          ce-code-review の経路で「周回が決めたモデルは無い」と定めたとき、差の報告の
+          条件 (周回が決めたモデルと実効モデルの比較) が成り立たなくなることを
+          見なかった。目的 (指定が効かなかったことを知らせる) は指定との比較でしか
+          達成できない
+        finding_ids: [2]
+        approach: >-
+          差の報告の条件を「指定 (review_model / --model) があり、実効モデルと違うとき」に
+          改める。arguments.md の同じ条件の言い直しは正本への参照だけにする
+        investigation:
+          scope: >-
+            「違えば報告」「違うときは報告」を review-triage-loop 配下で grep した。
+            結果: review-invocation.md:35 (正本) と arguments.md:38 (言い直し) の 2 箇所
+          included:
+            - arguments.md:38 — 同じ条件を言い直しているので参照だけにする (指摘には無い)
+        order: 2
+        sha: "fee5e98"
+        status: done
+      - problem_id: P3
+        cause: >-
+          再開だけの経路 (手順 3〜7 を飛ばす) を足したとき、手順 8 が順序の根拠を
+          手順 6 に置いていることを見なかった
+        finding_ids: [3]
+        approach: >-
+          手順 8 の順序の根拠を「計画の順 (plans[].order。無ければ問題の並び順)」に
+          改める。通常の経路では手順 6 がその順を決めるので意味は変わらない
+        investigation:
+          scope: >-
+            review-triage-fix/SKILL.md で「手順 6」への参照を grep した。結果: 手順 8 の
+            1 箇所。record-schema.md で order が任意であることを確認した
+        order: 3
+        sha: "44f3155"
+        status: done
+      - problem_id: P4
+        cause: >-
+          README の収録 skill の数を 3 つに直したとき、同じ数を書いている manifest
+          (plugin.json・marketplace.json) を直さなかった
+        finding_ids: [4]
+        approach: 2 つの manifest の description を「skill 3 つ」にする
+        investigation:
+          scope: >-
+            「skill 2 つ」をリポジトリ全体で grep した。結果: plugin.json と
+            marketplace.json の 2 箇所
+        order: 4
+        sha: "821c49a"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 8 回目 (origin/main..d398a3b)。4 件採択。図と決定表の
+      整合、消した節への参照、手順の実行可能性、定義済みの語はいずれも問題なし。
+      指摘 1 は G3 を足したとき「回数 0」の例外をノード名 (G1・G2) で書いていたために
+      新しい経路が漏れたもの。検知は不成立 — 捉え直しの型 (状態機械の散文の言い直し)
+      には当たらず (指摘 1 は決定表の行の条件の書き方)、補助の条件も回 17 の指摘と
+      節が違う。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "9996058"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 30
+        summary: >-
+          code-review の行が「呼び出し元と同じにしたいときも inherit を明示する」と書き、
+          inherit を周回が決めたモデルの値として認めている。同ファイルは「継承は値では
+          ない」と定め、報告は両モデルをモデル名で書き空欄にしないと求めるので、
+          --model inherit を指定すると書ける値が無い。回 6 で「継承」を値から外した
+          判断を、同じ修正が別の綴りで戻している
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            --model inherit (または設定の review_model に inherit) を指定して
+            code-review の経路で loop を回したとき
+          who: operator
+          what: >-
+            周回が決めたモデルの欄に書ける値が無い。inherit は決まり方の語で、名前に
+            解決する規則が無い
+          detectability: 報告を書く段で行き詰まるので気づく
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:30・:33 と reporting.md:10、決定表 G0 を
+          読み比べた。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 2
+        file: review-triage/skills/review-triage-loop/references/review-invocation.md
+        line: 35
+        summary: >-
+          「指定があり実効モデルと違うときは報告する」が経路で限定されておらず、
+          code-review + --model inherit では指定 (inherit) と実効モデル名が字句として
+          食い違い、指定が効いているのに「効かなかった」誤報が出る。同型の誤報の
+          実例が記録の回 6 にある
+        category: skill
+        audience: operator
+        consequence:
+          condition: --model inherit を指定して code-review の経路で loop を回したとき
+          who: operator
+          what: 指定は効いているのに、綴りと解決後の名前が違うために誤報が出る
+          detectability: 誤報が毎回出るので気づく。原因が比較の対象の取り方だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で review-invocation.md:35 と :30 を読み比べた。却下ゲート 4 つは
+          発火しない
+        attrs:
+          severity: P2
+          confidence: high
+      - id: 3
+        file: README.md
+        line: 14
+        summary: >-
+          リポジトリ直下の収録プラグイン表だけが 2 skill 相当の説明のまま。plugin.json・
+          marketplace.json・review-triage/README.md は 3 skill に更新済み
+        category: doc-user
+        audience: operator
+        consequence:
+          condition: リポジトリ直下の README で収録プラグインの表を読んだとき
+          who: operator
+          what: 収録 skill の数が実態と食い違う
+          detectability: 他の 3 箇所と見比べれば気づく
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: A2 — 段 A で README.md:14 を読んだ。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P3
+          confidence: high
+      - id: 4
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 25
+        summary: >-
+          手順 2 が「このファイルでは言い直さない」の宣言と loop-flow.md の禁止に反し、
+          G1/G2 → S1/S2・G3 → F1・J3 → F2 の 3 つの遷移を散文で再記述している。
+          今は図と一致しているが、図に分岐を足したときに回 17 と同じ食い違いが再発する
+        category: skill
+        audience: operator
+        consequence:
+          condition: 図に分岐を足したとき (次に状態を 1 つ増やしたとき)
+          who: operator
+          what: SKILL.md 手順 2 の散文が図と食い違い、どちらに従うかで振る舞いが変わる
+          detectability: 気づかない。図と散文の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:25 と loop-flow.md の図を読み比べ、遷移を述べた文が
+          3 つあることを確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P3
+          confidence: high
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 2
+          prior_run: 18
+          prior: P2
+          reason: >-
+            回 18 の P2 (差の報告を指定と実効モデルの比較にする) が比較対象を指定に
+            変えたとき、指定の綴り (inherit) と解決後の名前が違いうる経路を数えなかった。
+            回 18 の採択 (指摘 1) は回 17 の P2 の修正由来なので、修正由来の指摘が 2 回連続
+        - condition: same-location
+          finding_id: 1
+          prior_run: 18
+          prior: 指摘 2
+          reason: 回 18 の指摘 2 と同じ review-invocation.md の「実効モデル」の節を指す
+      reframe:
+        pattern: 同じものを指す語を規則ごとに別々に選んでいる
+        axes: 語 × 規則
+        root_cause: >-
+          モデルを指す語が 4 つ (指定・周回が決めたモデル・実効モデル・継承) あり、
+          記録・報告・比較・sub-agent への受け渡しがそれぞれ違う語を使うため、1 つの
+          規則を直すと隣の語との関係が動く。生の綴りである指定が、名前を前提にした
+          規則に流れ込む経路も残っている (回 5・6・7・12・18・19 の 6 回)
+        fix_unit: >-
+          語を「指定」(G0 だけで使う生の入力) と「実効モデル」(G0 で名前に解決。以降の
+          すべての規則が使う) の 2 つにし、「周回が決めたモデル」を消す。比較の規則は
+          経路による判定 (ce-code-review で指定が空でなければ効かないと報告) に置き換える
+        source: skill
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — モデルを指す語が 4 つあり、規則ごとに
+          違う語を選んでいる
+        finding_ids: [1, 2]
+        approach: >-
+          修正の単位は reframe.fix_unit。review-invocation.md の実効モデルの節を、
+          指定 → G0 での解決 → 実効モデル、の 2 語で書き直す。決定表 G0・reporting.md・
+          SKILL.md 手順 1 の「周回が決めたモデル」を消して実効モデルだけにする
+        investigation:
+          scope: >-
+            「周回が決めたモデル」「指定」「継承」「inherit」を review-triage/skills/ 配下で
+            grep し、出現箇所を数えた。結果: review-invocation.md (定義)、loop-flow.md (G0)、
+            reporting.md (周回の条件)、SKILL.md (手順 1)、arguments.md (検査)、
+            project-config.md (loop の表)
+        order: 1
+        sha: "0d64958"
+        status: done
+      - problem_id: P2
+        cause: >-
+          収録 skill の数を 3 つに直したとき、直下 README の収録プラグイン表を
+          見なかった (review-triage/README.md・manifest は直した)
+        finding_ids: [3]
+        approach: 直下 README の表の説明を 3 skill に合わせる
+        investigation:
+          scope: >-
+            「原因で束ねて直す」をリポジトリ全体で grep した。結果: 直下 README の
+            14 行目だけが旧い
+        order: 2
+        sha: "3abe887"
+        status: done
+      - problem_id: P3
+        cause: >-
+          回 16 で手順 1〜3 をノード参照に書き換えたとき、手順 2 に遷移の説明 (止まる・
+          F1 を通す・F2 が処理する) を残した。回 17 で G3 を足したときにさらに 1 文足した
+        finding_ids: [4]
+        approach: 手順 2 を「図の順に判定する。条件・行き先・報告は図と決定表が正本」だけにする
+        investigation:
+          scope: >-
+            SKILL.md の手順 1〜4 で遷移 (→・止まる・呼ぶ・通す) を述べた文を探した。
+            結果: 手順 2 の 3 文だけ
+        order: 3
+        sha: "25b34c0"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 9 回目 (origin/main..9996058)。4 件採択。図と決定表の
+      整合、手順の実行可能性、定義済みの語 (定義の節の内部の矛盾を除く) は問題なし。
+      指摘 1・2 は実効モデルの節で、この節は回 5・6・7・12・18・19 と繰り返し指摘の
+      場所になっている。指摘 4 は回 16 で捉え直した型 (散文で遷移を言い直す) が SKILL.md
+      手順 2 に残っていたもの。検知は主の条件と補助の条件の両方で成立。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "6630531"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/project-config.md
+        line: 60
+        summary: >-
+          review_model の「未設定のときの扱い」列が「呼び出し元の 1 つ前の世代」と経路で
+          条件づけずに書かれており、ce-code-review の経路で実効モデルが 2 通りに決まる。
+          決定の順 (arguments.md) からこの列を辿ると Opus 5、G0 の表からは Fable 5.1
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review_skill が ce-code-review、review_model が未設定、呼び出し元が Fable 5.1
+            のとき (project-config.md の JSON の例そのまま)
+          who: operator
+          what: >-
+            決定の順 → キーごとの既定 → この列、と辿る読みでは既定 (Opus 5) になり、
+            G0 の表では呼び出し元 (Fable 5.1) になる。記録の model と報告に書く値が
+            実際に走ったモデルと食い違いうる
+          detectability: 気づかない。2 つの正本の食い違いを検出する関門は無い
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で project-config.md:60 と review-invocation.md の G0 の表を読み比べ、
+          「人間に尋ねる」の枝には両所に経路の除外があるのに、既定を与えるこの列だけに
+          無いことを確認した。却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 19
+          prior: 捉え直し
+          reason: >-
+            回 19 の捉え直し (語を指定と実効モデルの 2 つにし、解決は G0 の表だけが定める)
+            の表で、「既定」という語 × 「project-config.md の既定の列」という規則のマスが
+            残っていた。G0 の表の外で既定の解決を述べている点が、軸 (語 × 規則) の型に
+            当たる。捉え直し済みの行なので条件 2 は要らない
+      reframe:
+        pattern: 同じものを指す語を規則ごとに別々に選んでいる (回 19 と同じ。今回は既定の列)
+        axes: 語 × 規則
+        root_cause: >-
+          回 19 と同じ。既定の解決を G0 の表の外 (project-config.md の「未設定のときの
+          扱い」の列) でもう 1 度述べていた
+        fix_unit: 解決は G0 の表だけが定める。既定の列は正本への参照だけにする
+        source: skill
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — 既定の解決を G0 の表の外で述べていた
+        finding_ids: [1]
+        approach: >-
+          project-config.md の review_model の「未設定のときの扱い」を「経路で決まる
+          (正本は G0 での解決)」の参照だけにする
+        investigation:
+          scope: >-
+            「1 つ前の世代」を review-triage/skills/ 配下で grep し、既定の解決を述べている
+            箇所を数えた。結果: review-invocation.md の G0 の表 (正本) と
+            project-config.md:60 の 2 箇所
+        order: 1
+        sha: "30eb5c1"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 10 回目 (origin/main..6630531)。1 件採択。語は 2 つで
+      閉じ、図と決定表の整合、遷移の言い直し、手順の実行可能性、README・manifest は
+      いずれも問題なしとレビュアが確認した。残った 1 件は、既定の解決を G0 の表の外
+      (project-config.md の列) でもう 1 度述べていたもので、回 19 の捉え直しの型。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: "8ca5014"
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage-loop/SKILL.md
+        line: 16
+        summary: >-
+          前提知識の「モデルは周回ごとに選べる」と、同じ行の「止まった後に --model を
+          変えて次の周回を起動する」が経路で条件づけられていない。ce-code-review の
+          経路では G0 の表が「指定は効かない」と定めるため、指示どおり --model を
+          付けてもモデルは変わらず「効かない」と報告される
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review_skill が ce-code-review の設定で、前提知識の指示どおり --model を変えて
+            次の周回を起動したとき
+          who: operator
+          what: モデルは変わらず、指示に従った結果として「効かない」報告が出る
+          detectability: 報告が出るので気づく。前提知識の文が原因だとは分かりにくい
+        premise_check:
+          stages: A
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2 — 段 A で SKILL.md:16 と review-invocation.md の G0 の表を読み比べた。
+          却下ゲート 4 つは発火しない
+        attrs:
+          severity: P2
+          confidence: high
+    recurrence:
+      status: reframed
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 20
+          prior: 捉え直し
+          reason: >-
+            回 19・20 の捉え直し (モデルの規則は G0 の表だけが定める) の表で、
+            「指定」× 「SKILL.md の前提知識」のマスが残っていた。G0 の表の外で
+            指定の効き方を述べている点が軸 (語 × 規則) の型に当たる
+      reframe:
+        pattern: 同じものを指す語を規則ごとに別々に選んでいる (回 19・20 と同じ。今回は前提知識)
+        axes: 語 × 規則
+        root_cause: >-
+          回 19 と同じ。指定の効き方を G0 の表の外 (SKILL.md の前提知識) で経路を
+          条件づけずに述べていた
+        fix_unit: 指定の効き方は G0 の表だけが定める。前提知識は正本への参照で条件づける
+        source: skill
+    plans:
+      - problem_id: P1
+        cause: >-
+          捉え直しの原因 (reframe.root_cause) — 指定の効き方を G0 の表の外で述べていた
+        finding_ids: [1]
+        approach: >-
+          前提知識の文を「指定が効く経路は G0 での解決が正本。効かない経路 (ce-code-review)
+          では --model を変えても実効モデルは変わらない」と参照で条件づける
+        investigation:
+          scope: >-
+            「--model」「モデルは」を review-triage-loop 配下で grep し、G0 の表の外で
+            指定の効き方を述べている文を探した。結果: SKILL.md:16 だけ
+        order: 1
+        sha: "050f7d1"
+        status: done
+    notes: >-
+      最終確認の全量レビューの 11 回目 (origin/main..8ca5014)。1 件採択。前回の修正に
+      食い違いは無く、語は 2 つで閉じ、図と決定表の整合、遷移の言い直し、手順の実行
+      可能性、README・manifest はいずれも問題なし。残った 1 件は前提知識の文で、
+      捉え直しの型。residual に plugin.json の version が 0.6.0 のままとあり、PR 前に
+      上げる判断が要る。
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: incremental
+    head: "3ee07c9"
+    findings: []
+    notes: >-
+      回 21 の修正 (前提知識を G0 での解決への参照で条件づける) に対する増分レビュー。
+      指摘 0 件。足した文が G0 の表と一致し、言い直しになっておらず、同じ行の他の
+      記述とも矛盾しないとレビュアが確認した。全量 11 回 (10 → 3 → 3 → 2 → 3 → 1 →
+      3 → 3 → 4 → 4 → 1 → 1) の後、増分で 0 件に到達した。residual のリファクタ提案
+      (参照先の粒度が「実効モデル」と「G0 での解決」で混在) は、どちらを辿っても同じ
+      規則に届くので指摘にしない。
