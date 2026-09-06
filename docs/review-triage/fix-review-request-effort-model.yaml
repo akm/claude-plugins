@@ -1,0 +1,60 @@
+runs:
+  - date: "2026-09-06"
+    skill: code-review
+    run_id: ""
+    model: opus-5
+    level: high
+    scope: full
+    head: 226e248
+    findings:
+      - id: 1
+        file: review-triage/skills/review-triage/references/review-request.md
+        line: 13
+        summary: >-
+          新設の項目 7 が記録の model を「レビュアの報告から確定する」と定めたが、
+          参照元の review-invocation.md は同じ model を「周回側が持つ実効モデルから採る。
+          空にしない」と定めており矛盾する。ce-code-review の経路ではモデルの報告が
+          存在しないため、項目 7 を字義どおり適用すると毎回人間へ差し戻される
+        category: skill
+        audience: operator
+        consequence:
+          condition: >-
+            review-triage-loop を ce-code-review の経路で走らせ、review-request.md の
+            項目 7 に従って記録の model を「報告から確定」しようとしたとき。
+            ce-code-review はモデルを指定する引数も報告も持たない
+          who: operator
+          what: >-
+            2 つの正本が同じ model の出所を別に定めているので、周回は「報告が無いので
+            人間に報告する」(項目 7) と「実効モデルを書いて空にしない」(review-invocation.md)
+            のどちらかを選ぶことになる。前者を選べば ce-code-review の周回は毎回止まり、
+            後者を選べば項目 7 が守られないまま記録が書かれ、どちらに従ったかが回ごとに
+            揺れうる
+          detectability: >-
+            気づかない。文書どうしの矛盾を検出する機械検査は無い
+            (triagecheck は judgment-flow の図と決定表の一致だけを検査し、
+            doc-dag は人間が起動する)。運用中に ce-code-review の周回が毎回止まって初めて気づく
+        premise_check:
+          stages: A+B
+          result: verified
+        gates_fired: []
+        verdict: adopted
+        verdict_reason: >-
+          A2。段 A: 引用 3 箇所 (review-request.md:13、review-invocation.md:38・:79) を
+          読んで一致を確認した。段 B: 矛盾の主張なので両方の正本を自分で読んで照合した
+          (sub-agent は使わず、引用がそのまま正本の記述)。ce-code-review がモデルの指定も
+          報告も持たないことは review-invocation.md:62・:75 で確認した。
+          全 4 ゲートを評価していずれも不発火。hypothetical は ce-code-review で周回を
+          起動すれば実運用で必ず起きる条件なので不成立。developer-domain は環境の異常では
+          なく、対象は利用者が使う skill の規範文書なので不成立。disproportionate-cost は
+          修正が項目 7 の 1 文の書き分けで済み、対象 (1 段落) より小さいので不成立。
+          already-visible は失敗する関門を名前で挙げられない (Go の関門は Markdown を
+          見ない) ので不成立
+        attrs:
+          severity: P2
+          confidence: high
+    notes: >-
+      レビューの residual に 1 件: 項目 7 の見出しが「呼んだ skill と effort の報告」の
+      ままで、本文が扱うようになったモデルの報告を含んでいない。指摘 1 を直すときに
+      同じ段落を触るので、そのときに見出しも合わせるのが自然。
+      レビューは依頼文で指定した effort high・モデル Opus 5 のとおりに走り、
+      /code-review を実際に呼んだと報告された (指定との食い違い無し)。
