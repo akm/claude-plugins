@@ -23,8 +23,8 @@ description: review-triage が採択したレビュー指摘を、原因で束�
      最後の回だけを見ると、`plans` を書かないまま次の回が追記された過去の回の採択が対象にならず、気づかれないまま消える。
    - **全回の `plans` を 1 パスで見て**、`status: pending` (未着手) と `status: awaiting-human` (選択待ち) が残っていれば回数を問わず報告する。未着手は再開の対象、**選択待ちは実装しない** — 人間に返した判断をスキルが代わりに決めない。
    - **全回の `recurrence` も同じく 1 パスで見て**、未処理の検知 (`recurrence.status: detected` のまま捉え直しも否定も書かれていない回) が残っていれば、`pending` / `awaiting-human` と同じく回数を問わず報告する。扱い方は手順 2。
-   - **過去の回の未着手を再開するときは、その問題が属する回の `findings` から `finding_ids` を解決する。** `finding_ids` は回の中でだけ一意なので、最後の回の `findings` と取り違えない。
-   - 読めない状態はそのまま報告して終了する — ファイルが無い (`review-triage` を先に走らせるよう案内)・`runs` が空・スキーマが読めない。**「読めない」を「採択 0 件」として扱わない。** 採択が 0 件なら何もせずに終了する。
+   - **過去の回の未着手を再開するときは、その問題が属する回の `findings` から `finding_ids` を解決する。** 再開だけのとき (未覆いの採択が無く、未着手だけが対象) は、俯瞰 (手順 2) は行い、原因の確認から計画の追記まで (手順 3〜7) を飛ばして、その問題の `plans` (`approach`・`order`) に従って手順 8 から続ける — 計画は既に記録にあるので作り直さないが、未処理の検知があれば人間の回答を待つのは同じ。 `finding_ids` は回の中でだけ一意なので、最後の回の `findings` と取り違えない。
+   - 読めない状態はそのまま報告して終了する — ファイルが無い (`review-triage` を先に走らせるよう案内)・`runs` が空・スキーマが読めない。**「読めない」を「採択 0 件」として扱わない。** 対象が無ければ何もせずに終了する — 対象とは、未覆いの採択と、再開する未着手 (`status: pending`) の両方。**未覆いの採択が 0 件でも、未着手があれば再開する** (`review-triage-loop` が再開のために呼ぶ経路 — [loop-flow.md](../review-triage-loop/references/loop-flow.md) の F2)。
 2. **俯瞰する**: 未処理の検知 (`recurrence.status: detected`) がある回があれば、原因を確かめる前に [references/reframing.md](references/reframing.md) に従って、履歴の連鎖と構造の軸の 2 段の図と問いで人間と確認し、捉え直し (`reframed`) か否定 (`declined`) を記録に書く。**人間の回答を待つ。回答が無いまま次の手順に進まない。** 未処理の検知が無ければこの手順は飛ばす。
 3. **原因を確かめる**: 採択した指摘ごとに「なぜそうなったか」を書く。**書けなければ束ねられない** ([references/grouping.md](references/grouping.md))。捉え直しがある回では、捉え直しの原因 (`reframe.root_cause`) を指摘ごとの原因より優先する ([references/grouping.md](references/grouping.md) の「捉え直しがあるとき」)。
 4. **問題にまとめる**: 同じ原因の指摘を 1 つの問題にする。**束ねる根拠は原因であって、ファイルが同じことではない** (基準の正本は [references/grouping.md](references/grouping.md))。
@@ -37,7 +37,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 6. **修正方法と順序を決める**: 調査の結果を踏まえて、問題ごとに何をどう直すかを決め、問題どうしの依存を確かめて並べる ([references/ordering.md](references/ordering.md))。
    - **修正方法が複数あり得て、規範や構造の設計を変える場合は、決めずに人間に返す。** その問題は `options` に選択肢とトレードオフを書き、`status: awaiting-human` にして実装しない (他の問題は依存が無ければ進めてよい)。設計のトレードオフは誤りの訂正ではないので、スキルが人間に諮らずに決めない。
 7. **計画を記録に追記する**: 整理した問題を記録の同じ回の `plans` に書く (`status: pending`)。サマリを再生成し、記録とサマリをコミットする (コミットの分け方の正本は [記録 README のコミット節](../review-triage/references/record-schema.md#コミット))。**直す前に書く** — 途中で止まっても、記録に残っていない計画を作らないため。
-8. **問題単位で直して、検証してからコミットする**: 手順 6 の順に、1 問題 1 コミット。各コミットの前に機械検査の関門と観点 A〜F の検証を通す ([references/committing.md](references/committing.md)・[references/verification.md](references/verification.md))。コミットしたら記録 YAML の該当の問題を `status: done`・`sha` に更新しておき、区切り (全問題の完了、または中断) で記録とサマリをコミットする。
+8. **問題単位で直して、検証してからコミットする**: 計画の順 (`plans[].order`。無ければ問題の並び順。通常の経路では手順 6 がこれを決める) に、1 問題 1 コミット。各コミットの前に機械検査の関門と観点 A〜F の検証を通す ([references/committing.md](references/committing.md)・[references/verification.md](references/verification.md))。コミットしたら記録 YAML の該当の問題を `status: done`・`sha` に更新しておき、区切り (全問題の完了、または中断) で記録とサマリをコミットする。
    - **修正の対象がリポジトリの外にある場合** (PR / Issue の本文やコメントなど) は、コミットが立たないので `status: done-external` にする。**`pending` のまま残さない** — 次の再開が対象として選び、実態と食い違う。**対象の範囲と、何を書くかの正本は [記録 README のリポジトリ外への反映](../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない。
 9. **報告する**: 直した問題と、残したもの (`pending` / `awaiting-human`、未処理の検知、保留・却下の件数) を出す。
 10. **文書の構造を確かめる**: 修正で文書を変更した場合は、`doc-dag` skill を修正した文書群に回し、重複が再び生じていないかを見る。修正ラウンドは重複が生まれやすい瞬間で、放置すると次のレビューの指摘になる。**`doc-dag` は別のプラグインなので、無ければこの手順は飛ばし、飛ばしたことを報告に書く。**

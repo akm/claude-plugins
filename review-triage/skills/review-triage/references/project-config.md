@@ -16,7 +16,8 @@
   "loop": {
     "max_rounds": 5,
     "review_skill": "ce-code-review",
-    "review_args": ""
+    "review_args": "",
+    "review_model": ""
   }
 }
 ```
@@ -55,9 +56,20 @@
 | --- | --- | --- |
 | `max_rounds` | 周回の上限 | 5 |
 | `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
-| `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 空 (スキルの既定に従う) |
+| `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
+| `review_model` | 周回に指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
 
-**`max_rounds` に上限を設ける理由は、収束しない周回を止めるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ型の指摘に何度も応え続けることになる (実測: 17 回に達した記録がある)。上限に達したときの扱いは `review-triage-loop` の手順が定める。
+**`max_rounds` に上限を設ける理由は、収束しない周回を止めるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ型の指摘に何度も応え続けることになる。記録の `runs` の要素数は周回をまたいだ累計で、上限の数え方 (正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
+
+### 「未設定」の定義 (正本)
+
+**`loop` のキーが「未設定」とは、キーが無いか、文字列のキー (`review_skill` / `review_args` / `review_model`) の値が空文字列であることを指す。** 未設定のキーは既定に従い、既定が決まらないキー (`review_skill` はいつでも、`review_model` は呼び出し元が対応表に無いとき。ただし周回がモデルを決めない経路は除く — 正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) は人間に尋ねる。JSON の様式が `""` を置いているのは、キーの存在を示すためであって、空のモデル名や空の引数を指定する意味ではない。
+
+**`max_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-loop` の値の検査 ([arguments.md](../../review-triage-loop/references/arguments.md)) がエラーにする。
+
+`review-triage-loop` の文書 (引数の決定手順・SKILL.md の手順 1) は「未設定」という語でこの定義を参照し、条件を言い直さない。
+
+**`review_model` は 1 つの周回に 1 つの値。** 回ごとに変えることはできない。周回をまたいで変えるのは構わない (記録が回ごとに `model` を持つので後から比較できる) が、そのつど人間が指示する — 周回が勝手に切り替えると、指摘の減り方がモデルの違いによるものか収束によるものかを人間が読み解けなくなる。
 
 **`review_skill` を推測しない。** どちらのスキルで走らせたかは記録の `skill` に残り、後から粒度を比較する材料になる。推測で決めると、記録が実態と食い違う。
 
