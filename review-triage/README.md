@@ -1,6 +1,6 @@
 # review-triage
 
-レビュー指摘を**一件ずつ吟味して採択 / 保留 / 却下に選り分け**、採択したものを**原因で束ねて直す** skill 2 つと、記録を検査する Go ツールを配布するプラグインです。
+レビュー指摘を**一件ずつ吟味して採択 / 保留 / 却下に選り分け**、採択したものを**原因で束ねて直す** skill 3 つと、記録を検査する Go ツールを配布するプラグインです。
 
 ## 収録スキル
 
@@ -8,8 +8,11 @@
 | --- | --- |
 | `review-triage` | 指摘を判定し、記録に残す。**修正はしない** (判断までが範囲)。判定の後、同じ型の指摘が続いていないかを直前の回と照らして検知する |
 | `review-triage-fix` | 採択した指摘を原因で束ね、問題単位で直す。検知があれば、束ねる前に図で繰り返しを人間と確かめて捉え直す (俯瞰) |
+| `review-triage-loop` | レビューの起動から上の 2 つまでを 1 周として、終了条件に当たるまで繰り返す。**判断も修正もせず、2 つを呼ぶだけ** |
 
 `code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは記録 (YAML) だけで行います。**
+
+`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。
 
 ## 繰り返しを検知して捉え直す
 
@@ -41,9 +44,17 @@
   "frozen_paths": ["docs/brainstorms/", "docs/plans/", "docs/solutions/"],
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",
-  "triage_summary_command": "make triage-summary"
+  "triage_summary_command": "make triage-summary",
+  "loop": {
+    "max_rounds": 5,
+    "review_skill": "code-review",
+    "review_args": "high",
+    "review_model": ""
+  }
 }
 ```
+
+`loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
