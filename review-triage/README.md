@@ -44,9 +44,17 @@
   "frozen_paths": ["docs/brainstorms/", "docs/plans/", "docs/solutions/"],
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",
-  "triage_summary_command": "make triage-summary"
+  "triage_summary_command": "make triage-summary",
+  "loop": {
+    "max_rounds": 5,
+    "review_skill": "code-review",
+    "review_args": "high",
+    "review_model": ""
+  }
 }
 ```
+
+`loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
