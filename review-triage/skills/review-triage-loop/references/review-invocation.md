@@ -43,14 +43,27 @@
 
 ### skill を呼んだことの確認
 
-依頼文に含める報告義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「依頼文に含めるもの」の 6。報告に無いときの扱い (人間に報告する) もそこが定める。
+依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「依頼文に含めるもの」の 6 と 7。報告に無いとき・指定と食い違うときの扱い (人間に報告する) もそこが定める。
+
+## 記録のキーの出所 (定義の正本)
+
+**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表だけが定める。** キーの意味の正本は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここは周回がその値をどこから採るかを定める。
+
+| 記録のキー | `code-review` | `ce-code-review` |
+| --- | --- | --- |
+| `model` | 実効モデル (上の定義)。**空にしない** — 記録の必須キーで、`triagecheck` が欠落をエラーにする | 同左 |
+| `skill` | sub-agent の報告で「実際に呼んだ」と確かめた `code-review` | `ce-code-review` |
+| `level` | sub-agent の報告で確かめた effort (`review_args`、無ければ既定。上の定義) | 空 (このスキルは effort を持たない) |
+| `scope` | 周回が決めた範囲 (下の「範囲」) | 同左。JSON の `scope` は差分の基点を持つ別物なので、そのまま写さない |
+
+**「無い属性を補完しない」が掛かるのは `attrs` だけ** — そこは上流が付けたものをそのまま残す欄である ([SKILL.md](../../review-triage/SKILL.md) の「このスキルが検出しないもの」)。記録の必須キーは別で、上の表のとおり周回の側が埋める。
 
 ## `code-review` の場合
 
 sub-agent を立て、[review-request.md](../../review-triage/references/review-request.md) の依頼文を渡す。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** 周回が回ごとに勝手に切り替えない (SKILL.md の原則)。
-- `review_args` (無ければ既定の effort。上の定義) は依頼文に含めて渡し、skill を呼んだことと effort を報告させる (上の定義)。
+- `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く正本にある)。
 - 出力は [review-request.md](../../review-triage/references/review-request.md) の「出力様式」の YAML で書き出させる。**地の文で返させない** — `review-triage` の手順 1 がファイル経由で読む形である。
 
 ## `ce-code-review` の場合
@@ -72,16 +85,7 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 | `findings[].severity` / `confidence` | `attrs.severity` / `attrs.confidence` |
 | `scope.head_sha` | `head` |
 
-**記録の必須キーのうち、JSON に無いものは周回の側が持つ。** `ce-code-review` はモデルや effort を指定する引数を持たないので、JSON にも出てこない。
-
-| 記録のキー | どこから採るか |
-| --- | --- |
-| `model` | 実効モデル (上の定義)。**空にしない** — 記録の必須キーで、`triagecheck` が欠落をエラーにする |
-| `scope` | 周回が決めた範囲 (下の「範囲」)。JSON の `scope` は差分の基点を持つ別物なので、そのまま写さない |
-| `skill` | `ce-code-review` |
-| `level` | 空 (このスキルは effort を持たない) |
-
-**「無い属性を補完しない」が掛かるのは `attrs` だけ** — そこは上流が付けたものをそのまま残す欄である ([SKILL.md](../../review-triage/SKILL.md) の「このスキルが検出しないもの」)。記録の必須キーは別で、上の表のとおり周回の側が埋める。
+**記録の必須キーのうち、JSON に無いものは周回の側が持つ** — 何から採るかは上の「記録のキーの出所」の表のとおり。`ce-code-review` はモデルや effort を指定する引数を持たないので、JSON にも出てこない。
 
 ## 範囲
 

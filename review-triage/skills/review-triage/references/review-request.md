@@ -9,7 +9,8 @@
 3. **検証の前払い** (下の節)。
 4. **報告しない条件と residual** (下の節)。
 5. **出力様式** (下の節)。
-6. **呼んだ skill と effort の報告**: レビューを sub-agent や別セッションに任せるときは、`/code-review` などの skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、渡した effort を報告に含めさせる。記録の `skill` / `level` はこの報告から確定する — 無ければ確定できないので、そのまま写さず人間に報告する。skill を呼ばずに差分を読んでも指摘の形は同じに見えるため、報告させないと区別できない。
+6. **呼ぶ skill・effort・モデルの指定**: レビューを sub-agent や別セッションに任せるときは、呼ぶ skill (`/code-review` など)、その skill に渡す effort (`code-review` なら `high` のように値そのもの)、レビューを実行するモデルを、依頼文に**値で明記する**。「effort を報告せよ」と書くだけでは指定にならない — 依頼文に値が無いと、レビュアが前回の記録などから自分で選び、依頼した側が知らない値で走る (実測: 記録の `level` に `xhigh` が並んでいたのを根拠に、依頼に無い `xhigh` で走った)。effort が高いほど、レビュアは不確かな指摘も報告するようになり、「報告しない条件」で落とすはずの指摘が増える。既定にしたいときも既定の値を書く (既定の正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」と「実効モデル」)。`ce-code-review` は effort もモデルも受け取らないので、その旨を書く。
+7. **呼んだ skill・effort・モデルの報告**: skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを報告に含めさせ、6 の指定と突き合わせる。**報告が 6 の指定と食い違っていれば — skill を呼んでいない、effort やモデルが違う、報告があるはずの経路 (`code-review`) なのに報告が無い — 記録に写す前に人間に報告する** (レビュアの判断で変わった値を、依頼どおりの値として記録しないため)。`ce-code-review` のように報告が無い経路では突き合わせない。**この項が定めるのは突き合わせまでで、記録の `skill` / `level` / `model` に何を書くかは定めない** — 各キーの意味の正本は [record-schema.md](record-schema.md) の `runs[]` の表、周回が経路ごとに何から採るかの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「記録のキーの出所」。skill を呼ばずに差分を読んでも指摘の形は同じに見えるため、報告させないと区別できない。
 
 ## 範囲の規則
 
@@ -61,8 +62,8 @@
 形式 (この構造に厳密に従う):
 
 skill: code-review            # code-review / ce-code-review など
-model: sonnet-5               # レビューを実行したモデル
-level: ""                     # レベルや mode があれば (無ければ空)
+model: sonnet-5               # レビューを実行したモデル (キーの意味の正本は record-schema.md)
+level: ""                     # レビューのレベル・effort (持たないスキルは空。正本は同上)
 run_id: ""                    # run 識別子があれば (無ければ空)
 scope: incremental            # full / incremental (範囲の規則のとおり)
 base: main                    # 差分の基点 (ブランチ名か SHA)
