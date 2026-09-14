@@ -60,7 +60,7 @@
 
 ## `code-review` の場合
 
-sub-agent を立て、[review-request.md](../../review-triage/references/review-request.md) の依頼文を渡す。
+sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** 周回が回ごとに勝手に切り替えない (SKILL.md の原則)。
 - `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く正本にある)。
