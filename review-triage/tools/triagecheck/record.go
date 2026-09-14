@@ -1,11 +1,11 @@
-// record.go はレビュー指摘のトリアージ記録 (docs/review-triages/*.yaml) の
+// record.go はレビュー指摘のトリアージ記録 (既定は tmp/review-triage/*.yaml) の
 // スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
 //
 // 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
 // 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・ピン値の
 // 誤りが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
 // 偽赤になる」穴を生んだ。数えるものを書かせないことで、この類を発生源から消す。
-// スキーマの意味の正本は docs/review-triages/README.md。
+// スキーマの意味の正本は skills/review-triage/references/record-schema.md。
 package main
 
 import (
@@ -27,10 +27,10 @@ import (
 // reviewTriageDir はトリアージの記録の置き場。この変数が唯一の定義 —
 // 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が黙って外れる。
 //
-// 既定は docs/review-triages/ で、-record-dir で上書きできる (リポジトリごとに
+// 既定は tmp/review-triage/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
 // 置き場が違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
 // path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
-var reviewTriageDir = "docs/review-triages/"
+var reviewTriageDir = "tmp/review-triage/"
 
 // summaryCommand はサマリの再生成手段を利用者へ案内するときに使う文字列。
 // エラーの文言と、生成サマリの 1 行目に埋まる。
@@ -61,7 +61,7 @@ func inReviewTriageDir(f string) bool {
 	return path.Dir(f) == path.Clean(reviewTriageDir)
 }
 
-// --- スキーマ (意味の正本は docs/review-triages/README.md) ---
+// --- スキーマ (意味の正本は skills/review-triage/references/record-schema.md) ---
 
 type recordDoc struct {
 	Runs []recordRun `yaml:"runs"`
@@ -217,7 +217,7 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"捉え直し": {"pattern": true, "axes": true, "root_cause": true, "fix_unit": true, "source": true},
 }
 
-// reviewTriageRecordProblems は docs/review-triages/ の記録 YAML を検査する。
+// reviewTriageRecordProblems は記録の置き場の YAML を検査する。
 // README.md は対象外。検査は (1) スキーマ (未知キー・必須キー・列挙値・参照の整合)、
 // (2) サマリの鮮度 (YAML から生成した内容と *.md の一致)、(3) 孤児のサマリ。
 func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, error)) []string {

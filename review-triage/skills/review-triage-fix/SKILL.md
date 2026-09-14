@@ -36,8 +36,8 @@ description: review-triage が採択したレビュー指摘を、原因で束�
    - **調べた範囲と結果を記録の `plans[].investigation` に書く** (様式の正本は [記録 README](../review-triage/references/record-schema.md))。見つからなかったときも範囲を書く — 「調査済みで波及なし」と「未調査」を記録上で区別するため。
 6. **修正方法と順序を決める**: 調査の結果を踏まえて、問題ごとに何をどう直すかを決め、問題どうしの依存を確かめて並べる ([references/ordering.md](references/ordering.md))。
    - **修正方法が複数あり得て、規範や構造の設計を変える場合は、決めずに人間に返す。** その問題は `options` に選択肢とトレードオフを書き、`status: awaiting-human` にして実装しない (他の問題は依存が無ければ進めてよい)。設計のトレードオフは誤りの訂正ではないので、スキルが人間に諮らずに決めない。
-7. **計画を記録に追記する**: 整理した問題を記録の同じ回の `plans` に書く (`status: pending`)。サマリを再生成し、記録とサマリをコミットする (コミットの分け方の正本は [記録 README のコミット節](../review-triage/references/record-schema.md#コミット))。**直す前に書く** — 途中で止まっても、記録に残っていない計画を作らないため。
-8. **問題単位で直して、検証してからコミットする**: 計画の順 (`plans[].order`。無ければ問題の並び順。通常の経路では手順 6 がこれを決める) に、1 問題 1 コミット。各コミットの前に機械検査の関門と観点 A〜F の検証を通す ([references/committing.md](references/committing.md)・[references/verification.md](references/verification.md))。コミットしたら記録 YAML の該当の問題を `status: done`・`sha` に更新しておき、区切り (全問題の完了、または中断) で記録とサマリをコミットする。
+7. **計画を記録に追記する**: 整理した問題を記録の同じ回の `plans` に書く (`status: pending`)。サマリを再生成し、置き場が git の追跡内なら記録とサマリをコミットする (要否と分け方の正本は [記録 README のコミット節](../review-triage/references/record-schema.md#コミット))。**直す前に書く** — 途中で止まっても、記録に残っていない計画を作らないため。
+8. **問題単位で直して、検証してからコミットする**: 計画の順 (`plans[].order`。無ければ問題の並び順。通常の経路では手順 6 がこれを決める) に、1 問題 1 コミット。各コミットの前に機械検査の関門と観点 A〜F の検証を通す ([references/committing.md](references/committing.md)・[references/verification.md](references/verification.md))。コミットしたら記録 YAML の該当の問題を `status: done`・`sha` に更新しておき、区切り (全問題の完了、または中断) で、置き場が追跡内なら記録とサマリをコミットする。
    - **修正の対象がリポジトリの外にある場合** (PR / Issue の本文やコメントなど) は、コミットが立たないので `status: done-external` にする。**`pending` のまま残さない** — 次の再開が対象として選び、実態と食い違う。**対象の範囲と、何を書くかの正本は [記録 README のリポジトリ外への反映](../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない。
 9. **報告する**: 直した問題と、残したもの (`pending` / `awaiting-human`、未処理の検知、保留・却下の件数) を出す。
 10. **文書の構造を確かめる**: 修正で文書を変更した場合は、`doc-dag` skill を修正した文書群に回し、重複が再び生じていないかを見る。修正ラウンドは重複が生まれやすい瞬間で、放置すると次のレビューの指摘になる。**`doc-dag` は別のプラグインなので、無ければこの手順は飛ばし、飛ばしたことを報告に書く。**
