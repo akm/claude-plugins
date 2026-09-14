@@ -36,7 +36,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 4. **検知**: 今回の採択を [references/recurrence-detection.md](references/recurrence-detection.md) に従って直前の回と照らし、同じ型の指摘が続いているかを判断する。発火したら、手順 5 の追記に `recurrence` (`status: detected`) を含める。過去の回が無い記録では判断しない。
 5. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。置き場のディレクトリが無ければ作る (既定の置き場は git の追跡外で、クローン直後には無い)。
 6. **サマリの再生成**: 設定の `triage_summary_command` でサマリを再生成し、`triage_check_command` の検査が通ることを確かめる ([references/project-config.md](references/project-config.md))。**どちらも未設定なら、走らせていないことを報告に書く。**
-7. **コミット**: 記録とサマリは、置き場が git の追跡内のときだけコミットする — 既定の `tmp/review-triage/` は追跡外なのでコミットしない (要否と分け方の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
+7. **コミット**: 記録とサマリは、置き場が git の追跡内のときだけコミットする — 既定の `tmp/review-triages/` は追跡外なのでコミットしない (要否と分け方の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
 8. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。検知があれば、その条件と根拠を出し、俯瞰 (`review-triage-fix` の冒頭) を案内する (報告の形の正本は [references/recurrence-detection.md](references/recurrence-detection.md))。**勝手に呼ばない** — 直すかどうか、俯瞰に進むかどうかは人間が決める。
 
 ## 原則

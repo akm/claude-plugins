@@ -11,7 +11,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 | `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・検知 (`recurrence`) の状態と根拠の整合 (根拠が同じ回の採択と直前の回を指すこと、修正由来の根拠の `prior` が、比べた回が捉え直し済みなら `捉え直し`、そうでなければ比べた回の修正計画を指すこと、状態ごとの専用キー)・生成サマリの鮮度 |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
-**記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定の置き場 `tmp/review-triage/` は `.gitignore` 済みで、そもそも追跡されない。
+**記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定の置き場 `tmp/review-triages/` は `.gitignore` 済みで、そもそも追跡されない。
 
 ## 前提
 
@@ -25,7 +25,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 ```sh
 go run -C <プラグインの展開先>/tools/triagecheck . \
-  -record-dir <リポジトリ>/tmp/review-triage \
+  -record-dir <リポジトリ>/tmp/review-triages \
   -judgment-flow <プラグインの展開先>/skills/review-triage/references/judgment-flow.md
 ```
 
@@ -81,7 +81,7 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 # 相対で書くなら基準を渡す。$(pwd) はシェルがその場で評価するので確実
 # (環境変数の $PWD と違い、非シェルの親が chdir しても古くならない)。
 go run -C <展開先>/tools/triagecheck . \
-  -current-dir "$(pwd)" -record-dir tmp/review-triage
+  -current-dir "$(pwd)" -record-dir tmp/review-triages
 ```
 
 `-install-wrapper` が生成するラッパーは**自分自身の実体の位置**を基準に渡すので、
@@ -114,7 +114,7 @@ PLUGIN_CACHE = $(HOME)/.claude/plugins/cache/akm-claude-plugins/review-triage
 REVIEW_TRIAGE_ROOT ?= $(shell ls -d $(PLUGIN_CACHE)/*/ 2>/dev/null | sort -V | tail -1)
 
 TRIAGECHECK = go run -C $(REVIEW_TRIAGE_ROOT)/tools/triagecheck . \
-  -record-dir $(CURDIR)/tmp/review-triage \
+  -record-dir $(CURDIR)/tmp/review-triages \
   -judgment-flow $(REVIEW_TRIAGE_ROOT)/skills/review-triage/references/judgment-flow.md \
   -summary-command "make triage-summary"
 
@@ -149,7 +149,7 @@ triage-summary: ## トリアージ記録から生成サマリを書き出す
 go run -C <プラグインの展開先>/tools/triagecheck . \
   -current-dir "$(pwd)" \
   -install-wrapper bin/review-triage-check \
-  -record-dir tmp/review-triage
+  -record-dir tmp/review-triages
 ```
 
 生成される `<path>` は実行権限つきのシェルスクリプトで、実行のたびに
@@ -232,7 +232,7 @@ bin/review-triage-check -write-summary   # 生成サマリを書き出す
 
 **焼き込む置き場と判定フローは、生成の時点で実在していること。** 実在しない値を渡すと
 エラーになり、ラッパーは書き出されない。**記録の置き場を後から作る段取りは取れない** —
-先に `mkdir -p <リポジトリ>/tmp/review-triage` してからラッパーを生成する。
+先に `mkdir -p <リポジトリ>/tmp/review-triages` してからラッパーを生成する。
 実在を要求するのは、値がラッパーに固定されるためで、生成時に通すと壊れたラッパーが
 「生成: …」と成功を報告したまま残る。
 

@@ -1,4 +1,4 @@
-// record.go はレビュー指摘のトリアージ記録 (既定は tmp/review-triage/*.yaml) の
+// record.go はレビュー指摘のトリアージ記録 (既定は tmp/review-triages/*.yaml) の
 // スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
 //
 // 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
@@ -27,10 +27,10 @@ import (
 // reviewTriageDir はトリアージの記録の置き場。この変数が唯一の定義 —
 // 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が黙って外れる。
 //
-// 既定は tmp/review-triage/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
+// 既定は tmp/review-triages/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
 // 置き場が違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
 // path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
-var reviewTriageDir = "tmp/review-triage/"
+var reviewTriageDir = "tmp/review-triages/"
 
 // summaryCommand はサマリの再生成手段を利用者へ案内するときに使う文字列。
 // エラーの文言と、生成サマリの 1 行目に埋まる。
