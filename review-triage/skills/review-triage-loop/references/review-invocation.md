@@ -60,7 +60,7 @@
 
 ## `code-review` の場合
 
-sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。埋める値と出力先 (`{{output_path}}`) は [review-request スキル](../../review-request/SKILL.md) の手順 1〜4 と同じ規則で決める — 周回はそのスキルを呼ばないが、識別子と出力先の規則は同じにする (別の名前を付けると `review-triage` の手順 1 が読む対象と食い違う)。
+sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。識別子と出力先 (`{{output_path}}`) は [review-request スキル](../../review-request/SKILL.md) の手順 3 (識別子) と手順 4 (書き出し) と同じ規則で決める — 周回はそのスキルを呼ばないが、この 2 つの規則は同じにする (別の名前を付けると `review-triage` の手順 1 が読む対象と食い違う)。モデルと範囲はそのスキルの手順 1・2 ではなく、このファイルの「実効モデル」と「範囲」が正本。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** 周回が回ごとに勝手に切り替えない (SKILL.md の原則)。
 - `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く正本にある)。

@@ -18,7 +18,7 @@
 
 ## 呼ぶ skill・effort・モデル
 
-- skill: `{{skill}}` / effort: `{{effort}}` / モデル: `{{model}}` — **この値で呼ぶ。** 自分で別の値を選ばない (`ce-code-review` のように effort やモデルを受け取らない skill では、その旨が上に書かれている)。
+- skill: `{{skill}}` / effort: `{{effort}}` / モデル: `{{model}}` — **この値で呼ぶ。** 自分で別の値を選ばない。effort が空なら、その skill は effort を受け取らない (`ce-code-review` など) ということで、値を補わない。
 - **報告に、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを含める。** 受け取る側はこの報告を上の指定と突き合わせる。
 
 ## 検証の前払い (すべての指摘に必須)
