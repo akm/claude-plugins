@@ -58,7 +58,7 @@ model: {{model}}
 level: "{{effort}}"
 run_id: ""
 scope: {{scope}}
-base: {{base}}
+base: "{{base}}"
 head: "{{head}}"
 date: "{{date}}"
 attrs: {}
