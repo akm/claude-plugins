@@ -86,7 +86,7 @@ LLM が手順書に従ってその場で組み立てる構造化データ。
 ### 修正由来の指摘
 レビューの指摘のうち、その原因が直前の回の修正作業にあるもの。前の回で直した箇所の隣に同じ規則を当て忘れた、直した文の複製を更新しなかった、といった形で現れる。
 
-**同じ場所への指摘とは別の概念である。** 場所が違っても修正由来でありうるし、同じ場所でも元から残っていた欠陥なら修正由来ではない。2 回続けて現れ、かつ採択の件数が直前の回より減っていなければ、修正が次の指摘を生む連鎖に入った合図として扱い、次の修正の前に人間と図で繰り返しを確かめる (俯瞰)。件数が減っていれば収束の途中とみなし、確かめずに次の回へ進む (条件の正本は `review-triage` の [recurrence-detection.md](review-triage/skills/review-triage/references/recurrence-detection.md))。人間が繰り返しと認めたときに捉え直す。認めなければ捉え直さず、従来どおり指摘ごとの原因で直す (手順の正本は `review-triage-fix` の [reframing.md](review-triage/skills/review-triage-fix/references/reframing.md))。
+**同じ場所への指摘とは別の概念である。** 場所が違っても修正由来でありうるし、同じ場所でも元から残っていた欠陥なら修正由来ではない。2 回続けて現れたら、修正が次の指摘を生む連鎖に入った合図として扱い、次の修正の前に人間と図で繰り返しを確かめる (俯瞰)。ただし採択の件数が減っている回は収束の途中とみなして確かめない緩和がある — 条件と例外 (scope が違うときは件数を比べない、など) の正本は `review-triage` の [recurrence-detection.md](review-triage/skills/review-triage/references/recurrence-detection.md) で、ここでは言い直さない。人間が繰り返しと認めたときに捉え直す。認めなければ捉え直さず、従来どおり指摘ごとの原因で直す (手順の正本は `review-triage-fix` の [reframing.md](review-triage/skills/review-triage-fix/references/reframing.md))。
 
 ### 捉え直し
 同じ型の指摘が続いたとき、指摘 1 件ごとの原因ではなく、その型を生んでいる構造 (同じ入力が別々に処理される軸と、その表のどこが埋まりどこが空いているか) を人間と図で確認し、根本の原因と修正の単位を決め直すこと。結果は記録 YAML に書き、`review-triage-fix` が指摘ごとの原因より優先して束ねる。
