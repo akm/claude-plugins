@@ -17,7 +17,7 @@ description: 別セッションで走らせる上流レビュー (code-review �
 
 ## 手順
 
-1. **引数と設定を読む**: 引数はスキル名とモデル名。**スキル名の省略時は `code-review`。モデル名は、引数に無ければ設定 (`.claude/akm-claude-plugins/review-triage/config.json`) の `loop.review_model` を使い、それも未設定なら人間に尋ねる** (設定のキーの正本は [project-config.md](../review-triage/references/project-config.md))。あわせて設定の `record_dir` を読む (未設定なら既定の `tmp/review-triages/`)。
+1. **引数と設定を読む**: 引数はスキル名・モデル名・effort。**スキル名の省略時は `code-review`。モデル名は、引数に無ければ設定 (`.claude/akm-claude-plugins/review-triage/config.json`) の `loop.review_model` を使い、それも未設定なら人間に尋ねる。effort は、引数に無ければ設定の `loop.review_args`、それも未設定なら既定 (正本は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「effort の既定」)。`ce-code-review` のように effort を受け取らない skill では空にする** (設定のキーの正本は [project-config.md](../review-triage/references/project-config.md))。あわせて設定の `record_dir` を読む (未設定なら既定の `tmp/review-triages/`)。
 2. **回と範囲を決める**: 現在のブランチの記録 (`<record_dir>/<ブランチ名>.yaml`。ブランチ名の `/` は `-` に置き換える) を読み、`runs` の数 + 1 を回とする (記録が無ければ 1)。**記録があるのに読めない (YAML として壊れている・`runs` が無い) なら、生成せずにその旨を報告して終了する** — 「読めない」を「無い」に寄せると回が 1 に戻り、過去の回と同じ番号の依頼文ができる。
    - 記録に回が無ければ scope は `full`、`base` は分岐元 (既定は `main`)。補足は「ブランチの全量」。
    - 回があれば scope は `incremental`、`base` は直前の回の `head`。補足は「前回の HEAD `<sha>` からの増分。増分の外は、増分が壊した場合のみ報告する」。
@@ -33,7 +33,7 @@ description: 別セッションで走らせる上流レビュー (code-review �
    | スキル名・モデル名 | 手順 1 | `/` と、ファイル名に使えない文字を `-` に置き換える (設定や引数の綴りをそのまま入れない) | 未指定なら手順 1 の既定か人間に尋ねる | 同じ回に複数のレビュアを走らせたとき (同じ分に作れば日時は同じ) を分け、依頼文を開かずにどのレビュアの結果かが分かる |
 
    - **どちらかが既に存在すれば上書きせず、その旨を報告して終了する。** 同じ識別子で作り直したいときは人間が消す。
-4. **雛形を埋めて書き出す**: 雛形の `{{…}}` を次で埋める — `repo` (`git remote get-url origin`)・`repo_dir` (`git rev-parse --show-toplevel`)・`branch` (現在のブランチ名)・`base` / `head` / `scope` / `scope_note` (手順 2)・`skill` / `model` (手順 1)・`date` (生成日 `YYYY-MM-DD`)・`output_path` (手順 3)。`tmp/` が無ければ作る (無視されていることは手順 2 で確かめ済み)。書き出したら、埋め残した `{{…}}` が無いことを確かめる。
+4. **雛形を埋めて書き出す**: 雛形の `{{…}}` を次で埋める — `repo` (`git remote get-url origin`)・`repo_dir` (`git rev-parse --show-toplevel`)・`branch` (現在のブランチ名)・`base` / `head` / `scope` / `scope_note` (手順 2)・`skill` / `model` / `effort` (手順 1)・`date` (生成日 `YYYY-MM-DD`)・`output_path` (手順 3)。`tmp/` が無ければ作る (無視されていることは手順 2 で確かめ済み)。書き出したら、埋め残した `{{…}}` が無いことを確かめる。
 5. **報告する**: 依頼文のパスと出力先のパス、埋めた値 (対象・範囲・スキル名・モデル名) を出す。**新しいセッションへ渡すのは依頼文のパス 1 つ**であること、結果が返ったら `review-triage` に出力先のパスを渡すことを案内する。
 
 ## 原則

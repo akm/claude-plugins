@@ -43,7 +43,7 @@
 
 ### skill を呼んだことの確認
 
-依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「依頼文に含めるもの」の 6 と 7。報告に無いとき・指定と食い違うときの扱い (人間に報告する) もそこが定める。
+依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」。報告に無いとき・指定と食い違うときの扱い (人間に報告する) もそこが定める。
 
 ## 記録のキーの出所 (定義の正本)
 
@@ -60,11 +60,11 @@
 
 ## `code-review` の場合
 
-sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。
+sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。埋める値と出力先 (`{{output_path}}`) は [review-request スキル](../../review-request/SKILL.md) の手順 1〜4 と同じ規則で決める — 周回はそのスキルを呼ばないが、識別子と出力先の規則は同じにする (別の名前を付けると `review-triage` の手順 1 が読む対象と食い違う)。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** 周回が回ごとに勝手に切り替えない (SKILL.md の原則)。
 - `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く正本にある)。
-- 出力は [review-request.md](../../review-triage/references/review-request.md) の「出力様式」の YAML で書き出させる。**地の文で返させない** — `review-triage` の手順 1 がファイル経由で読む形である。
+- 出力は雛形の「出力様式」の YAML で書き出させる。**地の文で返させない** — `review-triage` の手順 1 がファイル経由で読む形である。
 
 ## `ce-code-review` の場合
 

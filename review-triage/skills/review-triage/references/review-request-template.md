@@ -16,6 +16,11 @@
 - 指摘を見つけても直さない。直すかどうかは受け取る側が判断する。
 - レビューの前後で HEAD と作業ツリーが不変であることを確認して報告する。
 
+## 呼ぶ skill・effort・モデル
+
+- skill: `{{skill}}` / effort: `{{effort}}` / モデル: `{{model}}` — **この値で呼ぶ。** 自分で別の値を選ばない (`ce-code-review` のように effort やモデルを受け取らない skill では、その旨が上に書かれている)。
+- **報告に、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを含める。** 受け取る側はこの報告を上の指定と突き合わせる。
+
 ## 検証の前払い (すべての指摘に必須)
 
 - evidence には次のいずれかを含める。どちらも含められない指摘は confidence を low にする。
@@ -50,7 +55,7 @@
 ```yaml
 skill: {{skill}}
 model: {{model}}
-level: ""
+level: "{{effort}}"
 run_id: ""
 scope: {{scope}}
 base: {{base}}
@@ -71,8 +76,8 @@ residual: []
 
 | キー | 内容 |
 | --- | --- |
-| `skill` / `model` / `scope` / `base` / `head` / `date` | 上に埋めた値のまま書く。`head` は作業開始時の HEAD の短縮 SHA と一致すること |
-| `level` / `run_id` | レベル・mode や run 識別子があれば書く。無ければ空文字のまま |
+| `skill` / `model` / `level` / `scope` / `base` / `head` / `date` | 上に埋めた値のまま書く。`level` は指定された effort。`head` は作業開始時の HEAD の短縮 SHA と一致すること |
+| `run_id` | run 識別子があれば書く。無ければ空文字のまま |
 | `attrs` (トップレベル) | 上に挙げたキー以外に残したい情報 (PR 番号など)。無ければ `{}` |
 | `findings[].id` | 1 からの連番 |
 | `findings[].file` / `line` | 指摘の位置。`line` は不明なら省略 |
