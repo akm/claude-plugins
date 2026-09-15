@@ -80,7 +80,7 @@ flowchart TD
 | G2 | 判定 | 全回の `plans` に `status: awaiting-human` の問題があるか。記録が無ければ「無い」 | — |
 | G3 | 判定 | J2 と同じ条件。**`review-triage` を単独で走らせた直後 (採択が残り `plans` がまだ無い) はここで「ある」になり、レビューの前に F1 を通る** — 先にレビューを走らせると、`review-triage` が次の回を追記した時点で前の回の被覆の免除 (正本は [record-schema.md](../../review-triage/references/record-schema.md) の `plan_ref` の行) が解け、記録の検査が失敗する | — |
 | L1 | 手順 | レビューを起動する。経路・依頼文・範囲・モデルの正本は [review-invocation.md](review-invocation.md) | いま何回目か (この起動で数えた回数) と上限 |
-| L2 | 手順 | `review-triage` を呼ぶ。記録への追記・サマリの再生成・コミットはそちらが行う | — |
+| L2 | 手順 | `review-triage` を呼ぶ。記録への追記・サマリの再生成はそちらが行う (記録をコミットするかも、そちらの規範に従う) | — |
 | J1 | 判定 | G1 と同じ条件。今回の回で `review-triage` が書いた検知を含む | — |
 | J2 | 判定 | 全回の `findings` に、`plans` にも `plan_ref` にも覆われていない `verdict: adopted` があるか | — |
 | F1 | 手順 | `review-triage-fix` を呼ぶ。修正・検証・コミットはそちらが行う | — |

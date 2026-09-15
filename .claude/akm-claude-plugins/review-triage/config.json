@@ -1,13 +1,14 @@
 {
-  "record_dir": "docs/review-triage",
+  "record_dir": "tmp/review-triages",
   "frozen_paths": [
-    "docs/review-triage/"
+    "docs/review-triage/",
+    "tmp/review-triages/"
   ],
   "gates": [
     "ASDF_GOLANG_VERSION=1.25.1 go test -C review-triage/tools/triagecheck ./..."
   ],
-  "triage_check_command": "ASDF_GOLANG_VERSION=1.25.1 go run -C review-triage/tools/triagecheck . -current-dir \"$PWD\" -record-dir docs/review-triage -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md -summary-command \"triagecheck -write-summary\"",
-  "triage_summary_command": "ASDF_GOLANG_VERSION=1.25.1 go run -C review-triage/tools/triagecheck . -current-dir \"$PWD\" -record-dir docs/review-triage -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md -summary-command \"triagecheck -write-summary\" -write-summary",
+  "triage_check_command": "ASDF_GOLANG_VERSION=1.25.1 go run -C review-triage/tools/triagecheck . -current-dir \"$PWD\" -record-dir tmp/review-triages -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md -summary-command \"triagecheck -write-summary\"",
+  "triage_summary_command": "ASDF_GOLANG_VERSION=1.25.1 go run -C review-triage/tools/triagecheck . -current-dir \"$PWD\" -record-dir tmp/review-triages -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md -summary-command \"triagecheck -write-summary\" -write-summary",
   "loop": {
     "max_rounds": 5,
     "review_skill": "code-review",

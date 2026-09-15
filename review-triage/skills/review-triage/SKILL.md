@@ -22,9 +22,9 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 
 **手順 1 より前に `--gen-config` を処理する。** 指定されていれば、指摘の有無に関わらず雛形を生成して終了する (生成の内容と既存があるときの振る舞いは [references/config-schema.md](references/config-schema.md))。設定がまだ無い利用者は、レビューを走らせる前にこれを実行するので、手順 1 の「指摘が無ければ終了」より先に置かないと到達できない。
 
-1. **入力の確認**: 入力の経路は 2 つ — 同じセッションの文脈から受け取るか、**別セッションのレビュー結果を YAML ファイルで受け取る** (様式の正本は [references/review-request.md](references/review-request.md))。どのスキルかは記録の `skill` に残す。
-   - ファイル経由の場合、`head` が現在の HEAD と一致することを確かめてから判定に進む。`residual` の列は指摘として数えず、目を通して気になるものだけ記録の `notes` に写す。
-   - **出力先には過去の回のファイルが残る。** 複数あるときは `head` が現在の HEAD と一致するものだけを対象にし、一致するものが無ければ指摘が無い場合と同じ扱いにする — 古い結果を現在の HEAD への指摘として判定すると、既に直した箇所を再び却下・採択することになる。
+1. **入力の確認**: 入力の経路は 2 つ — 同じセッションの文脈から受け取るか、**別セッションのレビュー結果を YAML ファイルで受け取る** (依頼の運用と様式の正本は [references/review-request.md](references/review-request.md)。依頼文は [review-request](../review-request/SKILL.md) スキルが生成する)。どのスキルかは記録の `skill` に残す。
+   - ファイル経由の場合、読むのは**依頼文に埋め込んだ出力先の 1 ファイル** (`tmp/review-<識別子>.yaml`)。`head` が現在の HEAD と一致することを確かめてから判定に進む。`residual` の列は指摘として数えず、目を通して気になるものだけ記録の `notes` に写す。トップレベルの `attrs` も同じ扱い — 記録に写す場所は無いので、残す価値があるものだけ `notes` に写す。
+   - **出力先には過去の回のファイルが残る。** 識別子で名前が区別できる (成分の正本は [review-request](../review-request/SKILL.md) の手順 3) が、それでも `head` が現在の HEAD と一致するものだけを対象にし、一致するものが無ければ指摘が無い場合と同じ扱いにする — 古い結果を現在の HEAD への指摘として判定すると、既に直した箇所を再び却下・採択することになる。
    - **上流が報告のみで走ったかを確かめる** (実行前後で HEAD と作業ツリーが不変)。適用済みなら判定に進まず、その旨を報告して次から報告のみで走らせるよう案内する。
    - 指摘が見当たらなければ、レビューを先に走らせるよう案内して終了する。**勝手にレビューを走らせない。**
 2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) — 「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
@@ -33,10 +33,10 @@ description: code-review や ce-code-review が出したレビュー指摘を一
    - 帰結の 4 項目 (D3 で書くもの) は**全件に書く** — D1・D2 で決着した指摘にも記録の材料として残す。
    - 評価 (E1・E2) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
    - 境目が判断しづらいときは [references/gate-examples.md](references/gate-examples.md) の対になった例と突き合わせる。
-4. **検知**: 今回の採択を [references/recurrence-detection.md](references/recurrence-detection.md) に従って直前の回と照らし、同じ型の指摘が続いているかを判断する。発火したら、手順 5 の追記に `recurrence` (`status: detected`) を含める。過去の回が無い記録では判断しない。
-5. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。
+4. **検知**: 今回の採択を [references/recurrence-detection.md](references/recurrence-detection.md) に従って直前の回と照らし、同じ型の指摘が続いているかを判断する。採択の件数が直前の回より減っていれば、続いていても発火させない (緩和の条件と、見送ったときに `notes` に残すものの正本は同文書)。発火したら、手順 5 の追記に `recurrence` (`status: detected`) を含める。過去の回が無い記録では判断しない。
+5. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。既定の置き場を使うとき、置き場が `git check-ignore` で無視されていなければ、記録を書かずに「`.gitignore` に `tmp/` を足してコミットしてから再実行する」と案内して終了する — スキルは `.gitignore` を変えない (前提と設定で明示した置き場の扱いの正本は [references/record-schema.md](references/record-schema.md) の冒頭)。無視されていれば、置き場のディレクトリが無ければ作る。
 6. **サマリの再生成**: 設定の `triage_summary_command` でサマリを再生成し、`triage_check_command` の検査が通ることを確かめる ([references/project-config.md](references/project-config.md))。**どちらも未設定なら、走らせていないことを報告に書く。**
-7. **コミット**: 記録 YAML の追記を単独でコミットし、生成サマリを別のコミットにする (規範の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
+7. **コミット**: 記録とサマリは、置き場が git の追跡内 (`git check-ignore` で無視されない) のときだけコミットする — 既定の `tmp/review-triages/` は追跡外なのでコミットしない (判定の仕方・要否・分け方の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
 8. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。検知があれば、その条件と根拠を出し、俯瞰 (`review-triage-fix` の冒頭) を案内する (報告の形の正本は [references/recurrence-detection.md](references/recurrence-detection.md))。**勝手に呼ばない** — 直すかどうか、俯瞰に進むかどうかは人間が決める。
 
 ## 原則
