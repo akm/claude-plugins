@@ -23,7 +23,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
      最後の回だけを見ると、`plans` を書かないまま次の回が追記された過去の回の採択が対象にならず、気づかれないまま消える。
    - **全回の `plans` を 1 パスで見て**、`status: pending` (未着手) と `status: awaiting-human` (選択待ち) が残っていれば回数を問わず報告する。未着手は再開の対象、**選択待ちは実装しない** — 人間に返した判断をスキルが代わりに決めない。
    - **過去の回の未着手を再開するときは、その問題が属する回の `findings` から `finding_ids` を解決する。** 再開だけのとき (未覆いの採択が無く、未着手だけが対象) は、原因の確認から計画の追記まで (手順 2〜6) を飛ばして、その問題の `plans` (`approach`・`order`) に従って手順 7 から続ける — 計画は既に記録にあるので作り直さない。 `finding_ids` は回の中でだけ一意なので、最後の回の `findings` と取り違えない。
-   - 読めない状態はそのまま報告して終了する — ファイルが無い (`review-triage` を先に走らせるよう案内)・`runs` が空・スキーマが読めない。**「読めない」を「採択 0 件」として扱わない。** 対象が無ければ何もせずに終了する — 対象とは、未覆いの採択と、再開する未着手 (`status: pending`) の両方。**未覆いの採択が 0 件でも、未着手があれば再開する** (`review-triage-loop` が再開のために呼ぶ経路 — [loop-flow.md](../review-triage-loop/references/loop-flow.md) の F2)。
+   - 読めない状態はそのまま報告して終了する — ファイルが無い (`review-triage` を先に走らせるよう案内)・`runs` が空・スキーマが読めない。**「読めない」を「採択 0 件」として扱わない。** 対象が無ければ何もせずに終了する — 対象とは、未覆いの採択と、再開する未着手 (`status: pending`) の両方。**未覆いの採択が 0 件でも、未着手があれば再開する** (`review-triage-loop` が未着手を片付けるために呼ぶ経路 — [loop-flow.md](../review-triage-loop/references/loop-flow.md) の F1)。
 2. **原因を確かめる**: 採択した指摘ごとに「なぜそうなったか」を書く。**書けなければ束ねられない** ([references/grouping.md](references/grouping.md))。
 3. **問題にまとめる**: 同じ原因の指摘を 1 つの問題にする。**束ねる根拠は原因であって、ファイルが同じことではない** (基準の正本は [references/grouping.md](references/grouping.md))。
    - **別の回の採択を同じ原因で束ねる場合は、その指摘に `plan_ref` (束ね先の回と問題) を追記する** — 対応関係を自由記述に残さない。様式と被覆の規則の正本は [記録 README](../review-triage/references/record-schema.md) のスキーマ表。
