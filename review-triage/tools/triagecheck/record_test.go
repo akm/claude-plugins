@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1302,15 +1303,34 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 	}
 }
 
-// recurrenceRecordYAML は validRecordYAML に回 2 を足し、その回の直下に recurrence を
-// 置いた記録を返す。検知は過去の回との比較なので、回が 2 つ無いと正しい形を書けない。
-// recurrence が空文字列なら回 2 に recurrence を書かない。
-func recurrenceRecordYAML(recurrence string) string {
-	run2 := `  - date: "2026-08-31"
+// --- 旧様式 (検知の項目 recurrence) の受け入れ ---
+//
+// recurrence は、同じ型の指摘が続いていることの判断 (検知) を記録していたキー。
+// 検知は廃止したので review-triage は新しい回に書かないが、置き場に残る既存の記録は
+// 回ごとに持つ。triagecheck はその記録を書き換えずに検査を成功させ、生成サマリも
+// 従来どおり描画する。検査するのは形 (許可キーと値の有無) だけで、根拠が指す回や
+// 状態ごとの専用キーといった整合は見ない (README「何を検査するか」)。
+
+// legacyRecordYAML は旧様式の記録の fixture。validRecordYAML (回 1) の後ろに引数の
+// 数だけ回を足し、回 i+2 の直下に recurrences[i] を置く (空文字列なら書かない)。
+// 足す回は採択 (指摘 1) と、それを覆う plans (P1) を持つ。最後の回でなくなっても
+// 被覆の検査に掛からないようにするため。
+func legacyRecordYAML(recurrences ...string) string {
+	s := validRecordYAML
+	for i, rec := range recurrences {
+		s += legacyRunYAML(i+2, rec)
+	}
+	return s
+}
+
+// legacyRunYAML は legacyRecordYAML の回 1 つ分。runNo は 1 始まりの回番号で、
+// date と head を回ごとに変えるのに使う。
+func legacyRunYAML(runNo int, recurrence string) string {
+	run := fmt.Sprintf(`  - date: "2026-09-%02d"
     skill: code-review
     model: sonnet-5
     scope: incremental
-    head: def5678
+    head: abc%04d
     findings:
       - id: 1
         file: docs/foo.md
@@ -1328,332 +1348,167 @@ func recurrenceRecordYAML(recurrence string) string {
           result: verified
         verdict: adopted
         verdict_reason: ゲート 0 件で採択 (A2)
-      - id: 2
-        file: tools/baz_test.go
-        summary: 一時ファイルの削除が雑
-        category: test
-        audience: developer
-        consequence:
-          condition: disk full のとき
-          who: developer
-          what: テストが落ちる
-          detectability: 気づく
-        premise_check:
-          stages: A
-          result: verified
-        gates_fired: [developer-domain]
-        verdict: rejected
-        verdict_reason: 開発者の領域で却下 (R3)
-`
+    plans:
+      - problem_id: P1
+        cause: 数えずに書いた
+        finding_ids: [1]
+        approach: 数え直して単位を書く
+        order: 1
+        sha: ""
+        status: pending
+`, runNo, runNo)
 	if recurrence != "" {
-		run2 += "    recurrence:\n" + recurrence
+		run += "    recurrence:\n" + recurrence
 	}
-	return validRecordYAML + run2
+	return run
 }
 
-const recurrenceEvidenceYAML = `      evidence:
+// legacyEvidenceYAML は旧様式の検知の根拠 (evidence) 1 件。priorRun は比べた回の
+// 1 始まりの番号、prior は比べた先 (比べた回の問題 id など)。
+func legacyEvidenceYAML(priorRun int, prior string) string {
+	return fmt.Sprintf(`      evidence:
         - condition: fix-derived
           finding_id: 1
-          prior_run: 1
-          prior: P1
-          reason: 回 1 の P1 で直した表の隣の行に同じ規則を当て忘れた
+          prior_run: %d
+          prior: %s
+          reason: 回 %d で直した表の隣の行に同じ規則を当て忘れた
+`, priorRun, prior, priorRun)
+}
+
+// legacyDeclinedYAML は status declined (繰り返しではないと判断した) の旧様式の
+// recurrence。回 2 に置く形 (根拠は回 1 の P1 を指す)。
+var legacyDeclinedYAML = "      status: declined\n" + legacyEvidenceYAML(1, "P1") +
+	"      declined_reason: 回 1 の指摘は元から残っていた欠陥で、修正由来ではない\n"
+
+// legacyReframeYAML は旧様式の reframe (検知の後に問題の捉え方を改めた結果)。
+// status reframed の recurrence に置く。
+const legacyReframeYAML = `      reframe:
+        pattern: 表の行ごとに規則を当てている
+        axes: 規則 × 表の行
+        root_cause: 数え方の規則が表の外に無い
+        fix_unit: 数え方の規則を 1 か所に書き、表の全行をそこから引く
+        source: human
 `
 
-// recurrence は detected / declined / reframed の 3 状態のどれでも通る。
-// 無いことが「検知なし」の表現なので、無い記録も通る (validRecordYAML と
-// recurrenceRecordYAML(""))。
-func TestReviewTriageRecordRecurrencePasses(t *testing.T) {
+// 旧様式の記録はそのまま検査を通る。生成サマリは recordFiles が YAML から作るので、
+// 鮮度の検査も同時に通る。
+func TestReviewTriageRecordLegacyRecurrencePasses(t *testing.T) {
+	reframed2 := "      status: reframed\n" + legacyEvidenceYAML(1, "P1") + legacyReframeYAML
+	reframed3 := "      status: reframed\n" + legacyEvidenceYAML(2, "P1") + legacyReframeYAML
 	cases := []struct {
-		name       string
-		recurrence string
+		name    string
+		yamlSrc string
 	}{
-		{"検知なし (キーが無い)", ""},
-		{"detected", "      status: detected\n" + recurrenceEvidenceYAML},
-		{"declined", "      status: declined\n" + recurrenceEvidenceYAML +
-			"      declined_reason: 回 1 の指摘は元から残っていた欠陥で、修正由来ではない\n"},
-		{"reframed", "      status: reframed\n" + recurrenceEvidenceYAML +
-			"      reframe:\n" +
-			"        pattern: 表の行ごとに規則を当てている\n" +
-			"        axes: 規則 × 表の行\n" +
-			"        root_cause: 数え方の規則が表の外に無い\n" +
-			"        fix_unit: 数え方の規則を 1 か所に書き、表の全行をそこから引く\n" +
-			"        source: human\n"},
-		{"same-location の根拠", "      status: detected\n" +
+		{"recurrence の無い回だけ", legacyRecordYAML("")},
+		{"declined", legacyRecordYAML(legacyDeclinedYAML)},
+		{"reframed", legacyRecordYAML(reframed2)},
+		{"detected (更新される前に止まった記録)", legacyRecordYAML("      status: detected\n" + legacyEvidenceYAML(1, "P1"))},
+		{"declined の回と reframed の回の両方", legacyRecordYAML(legacyDeclinedYAML, reframed3)},
+		{"same-location の根拠", legacyRecordYAML("      status: declined\n" +
 			"      evidence:\n" +
 			"        - condition: same-location\n" +
 			"          finding_id: 1\n" +
 			"          prior_run: 1\n" +
 			"          prior: 指摘 1\n" +
-			"          reason: 回 1 の指摘 1 と同じ表を指す\n"},
+			"          reason: 回 1 の指摘 1 と同じ表を指す\n" +
+			"      declined_reason: 同じ表だが別の行で、当てる規則は同じではない\n")},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			files, read := recordFiles(t, recurrenceRecordYAML(tc.recurrence))
+			files, read := recordFiles(t, tc.yamlSrc)
 			if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
-				t.Fatalf("正しい recurrence で問題が出た: %v", problems)
+				t.Fatalf("旧様式の記録で問題が出た: %v", problems)
 			}
 		})
 	}
 }
 
-func TestReviewTriageRecordRecurrenceViolations(t *testing.T) {
+// 検知の整合 (根拠が直前の回を指すか、回 1 に無いか、比べた回の状態と prior の形が
+// 合うか、状態ごとの専用キー、status の列挙) はもう検査しない。以前は報告していた
+// 各ケースで問題が 0 件になることを確かめる。
+func TestReviewTriageRecordLegacyRecurrenceNotCrossChecked(t *testing.T) {
+	reframed2 := "      status: reframed\n" + legacyEvidenceYAML(1, "P1") + legacyReframeYAML
 	cases := []struct {
-		name       string
-		recurrence string
-		want       string // 問題文に含まれるべき語
+		name    string
+		yamlSrc string
 	}{
-		{"status の列挙値違反", "      status: found\n" + recurrenceEvidenceYAML, "status"},
-		{"status が無い", recurrenceEvidenceYAML, "status"},
-		{"evidence が空", "      status: detected\n      evidence: []\n", "evidence"},
-		{"evidence が無い", "      status: detected\n", "evidence"},
-		{"condition の列挙値違反", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "fix-derived", "same-file", 1), "condition"},
-		{"finding_id が採択でない指摘を指す", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "finding_id: 1", "finding_id: 2", 1), "採択"},
-		{"finding_id が存在しない指摘を指す", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "finding_id: 1", "finding_id: 9", 1), "finding_id"},
-		{"prior_run が自回以上", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 2", 1), "prior_run"},
-		{"prior_run が 0", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "prior_run: 1", "prior_run: 0", 1), "prior_run"},
-		{"prior が無い", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "          prior: P1\n", "", 1), "prior"},
-		{"reason が無い", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "          reason: 回 1 の P1 で直した表の隣の行に同じ規則を当て忘れた\n", "", 1), "reason"},
-		{"declined なのに declined_reason が無い", "      status: declined\n" + recurrenceEvidenceYAML, "declined_reason"},
-		{"detected なのに declined_reason がある", "      status: detected\n" + recurrenceEvidenceYAML +
-			"      declined_reason: 違う\n", "declined_reason"},
-		{"reframed なのに reframe が無い", "      status: reframed\n" + recurrenceEvidenceYAML, "reframe"},
-		{"reframe の項目が無い", "      status: reframed\n" + recurrenceEvidenceYAML +
-			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        source: human\n", "fix_unit"},
-		{"reframe.source の列挙値違反", "      status: reframed\n" + recurrenceEvidenceYAML +
-			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: claude\n", "source"},
-		{"detected なのに reframe がある", "      status: detected\n" + recurrenceEvidenceYAML +
-			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: human\n", "reframe"},
-		{"declined なのに reframe がある", "      status: declined\n" + recurrenceEvidenceYAML +
-			"      declined_reason: 回 1 の指摘は元から残っていた欠陥で、修正由来ではない\n" +
-			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: human\n", "reframe"},
-		{"fix-derived の prior が比べた回の plans に無い", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "prior: P1", "prior: P9", 1), "plans"},
-		{"fix-derived の prior が捉え直しなのに比べた回は reframed でない", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "prior: P1", "prior: 捉え直し", 1), "plans"},
-		{"recurrence の未知のキー", "      status: detected\n" + recurrenceEvidenceYAML + "      fired: true\n", "fired"},
-		{"evidence の未知のキー", "      status: detected\n" +
-			strings.Replace(recurrenceEvidenceYAML, "          prior: P1\n", "          prior: P1\n          where: docs/foo.md\n", 1), "where"},
-		{"reframe の未知のキー", "      status: reframed\n" + recurrenceEvidenceYAML +
-			"      reframe:\n        pattern: 表の行ごと\n        axes: 規則 × 行\n        root_cause: 規則が外に無い\n        fix_unit: 規則を 1 か所に\n        source: human\n        table: x\n", "table"},
+		{"回 1 に recurrence がある",
+			validRecordYAML + "    recurrence:\n      status: detected\n" + legacyEvidenceYAML(1, "P1")},
+		{"prior_run が直前の回でない (回 3 の根拠が回 1 を指す)",
+			legacyRecordYAML(reframed2, "      status: detected\n"+legacyEvidenceYAML(1, "P1"))},
+		{"比べた回が reframed なのに prior が問題 id",
+			legacyRecordYAML(reframed2, "      status: detected\n"+legacyEvidenceYAML(2, "P1"))},
+		{"prior が比べた回の plans に無い",
+			legacyRecordYAML("      status: detected\n" + legacyEvidenceYAML(1, "P9"))},
+		{"declined なのに declined_reason が無い",
+			legacyRecordYAML("      status: declined\n" + legacyEvidenceYAML(1, "P1"))},
+		{"status が列挙に無い",
+			legacyRecordYAML("      status: found\n" + legacyEvidenceYAML(1, "P1"))},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			yamlSrc := recurrenceRecordYAML(tc.recurrence)
-			yamlPath := reviewTriageDir + "feat-x.yaml"
-			read := func(_ string) ([]byte, error) { return []byte(yamlSrc), nil }
-			problems := reviewTriageRecordProblems([]string{yamlPath}, read)
+			files, read := recordFiles(t, tc.yamlSrc)
+			if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+				t.Fatalf("旧様式の recurrence の整合が報告された (整合検査は廃止した): %v", problems)
+			}
+		})
+	}
+}
+
+// 形の検査は残る。recurrence の中 (検知・根拠・reframe) の未知のキーと、recurrence と
+// 並ぶ実行の未知のキーは従来どおり報告し、recurrence 自体は許可キーなので報告しない。
+func TestReviewTriageRecordLegacyRecurrenceUnknownKeys(t *testing.T) {
+	cases := []struct {
+		name    string
+		yamlSrc string
+		want    string // 問題文に含まれるべきキー名
+	}{
+		{"recurrence の未知のキー", legacyRecordYAML(legacyDeclinedYAML + "      fired: true\n"), "fired"},
+		{"evidence の未知のキー", legacyRecordYAML(strings.Replace(legacyDeclinedYAML,
+			"          prior: P1\n", "          prior: P1\n          where: docs/foo.md\n", 1)), "where"},
+		{"reframe の未知のキー", legacyRecordYAML("      status: reframed\n" +
+			legacyEvidenceYAML(1, "P1") + legacyReframeYAML + "        table: x\n"), "table"},
+		{"recurrence と並ぶ実行の未知のキー", legacyRecordYAML(legacyDeclinedYAML + "    detection: x\n"), "detection"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			files, read := recordFiles(t, tc.yamlSrc)
+			problems := reviewTriageRecordProblems(files, read)
 			found := false
 			for _, p := range problems {
-				if strings.Contains(p, tc.want) {
+				if !strings.Contains(p, "未知のキー") {
+					continue
+				}
+				if strings.Contains(p, `"recurrence"`) {
+					t.Fatalf("recurrence が未知のキーとして報告された: %v", problems)
+				}
+				if strings.Contains(p, fmt.Sprintf("%q", tc.want)) {
 					found = true
 				}
 			}
 			if !found {
-				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
+				t.Fatalf("未知のキー %q が報告されない。出た問題: %v", tc.want, problems)
 			}
 		})
 	}
 }
 
-// recurrenceReframedThenRecordYAML は recurrenceRecordYAML の回 2 を reframed にして
-// 回 3 を足し、回 3 の recurrence に引数を置いた記録を返す。fix-derived の prior が
-// 「捉え直し」を指せるのは、比べた回が捉え直し済み (reframed) のときだけなので、
-// その形を書くには捉え直した回とそれを比べる回の 2 つが要る。回 2 は最後の回で
-// なくなるので、採択 (指摘 1) を覆う plans も足す。
-func recurrenceReframedThenRecordYAML(recurrence string) string {
-	run2 := recurrenceRecordYAML("      status: reframed\n" + recurrenceEvidenceYAML +
-		"      reframe:\n" +
-		"        pattern: 表の行ごとに規則を当てている\n" +
-		"        axes: 規則 × 表の行\n" +
-		"        root_cause: 数え方の規則が表の外に無い\n" +
-		"        fix_unit: 数え方の規則を 1 か所に書き、表の全行をそこから引く\n" +
-		"        source: human\n")
-	run2 += `    plans:
-      - problem_id: P2
-        cause: 表の外に規則が無い
-        finding_ids: [1]
-        approach: 規則を 1 か所に書く
-        order: 1
-        sha: ""
-        status: pending
-`
-	run3 := `  - date: "2026-09-01"
-    skill: code-review
-    model: sonnet-5
-    scope: incremental
-    head: 0123abc
-    findings:
-      - id: 1
-        file: docs/foo.md
-        line: 30
-        summary: 規則を 1 か所に寄せた後も別の表が旧規則のまま
-        category: doc-other
-        audience: developer
-        consequence:
-          condition: 検算するとき
-          who: developer
-          what: 分母を誤る
-          detectability: 気づかない
-        premise_check:
-          stages: A
-          result: verified
-        verdict: adopted
-        verdict_reason: ゲート 0 件で採択 (A2)
-    recurrence:
-` + recurrence
-	return run2 + run3
-}
-
-// 捉え直し済み (reframed) の回に plans がまだ無くても、次の回の fix-derived の根拠は
-// prior: 捉え直し で通る — recurrence-detection.md「直前の回の状態と主の条件」の
-// 捉え直し済みの行 (plans の有無を問わない) を固定する。実装済みの挙動の回帰テスト。
-// reframing.md の「記録に書いてから束ねに進む」の直後は、この状態が普通に起きる。
-func TestReviewTriageRecordRecurrencePriorReframedWithoutPlans(t *testing.T) {
-	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
-		"      evidence:\n" +
-		"        - condition: fix-derived\n" +
-		"          finding_id: 1\n" +
-		"          prior_run: 2\n" +
-		"          prior: 捉え直し\n" +
-		"          reason: 回 2 の捉え直しで寄せた規則を別の表に当て忘れた\n")
-	// 回 2 の plans を外す。回 2 の採択は最後の回ではないので、回 3 の問題で覆う。
-	plans := "    plans:\n" +
-		"      - problem_id: P2\n" +
-		"        cause: 表の外に規則が無い\n" +
-		"        finding_ids: [1]\n" +
-		"        approach: 規則を 1 か所に書く\n" +
-		"        order: 1\n" +
-		"        sha: \"\"\n" +
-		"        status: pending\n"
-	if !strings.Contains(yamlSrc, plans) {
-		t.Fatal("fixture に回 2 の plans が見つからない (fixture が変わった)")
-	}
-	yamlSrc = strings.Replace(yamlSrc, plans, "", 1)
-	// 回 2 の指摘 1 に plan_ref を足す。同じ文面の指摘は回 1 (validRecordYAML) にもあるので、
-	// 回 2 の recurrence より前で最後に現れる箇所を選ぶ。
-	marker := "        verdict_reason: ゲート 0 件で採択 (A2)\n      - id: 2\n"
-	recIdx := strings.Index(yamlSrc, "    recurrence:\n      status: reframed")
-	if recIdx < 0 {
-		t.Fatal("fixture に回 2 の recurrence が見つからない (fixture が変わった)")
-	}
-	head := yamlSrc[:recIdx]
-	mIdx := strings.LastIndex(head, marker)
-	if mIdx < 0 {
-		t.Fatal("fixture に回 2 の指摘 1 の終わりが見つからない (fixture が変わった)")
-	}
-	yamlSrc = head[:mIdx] +
-		"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n          run: 3\n          problem: P3\n      - id: 2\n" +
-		head[mIdx+len(marker):] + yamlSrc[recIdx:]
-	yamlSrc += "    plans:\n" +
-		"      - problem_id: P3\n" +
-		"        cause: 表の外に規則が無い (回 2 の指摘 1 も同じ原因で束ねる)\n" +
-		"        finding_ids: [1]\n" +
-		"        approach: 規則を 1 か所に書き、回 2 の指摘 1 もここで直す\n" +
-		"        order: 1\n" +
-		"        sha: \"\"\n" +
-		"        status: pending\n"
-	files, read := recordFiles(t, yamlSrc)
-	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
-		t.Fatalf("plans の無い捉え直し済みの回を指す prior 捉え直し で問題が出た: %v", problems)
-	}
-}
-
-// 回 1 に recurrence を書いた記録は、比べる過去の回が無いので専用の文で弾く —
-// recurrence-detection.md「過去の回が無い記録では判断しない」。範囲の検査の副作用
-// (直前の回が 0) で弾くと「直前の回 (0)」という読めない文になる。
-func TestReviewTriageRecordRecurrenceOnFirstRun(t *testing.T) {
-	yamlSrc := validRecordYAML + "    recurrence:\n      status: detected\n" + recurrenceEvidenceYAML
-	files, read := recordFiles(t, yamlSrc)
-	problems := reviewTriageRecordProblems(files, read)
-	if len(problems) != 1 || !strings.Contains(problems[0], "回 1 の recurrence") || !strings.Contains(problems[0], "過去の回が無い") {
-		t.Fatalf("回 1 の recurrence が専用の 1 件で報告されない: %v", problems)
-	}
-}
-
-// 直前でない回を指す根拠は弾く — 比べる相手は直前の 1 回 (recurrence-detection.md)。
-// 3 回の記録で、回 3 の根拠が回 1 を指す形。
-func TestReviewTriageRecordRecurrencePriorRunNotPrevious(t *testing.T) {
-	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
-		"      evidence:\n" +
-		"        - condition: fix-derived\n" +
-		"          finding_id: 1\n" +
-		"          prior_run: 1\n" +
-		"          prior: P1\n" +
-		"          reason: 回 1 の P1 の修正由来\n")
-	files, read := recordFiles(t, yamlSrc)
-	problems := reviewTriageRecordProblems(files, read)
-	found := false
-	for _, pr := range problems {
-		if strings.Contains(pr, "prior_run 1") && strings.Contains(pr, "直前の回") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("直前でない回 (回 3 から回 1) を指す prior_run が報告されない: %v", problems)
-	}
-}
-
-// 比べた回が捉え直し済み (reframed) なら、fix-derived の prior は 捉え直し と書く —
-// 表の捉え直し済みの行。問題の識別子で指す根拠は、正本と食い違うので弾く。
-func TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker(t *testing.T) {
-	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
-		"      evidence:\n" +
-		"        - condition: fix-derived\n" +
-		"          finding_id: 1\n" +
-		"          prior_run: 2\n" +
-		"          prior: P2\n" +
-		"          reason: 回 2 の P2 の修正由来\n")
-	files, read := recordFiles(t, yamlSrc)
-	problems := reviewTriageRecordProblems(files, read)
-	found := false
-	for _, pr := range problems {
-		if strings.Contains(pr, "捉え直し") && strings.Contains(pr, `"P2"`) {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("捉え直し済みの回を問題の識別子で指す根拠が報告されない: %v", problems)
-	}
-}
-
-// 捉え直し済み (reframed) の回を比べた fix-derived の根拠は、prior に 捉え直し を書く —
-// recurrence-detection.md「直前の回の状態と主の条件」の捉え直し済みの行。
-func TestReviewTriageRecordRecurrencePriorReframed(t *testing.T) {
-	yamlSrc := recurrenceReframedThenRecordYAML("      status: detected\n" +
-		"      evidence:\n" +
-		"        - condition: fix-derived\n" +
-		"          finding_id: 1\n" +
-		"          prior_run: 2\n" +
-		"          prior: 捉え直し\n" +
-		"          reason: 回 2 の捉え直しで寄せた規則を別の表に当て忘れた\n")
-	files, read := recordFiles(t, yamlSrc)
-	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
-		t.Fatalf("捉え直し済みの回を指す prior 捉え直し で問題が出た: %v", problems)
-	}
-}
-
-// キーだけ書いて値を省いた recurrence (null) は「無い」と同一に扱われて黙る。
-// 書きかけの検知を「検知なし」に化けさせないため報告する (investigation と同じ)。
+// キーだけ書いて値を省いた recurrence (null) は、有無をポインタで見る読み込みでは
+// 「無い」と同じになる。書きかけの記録を利用者に知らせずに通さないよう、従来どおり
+// 1 件の問題として報告する (investigation と同じ扱い)。
 func TestReviewTriageRecordRecurrenceNull(t *testing.T) {
-	yamlSrc := strings.Replace(recurrenceRecordYAML("      status: detected\n"),
-		"    recurrence:\n      status: detected\n", "    recurrence:\n", 1)
-	files, read := recordFiles(t, yamlSrc)
+	files, read := recordFiles(t, legacyRecordYAML("")+"    recurrence:\n")
 	problems := reviewTriageRecordProblems(files, read)
 	if len(problems) != 1 || !strings.Contains(problems[0], "recurrence に値がありません") {
 		t.Fatalf("recurrence の null が 1 件の問題として報告されない: %v", problems)
 	}
 }
 
-// 検知の小節は回ごとの節の中、指摘の表の後に出る。無い回には出さない。
-// 自由文字列の縦棒は recordCell で無害化する。
-func TestReviewTriageSummaryRecurrence(t *testing.T) {
+// 旧様式の recurrence を持つ回の生成サマリは、変更前と同じ検知の小節 (回ごとの節の中、
+// 指摘の表の後、修正計画の前) を出す。描画を変えると既存の生成サマリが古いと報告される
+// ので、文面まで検証する。recurrence の無い回には出さない。自由文字列の縦棒は
+// recordCell で無害化する。
+func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 	render := func(t *testing.T, yamlSrc string) string {
 		t.Helper()
 		summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(yamlSrc))
@@ -1662,11 +1517,11 @@ func TestReviewTriageSummaryRecurrence(t *testing.T) {
 		}
 		return summary
 	}
-	if summary := render(t, recurrenceRecordYAML("")); strings.Contains(summary, "### 検知") {
+	if summary := render(t, legacyRecordYAML("")); strings.Contains(summary, "### 検知") {
 		t.Fatalf("recurrence の無い回に検知の小節が出ている:\n%s", summary)
 	}
 
-	detected := render(t, recurrenceRecordYAML("      status: detected\n"+
+	detected := render(t, legacyRecordYAML("      status: detected\n"+
 		"      evidence:\n"+
 		"        - condition: fix-derived\n"+
 		"          finding_id: 1\n"+
@@ -1681,15 +1536,23 @@ func TestReviewTriageSummaryRecurrence(t *testing.T) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, detected)
 		}
 	}
-	// 小節の位置: 指摘の表の後、観察の前。
-	if strings.Index(detected, "### 検知") < strings.Index(detected, "| 2 | `tools/baz_test.go`") {
+	// 小節の位置: 回 2 の節の中で、指摘の表の後、修正計画の前。
+	run2 := detected[strings.Index(detected, "\n## 回 2:"):]
+	recIdx := strings.Index(run2, "\n### 検知\n")
+	if recIdx < 0 {
+		t.Fatalf("回 2 の節に検知の小節が無い:\n%s", detected)
+	}
+	if recIdx < strings.Index(run2, "| 1 | `docs/foo.md:12`") {
 		t.Fatalf("検知の小節が指摘の表より前に出ている:\n%s", detected)
+	}
+	if recIdx > strings.Index(run2, "\n### 修正計画\n") {
+		t.Fatalf("検知の小節が修正計画より後に出ている:\n%s", detected)
 	}
 	if strings.Contains(detected, "判断した理由") || strings.Contains(detected, "捉え直し:") {
 		t.Fatalf("detected なのに declined / reframed の行が出ている:\n%s", detected)
 	}
 
-	declined := render(t, recurrenceRecordYAML("      status: declined\n"+recurrenceEvidenceYAML+
+	declined := render(t, legacyRecordYAML("      status: declined\n"+legacyEvidenceYAML(1, "P1")+
 		"      declined_reason: \"元から | 残っていた欠陥\"\n"))
 	for _, want := range []string{
 		"- 状態: 繰り返しではないと判断\n",
@@ -1700,7 +1563,7 @@ func TestReviewTriageSummaryRecurrence(t *testing.T) {
 		}
 	}
 
-	reframed := render(t, recurrenceRecordYAML("      status: reframed\n"+
+	reframed := render(t, legacyRecordYAML("      status: reframed\n"+
 		"      evidence:\n"+
 		"        - condition: same-location\n"+
 		"          finding_id: 1\n"+
