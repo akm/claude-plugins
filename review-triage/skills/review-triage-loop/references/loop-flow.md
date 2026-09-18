@@ -70,7 +70,7 @@ flowchart TD
 | L1 | 手順 | レビューを起動する。経路・依頼文・範囲・モデルの正本は [review-invocation.md](review-invocation.md) | いま何回目か (この起動で数えた回数) と上限 |
 | L2 | 手順 | `review-triage` を呼ぶ。記録への追記・サマリの再生成はそちらが行う (記録をコミットするかも、そちらの規範に従う) | — |
 | J2 | 判定 | 全回の `findings` に、`plans` にも `plan_ref` にも覆われていない `verdict: adopted` があるか。または、全回の `plans` に `status: investigated` (調査済み・未立案) か `status: pending` (未着手) の問題があるか | — |
-| F1 | 手順 | `review-triage-fix` を呼ぶ。修正・検証・コミットはそちらが行う。**周回は、覆われていない採択を直す呼び出しと、調査済み・未着手を再開するだけの呼び出しを区別して渡さない** — 記録の状態から対象 (未覆いの採択・再開する調査済み・未着手) を解決し、再開する問題をどの段から続けるか (調査済みは立案 = 手順 5 から、未着手は修正 = 手順 7 から) を決めることは、`review-triage-fix` の手順 1 が行う。正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 | — |
+| F1 | 手順 | `review-triage-fix` を呼ぶ。修正・検証・コミットはそちらが行う。**周回は、覆われていない採択を直す呼び出しと、調査済み・未着手を再開するだけの呼び出しを区別して渡さない** — 記録の状態から対象 (未覆いの採択・再開する調査済み・未着手) を解決し、再開する問題をどの段から続けるか (調査済みは立案 = 手順 5 から、未着手は修正 = 手順 7 から) を決めることは、`review-triage-fix` の手順 1 が行う。正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1。**F1 が人間に問いを返して止まったとき (立案者の選択・修正を続けられない事情) も、その問いを人間にそのまま渡したうえで図に戻り、記録の状態で J4 と J7 を判定する** — `review-triage-fix` の報告で終わらせず、周回の報告 ([SKILL.md](../SKILL.md) の手順 4) を必ず出す | — |
 | J4 | 判定 | G2 と同じ条件。今回の回で `review-triage-fix` が書いた選択待ちを含む | — |
 | J7 | 判定 | 直前の F1 の前後で記録を比べ、`plans` の状態が 1 つでも進んだか — 覆われていなかった採択が `plans` か `plan_ref` で覆われた、`investigated` が `pending` か `awaiting-human` に進んだ、`pending` が `done` か `done-external` に進んだ、のいずれか。**比べる材料は記録 YAML であって、`review-triage-fix` の報告の文面ではない** (方針の 1 行目と同じ理由)。F1 の前に記録を控えておく | — |
 | J5 | 判定 | この起動で回した回数が `max_rounds` に達したか。**起動時に 0 から数える** — 記録の回数 (`runs` の要素数) ではない | — |
