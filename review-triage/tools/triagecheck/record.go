@@ -160,7 +160,11 @@ type recordPlan struct {
 	ProblemID  string `yaml:"problem_id"`
 	Cause      string `yaml:"cause"`
 	FindingIDs []int  `yaml:"finding_ids"`
-	Approach   string `yaml:"approach"`
+	// Approach (修正方法) と Order (順序) は review-triage-fix の段 2 (立案) が書く。
+	// 書く条件は status ごとに決まる — pending / done / done-external では approach が
+	// 必須、awaiting-human では任意 (人間の答えの後に書く)、investigated (段 1 の
+	// 結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
+	Approach string `yaml:"approach"`
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
 	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
@@ -536,7 +540,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 		for pi, pl := range run.Plans {
 			pn := fmt.Sprintf("%s: plans[%d] (%s)", rn, pi, pl.ProblemID)
 			for _, kv := range []struct{ key, val string }{
-				{"problem_id", pl.ProblemID}, {"cause", pl.Cause}, {"approach", pl.Approach},
+				{"problem_id", pl.ProblemID}, {"cause", pl.Cause},
 			} {
 				if kv.val == "" {
 					add("%s: %s がありません", pn, kv.key)
@@ -569,22 +573,51 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					}
 				}
 			}
+			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
+			// status ごとに決まる (スキーマ表の approach の行) — 修正に進む状態
+			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
+			// では任意 (人間が立案する待ちは approach を持たず、人間の答えの後に書く)、
+			// investigated では逆に書いてあれば報告する。
+			approachRequired := func() {
+				if pl.Approach == "" {
+					add("%s: approach がありません", pn)
+				}
+			}
 			switch pl.Status {
+			case "investigated":
+				// 段 1 (調査) の結果だけを持つ状態。修正方法と順序は段 2 (立案) が書いて
+				// pending / awaiting-human に進める。ここに書いてあると、段 2 が書いたのか
+				// 段 1 が段 2 の中身まで書いたのかを記録から読めなくなるので、書いてあれば報告する。
+				externalOnly()
+				if pl.SHA != "" {
+					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+				}
+				if pl.Approach != "" {
+					add("%s: 調査済み (investigated) では approach を書かない。修正方法を決めたのなら status: pending にする", pn)
+				}
+				if pl.Order != 0 {
+					add("%s: 調査済み (investigated) では order を書かない。順序を決めたのなら status: pending にする", pn)
+				}
 			case "pending", "awaiting-human":
 				externalOnly()
 				if pl.SHA != "" {
 					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+				}
+				if pl.Status == "pending" {
+					approachRequired()
 				}
 				if pl.Status == "awaiting-human" && pl.Options == "" {
 					add("%s: status awaiting-human には options (選択肢とトレードオフ) が必須", pn)
 				}
 			case "done":
 				externalOnly()
+				approachRequired()
 				if pl.SHA == "" {
 					add("%s: status done には sha (短縮 SHA) が必須。リポジトリ外の成果物への反映で"+
 						"コミットが立たないなら status: done-external にする", pn)
 				}
 			case "done-external":
+				approachRequired()
 				// コミットが無いのだから sha を書けるはずがない。書けているなら
 				// リポジトリ内の修正なので done が正しい。
 				if pl.SHA != "" {
@@ -595,7 +628,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 						"notes (反映先と、反映を確認した方法) のどちらかが必須", pn)
 				}
 			default:
-				add("%s: status は pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
+				add("%s: status は investigated / pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
 			}
 			// 調査は任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
@@ -786,6 +819,12 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			for _, pl := range run.Plans {
 				b.WriteString(recordRow(renderPlanCells(pl)))
 			}
+			// 調査済み・未立案 (investigated) の注記。段 1 (調査) の結果だけがあり、修正方法と
+			// 順序をまだ持たない問題が残っている回にだけ、表の下に件数と問題 id を出す。
+			// 無い回には 1 バイトも出さず、推移の表にも列を足さない — 鮮度の検査が描画結果の
+			// 全文一致なので、無い記録の出力が変わると置き場の既存サマリがすべて古いと
+			// 報告される (旧様式の検知の小節と同じ形)。
+			renderInvestigatedNote(&b, run.Plans)
 			for _, pl := range run.Plans {
 				if pl.Status == "awaiting-human" {
 					fmt.Fprintf(&b, "\n- **%s は選択待ち (人間が選ぶ)**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Options))
@@ -884,15 +923,39 @@ func renderPlanCells(pl recordPlan) []string {
 	case pl.AppliedExternalURL != "":
 		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
+	// 修正方法の欄。investigated (と人間が立案する待ちの awaiting-human) は approach を
+	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す — 空のセルは書き忘れと
+	// 区別できない。approach を持つ状態の行は変わらない。
+	approach := "—"
+	if pl.Approach != "" {
+		approach = recordCell(pl.Approach)
+	}
 	return []string{
 		recordCell(pl.ProblemID),
 		recordCell(pl.Cause),
 		strings.Join(ids, " "),
-		recordCell(pl.Approach),
+		approach,
 		order,
 		recordStatusJa(pl.Status),
 		sha,
 	}
+}
+
+// renderInvestigatedNote は調査済み・未立案 (status investigated) の問題の件数と id を
+// 修正計画の表の下に 1 行で出す。該当する問題が無ければ何も書かない。件数はここで
+// 数える — 人が書いた集計をどこからも読まない (推移の表と同じ)。
+func renderInvestigatedNote(b *strings.Builder, plans []recordPlan) {
+	var ids []string
+	for _, pl := range plans {
+		if pl.Status == "investigated" {
+			ids = append(ids, recordCell(pl.ProblemID))
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案 (段 2) から続ける\n",
+		len(ids), strings.Join(ids, ", "))
 }
 
 // renderInvestigation は調査の範囲と結果を 1 行にする。included / excluded が
@@ -991,6 +1054,8 @@ func recordVerdictJa(v string) string {
 
 func recordStatusJa(s string) string {
 	switch s {
+	case "investigated":
+		return "調査済み"
 	case "pending":
 		return "未着手"
 	case "awaiting-human":

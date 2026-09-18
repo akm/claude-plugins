@@ -1586,3 +1586,308 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 		}
 	}
 }
+
+// --- 調査済み・未立案 (investigated) の状態 ---
+//
+// review-triage-fix の段 1 (調査) の結果 (原因・束ね・調査) は、修正方法 (approach) と
+// 順序 (order) をまだ持たない問題として plans[].status: investigated で記録に置く。
+// approach と order を書く条件は状態ごとに決まる — pending / done / done-external では
+// approach が必須 (order は任意)、awaiting-human では任意 (人間の答えの後に書く)、
+// investigated では書かない (書いてあれば報告する)。被覆の規則 (採択は plans か
+// plan_ref で覆う) は状態を問わない。
+
+// investigatedPlansYAML は段 1 の結果だけを持つ問題 (approach と order が無い) の
+// plans 節。validRecordYAML の plans 節と差し替えて使う。
+const investigatedPlansYAML = `    plans:
+      - problem_id: P1
+        cause: 数えずに書いた
+        finding_ids: [1]
+        investigation:
+          scope: grep -rn '分母' . と docs/foo.md の同じ表の全行
+        status: investigated
+`
+
+// approach と order の無い investigated は問題にならない。採択 (指摘 1) を覆うのも
+// この問題なので、被覆の検査が状態を問わず通ることも同時に確かめる。
+func TestReviewTriageRecordInvestigatedPasses(t *testing.T) {
+	files, read := recordFiles(t, replaceRecordPlans(t, investigatedPlansYAML))
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("approach と order の無い investigated で問題が出た: %v", problems)
+	}
+}
+
+// investigated に approach / order が書いてあれば報告する。段 1 の結果に立案の中身が
+// 混ざると、段 2 が書いたのか段 1 が越境したのかを記録から読めなくなる。
+func TestReviewTriageRecordInvestigatedRejectsPlanningKeys(t *testing.T) {
+	cases := []struct {
+		name  string
+		extra string // status の直前に足す行
+		want  string // 問題文に含まれるべき文
+	}{
+		{"approach がある", "        approach: 数え直して単位を書く\n", "調査済み (investigated) では approach を書かない"},
+		{"order がある", "        order: 1\n", "調査済み (investigated) では order を書かない"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			plans := strings.Replace(investigatedPlansYAML,
+				"        status: investigated\n", tc.extra+"        status: investigated\n", 1)
+			if plans == investigatedPlansYAML {
+				t.Fatal("フィクスチャの置換が効いていない")
+			}
+			read := func(_ string) ([]byte, error) { return []byte(replaceRecordPlans(t, plans)), nil }
+			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+			found := false
+			for _, p := range problems {
+				if strings.Contains(p, tc.want) {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
+			}
+		})
+	}
+}
+
+// approach の必須は状態ごとに決まる。pending / done / done-external では従来どおり
+// 無ければ報告し、awaiting-human では options があれば approach が無くても通る
+// (人間が立案する待ち — 立案者 C — は approach を持たない)。
+func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
+	// approach の行を消した validRecordYAML。sha と status は各ケースが差し替える。
+	noApproach := strings.Replace(validRecordYAML, "        approach: 数え直して単位を書く\n", "", 1)
+	if noApproach == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	required := []struct {
+		name string
+		new  string // "        sha: \"\"\n        status: pending\n" と差し替える
+	}{
+		{"pending", "        sha: \"\"\n        status: pending\n"},
+		{"done", "        sha: abc1234\n        status: done\n"},
+		{"done-external", "        status: done-external\n        notes: PR 本文へ反映した\n"},
+	}
+	for _, tc := range required {
+		t.Run(tc.name+" で approach が無ければ報告する", func(t *testing.T) {
+			mutated := strings.Replace(noApproach, "        sha: \"\"\n        status: pending\n", tc.new, 1)
+			if mutated == noApproach && tc.name != "pending" {
+				t.Fatal("フィクスチャの置換が効いていない")
+			}
+			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+			found := false
+			for _, p := range problems {
+				if strings.Contains(p, "approach がありません") {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("approach の欠落が報告されない。出た問題: %v", problems)
+			}
+		})
+	}
+
+	t.Run("awaiting-human で approach が無く options があれば報告しない", func(t *testing.T) {
+		mutated := strings.Replace(noApproach, "        sha: \"\"\n        status: pending\n",
+			"        status: awaiting-human\n        options: 立案者 C — 人間が立案する\n", 1)
+		if mutated == noApproach {
+			t.Fatal("フィクスチャの置換が効いていない")
+		}
+		files, read := recordFiles(t, mutated)
+		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+			t.Fatalf("approach の無い awaiting-human (人間が立案する待ち) で問題が出た: %v", problems)
+		}
+	})
+
+	t.Run("awaiting-human で approach があっても報告しない", func(t *testing.T) {
+		mutated := strings.Replace(validRecordYAML, "        sha: \"\"\n        status: pending\n",
+			"        status: awaiting-human\n        options: 案 a は最小修正 / 案 b は構造の変更\n", 1)
+		if mutated == validRecordYAML {
+			t.Fatal("フィクスチャの置換が効いていない")
+		}
+		files, read := recordFiles(t, mutated)
+		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+			t.Fatalf("approach のある awaiting-human で問題が出た: %v", problems)
+		}
+	})
+}
+
+// 列挙に無い状態は従来どおり報告し、文言の列挙に investigated が入る (状態を足したのに
+// 案内の列挙が古いままだと、書き手は正しい値を知る手段が無い)。
+func TestReviewTriageRecordUnknownStatusListsInvestigated(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "status: pending", "status: investigating", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, "status は investigated / pending / awaiting-human / done / done-external のいずれか") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("列挙に無い status が investigated を含む列挙で報告されない。出た問題: %v", problems)
+	}
+}
+
+// 被覆の検査は状態を問わない。investigated の問題が覆う採択は報告されず、investigated の
+// 問題があっても覆われていない別の採択は従来どおり報告される。
+func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
+	extra := `      - id: 4
+        file: docs/extra.md
+        summary: 束ね忘れの例
+        category: doc-other
+        audience: developer
+        consequence:
+          condition: c
+          who: developer
+          what: w
+          detectability: d
+        premise_check:
+          stages: A
+          result: verified
+        verdict: adopted
+        verdict_reason: A2
+`
+	withInvestigated := replaceRecordPlans(t, investigatedPlansYAML)
+	mutated := strings.Replace(withInvestigated, "    plans:\n", extra+"    plans:\n", 1)
+	if mutated == withInvestigated {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+	var uncovered4, uncovered1 bool
+	for _, p := range problems {
+		if strings.Contains(p, "findings id 4: 採択が修正計画に載っていません") {
+			uncovered4 = true
+		}
+		if strings.Contains(p, "findings id 1: 採択が修正計画に載っていません") {
+			uncovered1 = true
+		}
+	}
+	if !uncovered4 {
+		t.Fatalf("investigated の問題がある回で、覆われていない採択 (id 4) が報告されない。出た問題: %v", problems)
+	}
+	if uncovered1 {
+		t.Fatalf("investigated の問題 (P1) が覆う採択 (id 1) が覆われていないと報告された。出た問題: %v", problems)
+	}
+}
+
+// summaryWithoutInvestigated は、investigated の状態を足す前に validRecordYAML から生成した
+// サマリの全文。鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
+// 1 バイトでも変わると、置き場に残る既存のサマリがすべて古いと報告される。注記は
+// investigated の問題がある回にだけ出し、推移の表には列を足さない。
+const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
+	"\n" +
+	"# feat-x のトリアージ記録\n" +
+	"\n" +
+	"正本は [feat-x.yaml](feat-x.yaml)。読み方と収束の目安は [README](README.md)。\n" +
+	"\n" +
+	"## 推移\n" +
+	"\n" +
+	"| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n" +
+	"| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" +
+	"| 1 | 2026-08-30 | `code-review` | `sonnet-5` | full | 3 | 1 | 1 | 1 |\n" +
+	"\n" +
+	"## 回 1: 2026-08-30 `code-review`\n" +
+	"\n" +
+	"- HEAD `abc1234` / model `sonnet-5` / scope full / level medium\n" +
+	"\n" +
+	"| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |\n" +
+	"| --- | --- | --- | --- | --- | --- | --- |\n" +
+	"| 1 | `docs/foo.md:10` 数の食い違い | doc-other / developer | 検算するとき / 分母を誤る / 気づかない | A: verified | — | **採択** — ゲート 0 件で採択 (A2) |\n" +
+	"| 2 | `internal/bar.go` 仕様違反の主張 | production / operator | 運用中 / 配信が止まる / 気づかない | A+B: unverifiable | — | **保留** — 根拠を確かめられず保留 (H3) |\n" +
+	"| 3 | `tools/baz_test.go` 一時ファイルの削除が雑 | test / developer | disk full のとき / テストが落ちる / 気づく | A: verified | developer-domain | **却下** — 開発者の領域で却下 (R3) |\n" +
+	"\n" +
+	"### 修正計画\n" +
+	"\n" +
+	"| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |\n" +
+	"| --- | --- | --- | --- | --- | --- | --- |\n" +
+	"| P1 | 数えずに書いた | #1 | 数え直して単位を書く | 1 | 未着手 | — |\n" +
+	"\n" +
+	"### 観察\n" +
+	"\n" +
+	"最初の回。\n"
+
+// investigated の無い記録の生成サマリは、この状態を足す前と 1 バイトも変わらない。
+func TestReviewTriageSummaryWithoutInvestigatedUnchanged(t *testing.T) {
+	saved := summaryCommand
+	summaryCommand = defaultSummaryCommand
+	t.Cleanup(func() { summaryCommand = saved })
+
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(validRecordYAML))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if summary != summaryWithoutInvestigated {
+		t.Fatalf("investigated の無い記録の生成サマリが変更前と違う:\n--- got ---\n%s\n--- want ---\n%s", summary, summaryWithoutInvestigated)
+	}
+}
+
+// investigated の問題がある回にだけ、修正計画の表の下に注記 (件数と問題 id) が出る。
+// 表の状態の欄は「調査済み」、修正方法の欄は空ではなく「—」。推移の表には列を足さない。
+func TestReviewTriageSummaryInvestigated(t *testing.T) {
+	render := func(t *testing.T, yamlSrc string) string {
+		t.Helper()
+		summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(yamlSrc))
+		if err != nil {
+			t.Fatalf("サマリの生成に失敗: %v", err)
+		}
+		return summary
+	}
+	const note = "調査済み・未立案 (investigated)"
+
+	one := render(t, replaceRecordPlans(t, investigatedPlansYAML))
+	for _, want := range []string{
+		"| P1 | 数えずに書いた | #1 | — | — | 調査済み | — |",
+		"\n- **" + note + " が 1 件: P1** — ",
+	} {
+		if !strings.Contains(one, want) {
+			t.Fatalf("%q がサマリに無い:\n%s", want, one)
+		}
+	}
+	// 注記の位置: 修正計画の表の後。
+	if strings.Index(one, "- **"+note) < strings.Index(one, "| P1 | 数えずに書いた |") {
+		t.Fatalf("注記が修正計画の表より前に出ている:\n%s", one)
+	}
+	// 推移の表には列を足さない。
+	if !strings.Contains(one, "| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n") {
+		t.Fatalf("推移の表の見出しが変わっている:\n%s", one)
+	}
+
+	// 2 件なら件数と id の列挙。investigated でない問題 (P3) は数えない。
+	two := render(t, replaceRecordPlans(t, investigatedPlansYAML+
+		"      - problem_id: P2\n        cause: c2\n        finding_ids: [1]\n        status: investigated\n"+
+		"      - problem_id: P3\n        cause: c3\n        finding_ids: [1]\n        approach: a3\n        sha: \"\"\n        status: pending\n"))
+	if !strings.Contains(two, "\n- **"+note+" が 2 件: P1, P2** — ") {
+		t.Fatalf("2 件の注記が出ていない:\n%s", two)
+	}
+	if strings.Count(two, "- **"+note) != 1 {
+		t.Fatalf("注記は回ごとに 1 行のはず:\n%s", two)
+	}
+
+	// 複数回の記録では、investigated の問題がある回にだけ出る。
+	multi := replaceRecordPlans(t, investigatedPlansYAML) + legacyRunYAML(2, "")
+	summary := render(t, multi)
+	run1 := summary[strings.Index(summary, "\n## 回 1:"):strings.Index(summary, "\n## 回 2:")]
+	run2 := summary[strings.Index(summary, "\n## 回 2:"):]
+	if !strings.Contains(run1, "- **"+note) {
+		t.Fatalf("investigated の問題がある回 1 に注記が無い:\n%s", summary)
+	}
+	if strings.Contains(run2, note) {
+		t.Fatalf("investigated の問題が無い回 2 に注記が出ている:\n%s", summary)
+	}
+}
+
+// 修正計画の表のセル: investigated の状態は「調査済み」、approach が空なら「—」
+// (空のセルは書き忘れと区別できない)。
+func TestRenderPlanCellsInvestigated(t *testing.T) {
+	pl := recordPlan{ProblemID: "P1", Cause: "c", FindingIDs: []int{1}, Status: "investigated"}
+	cells := renderPlanCells(pl)
+	for col, want := range map[int]string{3: "—", 4: "—", 5: "調査済み", 6: "—"} {
+		if cells[col] != want {
+			t.Fatalf("セル %d = %q, want %q", col, cells[col], want)
+		}
+	}
+}
