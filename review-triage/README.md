@@ -47,7 +47,7 @@
   "triage_check_command": "make triage-check",
   "triage_summary_command": "make triage-summary",
   "loop": {
-    "max_rounds": 5,
+    "max_rounds": 10,
     "review_skill": "code-review",
     "review_args": "high",
     "review_model": ""

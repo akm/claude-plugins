@@ -14,7 +14,7 @@
   "triage_check_command": "make triage-check",
   "triage_summary_command": "make triage-summary",
   "loop": {
-    "max_rounds": 5,
+    "max_rounds": 10,
     "review_skill": "ce-code-review",
     "review_args": "",
     "review_model": ""
@@ -54,7 +54,7 @@
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `max_rounds` | 周回の上限 | 5 |
+| `max_rounds` | 周回の上限 | 10 |
 | `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
 | `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
 | `review_model` | 周回に指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
