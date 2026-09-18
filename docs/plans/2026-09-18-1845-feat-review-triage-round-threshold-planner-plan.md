@@ -15,7 +15,7 @@ execution: code
 
 - **目的**: レビューと修正の周回で、人間が読まなくなった俯瞰 (繰り返しを図で確かめる作業) に時間を使わず、記録の回 N を越えた回だけ人間が「誰が立案するか」を選んで関与する状態にする。周回が止まるのは、人間の判断が要るところ (回 N+1 以降の立案者の選択、設計・仕様変更を含む案、人間が立案する回) と上限・収束だけになる。
 - **手段**: `review-triage` の検知と `review-triage-fix` の俯瞰・捉え直しを廃止し、記録の回数の閾値 N (既定 5) と立案者の選択に置き換える (Key Decisions の 1〜5 番目)。`review-triage-fix` を 調査 → 立案 → 修正 の 3 段にし、段ごとに sub-agent で走らせて model と effort を選べるようにする (同 6〜8 番目、KTD2・KTD6〜KTD9)。周回の上限の既定を 10 にする。
-- **優先順位**: 効き目の中心は「俯瞰の廃止 + 閾値 N + 上限 10」で、「段の sub-agent 化」と「立案者の選択」はその上に載る付加。実装単位は 3 つの段階に分け、段階 1 だけでも出せる形にする。立案者 B は段の sub-agent 化の仕組みを使うので、段階 2 が sub-agent 化、段階 3 が閾値と立案者の選択になる (Planning Contract の「順序」)。
+- **優先順位**: 効き目の中心は「俯瞰の廃止 + 閾値 N + 上限 10」で、「段の sub-agent 化」と「立案者の選択」はその上に載る付加。実装単位は 3 つの段階に分け、段階 1 だけでも出せる形にする。段階 2 が閾値と立案者 (A / C)、段階 3 が段の sub-agent 化と立案者 B になる (Planning Contract の「順序」)。
 - **正本の優先順位**: 製品の振る舞いは Product Contract の R-ID が正本。実装の選び方は Planning Contract の KTD が正本。実装単位 (U-ID) はどちらも書き換えない。
 - **止まる条件**: 記録の様式の変更で、置き場にある既存の記録 (`recurrence` を含む) の検査が失敗する形になったら、既存の記録を書き換えずに止めて報告する。設計の選択肢が複数あり規範を変える場合は、決めずに人間に返す。
 - **実行の型**: 検査ツール (Go) はテストを先に書いて固める。スキルの手順書 (Markdown) は記録の fixture で手動の通し確認をする。文書を変えたら `doc-dag` を回す。
@@ -247,7 +247,11 @@ flowchart TB
 
 - 段の依頼文の雛形の文面 (KTD8 が運ぶものと禁止事項を定め、文面は実装で書く)。
 - `loop-flow.md` の新しいノード ID の付け方 (KTD5 が形を定め、ID は既存の連番の慣習に合わせて実装で決める)。
-- `investigated` 状態の生成サマリでの見せ方 (件数の推移の表に列を足すか、注記にするか)。
+- 段 3 が直せずに未着手のまま残した問題で、周回がレビューと修正を上限まで繰り返すことを止めるか (「計画の状態が 1 つも進まなかったら止まる」ノードを足すか)。KTD5 の図には失敗の枝が無い。
+- 手順書の通し確認で使う fixture の記録の置き場と、どの作業ツリー・ブランチで周回を走らせるか。fixture の採択に対応する実際の修正対象が無いと段 3 のコミットと関門の確認が成り立たない。
+- 周回が選択待ちで止まった後、人間が答えて周回を再起動すると入口で再び止まる。答えの反映が `review-triage-fix` の単独起動に限られることを、止まったときの報告で案内するか。
+- 人間の C の案や選択待ちへの答えが、段 1 が書いた問題の分け方と一致しないとき (2 つを 1 つで扱う・1 つを分ける) の `plans[]` と `finding_ids` / `plan_ref` の書き換え方。
+- 段の sub-agent がサマリの再生成コマンドを走らせると置き場の全記録のサマリが書き直されるので、AE9 の「書き換わらない」を更新時刻で確かめる U1 の検証と、通常運用でのサマリ再生成の扱いをどう切り分けるか。
 
 ### Sources / Research
 
@@ -274,14 +278,15 @@ flowchart TB
 ### Key Technical Decisions
 
 - KTD1. **既存の記録の `recurrence` は、読み込みと生成サマリの描画を残し、整合検査だけ外す。** `triagecheck` は置き場の全記録を検査し、生成サマリの鮮度も比べる。`recurrence` を許可キーから外すと未知のキーとして全ブランチの関門が止まり、描画を外すと既存のサマリが「古い」と報告される。新しい記録には `review-triage` が書かないので、描画が残っても新しいサマリには出ない。`record-schema.md` には「旧様式のキー。新しい回には書かない。検査は形だけを見る」と 1 行残す。Governs R19。
-- KTD2. **段 1 の結果は `plans[].status: investigated` (調査済み・未立案) で記録に置く。** `plans[]` は現行では `approach` が必須で、段 1 の結果を置く場所が無い。状態を 1 つ足し、`investigated` では `approach` と `order` を書かず (書いてあれば検査が報告)、`pending` 以降は現行どおり `approach` 必須にする。被覆の規則 (採択は `plans` か `plan_ref` で覆う) は状態を問わない。別の節を新設する案は、段 2 が `plans` を二重に書く形になるので取らない。R16, R20 を実装する。
-- KTD3. **C (人間が立案) の待ちは、既存の `awaiting-human` で表す。** `options` に「立案者 C: 人間が立案する」と書く。周回の止まる条件 (G2・J4・J6 → S2) がそのまま使え、状態の種類も周回のノードも増えない。R8, R11, R21 を実装する。
+- KTD2. **段 1 の結果は `plans[].status: investigated` (調査済み・未立案) で記録に置く。** `plans[]` は現行では `approach` が必須で、段 1 の結果を置く場所が無い。状態を 1 つ足し、`approach` と `order` の必須条件を状態ごとに定める — `pending` / `done` / `done-external` では必須 (現行どおり)、`awaiting-human` では任意 (設計・仕様変更の案は `options` に書き、C の待ちでは書かない。人間の答えの後に KTD4 が書く)、`investigated` では書いてあれば検査が報告する。被覆の規則 (採択は `plans` か `plan_ref` で覆う) は状態を問わない。生成サマリは、`investigated` の問題がある回にだけ修正計画の表の下に注記を出し、推移の表には列を足さない — 鮮度の検査が描画結果の全文一致なので、列を足すと既存の全サマリが古いと報告され R19 に反する。別の節を新設する案は、段 2 が `plans` を二重に書く形になるので取らない。R16, R20 を実装する。
+- KTD3. **C (人間が立案) の待ちは、既存の `awaiting-human` で表す。** `options` に「立案者 C: 人間が立案する」と書き、`approach` は書かない (KTD2 の状態ごとの条件)。周回の止まる条件 (G2・J4・J6 → S2) がそのまま使え、状態の種類も周回のノードも増えない。R8, R11, R21 を実装する。
 - KTD4. **人間の答えは `review-triage-fix` が記録に反映する。** 選択待ちの承認と C の案のどちらも、`approach` (と `order`) を書き、`options` は残し、`status: pending` にして段 3 に進む。周回はこれを未着手の再開として扱う。R21 を実装する。
-- KTD5. **周回の状態機械は、検知のノード (G1・J1・S1) を外し、`review-triage-fix` を呼ぶ条件に `investigated` を加え、入口で未着手をレビューより先に片付ける。** 入口の判定は「選択待ち → 停止」「覆われていない採択・調査済み・未着手のいずれかがある → `review-triage-fix` を呼んでからレビュー」の順にする。周回の中の判定は現行の J2 (覆われていない採択) に調査済みを加える。S4 (上限) の勧めは「継続すれば回 N+1 以降として毎回立案者を選ぶ」に置き換える。図が正本で散文はノード ID で参照する規律 (`loop-flow.md` の冒頭) は保つ。R11, R22 を実装する。
+- KTD5. **周回の状態機械は、検知のノード (G1・J1・S1) を外し、`review-triage-fix` を呼ぶ条件に `investigated` を加え、入口で未着手をレビューより先に片付ける。** 入口の判定は「選択待ち → 停止」「覆われていない採択・調査済み・未着手のいずれかがある → `review-triage-fix` を呼んでからレビュー」の順にする。周回の中の判定は現行の J2 (覆われていない採択) に調査済みと未着手を加える (図が正)。S4 (上限) の勧めは俯瞰への言及を外し、「継続するか」を人間に問う形にする (回 N+1 以降で毎回立案者を選ぶことは R7 のとおりで、S4 で言い直さない)。図が正本で散文はノード ID で参照する規律 (`loop-flow.md` の冒頭) は保つ。R11, R22 を実装する。
 - KTD6. **閾値 N と段の設定は、設定ファイル `.claude/akm-claude-plugins/review-triage/config.json` に `fix` 節を新設して置き、引数で上書きする。** R2, R13, R14 を実装する。
   - キー: `threshold_rounds` は整数で既定 5。`stages` は段 (`investigate` / `plan` / `fix`) ごとに `subagent` (真偽)・`model` (文字列)・`effort` (文字列) を持つ。文字列の空は「未設定」= 継承で、定義は `loop` の「未設定」を再利用する。
-  - 引数: `review-triage-fix` が `--threshold <N>` と `--stage <段>[=<model>[:<effort>]]` を受ける。`--stage` は段ごとに 1 つで、`=` 以降を省くと継承。`review-triage-loop` は同じ引数をそのまま `review-triage-fix` に渡す。
-  - 検査: 決定した値を検査し (`threshold_rounds` は 1 以上の整数、段の名前は 3 つのいずれか、effort は 5 値のいずれか)、値の出所 (引数か設定か) を報告する。`arguments.md` の流儀に合わせる。
+  - 引数: `review-triage-fix` が `--threshold <N>` と `--stage <段>[=<値>]` を受ける。`<値>` は `session` (その段をセッション内で走らせる。設定の `subagent: true` を上書きする) か `<model>[:<effort>]` で、`=` 以降を省くと sub-agent で継承。`--stage` は段ごとに 1 つ。`review-triage-loop` は同じ引数をそのまま `review-triage-fix` に渡す。
+  - 検査: 決定した値を検査し (`threshold_rounds` は 1 以上の整数、段の名前は 3 つのいずれか、`<値>` は `session` か `<model>[:<effort>]`、effort は 5 値のいずれか)、値の出所 (引数か設定か) を報告する。`arguments.md` の流儀に合わせる。
+  - 継承の model: 空 (継承) は、セッションのモデルの名前に解決してから呼び出し時の `model` に明示して渡す (`review-invocation.md` の「G0 より後の規則」の再利用)。省略すると agent 定義・環境変数・親の順で解決され、周回が知らないモデルで走りうる。
   - 設定の形 (方向を示す例):
 
     ```json
@@ -305,12 +310,13 @@ flowchart TB
   - 運ばないもの: 指摘や計画の中身の言い直し (記録が正本)。
   - 呼び出し側の検証: 記録を読み直して `triage_check_command` を走らせる。段ごとに期待する状態の遷移を確かめる。段 1・2 の後は HEAD と作業ツリーが記録とサマリ以外で変わっていないことを確かめる (`review-invocation.md` の規則の再利用)。段 3 の後は `done` の各 `sha` が HEAD の履歴にあり作業ツリーに未コミットの変更が無いことを確かめ、最終 HEAD で `gates` を 1 度走らせる。
   - 失敗時: 再試行も inline への切り替えもせず、止めて検査の出力と一緒に報告する。止まった sub-agent を再開しない (記録の状態から新しい段として始める)。
-  - 実行の形: 段は逐次で、同時に走らせる sub-agent は 1 つ。`run_in_background` は使わない。手順 10 の `doc-dag` は段 3 の sub-agent に含めず、セッション側で行う。
-- KTD9. **effort から定義名への対応表は `stage-subagent.md` の 1 か所に置き、報告の effort は使った定義名から導く。** sub-agent は自分の effort を確かめられないので自己申告を根拠にしない。model は sub-agent に「動いている model 名」を報告させ、呼び出し側が指定と突き合わせる (`review-request.md` の「食い違えば人間に報告する」の再利用)。モデルが対応しない effort を指定したときは検出できないので、5 値の検査だけ行い、その限界を文書に書く。R12, R14 を実装する。
+  - 実行の形: 段は逐次で、同時に走らせる sub-agent は 1 つ。Agent ツールの `run_in_background` は既定が background なので、`run_in_background: false` を明示して渡し、結果が返るまで次の段に進まない。手順 10 の `doc-dag` は段 3 の sub-agent に含めず、セッション側で行う。
+  - 追跡内の記録の置き場: `record_dir` を git の追跡内にしている利用者では、記録と生成サマリのコミット (`record-schema.md` のコミット節の分け方) は呼び出し側が検証の後に行う。段 1・2 の禁止事項「コミットしない」は記録のコミットも含む。段 3 は現行の手順どおり、区切りで sub-agent が記録をコミットしてよい。
+- KTD9. **effort から定義名への対応表は `stage-subagent.md` の 1 か所に置き、報告の effort は使った定義名から導く。** sub-agent は自分の effort を確かめられないので自己申告を根拠にしない。model は sub-agent に「動いている model 名」を報告させ、呼び出し側が指定と突き合わせる (`review-request.md` の「食い違えば人間に報告する」の再利用)。モデルが対応しない effort を指定したときは検出できないので、5 値の検査だけ行い、その限界を文書に書く。呼び出し時の `model` は、この環境では別名 (sonnet / opus / haiku / fable) の列挙で、それ以外の綴りは置き換わるのではなく入力エラーになりうる — 設定・引数・B の指定は別名に解決してから渡し (`review-invocation.md` の実効モデルの規則)、置き換えかエラーかは通し確認で確かめる。R12, R14 を実装する。
 - KTD10. **「同じ場所を再び直すとき」は `references/doc-fix-form.md` (仮。「文書の記述を直すときの形」) に改名し、発火条件の節を「文書の記述を直すときは、書く前に形を見る」に置き換える。** 手 (数を書かない・重複を参照にする) と「記録に書く」はそのまま残す。`SKILL.md` の 2 箇所の参照を新しい名前と条件に合わせる。Governs R18 の同ファイルの項。
 - KTD11. **sub-agent を起動する前に記録の写しは取らない。** 記録はブランチ単位で短命で、壊れたら検査が止めて人間が直す。置き場を git の追跡内にしている利用者は git で戻せる。写しを取る仕組みは、置き場に別のファイルを増やし、検査の対象の扱いを決める必要が生じるので、費用に見合わない。
 - KTD12. **段の実行情報 (定義名・model・effort) は報告だけに書き、記録 YAML には残さない。** 記録の様式の変更を R20 の 1 つに絞る。セッションが切れた後の再開では出所を失うが、回 N+1 以降は再度尋ねる (R22) ので判断には影響しない。記録に残すことは後続の課題にする (Scope Boundaries)。
-- KTD13. **検査ツールの変更はテストを先に書く。** `record_test.go` の検知のテスト 9 本と fixture の組み立て 2 本は、旧様式の受け入れ (AE9) のテストに置き換える。`investigated` の検査 (KTD2) は状態の列挙・条件付きのキー・被覆の 3 つをテストで固める。
+- KTD13. **検査ツールの変更はテストを先に書く。** `record_test.go` の検知のテスト 9 本 (`TestReviewTriageRecordRecurrence*` 8 本と `TestReviewTriageSummaryRecurrence`) と fixture の組み立て 2 本は、旧様式の受け入れ (AE9) のテストに置き換える。`investigated` の検査 (KTD2) は状態の列挙・条件付きのキー・被覆の 3 つをテストで固める。
 
 ### High-Level Technical Design
 
@@ -381,10 +387,10 @@ sequenceDiagram
 3 つの段階に分け、段階 1 だけでも出せる形にする。段階の中は依存の順。
 
 1. **段階 1 — 検知・俯瞰の廃止と上限 10**: U1 → U2 → U3 → U4 → U5。
-2. **段階 2 — 3 段化と段の sub-agent 化**: U6 → U8 → U9。
-3. **段階 3 — 閾値 N と立案者の選択**: U7 → U10。
+2. **段階 2 — 3 段化、閾値 N と立案者 A / C**: U6 → U7。
+3. **段階 3 — 段の sub-agent 化と立案者 B**: U8 → U9 → U11 → U10。
 
-立案者 B (指定モデルの sub-agent で段 2 を行う) は U9 の仕組みをそのまま使うので、U7 は U9 の後に置く。
+閾値 N (効き目の中心) は段階 2 に置く。立案者 B (指定モデルの sub-agent で段 2 を行う) だけは U9 の仕組みを使うので U11 に切り出し、段階 3 に置く。U7 の A / C は U6 だけで動く。
 
 ### Alternatives Considered
 
@@ -410,6 +416,7 @@ sequenceDiagram
 - **モデルが対応しない effort** — 検出できない (KTD9)。文書にその限界を書く。
 - **同じ場所への指摘の再発** — 「同じ場所」の枠を外すので、形を見る手が常に当たる (KTD10) ことに頼る。再発したら記録から確かめる。
 - **このブランチの前提** — `same-location-fix.md` はコミット `490f4b4` にしか無い。main から始めると U3 の対象が無い。
+- **関門の Go の版** — 設定の `gates` と `triage_check_command` は `ASDF_GOLANG_VERSION=1.25.1` を指すが、この機材の asdf には 1.25.1 が無く (1.24.5 / 1.25.4 / 1.26.4)、そのままでは終了コード 126 で失敗する。計画が持ち込んだ問題ではないが、Definition of Done は 1.25.1 を入れるか設定の版を直すまで満たせない (1.25.4 ではテストと検査の両方が成功する)。設定の版の変更は別の動機なので、この計画の外で先に直す。
 
 ---
 
@@ -419,14 +426,15 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | U1 | `triagecheck` から検知の整合検査を外し、旧様式として受け入れる | `review-triage/tools/triagecheck/record.go`, `record_test.go`, `README.md` | — |
 | U2 | `review-triage` から検知を外す | `review-triage/skills/review-triage/SKILL.md`, `references/record-schema.md`, `references/recurrence-detection.md` (削除) | U1 |
-| U3 | `review-triage-fix` から俯瞰・捉え直しを外し、「同じ場所」の枠を外す | `review-triage/skills/review-triage-fix/SKILL.md`, `references/reframing.md` (削除), `references/grouping.md`, `references/same-location-fix.md` (改名), `CONCEPTS.md` | U2 |
+| U3 | `review-triage-fix` から俯瞰・捉え直しを外し、「同じ場所」の枠を外す | `review-triage/skills/review-triage-fix/SKILL.md`, `references/reframing.md` (削除), `references/grouping.md`, `references/same-location-fix.md` (改名), `CONCEPTS.md`, `review-triage/README.md` | U2 |
 | U4 | 周回の状態機械から検知の停止を外し、入口で未着手を先に片付ける | `review-triage/skills/review-triage-loop/references/loop-flow.md`, `SKILL.md`, `references/reporting.md` | U3 |
 | U5 | 周回の上限の既定を 10 にする | `review-triage/skills/review-triage/references/project-config.md`, `review-triage/README.md` | — |
 | U6 | 3 段化と `investigated` の状態 | `review-triage/skills/review-triage-fix/SKILL.md`, `references/record-schema.md`, `record.go`, `record_test.go`, `loop-flow.md` | U3, U4 |
-| U7 | 閾値 N と立案者の選択 | `review-triage-fix/SKILL.md`, `references/arguments.md`, `project-config.md`, `loop-flow.md`, `review-triage-loop/references/arguments.md`, `reporting.md` | U6, U9 |
+| U7 | 閾値 N と立案者の選択 (A / C) | `review-triage-fix/SKILL.md`, `references/arguments.md` (新設), `project-config.md`, `loop-flow.md`, `review-triage-loop/references/arguments.md`, `reporting.md` | U6 |
 | U8 | effort ごとの agent 定義 6 つ | `review-triage/agents/fix-stage*.md` | — |
-| U9 | 段の sub-agent 実行 | `review-triage-fix/references/stage-subagent.md` (新設), `references/arguments.md` (新設), `review-triage-fix/SKILL.md`, `project-config.md`, `review-triage-loop` の `SKILL.md`・`arguments.md`・`loop-flow.md` | U6, U8 |
-| U10 | README と版の更新、文書の構造の確認 | `review-triage/README.md`, `review-triage/.claude-plugin/plugin.json` | U1〜U9 |
+| U9 | 段の sub-agent 実行 | `review-triage-fix/references/stage-subagent.md` (新設), `references/arguments.md`, `review-triage-fix/SKILL.md`, `project-config.md`, `review-triage-loop` の `SKILL.md`・`arguments.md`・`loop-flow.md` | U7, U8 |
+| U11 | 立案者 B の経路 | `review-triage-fix/SKILL.md` | U7, U9 |
+| U10 | README と版の更新、文書の構造の確認 | `review-triage/README.md`, `review-triage/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, リポジトリ直下の `README.md` | U1〜U9, U11 |
 
 ### U1. `triagecheck` から検知の整合検査を外し、旧様式として受け入れる
 
@@ -435,7 +443,7 @@ sequenceDiagram
 - **Dependencies:** 無し。
 - **Files:**
   - `review-triage/tools/triagecheck/record.go` — `recordRecurrenceProblems` とその呼び出し、`recordAllowedKeys` の `recurrence` と「検知」の扱い、`recordNullSilentKeys`、`recordUnknownKeyProblems` の `recurrence` の分岐、描画 `renderRecurrence` 系。
-  - `review-triage/tools/triagecheck/record_test.go` — `TestReviewTriageRecordRecurrence*` 9 本、`TestReviewTriageSummaryRecurrence`、fixture `recurrenceRecordYAML` / `recurrenceReframedThenRecordYAML`。
+  - `review-triage/tools/triagecheck/record_test.go` — `TestReviewTriageRecordRecurrence*` 8 本と `TestReviewTriageSummaryRecurrence` (合わせて KTD13 の 9 本)、fixture `recurrenceRecordYAML` / `recurrenceReframedThenRecordYAML`。
   - `review-triage/tools/triagecheck/README.md` — 「何を検査するか」の表の `recurrence` の記述。
 - **Approach:**
   1. 検知の型 (`recordRecurrence` ほか) と YAML の読み込みは残す。許可キーに `recurrence` を残す (KTD1)。
@@ -483,11 +491,13 @@ sequenceDiagram
   - `review-triage/skills/review-triage-fix/references/grouping.md` — 「捉え直しがあるとき」の節。
   - `review-triage/skills/review-triage-fix/references/same-location-fix.md` — 改名して書き換え。
   - リポジトリ直下の `CONCEPTS.md` — 「レビューの収束」。
+  - `review-triage/README.md` — 収録スキルの表の `review-triage` / `review-triage-fix` の 2 行の検知・俯瞰の説明、「繰り返しを検知して捉え直す」の節、`mermaid-preview` の行の俯瞰への言及。
 - **Approach:**
   1. `reframing.md` を削除し、`SKILL.md` の手順 2 と、手順 1・3・原則の捉え直し・俯瞰への言及を外す。手順の番号がずれるので、番号で参照している箇所 (`loop-flow.md` の F2、`same-location-fix.md`、`record-schema.md`) を grep で確かめて直す。3 段の再編成は U6 で行うので、ここでは番号を詰めるだけにする。
   2. `grouping.md` の「捉え直しがあるとき」を削除する。
   3. `same-location-fix.md` を `doc-fix-form.md` に改名し、冒頭と「いつ当てるか」を「文書の記述を直すときは、書く前に形を見る」に置き換える。検知・緩和・`declined`・`reframe.fix_unit` への言及を外し、実測の説明は検知の語を使わずに書き直す。手と「記録に書く」はそのまま残す。`SKILL.md` の 2 箇所の参照を新しい名前と条件に合わせる。
   4. `CONCEPTS.md` の「レビューの収束」から「修正由来の指摘」「捉え直し」を外し、代わりに「立案者の選択」(A / B / C の意味と、回 N+1 以降に人間が選ぶこと) を 1 項として足す。既存の項の書き方に合わせる。
+  5. `review-triage/README.md` から検知・俯瞰の説明と、削除する文書へのリンクを外す (立案者の選択と段の sub-agent 化の説明は U10 で足す)。段階 1 だけを出しても README が削除済みの文書を案内しないようにするため。
 - **Patterns to follow:** `CONCEPTS.md` の既存の項の形 (見出し・1 文の定義・理由)。
 - **Test scenarios:**
   - Test expectation: none -- 文書だけの変更。検証は grep と `doc-dag` で行う。
@@ -533,12 +543,12 @@ sequenceDiagram
 - **Files:**
   - `review-triage/skills/review-triage-fix/SKILL.md` — 手順を 3 段に再編成、手順 1 の再開の対象に `investigated` を足す。
   - `review-triage/skills/review-triage/references/record-schema.md` — 状態の表に `investigated` を足す、`approach` の必須条件を状態で書く、再開時の扱い。
-  - `review-triage/tools/triagecheck/record.go` — `plans[].status` の列挙、`investigated` での `approach` / `order` の禁止、`pending` 以降の `approach` の必須、生成サマリの件数。
+  - `review-triage/tools/triagecheck/record.go` — `plans[].status` の列挙、状態ごとの `approach` / `order` の必須条件 (KTD2)、`investigated` の問題がある回だけの生成サマリの注記。
   - `review-triage/tools/triagecheck/record_test.go` — 上の検査のテスト。
   - `review-triage/skills/review-triage-loop/references/loop-flow.md` — `review-triage-fix` を呼ぶ条件に「調査済み」を足す、決定表の F1 / F2 の説明。
 - **Approach:**
-  1. `record-schema.md` の状態の表に `investigated` (調査済み・未立案。再開時は段 2 から) を足し、`plans[]` の表で `approach` と `order` の必須条件を「`pending` 以降」と書く。`plans` のキーを散文で数え上げない (19 行目の規則)。
-  2. `record.go` の状態の列挙と条件付きの検査を足す。被覆の規則は状態を問わない。
+  1. `record-schema.md` の状態の表に `investigated` (調査済み・未立案。再開時は段 2 から) を足し、`plans[]` の表の `approach` と `order` の行に状態ごとの必須条件 (KTD2) を書く。`plans` のキーを散文で数え上げない (冒頭の規則)。
+  2. `record.go` の状態の列挙と状態ごとの条件付きの検査を足す。被覆の規則は状態を問わない。生成サマリは `investigated` の問題がある回にだけ注記を出し、無い記録の出力は変えない。
   3. `SKILL.md` の手順を 段 1 (現行の 3〜5)、段 2 (現行の 6〜7)、段 3 (現行の 8〜10) の見出しで再編成し、段 1 の終わりで記録に書く (状態 `investigated`) ことと、段 2 が `pending` / `awaiting-human` に進めることを書く。手順 1 の再開の対象に「`investigated` は段 2 から、`pending` は段 3 から」を足す。段 3 の手順 10 (`doc-dag`) はセッション側で行う (KTD8)。
   4. `loop-flow.md` の `review-triage-fix` を呼ぶ条件 (U4 で作った入口の分岐と J2) に「調査済み」を足す。
 - **Execution note:** 検査ツールはテストを先に書く。手順書は fixture の記録で通し確認する (段 1 の後に記録が `investigated` で止まり、再起動で段 2 から続く)。
@@ -549,28 +559,29 @@ sequenceDiagram
   - `pending` で `approach` が無い問題は従来どおり報告する。
   - 列挙に無い状態は従来どおり報告する。
   - `investigated` の問題が採択を覆っているとき、被覆の検査が成功する。
-  - 生成サマリの件数の推移に `investigated` が数えられる (Open Questions の見せ方に従う)。
+  - `awaiting-human` で `approach` が無く `options` がある問題 (C の待ち) は問題を報告しない。
+  - `investigated` の問題があるときだけ生成サマリに注記が出て、無い記録の生成サマリは変更前と同一である。
   - Covers AE10. 手動: 段 1 の後で記録を保存し、セッションを切って `review-triage-fix` を再起動すると、段 1 を飛ばして続く。
   - Covers AE1. 手動: 回 3 の fixture で 3 段が人間に尋ねずに進む。
 - **Verification:** Go のテストが成功する。fixture の記録で通し確認が上のとおりになる。`doc-dag` を両スキルの references に回す。
 
-### U7. 閾値 N と立案者の選択
+### U7. 閾値 N と立案者の選択 (A / C)
 
-- **Goal:** 回 N+1 以降で `review-triage-fix` が段 1 の後に人間に立案者を尋ね、A / B / C のそれぞれが R8 のとおりに進み、人間の答えが記録に反映され、周回が新しい止まる条件で回る。
-- **Requirements:** R2, R7, R8, R9, R10, R11, R12 (開始前の報告), R21, R22 (AE2〜AE6, AE11, AE12)。KTD3, KTD4, KTD6 (閾値の部分), KTD5 (S4 の案内)。B は U9 の仕組み (KTD8) を使う。
-- **Dependencies:** U6, U9。
+- **Goal:** 回 N+1 以降で `review-triage-fix` が段 1 の後に人間に立案者を尋ね、A と C が R8 のとおりに進み、人間の答えが記録に反映され、周回が新しい止まる条件で回る。B の経路は U11 で足す (この単位では、B を選ぶと「段の sub-agent 化 (U11) がまだ無い」と報告して止まる)。
+- **Requirements:** R2, R7, R8 (A と C), R9, R10, R11, R12 (開始前の報告), R21, R22 (AE2, AE4〜AE6, AE11, AE12)。KTD3, KTD4, KTD6 (閾値の部分), KTD5 (S4 の案内)。
+- **Dependencies:** U6。
 - **Files:**
   - `review-triage/skills/review-triage-fix/SKILL.md` — 段 1 の後の問い、A / B / C の意味、人間の答えの反映。
-  - `review-triage/skills/review-triage-fix/references/arguments.md` — `--threshold` を足す (ファイルは U9 が新設)。
-  - `review-triage/skills/review-triage/references/project-config.md` — `fix` 節に `threshold_rounds` を足す。
+  - `review-triage/skills/review-triage-fix/references/arguments.md` — 新設 (`--threshold`)。
+  - `review-triage/skills/review-triage/references/project-config.md` — `fix` 節を新設し `threshold_rounds` を書く。
   - `review-triage/skills/review-triage-loop/references/arguments.md` — `--threshold` の受け渡し。
   - `review-triage/skills/review-triage-loop/references/loop-flow.md` — G0 の報告に N を足す、S4 の案内。
   - `review-triage/skills/review-triage-loop/references/reporting.md` — 開始前の報告に N。
   - `review-triage/README.md` — 設定例の `threshold_rounds`。
 - **Approach:**
-  1. `project-config.md` の `fix` 節 (U9 が新設) に `threshold_rounds` を `loop` の表と同じ形で足す。「未設定」の定義は `loop` のものを参照する。
-  2. `review-triage-fix` の `arguments.md` (U9 が新設) に `--threshold <N>` を足す。優先順位 (引数 > 設定 > 既定)、決定した値の検査 (1 以上の整数)、出所の報告は `review-triage-loop` の `arguments.md` と同じ形。`review-triage-loop` は `--threshold` をそのまま渡す。
-  3. `SKILL.md` の段 1 の終わりに、対象の回の番号 (R2) と N を比べ、N+1 以上なら調査の結果を添えて立案者を尋ねる手順を書く。A / B / C の意味は R8 のとおり。B は「人間が指定した model と effort で、`stage-subagent.md` に従って段 2 を走らせる」と書く。C は `awaiting-human` に `options: 立案者 C: 人間が立案する` を書く (KTD3)。
+  1. `project-config.md` に `fix` 節を新設し、`threshold_rounds` を `loop` の表と同じ形で書く。「未設定」の定義は `loop` のものを参照する。
+  2. `review-triage-fix` の `arguments.md` を新設し、`--threshold <N>` と優先順位 (引数 > 設定 > 既定)、決定した値の検査 (1 以上の整数)、出所の報告を `review-triage-loop` の `arguments.md` と同じ形で書く。`review-triage-loop` は `--threshold` をそのまま渡す。
+  3. `SKILL.md` の段 1 の終わりに、対象の回の番号 (R2) と N を比べ、N+1 以上なら調査の結果を添えて立案者を尋ねる手順を書く。A / B / C の意味は R8 のとおり。B の経路は U11 が足す。C は `awaiting-human` に `options: 立案者 C: 人間が立案する` を書く (KTD3)。この状態では `approach` を書かない (KTD2)。
   4. 人間の答えの反映 (KTD4) を、選択待ちの承認と C の案の両方について 1 つの節に書く。一部の問題だけ答えたときの扱い (R21) も同じ節。
   5. 回 N+1 以降の段 2 の検討の範囲 (R9) を書く。設計・仕様変更を含む案の扱いは現行の手順 (`awaiting-human`) を参照する。
   6. `loop-flow.md` の G0 の報告に N を足し、S4 の案内を KTD5 のとおりにする。
@@ -578,7 +589,6 @@ sequenceDiagram
 - **Patterns to follow:** `review-triage-loop/references/arguments.md` の様式と検査の節。`project-config.md` の `loop` の表。`hold-presentation.md` の保留の提示 (立案者を尋ねるときの提示の形はこれに倣う)。
 - **Test scenarios:**
   - Covers AE2. 手動: 回 6 で尋ね、A を選ぶとセッション内で立案し、案が無ければ段 3 に進む。
-  - Covers AE3. 手動: B で model と effort を指定すると、対応する定義で段 2 が走り、設計変更の案は `awaiting-human` になり、報告に model・effort が出る。
   - Covers AE4 / AE12. 手動: C を選ぶと `awaiting-human` になり周回が止まる。案を伝えると `pending` になって段 3 に進む。一部だけ伝えると残りは選択待ちのまま。
   - Covers AE5. 手動: `threshold_rounds: 3` で回 4 に尋ね、`--threshold 6` で尋ねない。
   - Covers AE6. 手動: 回 8 の記録で周回を起動すると回 9 から尋ねる。
@@ -602,20 +612,20 @@ sequenceDiagram
 
 ### U9. 段の sub-agent 実行
 
-- **Goal:** 段 1〜3 を設定と引数で sub-agent に出せ、依頼文と検証が正本に従い、報告に走らせ方が書かれ、周回が開始前に段の設定を報告する。立案者 B も同じ仕組みで動く。
+- **Goal:** 段 1〜3 を設定と引数で sub-agent に出せ、依頼文と検証が正本に従い、報告に走らせ方が書かれ、周回が開始前に段の設定を報告する。
 - **Requirements:** R12, R13, R14, R16, R17 (AE7)。KTD6 (段の部分), KTD8, KTD9, KTD11, KTD12。
-- **Dependencies:** U6, U8。
+- **Dependencies:** U7, U8。
 - **Files:**
   - `review-triage/skills/review-triage-fix/references/stage-subagent.md` — 新設。
-  - `review-triage/skills/review-triage-fix/references/arguments.md` — 新設 (`--stage`)。
+  - `review-triage/skills/review-triage-fix/references/arguments.md` — `--stage` を足す。
   - `review-triage/skills/review-triage-fix/SKILL.md` — 各段の冒頭で走らせ方を決める。
-  - `review-triage/skills/review-triage/references/project-config.md` — `fix` 節を新設し `stages` を書く。
+  - `review-triage/skills/review-triage/references/project-config.md` — `fix` 節に `stages` を足す。
   - `review-triage/skills/review-triage-loop/SKILL.md`、`review-triage/skills/review-triage-loop/references/arguments.md` — `--stage` の受け渡し。
   - `review-triage/skills/review-triage-loop/references/loop-flow.md` — G0 の報告に段の設定。
   - `review-triage/skills/review-triage-loop/references/reporting.md` — 「書かないもの」を狭める。
   - `review-triage/README.md` — 設定例。
 - **Approach:**
-  1. `project-config.md` に `fix` 節を新設して `stages` を書く (KTD6)。`review-triage-fix` の `arguments.md` を新設し、`--stage` と優先順位、決定した値の検査 (段の名前・effort の 5 値)、出所の報告を `review-triage-loop` の `arguments.md` と同じ形で書く。
+  1. `project-config.md` の `fix` 節に `stages` を足す (KTD6)。`review-triage-fix` の `arguments.md` に `--stage` (値 `session` を含む) と決定した値の検査 (段の名前・`session` か `<model>[:<effort>]`・effort の 5 値)、出所の報告を足す。
   2. `stage-subagent.md` を新設し、依頼文が運ぶもの・運ばないもの・禁止事項・報告の様式・呼び出し側の検証・失敗時の扱い・effort と定義名の対応表・model の突き合わせを KTD8・KTD9 のとおり書く。依頼文の雛形は `review-request-template.md` と同じく値を埋める形にする。
   3. `SKILL.md` の各段の冒頭に「設定と引数で sub-agent なら `stage-subagent.md` に従って走らせ、そうでなければセッション内で進める」を書く。
   4. `reporting.md` の「書かないもの」を「段の走らせ方以外の内部の進み方」に狭め、各回の報告に段の走らせ方を足す。`loop-flow.md` の G0 の報告に段の設定を足す。
@@ -627,25 +637,45 @@ sequenceDiagram
   - 手動: 段 3 を sub-agent にし、問題 2 件のうち 1 件のコミット後に止めると、記録は 1 件 `done` + `sha`、1 件 `pending`、作業ツリーに未コミットの変更が無く、周回が段 3 から再開する。
   - 手動: 段 1 の sub-agent がソースを変更すると、呼び出し側の HEAD / 作業ツリーの照合で止まり、次の段に進まない。
   - 手動: sub-agent が `options` の無い `awaiting-human` を書くと、検査に失敗して止まり、再試行しない。
-  - 手動: 許可されていない model 名を B で指定すると、置き換わったことが突き合わせで検出され、人間に報告される。
+  - 手動: 設定で許可されていない model を指定すると、置き換え (または入力エラー) が突き合わせで検出され、人間に報告される。
   - 手動: 段 3 の sub-agent が作るコミットメッセージが、セッション内で作るものと同じ規約 (日本語・動機ごとの分割) に従う。従わなければ依頼文に規約を値で書く (Risks)。
   - `--stage investigate=sonnet:ultra` は周回を始めずにエラーになり、出所が報告される。
 - **Verification:** 通し確認が上のとおり。`doc-dag` を両スキルの references に回す。
+
+### U11. 立案者 B の経路
+
+- **Goal:** 回 N+1 以降で人間が B を選ぶと、人間が指定した model と effort の sub-agent が段 2 を行い、報告に走らせ方が出る。
+- **Requirements:** R8 (B), R12 (AE3)。KTD8, KTD9。
+- **Dependencies:** U7, U9。
+- **Files:**
+  - `review-triage/skills/review-triage-fix/SKILL.md` — 立案者の問いの B の枝。U7 が置いた「B はまだ無い」の報告を、`stage-subagent.md` に従って段 2 を走らせる手順に置き換える。
+- **Approach:**
+  1. B を選んだとき、人間に model (別名) と effort を聞き、KTD9 の対応表で定義名に解決し、`stage-subagent.md` の依頼文で段 2 を走らせる。「設計・仕様変更を含めて検討するか」は真で渡す (R9)。
+  2. 結果の検証と報告は U9 の仕組みをそのまま使う。
+- **Patterns to follow:** U9 の `stage-subagent.md`。`review-invocation.md` の実効モデルの規則 (別名への解決)。
+- **Test scenarios:**
+  - Covers AE3. 手動: B で model と effort を指定すると、対応する定義で段 2 が走り、設計変更の案は `awaiting-human` になり、報告に model・effort が出る。
+  - 手動: B で列挙に無い綴りの model を指定すると、別名に解決できないことを人間に報告して段 2 に進まない。
+- **Verification:** 通し確認が上のとおり。
 
 ### U10. README と版の更新、文書の構造の確認
 
 - **Goal:** プラグインの README が新しい振る舞い (検知と俯瞰の廃止、閾値 N と立案者の選択、段の sub-agent 化と agent 定義) を説明し、版が上がり、変更した文書群の重複と循環が無い。
 - **Requirements:** R18 (README の項), R12 の説明。
-- **Dependencies:** U1〜U9。
-- **Files:** `review-triage/README.md` (収録スキルの表、設定例、agent 定義の節)、`review-triage/.claude-plugin/plugin.json` (`version` を 0.9.0 に、`description` に agent 定義を足す)。
+- **Dependencies:** U1〜U9, U11。
+- **Files:**
+  - `review-triage/README.md` — 収録スキルの表、設定例、agent 定義の節。
+  - `review-triage/.claude-plugin/plugin.json` — `version` を 0.9.0 に、`description` に agent 定義を足す。
+  - `.claude-plugin/marketplace.json` — `review-triage` の `description` を plugin.json と同じ文にする。
+  - リポジトリ直下の `README.md` — プラグインの表の説明文と、ディレクトリ構成に `agents/` を足す (前回の説明文の変更、コミット `1749513` と同じ 4 つの組)。
 - **Approach:**
-  1. README の収録スキルの表から検知・俯瞰の説明を外し、立案者の選択と段の sub-agent 化を 1〜2 文で足す。設定例に `fix` 節を足す。agent 定義の一覧と、`review-triage-fix` の依頼文からだけ呼ぶことを書く。
-  2. `plugin.json` の版を上げる (動機が違うので別のコミット)。
+  1. README の収録スキルの表に、立案者の選択と段の sub-agent 化を 1〜2 文で足す (検知・俯瞰の説明は U3 で外している)。設定例に `fix` 節を足す。agent 定義の一覧と、`review-triage-fix` の依頼文からだけ呼ぶことを書く。
+  2. `plugin.json` の版を上げ、`description` を marketplace.json と直下の README の説明文にも写す (動機が違うので別のコミット)。
   3. `doc-dag` を `review-triage/` 全体と `CONCEPTS.md` に回し、重複と循環を解消する。
 - **Patterns to follow:** README の既存の表と設定例の形。
 - **Test scenarios:**
   - Test expectation: none -- 文書と配布情報の変更。
-- **Verification:** `doc-dag` の図が DAG で重複が無い。`grep -rnE 'recurrence-detection|reframing|俯瞰|捉え直し|same-location-fix|declined|reframed' review-triage/ CONCEPTS.md README.md` が、旧様式の 1 行と Go の型・テスト以外に 0 件。
+- **Verification:** `doc-dag` の図が DAG で重複が無い。`grep -rnE 'recurrence-detection|reframing|俯瞰|捉え直し|same-location-fix|declined|reframed' review-triage/ CONCEPTS.md README.md` が、旧様式の 1 行と Go の型・テスト以外に 0 件。`plugin.json`・`marketplace.json`・直下の `README.md` の `review-triage` の説明文が同じ。
 
 ---
 
@@ -653,17 +683,17 @@ sequenceDiagram
 
 | 検査 | コマンド / 手段 | 対象の単位 | 証明するもの |
 | --- | --- | --- | --- |
-| Go のテスト | `ASDF_GOLANG_VERSION=1.25.1 go test -C review-triage/tools/triagecheck ./...` (設定の `gates`) | U1, U6 | 旧様式の受け入れ、`investigated` の検査、既存の検査の非退行 |
+| Go のテスト | `ASDF_GOLANG_VERSION=1.25.1 go test -C review-triage/tools/triagecheck ./...` (設定の `gates`。版が無い機材では Risks のとおり先に設定を直す) | U1, U6 | 旧様式の受け入れ、`investigated` の検査、既存の検査の非退行 |
 | 既存の記録の検査 | 設定の `triage_check_command` (`tmp/review-triages/` の全記録) | U1, U2, U6 | 既存の記録と生成サマリを書き換えずに検査が成功する (AE9) |
 | 廃止した文書への参照 | 廃止した文書名と用語 (`recurrence-detection`・`reframing`・俯瞰・捉え直し・`same-location-fix`・`declined`・`reframed`) を `review-triage/`・`CONCEPTS.md`・`README.md` で grep する (コマンドは U10 の Verification) | U2, U3, U4, U10 | 旧様式の 1 行と Go の型以外に廃止した文書・項目への参照が無い |
 | 文書の構造 | `doc-dag` skill を変更した文書群に回す | U2, U3, U4, U6, U7, U9, U10 | 重複と循環が無い |
 | 状態機械の整合 | `loop-flow.md` の図のノード ID と決定表の ID を目視で照合 | U4, U6, U7, U9 | 1:1 (機械検査は無い) |
-| 手順書の通し確認 | fixture の記録 (回 5 まで・回 8 まで) で `review-triage-fix` と `review-triage-loop` を実行 | U6, U7, U9 | AE1〜AE8, AE10〜AE12 と U9 の手動シナリオ |
+| 手順書の通し確認 | fixture の記録 (回 5 まで・回 8 まで) で `review-triage-fix` と `review-triage-loop` を実行 | U6, U7, U9, U11 | AE1〜AE8, AE10〜AE12 と U9 の手動シナリオ |
 | agent 定義の起動 | Claude Code で `review-triage:fix-stage*` を起動し、`/tasks` で effort を確認 | U8, U9 | 定義が参照でき、effort の継承と指定が効く |
 
 ## Definition of Done
 
-- U1〜U10 がすべて完了し、上の Verification Contract の全項目が成功している。
+- U1〜U11 がすべて完了し、上の Verification Contract の全項目が成功している。
 - 廃止した文書・項目への参照が、旧様式の 1 行と Go の型以外に残っていない。
 - 既存の記録 (`tmp/review-triages/`・`docs/review-triage/`) と生成サマリが書き換わっていない。
 - 各単位が動機ごとのコミットになっている (U5 と U10 の版の更新は独立したコミット)。
