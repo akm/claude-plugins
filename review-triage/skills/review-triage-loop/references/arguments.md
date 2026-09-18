@@ -42,7 +42,7 @@ review-triage-loop [--max <回数>] [--review <スキル名>] [--review-args "<�
 - `review_skill` は `code-review` か `ce-code-review`。それ以外の値は、対応する起動の経路が無いので ([review-invocation.md](review-invocation.md))、周回を始めずにエラーとして報告する。
 - `review_args` の中身は検査しない。レビュースキルにそのまま渡し、解釈はそちらに委ねる。
 - `review_model` の値は検査しない。指定が効かなかったときの報告の条件は [review-invocation.md](review-invocation.md) の「実効モデル」が正本。
-- `fix.threshold_rounds` (`--threshold`) は、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 (1 以上の整数) で検査する。誤りは周回を始めずにエラーとして報告する — `review-triage-fix` を呼んだ回で初めて気づくと、そこまでのレビューの実行が無駄になる。
+- `fix.threshold_rounds` (`--threshold`) は、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」の条件で検査する (条件はそちらが正本)。誤りは周回を始めずにエラーとして報告する — `review-triage-fix` を呼んだ回で初めて気づくと、そこまでのレビューの実行が無駄になる。
 - `fix.stages` (`--stage`) も同じく、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 (段の名前・`<値>` の形・effort の 5 値・`subagent` の真偽値・モデルの指定が実効モデルに解決できること) で検査する。誤りは周回を始めずにエラーとして報告する (例: `--stage investigate=sonnet:ultra` は effort が 5 値に無いので、周回を始めずにエラーになる)。
 
 **エラーには、その値が引数と設定のどちらから来たかを書く。** 直す先が違う — 引数ならその場で言い直せるが、設定なら `config.json` を直すことになる。

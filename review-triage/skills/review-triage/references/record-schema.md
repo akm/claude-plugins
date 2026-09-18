@@ -103,9 +103,9 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 
 | 値 | 意味 | 再開時の扱い |
 | --- | --- | --- |
-| `investigated` | 調査済み・未立案 — `review-triage-fix` の段 1 (調査) の結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 段 2 (立案) から続ける — `review-triage-fix` の手順 5 |
-| `pending` | 未着手 — 修正方法と順序が決まっている | 段 3 (修正) から続ける — `review-triage-fix` の手順 7 |
-| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する — 選択の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) の待ちも同じ状態で表し、`options` に「立案者 C: 人間が立案する」と書く | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の答えは `review-triage-fix` が記録に反映する (手順 1) |
+| `investigated` | 調査済み・未立案 — `review-triage-fix` の段 1 (調査) の結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 段 2 (立案) から続ける (再開の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
+| `pending` | 未着手 — 修正方法と順序が決まっている | 段 3 (修正) から続ける (同上) |
+| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の待ちも同じ状態で表す — 選択と `options` に書くものの正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の答えは `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |
 

@@ -12,11 +12,11 @@
 
 ## 段と手順・文書の対応
 
-| 段 | 名前 (設定・引数) | sub-agent に含める SKILL.md の手順 | 段の規範 (references/) | 進める状態 |
+| 段 | 名前 (設定・引数) | sub-agent に含める手順 (番号の正本は [SKILL.md](../SKILL.md) の「手順」の直下にある段と手順の対応) | 段の規範 (references/) | 進める状態 |
 | --- | --- | --- | --- | --- |
-| 段 1 (調査) | `investigate` | 手順 2〜4。**末尾の「立案者の選択」は含めない** — 人間に問うのはセッション側 | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
-| 段 2 (立案) | `plan` | 手順 5〜6 | [ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
-| 段 3 (修正) | `fix` | 手順 7。**手順 8 (報告) と手順 9 (`doc-dag`) は含めない** — セッション側で行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
+| 段 1 (調査) | `investigate` | 段 1 の手順のうち、**末尾の「立案者の選択」は含めない** — 人間に問うのはセッション側 | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
+| 段 2 (立案) | `plan` | 段 2 の手順 | [ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
+| 段 3 (修正) | `fix` | 段 3 の手順のうち、**報告と `doc-dag` の確認は含めない** — セッション側で行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
 
 全段に共通して読ませる文書: [SKILL.md](../SKILL.md) (該当の手順と「原則」)、[record-schema.md](../../review-triage/references/record-schema.md) (記録の様式・状態・コミット節)、[project-config.md](../../review-triage/references/project-config.md) (設定のキーの意味)。
 
@@ -78,7 +78,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 | 埋める箇所 | 値 |
 | --- | --- |
-| `{{stage_no}}` / `{{stage_name}}` / `{{steps}}` | 「段と手順・文書の対応」の段の番号・名前・手順の範囲 |
+| `{{stage_no}}` / `{{stage_name}}` / `{{steps}}` | 段の番号・名前と、その段の手順の範囲 (番号は [SKILL.md](../SKILL.md) の段と手順の対応から写す。「段と手順・文書の対応」の除外を引いた範囲) |
 | `{{record_path}}` | 記録 YAML の絶対パス |
 | `{{config_path}}` | 設定ファイル `.claude/akm-claude-plugins/review-triage/config.json` の絶対パス |
 | `{{repo_dir}}` / `{{branch}}` | `git rev-parse --show-toplevel` / 現在のブランチ名 |
