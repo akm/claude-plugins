@@ -47,6 +47,9 @@
     "review_skill": "code-review",
     "review_args": "high",
     "review_model": ""
+  },
+  "fix": {
+    "threshold_rounds": 5
   }
 }
 ```
