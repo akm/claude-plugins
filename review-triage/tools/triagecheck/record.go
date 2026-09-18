@@ -168,6 +168,7 @@ type recordPlan struct {
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
 	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
+	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の正本は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
 	Options       string               `yaml:"options"`
@@ -597,6 +598,14 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				// pending / awaiting-human に進める。ここに書いてあると、段 2 が書いたのか
 				// 段 1 が段 2 の中身まで書いたのかを記録から読めなくなるので、書いてあれば報告する。
 				noSHAYet()
+				// 調査 (investigation) は他の状態では任意だが、この状態では必須。
+				// 無いことは「未調査」を意味する (スキーマ表) ので、調査済みの状態と矛盾する。
+				// 通してしまうと、段 2 が未調査の問題に立案し、同じ原因の別の現れが残る。
+				// 中身 (scope) の検査は下の inv != nil の検査に委ねる。
+				if pl.Investigation == nil {
+					add("%s: 調査済み (investigated) には investigation (調べた範囲と結果) が必須。"+
+						"無いものは未調査で、状態と矛盾する — 調べたなら scope を書き、まだなら plans に載せない", pn)
+				}
 				if pl.Approach != "" {
 					add("%s: 調査済み (investigated) では approach を書かない。修正方法を決めたのなら status: pending にする", pn)
 				}
@@ -632,7 +641,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			default:
 				add("%s: status は investigated / pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
 			}
-			// 調査は任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
+			// 調査は investigated 以外の状態では任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
 			if inv := pl.Investigation; inv != nil {
 				if strings.TrimSpace(inv.Scope) == "" {

@@ -141,7 +141,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"awaiting-human なのに notes がある", "        status: pending\n",
 			"        status: awaiting-human\n        options: 案 a / 案 b\n        notes: どこかへ反映した\n", "done-external 専用"},
 		{"depends_on の宙参照", "order: 1\n", "order: 1\n        depends_on: [P9]\n", "depends_on"},
-		// 調査は任意だが、書くなら範囲 (scope) が要る。範囲の無い調査は未調査と区別できない。
+		// 調査は (investigated 以外の状態では) 任意だが、書くなら範囲 (scope) が要る。範囲の無い調査は未調査と区別できない。
 		{"investigation に scope が無い", "order: 1\n",
 			"order: 1\n        investigation:\n          included: [docs/bar.md の同じ表]\n", "investigation.scope"},
 		{"investigation の included に空の要素", "order: 1\n",
@@ -1616,9 +1616,12 @@ func TestReviewTriageRecordInvestigatedPasses(t *testing.T) {
 	}
 }
 
-// investigated に approach / order が書いてあれば報告する。段 1 の結果に立案の中身が
-// 混ざると、段 2 が書いたのか段 1 が越境したのかを記録から読めなくなる。
-func TestReviewTriageRecordInvestigatedRejectsPlanningKeys(t *testing.T) {
+// investigated に後の段が書くキーがあれば報告する。approach / order は段 2 (立案) の
+// 中身で、段 1 の結果に混ざると、段 2 が書いたのか段 1 が越境したのかを記録から
+// 読めなくなる。sha は段 3 (修正) の結果で、done-external 専用のキー
+// (applied_external_url / notes) も同じく修正を終えた状態にしか無い — 調査だけの
+// 問題に残っていると、サマリが調査済みの行に sha を並べて、直したように見える。
+func TestReviewTriageRecordInvestigatedRejectsLaterStageKeys(t *testing.T) {
 	cases := []struct {
 		name  string
 		extra string // status の直前に足す行
@@ -1626,6 +1629,10 @@ func TestReviewTriageRecordInvestigatedRejectsPlanningKeys(t *testing.T) {
 	}{
 		{"approach がある", "        approach: 数え直して単位を書く\n", "調査済み (investigated) では approach を書かない"},
 		{"order がある", "        order: 1\n", "調査済み (investigated) では order を書かない"},
+		{"sha がある", "        sha: abc1234\n", "status investigated なのに sha \"abc1234\" があります"},
+		{"applied_external_url がある", "        applied_external_url: \"https://example.com/x\"\n",
+			"status investigated なのに applied_external_url \"https://example.com/x\" があります"},
+		{"notes がある", "        notes: どこかへ反映した\n", "status investigated なのに notes \"どこかへ反映した\" があります"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1646,6 +1653,30 @@ func TestReviewTriageRecordInvestigatedRejectsPlanningKeys(t *testing.T) {
 				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
 			}
 		})
+	}
+}
+
+// investigated に investigation (調べた範囲と結果) が無ければ報告する。investigation が
+// 無いことは「未調査」を意味する (record-schema.md の plans[] の表) ので、調査済みの
+// 状態と矛盾する — 段 1 が調査を飛ばして原因と束ねだけを書いた記録が検査を通ると、
+// 段 2 が未調査の問題に立案し、同じ原因の別の現れが残る。
+func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
+	plans := strings.Replace(investigatedPlansYAML,
+		"        investigation:\n          scope: grep -rn '分母' . と docs/foo.md の同じ表の全行\n", "", 1)
+	if plans == investigatedPlansYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	read := func(_ string) ([]byte, error) { return []byte(replaceRecordPlans(t, plans)), nil }
+	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+	const want = "調査済み (investigated) には investigation (調べた範囲と結果) が必須"
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, want) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("%q を含む問題が出ない。出た問題: %v", want, problems)
 	}
 }
 

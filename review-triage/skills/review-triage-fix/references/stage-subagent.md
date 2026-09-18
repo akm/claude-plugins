@@ -110,6 +110,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - 記録 YAML と生成サマリ以外のファイルを作らない・変えない・消さない。
 - コミットしない。**記録のコミットも含む** — 置き場が git の追跡内でも、コミットは呼び出し側が検証の後に行う。
 - 段 1 は `approach` と `order` を書かない (`investigated` の条件の正本は record-schema.md の `plans[]` の表)。段 2 は記録の外のファイルを変えない。
+- 段 1 は手順 4 の末尾の「立案者の選択」を行わない — 回の番号と回数の閾値 N を比べず、人間に尋ねず、問題を `status: awaiting-human` にしない。段 1 の結果はすべて `status: investigated` で返す (立案者の選択はセッション側が行う)。
 
 段 3:
 
@@ -127,11 +128,11 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 ## 値 — この値で動く。自分で別の値を選ばない
 
-- 段: 段 {{stage_no}} ({{stage_name}}) — SKILL.md の手順 {{steps}} の範囲。前後の段に進まない。
+- 段: 段 {{stage_no}} ({{stage_name}}) — SKILL.md の手順 {{steps}} の範囲。ただし「禁止事項」に挙げた部分は、この範囲の手順にあっても行わない。前後の段に進まない。
 - 記録 YAML: `{{record_path}}`
 - 設定ファイル: `{{config_path}}` — `record_dir`・`gates`・`triage_check_command`・`triage_summary_command` はここから読む
 - リポジトリ: `{{repo_dir}}` / ブランチ: `{{branch}}`
-- 対象の回: {{round}} (記録の `runs` の要素数)。新しく書く `plans` はこの回に置く。
+- 対象の回: {{round}} (記録の `runs` の要素数)。新しく書く `plans` は、その採択が属する回に置く (別の回の採択を同じ原因で束ねるときは、束ね先の問題に `plan_ref` を書く — 規則の正本は record-schema.md の `finding_ids` と `plan_ref` の行)。
 - 対象: {{targets}}
 - 設計・仕様変更を含めて検討する: {{consider_design_change}} — この値をそのまま使う。回の番号から自分で判断しない。
 - 定義名: `{{agent_name}}` — 報告にこの値をそのまま写す。
@@ -180,7 +181,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 | 段 | 状態の遷移 | HEAD と作業ツリー |
 | --- | --- | --- |
-| 段 1 | `{{targets}}` の採択がすべて `plans` (`status: investigated`) か `plan_ref` で覆われた。`investigated` に `approach`・`order` が無い (検査が報告する) | HEAD が段の前と同じ。`git status --porcelain` の差分が記録の置き場 (`record_dir`) 配下だけ |
+| 段 1 | `{{targets}}` の採択がすべて `plans` (`status: investigated`) か `plan_ref` で覆われた。`investigated` に `investigation` がある (検査が報告する)。`investigated` に `approach`・`order` が無い (検査が報告する) | HEAD が段の前と同じ。`git status --porcelain` の差分が記録の置き場 (`record_dir`) 配下だけ |
 | 段 2 | `{{targets}}` の `investigated` がすべて `pending` か `awaiting-human` に進んだ。`awaiting-human` に `options` がある (検査が報告する)。`investigated` のまま残った問題があれば、理由が報告の「できなかったこと」にある | 同上 |
 | 段 3 | `{{targets}}` の `pending` が `done` (`sha`) か `done-external` に進んだ。**`done` の各 `sha` が HEAD の履歴にある** (`git merge-base --is-ancestor <sha> HEAD`)。`pending` のまま残った問題があれば、理由が報告にある (区切りでの中断は失敗ではない — 次の再開が段 3 から続ける) | **作業ツリーに未コミットの変更が無い** (`git status --porcelain` が空)。**最終 HEAD で設定の `gates` を 1 度走らせる** — sub-agent がコミットごとに通したと報告していても、呼び出し側は最終状態を自分で確かめる。`gates` が未設定なら、走らせていないことを報告に書く |
 
