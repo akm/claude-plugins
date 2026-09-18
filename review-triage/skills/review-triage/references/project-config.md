@@ -20,7 +20,12 @@
     "review_model": ""
   },
   "fix": {
-    "threshold_rounds": 5
+    "threshold_rounds": 5,
+    "stages": {
+      "investigate": { "subagent": false, "model": "", "effort": "" },
+      "plan":        { "subagent": false, "model": "", "effort": "" },
+      "fix":         { "subagent": false, "model": "", "effort": "" }
+    }
   }
 }
 ```
@@ -84,10 +89,16 @@
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `threshold_rounds` | 回数の閾値 N。記録の回番号 (`runs` の要素数) が N を越えた回 (回 N+1 以降) では、`review-triage-fix` が段 1 (調査) の後に人間に立案者を尋ねる (尋ね方と選択肢の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) | 5 |
+| `stages` | 段ごとの走らせ方。キーは段の名前 — `investigate` (段 1 = 調査)・`plan` (段 2 = 立案)・`fix` (段 3 = 修正)。段の中身と手順の対応の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭 | 3 段ともセッション内 (下の各キーの既定) |
+| `stages.<段>.subagent` | その段を sub-agent で走らせるか (真偽値) | `false` — セッション内で走らせる |
+| `stages.<段>.model` | sub-agent で走らせるときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
+| `stages.<段>.effort` | sub-agent で走らせるときの effort の指定 (文字列)。値は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。`subagent` が `false` なら使わない | 空 — セッションの effort を継承する agent 定義を使う (effort と定義名の対応の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「effort と定義名の対応」) |
 
 **`threshold_rounds` は記録の回番号で数える。** `max_rounds` が「この起動で回した回数」を数えるのと違い、`review-triage-fix` は記録しか見ないので、単独で走らせても周回から呼ばれても同じ回で同じ振る舞いになる。上限は収束しない周回を止めるための値、閾値は人間が立案に関与し始める回を決める値で、別のものである。
 
-`fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。
+`fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<段>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
+
+**`stages` の設定は、回 N+1 以降の段 2 (`plan`) には効かない。** その回の段 2 は `review-triage-fix` が人間に尋ねた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。段 1 (`investigate`) と段 3 (`fix`) の設定は回の番号に関わらず効く。段の走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
 
 ## `frozen_paths` — 直さない文書
 

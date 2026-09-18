@@ -58,7 +58,7 @@ flowchart TD
 
 | ID | 種類 | 条件・内容 | 報告に書くもの |
 | --- | --- | --- | --- |
-| G0 | 手順 | 設定 (`config.json` の `loop`) と引数を読んで周回の条件を決める。決め方の正本は [arguments.md](arguments.md)、キーと既定は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」 | 決まった条件 (上限・レビュースキル・そのオプション・実効モデル。`ce-code-review` で指定が空でなければ、効かない旨も) と、`review-triage-fix` に渡す回数の閾値 N (設定 `fix.threshold_rounds` と引数 `--threshold` から決めた値。決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) を周回の開始前に出す |
+| G0 | 手順 | 設定 (`config.json` の `loop`) と引数を読んで周回の条件を決める。決め方の正本は [arguments.md](arguments.md)、キーと既定は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」 | 決まった条件 (上限・レビュースキル・そのオプション・実効モデル。`ce-code-review` で指定が空でなければ、効かない旨も) と、`review-triage-fix` に渡す回数の閾値 N (設定 `fix.threshold_rounds` と引数 `--threshold` から決めた値。決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) と、段ごとの走らせ方 (設定 `fix.stages` と引数 `--stage` から段ごとに決めた、セッション内か sub-agent か。sub-agent なら定義名と段の実効モデル。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」) を周回の開始前に出す。回 N+1 以降の段 2 は立案者の選択で決まり、ここで出した走らせ方は使われない (その旨も添える) |
 | G2 | 判定 | 全回の `plans` に `status: awaiting-human` の問題があるか。記録が無ければ「無い」 | — |
 | G3 | 判定 | J2 と同じ条件。**`review-triage` を単独で走らせた直後 (採択が残り `plans` がまだ無い) はここで「ある」になり、レビューの前に F1 を通る** — 先にレビューを走らせると、`review-triage` が次の回を追記した時点で前の回の被覆の免除 (正本は [record-schema.md](../../review-triage/references/record-schema.md) の `plan_ref` の行) が解け、記録の検査が失敗する。**調査済み・未着手が残ったまま周回を起動し直したときも同じ** | — |
 | L1 | 手順 | レビューを起動する。経路・依頼文・範囲・モデルの正本は [review-invocation.md](review-invocation.md) | いま何回目か (この起動で数えた回数) と上限 |

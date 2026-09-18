@@ -49,7 +49,12 @@
     "review_model": ""
   },
   "fix": {
-    "threshold_rounds": 5
+    "threshold_rounds": 5,
+    "stages": {
+      "investigate": { "subagent": false, "model": "", "effort": "" },
+      "plan":        { "subagent": false, "model": "", "effort": "" },
+      "fix":         { "subagent": false, "model": "", "effort": "" }
+    }
   }
 }
 ```
