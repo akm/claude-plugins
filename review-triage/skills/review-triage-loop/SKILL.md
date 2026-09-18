@@ -17,7 +17,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 
 ## 手順
 
-**周回の順序・分岐・優先・止まる条件は [references/loop-flow.md](references/loop-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (G0・G2・G3・L1・L2・J2・J4・J5・F1・S2〜S4) はそこを指す。
+**周回の順序・分岐・優先・止まる条件は [references/loop-flow.md](references/loop-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (G0・G2・G3・L1・L2・J2・J4・J5・J7・F1・S2〜S5) はそこを指す。
 
 1. **設定と引数を読む** (G0): `.claude/akm-claude-plugins/review-triage/config.json` の `loop` を読み、引数で上書きする (キーと既定値の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」。引数の様式は [references/arguments.md](references/arguments.md))。
    - **`review_skill` が引数でも設定でも未設定なら、人間に尋ねる** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
@@ -25,8 +25,8 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
    - **段の走らせ方 (`--stage`、設定は `fix.stages`) も同じく周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせた段の検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。周回は段の sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
    - 決まった条件を周回の開始前に報告する (書くものは決定表の G0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
 2. **入口の関門** (G2・G3): 記録 YAML を読み (置き場は設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)、図の順に判定する。各ノードの条件・行き先・止まるときの報告は、図と決定表が正本。
-3. **周回** (L1 → S2〜S4): 図に従って回す。各ノードで行うことと見る場所は決定表のとおり。**各回の冒頭で、いま何回目かと上限を報告する** (L1)。
-4. **報告** (S2〜S4): 止まった理由と、周回で何が起きたかを出す。全体の形は [references/reporting.md](references/reporting.md)、止まった理由ごとに足すものは決定表の S2〜S4 が正本。**採択件数の回ごとの推移を必ず出す** — 収束に向かっていたのか、減らないまま止まったのかは、件数の推移にしか現れない。
+3. **周回** (L1 → S2〜S5): 図に従って回す。各ノードで行うことと見る場所は決定表のとおり。**各回の冒頭で、いま何回目かと上限を報告する** (L1)。
+4. **報告** (S2〜S5): 止まった理由と、周回で何が起きたかを出す。全体の形は [references/reporting.md](references/reporting.md)、止まった理由ごとに足すものは決定表の S2〜S5 が正本。**採択件数の回ごとの推移を必ず出す** — 収束に向かっていたのか、減らないまま止まったのかは、件数の推移にしか現れない。
 
 ## 原則
 
