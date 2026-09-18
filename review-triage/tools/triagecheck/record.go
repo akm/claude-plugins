@@ -583,15 +583,20 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: approach がありません", pn)
 				}
 			}
+			// noSHAYet はまだ修正していない状態 (investigated / pending / awaiting-human) の
+			// 共通の検査 — done-external 専用のキーが無く、sha も無いこと。
+			noSHAYet := func() {
+				externalOnly()
+				if pl.SHA != "" {
+					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+				}
+			}
 			switch pl.Status {
 			case "investigated":
 				// 段 1 (調査) の結果だけを持つ状態。修正方法と順序は段 2 (立案) が書いて
 				// pending / awaiting-human に進める。ここに書いてあると、段 2 が書いたのか
 				// 段 1 が段 2 の中身まで書いたのかを記録から読めなくなるので、書いてあれば報告する。
-				externalOnly()
-				if pl.SHA != "" {
-					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
-				}
+				noSHAYet()
 				if pl.Approach != "" {
 					add("%s: 調査済み (investigated) では approach を書かない。修正方法を決めたのなら status: pending にする", pn)
 				}
@@ -599,10 +604,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: 調査済み (investigated) では order を書かない。順序を決めたのなら status: pending にする", pn)
 				}
 			case "pending", "awaiting-human":
-				externalOnly()
-				if pl.SHA != "" {
-					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
-				}
+				noSHAYet()
 				if pl.Status == "pending" {
 					approachRequired()
 				}
