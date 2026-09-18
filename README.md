@@ -11,7 +11,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [doc-dag](doc-dag/README.md) | 文書群の依存と重複を調べ、mermaid 図で示して DAG になるよう修正する (mermaid-preview と併用) |
 | [mermaid-preview](mermaid-preview/README.md) | mermaid の図を含む HTML を生成してブラウザで見せる (他のスキルからの図の提示にも使う) |
 | [commit-squash](commit-squash/README.md) | 未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす |
-| [review-triage](review-triage/README.md) | レビューの依頼文を生成し、レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直し、レビューから修正までを上限回数まで回す (Go が必要) |
+| [review-triage](review-triage/README.md) | レビューの依頼文を生成し、レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直し、レビューから修正までを上限回数まで回す。修正の段は sub-agent で走らせられる (Go が必要) |
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 
 ## 使い方
@@ -145,6 +145,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json
+    ├── agents/                    # 段を sub-agent で走らせる effort ごとの agent 定義
     ├── skills/review-request/     # レビューの依頼文の生成
     ├── skills/review-triage/      # SKILL.md と references/
     ├── skills/review-triage-fix/

@@ -8,7 +8,7 @@
 | --- | --- |
 | `review-request` | 別セッションで走らせる上流レビューの依頼文を、雛形から埋めて `tmp/` に書き出す。結果の出力先を依頼文に埋め込み、新しいセッションにはそのパス 1 つを渡す |
 | `review-triage` | 指摘を判定し、記録に残す。**修正はしない** (判断までが範囲) |
-| `review-triage-fix` | 採択した指摘を原因で束ね、問題単位で直す |
+| `review-triage-fix` | 採択した指摘を原因で束ね、調査 → 立案 → 修正 の 3 段で問題単位で直す。記録の回番号が回数の閾値 N を越えた回では、調査の後に人間が立案者 (セッションのモデル / 指定モデルの sub-agent / 人間自身) を選ぶ。段ごとに sub-agent で走らせられる |
 | `review-triage-loop` | レビューの起動から上の 2 つまでを 1 周として、終了条件に当たるまで繰り返す。**判断も修正もせず、2 つを呼ぶだけ** |
 
 `code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは記録 (YAML) だけで行います。**
@@ -61,9 +61,15 @@
 
 `loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
+`fix` は `review-triage-fix` の既定 — 回数の閾値 N (`threshold_rounds`) と、段 (調査 / 立案 / 修正) ごとに sub-agent で走らせるか・その model と effort (`stages`) — で、無くても既定 (閾値 5、どの段もセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
+
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
 別に、指摘の分類と被害者を宣言する `.claude/review-triage.yaml` が要ります。`review-triage --gen-config` が雛形を生成します (様式の正本は [config-schema.md](skills/review-triage/references/config-schema.md))。
+
+## 同梱の agent 定義
+
+`agents/` に、`review-triage-fix` が段を sub-agent で走らせるときに使う汎用の agent 定義を 6 つ同梱しています — `fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max`。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どの段を行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (走らせ方・依頼文・検証の正本は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
 
 ## 併用すると役に立つプラグイン
 
