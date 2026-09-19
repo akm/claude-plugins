@@ -77,17 +77,18 @@ type recordRun struct {
 	Head     string          `yaml:"head"`
 	Findings []recordFinding `yaml:"findings"`
 	Plans    []recordPlan    `yaml:"plans"`
-	// Recurrence は同じ型の指摘が続いていることの検知と、その後の捉え直し。
-	// review-triage が status: detected で書き、review-triage-fix が declined か
-	// reframed に更新する。無いことは「検知なし」を意味するので、有無をポインタで
-	// 持つ (investigation と同じ)。項目が無い過去の記録はそのまま検査を通る。
+	// Recurrence は旧様式のキー。同じ型の指摘が続いていることの判断 (検知) を
+	// 記録していたが、検知は廃止したので新しい回には書かれない。置き場に残る
+	// 既存の記録を読み、生成サマリに従来どおり描画するために型と読み込みを残す。
+	// 検査は形 (許可キーと値の有無) だけで、中身の整合は見ない。有無をポインタで
+	// 持つのは investigation と同じ。
 	Recurrence *recordRecurrence `yaml:"recurrence"`
 	Notes      string            `yaml:"notes"`
 }
 
-// recordRecurrence は runs[].recurrence — 検知の状態と根拠、捉え直し。
-// 根拠 (evidence) を自由記述 1 つにしないのは、誤検知を後から監査する経路が
-// これしかないため。1 件ごとに条件・今回の採択・比べた回・比べた先・理由を残す。
+// recordRecurrence は runs[].recurrence (旧様式) — 検知の状態 (status) と根拠
+// (evidence)、繰り返しではないと判断した理由 (declined_reason)、問題の捉え方を
+// 改めた結果 (reframe)。生成サマリの描画に使う。
 type recordRecurrence struct {
 	Status         string                     `yaml:"status"`
 	Evidence       []recordRecurrenceEvidence `yaml:"evidence"`
@@ -95,12 +96,10 @@ type recordRecurrence struct {
 	Reframe        *recordReframe             `yaml:"reframe"`
 }
 
-// recordRecurrenceEvidence は検知の根拠 1 件。condition は fix-derived
+// recordRecurrenceEvidence は旧様式の検知の根拠 1 件。condition は fix-derived
 // (修正由来の指摘が続いた) / same-location (同じ場所への採択が続いた)。
 // finding_id は同じ回の採択の id、prior_run は比べた回の 1 始まりの番号、
-// prior は比べた先。condition と比べた回の状態で形が決まる。形の正本は
-// recurrence-detection.md「直前の回の状態と主の条件」の表で、ここでは言い直さない
-// (言い直すと、規則を変えたとき写しを直し残す)。検査はその表を照合する。
+// prior は比べた先。生成サマリの描画に使う。
 type recordRecurrenceEvidence struct {
 	Condition string `yaml:"condition"`
 	FindingID int    `yaml:"finding_id"`
@@ -109,8 +108,9 @@ type recordRecurrenceEvidence struct {
 	Reason    string `yaml:"reason"`
 }
 
-// recordReframe は捉え直しの結果。source は human (人間の確認から出た) /
-// skill (スキルの見立てから出た) — 見立て由来かどうかを後から区別するため。
+// recordReframe は旧様式の reframe — 検知の後に問題の捉え方を改めた結果。
+// source は human (人間の確認から出た) / skill (スキルの見立てから出た)。
+// 生成サマリの描画に使う。
 type recordReframe struct {
 	Pattern   string `yaml:"pattern"`
 	Axes      string `yaml:"axes"`
@@ -160,10 +160,15 @@ type recordPlan struct {
 	ProblemID  string `yaml:"problem_id"`
 	Cause      string `yaml:"cause"`
 	FindingIDs []int  `yaml:"finding_ids"`
-	Approach   string `yaml:"approach"`
+	// Approach (修正方法) と Order (順序) は review-triage-fix の段 2 (立案) が書く。
+	// 書く条件は status ごとに決まる — pending / done / done-external では approach が
+	// 必須、awaiting-human では任意 (人間の答えの後に書く)、investigated (段 1 の
+	// 結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
+	Approach string `yaml:"approach"`
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
 	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
+	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の正本は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
 	Options       string               `yaml:"options"`
@@ -353,7 +358,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 「キーを書いて値を省いた」(書きかけ・インデントの誤り) が「キーが無い」と
 // 同一になり、書き手は書いたつもりのまま記録上は無い扱いになる (実測:
 // investigation: だけの記録が検査 0 件でサマリにも出なかった)。
-// recurrence も同じ — null は「検知なし」と同一になり、書きかけの検知が消える。
+// 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない — 重ねると 1 つの書き忘れが複数の問題になる。
 var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true, "recurrence": true}
@@ -536,7 +541,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 		for pi, pl := range run.Plans {
 			pn := fmt.Sprintf("%s: plans[%d] (%s)", rn, pi, pl.ProblemID)
 			for _, kv := range []struct{ key, val string }{
-				{"problem_id", pl.ProblemID}, {"cause", pl.Cause}, {"approach", pl.Approach},
+				{"problem_id", pl.ProblemID}, {"cause", pl.Cause},
 			} {
 				if kv.val == "" {
 					add("%s: %s がありません", pn, kv.key)
@@ -569,22 +574,61 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					}
 				}
 			}
-			switch pl.Status {
-			case "pending", "awaiting-human":
+			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
+			// status ごとに決まる (スキーマ表の approach の行) — 修正に進む状態
+			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
+			// では任意 (人間が立案する待ちは approach を持たず、人間の答えの後に書く)、
+			// investigated では逆に書いてあれば報告する。
+			approachRequired := func() {
+				if pl.Approach == "" {
+					add("%s: approach がありません", pn)
+				}
+			}
+			// noSHAYet はまだ修正していない状態 (investigated / pending / awaiting-human) の
+			// 共通の検査 — done-external 専用のキーが無く、sha も無いこと。
+			noSHAYet := func() {
 				externalOnly()
 				if pl.SHA != "" {
 					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+				}
+			}
+			switch pl.Status {
+			case "investigated":
+				// 段 1 (調査) の結果だけを持つ状態。修正方法と順序は段 2 (立案) が書いて
+				// pending / awaiting-human に進める。ここに書いてあると、段 2 が書いたのか
+				// 段 1 が段 2 の中身まで書いたのかを記録から読めなくなるので、書いてあれば報告する。
+				noSHAYet()
+				// 調査 (investigation) は他の状態では任意だが、この状態では必須。
+				// 無いことは「未調査」を意味する (スキーマ表) ので、調査済みの状態と矛盾する。
+				// 通してしまうと、段 2 が未調査の問題に立案し、同じ原因の別の現れが残る。
+				// 中身 (scope) の検査は下の inv != nil の検査に委ねる。
+				if pl.Investigation == nil {
+					add("%s: 調査済み (investigated) には investigation (調べた範囲と結果) が必須。"+
+						"無いものは未調査で、状態と矛盾する — 調べたなら scope を書き、まだなら plans に載せない", pn)
+				}
+				if pl.Approach != "" {
+					add("%s: 調査済み (investigated) では approach を書かない。修正方法を決めたのなら status: pending にする", pn)
+				}
+				if pl.Order != 0 {
+					add("%s: 調査済み (investigated) では order を書かない。順序を決めたのなら status: pending にする", pn)
+				}
+			case "pending", "awaiting-human":
+				noSHAYet()
+				if pl.Status == "pending" {
+					approachRequired()
 				}
 				if pl.Status == "awaiting-human" && pl.Options == "" {
 					add("%s: status awaiting-human には options (選択肢とトレードオフ) が必須", pn)
 				}
 			case "done":
 				externalOnly()
+				approachRequired()
 				if pl.SHA == "" {
 					add("%s: status done には sha (短縮 SHA) が必須。リポジトリ外の成果物への反映で"+
 						"コミットが立たないなら status: done-external にする", pn)
 				}
 			case "done-external":
+				approachRequired()
 				// コミットが無いのだから sha を書けるはずがない。書けているなら
 				// リポジトリ内の修正なので done が正しい。
 				if pl.SHA != "" {
@@ -595,9 +639,9 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 						"notes (反映先と、反映を確認した方法) のどちらかが必須", pn)
 				}
 			default:
-				add("%s: status は pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
+				add("%s: status は investigated / pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
 			}
-			// 調査は任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
+			// 調査は investigated 以外の状態では任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
 			if inv := pl.Investigation; inv != nil {
 				if strings.TrimSpace(inv.Scope) == "" {
@@ -650,127 +694,10 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				add("%s: findings id %d: 採択が修正計画に載っていません (自回の plans にも plan_ref にも無い)", rn, fd.ID)
 			}
 		}
-		if rec := run.Recurrence; rec != nil {
-			problems = append(problems, recordRecurrenceProblems(f, ri, rec, verdictByID, doc.Runs, plansByRun)...)
-		}
 		for _, cycle := range recordDependsOnCycles(run.Plans) {
 			add("%s: depends_on が循環しています (%s)。順序が定まらない — 同じ原因の 1 問題に束ねるべきものを分けていないかを疑う",
 				rn, strings.Join(cycle, " → "))
 		}
-	}
-	return problems
-}
-
-// recordRecurrenceProblems は runs[ri].recurrence の形を検査する。ri は 0 始まりの
-// 添字で、記録上の回番号は ri+1。verdictByID は同じ回の指摘 id → verdict。runs と
-// plansByRun (回ごとの問題 id の集合) は、根拠の prior が比べた回に実在するかを
-// 照らすのに使う。
-//
-// status ごとに専用のキーの有無を検査する。declined の理由と reframed の捉え直しは
-// 状態遷移の証拠なので、状態と食い違う記録 (detected なのに捉え直しがある、
-// declined なのに理由が無い) を黙って通すと、review-triage-fix がどの回を
-// 未処理と読むかが記録から定まらなくなる。列挙外の status では専用キーの検査を
-// 重ねない — 1 つの誤字が複数の問題になる (plans の status と同じ扱い)。
-func recordRecurrenceProblems(f string, ri int, rec *recordRecurrence, verdictByID map[int]string, runs []recordRun, plansByRun []map[string]bool) []string {
-	var problems []string
-	runNo := ri + 1
-	add := func(format string, args ...any) {
-		problems = append(problems, f+": "+fmt.Sprintf("回 %d の recurrence: ", runNo)+fmt.Sprintf(format, args...))
-	}
-	// 回 1 には比べる過去の回が無い (recurrence-detection.md「過去の回が無い記録では判断しない」)。
-	// prior_run の範囲の検査に任せると「直前の回 (0)」という読めない文になるので、先に専用の文で弾く。
-	if runNo == 1 {
-		add("比べる過去の回が無いので書けません (回 1 では検知の判断そのものを行わない)")
-		return problems
-	}
-	if len(rec.Evidence) == 0 {
-		add("evidence がありません (検知の根拠は 1 件以上)")
-	}
-	for ei, ev := range rec.Evidence {
-		en := fmt.Sprintf("evidence[%d]", ei)
-		switch ev.Condition {
-		case "fix-derived", "same-location":
-		default:
-			add("%s: condition は fix-derived / same-location のいずれか: %q", en, ev.Condition)
-		}
-		// 根拠が指す採択。検知は今回の採択と過去を照らすものなので、採択でない指摘や
-		// 存在しない id を根拠にした検知は誤検知か書き誤り。
-		v, ok := verdictByID[ev.FindingID]
-		switch {
-		case !ok:
-			add("%s: finding_id %d は同じ回の findings にありません", en, ev.FindingID)
-		case v != "adopted":
-			add("%s: finding_id %d は採択 (adopted) ではありません (verdict %s)。検知の根拠は採択だけを指す", en, ev.FindingID, v)
-		}
-		// 比べる相手は直前の 1 回 (recurrence-detection.md)。より前の回を指す根拠を通すと、
-		// 俯瞰の第 1 段の図に途中の回を飛ばした辺が描かれる。
-		priorRunOK := ev.PriorRun == runNo-1
-		if !priorRunOK {
-			add("%s: prior_run %d は直前の回 (%d) ではありません (比べる相手は直前の 1 回)", en, ev.PriorRun, runNo-1)
-		}
-		for _, kv := range []struct{ key, val string }{{"prior", ev.Prior}, {"reason", ev.Reason}} {
-			if strings.TrimSpace(kv.val) == "" {
-				add("%s: %s がありません", en, kv.key)
-			}
-		}
-		// fix-derived の prior は比べた回の何かを指す参照で、比べた回の状態で形が決まる。
-		// 形の正本は recurrence-detection.md「直前の回の状態と主の条件」の表 — ここでは
-		// 言い直さず、その表どおりかを照合する。正本に無い形の根拠は書き誤りで、
-		// review-triage-fix が俯瞰で辿る先を失う。same-location の prior は採択を指す
-		// 自由な文字列なので、空でないことだけを見る。prior_run が直前でなければ比べる回が
-		// 定まらないので、この照合は行わない (上で報告済み)。
-		if ev.Condition == "fix-derived" && priorRunOK && strings.TrimSpace(ev.Prior) != "" {
-			priorRun := runs[ev.PriorRun-1]
-			priorReframed := priorRun.Recurrence != nil && priorRun.Recurrence.Status == "reframed"
-			switch {
-			case priorReframed && ev.Prior != "捉え直し":
-				add("%s: 比べた回 %d は捉え直し済みなので prior は 捉え直し と書く: %q (形の正本は recurrence-detection.md の表)", en, ev.PriorRun, ev.Prior)
-			case !priorReframed && !plansByRun[ev.PriorRun-1][ev.Prior]:
-				add("%s: prior %q は回 %d の plans にありません (形の正本は recurrence-detection.md の表)", en, ev.Prior, ev.PriorRun)
-			}
-		}
-	}
-	// 状態と専用キーの排他。
-	noDeclinedReason := func() {
-		if rec.DeclinedReason != "" {
-			add("status %s なのに declined_reason %q があります。declined_reason は status declined 専用", rec.Status, rec.DeclinedReason)
-		}
-	}
-	noReframe := func() {
-		if rec.Reframe != nil {
-			add("status %s なのに reframe があります。reframe は status reframed 専用", rec.Status)
-		}
-	}
-	switch rec.Status {
-	case "detected":
-		noDeclinedReason()
-		noReframe()
-	case "declined":
-		noReframe()
-		if strings.TrimSpace(rec.DeclinedReason) == "" {
-			add("status declined には declined_reason (繰り返しではないと判断した理由) が必須")
-		}
-	case "reframed":
-		noDeclinedReason()
-		rf := rec.Reframe
-		if rf == nil {
-			add("status reframed には reframe (合意した捉え直し) が必須")
-			break
-		}
-		for _, kv := range []struct{ key, val string }{
-			{"pattern", rf.Pattern}, {"axes", rf.Axes}, {"root_cause", rf.RootCause}, {"fix_unit", rf.FixUnit},
-		} {
-			if strings.TrimSpace(kv.val) == "" {
-				add("reframe.%s がありません (捉え直しの 4 項目は必須)", kv.key)
-			}
-		}
-		switch rf.Source {
-		case "human", "skill":
-		default:
-			add("reframe.source は human / skill のいずれか: %q", rf.Source)
-		}
-	default:
-		add("status は detected / declined / reframed のいずれか: %q", rec.Status)
 	}
 	return problems
 }
@@ -885,9 +812,9 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			b.WriteString(recordRow(renderFindingCells(fd)))
 		}
 
-		// 検知は修正計画の前に起きる (俯瞰は束ねる前) ので、修正計画より前に出す。
-		// 推移の表には列を足さない — 収束の判断材料は件数で、検知はその回の文脈。
-		// 無い回には出さない (無いことが「検知なし」の表現)。
+		// 旧様式の検知の項目。既存の生成サマリを書き換えないよう、位置 (修正計画の前)
+		// と文面を変えない。推移の表にも列を足さない。無い回には出さない (検知を
+		// 廃止した後の回は常に無い)。
 		if run.Recurrence != nil {
 			b.WriteString("\n### 検知\n\n")
 			renderRecurrence(&b, run.Recurrence)
@@ -903,6 +830,12 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			for _, pl := range run.Plans {
 				b.WriteString(recordRow(renderPlanCells(pl)))
 			}
+			// 調査済み・未立案 (investigated) の注記。段 1 (調査) の結果だけがあり、修正方法と
+			// 順序をまだ持たない問題が残っている回にだけ、表の下に件数と問題 id を出す。
+			// 無い回には 1 バイトも出さず、推移の表にも列を足さない — 鮮度の検査が描画結果の
+			// 全文一致なので、無い記録の出力が変わると置き場の既存サマリがすべて古いと
+			// 報告される (旧様式の検知の小節と同じ形)。
+			renderInvestigatedNote(&b, run.Plans)
 			for _, pl := range run.Plans {
 				if pl.Status == "awaiting-human" {
 					fmt.Fprintf(&b, "\n- **%s は選択待ち (人間が選ぶ)**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Options))
@@ -1001,15 +934,39 @@ func renderPlanCells(pl recordPlan) []string {
 	case pl.AppliedExternalURL != "":
 		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
+	// 修正方法の欄。investigated (と人間が立案する待ちの awaiting-human) は approach を
+	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す — 空のセルは書き忘れと
+	// 区別できない。approach を持つ状態の行は変わらない。
+	approach := "—"
+	if pl.Approach != "" {
+		approach = recordCell(pl.Approach)
+	}
 	return []string{
 		recordCell(pl.ProblemID),
 		recordCell(pl.Cause),
 		strings.Join(ids, " "),
-		recordCell(pl.Approach),
+		approach,
 		order,
 		recordStatusJa(pl.Status),
 		sha,
 	}
+}
+
+// renderInvestigatedNote は調査済み・未立案 (status investigated) の問題の件数と id を
+// 修正計画の表の下に 1 行で出す。該当する問題が無ければ何も書かない。件数はここで
+// 数える — 人が書いた集計をどこからも読まない (推移の表と同じ)。
+func renderInvestigatedNote(b *strings.Builder, plans []recordPlan) {
+	var ids []string
+	for _, pl := range plans {
+		if pl.Status == "investigated" {
+			ids = append(ids, recordCell(pl.ProblemID))
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案 (段 2) から続ける\n",
+		len(ids), strings.Join(ids, ", "))
 }
 
 // renderInvestigation は調査の範囲と結果を 1 行にする。included / excluded が
@@ -1036,8 +993,9 @@ func renderInvestigation(inv *recordInvestigation) string {
 	return s
 }
 
-// renderRecurrence は検知の状態・根拠・捉え直しを箇条書きで出す。自由文字列は
-// すべて recordCell を通す — 表の外でも、縦棒や改行が入ると次の行の構造を壊す。
+// renderRecurrence は旧様式の検知の項目 (状態・根拠・判断した理由・reframe) を
+// 箇条書きで出す。自由文字列はすべて recordCell を通す — 表の外でも、縦棒や改行が
+// 入ると次の行の構造を壊す。
 func renderRecurrence(b *strings.Builder, rec *recordRecurrence) {
 	fmt.Fprintf(b, "- 状態: %s\n", recordRecurrenceStatusJa(rec.Status))
 	for _, ev := range rec.Evidence {
@@ -1107,6 +1065,8 @@ func recordVerdictJa(v string) string {
 
 func recordStatusJa(s string) string {
 	switch s {
+	case "investigated":
+		return "調査済み"
 	case "pending":
 		return "未着手"
 	case "awaiting-human":

@@ -16,7 +16,7 @@
 
 ## スキーマ
 
-YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行を 1 要素として**追記する**。**書き換えない範囲は `findings` と判定 (帰結・評価・verdict) — 誤りは後の回の `notes` で訂正する。** **`plans` の各キーの更新**と、`findings` への `plan_ref` の追記、**`recurrence` の `status` / `declined_reason` / `reframe` の更新**だけは例外で、受け渡しの契約の一部として `review-triage-fix` が書き換える (各キーの意味は `plans[]` のスキーマ表、状態は状態の表、`plan_ref` は `findings[]` の該当行、`recurrence` は検知のスキーマ表のとおり)。**ここで `plans` のキーを個別に数え上げない** — キーを足すたびにこの文の列挙も更新する必要が生じ、スキーマ表とこの文の片方だけが更新されて、もう片方が気づかれないまま古くなる (実測: `done-external` の追加で `applied_external_url` / `notes` がこの文から漏れた)。機械検査 (`review-triage-record`) は必須キー・列挙値・参照の整合を検査し、未知のキーを報告する。
+YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行を 1 要素として**追記する**。**書き換えない範囲は `findings` と判定 (帰結・評価・verdict) — 誤りは後の回の `notes` で訂正する。** **`plans` の各キーの更新**と、`findings` への `plan_ref` の追記だけは例外で、受け渡しの契約の一部として `review-triage-fix` が書き換える (各キーの意味は `plans[]` のスキーマ表、状態は状態の表、`plan_ref` は `findings[]` の該当行のとおり)。**ここで `plans` のキーを個別に数え上げない** — キーを足すたびにこの文の列挙も更新する必要が生じ、スキーマ表とこの文の片方だけが更新されて、もう片方が気づかれないまま古くなる (実測: `done-external` の追加で `applied_external_url` / `notes` がこの文から漏れた)。機械検査 (`review-triage-record`) は必須キー・列挙値・参照の整合を検査し、未知のキーを報告する。
 
 **記録では行内コメント (` #` 以降) を使わない。** YAML の素のスカラーは半角スペースに続く `#` 以降をコメントとして取り除くため、値が警告なく切り詰められる (実測で原因の記述が丸ごと消えた)。記録はスキルが機械的に追記するのでコメントの用途も無い。値に `#` を含めるときは引用符で囲む。行内コメントは位置を問わず (引用符付きの値の後ろも含めて) `review-triage-record` 検査が検出する。行頭だけのコメント行は値を壊さないので対象外。
 
@@ -33,7 +33,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `head` | ✓ | レビュー時点の HEAD (短縮 SHA)。レビューは報告のみで走らせ、実行前後で変わらないこと |
 | `findings` | ✓ | 指摘ごとの記録 (下記)。**全件を残す** — 却下だけ残すと却下率も判断の分布も再構成できない |
 | `plans` | | 修正計画 (下記)。`review-triage-fix` が追記する。採択 0 件なら無い |
-| `recurrence` | | 検知 (下記) — 同じ型の指摘が続いていることの検知と、その後の捉え直し。`review-triage` が書き、`review-triage-fix` が更新する。**無いことは「検知なし」を意味する** (項目の無い過去の記録はそのまま検査を通る) |
+| `recurrence` | | 旧様式のキー。検知 (廃止した、同じ型の指摘が続いているかの判断) の項目で、**新しい回には書かない**。過去の記録に残る分は、検査が形 (許可キーと値の有無) だけを見る。生成サマリの「検知」の節は、この項目を持つ回にだけ出る |
 | `notes` | | 観察・過去の回の訂正など自由記述 |
 
 ### 指摘 (`findings[]`)
@@ -47,7 +47,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `audience` | ✓ | 判定に使った被害者 (上書き後の最終値) |
 | `audience_initial` | | 設定から決まった初期値。上書きしたときだけ残す |
 | `consequence` | ✓ | 帰結の 4 項目: `condition` / `who` / `what` / `detectability` (すべて必須)。意味の正本は [判定フロー](judgment-flow.md) の D3 |
-| `premise_check` | ✓ | 根拠の検証: `stages` (`none` / `A` / `A+B`) と `result`。**`result` のトークンの意味の正本は [根拠の検証](premise-check.md) の冒頭の表** (機械検査は同じ列挙を検査する)。`stages: none` のときだけ `result: skipped` |
+| `premise_check` | ✓ | 根拠の検証: どこまで照合したか (`stages`: `none` = 照合なし / `A` = コードとの照合 / `A+B` = コード・仕様・設計との照合) と `result`。**`result` のトークンの意味の正本は [根拠の検証](premise-check.md) の「記録に残す値」** (機械検査は同じ列挙を検査する)。`stages: none` のときだけ `result: skipped` |
 | `gates_fired` | | 引っかかったゲート id の列。無ければ省略 (空とみなす) |
 | `verdict` | ✓ | `adopted` (採択) / `held` (保留) / `rejected` (却下) |
 | `verdict_reason` | ✓ | 判定の経路 — どのノードでどう決まったか。ノード ID の正本は [判定フロー](judgment-flow.md) |
@@ -61,12 +61,12 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `problem_id` | ✓ | 回の中で一意な識別子 (例: `P1`) |
 | `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** (基準の正本は [grouping.md](../../review-triage-fix/references/grouping.md)) |
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
-| `approach` | ✓ | 何をどう直すか |
-| `investigation` | | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。** 「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
+| `approach` | △ | 何をどう直すか。書く条件は状態で決まる — **`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の答えの後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する — 段 1 (`review-triage-fix` の調査の段) の結果に立案の中身が混ざると、どの段が書いたかを記録から読めなくなる) |
+| `investigation` | △ | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。`investigated` では必須** (無ければ検査が報告する — 調査済みの状態と矛盾するため。調べたなら `scope` を書き、まだなら `plans` に載せない)。「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
-| `order` | | コミットの順序 |
+| `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
 | `depends_on` | | 依存する問題の `problem_id` |
-| `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空** |
+| `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空**。**1 つのコミットが複数の問題を覆ったときは、覆われた問題すべてに同じ短縮 SHA を書く** (起きる条件の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 の「人間の答えの反映」) |
 | `applied_external_url` | | リポジトリ外の反映先の URL。**`status: done-external` 専用 — 他の状態では空** |
 | `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` 専用 — 他の状態では空。`applied_external_url` が無いとき必須** |
 | `status` | ✓ | 下の表のとおり |
@@ -97,68 +97,19 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
         status: pending
 ```
 
-### 検知 (`runs[].recurrence`)
-
-同じ型の指摘が続いていることの検知と、その後の捉え直しを、回の直下に 1 つの構造で持つ。用語 (修正由来の指摘・捉え直し) の正本は [CONCEPTS.md](../../../../CONCEPTS.md) の「レビューの収束」。検知の判断の手順は `review-triage` の参照文書、俯瞰と捉え直しの手順は `review-triage-fix` の参照文書が正本で、この表は記録の形だけを定める。
-
-| キー | 必須 | 内容 |
-| --- | --- | --- |
-| `status` | ✓ | `detected` (検知した。未処理) / `declined` (人間が繰り返しではないと判断した) / `reframed` (捉え直しに合意した)。`review-triage` は `detected` で書き、`review-triage-fix` が `declined` か `reframed` に更新する。`detected` のまま残っている回は未処理として扱う |
-| `evidence` | ✓ | 検知の根拠 (下記)。1 件以上。**自由記述 1 つにしない** — 誤検知を後から監査する経路がこれしかない |
-| `declined_reason` | △ | 繰り返しではないと判断した理由。**`status: declined` のとき必須、他の状態では空** |
-| `reframe` | △ | 合意した捉え直し (下記)。**`status: reframed` のとき必須、他の状態では書かない** |
-
-**キーだけ書いて値を省いた形 (`recurrence:` の後に何も無い) は検査が報告する** — YAML では null になり「無い」と同じに読まれるので、書いたつもりの検知が気づかれないまま「検知なし」として扱われる (`investigation` と同じ)。
-
-### 根拠 (`recurrence.evidence[]`)
-
-| キー | 必須 | 内容 |
-| --- | --- | --- |
-| `condition` | ✓ | 発火した条件。`fix-derived` (修正由来の指摘が続いた) / `same-location` (同じ場所への採択が続いた) |
-| `finding_id` | ✓ | 今回の採択の `id`。同じ回の `verdict: adopted` の指摘だけを指せる (機械検査が保証する) |
-| `prior_run` | ✓ | 比べた回の番号 (同じファイル内の 1 始まりの回番号)。**直前の回 (自回 - 1) に限る** — 比べる相手は直前の 1 回 (規則の正本は [recurrence-detection.md](recurrence-detection.md))。機械検査が照合する。回 1 には過去の回が無いので `recurrence` を書けない |
-| `prior` | ✓ | 比べた先。`condition` と比べた回の状態で形が決まる — `fix-derived` は、比べた回が捉え直し済み (`reframed`) なら `捉え直し`、そうでなければ比べた回の問題の識別子 (例: `P6`)。どちらも機械検査が照合し、もう一方の形は通らない。`same-location` は採択を指す文字列 (例: `指摘 3`)。書き分けの正本は [recurrence-detection.md](recurrence-detection.md) の「直前の回の状態と主の条件」の表 |
-| `reason` | ✓ | なぜ同じ型と読んだかの 1 文 |
-
-### 捉え直し (`recurrence.reframe`)
-
-| キー | 必須 | 内容 |
-| --- | --- | --- |
-| `pattern` | ✓ | 繰り返しの型の名前 |
-| `axes` | ✓ | 同じ入力が別々に処理される軸 (例: `規則 × 経路 × フラグ`) |
-| `root_cause` | ✓ | 根本の原因 |
-| `fix_unit` | ✓ | 修正の単位。`review-triage-fix` は指摘ごとの原因よりこれを優先して束ねる |
-| `source` | ✓ | `human` (人間の確認から出た) / `skill` (スキルの見立てから出て、人間が認めた)。見立て由来を後から区別するために残す |
-
-```yaml
-    recurrence:
-      status: reframed
-      evidence:
-        - condition: fix-derived
-          finding_id: 1
-          prior_run: 2
-          prior: P6
-          reason: 回 2 の P6 で直した経路の隣の経路に同じ規則を当て忘れた
-      reframe:
-        pattern: 経路によって契約が違う
-        axes: 規則 × 経路 × フラグ
-        root_cause: 規則を経路ごとに書いていて、1 か所で当てていない
-        fix_unit: 分岐の前で規則を 1 か所で当て、経路ごとの特例を外す
-        source: human
-```
-
 ### 状態 (`status`)
 
 「SHA が空」のような読み手の解釈に依存する状態表現を使わず、状態は必ずこの列挙で書く。
 
 | 値 | 意味 | 再開時の扱い |
 | --- | --- | --- |
-| `pending` | 未着手 | 続きから実装する |
-| `awaiting-human` | 設計判断を人間に返した選択待ち | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない |
+| `investigated` | 調査済み・未立案 — `review-triage-fix` の段 1 (調査) の結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 段 2 (立案) から続ける (再開の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
+| `pending` | 未着手 — 修正方法と順序が決まっている | 段 3 (修正) から続ける (同上) |
+| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の待ちも同じ状態で表す — 選択と `options` に書くものの正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の答えは `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |
 
-`review-triage-fix` は全回の `plans` を 1 パスで見て、`pending` / `awaiting-human` が残っていれば回数を問わず報告する。報告しないと、人間が回答しないまま回が進んだとき、エスカレーションされた判断が気づかれないまま消える。
+`review-triage-fix` は全回の `plans` を 1 パスで見て、`investigated` / `pending` / `awaiting-human` が残っていれば回数を問わず報告する。報告しないと、人間が回答しないまま回が進んだとき、エスカレーションされた判断が気づかれないまま消える。段の名前と手順の対応の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順。
 
 ### リポジトリ外への反映 (`done-external`)
 
@@ -188,11 +139,21 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 冒頭の**推移の表** (回ごとの全件 / 採択 / 保留 / 却下・model・scope) が収束の判断材料になる。
 
 - **同じ scope どうしで比べる。** 全量レビューは増分より多く出るのが普通。
-- **採択が減らない・同種の指摘が続くときは、修正を続けずに構造を疑う。** 文書の重複 (`doc-dag` skill で確認できる) と、規範文書に書いた実測値が典型的な発生源。1 回目の試行では、終盤 10 件中 8 件が前ラウンドの修正由来だった。
-- **同じ型の指摘が続いているかは `review-triage` が検知し、記録の `recurrence` に残す。** 条件と実例の正本は [recurrence-detection.md](recurrence-detection.md)。
+- **採択が減らない・同種の指摘が続くときは、修正を続けずに構造を疑う。** 文書の重複 (`doc-dag` skill で確認できる) と、規範文書に書いた実測値が典型的な発生源。1 回目の試行では、終盤 10 件中 8 件が前の回の修正で生じた指摘だった。
 - **却下がゲートごとに出ているかを見る。** どのゲートも発火しないなら、そのゲートは対象の種類に対して機能していない可能性がある。
 - **同じ指摘が複数回出ていないかを見る。** 前回却下したものが再び出たなら、却下の理由が上流に伝わっていない。
+- **`investigated` (調査済み・未立案) の問題がある回にだけ、修正計画の表の下に注記 (件数と問題 id) が出る。推移の表には列を足さない。** 段 1 (調査) の後で止まった記録の目印で、`review-triage-fix` を再び走らせると段 2 (立案) から続く (状態の表の「再開時の扱い」)。
 - **モデルとスキルの使い分けは、記録の `model` / `scope` 列から更新する。** このブランチの記録の傾向では、実害系の検出は Opus が、収束確認 (0 件に到達させる仕上げ) は粒度の粗い Sonnet が向いた。最上位モデルの全量レビューを収束条件にすると、テスト強化系の指摘が出続けて終わらない。範囲の規則 (full は最初と最終確認のみ) と依頼の様式は [レビューの依頼の様式](review-request.md) が正本。
+
+## 書いた後にすること
+
+**この節が、記録 (YAML) に書いた後の手順の正本。** `review-triage` も `review-triage-fix` も、記録に書いたらここに従う。
+
+1. **設定の `triage_summary_command` でサマリを再生成する。** 置き場が git の追跡内かどうかに関わらず行う — 再生成しないと、記録と生成サマリが食い違ったまま残り、次に検査を走らせた人が壊れた記録と見分けられない。**再生成は置き場の全記録に及ぶが、内容が変わるのは書いた記録のサマリだけである** (同梱ツールの挙動の正本は [README](../../../tools/triagecheck/README.md))。
+2. **設定の `triage_check_command` の検査が通ることを確かめる。** 通らなければ、直すか、直せなければ報告して止める。
+3. **置き場が git の追跡内なら、記録とサマリをコミットする** (要否と分け方は下の「コミット」の節)。
+
+**未設定のコマンドは走らせず、走らせていないことを報告に書く** (未設定のときの扱いの正本は [project-config.md](project-config.md))。「検査で問題が出なかった」と「検査を走らせていない」は別の事実である。
 
 ## コミット
 

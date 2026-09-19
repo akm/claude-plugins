@@ -8,7 +8,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 | 検査 | 内容 |
 | --- | --- |
-| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・検知 (`recurrence`) の状態と根拠の整合 (根拠が同じ回の採択と直前の回を指すこと、修正由来の根拠の `prior` が、比べた回が捉え直し済みなら `捉え直し`、そうでなければ比べた回の修正計画を指すこと、状態ごとの専用キー)・生成サマリの鮮度 |
+| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
 **記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定の置き場 `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して止まり、`.gitignore` は変えない — 正本は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。
@@ -36,13 +36,15 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 | `-record-dir` | ✓ | 記録の置き場。末尾のスラッシュは補う |
 | `-current-dir` | △ | 相対パスを解決する基準。**相対パスを渡すとき必須** |
 | `-judgment-flow` | | 判定フローの正本のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
-| `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す |
+| `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す。**対象は置き場の全記録** (1 ファイルだけを指定する手段は無い) |
 | `-install-wrapper` | | 検査せず、呼び出し用のラッパースクリプトを書き出す。相対パスなら `-current-dir` も要る |
 | `-summary-command` | | サマリの再生成手段として案内する文字列。既定は `triagecheck -write-summary` (`-install-wrapper` では `-current-dir` から見たラッパーの相対パス) |
 
 **パスの規則は 3 つの経路 (検査 / `-write-summary` / `-install-wrapper`) で同じ。** 規則は経路で分岐する前に 1 か所で当てるので、どの経路でも「パスの渡し方」と「対象が見つからないとき」の節がそのまま成り立つ。
 
 **`-install-wrapper` は `-write-summary` と併用できない** (何を書き出すかが食い違うため、指定するとエラーになる)。`-write-summary=false` は「生成しない」という既定の挙動と同じなので通る。
+
+**`-write-summary` は置き場の全記録のサマリを書き直す。** 内容が変わらないファイルも書き出すので、**更新時刻は全ファイルで変わる。** 何が変わったかは**内容で見る** — git の差分に出るのは内容が変わったものだけなので、追跡内の置き場でも、コミットの対象は書き換わった記録のサマリだけになる。「既存の記録とサマリを書き換えない」ことを確かめるときも、更新時刻ではなく内容 (ハッシュや `git status`) で見る。
 
 ### 再生成コマンドの案内 (-summary-command)
 
