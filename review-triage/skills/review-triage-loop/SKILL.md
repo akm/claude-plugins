@@ -17,7 +17,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 
 ## 手順
 
-**周回の順序・分岐・優先・止まる条件は [references/loop-flow.md](references/loop-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (G0・G2・G3・L1・L2・J2・J4・J5・J7・F1・S2〜S5) はそこを指す。
+**周回の順序・分岐・優先・止まる条件は [references/loop-flow.md](references/loop-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (G0・G2・G3・L1・L2・J2・J4・J5・J7・J8・F1・S2〜S5) はそこを指す。
 
 1. **設定と引数を読む** (G0): `.claude/akm-claude-plugins/review-triage/config.json` の `loop` を読み、引数で上書きする (キーと既定値の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」。引数の様式は [references/arguments.md](references/arguments.md))。
    - **`review_skill` が引数でも設定でも未設定なら、人間に尋ねる** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
