@@ -22,7 +22,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 1. **設定と引数を読む** (G0): `.claude/akm-claude-plugins/review-triage/config.json` の `loop` を読み、引数で上書きする (キーと既定値の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」。引数の様式は [references/arguments.md](references/arguments.md))。
    - **`review_skill` が引数でも設定でも未設定なら、人間に尋ねる** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
    - **回数の閾値 N (`--threshold`、設定は `fix.threshold_rounds`) は周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味・決め方・検査の正本は [review-triage-fix の arguments.md](../review-triage-fix/references/arguments.md))。
-   - **段の走らせ方 (`--stage`、設定は `fix.stages`) も同じく周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせた段の検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。周回は段の sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
+   - **段 (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の走らせ方 (`--stage`、設定は `fix.stages`) も同じく周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせた段の検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。周回は段の sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
    - 決まった条件を周回の開始前に報告する (書くものは決定表の G0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
 2. **入口の関門** (G2・G3): 記録 YAML を読み (置き場は設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)、図の順に判定する。各ノードの条件・行き先・止まるときの報告は、図と決定表が正本。
 3. **周回** (L1 → S2〜S5): 図に従って回す。各ノードで行うことと見る場所は決定表のとおり。**各回の冒頭で、いま何回目かと上限を報告する** (L1)。

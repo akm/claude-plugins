@@ -1,6 +1,6 @@
 # 段を sub-agent で走らせる
 
-**このファイルが、`review-triage-fix` の段 (調査 / 立案 / 修正) を sub-agent で走らせるときの、走らせ方の決定・依頼文・呼び出し側の検証の正本。** 段の中身の規範 (調査の 2 方向・束ねる基準・順序・検証の観点 A〜F・機械検査の関門・1 問題 1 コミット) は [SKILL.md](../SKILL.md) の手順と references/ 配下の各文書が正本で、ここでは言い直さない — sub-agent で走らせても、その段の規範は変わらない。設定と引数の様式・優先順位・値の検査は [arguments.md](arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」が正本。effort ごとの agent 定義 (`review-triage/agents/` の 6 ファイル) の中身は各定義が正本。
+**このファイルが、`review-triage-fix` の段 (調査 / 立案 / 修正。定義と手順との対応の正本は [SKILL.md](../SKILL.md) の「手順」の冒頭) を sub-agent で走らせるときの、走らせ方の決定・依頼文・呼び出し側の検証の正本。** 段の中身の規範 (調査の 2 方向・束ねる基準・順序・検証の観点 A〜F・機械検査の関門・1 問題 1 コミット) は [SKILL.md](../SKILL.md) の手順と references/ 配下の各文書が正本で、ここでは言い直さない — sub-agent で走らせても、その段の規範は変わらない。設定と引数の様式・優先順位・値の検査は [arguments.md](arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」が正本。effort ごとの agent 定義 (`review-triage/agents/` の 6 ファイル) の中身は各定義が正本。
 
 ## なぜ段ごとに sub-agent に出せるか
 

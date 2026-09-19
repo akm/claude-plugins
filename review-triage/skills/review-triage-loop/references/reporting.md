@@ -7,7 +7,7 @@
 1. **止まった理由** — どの停止ノード (S2〜S5) で止まったか (正本は [loop-flow.md](loop-flow.md))。
 2. **回った回数と上限** — 「3 回 / 上限 5 回」の形。この起動でレビューを 1 回も走らせずに止まった (回した回数が 0) ときは「0 回 / 上限 5 回」と書き、推移は出さない。
 3. **採択件数の回ごとの推移** — 下記。
-4. **周回の条件** — レビュースキル・そのオプション・実効モデル (定義の正本は [review-invocation.md](review-invocation.md) の「実効モデル」)、および `review-triage-fix` に渡した回数の閾値 N (引数 `--threshold`、設定 `fix.threshold_rounds`。意味と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) と段ごとの走らせ方 (引数 `--stage`、設定 `fix.stages`。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md))。手順 1 (決定表 G0) で報告したものと同じ値。**各回で実際にどう走らせたかは、各回の `review-triage-fix` の報告 (手順 8) が持つ** — 回 N+1 以降の段 2 は立案者の選択で決まるので、条件として出した走らせ方と回ごとの実態は一致しないことがある。
+4. **周回の条件** — レビュースキル・そのオプション・実効モデル (定義の正本は [review-invocation.md](review-invocation.md) の「実効モデル」)、および `review-triage-fix` に渡した回数の閾値 N (引数 `--threshold`、設定 `fix.threshold_rounds`。意味と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) と段 (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭) ごとの走らせ方 (引数 `--stage`、設定 `fix.stages`。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md))。手順 1 (決定表 G0) で報告したものと同じ値。**各回で実際にどう走らせたかは、各回の `review-triage-fix` の報告 (手順 8) が持つ** — 回 N+1 以降の段 2 は立案者の選択で決まるので、条件として出した走らせ方と回ごとの実態は一致しないことがある。
 5. **残っているもの** — 調査済み (`status: investigated`) と未着手 (`status: pending`) の問題があれば、その回と識別子。**止まった理由を問わず出す** — 周回の後に残ったものは次の周回か人間が引き継ぐので、報告に無いと引き継ぎ先が知る手段が無い。
 
 ## 採択件数の推移

@@ -61,7 +61,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `problem_id` | ✓ | 回の中で一意な識別子 (例: `P1`) |
 | `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** (基準の正本は [grouping.md](../../review-triage-fix/references/grouping.md)) |
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
-| `approach` | △ | 何をどう直すか。書く条件は状態で決まる — **`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の答えの後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する — 段 1 の結果に立案の中身が混ざると、どの段が書いたかを記録から読めなくなる) |
+| `approach` | △ | 何をどう直すか。書く条件は状態で決まる — **`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の答えの後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する — 段 1 (`review-triage-fix` の調査の段) の結果に立案の中身が混ざると、どの段が書いたかを記録から読めなくなる) |
 | `investigation` | △ | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。`investigated` では必須** (無ければ検査が報告する — 調査済みの状態と矛盾するため。調べたなら `scope` を書き、まだなら `plans` に載せない)。「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
