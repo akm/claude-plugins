@@ -47,7 +47,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `audience` | ✓ | 判定に使った被害者 (上書き後の最終値) |
 | `audience_initial` | | 設定から決まった初期値。上書きしたときだけ残す |
 | `consequence` | ✓ | 帰結の 4 項目: `condition` / `who` / `what` / `detectability` (すべて必須)。意味の正本は [判定フロー](judgment-flow.md) の D3 |
-| `premise_check` | ✓ | 根拠の検証: `stages` (`none` / `A` / `A+B`) と `result`。**`result` のトークンの意味の正本は [根拠の検証](premise-check.md) の冒頭の表** (機械検査は同じ列挙を検査する)。`stages: none` のときだけ `result: skipped` |
+| `premise_check` | ✓ | 根拠の検証: どこまで照合したか (`stages`: `none` = 照合なし / `A` = コードとの照合 / `A+B` = コード・仕様・設計との照合) と `result`。**`result` のトークンの意味の正本は [根拠の検証](premise-check.md) の「記録に残す値」** (機械検査は同じ列挙を検査する)。`stages: none` のときだけ `result: skipped` |
 | `gates_fired` | | 引っかかったゲート id の列。無ければ省略 (空とみなす) |
 | `verdict` | ✓ | `adopted` (採択) / `held` (保留) / `rejected` (却下) |
 | `verdict_reason` | ✓ | 判定の経路 — どのノードでどう決まったか。ノード ID の正本は [判定フロー](judgment-flow.md) |
