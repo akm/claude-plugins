@@ -18,4 +18,4 @@
 
 ## 順序を決めたら理由を書く
 
-**なぜその順なのかを 1 文で、記録の `plans[].approach` か `notes` に書く。**「正本が先」だけでは、後から読んだときに何が正本か分からない。
+**なぜその順なのかを 1 文で、記録の `plans[].approach` に書く。** `notes` は使わない — `status: done-external` 専用の欄で、他の状態で書くと記録の検査が弾く (様式の正本は [record-schema.md](../../review-triage/references/record-schema.md) の `plans[]` の表)。「正本が先」だけでは、後から読んだときに何が正本か分からない。
