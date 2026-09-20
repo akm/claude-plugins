@@ -5,7 +5,7 @@ description: これから外へ出す日本語の文章から、説明のない�
 
 # wording-guard: 書いた本人に見えない言い回しを、原則から探す
 
-**書き手が自分の文章に混ぜた比喩・口語・擬人化は、書いた本人には見えない。** 指摘されて 1 語を直しても、同じ原則に反する別の語が残る。指摘と修正を 3 往復してようやく終わる、という事態はこうして起きる (実例は [references/kind-expansion.md](references/kind-expansion.md))。
+**書き手が自分の文章に混ぜた比喩・口語・擬人化は、書いた本人には見えない。** 指摘されて 1 語を直しても、同じ原則に反する別の語が残る。指摘と修正を 3 往復してようやく終わる、という事態はこうして起きる (実例はファイル [wording-guard/skills/wording-guard/references/kind-expansion.md](references/kind-expansion.md))。
 
 このスキルは、**見つけた 1 件から、その 1 件が反している原則と種類を言葉にし、同じ種類の他の表現を対象全体から探す**。語の一覧との照合ではない。
 
@@ -25,9 +25,9 @@ description: これから外へ出す日本語の文章から、説明のない�
    - 引数が無いとき: ブランチで変更した Markdown (コマンド `git diff --name-only main...HEAD -- '*.md'`) と、未コミットの変更 (コマンド `git status --porcelain`) にある Markdown。
    - これから外へ出す文章の下書き (PR 本文・Issue 本文・レビューコメント・コミットメッセージ) を渡されたとき: その下書き。
 
-   あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む ([references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印がデフォルトになるだけ。対象と設定の有無を報告してから次へ進む。
+   あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む (ファイル [wording-guard/skills/wording-guard/references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印がデフォルトになるだけ。対象と設定の有無を報告してから次へ進む。
 
-   **直すのは、今回の変更で持ち込んだ文章だけにする。** 上の 2 つのコマンドはファイル名しか返さないので、対象のファイルごとに変更行を見る — コマンド `git diff main...HEAD -- <パス>` と、未コミット分のコマンド `git diff HEAD -- <パス>`。差分の外にある記述は直さず、報告に留める ([references/rewrite-scope.md](references/rewrite-scope.md))。
+   **直すのは、今回の変更で持ち込んだ文章だけにする。** 上の 2 つのコマンドはファイル名しか返さないので、対象のファイルごとに変更行を見る — コマンド `git diff main...HEAD -- <パス>` と、未コミット分のコマンド `git diff HEAD -- <パス>`。差分の外にある記述は直さず、報告に留める (ファイル [wording-guard/skills/wording-guard/references/rewrite-scope.md](references/rewrite-scope.md))。
 
 2. **規約から原則を読む。** 設定キー `convention_paths` が指す文書を読む。未設定のときはリポジトリのルートの `CLAUDE.md` を読む。規約が見つからないときは、**見つからなかったことと、次の 3 原則だけで判断することを報告してから**進む。**規約は見つかったが、これから直す文章の種類 (コミットメッセージ・PR 本文・レビューコメントなど) を対象に含めていないときも、そのことを報告してから進む** — その規約の原則を当てたうえで、次の 3 原則で補う。
 

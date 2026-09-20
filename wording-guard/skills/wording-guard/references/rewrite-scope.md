@@ -20,7 +20,7 @@
 
 他の文書の原文を引いている箇所は、原文のまま残す。書き換えると、読み手が原文を探しても見つからない。
 
-引用の目印は設定キー `quote_markers` ([project-config.md](project-config.md))。デフォルトは引用ブロック (`> ` で始まる行) とコードブロック。**目印が付いていない引用もある** — 鉤括弧で原文を引いている文は、読んで判断する。
+引用の目印は設定キー `quote_markers` (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。デフォルトは引用ブロック (`> ` で始まる行) とコードブロック。**目印が付いていない引用もある** — 鉤括弧で原文を引いている文は、読んで判断する。
 
 ### 2. 他の人が既に書いた文章
 

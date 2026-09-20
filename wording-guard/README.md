@@ -10,9 +10,9 @@
 
 ## 何を解決するか
 
-考え方と手順の正本は同梱の [SKILL.md](skills/wording-guard/SKILL.md) です。ここは要点だけを書きます。
+考え方と手順の正本は同梱のファイル [wording-guard/skills/wording-guard/SKILL.md](skills/wording-guard/SKILL.md) です。ここは要点だけを書きます。
 
-語を 1 つ指摘されて直しても、**同じ原則に反する別の語が残ります。** あるレビューコメントの下書きでは、プログラムやデータを主語にして人や物の動きを表す動詞が、人間が 3 回指摘するまで別の語で残り続けました (3 往復の記録は [kind-expansion.md](skills/wording-guard/references/kind-expansion.md) にあります)。
+語を 1 つ指摘されて直しても、**同じ原則に反する別の語が残ります。** あるレビューコメントの下書きでは、プログラムやデータを主語にして人や物の動きを表す動詞が、人間が 3 回指摘するまで別の語で残り続けました (3 往復の記録はファイル [wording-guard/skills/wording-guard/references/kind-expansion.md](skills/wording-guard/references/kind-expansion.md) にあります)。
 
 このスキルは、見つけた 1 件から**種類** (他の表現に当てはめて判定できる 1 文) を書き、その種類で対象全体を探し直します。**語の一覧との照合ではありません。** 一覧を範囲にすると、一覧に無い表現が検査されないまま残るためです。
 
@@ -24,7 +24,7 @@
 - **他の人が既に書いた文章** — 今回の変更で持ち込んだものだけを直します。**規範文書が使っていることは、自分が使ってよい理由になりません。**
 - **過去の記録** — 検討の記録・完了した計画・逐語引用のトリアージ記録。
 
-詳細は同梱の [rewrite-scope.md](skills/wording-guard/references/rewrite-scope.md) を参照してください。
+詳細は同梱のファイル [wording-guard/skills/wording-guard/references/rewrite-scope.md](skills/wording-guard/references/rewrite-scope.md) を参照してください。
 
 ## プロジェクト固有の設定 (任意)
 
@@ -44,7 +44,7 @@
 - `frozen_paths` — 書き換えない過去の記録のパス接頭辞。未設定なら書き換えないパスを無いものとし、過去の記録らしき文書が見つかったら人間に確認します。
 - `quote_markers` — 引用の目印になる行頭の文字列。**未設定なら引用ブロックとコードブロックを目印にします。** コードブロックは値を設定しても目印のままです (行頭の文字列では表せないため)。
 
-詳細は同梱の [project-config.md](skills/wording-guard/references/project-config.md) を参照してください。
+詳細は同梱のファイル [wording-guard/skills/wording-guard/references/project-config.md](skills/wording-guard/references/project-config.md) を参照してください。
 
 ## 使い方
 
