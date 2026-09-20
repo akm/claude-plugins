@@ -27,7 +27,7 @@ description: これから外へ出す日本語の文章から、説明のない�
 
    あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む (ファイル [wording-guard/skills/wording-guard/references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印がデフォルトになるだけ。対象と設定の有無を報告してから次へ進む。
 
-   **直すのは、今回の変更で持ち込んだ文章だけにする。** 上の 2 つのコマンドはファイル名しか返さないので、対象のファイルごとに変更行を見る — コマンド `git diff main...HEAD -- <パス>` と、未コミット分のコマンド `git diff HEAD -- <パス>`。差分の外にある記述は直さず、報告に留める (ファイル [wording-guard/skills/wording-guard/references/rewrite-scope.md](references/rewrite-scope.md))。
+   **直すのは、今回の変更で持ち込んだ文章だけにする。** 上の 2 つのコマンドはファイル名しか返さないので、ファイルごとに範囲を決める — 追跡済みのファイルを一部だけ変えたときは変更行だけを対象にし (コマンド `git diff main...HEAD -- <パス>` と、未コミット分のコマンド `git diff HEAD -- <パス>` で見る)、**新しく作ったファイルは全体**を対象にし、削除されたファイルは対象にしない。差分の外にある記述は直さず、報告に留める (ファイル [wording-guard/skills/wording-guard/references/rewrite-scope.md](references/rewrite-scope.md))。
 
 2. **規約から原則を読む。** 設定キー `convention_paths` が指す文書を読む。未設定のときはリポジトリのルートの `CLAUDE.md` を読む。規約が見つからないときは、**見つからなかったことと、次の 3 原則だけで判断することを報告してから**進む。**規約は見つかったが、これから直す文章の種類 (コミットメッセージ・PR 本文・レビューコメントなど) を対象に含めていないときも、そのことを報告してから進む** — その規約の原則を当てたうえで、次の 3 原則で補う。
 
