@@ -27,7 +27,7 @@ description: これから外へ出す日本語の文章から、説明のない�
 
    あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む ([references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印が既定になるだけ。対象と設定の有無を報告してから次へ進む。
 
-   **直すのは、今回の変更で持ち込んだ文章だけにする。** 差分の外にある記述は直さず、報告に留める ([references/rewrite-scope.md](references/rewrite-scope.md))。
+   **直すのは、今回の変更で持ち込んだ文章だけにする。** 上の 2 つのコマンドはファイル名しか返さないので、対象のファイルごとに変更行を見る — コマンド `git diff main...HEAD -- <パス>` と、未コミット分のコマンド `git diff -- <パス>`。差分の外にある記述は直さず、報告に留める ([references/rewrite-scope.md](references/rewrite-scope.md))。
 
 2. **規約から原則を読む。** 設定キー `convention_paths` が指す文書を読む。未設定のときはリポジトリのルートの `CLAUDE.md` を読む。規約が見つからないときは、**見つからなかったことと、次の 3 原則だけで判断することを報告してから**進む。
 
