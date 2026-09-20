@@ -22,7 +22,7 @@ description: これから外へ出す日本語の文章から、説明のない�
 1. **対象と設定を確定して報告する。** 対象は次のいずれか。
 
    - 引数でパス (ファイルまたはディレクトリ) が指定されたとき: そのファイル群。
-   - 引数が無いとき: ブランチで変更した Markdown (`git diff --name-only main...HEAD -- '*.md'`) と、未コミットの変更 (`git status --porcelain`) にある Markdown。
+   - 引数が無いとき: ブランチで変更した Markdown (コマンド `git diff --name-only main...HEAD -- '*.md'`) と、未コミットの変更 (コマンド `git status --porcelain`) にある Markdown。
    - これから外へ出す文章の下書き (PR 本文・Issue 本文・レビューコメント・コミットメッセージ) を渡されたとき: その下書き。
 
    あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む ([references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印がデフォルトになるだけ。対象と設定の有無を報告してから次へ進む。
