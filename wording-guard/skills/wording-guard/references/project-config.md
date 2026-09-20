@@ -1,6 +1,6 @@
 # プロジェクト固有の設定
 
-このスキルは、リポジトリごとに違う 3 つのことを設定から読む。**設定が無くても実行できる** — 既定で進み、該当する場面で人間に確認する。
+このスキルは、リポジトリごとに違う 3 つのことを設定から読む。**設定が無くても実行できる** — デフォルトのまま進み、該当する場面で人間に確認する。
 
 置き場はファイル `.claude/akm-claude-plugins/wording-guard/config.json`。プラグイン [doc-dag](https://github.com/akm/claude-plugins/tree/main/doc-dag)・[commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の手順を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
 

@@ -25,7 +25,7 @@ description: これから外へ出す日本語の文章から、説明のない�
    - 引数が無いとき: ブランチで変更した Markdown (`git diff --name-only main...HEAD -- '*.md'`) と、未コミットの変更 (`git status --porcelain`) にある Markdown。
    - これから外へ出す文章の下書き (PR 本文・Issue 本文・レビューコメント・コミットメッセージ) を渡されたとき: その下書き。
 
-   あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む ([references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印が既定になるだけ。対象と設定の有無を報告してから次へ進む。
+   あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む ([references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印がデフォルトになるだけ。対象と設定の有無を報告してから次へ進む。
 
    **直すのは、今回の変更で持ち込んだ文章だけにする。** 上の 2 つのコマンドはファイル名しか返さないので、対象のファイルごとに変更行を見る — コマンド `git diff main...HEAD -- <パス>` と、未コミット分のコマンド `git diff -- <パス>`。差分の外にある記述は直さず、報告に留める ([references/rewrite-scope.md](references/rewrite-scope.md))。
 
