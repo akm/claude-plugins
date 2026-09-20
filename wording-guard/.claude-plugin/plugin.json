@@ -1,0 +1,9 @@
+{
+  "name": "wording-guard",
+  "description": "これから外へ出す日本語の文章の不自然な言い回しを、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す skill",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}
