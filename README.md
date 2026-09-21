@@ -14,6 +14,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [review-triage](review-triage/README.md) | レビューの依頼文を生成し、レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直し、レビューから修正までを上限回数まで回す。`review-triage-fix` の各段 (調査 / 立案 / 修正) は sub-agent で走らせられる (Go が必要) |
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 | [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な言い回しを、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す |
+| [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに続きを始めたいときに使う) |
 
 ## 使い方
 
@@ -147,6 +148,14 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ├── wording-guard/                # skill 型
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/wording-guard/     # SKILL.md と references/
+│   └── README.md
+├── session-handoff/              # skill 型 + hooks 型
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/handoff-write/     # 引き継ぎ文を書いて保存する。SKILL.md と references/
+│   ├── skills/handoff-resume/    # 引き継ぎ文を読んで再開する。SKILL.md と references/
+│   ├── hooks/hooks.json
+│   ├── hook-scripts/             # 引き継ぎ文の保存先を貼ったときに再開を促す
+│   ├── tests/                     # python3 -m unittest discover -s session-handoff/tests
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json
