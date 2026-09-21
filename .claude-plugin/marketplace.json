@@ -110,6 +110,21 @@
         "ref": "main"
       },
       "tags": ["code-review", "triage", "workflow", "skill"]
+    },
+    {
+      "name": "wording-guard",
+      "description": "これから外へ出す日本語の文章の不自然な言い回しを、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す skill",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "wording-guard",
+        "ref": "main"
+      },
+      "tags": ["documentation", "writing", "japanese", "skill"]
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "convention_paths": [
+    "CLAUDE.md#文書の言い回し"
+  ],
+  "frozen_paths": [
+    "docs/plans/",
+    "docs/review-triage/",
+    "docs/solutions/",
+    "tmp/review-triages/"
+  ]
+}
