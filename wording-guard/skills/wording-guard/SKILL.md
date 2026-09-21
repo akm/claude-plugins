@@ -22,7 +22,7 @@ description: これから外へ出す日本語の文章から、説明のない�
 1. **対象と設定を確定して報告する。** 対象は次のいずれか。
 
    - 引数でパス (ファイルまたはディレクトリ) が指定されたとき: そのファイル群。
-   - 引数が無いとき: ブランチで変更した Markdown (コマンド `git diff --name-only <分岐元>...HEAD -- '*.md'`) と、未コミットの変更 (コマンド `git status --porcelain -uall`) にある Markdown。**`-uall` は外さない** — 外すと、新しく作ったディレクトリの中の Markdown がパスとして出ず、対象に入らない。**`<分岐元>` は、このブランチが分かれた先のブランチのリモート側** (`origin/main` など)。ローカル側は古いことがあり、他の人が書いた行まで今回持ち込んだ行として出る。
+   - 引数が無いとき: ブランチで変更した Markdown (コマンド `git diff --name-only <分岐元>...HEAD -- '*.md'`) と、未コミットの変更 (コマンド `git status --porcelain -uall`) にある Markdown。**`-uall` は外さない** — 外すと、新しく作ったディレクトリの中の Markdown がパスとして出ず、対象に入らない。**`<分岐元>` は、このブランチが分かれた先のブランチ。そのリモート側 (`origin/main` など) があればそれを使い、無ければローカル側を使う** — ローカル側は古いことがあり、他の人が書いた行まで今回持ち込んだ行として出るため。
    - これから外へ出す文章の下書き (PR 本文・Issue 本文・レビューコメント・コミットメッセージ) を渡されたとき: その下書き。
 
    あわせて設定ファイル `.claude/akm-claude-plugins/wording-guard/config.json` を読む (ファイル [wording-guard/skills/wording-guard/references/project-config.md](references/project-config.md))。**無くてもそのまま進む** — 規約の置き場・書き換えないパス・引用の目印がデフォルトになるだけ。対象と設定の有無を報告してから次へ進む。
