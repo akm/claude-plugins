@@ -1,0 +1,9 @@
+{
+  "name": "session-handoff",
+  "description": "セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する skill (モデルの使い分けや、compact せずに続きを始めたいときに使う)",
+  "version": "0.1.0",
+  "author": {
+    "name": "akm"
+  },
+  "license": "MIT"
+}

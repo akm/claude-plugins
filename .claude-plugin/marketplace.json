@@ -125,6 +125,21 @@
         "ref": "main"
       },
       "tags": ["documentation", "writing", "japanese", "skill"]
+    },
+    {
+      "name": "session-handoff",
+      "description": "セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する skill 2 つと、引き継ぎ文の保存先を貼ったときに再開を促すフック (モデルの使い分けや、compact せずに続きを始めたいときに使う)",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "session-handoff",
+        "ref": "main"
+      },
+      "tags": ["session", "handoff", "github", "workflow", "skills", "hooks"]
     }
   ]
 }
