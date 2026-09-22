@@ -9,6 +9,7 @@
 3. **採択件数の回ごとの推移** — 下記。
 4. **周回の条件** — レビュースキル・そのオプション・実効モデル (定義の正本は [review-invocation.md](review-invocation.md) の「実効モデル」)、および `review-triage-fix` に渡した回数の閾値 N (引数 `--threshold`、設定 `fix.threshold_rounds`。意味と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) と段 (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭) ごとの走らせ方 (引数 `--stage`、設定 `fix.stages`。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md))。手順 1 (決定表 G0) で報告したものと同じ値。**各回で実際にどう走らせたかは、各回の `review-triage-fix` の報告 (手順 8) が持つ** — 回 N+1 以降の段 2 は立案者の選択で決まるので、条件として出した走らせ方と回ごとの実態は一致しないことがある。
 5. **残っているもの** — 調査済み (`status: investigated`) と未着手 (`status: pending`) の問題があれば、その回と識別子。**止まった理由を問わず出す** — 周回の後に残ったものは次の周回か人間が引き継ぐので、報告に無いと引き継ぎ先が知る手段が無い。
+6. **次に回すときの条件の推奨** — 推移から導いた、次の周回のレビューのモデルと effort の推奨と、その理由。目安の正本は [record-schema.md の「生成サマリの読み方」](../../review-triage/references/record-schema.md#生成サマリの読み方) (実害の検出は粒度の細かいモデル、収束の確認は粒度の粗いモデル)。**周回は条件を変えない** (原則) — 推奨を出すだけで、変えるかどうかは人間が次の起動で決める。止まった理由を問わず出す ([#58](https://github.com/akm/claude-plugins/issues/58))。
 
 ## 採択件数の推移
 
