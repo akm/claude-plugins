@@ -63,6 +63,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
 | `approach` | △ | 何をどう直すか。書く条件は状態で決まる — **`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の答えの後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する — 段 1 (`review-triage-fix` の調査の段) の結果に立案の中身が混ざると、どの段が書いたかを記録から読めなくなる) |
 | `investigation` | △ | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。`investigated` では必須** (無ければ検査が報告する — 調査済みの状態と矛盾するため。調べたなら `scope` を書き、まだなら `plans` に載せない)。「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
+| `verification` | | 修正の後の検証のうち、観点 B (並びを読み直す) で読んだ範囲 (下記)。**任意だが、書くなら `near_edges` が要る** (無ければ検査が報告する — 書いたつもりの検証が「無い」と読まれないため)。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 7 (文書を変えたコミット) |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
 | `depends_on` | | 依存する問題の `problem_id` |
@@ -95,6 +96,27 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
           excluded:
             - README.md の検査項目の表は列の意味が違う (見出しと行の対応ではない)
         status: pending
+```
+
+### 検証 (`plans[].verification`)
+
+| キー | 必須 | 内容 |
+| --- | --- | --- |
+| `near_edges` | ✓ | 観点 B で読み直した範囲の列。1 要素は「ファイル 開始-終了 (種類。理由)」の形 — 同梱の道具 [nearedges](../../../tools/nearedges/README.md) の出力から写す。**読んでから書く** ([verification.md](../../review-triage-fix/references/verification.md) の観点 A と同じ考え方で、読む範囲を人の判断ではなく道具が決める)。要素は空にできない |
+
+`verification` 自体が無い問題は、観点 B の読み直しを記録していない。**キーだけ書いて値を省いた形 (`verification:` の後に何も無い) は検査が報告する** (`investigation` と同じ理由)。
+
+```yaml
+      - problem_id: P3
+        cause: 表の 1 行に足した軸を、同じ表の他の行に通さなかった
+        finding_ids: [2]
+        approach: 表の読み方を 1 か所に定め、全行の第 1 列を同じ軸で書く
+        verification:
+          near_edges:
+            - docs/design/09.md 289-297 (表の全行。変更行 291)
+            - docs/design/09.md 271-317 (節「適用前バックアップ…」。変更行 291 のリンク先)
+        sha: 1374436
+        status: done
 ```
 
 ### 状態 (`status`)
