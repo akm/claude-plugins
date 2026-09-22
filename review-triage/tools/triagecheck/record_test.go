@@ -121,6 +121,18 @@ func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	}
 }
 
+// origin: residual (周回中に residual を自己採択した指摘) は正しい記録として通る。
+func TestReviewTriageRecordOriginResidualPasses(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n", "        verdict: adopted\n        origin: residual\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	files, read := recordFiles(t, mutated)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("origin: residual の記録で問題が出た: %v", problems)
+	}
+}
+
 func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 	cases := []struct {
 		name string
@@ -176,6 +188,9 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"order: 1\n        verification:\n          near_edges: [docs/foo.md 11-14 (表)]\n          reviewed: true\n", "reviewed"},
 		{"verification の値が無い (null)", "order: 1\n", "order: 1\n        verification:\n", "verification に値がありません"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
+		// 指摘の出所 (origin) は review / residual の列挙。周回中に residual を自己採択した指摘を区別する
+		// (record-schema.md「周回中に記録の外で直さない」)。
+		{"origin の列挙値違反", "        verdict: adopted\n", "        verdict: adopted\n        origin: upstream\n", "origin"},
 		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
 		{"date が空", "- date: \"2026-08-30\"\n", "- date: \"\"\n", "date"},
 		{"id が正の整数でない", "- id: 1\n", "- id: 0\n", "id"},

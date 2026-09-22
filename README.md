@@ -112,6 +112,9 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 .
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイス定義 (収録プラグインの一覧)
+├── .github/
+│   ├── test-targets.txt          # CI が期待するテストの対象の一覧
+│   └── workflows/test.yml        # 各プラグインの自動テストを GitHub Actions で実行する
 ├── commit-rules-guard/           # hooks 型
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
@@ -143,7 +146,8 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   └── README.md
 ├── work-log-gh-comment/          # skill 型
 │   ├── .claude-plugin/plugin.json
-│   ├── skills/work-log-gh-comment/  # SKILL.md、references/、evals/
+│   ├── skills/work-log-gh-comment/  # SKILL.md、references/
+│   │   └── evals/                # python3 -m unittest discover -s work-log-gh-comment/skills/work-log-gh-comment/evals
 │   └── README.md
 ├── wording-guard/                # skill 型
 │   ├── .claude-plugin/plugin.json
@@ -164,11 +168,22 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── skills/review-triage/      # SKILL.md と references/
     ├── skills/review-triage-fix/
     ├── skills/review-triage-loop/  # レビューから修正までの周回
-    ├── tools/triagecheck/         # 記録を検査する Go ツール
+    ├── tools/triagecheck/         # 記録を検査する Go ツール (go test ./...)
     └── README.md
 ```
 
 プラグインは 2 つの型があります。**hooks 型**は Claude Code の動作に自動で割り込むもの、**skill 型**は依頼に応じて呼び出されるものです。skill 型はプラグイン直下の `skills/<スキル名>/SKILL.md` に置きます。1 つのプラグインが複数の skill を持つこともあります (`review-triage`)。
+
+## 自動テスト
+
+各プラグインのテストは、上の「構成」の節で各ディレクトリに添えたコマンドで実行します。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
+
+対象はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけ、ファイル `.github/test-targets.txt` に書いた期待の一覧と比べます。差があれば失敗にするので、テストが対象から外れても、一覧に無いテストが増えても気づけます。見つけ方・比べ方と各 job の失敗の条件の正本はワークフローのコメントで、以下はその要約です。
+
+- ファイル `test_*.py` を含むディレクトリごとにコマンド `python3 -m unittest discover -s <ディレクトリ>` を実行する (Python は 3.11。pr-teeth が前提とする下限に合わせている)
+- ファイル `go.mod` を含むディレクトリごとに `go test ./...` を実行する (Go は各モジュールの `go.mod` が宣言するバージョン)
+
+新しいプラグインがこの命名でテストを置き、`.github/test-targets.txt` に 1 行足せば、ワークフローを変えずにテストが実行されるようになります。
 
 ## 文書の書き方
 
