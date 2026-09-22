@@ -7,3 +7,4 @@ python pr-teeth/tests
 python session-handoff/tests
 python work-log-gh-comment/skills/work-log-gh-comment/evals
 go review-triage/tools/triagecheck
+go review-triage/tools/nearedges
