@@ -113,7 +113,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイス定義 (収録プラグインの一覧)
 ├── .github/workflows/
-│   └── test.yml                  # 各プラグインの自動テストを GitHub Actions で実行する (「自動テスト」の節を参照)
+│   └── test.yml                  # 各プラグインの自動テストを GitHub Actions で実行する
 ├── commit-rules-guard/           # hooks 型
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
@@ -177,7 +177,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 
 各プラグインのテストは、上の「構成」の節で各ディレクトリに添えたコマンドで実行します。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
 
-対象の一覧はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけます。
+対象の一覧はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけます。見つけ方と各 job の失敗の条件の正本はワークフローのコメントで、以下はその要約です。
 
 - ファイル `test_*.py` を含むディレクトリごとにコマンド `python3 -m unittest discover -s <ディレクトリ>` を実行する (Python は 3.11。pr-teeth が前提とする下限に合わせている)
 - ファイル `go.mod` を含むディレクトリごとに `go test ./...` を実行する (Go は各モジュールの `go.mod` が宣言するバージョン)
