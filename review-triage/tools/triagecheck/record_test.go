@@ -108,6 +108,19 @@ func TestReviewTriageRecordValidPasses(t *testing.T) {
 	}
 }
 
+// doc_dag (修正の後の doc-dag の確認) を持つ計画は正しい記録として通る。
+func TestReviewTriageRecordDocDagPasses(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "order: 1\n",
+		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: 向きの無い重複なし。巡回なし\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	files, read := recordFiles(t, mutated)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("doc_dag を持つ記録で問題が出た: %v", problems)
+	}
+}
+
 // verification (読み直した範囲) を持つ計画は正しい記録として通る。
 func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
@@ -123,7 +136,8 @@ func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 
 // origin: residual (周回中に residual を自己採択した指摘) は正しい記録として通る。
 func TestReviewTriageRecordOriginResidualPasses(t *testing.T) {
-	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n", "        verdict: adopted\n        origin: residual\n", 1)
+	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n",
+		"        verdict: adopted\n        origin: residual\n", 1)
 	if mutated == validRecordYAML {
 		t.Fatal("フィクスチャの置換が効いていない")
 	}
@@ -187,6 +201,14 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"verification の未知のキー", "order: 1\n",
 			"order: 1\n        verification:\n          near_edges: [docs/foo.md 11-14 (表)]\n          reviewed: true\n", "reviewed"},
 		{"verification の値が無い (null)", "order: 1\n", "order: 1\n        verification:\n", "verification に値がありません"},
+		// doc-dag の確認 (doc_dag) は任意だが、書くなら対象 (scope) と結果 (result) が要る。
+		{"doc_dag に scope が無い", "order: 1\n",
+			"order: 1\n        doc_dag:\n          result: 重複なし\n", "doc_dag.scope"},
+		{"doc_dag に result が無い", "order: 1\n",
+			"order: 1\n        doc_dag:\n          scope: docs/foo.md と docs/bar.md\n", "doc_dag.result"},
+		{"doc_dag の未知のキー", "order: 1\n",
+			"order: 1\n        doc_dag:\n          scope: docs/foo.md\n          result: 重複なし\n          figure: tmp/x.html\n", "figure"},
+		{"doc_dag の値が無い (null)", "order: 1\n", "order: 1\n        doc_dag:\n", "doc_dag に値がありません"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
 		// 指摘の出所 (origin) は review / residual の列挙。周回中に residual を自己採択した指摘を区別する
 		// (record-schema.md「周回中に記録の外で直さない」)。
