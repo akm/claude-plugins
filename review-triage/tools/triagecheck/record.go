@@ -133,6 +133,7 @@ type recordFinding struct {
 	Verdict         string            `yaml:"verdict"`
 	VerdictReason   string            `yaml:"verdict_reason"`
 	PlanRef         *recordPlanRef    `yaml:"plan_ref"`
+	Origin          string            `yaml:"origin"`
 	Attrs           map[string]any    `yaml:"attrs"`
 }
 
@@ -209,7 +210,7 @@ var recordAllowedKeys = map[string]map[string]bool{
 		"scope": true, "head": true, "findings": true, "plans": true, "recurrence": true, "notes": true},
 	"指摘": {"id": true, "file": true, "line": true, "summary": true, "category": true,
 		"audience": true, "audience_initial": true, "consequence": true, "premise_check": true,
-		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "attrs": true},
+		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "attrs": true},
 	"束ね先":   {"run": true, "problem": true},
 	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証": {"stages": true, "result": true},
@@ -521,6 +522,13 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 			if fd.VerdictReason == "" {
 				add("%s: verdict_reason がありません (判定の経路をノード ID で書く)", fn)
+			}
+			// 指摘の出所。省略時は上流のレビュー (review)。residual は周回中に自己採択したもの
+			// (record-schema.md「周回中に記録の外で直さない」)。
+			switch fd.Origin {
+			case "", "review", "residual":
+			default:
+				add("%s: origin は review / residual のいずれか (省略時は review): %q", fn, fd.Origin)
 			}
 			if fd.PlanRef != nil {
 				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
@@ -890,9 +898,14 @@ func renderFindingCells(fd recordFinding) []string {
 	if len(fd.GatesFired) > 0 {
 		gates = strings.Join(fd.GatesFired, ", ")
 	}
+	summary := recordCell(fd.Summary)
+	if fd.Origin == "residual" {
+		// 上流の residual を周回中に自己採択した指摘。上流の指摘と区別して読めるようにする。
+		summary = "(residual の自己採択) " + summary
+	}
 	return []string{
 		strconv.Itoa(fd.ID),
-		"`" + recordCell(loc) + "` " + recordCell(fd.Summary),
+		"`" + recordCell(loc) + "` " + summary,
 		recordCell(fd.Category) + " / " + recordCell(aud),
 		recordCell(fd.Consequence.Condition) + " / " + recordCell(fd.Consequence.What) +
 			" / " + recordCell(fd.Consequence.Detectability),
