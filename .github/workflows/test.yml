@@ -1,0 +1,116 @@
+# 各プラグインの自動テストを GitHub Actions で実行する。
+#
+# 対象の一覧はこのファイルに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つける。
+# - Python: ファイル `test_*.py` を含むディレクトリごとに `python3 -m unittest discover -s <ディレクトリ>`
+# - Go: ファイル `go.mod` を含むディレクトリごとに `go test ./...`
+# 見つけた対象はファイル `.github/test-targets.txt` の期待の一覧と種類ごとに比べ、差があれば失敗にする (対象が減っても増えても気づけるように)。
+# 新しいプラグインがこの命名に従ってテストを置き、一覧に 1 行足せば、このファイルを変えずに CI の対象になる。
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同じブランチ (PR なら同じ PR) で新しい実行が始まったら、まだ終わっていない古い実行は打ち切る
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    name: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      python-dirs: ${{ steps.list.outputs.python-dirs }}
+      go-modules: ${{ steps.list.outputs.go-modules }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        name: List test targets
+        run: |
+          python_dirs=$(git ls-files | grep -E '(^|/)test_[^/]*\.py$' | xargs -r -n1 dirname | sort -u)
+          go_modules=$(git ls-files | grep -E '(^|/)go\.mod$' | xargs -r -n1 dirname | sort -u)
+          printf 'Python:\n%s\nGo:\n%s\n' "$python_dirs" "$go_modules"
+          # 1 つも見つからないときは、テストが無いまま合格したように見えないよう失敗にする
+          [ -n "$python_dirs" ] || { echo "::error::test_*.py が 1 つも見つからない"; exit 1; }
+          [ -n "$go_modules" ] || { echo "::error::go.mod が 1 つも見つからない"; exit 1; }
+          # 見つけた対象を期待の一覧と種類ごとに比べる。一覧にあるのに見つからないもの (改名・移動・削除で対象から外れた) と、
+          # 見つかったのに一覧に無いもの (足したが一覧に書いていない) を挙げて失敗にする
+          expected=.github/test-targets.txt
+          ok=1
+          for kind in python go; do
+            if [ "$kind" = python ]; then actual=$python_dirs; else actual=$go_modules; fi
+            listed=$(grep -E "^$kind " "$expected" | cut -d' ' -f2- | sort -u)
+            missing=$(comm -23 <(printf '%s\n' "$listed") <(printf '%s\n' "$actual"))
+            unlisted=$(comm -13 <(printf '%s\n' "$listed") <(printf '%s\n' "$actual"))
+            [ -z "$missing" ] || { echo "::error::$kind: $expected にあるのに見つからない: $(echo $missing)"; ok=0; }
+            [ -z "$unlisted" ] || { echo "::error::$kind: 見つかったのに $expected に無い: $(echo $unlisted)"; ok=0; }
+          done
+          [ "$ok" = 1 ] || exit 1
+          echo "python-dirs=$(printf '%s\n' "$python_dirs" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+          echo "go-modules=$(printf '%s\n' "$go_modules" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+
+  python:
+    name: python (${{ matrix.dir }})
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.python-dirs) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          # pr-teeth が前提とする下限 (設定の読み込みに Python 3.11 以降の標準ライブラリ tomllib を使う) に合わせる
+          python-version: "3.11"
+      - name: unittest
+        env:
+          TEST_DIR: ${{ matrix.dir }}
+        # Python 3.11 の unittest はテストが 0 件でも終了コード 0 を返す (0 件を 5 にするのは 3.12 以降) ので、
+        # 終了コードに加えて実行件数の行を見て、1 件も実行していなければ失敗にする
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s "$TEST_DIR" 2>&1 | tee "$RUNNER_TEMP/unittest.log"
+          if grep -q '^Ran 0 tests' "$RUNNER_TEMP/unittest.log"; then
+            echo "::error::テストが 1 件も実行されていない: $TEST_DIR"
+            exit 1
+          fi
+
+  go:
+    name: go (${{ matrix.module }})
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.discover.outputs.go-modules) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          # モジュールが対応する最小のバージョン (go.mod の go ディレクティブ) で検証する
+          go-version-file: ${{ matrix.module }}/go.mod
+          # 依存のキャッシュは go.sum の無いモジュールで失敗するので使わない (依存は少なく、毎回取得しても時間はかからない)
+          cache: false
+      - name: go test
+        env:
+          MODULE: ${{ matrix.module }}
+        working-directory: ${{ matrix.module }}
+        # go test はテストファイルの無いパッケージを「?   … [no test files]」と表示して終了コード 0 を返すので、
+        # テストを実行したパッケージ (先頭が ok の行) が 1 つも無ければ失敗にする
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee "$RUNNER_TEMP/gotest.log"
+          if ! grep -q '^ok[[:space:]]' "$RUNNER_TEMP/gotest.log"; then
+            echo "::error::テストを実行したパッケージが無い: $MODULE"
+            exit 1
+          fi
