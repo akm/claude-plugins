@@ -1,0 +1,84 @@
+# 各プラグインの自動テストを GitHub Actions で実行する。
+#
+# 対象の一覧はこのファイルに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つける。
+# - Python: ファイル `test_*.py` を含むディレクトリごとに `python3 -m unittest discover -s <ディレクトリ>`
+# - Go: ファイル `go.mod` を含むディレクトリごとに `go test ./...`
+# 新しいプラグインがこの命名に従ってテストを置けば、このファイルを変えずに CI の対象になる。
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同じブランチ (PR なら同じ PR) で新しい実行が始まったら、まだ終わっていない古い実行は打ち切る
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    name: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      python-dirs: ${{ steps.list.outputs.python-dirs }}
+      go-modules: ${{ steps.list.outputs.go-modules }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        name: List test targets
+        run: |
+          python_dirs=$(git ls-files | grep -E '(^|/)test_[^/]*\.py$' | xargs -r -n1 dirname | sort -u)
+          go_modules=$(git ls-files | grep -E '(^|/)go\.mod$' | xargs -r -n1 dirname | sort -u)
+          printf 'Python:\n%s\nGo:\n%s\n' "$python_dirs" "$go_modules"
+          # 1 つも見つからないときは、テストが無いまま合格したように見えないよう失敗にする
+          [ -n "$python_dirs" ] || { echo "::error::test_*.py が 1 つも見つからない"; exit 1; }
+          [ -n "$go_modules" ] || { echo "::error::go.mod が 1 つも見つからない"; exit 1; }
+          echo "python-dirs=$(printf '%s\n' "$python_dirs" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+          echo "go-modules=$(printf '%s\n' "$go_modules" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+
+  python:
+    name: python (${{ matrix.dir }})
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.python-dirs) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          # pr-teeth が前提とする下限 (設定の読み込みに Python 3.11 以降の標準ライブラリ tomllib を使う) に合わせる
+          python-version: "3.11"
+      - name: unittest
+        env:
+          TEST_DIR: ${{ matrix.dir }}
+        run: python3 -m unittest discover -s "$TEST_DIR"
+
+  go:
+    name: go (${{ matrix.module }})
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.discover.outputs.go-modules) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          # モジュールが対応する最小のバージョン (go.mod の go ディレクティブ) で検証する
+          go-version-file: ${{ matrix.module }}/go.mod
+          # 依存のキャッシュは go.sum の無いモジュールで失敗するので使わない (依存は少なく、毎回取得しても時間はかからない)
+          cache: false
+      - name: go test
+        run: go test ./...
+        working-directory: ${{ matrix.module }}
