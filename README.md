@@ -145,7 +145,8 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   └── README.md
 ├── work-log-gh-comment/          # skill 型
 │   ├── .claude-plugin/plugin.json
-│   ├── skills/work-log-gh-comment/  # SKILL.md、references/、evals/
+│   ├── skills/work-log-gh-comment/  # SKILL.md、references/
+│   │   └── evals/                # python3 -m unittest discover -s work-log-gh-comment/skills/work-log-gh-comment/evals
 │   └── README.md
 ├── wording-guard/                # skill 型
 │   ├── .claude-plugin/plugin.json
@@ -166,7 +167,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── skills/review-triage/      # SKILL.md と references/
     ├── skills/review-triage-fix/
     ├── skills/review-triage-loop/  # レビューから修正までの周回
-    ├── tools/triagecheck/         # 記録を検査する Go ツール
+    ├── tools/triagecheck/         # 記録を検査する Go ツール (go test ./...)
     └── README.md
 ```
 
@@ -174,7 +175,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 
 ## 自動テスト
 
-各プラグインのテストは、上の「構成」の節に書いた通り `python3 -m unittest discover -s <プラグイン>/tests` と `go test ./...` で実行します。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
+各プラグインのテストは、上の「構成」の節で各ディレクトリに添えたコマンドで実行します。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
 
 対象の一覧はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけます。
 
