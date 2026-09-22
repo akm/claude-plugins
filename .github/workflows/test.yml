@@ -60,7 +60,15 @@ jobs:
       - name: unittest
         env:
           TEST_DIR: ${{ matrix.dir }}
-        run: python3 -m unittest discover -s "$TEST_DIR"
+        # Python 3.11 の unittest はテストが 0 件でも終了コード 0 を返す (0 件を 5 にするのは 3.12 以降) ので、
+        # 終了コードに加えて実行件数の行を見て、1 件も実行していなければ失敗にする
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s "$TEST_DIR" 2>&1 | tee "$RUNNER_TEMP/unittest.log"
+          if grep -q '^Ran 0 tests' "$RUNNER_TEMP/unittest.log"; then
+            echo "::error::テストが 1 件も実行されていない: $TEST_DIR"
+            exit 1
+          fi
 
   go:
     name: go (${{ matrix.module }})
@@ -80,5 +88,15 @@ jobs:
           # 依存のキャッシュは go.sum の無いモジュールで失敗するので使わない (依存は少なく、毎回取得しても時間はかからない)
           cache: false
       - name: go test
-        run: go test ./...
+        env:
+          MODULE: ${{ matrix.module }}
         working-directory: ${{ matrix.module }}
+        # go test はテストファイルの無いパッケージを「?   … [no test files]」と表示して終了コード 0 を返すので、
+        # テストを実行したパッケージ (先頭が ok の行) が 1 つも無ければ失敗にする
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee "$RUNNER_TEMP/gotest.log"
+          if ! grep -q '^ok[[:space:]]' "$RUNNER_TEMP/gotest.log"; then
+            echo "::error::テストを実行したパッケージが無い: $MODULE"
+            exit 1
+          fi
