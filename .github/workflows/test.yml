@@ -3,7 +3,8 @@
 # 対象の一覧はこのファイルに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つける。
 # - Python: ファイル `test_*.py` を含むディレクトリごとに `python3 -m unittest discover -s <ディレクトリ>`
 # - Go: ファイル `go.mod` を含むディレクトリごとに `go test ./...`
-# 新しいプラグインがこの命名に従ってテストを置けば、このファイルを変えずに CI の対象になる。
+# 見つけた対象はファイル `.github/test-targets.txt` の期待の一覧と種類ごとに比べ、差があれば失敗にする (対象が減っても増えても気づけるように)。
+# 新しいプラグインがこの命名に従ってテストを置き、一覧に 1 行足せば、このファイルを変えずに CI の対象になる。
 name: test
 
 on:
@@ -39,6 +40,19 @@ jobs:
           # 1 つも見つからないときは、テストが無いまま合格したように見えないよう失敗にする
           [ -n "$python_dirs" ] || { echo "::error::test_*.py が 1 つも見つからない"; exit 1; }
           [ -n "$go_modules" ] || { echo "::error::go.mod が 1 つも見つからない"; exit 1; }
+          # 見つけた対象を期待の一覧と種類ごとに比べる。一覧にあるのに見つからないもの (改名・移動・削除で対象から外れた) と、
+          # 見つかったのに一覧に無いもの (足したが一覧に書いていない) を挙げて失敗にする
+          expected=.github/test-targets.txt
+          ok=1
+          for kind in python go; do
+            if [ "$kind" = python ]; then actual=$python_dirs; else actual=$go_modules; fi
+            listed=$(grep -E "^$kind " "$expected" | cut -d' ' -f2- | sort -u)
+            missing=$(comm -23 <(printf '%s\n' "$listed") <(printf '%s\n' "$actual"))
+            unlisted=$(comm -13 <(printf '%s\n' "$listed") <(printf '%s\n' "$actual"))
+            [ -z "$missing" ] || { echo "::error::$kind: $expected にあるのに見つからない: $(echo $missing)"; ok=0; }
+            [ -z "$unlisted" ] || { echo "::error::$kind: 見つかったのに $expected に無い: $(echo $unlisted)"; ok=0; }
+          done
+          [ "$ok" = 1 ] || exit 1
           echo "python-dirs=$(printf '%s\n' "$python_dirs" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
           echo "go-modules=$(printf '%s\n' "$go_modules" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
 
