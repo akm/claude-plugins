@@ -108,6 +108,19 @@ func TestReviewTriageRecordValidPasses(t *testing.T) {
 	}
 }
 
+// doc_dag (修正の後の doc-dag の確認) を持つ計画は正しい記録として通る。
+func TestReviewTriageRecordDocDagPasses(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "order: 1\n",
+		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: 向きの無い重複なし。巡回なし\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	files, read := recordFiles(t, mutated)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("doc_dag を持つ記録で問題が出た: %v", problems)
+	}
+}
+
 func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 	cases := []struct {
 		name string
@@ -154,6 +167,14 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
 			"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n", "plan_ref に値がありません"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
+		// doc-dag の確認 (doc_dag) は任意だが、書くなら対象 (scope) と結果 (result) が要る。
+		{"doc_dag に scope が無い", "order: 1\n",
+			"order: 1\n        doc_dag:\n          result: 重複なし\n", "doc_dag.scope"},
+		{"doc_dag に result が無い", "order: 1\n",
+			"order: 1\n        doc_dag:\n          scope: docs/foo.md と docs/bar.md\n", "doc_dag.result"},
+		{"doc_dag の未知のキー", "order: 1\n",
+			"order: 1\n        doc_dag:\n          scope: docs/foo.md\n          result: 重複なし\n          figure: tmp/x.html\n", "figure"},
+		{"doc_dag の値が無い (null)", "order: 1\n", "order: 1\n        doc_dag:\n", "doc_dag に値がありません"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
 		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
 		{"date が空", "- date: \"2026-08-30\"\n", "- date: \"\"\n", "date"},

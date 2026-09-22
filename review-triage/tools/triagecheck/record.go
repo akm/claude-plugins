@@ -171,11 +171,14 @@ type recordPlan struct {
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の正本は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
-	Options       string               `yaml:"options"`
-	Order         int                  `yaml:"order"`
-	DependsOn     []string             `yaml:"depends_on"`
-	SHA           string               `yaml:"sha"`
-	Status        string               `yaml:"status"`
+	// DocDag は修正の後の doc-dag の確認 (対象と、向きの無い重複・巡回の有無と対処)。任意だが、
+	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
+	DocDag    *recordDocDag `yaml:"doc_dag"`
+	Options   string        `yaml:"options"`
+	Order     int           `yaml:"order"`
+	DependsOn []string      `yaml:"depends_on"`
+	SHA       string        `yaml:"sha"`
+	Status    string        `yaml:"status"`
 	// AppliedExternalURL / Notes は status: done-external の反映先の記録。
 	// リポジトリ外の成果物 (PR 本文・Issue のコメント・外部 Wiki など) への修正は
 	// コミットが立たないので sha を書けない。URL を必須にすると、URL を持たない
@@ -194,6 +197,12 @@ type recordPlan struct {
 // scope は調べた範囲 (実行したコマンドと目で読んだ対象)、included は同じ原因の
 // 別の現れとして問題に含めた箇所、excluded は見つけたが含めなかった箇所と理由。
 // included / excluded が両方空なら「調べたが波及先は無かった」。
+// recordDocDag は plans[].doc_dag — 修正の後の doc-dag の確認の対象と結果。
+type recordDocDag struct {
+	Scope  string `yaml:"scope"`
+	Result string `yaml:"result"`
+}
+
 type recordInvestigation struct {
 	Scope    string   `yaml:"scope"`
 	Included []string `yaml:"included"`
@@ -214,12 +223,13 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証": {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
-		"investigation": true, "options": true, "order": true, "depends_on": true, "sha": true,
+		"investigation": true, "doc_dag": true, "options": true, "order": true, "depends_on": true, "sha": true,
 		"status": true, "applied_external_url": true, "notes": true},
-	"調査":   {"scope": true, "included": true, "excluded": true},
-	"検知":   {"status": true, "evidence": true, "declined_reason": true, "reframe": true},
-	"根拠":   {"condition": true, "finding_id": true, "prior_run": true, "prior": true, "reason": true},
-	"捉え直し": {"pattern": true, "axes": true, "root_cause": true, "fix_unit": true, "source": true},
+	"調査":          {"scope": true, "included": true, "excluded": true},
+	"doc-dag の確認": {"scope": true, "result": true},
+	"検知":          {"status": true, "evidence": true, "declined_reason": true, "reframe": true},
+	"根拠":          {"condition": true, "finding_id": true, "prior_run": true, "prior": true, "reason": true},
+	"捉え直し":        {"pattern": true, "axes": true, "root_cause": true, "fix_unit": true, "source": true},
 }
 
 // reviewTriageRecordProblems は記録の置き場の YAML を検査する。
@@ -361,7 +371,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない — 重ねると 1 つの書き忘れが複数の問題になる。
-var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true, "recurrence": true}
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true, "doc_dag": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
 // 値の無い構造キー (recordNullSilentKeys) を列挙する。
@@ -411,6 +421,8 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "束ね先")
 			case "investigation":
 				walkMap(v, "調査")
+			case "doc_dag":
+				walkMap(v, "doc-dag の確認")
 			case "recurrence":
 				walkMap(v, "検知")
 			case "evidence":
@@ -656,6 +668,16 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 							add("%s: investigation.%s[%d] が空です (箇所を書くか要素を消す)", pn, kv.key, i)
 						}
 					}
+				}
+			}
+			// doc-dag の確認 (doc_dag) は任意だが、書くなら対象 (scope) と結果 (result) が要る。
+			// 片方だけの記録は、何を確かめて何が分かったかを残さない。
+			if dd := pl.DocDag; dd != nil {
+				if strings.TrimSpace(dd.Scope) == "" {
+					add("%s: doc_dag.scope がありません (doc-dag に渡した対象の文書群)", pn)
+				}
+				if strings.TrimSpace(dd.Result) == "" {
+					add("%s: doc_dag.result がありません (向きの無い重複・巡回の有無と対処)", pn)
 				}
 			}
 			for _, d := range pl.DependsOn {
