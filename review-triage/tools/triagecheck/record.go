@@ -174,12 +174,12 @@ type recordPlan struct {
 	// Verification は修正の後の検証のうち、観点 B (並びを読み直す) で読んだ範囲。任意だが、
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
-	Verification  *recordVerification  `yaml:"verification"`
-	Options       string               `yaml:"options"`
-	Order         int                  `yaml:"order"`
-	DependsOn     []string             `yaml:"depends_on"`
-	SHA           string               `yaml:"sha"`
-	Status        string               `yaml:"status"`
+	Verification *recordVerification `yaml:"verification"`
+	Options      string              `yaml:"options"`
+	Order        int                 `yaml:"order"`
+	DependsOn    []string            `yaml:"depends_on"`
+	SHA          string              `yaml:"sha"`
+	Status       string              `yaml:"status"`
 	// AppliedExternalURL / Notes は status: done-external の反映先の記録。
 	// リポジトリ外の成果物 (PR 本文・Issue のコメント・外部 Wiki など) への修正は
 	// コミットが立たないので sha を書けない。URL を必須にすると、URL を持たない
