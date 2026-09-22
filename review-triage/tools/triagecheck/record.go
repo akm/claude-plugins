@@ -133,6 +133,7 @@ type recordFinding struct {
 	Verdict         string            `yaml:"verdict"`
 	VerdictReason   string            `yaml:"verdict_reason"`
 	PlanRef         *recordPlanRef    `yaml:"plan_ref"`
+	Origin          string            `yaml:"origin"`
 	Attrs           map[string]any    `yaml:"attrs"`
 }
 
@@ -171,6 +172,10 @@ type recordPlan struct {
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の正本は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
+	// Verification は修正の後の検証のうち、観点 B (並びを読み直す) で読んだ範囲。任意だが、
+	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
+	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
+	Verification *recordVerification `yaml:"verification"`
 	// DocDag は修正の後の doc-dag の確認 (対象と、向きの無い重複・巡回の有無と対処)。任意だが、
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
 	DocDag    *recordDocDag `yaml:"doc_dag"`
@@ -203,6 +208,11 @@ type recordDocDag struct {
 	Result string `yaml:"result"`
 }
 
+// recordVerification は plans[].verification — 観点 B で読み直した範囲 (near_edges)。
+type recordVerification struct {
+	NearEdges []string `yaml:"near_edges"`
+}
+
 type recordInvestigation struct {
 	Scope    string   `yaml:"scope"`
 	Included []string `yaml:"included"`
@@ -218,14 +228,15 @@ var recordAllowedKeys = map[string]map[string]bool{
 		"scope": true, "head": true, "findings": true, "plans": true, "recurrence": true, "notes": true},
 	"指摘": {"id": true, "file": true, "line": true, "summary": true, "category": true,
 		"audience": true, "audience_initial": true, "consequence": true, "premise_check": true,
-		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "attrs": true},
+		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "attrs": true},
 	"束ね先":   {"run": true, "problem": true},
 	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証": {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
-		"investigation": true, "doc_dag": true, "options": true, "order": true, "depends_on": true, "sha": true,
+		"investigation": true, "verification": true, "doc_dag": true, "options": true, "order": true, "depends_on": true, "sha": true,
 		"status": true, "applied_external_url": true, "notes": true},
 	"調査":          {"scope": true, "included": true, "excluded": true},
+	"検証":          {"near_edges": true},
 	"doc-dag の確認": {"scope": true, "result": true},
 	"検知":          {"status": true, "evidence": true, "declined_reason": true, "reframe": true},
 	"根拠":          {"condition": true, "finding_id": true, "prior_run": true, "prior": true, "reason": true},
@@ -371,7 +382,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない — 重ねると 1 つの書き忘れが複数の問題になる。
-var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true, "doc_dag": true, "recurrence": true}
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
 // 値の無い構造キー (recordNullSilentKeys) を列挙する。
@@ -421,6 +432,8 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "束ね先")
 			case "investigation":
 				walkMap(v, "調査")
+			case "verification":
+				walkMap(v, "検証")
 			case "doc_dag":
 				walkMap(v, "doc-dag の確認")
 			case "recurrence":
@@ -533,6 +546,13 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 			if fd.VerdictReason == "" {
 				add("%s: verdict_reason がありません (判定の経路をノード ID で書く)", fn)
+			}
+			// 指摘の出所。省略時は上流のレビュー (review)。residual は周回中に自己採択したもの
+			// (record-schema.md「周回中に記録の外で直さない」)。
+			switch fd.Origin {
+			case "", "review", "residual":
+			default:
+				add("%s: origin は review / residual のいずれか (省略時は review): %q", fn, fd.Origin)
 			}
 			if fd.PlanRef != nil {
 				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
@@ -678,6 +698,18 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				}
 				if strings.TrimSpace(dd.Result) == "" {
 					add("%s: doc_dag.result がありません (向きの無い重複・巡回の有無と対処)", pn)
+				}
+			}
+			// 検証 (verification) は任意だが、書くなら読み直した範囲 (near_edges) が要る。
+			// 範囲の無い検証は、読んだつもりの記録と読んでいない記録を区別できない。
+			if ver := pl.Verification; ver != nil {
+				if len(ver.NearEdges) == 0 {
+					add("%s: verification.near_edges がありません (観点 B で読み直した範囲。nearedges の出力から写す)", pn)
+				}
+				for i, v := range ver.NearEdges {
+					if strings.TrimSpace(v) == "" {
+						add("%s: verification.near_edges[%d] が空です (範囲を書くか要素を消す)", pn, i)
+					}
 				}
 			}
 			for _, d := range pl.DependsOn {
@@ -912,9 +944,14 @@ func renderFindingCells(fd recordFinding) []string {
 	if len(fd.GatesFired) > 0 {
 		gates = strings.Join(fd.GatesFired, ", ")
 	}
+	summary := recordCell(fd.Summary)
+	if fd.Origin == "residual" {
+		// 上流の residual を周回中に自己採択した指摘。上流の指摘と区別して読めるようにする。
+		summary = "(residual の自己採択) " + summary
+	}
 	return []string{
 		strconv.Itoa(fd.ID),
-		"`" + recordCell(loc) + "` " + recordCell(fd.Summary),
+		"`" + recordCell(loc) + "` " + summary,
 		recordCell(fd.Category) + " / " + recordCell(aud),
 		recordCell(fd.Consequence.Condition) + " / " + recordCell(fd.Consequence.What) +
 			" / " + recordCell(fd.Consequence.Detectability),

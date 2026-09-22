@@ -121,6 +121,32 @@ func TestReviewTriageRecordDocDagPasses(t *testing.T) {
 	}
 }
 
+// verification (読み直した範囲) を持つ計画は正しい記録として通る。
+func TestReviewTriageRecordVerificationPasses(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "order: 1\n",
+		"order: 1\n        verification:\n          near_edges:\n            - docs/foo.md 11-14 (表の全行)\n            - docs/foo.md 7-30 (節「表の節」。変更行 25 のリンク先)\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	files, read := recordFiles(t, mutated)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("verification を持つ記録で問題が出た: %v", problems)
+	}
+}
+
+// origin: residual (周回中に residual を自己採択した指摘) は正しい記録として通る。
+func TestReviewTriageRecordOriginResidualPasses(t *testing.T) {
+	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n",
+		"        verdict: adopted\n        origin: residual\n", 1)
+	if mutated == validRecordYAML {
+		t.Fatal("フィクスチャの置換が効いていない")
+	}
+	files, read := recordFiles(t, mutated)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("origin: residual の記録で問題が出た: %v", problems)
+	}
+}
+
 func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 	cases := []struct {
 		name string
@@ -167,6 +193,14 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
 			"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n", "plan_ref に値がありません"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
+		// 修正の検証 (verification) は任意だが、書くなら near_edges (読み直した範囲) が要り、要素は空にできない。
+		{"verification に near_edges が無い", "order: 1\n",
+			"order: 1\n        verification:\n          note: 読んだ\n", "verification.near_edges"},
+		{"verification の near_edges に空の要素", "order: 1\n",
+			"order: 1\n        verification:\n          near_edges: [\"\"]\n", "verification.near_edges[0]"},
+		{"verification の未知のキー", "order: 1\n",
+			"order: 1\n        verification:\n          near_edges: [docs/foo.md 11-14 (表)]\n          reviewed: true\n", "reviewed"},
+		{"verification の値が無い (null)", "order: 1\n", "order: 1\n        verification:\n", "verification に値がありません"},
 		// doc-dag の確認 (doc_dag) は任意だが、書くなら対象 (scope) と結果 (result) が要る。
 		{"doc_dag に scope が無い", "order: 1\n",
 			"order: 1\n        doc_dag:\n          result: 重複なし\n", "doc_dag.scope"},
@@ -176,6 +210,9 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"order: 1\n        doc_dag:\n          scope: docs/foo.md\n          result: 重複なし\n          figure: tmp/x.html\n", "figure"},
 		{"doc_dag の値が無い (null)", "order: 1\n", "order: 1\n        doc_dag:\n", "doc_dag に値がありません"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
+		// 指摘の出所 (origin) は review / residual の列挙。周回中に residual を自己採択した指摘を区別する
+		// (record-schema.md「周回中に記録の外で直さない」)。
+		{"origin の列挙値違反", "        verdict: adopted\n", "        verdict: adopted\n        origin: upstream\n", "origin"},
 		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
 		{"date が空", "- date: \"2026-08-30\"\n", "- date: \"\"\n", "date"},
 		{"id が正の整数でない", "- id: 1\n", "- id: 0\n", "id"},

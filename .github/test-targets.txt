@@ -1,0 +1,10 @@
+# CI のワークフロー .github/workflows/test.yml の discover ジョブが期待する、テストの対象の一覧。
+# 1 行に 1 つ、「python <ディレクトリ>」か「go <ディレクトリ>」の形で書く。行頭の # はコメント。
+# discover は追跡ファイルから実際の対象を見つけてこの一覧と比べ、差があれば失敗にする
+# (見つけ方と比べ方の正本はワークフローの冒頭のコメント)。テストを足した・移した・消したときは、この一覧も直す。
+python commit-rules-guard/tests
+python pr-teeth/tests
+python session-handoff/tests
+python work-log-gh-comment/skills/work-log-gh-comment/evals
+go review-triage/tools/triagecheck
+go review-triage/tools/nearedges
