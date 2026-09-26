@@ -114,6 +114,6 @@ LLM が手順書に従ってその場で組み立てる構造化データ。
 様式の正本は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) の「`delivered-<識別子>.yaml`」、突き合わせの順序の正本は [round.md](review-triage/skills/review-loop/references/round.md) で、ここでは言い直さない。
 
 ### 再入の手順
-`review-loop` の作業側が、[完了の印](#完了の印)を待つ背景の処理の通知を受けたときと、人間が `--resume` で周回を続けるときに入る、1 つの入口。会話の文脈に依存せず、周回の置き場のファイルと記録と通知の説明文だけから、次に何をするかを決める。入口を 1 つにしてあるので、compact (会話の自動要約) の後や、セッションを開き直した後でも同じ手順に戻れ、同じ回を 2 度取り込まない。
+`review-loop` の作業側が、[完了の印](#完了の印)を待つバックグラウンドの処理の通知を受けたときと、人間が `--resume` で周回を続けるときに入る、1 つの入口。会話の文脈に依存せず、周回の置き場のファイルと記録と通知の説明文だけから、次に何をするかを決める。入口を 1 つにしてあるので、compact (会話の自動要約) の後や、セッションを開き直した後でも同じ手順に戻れ、同じ回を 2 度取り込まない。
 
 手順の正本は `review-loop` の [reentry.md](review-triage/skills/review-loop/references/reentry.md) で、ここでは言い直さない。

@@ -589,7 +589,7 @@ class TestStartChecks(WorkerTestBase):
             return f.read()
 
     def test_live_other_worker(self):
-        # AE14: 動いている他のワーカーが居れば、worker.yaml に触れずに終了コード 2
+        # AE14: 他のワーカーが動いていれば、worker.yaml に触れずに終了コード 2
         before = self.write_other_worker(os.getpid())
         p = self.start()
         _, err = p.communicate(timeout=20)
@@ -712,7 +712,7 @@ class TestEnding(WorkerTestBase):
                 self.wait_for(lambda: os.path.exists(self.pids_file), what="偽の claude の起動")
                 pids = _read_pids(self.pids_file)
                 started = time.time()
-                os.killpg(p.pid, sig)  # 端末の Ctrl-C と同じく、ワーカーの前景のプロセスグループに送る
+                os.killpg(p.pid, sig)  # 端末の Ctrl-C と同じく、ワーカーのフォアグラウンドのプロセスグループに送る
                 p.communicate(timeout=20)
                 self.assertLess(time.time() - started, 8)
                 self.assertEqual(p.returncode, code)

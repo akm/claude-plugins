@@ -124,9 +124,9 @@
 | --- | --- | --- |
 | `dir` | 周回の置き場の親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
 | `wait_minutes` | 完了の印を待つ上限 (分) | 60 |
-| `worker_wait_minutes` | ワーカーの起動を待つ上限 (分)。回 1 の最初の待機と、`--resume` でワーカーが居ないときに使う | 15 |
+| `worker_wait_minutes` | ワーカーの起動を待つ上限 (分)。回 1 の最初の待機と、`--resume` でワーカーが動いていないときに使う | 15 |
 | `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
-| `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーが居なくなったと読む (秒) | 30 |
+| `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
 | `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
 | `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
 | `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | ワーカーの既定 (同上。受け付けない値も同じ箇所) |

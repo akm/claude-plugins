@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# review-loop の作業側が背景で走らせる待機スクリプト。
+# review-loop の作業側がバックグラウンドで走らせる待機スクリプト。
 #
 # 使い方:
 #   review-loop-wait.sh [--await-worker] <周回の置き場> <識別子> <分> [<停滞の秒数>]
 #
-# 周回の置き場を 5 秒おきに見て、次のどれかが現れたら標準出力に 1 行を出して終了コード 0 で終わる。
+# 周回の置き場を 5 秒おきに見て、次のどれかが現れたら標準出力に 1 行を書いて終了コード 0 で終わる。
 # 同じ周期に複数が当たれば、上にあるものを返す。
 #
 #   delivered <識別子>   完了の印 delivered-<識別子>.yaml が現れた。status が ok なら依頼文と結果、
@@ -16,10 +16,10 @@
 #   worker invalid       worker.yaml の state が読めない (5 つの状態のどれでもない)
 #   worker stale         worker.yaml の更新時刻が <停滞の秒数> (既定 30) より古い。
 #                        ワーカーは動いている間は状態に関わらず 5 秒おきに更新時刻を進めるので、
-#                        古いことをワーカーのプロセスが居なくなった印と読む。worker.yaml が無い間は判定しない
+#                        古いことをワーカーのプロセスが無くなった印と読む。worker.yaml が無い間は判定しない
 #
-# --await-worker を付けると、起動時の worker.yaml のワーカーは居ないものとして扱い、その状態と停滞を事象にしない
-# (新しいワーカーの出現・完了の印・end だけを返す)。作業側が、居なくなったワーカーの起動し直しを待つときに使う。
+# --await-worker を付けると、起動時の worker.yaml のワーカーはもう動いていないものとして扱い、その状態と停滞を事象にしない
+# (新しいワーカーの出現・完了の印・end だけを返す)。作業側が、終了したワーカーの起動し直しを待つときに使う。
 #
 # 終了コード: 0 = 現れた / 124 = 期限切れ / それ以外 = 中断 (引数の誤りを含む。理由は標準エラー)。
 # 期限は起動時の date +%s に <分> を足した締切で測り、期限切れを宣言する前にもう 1 度確かめる。
@@ -75,7 +75,7 @@ if [ -f "$worker" ]; then
   start_pid=$(read_key "$worker" pid)
 fi
 
-# 1 回分の確認。現れたものがあれば標準出力に 1 行を出して 0 を返す
+# 1 回分の確認。現れたものがあれば標準出力に 1 行を書いて 0 を返す
 check_once() {
   if [ -f "$marker" ]; then
     status=$(read_key "$marker" status)
@@ -100,7 +100,7 @@ check_once() {
     if [ "$worker_existed" = 0 ] || [ "$(read_key "$worker" pid)" != "$start_pid" ]; then
       echo "worker $state"; return 0
     fi
-    # 起動時のワーカーは居ないものとして待っているので、その状態と停滞は見ない
+    # 起動時のワーカーはもう動いていないものとして待っているので、その状態と停滞は見ない
     [ "$await_worker" = 1 ] && return 1
     case "$state" in
       unavailable|expired|left) echo "worker $state"; return 0 ;;

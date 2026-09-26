@@ -216,7 +216,7 @@ class TestWorker(WaitTestBase):
 
 
 class TestAwaitWorker(WaitTestBase):
-    """--await-worker: 起動時のワーカーは居ないものとして、新しいワーカーの出現を待つ。"""
+    """--await-worker: 起動時のワーカーはもう動いていないものとして、新しいワーカーの出現を待つ。"""
 
     def test_terminal_state_at_start_is_not_an_event(self):
         for state in ("expired", "left", "unavailable"):

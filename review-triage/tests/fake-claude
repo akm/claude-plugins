@@ -5,7 +5,7 @@
 
 - FAKE_CLAUDE_ARGS: 受けた引数 (argv[1:]) を JSON の 1 行として追記するファイル
 - FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang のとき)
-- FAKE_CLAUDE_STREAM: 標準出力に出す stream-json の中身を持つファイル。無ければ既定の 3 行
+- FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行
 - FAKE_CLAUDE_SLEEP: 結果を書く前に待つ秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
 - FAKE_CLAUDE_MODE:

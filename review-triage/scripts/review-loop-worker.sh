@@ -202,7 +202,7 @@ unavailable() {
 
 STARTED=$(now_iso)
 
-# 1. 動いているワーカーが居るか。居れば worker.yaml に触れずに終わる
+# 1. 他のワーカーが動いているか。動いていれば worker.yaml に触れずに終わる
 if [ -f "$LOOP_DIR/worker.yaml" ]; then
   other_state=$(read_key "$LOOP_DIR/worker.yaml" state)
   other_pid=$(read_key "$LOOP_DIR/worker.yaml" pid)
@@ -247,9 +247,9 @@ command -v python3 >/dev/null 2>&1 || unavailable "python3 が見つからない
 IDLE_SECONDS=$(minutes_to_seconds "$IDLE_MINUTES")
 REVIEW_TIMEOUT_SECONDS=$(minutes_to_seconds "$REVIEW_TIMEOUT_MINUTES")
 
-# ---- 背景の処理 ----
+# ---- バックグラウンドの処理 ----
 
-# ワーカーのプロセスが居るか。終わったのに親が回収していない (ゾンビの) プロセスは居ないとみなす
+# ワーカーのプロセスが動いているか。終わったのに親が回収していない (ゾンビの) プロセスは動いていないとみなす
 worker_alive() {
   local st
   st=$(ps -o stat= -p "$WORKER_PID" 2>/dev/null)
@@ -259,7 +259,7 @@ worker_alive() {
   return 0
 }
 
-# worker.yaml の更新時刻を 5 秒おきに進める。ワーカーが居なくなったら (kill -9 で trap が動かなかった場合も) 自分も終わる
+# worker.yaml の更新時刻を 5 秒おきに進める。ワーカーのプロセスが無くなったら (kill -9 で trap が動かなかった場合も) 自分も終わる
 start_heartbeat() {
   (
     hb_sleep=""
@@ -302,7 +302,7 @@ stop_watchdog() {
   fi
 }
 
-# 割り込みに応じられるように、sleep を背景で起動して wait で待つ
+# 割り込みに応じられるように、sleep をバックグラウンドで起動して wait で待つ
 idle_sleep() {
   sleep "$1" &
   SLEEP_PID=$!

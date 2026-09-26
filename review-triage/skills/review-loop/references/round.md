@@ -32,14 +32,14 @@
 2. **記録が読めなければ RA3。**
 3. **増分の基点が HEAD の祖先でなければ RA3。** 記録に回があれば、最後の回の `head` について `git merge-base --is-ancestor <head> HEAD` を確かめる (reset や squash で履歴から外れていると、増分の範囲が成り立たない)。記録に回が無ければ (全量) 確かめない。
 4. **[review-request](../../review-request/SKILL.md) を呼ぶ**: `review-request <review.skill> <worker.model> <review.args> --dir <置き場>` (値は `loop.yaml`。置き場はリポジトリのルートからの相対パス。`ce-code-review` は effort を受け取らないので `<review.args>` を渡さない)。**範囲と基点は `review-request` の手順 2 に従う** (全量は分岐元、増分は直前の回の `head`)。`review-triage-loop` の [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「範囲」(merge-base で基点を決める規則) は使わない — 依頼文を書くのは `review-request` なので、基点の規則を 2 か所に持たないため。
-5. **`review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら** (RA1 の後に同じ分のうちに書き直した)、分が変わるのを待ってからやり直す。Bash ツールで `sleep 60` を背景で起動し (`run_in_background: true`)、`description` を「review-loop <周回 id>: 識別子の衝突を避けるため分が変わるまで待つ。通知を受けたら review-loop の再入の手順へ」にして、ターンを終える。再入の手順は、取り込む印も印の無い依頼文も無いので G2 に進み、L1 でここに戻る。識別子の成分に秒を足すことはしない (成分を変えると `review-request` の表の全欄を確かめ直すことになる)。
+5. **`review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら** (RA1 の後に同じ分のうちに書き直した)、分が変わるのを待ってからやり直す。Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-loop <周回 id>: 識別子の衝突を避けるため分が変わるまで待つ。通知を受けたら review-loop の再入の手順へ」にして、ターンを終える。再入の手順は、取り込む印も印の無い依頼文も無いので G2 に進み、L1 でここに戻る。識別子の成分に秒を足すことはしない (成分を変えると `review-request` の表の全欄を確かめ直すことになる)。
 6. **それ以外の理由で `review-request` が依頼文を書かなかったら RA3** (報告には `review-request` が報告した理由を書く)。
 7. **書けたら、この起動で数えた回数を 1 つ増やす** (J5 が見る回数。数えるのはここだけ)。依頼文の絶対パスと識別子を控える。
 8. **回 1 の最初の依頼文なら** (置き場に `worker.yaml` が無い)、ワーカーの起動を人間に案内する ([guide-template.md](guide-template.md))。
 
 ### (b) 完了の印を待つ
 
-[reentry.md](reentry.md) の「待機」のとおり、待機スクリプトを背景で起動して**ターンを終える**。印が現れると通知で次のターンが始まり、再入の手順で (c) に入る。
+[reentry.md](reentry.md) の「待機」のとおり、待機スクリプトをバックグラウンドで起動して**ターンを終える**。印が現れると通知で次のターンが始まり、再入の手順で (c) に入る。
 
 ### (c) 突き合わせる
 

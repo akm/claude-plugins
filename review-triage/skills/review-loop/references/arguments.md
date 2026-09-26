@@ -80,4 +80,4 @@ review-loop --end [<置き場>]
 | ワーカーの effort | `claude -p --effort` に渡す、レビュアの実行 (セッション) の effort | 人間 (`--effort` か `review_loop.worker_effort`) | `loop.yaml` の `worker.effort`・`worker.yaml` の `effort`・完了の印の `effort`・記録の `notes` の `worker_effort` |
 | レビュースキルの effort | レビュースキル (`code-review`) に渡す effort | `--review-args` か `loop.review_args` (無ければ既定。正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」) | 依頼文の `effort`・結果と記録の `level` |
 
-**ワーカーの effort は実行時の値を確かめられない** — `claude -p` のログに effort は出ないので、残るのはワーカーに渡した値である。
+**ワーカーの effort は実行時の値を確かめられない** — `claude -p` のログに effort は記録されないので、残るのはワーカーに渡した値である。
