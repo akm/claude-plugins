@@ -54,15 +54,15 @@ class WaitTestBase(unittest.TestCase):
     def put_marker(self, status="ok", rid=RID):
         _write(self.path(f"delivered-{rid}.yaml"), f'id: "{rid}"\nstatus: {status}\n')
 
-    def put_worker(self, state="idle", ago=0):
+    def put_worker(self, state="idle", ago=0, pid=1):
         p = self.path("worker.yaml")
-        _write(p, f"state: {state}\ncurrent_request: \"\"\npid: 1\n")
+        _write(p, f"state: {state}\ncurrent_request: \"\"\npid: {pid}\n")
         if ago:
             _set_mtime_ago(p, ago)
 
-    def run_wait(self, minutes="1", stale=None, actions=(), timeout=30):
+    def run_wait(self, minutes="1", stale=None, actions=(), timeout=30, await_worker=False):
         """スクリプトを起動し、actions ((秒, 関数) の列) をその時刻に行い、終了を待つ。"""
-        args = ["bash", _SCRIPT, self.dir, RID, str(minutes)]
+        args = ["bash", _SCRIPT] + (["--await-worker"] if await_worker else []) + [self.dir, RID, str(minutes)]
         if stale is not None:
             args.append(str(stale))
         started = time.time()
@@ -201,11 +201,58 @@ class TestWorker(WaitTestBase):
         )
         self.assertEqual(rc, 124)
 
+    def test_restarted_worker_returns_as_appearance(self):
+        # 起動時にあった worker.yaml でも、pid が変われば新しいワーカーの出現として返す
+        self.put_worker("idle", pid=100)
+        rc, out, err, _ = self.run_wait(actions=[(1, lambda: self.put_worker("idle", pid=200))])
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out, "worker idle")
+
     def test_unreadable_state_returns_invalid(self):
         _write(self.path("worker.yaml"), "pid: 1\n")
         rc, out, _, _ = self.run_wait()
         self.assertEqual(rc, 0)
         self.assertEqual(out, "worker invalid")
+
+
+class TestAwaitWorker(WaitTestBase):
+    """--await-worker: 起動時のワーカーは居ないものとして、新しいワーカーの出現を待つ。"""
+
+    def test_terminal_state_at_start_is_not_an_event(self):
+        for state in ("expired", "left", "unavailable"):
+            with self.subTest(state=state):
+                self.put_worker(state, pid=100)
+                rc, _, _, _ = self.run_wait(minutes="0.1", await_worker=True)
+                self.assertEqual(rc, 124)
+
+    def test_stale_worker_at_start_is_not_an_event(self):
+        self.put_worker("idle", ago=100, pid=100)
+        rc, _, _, _ = self.run_wait(minutes="0.1", await_worker=True)
+        self.assertEqual(rc, 124)
+
+    def test_new_worker_returns(self):
+        self.put_worker("expired", pid=100)
+        rc, out, err, _ = self.run_wait(
+            await_worker=True, actions=[(1, lambda: self.put_worker("idle", pid=200))]
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out, "worker idle")
+
+    def test_new_worker_that_fails_to_start_returns(self):
+        self.put_worker("expired", pid=100)
+        rc, out, _, _ = self.run_wait(
+            await_worker=True, actions=[(1, lambda: self.put_worker("unavailable", pid=200))]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "worker unavailable")
+
+    def test_marker_and_end_still_return(self):
+        self.put_worker("expired", pid=100)
+        self.put_request()
+        self.put_marker("failed")
+        rc, out, _, _ = self.run_wait(await_worker=True)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, f"delivered {RID}")
 
 
 class TestDeadline(WaitTestBase):

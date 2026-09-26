@@ -2,7 +2,7 @@
 # review-loop の作業側が背景で走らせる待機スクリプト。
 #
 # 使い方:
-#   review-loop-wait.sh <周回の置き場> <識別子> <分> [<停滞の秒数>]
+#   review-loop-wait.sh [--await-worker] <周回の置き場> <識別子> <分> [<停滞の秒数>]
 #
 # 周回の置き場を 5 秒おきに見て、次のどれかが現れたら標準出力に 1 行を出して終了コード 0 で終わる。
 # 同じ周期に複数が当たれば、上にあるものを返す。
@@ -11,12 +11,15 @@
 #                        failed なら依頼文も揃ったときに返す (揃うまでは次の周期まで待つ)。
 #                        status が読めない印は揃うのを待たずに返す (読めないことは作業側の検査が扱う)
 #   end                  ファイル end が現れた
-#   worker <state>       worker.yaml が、起動時には無く、その後に現れた
+#   worker <state>       新しいワーカーの worker.yaml が現れた (起動時には無かった、または pid が起動時と違う)
 #   worker <state>       worker.yaml の state が unavailable / expired / left
 #   worker invalid       worker.yaml の state が読めない (5 つの状態のどれでもない)
 #   worker stale         worker.yaml の更新時刻が <停滞の秒数> (既定 30) より古い。
 #                        ワーカーは動いている間は状態に関わらず 5 秒おきに更新時刻を進めるので、
 #                        古いことをワーカーのプロセスが居なくなった印と読む。worker.yaml が無い間は判定しない
+#
+# --await-worker を付けると、起動時の worker.yaml のワーカーは居ないものとして扱い、その状態と停滞を事象にしない
+# (新しいワーカーの出現・完了の印・end だけを返す)。作業側が、居なくなったワーカーの起動し直しを待つときに使う。
 #
 # 終了コード: 0 = 現れた / 124 = 期限切れ / それ以外 = 中断 (引数の誤りを含む。理由は標準エラー)。
 # 期限は起動時の date +%s に <分> を足した締切で測り、期限切れを宣言する前にもう 1 度確かめる。
@@ -28,10 +31,15 @@
 set -u
 
 usage() {
-  echo "使い方: review-loop-wait.sh <周回の置き場> <識別子> <分> [<停滞の秒数>]" >&2
+  echo "使い方: review-loop-wait.sh [--await-worker] <周回の置き場> <識別子> <分> [<停滞の秒数>]" >&2
   exit 2
 }
 
+await_worker=0
+if [ "${1:-}" = "--await-worker" ]; then
+  await_worker=1
+  shift
+fi
 [ $# -ge 3 ] && [ $# -le 4 ] || usage
 dir=$1
 rid=$2
@@ -61,7 +69,11 @@ result="$dir/review-$rid.yaml"
 worker="$dir/worker.yaml"
 
 worker_existed=0
-[ -f "$worker" ] && worker_existed=1
+start_pid=""
+if [ -f "$worker" ]; then
+  worker_existed=1
+  start_pid=$(read_key "$worker" pid)
+fi
 
 # 1 回分の確認。現れたものがあれば標準出力に 1 行を出して 0 を返す
 check_once() {
@@ -85,9 +97,11 @@ check_once() {
       idle|reviewing|expired|unavailable|left) ;;
       *) echo "worker invalid"; return 0 ;;
     esac
-    if [ "$worker_existed" = 0 ]; then
+    if [ "$worker_existed" = 0 ] || [ "$(read_key "$worker" pid)" != "$start_pid" ]; then
       echo "worker $state"; return 0
     fi
+    # 起動時のワーカーは居ないものとして待っているので、その状態と停滞は見ない
+    [ "$await_worker" = 1 ] && return 1
     case "$state" in
       unavailable|expired|left) echo "worker $state"; return 0 ;;
     esac
