@@ -12,20 +12,23 @@ review-loop --resume [<置き場>] [--max <回数>]
 review-loop --end [<置き場>]
 ```
 
-| 引数 | 対応する設定のキー | 意味 |
+| 引数 | 対応する設定のキー | 例 |
 | --- | --- | --- |
-| `--model` | `loop.review_model` | ワーカーに求めるモデルの指定 (ワーカーの `--model` にそのまま渡す綴り) |
-| `--effort` | `review_loop.worker_effort` | ワーカーに求める effort (ワーカーの `--effort`) |
-| `--review` | `loop.review_skill` | 依頼文でレビュアに呼ばせるレビュースキル |
-| `--review-args` | `loop.review_args` | レビュースキルに渡す effort など |
-| `--max` | `loop.max_rounds` | 上限 |
-| `--structure-rounds` | `loop.structure_rounds` | 構造の関門 k |
-| `--threshold` | `fix.threshold_rounds` | `review-triage-fix` に渡す回数の閾値 N |
-| `--stage` | `fix.stages.<段>` | `review-triage-fix` に渡す段の走らせ方 |
-| `--wait-minutes` | `review_loop.wait_minutes` | 完了の印を待つ上限 (分) |
-| `--worker-wait-minutes` | `review_loop.worker_wait_minutes` | ワーカーの起動 (`worker.yaml` の出現) を待つ上限 (分) |
-| `--resume [<置き場>]` | — | 止まった (または前のセッションが報告せずに終わった) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ) |
-| `--end [<置き場>]` | — | 周回を終える。置き場の省略は `--resume` と同じ |
+| `--model` | `loop.review_model` | `--model opus` |
+| `--effort` | `review_loop.worker_effort` | `--effort xhigh` |
+| `--review` | `loop.review_skill` | `--review code-review` |
+| `--review-args` | `loop.review_args` | `--review-args "high"` |
+| `--max` | `loop.max_rounds` | `--max 3` |
+| `--structure-rounds` | `loop.structure_rounds` | `--structure-rounds 0` |
+| `--threshold` | `fix.threshold_rounds` | `--threshold 3` |
+| `--stage` | `fix.stages.<段>` | `--stage investigate=sonnet:high` |
+| `--wait-minutes` | `review_loop.wait_minutes` | `--wait-minutes 5` |
+| `--worker-wait-minutes` | `review_loop.worker_wait_minutes` | `--worker-wait-minutes 5` |
+
+各キーの意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節。`--model` はワーカーの `--model` にそのまま渡す指定、`--effort` はワーカーの `--effort` で、どちらも周回の条件として `loop.yaml` に残る (語の区別は下の「モデルと effort を指す語」)。
+
+- **`--resume [<置き場>]`**: 止まった (または前のセッションが報告せずに終わった) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
+- **`--end [<置き場>]`**: 周回を終える。置き場の省略は `--resume` と同じ。
 
 設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`。
 

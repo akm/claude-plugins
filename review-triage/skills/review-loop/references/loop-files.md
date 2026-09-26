@@ -30,7 +30,7 @@
 
 ## `loop.yaml`
 
-作業側が周回の条件と状態を書く。**`--resume` はこのファイルだけから周回の条件を復元する** — 引数を毎回指定し直させると、再開のたびに条件が変わりうる。キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃える。
+作業側が周回の条件と状態を書く。`--resume` はこのファイルから周回の条件を復元する (再開のときに何を変えてよいかの正本は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃え、値の意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節にある — 下の表は対応する設定のキーだけを書く。
 
 ```yaml
 id: "20260926-1400-feat-review-loop-63"
@@ -67,21 +67,21 @@ rejected: []
 | `created` | ◯ | 周回を始めた日時 (ISO 8601。時差つき) |
 | `repo_dir` | ◯ | 作業側の作業ツリーのルートの実体パス (`git rev-parse --show-toplevel` を `cd` して `pwd -P` で解決したもの)。ワーカーは起動時に自分の作業ツリーと比べる |
 | `branch` | ◯ | 周回を始めたブランチ名 |
-| `worker.model` | ◯ | ワーカーに求めるモデルの指定 (人間が `--model` に渡す綴り) |
-| `worker.effort` | ◯ | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) |
-| `worker.permission_mode` | ◯ | レビュアの実行の権限モード |
-| `worker.allowed_tools` | ◯ | レビュアの実行に許すツールの一覧。空の列は「ワーカーの既定の一覧を使う」 |
-| `worker.idle_minutes` | ◯ | ワーカーの `--idle-minutes` |
-| `worker.review_timeout_minutes` | ◯ | ワーカーの `--review-timeout-minutes` |
-| `review.skill` | ◯ | 依頼文でレビュアに呼ばせるレビュースキル |
-| `review.args` | ◯ | レビュースキルに渡す effort など (空文字列なら既定) |
-| `loop.max_rounds` | ◯ | 上限 (起動ごとに 0 から数える) |
-| `loop.structure_rounds` | ◯ | 構造の関門 k |
-| `loop.threshold` | ◯ | `review-triage-fix` に渡す回数の閾値 N |
-| `loop.stages` | ◯ | `review-triage-fix` に渡す `--stage` の引数の列 (引数で指定したものだけ。設定 `fix.stages` は `review-triage-fix` が自分で読む)。無ければ `[]` |
-| `wait.wait_minutes` | ◯ | 完了の印を待つ上限 (分) |
-| `wait.worker_wait_minutes` | ◯ | 回 1 で `worker.yaml` の出現を待つ上限 (分) |
-| `wait.worker_stale_seconds` | ◯ | `worker.yaml` の更新時刻がこれより古ければ停滞と読む (秒) |
+| `worker.model` | ◯ | ワーカーのモデルの指定 (`loop.review_model`) |
+| `worker.effort` | ◯ | ワーカーの effort (`review_loop.worker_effort`) |
+| `worker.permission_mode` | ◯ | `review_loop.permission_mode` |
+| `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の列は「ワーカーの既定の一覧を使う」 |
+| `worker.idle_minutes` | ◯ | `review_loop.worker_idle_minutes` |
+| `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |
+| `review.skill` | ◯ | `loop.review_skill` |
+| `review.args` | ◯ | `loop.review_args` (空文字列なら既定) |
+| `loop.max_rounds` | ◯ | `loop.max_rounds` |
+| `loop.structure_rounds` | ◯ | `loop.structure_rounds` |
+| `loop.threshold` | ◯ | `fix.threshold_rounds` |
+| `loop.stages` | ◯ | 引数 `--stage` の値の列 (引数で指定したものだけ。設定 `fix.stages` は `review-triage-fix` が自分で読む)。無ければ `[]` |
+| `wait.wait_minutes` | ◯ | `review_loop.wait_minutes` |
+| `wait.worker_wait_minutes` | ◯ | `review_loop.worker_wait_minutes` |
+| `wait.worker_stale_seconds` | ◯ | `review_loop.worker_stale_seconds` |
 | `state` | ◯ | `active` (周回が進んでいる) / `stopped` (停止ノードで止まり、人間の判断を待つ) / `ended` (終わった) |
 | `stop_reason` | ◯ | `stopped` と `ended` のとき、ノード ID (`S2`〜`S6`・`RA1`〜`RA3`) か `end` と、1 行の理由。`active` なら空文字列 |
 | `rejected` | ◯ | レビュー不成立 (RA1) と判定した回の識別子の列。再入の手順が、その回の完了の印を取り込まない。無ければ `[]` |
@@ -207,8 +207,8 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | --- | --- | --- | --- |
 | 設定 | `config.json` の `review_loop` | キーごとの既定値 | 既定値で続行し、警告を報告に書く (失われるのは利用者が書いた数行) |
 | 状態 | `loop.yaml` | 周回が無い (開始の前提を満たす) | **止めて知らせる。新規に寄せない** — 新規として扱うと、同じブランチに終わっていない周回が 2 つでき、同じ回番号の依頼文が 2 つできる |
-| レビュアの実行が書くファイル | 結果 | ワーカーが `failed` (`no result`) の印を書く | ワーカーが `failed` の印を書く (形の誤りを `error` に書く) |
-| ワーカーが書くファイル | 完了の印・`worker.yaml` | 印はまだ (待つ)。`worker.yaml` はワーカーが未起動 (回 1 の最初の待機で待ち、期限を過ぎたら RA2) | 作業側は「レビュー不成立」(RA1) として止める。待機スクリプトは `worker.yaml` の `state` が読めなければ `worker invalid` を返す |
-| 作業側が書くファイル | 依頼文 | ワーカーは待つ | ワーカーが `failed` (`request malformed`) の印を書き、レビュアの実行を起動しない |
+| レビュアの実行が書くファイル | 結果 | ワーカーが `failed` の印を書く | ワーカーが `failed` の印を書く (`error` の書き方の正本は [worker.md](worker.md) の「回の処理」) |
+| ワーカーが書くファイル | 完了の印・`worker.yaml` | 印はまだ (待つ)。`worker.yaml` はワーカーが未起動 (起動を待ち、期限を過ぎたら RA2) | 作業側は「レビュー不成立」(RA1) として止める |
+| 作業側が書くファイル | 依頼文 | ワーカーは待つ | ワーカーが `failed` の印を書き、レビュアの実行を起動しない |
 
 停止ノード (RA1〜RA3) の定義と報告に書くものの正本は [stops.md](stops.md)。

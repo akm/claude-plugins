@@ -125,14 +125,14 @@
 | `dir` | 周回の置き場の親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
 | `wait_minutes` | 完了の印を待つ上限 (分) | 60 |
 | `worker_wait_minutes` | ワーカーの起動を待つ上限 (分)。回 1 の最初の待機と、`--resume` でワーカーが居ないときに使う | 15 |
-| `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | 180 |
+| `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
 | `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーが居なくなったと読む (秒) | 30 |
-| `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | 60 |
+| `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
 | `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
-| `permission_mode` | レビュアの実行の権限モード (`bypassPermissions` は受け付けない) | `default` |
-| `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。指定すればワーカーの既定の一覧を置き換える | ワーカーの既定の一覧 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
+| `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | ワーカーの既定 (同上。受け付けない値も同じ箇所) |
+| `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。ワーカーの `--allowed-tools` に要素ごとに埋める | ワーカーの既定の一覧 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
 
-**ワーカーのスクリプトは設定を読まない。** `review-loop` がここの値を、人間に案内するワーカーの起動コマンドに埋める。プラグインの展開先と利用者のリポジトリは別の場所にあり、スクリプトから設定を探すと、どのリポジトリの設定を読むかの基準を取り違える。
+ワーカーのスクリプトはこの設定を読まず、`review-loop` が値を人間に案内する起動コマンドに埋める (理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」)。
 
 `review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、`allowed_tools` は空の配列も未設定)。**`loop` と違い、値の誤りは周回を止めない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
 
