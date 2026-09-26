@@ -50,7 +50,7 @@
 3. **HEAD と作業ツリー**: 印の `head_before` と `head_after` が依頼文の `head` と同じコミットを指し、`tree_clean_after` が `true`。**作業側でも** `git rev-parse --short HEAD` が依頼文の `head` と同じで、`git status --porcelain` が空であることを確かめる (印を信じるだけにしない)。
 4. **effort とモデル**: 印の `effort` が `loop.yaml` の `worker.effort` と、`model.specified` が `worker.model` と等しい (人間が案内と違う値でワーカーを起動していない)。`model.effective` が `unknown` でなければ、実効モデルの名前が指定に一致する — 比べ方は [stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」と同じで、名前 (`opus-5` のような版を含む表記) から版を除いた部分が指定の別名 (`opus`) と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。`unknown` なら比べない (記録の `notes` に「不明」と残る)。
 5. **skill を呼んだ**: `skill_called` が `false` なら RA1 — skill を呼ばずに読んだ結果を、依頼どおりの結果として記録しない (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」)。`unknown` なら止めない (`notes` に「不明」と残る)。
-6. **拒否されたツールの呼び出しが無い**: `permission_denials.count` が 1 以上なら RA1 — 調べられなかった範囲の指摘が欠けた結果を、採択 0 の収束として記録に入れないため。報告には拒まれたツール名と、そのツールを `--allowed-tools` に足したワーカーの起動コマンドを書く。`unknown` なら止めない (`notes` に「不明」と残る)。
+6. **拒否されたツールの呼び出しが無い**: `permission_denials.count` が 1 以上なら RA1 — 調べられなかった範囲の指摘が欠けた結果を、採択 0 の収束として記録に入れないため。報告に書くもの (拒否の理由と、許可の一覧で直せるか) の正本は [stops.md](stops.md) の RA1 の行。`unknown` なら止めない (`notes` に「不明」と残る)。
 7. **結果**: 結果ファイル (`<置き場>/review-<識別子>.yaml`) が YAML として読め、`findings` キーがあり、`run_id` が識別子と一致する。
 
 すべて通れば L2 に進む。
