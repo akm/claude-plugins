@@ -57,6 +57,8 @@
 
 ## L2 で `review-triage` に渡すもの
 
+**L2 では、回ごとに Skill ツールで `review-triage` を呼ぶ。指摘が 0 件の回も同じ。** 前の回で読んだ `review-triage` の手順を、このスキルが自分で実行して記録に書かない — 記録への回の追記・residual を自己採択にするかの判断・生成サマリの再生成と検査は `review-triage` が行う。このスキルが代わりに行うと、`review-triage` の手順で確かめないまま判断が記録に入る (通し確認で、指摘が 0 件の回に作業側がこれを行った)。F1 の `review-triage-fix` も同じく、回ごとに Skill ツールで呼ぶ。
+
 `review-triage` を呼ぶときは、結果ファイルのパスと、次の値を渡す。
 
 - **記録のキー (`model` / `skill` / `level` / `scope`) の値の出所は、[review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「記録のキーの出所」の、そのレビュースキル (`code-review` か `ce-code-review`) の列のとおり。ただし「sub-agent の報告」を「完了の印」と読み替える。** この周回は新しい経路ではないので、出所の表を増やさない (表を複数の文書に持つと、同じ場所への採択が続いた実測がある)。`model` は印の `model.effective` で、`unknown` なら `loop.yaml` の `worker.model` (記録の `model` は空にできない)。
