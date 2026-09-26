@@ -19,7 +19,7 @@ execution: code
 - **手段**: スキル `review-loop` (作業側) とスクリプト `review-loop-worker.sh` (ワーカー) を review-triage プラグインに足し、2 つのプロセスの受け渡しを周回の置き場 (ディレクトリ) の中のファイルだけで行い、作業側の待機を同梱のスクリプトで背景で行う (KTD1〜KTD5)。
 - **優先順位**: 効き目の中心はワーカーのスクリプト (レビュー側の判断をすべてテストできるコードにする) と、作業側の再入の手順。
 - **正本の優先順位**: 製品の振る舞いは Product Contract の R-ID が正本。実装の選び方は Planning Contract の KTD が正本。実装単位 (U-ID) はどちらも書き換えない。
-- **止まる条件**: 作業側の背景の待機が対話セッションで 10 分を越えて続くこと、`claude -p` の 1 回の実行が 30 分のレビューで打ち切られないことを通し確認の最初に測り、どちらかが成り立たなければ設計 (KTD3・KTD4) を変えずに止めて報告する。打ち切りが出た場合の代替 (短い期限の繰り返しにして中断ではなく期限で数える) を人間に返す。`review-triage-loop`・`review-triage`・`review-triage-fix` のファイルや記録のスキーマを変えなければ実装できないと分かったら、変えずに止めて人間に返す。既存の記録 (`tmp/review-triages/`・`docs/review-triage/`) が書き換わる形になったら止める。
+- **止まる条件**: 作業側の背景の待機が対話セッションで 10 分を越えて続くこと、`claude -p` の 1 回の実行が 30 分を越えても打ち切られないことは、2026-09-26 に 1 回ずつ実測して成り立った (Dependencies / Assumptions)。通し確認で打ち切りが出たら、設計 (KTD3・KTD4) を変えずに止めて報告し、代替 (短い期限の繰り返しにして中断ではなく期限で数える) を人間に返す。`review-triage-loop`・`review-triage`・`review-triage-fix` のファイルや記録のスキーマを変えなければ実装できないと分かったら、変えずに止めて人間に返す。既存の記録 (`tmp/review-triages/`・`docs/review-triage/`) が書き換わる形になったら止める。
 - **実行の型**: 2 本のスクリプトはテスト (python の unittest。`claude` の代わりに置く偽のコマンドで動かす) を先に書いて固める。作業側の手順書 (Markdown) は、対話セッション 1 つと端末 1 つを実際に開いて通し確認する (Verification Contract)。文書を変えたら `doc-dag` と `wording-guard` を回す。
 - **後始末の所有**: この計画の PR は人間が作る。コミットは動機ごとに分ける (規範は利用者のコミットルール)。
 - **Product Contract の保全**: 出所は Issue #63。変更あり。(1) レビュー側を対話セッションではなく、人間が起動するスクリプト (`claude -p` を依頼文ごとに走らせる) にした (Key Decisions の 2 番目)。(2) 名前を `review-loop` / `review-loop-worker` にした。(3) 段階 2 (セッション間メッセージ) を落とした — ワーカーがレビュー中も動いていることの印を出し、失敗を即座に印にするので、停滞の検知が期限を待たずにできる。(4) 完了の印から導出できる項目を外し、識別子だけを持たせる (KTD2)。(5) 相手を起こすファイルは一時名に書いてから改名する (KTD4)。(6) 作業側の待機を同梱のスクリプトで行う (KTD3)。(7) `--resume` は `active` の周回も対象にする (R21)。(8) 停止ノードを 3 つ足す (KTD9)。(9) 依頼文に埋める出力先を絶対パスにする (KTD12)。(10) `review-request.md` に `run_id` の受け渡しの 1 文を足す (KTD6。`review-triage` の SKILL.md は変えない)。
@@ -217,7 +217,7 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 
 - 通し確認の成功の経路 (AE1・AE2) で、人間が行った操作がワーカーの起動・停止後の判断の 2 種類だけである (KTD15 の権限モードで走らせたとき)。
 - 待機中の作業側は、待機のターンでツールを呼ばず、通知で次のターンが始まる。ワーカーはレビュアの実行の外でトークンを消費しない。
-- 記録に `run_id` と固定書式の `notes` が入り、ワーカーの effort が実測として残る。同じ回が 2 つできない。既存の記録と生成サマリは書き換わらない。
+- 記録に `run_id` と固定書式の `notes` が入り、ワーカーに渡した effort が残る (effort は `claude -p` のログに出ないので、実行時の値は確かめられない。Dependencies / Assumptions)。同じ回が 2 つできない。既存の記録と生成サマリは書き換わらない。
 - ワーカーのスクリプトの全経路 (AE5〜AE8・AE10・AE11・AE14〜AE17) が偽の `claude` のテストで通る。
 - `review-triage-loop`・`review-triage`・`review-triage-fix` のディレクトリと `record-schema.md`・`triagecheck` に差分が無い。
 
@@ -244,8 +244,10 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 
 - Claude Code 2.1.236 (利用者の環境)。端末の `claude` は claude.ai の認証済み (Claude Desktop app とは別の認証)。
 - `claude -p` は `--model`・`--effort` (low / medium / high / xhigh / max)・`--permission-mode`・`--allowedTools`・`--disallowedTools`・`--output-format stream-json`・`--plugin-dir`・`--settings` を受ける (`claude --help` で確認)。`-p` の中でも Skill と Agent のツールが使える (自動メモリの通し確認で `--plugin-dir` のスキルを `-p` で走らせた実績)。`-p` は人間に問えない。
-- `claude -p` の 1 回の実行が 30 分を越えるレビューで打ち切られないことは未確認 (背景タスクの待ち上限 10 分は `-p` の実行そのものの上限ではない)。通し確認の最初に測る (止まる条件)。
-- 作業側の Bash ツールの `run_in_background` はターンをまたいで走り、終了で通知が届く。sub-agent では 630 秒の背景の `sleep` が打ち切られなかった (実測)。対話セッション (main) でも同じかは通し確認の最初に測る (止まる条件)。
+- `claude -p` の 1 回の実行は 30 分を越えても打ち切られない (2026-09-26 に実測。`claude -p --model sonnet --effort low --permission-mode acceptEdits --allowedTools Bash --output-format stream-json --verbose` で、`timeout: 600000` を付けた前景の Bash (290 秒の待ち) を 7 回続けさせ、2051 秒で終了コード 0、`result` の行は `subtype: success`・`terminal_reason: completed`)。背景タスクの待ち上限 10 分は `-p` の実行そのものの上限ではない。
+- 作業側の Bash ツールの `run_in_background` はターンをまたいで走り、終了で通知が届く。対話セッション (main。Claude Desktop app) でも、背景の `for i in $(seq 1 66); do sleep 10; done` が 660 秒で打ち切られずに終わり、完了の通知が届いた (2026-09-26 に実測)。sub-agent でも 630 秒の背景の `sleep` が打ち切られなかった。
+- `claude -p --output-format stream-json --verbose` のログ (2026-09-26 に実測): `type: system`・`subtype: init` の行に `model` (モデル ID。例 `claude-sonnet-5`)・`permissionMode`・`tools`・`skills`・`plugins`・`claude_code_version` がある。effort はログのどの行にも出ない。最後の `type: result` の行に `permission_denials` (配列)・`modelUsage` (モデルごとの集計)・`is_error`・`terminal_reason`・`duration_ms`・`total_cost_usd` がある。`init` の行より前に、利用者の SessionStart のフックの `hook_started` / `hook_response` の行が出る。
+- `claude -p` のレビュアの実行にも、利用者の設定・フック・インストール済みのプラグイン (`init` の行の `plugins`)・CLAUDE.md が効く (2026-09-26 に実測)。
 - 前景の `sleep` は拒否されるので、作業側の待機は必ず背景で起動する。`sleep` で始まるコマンドは前景の timeout の例外扱いになるので、スクリプトの先頭は `sleep` にしない。
 - Bash ツールのシェルは zsh で、`find` は同梱の bfs に置き換わっている。スクリプトは `bash` で起動し、その中の `find` は `/usr/bin/find` になる。
 - macOS に `fswatch` / `inotifywait` は無い。ポーリング (5 秒) で足りる。
@@ -255,10 +257,10 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 
 **Deferred to Implementation**
 
-- 対話セッション (main) で背景の待機が 10 分を越えて続くか。`claude -p` の 1 回の実行が 30 分を越えて続くか。通し確認の最初に測る。続かなければ止める (Goal Capsule)。打ち切りが 1 回でも出たら、待機を短い期限 (例: 10 分) の繰り返しにして中断ではなく期限で数える設計に改めるかを人間に返す。
+- 対話セッション (main) の背景の待機 (10 分を越える) と `claude -p` の 1 回の実行 (30 分を越える) は、1 回ずつの実測では打ち切られなかった (Dependencies / Assumptions)。通し確認で打ち切りが 1 回でも出たら、待機を短い期限 (例: 10 分) の繰り返しにして中断ではなく期限で数える設計に改めるかを人間に返す (Goal Capsule)。
 - 作業側の背景の待機が外から止められる条件 (セッションの切り替え・compact・app の再起動)。通し確認の再開のシナリオで、閉じる・切り替えるの両方を試す。
 - レビュアの実行の権限の既定 (権限モード `default`・読み取りのツールの許可の一覧・結果ファイル 1 つへの書き込みの許可。KTD15) で `code-review` が最後まで走るか。パスを指定した書き込みの許可 (`Edit(//<絶対パス>)`) が `-p` で効くか、レビュースキルが起動した sub-agent が結果を書く場合にも効くか。通し確認で、拒まれたツールをログから数える。
-- stream-json のどの行から実効モデルと skill の呼び出しを読めるか。読めなければ `unknown` のままにする。
+- 実効モデルは `init` の行の `model` から読めることを確かめた (Dependencies / Assumptions)。skill の呼び出しの `tool_use` の形と、拒否があったときの `permission_denials` の要素の形は、実測の実行ではどちらも起きていないので、通し確認のログで確かめる。読めなければ `unknown` のままにする。
 - `-p` の中で `code-review` が並行レビューを走らせるか (Problem Frame の仮説)。ログと記録の `notes` で集める。
 - 依頼文の雛形の「出力様式」の節で、`review-triage` の手順 1 の例示 `tmp/review-<識別子>.yaml` が周回の置き場でも読み違えを起こさないか。起こせば例示の 1 語を直すことを人間に返す (`review-triage` は変えない決定)。
 - Claude Desktop app の端末のツールでワーカーを起動する提案を段階 1 に含めるか。含めるなら、起動の承認を人間に求める形と、端末を閉じたときのワーカーの扱いを確かめる。
@@ -301,7 +303,7 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 - KTD13. **全量と増分の基点は `review-request` の規則に従い、増分の基点が HEAD の祖先でなければ止める。** `review-request` を呼ぶので基点の決め方はその手順 2 (全量は分岐元、増分は直前の回の `head`) になり、`review-invocation.md` の merge-base の規則は使わない — `review-loop` の references にその旨を明記する。増分の基点は `git merge-base --is-ancestor` で祖先であることを確かめ、祖先でなければ (reset や squash の後) RA3 で止める。周回の間に履歴を書き換えないことを前提知識に書く。R17 を実装する。
 - KTD14. **レビュアの実行のプロンプトは固定の 1 文にし、依頼文の中身を写さない。** 「依頼文 `<絶対パス>` のとおりに作業し、結果を依頼文が指す出力先に書く」だけを渡す。依頼文はレビュアが読む前提で書かれており (雛形の冒頭)、写すと貼り方が回ごとに変わる元の問題 (`review-request.md` の実測) に戻る。`AskUserQuestion` は `--disallowedTools` で外す (`-p` は人間に問えないため)。外したツールはレビュアに示されないので、レビュアは問わずに進む。失敗として現れるのではない。許可の一覧に無いツールの呼び出しも、その呼び出しが拒否されるだけでレビュアは続けるので、拒否の件数を完了の印に書き、作業側が RA1 で止める (R17)。R26 を実装する。
 - KTD15. **レビュアの実行の権限は引数で決め、既定は権限モード `default` と、読み取りのツールの許可の一覧と、その回の結果ファイル 1 つへの書き込みの許可にする** (session-settled: user-approved — chosen over 既定を `acceptEdits` とファイルの読み書きの許可にする案: `acceptEdits` は許可の一覧と関係なく作業ディレクトリ内の編集をすべて自動で許可するので、git に無視されるファイル (記録 `tmp/review-triages/*.yaml` やファイル `.claude/settings.local.json` など) への書き込みが検出されずに `ok` になる)。依頼文は読み取りを前提に書かれているので、既定のレビューは書き込みを要しない。依頼文の雛形が許すプローブ (一時的な変更と revert) を許したいときは、人間が `--permission-mode acceptEdits` を明示してワーカーを起動する。`bypassPermissions` は使わない。`-p` は許可の問い合わせに答えられないので、拒まれたツールは呼び出しが拒否されるだけで、レビュアは実行を続ける。許可の一覧の既定は `references/worker.md` に置き、通し確認で拒まれたツールを数えて直す。R5, R26 を実装する。
-- KTD16. **通し確認は、作業側の対話セッション 1 つと、ワーカーを起動する端末 1 つで行う。** 作業側はブランチ版のプラグインを `claude --plugin-dir <リポジトリ>/review-triage --settings '{"enabledPlugins":{"review-triage@akm-claude-plugins":false}}'` で開く (インストール済みの同名プラグインを外す)。ワーカーはリポジトリの `review-triage/scripts/review-loop-worker.sh` を直接起動し、`-- --plugin-dir …` は要らない (`code-review` は組み込みのスキル)。待機の期限は引数で短くする (R15)。最初に、対話セッションで `sleep 660` を背景で走らせて打ち切られないことと、`claude -p` で 30 分の `sleep` を含む実行が打ち切られないことを確かめる (Goal Capsule の止まる条件)。ワーカーのスクリプトの経路は偽の `claude` のテストで先に固め、通し確認では成功の経路と再開・終了だけを実際に走らせる。Verification Contract を実装する。
+- KTD16. **通し確認は、作業側の対話セッション 1 つと、ワーカーを起動する端末 1 つで行う。** 作業側はブランチ版のプラグインを `claude --plugin-dir <リポジトリ>/review-triage --settings '{"enabledPlugins":{"review-triage@akm-claude-plugins":false}}'` で開く (インストール済みの同名プラグインを外す)。ワーカーはリポジトリの `review-triage/scripts/review-loop-worker.sh` を直接起動し、`-- --plugin-dir …` は要らない (`code-review` は組み込みのスキル)。待機の期限は引数で短くする (R15)。対話セッションの背景の待機が 660 秒で打ち切られないことと、`claude -p` の 34 分の実行が打ち切られないことは、計画の段階で確かめた (Dependencies / Assumptions)。ワーカーのスクリプトの経路は偽の `claude` のテストで先に固め、通し確認では成功の経路と再開・終了だけを実際に走らせる。Verification Contract を実装する。
 - KTD17. **変えないもの。** `review-triage-loop/**`・`review-triage/SKILL.md`・`review-triage-fix/**`・`record-schema.md`・`tools/triagecheck/**`・`.github/workflows/`。review-triage 側で触るのは `project-config.md` の 1 文、`review-request.md` の 1 文、雛形の `run_id` の行、`review-request` の SKILL.md、`review-triage/README.md`、`review-triage/.claude-plugin/plugin.json` (description と version) だけ。
 
 ### High-Level Technical Design
@@ -415,15 +417,15 @@ flowchart TB
 - **共有の作業ツリー**: 作業側とレビュアの実行が同じ作業ツリーを使う。同時に動くのはどちらか一方だけで、人間も周回の間は作業ツリーを変えない (R5)。レビュアの実行の一時的なプローブ (依頼文の雛形が許す。revert 必須) が戻されなかった場合はワーカーが `failed` の印で検出し、片付けるのは人間 (印の `error` に汚れたファイルの一覧を書く)。
 - **`review-request` の呼び出し元**: `--dir` と `run_id` の埋め込みと絶対パスの出力先は、置き場を省略した既存の呼び出し (人間が別セッションに貼る運用) にも効く。`run_id` が埋まると、新しい回の生成サマリの見出しに識別子が付く (既存の記録は変わらない)。
 - **端末の `claude` の認証と権限**: ワーカーは端末の `claude` を使うので、Claude Desktop app とは別の認証が要る (この機材では認証済み)。レビュアの実行の権限は引数で決まり、利用者の `settings.json` の許可も効く。
-- **フック**: commit-rules-guard の未コミットの変更の警告は作業側だけに出る (ワーカーは Claude Code のセッションを持たない)。背景の通知はプロンプトではないのでフックは走らない (通し確認で見る)。
+- **フック**: ワーカーのスクリプト自体は Claude Code のセッションを持たないが、レビュアの実行 (`claude -p`) は Claude Code のセッションなので、利用者のフック (commit-rules-guard など)・プラグイン・CLAUDE.md が効く (実測で SessionStart のフックが走った)。作業ツリーは clean なので、未コミットの変更の警告は出ないはず。フックがレビューの終了を妨げないかは通し確認で見る。背景の通知はプロンプトではないので、作業側ではフックは走らない (通し確認で見る)。
 - **CI**: python のテストのディレクトリが 1 つ増え (`review-triage/tests/`)、`.github/test-targets.txt` に 1 行足す。テストは `claude` を呼ばない (偽のコマンド)。
 - **記録**: スキーマは変えない。`notes` の 1 行の固定書式が増える (R31)。
 - **プラグインの説明**: 「skill 4 つ」が 3 か所 (`review-triage/README.md`・`plugin.json`・`marketplace.json`) にあり、「skill 5 つと、レビューを行うワーカーのスクリプト」に揃える。
 
 ### Risks
 
-- **`claude -p` の長い実行が打ち切られる** — 未確認。通し確認の最初に測り、打ち切られれば止めて設計を人間に返す (Goal Capsule)。
-- **作業側の背景の待機が対話セッションで打ち切られる** — sub-agent での実測 (630 秒) しか無い。通し確認の最初に測り、打ち切りが出たら短い期限の繰り返しにする判断を人間に返す (Open Questions)。
+- **`claude -p` の長い実行が打ち切られる** — 34 分の実行 1 回では打ち切られなかった。通し確認で打ち切られれば止めて設計を人間に返す (Goal Capsule)。
+- **作業側の背景の待機が対話セッションで打ち切られる** — 660 秒の待機 1 回では打ち切られなかった。外から止められる条件 (セッションの切り替え・compact・app の再起動) は未確認で、通し確認で試す。打ち切りが出たら短い期限の繰り返しにする判断を人間に返す (Open Questions)。
 - **レビュアの実行の権限が足りず、`code-review` が一部を調べないまま結果を書く** — `-p` では拒否された呼び出しだけが失敗し、レビュアは続ける。拒否の件数を完了の印に書いて RA1 で止め (R17)、ログから拒まれたツールを読み、許可の一覧の既定を直す (KTD15)。
 - **実効モデルと skill の呼び出しをログから読めない** — `unknown` で動く設計にし、記録の比較は指定のモデルと effort で行う。
 - **待機スクリプトの許可** — 既定の権限モードでは初回に確認が出る。呼び出しの形を一定にして許可ルール 1 つで済むようにする (KTD3)。auto モードなら出ない。
@@ -640,7 +642,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | スクリプトのテスト | `python3 -m unittest discover -s review-triage/tests` (偽の `claude` を使う。実際の `claude` は呼ばない) | U2, U4 | 待機の終了コードと事象、ワーカーの全経路 (AE5〜AE8・AE10・AE11・AE14〜AE17)、書き出すファイルのキーが契約と一致 |
 | CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (push で走る) | U2, U4 | `.github/test-targets.txt` と実際の対象が一致する |
-| Claude Code の動作の前提の実測 | 対話セッションで `sleep 660` を背景で走らせる。端末で `claude -p --effort low` に 30 分の待ちを含む作業をさせる | 通し確認の前 | 作業側の背景の待機と `claude -p` の 1 回の実行が打ち切られない (打ち切られれば止める) |
+| Claude Code の動作の前提の実測 | 対話セッションで 660 秒の待機を背景で走らせる。端末で `claude -p --effort low` に 30 分を越える待ちを含む作業をさせる (2026-09-26 に実施済み。Dependencies / Assumptions) | 通し確認の前 | 作業側の背景の待機と `claude -p` の 1 回の実行が打ち切られない (打ち切られれば止める) |
 | 既存の記録の検査 | 設定の `triage_check_command` (`tmp/review-triages/` の全記録) | U1, U5 | `run_id` を埋めても既存の記録と生成サマリが書き換わらない |
 | 変えないものの差分 | `git diff --stat main -- review-triage/skills/review-triage-loop review-triage/skills/review-triage/SKILL.md review-triage/skills/review-triage-fix review-triage/skills/review-triage/references/record-schema.md review-triage/tools` | U1〜U7 | 差分が無い (KTD17) |
 | 説明文の一致 | `plugin.json` と `marketplace.json` の description の比較、`grep -rn 'skill 4 つ'` | U6 | 同文で 5 つとワーカー |
@@ -653,7 +655,7 @@ flowchart TB
 
 | # | シナリオ | 期待 | Covers |
 | --- | --- | --- | --- |
-| 0 | Claude Code の動作の前提 (作業側の背景の待機 11 分、`claude -p` の 30 分の実行、待機中にセッションの切り替え・compact・別の話題のプロンプトを挟む、レビュアの実行で拒まれたツールの数) | 打ち切られない。124 が `failed` の通知で届く。拒まれたツールを記録し、許可の一覧の既定を直す | Open Questions |
+| 0 | Claude Code の動作の前提 (待機中にセッションの切り替え・compact・別の話題のプロンプトを挟む、レビュアの実行で拒まれたツールの数。背景の待機 11 分と `claude -p` の 30 分を越える実行は実施済み) | 打ち切られない。124 が `failed` の通知で届く。拒まれたツールを記録し、許可の一覧の既定を直す | Open Questions |
 | A | 成功の経路 2 往復 → 採択 0 で S3 | 記録の回 1・2 に `run_id` と `notes`。待機のターンで他の操作をしていない。ワーカーは `idle` のまま同じプロセス | AE1, AE2 |
 | B | ワーカー未起動 → 期限切れ → 起動して `--resume` | RA2 で止まり起動コマンドを再掲。`--resume` が印の無い依頼文を待ち直して回 1 に進む | R18, R21 |
 | C | 別の worktree でワーカーを起動 | `worker.yaml` が `unavailable`。作業側は期限を待たずに RA2 | AE6 |
