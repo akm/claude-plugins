@@ -69,7 +69,7 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 - R2. `review-loop` は条件を引数 > 設定 > 既定の順で決め、決めた値を始める前に検査する。値の誤りは出所 (引数か設定か) を添えて報告して終わる。ワーカーに求めるモデルと effort が決まらなければ人間に尋ね、推測しない。引数の様式は `references/arguments.md` が正本 (KTD1)。
 - R3. 開始の前提は、作業ツリーが clean であること、周回の置き場が git に無視されていること、記録 YAML が読めること (無い場合は新規として扱う)、同じブランチに `ended` でない周回が無いこと。満たさなければ始めず、何を片付ければよいかを報告する。`ended` でない周回があれば `--resume` か `--end` を案内する。
 - R4. 開始時に周回の置き場 `<review_loop.dir>/<周回 id>/` を作り、`loop.yaml` に条件と状態を書く。周回 id は `<YYYYMMDD>-<hhmm>-<ブランチ名>` で、ブランチ名の整え方は `review-request` の手順 3 と同じ。
-- R5. 開始時と停止時の報告に、人間がワーカーを起動するためのコマンドをコピーできる形で出す — スクリプトの絶対パス (`${CLAUDE_PLUGIN_ROOT}` を展開したもの)、周回の置き場の絶対パス、`--model` と `--effort`、作業側と同じ作業ツリーで起動すること、周回の間は作業ツリーを変えないこと。Claude Desktop app で端末のツールが使えるときは、そのコマンドを端末のタブで起動することを人間に提案してよい (起動するかどうかとモデル・effort は人間が決める)。
+- R5. 開始時と停止時の報告に、人間がワーカーを起動するためのコマンドをコピーできる形で出す — スクリプトの絶対パス (`${CLAUDE_PLUGIN_ROOT}` を展開したもの)、周回の置き場の絶対パス、`--model` と `--effort`、設定 `review_loop.permission_mode` と `review_loop.allowed_tools` が設定されていれば `--permission-mode` と `--allowed-tools` (一覧の要素ごとに 1 つ。`Bash(git diff:*)` の括弧と `*` をシェルが展開しないように、各要素を単一引用符で囲む)、作業側と同じ作業ツリーで起動すること、周回の間は作業ツリーを変えないこと。Claude Desktop app で端末のツールが使えるときは、そのコマンドを端末のタブで起動することを人間に提案してよい (起動するかどうかとモデル・effort は人間が決める)。
 
 **受け渡しの契約 (ファイル)**
 
@@ -99,13 +99,13 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 
 **ワーカー**
 
-- R23. `review-loop-worker.sh <置き場の絶対パス> --model <指定> --effort <値> [--permission-mode <値>] [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>]` で起動する。`--model` と `--effort` は必須で、既定を持たない (人間が決める)。`--` 以降は `claude -p` にそのまま渡す (`--plugin-dir` や `--settings` を通し確認で使う)。
-- R24. 起動時の確認を行い、通らなければ `worker.yaml` を `unavailable` と理由で書いて終了コード 2 で終わる — 置き場に `loop.yaml` があり読めること、実体パスに解決した `git rev-parse --show-toplevel` が `loop.yaml` の `repo_dir` と一致すること (別の worktree は `--git-common-dir` の一致で判別して報告する)、`end` が無いこと、`worker.yaml` の `pid` のプロセスが動いていないこと (動いていれば、他のワーカーか、端末を閉じたのに残ったプロセスなので、PID を添えて止め方を案内する)、`claude` コマンドがあること。通れば `worker.yaml` を `idle` で書き、5 秒おきに更新時刻を進める処理を始める。
+- R23. `review-loop-worker.sh <置き場の絶対パス> --model <指定> --effort <値> [--permission-mode <値>] [--allowed-tools <道具>]... [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>]` で起動する。`--model` と `--effort` は必須で、既定を持たない (人間が決める)。`--allowed-tools` は繰り返して指定でき、1 回でも指定すれば R26 の既定の一覧を置き換える (設定 `review_loop.allowed_tools` をワーカーに届ける経路。ワーカーは設定を読まない)。`--` 以降は `claude -p` にそのまま渡す (`--plugin-dir` や `--settings` を通し確認で使う)。
+- R24. 起動時の確認を行う。最初に、動いているワーカーが居るかを判定する — `worker.yaml` の `state` が `idle` / `reviewing` で、更新時刻が 30 秒以内で、`kill -0 <pid>` が成功する、の 3 つがすべて成り立てば、他のワーカーか端末を閉じたのに残ったプロセスが居るので、`worker.yaml` に触れずに PID と止め方を出して終了コード 2 で終わる (更新時刻を条件に加えるのは、`kill -9` の後に PID が別のプロセスに再利用された場合に居ないワーカーを居ると判定しないため)。この判定を通った後の確認は、通らなければ `worker.yaml` を `unavailable` と理由で書いて終了コード 2 で終わる — 置き場に `loop.yaml` があり読めること、実体パスに解決した `git rev-parse --show-toplevel` が `loop.yaml` の `repo_dir` と一致すること (別の worktree は `--git-common-dir` の一致で判別して報告する)、`end` が無いこと、`claude` コマンドがあること。通れば `worker.yaml` を `idle` で書き、5 秒おきに更新時刻を進める処理を始める。
 - R25. 印の無い依頼文を 5 秒おきに探し (識別子の順で最初の 1 つ)、見つけたら `worker.yaml` を `reviewing` と識別子にし、`git rev-parse --short HEAD` が依頼文の `head` と一致し作業ツリーが clean であることを確かめる。違えばレビュアの実行を起動せずに `failed`・`error: head mismatch (expected …, actual …)` (または `tree not clean`) の印を書き、`idle` に戻る。
-- R26. レビュアの実行は `claude -p` を、`--model`・`--effort`・`--permission-mode` (既定は設定 `review_loop.permission_mode`。それも無ければ `acceptEdits`)・`--allowedTools` (設定 `review_loop.allowed_tools`。既定は git の読み取り・ファイルの読み書き・Skill・Agent)・`--disallowedTools AskUserQuestion`・`--output-format stream-json`・`--verbose` と、`--` 以降の追加の引数で起動し、標準出力と標準エラーを置き場の `<識別子>.log` に残す。プロンプトは固定の 1 文「依頼文 `<絶対パス>` のとおりに作業し、結果を依頼文が指す出力先に書く」で、依頼文の中身は写さない。実行には `--review-timeout-minutes` (既定は設定 `review_loop.review_timeout_minutes`、それも無ければ 60) の上限を付け、越えたら止めて `failed`・`error: timeout` にする。`ce-code-review` のように JSON を返す skill を依頼文が指す場合は、依頼文の「出力様式」のとおり結果 YAML を書くことをレビュアの実行に求める (対応表は `review-triage-loop` の `references/review-invocation.md` を参照する) — ワーカーは変換しない。
-- R27. レビュアの実行が終わったら、結果ファイルが存在し、`findings:` の行と識別子入りの `run_id` の行があり、前後で HEAD と作業ツリーが不変であることを確かめ、完了の印を `ok` で書く。どれかが通らなければ `failed` と `error` (何が通らなかったか。作業ツリーが汚れていればその一覧) で書く。実効モデルと skill を呼んだかは、ログ (stream-json) から取れれば書き、取れなければ `unknown` にする。印を書かずに次へ進まない。
-- R28. `end` が現れたら `worker.yaml` を `left` にし、応じた回の一覧 (識別子・`status`・モデル・effort・所要時間・`error`) を標準出力に出して終了コード 0 で終わる。印の無い依頼文が無いまま `--idle-minutes` (既定は設定 `review_loop.worker_idle_minutes`、それも無ければ 180) が過ぎたら `expired` にして、周回は終わっていないことと同じコマンドで起動し直せることを出して終了コード 124 で終わる。割り込み (SIGINT / SIGTERM) を受けたら、レビュアの実行を止め、進行中の回があれば `failed`・`error: interrupted` の印を書き、`worker.yaml` を `left` にして終わる。
-- R29. ワーカーは `claude -p` の実行を前景で待ち、その間も更新時刻を進める。ワーカー自身は git の状態を変えない (レビュアの実行が変えた場合は R27 で検出する)。
+- R26. レビュアの実行は `claude -p` を、`--model`・`--effort`・`--permission-mode` (既定は設定 `review_loop.permission_mode`。それも無ければ `acceptEdits`)・`--allowedTools` (ワーカーの `--allowed-tools` の値。指定が無ければ既定の一覧 — git の読み取り・ファイルの読み書き・Skill・Agent)・`--disallowedTools AskUserQuestion`・`--output-format stream-json`・`--verbose` と、`--` 以降の追加の引数で起動し、標準出力と標準エラーを置き場の `<識別子>.log` に残す。プロンプトは固定の 1 文「依頼文 `<絶対パス>` のとおりに作業し、結果を依頼文が指す出力先に書く」で、依頼文の中身は写さない。実行には `--review-timeout-minutes` (既定は設定 `review_loop.review_timeout_minutes`、それも無ければ 60) の上限を付け、越えたら止めて `failed`・`error: timeout` にする。`ce-code-review` のように JSON を返す skill を依頼文が指す場合は、依頼文の「出力様式」のとおり結果 YAML を書くことをレビュアの実行に求める (対応表は `review-triage-loop` の `references/review-invocation.md` を参照する) — ワーカーは変換しない。
+- R27. レビュアの実行が終わったら、結果ファイルが存在し、`findings:` の行と識別子入りの `run_id` の行があり、前後で HEAD と作業ツリーが不変であり、周回の置き場のファイルが結果と `<識別子>.log` を除いて前後で変わっていないことを確かめ、完了の印を `ok` で書く。置き場の比較は、レビュアの実行の前後でファイルの一覧と各ファイルの更新時刻を記録して行う (置き場は git に無視されているので、作業ツリーの確認では検出できない。レビュアの実行が依頼文や `end` を置くと、ワーカーや作業側がそれに従ってしまう)。どれかが通らなければ `failed` と `error` (何が通らなかったか。作業ツリーが汚れていればその一覧、置き場が変わっていれば `loop dir modified (<一覧>)`) で書く。実効モデルと skill を呼んだかは、ログ (stream-json) から取れれば書き、取れなければ `unknown` にする。読み方は次のとおりで、正本は `references/worker.md` — ログは 1 行ずつ JSON として読み、読めない行 (標準エラーの行など) は飛ばす。実効モデルは `type` が `system` で `subtype` が `init` の行の `model` だけから読む。`parent_tool_use_id` が空でない行 (レビュースキルが起動した sub-agent の行) は、モデルにも skill の呼び出しの判定にも使わない。`skill_called` は、最上位の `type: assistant` の行の content にある `tool_use` のうち `name` が `Skill` のものだけで判定し、道具の結果 (`type: user` の行の tool_result) の中身は読まない (レビュー対象のファイルに `Skill` やモデル名の文字列が含まれていても判定が変わらないようにするため)。印を書かずに次へ進まない。
+- R28. `end` が現れたら `worker.yaml` を `left` にし、応じた回の一覧 (識別子・`status`・モデル・effort・所要時間・`error`) を標準出力に出して終了コード 0 で終わる。印の無い依頼文が無いまま `--idle-minutes` (既定は設定 `review_loop.worker_idle_minutes`、それも無ければ 180) が過ぎたら `expired` にして、周回は終わっていないことと同じコマンドで起動し直せることを出して終了コード 124 で終わる。割り込み (SIGINT / SIGTERM / SIGHUP。SIGHUP は端末を閉じたとき) を受けたら、進行中の回があれば、レビュアの実行のプロセスグループ全体に TERM を送り、数秒後に残っていれば KILL を送り、すべて止まったことを確かめてから `failed`・`error: interrupted` の印を書く。進行中の回があってもなくても、更新時刻を進める背景の処理を止め、`worker.yaml` を `left` にして終わる。上限 (`--review-timeout-minutes`) を越えたときも、同じ手順でプロセスグループ全体を止めてから `failed`・`error: timeout` の印を書く。
+- R29. ワーカーは `claude -p` (上限つき) をそれ専用のプロセスグループで背景に起動し、`wait` で終わりを待つ。前景で待たないのは、bash が前景のコマンドを待っている間は trap の処理をそのコマンドが終わるまで遅らせるためと、GNU の `timeout` は別のプロセスグループで動くので端末の Ctrl-C が `claude -p` に届かないためである。待っている間も更新時刻を進める。ワーカー自身は git の状態を変えない (レビュアの実行が変えた場合は R27 で検出する)。
 - R30. ワーカーのスクリプトは python の unittest で検査する。`claude` の代わりに PATH の先頭に置く偽のコマンド (引数を記録し、指示どおりに結果ファイルを書く・書かない・止まる) で、`claude` を呼ばずに全経路を通す。
 
 **記録・設定・文書**
@@ -228,7 +228,7 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 - セッション間メッセージ (SendMessage / `notify_when_idle`) は使わない (Key Decisions)。
 - 記録のスキーマに経路のキー (`runs[].route` など) を足すことは対象外 (段階 1 の記録を比べてから)。
 - `code-review` の effort `ultra` (クラウドで走る) は対象外。`review_args` に `ultra` が来たら R27 の `failed` で分かる。
-- Windows は対象外 (スクリプトは macOS と Linux の bash と GNU / BSD の `stat` で動かす)。作業側の `claude -p` (非対話) は対象外 — 待機の通知で次のターンが始まる対話セッションだけを前提にする。
+- Windows は対象外 (スクリプトは macOS と Linux の bash と GNU / BSD の `stat` で動かす)。2 本のスクリプトは macOS の `/bin/bash` (3.2) で動く書き方にする — 空の配列は `${args[@]+"${args[@]}"}` で展開し (3.2 では `set -u` のもとで空の配列を `"${args[@]}"` と展開すると終了する)、連想配列・`mapfile`・`wait -n`・`$BASHPID` を使わない。作業側の `claude -p` (非対話) は対象外 — 待機の通知で次のターンが始まる対話セッションだけを前提にする。
 - 作業側からワーカーを起動するのは、Claude Desktop app の端末のツールで人間が承認したときだけ。作業側がワーカーのモデルや effort を決めることはしない (`session-handoff` の原則「どのモデルで、いつ始めるかは人間が決める」)。
 - 周回の置き場は消さない (後で比べる材料)。
 
@@ -289,8 +289,8 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 - KTD1. **`review-loop` の references は、`loop-flow.md` との差分だけをノード ID で書く** (session-settled: user-directed — chosen over `review-triage-loop` に経路を足す案: 既存のスキルを変えない)。SKILL.md の導入で「順序・分岐・止まる条件は `review-triage-loop` の `references/loop-flow.md` が正本で、G0 と L1 と追加の停止だけをこのスキルの references が定める」と宣言し、`review-invocation.md` の 63 行目と同じ形で「どの行を流用し、どの行を使わないか」を明示する。差し替えるノードは `RG0` (条件を読む)・`RL1` (レビューを起動する)、足す停止は `RA1`〜`RA3` — 接頭辞を分けるのは、`loop-flow.md` に将来足される `S7` などと ID が衝突しないため (図と決定表の ID は 1:1 で、機械検査は無い)。散文で遷移を言い直さない (規律は `loop-flow.md` の冒頭)。新しい語は `CONCEPTS.md` に 1 回だけ定義し、中間語を作らない。Governs R16, R18。
 - KTD2. **周回の置き場のファイル契約の正本は 1 つの references `review-triage/skills/review-loop/references/loop-files.md` にし、作業側のスキルとワーカーのスクリプトがそれに従う。** ファイルごとに書く側・いつ書くか・キーの表 (必須 / 任意 / 列挙値)・失敗時の態度 (設定 / 状態 / ワーカーとレビュアの実行が書くファイル / 印) を 1 か所に置く。識別子から導出できる項目は持たない (完了の印の `request` / `result`、`loop.yaml` の `record`)。「無いキーは省略」と「必須」を表で分け、様式に無いキーを足さない (雛形 `review-request-template.md` の流儀)。ワーカーのスクリプトはこの文書のキーの表をそのまま書き出し、テストがその一致を確かめる。R6, R8, R9, R12 を実装する。
 - KTD3. **作業側の待機は同梱のスクリプト `review-triage/scripts/review-loop-wait.sh` で行い、python の unittest で検査する。** 理由は 3 つ — 回ごとに文面が変わるインラインのループは既定の権限モードで毎回確認を求める、終了コードの規約と締切の計算をスクリプトに閉じ込めて SKILL.md には呼び方だけを書く、CI の既存の枠 (`.github/test-targets.txt` の python の対象) に載る。呼び出しは `bash "${CLAUDE_PLUGIN_ROOT}/scripts/review-loop-wait.sh" <置き場> <識別子> <分>` の形で、`${CLAUDE_PLUGIN_ROOT}` は SKILL.md の本文で置換される。規約: 終了コードは 0 / 124 / それ以外、何が現れたかは標準出力の 1 行、期限は `date +%s` の締切、列挙は `find` (zsh の glob の打ち切りを避ける)、先頭は `sleep` にしない、一時名 (`.` で始まる名前) は見ない、印の `status` が `ok` なら 3 点一致・`failed` なら 2 点一致、`worker.yaml` が無い状態から現れたことも事象として返す、停滞は `worker.yaml` の更新時刻だけで判定する (ワーカーはレビュアの実行中も更新時刻を進めるので、状態で場合分けしない)、更新時刻は関数 1 つで読み `stat -c %Y` が失敗したら `stat -f %m` に切り替える (GNU と BSD の両方で動かす)。R13, R15 を実装する。
-- KTD4. **ワーカーは bash のスクリプト `review-triage/scripts/review-loop-worker.sh` 1 本にし、レビュアの実行 (`claude -p`) 以外の判断をすべてスクリプトに置く。** 起動時の確認・依頼文の探索・HEAD と clean の確認・`claude -p` の起動と上限・結果の確認・完了の印・`worker.yaml` の状態と更新時刻・`end` と期限切れと割り込みの扱いを、すべて決定的なコードにする。`claude -p` の起動は 1 か所の関数にまとめ、テストでは PATH の先頭に置いた偽の `claude` が呼ばれる。更新時刻を進める処理は、スクリプトが起動する背景のサブシェル 1 つで行い、終了時に必ず止める (`trap`)。`claude -p` の上限は `timeout` コマンド (無ければ同等の処理) で付ける。設定ファイルは読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める (プラグインの展開先と利用者のリポジトリが別の場所にあり、スクリプトから設定を探すと基準の取り違えが起きる)。R23〜R30 を実装する。
-- KTD5. **`worker.yaml` は状態機械にし、更新時刻を動いていることの印にする。** 状態は `idle` / `reviewing` / `expired` / `unavailable` / `left`。ワーカーが遷移のたびに書き換え、動いている間は 5 秒おきに `touch` する (レビュアの実行中も)。作業側は「更新時刻が `worker_stale_seconds` より古い」を「ワーカーのプロセスが居ない」と読み、状態で場合分けしない。他のワーカーの検出は `pid` のプロセスが動いているか (`kill -0`) で行い、セッションの名前や乱数の値は使わない。受領の印を別のファイルにする案は、`reviewing` と識別子で同じことが分かるので採らない。R9, R24 を実装する。
+- KTD4. **ワーカーは bash のスクリプト `review-triage/scripts/review-loop-worker.sh` 1 本にし、レビュアの実行 (`claude -p`) 以外の判断をすべてスクリプトに置く。** 起動時の確認・依頼文の探索・HEAD と clean の確認・`claude -p` の起動と上限・結果の確認・完了の印・`worker.yaml` の状態と更新時刻・`end` と期限切れと割り込みの扱いを、すべて決定的なコードにする。`claude -p` の起動は 1 か所の関数にまとめ、テストでは PATH の先頭に置いた偽の `claude` が呼ばれる。更新時刻を進める処理は、スクリプトが起動する背景のサブシェル 1 つで行い、終了時に必ず止める (`trap`)。サブシェルは周期ごとに `kill -0 <ワーカーの PID>` (サブシェルを起動する前に控えた `$$`) を確かめ、ワーカーが居なければ `touch` せずに終わる — `kill -9` は trap で捕まえられず、親を失ったサブシェルが `touch` を続けると作業側が停滞を検出できないため。`claude -p` は専用のプロセスグループで背景に起動して `wait` で待ち (R29)、上限と割り込みではプロセスグループ全体を TERM、残れば KILL で止める (R28)。上限は `timeout` コマンド (無ければ同等の処理) で付ける。どちらの場合も、`claude -p` が起動した子孫のプロセス (Bash の子や sub-agent) を残さない。設定ファイルは読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める (プラグインの展開先と利用者のリポジトリが別の場所にあり、スクリプトから設定を探すと基準の取り違えが起きる)。R23〜R30 を実装する。
+- KTD5. **`worker.yaml` は状態機械にし、更新時刻を動いていることの印にする。** 状態は `idle` / `reviewing` / `expired` / `unavailable` / `left`。ワーカーが遷移のたびに書き換え、動いている間は 5 秒おきに `touch` する (レビュアの実行中も)。作業側は「更新時刻が `worker_stale_seconds` より古い」を「ワーカーのプロセスが居ない」と読み、状態で場合分けしない。この読み方が成り立つよう、`touch` するサブシェルはワーカーが居なくなったら自分も終わる (KTD4)。他のワーカーの検出は、`state` が `idle` / `reviewing`・更新時刻が新しい・`pid` のプロセスが動いている (`kill -0`) の 3 つで行い (R24)、セッションの名前や乱数の値は使わない。受領の印を別のファイルにする案は、`reviewing` と識別子で同じことが分かるので採らない。R9, R24 を実装する。
 - KTD6. **二重の取り込みは `run_id` で防ぎ、依存先を明文化する。** `review-request` が雛形の `run_id` を識別子で埋め (R33)、`review-request.md` の「出力様式」の節に「受け取る側は記録の `runs[].run_id` にそのまま写す」を足す (`review-triage` の SKILL.md は変えない。今も結果 YAML のトップレベルのキーを写しているのを規範にする)。ワーカーは結果の `run_id` が識別子と一致することを確かめ (不一致は `failed`)、作業側は取り込む前に同じ検査を行い、記録に空でない同じ `run_id` の回があれば取り込まず、`review-triage` の直後に記録の末尾の回の `run_id` を確かめる。既存の記録の `run_id: ''` は照合の対象にしない。R7, R17, R19, R27 を実装する。
 - KTD7. **モデルを指す語は `review-invocation.md` の 2 つ (指定・実効モデル) だけを使い、突き合わせは名前で行う。** `loop.yaml` の `worker.model` と `worker.yaml` の `model` は指定 (別名。人間が `--model` に渡す綴り)、完了の印の `model` は指定と、レビュアの実行のログから取れた実効モデルの名前 (記録の表記。モデル ID から `claude-` を除いたもの) の両方。一致の判定は「名前から版を除いた部分が指定の別名と等しい」(`stage-subagent.md` の「実効モデルの解決」と同じ規則) で、名前が取れなければ判定しない。effort はワーカーへの `--effort` (セッションの effort。記録の `notes` に実測として残す) とレビュースキルに渡す effort (`--review-args`。依頼文と記録の `level`) を分け、対応表を `references/arguments.md` に置く。R2, R8, R17, R31 を実装する。
 - KTD8. **記録のキーの出所に第 3 の表を作らない。** `review-invocation.md` の「記録のキーの出所」は経路ごとにその表だけが定めると宣言している。この周回は新しい経路ではなく、`code-review` (または `ce-code-review`) の列をそのまま使い、「sub-agent の報告」を完了の印と読み替える 1 文だけを `review-loop` の references に書く。過去に出所を複数の文書が定めて同じ場所に採択が 4 回続いた実測がある。R31 を実装する。
@@ -350,7 +350,8 @@ stateDiagram-v2
   reviewing --> idle: 完了の印 (ok / failed) を書く
   idle --> expired: 待機の期限切れ (終了コード 124)
   idle --> left: end を見て一覧を出す (終了コード 0)
-  reviewing --> left: 割り込み (failed の印を書いてから)
+  idle --> left: 割り込み (INT / TERM / HUP)
+  reviewing --> left: 割り込み (プロセスグループを止め、failed の印を書いてから)
   unavailable --> [*]
   expired --> [*]
   left --> [*]
@@ -391,7 +392,7 @@ flowchart TB
 ### Assumptions
 
 - レビュアの実行 (`claude -p`) は、実行中に人間に問わず、結果を書いて終わる。問おうとした場合は失敗として現れる (KTD14)。
-- ワーカーのスクリプトが起動する背景のサブシェル (更新時刻を進める) は、スクリプトの終了時に `trap` で止まる。`kill -9` で消された場合は `worker.yaml` の更新時刻が止まり、作業側が停滞で気づく (AE17)。
+- ワーカーのスクリプトが起動する背景のサブシェル (更新時刻を進める) は、スクリプトの終了時に `trap` で止まる。`kill -9` で消された場合は trap が動かないが、サブシェルが周期ごとにワーカーの PID を確かめて自分も終わるので、`worker.yaml` の更新時刻が止まり、作業側が停滞で気づく (AE17。KTD4)。
 - 作業側で人間がプロンプトを打つことがある (`--end` の後の確認など)。その間の待機スクリプトは走り続けてよい。
 
 ### Sequencing
@@ -490,7 +491,7 @@ flowchart TB
   - `worker.yaml` が無い間は停滞と判定せず、現れると 0 と `worker idle` で終わる。
   - 短い期限 (0.1 分) で何も置かなければ 124 で終わる。期限切れの直前に置いたファイルは 124 ではなく 0 で返る。
   - 更新時刻の読み方が ubuntu (GNU の `stat`) と macOS (BSD の `stat`) で同じ結果になる (CI と手元の両方でテストが通る)。
-- **Verification:** `python3 -m unittest discover -s review-triage/tests` が成功し、CI の discover ジョブが一覧と一致する。
+- **Verification:** `python3 -m unittest discover -s review-triage/tests` が CI (ubuntu の bash 5) と手元の macOS (`/bin/bash` 3.2) の両方で成功し、CI の discover ジョブが一覧と一致する。
 
 ### U3. 周回の置き場のファイル契約の正本
 
@@ -519,13 +520,14 @@ flowchart TB
   - `review-triage/tests/fake-claude` — PATH の先頭に置く偽の `claude`。環境変数で振る舞いを変える (結果を書く / 書かない / `run_id` を空で書く / 作業ツリーを汚す / 終わらない / 終了コード) と、受けた引数の記録。
   - `review-triage/tests/test_review_loop_worker.py` — 一時の git リポジトリと置き場を作り、`loop.yaml` と依頼文を置いて、スクリプトを subprocess で走らせる。
 - **Approach:**
-  1. 引数の様式と既定 (R23・R26) をスクリプトの冒頭の使い方に書き、`--model` と `--effort` が無ければ使い方を出して終了コード 2。
-  2. 起動時の確認は `worker.md` の表の順に行い、最初に通らなかった項目で `worker.yaml` を `unavailable` にして終了コード 2。`pid` のプロセスが動いているかは `kill -0` で見る。作業ツリーの一致は実体パス (`cd` して `pwd -P`) で比べる。
-  3. `worker.yaml` と完了の印は一時名から改名する (KTD4)。更新時刻を進める背景のサブシェルは、スクリプトの `EXIT` と `INT` / `TERM` の `trap` で止める。
+  1. 引数の様式と既定 (R23・R26) をスクリプトの冒頭の使い方に書き、`--model` と `--effort` が無ければ使い方を出して終了コード 2。`--allowed-tools` は繰り返しを配列に集め、1 つでもあれば既定の一覧を置き換える。
+  2. 起動時の確認は `worker.md` の表の順に行う。最初に動いているワーカーの判定 (`state`・更新時刻・`kill -0` の 3 つ。R24) を行い、居れば `worker.yaml` に触れずに終了コード 2。以降の項目は、最初に通らなかった項目で `worker.yaml` を `unavailable` にして終了コード 2。作業ツリーの一致は実体パス (`cd` して `pwd -P`) で比べる。
+  3. `worker.yaml` と完了の印は一時名から改名する (KTD4)。更新時刻を進める背景のサブシェルは、起動前に控えたワーカーの PID を周期ごとに `kill -0` で確かめ、居なければ終わる。スクリプトの `EXIT` と `INT` / `TERM` / `HUP` の `trap` でも止める。
   4. 依頼文を見つけたら `reviewing` にし、`git rev-parse --short HEAD` と `git status --porcelain` を確かめる (R25)。
-  5. `claude -p` は関数 1 つで起動する — `--model`・`--effort`・`--permission-mode`・`--allowedTools`・`--disallowedTools AskUserQuestion`・`--output-format stream-json`・`--verbose`・`--` 以降の追加の引数・固定のプロンプト (KTD14)。標準出力と標準エラーを `<識別子>.log` に残す。`timeout` で上限を付ける。
-  6. 終わったら結果の存在・`findings:` の行・識別子入りの `run_id` の行・前後の HEAD と作業ツリーを確かめ、印を書く (R27)。実効モデルと skill の呼び出しはログから読めれば書き、読めなければ `unknown`。
-  7. `end` で `left` と一覧 (終了コード 0)、期限で `expired` (終了コード 124)、割り込みで進行中の回に `failed` の印を書いて `left` (R28)。
+  5. `claude -p` は関数 1 つで、専用のプロセスグループで背景に起動し、PID を控えて `wait` で待つ (R29) — `--model`・`--effort`・`--permission-mode`・`--allowedTools`・`--disallowedTools AskUserQuestion`・`--output-format stream-json`・`--verbose`・`--` 以降の追加の引数・固定のプロンプト (KTD14)。標準入力は `/dev/null` にし、標準出力と標準エラーを `<識別子>.log` に残す。`timeout` で上限を付ける。起動の前に、置き場のファイルの一覧と更新時刻を記録する。
+  6. 終わったら結果の存在・`findings:` の行・識別子入りの `run_id` の行・前後の HEAD と作業ツリー・置き場の前後の一覧と更新時刻 (結果とログを除く) を確かめ、印を書く (R27)。実効モデルと skill の呼び出しは、R27 の読み方 (`system`/`init` の行の `model`、最上位の `tool_use` の `Skill`、`parent_tool_use_id` のある行と tool_result は使わない) でログを 1 行ずつ JSON として読み、読めなければ `unknown`。JSON の解析は `python3` で行う。
+  7. `end` で `left` と一覧 (終了コード 0)、期限で `expired` (終了コード 124)。割り込み (INT / TERM / HUP) では、進行中の回があればプロセスグループ全体を TERM、数秒後に残っていれば KILL で止めて `failed` の印を書き、どちらの場合も `left` にして終わる。上限を越えたときも同じ手順で止めてから `failed`・`timeout` の印を書く (R28)。
+  8. bash 3.2 で動く書き方にする (Scope Boundaries)。
 - **Execution note:** テストを先に書く。偽の `claude` で全経路を通し、実際の `claude` は通し確認でだけ呼ぶ。
 - **Patterns to follow:** `commit-rules-guard/hook-scripts/` の python の書き方は流用しない (このスクリプトは bash)。`review-triage/tools/triagecheck/README.md` の「前提」の書き方。`session-handoff/skills/handoff-resume/references/verify-state.md` の突き合わせの表 (`worker.md` に流用)。
 - **Test scenarios:**
@@ -536,15 +538,20 @@ flowchart TB
   - Covers AE8. 依頼文の `head` と HEAD が違うと、偽の `claude` を呼ばずに `failed`・`error: head mismatch` の印が書かれる。
   - Covers AE10. 依頼文が無いまま `--idle-minutes 0.05` で起動すると、`expired` になり終了コード 124。
   - Covers AE11. 待機中に `end` を置くと、`left` になり、応じた回の一覧が標準出力に出て、終了コード 0。
-  - Covers AE14. `worker.yaml` の `pid` のプロセスが動いているとき、起動時の確認で終了コード 2 になり、`worker.yaml` は書き換わらない。`pid` のプロセスが終了していれば通る。
-  - Covers AE15. 偽の `claude` が終わらないとき、`--review-timeout-minutes 0.05` で `failed`・`error: timeout` の印が書かれ、`idle` に戻る。
-  - Covers AE16. レビュアの実行中に SIGINT を送ると、`failed`・`error: interrupted` の印と `left` が書かれ、更新時刻を進める背景のサブシェルが残っていない。
+  - Covers AE14. `worker.yaml` の `pid` のプロセスが動いていて更新時刻が新しいとき、起動時の確認で終了コード 2 になり、`worker.yaml` は書き換わらない。別の worktree から 2 つ目を起動した場合も、`unavailable` で上書きせずに終了コード 2。`pid` のプロセスが終了しているか、更新時刻が 30 秒より古ければ通る。
+  - Covers AE15. 偽の `claude` が終わらないとき、`--review-timeout-minutes 0.05` で `failed`・`error: timeout` の印が書かれ、`idle` に戻る。偽の `claude` が起動した子プロセスも残っていない。
+  - Covers AE16. レビュアの実行中に SIGINT を送ると、偽の `claude` の終わりを待たずに (数秒以内に) `failed`・`error: interrupted` の印と `left` が書かれ、偽の `claude` とその子プロセス、更新時刻を進める背景のサブシェルが残っていない。SIGTERM と SIGHUP も同じ。
+  - 印の無い依頼文を待っている間 (`idle`) に SIGINT を送ると、印を書かずに `worker.yaml` が `left` になって終わる。
+  - Covers AE17. ワーカーを SIGKILL で消すと、10 秒以内に `worker.yaml` の更新時刻が止まる (背景のサブシェルが残って `touch` を続けない)。
+  - 偽の `claude` が周回の置き場に依頼文を書くと、`failed`・`error: loop dir modified` の印が書かれ、その依頼文はレビュアの実行に回されない。
+  - ログの読み方: sub-agent の行 (`parent_tool_use_id` あり) に別のモデルが混ざったログでも、印の `model` は `system`/`init` の行のモデルになる。tool_result に `"name":"Skill"` の文字列を含み、最上位の `tool_use` に `Skill` が無いログでは `skill_called` が偽になる。JSON として読めない行が混ざっても読み飛ばす。
+  - `--allowed-tools` を 2 回指定すると、偽の `claude` が受けた `--allowedTools` がその 2 つだけになる (既定の一覧は付かない)。指定しなければ既定の一覧になる。`--` 以降の追加の引数を付けない起動が、bash 3.2 の `set -u` のもとでも失敗しない。
   - 偽の `claude` が結果を書かずに 0 で終わると `failed`・`error: no result`。結果が YAML として読めない (`findings:` が無い) と `failed`。
   - 印の無い依頼文が 2 つあるとき、識別子の順で処理し、2 つの印が書かれる。
   - `claude` が PATH に無いと起動時の確認で終了コード 2。
   - `worker.yaml` の更新時刻が、レビュアの実行中 (偽の `claude` が 12 秒待つ) にも 5 秒おきに進む。
   - 書き出した `worker.yaml` と完了の印のキーが `loop-files.md` の表と一致する。
-- **Verification:** `python3 -m unittest discover -s review-triage/tests` が成功する。手で `review-request --dir` した依頼文 1 本で実際の `claude` を使って起動し、完了の印 (`ok`) が書かれ、ログに `code-review` の呼び出しが見えること。
+- **Verification:** `python3 -m unittest discover -s review-triage/tests` が、CI (ubuntu の bash 5) と手元の macOS (`/bin/bash` 3.2) の両方で成功する。手で `review-request --dir` した依頼文 1 本で実際の `claude` を使って起動し、完了の印 (`ok`) が書かれ、ログに `code-review` の呼び出しが見えること。
 
 ### U5. `review-loop` (作業側のスキル)
 
@@ -557,7 +564,7 @@ flowchart TB
   - `references/round.md` — RG0 と RL1 の決定表 (条件 / 報告に書くもの)、RL1 の 3 手順、突き合わせの順序と L2 の後の `run_id` の検査 (R17)、基点の規則 (KTD13)、記録のキーの出所の読み替え (KTD8)、`notes` の固定書式 (R31)。
   - `references/stops.md` — 追加の停止の図と決定表 (KTD9)、S2〜S6 にこの周回で足す項目の表 (R20)。
   - `references/reentry.md` — 再入の手順 (R19)、待機の呼び方と `description` の文 (KTD10)、期限切れ・中断の扱い (R15)。
-  - `references/worker.md` — ワーカーの起動時の確認の表、サポートする配置、引数と既定、レビュアの実行の権限の既定と一覧 (KTD11, KTD15)。スクリプトはこの文書のとおりに実装する。
+  - `references/worker.md` — ワーカーの起動時の確認の表、サポートする配置、引数と既定、レビュアの実行の権限の既定と一覧 (KTD11, KTD15)、ログ (stream-json) から実効モデルと skill の呼び出しを読む規則 (R27)。スクリプトはこの文書のとおりに実装する。
   - `references/guide-template.md` — 人間への案内の雛形 (R5。`handoff-write` の報告の様式に倣う。起動コマンドは `${CLAUDE_PLUGIN_ROOT}` を展開した絶対パス)。
 - **Approach:**
   1. SKILL.md の導入で `loop-flow.md`・`reporting.md` を正本として宣言し、`review-invocation.md` の 63 行目の形で「使う行と使わない行」を書く。周回の中で `review-triage` と `review-triage-fix` を呼ぶのは `loop-flow.md` の L2・F1 のとおり。
