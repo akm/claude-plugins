@@ -59,7 +59,7 @@ review-loop <周回 id> 回 <記録の回番号> (<識別子>) [この起動 <k>
 | 0 | `end` | 周回の終了として扱う (人間が `end` を直接置いた)。[SKILL.md](../SKILL.md) の「終了」の手順 3 |
 | 0 | `worker idle` / `worker reviewing` | ワーカーが起動した (出現した)。`wait.wait_minutes` で待ち直す。数える回数は変えない |
 | 0 | `worker unavailable` | RA2。報告に `worker.yaml` の `error` (起動時の確認で通らなかった項目) を書く |
-| 0 | `worker expired` / `worker left` / `worker stale` | RA2 |
+| 0 | `worker expired` / `worker left` / `worker stale` | RA2。**`worker stale` のとき、レビュアの実行 (`claude -p`) が残って動いていることがあるが、判定を覆さない** — ワーカーが `kill -9` などで消えても、専用のプロセスグループで動くレビュアの実行は残る。完了の印を書くワーカーが居ないので、待っても印は現れない。プロセスを調べて待ち直したり、手順に無い方法で待ったりしない |
 | 0 | `worker invalid` | RA1 (ワーカーが書くファイルが読めない) |
 | 124 | — | 下の「期限切れと中断」 |
 | それ以外 | — | 下の「期限切れと中断」 |
