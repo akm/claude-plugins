@@ -62,6 +62,7 @@ flowchart TD
 | 周回 | 周回の id と、置き場の絶対パス |
 | ワーカー | `worker.yaml` の `state` と、ファイルの更新時刻の古さ (キー `updated` ではない。読み方の正本は [loop-files.md](loop-files.md) の「`worker.yaml`」。無ければ「未起動」)、この起動でワーカーが応じた回の数 (`rounds_served`) |
 | 印の無い依頼文 | 有無と、あれば識別子 |
+| 再開のしかた | この起動が `--resume` で `active` の周回を再開したものなら、前のセッションが報告せずに終わったこと (開始の報告の正本は [reentry.md](reentry.md) の「`--resume` の開始の報告」) |
 | 回数 | この起動で回した回数と上限 (reporting.md の 2)、周回全体でワーカーが応じた回数 (置き場の完了の印の数) |
 | 次にできる操作 | `--resume` (止まった理由を片付けた後)・`--end` (周回を終える)・S2 なら `review-triage-fix` を単独で起動して答えること (答えの渡し先の正本は loop-flow.md の S2 の行) |
 | ワーカーの起動コマンド | [guide-template.md](guide-template.md) の形。ワーカーが動いていても書く (端末を閉じた後に起動し直すときに使う) |
