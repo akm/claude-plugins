@@ -740,6 +740,20 @@ class TestEnding(WorkerTestBase):
                 self.wait_for(lambda: not _group_alive(p.pid), timeout=3,
                               what="ワーカーのプロセスグループ (更新時刻を進める処理を含む) が空になる")
 
+    def test_sigkill_during_review_leaves_no_worker_processes(self):
+        # レビュー中にワーカーを SIGKILL で消すと、ワーカーのプロセスグループ (更新時刻を進める処理と、上限を測る処理) は
+        # 10 秒以内に空になる。レビュアの実行は専用のプロセスグループなので残る (trap が動かないので止められない)
+        self.env["FAKE_CLAUDE_MODE"] = "hang"
+        self.put_request()
+        p = self.start()
+        self.wait_state("reviewing")
+        self.wait_for(lambda: os.path.exists(self.pids_file), what="偽の claude の起動")
+        os.kill(p.pid, signal.SIGKILL)
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10,
+                      what="ワーカーのプロセスグループが空になる")
+        reviewer = _read_pids(self.pids_file)[0]
+        self.assertTrue(_pid_alive(reviewer))
+
     def test_sigkill_stops_heartbeat(self):
         # AE17: ワーカーを SIGKILL で消すと、10 秒以内に worker.yaml の更新時刻が止まる
         p = self.start()

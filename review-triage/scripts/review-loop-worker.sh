@@ -282,14 +282,25 @@ stop_heartbeat() {
   fi
 }
 
-# 上限の秒数が過ぎたらワーカーに USR1 を送る
+# 上限の秒数が過ぎたらワーカーに USR1 を送る。更新時刻を進める処理と同じく、周期ごとにワーカーが動いているかを確かめ、
+# 居なければ (kill -9 で trap が動かなかった場合も) 自分も終わる — 消えたワーカーの PID が別のプロセスに再利用されていると、
+# USR1 (既定の動作は終了) がそのプロセスを止めてしまうため
 start_watchdog() {
   (
     wd_sleep=""
     trap 'kill "$wd_sleep" 2>/dev/null; exit 0' TERM
-    sleep "$1" &
-    wd_sleep=$!
-    wait "$wd_sleep" && kill -USR1 "$WORKER_PID" 2>/dev/null
+    wd_deadline=$(( $(date +%s) + $1 ))
+    while worker_alive; do
+      wd_left=$(( wd_deadline - $(date +%s) ))
+      if [ "$wd_left" -le 0 ]; then
+        kill -USR1 "$WORKER_PID" 2>/dev/null
+        exit 0
+      fi
+      [ "$wd_left" -gt "$POLL_SECONDS" ] && wd_left=$POLL_SECONDS
+      sleep "$wd_left" &
+      wd_sleep=$!
+      wait "$wd_sleep"
+    done
   ) &
   WATCHDOG_PID=$!
 }
