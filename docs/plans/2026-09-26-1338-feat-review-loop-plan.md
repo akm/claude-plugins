@@ -34,7 +34,7 @@ review-triage プラグインに、作業側で回すスキル `review-loop` と
 
 ### Problem Frame
 
-`review-triage-loop` はレビューを同じセッションの sub-agent で走らせる。この形では指摘が収束しないことが多く、レビューを別のセッションで走らせると収束に向かいやすい、という観察が Issue #63 の出発点である。確かな違いは 2 つある — レビューを走らせるモデルとセッションの effort (推論の深さ) を人間が選べること、そして sub-agent は呼び出し時に effort を指定できない (agent 定義の frontmatter でしか受けない) こと。残りの違い (レビュースキルが使える道具、レビュアと修正者の文脈の分離) は仮説で、この計画は記録に経路を残して後から比べられるようにする。
+`review-triage-loop` はレビューを同じセッションの sub-agent で走らせる。この形では指摘が収束しないことが多く、レビューを別のセッションで走らせると収束に向かいやすい、という観察が Issue #63 の出発点である。確かな違いは 2 つある — レビューを走らせるモデルとセッションの effort (推論の深さ) を人間が選べること、そして sub-agent は呼び出し時に effort を指定できない (agent 定義の frontmatter でしか受けない) こと。残りの違い (レビュースキルが使える Claude Code のツール — `Bash`・`Read`・`Skill` など、モデルが作業のために呼び出す機能 — の違い、レビュアと修正者の文脈の分離) は仮説で、この計画は記録に経路を残して後から比べられるようにする。
 
 Issue の案 (レビュー側を人間が開く対話セッションにする) では、レビュー側の状態や起動時の確認を LLM の手順書に頼ることになり、effort は期待値のまま確かめられず、回を重ねるとレビュー側の文脈が長くなる。ワーカーをスクリプトにすると、effort は起動引数で確定し、回ごとに新しい `claude -p` の実行になるので文脈は長くならず、レビュー側の判断がすべてテストできるコードになる。失うのは、レビュー側を人間が対話で見守り割り込むことである。利用者はそれを承知でこの形を選んだ。
 
@@ -99,11 +99,11 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 
 **ワーカー**
 
-- R23. `review-loop-worker.sh <置き場の絶対パス> --model <指定> --effort <値> [--permission-mode <値>] [--allowed-tools <道具>]... [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>]` で起動する。`--model` と `--effort` は必須で、既定を持たない (人間が決める)。`--allowed-tools` は繰り返して指定でき、1 回でも指定すれば R26 の既定の一覧を置き換える (設定 `review_loop.allowed_tools` をワーカーに届ける経路。ワーカーは設定を読まない)。`--` 以降は `claude -p` にそのまま渡す (`--plugin-dir` や `--settings` を通し確認で使う)。
+- R23. `review-loop-worker.sh <置き場の絶対パス> --model <指定> --effort <値> [--permission-mode <値>] [--allowed-tools <ツール>]... [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>]` で起動する。`--model` と `--effort` は必須で、既定を持たない (人間が決める)。`--allowed-tools` は繰り返して指定でき、1 回でも指定すれば R26 の既定の一覧を置き換える (設定 `review_loop.allowed_tools` をワーカーに届ける経路。ワーカーは設定を読まない)。`--` 以降は `claude -p` にそのまま渡す (`--plugin-dir` や `--settings` を通し確認で使う)。
 - R24. 起動時の確認を行う。最初に、動いているワーカーが居るかを判定する — `worker.yaml` の `state` が `idle` / `reviewing` で、更新時刻が 30 秒以内で、`kill -0 <pid>` が成功する、の 3 つがすべて成り立てば、他のワーカーか端末を閉じたのに残ったプロセスが居るので、`worker.yaml` に触れずに PID と止め方を出して終了コード 2 で終わる (更新時刻を条件に加えるのは、`kill -9` の後に PID が別のプロセスに再利用された場合に居ないワーカーを居ると判定しないため)。この判定を通った後の確認は、通らなければ `worker.yaml` を `unavailable` と理由で書いて終了コード 2 で終わる — 置き場に `loop.yaml` があり読めること、実体パスに解決した `git rev-parse --show-toplevel` が `loop.yaml` の `repo_dir` と一致すること (別の worktree は `--git-common-dir` の一致で判別して報告する)、`end` が無いこと、`claude` コマンドがあること。通れば `worker.yaml` を `idle` で書き、5 秒おきに更新時刻を進める処理を始める。
 - R25. 印の無い依頼文を 5 秒おきに探し (識別子の順で最初の 1 つ)、見つけたら `worker.yaml` を `reviewing` と識別子にし、`git rev-parse --short HEAD` が依頼文の `head` と一致し作業ツリーが clean であることを確かめる。違えばレビュアの実行を起動せずに `failed`・`error: head mismatch (expected …, actual …)` (または `tree not clean`) の印を書き、`idle` に戻る。
 - R26. レビュアの実行は `claude -p` を、`--model`・`--effort`・`--permission-mode` (既定は設定 `review_loop.permission_mode`。それも無ければ `acceptEdits`)・`--allowedTools` (ワーカーの `--allowed-tools` の値。指定が無ければ既定の一覧 — git の読み取り・ファイルの読み書き・Skill・Agent)・`--disallowedTools AskUserQuestion`・`--output-format stream-json`・`--verbose` と、`--` 以降の追加の引数で起動し、標準出力と標準エラーを置き場の `<識別子>.log` に残す。プロンプトは固定の 1 文「依頼文 `<絶対パス>` のとおりに作業し、結果を依頼文が指す出力先に書く」で、依頼文の中身は写さない。実行には `--review-timeout-minutes` (既定は設定 `review_loop.review_timeout_minutes`、それも無ければ 60) の上限を付け、越えたら止めて `failed`・`error: timeout` にする。`ce-code-review` のように JSON を返す skill を依頼文が指す場合は、依頼文の「出力様式」のとおり結果 YAML を書くことをレビュアの実行に求める (対応表は `review-triage-loop` の `references/review-invocation.md` を参照する) — ワーカーは変換しない。
-- R27. レビュアの実行が終わったら、結果ファイルが存在し、`findings:` の行と識別子入りの `run_id` の行があり、前後で HEAD と作業ツリーが不変であり、周回の置き場のファイルが結果と `<識別子>.log` を除いて前後で変わっていないことを確かめ、完了の印を `ok` で書く。置き場の比較は、レビュアの実行の前後でファイルの一覧と各ファイルの更新時刻を記録して行う (置き場は git に無視されているので、作業ツリーの確認では検出できない。レビュアの実行が依頼文や `end` を置くと、ワーカーや作業側がそれに従ってしまう)。どれかが通らなければ `failed` と `error` (何が通らなかったか。作業ツリーが汚れていればその一覧、置き場が変わっていれば `loop dir modified (<一覧>)`) で書く。実効モデルと skill を呼んだかは、ログ (stream-json) から取れれば書き、取れなければ `unknown` にする。読み方は次のとおりで、正本は `references/worker.md` — ログは 1 行ずつ JSON として読み、読めない行 (標準エラーの行など) は飛ばす。実効モデルは `type` が `system` で `subtype` が `init` の行の `model` だけから読む。`parent_tool_use_id` が空でない行 (レビュースキルが起動した sub-agent の行) は、モデルにも skill の呼び出しの判定にも使わない。`skill_called` は、最上位の `type: assistant` の行の content にある `tool_use` のうち `name` が `Skill` のものだけで判定し、道具の結果 (`type: user` の行の tool_result) の中身は読まない (レビュー対象のファイルに `Skill` やモデル名の文字列が含まれていても判定が変わらないようにするため)。印を書かずに次へ進まない。
+- R27. レビュアの実行が終わったら、結果ファイルが存在し、`findings:` の行と識別子入りの `run_id` の行があり、前後で HEAD と作業ツリーが不変であり、周回の置き場のファイルが結果と `<識別子>.log` を除いて前後で変わっていないことを確かめ、完了の印を `ok` で書く。置き場の比較は、レビュアの実行の前後でファイルの一覧と各ファイルの更新時刻を記録して行う (置き場は git に無視されているので、作業ツリーの確認では検出できない。レビュアの実行が依頼文や `end` を置くと、ワーカーや作業側がそれに従ってしまう)。どれかが通らなければ `failed` と `error` (何が通らなかったか。作業ツリーが汚れていればその一覧、置き場が変わっていれば `loop dir modified (<一覧>)`) で書く。実効モデルと skill を呼んだかは、ログ (stream-json) から取れれば書き、取れなければ `unknown` にする。読み方は次のとおりで、正本は `references/worker.md` — ログは 1 行ずつ JSON として読み、読めない行 (標準エラーの行など) は飛ばす。実効モデルは `type` が `system` で `subtype` が `init` の行の `model` だけから読む。`parent_tool_use_id` が空でない行 (レビュースキルが起動した sub-agent の行) は、モデルにも skill の呼び出しの判定にも使わない。`skill_called` は、最上位の `type: assistant` の行の content にある `tool_use` のうち `name` が `Skill` のものだけで判定し、ツールの結果 (`type: user` の行の tool_result) の中身は読まない (レビュー対象のファイルに `Skill` やモデル名の文字列が含まれていても判定が変わらないようにするため)。印を書かずに次へ進まない。
 - R28. `end` が現れたら `worker.yaml` を `left` にし、応じた回の一覧 (識別子・`status`・モデル・effort・所要時間・`error`) を標準出力に出して終了コード 0 で終わる。印の無い依頼文が無いまま `--idle-minutes` (既定は設定 `review_loop.worker_idle_minutes`、それも無ければ 180) が過ぎたら `expired` にして、周回は終わっていないことと同じコマンドで起動し直せることを出して終了コード 124 で終わる。割り込み (SIGINT / SIGTERM / SIGHUP。SIGHUP は端末を閉じたとき) を受けたら、進行中の回があれば、レビュアの実行のプロセスグループ全体に TERM を送り、数秒後に残っていれば KILL を送り、すべて止まったことを確かめてから `failed`・`error: interrupted` の印を書く。進行中の回があってもなくても、更新時刻を進める背景の処理を止め、`worker.yaml` を `left` にして終わる。上限 (`--review-timeout-minutes`) を越えたときも、同じ手順でプロセスグループ全体を止めてから `failed`・`error: timeout` の印を書く。
 - R29. ワーカーは `claude -p` (上限つき) をそれ専用のプロセスグループで背景に起動し、`wait` で終わりを待つ。前景で待たないのは、bash が前景のコマンドを待っている間は trap の処理をそのコマンドが終わるまで遅らせるためと、GNU の `timeout` は別のプロセスグループで動くので端末の Ctrl-C が `claude -p` に届かないためである。待っている間も更新時刻を進める。ワーカー自身は git の状態を変えない (レビュアの実行が変えた場合は R27 で検出する)。
 - R30. ワーカーのスクリプトは python の unittest で検査する。`claude` の代わりに PATH の先頭に置く偽のコマンド (引数を記録し、指示どおりに結果ファイルを書く・書かない・止まる) で、`claude` を呼ばずに全経路を通す。
@@ -257,7 +257,7 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 
 - 対話セッション (main) で背景の待機が 10 分を越えて続くか。`claude -p` の 1 回の実行が 30 分を越えて続くか。通し確認の最初に測る。続かなければ止める (Goal Capsule)。打ち切りが 1 回でも出たら、待機を短い期限 (例: 10 分) の繰り返しにして中断ではなく期限で数える設計に改めるかを人間に返す。
 - 作業側の背景の待機が外から止められる条件 (セッションの切り替え・compact・app の再起動)。通し確認の再開のシナリオで、閉じる・切り替えるの両方を試す。
-- レビュアの実行の権限の既定 (`acceptEdits` と許可する道具の一覧) で `code-review` が最後まで走るか。依頼文の雛形が許すプローブ (一時的な変更と revert) を認めるかで一覧が変わる。通し確認で、拒まれた道具をログから数える。
+- レビュアの実行の権限の既定 (`acceptEdits` と許可するツールの一覧) で `code-review` が最後まで走るか。依頼文の雛形が許すプローブ (一時的な変更と revert) を認めるかで一覧が変わる。通し確認で、拒まれたツールをログから数える。
 - stream-json のどの行から実効モデルと skill の呼び出しを読めるか。読めなければ `unknown` のままにする。
 - `-p` の中で `code-review` が並行レビューを走らせるか (Problem Frame の仮説)。ログと記録の `notes` で集める。
 - 依頼文の雛形の「出力様式」の節で、`review-triage` の手順 1 の例示 `tmp/review-<識別子>.yaml` が周回の置き場でも読み違えを起こさないか。起こせば例示の 1 語を直すことを人間に返す (`review-triage` は変えない決定)。
@@ -300,7 +300,7 @@ Issue の案 (レビュー側を人間が開く対話セッションにする) �
 - KTD12. **依頼文に埋める出力先は絶対パスにする。** `review-request` の手順 3 の出力先を `repo_dir` 起点の絶対パスで組み、手順 4 でそのまま埋める。相対パスはレビュア側の cwd で解決されて別の場所に書かれた実測がある。既存の周回の経路 (同じ cwd) でも絶対パスは成り立つ。R7, R33 を実装する。
 - KTD13. **全量と増分の基点は `review-request` の規則に従い、増分の基点が HEAD の祖先でなければ止める。** `review-request` を呼ぶので基点の決め方はその手順 2 (全量は分岐元、増分は直前の回の `head`) になり、`review-invocation.md` の merge-base の規則は使わない — `review-loop` の references にその旨を明記する。増分の基点は `git merge-base --is-ancestor` で祖先であることを確かめ、祖先でなければ (reset や squash の後) RA3 で止める。周回の間に履歴を書き換えないことを前提知識に書く。R17 を実装する。
 - KTD14. **レビュアの実行のプロンプトは固定の 1 文にし、依頼文の中身を写さない。** 「依頼文 `<絶対パス>` のとおりに作業し、結果を依頼文が指す出力先に書く」だけを渡す。依頼文はレビュアが読む前提で書かれており (雛形の冒頭)、写すと貼り方が回ごとに変わる元の問題 (`review-request.md` の実測) に戻る。`AskUserQuestion` は `--disallowedTools` で外す (`-p` は人間に問えないので、問おうとした時点で失敗にする)。R26 を実装する。
-- KTD15. **レビュアの実行の権限は引数で決め、既定は `acceptEdits` と読み取り中心の許可の一覧にする。** `-p` は許可の問い合わせに答えられないので、拒まれた道具はレビューの失敗として現れる (ログに残り、結果が無ければ `failed` の印になる)。`bypassPermissions` は既定にしない (依頼文が読み取り専用を求めているので、書き込みの範囲を狭くしておく)。許可の一覧の既定は `references/worker.md` に置き、通し確認で拒まれた道具を数えて直す。R5, R26 を実装する。
+- KTD15. **レビュアの実行の権限は引数で決め、既定は `acceptEdits` と読み取り中心の許可の一覧にする。** `-p` は許可の問い合わせに答えられないので、拒まれたツールはレビューの失敗として現れる (ログに残り、結果が無ければ `failed` の印になる)。`bypassPermissions` は既定にしない (依頼文が読み取り専用を求めているので、書き込みの範囲を狭くしておく)。許可の一覧の既定は `references/worker.md` に置き、通し確認で拒まれたツールを数えて直す。R5, R26 を実装する。
 - KTD16. **通し確認は、作業側の対話セッション 1 つと、ワーカーを起動する端末 1 つで行う。** 作業側はブランチ版のプラグインを `claude --plugin-dir <リポジトリ>/review-triage --settings '{"enabledPlugins":{"review-triage@akm-claude-plugins":false}}'` で開く (インストール済みの同名プラグインを外す)。ワーカーはリポジトリの `review-triage/scripts/review-loop-worker.sh` を直接起動し、`-- --plugin-dir …` は要らない (`code-review` は組み込みのスキル)。待機の期限は引数で短くする (R15)。最初に、対話セッションで `sleep 660` を背景で走らせて打ち切られないことと、`claude -p` で 30 分の `sleep` を含む実行が打ち切られないことを確かめる (Goal Capsule の止まる条件)。ワーカーのスクリプトの経路は偽の `claude` のテストで先に固め、通し確認では成功の経路と再開・終了だけを実際に走らせる。Verification Contract を実装する。
 - KTD17. **変えないもの。** `review-triage-loop/**`・`review-triage/SKILL.md`・`review-triage-fix/**`・`record-schema.md`・`tools/triagecheck/**`・`.github/workflows/`。review-triage 側で触るのは `project-config.md` の 1 文、`review-request.md` の 1 文、雛形の `run_id` の行、`review-request` の SKILL.md、`review-triage/README.md`、`review-triage/.claude-plugin/plugin.json` (description と version) だけ。
 
@@ -402,7 +402,7 @@ flowchart TB
 ### Alternatives Considered
 
 - **レビュー側を人間が開く対話セッションにし、`review-rally-server` スキルで応じる (Issue #63 の案)** — 人間がレビュアを見守り割り込めるが、レビュー側の状態と起動時の確認が LLM の手順書になり、effort は期待値のまま確かめられず、文脈が回を重ねて長くなる。文書レビューで退けた (Key Decisions の 2 番目)。
-- **effort ごとのレビュー用 agent 定義を足して、`review-triage-loop` の経路でモデルと effort を選べるようにする** — 確かな違い 2 つ (モデル・effort) はこれでも得られるが、仮説 2 つ (道具・文脈の分離) は sub-agent の中では試せない。この計画は仮説の検証まで含めるので採らない。周回の経路でも effort を選びたくなったら、別の計画にする。
+- **effort ごとのレビュー用 agent 定義を足して、`review-triage-loop` の経路でモデルと effort を選べるようにする** — 確かな違い 2 つ (モデル・effort) はこれでも得られるが、仮説 2 つ (使えるツールの違い・文脈の分離) は sub-agent の中では試せない。この計画は仮説の検証まで含めるので採らない。周回の経路でも effort を選びたくなったら、別の計画にする。
 - **`review-triage-loop` に経路を足し、`review-loop` はそれを呼ぶ薄いスキルにする** — 判定が 1 か所になるが、既存のスキルの references を変える。利用者の決定で退けた。
 - **作業側の待機をインラインのループで書く** — 同梱のスクリプトより手順書が短いが、権限の確認が毎回出うる、終了コードの規約が SKILL.md に散る、zsh の glob の打ち切りを SKILL.md で避ける必要がある (KTD3)。
 - **ワーカーが `ce-code-review` の JSON を結果 YAML に変換する** — ワーカーの中にレビュースキルごとの変換が入り、`review-invocation.md` の対応表と二重になる。変換はレビュアの実行 (依頼文の出力様式) に任せる (R26)。
@@ -423,7 +423,7 @@ flowchart TB
 
 - **`claude -p` の長い実行が打ち切られる** — 未確認。通し確認の最初に測り、打ち切られれば止めて設計を人間に返す (Goal Capsule)。
 - **作業側の背景の待機が対話セッションで打ち切られる** — sub-agent での実測 (630 秒) しか無い。通し確認の最初に測り、打ち切りが出たら短い期限の繰り返しにする判断を人間に返す (Open Questions)。
-- **レビュアの実行の権限が足りず `code-review` が途中で止まる** — `-p` は問えないので失敗として現れる。ログから拒まれた道具を読み、許可の一覧の既定を直す (KTD15)。
+- **レビュアの実行の権限が足りず `code-review` が途中で止まる** — `-p` は問えないので失敗として現れる。ログから拒まれたツールを読み、許可の一覧の既定を直す (KTD15)。
 - **実効モデルと skill の呼び出しをログから読めない** — `unknown` で動く設計にし、記録の比較は指定のモデルと effort で行う。
 - **待機スクリプトの許可** — 既定の権限モードでは初回に確認が出る。呼び出しの形を一定にして許可ルール 1 つで済むようにする (KTD3)。auto モードなら出ない。
 - **`review-triage` の手順 1 の例示** — `tmp/review-<識別子>.yaml` の字面が周回の置き場と違う。作業側がパスを明示して渡すので動くはずだが、通し確認で読み違えが出れば人間に返す (Open Questions)。
@@ -635,7 +635,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | スクリプトのテスト | `python3 -m unittest discover -s review-triage/tests` (偽の `claude` を使う。実際の `claude` は呼ばない) | U2, U4 | 待機の終了コードと事象、ワーカーの全経路 (AE5〜AE8・AE10・AE11・AE14〜AE17)、書き出すファイルのキーが契約と一致 |
 | CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (push で走る) | U2, U4 | `.github/test-targets.txt` と実際の対象が一致する |
-| 道具の前提の実測 | 対話セッションで `sleep 660` を背景で走らせる。端末で `claude -p --effort low` に 30 分の待ちを含む作業をさせる | 通し確認の前 | 作業側の背景の待機と `claude -p` の 1 回の実行が打ち切られない (打ち切られれば止める) |
+| Claude Code の動作の前提の実測 | 対話セッションで `sleep 660` を背景で走らせる。端末で `claude -p --effort low` に 30 分の待ちを含む作業をさせる | 通し確認の前 | 作業側の背景の待機と `claude -p` の 1 回の実行が打ち切られない (打ち切られれば止める) |
 | 既存の記録の検査 | 設定の `triage_check_command` (`tmp/review-triages/` の全記録) | U1, U5 | `run_id` を埋めても既存の記録と生成サマリが書き換わらない |
 | 変えないものの差分 | `git diff --stat main -- review-triage/skills/review-triage-loop review-triage/skills/review-triage/SKILL.md review-triage/skills/review-triage-fix review-triage/skills/review-triage/references/record-schema.md review-triage/tools` | U1〜U7 | 差分が無い (KTD17) |
 | 説明文の一致 | `plugin.json` と `marketplace.json` の description の比較、`grep -rn 'skill 4 つ'` | U6 | 同文で 5 つとワーカー |
@@ -648,7 +648,7 @@ flowchart TB
 
 | # | シナリオ | 期待 | Covers |
 | --- | --- | --- | --- |
-| 0 | 道具の前提 (作業側の背景の待機 11 分、`claude -p` の 30 分の実行、待機中にセッションの切り替え・compact・別の話題のプロンプトを挟む、レビュアの実行で拒まれた道具の数) | 打ち切られない。124 が `failed` の通知で届く。拒まれた道具を記録し、許可の一覧の既定を直す | Open Questions |
+| 0 | Claude Code の動作の前提 (作業側の背景の待機 11 分、`claude -p` の 30 分の実行、待機中にセッションの切り替え・compact・別の話題のプロンプトを挟む、レビュアの実行で拒まれたツールの数) | 打ち切られない。124 が `failed` の通知で届く。拒まれたツールを記録し、許可の一覧の既定を直す | Open Questions |
 | A | 成功の経路 2 往復 → 採択 0 で S3 | 記録の回 1・2 に `run_id` と `notes`。待機のターンで他の操作をしていない。ワーカーは `idle` のまま同じプロセス | AE1, AE2 |
 | B | ワーカー未起動 → 期限切れ → 起動して `--resume` | RA2 で止まり起動コマンドを再掲。`--resume` が印の無い依頼文を待ち直して回 1 に進む | R18, R21 |
 | C | 別の worktree でワーカーを起動 | `worker.yaml` が `unavailable`。作業側は期限を待たずに RA2 | AE6 |
