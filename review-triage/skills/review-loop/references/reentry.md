@@ -36,7 +36,7 @@ review-loop <周回 id> 回 <記録の回番号> (<識別子>) [この起動 <k>
 3. **通知で入ったときは、事象で分ける** (下の「事象ごとの扱い」)。完了の印の事象なら 4 に進む。識別子を持たない通知 (識別子の衝突を避けるために分が変わるのを待った通知。[round.md](round.md) の手順 a の 5) は、2 と 3 を飛ばして 4 に進む。
 4. **取り込む印を探す**: 置き場の `delivered-<識別子>.yaml` のうち、識別子が記録の `run_id` (空でない値との完全一致) に無く、`rejected` にも無いものを、識別子の順で 1 つ選ぶ。あれば [round.md](round.md) の RL1 の手順 c (突き合わせ) に進む。**記録に `run_id: ''` の過去の回があっても、それとは照合しない。**
 5. **印の無い依頼文を探す**: 置き場の `review-request-<識別子>.md` のうち、完了の印が無いもの。あれば 6 に進む。
-6. **待機を起動する。** `--resume` で入ったときは、先にワーカーが動いているかを確かめる — `worker.yaml` の `state` が `idle` か `reviewing` で、更新時刻が `wait.worker_stale_seconds` 以内なら動いている。**動いていなければ、起動コマンドを案内し ([guide-template.md](guide-template.md))、`--await-worker` で待つ。** 動いていれば、または通知で入ったときは、普通に待つ。
+6. **待機を起動する。** `--resume` で入ったときは、先にワーカーが動いているかを確かめる — `worker.yaml` の `state` が `idle` か `reviewing` で、ファイルの更新時刻 (キー `updated` ではない。読み方の正本は [loop-files.md](loop-files.md) の「`worker.yaml`」) が `wait.worker_stale_seconds` 以内なら動いている。**動いていなければ、起動コマンドを案内し ([guide-template.md](guide-template.md))、`--await-worker` で待つ。** 動いていれば、または通知で入ったときは、普通に待つ。
 7. **取り込む印も印の無い依頼文も無ければ、G2 に進む** ([loop-flow.md](../../review-triage-loop/references/loop-flow.md) の図)。RA1 で止めた回はここを通り、L1 で新しい依頼文を書く (同じ回番号で、分が違う識別子になる)。
 
 `--resume` のときは、4〜7 の前に、ワーカーの起動コマンドを含む開始の報告 (条件は `loop.yaml` から読んだもの) を出す。
@@ -60,7 +60,7 @@ review-loop <周回 id> 回 <記録の回番号> (<識別子>) [この起動 <k>
 
 **期限切れ (124) は、宣言する前にもう 1 度ファイルを確かめる。** 完了の印があれば、再入の手順の 4 に進む。無ければ、次の順に見る。
 
-1. **`worker.yaml` の `state` が `reviewing` で、`current_request` が待っている識別子と一致し、更新時刻が `wait.worker_stale_seconds` 以内なら、数えずに待ち直す** (`<e>` を 0 に戻す)。ワーカーはその依頼文をレビュー中で、待つ長さの上限はワーカーの `--review-timeout-minutes` が保証する。これが無いと、待機の期限の 2 倍より長くかかる正常なレビューも RA2 で止まる。
+1. **`worker.yaml` の `state` が `reviewing` で、`current_request` が待っている識別子と一致し、ファイルの更新時刻 (6 と同じ読み方) が `wait.worker_stale_seconds` 以内なら、数えずに待ち直す** (`<e>` を 0 に戻す)。ワーカーはその依頼文をレビュー中で、待つ長さの上限はワーカーの `--review-timeout-minutes` が保証する。これが無いと、待機の期限の 2 倍より長くかかる正常なレビューも RA2 で止まる。
 2. **ワーカーの起動を待っていた** (`worker.yaml` が無いまま待った回 1 の最初の待機か、`--await-worker` の待機) **なら、待ち直さずに RA2。** 数えない。
 3. **それ以外は `<e>` を 1 増やす。** 2 になったら RA2、そうでなければ `wait.wait_minutes` で待ち直す。
 
