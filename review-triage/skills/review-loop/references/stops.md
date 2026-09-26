@@ -1,6 +1,6 @@
 # 差し替えた部分の流れと、追加の停止
 
-**このファイルが、`review-loop` が `review-triage-loop` の周回から差し替えた部分のノードと遷移 (図) と、追加の停止ノード RA1〜RA3 の条件と報告 (決定表) の正本。** 差し替えないノードとその遷移は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の図が正本で、ここでは言い直さない。規律は `loop-flow.md` の冒頭と同じ — 図が遷移の正本、決定表が条件と報告の正本で、散文はノード ID で参照する。
+**このファイルが、`review-loop` が `review-triage-loop` の周回から差し替えた部分のノードと遷移 (図) と、追加の停止ノード RA1〜RA3 の条件と報告 (決定表)、どの停止でも書き換えるものの正本。** 差し替えないノードとその遷移は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の図が正本で、ここでは言い直さない。規律は `loop-flow.md` の冒頭と同じ — 図が遷移の正本、決定表が条件と報告の正本で、散文はノード ID で参照する。
 
 - ID の接頭辞を `R` にするのは、`loop-flow.md` に将来足されるノード (`S7` など) と衝突させないため。
 - 図の ID 集合 (RG0・RL1・RA1・RA2・RA3) と決定表の ID 集合は 1:1。RG0 と RL1 の決定表は [round.md](round.md)、RA1〜RA3 の決定表はこのファイルにある。**同梱の `triagecheck` はこのファイルを検査しない** — 人手で照合する。
@@ -41,9 +41,11 @@ flowchart TD
 
 **RG0 から RL1 と G2 への分岐の中身 (取り込む印・印の無い依頼文の探し方、通知の重複の扱い) の正本は [reentry.md](reentry.md) の「再入の手順」。** 周回の終了 (`--end` と、人間が直接置いた `end`) は停止ではなく周回の外の手順で、図に含めない (正本は [SKILL.md](../SKILL.md) の「終了」)。
 
-## 決定表 (RA1〜RA3)
+## 停止のときに書き換えるもの
 
-**どの停止でも、`loop.yaml` を `state: stopped`・`stop_reason: "<ID>: <1 行の理由>"` にしてから報告する。ワーカーは止めない** — 待機を続けるので、人間が直して `--resume` すれば、起動し直さずに続けられる (ワーカーが期限切れで終了していなければ)。
+**どの停止ノード ([loop-flow.md](../../review-triage-loop/references/loop-flow.md) の S2〜S6 と、下の RA1〜RA3) でも、`loop.yaml` を `state: stopped`・`stop_reason: "<ID>: <1 行の理由>"` にしてから報告する。ワーカーは止めない** — 待機を続けるので、人間が直して `--resume` すれば、起動し直さずに続けられる (ワーカーが期限切れで終了していなければ)。
+
+## 決定表 (RA1〜RA3)
 
 | ID | 種類 | 条件 | 報告に書くもの |
 | --- | --- | --- | --- |

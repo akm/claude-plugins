@@ -32,7 +32,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 ## 前提知識
 
 - **周回は必ず止まる。** 止まる条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RA1〜RA3 を足したもの。
-- **停止と終了は別。** 停止 (S2〜S6・RA1〜RA3) は人間の判断を待つ状態で、判断の後に `--resume` で続けられる (停止のときに書き換えるものとワーカーの扱いの正本は [stops.md](references/stops.md) の「決定表」)。周回を終えるのは人間が `--end` を打ったときだけ。
+- **停止と終了は別。** 停止 (S2〜S6・RA1〜RA3) は人間の判断を待つ状態で、判断の後に `--resume` で続けられる (停止のときに書き換えるものとワーカーの扱いの正本は [stops.md](references/stops.md) の「停止のときに書き換えるもの」)。周回を終えるのは人間が `--end` を打ったときだけ。
 - **ワーカーのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ尋ねる。ワーカーを起動するのも人間で、このスキルは起動コマンドを案内する ([guide-template.md](references/guide-template.md))。
 - **受け渡しは周回の置き場のファイルだけ。** セッション間のメッセージは使わない。
 - **同時に動くのは、作業側かレビュアの実行 (ワーカーが起動する `claude -p` の 1 回) のどちらか一方。** 同じ作業ツリーを使うので、レビュアの実行の間は作業側も人間も作業ツリーを変えない。
@@ -59,7 +59,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 
 ### 停止
 
-図に従って停止ノード (S2〜S6・RA1〜RA3) に到達したら、[stops.md](references/stops.md) の「決定表」の冒頭の規則のとおり `loop.yaml` を書き換えてから報告する。報告の形は [reporting.md](../review-triage-loop/references/reporting.md)、停止ノードごとに足すものは [loop-flow.md](../review-triage-loop/references/loop-flow.md) の決定表 (S2〜S6) と [stops.md](references/stops.md) の決定表 (RA1〜RA3)、この周回で足すものは [stops.md](references/stops.md) の「停止の報告に足すもの」。
+図に従って停止ノード (S2〜S6・RA1〜RA3) に到達したら、[stops.md](references/stops.md) の「停止のときに書き換えるもの」のとおり `loop.yaml` を書き換えてから報告する。報告の形は [reporting.md](../review-triage-loop/references/reporting.md)、停止ノードごとに足すものは [loop-flow.md](../review-triage-loop/references/loop-flow.md) の決定表 (S2〜S6) と [stops.md](references/stops.md) の決定表 (RA1〜RA3)、この周回で足すものは [stops.md](references/stops.md) の「停止の報告に足すもの」。
 
 ### 終了 (`--end`)
 
