@@ -375,12 +375,13 @@ trap 'cleanup' EXIT
 
 # ---- 回の処理 (正本は worker.md の「回の処理」) ----
 
-# 置き場のファイルの一覧と更新時刻。ワーカーとレビュアの実行が書いてよいもの (worker.yaml・結果・ログ) は除く
+# 置き場のファイルの一覧と更新時刻。ワーカーとレビュアの実行が書いてよいもの (worker.yaml・結果・ログ) と、
+# 作業側が再開や停止のときにレビュー中でも書き換える loop.yaml は除く
 snapshot() {
   find "$LOOP_DIR" -mindepth 1 -maxdepth 1 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
     n=${p##*/}
     case "$n" in
-      worker.yaml|.worker.yaml.tmp|"review-$CURRENT_RID.yaml"|"$CURRENT_RID.log") continue ;;
+      worker.yaml|.worker.yaml.tmp|loop.yaml|.loop.yaml.tmp|"review-$CURRENT_RID.yaml"|"$CURRENT_RID.log") continue ;;
     esac
     echo "$n $(mtime "$p")"
   done

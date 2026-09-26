@@ -435,6 +435,21 @@ class TestResultChecks(WorkerTestBase):
         self.assertEqual(len(self.claude_calls()), 1)
         self.finish(p)
 
+    def test_loop_yaml_rewritten_during_review_is_not_a_modification(self):
+        # 作業側が再開や停止のときにレビュー中に loop.yaml を書き換えても、置き場の変化として数えない
+        self.env["FAKE_CLAUDE_SLEEP"] = "4"
+        self.put_request()
+        p = self.start()
+        self.wait_state("reviewing")
+        time.sleep(1)
+        tmp = self.path(".loop.yaml.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(f'id: "{LOOP_ID}"\nrepo_dir: "{self.repo}"\nstate: stopped\n')
+        os.rename(tmp, self.path("loop.yaml"))
+        marker = self.wait_marker()
+        self.finish(p)
+        self.assertEqual(marker["status"], "ok", marker)
+
     def test_head_mismatch_does_not_run_reviewer(self):
         # AE8: 依頼文の head と HEAD が違うと、偽の claude を呼ばずに failed の印を書く
         old = self.head()
