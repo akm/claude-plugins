@@ -169,6 +169,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── skills/review-triage-fix/
     ├── skills/review-triage-loop/  # レビューから修正までの周回
     ├── tools/triagecheck/         # 記録を検査する Go ツール (go test ./...)
+    ├── tools/nearedges/           # Markdown の修正の差分から、コミット前に読み直す範囲を列挙する Go ツール (go test ./...)
     └── README.md
 ```
 
