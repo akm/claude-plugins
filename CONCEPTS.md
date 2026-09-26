@@ -97,3 +97,23 @@ LLM が手順書に従ってその場で組み立てる構造化データ。
 [回数の閾値](#回数の閾値) N を越えた各回で、[段](#段) 2 (立案) を誰が行うかを人間が選ぶこと。選択肢 (セッションのモデル / 指定モデルの sub-agent / 人間自身)・尋ね方・設定で既定を持たない理由の正本は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の手順 4 で、ここでは言い直さない。
 
 同じ種類の指摘が続いているかをスキルが判断する仕組みと、指摘の繰り返しを図にして人間と確かめる作業を置き換えるもの — どちらも人間に読まれなくなっていて、判断の結果が何も駆動していなかった。
+
+### 周回の置き場
+`review-loop` (レビューを端末の[ワーカー](#ワーカー)に任せて、レビューと修正の周回を回すスキル) の 1 つの周回が、作業側 (`review-loop` を実行するセッション) とワーカーの受け渡しに使うディレクトリ。周回ごとに 1 つ作り、周回の条件と状態・依頼文・レビューの結果・[完了の印](#完了の印)・ワーカーの状態を、ファイルとして置く。2 つのプロセスはメッセージを送り合わず、このディレクトリの中のファイルだけで受け渡す。周回を終えても消さない。
+
+各ファイルの書く側・様式・失敗時の態度の正本は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) で、ここでは言い直さない。
+
+### ワーカー
+人間が端末で起動し、[周回の置き場](#周回の置き場)に現れた依頼文ごとに `claude -p` を、人間が決めたモデルと effort で走らせるプロセス (スクリプト `review-triage/scripts/review-loop-worker.sh`)。結果を確かめてから[完了の印](#完了の印)を書き、次の依頼文を待つ。レビュアの実行 (`claude -p` の 1 回) 以外の判断をすべてスクリプトで行う。
+
+起動時の確認・回の処理・権限の既定・終わり方の正本は `review-loop` の [worker.md](review-triage/skills/review-loop/references/worker.md) で、ここでは言い直さない。
+
+### 完了の印
+[ワーカー](#ワーカー)が依頼文 1 つを終えたことを、作業側に知らせるファイル。その回を使えるか (`ok` / `failed`)、ワーカーに渡したモデルと effort、ログから読んだ実効モデルを持つ。作業側は印が現れるのを待ち、印と結果を依頼文と突き合わせてから記録に取り込む。
+
+様式の正本は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) の「`delivered-<識別子>.yaml`」、突き合わせの順序の正本は [round.md](review-triage/skills/review-loop/references/round.md) で、ここでは言い直さない。
+
+### 再入の手順
+`review-loop` の作業側が、[完了の印](#完了の印)を待つ背景の処理の通知を受けたときと、人間が `--resume` で周回を続けるときに入る、1 つの入口。会話の文脈に依存せず、周回の置き場のファイルと記録と通知の説明文だけから、次に何をするかを決める。入口を 1 つにしてあるので、compact (会話の自動要約) の後や、セッションを開き直した後でも同じ手順に戻れ、同じ回を 2 度取り込まない。
+
+手順の正本は `review-loop` の [reentry.md](review-triage/skills/review-loop/references/reentry.md) で、ここでは言い直さない。
