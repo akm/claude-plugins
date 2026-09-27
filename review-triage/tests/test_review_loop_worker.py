@@ -7,12 +7,15 @@
 
 一時ディレクトリに git のリポジトリと周回の置き場を作り、claude の名前で偽のコマンド
 (review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で走らせる。
-実際の claude は呼ばない。
+実際の claude は呼ばない。依頼文は、実際の雛形 (review-triage/skills/review-triage/references/
+review-request-template.md) を埋めて作る — ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
+文字列で探して写しを作るので、雛形と食い違えばテストが失敗するようにするため。
 
 ワーカーは macOS でだけ起動する (起動時の確認で `uname -s` を見る)。CI (ubuntu) でも走るように、
 uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で Darwin を返す) も PATH の先頭に置く。
 ワーカーの環境変数 HOME と TMPDIR は、テストの一時ディレクトリの中の別々のディレクトリにする
 (利用者の設定 ~/.claude/settings.json を読まないように、また作業場所の条件を満たすように)。
+ワーカーは回ごとに作業場所を TMPDIR の下に作り、回の終わりに消す。
 
 振る舞いの正本は review-triage/skills/review-loop/references/worker.md、
 置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
@@ -35,6 +38,32 @@ _FAKE = os.path.join(_HERE, "fake-claude")
 _FAKE_UNAME = os.path.join(_HERE, "fake-uname")
 _LOOP_FILES = os.path.join(_HERE, "..", "skills", "review-loop", "references", "loop-files.md")
 _PLUGIN_JSON = os.path.join(_HERE, "..", ".claude-plugin", "plugin.json")
+_TEMPLATE = os.path.join(_HERE, "..", "skills", "review-triage", "references", "review-request-template.md")
+
+# 偽の git。テストが PATH の先頭の bin/ に git の名前で書き、FAKE_GIT_REAL の本物の git に引数をそのまま渡す。
+# サブコマンド (-C <ディレクトリ>・-c <設定> と、- で始まる引数を飛ばした最初の引数) が
+# FAKE_GIT_TOUCH_ON と同じならファイル FAKE_GIT_TOUCH を作り、FAKE_GIT_FAIL と同じなら本物を呼ばずに失敗する
+_FAKE_GIT = """#!/usr/bin/env python3
+import os, sys
+
+args = sys.argv[1:]
+i = 0
+while i < len(args):
+    if args[i] in ("-C", "-c"):
+        i += 2
+    elif args[i].startswith("-"):
+        i += 1
+    else:
+        break
+sub = args[i] if i < len(args) else ""
+if sub and sub == os.environ.get("FAKE_GIT_TOUCH_ON"):
+    open(os.environ["FAKE_GIT_TOUCH"], "w").close()
+if sub and sub == os.environ.get("FAKE_GIT_FAIL"):
+    print(f"fatal: 偽の git が {sub} を失敗させた", file=sys.stderr)
+    sys.exit(128)
+real = os.environ["FAKE_GIT_REAL"]
+os.execv(real, [real] + args)
+"""
 
 # サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側と周回の置き場がこの下にあると起動しない
 _SANDBOX_TMP = f"/private/tmp/claude-{os.getuid()}"
@@ -138,6 +167,18 @@ def _pid_alive(pid):
     return bool(out) and not out.startswith("Z")
 
 
+def _make_dirs_writable(top):
+    """top の下のディレクトリ (シンボリックリンクを除く) に所有者の権限を足す。後始末で消せるように。"""
+    for dirpath, dirnames, _ in os.walk(top):
+        for d in dirnames:
+            p = os.path.join(dirpath, d)
+            if not os.path.islink(p):
+                try:
+                    os.chmod(p, os.lstat(p).st_mode & 0o7777 | 0o700)
+                except OSError:
+                    pass
+
+
 def _make_repo(repo):
     """repo に、コミットが 1 つある git のリポジトリを作る。tmp/ は追跡しない。"""
     os.makedirs(repo)
@@ -181,16 +222,19 @@ class WorkerTestBase(unittest.TestCase):
         os.makedirs(self.home)
         os.makedirs(self.tmpdir)
         self.args_file = os.path.join(root, "claude-args.jsonl")
+        self.record_file = os.path.join(root, "claude-record.jsonl")
         self.pids_file = os.path.join(root, "claude-pids")
         self.env = dict(os.environ)
         self.env["PATH"] = self.bin + os.pathsep + self.env.get("PATH", "")
         self.env["HOME"] = self.home
         self.env["TMPDIR"] = self.tmpdir
-        self.env["FAKE_CLAUDE_ARGS"] = self.args_file
-        self.env["FAKE_CLAUDE_PIDS"] = self.pids_file
-        for k in ("FAKE_CLAUDE_MODE", "FAKE_CLAUDE_SLEEP", "FAKE_CLAUDE_STREAM", "FAKE_CLAUDE_EXIT",
-                  "FAKE_UNAME_S"):
+        for k in [k for k in self.env if k.startswith(("FAKE_CLAUDE_", "FAKE_GIT_"))] + ["FAKE_UNAME_S"]:
             self.env.pop(k, None)
+        self.env["FAKE_CLAUDE_ARGS"] = self.args_file
+        self.env["FAKE_CLAUDE_RECORD"] = self.record_file
+        self.env["FAKE_CLAUDE_PIDS"] = self.pids_file
+        self.env["FAKE_CLAUDE_REPO"] = self.repo
+        self.env["FAKE_CLAUDE_LOOP"] = self.loop
         self.procs = []
 
     def tearDown(self):
@@ -211,6 +255,7 @@ class WorkerTestBase(unittest.TestCase):
                     os.kill(int(pid), signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+        _make_dirs_writable(self.root)
         self._tmp.cleanup()
 
     # ---- 準備 ----
@@ -221,23 +266,59 @@ class WorkerTestBase(unittest.TestCase):
     def head(self):
         return _git(self.repo, "rev-parse", "--short", "HEAD")
 
-    def put_request(self, rid=RID, head=None):
-        result = self.path(f"review-{rid}.yaml")
-        text = (
-            "# レビューの依頼 (テスト)\n\n"
-            "## 出力様式\n\n"
-            f"出力先: `{result}` — この 1 ファイルだけ。\n\n"
-            "```yaml\n"
-            "skill: code-review\n"
-            f'run_id: "{rid}"\n'
-            f'head: "{head or self.head()}"\n'
-            "findings: []\n"
-            "```\n"
-        )
+    def request_text(self, rid=RID, head=None):
+        """実際の雛形を、review-request と同じ値の種類で埋めた依頼文を返す (作業ツリーの扱いは「共有」のまま)。"""
+        with open(_TEMPLATE, encoding="utf-8") as f:
+            text = f.read()
+        values = {
+            "repo": "example/repo",
+            "repo_dir": self.repo,
+            "branch": _git(self.repo, "branch", "--show-current"),
+            "base": "main",
+            "head": head or self.head(),
+            "scope": "full",
+            "scope_note": "ブランチの全体",
+            "skill": "code-review",
+            "effort": "high",
+            "model": "opus",
+            "date": "2026-09-26",
+            "run_id": rid,
+            "output_path": self.path(f"review-{rid}.yaml"),
+        }
+        for k, v in values.items():
+            text = text.replace("{{" + k + "}}", v)
+        self.assertEqual(re.findall(r"\{\{[^}]*\}\}", text), [], "雛形に、テストが埋めていない項目がある")
+        return text
+
+    def put_request(self, rid=RID, head=None, text=None):
+        if text is None:
+            text = self.request_text(rid, head)
         tmp = self.path(f".review-request-{rid}.md.tmp")
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(text)
         os.rename(tmp, self.path(f"review-request-{rid}.md"))
+
+    def reset_loop(self):
+        """subTest の間で、置き場を loop.yaml だけに戻し、偽の claude の記録を消す。"""
+        for n in os.listdir(self.loop):
+            if n == "loop.yaml":
+                continue
+            p = self.path(n)
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p)
+            else:
+                os.remove(p)
+        for f in (self.args_file, self.record_file, self.pids_file):
+            if os.path.exists(f):
+                os.remove(f)
+
+    def install_fake_git(self):
+        """PATH の先頭の bin/ に偽の git (_FAKE_GIT) を置く。テスト自身が使う git (関数 _git) は本物のまま。"""
+        path = os.path.join(self.bin, "git")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(_FAKE_GIT)
+        os.chmod(path, 0o755)
+        self.env["FAKE_GIT_REAL"] = shutil.which("git")
 
     def put_stream(self, lines):
         p = os.path.join(os.path.dirname(self.args_file), "stream.jsonl")
@@ -325,6 +406,26 @@ class WorkerTestBase(unittest.TestCase):
         with open(self.args_file, encoding="utf-8") as f:
             return [json.loads(line) for line in f if line.strip()]
 
+    def claude_records(self):
+        """偽の claude が起動されたときの様子 (cwd・複製の中の git の結果・--settings・写しの中身) の列。"""
+        if not os.path.exists(self.record_file):
+            return []
+        with open(self.record_file, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+
+    def workspaces(self):
+        """TMPDIR の下に残っている作業場所 (名前が review-loop- で始まるもの) の名前の列。"""
+        return sorted(n for n in os.listdir(self.tmpdir) if n.startswith("review-loop-"))
+
+    def run_round(self, *extra, rid=RID):
+        """ワーカーを起動し、完了の印を待って止める。(完了の印, ワーカーの標準エラー) を返す。"""
+        p = self.start(*extra)
+        marker = self.wait_marker(rid)
+        self.wait_state("idle")
+        _, _, err = self.finish(p)
+        self.assert_contract("## `delivered-<識別子>.yaml`", marker)
+        return marker, err
+
     def assert_contract(self, heading, data):
         required, allowed = _contract_keys(heading)
         keys = set(_flatten(data))
@@ -376,24 +477,26 @@ class TestHappyPath(WorkerTestBase):
         self.assertEqual([n for n in os.listdir(self.loop) if n.endswith(".tmp")], [])
         self.assertEqual(self.worker_state()["rounds_served"], 1)
 
-        # 偽の claude が受けた引数
+        # 偽の claude が受けた引数。プロンプトは作業場所の写しを指し、結果への書き込みの許可は作業場所の結果を指す
         calls = self.claude_calls()
         self.assertEqual(len(calls), 1)
         args = calls[0]
-        req = self.path(f"review-request-{RID}.md")
-        self.assertEqual(args[:2], ["-p", PROMPT.format(req=req)])
+        ws = os.path.dirname(self.claude_records()[0]["cwd"])
+        self.assertEqual(args[:2], ["-p", PROMPT.format(req=os.path.join(ws, f"review-request-{RID}.md"))])
         for opt, val in (("--model", "opus"), ("--effort", "high"),
                          ("--permission-mode", "auto"), ("--output-format", "stream-json")):
             self.assertEqual(args[args.index(opt) + 1], val, opt)
         self.assertIn("--verbose", args)
-        self.assertEqual(_option_values(args, "--disallowedTools"), ["AskUserQuestion"])
+        self.assertIn("AskUserQuestion", _option_values(args, "--disallowedTools"))
         tools = _option_values(args, "--allowedTools")
         self.assertIn("Read", tools)
         self.assertIn("Skill", tools)
         self.assertIn("Agent", tools)
         self.assertIn("Bash(git diff:*)", tools)
-        self.assertEqual(tools[-1], "Edit(/" + self.path(f"review-{RID}.yaml") + ")")
+        self.assertEqual(tools[-1], "Edit(/" + os.path.join(ws, f"review-{RID}.yaml") + ")")
         self.assertTrue(tools[-1].startswith("Edit(//"))
+        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")))
+        self.assertEqual(self.workspaces(), [])
 
         rc, _, _ = self.finish(p)
         self.assertEqual(rc, 143)
@@ -405,11 +508,14 @@ class TestHappyPath(WorkerTestBase):
         p = self.start()
         self.wait_marker(RID)
         self.wait_marker(RID2)
+        # 作業場所のパスは周回の間変わらず、写しの名前が識別子で変わる
         prompts = [c[1] for c in self.claude_calls()]
+        ws = os.path.dirname(self.claude_records()[0]["cwd"])
         self.assertEqual(prompts, [
-            PROMPT.format(req=self.path(f"review-request-{RID}.md")),
-            PROMPT.format(req=self.path(f"review-request-{RID2}.md")),
+            PROMPT.format(req=os.path.join(ws, f"review-request-{RID}.md")),
+            PROMPT.format(req=os.path.join(ws, f"review-request-{RID2}.md")),
         ])
+        self.assertEqual([r["cwd"] for r in self.claude_records()], [os.path.join(ws, "tree")] * 2)
         self.finish(p)
 
     def test_extra_args_are_passed_through(self):
@@ -427,8 +533,9 @@ class TestHappyPath(WorkerTestBase):
                        "--permission-mode", "default")
         self.wait_marker()
         args = self.claude_calls()[0]
+        ws = os.path.dirname(self.claude_records()[0]["cwd"])
         self.assertEqual(_option_values(args, "--allowedTools"), [
-            "Read", "Bash(git diff:*)", "Edit(/" + self.path(f"review-{RID}.yaml") + ")",
+            "Read", "Bash(git diff:*)", "Edit(/" + os.path.join(ws, f"review-{RID}.yaml") + ")",
         ])
         self.assertEqual(args[args.index("--permission-mode") + 1], "default")
         self.assertEqual(self.worker_state()["permission_mode"], "default")
@@ -462,10 +569,14 @@ class TestResultChecks(WorkerTestBase):
         return marker
 
     def test_empty_run_id(self):
-        # AE5
+        # AE5。failed の回でも、結果が通常のファイルなら置き場に複写する (人間が RA1 の報告から読めるように)
         marker = self.run_one("empty_run_id")
         self.assertEqual(marker["status"], "failed")
         self.assertIn("run_id mismatch", marker["error"])
+        result = self.path(f"review-{RID}.yaml")
+        self.assertTrue(os.path.isfile(result) and not os.path.islink(result))
+        with open(result, encoding="utf-8") as f:
+            self.assertIn('run_id: ""', f.read())
 
     def test_no_result(self):
         marker = self.run_one("no_result")
@@ -478,7 +589,7 @@ class TestResultChecks(WorkerTestBase):
         self.assertIn("no findings key", marker["error"])
 
     def test_dirty_tree(self):
-        # AE7
+        # 偽の claude が作業側の作業ツリーのファイルを絶対パスで書き換えると、tree_clean_after が偽で failed になる
         marker = self.run_one("dirty_tree")
         self.assertEqual(marker["status"], "failed")
         self.assertIs(marker["tree_clean_after"], False)
@@ -557,6 +668,347 @@ class TestResultChecks(WorkerTestBase):
         self.assertEqual(marker["status"], "failed")
         self.assertIn("request malformed", marker["error"])
         self.assertEqual(self.claude_calls(), [])
+
+
+class TestWorkspace(WorkerTestBase):
+    """回の作業場所・複製・写し・レビュアの実行の引数・結果の複写・作業場所の削除
+    (worker.md の「回の処理」の手順 5〜10 と「レビュアの実行の権限」)。"""
+
+    def assert_not_run(self, marker):
+        """レビュアの実行を起動しなかった回の印で、偽の claude が呼ばれず、作業場所が残っていないこと。"""
+        self.assertEqual(marker["status"], "failed", marker)
+        self.assertEqual(self.claude_calls(), [])
+        for key in ("head_after", "tree_clean_after", "exit_code", "log"):
+            self.assertNotIn(key, marker)
+        self.assertEqual(self.workspaces(), [])
+
+    def test_reviewer_runs_in_clone(self):
+        # AE1: cwd は作業場所の tree/ で、依頼の head を detached で取り出し、remote が無い。
+        # 結果は印より先に置き場に現れ、回の後に作業場所は残らない
+        self.put_request()
+        full = _git(self.repo, "rev-parse", "HEAD")
+        p = self.start()
+        marker_path = self.path(f"delivered-{RID}.yaml")
+        self.wait_for(lambda: os.path.exists(marker_path), what="完了の印")
+        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "印が現れた時点で結果が置き場に無い")
+        self.wait_state("idle")
+        self.finish(p)
+        marker = _read_yaml(marker_path)
+        self.assertEqual(marker["status"], "ok", marker)
+
+        rec = self.claude_records()[0]
+        ws = os.path.dirname(rec["cwd"])
+        self.assertEqual(os.path.basename(rec["cwd"]), "tree")
+        self.assertEqual(os.path.dirname(ws), os.path.realpath(self.tmpdir))
+        self.assertRegex(os.path.basename(ws), rf"^review-loop-{re.escape(LOOP_ID)}-[0-9a-f]{{8}}$")
+        self.assertEqual(rec["head"], full)
+        self.assertEqual(rec["branch"], "")
+        self.assertEqual(rec["remotes"], "")
+        with open(self.path(f"review-{RID}.yaml"), encoding="utf-8") as f:
+            self.assertIn(f'run_id: "{RID}"', f.read())
+        self.assertEqual(self.workspaces(), [])
+
+    def test_reviewer_arguments(self):
+        # AE1: --permission-mode auto・--strict-mcp-config・--settings (1 つ)・拒否の規則・結果への書き込みの許可
+        cache = os.path.join(self.root, "cache")
+        self.put_request()
+        marker, _ = self.run_round("--sandbox-allow-write", cache,
+                                   "--sandbox-allowed-domain", "proxy.golang.org",
+                                   "--sandbox-allowed-domain", "sum.golang.org")
+        self.assertEqual(marker["status"], "ok", marker)
+        args = self.claude_calls()[0]
+        rec = self.claude_records()[0]
+        clone = rec["cwd"]
+        ws = os.path.dirname(clone)
+        self.assertEqual(args[args.index("--permission-mode") + 1], "auto")
+        self.assertIn("--strict-mcp-config", args)
+        self.assertEqual(args.count("--settings"), 1)
+        self.assertEqual(rec["settings"], [{
+            "sandbox": {
+                "enabled": True,
+                "autoAllowBashIfSandboxed": True,
+                "allowUnsandboxedCommands": False,
+                "failIfUnavailable": True,
+                "filesystem": {"allowWrite": [ws, cache]},
+                "network": {"strictAllowlist": True, "allowedDomains": ["proxy.golang.org", "sum.golang.org"]},
+            },
+            "autoMemoryEnabled": False,
+        }])
+        self.assertEqual(_option_values(args, "--disallowedTools"), [
+            "AskUserQuestion",
+            "Edit(~/**)",
+            f"Edit(/{self.repo}/**)",
+            f"Edit(/{self.loop}/**)",
+            f"Edit(/{clone}/.claude/**)",
+            f"Edit(/{clone}/.git/**)",
+            f"Edit(/{clone}/.mcp.json)",
+            "Bash(git push:*)",
+        ])
+        tools = _option_values(args, "--allowedTools")
+        self.assertEqual(tools[-1], f"Edit(/{ws}/review-{RID}.yaml)")
+
+    def test_extra_settings_are_merged(self):
+        # 追加の引数の --settings (enabledPlugins だけ) は、ワーカーの --settings に合成して 1 つだけ渡す。--plugin-dir はそのまま渡す
+        plugin = os.path.join(self.root, "plugin")
+        os.makedirs(plugin)
+        self.put_request()
+        marker, _ = self.run_round("--", "--plugin-dir", plugin, "--settings",
+                                   json.dumps({"enabledPlugins": {"review-triage@akm": False}}))
+        self.assertEqual(marker["status"], "ok", marker)
+        args = self.claude_calls()[0]
+        self.assertEqual(args.count("--settings"), 1)
+        self.assertEqual(args[-2:], ["--plugin-dir", plugin])
+        settings = self.claude_records()[0]["settings"]
+        self.assertEqual(len(settings), 1)
+        self.assertEqual(settings[0]["enabledPlugins"], {"review-triage@akm": False})
+        self.assertIs(settings[0]["sandbox"]["enabled"], True)
+        self.assertIs(settings[0]["sandbox"]["allowUnsandboxedCommands"], False)
+        self.assertIs(settings[0]["autoMemoryEnabled"], False)
+
+    def test_request_copy(self):
+        # AE1: プロンプトが指す写しには、元の出力先と元の作業ツリーのパスが無く、扱いの行が「使い捨て」。作業側の依頼文は変わらない
+        self.put_request()
+        req = self.path(f"review-request-{RID}.md")
+        with open(req, "rb") as f:
+            before = f.read()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        rec = self.claude_records()[0]
+        clone = rec["cwd"]
+        ws = os.path.dirname(clone)
+        self.assertEqual(rec["request_path"], os.path.join(ws, f"review-request-{RID}.md"))
+        text = rec["request"]
+        self.assertNotIn(self.path(f"review-{RID}.yaml"), text)
+        self.assertNotIn(self.repo, text)
+        self.assertEqual(re.findall(r"^- 作業ツリーの扱い:.*$", text, re.M), ["- 作業ツリーの扱い: 使い捨て"])
+        self.assertIn(f"出力先: `{ws}/review-{RID}.yaml`", text)
+        self.assertIn(f"(作業ツリー: `{clone}`)", text)
+        with open(req, "rb") as f:
+            self.assertEqual(f.read(), before)
+
+    def test_branch_names_resolve_in_clone(self):
+        # AE2: 作業側が feature ブランチにいて main が別のコミットを指すとき、複製の中でもブランチ・リモート追跡ブランチ・
+        # タグが作業側と同じコミットに解決できる。作業側のブランチを取り出したままでも、複製の作成が失敗しない
+        main = _git(self.repo, "rev-parse", "HEAD")
+        _git(self.repo, "tag", "v1")
+        _git(self.repo, "update-ref", "refs/remotes/origin/main", main)
+        _git(self.repo, "checkout", "-q", "-b", "feat/x")
+        with open(os.path.join(self.repo, "b.txt"), "w", encoding="utf-8") as f:
+            f.write("b\n")
+        _git(self.repo, "add", "b.txt")
+        _git(self.repo, "commit", "-q", "-m", "feature")
+        feat = _git(self.repo, "rev-parse", "HEAD")
+        self.assertNotEqual(feat, main)
+        self.env["FAKE_CLAUDE_REVS"] = "main origin/main v1 feat/x"
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        rec = self.claude_records()[0]
+        self.assertEqual(rec["revs"], {"main": main, "origin/main": main, "v1": main, "feat/x": feat})
+        self.assertEqual(rec["head"], feat)
+        self.assertEqual(rec["branch"], "")
+
+    def test_request_copy_cannot_be_made(self):
+        # AE6: 扱いの行が無い (0.13.0 の依頼文)・2 つある・出力先が置き場を指さない・作業ツリーのパスが無い依頼文では、
+        # レビュアの実行を起動せずに failed の印を書き、作業場所を残さない
+        line = "- 作業ツリーの扱い: 共有\n"
+        cases = (
+            ("扱いの行が無い", lambda t: t.replace(line, ""), "handling lines: 0"),
+            ("扱いの行が 2 つ", lambda t: t.replace(line, line + line), "handling lines: 2"),
+            ("出力先が置き場を指さない",
+             lambda t: t.replace(self.path(f"review-{RID}.yaml"), os.path.join(self.root, f"review-{RID}.yaml")),
+             "output path does not point to the loop dir"),
+            ("作業ツリーのパスが無い", lambda t: t.replace(f"`{self.repo}`", "`/nowhere`"), "worktree path not found"),
+        )
+        for label, change, contains in cases:
+            with self.subTest(label):
+                self.reset_loop()
+                text = self.request_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                self.put_request(text=changed)
+                marker, _ = self.run_round()
+                self.assert_not_run(marker)
+                self.assertIn("request copy failed", marker["error"])
+                self.assertIn(contains, marker["error"])
+
+    def test_clone_stage_failure(self):
+        # AE7: 複製の作成の段 (複製・remote の設定の削除・取り込み・チェックアウト) のどれかが失敗すると、
+        # レビュアの実行を起動せずに failed の印を書き、error に失敗した段を書く。作業場所は残らない
+        self.install_fake_git()
+        for sub, stage in (("clone", "clone"), ("remote", "remove remote"), ("fetch", "fetch refs"),
+                           ("checkout", "checkout")):
+            with self.subTest(stage):
+                self.reset_loop()
+                self.env["FAKE_GIT_FAIL"] = sub
+                self.put_request()
+                marker, _ = self.run_round()
+                self.assert_not_run(marker)
+                self.assertTrue(marker["error"].startswith(f"clone failed ({stage}: "), marker["error"])
+                self.assertIn("偽の git", marker["error"])
+
+    def test_submodule(self):
+        # 複製に submodule の項目 (モード 160000) があれば、複製の作成の失敗とする (submodule はサポートしない)
+        sha = _git(self.repo, "rev-parse", "HEAD")
+        _git(self.repo, "update-index", "--add", "--cacheinfo", f"160000,{sha},sub")
+        _git(self.repo, "commit", "-q", "-m", "submodule")
+        os.makedirs(os.path.join(self.repo, "sub"))  # 取り出していない submodule の形にして、作業ツリーを clean にする
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assert_not_run(marker)
+        self.assertEqual(marker["error"], "clone failed (submodule: sub)")
+
+    def test_clone_settings(self):
+        # AE16: 複製の .claude/settings.json か .claude/settings.local.json に、空でない sandbox.excludedCommands があるか、
+        # JSON として読めなければ、レビュアの実行を起動せずに failed の印を書く
+        cases = (
+            (".claude/settings.json", json.dumps({"sandbox": {"excludedCommands": ["docker"]}}),
+             "sandbox.excludedCommands"),
+            (".claude/settings.local.json", "{ not json", "not readable as JSON"),
+        )
+        for rel, content, contains in cases:
+            with self.subTest(rel):
+                self.reset_loop()
+                path = os.path.join(self.repo, rel)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                _git(self.repo, "add", "-f", rel)
+                _git(self.repo, "commit", "-q", "-m", f"add {rel}")
+                self.put_request()
+                marker, _ = self.run_round()
+                self.assert_not_run(marker)
+                self.assertIn(f"clone settings ({rel}: ", marker["error"])
+                self.assertIn(contains, marker["error"])
+                _git(self.repo, "rm", "-q", rel)
+                _git(self.repo, "commit", "-q", "-m", f"remove {rel}")
+
+    def test_clone_settings_without_excluded_commands(self):
+        # 空の sandbox.excludedCommands は止めない
+        path = os.path.join(self.repo, ".claude", "settings.json")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"sandbox": {"excludedCommands": []}, "permissions": {"deny": ["Bash(rm:*)"]}}, f)
+        _git(self.repo, "add", ".claude/settings.json")
+        _git(self.repo, "commit", "-q", "-m", "settings")
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_reviewer_git_config_is_not_run(self):
+        # AE12: レビュアの実行が複製の .git/config に core.fsmonitor・core.hooksPath・filter.<名前>.clean を書き、
+        # .git/hooks/post-checkout を置いても、ワーカーはどれも実行しない (レビュアの実行の後に、複製の中で git を使わない)
+        mark = os.path.join(self.root, "git-mark")
+        self.env["FAKE_CLAUDE_MODE"] = "git_config"
+        self.env["FAKE_CLAUDE_GIT_MARK"] = mark
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertTrue(os.path.exists(mark + "-written"), "偽の claude が複製の git の設定を書いていない")
+        for kind in ("fsmonitor", "hooksPath", "clean", "post-checkout"):
+            self.assertFalse(os.path.exists(f"{mark}-{kind}"), f"{kind} のコマンドが実行された")
+        self.assertEqual(marker["status"], "ok", marker)
+        self.assertEqual(self.workspaces(), [])
+
+    def test_reviewer_writes_loop_result_directly(self):
+        # AE13: レビュアの実行が置き場の出力先に直接書くと、置き場が変わったとして failed
+        self.env["FAKE_CLAUDE_MODE"] = "write_loop_result"
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "failed")
+        self.assertIn(f"loop dir modified (review-{RID}.yaml)", marker["error"])
+
+    def test_result_copy_failure(self):
+        # AE15: 置き場の結果の一時名の場所にディレクトリがあると複写が失敗し、failed の印の error に複写の失敗を書く。ok の印は書かない
+        os.makedirs(self.path(f".review-{RID}.yaml.tmp"))
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "failed")
+        self.assertTrue(marker["error"].startswith("result copy failed ("), marker["error"])
+        self.assertFalse(os.path.exists(self.path(f"review-{RID}.yaml")))
+        self.assertEqual(self.workspaces(), [])
+
+    def test_result_file_conditions(self):
+        # 結果がシンボリックリンク・FIFO・ディレクトリのとき、実体が作業場所の外にあるとき、大きさが上限を越えるときに、
+        # 止まらずに failed の印を書き、結果を置き場に複写しない
+        outside = os.path.join(self.root, "outside-result.yaml")
+        self.env["FAKE_CLAUDE_OUTSIDE"] = outside
+        cases = (
+            ("シンボリックリンク", "result_symlink", "result not a regular file (symbolic link)"),
+            ("実体が作業場所の外", "result_symlink_outside", "result outside workspace"),
+            ("FIFO", "result_fifo", "result not a regular file (FIFO)"),
+            ("ディレクトリ", "result_dir", "result not a regular file (directory)"),
+            ("上限を越える大きさ", "result_large", "result too large"),
+        )
+        for label, mode, contains in cases:
+            with self.subTest(label):
+                self.reset_loop()
+                self.env["FAKE_CLAUDE_MODE"] = mode
+                self.put_request()
+                marker, _ = self.run_round()
+                self.assertEqual(marker["status"], "failed", marker)
+                self.assertIn(contains, marker["error"])
+                self.assertFalse(os.path.lexists(self.path(f"review-{RID}.yaml")))
+                self.assertEqual(self.workspaces(), [])
+
+    def test_end_during_preparation(self):
+        # 準備の途中 (複製の作成中) に置き場に end が現れた回は、failed・loop dir modified の印を書いてから、end を見て終わる
+        self.install_fake_git()
+        self.env["FAKE_GIT_TOUCH_ON"] = "clone"
+        self.env["FAKE_GIT_TOUCH"] = self.path("end")
+        self.put_request()
+        p = self.start()
+        marker = self.wait_marker()
+        p.communicate(timeout=20)
+        self.assertEqual(p.returncode, 0)
+        self.assertEqual(marker["status"], "failed")
+        self.assertIn("loop dir modified (end)", marker["error"])
+
+    def test_workspace_replaced_by_symlink(self):
+        # レビュアの実行が作業場所をシンボリックリンクに置き換えても、リンクの先は消さない。
+        # 次の回は、残ったリンクだけを消して作業場所を作り直す
+        target = os.path.join(self.root, "link-target")
+        os.makedirs(target)
+        keep = os.path.join(target, "keep.txt")
+        with open(keep, "w", encoding="utf-8") as f:
+            f.write("消してはいけない\n")
+        self.env["FAKE_CLAUDE_MODE"] = "symlink_workspace"
+        self.env["FAKE_CLAUDE_LINK_TARGET"] = target
+        self.put_request()
+        marker, err = self.run_round()
+        ws = os.path.dirname(self.claude_records()[0]["cwd"])
+        self.assertEqual(marker["status"], "failed", marker)
+        self.assertIn("result outside workspace", marker["error"])
+        self.assertTrue(os.path.islink(ws))
+        self.assertTrue(os.path.exists(keep))
+        self.assertTrue(os.path.exists(os.path.join(target, f"review-{RID}.yaml")))
+        self.assertIn(ws, err)
+
+        self.env["FAKE_CLAUDE_MODE"] = "ok"
+        self.put_request(RID2)
+        marker, _ = self.run_round(rid=RID2)
+        self.assertEqual(marker["status"], "ok", marker)
+        self.assertTrue(os.path.exists(keep))
+        self.assertFalse(os.path.lexists(ws))
+
+    def test_leftover_process_is_stopped(self):
+        # 正常に終わったレビュアの実行が、別のプロセスグループで cwd が複製の中の子を残しても、回の後にその子は残らない
+        self.env["FAKE_CLAUDE_MODE"] = "leave_child"
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        child = _read_pids(self.pids_file)[0]
+        self.wait_for(lambda: not _pid_alive(child), timeout=3, what=f"残した子 {child} の終了")
+        self.assertEqual(self.workspaces(), [])
+
+    def test_readonly_directory(self):
+        # 作業場所の中に読み取り専用のディレクトリがあっても、回の後に作業場所は残らない。印の exit_code は偽の claude の終了コードのまま
+        self.env["FAKE_CLAUDE_MODE"] = "readonly_dir"
+        self.env["FAKE_CLAUDE_EXIT"] = "5"
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        self.assertEqual(marker["exit_code"], 5)
+        self.assertEqual(self.workspaces(), [])
 
 
 class TestLogReading(WorkerTestBase):

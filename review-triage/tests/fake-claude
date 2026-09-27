@@ -4,20 +4,43 @@
 実際の claude -p の代わりに、環境変数の指示どおりに振る舞う。
 
 - FAKE_CLAUDE_ARGS: 受けた引数 (argv[1:]) を JSON の 1 行として追記するファイル
-- FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang のとき)
+- FAKE_CLAUDE_RECORD: 起動されたときの様子を JSON の 1 行として追記するファイル。記録するのは、
+  cwd・そこでの `git rev-parse HEAD`・`git branch --show-current`・`git remote` の結果・
+  FAKE_CLAUDE_REVS の各名前を `git rev-parse` で解決した SHA (解決できなければ null)・
+  受けた `--settings` の値を JSON として読んだものの列・プロンプトが指す依頼文 (写し) の中身
+- FAKE_CLAUDE_REVS: 記録で解決する名前を空白で区切って並べたもの (既定 main)
+- FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang と leave_child のとき)
 - FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行
 - FAKE_CLAUDE_SLEEP: 結果を書く前に待つ秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
+- FAKE_CLAUDE_REPO: 作業側の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
+- FAKE_CLAUDE_LOOP: 周回の置き場の絶対パス (mode が write_request と write_loop_result のとき使う)
+- FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作る印のファイルの名前の先頭
+- FAKE_CLAUDE_LINK_TARGET: mode が symlink_workspace のとき、作業場所を置き換えるシンボリックリンクの先
+- FAKE_CLAUDE_OUTSIDE: mode が result_symlink_outside のとき、結果のシンボリックリンクの先 (作業場所の外のファイル)
 - FAKE_CLAUDE_MODE:
-    ok            結果を正しく書く (既定)
-    no_result     結果を書かない
-    empty_run_id  run_id を空で書く
-    no_findings   findings の行を書かない
-    dirty_tree    結果を書き、作業ツリーの追跡中のファイルを変える
-    write_request 結果を書き、周回の置き場に依頼文を 1 つ置く
-    hang          子プロセスを起動して終わらない
+    ok                    結果を正しく書く (既定)
+    no_result             結果を書かない
+    empty_run_id          run_id を空で書く
+    no_findings           findings の行を書かない
+    dirty_tree            結果を書き、作業側の作業ツリーの追跡中のファイル (README.md) を変える
+    write_request         結果を書き、周回の置き場に依頼文を 1 つ置く
+    write_loop_result     結果を、写しの出力先ではなく周回の置き場の出力先に直接書く
+    git_config            結果を書き、複製の .git/config に core.fsmonitor・core.hooksPath・filter.<名前>.clean を、
+                          .git/hooks/ に post-checkout を置く (どれも、git が実行すると印のファイルを作る)
+    symlink_workspace     作業場所を別の名前に移し、元の名前を FAKE_CLAUDE_LINK_TARGET へのシンボリックリンクにしてから、
+                          写しの出力先に結果を書く (結果はリンクの先に書かれる)
+    leave_child           結果を書き、別のプロセスグループ (新しいセッション) で cwd が複製の中の子を残して終わる
+    readonly_dir          結果を書き、複製の中に読み取り専用のディレクトリを作る
+    result_symlink        結果を、複製の中のファイルへのシンボリックリンクにする
+    result_symlink_outside 結果を、FAKE_CLAUDE_OUTSIDE (作業場所の外のファイル) へのシンボリックリンクにする
+    result_fifo           結果を FIFO にする
+    result_dir            結果をディレクトリにする
+    result_large          結果を、ワーカーの上限 (1 MiB) を越える大きさで書く
+    hang                  子プロセスを起動して終わらない
 
-プロンプトの「依頼文 <パス> のとおりに」から依頼文を見つけ、依頼文の「出力先: `<パス>`」の行から結果の置き場を読む。
+プロンプトの「依頼文 <パス> のとおりに」から依頼文 (ワーカーが作業場所に作った写し) を見つけ、
+その「出力先: `<パス>`」の行から結果の書き先を読む。
 """
 
 import json
@@ -28,12 +51,117 @@ import sys
 import time
 
 
+def git(*args):
+    """cwd で git を実行し、成功すれば標準出力 (前後の空白を除く) を、失敗すれば None を返す。"""
+    r = subprocess.run(["git", *args], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def option_values(args, name):
+    return [args[i + 1] for i, a in enumerate(args) if a == name and i + 1 < len(args)]
+
+
+def record_call(args, request):
+    path = os.environ.get("FAKE_CLAUDE_RECORD")
+    if not path:
+        return
+    settings = []
+    for v in option_values(args, "--settings"):
+        try:
+            settings.append(json.loads(v))
+        except ValueError:
+            settings.append(v)
+    try:
+        with open(request, encoding="utf-8") as f:
+            text = f.read()
+    except (OSError, TypeError):
+        text = None
+    revs = {r: git("rev-parse", "--verify", "-q", r + "^{commit}")
+            for r in os.environ.get("FAKE_CLAUDE_REVS", "main").split()}
+    rec = {
+        "cwd": os.getcwd(),
+        "head": git("rev-parse", "HEAD"),
+        "branch": git("branch", "--show-current"),
+        "remotes": git("remote"),
+        "revs": revs,
+        "settings": settings,
+        "request_path": request,
+        "request": text,
+    }
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def write_pids(*pids):
+    path = os.environ.get("FAKE_CLAUDE_PIDS")
+    if path:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(" ".join(str(p) for p in pids) + "\n")
+
+
+def result_lines(mode, rid, head):
+    lines = [
+        "skill: code-review",
+        "model: opus",
+        'level: "high"',
+        'run_id: ""' if mode == "empty_run_id" else f'run_id: "{rid}"',
+        "scope: full",
+        f'head: "{head}"',
+    ]
+    if mode != "no_findings":
+        lines.append("findings: []")
+    lines.append("residual: []")
+    return "\n".join(lines) + "\n"
+
+
+def write_git_config(content_mark):
+    """複製 (cwd) の .git に、git が後で実行するコマンドを書く。どれも実行されると content_mark-<種類> を作る。"""
+    base = os.path.dirname(content_mark)
+
+    def script(kind, passthrough=False):
+        p = os.path.join(base, f"fake-hook-{kind}")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(f"#!/bin/sh\ntouch '{content_mark}-{kind}'\n" + ("cat\n" if passthrough else ""))
+        os.chmod(p, 0o755)
+        return p
+
+    hooks_dir = os.path.join(base, "fake-hooks-dir")
+    os.makedirs(hooks_dir, exist_ok=True)
+    for name in ("post-checkout", "pre-commit", "post-merge", "reference-transaction"):
+        p = os.path.join(hooks_dir, name)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(f"#!/bin/sh\ntouch '{content_mark}-hooksPath'\n")
+        os.chmod(p, 0o755)
+    with open(os.path.join(".git", "config"), "a", encoding="utf-8") as f:
+        f.write(
+            "[core]\n"
+            f"\tfsmonitor = {script('fsmonitor')}\n"
+            f"\thooksPath = {hooks_dir}\n"
+            '[filter "fake"]\n'
+            f"\tclean = {script('clean', passthrough=True)}\n"
+        )
+    post_checkout = os.path.join(".git", "hooks", "post-checkout")
+    with open(post_checkout, "w", encoding="utf-8") as f:
+        f.write(f"#!/bin/sh\ntouch '{content_mark}-post-checkout'\n")
+    os.chmod(post_checkout, 0o755)
+    with open(".gitattributes", "w", encoding="utf-8") as f:
+        f.write("* filter=fake\n")
+    with open("README.md", "a", encoding="utf-8") as f:
+        f.write("clean フィルタが走るように変える\n")
+    open(f"{content_mark}-written", "w").close()
+
+
 def main():
     args = sys.argv[1:]
     record = os.environ.get("FAKE_CLAUDE_ARGS")
     if record:
         with open(record, "a", encoding="utf-8") as f:
             f.write(json.dumps(args, ensure_ascii=False) + "\n")
+
+    prompt = next((a for a in args if a.startswith("依頼文 ")), "")
+    m = re.match(r"依頼文 (\S+) のとおりに", prompt)
+    request = m.group(1) if m else None
+    record_call(args, request)
 
     stream = os.environ.get("FAKE_CLAUDE_STREAM")
     if stream:
@@ -52,21 +180,15 @@ def main():
     mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
     if mode == "hang":
         child = subprocess.Popen(["sleep", "1000"])
-        pids = os.environ.get("FAKE_CLAUDE_PIDS")
-        if pids:
-            with open(pids, "w", encoding="utf-8") as f:
-                f.write(f"{os.getpid()} {child.pid}\n")
+        write_pids(os.getpid(), child.pid)
         while True:
             time.sleep(1)
 
     time.sleep(float(os.environ.get("FAKE_CLAUDE_SLEEP", "0")))
 
-    prompt = next((a for a in args if a.startswith("依頼文 ")), "")
-    m = re.match(r"依頼文 (\S+) のとおりに", prompt)
-    if not m:
+    if not request:
         print("fake-claude: プロンプトに依頼文のパスが無い", file=sys.stderr)
         return 3
-    request = m.group(1)
     with open(request, encoding="utf-8") as f:
         text = f.read()
     out = re.search(r"^出力先: `([^`]+)`", text, re.M)
@@ -76,30 +198,59 @@ def main():
         print("fake-claude: 依頼文に出力先・run_id・head の行が無い", file=sys.stderr)
         return 3
     result = out.group(1)
+    content = result_lines(mode, rid.group(1), head.group(1))
 
-    if mode != "no_result":
-        lines = [
-            "skill: code-review",
-            "model: opus",
-            'level: "high"',
-            'run_id: ""' if mode == "empty_run_id" else f'run_id: "{rid.group(1)}"',
-            "scope: full",
-            f'head: "{head.group(1)}"',
-        ]
-        if mode != "no_findings":
-            lines.append("findings: []")
-        lines.append("residual: []")
+    if mode == "symlink_workspace":
+        workspace = os.path.dirname(result)
+        os.rename(workspace, workspace + ".moved")
+        os.symlink(os.environ["FAKE_CLAUDE_LINK_TARGET"], workspace)
+    if mode == "write_loop_result":
+        with open(os.path.join(os.environ["FAKE_CLAUDE_LOOP"], f"review-{rid.group(1)}.yaml"), "w",
+                  encoding="utf-8") as f:
+            f.write(content)
+    elif mode == "result_symlink":
+        target = os.path.join(os.getcwd(), "result-target.yaml")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.symlink(target, result)
+    elif mode == "result_symlink_outside":
+        target = os.environ["FAKE_CLAUDE_OUTSIDE"]
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.symlink(target, result)
+    elif mode == "result_fifo":
+        os.mkfifo(result)
+    elif mode == "result_dir":
+        os.makedirs(result)
+    elif mode == "result_large":
         with open(result, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+            f.write(content + "# " + "x" * (1024 * 1024) + "\n")
+    elif mode != "no_result":
+        with open(result, "w", encoding="utf-8") as f:
+            f.write(content)
 
     if mode == "dirty_tree":
-        with open("README.md", "a", encoding="utf-8") as f:
+        with open(os.path.join(os.environ["FAKE_CLAUDE_REPO"], "README.md"), "a", encoding="utf-8") as f:
             f.write("レビュアが書き足した行\n")
     if mode == "write_request":
-        loop_dir = os.path.dirname(request)
-        path = os.path.join(loop_dir, "review-request-29990101-0000-x-9-code-review-opus.md")
+        path = os.path.join(os.environ["FAKE_CLAUDE_LOOP"], "review-request-29990101-0000-x-9-code-review-opus.md")
         with open(path, "w", encoding="utf-8") as f:
             f.write("# レビュアが置いた依頼文\n")
+    if mode == "git_config":
+        write_git_config(os.environ["FAKE_CLAUDE_GIT_MARK"])
+    if mode == "leave_child":
+        child = subprocess.Popen(["sleep", "1000"], cwd=os.getcwd(), start_new_session=True,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+        write_pids(child.pid)
+    if mode == "readonly_dir":
+        # Go のモジュールのキャッシュと同じく、ディレクトリを 555、ファイルを 444 にする
+        os.makedirs(os.path.join("ro", "sub"))
+        with open(os.path.join("ro", "sub", "f.txt"), "w", encoding="utf-8") as f:
+            f.write("読み取り専用\n")
+        os.chmod(os.path.join("ro", "sub", "f.txt"), 0o444)
+        os.chmod(os.path.join("ro", "sub"), 0o555)
+        os.chmod("ro", 0o555)
 
     return int(os.environ.get("FAKE_CLAUDE_EXIT", "0"))
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# review-loop のワーカー。人間が端末で起動し、周回の置き場に現れた依頼文ごとに claude -p を走らせて、
-# 結果を確かめてから完了の印を書く。
+# review-loop のワーカー。人間が端末で起動し、周回の置き場に現れた依頼文ごとに、TMPDIR の下に回の作業場所を作り、
+# その中の複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) で claude -p を走らせる。
+# 結果を確かめてから置き場に複写し、作業場所を消して、完了の印を書く。
 #
 # 使い方:
 #   review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --effort <値>
@@ -24,16 +25,21 @@
 #
 # macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確かめたため)。
 # bash は macOS の /bin/bash (3.2) で動くように書く。テストは CI (ubuntu) でも偽の uname で走らせるので、
-# GNU の stat でも動くようにしておく。python3 が要る (claude -p を専用のプロセスグループで起動する・
-# ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定を JSON として検査する・
-# パスの実体を求めるのに使う)。
+# GNU の stat と Linux の /proc でも動くようにしておく。python3 が要る (claude -p を専用のプロセスグループで起動する・
+# ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
+# --settings の JSON を組み立てる・依頼文の写しを作る・結果を確かめて複写する・作業場所の中を cwd にしているプロセスを
+# 見つける・パスの実体を求めるのに使う)。
+#
+# 不変条件: レビュアの実行を起動した後は、複製の中で git を実行しない (複製の .git/config やフックはレビュアの実行が
+# 書き換えられるので、git を実行するとそのコマンドがサンドボックスの外で動く)。作業場所は rm -rf だけで消す。
 
 set -u
 
 WORKER_PID=$$
 POLL_SECONDS=5              # 依頼文を探す周期と、worker.yaml の更新時刻を進める周期
 OTHER_WORKER_FRESH_SECONDS=30  # 起動時の確認で、他のワーカーが動いていると判定する更新時刻の新しさ
-STOP_GRACE_SECONDS=5        # レビュアの実行を TERM で止めてから KILL を送るまでの猶予
+STOP_GRACE_SECONDS=5        # レビュアの実行や作業場所に残ったプロセスを TERM で止めてから KILL を送るまでの猶予
+RESULT_MAX_BYTES=1048576    # 置き場に複写する結果の大きさの上限 (1 MiB)。正本は worker.md の「回の処理」の手順 10
 
 # レビュアの実行に許すツールの既定の一覧 (--allowed-tools を 1 回でも指定すれば置き換わる)。
 # 正本は worker.md の「レビュアの実行の権限」
@@ -182,6 +188,16 @@ real_dir() {
   (cd "$1" 2>/dev/null && pwd -P)
 }
 
+# 複数行の文字列 ($1) の、空白だけではない最後の行
+last_line() {
+  printf '%s\n' "$1" | sed '/^[[:space:]]*$/d' | tail -n 1
+}
+
+# 複数行の文字列 ($1) の空でない行を、"; " で繋いで 1 行にする (完了の印の error の区切り)
+join_lines() {
+  printf '%s\n' "$1" | sed '/^$/d' | awk 'NR > 1 { printf "; " } { printf "%s", $0 }'
+}
+
 # そのプロセスグループに、終わっていない (ゾンビでない) プロセスが残っているか
 group_alive() {
   ps -A -o pgid=,stat= 2>/dev/null | awk -v g="$1" '$1 == g && $2 !~ /^Z/ { found = 1 } END { exit !found }'
@@ -304,6 +320,49 @@ for rule in allow if isinstance(allow, list) else []:
         domains.append(m.group(1).strip())
 for d in domains:
     print(d)
+PY
+}
+
+# 作業場所の名前に付けるハッシュ。周回の置き場の実体パス ($1) の SHA-256 の、16 進の先頭 8 文字
+workspace_hash() {
+  python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.argv[1].encode("utf-8")).hexdigest()[:8])' "$1"
+}
+
+# レビュアの実行に渡す --settings の JSON を組み立てて標準出力に出す (中身の正本は worker.md の「サンドボックス」)。
+# 引数は、作業場所のパスに続けて、-w <書き込みを許す場所>・-d <接続を許すドメイン>・-s <追加の引数の --settings の値> の組を並べる。
+# 追加の引数の値を合成した後に、サンドボックスと自動メモリのキーがワーカーの値のままで、ほかのキーが enabledPlugins だけであることを
+# 確かめる。確かめられなければ理由を標準エラーに出して、終了コード 1 で終わる
+build_settings_json() {
+  python3 - "$@" <<'PY'
+import json, sys
+
+workspace, pairs = sys.argv[1], sys.argv[2:]
+lists = {"-w": [], "-d": [], "-s": []}
+for flag, value in zip(pairs[0::2], pairs[1::2]):
+    lists[flag].append(value)
+settings = {
+    "sandbox": {
+        "enabled": True,
+        "autoAllowBashIfSandboxed": True,
+        "allowUnsandboxedCommands": False,
+        "failIfUnavailable": True,
+        "filesystem": {"allowWrite": [workspace] + lists["-w"]},
+        "network": {"strictAllowlist": True, "allowedDomains": lists["-d"]},
+    },
+    "autoMemoryEnabled": False,
+}
+worker_values = json.loads(json.dumps(settings))
+for text in lists["-s"]:
+    for key, value in json.loads(text).items():
+        if key == "enabledPlugins":
+            settings.setdefault("enabledPlugins", {}).update(value)
+        else:
+            settings[key] = value
+if {k: v for k, v in settings.items() if k != "enabledPlugins"} != worker_values:
+    print("review-loop-worker: 追加の引数の --settings を合成すると、サンドボックスか自動メモリの設定がワーカーの値から変わるか、"
+          "enabledPlugins 以外のキーが加わる", file=sys.stderr)
+    sys.exit(1)
+print(json.dumps(settings, ensure_ascii=False))
 PY
 }
 
@@ -479,7 +538,10 @@ if [ ${#SANDBOX_ALLOW_WRITE[@]} -gt 0 ]; then
   fi
 fi
 
-# 13. 追加の引数 (-- の後) が、受け付ける一覧に収まるか。制限を弱めるフラグは列挙しきれないので、受け付けるものの一覧で検査する
+# 13. 追加の引数 (-- の後) が、受け付ける一覧に収まるか。制限を弱めるフラグは列挙しきれないので、受け付けるものの一覧で検査する。
+# --plugin-dir はそのまま claude に渡し (EXTRA_PASS)、--settings の値はワーカーの --settings に合成する (EXTRA_SETTINGS)
+EXTRA_PASS=()
+EXTRA_SETTINGS=()
 i=0
 while [ "$i" -lt ${#EXTRA_ARGS[@]} ]; do
   a=${EXTRA_ARGS[$i]}
@@ -495,6 +557,9 @@ while [ "$i" -lt ${#EXTRA_ARGS[@]} ]; do
           [ -n "$problem" ] || problem="検査できない"
           unavailable "追加の引数の --settings の値を受け付けない: ${problem}。受け付けるのは、enabledPlugins だけを持つ JSON"
         fi
+        EXTRA_SETTINGS+=("$val")
+      else
+        EXTRA_PASS+=("$a" "$val")
       fi
       i=$(( i + 2 )) ;;
     *) unavailable "追加の引数 $a は受け付けない (受け付けるのは --plugin-dir <ディレクトリ> と、enabledPlugins だけを持つ JSON を値にした --settings)" ;;
@@ -521,6 +586,21 @@ fi
 
 IDLE_SECONDS=$(minutes_to_seconds "$IDLE_MINUTES")
 REVIEW_TIMEOUT_SECONDS=$(minutes_to_seconds "$REVIEW_TIMEOUT_MINUTES")
+
+# 回の作業場所 (worker.md の「回の処理」の手順 5)。周回の間は同じパスを使い回し、回ごとに作り直す。
+# 名前は、周回 id (置き場のディレクトリ名) と、周回の置き場の実体パスから作るハッシュ。TMP_REAL は実体パスなので、
+# 作業場所のパスもそのまま実体パスになる (シンボリックリンクに置き換えられていないかを、このパスと比べて確かめる)
+ws_hash=$(workspace_hash "$LOOP_REAL") && [ -n "$ws_hash" ] || unavailable "作業場所の名前に付けるハッシュを求められない"
+WS="$TMP_REAL/review-loop-${LOOP_REAL##*/}-$ws_hash"
+CLONE="$WS/tree"
+
+# レビュアの実行に渡す --settings の JSON。値は起動の間変わらないので、ここで 1 度だけ組み立てる
+settings_args=("$WS")
+for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do settings_args+=(-w "$v"); done
+for v in ${SANDBOX_ALLOWED_DOMAINS[@]+"${SANDBOX_ALLOWED_DOMAINS[@]}"}; do settings_args+=(-d "$v"); done
+for v in ${EXTRA_SETTINGS[@]+"${EXTRA_SETTINGS[@]}"}; do settings_args+=(-s "$v"); done
+SETTINGS_JSON=$(build_settings_json "${settings_args[@]}") && [ -n "$SETTINGS_JSON" ] \
+  || unavailable "レビュアの実行に渡す --settings の JSON を組み立てられない"
 
 # ---- バックグラウンドの処理 ----
 
@@ -661,13 +741,14 @@ trap 'cleanup' EXIT
 
 # ---- 回の処理 (正本は worker.md の「回の処理」) ----
 
-# 置き場のファイルの一覧と更新時刻。ワーカーとレビュアの実行が書いてよいもの (worker.yaml・結果・ログ) と、
-# 作業側が再開や停止のときにレビュー中でも書き換える loop.yaml は除く
+# 置き場のファイルの一覧と更新時刻。ワーカーが回の間に書くもの (worker.yaml・その回のログ) と、
+# 作業側が再開や停止のときにレビュー中でも書き換える loop.yaml は除く。その回の結果は除かない — 結果はワーカーが
+# 比べた後に複写するので、比べる時点で置き場の結果が変わっていれば、レビュアの実行が置き場に書いたことになる
 snapshot() {
   find "$LOOP_DIR" -mindepth 1 -maxdepth 1 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
     n=${p##*/}
     case "$n" in
-      worker.yaml|.worker.yaml.tmp|loop.yaml|.loop.yaml.tmp|"review-$CURRENT_RID.yaml"|"$CURRENT_RID.log") continue ;;
+      worker.yaml|.worker.yaml.tmp|loop.yaml|.loop.yaml.tmp|"$CURRENT_RID.log") continue ;;
     esac
     echo "$n $(mtime "$p")"
   done
@@ -765,23 +846,418 @@ write_marker() {
   log "完了の印を書いた: $CURRENT_RID ($status${error:+: $error})"
 }
 
-# レビュアの実行を起動しなかった回の印 (依頼文・HEAD・作業ツリーの確認が通らない)
+# ---- 回の作業場所・複製・写し・結果の複写に使う道具 (正本は worker.md の「回の処理」の手順 5〜10) ----
+
+# 作業場所 ($1。実体パス) の中を cwd にしているプロセスを止める (手順 10 の 1)。TERM を送り、STOP_GRACE_SECONDS 秒のうちに
+# 消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドはレビュアの実行とは別のプロセスグループで動く) ので、
+# cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
+# 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる
+stop_cwd_procs() {
+  python3 - "$1" "$STOP_GRACE_SECONDS" <<'PY'
+import os, signal, subprocess, sys, time
+
+workspace, grace = sys.argv[1], float(sys.argv[2])
+me = os.getpid()
+
+
+def inside(path):
+    return path == workspace or path.startswith(workspace + "/")
+
+
+def scan():
+    found = set()
+    if os.path.isdir("/proc/self"):
+        for name in os.listdir("/proc"):
+            if name.isdigit():
+                try:
+                    cwd = os.readlink(f"/proc/{name}/cwd")
+                except OSError:
+                    continue
+                if inside(cwd):
+                    found.add(int(name))
+    else:
+        try:
+            r = subprocess.run(["lsof", "-w", "-d", "cwd", "-Fpn"], capture_output=True, text=True, errors="replace")
+        except OSError as e:
+            raise RuntimeError(f"lsof を実行できない ({e})")
+        pid, listed = None, False
+        for line in r.stdout.splitlines():
+            if line.startswith("p") and line[1:].isdigit():
+                pid, listed = int(line[1:]), True
+            elif line.startswith("n") and pid is not None and inside(line[1:]):
+                found.add(pid)
+        # lsof は自分自身の cwd も出力するので、プロセスが 1 つも無ければ列挙に失敗している
+        if not listed:
+            raise RuntimeError(f"lsof の出力にプロセスが無い (終了コード {r.returncode}: {r.stderr.strip()[:200]})")
+    found.discard(me)
+    return found
+
+
+try:
+    pids = scan()
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        if not pids:
+            sys.exit(0)
+        print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが残っているので、"
+              f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
+        for pid in pids:
+            try:
+                os.kill(pid, sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+        deadline = time.time() + grace
+        while True:
+            time.sleep(0.2)
+            pids = scan()
+            if not pids or time.time() >= deadline:
+                break
+except RuntimeError as e:
+    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスを列挙できない: {e}", file=sys.stderr)
+    sys.exit(1)
+if pids:
+    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが止まらない "
+          f"(PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の読み取り・書き込み・実行の権限を足す
+# (Go のモジュールのキャッシュなど、読み取り専用のディレクトリを作るツールがあるため)。シンボリックリンクは辿らない。
+# $1 がディレクトリでないか、実体パスが $1 と違えば (作ったときと違えば)、理由を標準出力に出して終了コード 1 で終わる
+make_removable() {
+  python3 - "$1" <<'PY'
+import os, stat, sys
+
+top = sys.argv[1]
+try:
+    st = os.lstat(top)
+except OSError as e:
+    print(f"状態を読めない ({e})")
+    sys.exit(1)
+if not stat.S_ISDIR(st.st_mode):
+    print("ディレクトリではない")
+    sys.exit(1)
+real = os.path.realpath(top)
+if real != top:
+    print(f"実体パス {real} が、作ったときと違う")
+    sys.exit(1)
+
+
+def add_owner_rwx(path, mode):
+    if mode & 0o700 != 0o700:
+        try:
+            os.chmod(path, stat.S_IMODE(mode) | 0o700)
+        except OSError:
+            pass
+
+
+add_owner_rwx(top, st.st_mode)
+# 上から順にたどり、下のディレクトリの権限を、そこへ降りる前に足す
+for root, dirs, _ in os.walk(top):
+    for d in dirs:
+        p = os.path.join(root, d)
+        try:
+            s = os.lstat(p)
+        except OSError:
+            continue
+        if stat.S_ISDIR(s.st_mode):
+            add_owner_rwx(p, s.st_mode)
+PY
+}
+
+# 作業場所を消す (手順 10 の 5)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確かめてから、
+# 中のディレクトリに権限を足して rm -rf で消す。git は使わない。消さなかったか消せなければ、パスと理由を標準エラーに出して 1 を返す
+remove_workspace() {
+  local why
+  if [ -L "$WS" ]; then
+    log "作業場所 $WS がシンボリックリンクに置き換えられているので、消さない (リンクの先も消さない)。次の回に、リンクだけを消して作り直す"
+    return 1
+  fi
+  [ -e "$WS" ] || return 0
+  if ! why=$(make_removable "$WS"); then
+    log "作業場所 $WS を消さない: ${why:-確かめられない}。次の回に消す"
+    return 1
+  fi
+  rm -rf "$WS" 2>/dev/null
+  if [ -e "$WS" ] || [ -L "$WS" ]; then
+    log "作業場所 $WS を消せない。次の回に消す"
+    return 1
+  fi
+  return 0
+}
+
+# 手順 5。作業場所を作る。前の回の作業場所が残っていれば、残ったプロセスを止めて消してから作る。
+# シンボリックリンクが残っていれば、リンクだけを消す (リンクの先は消さない)。
+# 作れなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+prepare_workspace() {
+  local out
+  if [ -L "$WS" ]; then
+    log "作業場所のパス $WS にシンボリックリンクが残っているので、リンクだけを消す"
+    rm -f "$WS" 2>/dev/null
+  elif [ -e "$WS" ]; then
+    log "前の回の作業場所 $WS が残っているので、消してから作る"
+    stop_cwd_procs "$WS"
+    remove_workspace
+  fi
+  if [ -e "$WS" ] || [ -L "$WS" ]; then
+    echo "workspace failed (the previous workspace remains: $WS)"
+    return 1
+  fi
+  if ! out=$(mkdir -m 700 "$WS" 2>&1); then
+    echo "workspace failed (mkdir: $(last_line "$out"))"
+    return 1
+  fi
+  if [ -L "$WS" ] || [ ! -d "$WS" ] || [ ! -O "$WS" ] || [ "$(real_dir "$WS")" != "$WS" ]; then
+    echo "workspace failed (not a directory owned by the worker: $WS)"
+    return 1
+  fi
+  return 0
+}
+
+# 手順 6 の段の失敗を、完了の印の error に書く文字列にする。$1 は段の名前、$2 は git の出力
+clone_failed() {
+  local detail
+  detail=$(last_line "$2")
+  echo "clone failed ($1${detail:+: $detail})"
+}
+
+# 手順 6。作業側のリポジトリを作業場所の tree/ に複製し、依頼の head ($1。作業側で解決した完全な SHA) を detached HEAD で取り出す。
+# 段は、複製 (clone)・remote の設定の削除 (remove remote)・ブランチとリモート追跡ブランチとタグの取り込み (fetch refs)・
+# チェックアウト (checkout)・submodule の項目の検査 (submodule) の順。準備のコマンドの cwd は作業場所にする。
+# 失敗すれば、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+make_clone() {
+  local sha=$1 out subs
+  if ! out=$( { cd "$WS" && git clone -q --shared --no-checkout -- "$CWD_REAL" tree; } 2>&1 ); then
+    clone_failed clone "$out"; return 1
+  fi
+  # remote の設定を消し、git push origin の行き先 (作業側のリポジトリ) を無くす
+  if ! out=$( { cd "$WS" && git -C tree remote remove origin; } 2>&1 ); then
+    clone_failed "remove remote" "$out"; return 1
+  fi
+  # --no-checkout の直後の HEAD は作業側と同じブランチを指すので、そのブランチも更新できるように --update-head-ok を付ける
+  if ! out=$( { cd "$WS" && git -C tree -c gc.auto=0 -c maintenance.auto=false fetch -q --update-head-ok --no-tags \
+      --no-recurse-submodules "$CWD_REAL" '+refs/heads/*:refs/heads/*' '+refs/remotes/*:refs/remotes/*' \
+      '+refs/tags/*:refs/tags/*'; } 2>&1 ); then
+    clone_failed "fetch refs" "$out"; return 1
+  fi
+  if ! out=$( { cd "$WS" && git -C tree -c advice.detachedHead=false checkout -q --detach "$sha"; } 2>&1 ); then
+    clone_failed checkout "$out"; return 1
+  fi
+  if ! out=$( { cd "$WS" && git -C tree ls-files -s; } 2>&1 ); then
+    clone_failed submodule "$out"; return 1
+  fi
+  subs=$(printf '%s\n' "$out" | grep '^160000 ' | cut -f2 | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
+  if [ -n "$subs" ]; then
+    echo "clone failed (submodule: $subs)"
+    return 1
+  fi
+  return 0
+}
+
+# 手順 7。複製 ($1) の .claude/settings.json と .claude/settings.local.json のどちらかに、空でない sandbox.excludedCommands があるか、
+# JSON として読めなければ、当たったものを 1 行に 1 つ出して、終了コード 1 で終わる。ファイルが無ければ何もしない
+clone_settings_problem() {
+  python3 - "$1" <<'PY'
+import json, os, stat, sys
+
+tree = sys.argv[1]
+problems = []
+for rel in (".claude/settings.json", ".claude/settings.local.json"):
+    path = os.path.join(tree, rel)
+    try:
+        # シンボリックリンクなら先を読む (Claude Code もそうする)。通常のファイルでなければ読まない (/dev/zero などで止まらないように)
+        if not stat.S_ISREG(os.stat(path).st_mode):
+            problems.append(f"{rel}: not a regular file")
+            continue
+        with open(path, encoding="utf-8") as f:
+            settings = json.load(f)
+    except FileNotFoundError:
+        continue
+    except (OSError, ValueError) as e:
+        problems.append(f"{rel}: not readable as JSON ({e})")
+        continue
+    if not isinstance(settings, dict):
+        problems.append(f"{rel}: top level is not an object")
+        continue
+    sandbox = settings.get("sandbox")
+    excluded = sandbox.get("excludedCommands") if isinstance(sandbox, dict) else None
+    if excluded:
+        problems.append(f"{rel}: sandbox.excludedCommands is not empty ({json.dumps(excluded, ensure_ascii=False)})")
+for p in problems:
+    print(f"clone settings ({p})")
+sys.exit(1 if problems else 0)
+PY
+}
+
+# 手順 8。作業側の依頼文 ($1) の写しを、作業場所の $2 に作る。次の順に文字列を置き換える。
+#   1. 元の出力先 (依頼文の「出力先:」の行の値) の、すべての出現 → 作業場所の結果のパス
+#   2. バッククォートで囲んだ元の作業ツリーのパス (作業側の実体パス) → 複製のパス
+#   3. 作業ツリーの扱いを示す行 (「- 作業ツリーの扱い: <値>」) の値 → 使い捨て
+# 出力先は作業ツリーのパスで始まるので、この順でないと出力先が複製の中のパスになる。元の出力先は、置き場から組み立てたもの
+# (実体が周回の置き場で、名前が review-<識別子>.yaml) でなければならない。置き換えの後に、元の出力先か元の作業ツリーのパスが
+# 残っているか、扱いの行がちょうど 1 つでなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+make_request_copy() {
+  python3 - "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" <<'PY'
+import os, re, sys
+
+request, copy, rid, loop_real, tree_real, workspace, clone = sys.argv[1:8]
+ws_result = os.path.join(workspace, f"review-{rid}.yaml")
+
+
+def fail(reason):
+    print(f"request copy failed ({reason})")
+    sys.exit(1)
+
+
+try:
+    with open(request, encoding="utf-8") as f:
+        text = f.read()
+except (OSError, ValueError) as e:
+    fail(f"cannot read the request: {e}")
+m = re.search(r"^出力先: `([^`]+)`", text, re.M)
+if not m:
+    fail("no output line")
+orig_out = m.group(1)
+if not (os.path.isabs(orig_out) and os.path.basename(orig_out) == f"review-{rid}.yaml"
+        and os.path.realpath(os.path.dirname(orig_out)) == loop_real):
+    fail(f"output path does not point to the loop dir: {orig_out}")
+text = text.replace(orig_out, ws_result)
+tree_token = f"`{tree_real}`"
+if tree_token not in text:
+    fail(f"worktree path not found: {tree_token}")
+text = text.replace(tree_token, f"`{clone}`")
+lines = text.split("\n")
+handling = [i for i, line in enumerate(lines) if line.startswith("- 作業ツリーの扱い:")]
+if len(handling) != 1:
+    fail(f"handling lines: {len(handling)}")
+lines[handling[0]] = re.sub(r"^(- 作業ツリーの扱い:).*?(\r?)$", r"\1 使い捨て\2", lines[handling[0]])
+text = "\n".join(lines)
+# 作業場所のパスを除いてから探す (作業場所のパスの中に、元のパスと同じ文字列が偶然現れても数えないように)
+rest = text.replace(workspace, "")
+if orig_out in rest:
+    fail("output path remains")
+if tree_real in rest:
+    fail("worktree path remains")
+try:
+    with open(copy, "w", encoding="utf-8") as f:
+        f.write(text)
+except OSError as e:
+    fail(f"cannot write the copy: {e}")
+PY
+}
+
+# 作業場所の結果 ($1) を確かめる (「回の処理」の表の「結果のファイル」)。通常のファイルで、実体パスが作業場所の下にあり、
+# 大きさが RESULT_MAX_BYTES 以下なら何も出さずに終了コード 0 で、そうでなければ当たった条件を 1 行に 1 つ出して終了コード 1 で終わる。
+# 中身は読まない (FIFO で止まらないように)
+result_file_problem() {
+  python3 - "$1" "$WS" "$RESULT_MAX_BYTES" <<'PY'
+import os, stat, sys
+
+path, workspace, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
+try:
+    st = os.lstat(path)
+except OSError as e:
+    print(f"result not readable ({e})")
+    sys.exit(1)
+problems = []
+if not stat.S_ISREG(st.st_mode):
+    kinds = ((stat.S_ISLNK, "symbolic link"), (stat.S_ISDIR, "directory"), (stat.S_ISFIFO, "FIFO"),
+             (stat.S_ISSOCK, "socket"), (stat.S_ISCHR, "character device"), (stat.S_ISBLK, "block device"))
+    kind = next((name for test, name in kinds if test(st.st_mode)), "unknown type")
+    problems.append(f"result not a regular file ({kind})")
+real = os.path.realpath(path)
+if not real.startswith(workspace + "/"):
+    problems.append(f"result outside workspace ({real})")
+if stat.S_ISREG(st.st_mode) and st.st_size > limit:
+    problems.append(f"result too large ({st.st_size} bytes > {limit} bytes)")
+for p in problems:
+    print(p)
+sys.exit(1 if problems else 0)
+PY
+}
+
+# 手順 10 の 4。作業場所の結果 ($1) を、置き場の出力先 ($2) と同じディレクトリの一時名に書いてから改名して複写する。
+# 結果はシンボリックリンクを辿らずに開き直し、通常のファイルで大きさが上限以下であることを確かめてから読む。
+# 一時名もシンボリックリンクを辿らずに開く。改名の後に、出力先が通常のファイルとして在ることを確かめる。
+# 失敗すれば理由を標準出力に出して、終了コード 1 で終わる
+copy_result() {
+  python3 - "$1" "$2" "$RESULT_MAX_BYTES" <<'PY'
+import os, stat, sys
+
+src, dest, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
+tmp = os.path.join(os.path.dirname(dest), "." + os.path.basename(dest) + ".tmp")
+
+
+def fail(reason):
+    print(reason)
+    sys.exit(1)
+
+
+try:
+    with os.fdopen(os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            fail("the result is not a regular file")
+        data = f.read(limit + 1)
+except OSError as e:
+    fail(f"cannot read the result: {e}")
+if len(data) > limit:
+    fail(f"the result is larger than {limit} bytes")
+try:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)
+except OSError as e:
+    fail(f"cannot create {tmp}: {e}")
+try:
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+    os.rename(tmp, dest)
+except OSError as e:
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    fail(f"cannot write {dest}: {e}")
+try:
+    placed = stat.S_ISREG(os.lstat(dest).st_mode)
+except OSError:
+    placed = False
+if not placed:
+    fail(f"{dest} is not a regular file after the rename")
+PY
+}
+
+# ---- 回の処理の流れ (手順 2〜10) ----
+
+# レビュアの実行を起動しなかった回の印 (依頼文・HEAD・作業ツリーの確認か、作業場所を作れない)
 fail_without_run() {
   write_marker failed "$1" 0
   CURRENT_RID=""
   write_worker_yaml idle ""
 }
 
-# レビュアの実行が終わった (または止めた) 後の確認と印。how は done / timeout / interrupted
+# 作業場所を作った後の準備 (手順 6〜8) が通らなかった回。回の終わりの処理の 1 と 5 の手順で作業場所を片付けてから、
+# レビュアの実行を起動せずに failed の印を書く
+fail_prepared() {
+  stop_cwd_procs "$WS"
+  remove_workspace
+  fail_without_run "$1"
+}
+
+# 手順 10。レビュアの実行が終わった (または止めた) 後の処理と印。how は done / timeout / interrupted。
+# 順序は、残ったプロセスを止める → ログを読む → 確かめる → 結果を複写する → 作業場所を消す → 印を書く
 REVIEWER_RC=""
 SNAPSHOT_BEFORE=""
-RESULT_SIG_BEFORE=""
 finish_round() {
   local how=$1
-  local result="$LOOP_DIR/review-$CURRENT_RID.yaml"
+  local ws_result="$WS/review-$CURRENT_RID.yaml"
+  local dest="$LOOP_DIR/review-$CURRENT_RID.yaml"
   local errors=()
-  local facts head_after full_after full_before dirty clean_after after changed
+  local facts head_after full_after full_before dirty clean_after after changed problem line copyable=0
 
+  # 1. 作業場所の中を cwd にしているプロセスが残っていれば止める (後始末の途中で作業場所に書かれないように)。
+  # レビュアの実行の終了コード (REVIEWER_RC) は変えない
+  stop_cwd_procs "$WS"
+
+  # 2. ログを読む
   facts=$(read_log_facts "$LOOP_DIR/$CURRENT_RID.log")
   EFFECTIVE=$(echo "$facts" | sed -n 1p)
   SKILL_CALLED=$(echo "$facts" | sed -n 2p)
@@ -793,22 +1269,34 @@ finish_round() {
   [ -n "$DENIAL_COUNT" ] || DENIAL_COUNT=unknown
   [ -n "$DENIAL_TOOLS" ] || DENIAL_TOOLS="[]"
 
+  # 3. 確かめる。上限と割り込みで止めた回は、結果の 4 項目 (ある・ファイル・形・run_id) を確かめない。
+  # 作業場所は回ごとに作り直すので、作業場所にある結果は、この回のレビュアの実行が書いたものである
   case "$how" in
     timeout) errors+=("timeout") ;;
     interrupted) errors+=("interrupted") ;;
-    done)
-      if [ ! -f "$result" ]; then
-        errors+=("no result")
-      elif [ -n "$RESULT_SIG_BEFORE" ] && [ "$(mtime "$result") $(wc -c <"$result")" = "$RESULT_SIG_BEFORE" ]; then
-        errors+=("no result (the file is from an earlier run)")
-      else
-        grep -q '^findings:' "$result" || errors+=("no findings key")
-        local got
-        got=$(read_key "$result" run_id)
-        [ "$got" = "$CURRENT_RID" ] || errors+=("run_id mismatch (expected $CURRENT_RID, actual \"$got\")")
-      fi ;;
   esac
+  if [ -e "$ws_result" ] || [ -L "$ws_result" ]; then
+    if problem=$(result_file_problem "$ws_result"); then
+      copyable=1
+      if [ "$how" = done ]; then
+        grep -q '^findings:' "$ws_result" || errors+=("no findings key")
+        local got
+        got=$(read_key "$ws_result" run_id)
+        [ "$got" = "$CURRENT_RID" ] || errors+=("run_id mismatch (expected $CURRENT_RID, actual \"$got\")")
+      fi
+    elif [ "$how" = done ]; then
+      [ -n "$problem" ] || problem="result not checked (python3 が理由を出さずに終わった)"
+      while IFS= read -r line; do
+        [ -n "$line" ] && errors+=("$line")
+      done <<EOF
+$problem
+EOF
+    fi
+  elif [ "$how" = done ]; then
+    errors+=("no result")
+  fi
 
+  # 作業側の HEAD と作業ツリー。git は作業側のリポジトリに対して実行する (複製では実行しない)
   head_after=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null)
   full_after=$(git -C "$CWD_REAL" rev-parse HEAD 2>/dev/null)
   full_before=$(git -C "$CWD_REAL" rev-parse --verify -q "$HEAD_BEFORE^{commit}" 2>/dev/null)
@@ -816,6 +1304,7 @@ finish_round() {
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
   if [ -z "$dirty" ]; then clean_after=true; else clean_after=false; errors+=("tree not clean ($dirty)"); fi
 
+  # 置き場。依頼文を受け取ったときに控えた一覧と比べる (結果の複写より前に比べる)
   after=$(snapshot)
   changed=$( { echo "$SNAPSHOT_BEFORE"; echo "$after"; } | sed '/^$/d' | LC_ALL=C sort | uniq -u | sed 's/ [^ ]*$//' | LC_ALL=C sort -u | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
   if [ -n "$changed" ]; then
@@ -829,6 +1318,18 @@ finish_round() {
     done
   fi
 
+  # 4. 結果を複写する。failed の回でも、結果のファイルの条件を満たせば複写する (RA1 の報告から人間が結果を読めるように)。
+  # ok の印は、置き場の出力先に結果が通常のファイルとして在ることを copy_result が確かめた後にだけ書ける
+  if [ "$copyable" = 1 ]; then
+    if ! problem=$(copy_result "$ws_result" "$dest"); then
+      errors+=("result copy failed (${problem:-理由が分からない})")
+    fi
+  fi
+
+  # 5. 作業場所を消す。消せなくても印の status は変えない (次の回の手順 5 で消す)
+  remove_workspace
+
+  # 6. 印を書く
   if [ ${#errors[@]} -eq 0 ]; then
     write_marker ok "" 1 "$head_after" "$clean_after" "$REVIEWER_RC"
   else
@@ -838,28 +1339,43 @@ finish_round() {
   fi
 }
 
+# 手順 9。レビュアの実行を、複製を cwd にして、専用のプロセスグループでバックグラウンドに起動して待つ。
+# 引数の中身と理由の正本は worker.md の「レビュアの実行」と「レビュアの実行の権限」
 run_reviewer() {
-  local req=$1 result=$2 logf=$3
-  local prompt="依頼文 $req のとおりに作業し、結果を依頼文が指す出力先に書く。"
-  local tools=()
+  local copy=$1 logf=$2
+  local prompt="依頼文 $copy のとおりに作業し、結果を依頼文が指す出力先に書く。"
+  local tools=() denied=()
   if [ ${#ALLOWED_TOOLS[@]} -gt 0 ]; then
     tools=("${ALLOWED_TOOLS[@]}")
   else
     tools=("${DEFAULT_ALLOWED_TOOLS[@]}")
   fi
-  # 結果ファイル 1 つへの書き込みの許可。// の後にルートからのパスを続ける
-  tools+=("Edit(/$result)")
+  # 作業場所の結果ファイル 1 つへの書き込みの許可。// の後にルートからのパスを続ける (Claude Code の規則で絶対パスを表す書き方)
+  tools+=("Edit(/$WS/review-$CURRENT_RID.yaml)")
+  # 拒否の規則。ホーム・作業側・周回の置き場への書き込みと、複製の中の Claude Code と git が後で読んで実行するものの書き換えと、
+  # git push を止める。WebFetch・WebSearch とネットワークのコマンドは拒否しない (接続できるかはサンドボックスの接続先の一覧で決まる)
+  denied=(
+    'AskUserQuestion'
+    'Edit(~/**)'
+    "Edit(/$CWD_REAL/**)"
+    "Edit(/$LOOP_REAL/**)"
+    "Edit(/$CLONE/.claude/**)"
+    "Edit(/$CLONE/.git/**)"
+    "Edit(/$CLONE/.mcp.json)"
+    'Bash(git push:*)'
+  )
 
   TIMED_OUT=0
   (
-    cd "$CWD_REAL" || exit 127
+    cd "$CLONE" || exit 127
     exec python3 -c 'import os, sys; os.setpgid(0, 0); os.execvp(sys.argv[1], sys.argv[1:])' \
       claude -p "$prompt" \
       --model "$MODEL" --effort "$EFFORT" --permission-mode "$PERMISSION_MODE" \
+      --settings "$SETTINGS_JSON" --strict-mcp-config \
       --allowedTools "${tools[@]}" \
-      --disallowedTools AskUserQuestion \
+      --disallowedTools "${denied[@]}" \
       --output-format stream-json --verbose \
-      ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+      ${EXTRA_PASS[@]+"${EXTRA_PASS[@]}"}
   ) </dev/null >"$logf" 2>&1 &
   REVIEWER_PID=$!
   start_watchdog "$REVIEW_TIMEOUT_SECONDS"
@@ -889,20 +1405,22 @@ process_request() {
   REVIEWER_RC=""
   write_worker_yaml reviewing "$CURRENT_RID"
   log "依頼文を見つけた: $CURRENT_RID"
+  # 手順 2。置き場のファイルの一覧と更新時刻を控える (回の終わりの処理で比べる。準備の途中に現れた end も検出するため、ここで控える)
+  SNAPSHOT_BEFORE=$(snapshot)
 
   local req="$LOOP_DIR/review-request-$CURRENT_RID.md"
-  local result="$LOOP_DIR/review-$CURRENT_RID.yaml"
+  local copy="$WS/review-request-$CURRENT_RID.md"
   local logf="$LOOP_DIR/$CURRENT_RID.log"
   HEAD_BEFORE=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null)
 
-  # 依頼文の検査
+  # 手順 3。依頼文を確かめる
   if grep -q '{{' "$req"; then fail_without_run "request malformed (unfilled placeholder)"; return; fi
   if ! grep -q '^## 出力様式' "$req"; then fail_without_run "request malformed (no output format section)"; return; fi
   local req_head
   req_head=$(sed -n 's/^head:[[:space:]]*"\([0-9a-f][0-9a-f]*\)"[[:space:]]*$/\1/p' "$req" | head -n 1)
   if [ -z "$req_head" ]; then fail_without_run "request malformed (no head line)"; return; fi
 
-  # HEAD と作業ツリーの確認
+  # 手順 4。作業側の HEAD と作業ツリーを確かめる
   local full_req full_head dirty
   full_req=$(git -C "$CWD_REAL" rev-parse --verify -q "$req_head^{commit}" 2>/dev/null)
   full_head=$(git -C "$CWD_REAL" rev-parse HEAD 2>/dev/null)
@@ -912,12 +1430,24 @@ process_request() {
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
-  SNAPSHOT_BEFORE=$(snapshot)
-  RESULT_SIG_BEFORE=""
-  if [ -f "$result" ]; then RESULT_SIG_BEFORE="$(mtime "$result") $(wc -c <"$result")"; fi
+  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない
+  local problem
+  if ! problem=$(prepare_workspace); then
+    fail_without_run "${problem:-workspace failed (理由が分からない)}"; return
+  fi
+  if ! problem=$(make_clone "$full_req"); then
+    fail_prepared "${problem:-clone failed (理由が分からない)}"; return
+  fi
+  if ! problem=$(clone_settings_problem "$CLONE"); then
+    [ -n "$problem" ] || problem="clone settings (python3 が理由を出さずに終わった)"
+    fail_prepared "$(join_lines "$problem")"; return
+  fi
+  if ! problem=$(make_request_copy "$req" "$copy"); then
+    fail_prepared "${problem:-request copy failed (理由が分からない)}"; return
+  fi
 
-  log "レビュアの実行を起動する: claude -p --model $MODEL --effort $EFFORT (上限 $REVIEW_TIMEOUT_MINUTES 分)"
-  run_reviewer "$req" "$result" "$logf"
+  log "レビュアの実行を起動する: claude -p --model $MODEL --effort $EFFORT --permission-mode $PERMISSION_MODE (cwd: ${CLONE}、上限 $REVIEW_TIMEOUT_MINUTES 分)"
+  run_reviewer "$copy" "$logf"
   CURRENT_RID=""
   write_worker_yaml idle ""
 }
