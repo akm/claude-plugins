@@ -40,8 +40,10 @@ branch: "feat/review-loop-63"
 worker:
   model: "opus"
   effort: "xhigh"
-  permission_mode: "default"
+  permission_mode: "auto"
   allowed_tools: []
+  sandbox_allow_write: ["~/Library/Caches/go-build"]
+  sandbox_allowed_domains: []
   idle_minutes: 180
   review_timeout_minutes: 60
 review:
@@ -71,6 +73,8 @@ rejected: []
 | `worker.effort` | ◯ | ワーカーの effort (`review_loop.worker_effort`) |
 | `worker.permission_mode` | ◯ | `review_loop.permission_mode` |
 | `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の列は「ワーカーの既定の一覧を使う」 |
+| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。周回の条件ではなく環境の値で、`--resume` のたびに設定から読み直して書き換える ([arguments.md](arguments.md) の「様式」)。0.13.0 で始めた周回には無く、無ければ空の列として扱う |
+| `worker.sandbox_allowed_domains` | | `review_loop.sandbox_allowed_domains`。扱いは `worker.sandbox_allow_write` と同じ |
 | `worker.idle_minutes` | ◯ | `review_loop.worker_idle_minutes` |
 | `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |
 | `review.skill` | ◯ | `loop.review_skill` |
