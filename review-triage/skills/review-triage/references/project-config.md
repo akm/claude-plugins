@@ -27,6 +27,17 @@
       "plan":        { "subagent": false, "model": "", "effort": "" },
       "fix":         { "subagent": false, "model": "", "effort": "" }
     }
+  },
+  "review_loop": {
+    "dir": "tmp/review-loop",
+    "wait_minutes": 60,
+    "worker_wait_minutes": 15,
+    "worker_idle_minutes": 180,
+    "worker_stale_seconds": 30,
+    "review_timeout_minutes": 60,
+    "worker_effort": "",
+    "permission_mode": "",
+    "allowed_tools": []
   }
 }
 ```
@@ -40,6 +51,7 @@
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが正本として残る |
 | `loop` | `review-triage-loop` の既定値 (下記) | 周回の既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に尋ねる |
 | `fix` | `review-triage-fix` の既定値 (下記) | 修正の既定値を持たない。`review-triage-fix` はキーごとの既定 (下の「`fix`」の表) に従う |
+| `review_loop` | `review-loop` (レビューを端末のワーカーに任せる周回) の既定値 (下記) | キーごとの既定 (下の「`review_loop`」の表) に従う |
 
 ## `triage_summary_command` — 同梱の triagecheck に渡す
 
@@ -60,7 +72,7 @@
 
 ## `loop` — 周回の既定値
 
-[review-triage-loop](../../review-triage-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き。
+[review-triage-loop](../../review-triage-loop/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) も同じ既定を読む (ワーカーのモデルの指定には `review_model` を共用する)。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
@@ -88,7 +100,7 @@
 
 ## `fix` — 修正の既定値
 
-[review-triage-fix](../../review-triage-fix/SKILL.md) が読む。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き (引数の様式と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md))。
+[review-triage-fix](../../review-triage-fix/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) も、`review-triage-fix` に渡す値を決めるために同じ既定を読む。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き (引数の様式と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md))。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
@@ -103,6 +115,26 @@
 `fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<段>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
 
 **`stages` の設定は、回 N+1 以降の段 2 (`plan`) には効かない。** その回の段 2 は `review-triage-fix` が人間に尋ねた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。段 1 (`investigate`) と段 3 (`fix`) の設定は回の番号に関わらず効く。段の走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
+
+## `review_loop` — ワーカーに任せる周回の既定値
+
+[review-loop](../../review-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** (引数の様式と、値の誤りの扱いの正本は [review-loop の arguments.md](../../review-loop/references/arguments.md))。周回の条件のうち上限・レビュースキル・モデルなどは `loop`、`review-triage-fix` に渡す値は `fix` から読み、ここには周回の置き場とワーカーに固有の値だけを置く。
+
+| キー | 意味 | 未設定のときの扱い |
+| --- | --- | --- |
+| `dir` | 周回の置き場の親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
+| `wait_minutes` | 完了の印を待つ上限 (分) | 60 |
+| `worker_wait_minutes` | ワーカーの起動を待つ上限 (分)。回 1 の最初の待機と、`--resume` でワーカーが動いていないときに使う | 15 |
+| `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
+| `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
+| `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
+| `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
+| `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | ワーカーの既定 (同上。受け付けない値も同じ箇所) |
+| `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。ワーカーの `--allowed-tools` に要素ごとに埋める | ワーカーの既定の一覧 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
+
+ワーカーのスクリプトはこの設定を読まず、`review-loop` が値を人間に案内する起動コマンドに埋める (理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」)。
+
+`review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、`allowed_tools` は空の配列も未設定)。**`loop` と違い、値の誤りは周回を止めない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
 
 ## `frozen_paths` — 直さない文書
 

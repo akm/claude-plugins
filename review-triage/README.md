@@ -1,19 +1,20 @@
 # review-triage
 
-レビュー指摘を**一件ずつ吟味して採択 / 保留 / 却下に選り分け**、採択したものを**原因で束ねて直す** skill 4 つと、記録を検査する Go ツールを配布するプラグインです。
+レビュー指摘を**一件ずつ吟味して採択 / 保留 / 却下に選り分け**、採択したものを**原因で束ねて直す** skill 5 つと、レビューを行うワーカーのスクリプト、記録を検査する Go ツールを配布するプラグインです。
 
 ## 収録スキル
 
 | スキル | 説明 |
 | --- | --- |
-| `review-request` | 別セッションで走らせる上流レビューの依頼文を、雛形から埋めて `tmp/` に書き出す。結果の出力先を依頼文に埋め込み、新しいセッションにはそのパス 1 つを渡す |
+| `review-request` | 別セッションで走らせる上流レビューの依頼文を、雛形から埋めて置き場 (既定は `tmp/`。`--dir` で変えられる) に書き出す。結果の出力先を依頼文に埋め込み、新しいセッションにはそのパス 1 つを渡す |
 | `review-triage` | 指摘を判定し、記録に残す。**修正はしない** (判断までが範囲) |
 | `review-triage-fix` | 採択した指摘を原因で束ね、調査 → 立案 → 修正 の 3 段で問題単位で直す。記録の回番号が回数の閾値 N を越えた回では、調査の後に人間が立案者 (セッションのモデル / 指定モデルの sub-agent / 人間自身) を選ぶ。段ごとに sub-agent で走らせられる |
 | `review-triage-loop` | レビューの起動から上の 2 つまでを 1 周として、終了条件に当たるまで繰り返す。**判断も修正もせず、2 つを呼ぶだけ** |
+| `review-loop` | `review-triage-loop` と同じ周回を、レビューだけを端末のワーカー (下記) に任せて回す。ワーカーのモデルと effort を人間が選べる。止まった周回は `--resume` で続け、`--end` で終える |
 
 `code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは記録 (YAML) だけで行います。**
 
-`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。
+`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。`review-loop` は、レビューを同じセッションの sub-agent ではなく、人間が決めたモデルと effort の別のプロセスで走らせたいときに使います (詳細は [SKILL.md](skills/review-loop/SKILL.md))。
 
 ## なぜ記録を残すか
 
@@ -34,6 +35,15 @@
 ## 同梱の道具 (nearedges)
 
 Markdown の修正の差分から、コミット前に読み直す範囲 — 同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 (近くの辺) — を列挙します。`review-triage-fix` の段 3 が観点 B (並びを読み直す) に使い、読んだ範囲を記録の `plans[].verification.near_edges` に残します。`-hints` で差分の種類に応じた観点 (B・C・F) も提示します。使い方は [tools/nearedges/README.md](tools/nearedges/README.md)。**Go が必要です** (triagecheck と同じく `go run` で都度実行)。
+
+## 同梱のワーカー (review-loop-worker)
+
+`review-loop` のレビューを行うスクリプト `scripts/review-loop-worker.sh` です。**人間が端末で 1 回起動**すると、周回の置き場 (作業側との受け渡しに使うディレクトリ) に依頼文が現れるたびに `claude -p` を指定のモデルと effort で走らせ、結果を確かめてから完了の印を書き、次の依頼文を待ちます。起動コマンドは `review-loop` が案内します。
+
+- **作業側と同じ作業ツリーで起動します。** 別の worktree やクローンで起動すると、起動時の確認で止まります。
+- **端末の `claude` の認証が要ります** (Claude Desktop app とは別)。bash・git・python3 も要ります。
+- **レビュアの実行の権限は、既定では読み取りのツールとその回の結果ファイル 1 つへの書き込みだけです** (権限モード `default`)。拒まれたツールがあった回は、作業側がレビュー不成立として止め、許可の一覧を足した起動コマンドを案内します。
+- 引数・起動時の確認・権限の既定の正本は [worker.md](skills/review-loop/references/worker.md) です。テストは `claude` の代わりに偽のコマンドを置いて走らせます (`python3 -m unittest discover -s review-triage/tests`)。
 
 ## プロジェクト固有の設定
 
@@ -59,6 +69,11 @@ Markdown の修正の差分から、コミット前に読み直す範囲 — 同
       "plan":        { "subagent": false, "model": "", "effort": "" },
       "fix":         { "subagent": false, "model": "", "effort": "" }
     }
+  },
+  "review_loop": {
+    "dir": "tmp/review-loop",
+    "wait_minutes": 60,
+    "worker_effort": "xhigh"
   }
 }
 ```
@@ -66,6 +81,8 @@ Markdown の修正の差分から、コミット前に読み直す範囲 — 同
 `loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
 `fix` は `review-triage-fix` の既定 — 回数の閾値 N (`threshold_rounds`) と、段 (調査 / 立案 / 修正) ごとに sub-agent で走らせるか・その model と effort (`stages`) — で、無くても既定 (閾値 5、どの段もセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
+
+`review_loop` は `review-loop` の既定 — 周回の置き場・待機の期限・ワーカーの effort と権限 — で、無くても既定で動きます (ワーカーの effort とモデルが決まらなければ尋ねます。モデルは `loop.review_model` を共用します)。各キーの意味は同ファイルの「`review_loop`」を参照してください。
 
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
@@ -95,4 +112,6 @@ claude plugin marketplace add akm/claude-plugins
 claude plugin install review-triage@akm-claude-plugins
 ```
 
-別セッションでレビューを走らせるときは、先に「レビューの依頼文を作って」(`review-request`) で依頼文を `tmp/` に書き出し、新しいセッションにそのパスを渡します。結果が返ったら「レビューの指摘を選り分けて」のように依頼すると `review-triage` が起動します。同じセッションで走らせたレビューの指摘も対象にできます。**勝手にレビューを走らせることはありません。**
+レビューを端末のワーカーに任せて周回を回すときは、「レビューをワーカーに任せて回して」(`review-loop`) と依頼します。案内されたコマンドで端末にワーカーを起動すると、周回が止まるまでレビュー・トリアージ・修正が続きます。
+
+別セッションでレビューを走らせるときは、先に「レビューの依頼文を作って」(`review-request`) で依頼文を `tmp/` (既定の置き場) に書き出し、新しいセッションにそのパスを渡します。結果が返ったら「レビューの指摘を選り分けて」のように依頼すると `review-triage` が起動します。同じセッションで走らせたレビューの指摘も対象にできます。**勝手にレビューを走らせることはありません。**

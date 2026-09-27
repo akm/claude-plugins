@@ -56,7 +56,7 @@
 skill: {{skill}}
 model: {{model}}
 level: "{{effort}}"
-run_id: ""
+run_id: "{{run_id}}"
 scope: {{scope}}
 base: "{{base}}"
 head: "{{head}}"
@@ -77,7 +77,7 @@ residual: []
 | キー | 内容 |
 | --- | --- |
 | `skill` / `model` / `level` / `scope` / `base` / `head` / `date` | 上に埋めた値のまま書く。`level` は指定された effort。`head` は作業開始時の HEAD の短縮 SHA と一致すること |
-| `run_id` | run 識別子があれば書く。無ければ空文字のまま |
+| `run_id` | `review-request` が識別子で埋める。上に埋めた値のまま書く。受け取る側は記録の `runs[].run_id` にそのまま写す |
 | `attrs` (トップレベル) | 上に挙げたキー以外に残したい情報 (PR 番号など)。無ければ `{}` |
 | `findings[].id` | 1 からの連番 |
 | `findings[].file` / `line` | 指摘の位置。`line` は不明なら省略 |
