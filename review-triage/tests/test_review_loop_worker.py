@@ -107,35 +107,64 @@ def _git(repo, *args):
     ).stdout.strip()
 
 
+_YAML_LINE = re.compile(r"^( *)(- )?([A-Za-z_]+):(?: (.*))?$")
+
+
+def _yaml_scalar(value):
+    v = value.strip()
+    if v.startswith('"') or v.startswith("["):
+        return json.loads(v)
+    if re.fullmatch(r"-?\d+", v):
+        return int(v)
+    if v in ("true", "false"):
+        return v == "true"
+    return v
+
+
 def _read_yaml(path):
-    """ワーカーが書く YAML (2 段までの入れ子・スカラー・JSON 形式の列) を読む。"""
-    root = {}
-    parent = None
+    """ワーカーが書く YAML を読む。読めるのは、ブロック形式の対応の入れ子・対応を要素に持つブロック形式の列
+    (`- <キー>: <値>` の行で要素が始まるもの)・スカラー・JSON 形式の列。二重引用符の文字列は JSON の文字列として読むので、
+    エスケープが正しくなければ (制御文字がそのまま入っているなど) 例外になる。字下げが揃わない行も例外にする。"""
+    rows = []  # (字下げ, キー, 値)。キーが None の行は列の要素の始まり
     with open(path, encoding="utf-8") as f:
         for raw in f:
             line = raw.rstrip("\n")
             if not line.strip():
                 continue
-            m = re.match(r"^( *)([A-Za-z_]+):(?: (.*))?$", line)
+            m = _YAML_LINE.match(line)
             if not m:
                 raise ValueError(f"読めない行: {line!r}")
-            indent, key, value = m.group(1), m.group(2), m.group(3)
-            if value is None:
-                root[key] = {}
-                parent = root[key]
-                continue
-            v = value.strip()
-            if v.startswith('"') or v.startswith("["):
-                v = json.loads(v)
-            elif re.fullmatch(r"-?\d+", v):
-                v = int(v)
-            elif v in ("true", "false"):
-                v = v == "true"
-            if indent:
-                parent[key] = v
+            indent = len(m.group(1))
+            if m.group(2):
+                # 列の要素の始まり。要素の対応のキーは「- 」の後ろの桁にあるものとして読む
+                rows.append((indent, None, None))
+                indent += 2
+            rows.append((indent, m.group(3), m.group(4)))
+    pos = 0
+
+    def block(indent):
+        nonlocal pos
+        if rows[pos][1] is None:
+            items = []
+            while pos < len(rows) and rows[pos][0] == indent and rows[pos][1] is None:
+                pos += 1
+                items.append(block(indent + 2))
+            return items
+        out = {}
+        while pos < len(rows) and rows[pos][0] == indent and rows[pos][1] is not None:
+            _, key, value = rows[pos]
+            pos += 1
+            if value is not None:
+                out[key] = _yaml_scalar(value)
+            elif pos < len(rows) and rows[pos][0] > indent:
+                out[key] = block(rows[pos][0])
             else:
-                root[key] = v
-                parent = None
+                out[key] = {}
+        return out
+
+    root = block(0) if rows else {}
+    if pos != len(rows):
+        raise ValueError(f"字下げが揃わない行がある: {rows[pos]!r}")
     return root
 
 
@@ -536,6 +565,42 @@ def _option_values(args, name):
     return out
 
 
+def _assert_not_run_values(test, marker):
+    """レビュアの実行を起動しなかった回の印も、ワーカーの版と、値が unknown のログから読む項目を持つこと (KTD15)。"""
+    test.assertEqual(marker["worker_version"], _plugin_version())
+    test.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "unknown"})
+    test.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
+
+
+# ---- ログ (stream-json) の行。形は Claude Code 2.1.273 で実測したログに合わせる ----
+
+def _init(mode=None, parent=None, model="claude-opus-5"):
+    """init の行。mode が None なら permissionMode のキーを書かない。parent は parent_tool_use_id (sub-agent の行なら値がある)。"""
+    line = {"type": "system", "subtype": "init", "model": model, "session_id": "s", "parent_tool_use_id": parent}
+    if mode is not None:
+        line["permissionMode"] = mode
+    return line
+
+
+def _tool_use(tid, name, tool_input, parent=None):
+    """ツールの呼び出し (type が assistant の行の message.content の tool_use)。"""
+    return {"type": "assistant", "parent_tool_use_id": parent, "session_id": "s",
+            "message": {"role": "assistant",
+                        "content": [{"type": "tool_use", "id": tid, "name": name, "input": tool_input}]}}
+
+
+def _tool_result(tid, content, is_error, parent=None):
+    """ツールの結果 (type が user の行の message.content の tool_result)。content は文字列か text の要素の列。"""
+    return {"type": "user", "parent_tool_use_id": parent, "session_id": "s",
+            "message": {"role": "user",
+                        "content": [{"type": "tool_result", "tool_use_id": tid, "content": content,
+                                     "is_error": is_error}]}}
+
+
+_RESULT_LINE = {"type": "result", "subtype": "success", "is_error": False, "session_id": "s",
+                "permission_denials": []}
+
+
 class TestHappyPath(WorkerTestBase):
     def test_one_round(self):
         # AE1: idle → reviewing (識別子入り) → idle と遷移し、ok の印とログが残る
@@ -557,10 +622,13 @@ class TestHappyPath(WorkerTestBase):
 
         self.assertEqual(marker["status"], "ok", marker)
         self.assertEqual(marker["id"], RID)
+        self.assertEqual(marker["worker_version"], _plugin_version())
         self.assertEqual(marker["model"], {"specified": "opus", "effective": "opus-5"})
         self.assertEqual(marker["effort"], "high")
+        self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "auto"})
         self.assertIs(marker["skill_called"], True)
         self.assertEqual(marker["permission_denials"], {"count": 0, "tools": []})
+        self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
         self.assertEqual(marker["head_before"], head)
         self.assertEqual(marker["head_after"], head)
         self.assertIs(marker["tree_clean_after"], True)
@@ -626,7 +694,10 @@ class TestHappyPath(WorkerTestBase):
         self.put_request()
         p = self.start("--allowed-tools", "Read", "--allowed-tools", "Bash(git diff:*)",
                        "--permission-mode", "default")
-        self.wait_marker()
+        marker = self.wait_marker()
+        # 偽の claude はログの init の行に受けた権限モードを書くので、実効の権限モードも default になり、食い違わない
+        self.assertEqual(marker["permission_mode"], {"specified": "default", "effective": "default"})
+        self.assertEqual(marker["status"], "ok", marker)
         args = self.claude_calls()[0]
         ws = os.path.dirname(self.claude_records()[0]["cwd"])
         self.assertEqual(_option_values(args, "--allowedTools"), [
@@ -740,6 +811,7 @@ class TestResultChecks(WorkerTestBase):
         for key in ("head_after", "tree_clean_after", "exit_code", "log"):
             self.assertNotIn(key, marker)
         self.assertEqual(marker["skill_called"], "unknown")
+        _assert_not_run_values(self, marker)
         self.assert_contract("## `delivered-<識別子>.yaml`", marker)
 
     def test_tree_not_clean_before_review(self):
@@ -775,6 +847,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(self.claude_calls(), [])
         for key in ("head_after", "tree_clean_after", "exit_code", "log"):
             self.assertNotIn(key, marker)
+        _assert_not_run_values(self, marker)
         self.assertEqual(self.workspaces(), [])
 
     def test_reviewer_runs_in_clone(self):
@@ -1110,9 +1183,7 @@ class TestLogReading(WorkerTestBase):
     def run_with_stream(self, lines):
         self.put_stream(lines)
         self.put_request()
-        p = self.start()
-        marker = self.wait_marker()
-        self.finish(p)
+        marker, _ = self.run_round()
         return marker
 
     def test_permission_denials(self):
@@ -1127,10 +1198,15 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual(marker["skill_called"], "unknown")
 
     def test_no_result_line_is_unknown(self):
+        # result の行が無い (実行が最後まで行かなかった) ログでは、拒否の件数も、サンドボックスが止めた件数も unknown。
+        # 止められた呼び出しがあっても、件数が unknown なら calls は空
         marker = self.run_with_stream([
             {"type": "system", "subtype": "init", "model": "claude-opus-5"},
+            _tool_use("toolu_1", "Bash", {"command": "touch /Users/x/y"}),
+            _tool_result("toolu_1", "touch: /Users/x/y: Operation not permitted", True),
         ])
         self.assertEqual(marker["permission_denials"], {"count": "unknown", "tools": []})
+        self.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
 
     def test_subagent_lines_and_tool_results_are_ignored(self):
         marker = self.run_with_stream([
@@ -1156,6 +1232,143 @@ class TestLogReading(WorkerTestBase):
         marker = self.run_with_stream(["not json"])
         self.assertEqual(marker["model"]["effective"], "unknown")
         self.assertEqual(marker["skill_called"], "unknown")
+
+    # ---- 実効の権限モード (worker.md の「ログの読み方」) ----
+
+    def test_permission_mode_mismatch(self):
+        # AE4: 偽の claude が init の行の permissionMode に default を書く (auto モードを使えなかった) と、指定 (既定の auto) と
+        # 違うので failed。error に期待したモードと実際のモードを書き、印の permission_mode に指定と実効を書く
+        self.env["FAKE_CLAUDE_PERMISSION_MODE"] = "default"
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "failed", marker)
+        self.assertEqual(marker["error"], "permission mode mismatch (expected auto, actual default)")
+        self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "default"})
+        # failed の回でも、結果が通常のファイルなら置き場に複写する
+        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")))
+
+    def test_permission_mode_without_init_line_is_unknown(self):
+        # init の行が無ければ実効の権限モードは unknown で、それだけでは failed にしない
+        marker = self.run_with_stream([
+            _tool_use("toolu_skill", "Skill", {"skill": "code-review"}),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "unknown"})
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_permission_mode_ignores_subagent_init_line(self):
+        # sub-agent の init の行 (parent_tool_use_id がある) は使わない。最上位の init の行より前に置いて、
+        # parent_tool_use_id を見ずに最初の init の行を読む誤りも検出できるようにする
+        marker = self.run_with_stream([
+            _init("auto", parent="toolu_agent"),
+            _init("default"),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "default"})
+        self.assertEqual(marker["status"], "failed", marker)
+        self.assertEqual(marker["error"], "permission mode mismatch (expected auto, actual default)")
+
+    def test_permission_mode_ignores_init_json_in_tool_result(self):
+        # Bash の結果の本文に init の行の JSON (permissionMode が auto) があっても、実効の権限モードは最上位の init の行から読む。
+        # Bash で出力した JSON の行は tool_result の文字列の中に入り、ログの行としては現れない (実測)
+        marker = self.run_with_stream([
+            _init("default"),
+            _tool_use("toolu_echo", "Bash", {"command": "cat fake-init.json"}),
+            _tool_result("toolu_echo", json.dumps(_init("auto")), False),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "default"})
+        self.assertEqual(marker["status"], "failed", marker)
+
+    # ---- サンドボックスが止めた確認 (worker.md の「サンドボックスが止めた確認の数え方」) ----
+
+    def test_sandbox_blocked_top_level_and_subagent(self):
+        # AE5: 最上位の Bash の結果 (本文の文面は小文字) と、sub-agent の中の Bash の結果 (大文字で始まる) の 2 件を数え、
+        # それぞれのコマンドと、本文のうち文面を含む行を印に書く。本文の形は実測したもの
+        marker = self.run_with_stream([
+            _init("auto"),
+            _tool_use("toolu_top", "Bash", {"command": "touch /Users/x/probe.txt", "description": "プローブを置く"}),
+            _tool_result("toolu_top", "Exit code 1\n(eval):1: operation not permitted: /Users/x/probe.txt", True),
+            _tool_use("toolu_agent", "Agent", {"description": "確かめる", "prompt": "調べる"}),
+            _tool_use("toolu_sub", "Bash", {"command": "touch /Users/x/y"}, parent="toolu_agent"),
+            _tool_result("toolu_sub", "touch: /Users/x/y: Operation not permitted", True, parent="toolu_agent"),
+            _tool_result("toolu_agent", [{"type": "text", "text": "調べた"}], False),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["sandbox_blocked"], {"count": 2, "calls": [
+            {"command": "touch /Users/x/probe.txt",
+             "message": "(eval):1: operation not permitted: /Users/x/probe.txt"},
+            {"command": "touch /Users/x/y",
+             "message": "touch: /Users/x/y: Operation not permitted"},
+        ]})
+        # サンドボックスが止めた確認は failed の条件にしない (その回を使うかは作業側が突き合わせで決める)
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_sandbox_blocked_network_and_text_elements(self):
+        # 接続を止められた結果 (本文に <sandbox_violations> のタグ) も数え、message にタグの中の行 (止められたホスト) を書く。
+        # 本文が text の要素の列の形の結果も数える
+        marker = self.run_with_stream([
+            _init("auto"),
+            _tool_use("toolu_net", "Bash", {"command": "curl -sS https://example.com/"}),
+            _tool_result("toolu_net",
+                         "Exit code 56\ncurl: (56) CONNECT tunnel failed, response 403\n"
+                         "<sandbox_violations>\ndeny network-outbound example.com:443 (host is not on the allow list)",
+                         True),
+            _tool_use("toolu_py", "Bash", {"command": "python3 probe.py"}),
+            _tool_result("toolu_py", [{"type": "text", "text":
+                                       "Exit code 1\nTraceback (most recent call last):\n"
+                                       "PermissionError: [Errno 1] Operation not permitted: '/Users/x/z'"}], True),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["sandbox_blocked"], {"count": 2, "calls": [
+            {"command": "curl -sS https://example.com/",
+             "message": "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"},
+            {"command": "python3 probe.py",
+             "message": "PermissionError: [Errno 1] Operation not permitted: '/Users/x/z'"},
+        ]})
+
+    def test_sandbox_blocked_ignores_other_tools_and_successful_results(self):
+        # Bash 以外 (Read) の結果と、is_error が偽の Bash の結果 (文面を含む文書を grep した出力) は、同じ文面があっても数えない。
+        # 対応する tool_use の無い結果も、ツールが Bash と分からないので数えない
+        marker = self.run_with_stream([
+            _init("auto"),
+            _tool_use("toolu_read", "Read", {"file_path": "/Users/x/secret"}),
+            _tool_result("toolu_read", "EPERM: operation not permitted, open '/Users/x/secret'", True),
+            _tool_use("toolu_grep", "Bash", {"command": "grep -rn 'operation not permitted' ."}),
+            _tool_result("toolu_grep",
+                         "worker.md:330:(eval):1: operation not permitted: <パス>\n"
+                         "worker.md:272:<sandbox_violations> deny network-outbound", False),
+            _tool_result("toolu_nowhere", "touch: /Users/x/y: Operation not permitted", True),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_sandbox_blocked_values_are_one_line(self):
+        # 改行・タブ・引用符・バックスラッシュ・制御文字・行の区切りの文字・対になっていないサロゲート (JSON の \ud800 の
+        # エスケープから入る、2 つ組で 1 文字を表す符号の片方) を含むコマンドと本文も、
+        # 印の YAML を壊さずに 1 行で書く (_read_yaml は二重引用符の文字列を JSON として読むので、エスケープの誤りも例外になる)。
+        # コマンドと文面は先頭 200 文字で切る
+        tricky = ("cat <<'EOF' > ~/probe.txt\n\"quoted\" and \\backslash\\\tTab\x01\x7f\x85\u2028\ud800 日本語\nEOF\n")
+        long_command = "echo " + "x" * 300 + " > ~/long.txt"
+        long_message = "touch: /Users/x/" + "y" * 300 + ": Operation not permitted"
+        marker = self.run_with_stream([
+            _init("auto"),
+            _tool_use("toolu_1", "Bash", {"command": tricky}),
+            _tool_result("toolu_1", "Exit code 1\n(eval):1: operation not permitted: /Users/x/\"q\"\\probe.txt", True),
+            _tool_use("toolu_2", "Bash", {"command": long_command}),
+            _tool_result("toolu_2", long_message, True),
+            _RESULT_LINE,
+        ])
+        calls = marker["sandbox_blocked"]["calls"]
+        self.assertEqual(marker["sandbox_blocked"]["count"], 2)
+        # 改行・タブ・制御文字・行の区切りの文字・サロゲートは 1 文字ずつ空白にし、前後の空白を除く
+        self.assertEqual(calls[0], {
+            "command": "cat <<'EOF' > ~/probe.txt \"quoted\" and \\backslash\\ Tab" + " " * 6 + "日本語 EOF",
+            "message": "(eval):1: operation not permitted: /Users/x/\"q\"\\probe.txt",
+        })
+        self.assertEqual(calls[1], {"command": long_command[:200], "message": long_message[:200]})
+        self.assertEqual(len(calls[1]["command"]), 200)
 
 
 class TestStartChecks(WorkerTestBase):

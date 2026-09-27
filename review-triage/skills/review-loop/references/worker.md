@@ -310,12 +310,14 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 
 **サンドボックスが止めた書き込みと接続は、Bash の `tool_result` の本文にだけ残る** — `permission_denials` にも `init` の行にも現れない (実測)。そのため、この項目に限ってツールの結果の中身を読む。
 
-1. ログの全行 (sub-agent の行を含む) から、`tool_use` の `id` と、ツールの名前と入力の `command` の対応を作る。
-2. `tool_result` のうち、次の 3 つをすべて満たすものを数える。
+1. ログの全行 (sub-agent の行を含む) から、`tool_use` の `id` と、ツールの名前と入力の `command` の対応を作る。`tool_use` は `type` が `assistant` の行の `message.content` から、`tool_result` は `type` が `user` の行の `message.content` から読む。
+2. `tool_result` のうち、次の 3 つをすべて満たすものを数える。対応する `tool_use` が見つからない結果は、ツールが `Bash` と分からないので数えない。
    - 対応するツールが `Bash`
    - `is_error` が真
-   - 本文 (文字列か、`text` の要素を連結したもの) が、`operation not permitted` (大文字と小文字を区別しない) か `<sandbox_violations>` を含む
+   - 本文 (文字列か、`text` の要素を改行で連結したもの) が、`operation not permitted` (大文字と小文字を区別しない) か `<sandbox_violations>` を含む
 3. 数えた呼び出しごとに、`tool_use` の `command` と、本文のうち文面を含む行 (止められたパスかホストを含む) を、それぞれ 1 行に直して先頭 200 文字までを印に書く。止められたのが書き込みか接続かで、直し方 (上の「止められたときの直し方」) が変わるため。
+   - 文面を含む行は、`operation not permitted` を含む行と、`<sandbox_violations>` の行から `</sandbox_violations>` の行 (無ければ本文の終わり) までの行。接続を止められたときは、止められたホストがタグの次の行にあるので、タグの中の行も含める。複数の行は空白で繋ぐ。
+   - 1 行に直すときは、改行・タブなどの制御文字・行の区切りの文字 (U+2028 など)・対になっていないサロゲート (JSON の `\ud800` のように、2 つ組で 1 文字を表す符号の片方だけをエスケープで書いたもの) を 1 文字ずつ空白に置き換え、前後の空白を除く。どれも、印の YAML の文字列にそのまま書けないか、書くと行が分かれるため。
 
 | ログの形 | 扱い |
 | --- | --- |

@@ -10,7 +10,10 @@
   受けた `--settings` の値を JSON として読んだものの列・プロンプトが指す依頼文 (写し) の中身
 - FAKE_CLAUDE_REVS: 記録で解決する名前を空白で区切って並べたもの (既定 main)
 - FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang・hang_leave_child・leave_child のとき)
-- FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行
+- FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行 (init の行・Skill の呼び出し・
+  result の行)。既定の init の行の permissionMode には、受けた `--permission-mode` の値を書く (受けていなければキーを書かない)
+- FAKE_CLAUDE_PERMISSION_MODE: 既定の init の行の permissionMode に、受けた `--permission-mode` の値の代わりに書く値
+  (auto モードを使えずに別のモードで起動した回を真似る)
 - FAKE_CLAUDE_SLEEP: 結果を書く前に待つ秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
 - FAKE_CLAUDE_REPO: 作業側の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
@@ -170,8 +173,13 @@ def main():
         with open(stream, encoding="utf-8") as f:
             sys.stdout.write(f.read())
     else:
-        print(json.dumps({"type": "system", "subtype": "init", "model": "claude-opus-5",
-                          "session_id": "s", "parent_tool_use_id": None}))
+        init = {"type": "system", "subtype": "init", "model": "claude-opus-5",
+                "session_id": "s", "parent_tool_use_id": None}
+        modes = option_values(args, "--permission-mode")
+        mode_in_log = os.environ.get("FAKE_CLAUDE_PERMISSION_MODE", modes[0] if modes else None)
+        if mode_in_log is not None:
+            init["permissionMode"] = mode_in_log
+        print(json.dumps(init))
         print(json.dumps({"type": "assistant", "parent_tool_use_id": None,
                           "message": {"content": [{"type": "tool_use", "name": "Skill",
                                                    "input": {"skill": "code-review"}}]}}))

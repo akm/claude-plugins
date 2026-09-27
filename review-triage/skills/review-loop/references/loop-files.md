@@ -164,14 +164,21 @@ stateDiagram-v2
 ```yaml
 id: "20260926-1400-feat-review-loop-63-1-code-review-opus"
 status: ok
+worker_version: "0.14.0"
 model:
   specified: "opus"
   effective: "opus-5"
 effort: "xhigh"
+permission_mode:
+  specified: "auto"
+  effective: "auto"
 skill_called: true
 permission_denials:
   count: 0
   tools: []
+sandbox_blocked:
+  count: 0
+  calls: []
 head_before: "abc1234"
 head_after: "abc1234"
 tree_clean_after: true
@@ -185,12 +192,17 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | --- | --- | --- |
 | `id` | ◯ | 識別子 |
 | `status` | ◯ | `ok` (作業場所の結果を確かめて置き場に複写し、すべて通った) / `failed` (どれかが通らなかった、またはレビュアの実行を起動しなかった。結果を複写できていれば、置き場に結果がある) |
+| `worker_version` | ◯ | この印を書いたワーカーの版 (`worker.yaml` の `worker_version` と同じ決め方)。読めなければ `unknown`。作業側はこの値で、ワーカーが古いかを判定する ([round.md](round.md) の RL1 の手順 c) |
 | `model.specified` | ◯ | ワーカーに渡したモデルの指定 |
 | `model.effective` | ◯ | ログから読んだ実効モデルの名前 (モデル ID から `claude-` を除いた、記録の表記)。読めなければ `unknown` |
 | `effort` | ◯ | ワーカーに渡した effort。**実行時の値ではない** — effort はログに記録されないので、ワーカーが確かめられるのは渡した値だけ |
+| `permission_mode.specified` | ◯ | レビュアの実行に渡した権限モード (`--permission-mode` の値) |
+| `permission_mode.effective` | ◯ | ログから読んだ実効の権限モード。指定と違えば `status` は `failed`。読めなければ `unknown` (それだけでは `failed` にしない)。起動しなかった回も `unknown` |
 | `skill_called` | ◯ | レビュアの実行が Skill ツールを呼んだか。`true` / `false`、ログから読めなければ `unknown` |
 | `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ログから読めなければ `unknown` |
 | `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く)。件数が 0 か `unknown` なら `[]` |
+| `sandbox_blocked.count` | ◯ | サンドボックスが止めた確認 (Bash の呼び出しのうち、書き込みか接続を止められたエラーで終わったもの。sub-agent の中の呼び出しを含む) の件数。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
+| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、止められたパスかホストを含む部分) の 2 つのキーを持ち、どちらも 1 行に直して先頭 200 文字までの文字列。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |
 | `head_after` | | レビュアの実行が終わった後の HEAD の短縮 SHA。**起動しなかった回は省く** |
 | `tree_clean_after` | | レビュアの実行が終わった後に作業ツリーが clean か。起動しなかった回は省く |
@@ -199,6 +211,18 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `exit_code` | | レビュアの実行の終了コード。起動しなかった回は省く。上限や割り込みで止めたときは止めた後の値 |
 | `error` | | `failed` のときだけ書く。通らなかった項目 (複数なら `; ` で区切る)。`ok` のときは省く |
 | `log` | | ログのファイル名。起動しなかった回は省く (ログが無いことを示す) |
+
+`sandbox_blocked.calls` が空でないときは、要素ごとに `- ` で始まる行から書く (YAML のブロック形式の列)。
+
+```yaml
+sandbox_blocked:
+  count: 2
+  calls:
+    - command: "go test ./..."
+      message: "open /Users/me/Library/Caches/go-build/ab/abcd-d: operation not permitted"
+    - command: "curl -sS https://example.com/"
+      message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"
+```
 
 `error` に書く項目の一覧と、それぞれの確かめ方の正本は [worker.md](worker.md) の「回の処理」。ログから読む項目の読み方の正本は同じファイルの「ログの読み方」。
 
