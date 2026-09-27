@@ -96,9 +96,12 @@ rejected: []
 state: reviewing
 current_request: "20260926-1400-feat-review-loop-63-1-code-review-opus"
 pid: 12345
+worker_version: "0.14.0"
 model: "opus"
 effort: "xhigh"
-permission_mode: "default"
+permission_mode: "auto"
+sandbox_allow_write: ["/Users/me/Library/Caches/go-build"]
+sandbox_allowed_domains: []
 cwd: "/Users/me/src/repo"
 head: "abc1234"
 started: "2026-09-26T14:02:00+0900"
@@ -111,9 +114,12 @@ rounds_served: 0
 | `state` | ◯ | 下の「状態」の 5 つのいずれか |
 | `current_request` | ◯ | `reviewing` のとき処理中の識別子。それ以外は空文字列 |
 | `pid` | ◯ | ワーカーのプロセス ID |
+| `worker_version` | ◯ | ワーカーの版。スクリプトの実体の位置から、プラグインのファイル `review-triage/.claude-plugin/plugin.json` を読んで決める。読めなければ `unknown` |
 | `model` | ◯ | ワーカーに渡したモデルの指定 (`--model` の値) |
 | `effort` | ◯ | ワーカーに渡した effort (`--effort` の値) |
 | `permission_mode` | ◯ | レビュアの実行に渡す権限モード |
+| `sandbox_allow_write` | ◯ | サンドボックスの中の Bash に、作業場所のほかに書き込みを許す場所の列 (`--sandbox-allow-write` の値を指定の順に。先頭の `~` はホームに展開したもの)。指定が無ければ `[]` |
+| `sandbox_allowed_domains` | ◯ | サンドボックスの中の Bash に接続を許すホストの列 (`--sandbox-allowed-domain` の値を指定の順に)。指定が無ければ `[]`。利用者の設定の `WebFetch(domain:…)` の許可から加わるものは含まない |
 | `cwd` | ◯ | ワーカーを起動した作業ツリーのルートの実体パス |
 | `head` | ◯ | ワーカーを起動したときの HEAD の短縮 SHA |
 | `started` | ◯ | ワーカーを起動した日時 |

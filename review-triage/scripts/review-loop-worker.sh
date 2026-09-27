@@ -4,10 +4,13 @@
 #
 # 使い方:
 #   review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --effort <値>
-#       [--permission-mode <値>] [--allowed-tools <ツール>]... [--idle-minutes <分>]
-#       [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>...]
+#       [--permission-mode <値>] [--allowed-tools <ツール>]...
+#       [--sandbox-allow-write <パス>]... [--sandbox-allowed-domain <ドメイン>]...
+#       [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>...]
 #
 # --model と --effort は必須で、既定を持たない (どのモデルと effort でレビューするかは人間が決める)。
+# --permission-mode の既定は auto。-- の後に受け付けるのは、--plugin-dir <ディレクトリ> と、
+# enabledPlugins だけを持つ JSON を値にした --settings の 2 つ (起動時の確認の 13)。
 # 作業側 (review-loop) と同じ作業ツリーで起動する。周回の間は作業ツリーを変えない。
 #
 # 終了コード: 0 = end を見て終わった / 124 = 依頼文が無いまま --idle-minutes が過ぎた /
@@ -16,10 +19,14 @@
 #
 # 振る舞いの正本は review-triage/skills/review-loop/references/worker.md (起動時の確認・回の処理・
 # 権限の既定・ログの読み方)、置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
-# 設定ファイルは読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める。
+# プラグインの設定ファイル (config.json) は読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める。
+# Claude Code の利用者の設定 (~/.claude/settings.json) は読むが、使うのは起動時の確認と表示だけ。
 #
-# macOS の /bin/bash (3.2) と Linux の bash、GNU と BSD の stat で動かす。python3 が要る
-# (claude -p を専用のプロセスグループで起動するのと、ログ (stream-json) を読むのに使う)。
+# macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確かめたため)。
+# bash は macOS の /bin/bash (3.2) で動くように書く。テストは CI (ubuntu) でも偽の uname で走らせるので、
+# GNU の stat でも動くようにしておく。python3 が要る (claude -p を専用のプロセスグループで起動する・
+# ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定を JSON として検査する・
+# パスの実体を求めるのに使う)。
 
 set -u
 
@@ -51,8 +58,9 @@ DEFAULT_ALLOWED_TOOLS=(
 usage() {
   cat >&2 <<'USAGE'
 使い方: review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --effort <値>
-    [--permission-mode <値>] [--allowed-tools <ツール>]... [--idle-minutes <分>]
-    [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>...]
+    [--permission-mode <値>] [--allowed-tools <ツール>]...
+    [--sandbox-allow-write <パス>]... [--sandbox-allowed-domain <ドメイン>]...
+    [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>...]
 USAGE
   exit 2
 }
@@ -69,11 +77,23 @@ LOOP_DIR=$1
 shift
 MODEL=""
 EFFORT=""
-PERMISSION_MODE="default"
+PERMISSION_MODE="auto"
 ALLOWED_TOOLS=()
+SANDBOX_ALLOW_WRITE=()
+SANDBOX_ALLOWED_DOMAINS=()
 IDLE_MINUTES=180
 REVIEW_TIMEOUT_MINUTES=60
 EXTRA_ARGS=()
+
+# --sandbox-allow-write の値の先頭の ~ をホームに展開する。展開するのは ~ だけの値と ~/ で始まる値で、
+# ~ の後に名前が続く値 (~ユーザー名) はそのまま返す (起動時の確認の 12 で、絶対パスでないものとして止める)
+expand_home() {
+  case "$1" in
+    "~") printf '%s' "${HOME:-}" ;;
+    "~/"*) printf '%s/%s' "${HOME:-}" "${1#"~/"}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -81,6 +101,8 @@ while [ $# -gt 0 ]; do
     --effort) [ $# -ge 2 ] || usage; EFFORT=$2; shift 2 ;;
     --permission-mode) [ $# -ge 2 ] || usage; PERMISSION_MODE=$2; shift 2 ;;
     --allowed-tools) [ $# -ge 2 ] || usage; ALLOWED_TOOLS+=("$2"); shift 2 ;;
+    --sandbox-allow-write) [ $# -ge 2 ] || usage; SANDBOX_ALLOW_WRITE+=("$(expand_home "$2")"); shift 2 ;;
+    --sandbox-allowed-domain) [ $# -ge 2 ] || usage; SANDBOX_ALLOWED_DOMAINS+=("$2"); shift 2 ;;
     --idle-minutes) [ $# -ge 2 ] || usage; IDLE_MINUTES=$2; shift 2 ;;
     --review-timeout-minutes) [ $# -ge 2 ] || usage; REVIEW_TIMEOUT_MINUTES=$2; shift 2 ;;
     --) shift; EXTRA_ARGS=("$@"); break ;;
@@ -131,6 +153,22 @@ yaml_str() {
   printf '"%s"' "$(printf '%s' "$1" | tr '\n\t' '  ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 }
 
+# 引数を、二重引用符の文字列を並べた 1 行の列 (["a", "b"]。引数が無ければ []) にする
+yaml_list() {
+  local out="" v
+  for v in "$@"; do out="${out:+$out, }$(yaml_str "$v")"; done
+  printf '[%s]' "$out"
+}
+
+# パス $1 が、パス $2 と同じか、その下にあるか (どちらも実体パスで渡す)
+is_within() {
+  [ "$2" = / ] && return 0
+  case "$1" in
+    "$2"|"$2"/*) return 0 ;;
+  esac
+  return 1
+}
+
 # 標準入力を、同じディレクトリの一時名に書いてから改名する (読む側が書きかけを読まないように)
 write_atomic() {
   local target=$1
@@ -149,8 +187,129 @@ group_alive() {
   ps -A -o pgid=,stat= 2>/dev/null | awk -v g="$1" '$1 == g && $2 !~ /^Z/ { found = 1 } END { exit !found }'
 }
 
+# ---- 起動時の確認に使う道具 (python3 を使う。read_worker_version のほかは、起動時の確認の 8 で python3 を確かめた後に呼ぶ) ----
+
+# ワーカーの版を、スクリプト ($1) の実体の位置からプラグインのファイル .claude-plugin/plugin.json を読んで標準出力に出す。
+# 環境変数 CLAUDE_PLUGIN_ROOT は、人間が端末で起動するワーカーには設定されないので使わない。
+# 読めなければ理由を標準エラーに出力して、終了コード 1 で終わる
+read_worker_version() {
+  python3 - "$1" <<'PY'
+import json, os, sys
+
+root = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[1])))
+path = os.path.join(root, ".claude-plugin", "plugin.json")
+try:
+    with open(path, encoding="utf-8") as f:
+        version = json.load(f).get("version")
+except (OSError, ValueError, AttributeError) as e:
+    print(f"review-loop-worker: プラグインのファイル {path} から版を読めない ({e})", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(version, str) or not version:
+    print(f"review-loop-worker: プラグインのファイル {path} に版 (version) が無い", file=sys.stderr)
+    sys.exit(1)
+print(version)
+PY
+}
+
+# 起動時の確認の 12。--sandbox-allow-write の値 (4 つ目以降の引数) の実体パスが、ホーム・作業側・周回の置き場の実体パス
+# (1〜3 つ目の引数) と同じか、その祖先なら、最初に当たったものの理由を標準出力に出して、終了コード 1 で終わる。
+# 値の場所はまだ無くてよい (無い部分は、シンボリックリンクを解決せずにそのまま繋ぐ)
+allow_write_problem() {
+  python3 - "$@" <<'PY'
+import os, sys
+
+protected = (("ホーム", sys.argv[1]), ("作業側", sys.argv[2]), ("周回の置き場", sys.argv[3]))
+for value in sys.argv[4:]:
+    real = os.path.realpath(value)
+    for label, path in protected:
+        if real == path:
+            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は{label}そのものなので、書き込みを許せない")
+            sys.exit(1)
+        if real == "/" or path.startswith(real + "/"):
+            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は{label} ({path}) を含むので、書き込みを許せない")
+            sys.exit(1)
+PY
+}
+
+# 起動時の確認の 13。追加の引数の --settings の値 ($1) が、トップレベルのキーが enabledPlugins だけで、
+# その値がプラグイン名から真偽値への対応である JSON でなければ、理由を標準出力に出して、終了コード 1 で終わる
+settings_arg_problem() {
+  python3 - "$1" <<'PY'
+import json, sys
+
+try:
+    value = json.loads(sys.argv[1])
+except ValueError as e:
+    print(f"JSON として読めない ({e})")
+    sys.exit(1)
+if not isinstance(value, dict):
+    print("トップレベルが、キーに enabledPlugins だけを持つオブジェクトではない")
+    sys.exit(1)
+if list(value) != ["enabledPlugins"]:
+    print(f"トップレベルのキーが enabledPlugins だけではない (キー: {', '.join(value) or '無し'})")
+    sys.exit(1)
+plugins = value["enabledPlugins"]
+if not isinstance(plugins, dict) or not all(isinstance(v, bool) for v in plugins.values()):
+    print("enabledPlugins の値が、プラグイン名から真偽値 (true / false) への対応ではない")
+    sys.exit(1)
+PY
+}
+
+# 起動時の確認の 14。利用者の設定ファイル ($1) が JSON として読めないか、空でない sandbox.excludedCommands を持てば、
+# 理由を標準出力に出して、終了コード 1 で終わる。ファイルが無ければ何もしない
+user_settings_problem() {
+  python3 - "$1" <<'PY'
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as f:
+        settings = json.load(f)
+except FileNotFoundError:
+    sys.exit(0)
+except (OSError, ValueError) as e:
+    print(f"利用者の設定 {path} を JSON として読めない ({e})。検査できないので起動しない")
+    sys.exit(1)
+if not isinstance(settings, dict):
+    print(f"利用者の設定 {path} のトップレベルがオブジェクトではない。検査できないので起動しない")
+    sys.exit(1)
+sandbox = settings.get("sandbox")
+excluded = sandbox.get("excludedCommands") if isinstance(sandbox, dict) else None
+if excluded:
+    shown = json.dumps(excluded, ensure_ascii=False)
+    print(f"利用者の設定 {path} に sandbox.excludedCommands ({shown}) がある。当たるコマンドはサンドボックスの外で動くので、"
+          "この設定を消すか空にしてから起動し直す")
+    sys.exit(1)
+PY
+}
+
+# 起動時の確認の 15 (表示)。利用者の設定ファイル ($1) の許可の規則 (permissions.allow) のうち、
+# WebFetch(domain:<ドメイン>) の形のものから、ドメインを重ねずに 1 行に 1 つずつ出す。
+# 14 の後に呼ぶので、ファイルは無いか JSON として読める
+webfetch_domains() {
+  python3 - "$1" <<'PY'
+import json, re, sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        settings = json.load(f)
+except FileNotFoundError:
+    sys.exit(0)
+permissions = settings.get("permissions") if isinstance(settings, dict) else None
+allow = permissions.get("allow") if isinstance(permissions, dict) else None
+domains = []
+for rule in allow if isinstance(allow, list) else []:
+    m = re.fullmatch(r"\s*WebFetch\(domain:(.+)\)\s*", rule) if isinstance(rule, str) else None
+    if m and m.group(1).strip() not in domains:
+        domains.append(m.group(1).strip())
+for d in domains:
+    print(d)
+PY
+}
+
 # ---- 状態 ----
 
+WORKER_VERSION="unknown"
 CWD_REAL=""
 START_HEAD=""
 STARTED=""
@@ -180,9 +339,12 @@ write_worker_yaml() {
     echo "state: $state"
     echo "current_request: $(yaml_str "$current")"
     echo "pid: $WORKER_PID"
+    echo "worker_version: $(yaml_str "$WORKER_VERSION")"
     echo "model: $(yaml_str "$MODEL")"
     echo "effort: $(yaml_str "$EFFORT")"
     echo "permission_mode: $(yaml_str "$PERMISSION_MODE")"
+    echo "sandbox_allow_write: $(yaml_list ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"})"
+    echo "sandbox_allowed_domains: $(yaml_list ${SANDBOX_ALLOWED_DOMAINS[@]+"${SANDBOX_ALLOWED_DOMAINS[@]}"})"
     echo "cwd: $(yaml_str "$CWD_REAL")"
     echo "head: $(yaml_str "$START_HEAD")"
     echo "started: $(yaml_str "$STARTED")"
@@ -198,9 +360,19 @@ unavailable() {
   exit 2
 }
 
-# ---- 起動時の確認 (正本は worker.md の「起動時の確認」の表) ----
+# ---- 起動時の確認 (正本は worker.md の「起動時の確認」の表。番号は表の「順」) ----
 
 STARTED=$(now_iso)
+
+# ワーカーの版。起動時の確認が通らずに worker.yaml を unavailable で書くときにも書くので、確認より先に読む。
+# python3 が無ければ unknown のまま進み、起動時の確認の 8 で止まる
+if command -v python3 >/dev/null 2>&1; then
+  if v=$(read_worker_version "$0"); then
+    WORKER_VERSION=$v
+  else
+    log "ワーカーの版が分からないので、worker.yaml には unknown と書く"
+  fi
+fi
 
 # 1. 他のワーカーが動いているか。動いていれば worker.yaml に触れずに終わる
 if [ -f "$LOOP_DIR/worker.yaml" ]; then
@@ -218,12 +390,18 @@ if [ -f "$LOOP_DIR/worker.yaml" ]; then
   esac
 fi
 
-# 2. loop.yaml があり、repo_dir が読めるか
+# 2. 前の起動の作業場所を片付ける (掃除)。作業場所を作る処理がまだ無いので、今は片付けるものが無い
+
+# 3. macOS で動いているか
+os_name=$(uname -s 2>/dev/null)
+[ "$os_name" = Darwin ] || unavailable "macOS で動いていない (uname -s: ${os_name:-読めない})。サンドボックスの振る舞いを macOS でだけ確かめたので、ほかの OS では起動しない"
+
+# 4. loop.yaml があり、repo_dir が読めるか
 [ -f "$LOOP_DIR/loop.yaml" ] || unavailable "loop.yaml が無い"
 REPO_DIR=$(read_key "$LOOP_DIR/loop.yaml" repo_dir)
 [ -n "$REPO_DIR" ] || unavailable "loop.yaml の repo_dir が読めない"
 
-# 3. 作業側と同じ作業ツリーで起動したか
+# 5. 作業側と同じ作業ツリーで起動したか
 top=$(git rev-parse --show-toplevel 2>/dev/null) || unavailable "git の作業ツリーの中で起動していない (cwd: $(pwd -P))"
 CWD_REAL=$(real_dir "$top")
 repo_real=$(real_dir "$REPO_DIR") || unavailable "loop.yaml の repo_dir が存在しない: $REPO_DIR"
@@ -235,14 +413,111 @@ if [ "$CWD_REAL" != "$repo_real" ]; then
   fi
   unavailable "別の作業ツリーで起動した (期待: ${repo_real}、実際: $CWD_REAL)"
 fi
+
+# 6. HEAD が読めるか
 START_HEAD=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null) || unavailable "HEAD が読めない"
 
-# 4. 周回が終わっていないか
+# 7. 周回が終わっていないか
 [ ! -e "$LOOP_DIR/end" ] || unavailable "end がある (周回は終わっている)"
 
-# 5. 使うコマンドがあるか
+# 8. 使うコマンドがあるか
 command -v claude >/dev/null 2>&1 || unavailable "claude コマンドが見つからない"
 command -v python3 >/dev/null 2>&1 || unavailable "python3 が見つからない"
+
+# 9. 作業場所を置ける一時ディレクトリがあるか。作業場所は書き込みを許す場所で、ホームと作業側は守る場所なので、重なってはいけない。
+# TMPDIR が無くても /tmp に代えない (他の利用者も書ける場所で、作業場所の名前も予測できるため)
+[ -n "${TMPDIR:-}" ] || unavailable "環境変数 TMPDIR が無い (作業場所をその下に作る。/tmp には代えない)"
+TMP_REAL=$(real_dir "$TMPDIR") || unavailable "TMPDIR がディレクトリとして存在しない: $TMPDIR"
+[ -n "${HOME:-}" ] || unavailable "環境変数 HOME が無い (TMPDIR がホームの外にあるかを確かめられない)"
+HOME_REAL=$(real_dir "$HOME") || unavailable "ホームがディレクトリとして存在しない: $HOME"
+if is_within "$TMP_REAL" "$HOME_REAL"; then
+  unavailable "TMPDIR の実体がホームの下にある (TMPDIR の実体: ${TMP_REAL}、ホーム: ${HOME_REAL})。作業場所への書き込みが、ホームを守る拒否の規則に当たる"
+fi
+if is_within "$TMP_REAL" "$CWD_REAL"; then
+  unavailable "TMPDIR の実体が作業側の下にある (TMPDIR の実体: ${TMP_REAL}、作業側: ${CWD_REAL})。書き込みを許す作業場所と、守る作業側が重なる"
+fi
+if is_within "$CWD_REAL" "$TMP_REAL"; then
+  unavailable "作業側が TMPDIR の実体の下にある (作業側: ${CWD_REAL}、TMPDIR の実体: ${TMP_REAL})。書き込みを許す作業場所と、守る作業側が重なる"
+fi
+
+# 10. 作業側と周回の置き場が、サンドボックスの一時ディレクトリの外にあるか。サンドボックスの中の Bash はそこに既定で書けるので、
+# その下にあると守れない
+SANDBOX_TMP="/private/tmp/claude-$(id -u)"
+LOOP_REAL=$(real_dir "$LOOP_DIR") || unavailable "周回の置き場の実体パスを求められない: $LOOP_DIR"
+if is_within "$CWD_REAL" "$SANDBOX_TMP"; then
+  unavailable "作業側がサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (作業側: ${CWD_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
+fi
+if is_within "$LOOP_REAL" "$SANDBOX_TMP"; then
+  unavailable "周回の置き場がサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (周回の置き場: ${LOOP_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
+fi
+
+# 11. 作業側・周回の置き場・TMPDIR の実体パスを、許可と拒否の規則に書けるか (Claude Code は、これらの文字を含むパスの規則を正しく扱えない)
+check_rule_chars() {
+  local label=$1 path=$2 c
+  for c in '(' ')' '[' ']' '{' '}' '*' '?' '!' '#'; do
+    case "$path" in
+      *"$c"*) unavailable "${label}の実体パスに、許可と拒否の規則に書けない文字「${c}」がある: $path" ;;
+    esac
+  done
+}
+check_rule_chars 作業側 "$CWD_REAL"
+check_rule_chars 周回の置き場 "$LOOP_REAL"
+check_rule_chars TMPDIR "$TMP_REAL"
+
+# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・周回の置き場) と同じでも、その祖先でもないか。
+# 先頭の ~ は引数を読んだときにホームに展開してある
+for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do
+  case "$v" in
+    /*) ;;
+    *) unavailable "--sandbox-allow-write の値は絶対パスで指定する (先頭の ~ と ~/ はホームに展開する。~ユーザー名 の形は展開しない): $v" ;;
+  esac
+done
+if [ ${#SANDBOX_ALLOW_WRITE[@]} -gt 0 ]; then
+  if ! problem=$(allow_write_problem "$HOME_REAL" "$CWD_REAL" "$LOOP_REAL" "${SANDBOX_ALLOW_WRITE[@]}"); then
+    [ -n "$problem" ] || problem="--sandbox-allow-write の値を検査できない"
+    unavailable "$problem"
+  fi
+fi
+
+# 13. 追加の引数 (-- の後) が、受け付ける一覧に収まるか。制限を弱めるフラグは列挙しきれないので、受け付けるものの一覧で検査する
+i=0
+while [ "$i" -lt ${#EXTRA_ARGS[@]} ]; do
+  a=${EXTRA_ARGS[$i]}
+  case "$a" in
+    --plugin-dir|--settings)
+      [ $(( i + 1 )) -lt ${#EXTRA_ARGS[@]} ] || unavailable "追加の引数 $a に値が無い"
+      val=${EXTRA_ARGS[$(( i + 1 ))]}
+      case "$val" in
+        -*) unavailable "追加の引数 $a の値が - で始まる: $val" ;;
+      esac
+      if [ "$a" = --settings ]; then
+        if ! problem=$(settings_arg_problem "$val"); then
+          [ -n "$problem" ] || problem="検査できない"
+          unavailable "追加の引数の --settings の値を受け付けない: ${problem}。受け付けるのは、enabledPlugins だけを持つ JSON"
+        fi
+      fi
+      i=$(( i + 2 )) ;;
+    *) unavailable "追加の引数 $a は受け付けない (受け付けるのは --plugin-dir <ディレクトリ> と、enabledPlugins だけを持つ JSON を値にした --settings)" ;;
+  esac
+done
+
+# 14. 利用者の設定が、コマンドをサンドボックスの外で実行させないか。レビュー対象のブランチの設定は、回ごとに複製で確かめる
+USER_SETTINGS="$HOME/.claude/settings.json"
+if ! problem=$(user_settings_problem "$USER_SETTINGS"); then
+  [ -n "$problem" ] || problem="利用者の設定 $USER_SETTINGS を検査できない"
+  unavailable "$problem"
+fi
+
+# 15. (表示) 利用者の設定の WebFetch(domain:…) の許可は、サンドボックスの接続を許すホストに加わる。止めはしない
+domains=$(webfetch_domains "$USER_SETTINGS")
+if [ -n "$domains" ]; then
+  echo "利用者の設定 $USER_SETTINGS の WebFetch(domain:…) の許可により、レビュアの実行の Bash が接続できるホストに次のドメインが加わる:"
+  echo "$domains" | sed 's/^/  /'
+  if echo "$domains" | grep -Fqx '*'; then
+    echo "WebFetch(domain:*) があるので、レビュアの実行の Bash は外のすべてのホストに接続できる。"
+    echo "  レビュー対象に埋め込まれた指示にレビュアが従うと、手元の情報を外へ送れる。接続できるホストを絞るには、利用者の設定の許可をドメインごとに書く。"
+  fi
+fi
 
 IDLE_SECONDS=$(minutes_to_seconds "$IDLE_MINUTES")
 REVIEW_TIMEOUT_SECONDS=$(minutes_to_seconds "$REVIEW_TIMEOUT_MINUTES")
@@ -662,7 +937,7 @@ next_request() {
 
 write_worker_yaml idle ""
 start_heartbeat
-log "ワーカーを起動した: 置き場 $LOOP_DIR / モデル $MODEL / effort $EFFORT / 権限モード $PERMISSION_MODE"
+log "ワーカーを起動した: 版 $WORKER_VERSION / 置き場 $LOOP_DIR / モデル $MODEL / effort $EFFORT / 権限モード $PERMISSION_MODE"
 
 idle_since=$(date +%s)
 while :; do
