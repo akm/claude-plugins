@@ -138,7 +138,8 @@ if isinstance(result, dict):
     blocked = []
     for r in results:
         name_cmd = uses.get(r.get("tool_use_id"))
-        if not name_cmd or name_cmd[0] != "Bash" or r.get("is_error") is not True:
+        # is_error は見ない — 出力を | tail に渡したコマンドや、; echo で終わるコマンドは、止められても成功で終わる (実測)
+        if not name_cmd or name_cmd[0] != "Bash":
             continue
         body = body_text(r.get("content"))
         if PHRASE in body.lower() or TAG in body:

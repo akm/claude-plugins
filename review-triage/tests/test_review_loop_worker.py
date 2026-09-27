@@ -1615,21 +1615,46 @@ class TestLogReading(WorkerTestBase):
              "message": "PermissionError: [Errno 1] Operation not permitted: '/Users/x/z'"},
         ]})
 
-    def test_sandbox_blocked_ignores_other_tools_and_successful_results(self):
-        # Bash 以外 (Read) の結果と、is_error が偽の Bash の結果 (文面を含む文書を grep した出力) は、同じ文面があっても数えない。
+    def test_sandbox_blocked_ignores_other_tools(self):
+        # Bash 以外 (Read) の結果は、同じ文面があっても数えない。
         # 対応する tool_use の無い結果も、ツールが Bash と分からないので数えない
         marker = self.run_with_stream([
             _init("auto"),
             _tool_use("toolu_read", "Read", {"file_path": "/Users/x/secret"}),
             _tool_result("toolu_read", "EPERM: operation not permitted, open '/Users/x/secret'", True),
-            _tool_use("toolu_grep", "Bash", {"command": "grep -rn 'operation not permitted' ."}),
-            _tool_result("toolu_grep",
-                         "worker.md:330:(eval):1: operation not permitted: <パス>\n"
-                         "worker.md:272:<sandbox_violations> deny network-outbound", False),
             _tool_result("toolu_nowhere", "touch: /Users/x/y: Operation not permitted", True),
             _RESULT_LINE,
         ])
         self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_sandbox_blocked_counts_successful_results(self):
+        # is_error が偽の Bash の結果も、文面があれば数える。通し確認 (2026-09-28) で、出力を | tail に渡したコマンドと
+        # ; echo で終わるコマンドは、止められても成功で終わった。文面を含む文書を grep しただけの結果も数える
+        # (見落として記録に入れるより、止めて人間が報告を読む方を選ぶ)
+        go = "cd tree/tools && go test ./... 2>&1 | tail -30"
+        cat = "cat > /tmp/t_test.go <<'EOF'\npackage main\nEOF\necho skip"
+        grep = "grep -rn 'operation not permitted' ."
+        marker = self.run_with_stream([
+            _init("auto"),
+            _tool_use("toolu_go", "Bash", {"command": go}),
+            _tool_result("toolu_go",
+                         "# example.com/m\nopen /Users/x/Library/Caches/go-build/4c/4c9c-d: operation not permitted\n"
+                         "FAIL\texample.com/m [setup failed]\nFAIL", False),
+            _tool_use("toolu_cat", "Bash", {"command": cat}),
+            _tool_result("toolu_cat", "(eval):1: operation not permitted: /tmp/t_test.go\nskip", False),
+            _tool_use("toolu_grep", "Bash", {"command": grep}),
+            _tool_result("toolu_grep", "worker.md:330:(eval):1: operation not permitted: <パス>", False),
+            _RESULT_LINE,
+        ])
+        self.assertEqual(marker["sandbox_blocked"], {"count": 3, "calls": [
+            {"command": go,
+             "message": "open /Users/x/Library/Caches/go-build/4c/4c9c-d: operation not permitted"},
+            {"command": "cat > /tmp/t_test.go <<'EOF' package main EOF echo skip",
+             "message": "(eval):1: operation not permitted: /tmp/t_test.go"},
+            {"command": grep, "message": "worker.md:330:(eval):1: operation not permitted: <パス>"},
+        ]})
+        # サンドボックスが止めた確認を failed の条件にしないのは今までどおり (RA1 にするのは作業側)
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_sandbox_blocked_values_are_one_line(self):

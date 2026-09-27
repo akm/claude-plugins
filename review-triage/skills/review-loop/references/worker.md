@@ -300,7 +300,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 | 拒否の規則 | 印の `permission_denials`。拒否の理由はログの `tool_result` の文面 | 当たった規則を確かめる。上の「拒否の規則」にある規則は、複製と作業場所の外を変える呼び出しを止めるためのもので、引数では外せない。利用者の設定かレビュー対象のブランチの `.claude/settings.json` の規則なら、その設定を見直す |
 | auto モードの判定 | 同上 | 拒否の理由を読んで判断する。判定の前に許す必要があれば、その呼び出しに当たる規則を `--allowed-tools` (設定 `review_loop.allowed_tools`) に足す。ただし、広い規則 (`Bash(*)` など) は足しても使われない (正本は上の「権限モードと許可の一覧」) |
 | 安全のための検査 | 同上 | 許可の一覧では直せない (許可の規則に当たる呼び出しでも拒否される)。起動のコマンドは変えない |
-| サンドボックス | 印の、サンドボックスが止めた確認 (コマンドと、止められたパスかホスト) | 止められたのがパスなら設定 `review_loop.sandbox_allow_write` に、ホストなら `review_loop.sandbox_allowed_domains` に足す。サンドボックスと関係の無い、操作が許されないことを示すエラー (macOS 自身の保護など) なら、設定では直せない |
+| サンドボックス | 印の、サンドボックスが止めた確認 (コマンドと、止められたパスかホスト) | 止められたのがパスなら設定 `review_loop.sandbox_allow_write` に、ホストなら `review_loop.sandbox_allowed_domains` に足す。サンドボックスと関係の無い、操作が許されないことを示すエラー (macOS 自身の保護など) なら、設定では直せない。止められたのではなく、文面を含む文書を表示しただけの結果 (コマンドが `grep` や `cat` で、文面が文書の行) なら、設定は変えずに `--resume` で同じ回をやり直す (下の「サンドボックスが止めた確認の数え方」) |
 | 権限モードの指定の食い違い | 作業側が、印の権限モードの指定を `loop.yaml` と比べる | 作業側が案内するコマンドでワーカーを起動し直す。0.13.0 の案内は `default` のときに `--permission-mode` を付けなかったので、そのコマンドで起動するとデフォルトの `auto` になる |
 | 実効の権限モードの食い違い | 印の `error` の `permission mode mismatch` | 指定したモデルが auto モードに対応しているかを確かめる (実測で、`haiku` を指定すると `default` になった)。サーバー側で auto モードが一時的に使えないこともあり、`--resume` で同じ回をやり直せる |
 | ワーカーのバージョン | 作業側が、印のワーカーのバージョンを確かめる | 0.14.0 以降のワーカーで起動し直す |
@@ -326,9 +326,8 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 **サンドボックスが止めた書き込みと接続は、Bash の `tool_result` の本文にだけ残る** — `permission_denials` にも `init` の行にも現れない (実測)。そのため、この項目に限ってツールの結果の中身を読む。
 
 1. ログの全行 (sub-agent の行を含む) から、`tool_use` の `id` と、ツールの名前と入力の `command` の対応を作る。`tool_use` は `type` が `assistant` の行の `message.content` から、`tool_result` は `type` が `user` の行の `message.content` から読む。
-2. `tool_result` のうち、次の 3 つをすべて満たすものを数える。対応する `tool_use` が見つからない結果は、ツールが `Bash` と分からないので数えない。
+2. `tool_result` のうち、次の 2 つをどちらも満たすものを数える。`is_error` (結果がエラーか) は見ない。対応する `tool_use` が見つからない結果は、ツールが `Bash` と分からないので数えない。
    - 対応するツールが `Bash`
-   - `is_error` が真
    - 本文 (文字列か、`text` の要素を改行で連結したもの) が、`operation not permitted` (大文字と小文字を区別しない) か `<sandbox_violations>` を含む
 3. 数えた呼び出しごとに、`tool_use` の `command` と、本文のうち文面を含む行 (止められたパスかホストを含む) を、それぞれ 1 行に直して先頭 200 文字までを印に書く。止められたのが書き込みか接続かで、直し方 (上の「止められたときの直し方」) が変わるため。
    - 文面を含む行は、`operation not permitted` を含む行と、`<sandbox_violations>` の行から `</sandbox_violations>` の行 (無ければ本文の終わり) までの行。接続を止められたときは、止められたホストがタグの次の行にあるので、タグの中の行も含める。複数の行は空白で繋ぐ。
@@ -336,13 +335,13 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 
 | ログの形 | 扱い |
 | --- | --- |
-| Bash の `tool_result` で `is_error` が真、本文に `Operation not permitted` / `operation not permitted` | 数える (sub-agent の行も) |
-| Bash の `tool_result` で `is_error` が真、本文に `<sandbox_violations>` (接続を止められたとき) | 数える |
-| Bash の `tool_result` で `is_error` が偽 (文面を含む文書を `grep` した結果など) | 数えない |
+| Bash の `tool_result` で、本文に `Operation not permitted` / `operation not permitted` | 数える (sub-agent の行も。`is_error` が偽でも) |
+| Bash の `tool_result` で、本文に `<sandbox_violations>` (接続を止められたとき) | 数える (`is_error` が偽でも) |
 | Bash 以外 (`Read` など) の `tool_result` | 数えない |
 | `result` の行が無い | 件数を `unknown` |
 
-- **`is_error` を条件にするのは、この文面を含む文書 (このファイルや Issue) を `grep` して成功した結果を数えないため。** その代わり、最後の部分が成功して終了コード 0 で終わる複合コマンド (`touch ~/x; echo done` など) の中で止められた書き込みは数えない。
+- **`is_error` を条件にしないのは、止められても成功で終わるコマンドが多いため。** 出力を `| tail -30` に渡したコマンドや、`; echo skip` で終わるコマンドは、途中で書き込みを止められても終了コード 0 で終わり、`is_error` が偽になる。通し確認 (2026-09-28) では、サンドボックスが止めた 4 件のうち 3 件がこの形だった (`go test ./... 2>&1 | tail -30` の Go のビルドのキャッシュ・`python3 -m pytest … 2>&1 | tail -20`・`cat > /tmp/… ; echo skip`)。
+- **その代わり、この文面を含む文書 (このファイルや Issue) を `grep` や `cat` で表示しただけの結果も数え、その回は RA1 になる。** 止められた確認を見落として記録に入れるより、止めて人間が報告を読む方を選ぶ (止められた回を記録に入れないという、RA1 の決定と同じ理由)。報告の `sandbox_blocked.calls` にコマンドが並ぶので、文書を表示しただけかは人間が見分けられ、`--resume` で同じ回をやり直せる。
 - **サンドボックスと関係の無い、操作が許されないことを示すエラー (EPERM。macOS 自身の保護や、他のユーザーのプロセスへの `kill` など) も数える。** 確認を実行できなかった点は同じなので、その回は RA1 になる。
 - **文面は Claude Code 2.1.273 で実測したもの。** ファイルの書き込みを止められたときの本文は `(eval):1: operation not permitted: <パス>`・`open <パス>: operation not permitted`・`touch: <パス>: Operation not permitted`・`mkdir: <パス>: Operation not permitted`・python の `PermissionError` (`Operation not permitted`)・`fatal: Unable to create '<パス>/index.lock': Operation not permitted` などで、`<sandbox_violations>` のタグは付かない。接続を止められたときは `<sandbox_violations> deny network-outbound <ホスト>:<ポート> (host is not on the allow list)` のタグが付く。ファイルの書き込みにもタグが付くバージョンになったら、タグだけで数えるように見直す。
 
@@ -370,7 +369,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 - **effort が実際に効いたか** — ログに記録されないので、渡した値を印に残すだけ。
 - **サンドボックスの一時ディレクトリへの書き込み** — サンドボックスは、自身の一時ディレクトリ (`/private/tmp/claude-<利用者の番号>`。サンドボックスの中の `TMPDIR`) への Bash の書き込みを止めない。そこにある他のプロセスの一時ファイルは守られず、そこへの書き込みも検出しない。
 - **ホームと作業側の外への `Write`・`Edit`** — Bash による同じ書き込みはサンドボックスが止めるが、ツールには効かない。拒否の規則で止めるのはホーム・作業側・置き場だけで、その外 (`/opt/homebrew` など) への書き込みは auto モードの判定に任せる。
-- **終了コード 0 で終わる複合コマンドの中で、サンドボックスが止めた書き込み** — 上の「サンドボックスが止めた確認の数え方」。
+- **サンドボックスが止めたのに、その文面が出力に残らなかった書き込みと接続** — 標準エラーを捨てたコマンド (`2>/dev/null`) や、出力の一部だけを表示したコマンド (`| tail -1` で文面の行が切れたとき) は、文面を読めないので数えない (上の「サンドボックスが止めた確認の数え方」)。
 - **レビュアが意図してログの件数を隠す場合** — 上の「ログを信頼できる前提」。
 - **作業場所の外に cwd を移して動き続けるプロセス** — 回の終わりの処理でも、起動し直したときの掃除でも、残ったプロセスは作業場所の中の cwd で見つけるので、止まらない。作業場所のパスは周回の間使い回すので、そのプロセスは後の回の作業場所のパスにも書ける。ワーカーは、準備を新しい準備のディレクトリで行い、作業場所のパスの下で git を実行しないので (「回の処理」の不変条件)、準備はその書き込みの影響を受けない。改名の前に作業場所のパスを作り直された回は、改名が失敗して `failed` になる。改名の後の作業場所の中身 (複製・写し・結果) は、レビュアの実行を起動する前も含めて、そのプロセスが書き換えうる。ワーカーはそれを、その回のレビュアの実行が書いたものと区別しない。複製のローカルの設定 (`.claude/settings.local.json`) はレビュアの実行に読ませないが (「レビュアの実行」)、ほかに Claude Code が複製から読むもの (`CLAUDE.md`・`.claude/` の下のスキルや sub-agent の定義など) は読む。
 - **利用者の設定とレビュー対象のブランチの設定の `sandbox.filesystem.allowWrite`** — ワーカーの値と合わせて使われ、書き込みを許す場所を広げうるが、ワーカーは確かめない。
