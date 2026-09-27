@@ -34,7 +34,7 @@
 # python3 の処理はこのファイルに書かず、処理ごとのファイル (.py) にして、このスクリプトの実体と同じディレクトリの下の
 # ディレクトリ review-triage/scripts/review-loop-worker/ に置く。ファイル名は、そのファイルを python3 で実行する関数の名前に
 # 合わせる (setpgid_exec.py だけは、関数 run_prep と run_reviewer が共に使う)。各ファイルの説明の正本は、そのファイルの
-# 先頭のコメント。ワーカーは起動時にすべてのファイルの中身を変数に読み込み、実行するときは読み込んだ中身を python3 -c に
+# 先頭のコメント。ワーカーは起動時にすべてのファイルの中身を変数に読み込み、実行するときは読み込んだ中身を python3 -I -c に
 # 渡す (実行中にプラグインが更新されて、ディレクトリの中身が消えても動き続けるため。関数 load_py_files)。
 # 読み込めたかは、起動時の確認の 8 で確かめる。
 #
@@ -274,12 +274,13 @@ load_py_files() {
   [ -z "$unreadable" ] || PY_PROBLEM="${PY_PROBLEM:+$PY_PROBLEM。}python3 のスクリプトのディレクトリ $PY_DIR の、ファイル $unreadable を読めない"
 }
 
-# 読み込んだ python3 のスクリプト ($1 は名前) を、$2 以降を引数にして実行する。標準入力は /dev/null にする (どのスクリプトも
-# 標準入力を読まない)
+# 読み込んだ python3 のスクリプト ($1 は名前) を、$2 以降を引数にして実行する。python3 は isolated mode (-I) で起動する —
+# -c では、Python の import の探索先の先頭がカレントディレクトリになり、ワーカーのカレントディレクトリ (作業側) に json.py のような
+# 標準ライブラリと同名のファイルがあると、そちらが読まれるため。標準入力は /dev/null にする (どのスクリプトも標準入力を読まない)
 run_py() {
   local var="PY_SRC_$1"
   shift
-  python3 -c "${!var}" "$@" </dev/null
+  python3 -I -c "${!var}" "$@" </dev/null
 }
 
 # 起動時の確認より前のバージョンの読み取りと、起動時の確認の 2 の掃除にも読み込んだ中身を使うので、ここで読み込む。
@@ -1084,10 +1085,10 @@ run_prep() {
     PREP_TIMEOUT=1
     return 1
   fi
-  # 読み込んだ setpgid_exec.py の中身を、関数 run_py と同じく python3 -c で実行する
+  # 読み込んだ setpgid_exec.py の中身を、関数 run_py と同じく python3 -I -c で実行する (-I の理由は関数 run_py)
   (
     cd "$PREP_DIR" || exit 127
-    exec python3 -c "$PY_SRC_setpgid_exec" "$@"
+    exec python3 -I -c "$PY_SRC_setpgid_exec" "$@"
   ) </dev/null >"$PREP_OUT" 2>&1 &
   PREP_PID=$!
   until wait_once "$PREP_PID"; do
@@ -1144,11 +1145,11 @@ clone_settings_problem() {
 
 # 手順 8。作業側の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。写しの作り方 (置き換える文字列と、失敗とする条件) の
 # 正本は review-loop-worker/make_request_copy.py。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
-# 読み込んだ中身を、関数 run_py と同じく python3 -c で実行する。
+# 読み込んだ中身を、関数 run_py と同じく python3 -I -c で実行する。
 # 通らなければ 1 を返し、上限を越えたためでなければ、完了の印の error に書く文字列を PREP_ERROR に入れる
 make_request_copy() {
   local out
-  run_prep "request copy" python3 -c "$PY_SRC_make_request_copy" "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" \
+  run_prep "request copy" python3 -I -c "$PY_SRC_make_request_copy" "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" \
     && return 0
   [ "$PREP_TIMEOUT" = 1 ] && return 1
   out=$(last_line "$(cat "$PREP_OUT" 2>/dev/null)")
@@ -1390,10 +1391,10 @@ run_reviewer() {
 
   # --setting-sources user,project: 複製の .claude/settings.local.json (ローカルの設定) を読ませない。複製はコミットから作るので
   # ふつうは無いが、前の回のレビュアの実行が残したプロセスは、改名の後に作れる (フックはサンドボックスの外で動く)。
-  # setpgid_exec.py は、関数 run_prep と同じく、読み込んだ中身を python3 -c で実行する
+  # setpgid_exec.py は、関数 run_prep と同じく、読み込んだ中身を python3 -I -c で実行する
   (
     cd "$CLONE" || exit 127
-    exec python3 -c "$PY_SRC_setpgid_exec" \
+    exec python3 -I -c "$PY_SRC_setpgid_exec" \
       claude -p "$prompt" \
       --model "$MODEL" --effort "$EFFORT" --permission-mode "$PERMISSION_MODE" \
       --settings "$SETTINGS_JSON" --setting-sources user,project --strict-mcp-config \

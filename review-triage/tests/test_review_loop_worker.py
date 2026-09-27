@@ -705,6 +705,19 @@ _RESULT_LINE = {"type": "result", "subtype": "success", "is_error": False, "sess
 
 
 class TestHappyPath(WorkerTestBase):
+    def test_stdlib_named_files_in_repo_are_not_imported(self):
+        # 作業側 (ワーカーのカレントディレクトリ) に標準ライブラリと同名のファイルがあっても、ワーカーの python3 はそれを読まない
+        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終わり、印が書かれない
+        for name in ("json", "re", "hashlib", "stat"):
+            with open(os.path.join(self.repo, f"{name}.py"), "w", encoding="utf-8") as f:
+                f.write(f'raise SystemExit("作業側の {name}.py が読まれた")\n')
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-q", "-m", "標準ライブラリと同名のファイル")
+        self.put_request()
+        marker, err = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        self.assertNotIn("が読まれた", err)
+
     def test_one_round(self):
         # AE1: idle → reviewing (識別子入り) → idle と遷移し、ok の印とログが残る
         self.env["FAKE_CLAUDE_SLEEP"] = "2"
