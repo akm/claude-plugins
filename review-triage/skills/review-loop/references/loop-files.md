@@ -99,6 +99,7 @@ rejected: []
 ```yaml
 state: reviewing
 current_request: "20260926-1400-feat-review-loop-63-1-code-review-opus"
+workspace: "/private/var/folders/xx/abcd/T/review-loop-20260926-1400-feat-review-loop-63-1a2b3c4d"
 pid: 12345
 worker_version: "0.14.0"
 model: "opus"
@@ -117,6 +118,7 @@ rounds_served: 0
 | --- | --- | --- |
 | `state` | ◯ | 下の「状態」の 5 つのいずれか |
 | `current_request` | ◯ | `reviewing` のとき処理中の識別子。それ以外は空文字列 |
+| `workspace` | ◯ | `reviewing` のとき、その回の作業場所 (ワーカーが環境変数 `TMPDIR` の下に作る一時ディレクトリ) のパス。それ以外は空文字列。起動し直したワーカーが、`kill -9` などで消えた前の起動の作業場所を片付けるのに使う (正本は [worker.md](worker.md) の「起動時の確認」の 2) |
 | `pid` | ◯ | ワーカーのプロセス ID |
 | `worker_version` | ◯ | ワーカーの版。スクリプトの実体の位置から、プラグインのファイル `review-triage/.claude-plugin/plugin.json` を読んで決める。読めなければ `unknown` |
 | `model` | ◯ | ワーカーに渡したモデルの指定 (`--model` の値) |

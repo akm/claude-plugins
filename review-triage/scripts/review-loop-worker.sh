@@ -25,8 +25,8 @@
 #
 # macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確かめたため)。
 # bash は macOS の /bin/bash (3.2) で動くように書く。テストは CI (ubuntu) でも偽の uname で走らせるので、
-# GNU の stat と Linux の /proc でも動くようにしておく。python3 が要る (claude -p を専用のプロセスグループで起動する・
-# ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
+# GNU の stat と Linux の /proc でも動くようにしておく。python3 が要る (claude -p と準備のコマンドを専用のプロセスグループで
+# 起動する・ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
 # --settings の JSON を組み立てる・依頼文の写しを作る・結果を確かめて複写する・作業場所の中を cwd にしているプロセスを
 # 見つける・パスの実体を求めるのに使う)。
 #
@@ -40,6 +40,10 @@ POLL_SECONDS=5              # 依頼文を探す周期と、worker.yaml の更�
 OTHER_WORKER_FRESH_SECONDS=30  # 起動時の確認で、他のワーカーが動いていると判定する更新時刻の新しさ
 STOP_GRACE_SECONDS=5        # レビュアの実行や作業場所に残ったプロセスを TERM で止めてから KILL を送るまでの猶予
 RESULT_MAX_BYTES=1048576    # 置き場に複写する結果の大きさの上限 (1 MiB)。正本は worker.md の「回の処理」の手順 10
+
+# 引数のコマンドを、専用のプロセスグループ (自分の PID と同じ番号) にしてから実行する python3 のスクリプト。
+# レビュアの実行と準備のコマンドをこれで起動する (上限を越えたときと割り込みを受けたときに、プロセスグループごと止めるため)
+SETPGID_PY='import os, sys; os.setpgid(0, 0); os.execvp(sys.argv[1], sys.argv[1:])'
 
 # レビュアの実行に許すツールの既定の一覧 (--allowed-tools を 1 回でも指定すれば置き換わる)。
 # 正本は worker.md の「レビュアの実行の権限」
@@ -366,6 +370,192 @@ print(json.dumps(settings, ensure_ascii=False))
 PY
 }
 
+# ---- 作業場所の片付けに使う道具 (起動時の確認の 2 と、回の処理の手順 5・10 で使う。python3 を使う) ----
+
+# 作業場所 ($1。実体パス) の中を cwd にしているプロセスを止める (回の終わりの処理の 1 と、起動時の確認の 2)。
+# TERM を送り、STOP_GRACE_SECONDS 秒のうちに消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドは
+# レビュアの実行とは別のプロセスグループで動く) ので、cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から
+# (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
+# 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる
+stop_cwd_procs() {
+  python3 - "$1" "$STOP_GRACE_SECONDS" <<'PY'
+import os, signal, subprocess, sys, time
+
+workspace, grace = sys.argv[1], float(sys.argv[2])
+me = os.getpid()
+
+
+def inside(path):
+    return path == workspace or path.startswith(workspace + "/")
+
+
+def scan():
+    found = set()
+    if os.path.isdir("/proc/self"):
+        for name in os.listdir("/proc"):
+            if name.isdigit():
+                try:
+                    cwd = os.readlink(f"/proc/{name}/cwd")
+                except OSError:
+                    continue
+                if inside(cwd):
+                    found.add(int(name))
+    else:
+        try:
+            r = subprocess.run(["lsof", "-w", "-d", "cwd", "-Fpn"], capture_output=True, text=True, errors="replace")
+        except OSError as e:
+            raise RuntimeError(f"lsof を実行できない ({e})")
+        pid, listed = None, False
+        for line in r.stdout.splitlines():
+            if line.startswith("p") and line[1:].isdigit():
+                pid, listed = int(line[1:]), True
+            elif line.startswith("n") and pid is not None and inside(line[1:]):
+                found.add(pid)
+        # lsof は自分自身の cwd も出力するので、プロセスが 1 つも無ければ列挙に失敗している
+        if not listed:
+            raise RuntimeError(f"lsof の出力にプロセスが無い (終了コード {r.returncode}: {r.stderr.strip()[:200]})")
+    found.discard(me)
+    return found
+
+
+try:
+    pids = scan()
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        if not pids:
+            sys.exit(0)
+        print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが残っているので、"
+              f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
+        for pid in pids:
+            try:
+                os.kill(pid, sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+        deadline = time.time() + grace
+        while True:
+            time.sleep(0.2)
+            pids = scan()
+            if not pids or time.time() >= deadline:
+                break
+except RuntimeError as e:
+    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスを列挙できない: {e}", file=sys.stderr)
+    sys.exit(1)
+if pids:
+    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが止まらない "
+          f"(PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の読み取り・書き込み・実行の権限を足す
+# (Go のモジュールのキャッシュなど、読み取り専用のディレクトリを作るツールがあるため)。シンボリックリンクは辿らない。
+# $1 がディレクトリでないか、実体パスが $1 と違えば (作ったときと違えば)、理由を標準出力に出して終了コード 1 で終わる
+make_removable() {
+  python3 - "$1" <<'PY'
+import os, stat, sys
+
+top = sys.argv[1]
+try:
+    st = os.lstat(top)
+except OSError as e:
+    print(f"状態を読めない ({e})")
+    sys.exit(1)
+if not stat.S_ISDIR(st.st_mode):
+    print("ディレクトリではない")
+    sys.exit(1)
+real = os.path.realpath(top)
+if real != top:
+    print(f"実体パス {real} が、作ったときと違う")
+    sys.exit(1)
+
+
+def add_owner_rwx(path, mode):
+    if mode & 0o700 != 0o700:
+        try:
+            os.chmod(path, stat.S_IMODE(mode) | 0o700)
+        except OSError:
+            pass
+
+
+add_owner_rwx(top, st.st_mode)
+# 上から順にたどり、下のディレクトリの権限を、そこへ降りる前に足す
+for root, dirs, _ in os.walk(top):
+    for d in dirs:
+        p = os.path.join(root, d)
+        try:
+            s = os.lstat(p)
+        except OSError:
+            continue
+        if stat.S_ISDIR(s.st_mode):
+            add_owner_rwx(p, s.st_mode)
+PY
+}
+
+# 作業場所 ($1。実体パス) を消す (回の終わりの処理の 5)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確かめてから、
+# 中のディレクトリに権限を足して rm -rf で消す。git は使わない。消さなかったか消せなければ、パスと理由を標準エラーに出して 1 を返す
+remove_workspace() {
+  local ws=$1 why
+  if [ -L "$ws" ]; then
+    log "作業場所 $ws がシンボリックリンクに置き換えられているので、消さない (リンクの先も消さない)。次の回の作業場所を作るときに、リンクだけを消す"
+    return 1
+  fi
+  [ -e "$ws" ] || return 0
+  if ! why=$(make_removable "$ws"); then
+    log "作業場所 $ws を消さない: ${why:-確かめられない}。次の回の作業場所を作るときか、次の起動で消す"
+    return 1
+  fi
+  rm -rf "$ws" 2>/dev/null
+  if [ -e "$ws" ] || [ -L "$ws" ]; then
+    log "作業場所 $ws を消せない。次の回の作業場所を作るときか、次の起動で消す"
+    return 1
+  fi
+  return 0
+}
+
+# 起動時の確認の 2 (掃除)。前の起動が残した作業場所の中を cwd にしているプロセスを止め、作業場所を消す。
+# 片付けるのは、前の worker.yaml のキー workspace に記録されたパス (無いか空なら、TMPDIR の実体の下の決まったパス) だけで、
+# パスの名前が作業場所の名前の形 (review-loop-<周回 id>-<周回の置き場の実体パスのハッシュ>) に合い、シンボリックリンクでない
+# ディレクトリのときだけ、止めて消す — worker.yaml に書かれた値だけを根拠に、ワーカーが作ったのではないディレクトリの中の
+# プロセスを止めたり、ディレクトリを消したりしないため。プロセスは cwd で見つける (プロセスグループでは見つけられず、名前 (claude) は
+# 利用者の対話セッションと同じなので照合しない)。確認ではないので、片付けられなくても止めない (理由とパスを標準エラーに出す)
+startup_cleanup() {
+  local loop_real name recorded="" tmp_real target
+  if ! command -v python3 >/dev/null 2>&1; then
+    log "python3 が見つからないので、前の起動の作業場所を片付けられない"
+    return 0
+  fi
+  loop_real=$(real_dir "$LOOP_DIR") || return 0
+  name="review-loop-${loop_real##*/}-$(workspace_hash "$loop_real")"
+  if [ -f "$LOOP_DIR/worker.yaml" ]; then
+    # yaml_str で書いた値なので、\ で始まる 2 文字 (\\ と \") を 1 文字に戻す
+    recorded=$(read_key "$LOOP_DIR/worker.yaml" workspace | sed 's/\\\(.\)/\1/g')
+  fi
+  if [ -n "$recorded" ]; then
+    case "$recorded" in
+      /*/"$name") target=$recorded ;;
+      *)
+        log "worker.yaml の workspace の値 $recorded は作業場所の名前の形 (…/$name) に合わないので、片付けない"
+        return 0 ;;
+    esac
+  elif [ -n "${TMPDIR:-}" ] && tmp_real=$(real_dir "$TMPDIR"); then
+    target="$tmp_real/$name"
+  else
+    return 0
+  fi
+  if [ -L "$target" ]; then
+    log "前の起動の作業場所のパス $target はシンボリックリンクなので、片付けない (リンクの先も消さない)"
+    return 0
+  fi
+  [ -e "$target" ] || return 0
+  if [ ! -d "$target" ]; then
+    log "前の起動の作業場所のパス $target はディレクトリではないので、片付けない"
+    return 0
+  fi
+  log "前の起動の作業場所 $target が残っているので、片付ける"
+  stop_cwd_procs "$target"
+  remove_workspace "$target"
+  return 0
+}
+
 # ---- 状態 ----
 
 WORKER_VERSION="unknown"
@@ -379,24 +569,38 @@ HEARTBEAT_PID=""
 WATCHDOG_PID=""
 SLEEP_PID=""
 REVIEWER_PID=""
-TIMED_OUT=0
+PREP_PID=""            # 準備のコマンド (専用のプロセスグループで動かす) の PID
+WAITED_RC=""           # 関数 wait_once・wait_child・stop_group が受け取った、子プロセスの終了コード
 FINISHING=0
+WS=""                  # 回の作業場所のパス (起動時の確認が通った後に決める)
+# 回のどの部分を行っているか。割り込みを受けたときの扱いを決める (関数 on_signal)。
+#   "" = 依頼文を探している / prep = 準備 (手順 2〜8) / review = レビュアの実行 (手順 9) / finish = 回の終わりの処理 (手順 10)
+PHASE=""
+PENDING_CODE=""        # 回の終わりの処理の途中に受けた割り込みの終了コード。印を書き終えてから、この値で終わる
 
 # 回ごとの状態
 CURRENT_RID=""
 REQ_STARTED=""
 REQ_STARTED_EPOCH=0
+REQ_DEADLINE=0         # 上限の時刻 (エポック秒)。依頼文を受け取った時刻に --review-timeout-minutes を足したもの
 HEAD_BEFORE=""
 EFFECTIVE="unknown"
 SKILL_CALLED="unknown"
 DENIAL_COUNT="unknown"
 DENIAL_TOOLS="[]"
+MARKER_LINE=""         # 最後に書いた完了の印の、この起動で応じた回の一覧に出す行
+PREP_OUT=""            # 準備のコマンドの標準出力と標準エラーを書くファイル (作業場所の中)
+PREP_TIMEOUT=0         # 準備のコマンドを、上限を越えたために止めたか起動しなかったら 1
+PREP_ERROR=""          # 準備の段が通らなかったときに、完了の印の error に書く文字列
 
+# worker.yaml を書く。キー workspace には、reviewing のときだけ回の作業場所のパスを書く (起動し直したワーカーが片付けるのに使う)
 write_worker_yaml() {
-  local state=$1 current=$2 error=${3:-}
+  local state=$1 current=$2 error=${3:-} ws=""
+  [ "$state" = reviewing ] && ws=$WS
   {
     echo "state: $state"
     echo "current_request: $(yaml_str "$current")"
+    echo "workspace: $(yaml_str "$ws")"
     echo "pid: $WORKER_PID"
     echo "worker_version: $(yaml_str "$WORKER_VERSION")"
     echo "model: $(yaml_str "$MODEL")"
@@ -449,7 +653,9 @@ if [ -f "$LOOP_DIR/worker.yaml" ]; then
   esac
 fi
 
-# 2. 前の起動の作業場所を片付ける (掃除)。作業場所を作る処理がまだ無いので、今は片付けるものが無い
+# 2. 前の起動の作業場所を片付ける (掃除)。worker.yaml を書くどの処理よりも前に行う — end がある周回や、ほかの確認で
+# unavailable になる起動でも、kill -9 で消えたワーカーが残したプロセスと作業場所を片付けるため
+startup_cleanup
 
 # 3. macOS で動いているか
 os_name=$(uname -s 2>/dev/null)
@@ -637,19 +843,20 @@ stop_heartbeat() {
   fi
 }
 
-# 上限の秒数が過ぎたらワーカーに USR1 を送る。更新時刻を進める処理と同じく、周期ごとにワーカーが動いているかを確かめ、
-# 動いていなければ (kill -9 で trap が動かなかった場合も) 自分も終わる — 消えたワーカーの PID が別のプロセスに再利用されていると、
-# USR1 (既定の動作は終了) がそのプロセスを止めてしまうため
+# 上限の時刻 ($1。エポック秒) を過ぎたら、ワーカーに USR1 を送る。USR1 は、ワーカーが待っている wait を途中で戻すための知らせで、
+# 上限を越えたかどうかはワーカーが時計で確かめる (関数 timed_out)。過ぎた後は、止められるまで 1 秒おきに送る — 1 度だけだと、
+# ワーカーが wait を始める直前に届いた USR1 は wait を戻さず、その wait に上限が掛からない。更新時刻を進める処理と同じく、
+# 周期ごとにワーカーが動いているかを確かめ、動いていなければ (kill -9 で trap が動かなかった場合も) 自分も終わる —
+# 消えたワーカーの PID が別のプロセスに再利用されていると、USR1 (既定の動作は終了) がそのプロセスを止めてしまうため
 start_watchdog() {
   (
     wd_sleep=""
     trap 'kill "$wd_sleep" 2>/dev/null; exit 0' TERM
-    wd_deadline=$(( $(date +%s) + $1 ))
     while worker_alive; do
-      wd_left=$(( wd_deadline - $(date +%s) ))
+      wd_left=$(( $1 - $(date +%s) ))
       if [ "$wd_left" -le 0 ]; then
         kill -USR1 "$WORKER_PID" 2>/dev/null
-        exit 0
+        wd_left=1
       fi
       [ "$wd_left" -gt "$POLL_SECONDS" ] && wd_left=$POLL_SECONDS
       sleep "$wd_left" &
@@ -668,6 +875,12 @@ stop_watchdog() {
   fi
 }
 
+# 上限を越えたか (依頼文を受け取った時刻から --review-timeout-minutes が過ぎたか)。時計で確かめる — USR1 は wait を戻すための
+# 知らせで、前の回の上限を測る処理が止まる間際に送ったものが遅れて届くこともあるので、越えたことの根拠にしない
+timed_out() {
+  [ "$(date +%s)" -ge "$REQ_DEADLINE" ]
+}
+
 # 割り込みに応じられるように、sleep をバックグラウンドで起動して wait で待つ
 idle_sleep() {
   sleep "$1" &
@@ -676,7 +889,27 @@ idle_sleep() {
   SLEEP_PID=""
 }
 
-# レビュアの実行のプロセスグループ全体を止める (TERM、猶予の後に残っていれば KILL)。終了コードを REVIEWER_RC に入れる
+# 子プロセス $1 の終わりを 1 度待つ。終わっていれば終了コードを WAITED_RC に入れて 0 を返す。trap (割り込みや USR1) を実行したために
+# wait が途中で戻り、子がまだ在れば 1 を返す (呼び出し元が上限を確かめてから待ち直す)。wait が途中で戻った直後に子が終わった場合も、
+# 子の終了コードを受け取り直す (受け取り済みの子を待つと 127 が返るので、そのときは最初の値のままにする)
+wait_once() {
+  local rc
+  wait "$1"
+  WAITED_RC=$?
+  [ "$WAITED_RC" -gt 128 ] || return 0
+  kill -0 "$1" 2>/dev/null && return 1
+  wait "$1" 2>/dev/null
+  rc=$?
+  [ "$rc" -eq 127 ] || WAITED_RC=$rc
+  return 0
+}
+
+# 子プロセス $1 が終わるまで待ち、終了コードを WAITED_RC に入れる
+wait_child() {
+  until wait_once "$1"; do :; done
+}
+
+# プロセスグループ $1 に、終わっていないプロセスが無くなるのを $2 秒まで待つ。無くなれば 0 を返す
 wait_group_gone() {
   local pgid=$1 limit=$2 i=0
   while [ "$i" -lt $(( limit * 5 )) ]; do
@@ -687,20 +920,25 @@ wait_group_gone() {
   ! group_alive "$pgid"
 }
 
-stop_reviewer() {
-  local pid=$REVIEWER_PID
-  [ -n "$pid" ] || return 0
-  kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
-  if ! wait_group_gone "$pid" "$STOP_GRACE_SECONDS"; then
-    kill -KILL -- "-$pid" 2>/dev/null
-    kill -KILL "$pid" 2>/dev/null
-    wait_group_gone "$pid" "$STOP_GRACE_SECONDS" || log "レビュアの実行のプロセスグループ $pid が止まらない"
-  fi
-  wait "$pid" 2>/dev/null
-  REVIEWER_RC=$?
+# 専用のプロセスグループで起動したコマンド (PID $1。プロセスグループの番号も同じ) を、プロセスグループごと止める。TERM を送り、
+# STOP_GRACE_SECONDS 秒のうちに空にならなければ KILL を送る。待つ間に使う ps と sleep が、ワーカーのプロセスグループに届いた
+# 割り込み (端末の Ctrl-C など) で止まらないように、INT・TERM・HUP を無視するサブシェルで行う (無視はコマンドに引き継がれる)。
+# そのあとコマンドの終わりを待ち、終了コードを WAITED_RC に入れる
+stop_group() {
+  local pgid=$1
+  (
+    trap '' INT TERM HUP
+    kill -TERM -- "-$pgid" 2>/dev/null || kill -TERM "$pgid" 2>/dev/null
+    if ! wait_group_gone "$pgid" "$STOP_GRACE_SECONDS"; then
+      kill -KILL -- "-$pgid" 2>/dev/null
+      kill -KILL "$pgid" 2>/dev/null
+      wait_group_gone "$pgid" "$STOP_GRACE_SECONDS" || log "プロセスグループ $pgid が止まらない"
+    fi
+  )
+  wait_child "$pgid"
 }
 
-# ---- 終わり方 ----
+# ---- 終わり方 (正本は worker.md の「終わり方」) ----
 
 cleanup() {
   stop_watchdog
@@ -716,27 +954,78 @@ print_served() {
   done
 }
 
-on_signal() {
-  local sig=$1 code=$2
-  [ "$FINISHING" = 0 ] || exit "$code"
+# 作業場所 (WS) が残っていれば片付ける。シンボリックリンクならリンクだけを消し (リンクの先は消さない)、ディレクトリなら、
+# 中を cwd にしているプロセスを止めてから消す (回の終わりの処理の 1 と 5 の手順)
+discard_workspace() {
+  if [ -L "$WS" ]; then
+    log "作業場所のパス $WS にシンボリックリンクが残っているので、リンクだけを消す"
+    rm -f "$WS" 2>/dev/null
+  elif [ -e "$WS" ]; then
+    stop_cwd_procs "$WS"
+    remove_workspace "$WS"
+  fi
+}
+
+# 更新時刻を進める処理などを止め、worker.yaml を left にし、この起動で応じた回の一覧を出力して、終了コード $1 で終わる
+leave() {
   FINISHING=1
   trap '' INT TERM HUP USR1
-  log "割り込み ($sig) を受けた"
-  if [ -n "$REVIEWER_PID" ]; then
-    stop_reviewer
-    REVIEWER_PID=""
-    finish_round interrupted
-  fi
+  CURRENT_RID=""
+  PHASE=""
   cleanup
   write_worker_yaml left ""
   print_served
-  exit "$code"
+  exit "$1"
+}
+
+# 割り込み (INT / TERM / HUP) を受けたときの処理。受けた時点 (PHASE) で扱いが違う。
+#   prep   (準備の途中): 準備のコマンドのプロセスグループを止め、作業場所を消す。印は書かない — レビュアの実行を起動していないので、
+#          起動し直したワーカーが同じ依頼文を初めから処理する
+#   review (レビュアの実行中): レビュアの実行を止め、回の終わりの処理を行って、failed・interrupted の印を書く
+#   finish (回の終わりの処理の途中): 受けたことを控えて戻る。その回の印を書き終えてから、控えた終了コードで終わる
+#          (関数 process_request)。印の無い回と、消し残した作業場所を作らないため
+# finish のほかは、そのあと worker.yaml を left にして終わる
+on_signal() {
+  local sig=$1 code=$2
+  [ "$FINISHING" = 0 ] || exit "$code"
+  if [ "$PHASE" = finish ]; then
+    if [ -z "$PENDING_CODE" ]; then
+      PENDING_CODE=$code
+      log "割り込み ($sig) を受けた。この回の印を書き終えてから終わる"
+    fi
+    return 0
+  fi
+  FINISHING=1
+  trap '' INT TERM HUP USR1
+  log "割り込み ($sig) を受けた"
+  case "$PHASE" in
+    prep)
+      stop_watchdog
+      if [ -n "$PREP_PID" ]; then
+        stop_group "$PREP_PID"
+        PREP_PID=""
+      fi
+      discard_workspace
+      log "準備の途中だったので、印を書かずに終わる。起動し直したワーカーが、同じ依頼文を初めから処理する: $CURRENT_RID"
+      ;;
+    review)
+      stop_watchdog
+      if [ -n "$REVIEWER_PID" ]; then
+        stop_group "$REVIEWER_PID"
+        REVIEWER_RC=$WAITED_RC
+        REVIEWER_PID=""
+      fi
+      run_finish interrupted
+      ;;
+  esac
+  leave "$code"
 }
 
 trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM
 trap 'on_signal HUP 129' HUP
-trap 'TIMED_OUT=1' USR1
+# USR1 は、上限を測る処理が wait を途中で戻すための知らせ。上限を越えたかどうかは時計で確かめる (関数 timed_out)
+trap ':' USR1
 trap 'cleanup' EXIT
 
 # ---- 回の処理 (正本は worker.md の「回の処理」) ----
@@ -812,7 +1101,8 @@ else:
 PY
 }
 
-# 完了の印を書く。ran=1 はレビュアの実行を起動した回
+# 完了の印を書き、この起動で応じた回の一覧に出す行を MARKER_LINE に入れる。ran=1 はレビュアの実行を起動した回。
+# 一覧への追加 (関数 note_served) は呼び出し元が行う — 回の終わりの処理はサブシェルで行うので、ここで変数を変えても戻らないため
 write_marker() {
   local status=$1 error=$2 ran=$3 head_after=${4:-} clean_after=${5:-} exit_code=${6:-}
   {
@@ -841,164 +1131,27 @@ write_marker() {
   local elapsed=$(( $(date +%s) - REQ_STARTED_EPOCH ))
   local line="$CURRENT_RID  $status  model: $MODEL (実効: $EFFECTIVE)  effort: $EFFORT  所要: $(( elapsed / 60 ))分$(( elapsed % 60 ))秒"
   [ "$status" = failed ] && line="$line  error: $error"
-  SERVED_LINES+=("$line")
-  ROUNDS_SERVED=$(( ROUNDS_SERVED + 1 ))
+  MARKER_LINE=$(printf '%s' "$line" | tr '\n' ' ')
   log "完了の印を書いた: $CURRENT_RID ($status${error:+: $error})"
 }
 
+# この起動で応じた回の一覧に 1 行 ($1) を足し、応じた回の数を 1 つ増やす
+note_served() {
+  SERVED_LINES+=("$1")
+  ROUNDS_SERVED=$(( ROUNDS_SERVED + 1 ))
+}
+
 # ---- 回の作業場所・複製・写し・結果の複写に使う道具 (正本は worker.md の「回の処理」の手順 5〜10) ----
-
-# 作業場所 ($1。実体パス) の中を cwd にしているプロセスを止める (手順 10 の 1)。TERM を送り、STOP_GRACE_SECONDS 秒のうちに
-# 消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドはレビュアの実行とは別のプロセスグループで動く) ので、
-# cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
-# 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる
-stop_cwd_procs() {
-  python3 - "$1" "$STOP_GRACE_SECONDS" <<'PY'
-import os, signal, subprocess, sys, time
-
-workspace, grace = sys.argv[1], float(sys.argv[2])
-me = os.getpid()
-
-
-def inside(path):
-    return path == workspace or path.startswith(workspace + "/")
-
-
-def scan():
-    found = set()
-    if os.path.isdir("/proc/self"):
-        for name in os.listdir("/proc"):
-            if name.isdigit():
-                try:
-                    cwd = os.readlink(f"/proc/{name}/cwd")
-                except OSError:
-                    continue
-                if inside(cwd):
-                    found.add(int(name))
-    else:
-        try:
-            r = subprocess.run(["lsof", "-w", "-d", "cwd", "-Fpn"], capture_output=True, text=True, errors="replace")
-        except OSError as e:
-            raise RuntimeError(f"lsof を実行できない ({e})")
-        pid, listed = None, False
-        for line in r.stdout.splitlines():
-            if line.startswith("p") and line[1:].isdigit():
-                pid, listed = int(line[1:]), True
-            elif line.startswith("n") and pid is not None and inside(line[1:]):
-                found.add(pid)
-        # lsof は自分自身の cwd も出力するので、プロセスが 1 つも無ければ列挙に失敗している
-        if not listed:
-            raise RuntimeError(f"lsof の出力にプロセスが無い (終了コード {r.returncode}: {r.stderr.strip()[:200]})")
-    found.discard(me)
-    return found
-
-
-try:
-    pids = scan()
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        if not pids:
-            sys.exit(0)
-        print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが残っているので、"
-              f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
-        for pid in pids:
-            try:
-                os.kill(pid, sig)
-            except (ProcessLookupError, PermissionError):
-                pass
-        deadline = time.time() + grace
-        while True:
-            time.sleep(0.2)
-            pids = scan()
-            if not pids or time.time() >= deadline:
-                break
-except RuntimeError as e:
-    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスを列挙できない: {e}", file=sys.stderr)
-    sys.exit(1)
-if pids:
-    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが止まらない "
-          f"(PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
-    sys.exit(1)
-PY
-}
-
-# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の読み取り・書き込み・実行の権限を足す
-# (Go のモジュールのキャッシュなど、読み取り専用のディレクトリを作るツールがあるため)。シンボリックリンクは辿らない。
-# $1 がディレクトリでないか、実体パスが $1 と違えば (作ったときと違えば)、理由を標準出力に出して終了コード 1 で終わる
-make_removable() {
-  python3 - "$1" <<'PY'
-import os, stat, sys
-
-top = sys.argv[1]
-try:
-    st = os.lstat(top)
-except OSError as e:
-    print(f"状態を読めない ({e})")
-    sys.exit(1)
-if not stat.S_ISDIR(st.st_mode):
-    print("ディレクトリではない")
-    sys.exit(1)
-real = os.path.realpath(top)
-if real != top:
-    print(f"実体パス {real} が、作ったときと違う")
-    sys.exit(1)
-
-
-def add_owner_rwx(path, mode):
-    if mode & 0o700 != 0o700:
-        try:
-            os.chmod(path, stat.S_IMODE(mode) | 0o700)
-        except OSError:
-            pass
-
-
-add_owner_rwx(top, st.st_mode)
-# 上から順にたどり、下のディレクトリの権限を、そこへ降りる前に足す
-for root, dirs, _ in os.walk(top):
-    for d in dirs:
-        p = os.path.join(root, d)
-        try:
-            s = os.lstat(p)
-        except OSError:
-            continue
-        if stat.S_ISDIR(s.st_mode):
-            add_owner_rwx(p, s.st_mode)
-PY
-}
-
-# 作業場所を消す (手順 10 の 5)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確かめてから、
-# 中のディレクトリに権限を足して rm -rf で消す。git は使わない。消さなかったか消せなければ、パスと理由を標準エラーに出して 1 を返す
-remove_workspace() {
-  local why
-  if [ -L "$WS" ]; then
-    log "作業場所 $WS がシンボリックリンクに置き換えられているので、消さない (リンクの先も消さない)。次の回に、リンクだけを消して作り直す"
-    return 1
-  fi
-  [ -e "$WS" ] || return 0
-  if ! why=$(make_removable "$WS"); then
-    log "作業場所 $WS を消さない: ${why:-確かめられない}。次の回に消す"
-    return 1
-  fi
-  rm -rf "$WS" 2>/dev/null
-  if [ -e "$WS" ] || [ -L "$WS" ]; then
-    log "作業場所 $WS を消せない。次の回に消す"
-    return 1
-  fi
-  return 0
-}
 
 # 手順 5。作業場所を作る。前の回の作業場所が残っていれば、残ったプロセスを止めて消してから作る。
 # シンボリックリンクが残っていれば、リンクだけを消す (リンクの先は消さない)。
 # 作れなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
 prepare_workspace() {
   local out
-  if [ -L "$WS" ]; then
-    log "作業場所のパス $WS にシンボリックリンクが残っているので、リンクだけを消す"
-    rm -f "$WS" 2>/dev/null
-  elif [ -e "$WS" ]; then
+  if [ -e "$WS" ] && [ ! -L "$WS" ]; then
     log "前の回の作業場所 $WS が残っているので、消してから作る"
-    stop_cwd_procs "$WS"
-    remove_workspace
   fi
+  discard_workspace
   if [ -e "$WS" ] || [ -L "$WS" ]; then
     echo "workspace failed (the previous workspace remains: $WS)"
     return 1
@@ -1021,34 +1174,64 @@ clone_failed() {
   echo "clone failed ($1${detail:+: $detail})"
 }
 
+# 準備のコマンド ($2 以降) を、作業場所を cwd にして、専用のプロセスグループでバックグラウンドに起動して待つ ($1 は出力に書く段の名前)。
+# 標準出力と標準エラーは PREP_OUT に書く。レビュアの実行と同じ起動の仕方にするのは、上限を越えたときと割り込みを受けたときに、
+# プロセスグループごと止められるようにするため (フォアグラウンドで待つと、bash は trap をコマンドが終わるまで遅らせる)。
+# 起動する前か待つ間に上限を越えたら、プロセスグループを止め、PREP_TIMEOUT を 1 にして 1 を返す。そうでなければコマンドの終了コードを返す
+run_prep() {
+  local stage=$1
+  shift
+  if timed_out; then
+    log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、準備の段 ($stage) を始めない"
+    PREP_TIMEOUT=1
+    return 1
+  fi
+  (
+    cd "$WS" || exit 127
+    exec python3 -c "$SETPGID_PY" "$@"
+  ) </dev/null >"$PREP_OUT" 2>&1 &
+  PREP_PID=$!
+  until wait_once "$PREP_PID"; do
+    if timed_out; then
+      log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、準備の段 ($stage) のプロセスグループを止める"
+      stop_group "$PREP_PID"
+      PREP_PID=""
+      PREP_TIMEOUT=1
+      return 1
+    fi
+  done
+  PREP_PID=""
+  return "$WAITED_RC"
+}
+
+# 手順 6 の段を 1 つ行う。$1 は段の名前、残りは git の引数。通らなければ 1 を返し、上限を越えたためでなければ、
+# 完了の印の error に書く文字列を PREP_ERROR に入れる
+clone_stage() {
+  local stage=$1
+  shift
+  run_prep "$stage" git "$@" && return 0
+  [ "$PREP_TIMEOUT" = 1 ] || PREP_ERROR=$(clone_failed "$stage" "$(cat "$PREP_OUT" 2>/dev/null)")
+  return 1
+}
+
 # 手順 6。作業側のリポジトリを作業場所の tree/ に複製し、依頼の head ($1。作業側で解決した完全な SHA) を detached HEAD で取り出す。
 # 段は、複製 (clone)・remote の設定の削除 (remove remote)・ブランチとリモート追跡ブランチとタグの取り込み (fetch refs)・
-# チェックアウト (checkout)・submodule の項目の検査 (submodule) の順。準備のコマンドの cwd は作業場所にする。
-# 失敗すれば、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+# チェックアウト (checkout)・submodule の項目の検査 (submodule) の順で、どれも準備のコマンドとして起動する (関数 run_prep)。
+# 通らなければ 1 を返す (理由は関数 clone_stage のとおり PREP_TIMEOUT か PREP_ERROR に入る)
 make_clone() {
-  local sha=$1 out subs
-  if ! out=$( { cd "$WS" && git clone -q --shared --no-checkout -- "$CWD_REAL" tree; } 2>&1 ); then
-    clone_failed clone "$out"; return 1
-  fi
+  local sha=$1 subs
+  clone_stage clone clone -q --shared --no-checkout -- "$CWD_REAL" tree || return 1
   # remote の設定を消し、git push origin の行き先 (作業側のリポジトリ) を無くす
-  if ! out=$( { cd "$WS" && git -C tree remote remove origin; } 2>&1 ); then
-    clone_failed "remove remote" "$out"; return 1
-  fi
+  clone_stage "remove remote" -C tree remote remove origin || return 1
   # --no-checkout の直後の HEAD は作業側と同じブランチを指すので、そのブランチも更新できるように --update-head-ok を付ける
-  if ! out=$( { cd "$WS" && git -C tree -c gc.auto=0 -c maintenance.auto=false fetch -q --update-head-ok --no-tags \
-      --no-recurse-submodules "$CWD_REAL" '+refs/heads/*:refs/heads/*' '+refs/remotes/*:refs/remotes/*' \
-      '+refs/tags/*:refs/tags/*'; } 2>&1 ); then
-    clone_failed "fetch refs" "$out"; return 1
-  fi
-  if ! out=$( { cd "$WS" && git -C tree -c advice.detachedHead=false checkout -q --detach "$sha"; } 2>&1 ); then
-    clone_failed checkout "$out"; return 1
-  fi
-  if ! out=$( { cd "$WS" && git -C tree ls-files -s; } 2>&1 ); then
-    clone_failed submodule "$out"; return 1
-  fi
-  subs=$(printf '%s\n' "$out" | grep '^160000 ' | cut -f2 | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
+  clone_stage "fetch refs" -C tree -c gc.auto=0 -c maintenance.auto=false fetch -q --update-head-ok --no-tags \
+    --no-recurse-submodules "$CWD_REAL" '+refs/heads/*:refs/heads/*' '+refs/remotes/*:refs/remotes/*' \
+    '+refs/tags/*:refs/tags/*' || return 1
+  clone_stage checkout -C tree -c advice.detachedHead=false checkout -q --detach "$sha" || return 1
+  clone_stage submodule -C tree ls-files -s || return 1
+  subs=$(grep '^160000 ' "$PREP_OUT" | cut -f2 | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
   if [ -n "$subs" ]; then
-    echo "clone failed (submodule: $subs)"
+    PREP_ERROR="clone failed (submodule: $subs)"
     return 1
   fi
   return 0
@@ -1095,9 +1278,25 @@ PY
 #   3. 作業ツリーの扱いを示す行 (「- 作業ツリーの扱い: <値>」) の値 → 使い捨て
 # 出力先は作業ツリーのパスで始まるので、この順でないと出力先が複製の中のパスになる。元の出力先は、置き場から組み立てたもの
 # (実体が周回の置き場で、名前が review-<識別子>.yaml) でなければならない。置き換えの後に、元の出力先か元の作業ツリーのパスが
-# 残っているか、扱いの行がちょうど 1 つでなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+# 残っているか、扱いの行がちょうど 1 つでなければ通らない。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
+# 通らなければ 1 を返し、上限を越えたためでなければ、完了の印の error に書く文字列を PREP_ERROR に入れる
 make_request_copy() {
-  python3 - "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" <<'PY'
+  local out
+  run_prep "request copy" python3 -c "$(request_copy_py)" "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" \
+    && return 0
+  [ "$PREP_TIMEOUT" = 1 ] && return 1
+  out=$(last_line "$(cat "$PREP_OUT" 2>/dev/null)")
+  case "$out" in
+    "request copy failed ("*) PREP_ERROR=$out ;;
+    *) PREP_ERROR="request copy failed (${out:-理由が分からない})" ;;
+  esac
+  return 1
+}
+
+# 手順 8 の写しを作る python3 のスクリプトを標準出力に出す (python3 -c に渡す)。引数は、依頼文・写し・識別子・周回の置き場の実体パス・
+# 作業側の実体パス・作業場所・複製の順。通らなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+request_copy_py() {
+  cat <<'PY'
 import os, re, sys
 
 request, copy, rid, loop_real, tree_real, workspace, clone = sys.argv[1:8]
@@ -1227,23 +1426,42 @@ PY
 
 # ---- 回の処理の流れ (手順 2〜10) ----
 
-# レビュアの実行を起動しなかった回の印 (依頼文・HEAD・作業ツリーの確認か、作業場所を作れない)
+# レビュアの実行を起動しなかった回の印 (依頼文・HEAD・作業ツリーの確認か、作業場所を作れない)。上限の計測を止めてから書く
 fail_without_run() {
+  stop_watchdog
   write_marker failed "$1" 0
+  note_served "$MARKER_LINE"
   CURRENT_RID=""
+  PHASE=""
   write_worker_yaml idle ""
 }
 
-# 作業場所を作った後の準備 (手順 6〜8) が通らなかった回。回の終わりの処理の 1 と 5 の手順で作業場所を片付けてから、
+# 準備 (手順 5〜8) が通らなかった回。作業場所があれば、回の終わりの処理の 1 と 5 の手順で片付けてから、
 # レビュアの実行を起動せずに failed の印を書く
 fail_prepared() {
-  stop_cwd_procs "$WS"
-  remove_workspace
+  discard_workspace
   fail_without_run "$1"
 }
 
+# 準備の途中で上限を越えた回。レビュアの実行を起動せずに、failed・timeout の印を書く
+fail_timeout_in_preparation() {
+  log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、レビュアの実行を起動しない"
+  fail_prepared timeout
+}
+
+# 手順 6 か 8 が通らなかった回。上限を越えたためなら timeout を、そうでなければ段の失敗 (PREP_ERROR。無ければ $1) を error に書く
+fail_preparation_stage() {
+  if [ "$PREP_TIMEOUT" = 1 ]; then
+    fail_timeout_in_preparation
+  else
+    fail_prepared "${PREP_ERROR:-$1}"
+  fi
+}
+
 # 手順 10。レビュアの実行が終わった (または止めた) 後の処理と印。how は done / timeout / interrupted。
-# 順序は、残ったプロセスを止める → ログを読む → 確かめる → 結果を複写する → 作業場所を消す → 印を書く
+# 順序は、残ったプロセスを止める → ログを読む → 確かめる → 結果を複写する → 作業場所を消す → 印を書く。
+# 関数 run_finish がサブシェルで呼ぶ。この起動で応じた回の一覧の行 (1 行目) と、この起動の間は処理しない依頼文の識別子
+# (2 行目以降) を標準出力に出して、呼び出し元に返す
 REVIEWER_RC=""
 SNAPSHOT_BEFORE=""
 finish_round() {
@@ -1251,7 +1469,7 @@ finish_round() {
   local ws_result="$WS/review-$CURRENT_RID.yaml"
   local dest="$LOOP_DIR/review-$CURRENT_RID.yaml"
   local errors=()
-  local facts head_after full_after full_before dirty clean_after after changed problem line copyable=0
+  local facts head_after full_after full_before dirty clean_after after changed problem line copyable=0 ignored="" n
 
   # 1. 作業場所の中を cwd にしているプロセスが残っていれば止める (後始末の途中で作業場所に書かれないように)。
   # レビュアの実行の終了コード (REVIEWER_RC) は変えない
@@ -1310,10 +1528,9 @@ EOF
   if [ -n "$changed" ]; then
     errors+=("loop dir modified ($changed)")
     # レビュアの実行が置いた依頼文は、この起動の間は処理しない
-    local n
     for n in $(echo "$changed" | tr -d ','); do
       case "$n" in
-        review-request-*.md) n=${n#review-request-}; IGNORED_REQUESTS="$IGNORED_REQUESTS${n%.md} " ;;
+        review-request-*.md) n=${n#review-request-}; ignored="$ignored ${n%.md}" ;;
       esac
     done
   fi
@@ -1326,8 +1543,8 @@ EOF
     fi
   fi
 
-  # 5. 作業場所を消す。消せなくても印の status は変えない (次の回の手順 5 で消す)
-  remove_workspace
+  # 5. 作業場所を消す。消せなくても印の status は変えない (次の回の手順 5 か、次の起動の掃除で消す)
+  remove_workspace "$WS"
 
   # 6. 印を書く
   if [ ${#errors[@]} -eq 0 ]; then
@@ -1337,6 +1554,33 @@ EOF
     for e in "${errors[@]}"; do joined="${joined:+$joined; }$e"; done
     write_marker failed "$joined" 1 "$head_after" "$clean_after" "$REVIEWER_RC"
   fi
+  printf '%s\n' "$MARKER_LINE"
+  for n in $ignored; do printf '%s\n' "$n"; done
+}
+
+# 手順 10 (回の終わりの処理) を行う。how は done / timeout / interrupted。
+# 端末の Ctrl-C のようにワーカーのプロセスグループ全体に届く割り込みで、回の終わりの処理が起動したコマンド (結果の複写や
+# 作業場所の削除) が止まらないように、INT・TERM・HUP を無視するサブシェルで行う (無視はコマンドに引き継がれる)。
+# ワーカー自身は、サブシェルを待つ間に受けた割り込みを控えておき (関数 on_signal)、印を書き終えてから処理する。
+# サブシェルで変えた変数は戻らないので、この起動で応じた回の一覧の行と、処理しない依頼文の識別子を標準出力で受け取る
+run_finish() {
+  local how=$1 out line first=1
+  PHASE=finish
+  out=$(trap '' INT TERM HUP; finish_round "$how")
+  if [ -z "$out" ]; then
+    log "回の終わりの処理が、印を書いたことを知らせずに終わった: $CURRENT_RID"
+    return 0
+  fi
+  while IFS= read -r line; do
+    if [ "$first" = 1 ]; then
+      note_served "$line"
+      first=0
+    elif [ -n "$line" ]; then
+      IGNORED_REQUESTS="$IGNORED_REQUESTS$line "
+    fi
+  done <<EOF
+$out
+EOF
 }
 
 # 手順 9。レビュアの実行を、複製を cwd にして、専用のプロセスグループでバックグラウンドに起動して待つ。
@@ -1365,10 +1609,9 @@ run_reviewer() {
     'Bash(git push:*)'
   )
 
-  TIMED_OUT=0
   (
     cd "$CLONE" || exit 127
-    exec python3 -c 'import os, sys; os.setpgid(0, 0); os.execvp(sys.argv[1], sys.argv[1:])' \
+    exec python3 -c "$SETPGID_PY" \
       claude -p "$prompt" \
       --model "$MODEL" --effort "$EFFORT" --permission-mode "$PERMISSION_MODE" \
       --settings "$SETTINGS_JSON" --strict-mcp-config \
@@ -1378,34 +1621,47 @@ run_reviewer() {
       ${EXTRA_PASS[@]+"${EXTRA_PASS[@]}"}
   ) </dev/null >"$logf" 2>&1 &
   REVIEWER_PID=$!
-  start_watchdog "$REVIEW_TIMEOUT_SECONDS"
-  wait "$REVIEWER_PID"
-  REVIEWER_RC=$?
-  if [ "$TIMED_OUT" = 1 ] && [ "$REVIEWER_RC" -gt 128 ]; then
-    log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、レビュアの実行を止める"
-    stop_reviewer
-    REVIEWER_PID=""
-    stop_watchdog
-    finish_round timeout
-  else
-    REVIEWER_PID=""
-    stop_watchdog
-    finish_round done
-  fi
+  PHASE=review
+  until wait_once "$REVIEWER_PID"; do
+    if timed_out; then
+      # 上限を越えたときは、レビュアの実行のプロセスグループを止めるところから回の終わりの処理 (その間の割り込みは後で処理する)
+      PHASE=finish
+      log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、レビュアの実行を止める"
+      stop_watchdog
+      stop_group "$REVIEWER_PID"
+      REVIEWER_RC=$WAITED_RC
+      REVIEWER_PID=""
+      run_finish timeout
+      return
+    fi
+  done
+  PHASE=finish
+  REVIEWER_RC=$WAITED_RC
+  REVIEWER_PID=""
+  stop_watchdog
+  run_finish done
 }
 
 process_request() {
+  PHASE=prep
   CURRENT_RID=$1
   REQ_STARTED=$(now_iso)
   REQ_STARTED_EPOCH=$(date +%s)
+  REQ_DEADLINE=$(( REQ_STARTED_EPOCH + REVIEW_TIMEOUT_SECONDS ))
   EFFECTIVE="unknown"
   SKILL_CALLED="unknown"
   DENIAL_COUNT="unknown"
   DENIAL_TOOLS="[]"
   REVIEWER_RC=""
+  PREP_TIMEOUT=0
+  PREP_ERROR=""
+  PENDING_CODE=""
+  PREP_OUT="$WS/.prep-output"
+  # 手順 2。上限の計測を始め、worker.yaml を reviewing にして識別子と作業場所のパスを書き、置き場のファイルの一覧と更新時刻を
+  # 控える (回の終わりの処理で比べる。準備の途中に現れた end も検出するため、ここで控える)
+  start_watchdog "$REQ_DEADLINE"
   write_worker_yaml reviewing "$CURRENT_RID"
   log "依頼文を見つけた: $CURRENT_RID"
-  # 手順 2。置き場のファイルの一覧と更新時刻を控える (回の終わりの処理で比べる。準備の途中に現れた end も検出するため、ここで控える)
   SNAPSHOT_BEFORE=$(snapshot)
 
   local req="$LOOP_DIR/review-request-$CURRENT_RID.md"
@@ -1421,6 +1677,7 @@ process_request() {
   if [ -z "$req_head" ]; then fail_without_run "request malformed (no head line)"; return; fi
 
   # 手順 4。作業側の HEAD と作業ツリーを確かめる
+  if timed_out; then fail_timeout_in_preparation; return; fi
   local full_req full_head dirty
   full_req=$(git -C "$CWD_REAL" rev-parse --verify -q "$req_head^{commit}" 2>/dev/null)
   full_head=$(git -C "$CWD_REAL" rev-parse HEAD 2>/dev/null)
@@ -1430,25 +1687,34 @@ process_request() {
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
-  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない
+  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各段の前に確かめる
+  # (手順 6 の各段と手順 8 では、関数 run_prep が起動する前と待つ間に確かめる)
   local problem
+  if timed_out; then fail_timeout_in_preparation; return; fi
   if ! problem=$(prepare_workspace); then
     fail_without_run "${problem:-workspace failed (理由が分からない)}"; return
   fi
-  if ! problem=$(make_clone "$full_req"); then
-    fail_prepared "${problem:-clone failed (理由が分からない)}"; return
+  if ! make_clone "$full_req"; then
+    fail_preparation_stage "clone failed (理由が分からない)"; return
   fi
+  if timed_out; then fail_timeout_in_preparation; return; fi
   if ! problem=$(clone_settings_problem "$CLONE"); then
     [ -n "$problem" ] || problem="clone settings (python3 が理由を出さずに終わった)"
     fail_prepared "$(join_lines "$problem")"; return
   fi
-  if ! problem=$(make_request_copy "$req" "$copy"); then
-    fail_prepared "${problem:-request copy failed (理由が分からない)}"; return
+  if ! make_request_copy "$req" "$copy"; then
+    fail_preparation_stage "request copy failed (理由が分からない)"; return
   fi
+  rm -f "$PREP_OUT"
 
+  # 手順 9。準備の段の合間に上限を越えていれば、レビュアの実行を起動しない
+  if timed_out; then fail_timeout_in_preparation; return; fi
   log "レビュアの実行を起動する: claude -p --model $MODEL --effort $EFFORT --permission-mode $PERMISSION_MODE (cwd: ${CLONE}、上限 $REVIEW_TIMEOUT_MINUTES 分)"
   run_reviewer "$copy" "$logf"
+  # 回の終わりの処理の途中に割り込みを受けていれば、印を書き終えたので、ここで終わる
+  if [ -n "$PENDING_CODE" ]; then leave "$PENDING_CODE"; fi
   CURRENT_RID=""
+  PHASE=""
   write_worker_yaml idle ""
 }
 
@@ -1474,6 +1740,8 @@ while :; do
   if [ -e "$LOOP_DIR/end" ]; then
     FINISHING=1
     trap '' INT TERM HUP
+    # 周回の作業場所が残っていれば消す (消せなかった回の作業場所など)
+    discard_workspace
     cleanup
     write_worker_yaml left ""
     log "end を見たので終わる"

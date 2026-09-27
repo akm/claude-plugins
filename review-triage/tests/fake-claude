@@ -9,7 +9,7 @@
   FAKE_CLAUDE_REVS の各名前を `git rev-parse` で解決した SHA (解決できなければ null)・
   受けた `--settings` の値を JSON として読んだものの列・プロンプトが指す依頼文 (写し) の中身
 - FAKE_CLAUDE_REVS: 記録で解決する名前を空白で区切って並べたもの (既定 main)
-- FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang と leave_child のとき)
+- FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang・hang_leave_child・leave_child のとき)
 - FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行
 - FAKE_CLAUDE_SLEEP: 結果を書く前に待つ秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
@@ -38,6 +38,8 @@
     result_dir            結果をディレクトリにする
     result_large          結果を、ワーカーの上限 (1 MiB) を越える大きさで書く
     hang                  子プロセスを起動して終わらない
+    hang_leave_child      子プロセスを 2 つ (同じプロセスグループのものと、別のプロセスグループ (新しいセッション) のもの。
+                          どちらも cwd は複製) 起動し、0.2 秒おきに標準出力に {"type": "fake_tick"} の行を書いて終わらない
 
 プロンプトの「依頼文 <パス> のとおりに」から依頼文 (ワーカーが作業場所に作った写し) を見つけ、
 その「出力先: `<パス>`」の行から結果の書き先を読む。
@@ -183,6 +185,15 @@ def main():
         write_pids(os.getpid(), child.pid)
         while True:
             time.sleep(1)
+    if mode == "hang_leave_child":
+        child = subprocess.Popen(["sleep", "1000"])
+        detached = subprocess.Popen(["sleep", "1000"], cwd=os.getcwd(), start_new_session=True,
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL)
+        write_pids(os.getpid(), child.pid, detached.pid)
+        while True:
+            print(json.dumps({"type": "fake_tick"}), flush=True)
+            time.sleep(0.2)
 
     time.sleep(float(os.environ.get("FAKE_CLAUDE_SLEEP", "0")))
 

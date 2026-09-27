@@ -21,6 +21,7 @@ uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で
 置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
 """
 
+import hashlib
 import json
 import os
 import re
@@ -42,9 +43,11 @@ _TEMPLATE = os.path.join(_HERE, "..", "skills", "review-triage", "references", "
 
 # 偽の git。テストが PATH の先頭の bin/ に git の名前で書き、FAKE_GIT_REAL の本物の git に引数をそのまま渡す。
 # サブコマンド (-C <ディレクトリ>・-c <設定> と、- で始まる引数を飛ばした最初の引数) が
-# FAKE_GIT_TOUCH_ON と同じならファイル FAKE_GIT_TOUCH を作り、FAKE_GIT_FAIL と同じなら本物を呼ばずに失敗する
+# FAKE_GIT_TOUCH_ON と同じならファイル FAKE_GIT_TOUCH を作り、
+# FAKE_GIT_SLEEP_ON と同じなら自分の PID をファイル FAKE_GIT_PIDS に書き足してから FAKE_GIT_SLEEP 秒 (既定 1000) 待ち、
+# FAKE_GIT_FAIL と同じなら本物を呼ばずに失敗する
 _FAKE_GIT = """#!/usr/bin/env python3
-import os, sys
+import os, sys, time
 
 args = sys.argv[1:]
 i = 0
@@ -58,11 +61,34 @@ while i < len(args):
 sub = args[i] if i < len(args) else ""
 if sub and sub == os.environ.get("FAKE_GIT_TOUCH_ON"):
     open(os.environ["FAKE_GIT_TOUCH"], "w").close()
+if sub and sub == os.environ.get("FAKE_GIT_SLEEP_ON"):
+    if os.environ.get("FAKE_GIT_PIDS"):
+        with open(os.environ["FAKE_GIT_PIDS"], "a", encoding="utf-8") as f:
+            f.write(str(os.getpid()) + " ")
+    time.sleep(float(os.environ.get("FAKE_GIT_SLEEP", "1000")))
 if sub and sub == os.environ.get("FAKE_GIT_FAIL"):
     print(f"fatal: 偽の git が {sub} を失敗させた", file=sys.stderr)
     sys.exit(128)
 real = os.environ["FAKE_GIT_REAL"]
 os.execv(real, [real] + args)
+"""
+
+# 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを走らせている python) に
+# 引数をそのまま渡す。標準入力から読むスクリプト (python3 - <引数>...) が文字列 FAKE_PY_SLEEP_MARK を含めば、
+# ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待ち、そのあとスクリプトを実行する。
+# ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う
+_FAKE_PYTHON = """#!/bin/sh
+if [ "$1" = "-" ] && [ -n "${FAKE_PY_SLEEP_MARK:-}" ]; then
+  shift
+  script=$(cat)
+  case "$script" in
+    *"$FAKE_PY_SLEEP_MARK"*)
+      if [ -n "${FAKE_PY_TOUCH:-}" ]; then : >"$FAKE_PY_TOUCH"; fi
+      sleep "${FAKE_PY_SLEEP:-1000}" ;;
+  esac
+  exec "$FAKE_PY_REAL" -c "$script" "$@"
+fi
+exec "$FAKE_PY_REAL" "$@"
 """
 
 # サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側と周回の置き場がこの下にあると起動しない
@@ -160,6 +186,13 @@ def _read_pids(path):
         return [int(x) for x in f.read().split()]
 
 
+def _workspace_path(tmpdir, loop):
+    """ワーカーが周回の置き場 loop のために TMPDIR (tmpdir) の下に作る作業場所のパス (worker.md の「回の処理」の手順 5)。"""
+    loop_real = os.path.realpath(loop)
+    digest = hashlib.sha256(loop_real.encode("utf-8")).hexdigest()[:8]
+    return os.path.join(os.path.realpath(tmpdir), f"review-loop-{os.path.basename(loop_real)}-{digest}")
+
+
 def _pid_alive(pid):
     out = subprocess.run(
         ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True
@@ -224,6 +257,7 @@ class WorkerTestBase(unittest.TestCase):
         self.args_file = os.path.join(root, "claude-args.jsonl")
         self.record_file = os.path.join(root, "claude-record.jsonl")
         self.pids_file = os.path.join(root, "claude-pids")
+        self.git_pids_file = os.path.join(root, "git-pids")
         self.env = dict(os.environ)
         self.env["PATH"] = self.bin + os.pathsep + self.env.get("PATH", "")
         self.env["HOME"] = self.home
@@ -236,6 +270,7 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_CLAUDE_REPO"] = self.repo
         self.env["FAKE_CLAUDE_LOOP"] = self.loop
         self.procs = []
+        self.sleepers = []
 
     def tearDown(self):
         for p in self.procs:
@@ -245,8 +280,14 @@ class WorkerTestBase(unittest.TestCase):
                 except ProcessLookupError:
                     pass
                 p.communicate()
-        if os.path.exists(self.pids_file):
-            for pid in _read_pids(self.pids_file):
+        for p in self.sleepers:
+            if p.poll() is None:
+                p.kill()
+                p.wait()
+        for path in (self.pids_file, self.git_pids_file):
+            if not os.path.exists(path):
+                continue
+            for pid in _read_pids(path):
                 try:
                     os.killpg(int(pid), signal.SIGKILL)
                 except (ProcessLookupError, PermissionError):
@@ -308,7 +349,7 @@ class WorkerTestBase(unittest.TestCase):
                 shutil.rmtree(p)
             else:
                 os.remove(p)
-        for f in (self.args_file, self.record_file, self.pids_file):
+        for f in (self.args_file, self.record_file, self.pids_file, self.git_pids_file):
             if os.path.exists(f):
                 os.remove(f)
 
@@ -319,6 +360,46 @@ class WorkerTestBase(unittest.TestCase):
             f.write(_FAKE_GIT)
         os.chmod(path, 0o755)
         self.env["FAKE_GIT_REAL"] = shutil.which("git")
+
+    def delay_git(self, sub):
+        """偽の git を置き、サブコマンド sub を終わらせないようにする (PID は self.git_pids_file に書かれる)。"""
+        self.install_fake_git()
+        self.env["FAKE_GIT_SLEEP_ON"] = sub
+        self.env["FAKE_GIT_SLEEP"] = "1000"
+        self.env["FAKE_GIT_PIDS"] = self.git_pids_file
+
+    def delay_python(self, mark, seconds, touch):
+        """PATH の先頭の bin/ の python3 を偽の python3 (_FAKE_PYTHON) に替え、標準入力から読むスクリプトが mark を含むものを
+        seconds 秒遅らせる。遅らせ始めたときにファイル touch を作る。"""
+        path = os.path.join(self.bin, "python3")
+        os.remove(path)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(_FAKE_PYTHON)
+        os.chmod(path, 0o755)
+        self.env["FAKE_PY_REAL"] = sys.executable
+        self.env["FAKE_PY_SLEEP_MARK"] = mark
+        self.env["FAKE_PY_SLEEP"] = str(seconds)
+        self.env["FAKE_PY_TOUCH"] = touch
+
+    def ws_path(self):
+        """この周回の作業場所のパス。"""
+        return _workspace_path(self.tmpdir, self.loop)
+
+    def spawn_sleeper(self, cwd, *args):
+        """cwd を作業ディレクトリにして、別のセッションで待ち続けるプロセスを起動する。args は起動引数に足すだけで使わない。"""
+        p = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(1000)", *args], cwd=cwd, start_new_session=True,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        self.sleepers.append(p)
+        return p
+
+    def write_dead_worker_yaml(self, workspace):
+        """kill -9 で消えたレビュー中のワーカーが残した形の worker.yaml を書く (pid は終わったプロセスのもの)。"""
+        dead = subprocess.Popen(["true"])
+        dead.wait()
+        with open(self.path("worker.yaml"), "w", encoding="utf-8") as f:
+            f.write(f'state: reviewing\ncurrent_request: "{RID}"\nworkspace: {json.dumps(workspace)}\npid: {dead.pid}\n')
 
     def put_stream(self, lines):
         p = os.path.join(os.path.dirname(self.args_file), "stream.jsonl")
@@ -395,6 +476,16 @@ class WorkerTestBase(unittest.TestCase):
         self.wait_for(lambda: os.path.exists(p), timeout=timeout, what=f"完了の印 {rid}")
         return _read_yaml(p)
 
+    def wait_pids(self, path, count):
+        """ファイル path に PID が count 個以上書かれるのを待って、その列を返す。"""
+        def ready():
+            try:
+                pids = _read_pids(path)
+            except (OSError, ValueError):
+                return None
+            return pids if len(pids) >= count else None
+        return self.wait_for(ready, what=f"{path} に PID が {count} 個書かれること")
+
     def finish(self, p, sig=signal.SIGTERM, timeout=20):
         p.send_signal(sig)
         out, err = p.communicate(timeout=timeout)
@@ -452,13 +543,17 @@ class TestHappyPath(WorkerTestBase):
         p = self.start()
         idle = self.wait_state("idle")
         self.assertEqual(idle["current_request"], "")
+        self.assertEqual(idle["workspace"], "")
         self.assert_contract("## `worker.yaml`", idle)
         head = self.head()
         self.put_request()
         reviewing = self.wait_state("reviewing", timeout=10)
         self.assertEqual(reviewing["current_request"], RID)
+        # レビュー中の worker.yaml には、起動し直したワーカーが片付けられるように、その回の作業場所のパスがある
+        self.assertEqual(reviewing["workspace"], self.ws_path())
+        self.assert_contract("## `worker.yaml`", reviewing)
         marker = self.wait_marker()
-        self.wait_state("idle")
+        self.assertEqual(self.wait_state("idle")["workspace"], "")
 
         self.assertEqual(marker["status"], "ok", marker)
         self.assertEqual(marker["id"], RID)
@@ -1463,7 +1558,7 @@ class TestEnding(WorkerTestBase):
         self.finish(p)
 
     def test_interrupt_while_reviewing(self):
-        # AE16: 割り込みを受けたら、レビュアの実行とその子を止めて failed の印と left を書く
+        # AE16: 割り込みを受けたら、レビュアの実行とその子を止めて failed の印と left を書く。作業場所は残らない
         for sig, code in ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129)):
             with self.subTest(sig=sig.name):
                 for n in os.listdir(self.loop):
@@ -1487,6 +1582,8 @@ class TestEnding(WorkerTestBase):
                 self.assertEqual(marker["status"], "failed")
                 self.assertEqual(marker["error"], "interrupted")
                 self.assertEqual(self.worker_state()["state"], "left")
+                self.assertEqual(self.worker_state()["workspace"], "")
+                self.assertEqual(self.workspaces(), [])
                 for pid in pids:
                     self.wait_for(lambda: not _pid_alive(pid), timeout=3, what=f"プロセス {pid} の終了")
                 self.wait_for(lambda: not _group_alive(p.pid), timeout=3,
@@ -1518,6 +1615,248 @@ class TestEnding(WorkerTestBase):
         m2 = os.stat(self.path("worker.yaml")).st_mtime
         self.assertEqual(m1, m2)
         self.assertFalse(_group_alive(p.pid))
+
+
+class TestTimeoutDuringPreparation(WorkerTestBase):
+    """上限は、依頼文を受け取ってからレビュアの実行が終わるまでを測る (worker.md の「回の処理」)。
+    準備 (作業場所・複製・複製の設定・写し) の途中で越えた回は、レビュアの実行を起動しない (計画の AE8)。"""
+
+    def assert_timeout_without_run(self, p):
+        marker = self.wait_marker(timeout=30)
+        self.wait_state("idle")
+        self.finish(p)
+        self.assertEqual(marker["status"], "failed", marker)
+        self.assertEqual(marker["error"], "timeout")
+        self.assertEqual(self.claude_calls(), [])
+        for key in ("head_after", "tree_clean_after", "exit_code", "log"):
+            self.assertNotIn(key, marker)
+        self.assertEqual(self.workspaces(), [])
+        self.assert_contract("## `delivered-<識別子>.yaml`", marker)
+        return marker
+
+    def test_timeout_while_cloning(self):
+        # 複製の作成 (偽の git の clone) が終わらないと、上限で偽の git のプロセスグループを止め、failed・timeout の印を書く
+        self.delay_git("clone")
+        self.put_request()
+        p = self.start("--review-timeout-minutes", "0.05")
+        self.assert_timeout_without_run(p)
+        for pid in _read_pids(self.git_pids_file):
+            self.wait_for(lambda: not _pid_alive(pid), timeout=5, what=f"偽の git {pid} の終了")
+
+    def test_timeout_just_before_request_copy(self):
+        # 複製の設定の確認 (手順 7) を遅らせて、写しの作成 (手順 8) の直前に上限を越えさせる。
+        # 準備の段の合間に越えても、次の段の前かレビュアの実行を起動する前に確かめるので、偽の claude は呼ばれない
+        touch = os.path.join(self.root, "delay-started")
+        self.delay_python("settings.local.json", 5, touch)
+        self.put_request()
+        p = self.start("--review-timeout-minutes", "0.05")
+        self.assert_timeout_without_run(p)
+        self.assertTrue(os.path.exists(touch), "複製の設定の確認を遅らせていない")
+
+
+class TestInterruptPhases(WorkerTestBase):
+    """割り込みを受けた時点ごとの扱い (worker.md の「終わり方」。計画の AE9)。レビュアの実行中の扱いは
+    TestEnding.test_interrupt_while_reviewing で確かめる。シグナルは、端末の Ctrl-C と同じくワーカーのプロセスグループに送る。"""
+
+    SIGNALS = ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129))
+
+    def test_interrupt_during_preparation(self):
+        # 準備の途中 (偽の git の clone が終わらない間) に割り込みを受けると、準備のプロセスグループを止め、作業場所を消し、
+        # 印を書かずに left で終わる。起動し直したワーカーが、印の無い同じ依頼文を処理する
+        for sig, code in self.SIGNALS:
+            with self.subTest(sig=sig.name):
+                self.reset_loop()
+                self.delay_git("clone")
+                self.put_request()
+                p = self.start()
+                git_pid = self.wait_pids(self.git_pids_file, 1)[0]
+                os.killpg(p.pid, sig)
+                p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code)
+                self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")))
+                state = self.worker_state()
+                self.assertEqual(state["state"], "left")
+                self.assertEqual(state["workspace"], "")
+                self.assertEqual(self.workspaces(), [])
+                self.assertEqual(self.claude_calls(), [])
+                self.wait_for(lambda: not _pid_alive(git_pid), timeout=5, what=f"偽の git {git_pid} の終了")
+                self.wait_for(lambda: not _group_alive(p.pid), timeout=3, what="ワーカーのプロセスグループが空になる")
+        del self.env["FAKE_GIT_SLEEP_ON"]
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_interrupt_during_finish(self):
+        # 回の終わりの処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
+        # 書き終えてから left で終わる。割り込みは回の終わりの処理が起動したコマンド (遅らせた複写) にも届くが、それで止まらない
+        touch = os.path.join(self.root, "delay-started")
+        self.delay_python("after the rename", 3, touch)
+        for sig, code in self.SIGNALS:
+            with self.subTest(sig=sig.name):
+                self.reset_loop()
+                if os.path.exists(touch):
+                    os.remove(touch)
+                self.put_request()
+                p = self.start()
+                self.wait_for(lambda: os.path.exists(touch), what="結果の複写の開始")
+                os.killpg(p.pid, sig)
+                out, _ = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code)
+                marker = _read_yaml(self.path(f"delivered-{RID}.yaml"))
+                self.assertEqual(marker["status"], "ok", marker)
+                self.assertNotIn("error", marker)
+                self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")))
+                state = self.worker_state()
+                self.assertEqual(state["state"], "left")
+                self.assertEqual(state["rounds_served"], 1)
+                self.assertIn(RID, out)
+                self.assertEqual(self.workspaces(), [])
+
+
+class TestRestartCleanup(WorkerTestBase):
+    """起動し直したときの掃除 (worker.md の「起動時の確認」の 2 と「終わり方」の kill -9。計画の AE10)。"""
+
+    def kill9(self, p):
+        os.kill(p.pid, signal.SIGKILL)
+        p.communicate(timeout=30)
+
+    def assert_cleaned_before_pickup(self, err):
+        """起動し直したワーカーの出力で、前の作業場所に残ったプロセスを止めたことが、依頼文を見つけたことより先にある。"""
+        stopped = err.find("SIGTERM を送る")
+        picked = err.find("依頼文を見つけた")
+        self.assertNotEqual(stopped, -1, err)
+        self.assertNotEqual(picked, -1, err)
+        self.assertLess(stopped, picked, err)
+
+    def test_sigkill_while_reviewing_then_restart(self):
+        # レビュアの実行中にワーカーを SIGKILL で消すと、偽の claude と、その子と、別のプロセスグループで動く子が残る。
+        # 同じコマンドで起動し直すと、それらを止めて前の作業場所を消してから、同じ依頼文を処理する。新しいログに前の実行の行は混ざらない
+        self.env["FAKE_CLAUDE_MODE"] = "hang_leave_child"
+        self.put_request()
+        p = self.start()
+        state = self.wait_state("reviewing")
+        self.assertEqual(state["workspace"], self.ws_path())
+        pids = self.wait_pids(self.pids_file, 3)
+        self.kill9(p)
+        for pid in pids:
+            self.assertTrue(_pid_alive(pid), f"SIGKILL の後に {pid} が残っていない (テストの前提が崩れている)")
+        self.assertTrue(os.path.isdir(self.ws_path()))
+
+        self.env["FAKE_CLAUDE_MODE"] = "ok"
+        p = self.start()
+        marker = self.wait_marker()
+        self.wait_state("idle")
+        _, _, err = self.finish(p)
+        self.assertEqual(marker["status"], "ok", marker)
+        for pid in pids:
+            self.wait_for(lambda: not _pid_alive(pid), timeout=3, what=f"前の実行が残したプロセス {pid} の終了")
+        self.assertEqual(self.workspaces(), [])
+        with open(self.path(f"{RID}.log"), encoding="utf-8", errors="replace") as f:
+            self.assertNotIn("fake_tick", f.read())
+        self.assert_cleaned_before_pickup(err)
+
+    def test_sigkill_while_preparing_then_restart(self):
+        # 準備の途中 (偽の git の clone が終わらない間) にワーカーを SIGKILL で消すと、偽の git が残る。
+        # 起動し直すと、それを止めて前の作業場所を消してから、同じ依頼文を処理する
+        self.delay_git("clone")
+        self.put_request()
+        p = self.start()
+        git_pid = self.wait_pids(self.git_pids_file, 1)[0]
+        self.assertEqual(self.worker_state()["workspace"], self.ws_path())
+        self.kill9(p)
+        self.assertTrue(_pid_alive(git_pid), "SIGKILL の後に偽の git が残っていない (テストの前提が崩れている)")
+
+        del self.env["FAKE_GIT_SLEEP_ON"]
+        p = self.start()
+        marker = self.wait_marker()
+        self.wait_state("idle")
+        _, _, err = self.finish(p)
+        self.assertEqual(marker["status"], "ok", marker)
+        self.wait_for(lambda: not _pid_alive(git_pid), timeout=3, what=f"前の偽の git {git_pid} の終了")
+        self.assertEqual(self.workspaces(), [])
+        self.assert_cleaned_before_pickup(err)
+
+    def test_processes_outside_workspace_are_not_stopped(self):
+        # 作業場所の外を cwd にしているプロセスは、起動引数に作業場所のパスがあっても止めない。中を cwd にしているものは止める
+        ws = self.ws_path()
+        os.makedirs(os.path.join(ws, "tree"))
+        inside = self.spawn_sleeper(os.path.join(ws, "tree"))
+        outside = self.spawn_sleeper(self.root, ws)
+        self.write_dead_worker_yaml(ws)
+        self.start_idle()
+        self.wait_for(lambda: inside.poll() is not None, timeout=3, what="作業場所の中のプロセスの終了")
+        self.assertIsNone(outside.poll())
+        self.assertFalse(os.path.lexists(ws))
+
+    def test_cleanup_even_when_unavailable(self):
+        # 置き場に end がある状態や、ほかの確認で unavailable になる起動でも、残ったプロセスと作業場所を片付けてから止まる。
+        # worker.yaml が無ければ (作業場所のパスが記録されていなければ)、決まったパスを片付ける
+        cases = (
+            ("end がある", True, {}, "end"),
+            ("macOS でない・worker.yaml が無い", False, {"FAKE_UNAME_S": "Linux"}, "macOS"),
+        )
+        for label, recorded, extra_env, contains in cases:
+            with self.subTest(label):
+                self.reset_loop()
+                ws = self.ws_path()
+                os.makedirs(os.path.join(ws, "tree"))
+                inside = self.spawn_sleeper(os.path.join(ws, "tree"))
+                if recorded:
+                    self.write_dead_worker_yaml(ws)
+                if contains == "end":
+                    open(self.path("end"), "w").close()
+                p = self.start(env=dict(self.env, **extra_env))
+                _, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, 2, err)
+                state = self.worker_state()
+                self.assertEqual(state["state"], "unavailable", state)
+                self.assertIn(contains, state["error"])
+                self.wait_for(lambda: inside.poll() is not None, timeout=3, what="作業場所の中のプロセスの終了")
+                self.assertFalse(os.path.lexists(ws))
+
+    def test_cleanup_only_workspace_shaped_directories(self):
+        # worker.yaml の workspace が、作業場所の名前の形に合わないディレクトリや、シンボリックリンクを指すときは、
+        # 中を cwd にしているプロセスを止めず、何も消さない
+        victim = os.path.join(self.root, "victim")
+        os.makedirs(victim)
+        keep = os.path.join(victim, "keep.txt")
+        with open(keep, "w", encoding="utf-8") as f:
+            f.write("消してはいけない\n")
+        inside = self.spawn_sleeper(victim)
+        ws = self.ws_path()
+        os.symlink(victim, ws)
+        for label, recorded in (("名前の形に合わない", victim), ("シンボリックリンク", ws)):
+            with self.subTest(label):
+                self.write_dead_worker_yaml(recorded)
+                self.start_idle()
+                self.assertTrue(os.path.exists(keep))
+                self.assertIsNone(inside.poll())
+                self.assertTrue(os.path.islink(ws))
+
+    def test_end_removes_workspace(self):
+        # end を見て終わるとき、周回の作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
+        target = os.path.join(self.root, "link-target")
+        os.makedirs(target)
+        keep = os.path.join(target, "keep.txt")
+        with open(keep, "w", encoding="utf-8") as f:
+            f.write("消してはいけない\n")
+        for label in ("ディレクトリ", "シンボリックリンク"):
+            with self.subTest(label):
+                self.reset_loop()
+                p = self.start()
+                self.wait_state("idle")
+                ws = self.ws_path()
+                if label == "ディレクトリ":
+                    os.makedirs(os.path.join(ws, "tree", "sub"))
+                    with open(os.path.join(ws, "tree", "sub", "f.txt"), "w", encoding="utf-8") as f:
+                        f.write("x\n")
+                else:
+                    os.symlink(target, ws)
+                open(self.path("end"), "w").close()
+                p.communicate(timeout=30)
+                self.assertEqual(p.returncode, 0)
+                self.assertEqual(self.worker_state()["state"], "left")
+                self.assertFalse(os.path.lexists(ws))
+                self.assertTrue(os.path.exists(keep))
 
 
 if __name__ == "__main__":
