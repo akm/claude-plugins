@@ -838,10 +838,22 @@ start_heartbeat() {
   HEARTBEAT_PID=$!
 }
 
+# バックグラウンドの処理 (PID $1。更新時刻を進める処理か上限を測る処理) に TERM を送り、プロセスが残っている間だけ終わりを待つ。
+# 残っていなければ wait しない (正本は worker.md の「終わり方」)。これらの処理はワーカーと同じプロセスグループで動くので、
+# プロセスグループに届いた HUP ではすぐに (trap が無い)、TERM では自分の trap で、ワーカーと同時に終わる (INT は、バックグラウンドの
+# コマンドなので無視する)。bash 5 (Linux の 5.2 で確かめた) は、trap を設定したシグナルで wait を途中で抜けるとき、その wait の中で
+# 回収した子の終わりを記録しないことがあるので、準備のコマンドやレビュアの実行を待つ wait が、同時に終わったこれらの処理を
+# 回収したまま抜けることがある。終わりを記録しなかった子を wait すると、ほかの子がすべて終わるまで戻らない — まだ止めていない
+# 準備のコマンドやレビュアの実行が残っていれば、ワーカーが終わらない
+stop_background() {
+  kill -TERM "$1" 2>/dev/null
+  kill -0 "$1" 2>/dev/null || return 0
+  wait "$1" 2>/dev/null
+}
+
 stop_heartbeat() {
   if [ -n "$HEARTBEAT_PID" ]; then
-    kill -TERM "$HEARTBEAT_PID" 2>/dev/null
-    wait "$HEARTBEAT_PID" 2>/dev/null
+    stop_background "$HEARTBEAT_PID"
     HEARTBEAT_PID=""
   fi
 }
@@ -872,8 +884,7 @@ start_watchdog() {
 
 stop_watchdog() {
   if [ -n "$WATCHDOG_PID" ]; then
-    kill -TERM "$WATCHDOG_PID" 2>/dev/null
-    wait "$WATCHDOG_PID" 2>/dev/null
+    stop_background "$WATCHDOG_PID"
     WATCHDOG_PID=""
   fi
 }
