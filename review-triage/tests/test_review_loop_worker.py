@@ -358,6 +358,9 @@ class WorkerTestBase(unittest.TestCase):
         self.env["TMPDIR"] = self.tmpdir
         for k in [k for k in self.env if k.startswith(("FAKE_CLAUDE_", "FAKE_GIT_"))] + ["FAKE_UNAME_S"]:
             self.env.pop(k, None)
+        # この端末で環境変数 CLAUDE_CONFIG_DIR が設定されていると、既存のテストが self.home/.claude/settings.json
+        # ではなくそちらを見てしまう。テストがワーカーに渡す環境からは、明示的に指定しない限り外す
+        self.env.pop("CLAUDE_CONFIG_DIR", None)
         self.env["FAKE_CLAUDE_ARGS"] = self.args_file
         self.env["FAKE_CLAUDE_RECORD"] = self.record_file
         self.env["FAKE_CLAUDE_PIDS"] = self.pids_file
@@ -522,9 +525,10 @@ class WorkerTestBase(unittest.TestCase):
                 f.write((line if isinstance(line, str) else json.dumps(line)) + "\n")
         self.env["FAKE_CLAUDE_STREAM"] = p
 
-    def write_user_settings(self, content):
-        """ワーカーの HOME の .claude/settings.json (利用者の設定) を書く。content が文字列ならそのまま書く。"""
-        d = os.path.join(self.home, ".claude")
+    def write_user_settings(self, content, config_dir=None):
+        """利用者の設定 settings.json を書く。config_dir を省略すると HOME/.claude、指定するとそのディレクトリの直下
+        (環境変数 CLAUDE_CONFIG_DIR を指定したときの置き場)。content が文字列ならそのまま書く。"""
+        d = config_dir if config_dir is not None else os.path.join(self.home, ".claude")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "settings.json"), "w", encoding="utf-8") as f:
             f.write(content if isinstance(content, str) else json.dumps(content))
@@ -1937,6 +1941,40 @@ class TestSandboxStartChecks(WorkerTestBase):
             with self.subTest(label):
                 self.write_user_settings(content)
                 self.start_idle()
+
+    def test_user_settings_follows_claude_config_dir(self):
+        # AE11: CLAUDE_CONFIG_DIR があれば、利用者の設定は $HOME/.claude/settings.json ではなく
+        # その下の settings.json (Claude Code 本体と同じ決め方)
+        config_dir = os.path.join(self.root, "config-dir")
+        self.write_user_settings({"sandbox": {"excludedCommands": ["docker"]}}, config_dir=config_dir)
+        # $HOME/.claude/settings.json には無い (対比のため明示的に書く)
+        self.write_user_settings({"permissions": {"allow": ["Read"]}})
+        env = dict(self.env, CLAUDE_CONFIG_DIR=config_dir)
+        self.start_unavailable(env=env, contains=["利用者の設定", os.path.join(config_dir, "settings.json"),
+                                                   "sandbox.excludedCommands"])
+
+    def test_user_settings_ignores_home_when_claude_config_dir_set(self):
+        # 逆に $HOME/.claude/settings.json にだけ sandbox.excludedCommands があり、CLAUDE_CONFIG_DIR の下には
+        # 無ければ起動する (実際に使われるのは CLAUDE_CONFIG_DIR の下)
+        config_dir = os.path.join(self.root, "config-dir")
+        self.write_user_settings({"permissions": {"allow": ["Read"]}}, config_dir=config_dir)
+        self.write_user_settings({"sandbox": {"excludedCommands": ["docker"]}})
+        env = dict(self.env, CLAUDE_CONFIG_DIR=config_dir)
+        self.start_idle(env=env)
+
+    def test_webfetch_domains_follows_claude_config_dir(self):
+        # AE17 も CLAUDE_CONFIG_DIR の下の settings.json を見る (起動時の確認の 15)
+        config_dir = os.path.join(self.root, "config-dir")
+        self.write_user_settings({"permissions": {"allow": ["WebFetch(domain:example.com)"]}}, config_dir=config_dir)
+        env = dict(self.env, CLAUDE_CONFIG_DIR=config_dir)
+        out, _ = self.start_idle(env=env)
+        self.assertIn("example.com", out)
+
+    def test_claude_config_dir_must_be_absolute(self):
+        # CLAUDE_CONFIG_DIR が相対パスだと、Claude Code 本体はレビュアの実行の cwd (複製) から解決するので、
+        # ワーカーは同じファイルを確かめられず起動しない
+        env = dict(self.env, CLAUDE_CONFIG_DIR="relative/config-dir")
+        self.start_unavailable(env=env, contains=["CLAUDE_CONFIG_DIR", "絶対パス"])
 
 
 class TestNetworkNotice(WorkerTestBase):

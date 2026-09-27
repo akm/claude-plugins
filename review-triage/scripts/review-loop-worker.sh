@@ -22,7 +22,8 @@
 # 振る舞いの正本は review-triage/skills/review-loop/references/worker.md (起動時の確認・回の処理・
 # 権限の既定・ログの読み方)、置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
 # プラグインの設定ファイル (config.json) は読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める。
-# Claude Code の利用者の設定 (~/.claude/settings.json) は読むが、使うのは起動時の確認と表示だけ。
+# Claude Code の利用者の設定 (環境変数 CLAUDE_CONFIG_DIR があればその下、無ければ ~/.claude の settings.json) は
+# 読むが、使うのは起動時の確認と表示だけ。
 #
 # macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確かめたため)。
 # bash は macOS の /bin/bash (3.2) で動くように書く。テストは CI (ubuntu) でも偽の uname で走らせるので、
@@ -830,8 +831,19 @@ while [ "$i" -lt ${#EXTRA_ARGS[@]} ]; do
   esac
 done
 
-# 14. 利用者の設定が、コマンドをサンドボックスの外で実行させないか。レビュー対象のブランチの設定は、回ごとに複製で確かめる
-USER_SETTINGS="$HOME/.claude/settings.json"
+# 14. 利用者の設定が、コマンドをサンドボックスの外で実行させないか。レビュー対象のブランチの設定は、回ごとに複製で確かめる。
+# 利用者の設定の置き場は、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
+# 無ければ $HOME/.claude。CLAUDE_CONFIG_DIR が相対パスだと、レビュアの実行 (複製の中の cwd) からの解決先が
+# ワーカーの cwd (作業側) からの解決先と食い違い、ワーカーが実際に使われる設定を確かめられない
+if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
+  case "$CLAUDE_CONFIG_DIR" in
+    /*) CONFIG_DIR="$CLAUDE_CONFIG_DIR" ;;
+    *) unavailable "環境変数 CLAUDE_CONFIG_DIR が相対パス ($CLAUDE_CONFIG_DIR)。レビュアの実行はこれを自分の cwd (複製) から解決するので、ワーカーが同じファイルを確かめられない。絶対パスにしてから起動し直す" ;;
+  esac
+else
+  CONFIG_DIR="$HOME/.claude"
+fi
+USER_SETTINGS="$CONFIG_DIR/settings.json"
 if ! problem=$(user_settings_problem "$USER_SETTINGS"); then
   [ -n "$problem" ] || problem="利用者の設定 $USER_SETTINGS を検査できない"
   unavailable "$problem"
