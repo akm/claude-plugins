@@ -73,7 +73,7 @@ rejected: []
 | `worker.effort` | ◯ | ワーカーの effort (`review_loop.worker_effort`) |
 | `worker.permission_mode` | ◯ | `review_loop.permission_mode` |
 | `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の列は「ワーカーの既定の一覧を使う」 |
-| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。周回の条件ではなく環境の値で、`--resume` のたびに設定から読み直して書き換える ([arguments.md](arguments.md) の「様式」)。0.13.0 で始めた周回には無く、無ければ空の列として扱う |
+| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。`--resume` での読み直しと、キーが無いときの扱いの正本は [arguments.md](arguments.md) の「様式」 |
 | `worker.sandbox_allowed_domains` | | `review_loop.sandbox_allowed_domains`。扱いは `worker.sandbox_allow_write` と同じ |
 | `worker.idle_minutes` | ◯ | `review_loop.worker_idle_minutes` |
 | `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |
@@ -159,7 +159,7 @@ stateDiagram-v2
 
 ワーカーが回ごとに書く完了の印。**印が現れたことが「ワーカーがこの回を終えた」ことを表し、`status` がその回を使えるかを表す。** 突き合わせ (作業側が印と結果を依頼文と比べること) の順序の正本は [round.md](round.md) の RL1 の手順 c。
 
-**`status` が `ok` の印があれば、置き場に結果が通常のファイルとして在る。** ワーカーは結果を置き場へ複写し、在ることを確かめてから `ok` の印を書く。待機スクリプト `review-loop-wait.sh` は `ok` の印を見ても、依頼文と結果が揃うまで返さないので、この順序が崩れると期限まで待ち続ける。`failed` の印では、結果が在るとは限らない (複写できた結果は `failed` の回でも置き場にある)。
+**`status` が `ok` の印があれば、置き場に結果が通常のファイルとして在る** (ワーカーがこれを守る手順の正本は [worker.md](worker.md) の「回の処理」の手順 10)。待機スクリプト `review-loop-wait.sh` は `ok` の印を見ても、依頼文と結果が揃うまで返さないので、結果が無いまま `ok` の印が現れると期限まで待ち続ける。`failed` の印では、結果が在るとは限らない (複写できた結果は `failed` の回でも置き場にある)。
 
 ```yaml
 id: "20260926-1400-feat-review-loop-63-1-code-review-opus"
@@ -192,7 +192,7 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | --- | --- | --- |
 | `id` | ◯ | 識別子 |
 | `status` | ◯ | `ok` (作業場所の結果を確かめて置き場に複写し、すべて通った) / `failed` (どれかが通らなかった、またはレビュアの実行を起動しなかった。結果を複写できていれば、置き場に結果がある) |
-| `worker_version` | ◯ | この印を書いたワーカーの版 (`worker.yaml` の `worker_version` と同じ決め方)。読めなければ `unknown`。作業側はこの値で、ワーカーが古いかを判定する ([round.md](round.md) の RL1 の手順 c) |
+| `worker_version` | ◯ | この印を書いたワーカーの版 (`worker.yaml` の `worker_version` と同じ決め方)。読めなければ `unknown` |
 | `model.specified` | ◯ | ワーカーに渡したモデルの指定 |
 | `model.effective` | ◯ | ログから読んだ実効モデルの名前 (モデル ID から `claude-` を除いた、記録の表記)。読めなければ `unknown` |
 | `effort` | ◯ | ワーカーに渡した effort。**実行時の値ではない** — effort はログに記録されないので、ワーカーが確かめられるのは渡した値だけ |
@@ -202,7 +202,7 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ログから読めなければ `unknown` |
 | `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く)。件数が 0 か `unknown` なら `[]` |
 | `sandbox_blocked.count` | ◯ | サンドボックスが止めた確認 (Bash の呼び出しのうち、書き込みか接続を止められたエラーで終わったもの。sub-agent の中の呼び出しを含む) の件数。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
-| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、止められたパスかホストを含む部分) の 2 つのキーを持ち、どちらも 1 行に直して先頭 200 文字までの文字列。件数が 0 か `unknown` なら `[]` |
+| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、止められたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの正本は [worker.md](worker.md) の「サンドボックスが止めた確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |
 | `head_after` | | レビュアの実行が終わった後の HEAD の短縮 SHA。**起動しなかった回は省く** |
 | `tree_clean_after` | | レビュアの実行が終わった後に作業ツリーが clean か。起動しなかった回は省く |
