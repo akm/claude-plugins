@@ -24,6 +24,10 @@
 2. **置き場 `<review_loop.dir>/<周回 id>/` を作る。** 既にあれば (同じ分に 2 度始めた) 作らずに報告して終わる。
 3. **`loop.yaml` を書く** (様式の正本は [loop-files.md](loop-files.md) の「`loop.yaml`」)。`repo_dir` は作業ツリーのルートの実体パス、`state` は `active`。一時名 `.loop.yaml.tmp` に書いてから `mv` で改名する。
 
+## 呼ぶスキル
+
+**このスキルが呼ぶ 3 つのスキル — RL1 の手順 a の `review-request`・L2 の `review-triage`・F1 の `review-triage-fix` — は、回ごとに Skill ツールで呼ぶ。** 前の回で読んだ手順を、このスキルが自分で実行しない — 依頼文の識別子の組み立てと雛形の埋め方、記録への回の追記・residual を自己採択にするかの判断・生成サマリの再生成と検査、修正と記録の更新は、それぞれのスキルが行う。このスキルが代わりに行うと、そのスキルの手順で確かめないまま結果がファイルと記録に入る (通し確認で、指摘が 0 件の回に作業側が `review-triage` を、2 周目以降の依頼文で `review-request` を代わりに行った)。
+
 ## 1 回のレビュー (RL1)
 
 ### (a) 依頼文を書く
@@ -31,7 +35,7 @@
 1. **作業ツリーが clean でなければ RA3。**
 2. **記録が読めなければ RA3。**
 3. **増分の基点が HEAD の祖先でなければ RA3。** 記録に回があれば、最後の回の `head` について `git merge-base --is-ancestor <head> HEAD` を確かめる (reset や squash で履歴から外れていると、増分の範囲が成り立たない)。記録に回が無ければ (全量) 確かめない。
-4. **[review-request](../../review-request/SKILL.md) を呼ぶ**: `review-request <review.skill> <worker.model> <review.args> --dir <置き場>` (値は `loop.yaml`。置き場はリポジトリのルートからの相対パス。`ce-code-review` は effort を受け取らないので `<review.args>` を渡さない)。**範囲と基点は `review-request` の手順 2 に従う** (全量は分岐元、増分は直前の回の `head`)。`review-triage-loop` の [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「範囲」(merge-base で基点を決める規則) は使わない — 依頼文を書くのは `review-request` なので、基点の規則を 2 か所に持たないため。
+4. **Skill ツールで [review-request](../../review-request/SKILL.md) を呼ぶ** (回ごとに。上の「呼ぶスキル」): `review-request <review.skill> <worker.model> <review.args> --dir <置き場>` (値は `loop.yaml`。置き場はリポジトリのルートからの相対パス。`ce-code-review` は effort を受け取らないので `<review.args>` を渡さない)。**範囲と基点は `review-request` の手順 2 に従う** (全量は分岐元、増分は直前の回の `head`)。`review-triage-loop` の [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「範囲」(merge-base で基点を決める規則) は使わない — 依頼文を書くのは `review-request` なので、基点の規則を 2 か所に持たないため。
 5. **`review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら** (RA1 の後に同じ分のうちに書き直した)、分が変わるのを待ってからやり直す。Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-loop <周回 id>: 識別子の衝突を避けるため分が変わるまで待つ。通知を受けたら review-loop の再入の手順へ」にして、ターンを終える。再入の手順は、取り込む印も印の無い依頼文も無いので G2 に進み、L1 でここに戻る。識別子の成分に秒を足すことはしない (成分を変えると `review-request` の表の全欄を確かめ直すことになる)。
 6. **それ以外の理由で `review-request` が依頼文を書かなかったら RA3** (報告には `review-request` が報告した理由を書く)。
 7. **書けたら、この起動で数えた回数を 1 つ増やす** (J5 が見る回数。数えるのはここだけ)。依頼文の絶対パスと識別子を控える。
@@ -57,7 +61,7 @@
 
 ## L2 で `review-triage` に渡すもの
 
-**L2 では、回ごとに Skill ツールで `review-triage` を呼ぶ。指摘が 0 件の回も同じ。** 前の回で読んだ `review-triage` の手順を、このスキルが自分で実行して記録に書かない — 記録への回の追記・residual を自己採択にするかの判断・生成サマリの再生成と検査は `review-triage` が行う。このスキルが代わりに行うと、`review-triage` の手順で確かめないまま判断が記録に入る (通し確認で、指摘が 0 件の回に作業側がこれを行った)。F1 の `review-triage-fix` も同じく、回ごとに Skill ツールで呼ぶ。
+L2 でも、回ごとに Skill ツールで `review-triage` を呼ぶ (指摘が 0 件の回も。規則の正本は上の「呼ぶスキル」)。
 
 `review-triage` を呼ぶときは、結果ファイルのパスと、次の値を渡す。
 
