@@ -241,21 +241,29 @@ PY
 
 # 起動時の確認の 12。--sandbox-allow-write の値 (5 つ目以降の引数) の実体パスが、ホーム・作業側・周回の置き場・TMPDIR の
 # 実体パス (1〜4 つ目の引数) と同じか、その祖先なら、最初に当たったものの理由を標準出力に出して、終了コード 1 で終わる。
+# 作業側と周回の置き場は、その下の場所も同じく扱う (ホームと TMPDIR の下の場所は許す)。
 # 値の場所はまだ無くてよい (無い部分は、シンボリックリンクを解決せずにそのまま繋ぐ)
 allow_write_problem() {
   python3 - "$@" <<'PY'
 import os, sys
 
-protected = (("ホーム", sys.argv[1]), ("作業側", sys.argv[2]), ("周回の置き場", sys.argv[3]),
-             ("TMPDIR の実体", sys.argv[4]))
+# (呼び名, 実体パス, 下の場所も許さないか)
+protected = (("ホーム", sys.argv[1], False), ("作業側", sys.argv[2], True), ("周回の置き場", sys.argv[3], True),
+             ("TMPDIR の実体", sys.argv[4], False))
 for value in sys.argv[5:]:
     real = os.path.realpath(value)
-    for label, path in protected:
+    for label, path, _ in protected:
         if real == path:
             print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label}そのものなので、書き込みを許せない")
             sys.exit(1)
         if real == "/" or path.startswith(real + "/"):
             print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label} ({path}) を含むので、書き込みを許せない")
+            sys.exit(1)
+    # 下の場所は、同じか祖先かをすべての守る場所で確かめてから見る (周回の置き場の祖先が作業側の下にあるときは、
+    # 置き場を含むことを理由に出すため)
+    for label, path, below in protected:
+        if below and real.startswith(path + "/"):
+            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label} ({path}) の下にあるので、書き込みを許せない")
             sys.exit(1)
 PY
 }
@@ -788,8 +796,8 @@ check_rule_chars 周回の置き場 "$LOOP_REAL"
 check_rule_chars TMPDIR "$TMP_REAL"
 
 # 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・周回の置き場・TMPDIR の実体) と同じでも、
-# その祖先でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、前の回のレビュアの実行が残したプロセスが
-# 書けない場所に作るため。先頭の ~ は引数を読んだときにホームに展開してある
+# その祖先でもなく、作業側と周回の置き場の下の場所でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、
+# 前の回のレビュアの実行が残したプロセスが書けない場所に作るため。先頭の ~ は引数を読んだときにホームに展開してある
 for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do
   case "$v" in
     /*) ;;

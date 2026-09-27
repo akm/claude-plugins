@@ -1861,6 +1861,25 @@ class TestSandboxStartChecks(WorkerTestBase):
                                        "--sandbox-allow-write", value,
                                        contains=["--sandbox-allow-write", contains])
 
+    def test_sandbox_allow_write_must_not_be_below_repo_or_loop(self):
+        # 作業側と周回の置き場は、その下の場所も受け付けない (作業側の .git や、git が無視する場所への書き込みを許さないため)。
+        # ホームの下の場所は受け付ける (Go のビルドのキャッシュなど)
+        loop_outside = os.path.join(self.root, "loops", LOOP_ID)
+        _make_loop_dir(loop_outside, self.repo)
+        cases = (
+            ("作業側の .git", os.path.join(self.repo, ".git"), self.loop, "作業側"),
+            ("作業側の下のまだ無い場所", os.path.join(self.repo, ".venv", "cache"), self.loop, "作業側"),
+            ("作業側の外にある周回の置き場の下", os.path.join(loop_outside, "x"), loop_outside, "周回の置き場"),
+        )
+        for label, value, loop, contains in cases:
+            with self.subTest(label):
+                self.start_unavailable("--sandbox-allow-write", value, loop=loop,
+                                       contains=["--sandbox-allow-write", contains, "の下にある"])
+        with self.subTest("ホームの下"):
+            cache = os.path.join(self.home, "Library", "Caches", "go-build")
+            _, state = self.start_idle("--sandbox-allow-write", cache)
+            self.assertEqual(state["sandbox_allow_write"], [cache])
+
     def test_sandbox_allow_write_must_not_contain_tmpdir(self):
         # TMPDIR の実体と同じか、その祖先の値も受け付けない (前の回のレビュアの実行が残したプロセスが、次の回の準備のディレクトリに
         # 書けないように)。TMPDIR の下の場所は受け付ける
