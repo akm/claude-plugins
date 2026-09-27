@@ -1046,7 +1046,9 @@ class TestWorkspace(WorkerTestBase):
                 self.assertEqual(stat.S_IMODE(os.stat(victim).st_mode), 0o755)
 
     def test_reviewer_arguments(self):
-        # AE1: --permission-mode auto・--strict-mcp-config・--settings (1 つ)・拒否の規則・結果への書き込みの許可
+        # AE1: --permission-mode auto・--strict-mcp-config・--settings (1 つ)・拒否の規則・結果への書き込みの許可。
+        # --settings では、サンドボックスの制限を外す真偽値のキー (allowAppleEvents・filesystem.disabled・
+        # network.allowAllUnixSockets) を false にする
         cache = os.path.join(self.root, "cache")
         self.put_request()
         marker, _ = self.run_round("--sandbox-allow-write", cache,
@@ -1066,8 +1068,10 @@ class TestWorkspace(WorkerTestBase):
                 "autoAllowBashIfSandboxed": True,
                 "allowUnsandboxedCommands": False,
                 "failIfUnavailable": True,
-                "filesystem": {"allowWrite": [ws, cache]},
-                "network": {"strictAllowlist": True, "allowedDomains": ["proxy.golang.org", "sum.golang.org"]},
+                "allowAppleEvents": False,
+                "filesystem": {"allowWrite": [ws, cache], "disabled": False},
+                "network": {"strictAllowlist": True, "allowedDomains": ["proxy.golang.org", "sum.golang.org"],
+                            "allowAllUnixSockets": False},
             },
             "autoMemoryEnabled": False,
         }])
@@ -1101,6 +1105,27 @@ class TestWorkspace(WorkerTestBase):
         self.assertIs(settings[0]["sandbox"]["enabled"], True)
         self.assertIs(settings[0]["sandbox"]["allowUnsandboxedCommands"], False)
         self.assertIs(settings[0]["autoMemoryEnabled"], False)
+
+    def test_sandbox_boolean_keys_are_overridden_not_checked(self):
+        # 利用者の設定とブランチの設定で、サンドボックスの制限を外す真偽値のキーが true でも、回は止めない。
+        # --settings はそれらの設定より優先されるので、ワーカーは false を渡して値を上書きする
+        # (worker.md の「サンドボックス」)
+        loose = {"sandbox": {"allowAppleEvents": True, "filesystem": {"disabled": True},
+                             "network": {"allowAllUnixSockets": True}}}
+        self.write_user_settings(loose)
+        path = os.path.join(self.repo, ".claude", "settings.json")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(loose, f)
+        _git(self.repo, "add", ".claude/settings.json")
+        _git(self.repo, "commit", "-q", "-m", "settings")
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        sandbox = self.claude_records()[0]["settings"][0]["sandbox"]
+        self.assertIs(sandbox["allowAppleEvents"], False)
+        self.assertIs(sandbox["filesystem"]["disabled"], False)
+        self.assertIs(sandbox["network"]["allowAllUnixSockets"], False)
 
     def test_request_copy(self):
         # AE1: プロンプトが指す写しには、元の出力先と元の作業ツリーのパスが無く、扱いの行が「使い捨て」。作業側の依頼文は変わらない
@@ -1196,15 +1221,20 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(marker["error"], "clone failed (submodule: sub)")
 
     def test_clone_settings(self):
-        # AE16: 複製の .claude/settings.json か .claude/settings.local.json に、空でない sandbox.excludedCommands があるか、
-        # JSON として読めなければ、レビュアの実行を起動せずに failed の印を書く
+        # AE16: 複製の .claude/settings.json か .claude/settings.local.json に、空でない sandbox.excludedCommands か
+        # sandbox.network.allowUnixSockets があるか、JSON として読めなければ、レビュアの実行を起動せずに failed の印を書く
+        sockets = json.dumps({"sandbox": {"network": {"allowUnixSockets": ["/var/run/docker.sock"]}}})
         cases = (
-            (".claude/settings.json", json.dumps({"sandbox": {"excludedCommands": ["docker"]}}),
+            ("excludedCommands", ".claude/settings.json", json.dumps({"sandbox": {"excludedCommands": ["docker"]}}),
              "sandbox.excludedCommands"),
-            (".claude/settings.local.json", "{ not json", "not readable as JSON"),
+            ("JSON として読めない", ".claude/settings.local.json", "{ not json", "not readable as JSON"),
+            ("allowUnixSockets", ".claude/settings.json", sockets,
+             'sandbox.network.allowUnixSockets is not empty (["/var/run/docker.sock"])'),
+            ("allowUnixSockets (local)", ".claude/settings.local.json", sockets,
+             'sandbox.network.allowUnixSockets is not empty (["/var/run/docker.sock"])'),
         )
-        for rel, content, contains in cases:
-            with self.subTest(rel):
+        for label, rel, content, contains in cases:
+            with self.subTest(label):
                 self.reset_loop()
                 path = os.path.join(self.repo, rel)
                 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1221,11 +1251,14 @@ class TestWorkspace(WorkerTestBase):
                 _git(self.repo, "commit", "-q", "-m", f"remove {rel}")
 
     def test_clone_settings_without_excluded_commands(self):
-        # 空の sandbox.excludedCommands は止めない
+        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets は止めない。
+        # 検査しないキー (sandbox.network.allowLocalBinding) も止めない
         path = os.path.join(self.repo, ".claude", "settings.json")
         os.makedirs(os.path.dirname(path))
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"sandbox": {"excludedCommands": []}, "permissions": {"deny": ["Bash(rm:*)"]}}, f)
+            json.dump({"sandbox": {"excludedCommands": [],
+                                   "network": {"allowUnixSockets": [], "allowLocalBinding": True}},
+                       "permissions": {"deny": ["Bash(rm:*)"]}}, f)
         _git(self.repo, "add", ".claude/settings.json")
         _git(self.repo, "commit", "-q", "-m", "settings")
         self.put_request()
@@ -1951,9 +1984,26 @@ class TestSandboxStartChecks(WorkerTestBase):
                 self.write_user_settings(content)
                 self.start_unavailable(contains=["利用者の設定", contains])
 
+    def test_user_settings_allow_unix_sockets(self):
+        # 利用者の設定に空でない sandbox.network.allowUnixSockets がある。sandbox.excludedCommands もあれば、両方を理由に書く
+        docker = {"allowUnixSockets": ["/var/run/docker.sock"]}
+        cases = (
+            ("allowUnixSockets がある", {"sandbox": {"network": docker}},
+             ["sandbox.network.allowUnixSockets", "/var/run/docker.sock"]),
+            ("excludedCommands もある", {"sandbox": {"excludedCommands": ["docker"], "network": docker}},
+             ["sandbox.excludedCommands", "sandbox.network.allowUnixSockets"]),
+        )
+        for label, content, contains in cases:
+            with self.subTest(label):
+                self.write_user_settings(content)
+                self.start_unavailable(contains=["利用者の設定", *contains])
+
     def test_user_settings_without_excluded_commands(self):
+        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets は止めない。
+        # 検査しないキー (sandbox.network.allowLocalBinding) も止めない
         cases = (
             ("excludedCommands が空", {"sandbox": {"enabled": True, "excludedCommands": []}}),
+            ("allowUnixSockets が空", {"sandbox": {"network": {"allowUnixSockets": [], "allowLocalBinding": True}}}),
             ("sandbox が無い", {"permissions": {"allow": ["Read"]}}),
         )
         for label, content in cases:

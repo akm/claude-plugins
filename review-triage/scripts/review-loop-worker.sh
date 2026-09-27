@@ -292,8 +292,9 @@ if not isinstance(plugins, dict) or not all(isinstance(v, bool) for v in plugins
 PY
 }
 
-# 起動時の確認の 14。利用者の設定ファイル ($1) が JSON として読めないか、空でない sandbox.excludedCommands を持てば、
-# 理由を標準出力に出して、終了コード 1 で終わる。ファイルが無ければ何もしない
+# 起動時の確認の 14。利用者の設定ファイル ($1) が JSON として読めないか、空でない sandbox.excludedCommands か
+# sandbox.network.allowUnixSockets を持てば、理由 (当たったキーをすべて) を標準出力に出して、終了コード 1 で終わる。
+# ファイルが無ければ何もしない
 user_settings_problem() {
   python3 - "$1" <<'PY'
 import json, sys
@@ -311,11 +312,19 @@ if not isinstance(settings, dict):
     print(f"利用者の設定 {path} のトップレベルがオブジェクトではない。検査できないので起動しない")
     sys.exit(1)
 sandbox = settings.get("sandbox")
+network = sandbox.get("network") if isinstance(sandbox, dict) else None
 excluded = sandbox.get("excludedCommands") if isinstance(sandbox, dict) else None
+sockets = network.get("allowUnixSockets") if isinstance(network, dict) else None
+found = []
 if excluded:
-    shown = json.dumps(excluded, ensure_ascii=False)
-    print(f"利用者の設定 {path} に sandbox.excludedCommands ({shown}) がある。当たるコマンドはサンドボックスの外で動くので、"
-          "この設定を消すか空にしてから起動し直す")
+    found.append(f"sandbox.excludedCommands ({json.dumps(excluded, ensure_ascii=False)}) がある "
+                 "(当たるコマンドはサンドボックスの外で動く)")
+if sockets:
+    found.append(f"sandbox.network.allowUnixSockets ({json.dumps(sockets, ensure_ascii=False)}) がある "
+                 "(サンドボックスの中の Bash が、当たる Unix ソケットに接続できる。Docker のソケットなら、"
+                 "コンテナを通してサンドボックスの外に書ける)")
+if found:
+    print(f"利用者の設定 {path} に " + "。".join(found) + "。当たったキーを消すか空にしてから起動し直す")
     sys.exit(1)
 PY
 }
@@ -351,6 +360,8 @@ workspace_hash() {
 
 # レビュアの実行に渡す --settings の JSON を組み立てて標準出力に出す (中身の正本は worker.md の「サンドボックス」)。
 # 引数は、作業場所のパスに続けて、-w <書き込みを許す場所>・-d <接続を許すドメイン>・-s <追加の引数の --settings の値> の組を並べる。
+# サンドボックスの制限を外す真偽値のキー (allowAppleEvents・filesystem.disabled・network.allowAllUnixSockets) は、
+# 制限する側の値 (false) を書く。--settings は利用者とブランチの設定より優先されるので、それらの設定の値は効かなくなる。
 # 追加の引数の値を合成した後に、サンドボックスと自動メモリのキーがワーカーの値のままで、ほかのキーが enabledPlugins だけであることを
 # 確かめる。確かめられなければ理由を標準エラーに出して、終了コード 1 で終わる
 build_settings_json() {
@@ -367,8 +378,9 @@ settings = {
         "autoAllowBashIfSandboxed": True,
         "allowUnsandboxedCommands": False,
         "failIfUnavailable": True,
-        "filesystem": {"allowWrite": [workspace] + lists["-w"]},
-        "network": {"strictAllowlist": True, "allowedDomains": lists["-d"]},
+        "allowAppleEvents": False,
+        "filesystem": {"allowWrite": [workspace] + lists["-w"], "disabled": False},
+        "network": {"strictAllowlist": True, "allowedDomains": lists["-d"], "allowAllUnixSockets": False},
     },
     "autoMemoryEnabled": False,
 }
@@ -839,7 +851,8 @@ while [ "$i" -lt ${#EXTRA_ARGS[@]} ]; do
   esac
 done
 
-# 14. 利用者の設定が、コマンドをサンドボックスの外で実行させないか。レビュー対象のブランチの設定は、回ごとに複製で確かめる。
+# 14. 利用者の設定が、コマンドをサンドボックスの外で実行させず、Unix ソケットへの接続を許さないか
+# (sandbox.excludedCommands と sandbox.network.allowUnixSockets)。レビュー対象のブランチの設定は、回ごとに複製で確かめる。
 # 利用者の設定の置き場は、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
 # 無ければ $HOME/.claude。CLAUDE_CONFIG_DIR が相対パスだと、レビュアの実行 (複製の中の cwd) からの解決先が
 # ワーカーの cwd (作業側) からの解決先と食い違い、ワーカーが実際に使われる設定を確かめられない
@@ -1469,8 +1482,9 @@ make_clone() {
   return 0
 }
 
-# 手順 7。複製 ($1) の .claude/settings.json と .claude/settings.local.json のどちらかに、空でない sandbox.excludedCommands があるか、
-# JSON として読めなければ、当たったものを 1 行に 1 つ出して、終了コード 1 で終わる。ファイルが無ければ何もしない
+# 手順 7。複製 ($1) の .claude/settings.json と .claude/settings.local.json のどちらかに、空でない sandbox.excludedCommands か
+# sandbox.network.allowUnixSockets があるか、JSON として読めなければ、当たったものを 1 行に 1 つ出して、終了コード 1 で終わる。
+# ファイルが無ければ何もしない
 clone_settings_problem() {
   python3 - "$1" <<'PY'
 import json, os, stat, sys
@@ -1495,9 +1509,13 @@ for rel in (".claude/settings.json", ".claude/settings.local.json"):
         problems.append(f"{rel}: top level is not an object")
         continue
     sandbox = settings.get("sandbox")
+    network = sandbox.get("network") if isinstance(sandbox, dict) else None
     excluded = sandbox.get("excludedCommands") if isinstance(sandbox, dict) else None
+    sockets = network.get("allowUnixSockets") if isinstance(network, dict) else None
     if excluded:
         problems.append(f"{rel}: sandbox.excludedCommands is not empty ({json.dumps(excluded, ensure_ascii=False)})")
+    if sockets:
+        problems.append(f"{rel}: sandbox.network.allowUnixSockets is not empty ({json.dumps(sockets, ensure_ascii=False)})")
 for p in problems:
     print(f"clone settings ({p})")
 sys.exit(1 if problems else 0)
