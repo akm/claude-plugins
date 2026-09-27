@@ -32,7 +32,7 @@ review-loop --end [<置き場>]
 
 設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`・`review_loop.sandbox_allow_write` (サンドボックスの中の Bash に書き込みを許す場所)・`review_loop.sandbox_allowed_domains` (同じく接続を許すドメイン)。
 
-**`review_loop.permission_mode` が未設定なら、既定の `auto` を `loop.yaml` の `worker.permission_mode` に書く** (既定の値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。周回の権限モードは `loop.yaml` に書いた値で決まり、ワーカーの既定には任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了の印の権限モードの指定をこの値と比べる。
+**`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。周回の権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了の印の権限モードの指定をこの値と比べる。
 
 **`--threshold` と `--stage` は周回の条件ではなく、`review-triage-fix` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落 — 周回は開始前の報告に書くために同じ規則で値を決めて検査し、`review-triage-fix` を呼ぶ (F1) たびに渡す。
 

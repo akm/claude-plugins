@@ -120,7 +120,7 @@ rounds_served: 0
 | `current_request` | ◯ | `reviewing` のとき処理中の識別子。それ以外は空文字列 |
 | `workspace` | ◯ | `reviewing` のとき、その回の作業場所 (ワーカーが環境変数 `TMPDIR` の下に作る一時ディレクトリ) のパス。それ以外は空文字列。起動し直したワーカーが、`kill -9` などで消えた前の起動の作業場所を片付けるのに使う (正本は [worker.md](worker.md) の「起動時の確認」の 2) |
 | `pid` | ◯ | ワーカーのプロセス ID |
-| `worker_version` | ◯ | ワーカーの版。スクリプトの実体の位置から、プラグインのファイル `review-triage/.claude-plugin/plugin.json` を読んで決める。読めなければ `unknown` |
+| `worker_version` | ◯ | ワーカーのバージョン。スクリプトの実体の位置から、プラグインのファイル `review-triage/.claude-plugin/plugin.json` を読んで決める。読めなければ `unknown` |
 | `model` | ◯ | ワーカーに渡したモデルの指定 (`--model` の値) |
 | `effort` | ◯ | ワーカーに渡した effort (`--effort` の値) |
 | `permission_mode` | ◯ | レビュアの実行に渡す権限モード |
@@ -192,7 +192,7 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | --- | --- | --- |
 | `id` | ◯ | 識別子 |
 | `status` | ◯ | `ok` (作業場所の結果を確かめて置き場に複写し、すべて通った) / `failed` (どれかが通らなかった、またはレビュアの実行を起動しなかった。結果を複写できていれば、置き場に結果がある) |
-| `worker_version` | ◯ | この印を書いたワーカーの版 (`worker.yaml` の `worker_version` と同じ決め方)。読めなければ `unknown` |
+| `worker_version` | ◯ | この印を書いたワーカーのバージョン (`worker.yaml` の `worker_version` と同じ決め方)。読めなければ `unknown` |
 | `model.specified` | ◯ | ワーカーに渡したモデルの指定 |
 | `model.effective` | ◯ | ログから読んだ実効モデルの名前 (モデル ID から `claude-` を除いた、記録の表記)。読めなければ `unknown` |
 | `effort` | ◯ | ワーカーに渡した effort。**実行時の値ではない** — effort はログに記録されないので、ワーカーが確かめられるのは渡した値だけ |

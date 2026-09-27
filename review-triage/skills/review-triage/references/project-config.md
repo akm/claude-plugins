@@ -131,7 +131,7 @@
 | `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
 | `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
 | `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
-| `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | `auto` (既定にする理由と、ワーカーが受け付けない値の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
+| `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | `auto` (デフォルトにする理由と、ワーカーが受け付けない値の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
 | `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。ワーカーの `--allowed-tools` に要素ごとに埋める | ワーカーの既定の一覧 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
 | `sandbox_allow_write` | サンドボックス (Claude Code が Bash のコマンドの書き込みと接続を制限する機能) の中の Bash に書き込みを許す場所の一覧 (文字列の配列)。テストがホームの下のキャッシュ (Go のビルドのキャッシュ `~/Library/Caches/go-build` など) に書くときに足す (実測と理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「サンドボックス」)。各要素は絶対パスか `~` で始まるパスで、先頭の `~` はワーカーがホームに展開する。ワーカーの `--sandbox-allow-write` に要素ごとに埋める。環境の値 (下記) | 空 — 書き込みを許すのは、ワーカーが回ごとに作る一時ディレクトリ (回の作業場所) だけ (許せる場所の条件の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動時の確認」の 12) |
 | `sandbox_allowed_domains` | サンドボックスの中の Bash に接続を許すドメインの一覧 (文字列の配列)。ワーカーの `--sandbox-allowed-domain` に要素ごとに埋める。環境の値 (下記) | 空 — 接続を許すのは、利用者の設定の `WebFetch(domain:…)` の許可から加わるドメインだけ (加わり方の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「ネットワーク」) |
