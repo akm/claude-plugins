@@ -88,32 +88,45 @@ os.execv(real, [real] + args)
 """
 
 # 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを走らせている python) に
-# 引数をそのまま渡す。標準入力から読むスクリプト (python3 - <引数>...) が文字列 FAKE_PY_SLEEP_MARK を含めば、
+# 引数をそのまま渡す。実行するスクリプトが文字列 FAKE_PY_SLEEP_MARK を含めば、
 # ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待ち、そのあとスクリプトを実行する。
 # ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う。
 # 同じく文字列 FAKE_PY_PRELUDE_MARK を含めば、ファイル FAKE_PY_PRELUDE の中身をスクリプトの前に足してから実行する
-# (ワーカーの処理の途中に、別のプロセスが割り込んだのと同じ変更を起こすのに使う)
+# (ワーカーの処理の途中に、別のプロセスが割り込んだのと同じ変更を起こすのに使う)。
+# 実行するスクリプトは、コードを引数で渡す形 (python3 [-I] -c <コード> <引数>...) ならそのコード、標準入力から読む形
+# (python3 [-I] - <引数>...) なら標準入力の中身、ファイルを渡す形 (python3 [-I] <ファイル>.py <引数>...) ならそのファイルの中身で、
+# どの形でも同じ文字列で見つける。ワーカーは、ディレクトリ review-triage/scripts/review-loop-worker/ の .py の中身を起動時に
+# 読み込み、python3 -I -c <読み込んだ中身> の形で実行する。見つけたときは、見つけた中身を同じ -I の有無で -c に渡して実行する
 _FAKE_PYTHON = """#!/bin/sh
-if [ "$1" = "-" ] && { [ -n "${FAKE_PY_SLEEP_MARK:-}" ] || [ -n "${FAKE_PY_PRELUDE_MARK:-}" ]; }; then
-  shift
-  script=$(cat)
-  if [ -n "${FAKE_PY_SLEEP_MARK:-}" ]; then
-    case "$script" in
-      *"$FAKE_PY_SLEEP_MARK"*)
-        if [ -n "${FAKE_PY_TOUCH:-}" ]; then : >"$FAKE_PY_TOUCH"; fi
-        sleep "${FAKE_PY_SLEEP:-1000}" ;;
-    esac
-  fi
-  if [ -n "${FAKE_PY_PRELUDE_MARK:-}" ]; then
-    case "$script" in
-      *"$FAKE_PY_PRELUDE_MARK"*)
-        script="$(cat "$FAKE_PY_PRELUDE")
-$script" ;;
-    esac
-  fi
-  exec "$FAKE_PY_REAL" -c "$script" "$@"
+if [ -z "${FAKE_PY_SLEEP_MARK:-}" ] && [ -z "${FAKE_PY_PRELUDE_MARK:-}" ]; then
+  exec "$FAKE_PY_REAL" "$@"
 fi
-exec "$FAKE_PY_REAL" "$@"
+opt=""
+if [ "$1" = "-I" ]; then
+  opt=-I
+  shift
+fi
+case "$1" in
+  -c) script=$2; shift 2 ;;
+  -) script=$(cat); shift ;;
+  *.py) script=$(cat "$1" 2>/dev/null) || exec "$FAKE_PY_REAL" $opt "$@"; shift ;;
+  *) exec "$FAKE_PY_REAL" $opt "$@" ;;
+esac
+if [ -n "${FAKE_PY_SLEEP_MARK:-}" ]; then
+  case "$script" in
+    *"$FAKE_PY_SLEEP_MARK"*)
+      if [ -n "${FAKE_PY_TOUCH:-}" ]; then : >"$FAKE_PY_TOUCH"; fi
+      sleep "${FAKE_PY_SLEEP:-1000}" ;;
+  esac
+fi
+if [ -n "${FAKE_PY_PRELUDE_MARK:-}" ]; then
+  case "$script" in
+    *"$FAKE_PY_PRELUDE_MARK"*)
+      script="$(cat "$FAKE_PY_PRELUDE")
+$script" ;;
+  esac
+fi
+exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 """
 
 # make_removable の途中で、前の回のレビュアの実行が残したプロセスがディレクトリをシンボリックリンクに置き換えたのと同じ変更を
@@ -476,15 +489,16 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_PY_REAL"] = sys.executable
 
     def delay_python(self, mark, seconds, touch):
-        """偽の python3 を置き、標準入力から読むスクリプトが mark を含むものを seconds 秒遅らせる。
-        遅らせ始めたときにファイル touch を作る。"""
+        """偽の python3 を置き、実行するスクリプト (-c に渡すコード・標準入力から読むもの・引数で渡すファイルのどれか) が
+        mark を含むものを seconds 秒遅らせる。遅らせ始めたときにファイル touch を作る。"""
         self.install_fake_python()
         self.env["FAKE_PY_SLEEP_MARK"] = mark
         self.env["FAKE_PY_SLEEP"] = str(seconds)
         self.env["FAKE_PY_TOUCH"] = touch
 
     def prelude_python(self, mark, prelude):
-        """偽の python3 を置き、標準入力から読むスクリプトが mark を含むものの前に、Python のコード prelude を足す。"""
+        """偽の python3 を置き、実行するスクリプト (-c に渡すコード・標準入力から読むもの・引数で渡すファイルのどれか) が
+        mark を含むものの前に、Python のコード prelude を足す。"""
         self.install_fake_python()
         path = os.path.join(self.root, "python-prelude.py")
         with open(path, "w", encoding="utf-8") as f:
@@ -1801,6 +1815,41 @@ class TestWorkerYamlOnStart(WorkerTestBase):
         self.assertNotIn("unbound variable", err)
 
 
+class TestPythonScriptsLoadedAtStart(WorkerTestBase):
+    """ワーカーは、python3 で実行するファイル (ディレクトリ review-triage/scripts/review-loop-worker/ の .py) の中身を
+    起動時に読み込み、読み込んだ中身を実行する (worker.md の「要るもの」)。周回の間に別のセッションがプラグインを更新して、
+    古いバージョンのディレクトリの中身が消えても、ワーカーが動き続けるようにするため。"""
+
+    def test_keeps_running_after_python_dir_moved(self):
+        # プラグインのスクリプトとファイルを一時ディレクトリに写してワーカーを起動し、1 回を処理させた後に .py のディレクトリを
+        # 別名に移す。次の依頼文も、ファイルを開かずに処理を終え、ok の印を書く
+        copy = os.path.join(self.root, "plugin", "review-triage")
+        shutil.copytree(os.path.join(_HERE, "..", "scripts"), os.path.join(copy, "scripts"),
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copytree(os.path.join(_HERE, "..", ".claude-plugin"), os.path.join(copy, ".claude-plugin"))
+        pydir = os.path.join(copy, "scripts", "review-loop-worker")
+        self.put_request()
+        p = subprocess.Popen(
+            ["bash", os.path.join(copy, "scripts", "review-loop-worker.sh"), self.loop, "--model", "opus", "--effort", "high"],
+            cwd=self.repo, env=self.env, start_new_session=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        self.procs.append(p)
+        first = self.wait_marker()
+        self.wait_state("idle")
+        os.rename(pydir, pydir + ".moved")
+        self.put_request(rid=RID2)
+        second = self.wait_marker(RID2)
+        self.wait_state("idle")
+        _, _, err = self.finish(p)
+        for marker in (first, second):
+            self.assertEqual(marker["status"], "ok", (marker, err))
+            self.assertEqual(marker["worker_version"], _plugin_version())
+            self.assert_contract("## `delivered-<識別子>.yaml`", marker)
+        self.assertNotIn("can't open file", err)
+        self.assertEqual(self.workspaces(), [])
+
+
 class TestSandboxStartChecks(WorkerTestBase):
     """起動時の確認のうち、レビュアの実行をサンドボックスで走らせるための項目 (worker.md の「起動時の確認」の 3 と 9〜14)。"""
 
@@ -2466,7 +2515,7 @@ class TestRestartCleanup(WorkerTestBase):
         # 残ったプロセスを止める処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
         # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave 側への書き込みが
         # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
-        # 回の終わりの処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、そのヒアドキュメントの
+        # 回の終わりの処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
         # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
         # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが止まることを確かめる
         # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終わって
@@ -2491,7 +2540,7 @@ class TestRestartCleanup(WorkerTestBase):
         inside = self.spawn_sleeper(os.path.join(ws, "tree"))
 
         # stop_cwd_procs の呼び出し (回の終わりの処理の 1) が始まった (sleep に入った) ら、
-        # 端末を閉じたのと同じ状態にする。以降、そのヒアドキュメントの標準エラーへの書き込みは OSError になる
+        # 端末を閉じたのと同じ状態にする。以降、その python3 のスクリプトの標準エラーへの書き込みは OSError になる
         self.wait_for(lambda: os.path.exists(touch), what="stop_cwd_procs の呼び出しの開始")
         os.close(master)
         closed = True

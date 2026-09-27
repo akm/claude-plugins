@@ -169,7 +169,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── skills/review-triage-fix/
     ├── skills/review-triage-loop/  # レビューから修正までの周回
     ├── skills/review-loop/        # レビューを端末のワーカーに任せる周回
-    ├── scripts/                   # ワーカーと、作業側の待機スクリプト
+    ├── scripts/                   # ワーカー (python3 で実行するファイルを置く review-loop-worker/ を含む) と、作業側の待機スクリプト
     ├── tests/                     # python3 -m unittest discover -s review-triage/tests
     ├── tools/triagecheck/         # 記録を検査する Go ツール (go test ./...)
     ├── tools/nearedges/           # Markdown の修正の差分から、コミット前に読み直す範囲を列挙する Go ツール (go test ./...)

@@ -31,6 +31,12 @@
 # 起動する・ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
 # --settings の JSON を組み立てる・依頼文の写しを作る・準備のディレクトリを作業場所のパスに改名する・結果を確かめて複写する・
 # 作業場所の中を cwd にしているプロセスを見つける・作業場所の中のディレクトリに権限を足す・パスの実体を求めるのに使う)。
+# python3 の処理はこのファイルに書かず、処理ごとのファイル (.py) にして、このスクリプトの実体と同じディレクトリの下の
+# ディレクトリ review-triage/scripts/review-loop-worker/ に置く。ファイル名は、そのファイルを python3 で実行する関数の名前に
+# 合わせる (setpgid_exec.py だけは、関数 run_prep と run_reviewer が共に使う)。各ファイルの説明の正本は、そのファイルの
+# 先頭のコメント。ワーカーは起動時にすべてのファイルの中身を変数に読み込み、実行するときは読み込んだ中身を python3 -c に
+# 渡す (実行中にプラグインが更新されて、ディレクトリの中身が消えても動き続けるため。関数 load_py_files)。
+# 読み込めたかは、起動時の確認の 8 で確かめる。
 #
 # 不変条件: 作業場所のパスの下では git を実行しない。複製に対する git は、準備のディレクトリの中で、作業場所のパスに
 # 改名する前にだけ実行する (作業場所のパスは周回の間使い回すので、前の回のレビュアの実行が残したプロセスも書ける。
@@ -43,10 +49,6 @@ POLL_SECONDS=5              # 依頼文を探す周期と、worker.yaml の更�
 OTHER_WORKER_FRESH_SECONDS=30  # 起動時の確認で、他のワーカーが動いていると判定する更新時刻の新しさ
 STOP_GRACE_SECONDS=5        # レビュアの実行や作業場所に残ったプロセスを TERM で止めてから KILL を送るまでの猶予
 RESULT_MAX_BYTES=1048576    # 置き場に複写する結果の大きさの上限 (1 MiB)。正本は worker.md の「回の処理」の手順 10
-
-# 引数のコマンドを、専用のプロセスグループ (自分の PID と同じ番号) にしてから実行する python3 のスクリプト。
-# レビュアの実行と準備のコマンドをこれで起動する (上限を越えたときと割り込みを受けたときに、プロセスグループごと止めるため)
-SETPGID_PY='import os, sys; os.setpgid(0, 0); os.execvp(sys.argv[1], sys.argv[1:])'
 
 # レビュアの実行に許すツールの既定の一覧 (--allowed-tools を 1 回でも指定すれば置き換わる)。
 # 正本は worker.md の「レビュアの実行の権限」
@@ -215,329 +217,124 @@ group_alive() {
   ps -A -o pgid=,stat= 2>/dev/null | awk -v g="$1" '$1 == g && $2 !~ /^Z/ { found = 1 } END { exit !found }'
 }
 
-# ---- 起動時の確認に使う道具 (python3 を使う。read_worker_version のほかは、起動時の確認の 8 で python3 を確かめた後に呼ぶ) ----
+# ---- python3 のスクリプト ----
 
-# ワーカーの版を、スクリプト ($1) の実体の位置からプラグインのファイル .claude-plugin/plugin.json を読んで標準出力に出す。
-# 環境変数 CLAUDE_PLUGIN_ROOT は、人間が端末で起動するワーカーには設定されないので使わない。
-# 読めなければ理由を標準エラーに出力して、終了コード 1 で終わる
+# このスクリプトの実体があるディレクトリ (シンボリックリンクを解決した絶対パス) を標準出力に出す。$1 はこのスクリプトのパス ($0)。
+# スクリプト自身がシンボリックリンクなら、リンクを辿った先のディレクトリにする。求められなければ何も出さずに 1 を返す
+script_real_dir() {
+  local p=$1 link
+  while [ -L "$p" ]; do
+    link=$(readlink "$p") || return 1
+    case "$link" in
+      /*) p=$link ;;
+      *) p="$(dirname "$p")/$link" ;;
+    esac
+  done
+  real_dir "$(dirname "$p")"
+}
+
+# python3 のスクリプトのディレクトリ。プラグインのバージョンを読むとき (review-loop-worker/read_worker_version.py) と同じく、
+# このスクリプトの実体パスから決める。環境変数 CLAUDE_PLUGIN_ROOT は、人間が端末で起動するワーカーには設定されないので使わない
+PY_DIR=""
+if script_dir=$(script_real_dir "$0"); then
+  PY_DIR="$script_dir/review-loop-worker"
+fi
+# ワーカーが python3 で実行するファイルの名前 (.py を除いたもの)。ファイルを足したら、ここにも足す
+PY_FILES=(
+  read_worker_version allow_write_problem settings_arg_problem user_settings_problem webfetch_domains workspace_hash
+  build_settings_json stop_cwd_procs make_removable read_log_facts rename_dir clone_settings_problem make_request_copy
+  result_file_problem copy_result setpgid_exec
+)
+
+# python3 のスクリプトのディレクトリから、PY_FILES のファイルの中身を、名前ごとの変数 PY_SRC_<名前> に読み込む。
+# ディレクトリが無いか、ファイルが足りないか読めなければ、理由を PY_PROBLEM に入れる (読み込めれば PY_PROBLEM は空)。
+# 読み込んだ中身は関数 run_py で実行する。ファイルを呼ぶたびに開かないのは、周回の間 (何時間も動く) に別のセッションが
+# プラグインを更新すると、古いバージョンのディレクトリの中身が消えることがあるため
+load_py_files() {
+  local n src missing="" unreadable=""
+  PY_PROBLEM=""
+  if [ -z "$PY_DIR" ]; then
+    PY_PROBLEM="このスクリプト ($0) の実体パスを求められないので、python3 のスクリプトのディレクトリが分からない"
+    return
+  fi
+  if [ ! -d "$PY_DIR" ]; then
+    PY_PROBLEM="python3 のスクリプトのディレクトリ $PY_DIR が無い"
+    return
+  fi
+  for n in "${PY_FILES[@]}"; do
+    if [ ! -f "$PY_DIR/$n.py" ]; then
+      missing="${missing:+$missing, }$n.py"
+    elif src=$(cat "$PY_DIR/$n.py" 2>/dev/null); then
+      printf -v "PY_SRC_$n" '%s' "$src"
+    else
+      unreadable="${unreadable:+$unreadable, }$n.py"
+    fi
+  done
+  [ -z "$missing" ] || PY_PROBLEM="python3 のスクリプトのディレクトリ $PY_DIR に、ファイル $missing が無い"
+  [ -z "$unreadable" ] || PY_PROBLEM="${PY_PROBLEM:+$PY_PROBLEM。}python3 のスクリプトのディレクトリ $PY_DIR の、ファイル $unreadable を読めない"
+}
+
+# 読み込んだ python3 のスクリプト ($1 は名前) を、$2 以降を引数にして実行する。標準入力は /dev/null にする (どのスクリプトも
+# 標準入力を読まない)
+run_py() {
+  local var="PY_SRC_$1"
+  shift
+  python3 -c "${!var}" "$@" </dev/null
+}
+
+# 起動時の確認より前のバージョンの読み取りと、起動時の確認の 2 の掃除にも読み込んだ中身を使うので、ここで読み込む。
+# 読み込めなければ、それらを行わずに、起動時の確認の 8 で止まる
+load_py_files
+
+# ---- 起動時の確認に使う道具 (python3 を使う。read_worker_version のほかは、起動時の確認の 8 で python3 とそのスクリプトを確かめた後に呼ぶ) ----
+
+# ワーカーのバージョンを標準出力に出す。$1 はこのスクリプトのパス。説明の正本は review-loop-worker/read_worker_version.py
 read_worker_version() {
-  python3 - "$1" <<'PY'
-import json, os, sys
-
-root = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[1])))
-path = os.path.join(root, ".claude-plugin", "plugin.json")
-try:
-    with open(path, encoding="utf-8") as f:
-        version = json.load(f).get("version")
-except (OSError, ValueError, AttributeError) as e:
-    print(f"review-loop-worker: プラグインのファイル {path} から版を読めない ({e})", file=sys.stderr)
-    sys.exit(1)
-if not isinstance(version, str) or not version:
-    print(f"review-loop-worker: プラグインのファイル {path} に版 (version) が無い", file=sys.stderr)
-    sys.exit(1)
-print(version)
-PY
+  run_py read_worker_version "$1"
 }
 
-# 起動時の確認の 12。--sandbox-allow-write の値 (5 つ目以降の引数) の実体パスが、ホーム・作業側・周回の置き場・TMPDIR の
-# 実体パス (1〜4 つ目の引数) と同じか、その祖先なら、最初に当たったものの理由を標準出力に出して、終了コード 1 で終わる。
-# 作業側と周回の置き場は、その下の場所も同じく扱う (ホームと TMPDIR の下の場所は許す)。
-# 値の場所はまだ無くてよい (無い部分は、シンボリックリンクを解決せずにそのまま繋ぐ)
+# 起動時の確認の 12 (書き込みを許す場所の検査)。説明の正本は review-loop-worker/allow_write_problem.py
 allow_write_problem() {
-  python3 - "$@" <<'PY'
-import os, sys
-
-# (呼び名, 実体パス, 下の場所も許さないか)
-protected = (("ホーム", sys.argv[1], False), ("作業側", sys.argv[2], True), ("周回の置き場", sys.argv[3], True),
-             ("TMPDIR の実体", sys.argv[4], False))
-for value in sys.argv[5:]:
-    real = os.path.realpath(value)
-    for label, path, _ in protected:
-        if real == path:
-            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label}そのものなので、書き込みを許せない")
-            sys.exit(1)
-        if real == "/" or path.startswith(real + "/"):
-            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label} ({path}) を含むので、書き込みを許せない")
-            sys.exit(1)
-    # 下の場所は、同じか祖先かをすべての守る場所で確かめてから見る (周回の置き場の祖先が作業側の下にあるときは、
-    # 置き場を含むことを理由に出すため)
-    for label, path, below in protected:
-        if below and real.startswith(path + "/"):
-            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label} ({path}) の下にあるので、書き込みを許せない")
-            sys.exit(1)
-PY
+  run_py allow_write_problem "$@"
 }
 
-# 起動時の確認の 13。追加の引数の --settings の値 ($1) が、トップレベルのキーが enabledPlugins だけで、
-# その値がプラグイン名から真偽値への対応である JSON でなければ、理由を標準出力に出して、終了コード 1 で終わる
+# 起動時の確認の 13 (追加の引数の --settings の値の検査)。説明の正本は review-loop-worker/settings_arg_problem.py
 settings_arg_problem() {
-  python3 - "$1" <<'PY'
-import json, sys
-
-try:
-    value = json.loads(sys.argv[1])
-except ValueError as e:
-    print(f"JSON として読めない ({e})")
-    sys.exit(1)
-if not isinstance(value, dict):
-    print("トップレベルが、キーに enabledPlugins だけを持つオブジェクトではない")
-    sys.exit(1)
-if list(value) != ["enabledPlugins"]:
-    print(f"トップレベルのキーが enabledPlugins だけではない (キー: {', '.join(value) or '無し'})")
-    sys.exit(1)
-plugins = value["enabledPlugins"]
-if not isinstance(plugins, dict) or not all(isinstance(v, bool) for v in plugins.values()):
-    print("enabledPlugins の値が、プラグイン名から真偽値 (true / false) への対応ではない")
-    sys.exit(1)
-PY
+  run_py settings_arg_problem "$1"
 }
 
-# 起動時の確認の 14。利用者の設定ファイル ($1) が JSON として読めないか、空でない sandbox.excludedCommands か
-# sandbox.network.allowUnixSockets を持てば、理由 (当たったキーをすべて) を標準出力に出して、終了コード 1 で終わる。
-# ファイルが無ければ何もしない
+# 起動時の確認の 14 (利用者の設定の検査)。説明の正本は review-loop-worker/user_settings_problem.py
 user_settings_problem() {
-  python3 - "$1" <<'PY'
-import json, sys
-
-path = sys.argv[1]
-try:
-    with open(path, encoding="utf-8") as f:
-        settings = json.load(f)
-except FileNotFoundError:
-    sys.exit(0)
-except (OSError, ValueError) as e:
-    print(f"利用者の設定 {path} を JSON として読めない ({e})。検査できないので起動しない")
-    sys.exit(1)
-if not isinstance(settings, dict):
-    print(f"利用者の設定 {path} のトップレベルがオブジェクトではない。検査できないので起動しない")
-    sys.exit(1)
-sandbox = settings.get("sandbox")
-network = sandbox.get("network") if isinstance(sandbox, dict) else None
-excluded = sandbox.get("excludedCommands") if isinstance(sandbox, dict) else None
-sockets = network.get("allowUnixSockets") if isinstance(network, dict) else None
-found = []
-if excluded:
-    found.append(f"sandbox.excludedCommands ({json.dumps(excluded, ensure_ascii=False)}) がある "
-                 "(当たるコマンドはサンドボックスの外で動く)")
-if sockets:
-    found.append(f"sandbox.network.allowUnixSockets ({json.dumps(sockets, ensure_ascii=False)}) がある "
-                 "(サンドボックスの中の Bash が、当たる Unix ソケットに接続できる。Docker のソケットなら、"
-                 "コンテナを通してサンドボックスの外に書ける)")
-if found:
-    print(f"利用者の設定 {path} に " + "。".join(found) + "。当たったキーを消すか空にしてから起動し直す")
-    sys.exit(1)
-PY
+  run_py user_settings_problem "$1"
 }
 
-# 起動時の確認の 15 (表示)。利用者の設定ファイル ($1) の許可の規則 (permissions.allow) のうち、
-# WebFetch(domain:<ドメイン>) の形のものから、ドメインを重ねずに 1 行に 1 つずつ出す。
-# 14 の後に呼ぶので、ファイルは無いか JSON として読める
+# 起動時の確認の 15 (接続を許すホストに加わるドメインの表示)。説明の正本は review-loop-worker/webfetch_domains.py
 webfetch_domains() {
-  python3 - "$1" <<'PY'
-import json, re, sys
-
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        settings = json.load(f)
-except FileNotFoundError:
-    sys.exit(0)
-permissions = settings.get("permissions") if isinstance(settings, dict) else None
-allow = permissions.get("allow") if isinstance(permissions, dict) else None
-domains = []
-for rule in allow if isinstance(allow, list) else []:
-    m = re.fullmatch(r"\s*WebFetch\(domain:(.+)\)\s*", rule) if isinstance(rule, str) else None
-    if m and m.group(1).strip() not in domains:
-        domains.append(m.group(1).strip())
-for d in domains:
-    print(d)
-PY
+  run_py webfetch_domains "$1"
 }
 
-# 作業場所の名前に付けるハッシュ。周回の置き場の実体パス ($1) の SHA-256 の、16 進の先頭 8 文字
+# 作業場所の名前に付けるハッシュ。説明の正本は review-loop-worker/workspace_hash.py
 workspace_hash() {
-  python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.argv[1].encode("utf-8")).hexdigest()[:8])' "$1"
+  run_py workspace_hash "$1"
 }
 
-# レビュアの実行に渡す --settings の JSON を組み立てて標準出力に出す (中身の正本は worker.md の「サンドボックス」)。
-# 引数は、作業場所のパスに続けて、-w <書き込みを許す場所>・-d <接続を許すドメイン>・-s <追加の引数の --settings の値> の組を並べる。
-# サンドボックスの制限を外す真偽値のキー (allowAppleEvents・filesystem.disabled・network.allowAllUnixSockets) は、
-# 制限する側の値 (false) を書く。--settings は利用者とブランチの設定より優先されるので、それらの設定の値は効かなくなる。
-# 追加の引数の値を合成した後に、サンドボックスと自動メモリのキーがワーカーの値のままで、ほかのキーが enabledPlugins だけであることを
-# 確かめる。確かめられなければ理由を標準エラーに出して、終了コード 1 で終わる
+# レビュアの実行に渡す --settings の JSON を組み立てて標準出力に出す。説明の正本は review-loop-worker/build_settings_json.py
 build_settings_json() {
-  python3 - "$@" <<'PY'
-import json, sys
-
-workspace, pairs = sys.argv[1], sys.argv[2:]
-lists = {"-w": [], "-d": [], "-s": []}
-for flag, value in zip(pairs[0::2], pairs[1::2]):
-    lists[flag].append(value)
-settings = {
-    "sandbox": {
-        "enabled": True,
-        "autoAllowBashIfSandboxed": True,
-        "allowUnsandboxedCommands": False,
-        "failIfUnavailable": True,
-        "allowAppleEvents": False,
-        "filesystem": {"allowWrite": [workspace] + lists["-w"], "disabled": False},
-        "network": {"strictAllowlist": True, "allowedDomains": lists["-d"], "allowAllUnixSockets": False},
-    },
-    "autoMemoryEnabled": False,
-}
-worker_values = json.loads(json.dumps(settings))
-for text in lists["-s"]:
-    for key, value in json.loads(text).items():
-        if key == "enabledPlugins":
-            settings.setdefault("enabledPlugins", {}).update(value)
-        else:
-            settings[key] = value
-if {k: v for k, v in settings.items() if k != "enabledPlugins"} != worker_values:
-    print("review-loop-worker: 追加の引数の --settings を合成すると、サンドボックスか自動メモリの設定がワーカーの値から変わるか、"
-          "enabledPlugins 以外のキーが加わる", file=sys.stderr)
-    sys.exit(1)
-print(json.dumps(settings, ensure_ascii=False))
-PY
+  run_py build_settings_json "$@"
 }
 
 # ---- 作業場所と準備のディレクトリの片付けに使う道具 (起動時の確認の 2 と、回の処理の手順 5・10 で使う。python3 を使う) ----
 
-# 作業場所 ($1。実体パス) の中を cwd にしているプロセスを止める (回の終わりの処理の 1 と、起動時の確認の 2)。
-# 準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。省略すると「作業場所」)。
-# TERM を送り、STOP_GRACE_SECONDS 秒のうちに消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドは
-# レビュアの実行とは別のプロセスグループで動く) ので、cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から
-# (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
-# 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる。標準エラーに書けなくても
-# (ワーカーを動かしていた端末を閉じたときなど)、シグナルを送って止める処理は続ける
+# 作業場所 ($1。実体パス) の中を cwd にしているプロセスを止める。準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。
+# 省略すると「作業場所」)。TERM を送ってから KILL を送るまでの猶予は STOP_GRACE_SECONDS 秒。
+# 説明の正本は review-loop-worker/stop_cwd_procs.py
 stop_cwd_procs() {
-  python3 - "$1" "$STOP_GRACE_SECONDS" "${2:-作業場所}" <<'PY'
-import os, signal, subprocess, sys, time
-
-workspace, grace, label = sys.argv[1], float(sys.argv[2]), sys.argv[3]
-me = os.getpid()
-
-
-def note(msg):
-    """標準エラーへの報告。書けなくても (端末を閉じた後の OSError など) 無視して、止める処理は続ける。"""
-    try:
-        print(msg, file=sys.stderr, flush=True)
-    except OSError:
-        pass
-
-
-def inside(path):
-    return path == workspace or path.startswith(workspace + "/")
-
-
-def scan():
-    found = set()
-    if os.path.isdir("/proc/self"):
-        for name in os.listdir("/proc"):
-            if name.isdigit():
-                try:
-                    cwd = os.readlink(f"/proc/{name}/cwd")
-                except OSError:
-                    continue
-                if inside(cwd):
-                    found.add(int(name))
-    else:
-        try:
-            r = subprocess.run(["lsof", "-w", "-d", "cwd", "-Fpn"], capture_output=True, text=True, errors="replace")
-        except OSError as e:
-            raise RuntimeError(f"lsof を実行できない ({e})")
-        pid, listed = None, False
-        for line in r.stdout.splitlines():
-            if line.startswith("p") and line[1:].isdigit():
-                pid, listed = int(line[1:]), True
-            elif line.startswith("n") and pid is not None and inside(line[1:]):
-                found.add(pid)
-        # lsof は自分自身の cwd も出力するので、プロセスが 1 つも無ければ列挙に失敗している
-        if not listed:
-            raise RuntimeError(f"lsof の出力にプロセスが無い (終了コード {r.returncode}: {r.stderr.strip()[:200]})")
-    found.discard(me)
-    return found
-
-
-try:
-    pids = scan()
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        if not pids:
-            sys.exit(0)
-        for pid in pids:
-            try:
-                os.kill(pid, sig)
-            except (ProcessLookupError, PermissionError):
-                pass
-        note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが残っているので、"
-             f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})")
-        deadline = time.time() + grace
-        while True:
-            time.sleep(0.2)
-            pids = scan()
-            if not pids or time.time() >= deadline:
-                break
-except RuntimeError as e:
-    note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスを列挙できない: {e}")
-    sys.exit(1)
-if pids:
-    note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが止まらない "
-         f"(PID: {' '.join(str(p) for p in sorted(pids))})")
-    sys.exit(1)
-PY
+  run_py stop_cwd_procs "$1" "$STOP_GRACE_SECONDS" "${2:-作業場所}"
 }
 
-# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の読み取り・書き込み・実行の権限を足す
-# (Go のモジュールのキャッシュなど、読み取り専用のディレクトリを作るツールがあるため)。シンボリックリンクは辿らず、リンクの先の
-# 権限は変えない。$1 がディレクトリでないか、実体パスが $1 と違えば (作ったときと違えば)、理由を標準出力に出して終了コード 1 で終わる
+# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の権限を足す。説明の正本は review-loop-worker/make_removable.py
 make_removable() {
-  python3 - "$1" <<'PY'
-import os, stat, sys
-
-top = sys.argv[1]
-try:
-    st = os.lstat(top)
-except OSError as e:
-    print(f"状態を読めない ({e})")
-    sys.exit(1)
-if not stat.S_ISDIR(st.st_mode):
-    print("ディレクトリではない")
-    sys.exit(1)
-real = os.path.realpath(top)
-if real != top:
-    print(f"実体パス {real} が、作ったときと違う")
-    sys.exit(1)
-
-# 作業場所の中は、前の回のレビュアの実行が残したプロセス (作業場所の外に cwd を移したもの) も書き換えられる。
-# 確かめてから chmod するまでの間にディレクトリをシンボリックリンクに置き換えられても、リンクの先 (作業場所の外) の権限を
-# 変えないように、次の 2 つを守る。
-#   - パスの途中の部分は、名前を繋いだ文字列ではなく、開いたディレクトリのファイル記述子から辿る (os.fwalk の dir_fd)。
-#     os.fwalk はシンボリックリンクの先に降りない
-#   - パスの最後の部分は、chmod でシンボリックリンクを辿らない (os.chmod の follow_symlinks=False。macOS の lchmod)。
-#     Linux (CI のテストだけが通る経路) には lchmod が無いので、直前の lstat でシンボリックリンクでないことだけを確かめる
-NOFOLLOW = os.chmod in os.supports_follow_symlinks
-
-
-def add_owner_rwx(name, dir_fd=None):
-    try:
-        s = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
-    except OSError:
-        return
-    if not stat.S_ISDIR(s.st_mode) or s.st_mode & 0o700 == 0o700:
-        return
-    try:
-        if NOFOLLOW:
-            os.chmod(name, stat.S_IMODE(s.st_mode) | 0o700, dir_fd=dir_fd, follow_symlinks=False)
-        else:
-            os.chmod(name, stat.S_IMODE(s.st_mode) | 0o700, dir_fd=dir_fd)
-    except OSError:
-        pass
-
-
-add_owner_rwx(top)
-# 上から順にたどり、下のディレクトリの権限を、そこへ降りる前に足す
-for _, dirs, _, dir_fd in os.fwalk(top):
-    for d in dirs:
-        add_owner_rwx(d, dir_fd)
-PY
+  run_py make_removable "$1"
 }
 
 # 作業場所 ($1。実体パス) を消す (回の終わりの処理の 5)。準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。
@@ -590,6 +387,10 @@ startup_cleanup() {
   local loop_real key name recorded="" tmp_real target
   if ! command -v python3 >/dev/null 2>&1; then
     log "python3 が見つからないので、前の起動の作業場所を片付けられない"
+    return 0
+  fi
+  if [ -n "$PY_PROBLEM" ]; then
+    log "python3 のスクリプトを読み込めていないので、前の起動の作業場所を片付けられない"
     return 0
   fi
   loop_real=$(real_dir "$LOOP_DIR") || return 0
@@ -706,8 +507,8 @@ unavailable() {
 STARTED=$(now_iso)
 
 # ワーカーの版。起動時の確認が通らずに worker.yaml を unavailable で書くときにも書くので、確認より先に読む。
-# python3 が無ければ unknown のまま進み、起動時の確認の 8 で止まる
-if command -v python3 >/dev/null 2>&1; then
+# python3 が無いか、python3 のスクリプトを読み込めていなければ unknown のまま進み、起動時の確認の 8 で止まる
+if command -v python3 >/dev/null 2>&1 && [ -z "$PY_PROBLEM" ]; then
   if v=$(read_worker_version "$0"); then
     WORKER_VERSION=$v
   else
@@ -763,9 +564,10 @@ START_HEAD=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null) || unavailab
 # 7. 周回が終わっていないか
 [ ! -e "$LOOP_DIR/end" ] || unavailable "end がある (周回は終わっている)"
 
-# 8. 使うコマンドがあるか
+# 8. 使うコマンドがあり、python3 のスクリプトを読み込めたか (読み込んだのは関数 load_py_files)
 command -v claude >/dev/null 2>&1 || unavailable "claude コマンドが見つからない"
 command -v python3 >/dev/null 2>&1 || unavailable "python3 が見つからない"
+[ -z "$PY_PROBLEM" ] || unavailable "$PY_PROBLEM"
 
 # 9. 作業場所を置ける一時ディレクトリがあるか。作業場所は書き込みを許す場所で、ホームと作業側は守る場所なので、重なってはいけない。
 # TMPDIR が無くても /tmp に代えない (他の利用者も書ける場所で、作業場所の名前も予測できるため)
@@ -1154,150 +956,10 @@ snapshot() {
   done
 }
 
-# ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・サンドボックスが止めた確認を読む
-# (読み方の正本は worker.md の「ログの読み方」)。標準出力に次の行を出す。値はどれも 1 行 (改行を含まない)。
-#   1 行目: 実効モデルの名前 / 2 行目: skill_called / 3 行目: 拒否の件数 / 4 行目: 拒否されたツールの名前の列 (JSON) /
-#   5 行目: 実効の権限モード / 6 行目: サンドボックスが止めた件数 /
-#   7 行目から: 止められた呼び出しごとに、コマンドと文面の 2 行 (どちらも先頭 200 文字まで)
-# 読めない値は unknown にする。サンドボックスが止めた件数が unknown なら、7 行目からの行は出さない
+# ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・サンドボックスが止めた確認を読んで、
+# 1 行に 1 つずつ標準出力に出す。行の並びと説明の正本は review-loop-worker/read_log_facts.py
 read_log_facts() {
-  python3 - "$1" <<'PY'
-import json, re, sys
-
-# 印の YAML に書く値を 1 行に直すときに空白にする文字: 改行とタブを含む制御文字・行と段落の区切りの文字・
-# 対になっていないサロゲート (JSON の \ud800 のように、2 つ組で 1 文字を表す符号の片方だけをエスケープで書いたもの)・
-# 文字として使わない符号 (U+FFFE と U+FFFF)。どれも YAML の文字列にそのまま書けないか、書くと行が分かれるか、
-# ワーカーがこの出力を行ごとに読むのを乱す
-NOT_ONE_LINE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff\ufffe\uffff]")
-LIMIT = 200
-PHRASE = "operation not permitted"   # ファイルの書き込みを止められたときの文面 (大文字と小文字を区別しない)
-TAG = "<sandbox_violations>"         # 接続を止められたときに本文に付くタグ
-TAG_END = "</sandbox_violations>"
-
-
-def one_line(s, limit=None):
-    s = NOT_ONE_LINE.sub(" ", s).strip()
-    return s[:limit] if limit else s
-
-
-def body_text(content):
-    """tool_result の本文。文字列か、text の要素の text を改行で繋いだもの。"""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "\n".join(c["text"] for c in content
-                         if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str))
-    return ""
-
-
-def blocked_message(body):
-    """本文のうち、文面を含む行と、タグの行から閉じるタグの行 (無ければ本文の終わり) までの行を、空白で繋ぐ。
-    接続を止められたときは、止められたホストがタグの次の行にあるため、タグの中の行も含める。"""
-    out = []
-    in_tag = False
-    for l in body.splitlines():
-        if TAG in l:
-            in_tag = True
-        if in_tag or PHRASE in l.lower():
-            out.append(l.strip())
-        if TAG_END in l:
-            in_tag = False
-    return " ".join(x for x in out if x)
-
-
-model = None
-saw_assistant = False
-skill = False
-result = None
-init_seen = False
-mode = None
-uses = {}      # tool_use の id → (ツールの名前, 入力の command)。sub-agent の行も含める
-results = []   # tool_result の列 (ログの順)。sub-agent の行も含める
-try:
-    f = open(sys.argv[1], encoding="utf-8", errors="replace")
-except OSError:
-    f = []
-for line in f:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        o = json.loads(line)
-    except ValueError:
-        continue
-    if not isinstance(o, dict):
-        continue
-    t = o.get("type")
-    # サンドボックスが止めた確認を数えるための対応は、sub-agent の行 (parent_tool_use_id がある) からも作る
-    if t in ("assistant", "user"):
-        msg = o.get("message")
-        content = msg.get("content") if isinstance(msg, dict) else None
-        for c in content if isinstance(content, list) else []:
-            if not isinstance(c, dict):
-                continue
-            if t == "assistant" and c.get("type") == "tool_use" and isinstance(c.get("id"), str):
-                inp = c.get("input")
-                cmd = inp.get("command") if isinstance(inp, dict) else None
-                uses[c["id"]] = (c.get("name"), cmd if isinstance(cmd, str) else "")
-            elif t == "user" and c.get("type") == "tool_result":
-                results.append(c)
-    # 実効モデル・skill の呼び出し・実効の権限モード・拒否は、最上位の行だけから読む
-    if o.get("parent_tool_use_id"):
-        continue
-    if t == "system" and o.get("subtype") == "init":
-        if model is None and isinstance(o.get("model"), str) and o["model"]:
-            model = o["model"]
-        # 実効の権限モードは、最初の init の行だけから読む (その行に無ければ unknown)
-        if not init_seen:
-            init_seen = True
-            m = o.get("permissionMode")
-            mode = one_line(m) if isinstance(m, str) else None
-    elif t == "assistant":
-        saw_assistant = True
-        msg = o.get("message")
-        content = msg.get("content") if isinstance(msg, dict) else None
-        for c in content if isinstance(content, list) else []:
-            if isinstance(c, dict) and c.get("type") == "tool_use" and c.get("name") == "Skill":
-                skill = True
-    elif t == "result":
-        result = o
-
-sys.stdout.reconfigure(encoding="utf-8")
-name = "unknown"
-if model:
-    name = one_line(model[len("claude-"):] if model.startswith("claude-") else model) or "unknown"
-print(name)
-print(("true" if skill else "false") if saw_assistant else "unknown")
-denials = result.get("permission_denials") if isinstance(result, dict) else None
-if isinstance(denials, list):
-    tools = []
-    for d in denials:
-        n = d.get("tool_name") if isinstance(d, dict) else None
-        n = n if isinstance(n, str) and n else "unknown"
-        if n not in tools:
-            tools.append(n)
-    print(len(denials))
-    print(json.dumps(tools, ensure_ascii=False))
-else:
-    print("unknown")
-    print("[]")
-print(mode or "unknown")
-if isinstance(result, dict):
-    blocked = []
-    for r in results:
-        name_cmd = uses.get(r.get("tool_use_id"))
-        if not name_cmd or name_cmd[0] != "Bash" or r.get("is_error") is not True:
-            continue
-        body = body_text(r.get("content"))
-        if PHRASE in body.lower() or TAG in body:
-            blocked.append((one_line(name_cmd[1], LIMIT), one_line(blocked_message(body), LIMIT)))
-    print(len(blocked))
-    for cmd, message in blocked:
-        print(cmd)
-        print(message)
-else:
-    print("unknown")
-PY
+  run_py read_log_facts "$1"
 }
 
 # 完了の印を書き、この起動で応じた回の一覧に出す行を MARKER_LINE に入れる。ran=1 はレビュアの実行を起動した回。
@@ -1383,17 +1045,9 @@ prepare_workspace() {
   return 0
 }
 
-# ディレクトリ $1 を $2 に改名する (rename(2) をそのまま呼ぶ)。失敗すれば理由を標準出力に出して、終了コード 1 で終わる
+# ディレクトリ $1 を $2 に改名する (rename(2) をそのまま呼ぶ)。説明の正本は review-loop-worker/rename_dir.py
 rename_dir() {
-  python3 - "$1" "$2" <<'PY'
-import os, sys
-
-try:
-    os.rename(sys.argv[1], sys.argv[2])
-except OSError as e:
-    print(e.strerror or e)
-    sys.exit(1)
-PY
+  run_py rename_dir "$1" "$2"
 }
 
 # 手順 8 の後。準備のディレクトリ (PREP_DIR) を作業場所のパス (WS) に改名する。作業場所のパスに何かあれば (前の回の
@@ -1430,9 +1084,10 @@ run_prep() {
     PREP_TIMEOUT=1
     return 1
   fi
+  # 読み込んだ setpgid_exec.py の中身を、関数 run_py と同じく python3 -c で実行する
   (
     cd "$PREP_DIR" || exit 127
-    exec python3 -c "$SETPGID_PY" "$@"
+    exec python3 -c "$PY_SRC_setpgid_exec" "$@"
   ) </dev/null >"$PREP_OUT" 2>&1 &
   PREP_PID=$!
   until wait_once "$PREP_PID"; do
@@ -1482,58 +1137,18 @@ make_clone() {
   return 0
 }
 
-# 手順 7。複製 ($1) の .claude/settings.json と .claude/settings.local.json のどちらかに、空でない sandbox.excludedCommands か
-# sandbox.network.allowUnixSockets があるか、JSON として読めなければ、当たったものを 1 行に 1 つ出して、終了コード 1 で終わる。
-# ファイルが無ければ何もしない
+# 手順 7。複製 ($1) の設定を確かめる。説明の正本は review-loop-worker/clone_settings_problem.py
 clone_settings_problem() {
-  python3 - "$1" <<'PY'
-import json, os, stat, sys
-
-tree = sys.argv[1]
-problems = []
-for rel in (".claude/settings.json", ".claude/settings.local.json"):
-    path = os.path.join(tree, rel)
-    try:
-        # シンボリックリンクなら先を読む (Claude Code もそうする)。通常のファイルでなければ読まない (/dev/zero などで止まらないように)
-        if not stat.S_ISREG(os.stat(path).st_mode):
-            problems.append(f"{rel}: not a regular file")
-            continue
-        with open(path, encoding="utf-8") as f:
-            settings = json.load(f)
-    except FileNotFoundError:
-        continue
-    except (OSError, ValueError) as e:
-        problems.append(f"{rel}: not readable as JSON ({e})")
-        continue
-    if not isinstance(settings, dict):
-        problems.append(f"{rel}: top level is not an object")
-        continue
-    sandbox = settings.get("sandbox")
-    network = sandbox.get("network") if isinstance(sandbox, dict) else None
-    excluded = sandbox.get("excludedCommands") if isinstance(sandbox, dict) else None
-    sockets = network.get("allowUnixSockets") if isinstance(network, dict) else None
-    if excluded:
-        problems.append(f"{rel}: sandbox.excludedCommands is not empty ({json.dumps(excluded, ensure_ascii=False)})")
-    if sockets:
-        problems.append(f"{rel}: sandbox.network.allowUnixSockets is not empty ({json.dumps(sockets, ensure_ascii=False)})")
-for p in problems:
-    print(f"clone settings ({p})")
-sys.exit(1 if problems else 0)
-PY
+  run_py clone_settings_problem "$1"
 }
 
-# 手順 8。作業側の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。次の順に文字列を置き換える。置き換えた後のパスは、
-# どれも改名の後の作業場所のパス (レビュアの実行が見るパス) で書く。
-#   1. 元の出力先 (依頼文の「出力先:」の行の値) の、すべての出現 → 作業場所の結果のパス
-#   2. バッククォートで囲んだ元の作業ツリーのパス (作業側の実体パス) → 複製のパス
-#   3. 作業ツリーの扱いを示す行 (「- 作業ツリーの扱い: <値>」) の値 → 使い捨て
-# 出力先は作業ツリーのパスで始まるので、この順でないと出力先が複製の中のパスになる。元の出力先は、置き場から組み立てたもの
-# (実体が周回の置き場で、名前が review-<識別子>.yaml) でなければならない。置き換えの後に、元の出力先か元の作業ツリーのパスが
-# 残っているか、扱いの行がちょうど 1 つでなければ通らない。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
+# 手順 8。作業側の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。写しの作り方 (置き換える文字列と、失敗とする条件) の
+# 正本は review-loop-worker/make_request_copy.py。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
+# 読み込んだ中身を、関数 run_py と同じく python3 -c で実行する。
 # 通らなければ 1 を返し、上限を越えたためでなければ、完了の印の error に書く文字列を PREP_ERROR に入れる
 make_request_copy() {
   local out
-  run_prep "request copy" python3 -c "$(request_copy_py)" "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" \
+  run_prep "request copy" python3 -c "$PY_SRC_make_request_copy" "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" \
     && return 0
   [ "$PREP_TIMEOUT" = 1 ] && return 1
   out=$(last_line "$(cat "$PREP_OUT" 2>/dev/null)")
@@ -1544,135 +1159,16 @@ make_request_copy() {
   return 1
 }
 
-# 手順 8 の写しを作る python3 のスクリプトを標準出力に出す (python3 -c に渡す)。引数は、依頼文・写し・識別子・周回の置き場の実体パス・
-# 作業側の実体パス・作業場所・複製の順。通らなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
-request_copy_py() {
-  cat <<'PY'
-import os, re, sys
-
-request, copy, rid, loop_real, tree_real, workspace, clone = sys.argv[1:8]
-ws_result = os.path.join(workspace, f"review-{rid}.yaml")
-
-
-def fail(reason):
-    print(f"request copy failed ({reason})")
-    sys.exit(1)
-
-
-try:
-    with open(request, encoding="utf-8") as f:
-        text = f.read()
-except (OSError, ValueError) as e:
-    fail(f"cannot read the request: {e}")
-m = re.search(r"^出力先: `([^`]+)`", text, re.M)
-if not m:
-    fail("no output line")
-orig_out = m.group(1)
-if not (os.path.isabs(orig_out) and os.path.basename(orig_out) == f"review-{rid}.yaml"
-        and os.path.realpath(os.path.dirname(orig_out)) == loop_real):
-    fail(f"output path does not point to the loop dir: {orig_out}")
-text = text.replace(orig_out, ws_result)
-tree_token = f"`{tree_real}`"
-if tree_token not in text:
-    fail(f"worktree path not found: {tree_token}")
-text = text.replace(tree_token, f"`{clone}`")
-lines = text.split("\n")
-handling = [i for i, line in enumerate(lines) if line.startswith("- 作業ツリーの扱い:")]
-if len(handling) != 1:
-    fail(f"handling lines: {len(handling)}")
-lines[handling[0]] = re.sub(r"^(- 作業ツリーの扱い:).*?(\r?)$", r"\1 使い捨て\2", lines[handling[0]])
-text = "\n".join(lines)
-# 作業場所のパスを除いてから探す (作業場所のパスの中に、元のパスと同じ文字列が偶然現れても数えないように)
-rest = text.replace(workspace, "")
-if orig_out in rest:
-    fail("output path remains")
-if tree_real in rest:
-    fail("worktree path remains")
-try:
-    with open(copy, "w", encoding="utf-8") as f:
-        f.write(text)
-except OSError as e:
-    fail(f"cannot write the copy: {e}")
-PY
-}
-
-# 作業場所の結果 ($1) を確かめる (「回の処理」の表の「結果のファイル」)。通常のファイルで、実体パスが作業場所の下にあり、
-# 大きさが RESULT_MAX_BYTES 以下なら何も出さずに終了コード 0 で、そうでなければ当たった条件を 1 行に 1 つ出して終了コード 1 で終わる。
-# 中身は読まない (FIFO で止まらないように)
+# 作業場所の結果 ($1) を確かめる (「回の処理」の表の「結果のファイル」)。大きさの上限は RESULT_MAX_BYTES。
+# 説明の正本は review-loop-worker/result_file_problem.py
 result_file_problem() {
-  python3 - "$1" "$WS" "$RESULT_MAX_BYTES" <<'PY'
-import os, stat, sys
-
-path, workspace, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
-try:
-    st = os.lstat(path)
-except OSError as e:
-    print(f"result not readable ({e})")
-    sys.exit(1)
-problems = []
-if not stat.S_ISREG(st.st_mode):
-    kinds = ((stat.S_ISLNK, "symbolic link"), (stat.S_ISDIR, "directory"), (stat.S_ISFIFO, "FIFO"),
-             (stat.S_ISSOCK, "socket"), (stat.S_ISCHR, "character device"), (stat.S_ISBLK, "block device"))
-    kind = next((name for test, name in kinds if test(st.st_mode)), "unknown type")
-    problems.append(f"result not a regular file ({kind})")
-real = os.path.realpath(path)
-if not real.startswith(workspace + "/"):
-    problems.append(f"result outside workspace ({real})")
-if stat.S_ISREG(st.st_mode) and st.st_size > limit:
-    problems.append(f"result too large ({st.st_size} bytes > {limit} bytes)")
-for p in problems:
-    print(p)
-sys.exit(1 if problems else 0)
-PY
+  run_py result_file_problem "$1" "$WS" "$RESULT_MAX_BYTES"
 }
 
-# 手順 10 の 4。作業場所の結果 ($1) を、置き場の出力先 ($2) と同じディレクトリの一時名に書いてから改名して複写する。
-# 結果はシンボリックリンクを辿らずに開き直し、通常のファイルで大きさが上限以下であることを確かめてから読む。
-# 一時名もシンボリックリンクを辿らずに開く。改名の後に、出力先が通常のファイルとして在ることを確かめる。
-# 失敗すれば理由を標準出力に出して、終了コード 1 で終わる
+# 手順 10 の 4。作業場所の結果 ($1) を、置き場の出力先 ($2) に複写する。大きさの上限は RESULT_MAX_BYTES。
+# 説明の正本は review-loop-worker/copy_result.py
 copy_result() {
-  python3 - "$1" "$2" "$RESULT_MAX_BYTES" <<'PY'
-import os, stat, sys
-
-src, dest, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
-tmp = os.path.join(os.path.dirname(dest), "." + os.path.basename(dest) + ".tmp")
-
-
-def fail(reason):
-    print(reason)
-    sys.exit(1)
-
-
-try:
-    with os.fdopen(os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as f:
-        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
-            fail("the result is not a regular file")
-        data = f.read(limit + 1)
-except OSError as e:
-    fail(f"cannot read the result: {e}")
-if len(data) > limit:
-    fail(f"the result is larger than {limit} bytes")
-try:
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)
-except OSError as e:
-    fail(f"cannot create {tmp}: {e}")
-try:
-    with os.fdopen(fd, "wb") as f:
-        f.write(data)
-    os.rename(tmp, dest)
-except OSError as e:
-    try:
-        os.unlink(tmp)
-    except OSError:
-        pass
-    fail(f"cannot write {dest}: {e}")
-try:
-    placed = stat.S_ISREG(os.lstat(dest).st_mode)
-except OSError:
-    placed = False
-if not placed:
-    fail(f"{dest} is not a regular file after the rename")
-PY
+  run_py copy_result "$1" "$2" "$RESULT_MAX_BYTES"
 }
 
 # ---- 回の処理の流れ (手順 2〜10) ----
@@ -1730,8 +1226,9 @@ finish_round() {
   # レビュアの実行の終了コード (REVIEWER_RC) は変えない
   stop_cwd_procs "$WS"
 
-  # 2. ログを読む。行の並びは関数 read_log_facts の説明のとおり。7 行目からは、止められた呼び出しごとのコマンドと文面の 2 行で、
-  # 完了の印の sandbox_blocked.calls の要素の YAML にする (値は yaml_str で二重引用符の文字列にする)
+  # 2. ログを読む。行の並びは review-loop-worker/read_log_facts.py の先頭のコメントのとおり。7 行目からは、
+  # 止められた呼び出しごとのコマンドと文面の 2 行で、完了の印の sandbox_blocked.calls の要素の YAML にする
+  # (値は yaml_str で二重引用符の文字列にする)
   facts=$(read_log_facts "$LOOP_DIR/$CURRENT_RID.log")
   SANDBOX_CALLS=""
   while IFS= read -r fact; do
@@ -1892,10 +1389,11 @@ run_reviewer() {
   )
 
   # --setting-sources user,project: 複製の .claude/settings.local.json (ローカルの設定) を読ませない。複製はコミットから作るので
-  # ふつうは無いが、前の回のレビュアの実行が残したプロセスは、改名の後に作れる (フックはサンドボックスの外で動く)
+  # ふつうは無いが、前の回のレビュアの実行が残したプロセスは、改名の後に作れる (フックはサンドボックスの外で動く)。
+  # setpgid_exec.py は、関数 run_prep と同じく、読み込んだ中身を python3 -c で実行する
   (
     cd "$CLONE" || exit 127
-    exec python3 -c "$SETPGID_PY" \
+    exec python3 -c "$PY_SRC_setpgid_exec" \
       claude -p "$prompt" \
       --model "$MODEL" --effort "$EFFORT" --permission-mode "$PERMISSION_MODE" \
       --settings "$SETTINGS_JSON" --setting-sources user,project --strict-mcp-config \
