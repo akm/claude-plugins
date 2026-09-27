@@ -471,9 +471,9 @@ class WorkerTestBase(unittest.TestCase):
         self.assert_contract("## `worker.yaml`", state)
         return state
 
-    def start_idle(self, *extra, **kw):
+    def start_idle(self, *extra, cwd=None, env=None, loop=None):
         """起動時の確認が通り、worker.yaml が idle で書かれることを確かめ、止めて (標準出力, worker.yaml の中身) を返す。"""
-        p = self.start(*extra, **kw)
+        p = self.start(*extra, cwd=cwd, env=env, loop=loop)
         state = self.wait_for(
             lambda: self.worker_state().get("pid") == p.pid and self.worker_state(),
             what="この起動が worker.yaml を書くこと")
