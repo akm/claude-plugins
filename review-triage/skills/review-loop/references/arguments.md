@@ -30,11 +30,17 @@ review-loop --end [<置き場>]
 - **`--resume [<置き場>]`**: 止まった (または前のセッションが報告せずに終わった) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
 - **`--end [<置き場>]`**: 周回を終える。置き場の省略は `--resume` と同じ。
 
-設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`。
+設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`・`review_loop.sandbox_allow_write` (サンドボックスの中の Bash に書き込みを許す場所)・`review_loop.sandbox_allowed_domains` (同じく接続を許すドメイン)。
+
+**`review_loop.permission_mode` が未設定なら、既定の `auto` を `loop.yaml` の `worker.permission_mode` に書く** (既定の値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。周回の権限モードは `loop.yaml` に書いた値で決まり、ワーカーの既定には任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了の印の権限モードの指定をこの値と比べる。
 
 **`--threshold` と `--stage` は周回の条件ではなく、`review-triage-fix` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落 — 周回は開始前の報告に書くために同じ規則で値を決めて検査し、`review-triage-fix` を呼ぶ (F1) たびに渡す。
 
 **`--resume` で受け付けるのは `--max` だけ。** ほかの条件は `loop.yaml` から復元する — 再開のたびに条件が変わると、記録の回ごとの違いが条件の違いによるものか収束によるものかを読み解けなくなる。条件を変えたいときは、`--end` で終えてから新しい周回を始める。`--max` は起動ごとの上限 (J5 は起動ごとに 0 から数える) なので、再開のたびに決めてよい。省略時は `loop.yaml` の `loop.max_rounds`。
+
+**書き込みを許す場所と接続を許すドメイン (`review_loop.sandbox_allow_write`・`review_loop.sandbox_allowed_domains`) は周回の条件ではなく、`--resume` のたびに設定から読み直して、`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains` に書く。** この 2 つは、ワーカーを動かすマシンごとに変わる値 (環境の値) で、周回の結果を比べるときにそろえる値ではない。開始時の値のままにすると、書き込みを許す場所が足りずに RA1 で止まった周回を、終えずに直して続けられない。読み直すときの値の誤りは、開始時と同じく未設定 (空の一覧) として扱い、警告を `--resume` の開始の報告に書く。**権限モードは周回の条件のままで、`--resume` では読み直さない。**
+
+**0.13.0 で始めた周回の `loop.yaml` には、この 2 つのキーが無い。** 無ければ空の一覧として扱う (`--resume` で読み直した後は書かれている)。権限モードは `loop.yaml` の値のまま続く。
 
 ## 設定と引数の優先順位
 
@@ -64,7 +70,7 @@ review-loop --end [<置き場>]
 | `wait_minutes`・`worker_wait_minutes`・`worker_idle_minutes`・`review_timeout_minutes` | 正の数 (小数を許す) |
 | `worker_stale_seconds` | 10 以上の整数 (ワーカーは 5 秒おきに更新時刻を進めるので、それより短いと動いているワーカーを停滞と読む) |
 | `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の正本は [worker.md](worker.md) の「レビュアの実行の権限」) |
-| `allowed_tools` | 文字列の配列 |
+| `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確かめる (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
 | `dir` | 空でない文字列。リポジトリのルートからの相対パスとして解決する |
 
 **エラーと警告には、その値が引数と設定のどちらから来たかを書く。** 直す先が違う。
