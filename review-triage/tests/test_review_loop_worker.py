@@ -24,6 +24,7 @@ uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で
 import hashlib
 import json
 import os
+import pty
 import re
 import shlex
 import shutil
@@ -2349,6 +2350,45 @@ class TestRestartCleanup(WorkerTestBase):
                 self.assertEqual(self.worker_state()["state"], "left")
                 self.assertFalse(os.path.lexists(ws))
                 self.assertTrue(os.path.exists(keep))
+
+    def test_stopped_even_when_stderr_broken(self):
+        # 指摘 #6: stop_cwd_procs は、標準エラーへの報告 (print) が OSError で失敗しても、シグナルを送って
+        # 残ったプロセスを止める処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
+        # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave 側への書き込みが
+        # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
+        # 回の終わりの処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、そのヒアドキュメントの
+        # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
+        # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが止まることを確かめる
+        # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終わって
+        # os.kill に届かないので、このプロセスは止まらずに残る)。
+        ws = self.ws_path()
+        touch = os.path.join(self.root, "stop-started")
+        self.delay_python("の中を cwd にしているプロセスが残っているので", 2, touch)
+        self.put_request()
+
+        master, slave = pty.openpty()
+        args = ["bash", _WORKER, self.loop, "--model", "opus", "--effort", "high"]
+        p = subprocess.Popen(
+            args, cwd=self.repo, env=self.env, stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
+        )
+        self.procs.append(p)
+        os.close(slave)
+        closed = False
+        self.addCleanup(lambda: None if closed else os.close(master))
+
+        self.wait_state("reviewing")
+        os.makedirs(os.path.join(ws, "tree"), exist_ok=True)
+        inside = self.spawn_sleeper(os.path.join(ws, "tree"))
+
+        # stop_cwd_procs の呼び出し (回の終わりの処理の 1) が始まった (sleep に入った) ら、
+        # 端末を閉じたのと同じ状態にする。以降、そのヒアドキュメントの標準エラーへの書き込みは OSError になる
+        self.wait_for(lambda: os.path.exists(touch), what="stop_cwd_procs の呼び出しの開始")
+        os.close(master)
+        closed = True
+
+        p.wait(timeout=30)
+        self.assertEqual(p.returncode, 128 + signal.SIGHUP)
+        self.wait_for(lambda: inside.poll() is not None, timeout=5, what="作業場所の中のプロセスの終了")
 
 
 if __name__ == "__main__":

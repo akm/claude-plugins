@@ -385,13 +385,22 @@ PY
 # TERM を送り、STOP_GRACE_SECONDS 秒のうちに消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドは
 # レビュアの実行とは別のプロセスグループで動く) ので、cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から
 # (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
-# 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる
+# 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる。標準エラーに書けなくても
+# (ワーカーを動かしていた端末を閉じたときなど)、シグナルを送って止める処理は続ける
 stop_cwd_procs() {
   python3 - "$1" "$STOP_GRACE_SECONDS" "${2:-作業場所}" <<'PY'
 import os, signal, subprocess, sys, time
 
 workspace, grace, label = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 me = os.getpid()
+
+
+def note(msg):
+    """標準エラーへの報告。書けなくても (端末を閉じた後の OSError など) 無視して、止める処理は続ける。"""
+    try:
+        print(msg, file=sys.stderr, flush=True)
+    except OSError:
+        pass
 
 
 def inside(path):
@@ -432,13 +441,13 @@ try:
     for sig in (signal.SIGTERM, signal.SIGKILL):
         if not pids:
             sys.exit(0)
-        print(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが残っているので、"
-              f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
         for pid in pids:
             try:
                 os.kill(pid, sig)
             except (ProcessLookupError, PermissionError):
                 pass
+        note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが残っているので、"
+             f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})")
         deadline = time.time() + grace
         while True:
             time.sleep(0.2)
@@ -446,11 +455,11 @@ try:
             if not pids or time.time() >= deadline:
                 break
 except RuntimeError as e:
-    print(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスを列挙できない: {e}", file=sys.stderr)
+    note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスを列挙できない: {e}")
     sys.exit(1)
 if pids:
-    print(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが止まらない "
-          f"(PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
+    note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが止まらない "
+         f"(PID: {' '.join(str(p) for p in sorted(pids))})")
     sys.exit(1)
 PY
 }
