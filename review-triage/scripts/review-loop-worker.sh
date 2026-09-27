@@ -1891,12 +1891,14 @@ run_reviewer() {
     'Bash(git push:*)'
   )
 
+  # --setting-sources user,project: 複製の .claude/settings.local.json (ローカルの設定) を読ませない。複製はコミットから作るので
+  # ふつうは無いが、前の回のレビュアの実行が残したプロセスは、改名の後に作れる (フックはサンドボックスの外で動く)
   (
     cd "$CLONE" || exit 127
     exec python3 -c "$SETPGID_PY" \
       claude -p "$prompt" \
       --model "$MODEL" --effort "$EFFORT" --permission-mode "$PERMISSION_MODE" \
-      --settings "$SETTINGS_JSON" --strict-mcp-config \
+      --settings "$SETTINGS_JSON" --setting-sources user,project --strict-mcp-config \
       --allowedTools "${tools[@]}" \
       --disallowedTools "${denied[@]}" \
       --output-format stream-json --verbose \

@@ -1046,7 +1046,8 @@ class TestWorkspace(WorkerTestBase):
                 self.assertEqual(stat.S_IMODE(os.stat(victim).st_mode), 0o755)
 
     def test_reviewer_arguments(self):
-        # AE1: --permission-mode auto・--strict-mcp-config・--settings (1 つ)・拒否の規則・結果への書き込みの許可。
+        # AE1: --permission-mode auto・--strict-mcp-config・--setting-sources user,project・--settings (1 つ)・拒否の規則・
+        # 結果への書き込みの許可。
         # --settings では、サンドボックスの制限を外す真偽値のキー (allowAppleEvents・filesystem.disabled・
         # network.allowAllUnixSockets) を false にする
         cache = os.path.join(self.root, "cache")
@@ -1061,6 +1062,8 @@ class TestWorkspace(WorkerTestBase):
         ws = os.path.dirname(clone)
         self.assertEqual(args[args.index("--permission-mode") + 1], "auto")
         self.assertIn("--strict-mcp-config", args)
+        # 複製のローカルの設定 (.claude/settings.local.json) を読ませない
+        self.assertEqual(args[args.index("--setting-sources") + 1], "user,project")
         self.assertEqual(args.count("--settings"), 1)
         self.assertEqual(rec["settings"], [{
             "sandbox": {
