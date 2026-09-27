@@ -202,6 +202,11 @@ join_lines() {
   printf '%s\n' "$1" | sed '/^$/d' | awk 'NR > 1 { printf "; " } { printf "%s", $0 }'
 }
 
+# 改行区切りの列 (標準入力) を、", " で繋いだ 1 行にする (完了の印の error に並べる一覧)
+comma_join() {
+  tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g'
+}
+
 # そのプロセスグループに、終わっていない (ゾンビでない) プロセスが残っているか
 group_alive() {
   ps -A -o pgid=,stat= 2>/dev/null | awk -v g="$1" '$1 == g && $2 !~ /^Z/ { found = 1 } END { exit !found }'
@@ -1343,7 +1348,7 @@ make_clone() {
     '+refs/tags/*:refs/tags/*' || return 1
   clone_stage checkout -C tree -c advice.detachedHead=false checkout -q --detach "$sha" || return 1
   clone_stage submodule -C tree ls-files -s || return 1
-  subs=$(grep '^160000 ' "$PREP_OUT" | cut -f2 | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
+  subs=$(grep '^160000 ' "$PREP_OUT" | cut -f2 | comma_join)
   if [ -n "$subs" ]; then
     PREP_ERROR="clone failed (submodule: $subs)"
     return 1
@@ -1663,12 +1668,12 @@ EOF
   full_after=$(git -C "$CWD_REAL" rev-parse HEAD 2>/dev/null)
   full_before=$(git -C "$CWD_REAL" rev-parse --verify -q "$HEAD_BEFORE^{commit}" 2>/dev/null)
   [ "$full_after" = "$full_before" ] || errors+=("head changed (before $HEAD_BEFORE, after $head_after)")
-  dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
+  dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | comma_join)
   if [ -z "$dirty" ]; then clean_after=true; else clean_after=false; errors+=("tree not clean ($dirty)"); fi
 
   # 置き場。依頼文を受け取ったときに控えた一覧と比べる (結果の複写より前に比べる)
   after=$(snapshot)
-  changed=$( { echo "$SNAPSHOT_BEFORE"; echo "$after"; } | sed '/^$/d' | LC_ALL=C sort | uniq -u | sed 's/ [^ ]*$//' | LC_ALL=C sort -u | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
+  changed=$( { echo "$SNAPSHOT_BEFORE"; echo "$after"; } | sed '/^$/d' | LC_ALL=C sort | uniq -u | sed 's/ [^ ]*$//' | LC_ALL=C sort -u | comma_join)
   if [ -n "$changed" ]; then
     errors+=("loop dir modified ($changed)")
     # レビュアの実行が置いた依頼文は、この起動の間は処理しない
@@ -1832,7 +1837,7 @@ process_request() {
   if [ -z "$full_req" ] || [ "$full_req" != "$full_head" ]; then
     fail_without_run "head mismatch (expected $req_head, actual $HEAD_BEFORE)"; return
   fi
-  dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g')
+  dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | comma_join)
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
   # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各段の前に確かめる
