@@ -57,8 +57,10 @@ import time
 
 
 def git(*args):
-    """cwd で git を実行し、成功すれば標準出力 (前後の空白を除く) を、失敗すれば None を返す。"""
-    r = subprocess.run(["git", *args], capture_output=True, text=True)
+    """cwd で git を実行し、成功すれば標準出力 (前後の空白を除く) を、失敗すれば None を返す。
+    テストが PATH に置く偽の git が、ワーカーの実行した git と見分けられるように、環境変数 FAKE_GIT_CALLER を fake-claude にする。"""
+    r = subprocess.run(["git", *args], capture_output=True, text=True,
+                       env=dict(os.environ, FAKE_GIT_CALLER="fake-claude"))
     return r.stdout.strip() if r.returncode == 0 else None
 
 

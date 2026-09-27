@@ -15,7 +15,7 @@ review-request-template.md) を埋めて作る — ワーカーは雛形の行 (
 uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で Darwin を返す) も PATH の先頭に置く。
 ワーカーの環境変数 HOME と TMPDIR は、テストの一時ディレクトリの中の別々のディレクトリにする
 (利用者の設定 ~/.claude/settings.json を読まないように、また作業場所の条件を満たすように)。
-ワーカーは回ごとに作業場所を TMPDIR の下に作り、回の終わりに消す。
+ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終わりに消す。
 
 振る舞いの正本は review-triage/skills/review-loop/references/worker.md、
 置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
@@ -25,8 +25,10 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -42,25 +44,36 @@ _PLUGIN_JSON = os.path.join(_HERE, "..", ".claude-plugin", "plugin.json")
 _TEMPLATE = os.path.join(_HERE, "..", "skills", "review-triage", "references", "review-request-template.md")
 
 # 偽の git。テストが PATH の先頭の bin/ に git の名前で書き、FAKE_GIT_REAL の本物の git に引数をそのまま渡す。
+# FAKE_GIT_LOG があれば、git を実行するディレクトリ (cwd に -C の値を順に繋いだもの)・サブコマンド・呼び出し元
+# (環境変数 FAKE_GIT_CALLER の値。偽の claude は fake-claude にする。無ければ空文字列) を、JSON の 1 行としてそのファイルに書き足す。
 # サブコマンド (-C <ディレクトリ>・-c <設定> と、- で始まる引数を飛ばした最初の引数) が
 # FAKE_GIT_TOUCH_ON と同じならファイル FAKE_GIT_TOUCH を作り、
+# FAKE_GIT_RUN_ON と同じならシェルのコマンド FAKE_GIT_RUN を sh -c で実行し、
 # FAKE_GIT_SLEEP_ON と同じなら自分の PID をファイル FAKE_GIT_PIDS に書き足してから FAKE_GIT_SLEEP 秒 (既定 1000) 待ち、
 # FAKE_GIT_FAIL と同じなら本物を呼ばずに失敗する
 _FAKE_GIT = """#!/usr/bin/env python3
-import os, sys, time
+import json, os, subprocess, sys, time
 
 args = sys.argv[1:]
 i = 0
+where = os.getcwd()
 while i < len(args):
     if args[i] in ("-C", "-c"):
+        if args[i] == "-C" and i + 1 < len(args):
+            where = os.path.join(where, args[i + 1])
         i += 2
     elif args[i].startswith("-"):
         i += 1
     else:
         break
 sub = args[i] if i < len(args) else ""
+if os.environ.get("FAKE_GIT_LOG"):
+    with open(os.environ["FAKE_GIT_LOG"], "a", encoding="utf-8") as f:
+        f.write(json.dumps([os.path.realpath(where), sub, os.environ.get("FAKE_GIT_CALLER", "")]) + "\\n")
 if sub and sub == os.environ.get("FAKE_GIT_TOUCH_ON"):
     open(os.environ["FAKE_GIT_TOUCH"], "w").close()
+if sub and sub == os.environ.get("FAKE_GIT_RUN_ON"):
+    subprocess.run(["sh", "-c", os.environ["FAKE_GIT_RUN"]], check=True)
 if sub and sub == os.environ.get("FAKE_GIT_SLEEP_ON"):
     if os.environ.get("FAKE_GIT_PIDS"):
         with open(os.environ["FAKE_GIT_PIDS"], "a", encoding="utf-8") as f:
@@ -76,19 +89,70 @@ os.execv(real, [real] + args)
 # 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを走らせている python) に
 # 引数をそのまま渡す。標準入力から読むスクリプト (python3 - <引数>...) が文字列 FAKE_PY_SLEEP_MARK を含めば、
 # ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待ち、そのあとスクリプトを実行する。
-# ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う
+# ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う。
+# 同じく文字列 FAKE_PY_PRELUDE_MARK を含めば、ファイル FAKE_PY_PRELUDE の中身をスクリプトの前に足してから実行する
+# (ワーカーの処理の途中に、別のプロセスが割り込んだのと同じ変更を起こすのに使う)
 _FAKE_PYTHON = """#!/bin/sh
-if [ "$1" = "-" ] && [ -n "${FAKE_PY_SLEEP_MARK:-}" ]; then
+if [ "$1" = "-" ] && { [ -n "${FAKE_PY_SLEEP_MARK:-}" ] || [ -n "${FAKE_PY_PRELUDE_MARK:-}" ]; }; then
   shift
   script=$(cat)
-  case "$script" in
-    *"$FAKE_PY_SLEEP_MARK"*)
-      if [ -n "${FAKE_PY_TOUCH:-}" ]; then : >"$FAKE_PY_TOUCH"; fi
-      sleep "${FAKE_PY_SLEEP:-1000}" ;;
-  esac
+  if [ -n "${FAKE_PY_SLEEP_MARK:-}" ]; then
+    case "$script" in
+      *"$FAKE_PY_SLEEP_MARK"*)
+        if [ -n "${FAKE_PY_TOUCH:-}" ]; then : >"$FAKE_PY_TOUCH"; fi
+        sleep "${FAKE_PY_SLEEP:-1000}" ;;
+    esac
+  fi
+  if [ -n "${FAKE_PY_PRELUDE_MARK:-}" ]; then
+    case "$script" in
+      *"$FAKE_PY_PRELUDE_MARK"*)
+        script="$(cat "$FAKE_PY_PRELUDE")
+$script" ;;
+    esac
+  fi
   exec "$FAKE_PY_REAL" -c "$script" "$@"
 fi
 exec "$FAKE_PY_REAL" "$@"
+"""
+
+# make_removable の途中で、前の回のレビュアの実行が残したプロセスがディレクトリをシンボリックリンクに置き換えたのと同じ変更を
+# 起こす前置き (偽の python3 の FAKE_PY_PRELUDE)。名前が victim のパスを、シンボリックリンクを辿らずに stat した直後
+# (関数 make_removable がディレクトリであることを確かめた直後で、chmod より前) に 1 度だけ、そのディレクトリを victim.moved に移し、
+# victim を FAKE_PY_SWAP_TARGET へのシンボリックリンクにして、ファイル FAKE_PY_SWAP_DONE を作る
+_SWAP_PRELUDE = """
+import os as _os
+
+_real_stat, _real_lstat = _os.stat, _os.lstat
+_swapped = []
+
+
+def _swap(path, dir_fd):
+    if _swapped or not isinstance(path, str) or _os.path.basename(path) != "victim":
+        return
+    _swapped.append(path)
+    if dir_fd is None:
+        _os.rename(path, path + ".moved")
+        _os.symlink(_os.environ["FAKE_PY_SWAP_TARGET"], path)
+    else:
+        _os.rename(path, path + ".moved", src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        _os.symlink(_os.environ["FAKE_PY_SWAP_TARGET"], path, dir_fd=dir_fd)
+    open(_os.environ["FAKE_PY_SWAP_DONE"], "w").close()
+
+
+def _stat(path, *, dir_fd=None, follow_symlinks=True):
+    st = _real_stat(path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+    if not follow_symlinks:
+        _swap(path, dir_fd)
+    return st
+
+
+def _lstat(path, *, dir_fd=None):
+    st = _real_lstat(path, dir_fd=dir_fd)
+    _swap(path, dir_fd)
+    return st
+
+
+_os.stat, _os.lstat = _stat, _lstat
 """
 
 # サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側と周回の置き場がこの下にあると起動しない
@@ -397,22 +461,42 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_GIT_SLEEP"] = "1000"
         self.env["FAKE_GIT_PIDS"] = self.git_pids_file
 
-    def delay_python(self, mark, seconds, touch):
-        """PATH の先頭の bin/ の python3 を偽の python3 (_FAKE_PYTHON) に替え、標準入力から読むスクリプトが mark を含むものを
-        seconds 秒遅らせる。遅らせ始めたときにファイル touch を作る。"""
+    def install_fake_python(self):
+        """PATH の先頭の bin/ の python3 を偽の python3 (_FAKE_PYTHON) に替える。"""
         path = os.path.join(self.bin, "python3")
-        os.remove(path)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(_FAKE_PYTHON)
-        os.chmod(path, 0o755)
+        if os.path.islink(path):
+            os.remove(path)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(_FAKE_PYTHON)
+            os.chmod(path, 0o755)
         self.env["FAKE_PY_REAL"] = sys.executable
+
+    def delay_python(self, mark, seconds, touch):
+        """偽の python3 を置き、標準入力から読むスクリプトが mark を含むものを seconds 秒遅らせる。
+        遅らせ始めたときにファイル touch を作る。"""
+        self.install_fake_python()
         self.env["FAKE_PY_SLEEP_MARK"] = mark
         self.env["FAKE_PY_SLEEP"] = str(seconds)
         self.env["FAKE_PY_TOUCH"] = touch
 
+    def prelude_python(self, mark, prelude):
+        """偽の python3 を置き、標準入力から読むスクリプトが mark を含むものの前に、Python のコード prelude を足す。"""
+        self.install_fake_python()
+        path = os.path.join(self.root, "python-prelude.py")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(prelude)
+        self.env["FAKE_PY_PRELUDE_MARK"] = mark
+        self.env["FAKE_PY_PRELUDE"] = path
+
     def ws_path(self):
         """この周回の作業場所のパス。"""
         return _workspace_path(self.tmpdir, self.loop)
+
+    def prep_dirs(self):
+        """TMPDIR の下に残っている、この周回の準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの列。"""
+        prefix = "review-loop-prep-" + os.path.basename(self.ws_path())[len("review-loop-"):] + "."
+        tmp = os.path.realpath(self.tmpdir)
+        return sorted(os.path.join(tmp, n) for n in os.listdir(tmp) if n.startswith(prefix))
 
     def spawn_sleeper(self, cwd, *args):
         """cwd を作業ディレクトリにして、別のセッションで待ち続けるプロセスを起動する。args は起動引数に足すだけで使わない。"""
@@ -534,7 +618,7 @@ class WorkerTestBase(unittest.TestCase):
             return [json.loads(line) for line in f if line.strip()]
 
     def workspaces(self):
-        """TMPDIR の下に残っている作業場所 (名前が review-loop- で始まるもの) の名前の列。"""
+        """TMPDIR の下に残っている作業場所と準備のディレクトリ (どちらも名前が review-loop- で始まる) の名前の列。"""
         return sorted(n for n in os.listdir(self.tmpdir) if n.startswith("review-loop-"))
 
     def run_round(self, *extra, rid=RID):
@@ -876,6 +960,86 @@ class TestWorkspace(WorkerTestBase):
             self.assertIn(f'run_id: "{RID}"', f.read())
         self.assertEqual(self.workspaces(), [])
 
+    def test_preparation_in_separate_directory(self):
+        # 複製と写しは、作業場所とは別の、新しく作った準備のディレクトリで作り、作業場所のパスに改名してからレビュアの実行を起動する。
+        # 準備の間は作業場所のパスに何も無く、git は準備のディレクトリの中でだけ実行し、作業場所のパスの下では 1 度も実行しない
+        # (worker.md の「回の処理」の手順 5〜8 と、不変条件)
+        ws = self.ws_path()
+        seen = os.path.join(self.root, "seen-at-checkout")
+        git_log = os.path.join(self.root, "git-log.jsonl")
+        self.install_fake_git()
+        self.env["FAKE_GIT_LOG"] = git_log
+        self.env["FAKE_GIT_RUN_ON"] = "checkout"
+        self.env["FAKE_GIT_RUN"] = (
+            f"{{ pwd -P; if [ -e {shlex.quote(ws)} ] || [ -L {shlex.quote(ws)} ]; then echo exists; else echo absent; fi; }}"
+            f" > {shlex.quote(seen)}")
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+
+        with open(seen, encoding="utf-8") as f:
+            prep, ws_state = f.read().split()
+        self.assertEqual(os.path.dirname(prep), os.path.realpath(self.tmpdir))
+        self.assertRegex(os.path.basename(prep),
+                         rf"^review-loop-prep-{re.escape(LOOP_ID)}-[0-9a-f]{{8}}\.[A-Za-z0-9]{{6}}$")
+        # 作業場所のパスの文字列で始まらない (書き込みの許可がパスの接頭辞で判定されても、準備のディレクトリに及ばない)
+        self.assertFalse(prep.startswith(ws), prep)
+        self.assertEqual(ws_state, "absent", "準備の途中に作業場所のパスに何かがある")
+
+        # ワーカーが実行した git (偽の claude が実行したものを除く)
+        with open(git_log, encoding="utf-8") as f:
+            runs = [json.loads(line) for line in f if line.strip()]
+        runs = [(where, sub) for where, sub, caller in runs if caller != "fake-claude"]
+        in_prep = [sub for where, sub in runs if where == prep or where.startswith(prep + "/")]
+        self.assertEqual(in_prep, ["clone", "remote", "fetch", "checkout", "ls-files"])
+        self.assertEqual([r for r in runs if r[0] == ws or r[0].startswith(ws + "/")], [])
+
+        # レビュアの実行の時点では、複製・写し・書き込みの許可はどれも作業場所のパスに揃っていて、準備のディレクトリを指さない
+        rec = self.claude_records()[0]
+        self.assertEqual(rec["cwd"], os.path.join(ws, "tree"))
+        self.assertEqual(rec["head"], _git(self.repo, "rev-parse", "HEAD"))
+        self.assertEqual(rec["request_path"], os.path.join(ws, f"review-request-{RID}.md"))
+        self.assertIn(f"出力先: `{ws}/review-{RID}.yaml`", rec["request"])
+        self.assertNotIn(prep, rec["request"])
+        self.assertEqual(rec["settings"][0]["sandbox"]["filesystem"]["allowWrite"], [ws])
+        self.assertNotIn(prep, json.dumps(self.claude_calls()[0], ensure_ascii=False))
+        self.assertFalse(os.path.lexists(prep))
+        self.assertEqual(self.workspaces(), [])
+
+    def test_workspace_path_taken_before_rename(self):
+        # 前の回のレビュアの実行が残したプロセスが、準備の間に作業場所のパスを作り直した (偽の git の checkout の途中に作る) とき、
+        # シンボリックリンクと空でないディレクトリなら、リンクの先を変えずに改名が失敗し、レビュアの実行を起動せずに failed の印を書く。
+        # 空のディレクトリなら改名で置き換わり、その回は通る
+        ws = self.ws_path()
+        victim = os.path.join(self.root, "victim")
+        os.makedirs(victim)
+        with open(os.path.join(victim, "keep.txt"), "w", encoding="utf-8") as f:
+            f.write("消してはいけない\n")
+        os.chmod(victim, 0o755)
+        self.install_fake_git()
+        self.env["FAKE_GIT_RUN_ON"] = "checkout"
+        q = shlex.quote(ws)
+        cases = (
+            ("シンボリックリンク", f"ln -s {shlex.quote(victim)} {q}", False),
+            ("空でないディレクトリ", f"mkdir {q} && echo planted > {q}/planted.txt", False),
+            ("空のディレクトリ", f"mkdir {q}", True),
+        )
+        for label, command, passes in cases:
+            with self.subTest(label):
+                self.reset_loop()
+                self.env["FAKE_GIT_RUN"] = command
+                self.put_request()
+                marker, _ = self.run_round()
+                if passes:
+                    self.assertEqual(marker["status"], "ok", marker)
+                    self.assertEqual(self.claude_records()[0]["cwd"], os.path.join(ws, "tree"))
+                    self.assertEqual(self.workspaces(), [])
+                else:
+                    self.assert_not_run(marker)
+                    self.assertTrue(marker["error"].startswith(f"workspace failed (rename to {ws}: "), marker["error"])
+                self.assertEqual(os.listdir(victim), ["keep.txt"])
+                self.assertEqual(stat.S_IMODE(os.stat(victim).st_mode), 0o755)
+
     def test_reviewer_arguments(self):
         # AE1: --permission-mode auto・--strict-mcp-config・--settings (1 つ)・拒否の規則・結果への書き込みの許可
         cache = os.path.join(self.root, "cache")
@@ -1177,6 +1341,62 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(marker["status"], "ok", marker)
         self.assertEqual(marker["exit_code"], 5)
         self.assertEqual(self.workspaces(), [])
+
+    def make_outside_readonly_dir(self):
+        """作業場所の外に、所有者の書き込みの権限が無いディレクトリ (中にファイルが 1 つ) を作ってパスを返す。"""
+        outside = os.path.join(self.root, "outside")
+        os.makedirs(outside)
+        with open(os.path.join(outside, "keep.txt"), "w", encoding="utf-8") as f:
+            f.write("消してはいけない\n")
+        os.chmod(outside, 0o555)
+        return outside
+
+    def remove_workspace_at_end(self, fill):
+        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終わるのを待つ。"""
+        p = self.start()
+        self.wait_state("idle")
+        fill(self.ws_path())
+        open(self.path("end"), "w").close()
+        _, err = p.communicate(timeout=30)
+        self.assertEqual(p.returncode, 0, err)
+        self.assertFalse(os.path.lexists(self.ws_path()), err)
+        return err
+
+    def test_removal_does_not_change_symlink_targets(self):
+        # 作業場所を消すときに所有者の権限を足すのは、作業場所の中のディレクトリだけで、シンボリックリンクの先 (作業場所の外) の
+        # 権限は変えない。読み取り専用のディレクトリは消せる
+        outside = self.make_outside_readonly_dir()
+
+        def fill(ws):
+            os.makedirs(os.path.join(ws, "tree", "ro", "sub"))
+            os.symlink(outside, os.path.join(ws, "tree", "ro", "link"))
+            os.symlink(outside, os.path.join(ws, "link-top"))
+            os.chmod(os.path.join(ws, "tree", "ro", "sub"), 0o555)
+            os.chmod(os.path.join(ws, "tree", "ro"), 0o555)
+
+        self.remove_workspace_at_end(fill)
+        self.assertEqual(stat.S_IMODE(os.stat(outside).st_mode), 0o555)
+        self.assertEqual(os.listdir(outside), ["keep.txt"])
+
+    def test_removal_does_not_follow_symlink_swapped_in(self):
+        # 作業場所の中のディレクトリを、確かめてから chmod するまでの間にシンボリックリンクに置き換えられても (前の回のレビュアの実行が
+        # 残したプロセスの書き込みを、偽の python3 の前置きで起こす)、リンクの先の権限を変えない
+        if os.chmod not in os.supports_follow_symlinks:
+            self.skipTest("この OS には lchmod が無い (chmod でシンボリックリンクを辿らない方法を、macOS でだけ確かめられる)")
+        outside = self.make_outside_readonly_dir()
+        done = os.path.join(self.root, "swap-done")
+        self.prelude_python("add_owner_rwx", _SWAP_PRELUDE)
+        self.env["FAKE_PY_SWAP_TARGET"] = outside
+        self.env["FAKE_PY_SWAP_DONE"] = done
+
+        def fill(ws):
+            os.makedirs(os.path.join(ws, "tree", "victim"))
+            os.chmod(os.path.join(ws, "tree", "victim"), 0o555)
+
+        self.remove_workspace_at_end(fill)
+        self.assertTrue(os.path.exists(done), "作業場所を消す途中で、ディレクトリをシンボリックリンクに置き換えていない")
+        self.assertEqual(stat.S_IMODE(os.stat(outside).st_mode), 0o555)
+        self.assertEqual(os.listdir(outside), ["keep.txt"])
 
 
 class TestLogReading(WorkerTestBase):
@@ -1636,6 +1856,28 @@ class TestSandboxStartChecks(WorkerTestBase):
                                        "--sandbox-allow-write", value,
                                        contains=["--sandbox-allow-write", contains])
 
+    def test_sandbox_allow_write_must_not_contain_tmpdir(self):
+        # TMPDIR の実体と同じか、その祖先の値も受け付けない (前の回のレビュアの実行が残したプロセスが、次の回の準備のディレクトリに
+        # 書けないように)。TMPDIR の下の場所は受け付ける
+        tmpdir = os.path.join(self.root, "t", "tmpdir")
+        os.makedirs(tmpdir)
+        link = os.path.join(self.root, "tmpdir-link")
+        os.symlink(tmpdir, link)
+        env = dict(self.env, TMPDIR=tmpdir)
+        cases = (
+            ("TMPDIR", tmpdir),
+            ("TMPDIR へのシンボリックリンク", link),
+            ("TMPDIR の祖先", os.path.join(self.root, "t")),
+        )
+        for label, value in cases:
+            with self.subTest(label):
+                self.start_unavailable("--sandbox-allow-write", os.path.join(self.root, "cache"),
+                                       "--sandbox-allow-write", value, env=env,
+                                       contains=["--sandbox-allow-write", "TMPDIR の実体"])
+        with self.subTest("TMPDIR の下"):
+            _, state = self.start_idle("--sandbox-allow-write", os.path.join(tmpdir, "cache"), env=env)
+            self.assertEqual(state["sandbox_allow_write"], [os.path.join(tmpdir, "cache")])
+
     def test_sandbox_allow_write_must_be_absolute(self):
         # 相対パスは、どこを基準にするかで指す場所が変わるので受け付けない。~ の後に名前が続く形 (~ユーザー名) も展開しない
         for value in ("cache", "./cache", "~other/cache"):
@@ -1874,8 +2116,8 @@ class TestInterruptPhases(WorkerTestBase):
     SIGNALS = ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129))
 
     def test_interrupt_during_preparation(self):
-        # 準備の途中 (偽の git の clone が終わらない間) に割り込みを受けると、準備のプロセスグループを止め、作業場所を消し、
-        # 印を書かずに left で終わる。起動し直したワーカーが、印の無い同じ依頼文を処理する
+        # 準備の途中 (偽の git の clone が終わらない間) に割り込みを受けると、準備のプロセスグループを止め、準備のディレクトリと
+        # 作業場所を消し、印を書かずに left で終わる。起動し直したワーカーが、印の無い同じ依頼文を処理する
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
                 self.reset_loop()
@@ -1883,6 +2125,9 @@ class TestInterruptPhases(WorkerTestBase):
                 self.put_request()
                 p = self.start()
                 git_pid = self.wait_pids(self.git_pids_file, 1)[0]
+                # 準備は準備のディレクトリの中で行い、作業場所のパスにはまだ何も無い
+                self.assertEqual(len(self.prep_dirs()), 1, self.workspaces())
+                self.assertFalse(os.path.lexists(self.ws_path()))
                 os.killpg(p.pid, sig)
                 p.communicate(timeout=30)
                 self.assertEqual(p.returncode, code)
@@ -1890,6 +2135,7 @@ class TestInterruptPhases(WorkerTestBase):
                 state = self.worker_state()
                 self.assertEqual(state["state"], "left")
                 self.assertEqual(state["workspace"], "")
+                self.assertEqual(self.prep_dirs(), [])
                 self.assertEqual(self.workspaces(), [])
                 self.assertEqual(self.claude_calls(), [])
                 self.wait_for(lambda: not _pid_alive(git_pid), timeout=5, what=f"偽の git {git_pid} の終了")
@@ -1968,8 +2214,8 @@ class TestRestartCleanup(WorkerTestBase):
         self.assert_cleaned_before_pickup(err)
 
     def test_sigkill_while_preparing_then_restart(self):
-        # 準備の途中 (偽の git の clone が終わらない間) にワーカーを SIGKILL で消すと、偽の git が残る。
-        # 起動し直すと、それを止めて前の作業場所を消してから、同じ依頼文を処理する
+        # 準備の途中 (偽の git の clone が終わらない間) にワーカーを SIGKILL で消すと、準備のディレクトリと、その中を cwd にした
+        # 偽の git が残る。起動し直すと、それを止めて準備のディレクトリを消してから、同じ依頼文を処理する
         self.delay_git("clone")
         self.put_request()
         p = self.start()
@@ -1977,6 +2223,8 @@ class TestRestartCleanup(WorkerTestBase):
         self.assertEqual(self.worker_state()["workspace"], self.ws_path())
         self.kill9(p)
         self.assertTrue(_pid_alive(git_pid), "SIGKILL の後に偽の git が残っていない (テストの前提が崩れている)")
+        self.assertEqual(len(self.prep_dirs()), 1, self.workspaces())
+        self.assertFalse(os.path.lexists(self.ws_path()))
 
         del self.env["FAKE_GIT_SLEEP_ON"]
         p = self.start()
@@ -2044,6 +2292,37 @@ class TestRestartCleanup(WorkerTestBase):
                 self.assertTrue(os.path.exists(keep))
                 self.assertIsNone(inside.poll())
                 self.assertTrue(os.path.islink(ws))
+
+    def test_prep_dirs_are_found_by_name(self):
+        # worker.yaml が無くても (準備のディレクトリのパスは記録しない)、TMPDIR の実体の下の、この周回の準備のディレクトリの名前の形
+        # (review-loop-prep-<周回 id>-<ハッシュ>.<6 文字>) に合うディレクトリは、中を cwd にしているプロセスを止めてから消す。
+        # 名前の形に合わないものと、シンボリックリンクは片付けない
+        key = os.path.basename(self.ws_path())[len("review-loop-"):]
+        tmp = os.path.realpath(self.tmpdir)
+        preps = [os.path.join(tmp, f"review-loop-prep-{key}.{s}") for s in ("a1B2c3", "zzzzzz")]
+        for d in preps:
+            os.makedirs(os.path.join(d, "tree", "sub"))
+        os.chmod(os.path.join(preps[1], "tree", "sub"), 0o555)
+        inside = self.spawn_sleeper(os.path.join(preps[0], "tree"))
+        others = [os.path.join(tmp, n) for n in (f"review-loop-prep-{key}.toolong7", f"review-loop-prep-other-{key}.a1B2c3")]
+        for d in others:
+            os.makedirs(d)
+        victim = os.path.join(self.root, "victim")
+        os.makedirs(victim)
+        keep = os.path.join(victim, "keep.txt")
+        with open(keep, "w", encoding="utf-8") as f:
+            f.write("消してはいけない\n")
+        link = os.path.join(tmp, f"review-loop-prep-{key}.link00")
+        os.symlink(victim, link)
+        self.assertFalse(os.path.exists(self.path("worker.yaml")))
+        self.start_idle()
+        self.wait_for(lambda: inside.poll() is not None, timeout=3, what="準備のディレクトリの中のプロセスの終了")
+        for d in preps:
+            self.assertFalse(os.path.lexists(d), d)
+        for d in others:
+            self.assertTrue(os.path.isdir(d), d)
+        self.assertTrue(os.path.islink(link))
+        self.assertTrue(os.path.exists(keep))
 
     def test_end_removes_workspace(self):
         # end を見て終わるとき、周回の作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない

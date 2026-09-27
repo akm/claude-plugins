@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# review-loop のワーカー。人間が端末で起動し、周回の置き場に現れた依頼文ごとに、TMPDIR の下に回の作業場所を作り、
-# その中の複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) で claude -p を走らせる。
+# review-loop のワーカー。人間が端末で起動し、周回の置き場に現れた依頼文ごとに、TMPDIR の下に新しく作ったディレクトリ
+# (準備のディレクトリ) に複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) と依頼文の写しを作り、
+# 回の作業場所のパスに改名してから、複製の中で claude -p を走らせる。
 # 結果を確かめてから置き場に複写し、作業場所を消して、完了の印を書く。
 #
 # 使い方:
@@ -27,11 +28,12 @@
 # bash は macOS の /bin/bash (3.2) で動くように書く。テストは CI (ubuntu) でも偽の uname で走らせるので、
 # GNU の stat と Linux の /proc でも動くようにしておく。python3 が要る (claude -p と準備のコマンドを専用のプロセスグループで
 # 起動する・ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
-# --settings の JSON を組み立てる・依頼文の写しを作る・結果を確かめて複写する・作業場所の中を cwd にしているプロセスを
-# 見つける・パスの実体を求めるのに使う)。
+# --settings の JSON を組み立てる・依頼文の写しを作る・準備のディレクトリを作業場所のパスに改名する・結果を確かめて複写する・
+# 作業場所の中を cwd にしているプロセスを見つける・作業場所の中のディレクトリに権限を足す・パスの実体を求めるのに使う)。
 #
-# 不変条件: レビュアの実行を起動した後は、複製の中で git を実行しない (複製の .git/config やフックはレビュアの実行が
-# 書き換えられるので、git を実行するとそのコマンドがサンドボックスの外で動く)。作業場所は rm -rf だけで消す。
+# 不変条件: 作業場所のパスの下では git を実行しない。複製に対する git は、準備のディレクトリの中で、作業場所のパスに
+# 改名する前にだけ実行する (作業場所のパスは周回の間使い回すので、前の回のレビュアの実行が残したプロセスも書ける。
+# 複製の .git の中身を書き換えられると、git が実行するコマンドがサンドボックスの外で動く)。作業場所は rm -rf だけで消す。
 
 set -u
 
@@ -236,22 +238,23 @@ print(version)
 PY
 }
 
-# 起動時の確認の 12。--sandbox-allow-write の値 (4 つ目以降の引数) の実体パスが、ホーム・作業側・周回の置き場の実体パス
-# (1〜3 つ目の引数) と同じか、その祖先なら、最初に当たったものの理由を標準出力に出して、終了コード 1 で終わる。
+# 起動時の確認の 12。--sandbox-allow-write の値 (5 つ目以降の引数) の実体パスが、ホーム・作業側・周回の置き場・TMPDIR の
+# 実体パス (1〜4 つ目の引数) と同じか、その祖先なら、最初に当たったものの理由を標準出力に出して、終了コード 1 で終わる。
 # 値の場所はまだ無くてよい (無い部分は、シンボリックリンクを解決せずにそのまま繋ぐ)
 allow_write_problem() {
   python3 - "$@" <<'PY'
 import os, sys
 
-protected = (("ホーム", sys.argv[1]), ("作業側", sys.argv[2]), ("周回の置き場", sys.argv[3]))
-for value in sys.argv[4:]:
+protected = (("ホーム", sys.argv[1]), ("作業側", sys.argv[2]), ("周回の置き場", sys.argv[3]),
+             ("TMPDIR の実体", sys.argv[4]))
+for value in sys.argv[5:]:
     real = os.path.realpath(value)
     for label, path in protected:
         if real == path:
-            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は{label}そのものなので、書き込みを許せない")
+            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label}そのものなので、書き込みを許せない")
             sys.exit(1)
         if real == "/" or path.startswith(real + "/"):
-            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は{label} ({path}) を含むので、書き込みを許せない")
+            print(f"--sandbox-allow-write の値 {value} (実体 {real}) は、{label} ({path}) を含むので、書き込みを許せない")
             sys.exit(1)
 PY
 }
@@ -375,18 +378,19 @@ print(json.dumps(settings, ensure_ascii=False))
 PY
 }
 
-# ---- 作業場所の片付けに使う道具 (起動時の確認の 2 と、回の処理の手順 5・10 で使う。python3 を使う) ----
+# ---- 作業場所と準備のディレクトリの片付けに使う道具 (起動時の確認の 2 と、回の処理の手順 5・10 で使う。python3 を使う) ----
 
 # 作業場所 ($1。実体パス) の中を cwd にしているプロセスを止める (回の終わりの処理の 1 と、起動時の確認の 2)。
+# 準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。省略すると「作業場所」)。
 # TERM を送り、STOP_GRACE_SECONDS 秒のうちに消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドは
 # レビュアの実行とは別のプロセスグループで動く) ので、cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から
 # (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
 # 列挙できないか止められなければ、理由を標準エラーに出して終了コード 1 で終わる
 stop_cwd_procs() {
-  python3 - "$1" "$STOP_GRACE_SECONDS" <<'PY'
+  python3 - "$1" "$STOP_GRACE_SECONDS" "${2:-作業場所}" <<'PY'
 import os, signal, subprocess, sys, time
 
-workspace, grace = sys.argv[1], float(sys.argv[2])
+workspace, grace, label = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 me = os.getpid()
 
 
@@ -428,7 +432,7 @@ try:
     for sig in (signal.SIGTERM, signal.SIGKILL):
         if not pids:
             sys.exit(0)
-        print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが残っているので、"
+        print(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが残っているので、"
               f"{sig.name} を送る (PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
         for pid in pids:
             try:
@@ -442,18 +446,18 @@ try:
             if not pids or time.time() >= deadline:
                 break
 except RuntimeError as e:
-    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスを列挙できない: {e}", file=sys.stderr)
+    print(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスを列挙できない: {e}", file=sys.stderr)
     sys.exit(1)
 if pids:
-    print(f"review-loop-worker: 作業場所 {workspace} の中を cwd にしているプロセスが止まらない "
+    print(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが止まらない "
           f"(PID: {' '.join(str(p) for p in sorted(pids))})", file=sys.stderr)
     sys.exit(1)
 PY
 }
 
 # 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の読み取り・書き込み・実行の権限を足す
-# (Go のモジュールのキャッシュなど、読み取り専用のディレクトリを作るツールがあるため)。シンボリックリンクは辿らない。
-# $1 がディレクトリでないか、実体パスが $1 と違えば (作ったときと違えば)、理由を標準出力に出して終了コード 1 で終わる
+# (Go のモジュールのキャッシュなど、読み取り専用のディレクトリを作るツールがあるため)。シンボリックリンクは辿らず、リンクの先の
+# 権限は変えない。$1 がディレクトリでないか、実体パスが $1 と違えば (作ったときと違えば)、理由を標準出力に出して終了コード 1 で終わる
 make_removable() {
   python3 - "$1" <<'PY'
 import os, stat, sys
@@ -472,64 +476,95 @@ if real != top:
     print(f"実体パス {real} が、作ったときと違う")
     sys.exit(1)
 
+# 作業場所の中は、前の回のレビュアの実行が残したプロセス (作業場所の外に cwd を移したもの) も書き換えられる。
+# 確かめてから chmod するまでの間にディレクトリをシンボリックリンクに置き換えられても、リンクの先 (作業場所の外) の権限を
+# 変えないように、次の 2 つを守る。
+#   - パスの途中の部分は、名前を繋いだ文字列ではなく、開いたディレクトリのファイル記述子から辿る (os.fwalk の dir_fd)。
+#     os.fwalk はシンボリックリンクの先に降りない
+#   - パスの最後の部分は、chmod でシンボリックリンクを辿らない (os.chmod の follow_symlinks=False。macOS の lchmod)。
+#     Linux (CI のテストだけが通る経路) には lchmod が無いので、直前の lstat でシンボリックリンクでないことだけを確かめる
+NOFOLLOW = os.chmod in os.supports_follow_symlinks
 
-def add_owner_rwx(path, mode):
-    if mode & 0o700 != 0o700:
-        try:
-            os.chmod(path, stat.S_IMODE(mode) | 0o700)
-        except OSError:
-            pass
+
+def add_owner_rwx(name, dir_fd=None):
+    try:
+        s = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+    except OSError:
+        return
+    if not stat.S_ISDIR(s.st_mode) or s.st_mode & 0o700 == 0o700:
+        return
+    try:
+        if NOFOLLOW:
+            os.chmod(name, stat.S_IMODE(s.st_mode) | 0o700, dir_fd=dir_fd, follow_symlinks=False)
+        else:
+            os.chmod(name, stat.S_IMODE(s.st_mode) | 0o700, dir_fd=dir_fd)
+    except OSError:
+        pass
 
 
-add_owner_rwx(top, st.st_mode)
+add_owner_rwx(top)
 # 上から順にたどり、下のディレクトリの権限を、そこへ降りる前に足す
-for root, dirs, _ in os.walk(top):
+for _, dirs, _, dir_fd in os.fwalk(top):
     for d in dirs:
-        p = os.path.join(root, d)
-        try:
-            s = os.lstat(p)
-        except OSError:
-            continue
-        if stat.S_ISDIR(s.st_mode):
-            add_owner_rwx(p, s.st_mode)
+        add_owner_rwx(d, dir_fd)
 PY
 }
 
-# 作業場所 ($1。実体パス) を消す (回の終わりの処理の 5)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確かめてから、
+# 作業場所 ($1。実体パス) を消す (回の終わりの処理の 5)。準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。
+# 省略すると「作業場所」)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確かめてから、
 # 中のディレクトリに権限を足して rm -rf で消す。git は使わない。消さなかったか消せなければ、パスと理由を標準エラーに出して 1 を返す
 remove_workspace() {
-  local ws=$1 why
+  local ws=$1 label=${2:-作業場所} why
   if [ -L "$ws" ]; then
-    log "作業場所 $ws がシンボリックリンクに置き換えられているので、消さない (リンクの先も消さない)。次の回の作業場所を作るときに、リンクだけを消す"
+    log "$label $ws がシンボリックリンクに置き換えられているので、消さない (リンクの先も消さない)。次の回の作業場所を作るときに、リンクだけを消す"
     return 1
   fi
   [ -e "$ws" ] || return 0
   if ! why=$(make_removable "$ws"); then
-    log "作業場所 $ws を消さない: ${why:-確かめられない}。次の回の作業場所を作るときか、次の起動で消す"
+    log "$label $ws を消さない: ${why:-確かめられない}。次の回の作業場所を作るときか、次の起動で消す"
     return 1
   fi
   rm -rf "$ws" 2>/dev/null
   if [ -e "$ws" ] || [ -L "$ws" ]; then
-    log "作業場所 $ws を消せない。次の回の作業場所を作るときか、次の起動で消す"
+    log "$label $ws を消せない。次の回の作業場所を作るときか、次の起動で消す"
     return 1
   fi
   return 0
 }
 
-# 起動時の確認の 2 (掃除)。前の起動が残した作業場所の中を cwd にしているプロセスを止め、作業場所を消す。
-# 片付けるのは、前の worker.yaml のキー workspace に記録されたパス (無いか空なら、TMPDIR の実体の下の決まったパス) だけで、
-# パスの名前が作業場所の名前の形 (review-loop-<周回 id>-<周回の置き場の実体パスのハッシュ>) に合い、シンボリックリンクでない
+# ディレクトリ $1 の下に残っている準備のディレクトリ (名前が review-loop-prep-<$2>.<6 文字>。$2 は、周回 id と、周回の置き場の
+# 実体パスのハッシュを - で繋いだもの) を片付ける (起動時の確認の 2 と、回の処理の手順 5・割り込み)。準備のディレクトリは
+# worker.yaml に記録しないので、名前の形で見つける。シンボリックリンクでないディレクトリだけを、中を cwd にしているプロセスを
+# 止めてから消す (作業場所と同じ手順)。それ以外のものは、パスを標準エラーに出して残す
+discard_prep_dirs() {
+  local d
+  for d in "$1/review-loop-prep-$2".??????; do
+    if [ -d "$d" ] && [ ! -L "$d" ]; then
+      log "準備のディレクトリ $d が残っているので、片付ける"
+      stop_cwd_procs "$d" 準備のディレクトリ
+      remove_workspace "$d" 準備のディレクトリ
+    elif [ -e "$d" ] || [ -L "$d" ]; then
+      log "$d は準備のディレクトリの名前の形だが、シンボリックリンクか、ディレクトリでないので、片付けない"
+    fi
+  done
+}
+
+# 起動時の確認の 2 (掃除)。前の起動が残した作業場所と準備のディレクトリの中を cwd にしているプロセスを止め、それらを消す。
+# 作業場所として片付けるのは、前の worker.yaml のキー workspace に記録されたパス (無いか空なら、TMPDIR の実体の下の決まったパス)
+# だけで、パスの名前が作業場所の名前の形 (review-loop-<周回 id>-<周回の置き場の実体パスのハッシュ>) に合い、シンボリックリンクでない
 # ディレクトリのときだけ、止めて消す — worker.yaml に書かれた値だけを根拠に、ワーカーが作ったのではないディレクトリの中の
-# プロセスを止めたり、ディレクトリを消したりしないため。プロセスは cwd で見つける (プロセスグループでは見つけられず、名前 (claude) は
+# プロセスを止めたり、ディレクトリを消したりしないため。準備のディレクトリは worker.yaml に記録しないので、作業場所と同じディレクトリの
+# 下から名前の形で見つける (関数 discard_prep_dirs)。プロセスは cwd で見つける (プロセスグループでは見つけられず、名前 (claude) は
 # 利用者の対話セッションと同じなので照合しない)。確認ではないので、片付けられなくても止めない (理由とパスを標準エラーに出す)
 startup_cleanup() {
-  local loop_real name recorded="" tmp_real target
+  local loop_real key name recorded="" tmp_real target
   if ! command -v python3 >/dev/null 2>&1; then
     log "python3 が見つからないので、前の起動の作業場所を片付けられない"
     return 0
   fi
   loop_real=$(real_dir "$LOOP_DIR") || return 0
-  name="review-loop-${loop_real##*/}-$(workspace_hash "$loop_real")"
+  key="${loop_real##*/}-$(workspace_hash "$loop_real")"
+  name="review-loop-$key"
   if [ -f "$LOOP_DIR/worker.yaml" ]; then
     # yaml_str で書いた値なので、\ で始まる 2 文字 (\\ と \") を 1 文字に戻す
     recorded=$(read_key "$LOOP_DIR/worker.yaml" workspace | sed 's/\\\(.\)/\1/g')
@@ -546,6 +581,8 @@ startup_cleanup() {
   else
     return 0
   fi
+  # 準備の途中に消えた起動が残した準備のディレクトリ (その中で準備のコマンドが動き続けていることもある)
+  discard_prep_dirs "${target%/*}" "$key"
   if [ -L "$target" ]; then
     log "前の起動の作業場所のパス $target はシンボリックリンクなので、片付けない (リンクの先も消さない)"
     return 0
@@ -578,8 +615,10 @@ PREP_PID=""            # 準備のコマンド (専用のプロセスグルー�
 WAITED_RC=""           # 関数 wait_once・wait_child・stop_group が受け取った、子プロセスの終了コード
 FINISHING=0
 WS=""                  # 回の作業場所のパス (起動時の確認が通った後に決める)
+WS_KEY=""              # 作業場所と準備のディレクトリの名前に共通する部分 (<周回 id>-<周回の置き場の実体パスのハッシュ>)
 # 回のどの部分を行っているか。割り込みを受けたときの扱いを決める (関数 on_signal)。
-#   "" = 依頼文を探している / prep = 準備 (手順 2〜8) / review = レビュアの実行 (手順 9) / finish = 回の終わりの処理 (手順 10)
+#   "" = 依頼文を探している / prep = 準備 (手順 2〜8 と、準備のディレクトリの改名) / review = レビュアの実行 (手順 9) /
+#   finish = 回の終わりの処理 (手順 10)
 PHASE=""
 PENDING_CODE=""        # 回の終わりの処理の途中に受けた割り込みの終了コード。印を書き終えてから、この値で終わる
 
@@ -597,7 +636,8 @@ EFFECTIVE_MODE="unknown"  # ログから読んだ実効の権限モード
 SANDBOX_COUNT="unknown"   # ログから数えた、サンドボックスが止めた確認の件数
 SANDBOX_CALLS=""          # 完了の印の sandbox_blocked.calls の要素 (YAML の行)。空なら calls は []
 MARKER_LINE=""         # 最後に書いた完了の印の、この起動で応じた回の一覧に出す行
-PREP_OUT=""            # 準備のコマンドの標準出力と標準エラーを書くファイル (作業場所の中)
+PREP_DIR=""            # 回の準備のディレクトリのパス (手順 5 で作り、手順 8 の後に作業場所のパスに改名する)
+PREP_OUT=""            # 準備のコマンドの標準出力と標準エラーを書くファイル (準備のディレクトリの中。改名の前に消す)
 PREP_TIMEOUT=0         # 準備のコマンドを、上限を越えたために止めたか起動しなかったら 1
 PREP_ERROR=""          # 準備の段が通らなかったときに、完了の印の error に書く文字列
 
@@ -737,8 +777,9 @@ check_rule_chars 作業側 "$CWD_REAL"
 check_rule_chars 周回の置き場 "$LOOP_REAL"
 check_rule_chars TMPDIR "$TMP_REAL"
 
-# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・周回の置き場) と同じでも、その祖先でもないか。
-# 先頭の ~ は引数を読んだときにホームに展開してある
+# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・周回の置き場・TMPDIR の実体) と同じでも、
+# その祖先でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、前の回のレビュアの実行が残したプロセスが
+# 書けない場所に作るため。先頭の ~ は引数を読んだときにホームに展開してある
 for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do
   case "$v" in
     /*) ;;
@@ -746,7 +787,7 @@ for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do
   esac
 done
 if [ ${#SANDBOX_ALLOW_WRITE[@]} -gt 0 ]; then
-  if ! problem=$(allow_write_problem "$HOME_REAL" "$CWD_REAL" "$LOOP_REAL" "${SANDBOX_ALLOW_WRITE[@]}"); then
+  if ! problem=$(allow_write_problem "$HOME_REAL" "$CWD_REAL" "$LOOP_REAL" "$TMP_REAL" "${SANDBOX_ALLOW_WRITE[@]}"); then
     [ -n "$problem" ] || problem="--sandbox-allow-write の値を検査できない"
     unavailable "$problem"
   fi
@@ -803,9 +844,12 @@ REVIEW_TIMEOUT_SECONDS=$(minutes_to_seconds "$REVIEW_TIMEOUT_MINUTES")
 
 # 回の作業場所 (worker.md の「回の処理」の手順 5)。周回の間は同じパスを使い回し、回ごとに作り直す。
 # 名前は、周回 id (置き場のディレクトリ名) と、周回の置き場の実体パスから作るハッシュ。TMP_REAL は実体パスなので、
-# 作業場所のパスもそのまま実体パスになる (シンボリックリンクに置き換えられていないかを、このパスと比べて確かめる)
+# 作業場所のパスもそのまま実体パスになる (シンボリックリンクに置き換えられていないかを、このパスと比べて確かめる)。
+# 準備のディレクトリの名前は review-loop-prep-<WS_KEY>.<mktemp が決める 6 文字> で、作業場所のパスの文字列で始まらない
+# (サンドボックスが書き込みの許可をパスの接頭辞で判定しても、作業場所への許可が準備のディレクトリに及ばないように)
 ws_hash=$(workspace_hash "$LOOP_REAL") && [ -n "$ws_hash" ] || unavailable "作業場所の名前に付けるハッシュを求められない"
-WS="$TMP_REAL/review-loop-${LOOP_REAL##*/}-$ws_hash"
+WS_KEY="${LOOP_REAL##*/}-$ws_hash"
+WS="$TMP_REAL/review-loop-$WS_KEY"
 CLONE="$WS/tree"
 
 # レビュアの実行に渡す --settings の JSON。値は起動の間変わらないので、ここで 1 度だけ組み立てる
@@ -985,6 +1029,12 @@ discard_workspace() {
   fi
 }
 
+# この周回の準備のディレクトリと作業場所が残っていれば、どちらも片付ける (準備が通らなかった回と、準備の途中の割り込み)
+discard_round_dirs() {
+  discard_prep_dirs "$TMP_REAL" "$WS_KEY"
+  discard_workspace
+}
+
 # 更新時刻を進める処理などを止め、worker.yaml を left にし、この起動で応じた回の一覧を出力して、終了コード $1 で終わる
 leave() {
   FINISHING=1
@@ -998,8 +1048,8 @@ leave() {
 }
 
 # 割り込み (INT / TERM / HUP) を受けたときの処理。受けた時点 (PHASE) で扱いが違う。
-#   prep   (準備の途中): 準備のコマンドのプロセスグループを止め、作業場所を消す。印は書かない — レビュアの実行を起動していないので、
-#          起動し直したワーカーが同じ依頼文を初めから処理する
+#   prep   (準備の途中): 準備のコマンドのプロセスグループを止め、準備のディレクトリと作業場所を消す。印は書かない —
+#          レビュアの実行を起動していないので、起動し直したワーカーが同じ依頼文を初めから処理する
 #   review (レビュアの実行中): レビュアの実行を止め、回の終わりの処理を行って、failed・interrupted の印を書く
 #   finish (回の終わりの処理の途中): 受けたことを控えて戻る。その回の印を書き終えてから、控えた終了コードで終わる
 #          (関数 process_request)。印の無い回と、消し残した作業場所を作らないため
@@ -1024,7 +1074,7 @@ on_signal() {
         stop_group "$PREP_PID"
         PREP_PID=""
       fi
-      discard_workspace
+      discard_round_dirs
       log "準備の途中だったので、印を書かずに終わる。起動し直したワーカーが、同じ依頼文を初めから処理する: $CURRENT_RID"
       ;;
     review)
@@ -1262,28 +1312,61 @@ note_served() {
 
 # ---- 回の作業場所・複製・写し・結果の複写に使う道具 (正本は worker.md の「回の処理」の手順 5〜10) ----
 
-# 手順 5。作業場所を作る。前の回の作業場所が残っていれば、残ったプロセスを止めて消してから作る。
-# シンボリックリンクが残っていれば、リンクだけを消す (リンクの先は消さない)。
-# 作れなければ、完了の印の error に書く文字列を標準出力に出して、終了コード 1 で終わる
+# 手順 5。前の回の作業場所と準備のディレクトリが残っていれば、残ったプロセスを止めて消してから、準備のディレクトリを新しく作り、
+# そのパスを PREP_DIR に、準備のコマンドの出力を書くファイルのパスを PREP_OUT に入れる。作業場所のパスにシンボリックリンクが
+# 残っていれば、リンクだけを消す (リンクの先は消さない)。準備のディレクトリは mktemp -d で作る — 前の回のサンドボックスが
+# 書き込みを許したのは作業場所のパスで、新しい名前のディレクトリには書けない。
+# 作業場所は、手順 8 の後に準備のディレクトリを作業場所のパスに改名して作る (関数 rename_prep_dir)。
+# 作れなければ、完了の印の error に書く文字列を PREP_ERROR に入れて 1 を返す
 prepare_workspace() {
   local out
   if [ -e "$WS" ] && [ ! -L "$WS" ]; then
     log "前の回の作業場所 $WS が残っているので、消してから作る"
   fi
-  discard_workspace
+  discard_round_dirs
   if [ -e "$WS" ] || [ -L "$WS" ]; then
-    echo "workspace failed (the previous workspace remains: $WS)"
+    PREP_ERROR="workspace failed (the previous workspace remains: $WS)"
     return 1
   fi
-  if ! out=$(mkdir -m 700 "$WS" 2>&1); then
-    echo "workspace failed (mkdir: $(last_line "$out"))"
+  if ! out=$(mktemp -d "$TMP_REAL/review-loop-prep-$WS_KEY.XXXXXX" 2>&1); then
+    PREP_ERROR="workspace failed (mktemp: $(last_line "$out"))"
     return 1
   fi
-  if [ -L "$WS" ] || [ ! -d "$WS" ] || [ ! -O "$WS" ] || [ "$(real_dir "$WS")" != "$WS" ]; then
-    echo "workspace failed (not a directory owned by the worker: $WS)"
+  PREP_DIR=$out
+  PREP_OUT="$PREP_DIR/.prep-output"
+  if [ -L "$PREP_DIR" ] || [ ! -d "$PREP_DIR" ] || [ ! -O "$PREP_DIR" ] || [ "$(real_dir "$PREP_DIR")" != "$PREP_DIR" ]; then
+    PREP_ERROR="workspace failed (not a directory owned by the worker: $PREP_DIR)"
     return 1
   fi
   return 0
+}
+
+# ディレクトリ $1 を $2 に改名する (rename(2) をそのまま呼ぶ)。失敗すれば理由を標準出力に出して、終了コード 1 で終わる
+rename_dir() {
+  python3 - "$1" "$2" <<'PY'
+import os, sys
+
+try:
+    os.rename(sys.argv[1], sys.argv[2])
+except OSError as e:
+    print(e.strerror or e)
+    sys.exit(1)
+PY
+}
+
+# 手順 8 の後。準備のディレクトリ (PREP_DIR) を作業場所のパス (WS) に改名する。作業場所のパスに何かあれば (前の回の
+# レビュアの実行が残したプロセスが、手順 5 で消した後に作り直したもの)、シンボリックリンクを辿らずに失敗する —
+# rename(2) は、移す先が空でないディレクトリなら ENOTEMPTY で、ディレクトリでないもの (シンボリックリンクを含む) なら
+# ENOTDIR で失敗し、空のディレクトリなら置き換える。mv は移す先がディレクトリへのシンボリックリンクなら、その先の中に移すので使わない。
+# 改名できなければ、完了の印の error に書く文字列を PREP_ERROR に入れて 1 を返す
+rename_prep_dir() {
+  local out
+  if out=$(rename_dir "$PREP_DIR" "$WS"); then
+    PREP_DIR=""
+    return 0
+  fi
+  PREP_ERROR="workspace failed (rename to $WS: ${out:-理由が分からない})"
+  return 1
 }
 
 # 手順 6 の段の失敗を、完了の印の error に書く文字列にする。$1 は段の名前、$2 は git の出力
@@ -1293,7 +1376,7 @@ clone_failed() {
   echo "clone failed ($1${detail:+: $detail})"
 }
 
-# 準備のコマンド ($2 以降) を、作業場所を cwd にして、専用のプロセスグループでバックグラウンドに起動して待つ ($1 は出力に書く段の名前)。
+# 準備のコマンド ($2 以降) を、準備のディレクトリを cwd にして、専用のプロセスグループでバックグラウンドに起動して待つ ($1 は出力に書く段の名前)。
 # 標準出力と標準エラーは PREP_OUT に書く。レビュアの実行と同じ起動の仕方にするのは、上限を越えたときと割り込みを受けたときに、
 # プロセスグループごと止められるようにするため (フォアグラウンドで待つと、bash は trap をコマンドが終わるまで遅らせる)。
 # 起動する前か待つ間に上限を越えたら、プロセスグループを止め、PREP_TIMEOUT を 1 にして 1 を返す。そうでなければコマンドの終了コードを返す
@@ -1306,7 +1389,7 @@ run_prep() {
     return 1
   fi
   (
-    cd "$WS" || exit 127
+    cd "$PREP_DIR" || exit 127
     exec python3 -c "$SETPGID_PY" "$@"
   ) </dev/null >"$PREP_OUT" 2>&1 &
   PREP_PID=$!
@@ -1333,7 +1416,8 @@ clone_stage() {
   return 1
 }
 
-# 手順 6。作業側のリポジトリを作業場所の tree/ に複製し、依頼の head ($1。作業側で解決した完全な SHA) を detached HEAD で取り出す。
+# 手順 6。作業側のリポジトリを準備のディレクトリの tree/ (改名の後は作業場所の tree/) に複製し、依頼の head ($1。作業側で解決した
+# 完全な SHA) を detached HEAD で取り出す。
 # 段は、複製 (clone)・remote の設定の削除 (remove remote)・ブランチとリモート追跡ブランチとタグの取り込み (fetch refs)・
 # チェックアウト (checkout)・submodule の項目の検査 (submodule) の順で、どれも準備のコマンドとして起動する (関数 run_prep)。
 # 通らなければ 1 を返す (理由は関数 clone_stage のとおり PREP_TIMEOUT か PREP_ERROR に入る)
@@ -1391,7 +1475,8 @@ sys.exit(1 if problems else 0)
 PY
 }
 
-# 手順 8。作業側の依頼文 ($1) の写しを、作業場所の $2 に作る。次の順に文字列を置き換える。
+# 手順 8。作業側の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。次の順に文字列を置き換える。置き換えた後のパスは、
+# どれも改名の後の作業場所のパス (レビュアの実行が見るパス) で書く。
 #   1. 元の出力先 (依頼文の「出力先:」の行の値) の、すべての出現 → 作業場所の結果のパス
 #   2. バッククォートで囲んだ元の作業ツリーのパス (作業側の実体パス) → 複製のパス
 #   3. 作業ツリーの扱いを示す行 (「- 作業ツリーの扱い: <値>」) の値 → 使い捨て
@@ -1557,10 +1642,11 @@ fail_without_run() {
   write_worker_yaml idle ""
 }
 
-# 準備 (手順 5〜8) が通らなかった回。作業場所があれば、回の終わりの処理の 1 と 5 の手順で片付けてから、
-# レビュアの実行を起動せずに failed の印を書く
+# 準備 (手順 5〜8 と、その後の改名) が通らなかった回。準備のディレクトリと作業場所があれば、回の終わりの処理の 1 と 5 の手順で
+# 片付けてから、レビュアの実行を起動せずに failed の印を書く
 fail_prepared() {
-  discard_workspace
+  discard_round_dirs
+  PREP_DIR=""
   fail_without_run "$1"
 }
 
@@ -1809,7 +1895,8 @@ process_request() {
   PREP_TIMEOUT=0
   PREP_ERROR=""
   PENDING_CODE=""
-  PREP_OUT="$WS/.prep-output"
+  PREP_DIR=""
+  PREP_OUT=""
   # 手順 2。上限の計測を始め、worker.yaml を reviewing にして識別子と作業場所のパスを書き、置き場のファイルの一覧と更新時刻を
   # 控える (回の終わりの処理で比べる。準備の途中に現れた end も検出するため、ここで控える)
   start_watchdog "$REQ_DEADLINE"
@@ -1818,7 +1905,7 @@ process_request() {
   SNAPSHOT_BEFORE=$(snapshot)
 
   local req="$LOOP_DIR/review-request-$CURRENT_RID.md"
-  local copy="$WS/review-request-$CURRENT_RID.md"
+  local copy_name="review-request-$CURRENT_RID.md"
   local logf="$LOOP_DIR/$CURRENT_RID.log"
   HEAD_BEFORE=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null)
 
@@ -1841,29 +1928,35 @@ process_request() {
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
   # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各段の前に確かめる
-  # (手順 6 の各段と手順 8 では、関数 run_prep が起動する前と待つ間に確かめる)
+  # (手順 6 の各段と手順 8 では、関数 run_prep が起動する前と待つ間に確かめる)。手順 6〜8 は準備のディレクトリの中で行う
   local problem
   if timed_out; then fail_timeout_in_preparation; return; fi
-  if ! problem=$(prepare_workspace); then
-    fail_without_run "${problem:-workspace failed (理由が分からない)}"; return
+  if ! prepare_workspace; then
+    # 準備のディレクトリを作る前に通らなければ、片付けるものは無い (作業場所は prepare_workspace が片付けようとした)
+    if [ -n "$PREP_DIR" ]; then fail_prepared "$PREP_ERROR"; else fail_without_run "$PREP_ERROR"; fi
+    return
   fi
   if ! make_clone "$full_req"; then
     fail_preparation_stage "clone failed (理由が分からない)"; return
   fi
   if timed_out; then fail_timeout_in_preparation; return; fi
-  if ! problem=$(clone_settings_problem "$CLONE"); then
+  if ! problem=$(clone_settings_problem "$PREP_DIR/tree"); then
     [ -n "$problem" ] || problem="clone settings (python3 が理由を出さずに終わった)"
     fail_prepared "$(join_lines "$problem")"; return
   fi
-  if ! make_request_copy "$req" "$copy"; then
+  if ! make_request_copy "$req" "$PREP_DIR/$copy_name"; then
     fail_preparation_stage "request copy failed (理由が分からない)"; return
   fi
   rm -f "$PREP_OUT"
+  PREP_OUT=""
+
+  # 準備のディレクトリを作業場所のパスに改名する。改名の後は、作業場所のパスの下で git を実行せず、準備の出力も読まない
+  if ! rename_prep_dir; then fail_prepared "$PREP_ERROR"; return; fi
 
   # 手順 9。準備の段の合間に上限を越えていれば、レビュアの実行を起動しない
   if timed_out; then fail_timeout_in_preparation; return; fi
   log "レビュアの実行を起動する: claude -p --model $MODEL --effort $EFFORT --permission-mode $PERMISSION_MODE (cwd: ${CLONE}、上限 $REVIEW_TIMEOUT_MINUTES 分)"
-  run_reviewer "$copy" "$logf"
+  run_reviewer "$WS/$copy_name" "$logf"
   # 回の終わりの処理の途中に割り込みを受けていれば、印を書き終えたので、ここで終わる
   if [ -n "$PENDING_CODE" ]; then leave "$PENDING_CODE"; fi
   CURRENT_RID=""
@@ -1893,8 +1986,8 @@ while :; do
   if [ -e "$LOOP_DIR/end" ]; then
     FINISHING=1
     trap '' INT TERM HUP
-    # 周回の作業場所が残っていれば消す (消せなかった回の作業場所など)
-    discard_workspace
+    # 周回の作業場所と準備のディレクトリが残っていれば消す (消せなかった回の作業場所など)
+    discard_round_dirs
     cleanup
     write_worker_yaml left ""
     log "end を見たので終わる"
