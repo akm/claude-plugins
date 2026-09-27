@@ -172,6 +172,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── scripts/                   # ワーカーと、作業側の待機スクリプト
     ├── tests/                     # python3 -m unittest discover -s review-triage/tests
     ├── tools/triagecheck/         # 記録を検査する Go ツール (go test ./...)
+    ├── tools/nearedges/           # Markdown の修正の差分から、コミット前に読み直す範囲を列挙する Go ツール (go test ./...)
     └── README.md
 ```
 
