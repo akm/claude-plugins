@@ -6,7 +6,7 @@
 
 | ID | 種類 | 条件・内容 | 報告に書くもの |
 | --- | --- | --- | --- |
-| RG0 | 手順 | 新しい周回なら、条件を決め ([arguments.md](arguments.md))、下の「開始の前提」を確かめ、下の「置き場を作る」を行う。再入 (通知・`--resume`) なら、条件を `loop.yaml` から読み、[reentry.md](reentry.md) の「再入の手順」で行き先を決める | 新しい周回のときだけ、決まった条件を周回の開始前に出す — ワーカーのモデルの指定と effort・権限モードと許可の一覧・レビュースキルとそのオプション・上限・構造の関門 k・`review-triage-fix` に渡す回数の閾値 N と段ごとの走らせ方 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ。ただしモデルは実効モデルではなくワーカーへの指定を書き、実効モデルは各回の完了の印で分かることを添える)・待機の期限と停滞の秒数・`review_loop` の設定の警告 (あれば)・周回の id と置き場の絶対パス |
+| RG0 | 手順 | 新しい周回なら、条件を決め ([arguments.md](arguments.md))、下の「開始の前提」を確かめ、下の「置き場を作る」を行う。再入 (通知・`--resume`) なら、条件を `loop.yaml` から読み、[reentry.md](reentry.md) の「再入の手順」で行き先を決める | 新しい周回のときだけ、決まった条件を周回の開始前に出す — ワーカーのモデルの指定と effort・権限モードと許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン (`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains`。空なら「無し」と書き、接続を許すホストには利用者の設定の `WebFetch(domain:…)` の許可も加わり、ワーカーが起動時に表示することを添える。正本は [worker.md](worker.md) の「ネットワーク」)・レビュースキルとそのオプション・上限・構造の関門 k・`review-triage-fix` に渡す回数の閾値 N と段ごとの走らせ方 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ。ただしモデルは実効モデルではなくワーカーへの指定を書き、実効モデルは各回の完了の印で分かることを添える)・待機の期限と停滞の秒数・`review_loop` の設定の警告 (あれば)・周回の id と置き場の絶対パス |
 | RL1 | 手順 | 下の「1 回のレビュー」の (a) 依頼文を書く → (b) 完了の印を待つ → (c) 突き合わせる。再入の手順からは (b) か (c) に入る | いま何回目か (この起動で数えた回数) と上限、記録の回番号、識別子 |
 
 ## 開始の前提
@@ -47,15 +47,19 @@
 
 ### (c) 突き合わせる
 
-完了の印と結果を依頼文と比べる。**上から順に確かめ、最初に通らなかったところで RA1** — 報告にはその項目と、食い違った両方の値を書く。
+完了の印と結果を依頼文と比べる。**上から順に確かめ、最初に通らなかったところで RA1** — 報告に書くものの正本は [stops.md](stops.md) の決定表の RA1 の行。
 
-1. **印が読める**: YAML として読め、必須キー ([loop-files.md](loop-files.md) の「`delivered-<識別子>.yaml`」の表) があり、`id` が識別子と一致し、`status` が `ok` か `failed`。
-2. **`status` が `ok`**: `failed` なら、印の `error` を報告に書く。
-3. **HEAD と作業ツリー**: 印の `head_before` と `head_after` が依頼文の `head` と同じコミットを指し、`tree_clean_after` が `true`。**作業側でも** `git rev-parse --short HEAD` が依頼文の `head` と同じで、`git status --porcelain` が空であることを確かめる (印を信じるだけにしない)。
-4. **effort とモデル**: 印の `effort` が `loop.yaml` の `worker.effort` と、`model.specified` が `worker.model` と等しい (人間が案内と違う値でワーカーを起動していない)。`model.effective` が `unknown` でなければ、実効モデルの名前が指定に一致する — 比べ方は [stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」と同じで、名前 (`opus-5` のような版を含む表記) から版を除いた部分が指定の別名 (`opus`) と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。`unknown` なら比べない (記録の `notes` に「不明」と残る)。
-5. **skill を呼んだ**: `skill_called` が `false` なら RA1 — skill を呼ばずに読んだ結果を、依頼どおりの結果として記録しない (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」)。`unknown` なら止めない (`notes` に「不明」と残る)。
-6. **拒否されたツールの呼び出しが無い**: `permission_denials.count` が 1 以上なら RA1 — 調べられなかった範囲の指摘が欠けた結果を、採択 0 の収束として記録に入れないため。報告に書くもの (拒否の理由と、許可の一覧で直せるか) の正本は [stops.md](stops.md) の RA1 の行。`unknown` なら止めない (`notes` に「不明」と残る)。
-7. **結果**: 結果ファイル (`<置き場>/review-<識別子>.yaml`) が YAML として読め、`findings` キーがあり、`run_id` が識別子と一致する。
+1. **印が読める**: YAML として読め、`id` が識別子と一致する。
+2. **ワーカーのバージョン**: 印の `worker_version` が 0.14.0 以降 (`.` で区切った数を、先頭から数として比べる)。キーが無いか 0.14.0 より古ければ RA1 (報告に書く項目の正本は [stops.md](stops.md) の「RA1 の報告の、止めたものごとの項目」の表の「ワーカーのバージョン」の行)。`unknown` なら止めない (このキーを書くのは 0.14.0 以降のワーカーだけ。レビュアの実行を起動しなかった回は 4 で止まる)。**3 の必須キーより先に見る** — 0.13.0 のワーカーの印は 0.14.0 で足したキーを持たないので、必須キーを先に見ると、ワーカーが古いことではなくキーが足りないことを報告してしまう。
+3. **印の様式**: 必須キー ([loop-files.md](loop-files.md) の「`delivered-<識別子>.yaml`」の表) があり、`status` が `ok` か `failed`。
+4. **`status` が `ok`**: `failed` なら RA1。
+5. **HEAD と作業ツリー**: 印の `head_before` と `head_after` が依頼文の `head` と同じコミットを指し、`tree_clean_after` が `true`。**作業側でも** `git rev-parse --short HEAD` が依頼文の `head` と同じで、`git status --porcelain` が空であることを確かめる (印を信じるだけにしない)。
+6. **effort とモデル**: 印の `effort` が `loop.yaml` の `worker.effort` と、`model.specified` が `worker.model` と等しい (人間が案内と違う値でワーカーを起動していない)。`model.effective` が `unknown` でなければ、実効モデルの名前が指定に一致する — 比べ方は [stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」と同じで、名前 (`opus-5` のような版を含む表記) から版を除いた部分が指定の別名 (`opus`) と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。`unknown` なら比べない (記録の `notes` に「不明」と残る)。
+7. **skill を呼んだ**: `skill_called` が `false` なら RA1 — skill を呼ばずに読んだ結果を、依頼どおりの結果として記録しない (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」)。`unknown` なら止めない (`notes` に「不明」と残る)。
+8. **拒否されたツールの呼び出しが無い**: `permission_denials.count` が 1 以上なら RA1 — 調べられなかった範囲の指摘が欠けた結果を、採択 0 の収束として記録に入れないため。報告に書くもの (止めたものごとの項目と直し方) の正本は [stops.md](stops.md) の RA1 の行。`unknown` なら止めない (`notes` に「不明」と残る)。
+9. **権限モードの指定**: 印の `permission_mode.specified` が `loop.yaml` の `worker.permission_mode` と等しい (人間が案内と違う権限モードでワーカーを起動していない)。`unknown` なら止めない (`notes` に「不明」と残る)。実効の権限モード (`permission_mode.effective`) が指定と違う回は、ワーカーが `failed` にするので 4 で止まる (正本は [worker.md](worker.md) の「ログの読み方」)。
+10. **サンドボックスが止めた確認が無い**: `sandbox_blocked.count` が 1 以上なら RA1 — 理由は 8 と同じ。8 とは別に確かめる (サンドボックスが止めた確認が `permission_denials` に数えられないことと、件数が `unknown` になる条件の正本は [worker.md](worker.md) の「ログの読み方」)。報告に書くもの (止められたコマンドとパスかホスト、直し方) の正本は [stops.md](stops.md) の RA1 の行。`unknown` なら止めない — そのときは `permission_denials` も `unknown` になっていて、`notes` に「不明」と残る。
+11. **結果**: 結果ファイル (`<置き場>/review-<識別子>.yaml`) が YAML として読め、`findings` キーがあり、`run_id` が識別子と一致する。
 
 すべて通れば L2 に進む。
 
@@ -74,8 +78,8 @@ L2 でも、回ごとに Skill ツールで `review-triage` を呼ぶ (指摘が
 ## `notes` の固定書式
 
 ```
-review-loop: <周回 id> / worker_model: <指定> (実効: <名前 or 不明>) / worker_effort: <値> / skill_called: <true / false / 不明> / permission_denials: <件数 or 不明> / review_minutes: <分>
+review-loop: <周回 id> / worker_model: <指定> (実効: <名前 or 不明>) / worker_effort: <値> / permission_mode: <指定 or 不明> (実効: <値 or 不明>) / skill_called: <true / false / 不明> / permission_denials: <件数 or 不明> / review_minutes: <分>
 ```
 
-- 値は完了の印から採る。`unknown` は「不明」と書く。`review_minutes` は印の `started` から `finished` までの分 (小数第 1 位まで)。
+- 値は完了の印から採る。`unknown` は「不明」と書く。`permission_mode` は印の `permission_mode.specified` と `permission_mode.effective`。`review_minutes` は印の `started` から `finished` までの分 (小数第 1 位まで)。
 - **記録のスキーマは変えない。** この周回 (ワーカーの経路) で回した回であることと、ワーカーのモデルと effort は、この 1 行だけに残る。sub-agent の経路 (`review-triage-loop`) の回と収束を比べるときは、この行の有無で経路を分ける。
