@@ -91,7 +91,7 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 **全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点は、このブランチが分岐した main ブランチとの共通祖先 (`git merge-base <main ブランチ> HEAD`)。main ブランチの名前は `origin/HEAD` が指すものを使い、それで決まらなければ人間に尋ねる。それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
 
-**収束後の全量レビューは周回に含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、周回が担うのは最初の 1 回だけである。収束後の全量レビューを周回に入れると、収束のたびに全量が 1 回増え、上限の意味 (収束しない周回を止める関門) が変わってしまう。**代わりに、収束の報告で、収束後の全量レビューをまだ行っていないことを伝える** ([loop-flow.md](loop-flow.md) の決定表 S3)。
+**この経路 (`review-triage-loop`) は、収束後の全量レビューを周回に含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、この周回が担うのは最初の 1 回だけである。収束の報告で要否と行う手段を伝える (書き方は [loop-flow.md](loop-flow.md) の決定表 S3 に任せる)。周回の中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回を周回の中で行い、その回は上限に数えない (数えなくても周回が止まる理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 
 **「周回の 1 周目」と「記録の回 1」を同一視しない。** 既に回のある記録に対して loop を起動すれば、その周回の 1 周目は記録の 2 回目以降にあたる。周回の内側だけで数えると、2 度目以降の全量レビューを走らせることになり、この行が引く規則に反する。
 
