@@ -82,8 +82,8 @@ full_review_next: false
 | `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |
 | `review.skill` | ◯ | `loop.review_skill` |
 | `review.args` | ◯ | `loop.review_args` (空文字列なら既定) |
-| `review.full_review` | | 引数 `--full-review` を付けて始めたか (真偽値)。0.14.0 以前に始めた周回には無く、無ければ偽 (扱いの正本は [arguments.md](arguments.md) の「様式」) |
-| `review.base` | | 全量の起点を求める派生元のブランチ名 (引数 `--base`。省けば開始時に解決した `origin/HEAD` が指すブランチ)。0.14.0 以前に始めた周回には無く、無ければ `--resume` の開始時に解決して書く |
+| `review.full_review` | | 引数 `--full-review` を付けて始めたか (真偽値)。0.14.0 以前に始めた周回には無い (無いときの扱いの正本は [arguments.md](arguments.md) の「様式」) |
+| `review.base` | | 全量の起点を求める派生元のブランチ名 (引数 `--base`。省けば開始時に解決した `origin/HEAD` が指すブランチ)。0.14.0 以前に始めた周回には無い (無いときの扱いの正本は [arguments.md](arguments.md) の「様式」) |
 | `loop.max_rounds` | ◯ | `loop.max_rounds` |
 | `loop.structure_rounds` | ◯ | `loop.structure_rounds` |
 | `loop.threshold` | ◯ | `fix.threshold_rounds` |
