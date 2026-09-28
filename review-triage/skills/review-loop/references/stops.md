@@ -57,7 +57,7 @@ flowchart TD
 
 ## 停止のときに書き換えるもの
 
-**どの停止ノード ([loop-flow.md](../../review-triage-loop/references/loop-flow.md) の S2〜S6 と、下の RA1〜RA3) でも、`loop.yaml` を `state: stopped`・`stop_reason: "<ID>: <1 行の理由>"`・`full_review_next: false` にしてから報告する。** `full_review_next` は起動ごとの指定で、次の起動に持ち越さない (正本は [arguments.md](arguments.md) の「様式」)。**真のまま止まったら、報告に「全量の回を行わずに止まった」ことと、全量で行うには `--resume --full-review` を打つことを書く。** **ワーカーは止めない** — 待機を続けるので、人間が直して `--resume` すれば、起動し直さずに続けられる (ワーカーが期限切れで終了しておらず、直し方がワーカーの起動し直しを求めていなければ。起動し直すのは、下の「RA1 から再開する手順」の 2 に当たるとき)。
+**どの停止ノード ([loop-flow.md](../../review-triage-loop/references/loop-flow.md) の S2〜S6 と、下の RA1〜RA3) でも、`loop.yaml` を `state: stopped`・`stop_reason: "<ID>: <1 行の理由>"`・`full_review_next: false` にしてから報告する。** `full_review_next` を偽に戻すのは、起動ごとの指定を次の起動に持ち越さないため。**真のまま止まったら、報告に「全量の回を行わずに止まった」ことと、全量で行うには `--resume --full-review` を打つことを書く。** **ワーカーは止めない** — 待機を続けるので、人間が直して `--resume` すれば、起動し直さずに続けられる (ワーカーが期限切れで終了しておらず、直し方がワーカーの起動し直しを求めていなければ。起動し直すのは、下の「RA1 から再開する手順」の 2 に当たるとき)。
 
 ## 決定表 (RJ0・RJ1)
 
@@ -118,4 +118,4 @@ flowchart TD
 | 回数 | この起動で回した回数と上限 (reporting.md の 2)、この起動で行った収束後の全量の回の数 (上限に数えない回。数える場所は [round.md](round.md) の RL1 の手順 a の 7)、周回全体でワーカーが応じた回数 (置き場の完了の印の数)。**reporting.md の 2 と loop-flow.md の S2 の行が「レビューを 1 回も走らせずに止まった (回した回数が 0)」とするのは、この周回では、数えた回数と収束後の全量の回の数がどちらも 0 のときだけと読む** — 数えた回数が 0 でも、収束後の全量の回を行っていれば (RJ0 か `--resume --full-review` による最初の回)、その回がレビューを走らせたので、推移を出す |
 | 次にできる操作 | `--resume` (止まった理由を片付けた後)・`--end` (周回を終える)・S2 なら `review-triage-fix` を単独で起動して答えること (答えの渡し先の正本は loop-flow.md の S2 の行) |
 | ワーカーの起動コマンド | [guide-template.md](guide-template.md) の形。ワーカーが動いていても書く (端末を閉じた後に起動し直すときに使う) |
-| S3 のとき | 収束後の全量レビューの要否 (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) と、この周回での行い方。**要るとき**: `--resume --full-review` (同じ条件で次の回を全量にする) と、勧めるモデル ([reporting.md](../../review-triage-loop/references/reporting.md) の 6) で `--full-review` を付けて始める新しい周回 (`--end` の後)。**要らないとき**: 「強いて言えば、別のモデルか effort で行う」と推奨し、そのモデルで `--full-review` を付けて始める新しい周回 (RJ0 により最初の回が全量になる) と、`review-request --full-review` で依頼文を作る手段を書く。`review.full_review` が真の周回が S3 に来るのは要らないときだけ (要るときは RJ1 が全量の回に進む)。行うかどうかは人間が決める |
+| S3 のとき | 収束後の全量レビューの要否 (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) と、この周回での行い方。**要るとき**: `--resume --full-review` (同じ条件で次の回を全量にする) と、勧めるモデル ([reporting.md](../../review-triage-loop/references/reporting.md) の 6) で `--full-review` を付けて始める新しい周回 (`--end` の後)。**要らないとき**: 推奨 (正本は、要否と同じ review-request.md の節) に従う手段として、別のモデルか effort で `--full-review` を付けて始める新しい周回 (RJ0 により最初の回が全量になる) と、`review-request --full-review` で依頼文を作る手段を書く。`review.full_review` が真の周回が S3 に来るのは要らないときだけ (要るときは RJ1 が全量の回に進む)。行うかどうかは人間が決める |

@@ -45,7 +45,7 @@ review-loop --end [<置き場>]
 
 **`--resume` で受け付けるのは `--max` と `--full-review` だけ。** ほかの引数は、引数の誤りとして再開せずにエラーにする。ほかの条件は `loop.yaml` から復元する — 再開のたびに条件が変わると、記録の回ごとの違いが条件の違いによるものか収束によるものかを読み解けなくなる。条件を変えたいときは、`--end` で終えてから新しい周回を始める。`--max` は起動ごとの上限 (J5 は起動ごとに 0 から数える) なので、再開のたびに決めてよい。省略時は `loop.yaml` の `loop.max_rounds`。
 
-**`--resume --full-review` は、その起動で次に書く依頼文を全量にする。** 修正が残っていれば、それを済ませてから全量にする。要否に関わらず全量にする明示の指定で、印は `loop.yaml` の実行時のキー `full_review_next` に書く (書く時と消す時の正本は [loop-files.md](loop-files.md) の「`loop.yaml`」)。**周回の条件 `review.full_review` は変えない。** 範囲を 1 回変えるだけで、範囲は記録の回ごとに `scope` として残るので、上の「記録の回ごとの違いを読み解けなくなる」には当たらない。`--max` と同じく、次の起動には持ち越さない。
+**`--resume --full-review` は、その起動で次に書く依頼文を全量にする。** 修正が残っていれば、それを済ませてから全量にする。要否に関わらず全量にする明示の指定で、印は `loop.yaml` の実行時のキー `full_review_next` に書く (真にする所は [reentry.md](reentry.md) の「再入の手順」の 1 と [stops.md](stops.md) の RJ0・RJ1、偽に戻す所は [round.md](round.md) の RL1 の手順 a の 7 と [stops.md](stops.md) の「停止のときに書き換えるもの」。一覧は [loop-files.md](loop-files.md) の「`loop.yaml`」)。**周回の条件 `review.full_review` は変えない。** 範囲を 1 回変えるだけで、範囲は記録の回ごとに `scope` として残るので、上の「記録の回ごとの違いを読み解けなくなる」には当たらない。`--max` と同じく、次の起動には持ち越さない。
 
 **書き込みを許す場所と接続を許すドメイン (`review_loop.sandbox_allow_write`・`review_loop.sandbox_allowed_domains`) は周回の条件ではなく、`--resume` のたびに設定から読み直して、`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains` に書く。** この 2 つは、ワーカーを動かすマシンごとに変わる値 (環境の値) で、周回の結果を比べるときにそろえる値ではない。開始時の値のままにすると、書き込みを許す場所が足りずに RA1 で止まった周回を、終えずに直して続けられない。読み直すときの値の誤りは、開始時と同じく未設定 (空の一覧) として扱い、警告を `--resume` の開始の報告に書く。**権限モードは周回の条件のままで、`--resume` では読み直さない。**
 
@@ -83,7 +83,7 @@ review-loop --end [<置き場>]
 | `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の正本は [worker.md](worker.md) の「レビュアの実行の権限」) |
 | `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確かめる (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
 | `dir` | 空でない文字列。リポジトリのルートからの相対パスとして解決する |
-| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決できる |
+| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決できる (`review-request` の手順 2 と同じ検査) |
 
 **エラーと警告には、その値が引数と設定のどちらから来たかを書く。** 直す先が違う。
 
