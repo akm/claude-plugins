@@ -115,7 +115,7 @@ flowchart TD
 | ワーカー | `worker.yaml` の `state` と、ファイルの更新時刻の古さ (キー `updated` ではない。読み方の正本は [loop-files.md](loop-files.md) の「`worker.yaml`」。無ければ「未起動」)、この起動でワーカーが応じた回の数 (`rounds_served`) |
 | 印の無い依頼文 | 有無と、あれば識別子 |
 | 再開のしかた | この起動が `--resume` で `active` の周回を再開したものなら、前のセッションが報告せずに終わったこと (開始の報告の正本は [reentry.md](reentry.md) の「`--resume` の開始の報告」) |
-| 回数 | この起動で回した回数と上限 (reporting.md の 2)、この起動で行った収束後の全量の回の数 (上限に数えない回。数える場所は [round.md](round.md) の RL1 の手順 a の 7)、周回全体でワーカーが応じた回数 (置き場の完了の印の数) |
+| 回数 | この起動で回した回数と上限 (reporting.md の 2)、この起動で行った収束後の全量の回の数 (上限に数えない回。数える場所は [round.md](round.md) の RL1 の手順 a の 7)、周回全体でワーカーが応じた回数 (置き場の完了の印の数)。**reporting.md の 2 と loop-flow.md の S2 の行が「レビューを 1 回も走らせずに止まった (回した回数が 0)」とするのは、この周回では、数えた回数と収束後の全量の回の数がどちらも 0 のときだけと読む** — 数えた回数が 0 でも、収束後の全量の回を行っていれば (RJ0 か `--resume --full-review` による最初の回)、その回がレビューを走らせたので、推移を出す |
 | 次にできる操作 | `--resume` (止まった理由を片付けた後)・`--end` (周回を終える)・S2 なら `review-triage-fix` を単独で起動して答えること (答えの渡し先の正本は loop-flow.md の S2 の行) |
 | ワーカーの起動コマンド | [guide-template.md](guide-template.md) の形。ワーカーが動いていても書く (端末を閉じた後に起動し直すときに使う) |
 | S3 のとき | 収束後の全量レビューの要否 (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) と、この周回での行い方。**要るとき**: `--resume --full-review` (同じ条件で次の回を全量にする) と、勧めるモデル ([reporting.md](../../review-triage-loop/references/reporting.md) の 6) で `--full-review` を付けて始める新しい周回 (`--end` の後)。**要らないとき**: 「強いて言えば、別のモデルか effort で行う」と推奨し、そのモデルで `--full-review` を付けて始める新しい周回 (RJ0 により最初の回が全量になる) と、`review-request --full-review` で依頼文を作る手段を書く。`review.full_review` が真の周回が S3 に来るのは要らないときだけ (要るときは RJ1 が全量の回に進む)。行うかどうかは人間が決める |
