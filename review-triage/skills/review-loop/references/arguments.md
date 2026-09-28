@@ -37,7 +37,7 @@ review-loop --end [<置き場>]
 **`--full-review` と `--base` は設定のキーを持たず、開始時の値を `loop.yaml` の `review.full_review` (真偽値)・`review.base` (ブランチ名) に書く。** どちらもブランチや周回ごとに変わる値で、前例 (`--stage` の値を `loop.stages` に書く) に合わせる。
 
 - **`--full-review`**: 収束後の全量レビューを周回の中で行う。増分の回が収束し、要否の規則 (正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) で要るときに、止まらずに全量の回を行う。すでに収束した記録で始めたときは、要否に関わらず最初の回を全量にする。どのノードで分かれるかの正本は [stops.md](stops.md) の RJ0・RJ1。
-- **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。`review-request` に毎回 `--base` として渡す (起点の求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければ周回を始めずに人間に尋ねる** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で尋ねることになる。
+- **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。全量の回で `review-request` に `--base` として渡す (渡す回の正本は [round.md](round.md) の RL1 の手順 a の 4。起点の求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければ周回を始めずに人間に尋ねる** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で尋ねることになる。
 
 **`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。周回の権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了の印の権限モードの指定をこの値と比べる。
 
