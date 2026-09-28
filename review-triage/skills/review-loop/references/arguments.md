@@ -8,7 +8,7 @@
 review-loop [--model <指定>] [--effort <値>] [--review <スキル名>] [--review-args "<引数>"]
             [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <段>[=<値>]]...
             [--wait-minutes <分>] [--worker-wait-minutes <分>] [--full-review] [--base <ブランチ>]
-review-loop --resume [<置き場>] [--max <回数>] [--full-review]
+review-loop --resume [<置き場>] [--max <回数>] [--full-review] [--base <ブランチ>]
 review-loop --end [<置き場>]
 ```
 
@@ -43,7 +43,7 @@ review-loop --end [<置き場>]
 
 **`--threshold` と `--stage` は周回の条件ではなく、`review-triage-fix` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落 — 周回は開始前の報告に書くために同じ規則で値を決めて検査し、`review-triage-fix` を呼ぶ (F1) たびに渡す。
 
-**`--resume` で受け付けるのは `--max` と `--full-review` だけ。** ほかの引数は、引数の誤りとして再開せずにエラーにする。ほかの条件は `loop.yaml` から復元する — 再開のたびに条件が変わると、記録の回ごとの違いが条件の違いによるものか収束によるものかを読み解けなくなる。条件を変えたいときは、`--end` で終えてから新しい周回を始める。`--max` は起動ごとの上限 (J5 は起動ごとに 0 から数える) なので、再開のたびに決めてよい。省略時は `loop.yaml` の `loop.max_rounds`。
+**`--resume` で受け付けるのは `--max` と `--full-review` だけ。** 例外は `--base` で、`loop.yaml` に `review.base` が無いとき (下の「0.14.0 以前に始めた周回」) だけ受け付ける。ほかの引数と、`review.base` があるときの `--base` は、引数の誤りとして再開せずにエラーにする。ほかの条件は `loop.yaml` から復元する — 再開のたびに条件が変わると、記録の回ごとの違いが条件の違いによるものか収束によるものかを読み解けなくなる。条件を変えたいときは、`--end` で終えてから新しい周回を始める。`--max` は起動ごとの上限 (J5 は起動ごとに 0 から数える) なので、再開のたびに決めてよい。省略時は `loop.yaml` の `loop.max_rounds`。
 
 **`--resume --full-review` は、その起動で次に書く依頼文を全量にする。** 修正が残っていれば、それを済ませてから全量にする。要否に関わらず全量にする明示の指定で、印は `loop.yaml` の実行時のキー `full_review_next` に書く (真にする所は [reentry.md](reentry.md) の「再入の手順」の 1 と [stops.md](stops.md) の RJ0・RJ1、偽に戻す所は [round.md](round.md) の RL1 の手順 a の 7 と [stops.md](stops.md) の「停止のときに書き換えるもの」。一覧は [loop-files.md](loop-files.md) の「`loop.yaml`」)。**周回の条件 `review.full_review` は変えない。** 範囲を 1 回変えるだけで、範囲は記録の回ごとに `scope` として残るので、上の「記録の回ごとの違いを読み解けなくなる」には当たらない。`--max` と同じく、次の起動には持ち越さない。
 
@@ -51,7 +51,7 @@ review-loop --end [<置き場>]
 
 **0.13.0 で始めた周回の `loop.yaml` には、この 2 つのキーが無い。** 無ければ空の一覧として扱う (`--resume` で読み直した後は書かれている)。権限モードは `loop.yaml` の値のまま続く。
 
-**0.14.0 以前に始めた周回の `loop.yaml` には、`review.full_review` と `review.base` が無い。** `review.full_review` が無ければ偽とする (その周回は `--full-review` の無い条件で始めたので、条件は変わらない)。`review.base` が無ければ、`--resume` の開始時に、上の `--base` を省いたときと同じ求め方で解決して書く。解決できなければ、再開せずに人間に尋ねる。
+**0.14.0 以前に始めた周回の `loop.yaml` には、`review.full_review` と `review.base` が無い。** `review.full_review` が無ければ偽とする (その周回は `--full-review` の無い条件で始めたので、条件は変わらない)。`review.base` が無ければ、`--resume` の開始時に、引数 `--base` があればその値を (値の検査は開始時の `--base` と同じ)、無ければ上の `--base` を省いたときと同じ求め方で解決したブランチ名を書く。**解決できなければ再開せず、`--resume --base <ブランチ>` で再開するよう案内する** — `review.base` はまだ条件として決まっていないので、ここで決めても「再開のたびに条件を変えない」には当たらない。
 
 ## 設定と引数の優先順位
 

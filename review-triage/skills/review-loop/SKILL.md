@@ -53,7 +53,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 
 **待機の通知と `--resume` は、同じ 1 つの入口 ([reentry.md](references/reentry.md) の「再入の手順」) に入る。** 通知の `description` に周回 id・回・識別子が書いてあるので、会話の文脈が無くても入口に戻れる。
 
-- `--resume [<置き場>]` は、周回を探し (探し方と、受け付ける引数 `--max`・`--full-review` の扱いは [arguments.md](references/arguments.md))、条件を `loop.yaml` から読んでから入口に入る (レビュアの実行のサンドボックスで書き込みを許す場所と接続を許すドメインだけは、入口の手順 1 で設定から読み直す)。この起動で数える回数は 0 から始める。
+- `--resume [<置き場>]` は、周回を探し (探し方と、受け付ける引数 `--max`・`--full-review` (と、`loop.yaml` に `review.base` が無いときだけ `--base`) の扱いは [arguments.md](references/arguments.md))、条件を `loop.yaml` から読んでから入口に入る (レビュアの実行のサンドボックスで書き込みを許す場所と接続を許すドメインだけは、入口の手順 1 で設定から読み直す)。この起動で数える回数は 0 から始める。
 - 取り込んだ回は、L2 で Skill ツールで `review-triage` を呼んで渡す (指摘が 0 件の回も呼ぶ。呼ぶスキルの規則は [round.md](references/round.md) の「呼ぶスキル」、渡すものは「L2 で `review-triage` に渡すもの」)。その後は図のとおり J2 に進む。
 - F1 では Skill ツールで `review-triage-fix` を呼び、`loop.yaml` の `loop.threshold` を `--threshold` に、`loop.stages` の各要素を `--stage` に渡す。
 
