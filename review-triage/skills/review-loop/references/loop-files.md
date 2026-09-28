@@ -30,7 +30,7 @@
 
 ## `loop.yaml`
 
-作業側が周回の条件と状態を書く。`--resume` はこのファイルから周回の条件を復元する (再開のときに何を変えてよいかの正本は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃え、値の意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節にある — 下の表は対応する設定のキーだけを書く。
+作業側が周回の条件と状態を書く。`--resume` はこのファイルから周回の条件を復元する (再開のときに何を変えてよいかの正本は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃え、値の意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節にある — 下の表は対応する設定のキーだけを書く。設定のキーを持たない条件 (`loop.stages`・`review.full_review`・`review.base`) は、引数の値を書き、意味の正本は [arguments.md](arguments.md)。
 
 ```yaml
 id: "20260926-1400-feat-review-loop-63"
@@ -49,6 +49,8 @@ worker:
 review:
   skill: "code-review"
   args: "high"
+  full_review: true
+  base: "origin/main"
 loop:
   max_rounds: 10
   structure_rounds: 3
@@ -61,6 +63,7 @@ wait:
 state: active
 stop_reason: ""
 rejected: []
+full_review_next: false
 ```
 
 | キー | 必須 | 内容 |
@@ -79,6 +82,8 @@ rejected: []
 | `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |
 | `review.skill` | ◯ | `loop.review_skill` |
 | `review.args` | ◯ | `loop.review_args` (空文字列なら既定) |
+| `review.full_review` | | 引数 `--full-review` を付けて始めたか (真偽値)。0.14.0 以前に始めた周回には無く、無ければ偽 (扱いの正本は [arguments.md](arguments.md) の「様式」) |
+| `review.base` | | 全量の起点を求める派生元のブランチ名 (引数 `--base`。省けば開始時に解決した `origin/HEAD` が指すブランチ)。0.14.0 以前に始めた周回には無く、無ければ `--resume` の開始時に解決して書く |
 | `loop.max_rounds` | ◯ | `loop.max_rounds` |
 | `loop.structure_rounds` | ◯ | `loop.structure_rounds` |
 | `loop.threshold` | ◯ | `fix.threshold_rounds` |
@@ -89,6 +94,7 @@ rejected: []
 | `state` | ◯ | `active` (周回が進んでいる) / `stopped` (停止ノードで止まり、人間の判断を待つ) / `ended` (終わった) |
 | `stop_reason` | ◯ | `stopped` と `ended` のとき、ノード ID (`S2`〜`S6`・`RA1`〜`RA3`) か `end` と、1 行の理由。`active` なら空文字列 |
 | `rejected` | ◯ | レビュー不成立 (RA1) と判定した回の識別子の列。再入の手順が、その回の完了の印を取り込まない。無ければ `[]` |
+| `full_review_next` | | 実行時のキー (周回の条件ではない)。`--resume --full-review` の印で、真なら次に書く依頼文を全量にする。`--resume` の開始時 ([reentry.md](reentry.md) の「再入の手順」の 1) に `true` を書き、全量の依頼文を書いたら ([round.md](round.md) の RL1 の手順 a の 7) と、どの停止でも ([stops.md](stops.md) の「停止のときに書き換えるもの」) `false` にする。無ければ偽 |
 
 各値の決め方は [arguments.md](arguments.md) が正本。ワーカーが読むのは `repo_dir` だけで、トップレベルの `repo_dir: "<パス>"` の 1 行として読む (値を 1 行に書く)。
 
