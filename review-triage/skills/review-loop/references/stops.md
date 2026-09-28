@@ -51,7 +51,7 @@ flowchart TD
   style RA3 fill:#dc26262e,stroke:#b91c1c
 ```
 
-**RJ0 と RJ1 は、「はい」でも「いいえ」でも行き先の違いは次の依頼文の範囲だけで、「はい」なら `loop.yaml` の `full_review_next` を真にしてから RL1 の (a) に入る。** RL1 の (a) は、この印が真なら全量の依頼文を書く ([round.md](round.md) の RL1 の手順 a の 4)。「はい」を印として `loop.yaml` に書くのは、依頼文を書く前に分が変わるのを待つ (手順 a の 5) と、ターンをまたいでも RL1 が全量にすることを忘れないため。`--resume --full-review` の印 ([arguments.md](arguments.md) の「様式」) と同じキーを使う。
+**RJ0 と RJ1 は、「はい」でも「いいえ」でも行き先の違いは次の依頼文の範囲だけで、「はい」なら `loop.yaml` の `full_review_next` を真にしてから RL1 の (a) に入る。** RL1 の (a) は、この印が真なら全量の依頼文を書く ([round.md](round.md) の RL1 の手順 a の 4)。「はい」を印として `loop.yaml` に書くのは、依頼文を書く前に分が変わるのを待つ (手順 a の 5) ときにターンが終わっても、全量にするという判断が失われないようにするため。`--resume --full-review` の印 ([arguments.md](arguments.md) の「様式」) と同じキーを使う。
 
 **RG0 から RL1 と G2 への分岐の中身 (取り込む印・印の無い依頼文の探し方、通知の重複の扱い) の正本は [reentry.md](reentry.md) の「再入の手順」。** 周回の終了 (`--end` と、人間が直接置いた `end`) は停止ではなく周回の外の手順で、図に含めない (正本は [SKILL.md](../SKILL.md) の「終了」)。
 
