@@ -89,7 +89,7 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 ## 範囲
 
-**全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点の求め方は `review-request` と同じで、正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 (この経路は `--base` を受け取らないので、起点のブランチは常に `origin/HEAD` が指すもの)。それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
+**全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点の求め方は `review-request` と同じで、正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2。起点のブランチは、引数 `--base` があればそれ、無ければ `origin/HEAD` が指すもので、G0 で決める (決め方と、効かない経路の正本は [arguments.md](arguments.md) の「様式」にある `--base` の段落)。それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
 
 **この経路 (`review-triage-loop`) は、収束後の全量レビューを周回に含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、この周回が担うのは最初の 1 回だけである。収束の報告で要否と行う手段を伝える (書き方は [loop-flow.md](loop-flow.md) の決定表 S3 に任せる)。周回の中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回を周回の中で行い、その回は上限に数えない (数えなくても周回が止まる理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 
