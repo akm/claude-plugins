@@ -83,7 +83,7 @@ review-loop --end [<置き場>]
 | `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の正本は [worker.md](worker.md) の「レビュアの実行の権限」) |
 | `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確かめる (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
 | `dir` | 空でない文字列。リポジトリのルートからの相対パスとして解決する |
-| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決できる (`review-request` の手順 2 と同じ検査) |
+| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す (`review-request` の手順 2 と同じ検査。開始時に確かめないと、共通祖先の無いブランチが条件に入り、全量の回のたびに RA3 で止まる) |
 
 **エラーと警告には、その値が引数と設定のどちらから来たかを書く。** 直す先が違う。
 
