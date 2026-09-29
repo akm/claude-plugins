@@ -264,6 +264,17 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 - 利用者の設定とレビュー対象のブランチの設定の `sandbox.filesystem.allowWrite` は、ワーカーの値と合わせて使われる。ワーカーはこれを確かめない (下の「このワーカーが検出しないもの」)。
 - サンドボックスが効くのは Bash だけで、`Write`・`Edit` のツールには効かない。ツールによる書き込みは、次の拒否の規則で止める。
 
+**書き込みを許す場所 (`--sandbox-allow-write`) と接続を許すドメイン (`--sandbox-allowed-domain`) では許せない制限もある。** [#72](https://github.com/akm/claude-plugins/issues/72) の通し確認で、次の 2 つが止められ、周回が RA1 で止まった (経緯は [#76](https://github.com/akm/claude-plugins/issues/76))。localhost の bind は、利用者の設定で `sandbox.network.allowLocalBinding` を真にすれば許せる (localhost で待ち受けるサービスへの接続も許される。下の「このワーカーが検出しないもの」)。`/dev/fd` の読み取りを許す設定は調べていない。
+
+| 止められたもの | 止められた確認のコマンド | 結果に出た文面 |
+| --- | --- | --- |
+| localhost の socket の bind | `python3 -m pytest …` (pytest のプラグインが bind した) | Python の `PermissionError: [Errno 1] Operation not permitted` |
+| プロセス置換 (コマンドの出力を一時的なファイルとして渡す書き方) が渡す `/dev/fd/<番号>` の読み取り | `diff <(git ls-tree …) <(git ls-tree …)` | `diff: /dev/fd/12: Operation not permitted` |
+
+- **依頼文の雛形は、作業ツリーの扱いが「使い捨て」のとき、この 2 つを使わない書き方があればそちらを選ぶようにレビュアに求める** (雛形 [review-request-template.md](../../review-triage/references/review-request-template.md) の節「作業ツリーの扱い」)。止まる回は減るが、無くなるとは限らない — 止まるかどうかは、レビュアがどの確認のコマンドを選ぶかで決まる。
+- **この 2 つも、ほかのサンドボックスが止めた確認と同じく数え、その回を RA1 にする** (下の「サンドボックスが止めた確認の数え方」)。この 2 つだけを数えないようにすると、文面が書き込みを止められたときと同じ `Operation not permitted` なので、見分けるために探す語 (`bind` や `/dev/fd/` など) の選び方によっては、止められた書き込みも数えなくなる。
+- **ワーカーは、この 2 つを許すようにサンドボックスの設定を変えない。** localhost の bind を許す設定は、localhost で動くサービス (データベースなど) への接続も許すので、許すかどうかは利用者が自分の設定で決める。レビュー対象のブランチの設定では許させない (「回の処理」の手順 7)。
+
 ### 拒否の規則
 
 **ワーカーは `--disallowedTools` に次の規則を渡す。** 拒否の規則は auto モードの判定より優先し、sub-agent の呼び出しにも効く。sub-agent の中で拒否された呼び出しも、最上位の `result` の行の `permission_denials` に数えられる (実測)。`Edit` の規則は、ファイルを書き換えるすべての組み込みのツール (`Write`・`NotebookEdit` を含む) に効く。
@@ -300,7 +311,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 | 拒否の規則 | 印の `permission_denials`。拒否の理由はログの `tool_result` の文面 | 当たった規則を確かめる。上の「拒否の規則」にある規則は、複製と作業場所の外を変える呼び出しを止めるためのもので、引数では外せない。利用者の設定かレビュー対象のブランチの `.claude/settings.json` の規則なら、その設定を見直す |
 | auto モードの判定 | 同上 | 拒否の理由を読んで判断する。判定の前に許す必要があれば、その呼び出しに当たる規則を `--allowed-tools` (設定 `review_loop.allowed_tools`) に足す。ただし、広い規則 (`Bash(*)` など) は足しても使われない (正本は上の「権限モードと許可の一覧」) |
 | 安全のための検査 | 同上 | 許可の一覧では直せない (許可の規則に当たる呼び出しでも拒否される)。起動のコマンドは変えない |
-| サンドボックス | 印の、サンドボックスが止めた確認 (コマンドと、止められたパスかホスト) | 止められたのがパスなら設定 `review_loop.sandbox_allow_write` に、ホストなら `review_loop.sandbox_allowed_domains` に足す。サンドボックスと関係の無い、操作が許されないことを示すエラー (macOS 自身の保護など) なら、設定では直せない。止められたのではなく、文面を含む文書を表示しただけの結果 (コマンドが `grep` や `cat` で、文面が文書の行) なら、設定は変えずに `--resume` で同じ回をやり直す (下の「サンドボックスが止めた確認の数え方」) |
+| サンドボックス | 印の、サンドボックスが止めた確認 (コマンドと、止められたパスかホスト) | 止められたのが `/dev/fd/<番号>` の読み取りなら、設定は変えずに `--resume` で同じ回をやり直す (上の「サンドボックス」の通し確認では、レビュアが別の確認のコマンドを選んだ回は止められなかった)。localhost の socket の bind なら、同じく `--resume` でやり直すか、localhost を使う確認が要るなら、利用者の設定で `sandbox.network.allowLocalBinding` を真にしてから `--resume` する (localhost で待ち受けるサービスへの接続も許される。上の「サンドボックス」)。それ以外で、止められたのがパスなら設定 `review_loop.sandbox_allow_write` に、ホストなら `review_loop.sandbox_allowed_domains` に足す。サンドボックスと関係の無い、操作が許されないことを示すエラー (macOS 自身の保護など) なら、設定では直せない。止められたのではなく、文面を含む文書を表示しただけの結果 (コマンドが `grep` や `cat` で、文面が文書の行) なら、設定は変えずに `--resume` で同じ回をやり直す (下の「サンドボックスが止めた確認の数え方」) |
 | 権限モードの指定の食い違い | 作業側が、印の権限モードの指定を `loop.yaml` と比べる | 作業側が案内するコマンドでワーカーを起動し直す。0.13.0 の案内は `default` のときに `--permission-mode` を付けなかったので、そのコマンドで起動するとデフォルトの `auto` になる |
 | 実効の権限モードの食い違い | 印の `error` の `permission mode mismatch` | 指定したモデルが auto モードに対応しているかを確かめる (実測で、`haiku` を指定すると `default` になった)。サーバー側で auto モードが一時的に使えないこともあり、`--resume` で同じ回をやり直せる |
 | ワーカーのバージョン | 作業側が、印のワーカーのバージョンを確かめる | 0.14.0 以降のワーカーで起動し直す |
