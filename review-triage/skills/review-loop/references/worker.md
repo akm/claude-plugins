@@ -136,7 +136,7 @@ review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --eff
    - remote の設定を消すのは、`git push origin` の行き先 (作業側のリポジトリ) を無くすため。
    - 複製に submodule の項目 (モード 160000) があれば、複製の作成の失敗とする。Git LFS・partial clone・shallow clone のリポジトリもサポートしない (複製の作成かチェックアウトが失敗すれば、同じく複製の作成の失敗になる)。
    - git が追跡しないファイル (依存のディレクトリ・`.env`・`.claude/settings.local.json` など) は複製に無い。そのため確認が失敗することがあり、その回はレビュアの報告か RA1 で分かる。
-7. **複製の設定を確かめる**: 複製の `.claude/settings.json` と `.claude/settings.local.json` のどちらかに、空でない `sandbox.excludedCommands` か `sandbox.network.allowUnixSockets` があるか、JSON として読めなければ通らない。理由は起動時の確認の 14 と同じ。
+7. **複製の設定を確かめる**: 複製の `.claude/settings.json` と `.claude/settings.local.json` のどちらかに、空でない `sandbox.excludedCommands` か `sandbox.network.allowUnixSockets` があるか、`sandbox.network.allowLocalBinding` が偽でない値 (真偽値でない値を含む) を持つか、JSON として読めなければ通らない。`excludedCommands` と `allowUnixSockets` で回を止める理由は起動時の確認の 14 と同じ。`allowLocalBinding` で回を止める理由は、下の「このワーカーが検出しないもの」の、利用者の設定の `allowLocalBinding` の項目。
 8. **写しを作る**: 作業側の依頼文を、準備のディレクトリの `review-request-<識別子>.md` (改名の後は作業場所の同じ名前のファイル) に写し、次の順に文字列を置き換える。置き換えた後のパスは、どれも改名の後の作業場所のパス (レビュアの実行が見るパス) で書く。
    1. 元の出力先の絶対パスの、すべての出現 → 作業場所の結果のパス (`<作業場所>/review-<識別子>.yaml`)
    2. バッククォートで囲んだ元の作業ツリーのパス → 複製のパス
@@ -172,7 +172,7 @@ review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --eff
 | 作業ツリー (手順 4) | 上のとおり | `tree not clean (<汚れたファイルの一覧>)` |
 | 作業場所 (手順 5) | 残っていた作業場所と準備のディレクトリが消え、新しい準備のディレクトリができ、それが自分の所有でシンボリックリンクでない。手順 8 の後に、準備のディレクトリを作業場所のパスに改名できる | 作業場所を作れなかったことと理由 (`workspace failed (<理由>)`。改名できなければ `workspace failed (rename to <作業場所のパス>: <理由>)`) |
 | 複製 (手順 6) | 各段 (複製・remote の設定の削除・取り込み・チェックアウト) が成功し、submodule の項目が無い | 失敗した段と理由 (`clone failed (<段>: <git の出力の最後の行>)`。段の名前は `clone`・`remove remote`・`fetch refs`・`checkout`。submodule の項目があれば `clone failed (submodule: <パスの一覧>)`) |
-| 複製の設定 (手順 7) | 上のとおり | 当たったファイルと、`sandbox.excludedCommands` か `sandbox.network.allowUnixSockets` があるか JSON として読めないか (`clone settings (<ファイル>: <理由>)`。1 つのファイルで両方のキーが当たれば、キーごとに書く) |
+| 複製の設定 (手順 7) | 上のとおり | 当たったファイルと、`sandbox.excludedCommands` か `sandbox.network.allowUnixSockets` があるか、`sandbox.network.allowLocalBinding` が偽でないか、JSON として読めないか (`clone settings (<ファイル>: <理由>)`。1 つのファイルで複数のキーが当たれば、キーごとに書く) |
 | 写し (手順 8) | 上のとおり | 残った文字列か、扱いの行の数 (`request copy failed (<理由>)`) |
 | 結果がある | 作業場所に、その回の結果のファイルがある | `no result` |
 | 結果のファイル | 作業場所の結果が通常のファイル (シンボリックリンク・FIFO・ディレクトリでない) で、実体パスが作業場所の実体の下にあり、大きさが上限以下 | 当たった条件 (`result not a regular file (<種類>)`・`result outside workspace (<実体パス>)`・`result too large (<大きさ>)`) |
@@ -210,7 +210,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 - **専用のプロセスグループで、バックグラウンドで起動し、`wait` で終わりを待つ。** フォアグラウンドで待たないのは、bash がフォアグラウンドのコマンドを待っている間は trap (シグナルを受けたときの処理) をそのコマンドが終わるまで遅らせるためと、専用のプロセスグループにしないと端末の Ctrl-C がワーカーとレビュアの実行に同時に届き、止める順序を制御できないため。待っている間も更新時刻を進める。
 - **上限を越えたとき・割り込みを受けたときは、プロセスグループ全体に TERM を送り、5 秒後に残っていれば KILL を送り、止まったことを確かめる。** そのあと回の終わりの処理で、作業場所の中を cwd にしているプロセスも止める — Bash のコマンドはレビュアの実行とは別のプロセスグループで動くので (実測)、プロセスグループを止めても残ることがある。印の `exit_code` はレビュアの実行の終了コード (上限と割り込みでは、プロセスグループを止めた後の値) で、cwd で見つけたプロセスを止めても変えない。
 
-`-p` の中でも Skill と Agent のツールは使える。レビュアの実行には、利用者の設定 (許可と拒否の規則・フック・サンドボックスの設定)・インストール済みのプラグイン・CLAUDE.md も効く。MCP サーバーと自動メモリは使わせない (下の「MCP サーバーと自動メモリ」)。レビュー対象のブランチの共有の設定 (複製の `.claude/settings.json`) も効く — `-p` では、その許可の規則は使われず、拒否の規則・フック・環境変数・サンドボックスの設定が使われ、auto モードを無効にする設定 `disableAutoMode` も効く。このうち `sandbox.excludedCommands` と `sandbox.network.allowUnixSockets` はワーカーが確かめ (「回の処理」の手順 7)、サンドボックスの制限を外す真偽値のキーはワーカーの `--settings` の値で上書きし (下の「サンドボックス」)、ほかは、作業側の作業ツリーでレビュアの実行を行っていた 0.13.0 と同じ扱いにする。
+`-p` の中でも Skill と Agent のツールは使える。レビュアの実行には、利用者の設定 (許可と拒否の規則・フック・サンドボックスの設定)・インストール済みのプラグイン・CLAUDE.md も効く。MCP サーバーと自動メモリは使わせない (下の「MCP サーバーと自動メモリ」)。レビュー対象のブランチの共有の設定 (複製の `.claude/settings.json`) も効く — `-p` では、その許可の規則は使われず、拒否の規則・フック・環境変数・サンドボックスの設定が使われ、auto モードを無効にする設定 `disableAutoMode` も効く。このうち `sandbox.excludedCommands`・`sandbox.network.allowUnixSockets`・`sandbox.network.allowLocalBinding` はワーカーが確かめ (「回の処理」の手順 7)、サンドボックスの制限を外す真偽値のキーはワーカーの `--settings` の値で上書きし (下の「サンドボックス」)、ほかは、作業側の作業ツリーでレビュアの実行を行っていた 0.13.0 と同じ扱いにする。
 
 ## レビュアの実行の権限
 
@@ -253,7 +253,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 | `sandbox.filesystem.disabled` | `false` | ファイルシステムの制限 (書き込みを許す場所の制限など) を外させない。外れると、サンドボックスの中の Bash が作業側の作業ツリーやホームに書ける |
 | `sandbox.network.strictAllowlist` | `true` | 下の「ネットワーク」 |
 | `sandbox.network.allowedDomains` | `--sandbox-allowed-domain` の値 | 同上 |
-| `sandbox.network.allowAllUnixSockets` | `false` | すべての Unix ソケットへの接続を許させない。Docker のソケットに接続できると、コンテナを通してサンドボックスの外に書ける |
+| `sandbox.network.allowAllUnixSockets` | `false` | すべての Unix ソケットへの接続を許可させない。Docker のソケットに接続できると、コンテナを通してサンドボックスの外に書ける |
 | `autoMemoryEnabled` | `false` | 下の「MCP サーバーと自動メモリ」 |
 
 **ワーカーが書く真偽値のキーは、利用者の設定とレビュー対象のブランチの設定の値を上書きする。** Claude Code の設定は、コマンドラインの引数 (`--settings`) が利用者とプロジェクトの設定より優先され、真偽値などの値は優先される方の値が効く。`sandbox.allowAppleEvents`・`sandbox.filesystem.disabled`・`sandbox.network.allowAllUnixSockets` を `false` で書くのは、この上書きのためで、利用者の設定やレビュー対象のブランチの設定 (レビュー対象に埋め込まれた変更を含む) が `true` にしていても、サンドボックスの制限は外れない。配列の値 (`sandbox.excludedCommands`・`sandbox.network.allowUnixSockets`・`sandbox.filesystem.allowWrite` など) は設定どうしで合わさるので、この方法では制限できない。このうち `sandbox.excludedCommands` と `sandbox.network.allowUnixSockets` は、ワーカーが検査して止める (起動時の確認の 14 と、「回の処理」の手順 7)。
@@ -263,6 +263,17 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 - **テストがホームの下のキャッシュに書くなら、その場所を `--sandbox-allow-write` で許す** (続けて使うなら設定 `review_loop.sandbox_allow_write` に書く)。実測で、`go test` は Go のビルドのキャッシュ (`~/Library/Caches/go-build`) への書き込みが止まって失敗し、キャッシュを許すと、拒否の規則 `Edit(~/**)` と一緒でも成功した。
 - 利用者の設定とレビュー対象のブランチの設定の `sandbox.filesystem.allowWrite` は、ワーカーの値と合わせて使われる。ワーカーはこれを確かめない (下の「このワーカーが検出しないもの」)。
 - サンドボックスが効くのは Bash だけで、`Write`・`Edit` のツールには効かない。ツールによる書き込みは、次の拒否の規則で止める。
+
+**書き込みを許す場所 (`--sandbox-allow-write`) と接続を許すドメイン (`--sandbox-allowed-domain`) では許せない制限もある。** [#72](https://github.com/akm/claude-plugins/issues/72) の通し確認で、次の 2 つが止められ、周回が RA1 で止まった (経緯は [#76](https://github.com/akm/claude-plugins/issues/76))。localhost の bind は、利用者の設定で `sandbox.network.allowLocalBinding` を真にすれば許せる (localhost で待ち受けるサービスへの接続も許される。下の「このワーカーが検出しないもの」)。`/dev/fd` の読み取りを許す設定は調べていない。
+
+| 止められたもの | 止められた確認のコマンド | 結果に出た文面 |
+| --- | --- | --- |
+| localhost の socket の bind | `python3 -m pytest …` (pytest のプラグインが bind した) | Python の `PermissionError: [Errno 1] Operation not permitted` |
+| プロセス置換 (コマンドの出力を一時的なファイルとして渡す書き方) が渡す `/dev/fd/<番号>` の読み取り | `diff <(git ls-tree …) <(git ls-tree …)` | `diff: /dev/fd/12: Operation not permitted` |
+
+- **依頼文の雛形は、作業ツリーの扱いが「使い捨て」のとき、この 2 つを使わない書き方があればそちらを選ぶようにレビュアに求める** (雛形 [review-request-template.md](../../review-triage/references/review-request-template.md) の節「作業ツリーの扱い」)。止まる回は減るが、無くなるとは限らない — 止まるかどうかは、レビュアがどの確認のコマンドを選ぶかで決まる。
+- **この 2 つも、ほかのサンドボックスが止めた確認と同じく数え、その回を RA1 にする** (下の「サンドボックスが止めた確認の数え方」)。この 2 つだけを数えないようにすると、文面が書き込みを止められたときと同じ `Operation not permitted` なので、見分けるために探す語 (`bind` や `/dev/fd/` など) の選び方によっては、止められた書き込みも数えなくなる。
+- **ワーカーは、この 2 つを許すようにサンドボックスの設定を変えない。** localhost の bind を許す設定は、localhost で動くサービス (データベースなど) への接続も許すので、許すかどうかは利用者が自分の設定で決める。レビュー対象のブランチの設定では許可させない (「回の処理」の手順 7)。
 
 ### 拒否の規則
 
@@ -300,7 +311,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 | 拒否の規則 | 印の `permission_denials`。拒否の理由はログの `tool_result` の文面 | 当たった規則を確かめる。上の「拒否の規則」にある規則は、複製と作業場所の外を変える呼び出しを止めるためのもので、引数では外せない。利用者の設定かレビュー対象のブランチの `.claude/settings.json` の規則なら、その設定を見直す |
 | auto モードの判定 | 同上 | 拒否の理由を読んで判断する。判定の前に許す必要があれば、その呼び出しに当たる規則を `--allowed-tools` (設定 `review_loop.allowed_tools`) に足す。ただし、広い規則 (`Bash(*)` など) は足しても使われない (正本は上の「権限モードと許可の一覧」) |
 | 安全のための検査 | 同上 | 許可の一覧では直せない (許可の規則に当たる呼び出しでも拒否される)。起動のコマンドは変えない |
-| サンドボックス | 印の、サンドボックスが止めた確認 (コマンドと、止められたパスかホスト) | 止められたのがパスなら設定 `review_loop.sandbox_allow_write` に、ホストなら `review_loop.sandbox_allowed_domains` に足す。サンドボックスと関係の無い、操作が許されないことを示すエラー (macOS 自身の保護など) なら、設定では直せない。止められたのではなく、文面を含む文書を表示しただけの結果 (コマンドが `grep` や `cat` で、文面が文書の行) なら、設定は変えずに `--resume` で同じ回をやり直す (下の「サンドボックスが止めた確認の数え方」) |
+| サンドボックス | 印の、サンドボックスが止めた確認 (コマンドと、止められたパスかホスト) | 止められたのが `/dev/fd/<番号>` の読み取りなら、設定は変えずに `--resume` で同じ回をやり直す (上の「サンドボックス」の通し確認では、レビュアが別の確認のコマンドを選んだ回は止められなかった)。localhost の socket の bind なら、同じく `--resume` でやり直すか、localhost を使う確認が要るなら、利用者の設定で `sandbox.network.allowLocalBinding` を真にしてから `--resume` する (localhost で待ち受けるサービスへの接続も許される。上の「サンドボックス」)。それ以外で、止められたのがパスなら設定 `review_loop.sandbox_allow_write` に、ホストなら `review_loop.sandbox_allowed_domains` に足す。サンドボックスと関係の無い、操作が許されないことを示すエラー (macOS 自身の保護など) なら、設定では直せない。止められたのではなく、文面を含む文書を表示しただけの結果 (コマンドが `grep` や `cat` で、文面が文書の行) なら、設定は変えずに `--resume` で同じ回をやり直す (下の「サンドボックスが止めた確認の数え方」) |
 | 権限モードの指定の食い違い | 作業側が、印の権限モードの指定を `loop.yaml` と比べる | 作業側が案内するコマンドでワーカーを起動し直す。0.13.0 の案内は `default` のときに `--permission-mode` を付けなかったので、そのコマンドで起動するとデフォルトの `auto` になる |
 | 実効の権限モードの食い違い | 印の `error` の `permission mode mismatch` | 指定したモデルが auto モードに対応しているかを確かめる (実測で、`haiku` を指定すると `default` になった)。サーバー側で auto モードが一時的に使えないこともあり、`--resume` で同じ回をやり直せる |
 | ワーカーのバージョン | 作業側が、印のワーカーのバージョンを確かめる | 0.14.0 以降のワーカーで起動し直す |
@@ -373,8 +384,8 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 - **レビュアが意図してログの件数を隠す場合** — 上の「ログを信頼できる前提」。
 - **作業場所の外に cwd を移して動き続けるプロセス** — 回の終わりの処理でも、起動し直したときの掃除でも、残ったプロセスは作業場所の中の cwd で見つけるので、止まらない。作業場所のパスは周回の間使い回すので、そのプロセスは後の回の作業場所のパスにも書ける。ワーカーは、準備を新しい準備のディレクトリで行い、作業場所のパスの下で git を実行しないので (「回の処理」の不変条件)、準備はその書き込みの影響を受けない。改名の前に作業場所のパスを作り直された回は、改名が失敗して `failed` になる。改名の後の作業場所の中身 (複製・写し・結果) は、レビュアの実行を起動する前も含めて、そのプロセスが書き換えうる。ワーカーはそれを、その回のレビュアの実行が書いたものと区別しない。複製のローカルの設定 (`.claude/settings.local.json`) はレビュアの実行に読ませないが (「レビュアの実行」)、ほかに Claude Code が複製から読むもの (`CLAUDE.md`・`.claude/` の下のスキルや sub-agent の定義など) は読む。
 - **利用者の設定とレビュー対象のブランチの設定の `sandbox.filesystem.allowWrite`** — ワーカーの値と合わせて使われ、書き込みを許す場所を広げうるが、ワーカーは確かめない。
+- **利用者の設定の `sandbox.network.allowLocalBinding`** — 真にすると、サンドボックスの中の Bash に、localhost の socket の bind と、localhost で待ち受けるサービス (データベースや開発用のサーバーなど) への接続を許す (2026-09-29 に、Claude Code 2.1.273 で実測。経緯は [#76](https://github.com/akm/claude-plugins/issues/76))。ポートを開いて待ち受けるテストに要るので、ワーカーの `--settings` の値で上書きせず、利用者の設定の値がそのまま効く。**レビュー対象のブランチの設定がこのキーを偽でない値にしていれば、回を止める** (「回の処理」の手順 7)。ブランチの設定だけで効き (実測)、ブランチの設定にはレビュー対象に埋め込まれた変更も含まれるので、localhost のサービスへの接続を許すかどうかが、ブランチの設定ではなく利用者の設定で決まるようにするため。
 - **利用者の設定とレビュー対象のブランチの設定の、サンドボックスを緩めうるほかのキー** — 次の設定キーは、検査もワーカーの `--settings` の値での上書きもしないので、利用者の設定とブランチの設定の値がそのまま効く。どれも正当な用途があり、止めると、それが要る確認をレビュアが実行できなくなるため。
-  - `sandbox.network.allowLocalBinding` — localhost のポートを開くことを許す。ポートを開いて待ち受けるテストに要る。
   - `sandbox.network.allowMachLookup` — macOS のプロセス間通信 (XPC) のサービスのうち、サンドボックスの中から接続できるものの名前を足す。Playwright や iOS Simulator のように、XPC で通信するツールに要る。
   - `sandbox.enableWeakerNetworkIsolation` — macOS の証明書の検証のサービス (`com.apple.trustd.agent`) への接続を許す。Go で書いたツールが TLS の証明書を検証するのに要ることがある。
   - `sandbox.enableWeakerNestedSandbox` — Docker のコンテナの中のように、サンドボックスを入れ子で動かす環境向けに、制限を弱める。

@@ -1252,8 +1252,10 @@ class TestWorkspace(WorkerTestBase):
 
     def test_clone_settings(self):
         # AE16: 複製の .claude/settings.json か .claude/settings.local.json に、空でない sandbox.excludedCommands か
-        # sandbox.network.allowUnixSockets があるか、JSON として読めなければ、レビュアの実行を起動せずに failed の印を書く
+        # sandbox.network.allowUnixSockets があるか、sandbox.network.allowLocalBinding が偽でないか、JSON として読めなければ、
+        # レビュアの実行を起動せずに failed の印を書く
         sockets = json.dumps({"sandbox": {"network": {"allowUnixSockets": ["/var/run/docker.sock"]}}})
+        binding = json.dumps({"sandbox": {"network": {"allowLocalBinding": True}}})
         cases = (
             ("excludedCommands", ".claude/settings.json", json.dumps({"sandbox": {"excludedCommands": ["docker"]}}),
              "sandbox.excludedCommands"),
@@ -1262,6 +1264,13 @@ class TestWorkspace(WorkerTestBase):
              'sandbox.network.allowUnixSockets is not empty (["/var/run/docker.sock"])'),
             ("allowUnixSockets (local)", ".claude/settings.local.json", sockets,
              'sandbox.network.allowUnixSockets is not empty (["/var/run/docker.sock"])'),
+            ("allowLocalBinding", ".claude/settings.json", binding,
+             "sandbox.network.allowLocalBinding is not false (true)"),
+            ("allowLocalBinding (local)", ".claude/settings.local.json", binding,
+             "sandbox.network.allowLocalBinding is not false (true)"),
+            ("allowLocalBinding が真偽値でない", ".claude/settings.json",
+             json.dumps({"sandbox": {"network": {"allowLocalBinding": "true"}}}),
+             'sandbox.network.allowLocalBinding is not false ("true")'),
         )
         for label, rel, content, contains in cases:
             with self.subTest(label):
@@ -1281,13 +1290,13 @@ class TestWorkspace(WorkerTestBase):
                 _git(self.repo, "commit", "-q", "-m", f"remove {rel}")
 
     def test_clone_settings_without_excluded_commands(self):
-        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets は止めない。
-        # 検査しないキー (sandbox.network.allowLocalBinding) も止めない
+        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets、偽の sandbox.network.allowLocalBinding は止めない。
+        # 検査しないキー (sandbox.enableWeakerNetworkIsolation) も止めない
         path = os.path.join(self.repo, ".claude", "settings.json")
         os.makedirs(os.path.dirname(path))
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"sandbox": {"excludedCommands": [],
-                                   "network": {"allowUnixSockets": [], "allowLocalBinding": True}},
+            json.dump({"sandbox": {"excludedCommands": [], "enableWeakerNetworkIsolation": True,
+                                   "network": {"allowUnixSockets": [], "allowLocalBinding": False}},
                        "permissions": {"deny": ["Bash(rm:*)"]}}, f)
         _git(self.repo, "add", ".claude/settings.json")
         _git(self.repo, "commit", "-q", "-m", "settings")
@@ -2090,7 +2099,7 @@ class TestSandboxStartChecks(WorkerTestBase):
 
     def test_user_settings_without_excluded_commands(self):
         # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets は止めない。
-        # 検査しないキー (sandbox.network.allowLocalBinding) も止めない
+        # 利用者の設定の sandbox.network.allowLocalBinding は、真でも止めない (止めるのはレビュー対象のブランチの設定だけ)
         cases = (
             ("excludedCommands が空", {"sandbox": {"enabled": True, "excludedCommands": []}}),
             ("allowUnixSockets が空", {"sandbox": {"network": {"allowUnixSockets": [], "allowLocalBinding": True}}}),
