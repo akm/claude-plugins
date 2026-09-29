@@ -1,6 +1,6 @@
 ---
 name: review-loop
-description: レビューを端末のワーカー (人間が起動し、依頼文ごとに claude -p を人間が決めたモデルと effort で走らせるスクリプト) に任せ、トリアージと修正をこのセッションで行う周回を、止まるまで回す。受け渡しは周回の置き場のファイルだけで、完了の印をバックグラウンドで待つ。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限を指定でき、--resume で止まった周回を続け、--end で周回を終える。
+description: レビューを端末のワーカー (人間が起動し、依頼文ごとに claude -p を人間が決めたモデルと effort で走らせるスクリプト) に任せ、トリアージと修正をこのセッションで行う周回を、止まるまで回す。受け渡しは周回の置き場のファイルだけで、完了の印をバックグラウンドで待つ。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base) を指定でき、--resume で止まった周回を続け (--resume --full-review なら次の回を全量にする)、--end で周回を終える。
 ---
 
 # review-loop: レビューを端末のワーカーに任せる周回
@@ -11,11 +11,11 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 
 ## 正本の宣言
 
-**周回の順序・分岐・止まる条件・報告は、`review-triage-loop` の [loop-flow.md](../review-triage-loop/references/loop-flow.md) と [reporting.md](../review-triage-loop/references/reporting.md) が正本。** このスキルは `review-triage-loop` を呼ばず、同じ図に従って自分で `review-triage` と `review-triage-fix` を呼ぶ。差し替えるのは G0 と L1 だけで、停止ノードを 3 つ足す。散文で遷移を言い直さない。
+**周回の順序・分岐・止まる条件・報告は、`review-triage-loop` の [loop-flow.md](../review-triage-loop/references/loop-flow.md) と [reporting.md](../review-triage-loop/references/reporting.md) が正本。** このスキルは `review-triage-loop` を呼ばず、同じ図に従って自分で `review-triage` と `review-triage-fix` を呼ぶ。差し替えるのは G0 と L1、G3 の「無い」の先と J2 の「無い」の先 (収束後の全量の回に進むかの判定を挟む) で、停止ノードを 3 つ足す。散文で遷移を言い直さない。
 
 | 流用元 | 使うもの | 使わないもの (このスキルの正本) |
 | --- | --- | --- |
-| [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RG0、L1 → RL1 ([round.md](references/round.md))。追加の停止 RA1〜RA3 と、差し替えた部分の図 ([stops.md](references/stops.md)) |
+| [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RG0、L1 → RL1 ([round.md](references/round.md))。G3 の「無い」の先 (RJ0) と J2 の「無い」の先 (RJ1)、追加の停止 RA1〜RA3 と、差し替えた部分の図 ([stops.md](references/stops.md)) |
 | [reporting.md](../review-triage-loop/references/reporting.md) | 必ず出すもの 6 項目 (止まった理由に RA1〜RA3 を含める) | この周回で足す項目 ([stops.md](references/stops.md) の「停止の報告に足すもの」) |
 | [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表 (読み替え方は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)・「effort の既定」 | 「G0 での解決」(ワーカーのモデルは人間が決める)・「範囲」(基点は `review-request` の規則。[round.md](references/round.md) の RL1 の手順 a) |
 | [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |
@@ -31,7 +31,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 
 ## 前提知識
 
-- **周回は必ず止まる。** 止まる条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RA1〜RA3 を足したもの。
+- **周回は必ず止まる。** 止まる条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RA1〜RA3 を足したもの。収束後の全量の回 (`--full-review`) は上限に数えないが、それでも止まる (理由の正本は [review-request.md](../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 - **停止と終了は別。** 停止 (S2〜S6・RA1〜RA3) は人間の判断を待つ状態で、判断の後に `--resume` で続けられる (停止のときに書き換えるものとワーカーの扱いの正本は [stops.md](references/stops.md) の「停止のときに書き換えるもの」)。周回を終えるのは人間が `--end` を打ったときだけ。
 - **ワーカーのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ尋ねる。ワーカーを起動するのも人間で、このスキルは起動コマンドを案内する ([guide-template.md](references/guide-template.md))。
 - **受け渡しは周回の置き場のファイルだけ。** セッション間のメッセージは使わない。
@@ -53,7 +53,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 
 **待機の通知と `--resume` は、同じ 1 つの入口 ([reentry.md](references/reentry.md) の「再入の手順」) に入る。** 通知の `description` に周回 id・回・識別子が書いてあるので、会話の文脈が無くても入口に戻れる。
 
-- `--resume [<置き場>]` は、周回を探し (探し方と `--max` の扱いは [arguments.md](references/arguments.md))、条件を `loop.yaml` から読んでから入口に入る (レビュアの実行のサンドボックスで書き込みを許す場所と接続を許すドメインだけは、入口の手順 1 で設定から読み直す)。この起動で数える回数は 0 から始める。
+- `--resume [<置き場>]` は、周回を探し (探し方と、受け付ける引数 `--max`・`--full-review` (と、`loop.yaml` に `review.base` が無いときだけ `--base`) の扱いは [arguments.md](references/arguments.md))、条件を `loop.yaml` から読んでから入口に入る (レビュアの実行のサンドボックスで書き込みを許す場所と接続を許すドメインだけは、入口の手順 1 で設定から読み直す)。この起動で数える回数は 0 から始める。
 - 取り込んだ回は、L2 で Skill ツールで `review-triage` を呼んで渡す (指摘が 0 件の回も呼ぶ。呼ぶスキルの規則は [round.md](references/round.md) の「呼ぶスキル」、渡すものは「L2 で `review-triage` に渡すもの」)。その後は図のとおり J2 に進む。
 - F1 では Skill ツールで `review-triage-fix` を呼び、`loop.yaml` の `loop.threshold` を `--threshold` に、`loop.stages` の各要素を `--stage` に渡す。
 
