@@ -253,7 +253,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 | `sandbox.filesystem.disabled` | `false` | ファイルシステムの制限 (書き込みを許す場所の制限など) を外させない。外れると、サンドボックスの中の Bash が作業側の作業ツリーやホームに書ける |
 | `sandbox.network.strictAllowlist` | `true` | 下の「ネットワーク」 |
 | `sandbox.network.allowedDomains` | `--sandbox-allowed-domain` の値 | 同上 |
-| `sandbox.network.allowAllUnixSockets` | `false` | すべての Unix ソケットへの接続を許させない。Docker のソケットに接続できると、コンテナを通してサンドボックスの外に書ける |
+| `sandbox.network.allowAllUnixSockets` | `false` | すべての Unix ソケットへの接続を許可させない。Docker のソケットに接続できると、コンテナを通してサンドボックスの外に書ける |
 | `autoMemoryEnabled` | `false` | 下の「MCP サーバーと自動メモリ」 |
 
 **ワーカーが書く真偽値のキーは、利用者の設定とレビュー対象のブランチの設定の値を上書きする。** Claude Code の設定は、コマンドラインの引数 (`--settings`) が利用者とプロジェクトの設定より優先され、真偽値などの値は優先される方の値が効く。`sandbox.allowAppleEvents`・`sandbox.filesystem.disabled`・`sandbox.network.allowAllUnixSockets` を `false` で書くのは、この上書きのためで、利用者の設定やレビュー対象のブランチの設定 (レビュー対象に埋め込まれた変更を含む) が `true` にしていても、サンドボックスの制限は外れない。配列の値 (`sandbox.excludedCommands`・`sandbox.network.allowUnixSockets`・`sandbox.filesystem.allowWrite` など) は設定どうしで合わさるので、この方法では制限できない。このうち `sandbox.excludedCommands` と `sandbox.network.allowUnixSockets` は、ワーカーが検査して止める (起動時の確認の 14 と、「回の処理」の手順 7)。
