@@ -89,9 +89,11 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 ## 範囲
 
-**全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点の求め方は `review-request` と同じで、正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 (この経路は `--base` を受け取らないので、起点のブランチは常に `origin/HEAD` が指すもの)。それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
+**全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点は、起点のブランチと HEAD の merge-base (共通祖先のコミット) で、求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2。**起点のブランチは、引数 `--base` があればそのブランチ、無ければ `origin/HEAD` が指すブランチで、使うのはこの全量の回だけである。** それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
 
-**この経路 (`review-triage-loop`) は、収束後の全量レビューを周回に含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、この周回が担うのは最初の 1 回だけである。収束の報告で要否と行う手段を伝える (書き方は [loop-flow.md](loop-flow.md) の決定表 S3 に任せる)。周回の中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回を周回の中で行い、その回は上限に数えない (数えなくても周回が止まる理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
+**これらの基点 (全量と増分) を依頼文に埋めてレビュアに渡すのは、`code-review` の経路だけである。** `ce-code-review` の経路は範囲の基点をレビュアに渡していないので ([#79](https://github.com/akm/claude-plugins/issues/79))、全量の回でも増分の回でも基点はレビュア (`ce-code-review`) が自分で決め、起点のブランチも使わない。記録の `scope` には、`ce-code-review` の経路でも周回が決めた範囲を書く (実際の範囲と食い違いうることも #79 の件)。
+
+**この経路 (`review-triage-loop`) は、収束後の全量レビューを周回に含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、この周回が担うのは最初の 1 回だけである。周回の中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回を周回の中で行い、その回は上限に数えない (数えなくても周回が止まる理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 
 **「周回の 1 周目」と「記録の回 1」を同一視しない。** 既に回のある記録に対して loop を起動すれば、その周回の 1 周目は記録の 2 回目以降にあたる。周回の内側だけで数えると、2 度目以降の全量レビューを走らせることになり、この行が引く規則に反する。
 

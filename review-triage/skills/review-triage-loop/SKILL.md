@@ -1,6 +1,6 @@
 ---
 name: review-triage-loop
-description: レビュー・トリアージ・修正の 3 つを上限回数まで繰り返し、収束したか止まったかを人間に返す。各回で review-triage と review-triage-fix を呼び、終了条件に当たったら理由を添えて止める。「レビューから修正までを回して」「収束するまで繰り返して」「review-triage-loop を実行して」のような依頼で使う。引数で上限・レビュースキル・そのオプション・モデル・回数の閾値と段の走らせ方 (どちらも review-triage-fix に渡す) を指定でき、省略時は設定の既定に従う。
+description: レビュー・トリアージ・修正の 3 つを上限回数まで繰り返し、収束したか止まったかを人間に返す。各回で review-triage と review-triage-fix を呼び、終了条件に当たったら理由を添えて止める。「レビューから修正までを回して」「収束するまで繰り返して」「review-triage-loop を実行して」のような依頼で使う。引数で上限・レビュースキル・そのオプション・モデル・全量の起点にする派生元のブランチ (--base)・回数の閾値と段の走らせ方 (どちらも review-triage-fix に渡す) を指定でき、省略時は設定の既定に従う。
 ---
 
 # review-triage-loop: レビューから修正までの周回
@@ -22,6 +22,8 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 
 1. **設定と引数を読む** (G0): `.claude/akm-claude-plugins/review-triage/config.json` の `loop` を読み、引数で上書きする (キーと既定値の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」。引数の様式は [references/arguments.md](references/arguments.md))。
    - **`review_skill` が引数でも設定でも未設定なら、人間に尋ねる** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
+   - **全量の起点のブランチ (`--base`) も周回の条件で、G0 で決める** (扱いの正本は [references/arguments.md](references/arguments.md) の「様式」にある `--base` の段落)。
+   - **記録 (手順 2 で読むもの) も、経路を問わず G0 で読み、読めることを確かめる** (読めないときの扱いの正本は [references/arguments.md](references/arguments.md) の「値の検査」)。回の有無は `--base` の扱いに使う。
    - **構造の関門 k (`--structure-rounds`、設定は `loop.structure_rounds`) は周回の条件で、J9 が使う** (意味・既定・値の検査の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」と [references/arguments.md](references/arguments.md))。
    - **回数の閾値 N (`--threshold`、設定は `fix.threshold_rounds`) は周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味・決め方・検査の正本は [review-triage-fix の arguments.md](../review-triage-fix/references/arguments.md))。
    - **段 (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の走らせ方 (`--stage`、設定は `fix.stages`) も同じく周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせた段の検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。周回は段の sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
