@@ -1,11 +1,11 @@
 ---
 name: review-loop
-description: レビューを端末のワーカー (人間が起動し、依頼文ごとに claude -p を人間が決めたモデルと effort で走らせるスクリプト) に任せ、トリアージと修正をこのセッションで行う周回を、止まるまで回す。受け渡しは周回の置き場のファイルだけで、完了の印をバックグラウンドで待つ。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base) を指定でき、--resume で止まった周回を続け (--resume --full-review なら次の回を全量にする)、--end で周回を終える。
+description: レビューを端末のワーカー (依頼文ごとに claude -p を人間が決めたモデルと effort で走らせるスクリプト。起動は人間が承認する) に任せ、トリアージと修正をこのセッションで行う周回を、止まるまで回す。受け渡しは周回の置き場のファイルだけで、完了の印をバックグラウンドで待つ。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base) を指定でき、--resume で止まった周回を続け (--resume --full-review なら次の回を全量にする)、--end で周回を終える。
 ---
 
 # review-loop: レビューを端末のワーカーに任せる周回
 
-レビューは、人間が端末で起動するワーカー (スクリプト `review-triage/scripts/review-loop-worker.sh`) が行う。ワーカーは依頼文ごとに `claude -p` を、人間が決めたモデルと effort で走らせる。**このセッション (作業側) は、依頼文を書き、完了の印を待ち、[review-triage](../review-triage/SKILL.md) と [review-triage-fix](../review-triage-fix/SKILL.md) を呼ぶ。** 成果物は周回の結果の報告で、判断は `review-triage`、修正は `review-triage-fix` が持つ。
+レビューは、端末で起動するワーカー (スクリプト `review-triage/scripts/review-loop-worker.sh`) が行う。ワーカーは依頼文ごとに `claude -p` を、人間が決めたモデルと effort で走らせる。ワーカーは、人間の承認を得てこのセッションが端末のタブで起動するか、人間が端末で起動する。**このセッション (作業側) は、依頼文を書き、完了の印を待ち、[review-triage](../review-triage/SKILL.md) と [review-triage-fix](../review-triage-fix/SKILL.md) を呼ぶ。** 成果物は周回の結果の報告で、判断は `review-triage`、修正は `review-triage-fix` が持つ。
 
 同じセッションの sub-agent でレビューする周回 ([review-triage-loop](../review-triage-loop/SKILL.md)) との違いは、レビューを走らせるモデルとセッションの effort を人間が選べることと、レビュアが回ごとに新しいプロセスになること。どちらの経路で回したかは記録の `notes` の 1 行に残り、後から収束を比べられる。
 
@@ -33,7 +33,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 
 - **周回は必ず止まる。** 止まる条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RA1〜RA3 を足したもの。収束後の全量の回 (`--full-review`) は上限に数えないが、それでも止まる (理由の正本は [review-request.md](../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 - **停止と終了は別。** 停止 (S2〜S6・RA1〜RA3) は人間の判断を待つ状態で、判断の後に `--resume` で続けられる (停止のときに書き換えるものとワーカーの扱いの正本は [stops.md](references/stops.md) の「停止のときに書き換えるもの」)。周回を終えるのは人間が `--end` を打ったときだけ。
-- **ワーカーのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ尋ねる。ワーカーを起動するのも人間で、このスキルは起動コマンドを案内する ([guide-template.md](references/guide-template.md))。
+- **ワーカーのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ尋ねる。ワーカーを起動するかどうかも人間が決める。端末のツール (Claude Desktop app の Terminal パネルでコマンドを実行するツール) が使えれば、このスキルは人間の承認を得てから端末のタブで起動し、使えなければ起動コマンドを案内する (手順の正本は [guide-template.md](references/guide-template.md) の「起動の手順」)。
 - **受け渡しは周回の置き場のファイルだけ。** セッション間のメッセージは使わない。
 - **同時に動くのは、作業側かレビュアの実行 (ワーカーが起動する `claude -p` の 1 回) のどちらか一方。** レビュアの実行は作業側の作業ツリーでは動かない。ワーカーは依頼文ごとに一時ディレクトリ (回の作業場所。以下「作業場所」) を作り、その中の使い捨ての作業ツリー (作業側のリポジトリの複製) でレビュアの実行を行い、回の終わりに作業場所を消す。ただしワーカーは、依頼文を受け取ったときと、レビュアの実行が終わった後に、作業側の HEAD と作業ツリーが依頼文のとおりかを確かめ、違えばその回を `failed` にする。そのため、レビューの間は作業側も人間も作業ツリーを変えない。作業場所と複製の作り方と消し方、この確認の正本は [worker.md](references/worker.md) の「回の処理」。
 - **周回の間に履歴を書き換えない** (reset・rebase・squash)。増分の基点 (直前の回の `head`) が履歴から外れると、依頼文を書けずに止まる (RA3)。
@@ -47,7 +47,7 @@ description: レビューを端末のワーカー (人間が起動し、依頼�
 2. **開始の前提を確かめる** ([round.md](references/round.md) の「開始の前提」)。
 3. **置き場と `loop.yaml` を作る** ([round.md](references/round.md) の「置き場を作る」)。
 4. **決まった条件を報告する** (書くものは [round.md](references/round.md) の決定表の RG0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
-5. **周回を回す**: G2 から [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図に従う。L1 に来たら RL1 ([round.md](references/round.md))。回 1 の最初の依頼文を書いたら、ワーカーの起動を案内し ([guide-template.md](references/guide-template.md))、待機を起動して**ターンを終える** ([reentry.md](references/reentry.md) の「待機」)。
+5. **周回を回す**: G2 から [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図に従う。L1 に来たら RL1 ([round.md](references/round.md))。回 1 の最初の依頼文を書いたら、ワーカーを起動するか起動を案内し ([guide-template.md](references/guide-template.md) の「起動の手順」)、待機を起動して**ターンを終える** ([reentry.md](references/reentry.md) の「待機」)。
 
 ### 再入 (待機の通知・`--resume`)
 
