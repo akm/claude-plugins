@@ -1,13 +1,15 @@
 """レビュアの実行のログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・
-サンドボックスが止めた確認を読む (回の終わりの処理の 2)。
+ワーカーのフックが拒否した呼び出し・サンドボックスが止めた確認を読む (回の終わりの処理の 2)。
 読み方の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
 
-引数: ログのパス。読めなければ、空のログとして扱う。
+引数: 1 つ目はログのパス。読めなければ、空のログとして扱う。2 つ目はワーカーのフックのファイル
+(review-loop-worker/deny_tmp_hook.py) の中身で、__name__ を "__main__" 以外にして実行し、関数 denies と文字列 REASON を使う。
 標準出力: 次の行。値はどれも 1 行 (改行を含まない)。読めない値は unknown にする。
-  1 行目: 実効モデルの名前 / 2 行目: skill_called / 3 行目: 拒否の件数 / 4 行目: 拒否されたツールの名前の列 (JSON) /
-  5 行目: 実効の権限モード / 6 行目: サンドボックスが止めた件数 /
-  7 行目から: 止められた呼び出しごとに、コマンドと文面の 2 行 (どちらも先頭 200 文字まで)。
-  サンドボックスが止めた件数が unknown なら、7 行目からの行は出さない。
+  1 行目: 実効モデルの名前 / 2 行目: skill_called / 3 行目: 拒否の件数 (ワーカーのフックが拒否したものを除く) /
+  4 行目: 拒否されたツールの名前の列 (JSON。ワーカーのフックが拒否したものを除く) / 5 行目: 実効の権限モード /
+  6 行目: ワーカーのフックが拒否した件数 / 7 行目: サンドボックスが止めた件数 /
+  8 行目から: 止められた呼び出しごとに、コマンドと文面の 2 行 (どちらも先頭 200 文字まで)。
+  サンドボックスが止めた件数が unknown なら、8 行目からの行は出さない。
 終了コード: 0。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 read_log_facts。
@@ -26,6 +28,10 @@ PHRASE = "operation not permitted"   # ファイルの書き込みを止めら�
 TAG = "<sandbox_violations>"         # 接続を止められたときに本文に付くタグ
 TAG_END = "</sandbox_violations>"
 
+# ワーカーのフック。__name__ を "__main__" 以外にするので、フックとしての処理 (標準入力を読む) は実行されない
+hook = {"__name__": "deny_tmp_hook"}
+exec(sys.argv[2], hook)
+
 
 def one_line(s, limit=None):
     s = NOT_ONE_LINE.sub(" ", s).strip()
@@ -40,6 +46,20 @@ def body_text(content):
         return "\n".join(c["text"] for c in content
                          if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str))
     return ""
+
+
+def by_worker_hook(denial, results_by_id):
+    """拒否 (result の行の permission_denials の要素) が、ワーカーのフックによるものと確かめられるか。
+    ツールが Bash で、コマンドがフックの規則に当たり、その呼び出しの tool_result の本文がフックの返す理由の文面と一致すること。
+    どれも Claude Code が書く行なので、レビュアには書けない"""
+    if not isinstance(denial, dict) or denial.get("tool_name") != "Bash":
+        return False
+    inp = denial.get("tool_input")
+    if not isinstance(inp, dict) or not hook["denies"](inp.get("command")):
+        return False
+    tid = denial.get("tool_use_id")
+    r = results_by_id.get(tid) if isinstance(tid, str) else None
+    return r is not None and body_text(r.get("content")) == hook["REASON"]
 
 
 def blocked_message(body):
@@ -121,19 +141,24 @@ if model:
 print(name)
 print(("true" if skill else "false") if saw_assistant else "unknown")
 denials = result.get("permission_denials") if isinstance(result, dict) else None
+hook_denials = None
 if isinstance(denials, list):
+    results_by_id = {r.get("tool_use_id"): r for r in results if isinstance(r.get("tool_use_id"), str)}
+    others = [d for d in denials if not by_worker_hook(d, results_by_id)]
+    hook_denials = len(denials) - len(others)
     tools = []
-    for d in denials:
+    for d in others:
         n = d.get("tool_name") if isinstance(d, dict) else None
         n = n if isinstance(n, str) and n else "unknown"
         if n not in tools:
             tools.append(n)
-    print(len(denials))
+    print(len(others))
     print(json.dumps(tools, ensure_ascii=False))
 else:
     print("unknown")
     print("[]")
 print(mode or "unknown")
+print("unknown" if hook_denials is None else hook_denials)
 if isinstance(result, dict):
     blocked = []
     for r in results:

@@ -182,6 +182,7 @@ skill_called: true
 permission_denials:
   count: 0
   tools: []
+worker_hook_denials: 0
 sandbox_blocked:
   count: 0
   calls: []
@@ -205,8 +206,9 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `permission_mode.specified` | ◯ | レビュアの実行に渡した権限モード (`--permission-mode` の値) |
 | `permission_mode.effective` | ◯ | ログから読んだ実効の権限モード。指定と違えば `status` は `failed`。読めなければ `unknown` (それだけでは `failed` にしない)。起動しなかった回も `unknown` |
 | `skill_called` | ◯ | レビュアの実行が Skill ツールを呼んだか。`true` / `false`、ログから読めなければ `unknown` |
-| `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ログから読めなければ `unknown` |
-| `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く)。件数が 0 か `unknown` なら `[]` |
+| `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ワーカーのフックが拒否した呼び出し (`worker_hook_denials`) は含めない。ログから読めなければ `unknown` |
+| `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く。ワーカーのフックが拒否した呼び出しは含めない)。件数が 0 か `unknown` なら `[]` |
+| `worker_hook_denials` | | ワーカーのフック (`/tmp` を含む Bash のコマンドを実行前に拒否するもの) が拒否したと確かめられた呼び出しの件数。見分け方の正本は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」。ログから読めなければ `unknown`。起動しなかった回も `unknown`。0.18.0 以降のワーカーが書く — 0.17.0 以前のワーカーの印を、このキーが無いことでレビュー不成立にしないため、必須にしない |
 | `sandbox_blocked.count` | ◯ | サンドボックスが止めた確認 (Bash の呼び出しのうち、書き込みか接続を止められたエラーで終わったもの。sub-agent の中の呼び出しを含む) の件数。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
 | `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、止められたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの正本は [worker.md](worker.md) の「サンドボックスが止めた確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |

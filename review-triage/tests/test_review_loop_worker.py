@@ -26,6 +26,7 @@ import json
 import os
 import pty
 import re
+import runpy
 import shlex
 import shutil
 import signal
@@ -43,6 +44,9 @@ _FAKE_UNAME = os.path.join(_HERE, "fake-uname")
 _LOOP_FILES = os.path.join(_HERE, "..", "skills", "review-loop", "references", "loop-files.md")
 _PLUGIN_JSON = os.path.join(_HERE, "..", ".claude-plugin", "plugin.json")
 _TEMPLATE = os.path.join(_HERE, "..", "skills", "review-triage", "references", "review-request-template.md")
+# ワーカーのフック。__name__ を "__main__" 以外にして読み込み、規則 (関数 denies) と拒否の理由の文面 (REASON) を使う
+_HOOK = os.path.join(_HERE, "..", "scripts", "review-loop-worker", "deny_tmp_hook.py")
+_HOOK_NS = runpy.run_path(_HOOK, run_name="deny_tmp_hook")
 
 # 偽の git。テストが PATH の先頭の bin/ に git の名前で書き、FAKE_GIT_REAL の本物の git に引数をそのまま渡す。
 # FAKE_GIT_LOG があれば、git を実行するディレクトリ (cwd に -C の値を順に繋いだもの)・サブコマンド・呼び出し元
@@ -673,6 +677,7 @@ def _assert_not_run_values(test, marker):
     test.assertEqual(marker["worker_version"], _plugin_version())
     test.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "unknown"})
     test.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
+    test.assertEqual(marker["worker_hook_denials"], "unknown")
 
 
 # ---- ログ (stream-json) の行。形は Claude Code 2.1.273 で実測したログに合わせる ----
@@ -1092,6 +1097,14 @@ class TestWorkspace(WorkerTestBase):
         # 複製のローカルの設定 (.claude/settings.local.json) を読ませない
         self.assertEqual(args[args.index("--setting-sources") + 1], "user,project")
         self.assertEqual(args.count("--settings"), 1)
+        # フックのコマンドは、PATH で見つけた python3 の絶対パスと、起動時に読み込んだフックの中身 (ワーカーはコマンド置換で
+        # 読むので、末尾の改行は除かれる) を、それぞれシェルの引用符で囲んだもの。フックの振る舞いは TestWorkerHook で確かめる
+        with open(_HOOK, encoding="utf-8") as f:
+            hook_source = f.read().rstrip("\n")
+        python3 = shutil.which("python3", path=self.env["PATH"])
+        self.assertEqual(rec["settings"][0].pop("hooks"), {"PreToolUse": [{"matcher": "Bash", "hooks": [
+            {"type": "command", "command": f"{shlex.quote(python3)} -I -c {shlex.quote(hook_source)}"},
+        ]}]})
         self.assertEqual(rec["settings"], [{
             "sandbox": {
                 "enabled": True,
@@ -1492,6 +1505,7 @@ class TestLogReading(WorkerTestBase):
             ]},
         ])
         self.assertEqual(marker["permission_denials"], {"count": 2, "tools": ["Bash", "Write"]})
+        self.assertEqual(marker["worker_hook_denials"], 0)
         self.assertEqual(marker["skill_called"], "unknown")
 
     def test_no_result_line_is_unknown(self):
@@ -1503,7 +1517,68 @@ class TestLogReading(WorkerTestBase):
             _tool_result("toolu_1", "touch: /Users/x/y: Operation not permitted", True),
         ])
         self.assertEqual(marker["permission_denials"], {"count": "unknown", "tools": []})
+        self.assertEqual(marker["worker_hook_denials"], "unknown")
         self.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
+
+    # ---- ワーカーのフックが拒否した呼び出し (worker.md の「/tmp を含むコマンドを拒否するフック」) ----
+
+    def test_worker_hook_denials_are_not_permission_denials(self):
+        # 最上位と sub-agent の中の、ワーカーのフックが拒否した Bash の呼び出しは、permission_denials から除いて
+        # worker_hook_denials に数える。ほかの拒否 (Write) は今までどおり permission_denials に数える。
+        # tool_result の本文は、フックが返した理由の文面そのもの (Claude Code 2.1.273 で実測した形)
+        reason = _HOOK_NS["REASON"]
+        top = "cat > /tmp/x.go 2>/dev/null <<'EOF'\nEOF\nmkdir -p \"$TMPDIR/rx\""
+        sub = "cat > /tmp/zz_test.go <<'EOF'\npackage gooseut\nEOF"
+        marker = self.run_with_stream([
+            _init("auto"),
+            _tool_use("toolu_top", "Bash", {"command": top}),
+            _tool_result("toolu_top", reason, True),
+            _tool_use("toolu_agent", "Skill", {"skill": "code-review"}),
+            _tool_use("toolu_sub", "Bash", {"command": sub}, parent="toolu_agent"),
+            _tool_result("toolu_sub", reason, True, parent="toolu_agent"),
+            _tool_use("toolu_write", "Write", {"file_path": "/Users/x/y"}),
+            _tool_result("toolu_write", "Permission to use Write has been denied.", True),
+            dict(_RESULT_LINE, permission_denials=[
+                {"tool_name": "Bash", "tool_use_id": "toolu_top", "tool_input": {"command": top}},
+                {"tool_name": "Bash", "tool_use_id": "toolu_sub", "tool_input": {"command": sub}},
+                {"tool_name": "Write", "tool_use_id": "toolu_write", "tool_input": {"file_path": "/Users/x/y"}},
+            ]),
+        ])
+        self.assertEqual(marker["permission_denials"], {"count": 1, "tools": ["Write"]})
+        self.assertEqual(marker["worker_hook_denials"], 2)
+        self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
+        self.assertEqual(marker["status"], "ok", marker)
+
+    def test_worker_hook_denials_need_all_conditions(self):
+        # 3 つの条件 (ツールが Bash でコマンドがフックの規則に当たる・tool_result の本文がフックの理由の文面と一致する) の
+        # どれかを満たさない拒否は、ワーカーのフックによるものと確かめられないので、permission_denials に数える
+        reason = _HOOK_NS["REASON"]
+        tmp = "cat > /tmp/x.go"
+        marker = self.run_with_stream([
+            _init("auto"),
+            # 本文が理由の文面と違う (auto モードの判定が拒否したときなど)
+            _tool_use("toolu_other_body", "Bash", {"command": tmp}),
+            _tool_result("toolu_other_body", "Permission for this action has been denied.", True),
+            # 本文の前に別の文がある
+            _tool_use("toolu_prefixed", "Bash", {"command": tmp}),
+            _tool_result("toolu_prefixed", "Error: " + reason, True),
+            # コマンドが規則に当たらない
+            _tool_use("toolu_no_tmp", "Bash", {"command": "make test"}),
+            _tool_result("toolu_no_tmp", reason, True),
+            # ツールが Bash でない
+            _tool_use("toolu_write", "Write", {"file_path": "/tmp/x", "command": tmp}),
+            _tool_result("toolu_write", reason, True),
+            # 対応する tool_result が無い
+            dict(_RESULT_LINE, permission_denials=[
+                {"tool_name": "Bash", "tool_use_id": "toolu_other_body", "tool_input": {"command": tmp}},
+                {"tool_name": "Bash", "tool_use_id": "toolu_prefixed", "tool_input": {"command": tmp}},
+                {"tool_name": "Bash", "tool_use_id": "toolu_no_tmp", "tool_input": {"command": "make test"}},
+                {"tool_name": "Write", "tool_use_id": "toolu_write", "tool_input": {"file_path": "/tmp/x", "command": tmp}},
+                {"tool_name": "Bash", "tool_use_id": "toolu_missing", "tool_input": {"command": tmp}},
+            ]),
+        ])
+        self.assertEqual(marker["permission_denials"], {"count": 5, "tools": ["Bash", "Write"]})
+        self.assertEqual(marker["worker_hook_denials"], 0)
 
     def test_subagent_lines_and_tool_results_are_ignored(self):
         marker = self.run_with_stream([
@@ -1691,6 +1766,77 @@ class TestLogReading(WorkerTestBase):
         })
         self.assertEqual(calls[1], {"command": long_command[:200], "message": long_message[:200]})
         self.assertEqual(len(calls[1]["command"]), 200)
+
+
+class TestWorkerHook(WorkerTestBase):
+    """ワーカーがレビュアの実行に渡す PreToolUse のフック (worker.md の「/tmp を含むコマンドを拒否するフック」)。
+    ワーカーが --settings に埋め込んだコマンドを、Claude Code と同じくシェルで実行して確かめる。"""
+
+    # 拒否するコマンド。先頭の 3 つは goose-ut の周回で、サンドボックスが /tmp への書き込みを止めたもの (#80)
+    DENIED = [
+        "cat > /tmp/x.go 2>/dev/null <<'EOF'\nEOF\nmkdir -p \"$TMPDIR/rx\" && cat > \"$TMPDIR/rx/main.go\" <<'EOF'\nEOF",
+        "cat > /tmp/x.go 2>/dev/null; mkdir -p ./tmp/markerprobe && cat > ./tmp/markerprobe/main_test.go <<'EOF'\nEOF",
+        "cp gooseut/run.go /tmp/run.go.bak 2>/dev/null || cp gooseut/run.go \"$TMPDIR/run.go.bak\"",
+        "echo a >/tmp/a",
+        "TMPDIR=/tmp go test ./...",
+        "ls /tmp",
+        "cd '/tmp' && ls",
+        "python3 -c \"open('/tmp/x', 'w')\"",
+    ]
+    # 拒否しないコマンド。/tmp の前か後が、パスや名前の続きになる文字のもの
+    ALLOWED = [
+        "mkdir -p ./tmp/a && echo x > ./tmp/a/b",
+        "mkdir -p tmp && cat > tmp/probe_test.go <<'EOF'\nEOF",
+        "cat > \"$TMPDIR/rx/main.go\"",
+        "echo ${D}/tmp ~/tmp",
+        "ls /private/tmp/claude-501/x",
+        "ls /tmpfile /tmp.d /tmp-x",
+        "git diff HEAD~1 -- src/tmp/a.go",
+        "curl -sS https://example.com/tmp/x",
+    ]
+
+    def hook_command(self):
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["status"], "ok", marker)
+        hooks = self.claude_records()[0]["settings"][0]["hooks"]["PreToolUse"]
+        self.assertEqual([h["matcher"] for h in hooks], ["Bash"])
+        return hooks[0]["hooks"][0]["command"]
+
+    def run_hook(self, command, event):
+        return subprocess.run(["sh", "-c", command], input=json.dumps(event), capture_output=True, text=True,
+                              env=self.env, cwd=self.root, timeout=30)
+
+    def test_denies_commands_with_tmp(self):
+        command = self.hook_command()
+        for cmd in self.DENIED:
+            with self.subTest(cmd=cmd):
+                r = self.run_hook(command, {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                                            "tool_use_id": "toolu_1", "tool_input": {"command": cmd}})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(json.loads(r.stdout), {"hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    # ログを読むときに比べる文面 (read_log_facts が使う REASON) と同じ
+                    "permissionDecisionReason": _HOOK_NS["REASON"],
+                }})
+
+    def test_allows_other_commands_and_tools(self):
+        # 規則に当たらない Bash のコマンドと、Bash 以外のツールには何も出さない (拒否も許可もしない)
+        command = self.hook_command()
+        events = [{"tool_name": "Bash", "tool_input": {"command": cmd}} for cmd in self.ALLOWED]
+        events.append({"tool_name": "Write", "tool_input": {"file_path": "/tmp/x", "command": "cat > /tmp/x"}})
+        for event in events:
+            with self.subTest(event=event):
+                r = self.run_hook(command, dict(event, hook_event_name="PreToolUse", tool_use_id="toolu_1"))
+                self.assertEqual((r.returncode, r.stdout), (0, ""), r.stderr)
+
+    def test_rule_matches_denies(self):
+        # read_log_facts が使う関数 denies も、フックのコマンドと同じ判定をする (同じファイルの中身なので)
+        for cmd in self.DENIED:
+            self.assertTrue(_HOOK_NS["denies"](cmd), cmd)
+        for cmd in self.ALLOWED:
+            self.assertFalse(_HOOK_NS["denies"](cmd), cmd)
 
 
 class TestStartChecks(WorkerTestBase):
