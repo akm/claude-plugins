@@ -239,11 +239,13 @@ PY_DIR=""
 if script_dir=$(script_real_dir "$0"); then
   PY_DIR="$script_dir/review-loop-worker"
 fi
-# ワーカーが python3 で実行するファイルの名前 (.py を除いたもの)。ファイルを足したら、ここにも足す
+# ワーカーが python3 で実行するファイルの名前 (.py を除いたもの)。ファイルを足したら、ここにも足す。
+# deny_tmp_hook は run_py では実行せず、中身をレビュアの実行のフックのコマンドに埋め込み (build_settings_json)、
+# ログを読むとき (read_log_facts) にも渡す
 PY_FILES=(
   read_worker_version allow_write_problem settings_arg_problem user_settings_problem webfetch_domains workspace_hash
   build_settings_json stop_cwd_procs make_removable read_log_facts rename_dir clone_settings_problem make_request_copy
-  result_file_problem copy_result setpgid_exec
+  result_file_problem copy_result setpgid_exec deny_tmp_hook
 )
 
 # python3 のスクリプトのディレクトリから、PY_FILES のファイルの中身を、名前ごとの変数 PY_SRC_<名前> に読み込む。
@@ -465,6 +467,7 @@ SKILL_CALLED="unknown"
 DENIAL_COUNT="unknown"
 DENIAL_TOOLS="[]"
 EFFECTIVE_MODE="unknown"  # ログから読んだ実効の権限モード
+HOOK_DENIAL_COUNT="unknown"  # ログから数えた、ワーカーのフックが拒否した呼び出しの件数 (DENIAL_COUNT には含めない)
 SANDBOX_COUNT="unknown"   # ログから数えた、サンドボックスが止めた確認の件数
 SANDBOX_CALLS=""          # 完了の印の sandbox_blocked.calls の要素 (YAML の行)。空なら calls は []
 MARKER_LINE=""         # 最後に書いた完了の印の、この起動で応じた回の一覧に出す行
@@ -567,7 +570,7 @@ START_HEAD=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null) || unavailab
 
 # 8. 使うコマンドがあり、python3 のスクリプトを読み込めたか (読み込んだのは関数 load_py_files)
 command -v claude >/dev/null 2>&1 || unavailable "claude コマンドが見つからない"
-command -v python3 >/dev/null 2>&1 || unavailable "python3 が見つからない"
+PYTHON3=$(command -v python3 2>/dev/null) || unavailable "python3 が見つからない"
 [ -z "$PY_PROBLEM" ] || unavailable "$PY_PROBLEM"
 
 # 9. 作業場所を置ける一時ディレクトリがあるか。作業場所は書き込みを許す場所で、ホームと作業側は守る場所なので、重なってはいけない。
@@ -697,8 +700,9 @@ WS_KEY="${LOOP_REAL##*/}-$ws_hash"
 WS="$TMP_REAL/review-loop-$WS_KEY"
 CLONE="$WS/tree"
 
-# レビュアの実行に渡す --settings の JSON。値は起動の間変わらないので、ここで 1 度だけ組み立てる
-settings_args=("$WS")
+# レビュアの実行に渡す --settings の JSON。値は起動の間変わらないので、ここで 1 度だけ組み立てる。
+# フックのコマンドには、起動時の確認の 8 で見つけた python3 のパスと、起動時に読み込んだフックの中身を埋め込む
+settings_args=("$WS" "$PYTHON3" "$PY_SRC_deny_tmp_hook")
 for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do settings_args+=(-w "$v"); done
 for v in ${SANDBOX_ALLOWED_DOMAINS[@]+"${SANDBOX_ALLOWED_DOMAINS[@]}"}; do settings_args+=(-d "$v"); done
 for v in ${EXTRA_SETTINGS[@]+"${EXTRA_SETTINGS[@]}"}; do settings_args+=(-s "$v"); done
@@ -957,10 +961,11 @@ snapshot() {
   done
 }
 
-# ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・サンドボックスが止めた確認を読んで、
-# 1 行に 1 つずつ標準出力に出す。行の並びと説明の正本は review-loop-worker/read_log_facts.py
+# ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・ワーカーのフックが拒否した呼び出し・
+# サンドボックスが止めた確認を読んで、1 行に 1 つずつ標準出力に出す。行の並びと説明の正本は review-loop-worker/read_log_facts.py。
+# ワーカーのフックが拒否した呼び出しを見分けるのに、起動時に読み込んだフックの中身を渡す
 read_log_facts() {
-  run_py read_log_facts "$1"
+  run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook"
 }
 
 # 完了の印を書き、この起動で応じた回の一覧に出す行を MARKER_LINE に入れる。ran=1 はレビュアの実行を起動した回。
@@ -982,6 +987,7 @@ write_marker() {
     echo "permission_denials:"
     echo "  count: $DENIAL_COUNT"
     echo "  tools: $DENIAL_TOOLS"
+    echo "worker_hook_denials: $HOOK_DENIAL_COUNT"
     echo "sandbox_blocked:"
     echo "  count: $SANDBOX_COUNT"
     if [ -n "$SANDBOX_CALLS" ]; then
@@ -1227,7 +1233,7 @@ finish_round() {
   # レビュアの実行の終了コード (REVIEWER_RC) は変えない
   stop_cwd_procs "$WS"
 
-  # 2. ログを読む。行の並びは review-loop-worker/read_log_facts.py の先頭のコメントのとおり。7 行目からは、
+  # 2. ログを読む。行の並びは review-loop-worker/read_log_facts.py の先頭のコメントのとおり。8 行目からは、
   # 止められた呼び出しごとのコマンドと文面の 2 行で、完了の印の sandbox_blocked.calls の要素の YAML にする
   # (値は yaml_str で二重引用符の文字列にする)
   facts=$(read_log_facts "$LOOP_DIR/$CURRENT_RID.log")
@@ -1240,9 +1246,10 @@ finish_round() {
       3) DENIAL_COUNT=$fact ;;
       4) DENIAL_TOOLS=$fact ;;
       5) EFFECTIVE_MODE=$fact ;;
-      6) SANDBOX_COUNT=$fact ;;
+      6) HOOK_DENIAL_COUNT=$fact ;;
+      7) SANDBOX_COUNT=$fact ;;
       *)
-        if [ $(( fact_no % 2 )) -eq 1 ]; then
+        if [ $(( fact_no % 2 )) -eq 0 ]; then
           blocked_command=$fact
         else
           SANDBOX_CALLS="$SANDBOX_CALLS    - command: $(yaml_str "$blocked_command")
@@ -1259,6 +1266,7 @@ EOF
   [ -n "$DENIAL_COUNT" ] || DENIAL_COUNT=unknown
   [ -n "$DENIAL_TOOLS" ] || DENIAL_TOOLS="[]"
   [ -n "$EFFECTIVE_MODE" ] || EFFECTIVE_MODE=unknown
+  [ -n "$HOOK_DENIAL_COUNT" ] || HOOK_DENIAL_COUNT=unknown
   [ -n "$SANDBOX_COUNT" ] || SANDBOX_COUNT=unknown
 
   # 3. 確かめる。上限と割り込みで止めた回は、結果の 4 項目 (ある・ファイル・形・run_id) を確かめない。
@@ -1437,6 +1445,7 @@ process_request() {
   DENIAL_COUNT="unknown"
   DENIAL_TOOLS="[]"
   EFFECTIVE_MODE="unknown"
+  HOOK_DENIAL_COUNT="unknown"
   SANDBOX_COUNT="unknown"
   SANDBOX_CALLS=""
   REVIEWER_RC=""
