@@ -22,7 +22,8 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 
 1. **設定と引数を読む** (G0): `.claude/akm-claude-plugins/review-triage/config.json` の `loop` を読み、引数で上書きする (キーと既定値の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」。引数の様式は [references/arguments.md](references/arguments.md))。
    - **`review_skill` が引数でも設定でも未設定なら、人間に尋ねる** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
-   - **全量の起点のブランチ (`--base`) は、記録に回が無いときの最初の回 (全量の回) にだけ使う周回の条件で、設定のキーを持たない** (決め方・検査・効かない経路の正本は [references/arguments.md](references/arguments.md) の「様式」にある `--base` の段落)。省くと `origin/HEAD` が指すブランチになる。
+   - **全量の起点のブランチ (`--base`) も周回の条件で、G0 で決める** (扱いの正本は [references/arguments.md](references/arguments.md) の「様式」にある `--base` の段落)。
+   - **記録 (手順 2 で読むもの) も、経路を問わず G0 で読み、読めることを確かめる** (読めないときの扱いの正本は [references/arguments.md](references/arguments.md) の「値の検査」)。回の有無は `--base` の扱いに使う。
    - **構造の関門 k (`--structure-rounds`、設定は `loop.structure_rounds`) は周回の条件で、J9 が使う** (意味・既定・値の検査の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」と [references/arguments.md](references/arguments.md))。
    - **回数の閾値 N (`--threshold`、設定は `fix.threshold_rounds`) は周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味・決め方・検査の正本は [review-triage-fix の arguments.md](../review-triage-fix/references/arguments.md))。
    - **段 (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の走らせ方 (`--stage`、設定は `fix.stages`) も同じく周回の条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせた段の検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。周回は段の sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
