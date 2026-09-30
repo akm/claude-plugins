@@ -44,6 +44,8 @@ LINE_NUMBER = re.compile(r"\s*\d+\t")    # cat -n と nl の行番号とタブ
 # grep -n の「<ファイル>:<行番号>:」と、前後の行の「<ファイル>-<行番号>-」の後半。ファイル名が同じ形を含むこともあるので、
 # 重なり合うものも含めて、行の中のすべての位置で探す (先読みで探し、グループ 1 がその長さ)
 GREP_NUMBER = re.compile(r"(?=(:\d+:|-\d+-))")
+# grep -n で 1 つのファイルだけを検索したときに行の先頭に付く「<行番号>:」と、前後の行の「<行番号>-」
+GREP_LINE_NUMBER = re.compile(r"\d+[:-]")
 # git の差分の hunk の見出し。git は、hunk の前にある行の先頭の一部 (80 バイトまで。文字の途中では切らない) を後ろに付ける
 DIFF_HUNK = re.compile(r"@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@ (.*)")
 
@@ -124,7 +126,7 @@ def read_repo_lines(repo, base, head):
 
 def shows_repo_line(line, repo_lines):
     """本文の行が、リポジトリの行を表示したものか。行そのもの・表示のコマンドが前に付けるもの (差分の + と -・
-    cat -n と nl の行番号とタブ・grep -n のファイル名と行番号) を 1 つ除いたもののどれかが、前後の空白を除いてリポジトリの行と
+    cat -n と nl の行番号とタブ・grep -n のファイル名と行番号・grep -n の行番号) を 1 つ除いたもののどれかが、前後の空白を除いてリポジトリの行と
     一致するか、git の差分の hunk の見出しで、後ろに付いた文字列がリポジトリの行の先頭の部分と一致すれば、表示したものとする。"""
     m = DIFF_HUNK.fullmatch(line.strip())
     if m:
@@ -138,6 +140,9 @@ def shows_repo_line(line, repo_lines):
     if m:
         rests.append(line[m.end():])
     rests.extend(line[m.start() + len(m.group(1)):] for m in GREP_NUMBER.finditer(line))
+    m = GREP_LINE_NUMBER.match(line)
+    if m:
+        rests.append(line[m.end():])
     return any(r.strip() in repo_lines for r in rests)
 
 

@@ -1821,7 +1821,8 @@ class TestLogReading(WorkerTestBase):
         # #86: レビュアが差分や文書を表示しただけで、本文に文面とタグが現れた。文面かタグを含む行がどれも、
         # レビュー対象のコミット (base と base..head の各コミット) の行を表示したものなら、サンドボックスが止めた確認に数えず、
         # repo_text_displayed に数える。表示の形は、行そのもの (sed)・差分の + と - と文脈の行 (git diff・git log -p)・
-        # 行番号とタブ (cat -n)・grep -n のファイル名と行番号 (git grep -n のコミットの名前つきを含む)・hunk の見出しの 5 つ
+        # 行番号とタブ (cat -n)・grep -n のファイル名と行番号 (git grep -n のコミットの名前つきを含む)・1 つのファイルを
+        # grep -n したときの行番号 (#86 の周回の回 1 で、これだけ照合できずに数えられた)・hunk の見出しの 6 つ
         base = self.make_review_range()
         head_full = _git(self.repo, "rev-parse", "HEAD")
         git_log = os.path.join(self.root, "git-log.jsonl")
@@ -1842,12 +1843,15 @@ class TestLogReading(WorkerTestBase):
                      f"./worker/read_log_facts.py-3-{self.PY_TAG}\n"
                      f"{head_full[:7]}:docs/loop-files.md:3:{self.DOC_OPEN}")
         log_body = f"commit 0123abc\n\n    mid\n\n+{self.MID_LINE}"
+        # 1 つのファイルだけを検索すると、ファイル名が付かずに、当たった行は「<行番号>:」、前後の行は「<行番号>-」で始まる
+        one_file_body = f"2:{self.PY_PHRASE}\n3-{self.PY_TAG}\n4-{self.PY_TAG_END}"
         calls = [
             ("git diff base..head", diff_body),
             ("cat -n worker/read_log_facts.py", cat_body),
             ("sed -n 2,4p docs/loop-files.md", sed_body),
             ("grep -rn -e 'operation not permitted' -e sandbox_violations .", grep_body),
             ("git log -p base..head -- docs/mid.md", log_body),
+            ("grep -n -A 2 'operation not permitted' worker/read_log_facts.py", one_file_body),
         ]
         stream = [_init("auto")]
         for i, (cmd, body) in enumerate(calls):
