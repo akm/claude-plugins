@@ -421,7 +421,7 @@ class WorkerTestBase(unittest.TestCase):
     def head(self):
         return _git(self.repo, "rev-parse", "--short", "HEAD")
 
-    def request_text(self, rid=RID, head=None):
+    def request_text(self, rid=RID, head=None, base="main"):
         """実際の雛形を、review-request と同じ値の種類で埋めた依頼文を返す (作業ツリーの扱いは「共有」のまま)。"""
         with open(_TEMPLATE, encoding="utf-8") as f:
             text = f.read()
@@ -429,7 +429,7 @@ class WorkerTestBase(unittest.TestCase):
             "repo": "example/repo",
             "repo_dir": self.repo,
             "branch": _git(self.repo, "branch", "--show-current"),
-            "base": "main",
+            "base": base,
             "head": head or self.head(),
             "scope": "full",
             "scope_note": "ブランチの全体",
@@ -445,9 +445,9 @@ class WorkerTestBase(unittest.TestCase):
         self.assertEqual(re.findall(r"\{\{[^}]*\}\}", text), [], "雛形に、テストが埋めていない項目がある")
         return text
 
-    def put_request(self, rid=RID, head=None, text=None):
+    def put_request(self, rid=RID, head=None, text=None, base="main"):
         if text is None:
-            text = self.request_text(rid, head)
+            text = self.request_text(rid, head, base)
         tmp = self.path(f".review-request-{rid}.md.tmp")
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(text)
@@ -677,6 +677,7 @@ def _assert_not_run_values(test, marker):
     test.assertEqual(marker["worker_version"], _plugin_version())
     test.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "unknown"})
     test.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
+    test.assertEqual(marker["repo_text_displayed"], {"count": "unknown", "calls": []})
     test.assertEqual(marker["worker_hook_denials"], "unknown")
 
 
@@ -750,6 +751,7 @@ class TestHappyPath(WorkerTestBase):
         self.assertIs(marker["skill_called"], True)
         self.assertEqual(marker["permission_denials"], {"count": 0, "tools": []})
         self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
+        self.assertEqual(marker["repo_text_displayed"], {"count": 0, "calls": []})
         self.assertEqual(marker["head_before"], head)
         self.assertEqual(marker["head_after"], head)
         self.assertIs(marker["tree_clean_after"], True)
@@ -1519,6 +1521,7 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual(marker["permission_denials"], {"count": "unknown", "tools": []})
         self.assertEqual(marker["worker_hook_denials"], "unknown")
         self.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
+        self.assertEqual(marker["repo_text_displayed"], {"count": "unknown", "calls": []})
 
     # ---- ワーカーのフックが拒否した呼び出し (worker.md の「/tmp を含むコマンドを拒否するフック」) ----
 
@@ -1714,8 +1717,8 @@ class TestLogReading(WorkerTestBase):
 
     def test_sandbox_blocked_counts_successful_results(self):
         # is_error が偽の Bash の結果も、文面があれば数える。通し確認 (2026-09-28) で、出力を | tail に渡したコマンドと
-        # ; echo で終わるコマンドは、止められても成功で終わった。文面を含む文書を grep しただけの結果も数える
-        # (見落として記録に入れるより、止めて人間が報告を読む方を選ぶ)
+        # ; echo で終わるコマンドは、止められても成功で終わった。文面を含む文書を grep しただけの結果も、その行が
+        # レビュー対象のコミットに無ければ数える (見落として記録に入れるより、止めて人間が報告を読む方を選ぶ)
         go = "cd tree/tools && go test ./... 2>&1 | tail -30"
         cat = "cat > /tmp/t_test.go <<'EOF'\npackage main\nEOF\necho skip"
         grep = "grep -rn 'operation not permitted' ."
@@ -1738,6 +1741,7 @@ class TestLogReading(WorkerTestBase):
              "message": "(eval):1: operation not permitted: /tmp/t_test.go"},
             {"command": grep, "message": "worker.md:330:(eval):1: operation not permitted: <パス>"},
         ]})
+        self.assertEqual(marker["repo_text_displayed"], {"count": 0, "calls": []})
         # サンドボックスが止めた確認を failed の条件にしないのは今までどおり (RA1 にするのは作業側)
         self.assertEqual(marker["status"], "ok", marker)
 
@@ -1766,6 +1770,197 @@ class TestLogReading(WorkerTestBase):
         })
         self.assertEqual(calls[1], {"command": long_command[:200], "message": long_message[:200]})
         self.assertEqual(len(calls[1]["command"]), 200)
+
+
+    # ---- リポジトリの行を表示しただけの結果 (worker.md の「リポジトリの行を表示しただけの結果」) ----
+
+    def commit_files(self, files, message):
+        """作業側のリポジトリに、files (パス → 中身。中身が None ならそのファイルを消す) を書いてコミットし、短縮 SHA を返す。"""
+        for path, text in files.items():
+            full = os.path.join(self.repo, path)
+            if text is None:
+                os.remove(full)
+                continue
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(text)
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-q", "-m", message)
+        return self.head()
+
+    # 照合に使う行。#86 の周回で、表示しただけで数えられた行 (ワーカーの実装・テスト・文書) と同じ形にする
+    PY_PHRASE = 'PHRASE = "operation not permitted"   # ファイルの書き込みを止められたときの文面 (大文字と小文字を区別しない)'
+    PY_TAG = 'TAG = "<sandbox_violations>"         # 接続を止められたときに本文に付くタグ'
+    PY_TAG_END = 'TAG_END = "</sandbox_violations>"'
+    TEST_LINE = '        _tool_result("toolu_1", "touch: /Users/x/y: Operation not permitted", True),'
+    DOC_OPEN = '      message: "open /Users/me/Library/Caches/go-build/ab/abcd-d: operation not permitted"'
+    DOC_NET = '      message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"'
+    OLD_LINE = '旧い説明: サンドボックスの中から起動すると `sandbox-exec: sandbox_apply: Operation not permitted` で止まる。'
+    MID_LINE = '途中のコミットにだけある行: Operation not permitted の例'
+
+    def make_review_range(self):
+        """レビュー対象の範囲 (base..head) を作り、base の短縮 SHA を返す。base には OLD_LINE と PY_PHRASE・PY_TAG・
+        PY_TAG_END を置く。OLD_LINE は間のコミットで消すので、base にだけある。MID_LINE は間のコミットで足して head で消すので、
+        間のコミットにだけある。"""
+        base = self.commit_files({
+            "worker/read_log_facts.py": f"import re\n{self.PY_PHRASE}\n{self.PY_TAG}\n{self.PY_TAG_END}\n",
+            "docs/old.md": f"# 旧い文書\n{self.OLD_LINE}\n",
+        }, "base")
+        self.commit_files({
+            "tests/test_x.py": f"def test_x():\n{self.TEST_LINE}\n",
+            "docs/old.md": "# 旧い文書\n",
+            "docs/mid.md": f"{self.MID_LINE}\n",
+        }, "mid")
+        self.commit_files({
+            "docs/mid.md": None,
+            "docs/loop-files.md": f"```yaml\n    - command: \"x\"\n{self.DOC_OPEN}\n{self.DOC_NET}\n```\n",
+        }, "head")
+        return base
+
+    def test_repo_text_displayed_is_not_counted(self):
+        # #86: レビュアが差分や文書を表示しただけで、本文に文面とタグが現れた。文面かタグを含む行がどれも、
+        # レビュー対象のコミット (base と base..head の各コミット) の行を表示したものなら、サンドボックスが止めた確認に数えず、
+        # repo_text_displayed に数える。表示の形は、行そのもの (sed)・差分の + と - と文脈の行 (git diff・git log -p)・
+        # 行番号とタブ (cat -n)・grep -n のファイル名と行番号 (git grep -n のコミットの名前つきを含む)・hunk の見出しの 5 つ
+        base = self.make_review_range()
+        head_full = _git(self.repo, "rev-parse", "HEAD")
+        git_log = os.path.join(self.root, "git-log.jsonl")
+        self.install_fake_git()
+        self.env["FAKE_GIT_LOG"] = git_log
+        diff_body = "\n".join([
+            "diff --git a/worker/read_log_facts.py b/worker/read_log_facts.py",
+            # git は見出しの後ろに、hunk の前にある行の先頭を 80 バイトまで付ける (#86 の周回で実際に現れた形)
+            '@@ -2,6 +2,7 @@ PHRASE = "operation not permitted"   # ファイルの書き込みを止めら',
+            " " + self.PY_TAG,
+            " " + self.PY_TAG_END,
+            "-" + self.OLD_LINE,
+            "+" + self.TEST_LINE,
+        ])
+        cat_body = f"     1\timport re\n     2\t{self.PY_PHRASE}\n     3\t{self.PY_TAG}\n     4\t{self.PY_TAG_END}"
+        sed_body = f'    - command: "x"\n{self.DOC_OPEN}\n{self.DOC_NET}'
+        grep_body = (f"./tests/test_x.py:2:{self.TEST_LINE}\n"
+                     f"./worker/read_log_facts.py-3-{self.PY_TAG}\n"
+                     f"{head_full[:7]}:docs/loop-files.md:3:{self.DOC_OPEN}")
+        log_body = f"commit 0123abc\n\n    mid\n\n+{self.MID_LINE}"
+        calls = [
+            ("git diff base..head", diff_body),
+            ("cat -n worker/read_log_facts.py", cat_body),
+            ("sed -n 2,4p docs/loop-files.md", sed_body),
+            ("grep -rn -e 'operation not permitted' -e sandbox_violations .", grep_body),
+            ("git log -p base..head -- docs/mid.md", log_body),
+        ]
+        stream = [_init("auto")]
+        for i, (cmd, body) in enumerate(calls):
+            # sub-agent の中の呼び出しも同じく扱う
+            parent = "toolu_agent" if i % 2 else None
+            stream += [_tool_use(f"toolu_{i}", "Bash", {"command": cmd}, parent=parent),
+                       _tool_result(f"toolu_{i}", body, False, parent=parent)]
+        self.put_stream(stream + [_RESULT_LINE])
+        self.put_request(base=base)
+        marker, _ = self.run_round()
+
+        self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
+        self.assertEqual(marker["repo_text_displayed"]["count"], len(calls))
+        self.assertEqual([c["command"] for c in marker["repo_text_displayed"]["calls"]], [c for c, _ in calls])
+        # message には、文面かタグを含む行と、タグの行から閉じるタグの行までを書く。1 行への直し方と切り詰める長さも、
+        # サンドボックスが止めた確認と同じ (タブは空白にする)
+        self.assertEqual(marker["repo_text_displayed"]["calls"][1]["message"],
+                         f"2 {self.PY_PHRASE} 3 {self.PY_TAG} 4 {self.PY_TAG_END}"[:200])
+        self.assertEqual(marker["status"], "ok", marker)
+
+        # 照合に使う行は、作業側のリポジトリに対して git を実行して 1 回だけ読む (作業場所の下では実行しない)
+        with open(git_log, encoding="utf-8") as f:
+            runs = [json.loads(line) for line in f if line.strip()]
+        self.assertEqual([where for where, sub, caller in runs if sub == "grep"], [os.path.realpath(self.repo)])
+
+    def test_repo_text_mixed_and_excluded_lines(self):
+        # 表示したものと確かめられない行が 1 行でもあれば、今までどおりサンドボックスが止めた確認に数え、
+        # message には表示したものと確かめた行を除いて書く (表示したタグの行からは、タグの中の行を含め始めない)。
+        # 文面だけの行とタグだけの行は照合に使わない — 接続を止められたときの本物の本文にはタグだけの行がある。
+        # レビュー対象の範囲の外 (別のブランチ) にしか無い行も照合に使わない
+        _git(self.repo, "switch", "-q", "-c", "other")
+        self.commit_files({"other.md": "別のブランチにだけある行: operation not permitted\n"}, "other")
+        _git(self.repo, "switch", "-q", "main")
+        base = self.make_review_range()
+        self.commit_files({"docs/format.md": "```\n<sandbox_violations>\nOperation not permitted\n```\n"}, "format")
+        net = ("Exit code 56\ncurl: (56) CONNECT tunnel failed, response 403\n<sandbox_violations>\n"
+               "deny network-outbound example.com:443 (host is not on the allow list)\n</sandbox_violations>")
+        mixed = (f"{self.PY_TAG}\n{self.PY_TAG_END}\n{self.DOC_OPEN}\n"
+                 "touch: /Users/x/y: Operation not permitted")
+        self.put_stream([
+            _init("auto"),
+            _tool_use("toolu_net", "Bash", {"command": "curl -sS https://example.com/"}),
+            _tool_result("toolu_net", net, True),
+            _tool_use("toolu_perl", "Bash", {"command": "perl probe.pl"}),
+            _tool_result("toolu_perl", "Operation not permitted", True),
+            _tool_use("toolu_mixed", "Bash", {"command": "sed -n 1,3p x; touch /Users/x/y"}),
+            _tool_result("toolu_mixed", mixed, False),
+            _tool_use("toolu_other", "Bash", {"command": "git show other:other.md"}),
+            _tool_result("toolu_other", "別のブランチにだけある行: operation not permitted", False),
+            _RESULT_LINE,
+        ])
+        self.put_request(base=base)
+        marker, _ = self.run_round()
+
+        self.assertEqual(marker["sandbox_blocked"], {"count": 4, "calls": [
+            {"command": "curl -sS https://example.com/",
+             "message": "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list) "
+                        "</sandbox_violations>"},
+            {"command": "perl probe.pl", "message": "Operation not permitted"},
+            {"command": "sed -n 1,3p x; touch /Users/x/y", "message": "touch: /Users/x/y: Operation not permitted"},
+            {"command": "git show other:other.md", "message": "別のブランチにだけある行: operation not permitted"},
+        ]})
+        self.assertEqual(marker["repo_text_displayed"], {"count": 0, "calls": []})
+
+    def test_repo_lines_unreadable(self):
+        # 依頼文に base の行が無い・base が形に合わない (- で始まる)・コミットに解決できない・git grep が失敗したときは、
+        # リポジトリの行を読めなかったものとして、文面かタグを含む結果をすべてサンドボックスが止めた確認に数え、
+        # repo_text_displayed の件数を unknown にする。どれも回は止めない (status は ok)
+        base = self.make_review_range()
+        body = f"     2\t{self.PY_PHRASE}"
+        self.put_stream([
+            _init("auto"),
+            _tool_use("toolu_cat", "Bash", {"command": "cat -n worker/read_log_facts.py"}),
+            _tool_result("toolu_cat", body, False),
+            _RESULT_LINE,
+        ])
+        no_base = re.sub(r"(?m)^base: .*\n", "", self.request_text(base=base))
+        self.assertNotIn("\nbase:", no_base)
+        cases = [
+            ("base の行が無い", dict(text=no_base), {}),
+            ("base が - で始まる", dict(base="-x"), {}),
+            ("base をコミットに解決できない", dict(base="nosuch"), {}),
+            ("git grep が失敗する", dict(base=base), {"FAKE_GIT_FAIL": "grep"}),
+        ]
+        for what, request, env in cases:
+            with self.subTest(what):
+                self.reset_loop()
+                self.install_fake_git()
+                for k in ("FAKE_GIT_FAIL",):
+                    self.env.pop(k, None)
+                self.env.update(env)
+                self.put_request(**request)
+                marker, _ = self.run_round()
+                self.assertEqual(marker["sandbox_blocked"], {"count": 1, "calls": [
+                    {"command": "cat -n worker/read_log_facts.py", "message": f"2 {self.PY_PHRASE}"[:200]},
+                ]})
+                self.assertEqual(marker["repo_text_displayed"], {"count": "unknown", "calls": []})
+                self.assertEqual(marker["status"], "ok", marker)
+
+    def test_repo_lines_read_only_when_needed(self):
+        # 文面かタグを含む Bash の結果が無ければ、リポジトリの行を読まない (git grep が失敗しても、件数は unknown ではなく 0)
+        self.install_fake_git()
+        self.env["FAKE_GIT_FAIL"] = "grep"
+        self.put_stream([
+            _init("auto"),
+            _tool_use("toolu_ls", "Bash", {"command": "ls"}),
+            _tool_result("toolu_ls", "README.md", False),
+            _RESULT_LINE,
+        ])
+        self.put_request()
+        marker, _ = self.run_round()
+        self.assertEqual(marker["sandbox_blocked"], {"count": 0, "calls": []})
+        self.assertEqual(marker["repo_text_displayed"], {"count": 0, "calls": []})
 
 
 class TestWorkerHook(WorkerTestBase):

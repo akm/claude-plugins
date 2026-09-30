@@ -186,6 +186,9 @@ worker_hook_denials: 0
 sandbox_blocked:
   count: 0
   calls: []
+repo_text_displayed:
+  count: 0
+  calls: []
 head_before: "abc1234"
 head_after: "abc1234"
 tree_clean_after: true
@@ -209,8 +212,10 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ワーカーのフックが拒否した呼び出し (`worker_hook_denials`) は含めない。ログから読めなければ `unknown` |
 | `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く。ワーカーのフックが拒否した呼び出しは含めない)。件数が 0 か `unknown` なら `[]` |
 | `worker_hook_denials` | | ワーカーのフック (`/tmp` を含む Bash のコマンドを実行前に拒否するもの) が拒否したと確かめられた呼び出しの件数。見分け方の正本は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」。ログから読めなければ `unknown`。起動しなかった回も `unknown`。0.18.0 以降のワーカーが書く — 0.17.0 以前のワーカーの印を、このキーが無いことでレビュー不成立にしないため、必須にしない |
-| `sandbox_blocked.count` | ◯ | サンドボックスが止めた確認 (Bash の呼び出しのうち、書き込みか接続を止められたエラーで終わったもの。sub-agent の中の呼び出しを含む) の件数。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
+| `sandbox_blocked.count` | ◯ | サンドボックスが止めた確認 (Bash の呼び出しのうち、書き込みか接続を止められたエラーで終わったもの。sub-agent の中の呼び出しを含む) の件数。レビュー対象のコミットの行を表示しただけと確かめた呼び出し (`repo_text_displayed`) は含めない。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
 | `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、止められたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの正本は [worker.md](worker.md) の「サンドボックスが止めた確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
+| `repo_text_displayed.count` | | Bash の結果の本文に、サンドボックスが止めた確認を数えるときに探す文面 (`operation not permitted`) かタグ (`<sandbox_violations>`) があったが、それを含む行がどれも、レビュー対象のコミットにある行を表示したものと確かめた呼び出しの件数 (sub-agent の中の呼び出しを含む)。見分け方の正本は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」。`sandbox_blocked.count` が `unknown` なら `unknown`。起動しなかった回も `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` で、そのときはそれらの結果をすべて `sandbox_blocked` に数える。0.20.0 以降のワーカーが書く — 0.19.0 以前のワーカーの印を、このキーが無いことでレビュー不成立にしないため、必須にしない |
+| `repo_text_displayed.calls` | | 数えた呼び出しの列。要素の形と、1 行への直し方と切り詰める長さは `sandbox_blocked.calls` と同じで、`message` は本文のうち文面かタグを含む行。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |
 | `head_after` | | レビュアの実行が終わった後の HEAD の短縮 SHA。**起動しなかった回は省く** |
 | `tree_clean_after` | | レビュアの実行が終わった後に作業ツリーが clean か。起動しなかった回は省く |
@@ -220,7 +225,7 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `error` | | `failed` のときだけ書く。通らなかった項目 (複数なら `; ` で区切る)。`ok` のときは省く |
 | `log` | | ログのファイル名。起動しなかった回は省く (ログが無いことを示す) |
 
-`sandbox_blocked.calls` が空でないときは、要素ごとに `- ` で始まる行から書く (YAML のブロック形式の列)。
+`sandbox_blocked.calls` と `repo_text_displayed.calls` が空でないときは、要素ごとに `- ` で始まる行から書く (YAML のブロック形式の列)。
 
 ```yaml
 sandbox_blocked:

@@ -462,14 +462,18 @@ REQ_STARTED=""
 REQ_STARTED_EPOCH=0
 REQ_DEADLINE=0         # 上限の時刻 (エポック秒)。依頼文を受け取った時刻に --review-timeout-minutes を足したもの
 HEAD_BEFORE=""
+REQ_BASE=""            # 依頼文の base の値 (無ければ空)。リポジトリの行を表示しただけの結果を見分けるのに使う
+REQ_HEAD_FULL=""       # 依頼文の head を作業側で解決した完全な SHA
 EFFECTIVE="unknown"
 SKILL_CALLED="unknown"
 DENIAL_COUNT="unknown"
 DENIAL_TOOLS="[]"
 EFFECTIVE_MODE="unknown"  # ログから読んだ実効の権限モード
 HOOK_DENIAL_COUNT="unknown"  # ログから数えた、ワーカーのフックが拒否した呼び出しの件数 (DENIAL_COUNT には含めない)
-SANDBOX_COUNT="unknown"   # ログから数えた、サンドボックスが止めた確認の件数
+SANDBOX_COUNT="unknown"   # ログから数えた、サンドボックスが止めた確認の件数 (リポジトリの行を表示しただけのものを除く)
 SANDBOX_CALLS=""          # 完了の印の sandbox_blocked.calls の要素 (YAML の行)。空なら calls は []
+SHOWN_COUNT="unknown"     # ログから数えた、リポジトリの行を表示しただけと確かめた呼び出しの件数
+SHOWN_CALLS=""            # 完了の印の repo_text_displayed.calls の要素 (YAML の行)。空なら calls は []
 MARKER_LINE=""         # 最後に書いた完了の印の、この起動で応じた回の一覧に出す行
 PREP_DIR=""            # 回の準備のディレクトリのパス (手順 5 で作り、手順 8 の後に作業場所のパスに改名する)
 PREP_OUT=""            # 準備のコマンドの標準出力と標準エラーを書くファイル (準備のディレクトリの中。改名の前に消す)
@@ -962,10 +966,11 @@ snapshot() {
 }
 
 # ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・ワーカーのフックが拒否した呼び出し・
-# サンドボックスが止めた確認を読んで、1 行に 1 つずつ標準出力に出す。行の並びと説明の正本は review-loop-worker/read_log_facts.py。
-# ワーカーのフックが拒否した呼び出しを見分けるのに、起動時に読み込んだフックの中身を渡す
+# サンドボックスが止めた確認・リポジトリの行を表示しただけの呼び出しを読んで、1 行に 1 つずつ標準出力に出す。
+# 行の並びと説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを見分けるのに、
+# 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを見分けるのに、作業側のパスと依頼文の範囲を渡す
 read_log_facts() {
-  run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook"
+  run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook" "$CWD_REAL" "$REQ_BASE" "$REQ_HEAD_FULL"
 }
 
 # 完了の印を書き、この起動で応じた回の一覧に出す行を MARKER_LINE に入れる。ran=1 はレビュアの実行を起動した回。
@@ -993,6 +998,14 @@ write_marker() {
     if [ -n "$SANDBOX_CALLS" ]; then
       echo "  calls:"
       printf '%s' "$SANDBOX_CALLS"
+    else
+      echo "  calls: []"
+    fi
+    echo "repo_text_displayed:"
+    echo "  count: $SHOWN_COUNT"
+    if [ -n "$SHOWN_CALLS" ]; then
+      echo "  calls:"
+      printf '%s' "$SHOWN_CALLS"
     else
       echo "  calls: []"
     fi
@@ -1227,17 +1240,18 @@ finish_round() {
   local dest="$LOOP_DIR/review-$CURRENT_RID.yaml"
   local errors=()
   local facts head_after full_after full_before dirty clean_after after changed problem line copyable=0 ignored="" n
-  local fact fact_no=0 blocked_command=""
+  local fact fact_no=0 call_command="" call_yaml
 
   # 1. 作業場所の中を cwd にしているプロセスが残っていれば止める (後始末の途中で作業場所に書かれないように)。
   # レビュアの実行の終了コード (REVIEWER_RC) は変えない
   stop_cwd_procs "$WS"
 
-  # 2. ログを読む。行の並びは review-loop-worker/read_log_facts.py の先頭のコメントのとおり。8 行目からは、
-  # 止められた呼び出しごとのコマンドと文面の 2 行で、完了の印の sandbox_blocked.calls の要素の YAML にする
-  # (値は yaml_str で二重引用符の文字列にする)
+  # 2. ログを読む。行の並びは review-loop-worker/read_log_facts.py の先頭のコメントのとおり。9 行目からは、
+  # 呼び出しごとのコマンドと文面の 2 行で、先頭から SANDBOX_COUNT 件を完了の印の sandbox_blocked.calls の要素の YAML に、
+  # 残りを repo_text_displayed.calls の要素の YAML にする (値は yaml_str で二重引用符の文字列にする)
   facts=$(read_log_facts "$LOOP_DIR/$CURRENT_RID.log")
   SANDBOX_CALLS=""
+  SHOWN_CALLS=""
   while IFS= read -r fact; do
     fact_no=$(( fact_no + 1 ))
     case $fact_no in
@@ -1248,13 +1262,20 @@ finish_round() {
       5) EFFECTIVE_MODE=$fact ;;
       6) HOOK_DENIAL_COUNT=$fact ;;
       7) SANDBOX_COUNT=$fact ;;
+      8) SHOWN_COUNT=$fact ;;
       *)
-        if [ $(( fact_no % 2 )) -eq 0 ]; then
-          blocked_command=$fact
+        if [ $(( fact_no % 2 )) -eq 1 ]; then
+          call_command=$fact
         else
-          SANDBOX_CALLS="$SANDBOX_CALLS    - command: $(yaml_str "$blocked_command")
+          call_yaml="    - command: $(yaml_str "$call_command")
       message: $(yaml_str "$fact")
 "
+          # 呼び出しの番号 (0 から) が SANDBOX_COUNT より小さければ、サンドボックスが止めた確認
+          if [ $(( (fact_no - 10) / 2 )) -lt "$SANDBOX_COUNT" ]; then
+            SANDBOX_CALLS="$SANDBOX_CALLS$call_yaml"
+          else
+            SHOWN_CALLS="$SHOWN_CALLS$call_yaml"
+          fi
         fi ;;
     esac
   done <<EOF
@@ -1268,6 +1289,7 @@ EOF
   [ -n "$EFFECTIVE_MODE" ] || EFFECTIVE_MODE=unknown
   [ -n "$HOOK_DENIAL_COUNT" ] || HOOK_DENIAL_COUNT=unknown
   [ -n "$SANDBOX_COUNT" ] || SANDBOX_COUNT=unknown
+  [ -n "$SHOWN_COUNT" ] || SHOWN_COUNT=unknown
 
   # 3. 確かめる。上限と割り込みで止めた回は、結果の 4 項目 (ある・ファイル・形・run_id) を確かめない。
   # 作業場所は回ごとに作り直すので、作業場所にある結果は、この回のレビュアの実行が書いたものである
@@ -1439,6 +1461,8 @@ process_request() {
   REQ_STARTED=$(now_iso)
   REQ_STARTED_EPOCH=$(date +%s)
   REQ_DEADLINE=$(( REQ_STARTED_EPOCH + REVIEW_TIMEOUT_SECONDS ))
+  REQ_BASE=""
+  REQ_HEAD_FULL=""
   # ログから読む項目。レビュアの実行を起動しなかった回の印には、この unknown のまま書く
   EFFECTIVE="unknown"
   SKILL_CALLED="unknown"
@@ -1448,6 +1472,8 @@ process_request() {
   HOOK_DENIAL_COUNT="unknown"
   SANDBOX_COUNT="unknown"
   SANDBOX_CALLS=""
+  SHOWN_COUNT="unknown"
+  SHOWN_CALLS=""
   REVIEWER_RC=""
   PREP_TIMEOUT=0
   PREP_ERROR=""
@@ -1472,6 +1498,8 @@ process_request() {
   local req_head
   req_head=$(sed -n 's/^head:[[:space:]]*"\([0-9a-f][0-9a-f]*\)"[[:space:]]*$/\1/p' "$req" | head -n 1)
   if [ -z "$req_head" ]; then fail_without_run "request malformed (no head line)"; return; fi
+  # base は形を確かめずに控える (ログを読むときに確かめる。無くても、形に合わなくても、回は止めない)
+  REQ_BASE=$(sed -n 's/^base:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$req" | head -n 1)
 
   # 手順 4。作業側の HEAD と作業ツリーを確かめる
   if timed_out; then fail_timeout_in_preparation; return; fi
@@ -1481,6 +1509,7 @@ process_request() {
   if [ -z "$full_req" ] || [ "$full_req" != "$full_head" ]; then
     fail_without_run "head mismatch (expected $req_head, actual $HEAD_BEFORE)"; return
   fi
+  REQ_HEAD_FULL=$full_req
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | comma_join)
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
