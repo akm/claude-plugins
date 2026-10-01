@@ -343,7 +343,7 @@ claude -p "<プロンプト>" --model <指定> --effort <値> --permission-mode 
 | `worker_hook_denials` | 同じ配列の要素のうち、ワーカーのフックが拒否したと確かめられたものの数 | `permission_denials` と同じ条件で `unknown` |
 | 実効の権限モード (`permission_mode.effective`) | `parent_tool_use_id` の無い最初の `init` の行の `permissionMode`。指定と違えば、その回を `failed` にする (「回の処理」の表) | `init` の行か `permissionMode` が無ければ `unknown`。それだけでは `failed` にしない — 手動のモード (`default` のように、許可の一覧に無い呼び出しを人間に問い合わせるモード。`-p` では拒否になる) に戻った回は、拒否として別に現れる |
 | サンドボックスが止めた確認 (`sandbox_blocked`) | 件数と、各呼び出しのコマンドと文面。下の「サンドボックスが止めた確認の数え方」 | `result` の行が無ければ (実行が最後まで終わらなかった) 件数を `unknown` |
-| リポジトリの行を表示しただけの呼び出し (`repo_text_displayed`) | 件数と、各呼び出しのコマンドと文面。下の「リポジトリの行を表示しただけの結果」 | `sandbox_blocked` と同じ条件で `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` |
+| リポジトリの行を表示しただけの呼び出し (`repo_text_displayed`) | 件数と、各呼び出しのコマンドと文面。下の「リポジトリの行を表示しただけの結果」 | `sandbox_blocked` と同じ条件で `unknown`。ほかに `unknown` になる条件の正本は、下の「リポジトリの行を表示しただけの結果」の 4 |
 
 **effort はログのどの行にも記録されない。** 印の `effort` はワーカーに渡した値で、実行時の値は確かめられない。
 
