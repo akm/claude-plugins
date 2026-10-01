@@ -427,6 +427,15 @@ class TestCheckCommand(RepoTestCase):
         self.assertEqual(code, 2)
         self.assertIn("textlint は設定されていない", err)
 
+    def test_non_markdown_file_is_error(self):
+        self.configure(textlint={})
+        self.write("notes.txt", "x")
+        for command in ("check", "fix"):
+            code, out, err = self.run_cli(command, os.path.join(self.root, "notes.txt"))
+            self.assertEqual(code, 2, command)
+            self.assertIn("Markdown (.md) でない", err)
+            self.assertEqual(out, "")
+
     def test_check_without_textlint_installed(self):
         self.configure(textlint={})
         self.write("a.md", "x")

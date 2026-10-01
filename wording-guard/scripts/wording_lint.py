@@ -90,18 +90,20 @@ def _markdown_files(root, cfg, paths):
     """引数のパス (ファイルかディレクトリ) から、検査する Markdown のファイルを集める。
 
     (検査するファイル, 書き換えない過去の記録として除いたファイル) を返す。
+    ディレクトリからは Markdown だけを集める。明示的に指定したファイルが Markdown でなければ、
+    存在しないパスと同じく誤りにする — 知らせずに除くと「検査したもの 0 個」で成功に見えるため。
     """
     files, skipped = [], []
     for p in paths:
         if os.path.isdir(p):
             found = sorted(os.path.join(d, n) for d, _, names in os.walk(p) for n in names if n.endswith(".md"))
         elif os.path.isfile(p):
+            if not p.endswith(".md"):
+                raise config.ConfigError(f"{p} は Markdown (.md) でない。検査と自動修正の対象は Markdown だけ")
             found = [p]
         else:
             raise config.ConfigError(f"{p} が無い")
         for f in found:
-            if not f.endswith(".md"):
-                continue
             (skipped if config.is_frozen(root, cfg, f) else files).append(f)
     return files, skipped
 
