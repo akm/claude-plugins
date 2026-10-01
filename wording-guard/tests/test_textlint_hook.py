@@ -208,6 +208,101 @@ class TestEnsureInstalled(unittest.TestCase):
         self.assertIn(d, str(cm.exception))
 
 
+FAKE_NPM = """#!/bin/sh
+# テストで npm の代わりに置くスクリプト。FAKE_NPM_MODE で振る舞いを変える。
+case "$FAKE_NPM_MODE" in
+  fail) echo "npm ERR! fake" >&2; exit 1 ;;
+  race) mkdir -p "$FAKE_NPM_DEST/node_modules/.bin" && touch "$FAKE_NPM_DEST/node_modules/.bin/textlint" ;;
+esac
+mkdir -p node_modules/.bin && touch node_modules/.bin/textlint
+echo called >> "$FAKE_NPM_LOG"
+"""
+
+
+class TestSetup(unittest.TestCase):
+    """npm を差し替えて、setup の置き場の状態ごとの扱いを確かめる。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        base = self._tmp.name
+        self.cache = os.path.join(base, "cache")
+        bindir = os.path.join(base, "bin")
+        os.makedirs(bindir)
+        npm = os.path.join(bindir, "npm")
+        with open(npm, "w", encoding="utf-8") as f:
+            f.write(FAKE_NPM)
+        os.chmod(npm, 0o755)
+        self.log = os.path.join(base, "npm.log")
+        self._saved = {k: os.environ.get(k) for k in
+                       ("PATH", textlint.CACHE_ENV, "FAKE_NPM_MODE", "FAKE_NPM_DEST", "FAKE_NPM_LOG")}
+        os.environ["PATH"] = bindir + os.pathsep + os.environ.get("PATH", "")
+        os.environ[textlint.CACHE_ENV] = self.cache
+        os.environ["FAKE_NPM_LOG"] = self.log
+        os.environ.pop("FAKE_NPM_MODE", None)
+        self.dest = textlint.install_dir()
+        os.environ["FAKE_NPM_DEST"] = self.dest
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        self._tmp.cleanup()
+
+    def setup_quietly(self):
+        return textlint.setup(out=io.StringIO())
+
+    def npm_calls(self):
+        if not os.path.exists(self.log):
+            return 0
+        with open(self.log, encoding="utf-8") as f:
+            return len(f.read().split())
+
+    def leftovers(self):
+        return [n for n in os.listdir(self.cache) if n != os.path.basename(self.dest)]
+
+    def test_installs_and_leaves_no_work_directory(self):
+        self.assertEqual(self.setup_quietly(), self.dest)
+        self.assertTrue(os.path.exists(textlint.textlint_bin(self.dest)))
+        self.assertEqual(self.leftovers(), [])
+        # 2 度目は取得しない
+        self.setup_quietly()
+        self.assertEqual(self.npm_calls(), 1)
+
+    def test_broken_install_directory_stops_before_npm(self):
+        os.makedirs(os.path.join(self.dest, "node_modules"))
+        with self.assertRaises(textlint.TextlintError) as cm:
+            self.setup_quietly()
+        self.assertIn("置き場が壊れている", str(cm.exception))
+        self.assertIn("rm -rf", str(cm.exception))
+        self.assertEqual(self.npm_calls(), 0)
+        self.assertTrue(os.path.isdir(self.dest))
+
+    def test_concurrent_setup_finished_first(self):
+        os.environ["FAKE_NPM_MODE"] = "race"
+        self.assertEqual(self.setup_quietly(), self.dest)
+        self.assertTrue(os.path.exists(textlint.textlint_bin(self.dest)))
+        self.assertEqual(self.leftovers(), [])
+
+    def test_npm_failure_is_textlint_error(self):
+        os.environ["FAKE_NPM_MODE"] = "fail"
+        with self.assertRaises(textlint.TextlintError) as cm:
+            self.setup_quietly()
+        self.assertIn("npm ci が失敗した", str(cm.exception))
+        self.assertFalse(os.path.exists(self.dest))
+        self.assertEqual(self.leftovers(), [])
+
+    def test_os_error_is_textlint_error(self):
+        # キャッシュの親をファイルにして、ディレクトリを作れないようにする
+        os.makedirs(os.path.dirname(self.cache), exist_ok=True)
+        with open(self.cache, "w", encoding="utf-8") as f:
+            f.write("not a directory")
+        with self.assertRaises(textlint.TextlintError) as cm:
+            self.setup_quietly()
+        self.assertIn("セットアップに失敗した", str(cm.exception))
+
+
 def finding(rule, message, matched, severity="error", line=1, column=1):
     return {"rule": rule, "severity": severity, "message": message, "line": line, "column": column,
             "matched": matched}

@@ -25,7 +25,7 @@ textlint と規則集は、プラグインに同梱したファイル `wording-g
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py setup
 ```
 
-置き場は `${XDG_CACHE_HOME:-~/.cache}/akm-claude-plugins/wording-guard/textlint-<ロックファイルのハッシュ>`。環境変数 `WORDING_GUARD_CACHE_DIR` で親のディレクトリを変えられる。**プラグインを更新して版が変わると置き場も変わるので、もう一度セットアップする。** 入っていないときは、検査を省略せずに、セットアップのコマンドを添えた誤りを報告する。
+置き場は `${XDG_CACHE_HOME:-~/.cache}/akm-claude-plugins/wording-guard/textlint-<ロックファイルのハッシュ>`。環境変数 `WORDING_GUARD_CACHE_DIR` で親のディレクトリを変えられる。**プラグインを更新して版が変わると置き場も変わるので、もう一度セットアップする。** 入っていないときは、検査を省略せずに、セットアップのコマンドを添えた誤りを報告する。置き場があるのに textlint が入っていない (中身が消えた・壊れた) ときは、セットアップは取得を始めずに誤りを報告し、置き場を消すよう案内する (置き場は消さない)。
 
 **エージェントがセットアップを実行するときは、人間の承認を得てから実行する** — パッケージを取得するため。
 
