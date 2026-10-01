@@ -201,7 +201,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 | --- | --- |
 | `commit-rules-guard` | `generated_globs`・`custom_rules` |
 | `doc-dag` | `frozen_paths`・`doc_check_command` |
-| `wording-guard` | `convention_paths`・`frozen_paths`・`quote_markers` |
+| `wording-guard` | `convention_paths`・`frozen_paths`・`quote_markers`・`terms_paths` |
 | `review-triage` | `record_dir`・`gates`・`triage_check_command` ほか |
 
 いずれも**設定が無くても動きます** (該当の判断を人間に確認するか、その手順を飛ばして報告します)。詳細は各プラグインの README を参照してください。

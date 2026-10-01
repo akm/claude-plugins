@@ -18,6 +18,25 @@
 
 **判断の基準はこのスキルが持ちません。** リポジトリの規約から読みます。一覧を作らず原則だけを置くリポジトリと、例の表を持ちつつ「表は例であって網羅ではない」と宣言するリポジトリがあり、どちらの方針もそのリポジトリの規約に書いてあるためです。スキル自身が持つのは、SKILL.md の手順 2 が使うと定めた一般の 3 原則だけです。
 
+## 用語ファイル (任意)
+
+言い換えを決めた語 (避ける語) と、使い続けると決めた語 (許容する語) を、理由と決めた場所とともに TOML のファイルに記録できます。スキルは避ける語を検索の着手点にし、許容する語を候補から外します。**用語ファイルは決めたことの記録であって、検査の範囲ではありません。** 用語ファイルに無い言い回しも、原則に照らして判断します。
+
+```toml
+[[terms]]
+pattern = "周回"
+verdict = "avoid"
+replacements = ["ループ", "繰り返し"]
+reason = "日本語の「周回」はコースや軌道を回ること。処理の繰り返しには通じにくい"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+```
+
+様式と意味は同梱のファイル [wording-guard/skills/wording-guard/references/terms.md](skills/wording-guard/references/terms.md) を参照してください。様式の検査とまとめた内容の確認は、次のコマンドで行えます (Python 3.11 以降が必要です)。
+
+```bash
+python3 <プラグインのディレクトリ>/scripts/wording_lint.py terms
+```
+
 ## 書き換えないもの
 
 - **引用** — 原文と一致していることに意味があるため。
@@ -34,7 +53,8 @@
 {
   "convention_paths": ["CLAUDE.md#文書の言い回し"],
   "frozen_paths": ["docs/plans/", "docs/solutions/", "tmp/review-triages/"],
-  "quote_markers": ["> "]
+  "quote_markers": ["> "],
+  "terms_paths": [".claude/akm-claude-plugins/wording-guard/terms.toml"]
 }
 ```
 
@@ -43,6 +63,7 @@
 - `convention_paths` — 判断の基準になる規約の置き場。未設定ならリポジトリのルートの `CLAUDE.md` を読み、規約が見つからなければ一般の 3 原則だけで判断することを報告して進みます。
 - `frozen_paths` — 書き換えない過去の記録のパス接頭辞。未設定なら書き換えないパスを無いものとし、過去の記録らしき文書が見つかったら人間に確認します。
 - `quote_markers` — 引用の目印になる行頭の文字列。**未設定なら引用ブロックとコードブロックを目印にします。** コードブロックは値を設定しても目印のままです。
+- `terms_paths` — 用語ファイルの置き場の配列。未設定なら用語ファイルを使いません。書いたファイルが無ければ誤りとして報告します。
 
 詳細は同梱のファイル [wording-guard/skills/wording-guard/references/project-config.md](skills/wording-guard/references/project-config.md) を参照してください。
 
