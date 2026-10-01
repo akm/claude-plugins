@@ -1797,11 +1797,14 @@ class TestLogReading(WorkerTestBase):
     DOC_NET = '      message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"'
     OLD_LINE = '旧い説明: サンドボックスの中から起動すると `sandbox-exec: sandbox_apply: Operation not permitted` で止まる。'
     MID_LINE = '途中のコミットにだけある行: Operation not permitted の例'
+    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 の周回の回 1 で、git log で表示しただけで数えられた形)
+    MID_SUBJECT = 'mid: operation not permitted の例を足す'
+    MID_BODY = 'ワーカーは、本文に文面 operation not permitted かタグ <sandbox_violations> があれば数える。'
 
     def make_review_range(self):
         """レビュー対象の範囲 (base..head) を作り、base の短縮 SHA を返す。base には OLD_LINE と PY_PHRASE・PY_TAG・
         PY_TAG_END を置く。OLD_LINE は間のコミットで消すので、base にだけある。MID_LINE は間のコミットで足して head で消すので、
-        間のコミットにだけある。"""
+        間のコミットにだけある。間のコミットのメッセージは MID_SUBJECT と MID_BODY。"""
         base = self.commit_files({
             "worker/read_log_facts.py": f"import re\n{self.PY_PHRASE}\n{self.PY_TAG}\n{self.PY_TAG_END}\n",
             "docs/old.md": f"# 旧い文書\n{self.OLD_LINE}\n",
@@ -1810,7 +1813,7 @@ class TestLogReading(WorkerTestBase):
             "tests/test_x.py": f"def test_x():\n{self.TEST_LINE}\n",
             "docs/old.md": "# 旧い文書\n",
             "docs/mid.md": f"{self.MID_LINE}\n",
-        }, "mid")
+        }, f"{self.MID_SUBJECT}\n\n{self.MID_BODY}")
         self.commit_files({
             "docs/mid.md": None,
             "docs/loop-files.md": f"```yaml\n    - command: \"x\"\n{self.DOC_OPEN}\n{self.DOC_NET}\n```\n",
@@ -1822,7 +1825,8 @@ class TestLogReading(WorkerTestBase):
         # レビュー対象のコミット (base と base..head の各コミット) の行を表示したものなら、サンドボックスが止めた確認に数えず、
         # repo_text_displayed に数える。表示の形は、行そのもの (sed)・差分の + と - と文脈の行 (git diff・git log -p)・
         # 行番号とタブ (cat -n)・grep -n のファイル名と行番号 (git grep -n のコミットの名前つきを含む)・1 つのファイルを
-        # grep -n したときの行番号 (#86 の周回の回 1 で、これだけ照合できずに数えられた)・hunk の見出しの 6 つ
+        # grep -n したときの行番号・hunk の見出し。#86 の周回で照合できずに数えられた形 (コミットメッセージ・git blame・
+        # git log --oneline・-n 無しの grep と git grep) も含める
         base = self.make_review_range()
         head_full = _git(self.repo, "rev-parse", "HEAD")
         git_log = os.path.join(self.root, "git-log.jsonl")
@@ -1845,6 +1849,21 @@ class TestLogReading(WorkerTestBase):
         log_body = f"commit 0123abc\n\n    mid\n\n+{self.MID_LINE}"
         # 1 つのファイルだけを検索すると、ファイル名が付かずに、当たった行は「<行番号>:」、前後の行は「<行番号>-」で始まる
         one_file_body = f"2:{self.PY_PHRASE}\n3-{self.PY_TAG}\n4-{self.PY_TAG_END}"
+        mid = _git(self.repo, "rev-parse", "--short", "HEAD~1")
+        mid_full = _git(self.repo, "rev-parse", "HEAD~1")
+        # git log はメッセージの行を 4 つの空白で字下げし、--format=%B はそのまま、--oneline は「<短縮 SHA> <件名>」で表示する
+        message_body = (f"commit {mid_full}\nAuthor: t <t@example.com>\nDate:   Thu Oct 1 07:54:26 2026 +0900\n\n"
+                        f"    {self.MID_SUBJECT}\n\n    {self.MID_BODY}")
+        raw_message_body = f"{self.MID_SUBJECT}\n\n{self.MID_BODY}"
+        oneline_body = f"{_git(self.repo, 'rev-parse', '--short', 'HEAD')} head\n{mid} {self.MID_SUBJECT}"
+        # git blame の既定・-s・-f・-b (範囲の始まりのコミットは SHA の前に ^ が付き、-b では SHA が空白になる)
+        blame_body = (f"^{base} (t 2026-10-01 07:54:26 +0900 2) {self.PY_PHRASE}\n"
+                      f"{base}0 3) {self.PY_TAG}\n"
+                      f"{base}0 worker/read_log_facts.py (t 2026-10-01 07:54:26 +0900 4) {self.PY_TAG_END}\n"
+                      f"         (t 2026-10-01 07:54:26 +0900 2) {self.PY_PHRASE}")
+        # -n 無しの grep と git grep は「<ファイル>:」(コミットの名前つきは「<コミット>:<ファイル>:」) を付ける
+        grep_no_number_body = (f"./tests/test_x.py:{self.TEST_LINE}\n"
+                               f"{mid}:docs/mid.md:{self.MID_LINE}")
         calls = [
             ("git diff base..head", diff_body),
             ("cat -n worker/read_log_facts.py", cat_body),
@@ -1852,6 +1871,11 @@ class TestLogReading(WorkerTestBase):
             ("grep -rn -e 'operation not permitted' -e sandbox_violations .", grep_body),
             ("git log -p base..head -- docs/mid.md", log_body),
             ("grep -n -A 2 'operation not permitted' worker/read_log_facts.py", one_file_body),
+            ("git log base..head", message_body),
+            ("git log --format=%B -1 HEAD~1", raw_message_body),
+            ("git log --oneline base..head", oneline_body),
+            ("git blame worker/read_log_facts.py", blame_body),
+            (f"grep -r 'operation not permitted' . ; git grep -i 'operation not permitted' {mid}", grep_no_number_body),
         ]
         stream = [_init("auto")]
         for i, (cmd, body) in enumerate(calls):
@@ -1935,6 +1959,7 @@ class TestLogReading(WorkerTestBase):
             ("base が - で始まる", dict(base="-x"), {}),
             ("base をコミットに解決できない", dict(base="nosuch"), {}),
             ("git grep が失敗する", dict(base=base), {"FAKE_GIT_FAIL": "grep"}),
+            ("git show (コミットメッセージを読む) が失敗する", dict(base=base), {"FAKE_GIT_FAIL": "show"}),
         ]
         for what, request, env in cases:
             with self.subTest(what):

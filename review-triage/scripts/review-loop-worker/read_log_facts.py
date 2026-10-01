@@ -46,6 +46,11 @@ LINE_NUMBER = re.compile(r"\s*\d+\t")    # cat -n と nl の行番号とタブ
 GREP_NUMBER = re.compile(r"(?=(:\d+:|-\d+-))")
 # grep -n で 1 つのファイルだけを検索したときに行の先頭に付く「<行番号>:」と、前後の行の「<行番号>-」
 GREP_LINE_NUMBER = re.compile(r"\d+[:-]")
+# git blame の「<SHA> (<作者> <日時> <行番号>) 」。-s (「<SHA> <行番号>) 」)・-f (SHA の後にファイル名)・-n・-e・
+# -b (SHA の代わりに空白) の形も、行番号に続く「) 」までとして除く。SHA の前の ^ は、範囲の始まりのコミットの印
+BLAME_PREFIX = re.compile(r"[\^0-9a-f ]{8,}[^)]*?\d+\) ")
+# git log --oneline の「<短縮 SHA> 」
+ONELINE_PREFIX = re.compile(r"[0-9a-f]{7,64} ")
 # git の差分の hunk の見出し。git は、hunk の前にある行の先頭の一部 (80 バイトまで。文字の途中では切らない) を後ろに付ける
 DIFF_HUNK = re.compile(r"@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@ (.*)")
 
@@ -89,9 +94,9 @@ def marked(line):
 
 
 def read_repo_lines(repo, base, head):
-    """レビュー対象のコミット (base と、base..head の各コミット) で追跡されているファイルの行のうち、文面かタグを含むものを、
-    前後の空白を除いた文字列の集合にして返す。文面だけの行とタグだけの行は含めない — 止められたときの本物の行と同じになりうるため。
-    読めなければ (base か head の値が形に合わない・git が失敗した) None を返す。"""
+    """レビュー対象のコミット (base と、base..head の各コミット) で追跡されているファイルの行と、それらのコミットのコミットメッセージの
+    行のうち、文面かタグを含むものを、前後の空白を除いた文字列の集合にして返す。文面だけの行とタグだけの行は含めない — 止められたときの
+    本物の行と同じになりうるため。読めなければ (base か head の値が形に合わない・git が失敗した) None を返す。"""
     if not BASE_NAME.fullmatch(base) or not FULL_SHA.fullmatch(head):
         return None
 
@@ -110,23 +115,29 @@ def read_repo_lines(repo, base, head):
         rc, out = git("rev-list", base_full + ".." + head)
         if rc != 0:
             return None
+        commits = [base_full, *out.split()]
         # -h でファイル名 (と、コミットの名前) を出さない。-I で中身が文字でないファイルを除く
-        rc, out = git("grep", "-h", "-I", "-i", "-F", "-e", PHRASE, "-e", TAG, base_full, *out.split(), "--")
+        rc, files = git("grep", "-h", "-I", "-i", "-F", "-e", PHRASE, "-e", TAG, *commits, "--")
+        if rc not in (0, 1):   # 1 は、当たる行が無いとき
+            return None
+        # git log・git show・git cat-file -p は、コミットメッセージも表示する
+        rc, messages = git("show", "-s", "--format=%B", *commits, "--")
+        if rc != 0:
+            return None
     except OSError:
         return None
-    if rc not in (0, 1):   # 1 は、当たる行が無いとき
-        return None
     lines = set()
-    for l in out.splitlines():
+    for l in (files + "\n" + messages).splitlines():
         s = l.strip()
-        if s and s.lower() != PHRASE and s != TAG:
+        if marked(s) and s.lower() != PHRASE and s != TAG:
             lines.add(s)
     return lines
 
 
 def shows_repo_line(line, repo_lines):
     """本文の行が、リポジトリの行を表示したものか。行そのもの・表示のコマンドが前に付けるもの (差分の + と -・
-    cat -n と nl の行番号とタブ・grep -n のファイル名と行番号・grep -n の行番号) を 1 つ除いたもののどれかが、前後の空白を除いてリポジトリの行と
+    cat -n と nl の行番号とタブ・grep -n のファイル名と行番号・grep -n の行番号・git blame の SHA から行番号まで・
+    git log --oneline の短縮 SHA・-n 無しの grep のファイル名) を 1 つ除いたもののどれかが、前後の空白を除いてリポジトリの行と
     一致するか、git の差分の hunk の見出しで、後ろに付いた文字列がリポジトリの行の先頭の部分と一致すれば、表示したものとする。"""
     m = DIFF_HUNK.fullmatch(line.strip())
     if m:
@@ -140,9 +151,14 @@ def shows_repo_line(line, repo_lines):
     if m:
         rests.append(line[m.end():])
     rests.extend(line[m.start() + len(m.group(1)):] for m in GREP_NUMBER.finditer(line))
-    m = GREP_LINE_NUMBER.match(line)
-    if m:
-        rests.append(line[m.end():])
+    for prefix in (GREP_LINE_NUMBER, BLAME_PREFIX, ONELINE_PREFIX):
+        m = prefix.match(line)
+        if m:
+            rests.append(line[m.end():])
+    # -n 無しの grep と git grep の「<ファイル>:」(コミットの名前つきは「<コミット>:<ファイル>:」)。ファイル名は空白を含まないものとし、
+    # 行の先頭の空白を含まない部分にある「:」のそれぞれについて、そこまでを除く
+    head = re.match(r"\S*", line).group()
+    rests.extend(line[i + 1:] for i, c in enumerate(head) if c == ":")
     return any(r.strip() in repo_lines for r in rests)
 
 
