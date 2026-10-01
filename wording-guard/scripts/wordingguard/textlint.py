@@ -173,7 +173,11 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
     if dictionaries or "prh" in rules:
         prh = _option(rules.get("prh"), "規則 prh", where)
         prh["rulePaths"] = _absolutize(prh.get("rulePaths", []), base_dir) + dictionaries
-        rules["prh"] = prh
+        if prh["rulePaths"]:
+            rules["prh"] = prh
+        else:
+            # 辞書が 1 つも無い prh では、textlint が例外で終わり、検査できるものも無いので外す
+            rules.pop("prh", None)
 
     allow = terms.to_allowlist(term_list)
     if allow or "allowlist" in filters:
@@ -204,11 +208,13 @@ def _run_textlint(directory, conf, paths, cwd, fix=False):
         r = subprocess.run(cmd + paths, cwd=cwd, capture_output=True, text=True)
     except OSError as e:
         raise TextlintError(f"textlint を実行できない ({cmd[0]}): {e}") from e
-    # textlint は、検出が無いか warning だけなら 0、error があれば 1 で終わる。それ以外は実行の失敗
-    if r.returncode not in (0, 1):
+    # textlint は、検出が無いか warning だけなら 0、error があれば 1 で終わる。それ以外は実行の失敗。
+    # 規則の読み込みや実行が例外で終わったときも 1 で終わるが、そのときは標準出力に何も出さない
+    # (textlint 15.8.0 で確かめた)。検出が無いときもファイルごとの結果を JSON で出すので、空の出力は失敗として扱う
+    if r.returncode not in (0, 1) or not r.stdout.strip():
         raise TextlintError(f"textlint が失敗した (終了コード {r.returncode}):\n{r.stderr.strip() or r.stdout.strip()}")
     try:
-        return json.loads(r.stdout or "[]")
+        return json.loads(r.stdout)
     except json.JSONDecodeError as e:
         raise TextlintError(f"textlint の出力を JSON として読めない: {e}\n{r.stdout[:500]}") from e
 

@@ -171,6 +171,20 @@ class TestCompose(RepoTestCase):
             self.compose(cfg)
         self.assertIn("規則 prh を無効にしている", str(cm.exception))
 
+    def test_prh_without_dictionaries_is_removed(self):
+        # リポジトリの設定が規則 prh を宣言し、用語ファイルに避ける語が無い (許容する語だけ)
+        self.write(".claude/akm-claude-plugins/wording-guard/terms.toml",
+                   '[[terms]]\npattern = "正本"\nverdict = "allow"\nreason = "r"\ndecided_in = "#87"\n')
+        self.write("conf/textlintrc.json", json.dumps({"rules": {"prh": {}}}))
+        cfg = self.configure(textlint={"config": "conf/textlintrc.json"})
+        composed, has_rules, _ = self.compose(cfg)
+        self.assertNotIn("prh", composed["rules"])
+        self.assertFalse(has_rules)
+        self.write("conf/textlintrc.json", json.dumps({"rules": {"prh": {}, "ja-no-redundant-expression": True}}))
+        composed, has_rules, _ = self.compose(cfg)
+        self.assertEqual(list(composed["rules"]), ["ja-no-redundant-expression"])
+        self.assertTrue(has_rules)
+
     def test_no_rules(self):
         self.write(".claude/akm-claude-plugins/wording-guard/terms.toml", "")
         cfg = self.configure(textlint={})
@@ -189,6 +203,33 @@ class TestFinding(unittest.TestCase):
         f = textlint._finding({"ruleId": "r", "severity": 1, "message": "m", "range": [0, 1]}, "レビューを行う")
         self.assertEqual(f["matched"], "")
         self.assertEqual(f["severity"], "warning")
+
+
+class TestRunTextlint(unittest.TestCase):
+    """textlint を差し替えて、実行の結果の扱いを確かめる。"""
+
+    def run_fake(self, script):
+        with tempfile.TemporaryDirectory() as d:
+            binary = textlint.textlint_bin(d)
+            os.makedirs(os.path.dirname(binary))
+            with open(binary, "w", encoding="utf-8") as f:
+                f.write("#!/bin/sh\n" + script)
+            os.chmod(binary, 0o755)
+            return textlint._run_textlint(d, "conf.json", ["a.md"], cwd=d)
+
+    def test_empty_output_with_exit_1_is_error(self):
+        # 規則が例外で終わったときの textlint の形 (標準出力が空のまま終了コード 1)
+        with self.assertRaises(textlint.TextlintError) as cm:
+            self.run_fake('echo "Unexpected error during file processing" >&2\nexit 1\n')
+        self.assertIn("Unexpected error during file processing", str(cm.exception))
+
+    def test_empty_output_with_exit_0_is_error(self):
+        with self.assertRaises(textlint.TextlintError):
+            self.run_fake("exit 0\n")
+
+    def test_json_with_exit_1_is_result(self):
+        result = self.run_fake("echo '[{\"filePath\": \"a.md\", \"messages\": []}]'\nexit 1\n")
+        self.assertEqual(result, [{"filePath": "a.md", "messages": []}])
 
 
 class TestEnsureInstalled(unittest.TestCase):
