@@ -165,11 +165,14 @@ def shows_repo_line(line, repo_lines):
 def blocked_message(body, skip=frozenset()):
     """本文のうち、文面を含む行と、タグの行から閉じるタグの行 (無ければ本文の終わり) までの行を、空白で繋ぐ。
     接続を止められたときは、止められたホストがタグの次の行にあるため、タグの中の行も含める。
-    skip にある番号の行 (リポジトリの行を表示したと確かめた行) は含めず、タグの行でもタグの中の行を含め始めない。"""
+    skip にある番号の行 (リポジトリの行を表示したと確かめた行) は含めず、タグの行でもタグの中の行を含め始めない。
+    ただし、その行が閉じるタグを含めば、そこでタグの中の行を終える (開きタグと閉じタグを同じ行に書いた文書の行を表示したとき)。"""
     out = []
     in_tag = False
     for i, l in enumerate(body.splitlines()):
         if i in skip:
+            if TAG_END in l:
+                in_tag = False
             continue
         if TAG in l:
             in_tag = True
