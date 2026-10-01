@@ -1,0 +1,304 @@
+# このリポジトリで言い換えを決めた語 (避ける語) と、使い続けると決めた語 (許容する語) の記録。
+#
+# このファイルは決めたことの例であって、検査の範囲ではない。ここに無い言い回しも、
+# ルートの CLAUDE.md の「文書の言い回し」の 3 原則に照らして判断する。
+# 様式の正本は wording-guard/skills/wording-guard/references/terms.md。
+#
+# #35 で言い換えた語のうち、パターンで表せるものを登録した。「落ちる」(意味が文脈で 3 つに分かれる) や
+# 「守る」(正しい用法が多い) のように、字面で区別できない語は登録していない。
+
+# ---- CI の画面の色の比喩 (6ed9786) ----
+
+[[terms]]
+pattern = "/緑(になる|になっ|のまま|で通)/"
+verdict = "avoid"
+replacements = ["成功する", "合格する"]
+reason = "CI の画面の色の比喩で、文脈が無いと通じない"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/赤(くなる|くなっ|になる|になっ)/"
+verdict = "avoid"
+replacements = ["失敗する"]
+reason = "CI の画面の色の比喩で、文脈が無いと通じない"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "全緑"
+verdict = "avoid"
+replacements = ["すべて成功する"]
+reason = "CI の画面の色の比喩で、文脈が無いと通じない"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "グリーン"
+verdict = "avoid"
+replacements = ["成功する", "合格する"]
+reason = "CI の画面の色の比喩で、文脈が無いと通じない"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+# ---- プログラムを人に喩える表現 (a4c21a3) ----
+
+[[terms]]
+pattern = "黙って"
+verdict = "avoid"
+replacements = ["利用者に知らせずに", "エラーを出さずに", "理由を示さずに"]
+reason = "プログラムを人に喩えている。誰が気づかないのかを書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+# ---- 英語の直訳 ----
+
+[[terms]]
+pattern = "同じ型の"
+verdict = "avoid"
+replacements = ["同じ種類の"]
+autofix = true
+reason = "type の直訳。このリポジトリには Go のツールがあり、Go の型と読み違える (8ff14dd)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/型 ?[A-F](?![A-Za-z0-9])/"
+verdict = "avoid"
+replacements = ["観点"]
+reason = "type の直訳。検証の観点 A〜F を指す (8ff14dd)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/畳(む|ま|み|ん)/"
+verdict = "avoid"
+replacements = ["そろえる", "まとめる"]
+exceptions = ["折り畳み"]
+reason = "fold / collapse の直訳。UI の折りたたみと紛らわしい (c5f0779)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "二重化"
+verdict = "avoid"
+replacements = ["2 つに分かれる"]
+reason = "何が 2 つになるのかが読み取れない (b7de269)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "縮退"
+verdict = "avoid"
+replacements = ["意味をなさなくなる", "すり替わる"]
+reason = "何がどう変わるのかが読み取れない (b7de269)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+# ---- 説明のない比喩・慣用表現 ----
+
+[[terms]]
+pattern = "素通り"
+verdict = "avoid"
+replacements = ["検査されないまま通過する"]
+reason = "説明のない慣用表現。何がどう通過したのかを書く (ca0e529)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/穴(を塞|が開|に落ち)/"
+verdict = "avoid"
+replacements = ["検出できない条件をなくす", "取りこぼし", "同じ失敗を繰り返す"]
+reason = "何の穴かが分からない比喩 (7c1c87c)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/に化け/"
+verdict = "avoid"
+replacements = ["として扱われる", "と混同される"]
+reason = "通じない比喩 (14b9324)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/効(く|か(ない|なかっ|ず|せ)|き方|いて|いた)/"
+verdict = "avoid"
+replacements = ["機能する", "役に立つ", "適用される"]
+reason = "何がどう働くのかを書く (33751a4)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/(に|へ)倒(す|し|れ)/"
+verdict = "avoid"
+replacements = ["〜にする", "〜を選ぶ"]
+reason = "どちらを選ぶのかを比喩で書いている (508f4e0)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/湧(く|き|い)/"
+verdict = "avoid"
+replacements = ["出続ける"]
+reason = "比喩 (99059e1)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/拾(う|わ|い|っ|え)/"
+verdict = "avoid"
+replacements = ["選ぶ", "対象にする", "検知する"]
+reason = "何をどう扱うのかを書く (2ef8cf4)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/(弾か|はじか)れ/"
+verdict = "avoid"
+replacements = ["拒否される"]
+reason = "比喩 (1d95d0d)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "空振り"
+verdict = "avoid"
+replacements = ["結果が空になる"]
+reason = "比喩 (1d95d0d)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "再侵入"
+verdict = "avoid"
+replacements = ["再び生じる"]
+reason = "比喩 (6ce393a)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "二本柱"
+verdict = "avoid"
+replacements = ["2 つの原則"]
+reason = "本文の「2 つの原則」と重複した比喩 (59172c9)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "逃がし弁"
+verdict = "avoid"
+replacements = ["受け皿"]
+reason = "比喩 (0304e88)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "歯止め"
+verdict = "avoid"
+replacements = ["〜を防ぐ"]
+reason = "比喩。何を防ぐのかを書く (5edcf53)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "頭打ち"
+verdict = "avoid"
+replacements = ["上限"]
+reason = "比喩 (5edcf53)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/(テストで|テストが|挙動を)固定/"
+verdict = "avoid"
+replacements = ["検証する", "回帰テストを足す"]
+reason = "「固定」が何を指すか分からない (a0ad83f)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/に立(つ|って|た)/"
+verdict = "avoid"
+replacements = ["〜に基づく", "〜に従う", "優先する"]
+exceptions = ["役に立"]
+reason = "比喩 (51c2d8b)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/鳴(る|ら|り|っ)/"
+verdict = "avoid"
+replacements = ["通知が出る"]
+reason = "比喩 (2aeb6ef)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/汚(す|さ|し)/"
+verdict = "avoid"
+replacements = ["書き込む", "不要なファイルを残す"]
+reason = "何がどうなるのかを書く (c7a4061)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "本流"
+verdict = "avoid"
+replacements = ["主要な処理"]
+reason = "比喩 (1c65bec)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "割に合わない"
+verdict = "avoid"
+replacements = ["負担に見合わない"]
+reason = "同じ意味の表現を「負担に見合わない」にそろえた (a53ed38)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+# ---- 口語・スラング ----
+
+[[terms]]
+pattern = "/叩(く|か|き|い)/"
+verdict = "avoid"
+replacements = ["呼び出す", "実行する"]
+reason = "スラング (c4588ad)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/触(る|ら|り|っ)/"
+verdict = "avoid"
+replacements = ["変更する", "言及する", "アクセスする"]
+reason = "口語 (d9423a3)。「〜に触れる」(言及する) は対象にしていない"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "事故"
+verdict = "avoid"
+replacements = ["障害", "障害が起きる"]
+reason = "口語 (5d1489f)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "手を出さない"
+verdict = "avoid"
+replacements = ["対象にしない"]
+reason = "口語 (bda1774)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "値打ち"
+verdict = "avoid"
+replacements = ["価値", "意味"]
+reason = "口語 (f9562a0)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "一瞥"
+verdict = "avoid"
+replacements = ["目を通す"]
+reason = "硬い表現で、何をするのかが曖昧 (dec0b13)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "名指し"
+verdict = "avoid"
+replacements = ["特定する", "明示する"]
+reason = "口語 (9a7e29f)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "蒸し返"
+verdict = "avoid"
+replacements = ["再度判断する"]
+reason = "口語 (15df87d)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+# ---- #35 以外で決めた語 ----
+
+[[terms]]
+pattern = "最終確認"
+verdict = "avoid"
+replacements = ["収束後の全量レビュー"]
+reason = "指摘が出れば直して増分の回に戻るので、「最終」ではない"
+decided_in = "https://github.com/akm/claude-plugins/issues/71"
+
+# ---- 許容する語 ----
+
+[[terms]]
+pattern = "近くの辺"
+verdict = "allow"
+reason = "グラフ理論の edge の直訳だが、用語として定義して使い続けると決めた (定義は review-triage-fix の verification.md。2bfdf82)"
+decided_in = "https://github.com/akm/claude-plugins/issues/35"

@@ -12,6 +12,8 @@
 
 網羅的な避ける言い回しの一覧は作らない。列挙を検査の範囲にすると、一覧に無いものが検査されないまま残る。例として一覧を作ることは許容する。そのときは、一覧が例であって範囲ではないことを一覧の側に書く。一覧に無い言い回しも、この 3 原則に照らして判断する。
 
+言い換えを決めた語と、使い続けると決めた語は、ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` に例として記録している (様式の正本は `wording-guard/skills/wording-guard/references/terms.md`)。
+
 例外: トリアージ記録 (現行の置き場 `tmp/review-triages/` と、過去にコミットした `docs/review-triage/`) は、レビュー指摘を逐語で引用するため書き換えない。
 
 経緯は [#35](https://github.com/akm/claude-plugins/issues/35) と [#89](https://github.com/akm/claude-plugins/issues/89) を参照。
