@@ -68,11 +68,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py check --stdin --filename i
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
 ```
 
+終了コードの意味の正本はこの表で、どのサブコマンドも同じ意味で返す (`terms` が返すのは 0 と 2 だけ)。
+
 | 終了コード | 意味 |
 | --- | --- |
 | 0 | 成功。`check` では error の検出が無い (warning だけなら 0) |
 | 1 | `check` で error の検出 (用語ファイルの避ける語) がある |
-| 2 | 設定ファイル・用語ファイルの誤り、設定キー `textlint` が無い、または指定したパスが無いか、指定したファイルが Markdown (`.md`) でない (ディレクトリを指定すると、その下の Markdown だけを対象にする) |
+| 2 | 設定ファイル・用語ファイルの誤り、設定キー `textlint` が無い、git リポジトリの外で `--root` を付けずに実行した、または指定したパスが無いか、指定したファイルが Markdown (`.md`) でない (ディレクトリを指定すると、その下の Markdown だけを対象にする) |
 | 3 | textlint が入っていない、または textlint・npm の実行に失敗した |
 
 **`fix` はファイルの全体に適用する。** 他の人が書いた文章も直すので、今回の変更で書いたファイルだけに使う ([rewrite-scope.md](rewrite-scope.md))。文脈によって言い換えが変わる語 (`autofix` を書かない語) は、`fix` では直さない — [#89](https://github.com/akm/claude-plugins/issues/89) の試行で、自動修正が「効かない」を「適用される」に書き換え、意味が逆になったため。

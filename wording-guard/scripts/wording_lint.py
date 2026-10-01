@@ -7,14 +7,9 @@
   check   Markdown のファイル (または標準入力の文章) を、用語ファイルと規則集で検査する
   fix     自動修正してよい避ける語 (autofix = true) だけを、ファイルに適用する
 
-check と fix は、設定キー textlint があるリポジトリでだけ実行できる。振る舞いの正本は
-ファイル `wording-guard/skills/wording-guard/references/textlint.md`。
-
-終了コード:
-  0  成功 (check では、error の検出が無い。warning だけなら 0)
-  1  check で error の検出 (用語ファイルの避ける語など) がある
-  2  設定ファイル・用語ファイルの誤り、または git リポジトリの外で --root を付けずに実行した
-  3  textlint が入っていない、または textlint・npm の実行に失敗した
+check と fix は、設定キー textlint があるリポジトリでだけ実行できる。振る舞いと終了コードの意味の
+正本はファイル `wording-guard/skills/wording-guard/references/textlint.md` (終了コードは「コマンド」の表)。
+ここでは言い直さない。
 """
 
 import argparse
