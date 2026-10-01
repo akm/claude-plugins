@@ -13,7 +13,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [commit-squash](commit-squash/README.md) | 未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす |
 | [review-triage](review-triage/README.md) | レビューの依頼文を生成し、レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直し、レビューから修正までを上限回数まで回す。レビューは同じセッションの sub-agent か、人間が端末で起動するワーカー (モデルと effort を人間が選ぶ) で走らせる。`review-triage-fix` の各段 (調査 / 立案 / 修正) は sub-agent で走らせられる (Go が必要) |
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
-| [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な言い回しを、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す |
+| [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な言い回しを、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに続きを始めたいときに使う) |
 
 ## 使い方
@@ -149,9 +149,14 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── skills/work-log-gh-comment/  # SKILL.md、references/
 │   │   └── evals/                # python3 -m unittest discover -s work-log-gh-comment/skills/work-log-gh-comment/evals
 │   └── README.md
-├── wording-guard/                # skill 型
+├── wording-guard/                # skill 型 + hooks 型
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/wording-guard/     # SKILL.md と references/
+│   ├── hooks/hooks.json
+│   ├── hook-scripts/             # Markdown に書き足した文章を textlint で検査する
+│   ├── scripts/                  # 用語ファイルの読み込みと textlint の実行 (wording_lint.py)
+│   ├── textlint/                 # textlint と規則集の版を固定する package.json と package-lock.json
+│   ├── tests/                    # python3 -m unittest discover -s wording-guard/tests
 │   └── README.md
 ├── session-handoff/              # skill 型 + hooks 型
 │   ├── .claude-plugin/plugin.json
@@ -201,7 +206,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 | --- | --- |
 | `commit-rules-guard` | `generated_globs`・`custom_rules` |
 | `doc-dag` | `frozen_paths`・`doc_check_command` |
-| `wording-guard` | `convention_paths`・`frozen_paths`・`quote_markers`・`terms_paths` |
+| `wording-guard` | `convention_paths`・`frozen_paths`・`quote_markers`・`terms_paths`・`textlint` |
 | `review-triage` | `record_dir`・`gates`・`triage_check_command` ほか |
 
 いずれも**設定が無くても動きます** (該当の判断を人間に確認するか、その手順を飛ばして報告します)。詳細は各プラグインの README を参照してください。

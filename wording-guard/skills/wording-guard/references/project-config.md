@@ -1,6 +1,6 @@
 # プロジェクト固有の設定
 
-このスキルは、リポジトリごとに違う 4 つのことを設定から読む。**設定が無くても実行できる** — デフォルトのまま進み、該当する場面で人間に確認する。
+このスキルは、リポジトリごとに違う 5 つのことを設定から読む。**設定が無くても実行できる** — デフォルトのまま進み、該当する場面で人間に確認する。
 
 置き場はファイル `.claude/akm-claude-plugins/wording-guard/config.json`。プラグイン [doc-dag](https://github.com/akm/claude-plugins/tree/main/doc-dag)・[commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の手順を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
 
@@ -11,7 +11,11 @@
   "convention_paths": ["CLAUDE.md#文書の言い回し", ".claude/rules/wording.md"],
   "frozen_paths": ["docs/plans/", "docs/solutions/", "tmp/review-triages/"],
   "quote_markers": ["> "],
-  "terms_paths": [".claude/akm-claude-plugins/wording-guard/terms.toml"]
+  "terms_paths": [".claude/akm-claude-plugins/wording-guard/terms.toml"],
+  "textlint": {
+    "config": ".claude/akm-claude-plugins/wording-guard/textlintrc.json",
+    "hook": true
+  }
 }
 ```
 
@@ -23,6 +27,7 @@
 | `frozen_paths` | 書き換えない過去の記録のパス接頭辞 | 書き換えないパスは無いものとする。ただし過去の記録らしき文書が見つかったら**人間に確認する** |
 | `quote_markers` | 引用の目印になる行頭の文字列。**値を設定しても、コードブロックは目印のまま** (行頭の文字列では表せないため) | 引用ブロック (`> ` で始まる行) とコードブロックを目印にする |
 | `terms_paths` | 用語ファイル (言い換えを決めた語と許容すると決めた語の記録) の置き場の配列。相対パスはリポジトリのルートから、`~` で始まるパスはホームディレクトリから解決する。**書いたファイルが無ければ誤りとして報告する** | 用語ファイルを使わない |
+| `textlint` | textlint で検査するかどうかと、その設定。キーは `config` (不自然な言い回しの候補を出す規則を選ぶ textlint の設定ファイルのパス。省略すると用語ファイルだけで検査する) と `hook` (`true` なら、Markdown を書いた直後に hook で検査する)。**キーを書くと、textlint のセットアップが必要になる** | textlint を使わない |
 
 ## `convention_paths` — なぜ基準を外から読むか
 
@@ -52,6 +57,10 @@
 原則に照らした判断は、走査のたびにやり直される。人間が一度決めた言い換えも、記録が無ければ次に書く人やエージェントに届かず、同じ語が再び書かれる。逆に、使い続けると決めた語は、記録が無ければ走査のたびに候補に挙げ直される。
 
 **用語ファイルは決めたことの記録であって、範囲ではない。** 様式・意味・複数のファイルの扱いの正本はファイル [wording-guard/skills/wording-guard/references/terms.md](terms.md)。
+
+## `textlint` — なぜ設定で有効にするか
+
+textlint は Node のパッケージを取得して使うので、セットアップが要る。プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くので、キーを書いたリポジトリでだけ検査する。振る舞い・セットアップ・コマンドの正本はファイル [wording-guard/skills/wording-guard/references/textlint.md](textlint.md)。
 
 ## 未設定でも止まらない
 

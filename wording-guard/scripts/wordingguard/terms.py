@@ -1,7 +1,15 @@
-"""用語ファイル (TOML) を読み、様式を検査する。
+"""用語ファイル (TOML) を読み、様式を検査して、textlint の辞書と許容の一覧に変換する。
 
 用語ファイルの様式と意味の正本はファイル `wording-guard/skills/wording-guard/references/terms.md`。
 用語ファイルは「決めたことの記録」であって、検査の範囲ではない。
+
+textlint への変換先:
+  - 避ける語 (verdict = "avoid") は、規則 textlint-rule-prh (語のパターンと置き換え先を照合する規則。
+    以下 prh) の辞書の項目にする。autofix = true の語は自動修正してよい辞書に、それ以外は検出だけする
+    辞書に分ける。prh は全項目に置き換え先を持たせる仕組みなので、辞書を分けないと、自動修正が
+    文脈によって言い換えが変わる語まで書き換える (#89 の試行で、「効かない」が「適用される」になった)。
+  - 許容する語 (verdict = "allow") と、避ける語の例外 (exceptions) は、フィルタ
+    textlint-filter-rule-allowlist の許容の一覧にする。この一覧はすべての規則の検出に適用される。
 """
 
 import tomllib
@@ -145,3 +153,30 @@ def load_all(paths):
     if errors:
         raise TermsError("\n".join(errors))
     return list(merged.values())
+
+
+def prh_message(term):
+    """prh の辞書の項目に付ける説明文。検出したときのメッセージに出る。"""
+    return f"{term.reason} (言い換えの候補: {'・'.join(term.replacements)}。決めた場所: {term.decided_in})"
+
+
+def to_prh(terms):
+    """避ける語を prh の辞書の項目に変換する。(自動修正してよい項目, 検出だけする項目) を返す。"""
+    fix, detect = [], []
+    for t in terms:
+        if t.verdict != "avoid":
+            continue
+        rule = {"expected": t.replacements[0], "pattern": t.pattern, "prh": prh_message(t)}
+        (fix if t.autofix else detect).append(rule)
+    return fix, detect
+
+
+def to_allowlist(terms):
+    """許容する語と、避ける語の例外を、許容の一覧の項目に変換する。重複は除く。"""
+    allow = []
+    for t in terms:
+        items = [t.pattern] if t.verdict == "allow" else list(t.exceptions)
+        for item in items:
+            if item not in allow:
+                allow.append(item)
+    return allow

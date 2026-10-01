@@ -4,7 +4,7 @@
 `.claude/akm-claude-plugins/wording-guard/config.json`。各キーの意味の正本は
 ファイル `wording-guard/skills/wording-guard/references/project-config.md`。
 
-ここで型を検査するのは、このモジュールが使うキー (`terms_paths`・`frozen_paths`) だけ。
+ここで型を検査するのは、このパッケージが使うキー (`terms_paths`・`frozen_paths`・`textlint`) だけ。
 `convention_paths`・`quote_markers` はスキル (モデル) が読むので、ここでは検査しない。
 """
 
@@ -57,7 +57,24 @@ def load(root):
     for key in ("terms_paths", "frozen_paths"):
         if key in data and not _is_str_list(data[key]):
             raise ConfigError(f"設定ファイル {path} のキー {key} は文字列の配列にする")
+    if "textlint" in data:
+        _check_textlint(data["textlint"], path)
     return data
+
+
+TEXTLINT_KEYS = {"config", "hook"}
+
+
+def _check_textlint(value, path):
+    if not isinstance(value, dict):
+        raise ConfigError(f"設定ファイル {path} のキー textlint はオブジェクトにする")
+    unknown = sorted(set(value) - TEXTLINT_KEYS)
+    if unknown:
+        raise ConfigError(f"設定ファイル {path} のキー textlint に知らないキーがある: {', '.join(unknown)}")
+    if "config" in value and (not isinstance(value["config"], str) or not value["config"]):
+        raise ConfigError(f"設定ファイル {path} のキー textlint.config は空でない文字列にする")
+    if "hook" in value and not isinstance(value["hook"], bool):
+        raise ConfigError(f"設定ファイル {path} のキー textlint.hook は true か false にする")
 
 
 def _is_str_list(value):
@@ -81,3 +98,35 @@ def terms_paths(root, cfg):
             raise ConfigError(f"設定キー terms_paths の {p} が無い (探した場所: {full})")
         result.append(full)
     return result
+
+
+def textlint_settings(cfg):
+    """設定キー textlint の値を返す。textlint を使わないリポジトリ (キーが無い) では None を返す。"""
+    if not cfg:
+        return None
+    return cfg.get("textlint")
+
+
+def textlint_config_path(root, cfg):
+    """設定キー textlint.config が指す textlint の設定ファイルの絶対パスを返す。未設定なら None を返す。"""
+    settings = textlint_settings(cfg) or {}
+    if "config" not in settings:
+        return None
+    full = os.path.expanduser(settings["config"])
+    if not os.path.isabs(full):
+        full = os.path.join(root, full)
+    if not os.path.isfile(full):
+        raise ConfigError(f"設定キー textlint.config の {settings['config']} が無い (探した場所: {full})")
+    return full
+
+
+def is_frozen(root, cfg, path):
+    """パス path が、設定キー frozen_paths (書き換えない過去の記録のパス接頭辞) のどれかで始まれば True。"""
+    if not cfg or "frozen_paths" not in cfg:
+        return False
+    # macOS の /tmp と /private/tmp のように、同じ場所を指す別のパスがあるので、実体のパスで比べる
+    rel = os.path.relpath(os.path.realpath(path), os.path.realpath(root))
+    if rel == ".." or rel.startswith(".." + os.sep):
+        return False
+    rel = rel.replace(os.sep, "/")
+    return any(rel.startswith(prefix) for prefix in cfg["frozen_paths"])
