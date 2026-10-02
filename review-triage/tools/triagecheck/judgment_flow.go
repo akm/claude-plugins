@@ -48,8 +48,8 @@ var judgmentFlowDecorations = map[string]bool{
 }
 
 // judgmentFlowProblems は図と表の ID 集合を照合する。対象は git 追跡でなく
-// ファイルの実在で決める — 追跡前の判定フローが 0 件マッチのまま、何も検査せずに成功する
-// 種類の欠陥 (B1 と同じ) を防ぐ。
+// ファイルの実在で決める — 追跡前の判定フローが検査の対象に入らず、0 件マッチのまま
+// 検査が成功する種類の欠陥 (B1 と同じ) を防ぐ。
 //
 // ファイルが無いときの扱いは origin で分かれる。origin は在り処を指定したものの
 // 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。在り処を指定する
