@@ -91,7 +91,7 @@ exec go run -C "$root/tools/triagecheck" . \
 // judgmentFlow が非空なら絶対パスのまま焼き込み、空なら -judgment-flow は付けず、
 // プラグイン展開先の既定パス (skills/review-triage/references/judgment-flow.md) を
 // 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
-// resolveInputs が弾く。
+// resolveInputs が拒否する。
 //
 // summaryCommand は決定済みの案内 (resolveInputs が決める)。ここでは値を作らない。
 //

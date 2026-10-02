@@ -313,7 +313,7 @@ func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 }
 
 // 空のパス (空文字・空白だけ・不可視のフォーマット文字だけの値) を明示指定したら、
-// どの経路でもその場で弾く。通すと -judgment-flow "" は「指定なし」として扱われ
+// どの経路でもその場で拒否する。通すと -judgment-flow "" は「指定なし」として扱われ
 // 検査が走らないまま成功し、空白や不可視の値は展開先を基準にした無関係なパスに
 // なる — どちらも「指定したのに検査されない」種類の欠陥そのもの。
 //
@@ -366,7 +366,7 @@ func TestRunRejectsEmptyExplicitPaths(t *testing.T) {
 				})
 			}
 			// -record-dir の空文字だけは省略と区別できないので必須の検査が先に立つ
-			// (TestRunRequiresRecordDir)。空白と不可視は空のパスとして弾く。
+			// (TestRunRequiresRecordDir)。空白と不可視は空のパスとして拒否する。
 			if v.value != "" {
 				t.Run(route.name+"/-record-dir/"+v.label, func(t *testing.T) {
 					withRunGlobals(t)
@@ -405,7 +405,7 @@ func TestRunEmptyInstallWrapperDoesNotFallThroughToCheck(t *testing.T) {
 		t.Fatal("空の -install-wrapper と -write-summary=true が通った")
 	}
 	if !strings.Contains(err.Error(), "-install-wrapper") {
-		t.Fatalf("-install-wrapper の空文字として弾かれていない: %v", err)
+		t.Fatalf("-install-wrapper の空文字として拒否されていない: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(recs, "rec.md")); !os.IsNotExist(err) {
 		t.Fatalf("頼んでいない生成サマリが書き出された (err=%v)", err)
@@ -413,7 +413,7 @@ func TestRunEmptyInstallWrapperDoesNotFallThroughToCheck(t *testing.T) {
 }
 
 // -judgment-flow を省略したときだけ、ラッパーは $root からの既定パスを使う。
-// 「既定を使う」は省略で表す — 明示した空は他の経路と同じく弾かれる
+// 「既定を使う」は省略で表す — 明示した空は他の経路と同じく拒否される
 // (TestRunRejectsEmptyExplicitPaths)。空文字を「既定」の意味に使うと、
 // 空のパスの規則に生成の経路だけの例外ができ、規則を足すたびに例外の処理が要る。
 func TestRunInstallWrapperOmittedJudgmentFlowUsesDefault(t *testing.T) {
@@ -805,7 +805,7 @@ func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
 	}
 }
 
-// 空 (空白・不可視だけ) の明示指定は弾く。通すと「再生成する手段は空欄です」と
+// 空 (空白・不可視だけ) の明示指定は拒否する。通すと「再生成する手段は空欄です」と
 // 案内することになり、指定しないより悪い (パスを取るフラグと同じ規則)。
 func TestRunRejectsBlankSummaryCommand(t *testing.T) {
 	recs := realTempDir(t)
@@ -835,7 +835,7 @@ func firstLine(s string) string {
 
 // -install-wrapper と -summary-command を併記したら、その値がラッパーに焼き込まれる。
 // 捨てると「指定したのに適用されない」を作る (既存の -write-summary のガードが防ぐのと
-// 同じ種類だが、こちらは両立する要求なので弾かずに適用する)。
+// 同じ種類だが、こちらは両立する要求なので拒否せずに適用する)。
 func TestRunInstallWrapperEmbedsExplicitSummaryCommand(t *testing.T) {
 	toolDir := versionedToolDir(t)
 	recs := realTempDir(t)

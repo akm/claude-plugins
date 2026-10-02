@@ -61,7 +61,7 @@ func run(args []string) error {
 
 	// 経路どうしの衝突は、パスの規則より前に見る。-install-wrapper と
 	// -write-summary=true は「何を書き出すか」が食い違うので、エラーを出さずに片方を
-	// 無視すると「指定したのに適用されない」を作る。弾くのは「何かを要求したとき」
+	// 無視すると「指定したのに適用されない」を作る。拒否するのは「何かを要求したとき」
 	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
 	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
 	// 値を見ずに「指定された」と報告するので、値の側も見る。
@@ -69,7 +69,7 @@ func run(args []string) error {
 		return fmt.Errorf("-write-summary は %w (生成の経路では使われません)", errFlagUnusedWithInstallWrapper)
 	}
 
-	// 空白だけの -summary-command は弾く — 通すと「再生成する手段は空欄です」と
+	// 空白だけの -summary-command は拒否する — 通すと「再生成する手段は空欄です」と
 	// 案内することになり、指定しないより悪い。値そのものの決定は、パスの規則と
 	// 一緒に resolveInputs で行う (案内はパスの形をした値なので、同じ規則に乗せる)。
 	if explicit["summary-command"] && isBlankPath(*summaryCmd) {
@@ -183,7 +183,7 @@ type resolvedInputs struct {
 
 // resolveInputs は、明示された各パスに同じ規則を同じ順で当てる。
 //
-//  1. 空・空白・不可視の値は弾く (isBlankPath)。空の明示はパスとして意味を持たず、
+//  1. 空・空白・不可視の値は拒否する (isBlankPath)。空の明示はパスとして意味を持たず、
 //     通すと「指定したのに検査されない」になる。
 //  2. 相対パスは -current-dir を基準に解決する (無ければ resolvePath がエラー)。
 //     基準は推測しない — go run -C で起動されるためカレントはツール側を指し、
@@ -196,7 +196,7 @@ type resolvedInputs struct {
 // -record-dir は必須で既定値を持たせない。既定が相対パスだと「基準の無い相対」を
 // 許すことになり、上の規則が崩れる。省略を許して既定の場所を検査したことにする
 // より、どこを検査するのかを必ず言わせる。空文字は省略と区別できないので、
-// 空のパスではなく必須の検査として弾かれる。
+// 空のパスではなく必須の検査として拒否される。
 func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	var out resolvedInputs
 	if in.recordDir == "" {
@@ -227,7 +227,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	//
 	// 「絶対パスに -current-dir を併記したらエラー」は -judgment-flow で明示された
 	// ときにだけ課す。CLAUDE_PLUGIN_ROOT から組み立てた値は常に絶対で、利用者が
-	// -current-dir を書いたかどうかとは無関係に決まるため、そこで弾くと
+	// -current-dir を書いたかどうかとは無関係に決まるため、そこで拒否すると
 	// 「環境変数を設定していると -current-dir が使えない」ことになる。
 	// 報告には値の出所 (origin) を使う。固定のフラグ名で報告すると、環境変数から
 	// 解決した値の誤りを、利用者が渡していない -judgment-flow の名前で叱ることになる。

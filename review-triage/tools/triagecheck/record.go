@@ -349,7 +349,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 		}
 		return []string{fmt.Sprintf("%s: YAML を解析できません: %v", f, err)}, nil
 	}
-	// 記録は単一ドキュメント。--- 区切りの 2 つ目以降は読まれずに消えるため、存在自体を弾く。
+	// 記録は単一ドキュメント。--- 区切りの 2 つ目以降は読まれずに消えるため、存在自体を拒否する。
 	var extra yaml.Node
 	if err := dec.Decode(&extra); err == nil {
 		return []string{fmt.Sprintf(
