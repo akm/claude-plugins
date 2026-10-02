@@ -9,6 +9,7 @@ textlint を実際に実行する確認は、ファイル wording-guard/skills/w
 """
 
 import contextlib
+import difflib
 import io
 import json
 import os
@@ -410,6 +411,23 @@ def finding(rule, message, matched, severity="error", line=1, column=1):
             "matched": matched}
 
 
+def make_patch(before, after):
+    """before と after の行の差分を、Claude Code の structuredPatch と同じ様式で作る (テスト用)。"""
+    a, b = before.split("\n"), after.split("\n")
+    hunks = []
+    for group in difflib.SequenceMatcher(None, a, b, autojunk=False).get_grouped_opcodes(3):
+        lines = []
+        for tag, i1, i2, j1, j2 in group:
+            if tag == "equal":
+                lines += [" " + x for x in a[i1:i2]]
+            else:
+                lines += ["-" + x for x in a[i1:i2]] + ["+" + x for x in b[j1:j2]]
+        first, last = group[0], group[-1]
+        hunks.append({"oldStart": first[1] + 1, "oldLines": last[2] - first[1],
+                      "newStart": first[3] + 1, "newLines": last[4] - first[3], "lines": lines})
+    return hunks
+
+
 KIKU = finding("prh", "効く => 適用される\n何がどう働くかを書く", "効く")
 KATA = finding("prh", "同じ型の => 同じ種類の\ntype の直訳", "同じ型の")
 REDUNDANT = finding("ja-no-redundant-expression", "冗長な表現です", "", severity="warning")
@@ -433,40 +451,64 @@ class TestIntroduced(unittest.TestCase):
         self.assertEqual(hook.introduced([KIKU], [KIKU, KIKU]), [KIKU])
 
 
-class TestChangedLines(unittest.TestCase):
-    def test_inserted_line(self):
-        self.assertEqual(hook.changed_lines("a\nb\nc\n", "a\nX\nb\nc\n"), (set(), {1}))
+class TestPatchLines(unittest.TestCase):
+    def lines(self, before, after, tool="Edit", **extra):
+        response = {"structuredPatch": make_patch(before, after), **extra}
+        return hook.patch_lines(tool, response, before, after)
 
     def test_replaced_line(self):
-        self.assertEqual(hook.changed_lines("a\nb\nc\n", "a\nB\nc\n"), ({1}, {1}))
+        self.assertEqual(self.lines("a\nb\nc\n", "a\nB\nc\n"), ({1}, {1}))
 
-    def test_new_file(self):
-        self.assertEqual(hook.changed_lines("", "a\nb\n"), (set(), {0, 1}))
+    def test_inserted_line(self):
+        self.assertEqual(self.lines("a\nb\nc\n", "a\nX\nb\nc\n"), (set(), {1}))
 
-    def test_same_contents(self):
-        self.assertEqual(hook.changed_lines("a\nb\n", "a\nb\n"), (set(), set()))
+    def test_same_line_in_code_block_does_not_hide_added_line(self):
+        # 本文に足した行と同じ内容の行が後ろのコードブロックにあっても、位置で書き換えた行を決める (7 回目の指摘)
+        before = "# 例\n\n本文。\n\n```text\n同じ型の指摘が続く\n```\n"
+        after = "# 例\n\n本文。\n同じ型の指摘が続く\n\n```text\n同じ型の指摘が続く\n```\n"
+        self.assertEqual(self.lines(before, after), (set(), {3}))
 
-    def test_moved_line_is_not_changed(self):
-        # 行を移しただけなら、新しい文章を持ち込んでいないので、書き換えた行にならない
-        self.assertEqual(hook.changed_lines("a\nb\nc\n", "b\na\nc\n"), (set(), set()))
+    def test_moved_line_is_changed(self):
+        # 位置の差分なので、行を移すと、消した行と足した行になる (文書に書いた限界)
+        removed, added = self.lines("a\nb\nc\n", "b\na\nc\n")
+        self.assertTrue(removed and added)
 
-    def test_added_copy_is_counted_from_the_end(self):
-        # 同じ内容の行が増えたときは、後ろにある行から数えて増えた分を選ぶ
-        self.assertEqual(hook.changed_lines("a\nb\n", "a\nb\na\n"), (set(), {2}))
+    def test_empty_patch_with_same_contents(self):
+        self.assertEqual(hook.patch_lines("Edit", {"structuredPatch": []}, "a\n", "a\n"), (set(), set()))
 
-    def test_large_file_changed_at_both_ends_is_fast(self):
-        # 空行のような同じ行が多い 2 万行のファイルの、先頭と末尾の両方を書き換える (replace_all の Edit と同じ)。
-        # 位置の差分で比べると、間の行がすべて比べられて 10 秒近くかかる
-        lines = []
-        for i in range(10000):
-            lines += [f"段落 {i} の文。", ""]
-        lines[0] = "用語A " + lines[0]
-        lines[-2] = "用語A " + lines[-2]
-        before = "\n".join(lines) + "\n"
-        started = time.monotonic()
-        changed = hook.changed_lines(before, before.replace("用語A", "用語B"))
-        self.assertLess(time.monotonic() - started, 2)
-        self.assertEqual(changed, ({0, 19998}, {0, 19998}))
+    def test_empty_patch_of_new_file_is_whole_content(self):
+        response = {"type": "create", "structuredPatch": []}
+        self.assertEqual(hook.patch_lines("Write", response, "", "a\nb\n"), (set(), {0, 1, 2}))
+
+    def test_empty_patch_with_different_contents_is_error(self):
+        # Claude Code の差分の計算が時間切れになると空になる。hook の中で差分を計算せずに知らせる
+        with self.assertRaises(ValueError) as cm:
+            hook.patch_lines("Edit", {"structuredPatch": []}, "a\n", "b\n")
+        self.assertIn("時間切れ", str(cm.exception))
+
+    def test_missing_patch_is_error(self):
+        with self.assertRaises(ValueError) as cm:
+            hook.patch_lines("Edit", {}, "a\n", "b\n")
+        self.assertIn("structuredPatch が無い", str(cm.exception))
+
+    def test_patch_not_matching_file_is_error(self):
+        # 書いた直後に別の処理がファイルを変えたなど、差分の行がファイルの内容と一致しないときは知らせる
+        response = {"structuredPatch": make_patch("a\nb\n", "a\nB\n")}
+        with self.assertRaises(ValueError) as cm:
+            hook.patch_lines("Edit", response, "a\nb\n", "a\nC\n")
+        self.assertIn("一致しない", str(cm.exception))
+
+    def test_leading_tabs_are_compared_as_two_spaces(self):
+        # Claude Code は差分の行の先頭のタブを 1 つにつき空白 2 つに置き換える
+        response = {"structuredPatch": [{"oldStart": 1, "oldLines": 1, "newStart": 1, "newLines": 2,
+                                         "lines": ["     コード", "+足した"]}]}
+        self.assertEqual(hook.patch_lines("Edit", response, "\t\tコード\n", "\t\tコード\n足した\n"), (set(), {1}))
+
+    def test_no_newline_marker_is_skipped(self):
+        response = {"structuredPatch": [{"oldStart": 1, "oldLines": 1, "newStart": 1, "newLines": 1,
+                                         "lines": ["-a", "\\ No newline at end of file", "+b",
+                                                   "\\ No newline at end of file"]}]}
+        self.assertEqual(hook.patch_lines("Edit", response, "a", "b"), ({0}, {0}))
 
     def test_in_lines_uses_start_and_end(self):
         text = "一行目\n長い文の\n続き。\n四行目\n"
@@ -488,6 +530,12 @@ class TestHook(RepoTestCase):
         if tool_response is not None:
             event["tool_response"] = tool_response
         return event
+
+    def response(self, before, path="docs/a.md", **extra):
+        """originalFile と、ディスクの内容との structuredPatch を持つ tool_response を作る。"""
+        with open(os.path.join(self.root, path), encoding="utf-8") as f:
+            after = f.read()
+        return {"originalFile": before, "structuredPatch": make_patch(before or "", after), **extra}
 
     def fake(self, results):
         calls = []
@@ -534,7 +582,7 @@ class TestHook(RepoTestCase):
         kata = finding("prh", KATA["message"], "同じ型の", line=3)
         check, calls = self.fake([[kiku], [kiku, kata]])
         out = hook.handle(self.event(old_string="ここでも効く。", new_string="ここでも効く。\n同じ型の指摘。",
-                                     tool_response={"originalFile": "前の行。\nここでも効く。\n"}), check)
+                                     tool_response=self.response("前の行。\nここでも効く。\n")), check)
         self.assertEqual(out["decision"], "block")
         self.assertIn("「同じ型の」", out["reason"])
         self.assertNotIn("「効く」", out["reason"])
@@ -553,7 +601,7 @@ class TestHook(RepoTestCase):
         after = finding("sentence-length", "Line 4 sentence length(47) exceeds the maximum sentence length of 40.", "長い文。", line=4)
         check, _ = self.fake([[before], [after]])
         self.assertIsNone(hook.handle(self.event(old_string="見出し。", new_string="見出し。\n足した行。",
-                                                 tool_response={"originalFile": "見出し。\n\n長い文。\n"}), check))
+                                                 tool_response=self.response("見出し。\n\n長い文。\n")), check))
 
     def test_only_finding_on_changed_line_is_returned(self):
         # message にファイル全体の件数を入れる規則 (no-mix-dearu-desumasu) では、既存の検出の message も変わるが、
@@ -565,9 +613,29 @@ class TestHook(RepoTestCase):
         added = finding("no-mix-dearu-desumasu", "混在: である\nTotal:\nである  : 2\nですます: 1", "である", line=3)
         check, _ = self.fake([[old], [existing, added]])
         out = hook.handle(self.event(old_string="です。", new_string="です。\nである。",
-                                     tool_response={"originalFile": "である。\nです。\n"}), check)
+                                     tool_response=self.response("である。\nです。\n")), check)
         self.assertIn("「である」", out["reason"])
         self.assertNotIn("「です」", out["reason"])
+
+    def test_added_line_is_returned_when_same_line_is_in_code_block(self):
+        # 本文に足した行と同じ内容の行が後ろのコードブロックにあっても、本文の行の検出を返す (7 回目の指摘)
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "# 例\n\n本文。\n同じ型の指摘が続く\n\n```text\n同じ型の指摘が続く\n```\n")
+        kata = finding("prh", KATA["message"], "同じ型の", line=4)
+        check, _ = self.fake([[], [kata]])
+        out = hook.handle(self.event(old_string="本文。", new_string="本文。\n同じ型の指摘が続く",
+                                     tool_response=self.response("# 例\n\n本文。\n\n```text\n同じ型の指摘が続く\n```\n")),
+                          check)
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("「同じ型の」", out["reason"])
+
+    def test_missing_structured_patch_is_reported(self):
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "b\n")
+        out = hook.handle(self.event(old_string="a", new_string="b", tool_response={"originalFile": "a\n"}),
+                          self.not_called)
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("structuredPatch が無い", out["systemMessage"])
 
     def test_code_block_keeps_its_context(self):
         # コードブロックの中の行を書き換えても、囲みの ``` を含むファイルの全体を渡す
@@ -576,7 +644,7 @@ class TestHook(RepoTestCase):
         check, calls = self.fake([[], []])
         before = "本文。\n\n```toml\npattern = \"x\"\n```\n"
         self.assertIsNone(hook.handle(self.event(old_string='pattern = "x"', new_string='pattern = "同じ型の"',
-                                                 tool_response={"originalFile": before}), check))
+                                                 tool_response=self.response(before)), check))
         self.assertEqual(calls[0][0], [before, "本文。\n\n```toml\npattern = \"同じ型の\"\n```\n"])
 
     def test_edit_that_changed_quotes_is_checked(self):
@@ -585,7 +653,7 @@ class TestHook(RepoTestCase):
         self.write("docs/a.md", "He said “hello world”.\n")
         check, calls = self.fake([[], []])
         self.assertIsNone(hook.handle(self.event(old_string='"hello"', new_string='"hello world"',
-                                                 tool_response={"originalFile": "He said “hello”.\n"}), check))
+                                                 tool_response=self.response("He said “hello”.\n")), check))
         self.assertEqual(calls[0][0], ["He said “hello”.\n", "He said “hello world”.\n"])
 
     def test_warning_only_is_additional_context(self):
@@ -593,7 +661,7 @@ class TestHook(RepoTestCase):
         self.write("docs/a.md", "レビューを行う。\n")
         check, _ = self.fake([[], [REDUNDANT]])
         out = hook.handle(self.event(old_string="x", new_string="レビューを行う。",
-                                     tool_response={"originalFile": "x\n"}), check)
+                                     tool_response=self.response("x\n")), check)
         self.assertNotIn("decision", out)
         self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "PostToolUse")
         self.assertIn("冗長な表現です", out["hookSpecificOutput"]["additionalContext"])
@@ -603,21 +671,21 @@ class TestHook(RepoTestCase):
         self.write("docs/a.md", "効く。B\n")
         check, _ = self.fake([[KIKU], [KIKU]])
         self.assertIsNone(hook.handle(self.event(old_string="効く。A", new_string="効く。B",
-                                                 tool_response={"originalFile": "効く。A\n"}), check))
+                                                 tool_response=self.response("効く。A\n")), check))
 
     def test_write_compares_with_original_file(self):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "前からある文。\n足した文。\n")
         check, calls = self.fake([[], []])
         hook.handle(self.event(tool="Write", content="前からある文。\n足した文。\n",
-                               tool_response={"type": "update", "originalFile": "前からある文。\n"}), check)
+                               tool_response=self.response("前からある文。\n", type="update")), check)
         self.assertEqual(calls[0][0], ["前からある文。\n", "前からある文。\n足した文。\n"])
 
     def test_write_new_file_checks_whole_content(self):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "全体\n")
         check, calls = self.fake([[], []])
-        hook.handle(self.event(tool="Write", content="全体\n", tool_response={"type": "create", "originalFile": None}), check)
+        hook.handle(self.event(tool="Write", content="全体\n", tool_response={"type": "create", "originalFile": None, "structuredPatch": []}), check)
         self.assertEqual(calls[0][0], ["", "全体\n"])
 
     def test_staged_edit_does_nothing(self):
@@ -683,7 +751,7 @@ class TestHook(RepoTestCase):
         def broken(*args, **kwargs):
             raise textlint.TextlintError("textlint が入っていない")
 
-        out = hook.handle(self.event(old_string="a", new_string="b", tool_response={"originalFile": "a\n"}), broken)
+        out = hook.handle(self.event(old_string="a", new_string="b", tool_response=self.response("a\n")), broken)
         self.assertIn("textlint が入っていない", out["systemMessage"])
         self.assertIn("人間の承認を得てから実行する", out["reason"])
 

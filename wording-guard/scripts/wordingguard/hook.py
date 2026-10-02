@@ -10,7 +10,8 @@ Edit / Write で Markdown に書き足した文章を textlint で検査し、�
     ツールの結果 tool_response の originalFile) を検査し、書き換えた行にある検出のうち、増えたものだけを返す。
     文字列だけを切り出して検査すると、コードブロックや引用ブロックの中の行が本文として解析されるため、
     ファイルの全体を検査する。書き換えた行の外の検出を比べないのは、message に行番号やファイル全体の件数を
-    入れる規則があり、書き換えた箇所の外の既存の検出も message が変わるため。ツールの入力
+    入れる規則があり、書き換えた箇所の外の既存の検出も message が変わるため。書き換えた行は、tool_response の
+    structuredPatch (Claude Code が計算した行の差分) から取り、hook の中では差分を計算しない。ツールの入力
     (new_string) から書き換える前の内容を組み立てないのは、Edit が引用符をファイルに合わせて書き換えたり、
     利用者が提案を変えたりして、ファイルにツールの入力どおりの文字列が無いことがあるため。
   - error (用語ファイルの避ける語) があれば decision: block で直すよう求め、warning (規則集の候補) だけなら
@@ -21,6 +22,7 @@ Edit / Write で Markdown に書き足した文章を textlint で検査し、�
 import bisect
 import collections
 import os
+import re
 import sys
 
 from . import config
@@ -52,29 +54,71 @@ def contents_before(tool, tool_response):
     return original
 
 
-def changed_lines(before, after):
-    """書き換えた行を、内容の数で比べて (書き換える前の側の行番号の集合, 書き換えた後の側の行番号の集合) で返す。
+def patch_lines(tool, tool_response, before, after):
+    """書き換えた行を、ツールの結果 (tool_response) の structuredPatch から (書き換える前の側, 書き換えた後の側) の
+    行番号の集合で返す。
 
-    書き換えた後の側は、書き換える前に無かった内容の行 (同じ内容の行が増えた分を含む)。書き換える前の側は、
-    書き換えた後で減った内容の行。行は改行 (\\n) で区切り、0 から数える (textlint の行番号と同じ数え方)。
-    同じ内容の行が増えたときは、後ろにある行から数えて増えた分を選ぶ — どの行を書き換えたかは区別しないが、
-    検出は (rule, message, matched) の数で比べるので、同じ内容の行の検出は同じものとして数える。行を移しただけなら、
-    どちらの側にも入らない。位置の差分を計算しないので、時間は行数に比例し、書き換えた箇所の数や離れ方に関わらない。
+    structuredPatch は Claude Code が計算した行の差分で、範囲 (hunk) ごとに oldStart・newStart (1 から数える行番号) と
+    lines (先頭の 1 文字が " " は変えていない行、"-" は消した行、"+" は足した行、"\\" は末尾の改行の有無の印) を持つ。
+    "-" の行を書き換える前の側、"+" の行を書き換えた後の側にする。行番号は 0 から数える (textlint の行番号と同じ数え方)。
+    hook の中では差分を計算しない。structuredPatch は公式の文書に載っていない (Claude Code 2.1.273 で確かめた)。
+
+    次のときは ValueError を送出する (hook の中の差分の計算には戻らない)。
+      - structuredPatch が無い、または様式が想定と違う
+      - structuredPatch が空なのに、書き換える前と後の内容が違う (Claude Code の差分の計算が時間切れになったときなど)。
+        ただし Write で新しいファイルを作ったとき (type が create) は、内容の全体を書き換えた行にする
+      - " "・"-"・"+" の行の内容が、前後の内容の行と一致しない (書いた直後に別の処理がファイルを変えたときなど)
     """
+    if "structuredPatch" not in tool_response:
+        raise ValueError("hook の入力の tool_response に structuredPatch が無い (この版の Claude Code は差分を渡さない)")
+    hunks = tool_response["structuredPatch"]
+    if not isinstance(hunks, list):
+        raise ValueError(f"hook の入力の tool_response の structuredPatch がリストでない ({hunks!r})")
     a, b = before.split("\n"), after.split("\n")
-    count_a, count_b = collections.Counter(a), collections.Counter(b)
-    return _extra_lines(a, count_a - count_b), _extra_lines(b, count_b - count_a)
+    if not hunks:
+        if before == after:
+            return set(), set()
+        if tool == "Write" and tool_response.get("type") == "create":
+            return set(), set(range(len(b)))
+        raise ValueError("structuredPatch が空なのに、書き換える前と後の内容が違う "
+                         "(Claude Code の差分の計算が時間切れになったときなど)")
+    removed, added = set(), set()
+    for hunk in hunks:
+        try:
+            old_no, new_no, lines = int(hunk["oldStart"]), int(hunk["newStart"]), list(hunk["lines"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"structuredPatch の範囲の様式が想定と違う ({hunk!r})") from e
+        for line in lines:
+            mark, text = str(line)[:1], str(line)[1:]
+            if mark == "\\":
+                continue
+            if mark not in (" ", "-", "+"):
+                raise ValueError(f"structuredPatch の行の先頭の文字が想定と違う ({line!r})")
+            if mark in (" ", "-"):
+                _expect_line(a, old_no, text, "書き換える前")
+                if mark == "-":
+                    removed.add(old_no - 1)
+                old_no += 1
+            if mark in (" ", "+"):
+                _expect_line(b, new_no, text, "書き換えた後")
+                if mark == "+":
+                    added.add(new_no - 1)
+                new_no += 1
+    return removed, added
 
 
-def _extra_lines(lines, extra):
-    """lines のうち、内容ごとに extra の数だけ、後ろにある行から選んだ行番号の集合を返す。"""
-    extra = collections.Counter(extra)
-    result = set()
-    for i in range(len(lines) - 1, -1, -1):
-        if extra[lines[i]] > 0:
-            extra[lines[i]] -= 1
-            result.add(i)
-    return result
+def _expect_line(lines, number, text, side):
+    """structuredPatch の number 行目 (1 から数える) の内容 text が、lines の同じ行と一致することを確かめる。
+
+    Claude Code は差分の行の先頭のタブを 1 つにつき空白 2 つに置き換えるので、比べる前にファイルの行も同じく置き換える。
+    """
+    if not 1 <= number <= len(lines):
+        raise ValueError(f"structuredPatch の{side}の {number} 行目が、ファイルの行の数 ({len(lines)}) を越える")
+    line = lines[number - 1]
+    expected = re.sub(r"^\t+", lambda m: "  " * len(m.group()), line).rstrip("\r")
+    if expected != text.rstrip("\r"):
+        raise ValueError(f"structuredPatch の{side}の {number} 行目が、ファイルの内容と一致しない "
+                         "(書いた直後に別の処理がファイルを変えた可能性がある)")
 
 
 def in_lines(text, findings, lines):
@@ -212,11 +256,14 @@ def handle(event, check_texts=None):
                 after = f.read()
         except (OSError, UnicodeDecodeError) as e:
             return _failure(f"書き換えた後のファイル {path} を読めない: {e}")
+        try:
+            removed, added = patch_lines(tool, tool_response, before, after)
+        except ValueError as e:
+            return _failure(f"書き換えた行が分からない ({path}): {e}")
         results = check_texts(root, cfg, term_list, [before, after], filename=os.path.basename(path))
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:
         return _failure(str(e))
 
-    removed, added = changed_lines(before, after)
     errors, warnings = [], []
     for f in introduced(in_lines(before, results[0], removed), in_lines(after, results[1], added)):
         (errors if f["severity"] == "error" else warnings).append((after, f))
