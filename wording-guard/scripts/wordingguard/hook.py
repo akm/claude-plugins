@@ -1,16 +1,16 @@
 """PostToolUse の hook (ツールの実行の直後に動く処理) の本体。
 
-Edit / MultiEdit / Write で Markdown に書き足した文字列を textlint で検査し、結果を Claude に返す。
+Edit / MultiEdit / Write で Markdown に書き足した文章を textlint で検査し、結果を Claude に返す。
 振る舞いの正本はファイル `wording-guard/skills/wording-guard/references/textlint.md` の「hook」。
 
   - 検査するのは、設定キー textlint.hook を true にしたリポジトリの Markdown だけ。それ以外は何もしない
     (プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くため)。textlint.hook は設定の型を
     検査する前に見るので、有効にしていないリポジトリでは設定の誤りでも何もしない。
-  - Edit / MultiEdit は、書き換えた後のファイルの全体 (ディスクから読む) と、old_string と new_string から
-    組み立てた書き換える前の内容の全体を検査し、増えた検出だけを返す。文字列だけを切り出して検査すると、
-    コードブロックや引用ブロックの中の行が本文として解析されるため、ファイルの全体で比べる。
-    書き換える箇所の前後の変えていない行にあった検出 (他の人が既に書いた文章) は、前後の両方にあるので返らない。
-  - Write は、書いた内容の全体を検査する (書き換える前の内容は hook に渡されない)。
+  - 書き換えた後のファイルの全体 (ディスクから読む) と、書き換える前のファイルの全体 (Claude Code が hook に渡す
+    ツールの結果 tool_response の originalFile) を検査し、増えた検出だけを返す。文字列だけを切り出して検査すると、
+    コードブロックや引用ブロックの中の行が本文として解析されるため、ファイルの全体で比べる。ツールの入力
+    (new_string) から書き換える前の内容を組み立てないのは、Edit が引用符をファイルに合わせて書き換えたり、
+    利用者が提案を変えたりして、ファイルにツールの入力どおりの文字列が無いことがあるため。
   - error (用語ファイルの避ける語) があれば decision: block で直すよう求め、warning (規則集の候補) だけなら
     additionalContext で判断の材料として渡す。
   - 設定・用語ファイルの誤りや、textlint が入っていないときは、検査を省略せずに、Claude と利用者に知らせる。
@@ -29,32 +29,23 @@ EVENT_NAME = "PostToolUse"
 TOOLS = ("Edit", "MultiEdit", "Write")
 
 
-def _edits(tool, tool_input):
-    """書き換えの列 [(old_string, new_string, replace_all)] を、行った順に返す。"""
-    if tool == "Edit":
-        return [(tool_input.get("old_string", ""), tool_input.get("new_string", ""),
-                 bool(tool_input.get("replace_all")))]
-    if tool == "MultiEdit":
-        return [(e.get("old_string", ""), e.get("new_string", ""), bool(e.get("replace_all")))
-                for e in tool_input.get("edits", [])]
-    return []
+def contents_before(tool, tool_response):
+    """書き換える前のファイルの内容を、ツールの結果 (tool_response) の originalFile から返す。
 
-
-def reconstruct_before(after, edits):
-    """書き換えた後の内容 after から、書き換えを後ろから順に戻して、書き換える前の内容を組み立てる。
-
-    new_string が空の書き換え (削除) は、新しい文章を持ち込まず、戻す位置も決められないので戻さない。
-    new_string が複数の場所にあるときは、最初の場所を戻す (replace_all はすべての場所を戻す)。
-    new_string が見つからないとき (書いた直後に別の処理がファイルを変えたなど) は ValueError を送出する。
+    Write で新しいファイルを作ったとき (originalFile が null で、type が create) は空の文字列を返す。
+    originalFile が無い (この版の Claude Code は渡さない) か、それ以外で null (前の内容が大きすぎるなど) の
+    ときは ValueError を送出する。tool_response のフィールドは Claude Code の公式の文書に載っていない
+    (Claude Code 2.1.273 の Edit と Write の出力の様式で確かめた)。
     """
-    before = after
-    for old, new, replace_all in reversed(edits):
-        if not new:
-            continue
-        if new not in before:
-            raise ValueError("書き換えた後のファイルに new_string が見つからない")
-        before = before.replace(new, old) if replace_all else before.replace(new, old, 1)
-    return before
+    if "originalFile" not in tool_response:
+        raise ValueError("hook の入力の tool_response に originalFile が無い (この版の Claude Code は書き換える前の内容を渡さない)")
+    original = tool_response["originalFile"]
+    if original is None and tool == "Write" and tool_response.get("type") == "create":
+        return ""
+    if not isinstance(original, str):
+        raise ValueError(f"hook の入力の tool_response の originalFile が文字列でない ({original!r}。"
+                         "書き換える前の内容が大きすぎるときは null になる)")
+    return original
 
 
 def _key(finding):
@@ -123,8 +114,14 @@ def handle(event, check_texts=None):
     """
     tool = event.get("tool_name")
     tool_input = event.get("tool_input") or {}
+    tool_response = event.get("tool_response")
+    if not isinstance(tool_response, dict):
+        tool_response = {}
     path = tool_input.get("file_path") or ""
     if tool not in TOOLS or not path.endswith(".md"):
+        return None
+    if tool_response.get("staged") is True:
+        # 書き込みを保留した (ファイルは変わっていない) ので、検査するものが無い
         return None
     root = config.find_root(path)
     if root is None:
@@ -151,19 +148,15 @@ def handle(event, check_texts=None):
         check_texts = textlint.check_texts
     try:
         term_list = terms.load_all(config.terms_paths(root, cfg))
-        if tool == "Write":
-            before, after = "", tool_input.get("content", "")
-        else:
-            try:
-                with open(path, encoding="utf-8") as f:
-                    after = f.read()
-            except (OSError, UnicodeDecodeError) as e:
-                return _failure(f"書き換えた後のファイル {path} を読めない: {e}")
-            try:
-                before = reconstruct_before(after, _edits(tool, tool_input))
-            except ValueError as e:
-                return _failure(f"書き換える前の内容を組み立てられない ({path}): {e}。"
-                                "書いた直後に別の処理がファイルを変えた可能性がある")
+        try:
+            before = contents_before(tool, tool_response)
+        except ValueError as e:
+            return _failure(f"書き換える前の内容が分からない ({path}): {e}")
+        try:
+            with open(path, encoding="utf-8") as f:
+                after = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            return _failure(f"書き換えた後のファイル {path} を読めない: {e}")
         results = check_texts(root, cfg, term_list, [before, after], filename=os.path.basename(path))
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:
         return _failure(str(e))

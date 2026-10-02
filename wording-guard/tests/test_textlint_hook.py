@@ -433,9 +433,12 @@ class TestIntroduced(unittest.TestCase):
 
 
 class TestHook(RepoTestCase):
-    def event(self, tool="Edit", path="docs/a.md", **tool_input):
+    def event(self, tool="Edit", path="docs/a.md", tool_response=None, **tool_input):
         tool_input.setdefault("file_path", os.path.join(self.root, path))
-        return {"tool_name": tool, "tool_input": tool_input}
+        event = {"tool_name": tool, "tool_input": tool_input}
+        if tool_response is not None:
+            event["tool_response"] = tool_response
+        return event
 
     def fake(self, results):
         calls = []
@@ -473,12 +476,13 @@ class TestHook(RepoTestCase):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "前の行。\nここでも効く。\n同じ型の指摘。\n")
         check, calls = self.fake([[KIKU], [KIKU, KATA]])
-        out = hook.handle(self.event(old_string="ここでも効く。", new_string="ここでも効く。\n同じ型の指摘。"), check)
+        out = hook.handle(self.event(old_string="ここでも効く。", new_string="ここでも効く。\n同じ型の指摘。",
+                                     tool_response={"originalFile": "前の行。\nここでも効く。\n"}), check)
         self.assertEqual(out["decision"], "block")
         self.assertIn("「同じ型の」", out["reason"])
         self.assertNotIn("「効く」", out["reason"])
         texts, filename, patterns = calls[0]
-        # 書き換えた箇所だけでなく、ファイルの全体を前後で比べる
+        # 書き換える前 (tool_response の originalFile) と後 (ディスク) のファイルの全体を比べる
         self.assertEqual(texts, ["前の行。\nここでも効く。\n", "前の行。\nここでも効く。\n同じ型の指摘。\n"])
         self.assertEqual(filename, "a.md")
         self.assertIn("正本", patterns)
@@ -488,15 +492,26 @@ class TestHook(RepoTestCase):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "本文。\n\n```toml\npattern = \"同じ型の\"\n```\n")
         check, calls = self.fake([[], []])
-        self.assertIsNone(hook.handle(self.event(old_string='pattern = "x"', new_string='pattern = "同じ型の"'), check))
-        self.assertEqual(calls[0][0], ["本文。\n\n```toml\npattern = \"x\"\n```\n",
-                                       "本文。\n\n```toml\npattern = \"同じ型の\"\n```\n"])
+        before = "本文。\n\n```toml\npattern = \"x\"\n```\n"
+        self.assertIsNone(hook.handle(self.event(old_string='pattern = "x"', new_string='pattern = "同じ型の"',
+                                                 tool_response={"originalFile": before}), check))
+        self.assertEqual(calls[0][0], [before, "本文。\n\n```toml\npattern = \"同じ型の\"\n```\n"])
+
+    def test_edit_that_changed_quotes_is_checked(self):
+        # Edit は引用符をファイルに合わせて書くので、ファイルにツールの入力 (new_string) どおりの文字列が無いことがある
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "He said “hello world”.\n")
+        check, calls = self.fake([[], []])
+        self.assertIsNone(hook.handle(self.event(old_string='"hello"', new_string='"hello world"',
+                                                 tool_response={"originalFile": "He said “hello”.\n"}), check))
+        self.assertEqual(calls[0][0], ["He said “hello”.\n", "He said “hello world”.\n"])
 
     def test_warning_only_is_additional_context(self):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "レビューを行う。\n")
         check, _ = self.fake([[], [REDUNDANT]])
-        out = hook.handle(self.event(old_string="x", new_string="レビューを行う。"), check)
+        out = hook.handle(self.event(old_string="x", new_string="レビューを行う。",
+                                     tool_response={"originalFile": "x\n"}), check)
         self.assertNotIn("decision", out)
         self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "PostToolUse")
         self.assertIn("冗長な表現です", out["hookSpecificOutput"]["additionalContext"])
@@ -505,50 +520,51 @@ class TestHook(RepoTestCase):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "効く。B\n")
         check, _ = self.fake([[KIKU], [KIKU]])
-        self.assertIsNone(hook.handle(self.event(old_string="効く。A", new_string="効く。B"), check))
+        self.assertIsNone(hook.handle(self.event(old_string="効く。A", new_string="効く。B",
+                                                 tool_response={"originalFile": "効く。A\n"}), check))
 
-    def test_multi_edit_and_write(self):
+    def test_write_compares_with_original_file(self):
         self.configure(textlint={"hook": True})
-        self.write("docs/a.md", "同じ型の\nc\n")
-        check, calls = self.fake([[], [KATA]])
-        edits = [{"old_string": "a", "new_string": "同じ型の"}, {"old_string": "b", "new_string": "c"}]
-        out = hook.handle(self.event(tool="MultiEdit", edits=edits), check)
-        self.assertEqual(calls[0][0], ["a\nb\n", "同じ型の\nc\n"])
+        self.write("docs/a.md", "前からある文。\n足した文。\n")
+        check, calls = self.fake([[], []])
+        hook.handle(self.event(tool="Write", content="前からある文。\n足した文。\n",
+                               tool_response={"type": "update", "originalFile": "前からある文。\n"}), check)
+        self.assertEqual(calls[0][0], ["前からある文。\n", "前からある文。\n足した文。\n"])
+
+    def test_write_new_file_checks_whole_content(self):
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "全体\n")
+        check, calls = self.fake([[], []])
+        hook.handle(self.event(tool="Write", content="全体\n", tool_response={"type": "create", "originalFile": None}), check)
+        self.assertEqual(calls[0][0], ["", "全体\n"])
+
+    def test_staged_edit_does_nothing(self):
+        # 書き込みを保留した (ファイルは変わっていない) ときは検査しない
+        self.configure(textlint={"hook": True})
+        event = self.event(old_string="a", new_string="b", tool_response={"originalFile": "a\n", "staged": True})
+        self.assertIsNone(hook.handle(event, self.not_called))
+
+    def test_missing_original_file_is_reported(self):
+        # 書き換える前の内容が分からないときは、ツールの入力から組み立てずに知らせる
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "b\n")
+        for response in (None, {}, {"type": "text", "text": "ok"}):
+            out = hook.handle(self.event(old_string="a", new_string="b", tool_response=response), self.not_called)
+            self.assertEqual(out["decision"], "block")
+            self.assertIn("originalFile が無い", out["systemMessage"])
+
+    def test_null_original_file_of_existing_file_is_reported(self):
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "b\n")
+        out = hook.handle(self.event(tool="Write", content="b\n", tool_response={"type": "update", "originalFile": None}),
+                          self.not_called)
         self.assertEqual(out["decision"], "block")
-        check, calls = self.fake([[], []])
-        hook.handle(self.event(tool="Write", content="全体"), check)
-        self.assertEqual(calls[0][0], ["", "全体"])
-
-    def test_replace_all_is_reversed_everywhere(self):
-        self.configure(textlint={"hook": True})
-        self.write("docs/a.md", "同じ型の と 同じ型の\n")
-        check, calls = self.fake([[], []])
-        hook.handle(self.event(old_string="x", new_string="同じ型の", replace_all=True), check)
-        self.assertEqual(calls[0][0][0], "x と x\n")
-
-    def test_deletion_is_not_reversed(self):
-        # 削除 (new_string が空) は新しい文章を持ち込まないので、書き換える前の内容に戻さない
-        self.configure(textlint={"hook": True})
-        self.write("docs/a.md", "同じ型の\n")
-        check, calls = self.fake([[], []])
-        edits = [{"old_string": "消す行\n", "new_string": ""}, {"old_string": "a", "new_string": "同じ型の"}]
-        hook.handle(self.event(tool="MultiEdit", edits=edits), check)
-        self.assertEqual(calls[0][0], ["a\n", "同じ型の\n"])
-
-    def test_new_string_not_in_file_is_reported(self):
-        # 書いた直後に別の処理がファイルを変えたなど、書き換える前の内容を組み立てられないときは知らせる
-        self.configure(textlint={"hook": True})
-        self.write("docs/a.md", "別の内容\n")
-        out = hook.handle(self.event(old_string="a", new_string="b"), self.not_called)
-        self.assertEqual(out["decision"], "block")
-        self.assertIn("書き換える前の内容を組み立てられない", out["systemMessage"])
-        self.assertIn("new_string が見つからない。", out["systemMessage"])
-        # 例外の文の後に、空白を挟んで助詞を続けない
-        self.assertNotIn("見つからない ので", out["systemMessage"])
+        self.assertIn("originalFile が文字列でない", out["systemMessage"])
 
     def test_unreadable_file_is_reported(self):
         self.configure(textlint={"hook": True})
-        out = hook.handle(self.event(old_string="a", new_string="b"), self.not_called)
+        out = hook.handle(self.event(old_string="a", new_string="b", tool_response={"originalFile": "a\n"}),
+                          self.not_called)
         self.assertEqual(out["decision"], "block")
         self.assertIn("読めない", out["systemMessage"])
 
@@ -585,7 +601,7 @@ class TestHook(RepoTestCase):
         def broken(*args, **kwargs):
             raise textlint.TextlintError("textlint が入っていない")
 
-        out = hook.handle(self.event(old_string="a", new_string="b"), broken)
+        out = hook.handle(self.event(old_string="a", new_string="b", tool_response={"originalFile": "a\n"}), broken)
         self.assertIn("textlint が入っていない", out["systemMessage"])
         self.assertIn("人間の承認を得てから実行する", out["reason"])
 
