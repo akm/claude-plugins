@@ -926,7 +926,7 @@ func recordRow(cells []string) string {
 
 // renderFindingCells は指摘 1 件の表のセル列を返す。行を 1 つの書式文字列で
 // 組み立てると、テストがセル単位で分岐を検証できず、存在確認のアサーションが
-// 別のセルへの偶然一致で通り抜ける (実測で 3 度起きた種類の欠陥)。
+// 別のセルへの偶然一致で合格してしまう (実測で 3 度起きた種類の欠陥)。
 func renderFindingCells(fd recordFinding) []string {
 	loc := fd.File
 	if fd.Line > 0 {
@@ -1148,7 +1148,7 @@ var errRecordDirMissing = errors.New(
 // listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
-// git add 前の最初の記録が素通りする穴 (0 件マッチで何も検査しないまま成功する種類の欠陥) を塞ぐため。
+// git add 前の最初の記録が検査されないまま通過する穴 (0 件マッチで何も検査しないまま成功する種類の欠陥) を塞ぐため。
 //
 // ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
 // (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。

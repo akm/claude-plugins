@@ -285,7 +285,7 @@ func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 
 // LineComment 方式固有の境界の実測ピン: 複数行の素のスカラーの継続行と
 // フロー値の後の ' #' は検出され、フロー内の ' #' は解析エラーとして報告される
-// (いずれも素通りしない)。
+// (いずれも検査されないまま通過しない)。
 func TestReviewTriageRecordHashNewMethodEdges(t *testing.T) {
 	cases := []struct {
 		name string
@@ -451,7 +451,7 @@ func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
 }
 
 // セル単位のテーブル駆動テスト。行に紐付かない部分文字列の照合は別のセルへの
-// 偶然一致で通り抜けるため (ミューテーションで実証された、3 度目の同じ種類の欠陥)、
+// 偶然一致で合格してしまうため (ミューテーションで実証された、3 度目の同じ種類の欠陥)、
 // セルの値そのものを検証する。
 func TestRenderFindingCells(t *testing.T) {
 	base := recordFinding{
@@ -746,7 +746,7 @@ func TestReviewTriageRecordMultiDocument(t *testing.T) {
 }
 
 // 記録の走査は git 追跡でなくファイルシステムを見る。追跡前 (git add 前) の
-// 最初の記録が検査も生成もされず素通りする穴を塞ぐため。
+// 最初の記録が検査も生成もされずに通過する穴を塞ぐため。
 func TestListReviewTriageFiles(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"feat-x.yaml", "feat-x.md", "README.md", "README.yaml", "note.txt"} {

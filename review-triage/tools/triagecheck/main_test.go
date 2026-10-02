@@ -794,7 +794,7 @@ func TestRunCheckReportsSummaryCommand(t *testing.T) {
 // 存在しないコマンドを案内することになる (Issue #36)。
 //
 // 見るのは定数であって可変の summaryCommand ではない。変数は run が書き換える
-// ので、先行するテストが残した値を既定と取り違えて、既定の回帰を見逃す
+// ので、先行するテストが残した値を既定と取り違えて、既定の回帰を検出できない
 // (または偽陽性で落ちる) ことがある。
 func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
 	if !strings.Contains(defaultSummaryCommand, "-write-summary") {

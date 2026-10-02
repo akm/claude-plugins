@@ -277,7 +277,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 		if out, err := cmd.CombinedOutput(); err == nil {
-			t.Fatalf("%s から実行したとき、壊れた記録を見逃した:\n%s", dir, out)
+			t.Fatalf("%s から実行したとき、壊れた記録を検出しなかった:\n%s", dir, out)
 		}
 	}
 
@@ -303,7 +303,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Dir = linkDir
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("リンク経由で実行したとき、実体の置き場の壊れた記録を見逃した"+
+		t.Fatalf("リンク経由で実行したとき、実体の置き場の壊れた記録を検出しなかった"+
 			" (隣の囮を検査している):\n%s", out)
 	}
 
@@ -325,7 +325,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Dir = viaBase
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("経路のディレクトリがリンクのとき、実体の置き場の壊れた記録を見逃した"+
+		t.Fatalf("経路のディレクトリがリンクのとき、実体の置き場の壊れた記録を検出しなかった"+
 			" (cd -P が効いていない):\n%s", out)
 	}
 }
