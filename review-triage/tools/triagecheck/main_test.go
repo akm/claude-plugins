@@ -365,7 +365,7 @@ func TestRunRejectsEmptyExplicitPaths(t *testing.T) {
 					assertEmpty(t, run(args), flag, v.label)
 				})
 			}
-			// -record-dir の空文字だけは省略と区別できないので必須の検査が先に立つ
+			// -record-dir の空文字だけは省略と区別できないので必須の検査が優先する
 			// (TestRunRequiresRecordDir)。空白と不可視は空のパスとして拒否する。
 			if v.value != "" {
 				t.Run(route.name+"/-record-dir/"+v.label, func(t *testing.T) {
