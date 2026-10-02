@@ -21,7 +21,7 @@ textlint は語の一覧と文の形で照合する道具なので、**検出し
 
 ## セットアップ
 
-textlint と規則集は、プラグインに同梱したファイル `wording-guard/textlint/package.json` と `package-lock.json` で版を固定している。次のコマンドで、利用者のキャッシュに `npm ci` で入れる。**npm で約 380 個のパッケージを取得する。Node と npm が必要。**
+textlint と規則集は、プラグインに同梱したファイル `wording-guard/textlint/package.json` と `wording-guard/textlint/package-lock.json` で版を固定している。次のコマンドで、利用者のキャッシュに `npm ci` で入れる。**npm で約 380 個のパッケージを取得する。Node と npm が必要。**
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py setup
