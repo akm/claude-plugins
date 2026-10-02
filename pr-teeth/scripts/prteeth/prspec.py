@@ -77,8 +77,8 @@ def parse_one(text):
             continue
         # **大文字小文字をそろえる。** GitHub は owner/repo を区別しないが、この先の
         # 設定引き当て（config.toml の [repos."owner/repo"]）と範囲判定は素の辞書
-        # 引きなので、`Akm/Claude-Plugins` と打つと設定を取りこぼし、出力言語と
-        # レビュー範囲が、利用者に知らせずに既定値になる。巡回は `gh search prs` が返す正規の
+        # 引きなので、`Akm/Claude-Plugins` と打つと設定を取りこぼし、利用者が気づかないまま
+        # 出力言語とレビュー範囲が既定値になる。巡回は `gh search prs` が返す正規の
         # 表記を使うためこの問題が無く、番号指定だけが利用者の打った文字列を
         # そのまま流す。ここが識別子を確定させる唯一の場所なので、ここで揃える。
         return {"repo": (owner + "/" + repo).lower(), "number": int(m.group("number"))}

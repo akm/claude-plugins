@@ -763,7 +763,7 @@ class TestLabels(unittest.TestCase):
         self.assertEqual(labels.for_language("ja-JP")["summary"], "概要")
 
     def test_unknown_language_falls_back_to_english(self):
-        # 日本語にすると、日本語を読めない利用者に読めない画面を出すことになる。
+        # 日本語にフォールバックすると、日本語を読めない利用者に読めない画面を出すことになる。
         self.assertEqual(labels.for_language("ko")["summary"], "Summary")
         self.assertEqual(labels.for_language("")["summary"], "Summary")
 
@@ -1341,7 +1341,7 @@ class TestDocument(unittest.TestCase):
     """解説データの型（scripts/prteeth/document.py）。
 
     素の dict を .get() で読むと、キー名を間違えても None が空文字になり、
-    セクションが、エラーにならずに消える。型で必須を持つことで組み立て時点で検出する。
+    エラーにならないままセクションが消える。型で必須を持つことで組み立て時点で検出する。
     """
 
     def _pr(self, **kw):
@@ -1506,7 +1506,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('<a href="#pr-o-other-2">Second</a>', h)
 
     def test_index_anchors_match_article_ids(self):
-        # 飛び先が無いとリンクが、エラーにならずに機能しなくなる。
+        # 飛び先が無いとエラーにならないままリンクが機能しなくなる。
         h = render.render(self._two())
         self.assertIn('id="pr-o-r-1"', h)
         self.assertIn('id="pr-o-other-2"', h)
@@ -1724,7 +1724,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(by_repo["other/x"], "ja")
 
     def test_resolve_mixed_case_spec_finds_repo_config(self):
-        # 打った表記の揺れで設定を取りこぼすと、出力言語が、利用者に知らせずに変わる。
+        # 打った表記の揺れで設定を取りこぼすと、利用者が気づかないまま出力言語が変わる。
         with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
             f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
         out = self._run(self.mod.cmd_resolve, specs=["O/R#1"])
