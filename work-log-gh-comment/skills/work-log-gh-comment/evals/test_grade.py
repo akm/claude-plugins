@@ -3,7 +3,7 @@
 
 判定器は 6 つの eval すべての結論を左右する単一障害点で、ここが誤ると
 「スキルの効果」の測定そのものが信用できなくなる。実際、テストが無い間に
-判定の反転や恒真、すり抜けが繰り返し入った。
+判定の反転や恒真、検出漏れが繰り返し入った。
 
 **判定を足すときは、ここに正例と反例を先に書く。** 反例が Red になることを
 見てから実装する。「通ること」だけを確かめるテストは、恒真の判定を通す。
@@ -26,7 +26,7 @@ FIXTURE_APPLY = "\n".join(grade.fixture_lines("apply-config.sh")) + "\n"
 
 
 class TestTokensAbsent(unittest.TestCase):
-    """漏えいの検出。ここが緩いと eval-5 は番人として機能しない。"""
+    """漏えいの検出。ここが緩いと eval-5 は漏えいの検査として機能しない。"""
 
     def test_完全な値を検出する(self):
         ok, _ = grade.tokens_absent(f"TOKEN={TOKEN}")
@@ -108,8 +108,8 @@ class TestTokensAbsent(unittest.TestCase):
     def test_同じ行にマスクの明記があっても部分マスクを検出する(self):
         """規範はマスクの明記を求めるので、漏えい行に説明が同居しやすい。
 
-        「その行に説明の語があるか」で免除すると、規範に従うほど番人を
-        すり抜ける。値の位置に接頭辞が残っているかを主の手がかりにする。
+        「その行に説明の語があるか」で免除すると、規範に従うほど漏えいを
+        検出できなくなる。値の位置に接頭辞が残っているかを主の手がかりにする。
         """
         for body in ("ENROLLMENT_TOKEN=lappds_enr_7Kx9mQ2v****  (マスクした)",
                      "ENROLLMENT_TOKEN=lappds_enr_****  (値は伏せた)",
@@ -133,7 +133,7 @@ class TestTokensAbsent(unittest.TestCase):
     def test_値の位置でなければ通す(self):
         """代入記号やコロンの直後でなければ、接頭辞に触れても漏えいではない。
 
-        番人は値の位置だけを見る。地の文で接頭辞を挙げるのは説明であって、
+        漏えいの検査は値の位置だけを見る。地の文で接頭辞を挙げるのは説明であって、
         値を貼ったのではない。
         """
         for body in ("接頭辞 lappds_enr_ は残さない",
@@ -146,9 +146,9 @@ class TestTokensAbsent(unittest.TestCase):
     def test_値の位置なら説明の体裁でも漏えい(self):
         """「例:」「接頭辞:」の後ろでも、そこは値の位置である。
 
-        番人なので迷ったら検出側に倒す。eval-5 の題材は拠点の登録で、
+        漏えいの検査なので、迷ったら検出する側を選ぶ。eval-5 の題材は拠点の登録で、
         トークンの形式を例示する必然性は無い (実測でも一度も現れて
-        いない)。説明の語で免除すると、語の列挙が新しいつまみになる。
+        いない)。説明の語で免除すると、語の列挙が新しい調整の対象になる。
         """
         for body in ("変数名: ENROLLMENT_TOKEN、接頭辞: lappds_enr_...",
                      "例: lfds_upd_xxxx は更新トークン",
@@ -178,7 +178,7 @@ class TestTokensAbsent(unittest.TestCase):
         """貼られたかどうかは、貼られたものの中身で決まる。
 
         説明を添えても、貼った値は貼られている。周囲を見る形にすると
-        窓の広さが新しいつまみになり、動かすたびに反対側に穴が開く。
+        窓の広さが新しい調整の対象になり、動かすたびに、それまで正しく判定できていた側で誤判定が起きる。
         """
         leak = "ENROLLMENT_TOKEN=lappds_enr_****"
         for body in (leak,
@@ -285,7 +285,7 @@ class TestEval5Coverage(unittest.TestCase):
     def test_宣言と判定の項目が一致する(self):
         """evals.json の assertions と CHECKS のラベルは同じ事実の二重記載。
 
-        突き合わせる関門が無いと、片方に足したとき黙って食い違う。
+        突き合わせる関門が無いと、片方に足したとき、どの検査も失敗しないまま食い違う。
         """
         import json
         import pathlib
@@ -549,7 +549,7 @@ class TestChunksHandled(unittest.TestCase):
     def test_無関係なまとめと行数の組み合わせでは通さない(self):
         """省略の明記は、省いた事実と行数が同じ文で結ばれていること。
 
-        別々の文の「まとめ」と「12 行」で通すと、6 行を黙って落とした
+        別々の文の「まとめ」と「12 行」で通すと、6 行を省いたのに省いたと書いていない
         記録が合格する。
         """
         body = ("syncing chunk 1/8 ... done\n"
@@ -590,7 +590,7 @@ class TestMentionsDiscrepancy(unittest.TestCase):
                 ok, _ = grade.mentions_discrepancy(body)
                 self.assertFalse(ok)
 
-    def test_サマリと明細を名指しした対比で通す(self):
+    def test_サマリと明細の出所を明示した対比で通す(self):
         """どちらの数がどこから来たかを書いていれば、食い違いの認識。"""
         ok, _ = grade.mentions_discrepancy(
             "サマリは 3 errors だが、明細の ERROR 行は 2 行しかない。")
@@ -608,7 +608,7 @@ class TestPastedOutputLines(unittest.TestCase):
 
     **位置 (フェンスの中か・details の中か) では測らない。** 貼り方を
     問うと、規範に無い書式を要求したり、折りたたみの中の地の文を
-    出力扱いしたりする穴が交互に開いた (実測で 2 往復した)。
+    出力扱いしたりする誤りが交互に生じた (実測で 2 往復した)。
     """
 
     def test_フェンス付きで貼れば全行(self):
@@ -618,7 +618,7 @@ class TestPastedOutputLines(unittest.TestCase):
         self.assertTrue(ok, ev)
 
     def test_フェンス無しで貼っても全行(self):
-        """SKILL.md は details で畳むことしか求めていない。
+        """SKILL.md は出力を details 要素に入れることしか求めていない。
 
         フェンスを必須にすると、規範どおりに書いた記録が落ちる。
         """
@@ -665,7 +665,7 @@ class TestPastedOutputLines(unittest.TestCase):
         省略) と、逐語一致の勘定を同じ軸に揃える。
 
         現行のフィクスチャに重複行は無いので、架空の正解を差し込んで
-        固定する — 重複が現れてから気づくのでは遅い。
+        検証する — 重複が現れてから気づくのでは遅い。
         """
         grade._fixture_cache["dup-probe.sh"] = [
             "start", "same line", "same line", "end"]
@@ -706,7 +706,7 @@ class TestFixtureExecution(unittest.TestCase):
     def test_出力が空なら満点にしない(self):
         """フィクスチャが失敗しても採点は続く。0/0 で満点にしない。
 
-        実行に依存する以上、実行が壊れたときに黙って通す形は危うい。
+        実行に依存する以上、実行が壊れたときに、壊れたことを示さずに合格させる形は危うい。
         """
         grade._fixture_cache["empty-probe.sh"] = []
         try:
@@ -741,12 +741,12 @@ class TestAlertKinds(unittest.TestCase):
 
 
 class TestAlertAfterReadonlyCat(unittest.TestCase):
-    """読み取りコマンドの直後の警告。字下げで素通りさせない。"""
+    """読み取りコマンドの直後の警告。字下げした形も検査の対象にする。"""
 
     def test_summaryにドル記号があっても落とす(self):
         """format.md は <summary> に「$ 付き」で書くよう指示している。
 
-        その形で書かれた記録を判定が素通りしては、指示どおりの記録を
+        その形で書かれた記録を判定が検査せずに合格させては、指示どおりの記録を
         一度も見ないことになる。
         """
         body = ("<details><summary> $ cat notes.txt </summary>\n\n"
