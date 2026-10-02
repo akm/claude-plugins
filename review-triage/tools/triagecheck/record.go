@@ -2,7 +2,7 @@
 // スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
 //
 // 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
-// 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・ピン値の
+// 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・決め打ちの値の
 // 誤りが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
 // 誤って失敗する」誤検出を生んだ。数えるものを書かせないことで、この類を発生源から消す。
 // スキーマの意味の正本は skills/review-triage/references/record-schema.md。

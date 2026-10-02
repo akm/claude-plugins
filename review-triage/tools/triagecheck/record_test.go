@@ -283,7 +283,7 @@ func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 	}
 }
 
-// LineComment 方式固有の境界の実測ピン: 複数行の素のスカラーの継続行と
+// LineComment 方式固有の境界を実測した回帰テスト: 複数行の素のスカラーの継続行と
 // フロー値の後の ' #' は検出され、フロー内の ' #' は解析エラーとして報告される
 // (いずれも検査されないまま通過しない)。
 func TestReviewTriageRecordHashNewMethodEdges(t *testing.T) {
@@ -589,7 +589,7 @@ func TestReviewTriageRecordHashOnSequenceFirstKey(t *testing.T) {
 }
 
 // サマリの表示分岐 (run_id・audience の上書き・premise 対象外・order 無し・depends_on)
-// を固定する。実装済みの挙動の固定 (退行防止)。
+// を検証する。実装済みの挙動の回帰テスト (退行防止)。
 func TestReviewTriageSummaryRenderBranches(t *testing.T) {
 	src := `runs:
   - date: "2026-08-30"
@@ -775,7 +775,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 }
 
 // TestInReviewTriageDirNotationVariants は、置き場の表記が揺れても検査の対象が
-// 変わらないことを固定する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
+// 変わらないことを検証する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
 // "." / "./rec" / "rec//" で一覧側 (path.Join が clean する) と前置が一致せず、
 // 検査が 1 件も走らないまま成功した。
 func TestInReviewTriageDirNotationVariants(t *testing.T) {

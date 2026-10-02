@@ -27,7 +27,7 @@ func withRunGlobals(t *testing.T) {
 
 // 指定した置き場・判定フローが存在しないなら、run は非 0 (error) で終わる。
 // 「検査が走って合格した」と「そもそも走らなかった」を区別できるようにするための
-// 中核の挙動なので、入口 (run) の側でも固定する。
+// 中核の挙動なので、入口 (run) の側でもテストで検証する。
 // 判定はエラーが返ること自体で行い、報告メッセージの文言には結合しない。
 // 文言で判定すると、挙動を変えない書式の変更だけで落ちる (誤った失敗)。
 // 報告の本文は stderr に出るので err.Error() には載らず、文言に頼ると実質
@@ -300,7 +300,7 @@ func captureStderr(t *testing.T, fn func()) string {
 	return out
 }
 
-// -write-summary も run 経由で explicit が渡ることを固定する。関数を直接呼ぶ
+// -write-summary も run 経由で explicit が渡ることを検証する。関数を直接呼ぶ
 // テストだけだと、run から検査への配線を壊しても全テストが通る (配線を false に
 // 固定するミューテーションで実測した) — そのとき「明示指定した置き場が無いのに
 // エラーを出さずに成功する」挙動が復活する。
@@ -482,7 +482,7 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 // CLAUDE_PLUGIN_ROOT 由来の判定フローは -current-dir の基準を使わない。
 // 環境変数の値は利用者が -current-dir を書いたかどうかとは無関係に決まるので、
 // そこへ基準を当てると「環境変数を設定していると -current-dir が使えない」
-// (逆に相対の環境変数が、エラーにならずに解決される) ことになる。分岐の両側を固定する。
+// (逆に相対の環境変数が、エラーにならずに解決される) ことになる。分岐の両側をテストで検証する。
 func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 	base := realTempDir(t)
 	recs := filepath.Join(base, "recs")
