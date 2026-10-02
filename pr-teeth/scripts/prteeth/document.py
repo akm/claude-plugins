@@ -80,7 +80,7 @@ class PullRequest:
         """
         raw = str(self.repo or "") + "-" + str(self.number)
         safe = "".join(c if c.isalnum() or c == "-" else "-" for c in raw.lower())
-        # 連続したハイフンを畳む。`owner/repo.js#1` のような名前でも読める id にする。
+        # 連続したハイフンを 1 つにまとめる。`owner/repo.js#1` のような名前でも読める id にする。
         while "--" in safe:
             safe = safe.replace("--", "-")
         return "pr-" + safe.strip("-")
@@ -210,7 +210,7 @@ def from_payload(payload):
 
     prs = [_pr_from(raw, i) for i, raw in enumerate(raw_prs)]
 
-    # ignore のみの PR は1行に畳む（第7節）。指定があればそれを尊重する。
+    # ignore のみの PR は1行にまとめる（第7節）。指定があればそれを尊重する。
     for pr in prs:
         if pr.collapsed is None:
             pr.collapsed = pr.priority == scope.IGNORE

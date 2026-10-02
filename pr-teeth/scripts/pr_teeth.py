@@ -470,7 +470,7 @@ def cmd_render(args):
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
     # キー名の誤りや必須の欠落はここで弾く。エラーにせずに空のセクションを出すことはしない。
-    # 畳み込みと並び替えも from_payload が行う。
+    # ignore だけの PR を 1 行で表示する判定と並び替えも from_payload が行う。
     # --context は入力 JSON の context より優先する（コマンド側が文脈を知っている）。
     if args.context:
         payload = dict(payload, context=args.context)

@@ -75,7 +75,7 @@ def parse_one(text):
             repo = repo[: -len(".git")]
         if not owner or not repo:
             continue
-        # **大文字小文字を畳む。** GitHub は owner/repo を区別しないが、この先の
+        # **大文字小文字をそろえる。** GitHub は owner/repo を区別しないが、この先の
         # 設定引き当て（config.toml の [repos."owner/repo"]）と範囲判定は素の辞書
         # 引きなので、`Akm/Claude-Plugins` と打つと設定を取りこぼし、出力言語と
         # レビュー範囲が、利用者に知らせずに既定値になる。巡回は `gh search prs` が返す正規の
@@ -90,10 +90,10 @@ def parse(specs):
     """複数の指定をまとめて解釈する。
 
     戻り値: (targets, errors)
-      targets: [{"repo","number"}]。**入力順を保ち、重複は先勝ちで1件に畳む。**
+      targets: [{"repo","number"}]。**入力順を保ち、重複は先勝ちで1件にまとめる。**
       errors:  解釈できなかった指定の理由（文字列）。
 
-    重複を畳むのは、同じ PR を2回解説しても情報が増えないため。ただし**畳んだ事実は
+    重複をまとめるのは、同じ PR を2回解説しても情報が増えないため。ただし**まとめた事実は
     errors には入れない**（利用者の誤りではなく、実害も無い）。
     """
     targets = []

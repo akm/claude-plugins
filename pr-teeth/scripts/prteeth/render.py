@@ -158,7 +158,7 @@ def _render_index(prs, L, context):
     あるかがスクロールしないと分からない（第9節の趣旨に反する）。件数が増えるほど必要になる。
 
     1件のときは出さない。インデックスが意味を持たず、縦を消費するだけになるため。
-    畳まれた PR も載せる（画面に在ることは目次から分かるべき）。
+    1行にまとめた PR も載せる（画面に在ることは目次から分かるべき）。
     """
     if len(prs) < 2:
         return ""
@@ -246,7 +246,7 @@ def _render_pr(pr, context=labels.CONTEXT_PATROL):
         out.append('<div class="scope">' + summary + "</div>")
 
     if collapsed:
-        # ignore のみの PR は1行に畳む。リンクは残す（第7節）。
+        # ignore のみの PR は1行にまとめる。リンクは残す（第7節）。
         if pr.summary:
             out.append("<div>" + _e(pr.summary) + "</div>")
         out.append("</article>")

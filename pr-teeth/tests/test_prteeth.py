@@ -1523,7 +1523,7 @@ class TestRender(unittest.TestCase):
         self.assertIn("対象外: 1", head)
 
     def test_index_includes_collapsed_prs(self):
-        # ignore は1行に畳まれるが、画面に在ることは目次から分かるべき。
+        # ignore は1行にまとめられるが、画面に在ることは目次から分かるべき。
         h = render.render(self._two())
         self.assertIn("Second", h.split('<article')[0])
 
