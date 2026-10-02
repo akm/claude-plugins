@@ -618,7 +618,7 @@ class TestPastedOutputLines(unittest.TestCase):
         self.assertTrue(ok, ev)
 
     def test_フェンス無しで貼っても全行(self):
-        """SKILL.md は details で畳むことしか求めていない。
+        """SKILL.md は出力を details 要素に入れることしか求めていない。
 
         フェンスを必須にすると、規範どおりに書いた記録が落ちる。
         """
