@@ -100,7 +100,7 @@ class TestLanguageResolution(unittest.TestCase):
         self.assertEqual(config.default_language(cfg, None), "en")
 
     def test_malformed_config_does_not_crash(self):
-        # 利用者が手で書くファイルなので、想定外の型でも落とさず既定へ倒す。
+        # 利用者が手で書くファイルなので、想定外の型でも落とさず既定を使う。
         for bad in ({"repos": "nope"}, {"repos": {"o/r": "nope"}}, {"language": 42}):
             self.assertEqual(config.resolve_language("o/r", bad), "ja")
 
@@ -763,7 +763,7 @@ class TestLabels(unittest.TestCase):
         self.assertEqual(labels.for_language("ja-JP")["summary"], "概要")
 
     def test_unknown_language_falls_back_to_english(self):
-        # 日本語に倒すと、日本語を読めない利用者に読めない画面を出すことになる。
+        # 日本語にすると、日本語を読めない利用者に読めない画面を出すことになる。
         self.assertEqual(labels.for_language("ko")["summary"], "Summary")
         self.assertEqual(labels.for_language("")["summary"], "Summary")
 

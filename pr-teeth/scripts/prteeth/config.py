@@ -45,7 +45,7 @@ def repo_entry(config, repo):
 
     利用者が手で書くファイルなので、想定外の型（スカラーやリスト）が入りうる。
     そこで落とすと設定ミスがクラッシュになるため、空扱いにして呼び出し側の
-    既定へ倒す（第5.1節の fail-soft 方針）。
+    既定を使わせる（第5.1節の fail-soft 方針）。
     """
     repos = (config or {}).get("repos")
     if not isinstance(repos, dict):
