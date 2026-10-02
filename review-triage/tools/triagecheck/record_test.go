@@ -241,7 +241,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 }
 
 // ' #' 検査の境界: コロン後の空白の揺れ・値全体がコメント・シーケンス先頭キーの
-// ブロックスカラーの兄弟・インデント指示子。正規表現では列挙的に穴が開いた種類の境界
+// ブロックスカラーの兄弟・インデント指示子。正規表現では列挙するたびに検出漏れが生じた種類の境界
 // (LineComment 走査への置き換えで構造的に守る)。
 func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 	cases := []struct {
@@ -746,7 +746,7 @@ func TestReviewTriageRecordMultiDocument(t *testing.T) {
 }
 
 // 記録の走査は git 追跡でなくファイルシステムを見る。追跡前 (git add 前) の
-// 最初の記録が検査も生成もされずに通過する穴を塞ぐため。
+// 最初の記録が検査も生成もされずに通過することを防ぐため。
 func TestListReviewTriageFiles(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"feat-x.yaml", "feat-x.md", "README.md", "README.yaml", "note.txt"} {
