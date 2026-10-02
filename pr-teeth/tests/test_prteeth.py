@@ -422,7 +422,7 @@ class TestPreciousData(unittest.TestCase):
             self.assertEqual(store.load_precious(p, {})["terms"]["a"]["term"], "a")
 
     def test_lock_is_exclusive_between_processes(self):
-        # ロックが効いていなければ、子プロセスが即座に取得できてしまう。
+        # ロックが機能していなければ、子プロセスが即座に取得できてしまう。
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "g.json")
             with store.locked(p):
@@ -1059,7 +1059,7 @@ class TestBodies(unittest.TestCase):
             self.assertEqual(bodies.load(self.dir, "o/r", i), "b")
 
     def test_prune_without_alive_applies_only_the_count_limit(self):
-        # alive が分からない場合でも件数の上限は効かせる。ただし生死による
+        # alive が分からない場合でも件数の上限は適用する。ただし生死による
         # 削除はしない（どれが閉じたか分からないため）。
         for i in range(4):
             path, _ = bodies.save(self.dir, "o/r", i, "b")
@@ -1296,7 +1296,7 @@ class TestRepoCache(unittest.TestCase):
         self.assertEqual([r["reason"] for r in out["removed"]], ["age"])
 
     def test_cleanup_respects_the_size_limit(self):
-        # 大きなモノレポが数個あると、件数の上限では効かない。
+        # 大きなモノレポが数個あると、件数の上限では機能しない。
         self._fake("o/a", used_at=1000, size=4000)
         self._fake("o/b", used_at=2000, size=4000)
         out = repos.cleanup(self.repos_dir, max_repos=99, max_bytes=5000,
@@ -1506,7 +1506,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('<a href="#pr-o-other-2">Second</a>', h)
 
     def test_index_anchors_match_article_ids(self):
-        # 飛び先が無いとリンクが、エラーにならずに効かなくなる。
+        # 飛び先が無いとリンクが、エラーにならずに機能しなくなる。
         h = render.render(self._two())
         self.assertIn('id="pr-o-r-1"', h)
         self.assertIn('id="pr-o-other-2"', h)
@@ -1607,7 +1607,7 @@ class TestRender(unittest.TestCase):
         self.assertNotIn("レビュー依頼の PR", h)
 
     def test_pick_context_applies_to_pr_language_not_page_language(self):
-        # ページは ja、PR は en。文脈は両方に効き、言語はそれぞれのものを使う。
+        # ページは ja、PR は en。文脈は両方に適用され、言語はそれぞれのものを使う。
         doc = self._doc({"language": "en", "priority": "must_review",
                          "counts": {"must_review": 1}}, context="pick")
         h = render.render(doc)
@@ -1873,7 +1873,7 @@ class TestCliCommands(unittest.TestCase):
 
     def test_body_count_limit_applies_without_open_prs(self):
         # SKILL.md は「迷ったら渡さない」と指示しているので、--open-prs 無しが
-        # 通常の経路。そこで上限が効かないと、README に書いた 200 件が成立しない。
+        # 通常の経路。そこで上限が適用されないと、README に書いた 200 件が成立しない。
         bodies_dir = os.path.join(self._dir.name, "bodies")
         for i in range(5):
             path, _ = bodies.save(bodies_dir, "o/r", i, "old")

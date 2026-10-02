@@ -83,7 +83,7 @@ def resolve_language(repo, config, cli_lang=None):
 def default_language(config, cli_lang=None):
     """ユーザー既定の言語。通知の地の文や HTML の lang 属性に使う（第5.3節）。
 
-    リポジトリ単位の設定は個々の PR にしか効かないため、ここでは参照しない。
+    リポジトリ単位の設定は個々の PR にしか適用されないため、ここでは参照しない。
     """
     if cli_lang and str(cli_lang).strip():
         return str(cli_lang).strip()
