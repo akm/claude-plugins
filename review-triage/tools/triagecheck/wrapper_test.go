@@ -326,7 +326,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
 		t.Fatalf("経路のディレクトリがリンクのとき、実体の置き場の壊れた記録を検出しなかった"+
-			" (cd -P が効いていない):\n%s", out)
+			" (cd -P が機能していない):\n%s", out)
 	}
 }
 

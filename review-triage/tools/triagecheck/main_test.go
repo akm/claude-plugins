@@ -158,7 +158,7 @@ func TestResolvePath(t *testing.T) {
 	})
 }
 
-// -current-dir を渡したのに全パスが絶対で一度も使われないなら、指定が効いて
+// -current-dir を渡したのに全パスが絶対で一度も使われないなら、指定が使われて
 // いないのでエラーにする。エラーにしないと「基準を渡したつもり」のまま別の解決結果を
 // 受け取る。検査の経路と -write-summary の経路の両方で課す。
 func TestRunRejectsUnusedCurrentDir(t *testing.T) {
@@ -569,7 +569,7 @@ func TestRunWriteSummarySharesPathRules(t *testing.T) {
 }
 
 // -install-wrapper と -write-summary=true は「何を書き出すか」が食い違うので、
-// 片方を無視するのではなくエラーにする。無視すると「指定したのに効かない」を作る —
+// 片方を無視するのではなくエラーにする。無視すると「指定したのに適用されない」を作る —
 // 検査の経路で errCurrentDirUnused として禁じているのと同じ種類の欠陥。
 // -current-dir は併用できる (相対パスの基準として、他の経路と同じ規則で使う)。
 func TestRunInstallWrapperRejectsUnusedFlags(t *testing.T) {
@@ -834,8 +834,8 @@ func firstLine(s string) string {
 }
 
 // -install-wrapper と -summary-command を併記したら、その値がラッパーに焼き込まれる。
-// 捨てると「指定したのに効かない」を作る (既存の -write-summary のガードが防ぐのと
-// 同じ種類だが、こちらは両立する要求なので弾かずに効かせる)。
+// 捨てると「指定したのに適用されない」を作る (既存の -write-summary のガードが防ぐのと
+// 同じ種類だが、こちらは両立する要求なので弾かずに適用する)。
 func TestRunInstallWrapperEmbedsExplicitSummaryCommand(t *testing.T) {
 	toolDir := versionedToolDir(t)
 	recs := realTempDir(t)

@@ -113,7 +113,7 @@ func TestReviewTriageRecordDocDagPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
 		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: 向きの無い重複なし。巡回なし\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	files, read := recordFiles(t, mutated)
 	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -126,7 +126,7 @@ func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
 		"order: 1\n        verification:\n          near_edges:\n            - docs/foo.md 11-14 (表の全行)\n            - docs/foo.md 7-30 (節「表の節」。変更行 25 のリンク先)\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	files, read := recordFiles(t, mutated)
 	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -139,7 +139,7 @@ func TestReviewTriageRecordOriginResidualPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n",
 		"        verdict: adopted\n        origin: residual\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	files, read := recordFiles(t, mutated)
 	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -222,7 +222,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mutated := strings.Replace(validRecordYAML, tc.old, tc.new, 1)
 			if mutated == validRecordYAML {
-				t.Fatalf("フィクスチャの置換が効いていない: %q", tc.old)
+				t.Fatalf("フィクスチャの置換が適用されていない: %q", tc.old)
 			}
 			yamlPath := reviewTriageDir + "feat-x.yaml"
 			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
@@ -265,7 +265,7 @@ func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mutated := strings.Replace(validRecordYAML, tc.old, tc.new, 1)
 			if mutated == validRecordYAML {
-				t.Fatalf("フィクスチャの置換が効いていない: %q", tc.old)
+				t.Fatalf("フィクスチャの置換が適用されていない: %q", tc.old)
 			}
 			yamlPath := reviewTriageDir + "feat-x.yaml"
 			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
@@ -306,7 +306,7 @@ func TestReviewTriageRecordHashNewMethodEdges(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mutated := strings.Replace(validRecordYAML, tc.old, tc.new, 1)
 			if mutated == validRecordYAML {
-				t.Fatalf("フィクスチャの置換が効いていない: %q", tc.old)
+				t.Fatalf("フィクスチャの置換が適用されていない: %q", tc.old)
 			}
 			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
 			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
@@ -360,7 +360,7 @@ func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
 `
 	base := strings.Replace(validRecordYAML, "    plans:\n", extra+"    plans:\n", 1)
 	if base == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	yamlPath := reviewTriageDir + "feat-x.yaml"
 
@@ -382,7 +382,7 @@ func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
 		covered := strings.Replace(base, "        verdict_reason: A2\n    plans:",
 			"        verdict_reason: A2\n        plan_ref:\n          run: 1\n          problem: P1\n    plans:", 1)
 		if covered == base {
-			t.Fatal("フィクスチャの置換が効いていない")
+			t.Fatal("フィクスチャの置換が適用されていない")
 		}
 		read := func(_ string) ([]byte, error) { return []byte(covered), nil }
 		for _, p := range reviewTriageRecordProblems([]string{yamlPath}, read) {
@@ -555,7 +555,7 @@ func TestReviewTriageRecordHashInBlockScalarAllowed(t *testing.T) {
 		"    notes: 最初の回。\n",
 		"    notes: |-\n      最初の回。\n      memo: 詳細は PR #333 を見る\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	yamlPath := reviewTriageDir + "feat-x.yaml"
 	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
@@ -572,7 +572,7 @@ func TestReviewTriageRecordHashOnSequenceFirstKey(t *testing.T) {
 		"      - problem_id: P1\n        cause: 数えずに書いた\n",
 		"      - cause: PR #333 を一般化した\n        problem_id: P1\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	yamlPath := reviewTriageDir + "feat-x.yaml"
 	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
@@ -921,7 +921,7 @@ func TestReviewTriageRecordDependsOnCycle(t *testing.T) {
 `
 	mutated := strings.Replace(validRecordYAML, origPlans, cyclePlans, 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	yamlPath := reviewTriageDir + "feat-x.yaml"
 	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
@@ -997,7 +997,7 @@ func replaceRecordPlans(t *testing.T, plans string) string {
 `
 	mutated := strings.Replace(validRecordYAML, origPlans, plans, 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの plans の置換が効いていない")
+		t.Fatal("フィクスチャの plans の置換が適用されていない")
 	}
 	return mutated
 }
@@ -1149,7 +1149,7 @@ func TestReviewTriageRecordDoneExternalPasses(t *testing.T) {
 			mutated := strings.Replace(validRecordYAML,
 				"        sha: \"\"\n        status: pending\n", tc.new, 1)
 			if mutated == validRecordYAML {
-				t.Fatal("フィクスチャの置換が効いていない")
+				t.Fatal("フィクスチャの置換が適用されていない")
 			}
 			files, read := recordFiles(t, mutated)
 			if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -1179,7 +1179,7 @@ func TestReviewTriageRecordInvestigationPasses(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mutated := strings.Replace(validRecordYAML, "order: 1\n", tc.new, 1)
 			if mutated == validRecordYAML {
-				t.Fatal("フィクスチャの置換が効いていない")
+				t.Fatal("フィクスチャの置換が適用されていない")
 			}
 			files, read := recordFiles(t, mutated)
 			if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -1230,7 +1230,7 @@ func TestReviewTriageRecordUnknownStatusReportsOnce(t *testing.T) {
 		"        status: pending\n",
 		"        status: done-ext\n        applied_external_url: \"https://example.com/x\"\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
 	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
@@ -1250,7 +1250,7 @@ func TestReviewTriageSummaryPlanEvidenceHeader(t *testing.T) {
 		"        status: done-external\n"+
 			"        applied_external_url: \"https://example.com/pr/1\"\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(mutated))
 	if err != nil {
@@ -1273,7 +1273,7 @@ func TestReviewTriageSummaryDoneExternal(t *testing.T) {
 			"        applied_external_url: \"https://github.com/o/r/pull/123\"\n"+
 			"        notes: PR 本文を書き換え、Files changed と読み比べて一致を確認した\n", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(mutated))
 	if err != nil {
@@ -1697,7 +1697,7 @@ func TestReviewTriageRecordInvestigatedRejectsLaterStageKeys(t *testing.T) {
 			plans := strings.Replace(investigatedPlansYAML,
 				"        status: investigated\n", tc.extra+"        status: investigated\n", 1)
 			if plans == investigatedPlansYAML {
-				t.Fatal("フィクスチャの置換が効いていない")
+				t.Fatal("フィクスチャの置換が適用されていない")
 			}
 			read := func(_ string) ([]byte, error) { return []byte(replaceRecordPlans(t, plans)), nil }
 			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
@@ -1722,7 +1722,7 @@ func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 	plans := strings.Replace(investigatedPlansYAML,
 		"        investigation:\n          scope: grep -rn '分母' . と docs/foo.md の同じ表の全行\n", "", 1)
 	if plans == investigatedPlansYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	read := func(_ string) ([]byte, error) { return []byte(replaceRecordPlans(t, plans)), nil }
 	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
@@ -1745,7 +1745,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 	// approach の行を消した validRecordYAML。sha と status は各ケースが差し替える。
 	noApproach := strings.Replace(validRecordYAML, "        approach: 数え直して単位を書く\n", "", 1)
 	if noApproach == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	required := []struct {
 		name string
@@ -1759,7 +1759,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 		t.Run(tc.name+" で approach が無ければ報告する", func(t *testing.T) {
 			mutated := strings.Replace(noApproach, "        sha: \"\"\n        status: pending\n", tc.new, 1)
 			if mutated == noApproach && tc.name != "pending" {
-				t.Fatal("フィクスチャの置換が効いていない")
+				t.Fatal("フィクスチャの置換が適用されていない")
 			}
 			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
 			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
@@ -1779,7 +1779,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 		mutated := strings.Replace(noApproach, "        sha: \"\"\n        status: pending\n",
 			"        status: awaiting-human\n        options: 立案者 C — 人間が立案する\n", 1)
 		if mutated == noApproach {
-			t.Fatal("フィクスチャの置換が効いていない")
+			t.Fatal("フィクスチャの置換が適用されていない")
 		}
 		files, read := recordFiles(t, mutated)
 		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -1791,7 +1791,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 		mutated := strings.Replace(validRecordYAML, "        sha: \"\"\n        status: pending\n",
 			"        status: awaiting-human\n        options: 案 a は最小修正 / 案 b は構造の変更\n", 1)
 		if mutated == validRecordYAML {
-			t.Fatal("フィクスチャの置換が効いていない")
+			t.Fatal("フィクスチャの置換が適用されていない")
 		}
 		files, read := recordFiles(t, mutated)
 		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -1805,7 +1805,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 func TestReviewTriageRecordUnknownStatusListsInvestigated(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "status: pending", "status: investigating", 1)
 	if mutated == validRecordYAML {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
 	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
@@ -1842,7 +1842,7 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 	withInvestigated := replaceRecordPlans(t, investigatedPlansYAML)
 	mutated := strings.Replace(withInvestigated, "    plans:\n", extra+"    plans:\n", 1)
 	if mutated == withInvestigated {
-		t.Fatal("フィクスチャの置換が効いていない")
+		t.Fatal("フィクスチャの置換が適用されていない")
 	}
 	read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
 	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
