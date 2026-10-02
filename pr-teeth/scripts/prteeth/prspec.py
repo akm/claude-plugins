@@ -46,7 +46,7 @@ _URL = re.compile(
 
 # owner/repo#123 と owner/repo/123。`#` は引用符を付け忘れると渡らないことがあるので
 # 後者も受ける。owner にドットを許さないので、`github.com/akm/123` のような
-# スキーム無しの URL 断片がここに落ちてきて `github.com/akm` に化けることはない。
+# スキーム無しの URL 断片がここに落ちてきて `github.com/akm` として扱われることはない。
 _SHORT = re.compile(
     r"^(?P<owner>" + _OWNER + r")/(?P<repo>" + _REPO + r")(?:#|/)(?P<number>\d+)$"
 )
