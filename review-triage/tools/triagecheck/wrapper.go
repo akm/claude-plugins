@@ -46,7 +46,7 @@ import (
 // 置き場を絶対パスで焼き込む案は採らない。リポジトリを移動・再クローンすると
 // 移動元を検査して成功を返し、移動先の壊れた記録を検出できない (実測)。
 //
-// PLUGIN_CACHE の解決 (最新版を拾う) は Makefile の例と同じロジック。ここを
+// PLUGIN_CACHE の解決 (最新版を選ぶ) は Makefile の例と同じロジック。ここを
 // 変えるときは README の「Makefile に置く例」も合わせて直す。
 const wrapperTemplate = `#!/usr/bin/env bash
 # review-triage/tools/triagecheck -install-wrapper が生成した。手で編集しない

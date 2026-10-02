@@ -52,7 +52,7 @@ func run(args []string) error {
 		return err
 	}
 
-	// 明示的に渡されたフラグを拾う。既定値との一致では判定しない — 利用者が
+	// 明示的に渡されたフラグを集める。既定値との一致では判定しない — 利用者が
 	// 既定と同じ値を明示的に渡すことがあり、そのとき「指定していない」と誤って
 	// 扱うと、不在を報告すべき経路が報告されないまま通る。flag.Visit は実際に指定された
 	// フラグだけを回すので、意思表示の有無をそのまま読める。
@@ -146,7 +146,7 @@ func run(args []string) error {
 }
 
 // pathInputs はフラグから読んだ、パスに関わる入力。explicit は flag.Visit で
-// 拾った「明示されたか」。
+// 集めた「明示されたか」。
 type pathInputs struct {
 	recordDir      string
 	currentDir     string
