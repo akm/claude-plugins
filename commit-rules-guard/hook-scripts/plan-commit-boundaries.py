@@ -259,7 +259,7 @@ def has_plan_content(tool_input):
         return False
 
     # 状態遷移のための呼び出し。subject 等は「どのタスクか」の指示でしかない。
-    # todos/plan/tasks のような計画そのものを持つ場合は、下のループで拾う。
+    # todos/plan/tasks のような計画そのものを持つ場合は、下のループで判定の対象にする。
     if _is_meaningful(tool_input.get("status")):
         if not any(k in tool_input for k in ("todos", "plan", "tasks")):
             return False
