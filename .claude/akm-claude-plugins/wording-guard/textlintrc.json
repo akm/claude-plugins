@@ -1,0 +1,22 @@
+{
+  "filters": {
+    "allowlist": {
+      "allow": ["/「[^」\\n]*」/"]
+    }
+  },
+  "rules": {
+    "preset-ja-no-ai-slop": {
+      "literal-verb-translation": { "severity": "warning" },
+      "vague-evaluative-ending": { "severity": "warning" },
+      "calqued-metaphor": { "severity": "warning" },
+      "sentence-connection": false,
+      "foreign-field-term": false,
+      "physical-verb-for-abstract": false,
+      "nominalized-kango": false,
+      "person-word-for-code": false,
+      "unspecified-behavior": false,
+      "request-in-condition": false
+    },
+    "ja-no-redundant-expression": { "severity": "warning" }
+  }
+}

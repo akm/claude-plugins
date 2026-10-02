@@ -1,0 +1,107 @@
+# textlint による検査
+
+**textlint (文章を規則で検査するツール) で、用語ファイルの避ける語と、規則集 (textlint の規則をまとめたパッケージ) が出す不自然な言い回しの候補を検出する。** 使うのは、設定キー `textlint` を書いたリポジトリだけ (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。
+
+textlint は語の一覧と文の形で照合する道具なので、**検出したものは着手点であって、範囲ではない。** 検出されなかった言い回しも、SKILL.md の手順 2 で読んだ原則に照らして判断する (用語ファイルを範囲として扱わない理由の正本は [terms.md](terms.md) の「用語ファイルは例であって、範囲ではない」)。
+
+## 何を検出するか
+
+| 種類 | 検出に使うもの | 重大度 |
+| --- | --- | --- |
+| 避ける語 | 用語ファイル ([terms.md](terms.md)) を、規則 textlint-rule-prh (語のパターンと置き換え先を照合する規則。以下 prh) の辞書に変換したもの。リポジトリの textlint の設定に書いた prh の辞書の語も含む | error (失敗にする) |
+| 不自然な言い回しの候補 | リポジトリの textlint の設定 (設定キー `textlint.config`) で有効にした規則集 | 設定で決める。warning (失敗にしない) を推奨。指定しなければ textlint のデフォルト値の error になる |
+
+**重大度 (error / warning) は、検出の種類ではない。** 検出の種類は規則の名前で見分ける — 規則 `prh` の検出が避ける語、それ以外が規則集の検出。重大度は失敗にするかどうかだけを決め、`check` と hook は、種類に関わらず error の検出があれば失敗にする。この表とこの段落が、検出の種類と重大度の関係の正本。
+
+**次のものは検出しない。**
+
+- 用語ファイルの許容する語と、避ける語の例外 (`exceptions`)。フィルタ textlint-filter-rule-allowlist (指定した文字列の範囲の検出を除くフィルタ) の一覧に入れる。**この一覧はすべての規則に適用される** — 許容する語は、規則集のどの規則でも検出されなくなる
+- 引用ブロック。フィルタ textlint-filter-rule-node-types で除く (このスキルが引用を書き換えないため。[rewrite-scope.md](rewrite-scope.md))
+- 設定キー `frozen_paths` (書き換えない過去の記録のパス接頭辞) の下のファイル
+
+## セットアップ
+
+textlint と規則集は、プラグインに同梱したファイル `wording-guard/textlint/package.json` と `wording-guard/textlint/package-lock.json` で版を固定している。次のコマンドで、利用者のキャッシュに `npm ci` で入れる。**npm で約 380 個のパッケージを取得する。Node と npm が必要。**
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py setup
+```
+
+置き場は `${XDG_CACHE_HOME:-~/.cache}/akm-claude-plugins/wording-guard/textlint-<ロックファイルのハッシュ>`。環境変数 `WORDING_GUARD_CACHE_DIR` で親のディレクトリを変えられる。**プラグインを更新して版が変わると置き場も変わるので、もう一度セットアップする。** 入っていないときは、検査を省略せずに、セットアップのコマンドを添えた誤りを報告する。置き場があるのに textlint が入っていない (中身が消えた・壊れた) ときは、セットアップは取得を始めずに誤りを報告し、置き場を消すよう案内する (置き場は消さない)。
+
+**エージェントがセットアップを実行するときは、人間の承認を得てから実行する** — パッケージを取得するため。
+
+使える規則集は `package.json` にあるもの (textlint-rule-preset-ja-no-ai-slop・textlint-rule-preset-ai-writing・textlint-rule-preset-ja-technical-writing・textlint-rule-ja-no-redundant-expression)。リポジトリの textlint の設定に、これ以外の規則を書くと、textlint の実行が失敗する。
+
+## リポジトリの textlint の設定
+
+設定キー `textlint.config` に、textlint の標準の様式 (JSON) の設定ファイルを指定する。**候補を出す規則集の選び方** (どの規則を有効にし、どれを warning にするか) をここに書く。省略すると、用語ファイルだけで検査する。
+
+```json
+{
+  "rules": {
+    "preset-ja-no-ai-slop": {
+      "literal-verb-translation": { "severity": "warning" },
+      "sentence-connection": false
+    },
+    "ja-no-redundant-expression": { "severity": "warning" }
+  }
+}
+```
+
+**この例は様式を示すもので、そのまま写さない。** 規則集の検出の多くはリポジトリの書式 (ダッシュの使い方・文の長さなど) に対するもので、どれを有効にするかはリポジトリごとに違う。[#89](https://github.com/akm/claude-plugins/issues/89) の試行では、このリポジトリで規則ごとの件数を数えてから選んだ。
+
+実行するたびに、この設定・用語ファイルから生成した prh の辞書と許容の一覧・引用ブロックを除くフィルタを合わせた設定を、一時ディレクトリに作って使う。
+
+- 規則 `prh` とフィルタ `allowlist` を自分で書いてもよい。生成した辞書と一覧は、その後ろに足す。`rulePaths` と `allowlistConfigPaths` の相対パスは、設定ファイルの場所から解決する。辞書が 1 つも無いとき (`rulePaths` が無いか空で、用語ファイルに避ける語も無い) は、規則 `prh` を外して実行する — 辞書の無い prh では textlint が例外で終わり、検査できるものも無いため
+- **それ以外の規則の設定にパスを書くときは、絶対パスにする** — 合わせた設定は一時ディレクトリに置くので、相対パスが解決できない
+- 規則 `prh`・フィルタ `allowlist`・フィルタ `node-types` を `false` にすると誤りになる (用語ファイルの検査に使うため)。規則 `prh` に `error` 以外の `severity` を書いても誤りになる — 用語ファイルの避ける語は error にするため ([「何を検出するか」](#何を検出するか))。設定を error に上書きして、利用者に知らせずに続けることはしない
+
+## コマンド
+
+```bash
+# ファイルかディレクトリを検査する
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py check docs/ README.md
+
+# ファイルにしていない文章 (Issue・PR の本文、コミットメッセージの下書き) を検査する
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py check --stdin --filename issue.md < draft.md
+
+# 自動修正してよい避ける語 (autofix = true) だけを、ファイルに適用する
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
+```
+
+終了コードの意味の正本はこの表で、どのサブコマンドも同じ意味で返す (`terms` が返すのは 0・2・3 だけ)。
+
+| 終了コード | 意味 |
+| --- | --- |
+| 0 | 成功。`check` では error の検出が無い (warning だけなら 0) |
+| 1 | `check` で error の検出がある (検出の種類は[「何を検出するか」](#何を検出するか)のとおり規則の名前で見分ける) |
+| 2 | 設定ファイル・用語ファイルの誤り、設定キー `textlint` が無い、git リポジトリの外で `--root` を付けずに実行した、または指定したパスが無いか、指定したディレクトリがリポジトリの外にあるか、ルートが git リポジトリでないのにディレクトリを指定したか、指定したファイルが Markdown (`.md`) でない (ディレクトリを指定すると、その下の Markdown のうち git に無視されていないものだけを対象にするので、git リポジトリが要る。ファイルの指定には要らない) |
+| 3 | Python が 3.11 より古い、textlint が入っていない、または textlint・npm の実行に失敗した |
+
+**`fix` はファイルの全体に適用する。** 他の人が書いた文章も直すので、今回の変更で書いたファイルだけに使う ([rewrite-scope.md](rewrite-scope.md))。`fix` はリポジトリの textlint の設定の規則を使わないが、検出から除く範囲 (フィルタ) は `check` と同じものを使う — `check` が検出しない範囲 (リポジトリの設定で除いた引用など) を書き換えないため。文脈によって言い換えが変わる語 (`autofix` を書かない語) は、`fix` では直さない — [#89](https://github.com/akm/claude-plugins/issues/89) の試行で、自動修正が「効かない」を「適用される」に書き換え、意味が逆になったため。
+
+## hook
+
+設定キー `textlint.hook` を `true` にすると、Claude Code のツール Edit・Write が Markdown を書いた直後に、書き足した文章を検査する (PostToolUse の hook。同梱のファイル `wording-guard/hooks/hooks.json`)。複数の箇所をまとめて書き換えるツール MultiEdit は、Claude Code 2.0 で無くなった (1.0.128 まではあった) ので対象にしない。
+
+- **書き換えた後のファイルの全体と、書き換える前のファイルの全体を検査し、書き換えた行にある検出のうち、増えたものだけを返す。** 書き換えた後の内容はディスクから読み、書き換える前の内容は、Claude Code が hook に渡すツールの結果 (`tool_response`) の `originalFile` から取る。書き換えた文字列だけを切り出して検査しないのは、コードブロックや引用ブロックの中の行が、囲みの記号を失って本文として解析されるため。ツールの入力 (`old_string`・`new_string`) から書き換える前の内容を組み立てないのは、Edit が引用符をファイルに合わせて書き換えたり、利用者が提案を変えたりして、ファイルにツールの入力どおりの文字列が無いことがあるため
+  - 書き換えた行は、`tool_response` の `structuredPatch` (Claude Code が計算した行の差分) の、消した行 (`-`) と足した行 (`+`) とする。hook の中では差分を計算しない — 差分を計算する方法を変えるたびに、大きなファイルで時間がかかる、または同じ内容の行が別の文脈 (本文とコードブロックなど) にあると書き換えた行を取り違える、という問題が生じたため ([#89](https://github.com/akm/claude-plugins/issues/89) の実装のレビューで、指摘として続いた)。位置の差分なので、行を移しただけでも、消した行と足した行になる
+  - 書き換えた行の外の検出 (他の人が既に書いた文章) は比べない — message に行番号を入れる規則 (sentence-length) や、ファイル全体の件数を入れる規則 (no-mix-dearu-desumasu) では、書き換えた箇所の外の既存の検出も message が変わり、今回持ち込んだものとして扱ってしまうため。複数の行にまたがる検出 (長い文など) は、どれかの行を書き換えれば比べる
+  - そのため、書き換えによって書き換えた行の外に新しい検出が生じても (別の行の文体が混在として検出されるなど)、hook は返さない。ファイルの全体の検出は `check` で確かめる
+  - `tool_response` のフィールド (`originalFile`・`structuredPatch`) は、Claude Code の公式の文書に載っていない (Claude Code 2.1.273 の Edit と Write の出力の様式で確かめた)。渡さない版では、検査できなかったこととして知らせる
+  - Claude Code は、差分の計算が時間切れになると `structuredPatch` を空にする。空なのに書き換える前と後の内容が違うときは、検査できなかったこととして知らせる (hook の中で差分を計算し直さない)
+  - Write で新しいファイルを作ったとき (`originalFile` が null で、`type` が `create`) は、書いた内容の全体を検査する
+  - 書き込みを保留したとき (`staged` が true。ファイルは変わっていない) は、何もしない
+- error の検出があれば、Claude に直すよう求める (`decision: block`)。規則 `prh` の検出 (避ける語) は言い換えの候補から選んで直すよう、それ以外の規則の検出は規則の message に従って直すよう案内する (見分け方の正本は[「何を検出するか」](#何を検出するか))。warning だけなら、判断の材料として渡す (`additionalContext`)
+- hook を有効にしたリポジトリで、設定・用語ファイルの誤り、textlint が入っていない、または書き換える前と後の内容か書き換えた行が分からない (`tool_response` に `originalFile` か `structuredPatch` が無い、既存のファイルなのに `originalFile` が null である、書き換えた後のファイルを読めない、`structuredPatch` が空なのに前後の内容が違う、または `structuredPatch` の行の内容がファイルの内容と一致しない) ときは、検査を省略せずに、Claude と利用者の両方に知らせる
+- 設定キー `textlint.hook` が `true` でないリポジトリ、Markdown 以外のファイル、設定キー `frozen_paths` の下のファイル、git リポジトリの外のファイルでは何もしない。**プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動く** ので、設定で有効にしたリポジトリでだけ検査する。`textlint.hook` は設定の型を検査する前に見るので、有効にしていないリポジトリでは、設定の誤りがあっても何もしない。設定ファイルが JSON として読めないときは、有効かを決められないので誤りとして知らせる
+- Python 3.11 以降が必要 (用語ファイルを標準ライブラリ `tomllib` で読むため)
+
+## 動作の確認
+
+textlint そのものは CI の環境に無いので、テスト (ディレクトリ `wording-guard/tests/`) は textlint の実行を差し替えている。textlint を実際に実行する確認は、次の手順で行う。
+
+1. セットアップする (上の「セットアップ」)
+2. 設定キー `textlint` を書いたリポジトリで、避ける語・例外・許容する語・引用ブロックを含む Markdown を作り、`check` を実行する。避ける語だけが error になり、例外・許容する語・引用ブロックは検出されないことを確かめる
+3. 同じファイルの複製に `fix` を実行し、`autofix = true` の語だけが書き換わることを確かめる

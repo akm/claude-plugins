@@ -7,5 +7,12 @@
     "docs/review-triage/",
     "docs/solutions/",
     "tmp/review-triages/"
-  ]
+  ],
+  "terms_paths": [
+    ".claude/akm-claude-plugins/wording-guard/terms.toml"
+  ],
+  "textlint": {
+    "config": ".claude/akm-claude-plugins/wording-guard/textlintrc.json",
+    "hook": true
+  }
 }

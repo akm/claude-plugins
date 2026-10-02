@@ -1,6 +1,6 @@
 # wording-guard
 
-**書き手が自分の文章に混ぜた比喩・口語・擬人化は、書いた本人には見えない。** これから外へ出す日本語の文章からそれを見つけ、リポジトリの規約が定める原則に照らして言い換える skill を配布するプラグインです。
+**書き手が自分の文章に混ぜた比喩・口語・擬人化は、書いた本人には見えない。** これから外へ出す日本語の文章からそれを見つけ、リポジトリの規約が定める原則に照らして言い換える skill と、言い換えを決めた語を textlint で検出する hook を配布するプラグインです。
 
 ## 収録スキル
 
@@ -18,6 +18,41 @@
 
 **判断の基準はこのスキルが持ちません。** リポジトリの規約から読みます。一覧を作らず原則だけを置くリポジトリと、例の表を持ちつつ「表は例であって網羅ではない」と宣言するリポジトリがあり、どちらの方針もそのリポジトリの規約に書いてあるためです。スキル自身が持つのは、SKILL.md の手順 2 が使うと定めた一般の 3 原則だけです。
 
+## 用語ファイル (任意)
+
+言い換えを決めた語 (避ける語) と、使い続けると決めた語 (許容する語) を、理由と決めた場所とともに TOML のファイルに記録できます。スキルは避ける語を検索の着手点にし、許容する語を候補から外します。**用語ファイルは決めたことの記録であって、検査の範囲ではありません。** 用語ファイルに無い言い回しも、原則に照らして判断します。
+
+```toml
+[[terms]]
+pattern = "周回"
+verdict = "avoid"
+replacements = ["ループ", "繰り返し"]
+reason = "日本語の「周回」はコースや軌道を回ること。処理の繰り返しには通じにくい"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+```
+
+様式と意味は同梱のファイル [wording-guard/skills/wording-guard/references/terms.md](skills/wording-guard/references/terms.md) を参照してください。様式の検査とまとめた内容の確認は、次のコマンドで行えます (Python 3.11 以降が必要です)。
+
+```bash
+python3 <プラグインのディレクトリ>/scripts/wording_lint.py terms
+```
+
+## textlint による検査 (任意)
+
+設定キー `textlint` を書くと、textlint (文章を規則で検査するツール) で、用語ファイルの避ける語と、規則集 (textlint の規則をまとめたパッケージ) が出す不自然な言い回しの候補を検出します。避ける語は error (失敗にする重大度) として報告します。候補の重大度はリポジトリの textlint の設定で決め、warning (失敗にしない重大度) を推奨します。**検出したものは着手点であって、範囲ではありません。**
+
+- **スキル:** 手順 3 で対象を検査し、結果を候補にします
+- **hook:** `textlint.hook` を `true` にすると、Claude Code が Markdown を書いた直後に、書き足した文章を検査します。error の検出 (避ける語と、設定で error にした規則集の規則) があれば直すよう Claude に求め、warning だけなら判断の材料として渡します
+- **コマンド:** `wording_lint.py check` で検査し、`wording_lint.py fix` で自動修正してよい避ける語 (`autofix = true`) だけを直します
+
+**Node と npm が必要です。** textlint と規則集の版はプラグインが固定していて、次のコマンドで利用者のキャッシュに入れます (npm で約 380 個のパッケージを取得します)。プラグインを更新して版が変わったら、もう一度実行します。
+
+```bash
+python3 <プラグインのディレクトリ>/scripts/wording_lint.py setup
+```
+
+詳細は同梱のファイル [wording-guard/skills/wording-guard/references/textlint.md](skills/wording-guard/references/textlint.md) を参照してください。
+
 ## 書き換えないもの
 
 - **引用** — 原文と一致していることに意味があるため。
@@ -34,7 +69,9 @@
 {
   "convention_paths": ["CLAUDE.md#文書の言い回し"],
   "frozen_paths": ["docs/plans/", "docs/solutions/", "tmp/review-triages/"],
-  "quote_markers": ["> "]
+  "quote_markers": ["> "],
+  "terms_paths": [".claude/akm-claude-plugins/wording-guard/terms.toml"],
+  "textlint": { "config": ".claude/akm-claude-plugins/wording-guard/textlintrc.json", "hook": true }
 }
 ```
 
@@ -43,6 +80,8 @@
 - `convention_paths` — 判断の基準になる規約の置き場。未設定ならリポジトリのルートの `CLAUDE.md` を読み、規約が見つからなければ一般の 3 原則だけで判断することを報告して進みます。
 - `frozen_paths` — 書き換えない過去の記録のパス接頭辞。未設定なら書き換えないパスを無いものとし、過去の記録らしき文書が見つかったら人間に確認します。
 - `quote_markers` — 引用の目印になる行頭の文字列。**未設定なら引用ブロックとコードブロックを目印にします。** コードブロックは値を設定しても目印のままです。
+- `terms_paths` — 用語ファイルの置き場の配列。未設定なら用語ファイルを使いません。書いたファイルが無ければ誤りとして報告します。
+- `textlint` — textlint で検査するかどうかと、その設定 (`config`: 候補を出す規則集を選ぶ textlint の設定ファイル、`hook`: hook で検査するか)。未設定なら textlint を使いません。
 
 詳細は同梱のファイル [wording-guard/skills/wording-guard/references/project-config.md](skills/wording-guard/references/project-config.md) を参照してください。
 

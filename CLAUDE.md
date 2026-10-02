@@ -10,8 +10,10 @@
 2. **正しい英語を翻訳するのではなく、日本語の文章として正しい文章を書く。**
 3. **専門用語やコンテキスト依存の造語は、初出の際にコンテキストを把握していない人間向けに説明する文を添える。** 文章として不自然な場合は括弧などを使う。
 
-避ける言い回しの一覧は作らない。列挙を規則にすると、一覧に無いものが検査されないまま残る。気づいた言い回しはこの 3 原則に照らして判断する。
+網羅的な避ける言い回しの一覧は作らない。列挙を検査の範囲にすると、一覧に無いものが検査されないまま残る。例として一覧を作ることは許容する。そのときは、一覧が例であって範囲ではないことを一覧の側に書く。一覧に無い言い回しも、この 3 原則に照らして判断する。
+
+言い換えを決めた語と、使い続けると決めた語は、ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` に例として記録している (様式の正本はファイル [wording-guard/skills/wording-guard/references/terms.md](wording-guard/skills/wording-guard/references/terms.md))。
 
 例外: トリアージ記録 (現行の置き場 `tmp/review-triages/` と、過去にコミットした `docs/review-triage/`) は、レビュー指摘を逐語で引用するため書き換えない。
 
-経緯は [#35](https://github.com/akm/claude-plugins/issues/35) を参照。
+経緯は [#35](https://github.com/akm/claude-plugins/issues/35) と [#89](https://github.com/akm/claude-plugins/issues/89) を参照。
