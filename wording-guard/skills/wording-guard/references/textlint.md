@@ -81,7 +81,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
 
 ## hook
 
-設定キー `textlint.hook` を `true` にすると、Claude Code のツール Edit・MultiEdit・Write が Markdown を書いた直後に、書き足した文章を検査する (PostToolUse の hook。同梱のファイル `wording-guard/hooks/hooks.json`)。
+設定キー `textlint.hook` を `true` にすると、Claude Code のツール Edit・Write が Markdown を書いた直後に、書き足した文章を検査する (PostToolUse の hook。同梱のファイル `wording-guard/hooks/hooks.json`)。複数の箇所をまとめて書き換えるツール MultiEdit は、Claude Code 2.0 で無くなった (1.0.128 まではあった) ので対象にしない。
 
 - **書き換えた後のファイルの全体と、書き換える前のファイルの全体を検査し、書き換えた行にある検出のうち、増えたものだけを返す。** 書き換えた後の内容はディスクから読み、書き換える前の内容は、Claude Code が hook に渡すツールの結果 (`tool_response`) の `originalFile` から取る。書き換えた文字列だけを切り出して検査しないのは、コードブロックや引用ブロックの中の行が、囲みの記号を失って本文として解析されるため。ツールの入力 (`old_string`・`new_string`) から書き換える前の内容を組み立てないのは、Edit が引用符をファイルに合わせて書き換えたり、利用者が提案を変えたりして、ファイルにツールの入力どおりの文字列が無いことがあるため
   - 書き換えた行は、前後の内容の行の差分で決める。書き換えた行の外の検出 (他の人が既に書いた文章) は比べない — message に行番号を入れる規則 (sentence-length) や、ファイル全体の件数を入れる規則 (no-mix-dearu-desumasu) では、書き換えた箇所の外の既存の検出も message が変わり、今回持ち込んだものとして扱ってしまうため。複数の行にまたがる検出 (長い文など) は、どれかの行を書き換えれば比べる

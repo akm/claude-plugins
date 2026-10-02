@@ -487,6 +487,12 @@ class TestHook(RepoTestCase):
         self.configure(textlint={"hook": True})
         self.assertIsNone(hook.handle(self.event(path="a.go", old_string="a", new_string="b"), self.not_called))
 
+    def test_multi_edit_is_not_a_target(self):
+        # MultiEdit は Claude Code 2.0 で無くなったツールなので、入力が来ても何もしない
+        self.configure(textlint={"hook": True})
+        event = self.event(tool="MultiEdit", edits=[{"old_string": "a", "new_string": "同じ型の"}])
+        self.assertIsNone(hook.handle(event, self.not_called))
+
     def test_frozen_path(self):
         self.configure(textlint={"hook": True}, frozen_paths=["docs/"])
         self.assertIsNone(hook.handle(self.event(old_string="a", new_string="b"), self.not_called))
