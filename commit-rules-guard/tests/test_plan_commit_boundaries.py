@@ -381,7 +381,7 @@ class TestHookBehavior(unittest.TestCase):
 
     @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が適用されない")
     def test_unwritable_state_dir_still_notifies(self):
-        # 状態を保存できないと間引けない。ここで通知を出さないと、フックは二度と通知を出さなくなり、
+        # 状態を保存できないと間引けない。ここで通知を出さないと、フックはそのセッションで一切通知を出さなくなり、
         # しかも利用者はそれを正常な間引きと区別できない。何も知らせずに機能しなくなるより通知を出す。
         os.makedirs(self.state, exist_ok=True)
         os.chmod(self.state, 0o500)
