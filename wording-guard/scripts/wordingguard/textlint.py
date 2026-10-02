@@ -26,7 +26,8 @@ from . import config, terms
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PACKAGE_DIR = os.path.join(PLUGIN_ROOT, "textlint")
 CACHE_ENV = "WORDING_GUARD_CACHE_DIR"
-SEVERITIES = {0: "info", 1: "warning", 2: "error"}
+# textlint の重大度の数値 (@textlint/types の TextlintRuleSeverityLevel。0 は none で、検出としては報告されない)
+SEVERITIES = {1: "warning", 2: "error", 3: "info"}
 
 
 class TextlintError(Exception):
@@ -221,21 +222,45 @@ def _run_textlint(directory, conf, paths, cwd, fix=False):
         raise TextlintError(f"textlint の出力を JSON として読めない: {e}\n{r.stdout[:500]}") from e
 
 
+def _utf16_to_index(text, offset):
+    """UTF-16 の単位の位置 offset (textlint の range は JavaScript の文字列の位置) を、Python の文字列の位置に直す。
+
+    Python の文字列はコードポイントの単位なので、BMP の外の文字 (絵文字など) は UTF-16 では 2 単位、Python では 1 文字になる。
+    """
+    units = 0
+    for index, ch in enumerate(text):
+        if units >= offset:
+            return index
+        units += 2 if ord(ch) > 0xFFFF else 1
+    return len(text)
+
+
 def _finding(message, source):
-    """textlint の 1 件の検出を、wording-guard が扱う形に変換する。"""
+    """textlint の 1 件の検出を、wording-guard が扱う形に変換する。
+
+    start は検出の始まりの Python の文字列の位置 (source の中の位置)。line と column は textlint の値のまま
+    (column は UTF-16 の単位で数える) なので、文字列を切り出すときは start を使う。
+    """
+    severity = SEVERITIES.get(message.get("severity"))
+    if severity is None:
+        raise TextlintError(f"textlint の検出の重大度が想定外の値: {message.get('severity')!r} (規則 {message.get('ruleId', '')})")
     # prh は検出の範囲 (range) に先頭の 1 文字だけを入れ、置き換える範囲を fix.range に入れる。
     # 他の規則にも range が 1 文字だけのもの (ja-no-redundant-expression など) があり、
     # 1 文字では何を指すか読み取れないので、その場合は検出した文字列を空にする
     span = (message.get("fix") or {}).get("range") or message.get("range")
-    matched = source[span[0]:span[1]] if span and source is not None else ""
+    start, matched = None, ""
+    if span and source is not None:
+        start = _utf16_to_index(source, (message.get("range") or span)[0])
+        matched = source[_utf16_to_index(source, span[0]):_utf16_to_index(source, span[1])]
     if len(matched) <= 1:
         matched = ""
     return {
         "rule": message.get("ruleId", ""),
-        "severity": SEVERITIES.get(message.get("severity"), "error"),
+        "severity": severity,
         "message": message.get("message", ""),
         "line": message.get("line"),
         "column": message.get("column"),
+        "start": start,
         "matched": matched,
     }
 

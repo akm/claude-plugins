@@ -206,6 +206,24 @@ class TestFinding(unittest.TestCase):
         self.assertEqual(f["matched"], "同じ型の")
         self.assertEqual(f["severity"], "error")
 
+    def test_info_severity(self):
+        # textlint の重大度は 1 = warning・2 = error・3 = info
+        f = textlint._finding({"ruleId": "r", "severity": 3, "message": "m", "range": [0, 3]}, "レビューを行う")
+        self.assertEqual(f["severity"], "info")
+
+    def test_unknown_severity_is_error(self):
+        for value in (0, 4, None):
+            with self.assertRaises(textlint.TextlintError):
+                textlint._finding({"ruleId": "r", "severity": value, "message": "m"}, "x")
+
+    def test_range_is_utf16_offset(self):
+        # 🐛 は UTF-16 では 2 単位なので、「同じ型の」は UTF-16 の [3, 7)、Python の文字列では [2, 6)
+        source = "🐛 同じ型の指摘"
+        f = textlint._finding({"ruleId": "prh", "severity": 2, "message": "m", "range": [3, 4],
+                               "fix": {"range": [3, 7], "text": "同じ種類の"}}, source)
+        self.assertEqual(f["matched"], "同じ型の")
+        self.assertEqual(f["start"], 2)
+
     def test_single_character_range_is_not_shown(self):
         f = textlint._finding({"ruleId": "r", "severity": 1, "message": "m", "range": [0, 1]}, "レビューを行う")
         self.assertEqual(f["matched"], "")
@@ -359,6 +377,16 @@ def finding(rule, message, matched, severity="error", line=1, column=1):
 KIKU = finding("prh", "効く => 適用される\n何がどう働くかを書く", "効く")
 KATA = finding("prh", "同じ型の => 同じ種類の\ntype の直訳", "同じ型の")
 REDUNDANT = finding("ja-no-redundant-expression", "冗長な表現です", "", severity="warning")
+
+
+class TestExcerpt(unittest.TestCase):
+    def test_uses_start_not_column(self):
+        text = "一行目\n🐛🐛 ここで効く。\n三行目"
+        start = text.index("効く")
+        # column は UTF-16 の単位なので、Python の文字列の位置とずれる。抜き出しは start を使う
+        excerpt = hook._excerpt(text, {"start": start, "line": 2, "column": 99})
+        self.assertEqual(excerpt, "🐛🐛 ここで効く。")
+        self.assertEqual(hook._excerpt(text, {"start": None}), "")
 
 
 class TestIntroduced(unittest.TestCase):

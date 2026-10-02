@@ -53,12 +53,17 @@ def introduced(before, after):
 
 
 def _excerpt(text, finding):
-    lines = text.split("\n")
-    line = finding.get("line") or 0
-    if not 1 <= line <= len(lines):
+    """検出の始まり (finding の start。Python の文字列の位置) を含む行から、前後を抜き出す。
+
+    textlint の column は UTF-16 の単位で数えるので、Python の文字列の切り出しには使わない。
+    """
+    pos = finding.get("start")
+    if pos is None or not 0 <= pos <= len(text):
         return ""
-    src = lines[line - 1]
-    col = (finding.get("column") or 1) - 1
+    line_start = text.rfind("\n", 0, pos) + 1
+    line_end = text.find("\n", pos)
+    src = text[line_start:len(text) if line_end == -1 else line_end]
+    col = pos - line_start
     start = max(0, col - 20)
     return ("…" if start > 0 else "") + src[start:col + 30] + ("…" if col + 30 < len(src) else "")
 

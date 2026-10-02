@@ -134,7 +134,8 @@ def cmd_check(args):
         for path, findings in results.items():
             label = os.path.relpath(path, root) if os.path.isabs(path) else path
             _print_findings(label, findings)
-        print(f"error {counts['error']} 件・warning {counts['warning']} 件 (検査したもの {len(results)} 個)")
+        info = f"・info {counts['info']} 件" if counts["info"] else ""
+        print(f"error {counts['error']} 件・warning {counts['warning']} 件{info} (検査したもの {len(results)} 個)")
         if skipped:
             print("書き換えない過去の記録 (設定キー frozen_paths) として除いたファイル: "
                   + ", ".join(os.path.relpath(p, root) for p in skipped))
