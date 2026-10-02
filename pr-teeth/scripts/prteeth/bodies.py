@@ -14,7 +14,7 @@ CONCEPTS.md 第15節「PR本文(description)の差分表示」の実装。
 
 **本文はキャッシュであり蓄積データではない**（docs/design/data-integrity.md）。
 GitHub から取り直せるので、無ければ「前回の本文が無い」として全体を説明すれば
-よく、壊れていたら捨ててよい。用語集と同じ「壊れていたら触らない」は適用しない。
+よく、壊れていたら捨ててよい。用語集と同じ「壊れているなら変更しない」は適用しない。
 """
 
 import difflib
@@ -214,7 +214,7 @@ def prune(bodies_dir, alive=None, max_bodies=None):
         path = os.path.join(bodies_dir, name)
         if not os.path.isfile(path):
             continue
-        # 他プロセスが書き込み中の一時ファイルには触らない。store の原子的書き込みは
+        # 他プロセスが書き込み中の一時ファイルは消さない。store の原子的書き込みは
         # 一時ファイル + os.replace で成り立っているため、ここで消すとその保証が崩れる
         # （書き込み側は消えたファイルを replace しようとして失敗する）。
         if name.startswith(".tmp-"):

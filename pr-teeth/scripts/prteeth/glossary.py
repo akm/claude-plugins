@@ -95,7 +95,7 @@ def record(glossary, term, language=None, definition=None, provenance=None, now=
     - 未登録なら new として登録する。
     - occurrences を加算し、閾値を超えたら new → learning に自動昇格する。
     - definition が渡され、その言語の定義がまだ無ければ書き込む（次回から再利用）。
-    - known は自動では触らない（降格は行わない。第8節）。
+    - known は自動では変更しない（降格は行わない。第8節）。
     """
     terms = glossary.setdefault("terms", {})
     entry = terms.get(term)

@@ -155,7 +155,7 @@ def load_precious(path, default):
 
     無い場合は default を返す（正常な初回実行）。壊れている場合に既定値を返すと、
     呼び出し側がそれを保存して**元データを失わせる**ため、ここで止める。
-    docs/design/data-integrity.md「蓄積データ — 壊れているなら触らない」。
+    docs/design/data-integrity.md「蓄積データ — 壊れているなら変更しない」。
     """
     text = _read_text(path)
     if text is None:
