@@ -80,7 +80,7 @@ func TestJudgmentFlowDuplicateTableRow(t *testing.T) {
 }
 
 // mermaid のコメント行 (%%) に書いた ID と、色コード (大文字 16 進) は
-// ノード ID として数えない — 正規表現の反例 (verification.md の型 F)。
+// ノード ID として数えない — 正規表現の反例 (verification.md の観点 F)。
 func TestJudgmentFlowIgnoresCommentsAndColors(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture,
 		"flowchart TD\n",
@@ -192,7 +192,7 @@ func TestJudgmentFlowMissingTable(t *testing.T) {
 }
 
 // git 追跡に依らず、ファイルが読めれば検査する — 追跡前の判定フローが
-// 素通りする「0 件マッチで黙って緑」の型 (B1 と同じ) を塞ぐ。
+// 素通りする「0 件マッチで黙って緑」の種類の欠陥 (B1 と同じ) を防ぐ。
 func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"), "")
 	if len(problems) == 0 {

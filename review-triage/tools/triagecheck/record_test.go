@@ -241,7 +241,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 }
 
 // ' #' 検査の境界: コロン後の空白の揺れ・値全体がコメント・シーケンス先頭キーの
-// ブロックスカラーの兄弟・インデント指示子。正規表現では列挙的に穴が開いた型
+// ブロックスカラーの兄弟・インデント指示子。正規表現では列挙的に穴が開いた種類の境界
 // (LineComment 走査への置き換えで構造的に守る)。
 func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 	cases := []struct {
@@ -451,7 +451,7 @@ func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
 }
 
 // セル単位のテーブル駆動テスト。行に紐付かない部分文字列の照合は別のセルへの
-// 偶然一致で通り抜けるため (ミューテーションで実証された 3 度目の同型)、
+// 偶然一致で通り抜けるため (ミューテーションで実証された、3 度目の同じ種類の欠陥)、
 // セルの値そのものを検証する。
 func TestRenderFindingCells(t *testing.T) {
 	base := recordFinding{
@@ -1243,7 +1243,7 @@ func TestReviewTriageRecordUnknownStatusReportsOnce(t *testing.T) {
 
 // 修正計画の表の最終列は SHA と URL の 2 つの型を取るので、見出しは「証拠」で
 // なければならない。見出しを SHA に戻すと、done-external の行の URL を SHA として
-// 読ませることになる (セルを埋める側だけ直して見出しに追随しなかった型)。
+// 読ませることになる (セルを埋める側だけ直して見出しに追随しなかった種類の欠陥)。
 func TestReviewTriageSummaryPlanEvidenceHeader(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML,
 		"        sha: \"\"\n        status: pending\n",
@@ -1363,7 +1363,7 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 
 // --- 旧様式 (検知の項目 recurrence) の受け入れ ---
 //
-// recurrence は、同じ型の指摘が続いていることの判断 (検知) を記録していたキー。
+// recurrence は、同じ種類の指摘が続いていることの判断 (検知) を記録していたキー。
 // 検知は廃止したので review-triage は新しい回に書かないが、置き場に残る既存の記録は
 // 回ごとに持つ。triagecheck はその記録を書き換えずに検査を成功させ、生成サマリも
 // 従来どおり描画する。検査するのは形 (許可キーと値の有無) だけで、根拠が指す回や

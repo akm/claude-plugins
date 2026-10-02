@@ -77,7 +77,7 @@ type recordRun struct {
 	Head     string          `yaml:"head"`
 	Findings []recordFinding `yaml:"findings"`
 	Plans    []recordPlan    `yaml:"plans"`
-	// Recurrence は旧様式のキー。同じ型の指摘が続いていることの判断 (検知) を
+	// Recurrence は旧様式のキー。同じ種類の指摘が続いていることの判断 (検知) を
 	// 記録していたが、検知は廃止したので新しい回には書かれない。置き場に残る
 	// 既存の記録を読み、生成サマリに従来どおり描画するために型と読み込みを残す。
 	// 検査は形 (許可キーと値の有無) だけで、中身の整合は見ない。有無をポインタで
@@ -220,7 +220,7 @@ type recordInvestigation struct {
 }
 
 // recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
-// 残存が「エラーなしで空」に化ける型を避けるため。attrs だけは任意のキーを許す
+// 残存が「エラーなしで空」に化ける種類の欠陥を避けるため。attrs だけは任意のキーを許す
 // (上流固有の属性のパススルー)。
 var recordAllowedKeys = map[string]map[string]bool{
 	"トップレベル": {"runs": true},
@@ -318,7 +318,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 // 引用符の無い値に # を書くと値が黙って切り詰められる (実測で cause が「PR」だけに
 // なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る —
 // 生テキストの正規表現で字句規則を再現する方式は、キーの形・空白・ブロックスカラー・
-// 値全体のコメントと境界のたびに穴が開いた (列挙する検査は穴を再生産する既知の型)。
+// 値全体のコメントと境界のたびに穴が開いた (列挙する検査は穴を再生産する。既知の種類の欠陥)。
 // ブロックスカラーの本文の # は内容でありコメントにならないので、構造的に区別される。
 // 行頭コメント (HeadComment) は値を壊さないため対象にしない。
 func recordLineCommentProblems(f string, root *yaml.Node) []string {
@@ -902,7 +902,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 					fmt.Fprintf(&b, "\n- **%s はリポジトリ外へ反映済み**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Notes))
 				}
 			}
-			// 直す前の調査の範囲と結果。次のレビューで同じ型の指摘が来たとき、前回の
+			// 直す前の調査の範囲と結果。次のレビューで同じ種類の指摘が来たとき、前回の
 			// 調査漏れ (範囲の外だった) か新規かを判別する材料なので表の外に出す。
 			// 無い問題は出さない — 無いことが「未調査」の表現。
 			for _, pl := range run.Plans {
@@ -926,7 +926,7 @@ func recordRow(cells []string) string {
 
 // renderFindingCells は指摘 1 件の表のセル列を返す。行を 1 つの書式文字列で
 // 組み立てると、テストがセル単位で分岐を検証できず、存在確認のアサーションが
-// 別のセルへの偶然一致で通り抜ける (実測で 3 度起きた型)。
+// 別のセルへの偶然一致で通り抜ける (実測で 3 度起きた種類の欠陥)。
 func renderFindingCells(fd recordFinding) []string {
 	loc := fd.File
 	if fd.Line > 0 {
@@ -1148,7 +1148,7 @@ var errRecordDirMissing = errors.New(
 // listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
-// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って緑の型) を塞ぐため。
+// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って緑になる種類の欠陥) を塞ぐため。
 //
 // ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
 // (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。

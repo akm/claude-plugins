@@ -67,7 +67,7 @@ func TestRunPassesWhenJudgmentFlowUnavailable(t *testing.T) {
 }
 
 // CLAUDE_PLUGIN_ROOT が指す判定フローが無いなら報告する。プラグイン側がファイルを
-// 移動・改名したとき、利用側の CI は何も変えていないのに守りだけが外れる型を塞ぐ。
+// 移動・改名したとき、利用側の CI は何も変えていないのに守りだけが外れる種類の欠陥を防ぐ。
 func TestRunFailsWhenPluginRootFlowMissing(t *testing.T) {
 	withRunGlobals(t)
 	cwd, err := os.Getwd()
@@ -315,7 +315,7 @@ func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 // 空のパス (空文字・空白だけ・不可視のフォーマット文字だけの値) を明示指定したら、
 // どの経路でもその場で弾く。通すと -judgment-flow "" は「指定なし」として扱われ
 // 検査が走らないまま成功し、空白や不可視の値は展開先を基準にした無関係なパスに
-// なる — どちらも「指定したのに検査されない」型そのもの。
+// なる — どちらも「指定したのに検査されない」種類の欠陥そのもの。
 //
 // 規則は経路の分岐より前の 1 か所 (resolveInputs) にあるので、表は
 // 経路 × フラグ × 入力 で回す。経路ごとに別のテストを書くと、規則を経路ごとに
@@ -570,7 +570,7 @@ func TestRunWriteSummarySharesPathRules(t *testing.T) {
 
 // -install-wrapper と -write-summary=true は「何を書き出すか」が食い違うので、
 // 黙って片方を無視せずエラーにする。無視すると「指定したのに効かない」を作る —
-// 検査の経路で errCurrentDirUnused として禁じているのと同じ型。
+// 検査の経路で errCurrentDirUnused として禁じているのと同じ種類の欠陥。
 // -current-dir は併用できる (相対パスの基準として、他の経路と同じ規則で使う)。
 func TestRunInstallWrapperRejectsUnusedFlags(t *testing.T) {
 	recs := filepath.Join(realTempDir(t), "docs", "rt")
@@ -835,7 +835,7 @@ func firstLine(s string) string {
 
 // -install-wrapper と -summary-command を併記したら、その値がラッパーに焼き込まれる。
 // 捨てると「指定したのに効かない」を作る (既存の -write-summary のガードが防ぐのと
-// 同じ型だが、こちらは両立する要求なので弾かずに効かせる)。
+// 同じ種類だが、こちらは両立する要求なので弾かずに効かせる)。
 func TestRunInstallWrapperEmbedsExplicitSummaryCommand(t *testing.T) {
 	toolDir := versionedToolDir(t)
 	recs := realTempDir(t)

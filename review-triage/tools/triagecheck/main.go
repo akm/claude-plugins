@@ -78,7 +78,7 @@ func run(args []string) error {
 
 	// パスの規則は、経路 (検査 / -write-summary / -install-wrapper) で分岐する前に
 	// 1 か所で当てる。経路ごとに書くと、規則を 1 つ足すたびに他の経路へ書き忘れ、
-	// 同じ入力に経路ごとに違う契約ができる (このブランチのレビューで、その型の
+	// 同じ入力に経路ごとに違う契約ができる (このブランチのレビューで、その種類の
 	// 指摘が回を重ねて続いた)。ここを通った後の経路は、解決済みの絶対パスを
 	// 受け取るだけで、パスを検査しない。
 	in, err := resolveInputs(pathInputs{
@@ -428,7 +428,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 //
 // 指定の有無は値ではなく specified (呼び出し側が flag.Visit で読んだ意思表示) で
 // 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」に
-// 化け、検査が走らないまま緑になる (-record-dir で避けたはずの型と同じ)。
+// 化け、検査が走らないまま緑になる (-record-dir で避けたはずの種類の欠陥と同じ)。
 func resolveJudgmentFlowPath(value string, specified bool) (flowPath, origin string) {
 	if specified {
 		return value, "-judgment-flow"

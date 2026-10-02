@@ -35,7 +35,7 @@ var (
 	// (ラベル内の "D1: ..." のような表示用の ID を数えないため)。
 	judgmentFlowQuoteRe = regexp.MustCompile(`"[^"]*"`)
 	// judgmentFlowColorRe は色コード。`#A12` のような大文字の短い 16 進が
-	// ID の形 ([ADEHR]\d+) に一致してしまうため、抽出前に取り除く (型 F の反例)。
+	// ID の形 ([ADEHR]\d+) に一致してしまうため、抽出前に取り除く (観点 F の反例)。
 	judgmentFlowColorRe = regexp.MustCompile(`#[0-9A-Fa-f]+`)
 	// judgmentFlowSeparatorRe は表の区切り行 (| --- | --- |)。直前の行は見出しで、
 	// 先頭セルが ID の形でも本体行として数えない。
@@ -49,7 +49,7 @@ var judgmentFlowDecorations = map[string]bool{
 
 // judgmentFlowProblems は図と表の ID 集合を照合する。対象は git 追跡でなく
 // ファイルの実在で決める — 追跡前の判定フローが素通りする「0 件マッチで黙って緑」の
-// 型 (B1 と同じ) を塞ぐ。
+// 種類の欠陥 (B1 と同じ) を防ぐ。
 //
 // ファイルが無いときの扱いは origin で分かれる。origin は在り処を指定したものの
 // 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。在り処を指定する
