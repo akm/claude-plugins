@@ -197,7 +197,7 @@ class TestScopeGlob(unittest.TestCase):
 
 class TestClassifyFiles(unittest.TestCase):
     def test_unconfigured_repo_is_should_review(self):
-        # 設定し忘れたリポジトリの変更を黙って隠さない（安全側）。
+        # 設定し忘れたリポジトリの変更を、利用者に知らせずに隠さない（安全側）。
         r = scope.classify_files(["a.md", "b.go"], "o/r", {"repos": {}})
         self.assertEqual(r["priority"], scope.SHOULD)
         self.assertEqual(r["counts"][scope.SHOULD], 2)
@@ -350,7 +350,7 @@ class TestToml(unittest.TestCase):
         self.assertEqual(store.load_toml("/nonexistent/config.toml", {"a": 1}), {"a": 1})
 
     def test_broken_toml_warns_and_defaults(self):
-        # 壊れていても落とさないが、黙って握りつぶさず理由を残す。
+        # 壊れていても落とさないが、握りつぶさず理由を残す。
         with tempfile.TemporaryDirectory() as d:
             warnings = []
             cfg = store.load_toml(self._write(d, "this is not toml ==\n"), {}, warnings)
@@ -526,7 +526,7 @@ class TestAgentInput(unittest.TestCase):
         self.assertEqual(skipped, [])
 
     def test_missing_terms_key_is_an_error(self):
-        # 黙って0件記録して成功を返すと、記録できたと誤解される。
+        # 0件を記録して、エラーを出さずに成功を返すと、記録できたと誤解される。
         with self.assertRaises(agent_input.InvalidInput) as cm:
             agent_input.terms({"glossary": []})
         self.assertIn("terms", str(cm.exception))
@@ -740,7 +740,7 @@ class TestAuth(unittest.TestCase):
         self.assertEqual(auth.resolve()[0], "tok-gh")
 
     def test_unreadable_token_file_reports_reason(self):
-        # 指定されたのに読めないのは設定ミス。黙って進むと原因が分からない。
+        # 指定されたのに読めないのは設定ミス。エラーを出さずに進むと原因が分からない。
         os.environ[auth.ENV_TOKEN_FILE] = "/nonexistent/token"
         token, _, err = auth.resolve()
         self.assertIsNone(token)
@@ -863,7 +863,7 @@ class TestPRSpec(unittest.TestCase):
     def test_repo_case_is_normalized(self):
         # GitHub は大文字小文字を区別しないが、設定の引き当ては素の辞書引き。
         # 揃えないと [repos."owner/repo"] を取りこぼし、出力言語とレビュー範囲が
-        # 黙って既定値に落ちる。
+        # 利用者に知らせずに既定値になる。
         self.assertEqual(prspec.parse_one("Akm/Claude-Plugins#1")["repo"], "akm/claude-plugins")
 
     def test_case_variants_are_deduplicated(self):
@@ -1341,7 +1341,7 @@ class TestDocument(unittest.TestCase):
     """解説データの型（scripts/prteeth/document.py）。
 
     素の dict を .get() で読むと、キー名を間違えても None が空文字になり、
-    セクションが黙って消える。型で必須を持つことで組み立て時点で検出する。
+    セクションが、エラーにならずに消える。型で必須を持つことで組み立て時点で検出する。
     """
 
     def _pr(self, **kw):
@@ -1375,7 +1375,7 @@ class TestDocument(unittest.TestCase):
         self.assertEqual(doc.prs[0].anchor, "pr-owner-repo-js-1")
 
     def test_missing_required_key_is_an_error(self):
-        # 従来は空文字になって黙って欠落していた。
+        # 従来は空文字になり、エラーにならずに欠落していた。
         for missing in ("repo", "number", "title", "priority"):
             payload = self._pr()
             del payload["prs"][0][missing]
@@ -1384,7 +1384,7 @@ class TestDocument(unittest.TestCase):
             self.assertIn(missing, str(cm.exception))
 
     def test_typo_in_optional_key_is_an_error(self):
-        # main_changes のようなタイポを黙って捨てるとセクションが消える。
+        # main_changes のようなタイポを、警告を出さずに捨てるとセクションが消える。
         with self.assertRaises(document.InvalidDocument) as cm:
             document.from_payload(self._pr(main_changes=["x"]))
         self.assertIn("main_changes", str(cm.exception))
@@ -1437,7 +1437,7 @@ class TestDocument(unittest.TestCase):
         self.assertEqual(document.from_payload(payload).context, labels.CONTEXT_PICK)
 
     def test_invalid_context_is_an_error(self):
-        # 黙って巡回扱いにすると、番号指定なのに「必須」と出る。
+        # エラーにせずに巡回扱いにすると、番号指定なのに「必須」と出る。
         payload = self._pr()
         payload["context"] = "browsing"
         with self.assertRaises(document.InvalidDocument) as cm:
@@ -1506,7 +1506,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('<a href="#pr-o-other-2">Second</a>', h)
 
     def test_index_anchors_match_article_ids(self):
-        # 飛び先が無いとリンクが黙って効かなくなる。
+        # 飛び先が無いとリンクが、エラーにならずに効かなくなる。
         h = render.render(self._two())
         self.assertIn('id="pr-o-r-1"', h)
         self.assertIn('id="pr-o-other-2"', h)
@@ -1569,7 +1569,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('crossorigin="anonymous"', h)
 
     def test_cdn_version_and_sri_are_consistent(self):
-        # バージョンだけ上げて SRI を更新し忘れると、図が黙って出なくなる。
+        # バージョンだけ上げて SRI を更新し忘れると、図が、エラーにならずに出なくなる。
         h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
         self.assertIn(render._MERMAID_VERSION + "/mermaid.min.js", h)
         self.assertIn(render._MERMAID_SRI, h)
@@ -1724,7 +1724,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(by_repo["other/x"], "ja")
 
     def test_resolve_mixed_case_spec_finds_repo_config(self):
-        # 打った表記の揺れで設定を取りこぼすと、出力言語が黙って変わる。
+        # 打った表記の揺れで設定を取りこぼすと、出力言語が、利用者に知らせずに変わる。
         with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
             f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
         out = self._run(self.mod.cmd_resolve, specs=["O/R#1"])
@@ -1948,7 +1948,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertTrue(any("文字列ではない" in w for w in out["warnings"]))
 
     def test_long_body_is_reported_as_truncated(self):
-        # 黙って切り詰めると、次回の差分がずれた理由が分からない。
+        # 利用者に知らせずに切り詰めると、次回の差分がずれた理由が分からない。
         out = self._record_body("あ" * (bodies.MAX_BODY_BYTES))
         self.assertTrue(any("先頭のみ保存" in w for w in out["warnings"]))
 

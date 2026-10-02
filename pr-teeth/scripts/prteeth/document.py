@@ -149,7 +149,7 @@ def _pr_from(raw, index):
             "期待する形: " + _EXPECTED
         )
 
-    # 未知のキーはタイポの可能性が高い。黙って捨てるとセクションが消える。
+    # 未知のキーはタイポの可能性が高い。警告を出さずに捨てるとセクションが消える。
     unknown = sorted(set(raw) - set(_PR_REQUIRED) - set(_PR_OPTIONAL))
     if unknown:
         raise InvalidDocument(
@@ -192,7 +192,7 @@ def _pr_from(raw, index):
 def from_payload(payload):
     """エージェントが組み立てた JSON を Document にする。
 
-    不正なら InvalidDocument を投げる。黙って欠落させない。
+    不正なら InvalidDocument を投げる。エラーにせずに欠落させない。
     """
     if not isinstance(payload, dict):
         raise InvalidDocument(
@@ -219,7 +219,7 @@ def from_payload(payload):
 
     context = payload.get("context") or labels.CONTEXT_PATROL
     if context not in (labels.CONTEXT_PATROL, labels.CONTEXT_PICK):
-        # 誤った値を黙って巡回扱いにすると、番号指定なのに「必須」と出る。
+        # 誤った値を、エラーにせずに巡回扱いにすると、番号指定なのに「必須」と出る。
         raise InvalidDocument(
             "context は " + labels.CONTEXT_PATROL + " / " + labels.CONTEXT_PICK
             + " のいずれかです（実際: " + str(context) + "）"

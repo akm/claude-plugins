@@ -51,7 +51,7 @@ def _from_env_file():
         with open(path, "r", encoding="utf-8") as f:
             return _clean(f.read()), ENV_TOKEN_FILE + ":" + path
     except OSError as e:
-        # 指定されたのに読めないのは設定ミス。黙って次に進むと原因が分からないため、
+        # 指定されたのに読めないのは設定ミス。エラーを出さずに次に進むと原因が分からないため、
         # 理由を添えて呼び出し側に返す。
         return None, "error:" + ENV_TOKEN_FILE + " を読めません (" + str(e) + ")"
 

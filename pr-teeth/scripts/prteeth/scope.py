@@ -131,7 +131,7 @@ def classify_files(paths, repo, config):
     priority はその PR 全体の優先度で、PR の並び順に使う（第7節）。
 
     リポジトリ自体が未設定なら全ファイルを should_review 扱いにする（安全側）。
-    ignore に倒すと、設定し忘れたリポジトリの重要な変更を黙って隠してしまう。
+    ignore に倒すと、設定し忘れたリポジトリの重要な変更を、利用者に知らせずに隠してしまう。
     """
     cfg = config or {}
     repos = cfg.get("repos")
