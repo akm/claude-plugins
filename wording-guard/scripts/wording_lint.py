@@ -15,6 +15,7 @@ check と fix は、設定キー textlint があるリポジトリでだけ実�
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -81,17 +82,36 @@ def _textlint_context(args):
     return root, cfg, terms.load_all(config.terms_paths(root, cfg))
 
 
+def _git_markdown_files(root, directory):
+    """ディレクトリの下の Markdown のうち、git が追跡しているものと、無視されていない未追跡のものを集める。
+
+    .git の中と、git に無視されたパス (node_modules など) は除く — 依存パッケージの文書まで検査したり
+    書き換えたりしないため。
+    """
+    rel = os.path.relpath(os.path.realpath(directory), os.path.realpath(root))
+    if rel == ".." or rel.startswith(".." + os.sep):
+        raise config.ConfigError(f"{directory} はリポジトリ ({root}) の外にある")
+    r = subprocess.run(["git", "-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", rel],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise config.ConfigError(f"{directory} の下のファイルを git で列挙できない: {r.stderr.strip()}")
+    names = [n for n in r.stdout.split("\0") if n.endswith(".md")]
+    # 削除してまだコミットしていないファイルも --cached に出るので、存在するものだけにする
+    return sorted(p for p in (os.path.join(root, n) for n in names) if os.path.isfile(p))
+
+
 def _markdown_files(root, cfg, paths):
     """引数のパス (ファイルかディレクトリ) から、検査する Markdown のファイルを集める。
 
     (検査するファイル, 書き換えない過去の記録として除いたファイル) を返す。
-    ディレクトリからは Markdown だけを集める。明示的に指定したファイルが Markdown でなければ、
-    存在しないパスと同じく誤りにする — 知らせずに除くと「検査したもの 0 個」で成功に見えるため。
+    ディレクトリからは、git に無視されていない Markdown だけを集める。明示的に指定したファイルが
+    Markdown でなければ、存在しないパスと同じく誤りにする — 知らせずに除くと「検査したもの 0 個」で
+    成功に見えるため。
     """
     files, skipped = [], []
     for p in paths:
         if os.path.isdir(p):
-            found = sorted(os.path.join(d, n) for d, _, names in os.walk(p) for n in names if n.endswith(".md"))
+            found = _git_markdown_files(root, p)
         elif os.path.isfile(p):
             if not p.endswith(".md"):
                 raise config.ConfigError(f"{p} は Markdown (.md) でない。検査と自動修正の対象は Markdown だけ")

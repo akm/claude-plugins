@@ -530,6 +530,22 @@ class TestCheckCommand(RepoTestCase):
             self.assertIn("Markdown (.md) でない", err)
             self.assertEqual(out, "")
 
+    def test_directory_skips_git_ignored_files(self):
+        self.configure(textlint={})
+        self.write(".gitignore", "node_modules/\n")
+        self.write("docs/a.md", "x")
+        self.write("node_modules/pkg/README.md", "x")
+        self.write("docs/notes.txt", "x")
+        files, skipped = wording_lint._markdown_files(self.root, config.load(self.root), [self.root])
+        self.assertEqual(files, [os.path.join(self.root, "docs/a.md")])
+        self.assertEqual(skipped, [])
+
+    def test_directory_outside_repository_is_error(self):
+        self.configure(textlint={})
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(config.ConfigError):
+                wording_lint._markdown_files(self.root, config.load(self.root), [d])
+
     def test_check_without_textlint_installed(self):
         self.configure(textlint={})
         self.write("a.md", "x")
