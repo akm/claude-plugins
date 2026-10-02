@@ -336,7 +336,7 @@ def render(data):
     """解説データ全体を自己完結 HTML にする。
 
     data: document.Document（dict ではない）。
-    キー名の誤りは document.from_payload の時点で弾かれているので、
+    キー名の誤りは document.from_payload の時点で拒否されているので、
     ここで欠落を気にする必要はない。
     """
     lang = data.language or "ja"

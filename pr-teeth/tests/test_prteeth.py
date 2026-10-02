@@ -1424,7 +1424,7 @@ class TestDocument(unittest.TestCase):
         self.assertEqual([p.number for p in doc.prs], [1, 2, 3])
 
     def test_number_zero_is_not_treated_as_missing(self):
-        # 0 は falsy だが有効な値。required 判定で誤って弾かない。
+        # 0 は falsy だが有効な値。required 判定で誤って拒否しない。
         doc = document.from_payload(self._pr(number=0))
         self.assertEqual(doc.prs[0].number, 0)
 
