@@ -220,7 +220,7 @@ type recordInvestigation struct {
 }
 
 // recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
-// 残存が「エラーなしで空」に化ける種類の欠陥を避けるため。attrs だけは任意のキーを許す
+// 残存が「エラーなしで空」として扱われる種類の欠陥を避けるため。attrs だけは任意のキーを許す
 // (上流固有の属性のパススルー)。
 var recordAllowedKeys = map[string]map[string]bool{
 	"トップレベル": {"runs": true},

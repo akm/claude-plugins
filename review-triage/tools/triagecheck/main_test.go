@@ -450,7 +450,7 @@ func TestResolveJudgmentFlowPathUsesSpecifiedNotValue(t *testing.T) {
 	// CLAUDE_PLUGIN_ROOT へフォールバックしない。
 	p, origin := resolveJudgmentFlowPath("", true)
 	if origin != "-judgment-flow" {
-		t.Fatalf("空の明示指定が指定なしに化けた: (%q, %q)", p, origin)
+		t.Fatalf("空の明示指定が指定なしとして扱われた: (%q, %q)", p, origin)
 	}
 }
 

@@ -188,7 +188,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"investigation の未知のキー", "order: 1\n",
 			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          found: [docs/bar.md]\n", "found"},
 		// 値を省いた構造キー (null) は「無い」と同一に扱われ、検査が何も報告しない。書きかけの記録を
-		// 未調査・束ね先なしに化けさせないため報告する。
+		// 未調査・束ね先なしとして扱わせないため報告する。
 		{"investigation の値が無い (null)", "order: 1\n", "order: 1\n        investigation:\n", "investigation に値がありません"},
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
 			"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n", "plan_ref に値がありません"},
@@ -836,7 +836,7 @@ func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 }
 
 // ディレクトリが「無い」以外の読み取りエラー (ENOTDIR など) は握りつぶさず返す —
-// 権限や I/O のエラーを「記録 0 件」= 成功に化けさせない。
+// 権限や I/O のエラーを「記録 0 件」= 成功として扱わせない。
 func TestListReviewTriageFilesErrorReported(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {

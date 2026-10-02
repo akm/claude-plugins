@@ -427,8 +427,8 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 // 不在の報告にどちらを直せばよいかを載せるため。
 //
 // 指定の有無は値ではなく specified (呼び出し側が flag.Visit で読んだ意思表示) で
-// 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」に
-// 化け、検査が走らないまま成功する (-record-dir で避けたはずの種類の欠陥と同じ)。
+// 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」として
+// 扱われ、検査が走らないまま成功する (-record-dir で避けたはずの種類の欠陥と同じ)。
 func resolveJudgmentFlowPath(value string, specified bool) (flowPath, origin string) {
 	if specified {
 		return value, "-judgment-flow"

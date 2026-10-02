@@ -24,7 +24,7 @@ import (
 // テンプレート内の二重引用符は「実行時に展開させる」箇所だけに使う —
 // "$script_dir"・"$root/..." がそれで、焼き込む値には使わない。二重引用符の中では
 // $(...)・バックティック・$VAR が展開されるので、値にそれらを含むパスが実行時に
-// 別のパスに化ける。焼き込む値と展開させる変数を、引用符の種類で見分けられる
+// 別のパスに変わる。焼き込む値と展開させる変数を、引用符の種類で見分けられる
 // ようにしておく。
 //
 // -summary-command は生成時に決めた値を焼き込む。実行時の $0 から組み立てない —
@@ -98,7 +98,7 @@ exec go run -C "$root/tools/triagecheck" . \
 // 焼き込む値はすべてシェルの単一引用符で包む (shellSingleQuote)。%q (Go の引用) は
 // 使わない — bash の二重引用符とは規則が違い、`make $(TARGET)` のような値を
 // 焼き込むと実行時に $(TARGET) が展開されて消える (実測)。パスも同じで、
-// docs/$(echo x) のような置き場は別の場所に化ける。
+// docs/$(echo x) のような置き場は別の場所を指すようになる。
 func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error {
 	pluginCache, err := pluginCacheDir()
 	if err != nil {
