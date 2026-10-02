@@ -13,6 +13,7 @@ textlint と規則集は、プラグインに同梱した `wording-guard/textlin
 振る舞いの正本はファイル `wording-guard/skills/wording-guard/references/textlint.md`。
 """
 
+import bisect
 import hashlib
 import json
 import os
@@ -222,24 +223,28 @@ def _run_textlint(directory, conf, paths, cwd, fix=False):
         raise TextlintError(f"textlint の出力を JSON として読めない: {e}\n{r.stdout[:500]}") from e
 
 
-def _utf16_to_index(text, offset):
-    """UTF-16 の単位の位置 offset (textlint の range は JavaScript の文字列の位置) を、Python の文字列の位置に直す。
+def _utf16_indexer(text):
+    """UTF-16 の単位の位置 (textlint の range は JavaScript の文字列の位置) を、Python の文字列の位置に直す関数を返す。
 
     Python の文字列はコードポイントの単位なので、BMP の外の文字 (絵文字など) は UTF-16 では 2 単位、Python では 1 文字になる。
+    検出ごとに先頭から数え直すと、時間が (文字数 × 検出の件数) に比例するので、文字列ごとに 1 回だけ表を作って引く。
     """
-    units = 0
-    for index, ch in enumerate(text):
-        if units >= offset:
-            return index
-        units += 2 if ord(ch) > 0xFFFF else 1
-    return len(text)
+    if len(text.encode("utf-16-le")) == 2 * len(text):
+        # BMP の外の文字が無ければ、UTF-16 の位置と Python の位置は同じ
+        return lambda offset: min(max(offset, 0), len(text))
+    # units[i] は、Python の位置 i より前にある UTF-16 の単位数
+    units = [0]
+    for ch in text:
+        units.append(units[-1] + (2 if ord(ch) > 0xFFFF else 1))
+    return lambda offset: min(bisect.bisect_left(units, offset), len(text))
 
 
-def _finding(message, source):
+def _finding(message, source, to_index=None):
     """textlint の 1 件の検出を、wording-guard が扱う形に変換する。
 
     start は検出の始まりの Python の文字列の位置 (source の中の位置)。line と column は textlint の値のまま
     (column は UTF-16 の単位で数える) なので、文字列を切り出すときは start を使う。
+    to_index は _utf16_indexer(source) の結果。同じ source の検出を続けて変換するときは、1 回作って渡す。
     """
     severity = SEVERITIES.get(message.get("severity"))
     if severity is None:
@@ -250,8 +255,10 @@ def _finding(message, source):
     span = (message.get("fix") or {}).get("range") or message.get("range")
     start, matched = None, ""
     if span and source is not None:
-        start = _utf16_to_index(source, (message.get("range") or span)[0])
-        matched = source[_utf16_to_index(source, span[0]):_utf16_to_index(source, span[1])]
+        if to_index is None:
+            to_index = _utf16_indexer(source)
+        start = to_index((message.get("range") or span)[0])
+        matched = source[to_index(span[0]):to_index(span[1])]
     if len(matched) <= 1:
         matched = ""
     return {
@@ -279,7 +286,8 @@ def check_files(root, cfg, term_list, paths):
     for r in results:
         with open(r["filePath"], encoding="utf-8") as f:
             source = f.read()
-        found[r["filePath"]] = [_finding(m, source) for m in r["messages"]]
+        to_index = _utf16_indexer(source)
+        found[r["filePath"]] = [_finding(m, source, to_index) for m in r["messages"]]
     return found
 
 
@@ -306,7 +314,11 @@ def check_texts(root, cfg, term_list, texts, filename="text.md"):
             paths.append(path)
         results = _run_textlint(directory, conf, paths, cwd=root)
         by_path = {os.path.realpath(r["filePath"]): r["messages"] for r in results}
-    return [[_finding(m, text) for m in by_path.get(os.path.realpath(p), [])] for p, text in zip(paths, texts)]
+    found = []
+    for p, text in zip(paths, texts):
+        to_index = _utf16_indexer(text)
+        found.append([_finding(m, text, to_index) for m in by_path.get(os.path.realpath(p), [])])
+    return found
 
 
 def fix_files(root, cfg, term_list, paths):

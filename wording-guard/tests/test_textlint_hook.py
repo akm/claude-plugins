@@ -16,7 +16,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
@@ -228,6 +230,39 @@ class TestFinding(unittest.TestCase):
         f = textlint._finding({"ruleId": "r", "severity": 1, "message": "m", "range": [0, 1]}, "レビューを行う")
         self.assertEqual(f["matched"], "")
         self.assertEqual(f["severity"], "warning")
+
+    def test_utf16_indexer_matches_counting_from_start(self):
+        def counted(text, offset):
+            units = 0
+            for index, ch in enumerate(text):
+                if units >= offset:
+                    return index
+                units += 2 if ord(ch) > 0xFFFF else 1
+            return len(text)
+
+        for text in ("", "abc", "🐛 同じ型の指摘", "a🐛b🐛🐛c"):
+            to_index = textlint._utf16_indexer(text)
+            for offset in range(-1, len(text.encode("utf-16-le")) // 2 + 3):
+                self.assertEqual(to_index(offset), counted(text, offset), f"{text!r} の位置 {offset}")
+
+    def test_check_texts_converts_many_findings_in_large_text_quickly(self):
+        # 位置の表は文字列ごとに 1 回だけ作る。検出ごとに先頭から数え直すと、この大きさでは数十秒かかる
+        text = "🐛" + ("あ" * 99 + "\n") * 2000
+        end = len(text.encode("utf-16-le")) // 2
+        messages = [{"ruleId": "r", "severity": 1, "message": "m", "range": [end - 4, end - 2]}] * 500
+
+        def run(directory, conf, paths, cwd):
+            return [{"filePath": p, "messages": messages} for p in paths]
+
+        with mock.patch.object(textlint, "ensure_installed", return_value="dir"), \
+                mock.patch.object(textlint, "compose", return_value=("conf.json", True)), \
+                mock.patch.object(textlint, "_run_textlint", side_effect=run):
+            started = time.monotonic()
+            results = textlint.check_texts("root", {}, [], [text, text])
+            elapsed = time.monotonic() - started
+        self.assertEqual(len(results[1]), 500)
+        self.assertEqual(results[1][0]["matched"], "ああ")
+        self.assertLess(elapsed, 5)
 
 
 class TestRunTextlint(unittest.TestCase):
