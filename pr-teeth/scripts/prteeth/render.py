@@ -94,7 +94,7 @@ footer { color: var(--muted); font-size: .85rem; margin-top: 3rem; text-align: c
 """
 
 # Mermaid は CDN から読む。ライブラリは 3.2MB あり、図は補助でしかない（単純なら
-# 省略する）ため、PR ごとに埋め込むのは割に合わない。読めなくても本文は読めるよう、
+# 省略する）ため、PR ごとに埋め込むのは負担に見合わない。読めなくても本文は読めるよう、
 # 失敗時は元のコードを <pre> のまま残す。
 #
 # integrity は改竄検知のため。値は cdnjs が公開している sha512 と一致することを
