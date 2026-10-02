@@ -52,16 +52,16 @@ func run(args []string) error {
 		return err
 	}
 
-	// 明示的に渡されたフラグを拾う。既定値との一致では判定しない — 利用者が
+	// 明示的に渡されたフラグを集める。既定値との一致では判定しない — 利用者が
 	// 既定と同じ値を明示的に渡すことがあり、そのとき「指定していない」と誤って
-	// 扱うと、不在を報告すべき経路が黙って通る。flag.Visit は実際に指定された
+	// 扱うと、不在を報告すべき経路が報告されないまま通る。flag.Visit は実際に指定された
 	// フラグだけを回すので、意思表示の有無をそのまま読める。
 	explicit := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
 
 	// 経路どうしの衝突は、パスの規則より前に見る。-install-wrapper と
-	// -write-summary=true は「何を書き出すか」が食い違うので、黙って片方を
-	// 無視すると「指定したのに効かない」を作る。弾くのは「何かを要求したとき」
+	// -write-summary=true は「何を書き出すか」が食い違うので、エラーを出さずに片方を
+	// 無視すると「指定したのに適用されない」を作る。拒否するのは「何かを要求したとき」
 	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
 	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
 	// 値を見ずに「指定された」と報告するので、値の側も見る。
@@ -69,7 +69,7 @@ func run(args []string) error {
 		return fmt.Errorf("-write-summary は %w (生成の経路では使われません)", errFlagUnusedWithInstallWrapper)
 	}
 
-	// 空白だけの -summary-command は弾く — 通すと「再生成する手段は空欄です」と
+	// 空白だけの -summary-command は拒否する — 通すと「再生成する手段は空欄です」と
 	// 案内することになり、指定しないより悪い。値そのものの決定は、パスの規則と
 	// 一緒に resolveInputs で行う (案内はパスの形をした値なので、同じ規則に乗せる)。
 	if explicit["summary-command"] && isBlankPath(*summaryCmd) {
@@ -78,7 +78,7 @@ func run(args []string) error {
 
 	// パスの規則は、経路 (検査 / -write-summary / -install-wrapper) で分岐する前に
 	// 1 か所で当てる。経路ごとに書くと、規則を 1 つ足すたびに他の経路へ書き忘れ、
-	// 同じ入力に経路ごとに違う契約ができる (このブランチのレビューで、その型の
+	// 同じ入力に経路ごとに違う契約ができる (このブランチのレビューで、その種類の
 	// 指摘が回を重ねて続いた)。ここを通った後の経路は、解決済みの絶対パスを
 	// 受け取るだけで、パスを検査しない。
 	in, err := resolveInputs(pathInputs{
@@ -109,7 +109,7 @@ func run(args []string) error {
 		return fmt.Errorf("triagecheck: %d 件の問題が見つかりました: %w", len(problems), errPathMissing)
 	}
 
-	// path.Clean で表記の揺れ (".", "./rec", "rec//") を畳む。照合は
+	// path.Clean で表記の揺れ (".", "./rec", "rec//") をそろえる。照合は
 	// inReviewTriageDir が両辺を clean して行うので、ここでの末尾のスラッシュは
 	// エラーメッセージの見た目のためだけに付ける。
 	reviewTriageDir = path.Clean(filepath.ToSlash(in.recordDir)) + "/"
@@ -146,7 +146,7 @@ func run(args []string) error {
 }
 
 // pathInputs はフラグから読んだ、パスに関わる入力。explicit は flag.Visit で
-// 拾った「明示されたか」。
+// 集めた「明示されたか」。
 type pathInputs struct {
 	recordDir      string
 	currentDir     string
@@ -183,12 +183,12 @@ type resolvedInputs struct {
 
 // resolveInputs は、明示された各パスに同じ規則を同じ順で当てる。
 //
-//  1. 空・空白・不可視の値は弾く (isBlankPath)。空の明示はパスとして意味を持たず、
+//  1. 空・空白・不可視の値は拒否する (isBlankPath)。空の明示はパスとして意味を持たず、
 //     通すと「指定したのに検査されない」になる。
 //  2. 相対パスは -current-dir を基準に解決する (無ければ resolvePath がエラー)。
 //     基準は推測しない — go run -C で起動されるためカレントはツール側を指し、
 //     呼び出し元のカレントはプロセスの中から知りようがない。
-//  3. -current-dir を渡したのに一度も基準として使われなければエラー。黙って通すと
+//  3. -current-dir を渡したのに一度も基準として使われなければエラー。エラーにしないと
 //     「基準を渡したつもり」のまま別の解決結果を受け取る。
 //
 // 実在の要求は missingPathProblems が担う (全件をまとめて報告するため)。
@@ -196,7 +196,7 @@ type resolvedInputs struct {
 // -record-dir は必須で既定値を持たせない。既定が相対パスだと「基準の無い相対」を
 // 許すことになり、上の規則が崩れる。省略を許して既定の場所を検査したことにする
 // より、どこを検査するのかを必ず言わせる。空文字は省略と区別できないので、
-// 空のパスではなく必須の検査として弾かれる。
+// 空のパスではなく必須の検査として拒否される。
 func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	var out resolvedInputs
 	if in.recordDir == "" {
@@ -227,7 +227,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	//
 	// 「絶対パスに -current-dir を併記したらエラー」は -judgment-flow で明示された
 	// ときにだけ課す。CLAUDE_PLUGIN_ROOT から組み立てた値は常に絶対で、利用者が
-	// -current-dir を書いたかどうかとは無関係に決まるため、そこで弾くと
+	// -current-dir を書いたかどうかとは無関係に決まるため、そこで拒否すると
 	// 「環境変数を設定していると -current-dir が使えない」ことになる。
 	// 報告には値の出所 (origin) を使う。固定のフラグ名で報告すると、環境変数から
 	// 解決した値の誤りを、利用者が渡していない -judgment-flow の名前で叱ることになる。
@@ -259,13 +259,13 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	}
 
 	// 案内する再生成コマンド。明示があればそのまま。-install-wrapper で省略されたら
-	// 「ラッパー自身をリポジトリのルートから叩く形」を組み立てて焼き込む。
+	// 「ラッパー自身をリポジトリのルートから実行する形」を組み立てて焼き込む。
 	//
-	// 実行時の $0 から組み立てない — $0 は叩いた形 (./bin/rtc、絶対パス、リンク名)
-	// そのもので、コミットされるサマリの 1 行目が叩き方ごとに変わり、生成直後の
-	// サマリが別の叩き方の検査で「食い違う」と報告される (実測)。絶対パスも
-	// 焼き込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットが
-	// 場所によって赤くなる。コミットされる値は、リポジトリ相対でなければならない。
+	// 実行時の $0 から組み立てない — $0 は実行したときの形 (./bin/rtc、絶対パス、リンク名)
+	// そのもので、コミットされるサマリの 1 行目が実行の仕方ごとに変わり、生成直後の
+	// サマリが別の実行の仕方での検査で「食い違う」と報告される (実測)。絶対パスも
+	// 焼き込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
+	// checkout した場所によって検査が失敗する。コミットされる値は、リポジトリ相対でなければならない。
 	//
 	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する —
 	// -record-dir と同じ規則で、案内というパスの形をした値にも同じ規則を当てる。
@@ -329,7 +329,7 @@ func missingPathProblems(in resolvedInputs) []string {
 	if in.judgmentFlow != "" {
 		if _, err := os.Stat(in.judgmentFlow); errors.Is(err, fs.ErrNotExist) {
 			problems = append(problems, fmt.Sprintf(
-				"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま緑になるため報告する)",
+				"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま成功するため報告する)",
 				in.judgmentFlow, in.judgmentFlowOrigin))
 		}
 	}
@@ -396,7 +396,7 @@ func resolveBaseDir(currentDir string) (string, error) {
 // 使われなかった」ことを検出するために使う)。
 //
 // base が空 (= -current-dir が無い) のに相対を渡されたらエラーにする。ここで
-// 推測した基準を当てにいくと、外れたときに別の場所を検査して黙って緑を返す。
+// 推測した基準を当てにいくと、外れたときに別の場所を検査して、エラーを出さずに成功を返す。
 func resolvePath(p, base, flagName string) (string, bool, error) {
 	if filepath.IsAbs(p) {
 		return p, false, nil
@@ -427,8 +427,8 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 // 不在の報告にどちらを直せばよいかを載せるため。
 //
 // 指定の有無は値ではなく specified (呼び出し側が flag.Visit で読んだ意思表示) で
-// 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」に
-// 化け、検査が走らないまま緑になる (-record-dir で避けたはずの型と同じ)。
+// 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」として
+// 扱われ、検査が走らないまま成功する (-record-dir で避けたはずの種類の欠陥と同じ)。
 func resolveJudgmentFlowPath(value string, specified bool) (flowPath, origin string) {
 	if specified {
 		return value, "-judgment-flow"

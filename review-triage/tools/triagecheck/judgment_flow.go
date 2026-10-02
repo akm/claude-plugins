@@ -35,7 +35,7 @@ var (
 	// (ラベル内の "D1: ..." のような表示用の ID を数えないため)。
 	judgmentFlowQuoteRe = regexp.MustCompile(`"[^"]*"`)
 	// judgmentFlowColorRe は色コード。`#A12` のような大文字の短い 16 進が
-	// ID の形 ([ADEHR]\d+) に一致してしまうため、抽出前に取り除く (型 F の反例)。
+	// ID の形 ([ADEHR]\d+) に一致してしまうため、抽出前に取り除く (観点 F の反例)。
 	judgmentFlowColorRe = regexp.MustCompile(`#[0-9A-Fa-f]+`)
 	// judgmentFlowSeparatorRe は表の区切り行 (| --- | --- |)。直前の行は見出しで、
 	// 先頭セルが ID の形でも本体行として数えない。
@@ -48,15 +48,15 @@ var judgmentFlowDecorations = map[string]bool{
 }
 
 // judgmentFlowProblems は図と表の ID 集合を照合する。対象は git 追跡でなく
-// ファイルの実在で決める — 追跡前の判定フローが素通りする「0 件マッチで黙って緑」の
-// 型 (B1 と同じ) を塞ぐ。
+// ファイルの実在で決める — 追跡前の判定フローが検査の対象に入らず、0 件マッチのまま
+// 検査が成功する種類の欠陥 (B1 と同じ) を防ぐ。
 //
 // ファイルが無いときの扱いは origin で分かれる。origin は在り処を指定したものの
 // 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。在り処を指定する
 // ことは「そこを検査せよ」という意思表示なので、不在は問題として報告する。指定が
 // 無いまま不在なのはスキル未導入の正常な状態で、何もしない。1 つの入口に 2 つの
 // 意味を担わせると、プラグイン側がファイルを移動・改名した時点で利用側の検査が
-// 黙って無効になり、「走って合格した」と「そもそも走らなかった」が区別できなくなる
+// 利用者に知らせずに無効になり、「走って合格した」と「そもそも走らなかった」が区別できなくなる
 // (rejection-gates.md の「診断ツールの偽陰性」)。
 //
 // origin を真偽値でなく名前にするのは、報告を読む人が直す先を特定できるようにする
@@ -68,7 +68,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 		if errors.Is(err, fs.ErrNotExist) {
 			if origin != "" {
 				return []string{fmt.Sprintf(
-					"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま緑になるため報告する)",
+					"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま成功するため報告する)",
 					judgmentFlowPath, origin)}
 			}
 			return nil

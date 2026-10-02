@@ -71,7 +71,7 @@ func TestPluginCacheDirResolvesFromVersionedLayout(t *testing.T) {
 func TestPluginCacheDirRejectsUnexpectedLayout(t *testing.T) {
 	// tools/triagecheck で終わらない場所 (go run -C を経ずに直接 go run . した
 	// ときなど、プラグインキャッシュと無関係な場所) では、実体と食い違ったパスを
-	// 黙って書き出す代わりにエラーにする。
+	// そのまま書き出す代わりにエラーにする。
 	dir := t.TempDir()
 
 	withWorkingDir(t, dir, func() {
@@ -126,7 +126,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 	if !strings.Contains(got, `-record-dir '../docs/review-triages'`) {
 		t.Errorf("生成物に script_dir 基準の -record-dir が見当たらない:\n%s", got)
 	}
-	// 基準は $PWD でなく script_dir。$PWD だと叩く場所で見る先が変わる。
+	// 基準は $PWD でなく script_dir。$PWD だと実行する場所で見る先が変わる。
 	if !strings.Contains(got, `-current-dir "$script_dir"`) {
 		t.Errorf("生成物が script_dir を基準にしていない:\n%s", got)
 	}
@@ -212,10 +212,10 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 	}
 }
 
-// 生成したラッパーを実際に実行して、正しい置き場を検査することを固定する。
+// 生成したラッパーを実際に実行して、正しい置き場を検査することを検証する。
 //
 // 文字列だけを検査していたため、-current-dir の焼き込みを壊しても全テストが
-// 通っていた。生成物の契約 (どこから叩いても同じ置き場を見る) は、実行して
+// 通っていた。生成物の契約 (どこから実行しても同じ置き場を見る) は、実行して
 // 初めて確かめられる。
 func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	goBin, err := exec.LookPath("go")
@@ -255,7 +255,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}
 
-	// 叩く場所を変えても同じ置き場を検査すること。$PWD 基準だとここで割れる。
+	// 実行する場所を変えても同じ置き場を検査すること。$PWD 基準だとここで割れる。
 	elsewhere := realTempDir(t)
 	for _, dir := range []string{repo, elsewhere, base} {
 		cmd := exec.Command(wrapper)
@@ -267,7 +267,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		}
 	}
 
-	// 置き場に壊れた記録を置いたら、どこから叩いても検出すること
+	// 置き場に壊れた記録を置いたら、どこから実行しても検出すること
 	// (実行はしているが対象が違う、を捕まえる)。
 	if err := os.WriteFile(filepath.Join(recDir, "bad.yaml"), []byte("broken: yes\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -277,13 +277,13 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 		if out, err := cmd.CombinedOutput(); err == nil {
-			t.Fatalf("%s から実行したとき、壊れた記録を見逃した:\n%s", dir, out)
+			t.Fatalf("%s から実行したとき、壊れた記録を検出しなかった:\n%s", dir, out)
 		}
 	}
 
 	// シンボリックリンク経由で起動しても実体の置き場を検査すること。
 	// dirname "$0" だけで基準を求めるとリンクの置き場が基準になり、その隣に
-	// 別の置き場があるとそちらを検査して緑になる (実測でそうなった)。
+	// 別の置き場があるとそちらを検査して成功する (実測でそうなった)。
 	// リンクの隣に紛らわしい置き場を実在させたうえで確かめる。
 	linkDir := filepath.Join(realTempDir(t), "localbin")
 	if err := os.MkdirAll(linkDir, 0o755); err != nil {
@@ -303,12 +303,12 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Dir = linkDir
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("リンク経由で実行したとき、実体の置き場の壊れた記録を見逃した"+
+		t.Fatalf("リンク経由で実行したとき、実体の置き場の壊れた記録を検出しなかった"+
 			" (隣の囮を検査している):\n%s", out)
 	}
 
 	// 経路のディレクトリ自体がシンボリックリンクでも、実体側の置き場を検査すること。
-	// cd -P が cd -L に変わると解決先がリンク側へ割れ、隣の囮を検査して緑になる。
+	// cd -P が cd -L に変わると解決先がリンク側へ割れ、隣の囮を検査して成功する。
 	// ラッパーそのものはリンクでないので、上の [ -L ] のループでは捕まらない経路。
 	//
 	// リンクは bin ディレクトリに張る。リポジトリごとリンクすると、リンク側から見た
@@ -325,15 +325,15 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Dir = viaBase
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("経路のディレクトリがリンクのとき、実体の置き場の壊れた記録を見逃した"+
-			" (cd -P が効いていない):\n%s", out)
+		t.Fatalf("経路のディレクトリがリンクのとき、実体の置き場の壊れた記録を検出しなかった"+
+			" (cd -P が機能していない):\n%s", out)
 	}
 }
 
 // ラッパー経由で書き出した生成サマリの 1 行目には、生成時に焼き込んだ
-// リポジトリ相対の案内が入り、叩き方 (相対・絶対) に依らず同じになる。
+// リポジトリ相対の案内が入り、実行の仕方 (相対・絶対) に依らず同じになる。
 //
-// 生成は相対 (./bin/rtc)、検査は絶対パスで叩く。実行時の $0 から組み立てる
+// 生成は相対 (./bin/rtc)、検査は絶対パスで実行する。実行時の $0 から組み立てる
 // 実装だと、この 2 つで 1 行目が食い違い、生成直後のサマリが検査に落ちる
 // (実測)。文字列だけを見ると渡し忘れても通ってしまうので、実際に走らせる。
 func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
@@ -373,7 +373,7 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}
 
-	// リポジトリのルートから相対で叩く。利用者が実際に打つ形。
+	// リポジトリのルートから相対で実行する。利用者が実際に打つ形。
 	cmd := exec.Command("./bin/rtc", "-write-summary")
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
@@ -389,14 +389,14 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 		t.Errorf("生成サマリがラッパーのリポジトリ相対の案内になっていない:\n%s", string(got)[:min(200, len(got))])
 	}
 
-	// 生成したサマリは、別の叩き方 (絶対パス。CI・エディタ・PATH 経由の起動が
-	// これに当たる) の検査でも鮮度が合うこと。案内が叩き方に依存すると、
+	// 生成したサマリは、別の実行の仕方 (絶対パス。CI・エディタ・PATH 経由の起動が
+	// これに当たる) の検査でも鮮度が合うこと。案内が実行の仕方に依存すると、
 	// 生成した直後のサマリが古いと報告される。
 	check := exec.Command(wrapper)
 	check.Dir = repo
 	check.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := check.CombinedOutput(); err != nil {
-		t.Fatalf("生成した直後のサマリが、絶対パスで叩いた検査を通らない: %v\n%s", err, out)
+		t.Fatalf("生成した直後のサマリが、絶対パスで実行した検査を通らない: %v\n%s", err, out)
 	}
 }
 

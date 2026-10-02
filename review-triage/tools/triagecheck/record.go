@@ -2,9 +2,9 @@
 // スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
 //
 // 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
-// 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・ピン値の
+// 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・決め打ちの値の
 // 誤りが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
-// 偽赤になる」穴を生んだ。数えるものを書かせないことで、この類を発生源から消す。
+// 誤って失敗する」誤検出を生んだ。数えるものを書かせないことで、この類を発生源から消す。
 // スキーマの意味の正本は skills/review-triage/references/record-schema.md。
 package main
 
@@ -25,7 +25,7 @@ import (
 )
 
 // reviewTriageDir はトリアージの記録の置き場。この変数が唯一の定義 —
-// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が黙って外れる。
+// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が外れ、利用者はそれに気づけない。
 //
 // 既定は tmp/review-triages/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
 // 置き場が違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
@@ -55,7 +55,7 @@ var summaryCommand = defaultSummaryCommand
 //
 // 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧側 (listReviewTriageFiles)
 // は path.Join でパスを clean するため、置き場の表記だけを整えて接頭辞で照合すると
-// "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま緑になった。
+// "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま成功した。
 // 両辺を path.Clean に通せば、どちらの表記でも同じ判定になる。
 func inReviewTriageDir(f string) bool {
 	return path.Dir(f) == path.Clean(reviewTriageDir)
@@ -77,7 +77,7 @@ type recordRun struct {
 	Head     string          `yaml:"head"`
 	Findings []recordFinding `yaml:"findings"`
 	Plans    []recordPlan    `yaml:"plans"`
-	// Recurrence は旧様式のキー。同じ型の指摘が続いていることの判断 (検知) を
+	// Recurrence は旧様式のキー。同じ種類の指摘が続いていることの判断 (検知) を
 	// 記録していたが、検知は廃止したので新しい回には書かれない。置き場に残る
 	// 既存の記録を読み、生成サマリに従来どおり描画するために型と読み込みを残す。
 	// 検査は形 (許可キーと値の有無) だけで、中身の整合は見ない。有無をポインタで
@@ -220,7 +220,7 @@ type recordInvestigation struct {
 }
 
 // recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
-// 残存が「エラーなしで空」に化ける型を避けるため。attrs だけは任意のキーを許す
+// 残存が「エラーなしで空」として扱われる種類の欠陥を避けるため。attrs だけは任意のキーを許す
 // (上流固有の属性のパススルー)。
 var recordAllowedKeys = map[string]map[string]bool{
 	"トップレベル": {"runs": true},
@@ -315,10 +315,10 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 
 // recordLineCommentProblems は行内コメント (LineComment) を持つノードを検出する。
 // YAML の素のスカラーは半角スペースに続く # 以降をコメントとして落とすため、
-// 引用符の無い値に # を書くと値が黙って切り詰められる (実測で cause が「PR」だけに
+// 引用符の無い値に # を書くと値が警告なく切り詰められる (実測で cause が「PR」だけに
 // なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る —
 // 生テキストの正規表現で字句規則を再現する方式は、キーの形・空白・ブロックスカラー・
-// 値全体のコメントと境界のたびに穴が開いた (列挙する検査は穴を再生産する既知の型)。
+// 値全体のコメントと境界のたびに検出漏れが生じた (字句の形を列挙する検査は、列挙に無い形が現れるたびに検出漏れを繰り返す。既知の種類の欠陥である)。
 // ブロックスカラーの本文の # は内容でありコメントにならないので、構造的に区別される。
 // 行頭コメント (HeadComment) は値を壊さないため対象にしない。
 func recordLineCommentProblems(f string, root *yaml.Node) []string {
@@ -327,7 +327,7 @@ func recordLineCommentProblems(f string, root *yaml.Node) []string {
 	walk = func(n *yaml.Node) {
 		if n.LineComment != "" {
 			problems = append(problems, fmt.Sprintf(
-				"%s:%d: 行内コメント (%q) は使えません — YAML は ' #' 以降をコメントとして落とし、値が黙って切り詰められる。値に # を含めるときは引用符で囲む",
+				"%s:%d: 行内コメント (%q) は使えません — YAML は ' #' 以降をコメントとして落とし、値が警告なく切り詰められる。値に # を含めるときは引用符で囲む",
 				f, n.Line, n.LineComment))
 		}
 		for _, c := range n.Content {
@@ -349,7 +349,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 		}
 		return []string{fmt.Sprintf("%s: YAML を解析できません: %v", f, err)}, nil
 	}
-	// 記録は単一ドキュメント。--- 区切りの 2 つ目以降は読まれずに消えるため、存在自体を弾く。
+	// 記録は単一ドキュメント。--- 区切りの 2 つ目以降は読まれずに消えるため、存在自体を拒否する。
 	var extra yaml.Node
 	if err := dec.Decode(&extra); err == nil {
 		return []string{fmt.Sprintf(
@@ -374,7 +374,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 	return problems, &doc
 }
 
-// recordNullSilentKeys は、値を省いて null にすると他のどの検査でも赤くならない
+// recordNullSilentKeys は、値を省いて null にすると他のどの検査でも失敗しない
 // 構造キー。キーの有無をポインタの nil で見る plan_ref / investigation は、
 // 「キーを書いて値を省いた」(書きかけ・インデントの誤り) が「キーが無い」と
 // 同一になり、書き手は書いたつもりのまま記録上は無い扱いになる (実測:
@@ -413,7 +413,7 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 			}
 			if recordNullSilentKeys[k.Value] && v.Kind == yaml.ScalarNode && v.Tag == "!!null" {
 				problems = append(problems, fmt.Sprintf(
-					"%s:%d: %s の %s に値がありません。書くなら中身を書き、書かないならキーごと消す (値の無いキーは「無い」と同じに扱われ、書いたつもりの記録が黙って消える)",
+					"%s:%d: %s の %s に値がありません。書くなら中身を書き、書かないならキーごと消す (値の無いキーは「無い」と同じに扱われ、書いたつもりの記録が警告なく消える)",
 					f, k.Line, kind, k.Value))
 				continue
 			}
@@ -509,7 +509,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: %s がありません", fn, kv.key)
 				}
 			}
-			// audience の列挙。列挙外の値が黙って通ると D7 (被害者の判定) の入力が壊れる。
+			// audience の列挙。列挙外の値をエラーにせずに通すと D7 (被害者の判定) の入力が壊れる。
 			if fd.Audience != "" && !recordAudiences[fd.Audience] {
 				add("%s: audience は operator / admin / provider / developer のいずれか: %q", fn, fd.Audience)
 			}
@@ -593,7 +593,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// externalOnly は done-external 専用のキーが空であることを検査する。
 			// スキーマ表が「done-external のときだけ書く」と定める排他で、書かせる
 			// だけで検査しないと、done でコミット済みなのに外部 URL が残る記録が
-			// 黙って通る (sha の排他は前から検査されていた)。列挙外の status では
+			// エラーにならずに通る (sha の排他は前から検査されていた)。列挙外の status では
 			// 呼ばない — default が列挙違反を報告するので、そこへ重ねると 1 つの
 			// 誤字が 2 つの問題になる。
 			externalOnly := func() {
@@ -723,13 +723,13 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 		}
 		// 被覆: 採択は自回の plans か plan_ref で覆われる。覆われない採択は、
-		// 対処しないまま黙って消える。
+		// 対処しないまま、誰にも知らされずに消える。
 		//
 		// 免除するのは「plans がまだ無い最後の回」だけ — fix 前の状態を指す。
 		// 後続の回が追記された時点でその回はもう fix 前ではないので、免除を解く。
 		// 全回で len(run.Plans) > 0 を条件にしていた頃は、plans を書かないまま
 		// 次の回に進んだ過去の回の採択が、検査からも review-triage-fix (最後の回の
-		// findings しか見ない) からも見えなくなり、黙って消えていた。
+		// findings しか見ない) からも見えなくなり、誰にも知らされずに消えていた。
 		isLastRun := ri == len(doc.Runs)-1
 		if len(run.Plans) > 0 || !isLastRun {
 			covered := map[int]bool{}
@@ -902,7 +902,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 					fmt.Fprintf(&b, "\n- **%s はリポジトリ外へ反映済み**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Notes))
 				}
 			}
-			// 直す前の調査の範囲と結果。次のレビューで同じ型の指摘が来たとき、前回の
+			// 直す前の調査の範囲と結果。次のレビューで同じ種類の指摘が来たとき、前回の
 			// 調査漏れ (範囲の外だった) か新規かを判別する材料なので表の外に出す。
 			// 無い問題は出さない — 無いことが「未調査」の表現。
 			for _, pl := range run.Plans {
@@ -926,7 +926,7 @@ func recordRow(cells []string) string {
 
 // renderFindingCells は指摘 1 件の表のセル列を返す。行を 1 つの書式文字列で
 // 組み立てると、テストがセル単位で分岐を検証できず、存在確認のアサーションが
-// 別のセルへの偶然一致で通り抜ける (実測で 3 度起きた型)。
+// 別のセルへの偶然一致で合格してしまう (実測で 3 度起きた種類の欠陥)。
 func renderFindingCells(fd recordFinding) []string {
 	loc := fd.File
 	if fd.Line > 0 {
@@ -1143,23 +1143,23 @@ func recordStatusJa(s string) string {
 // 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れない。
 // 権限・I/O のエラーは続行しても意味が無いので、これとは区別して返す。
 var errRecordDirMissing = errors.New(
-	"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま緑になるため報告する)")
+	"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま成功するため報告する)")
 
 // listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
-// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って緑の型) を塞ぐため。
+// git add 前の最初の記録が検査の対象に入らず、0 件マッチのまま検査が成功する種類の欠陥を防ぐため。
 //
 // ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
 // (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。
 // 未指定 (既定値) のまま不在なのはスキル未導入の正常な状態で、nil を返す。
-// 判定を分けないと、置き場を移した時点で検査が黙って無効になる
+// 判定を分けないと、置き場を移した時点で検査が無効になり、利用者はそれに気づけない
 // (judgment_flow.go の explicit と同じ理由)。
 func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		// ディレクトリが無いのはスキル未導入の正常な状態 (明示指定のときを除く)。
-		// それ以外 (権限・I/O) のエラーを「記録 0 件」に潰すと、守りが黙って外れる。
+		// それ以外 (権限・I/O) のエラーを「記録 0 件」に潰すと、検査が行われなくなり、利用者はそれに気づけない。
 		// 判定は judgment_flow.go と同じ errors.Is に揃える (ラップされたエラーも
 		// 正しく分類するため)。
 		if errors.Is(err, fs.ErrNotExist) {
@@ -1191,7 +1191,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 
 // writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
 // (-write-summary の経路)。explicit は listReviewTriageFiles と同じ意味 —
-// 明示指定した置き場が無いなら、0 件生成して黙って成功させない。
+// 明示指定した置き場が無いなら、0 件生成して、エラーを出さずに成功させない。
 func writeReviewTriageSummaries(dir string, explicit bool) error {
 	files, err := listReviewTriageFiles(dir, explicit)
 	if err != nil {
