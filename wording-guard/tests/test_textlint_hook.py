@@ -225,6 +225,7 @@ class TestFinding(unittest.TestCase):
                                "fix": {"range": [3, 7], "text": "同じ種類の"}}, source)
         self.assertEqual(f["matched"], "同じ型の")
         self.assertEqual(f["start"], 2)
+        self.assertEqual(f["end"], 6)
 
     def test_single_character_range_is_not_shown(self):
         f = textlint._finding({"ruleId": "r", "severity": 1, "message": "m", "range": [0, 1]}, "レビューを行う")
@@ -432,6 +433,29 @@ class TestIntroduced(unittest.TestCase):
         self.assertEqual(hook.introduced([KIKU], [KIKU, KIKU]), [KIKU])
 
 
+class TestChangedLines(unittest.TestCase):
+    def test_inserted_line_has_empty_before_range(self):
+        self.assertEqual(hook.changed_line_ranges("a\nb\nc\n", "a\nX\nb\nc\n"), ([(1, 1)], [(1, 2)]))
+
+    def test_replaced_line(self):
+        self.assertEqual(hook.changed_line_ranges("a\nb\nc\n", "a\nB\nc\n"), ([(1, 2)], [(1, 2)]))
+
+    def test_new_file(self):
+        self.assertEqual(hook.changed_line_ranges("", "a\nb\n"), ([(0, 0)], [(0, 2)]))
+
+    def test_in_lines_uses_start_and_end(self):
+        text = "一行目\n長い文の\n続き。\n四行目\n"
+        long = {"rule": "sentence-length", "start": text.index("長い"), "end": text.index("。") + 1, "line": 2}
+        head = {"rule": "r", "start": 0, "end": 3, "line": 1}
+        # 長い文は 2 行目から 3 行目にまたがるので、3 行目だけを書き換えても重なる
+        self.assertEqual(hook.in_lines(text, [long, head], [(2, 3)]), [long])
+        self.assertEqual(hook.in_lines(text, [long, head], [(3, 4)]), [])
+
+    def test_in_lines_without_start_uses_line(self):
+        self.assertEqual(hook.in_lines("a\nb\n", [KATA], [(0, 1)]), [KATA])
+        self.assertEqual(hook.in_lines("a\nb\n", [KATA], [(1, 2)]), [])
+
+
 class TestHook(RepoTestCase):
     def event(self, tool="Edit", path="docs/a.md", tool_response=None, **tool_input):
         tool_input.setdefault("file_path", os.path.join(self.root, path))
@@ -475,7 +499,9 @@ class TestHook(RepoTestCase):
     def test_error_blocks_and_ignores_existing_findings(self):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "前の行。\nここでも効く。\n同じ型の指摘。\n")
-        check, calls = self.fake([[KIKU], [KIKU, KATA]])
+        kiku = finding("prh", KIKU["message"], "効く", line=2)
+        kata = finding("prh", KATA["message"], "同じ型の", line=3)
+        check, calls = self.fake([[kiku], [kiku, kata]])
         out = hook.handle(self.event(old_string="ここでも効く。", new_string="ここでも効く。\n同じ型の指摘。",
                                      tool_response={"originalFile": "前の行。\nここでも効く。\n"}), check)
         self.assertEqual(out["decision"], "block")
@@ -486,6 +512,31 @@ class TestHook(RepoTestCase):
         self.assertEqual(texts, ["前の行。\nここでも効く。\n", "前の行。\nここでも効く。\n同じ型の指摘。\n"])
         self.assertEqual(filename, "a.md")
         self.assertIn("正本", patterns)
+
+    def test_findings_outside_changed_lines_are_not_returned(self):
+        # message に行番号を入れる規則 (sentence-length) は、前に行を足すと既存の検出の message が変わる。
+        # 書き換えた行の外の検出は比べないので、返らない
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "見出し。\n足した行。\n\n長い文。\n")
+        before = finding("sentence-length", "Line 3 sentence length(47) exceeds the maximum sentence length of 40.", "長い文。", line=3)
+        after = finding("sentence-length", "Line 4 sentence length(47) exceeds the maximum sentence length of 40.", "長い文。", line=4)
+        check, _ = self.fake([[before], [after]])
+        self.assertIsNone(hook.handle(self.event(old_string="見出し。", new_string="見出し。\n足した行。",
+                                                 tool_response={"originalFile": "見出し。\n\n長い文。\n"}), check))
+
+    def test_only_finding_on_changed_line_is_returned(self):
+        # message にファイル全体の件数を入れる規則 (no-mix-dearu-desumasu) では、既存の検出の message も変わるが、
+        # 書き換えた行にある検出だけを返す
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "である。\nです。\nである。\n")
+        old = finding("no-mix-dearu-desumasu", "混在: です\nTotal:\nである  : 1\nですます: 1", "です", line=2)
+        existing = finding("no-mix-dearu-desumasu", "混在: です\nTotal:\nである  : 2\nですます: 1", "です", line=2)
+        added = finding("no-mix-dearu-desumasu", "混在: である\nTotal:\nである  : 2\nですます: 1", "である", line=3)
+        check, _ = self.fake([[old], [existing, added]])
+        out = hook.handle(self.event(old_string="です。", new_string="です。\nである。",
+                                     tool_response={"originalFile": "である。\nです。\n"}), check)
+        self.assertIn("「である」", out["reason"])
+        self.assertNotIn("「です」", out["reason"])
 
     def test_code_block_keeps_its_context(self):
         # コードブロックの中の行を書き換えても、囲みの ``` を含むファイルの全体を渡す

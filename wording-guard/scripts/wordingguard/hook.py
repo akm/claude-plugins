@@ -7,8 +7,10 @@ Edit / MultiEdit / Write で Markdown に書き足した文章を textlint で�
     (プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くため)。textlint.hook は設定の型を
     検査する前に見るので、有効にしていないリポジトリでは設定の誤りでも何もしない。
   - 書き換えた後のファイルの全体 (ディスクから読む) と、書き換える前のファイルの全体 (Claude Code が hook に渡す
-    ツールの結果 tool_response の originalFile) を検査し、増えた検出だけを返す。文字列だけを切り出して検査すると、
-    コードブロックや引用ブロックの中の行が本文として解析されるため、ファイルの全体で比べる。ツールの入力
+    ツールの結果 tool_response の originalFile) を検査し、書き換えた行にある検出のうち、増えたものだけを返す。
+    文字列だけを切り出して検査すると、コードブロックや引用ブロックの中の行が本文として解析されるため、
+    ファイルの全体を検査する。書き換えた行の外の検出を比べないのは、message に行番号やファイル全体の件数を
+    入れる規則があり、書き換えた箇所の外の既存の検出も message が変わるため。ツールの入力
     (new_string) から書き換える前の内容を組み立てないのは、Edit が引用符をファイルに合わせて書き換えたり、
     利用者が提案を変えたりして、ファイルにツールの入力どおりの文字列が無いことがあるため。
   - error (用語ファイルの避ける語) があれば decision: block で直すよう求め、warning (規則集の候補) だけなら
@@ -16,7 +18,9 @@ Edit / MultiEdit / Write で Markdown に書き足した文章を textlint で�
   - 設定・用語ファイルの誤りや、textlint が入っていないときは、検査を省略せずに、Claude と利用者に知らせる。
 """
 
+import bisect
 import collections
+import difflib
 import os
 import sys
 
@@ -46,6 +50,47 @@ def contents_before(tool, tool_response):
         raise ValueError(f"hook の入力の tool_response の originalFile が文字列でない ({original!r}。"
                          "書き換える前の内容が大きすぎるときは null になる)")
     return original
+
+
+def changed_line_ranges(before, after):
+    """書き換える前と後で違う行の範囲を、(前の範囲のリスト, 後の範囲のリスト) で返す。
+
+    範囲は (始まりの行, 終わりの行) で、行は 0 から数え、終わりの行を含まない。行は改行 (\\n) で区切る
+    (textlint の行番号と同じ数え方)。行を足しただけの箇所は、前の範囲が空 (始まりと終わりが同じ) になる。
+    """
+    a, b = before.split("\n"), after.split("\n")
+    before_ranges, after_ranges = [], []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if tag != "equal":
+            before_ranges.append((i1, i2))
+            after_ranges.append((j1, j2))
+    return before_ranges, after_ranges
+
+
+def in_lines(text, findings, ranges):
+    """findings (text の検出) のうち、行の範囲 ranges のどれかに重なるものを返す。
+
+    検出の行は、始まり (start) から終わり (end) までの Python の文字列の位置から数える。複数の行にまたがる
+    検出 (長い文など) は、どれかの行が範囲に入れば重なるとする。位置の無い検出は範囲で絞れないので残す。
+    """
+    line_starts = [0] + [i + 1 for i, ch in enumerate(text) if ch == "\n"]
+
+    def line_of(index):
+        return bisect.bisect_right(line_starts, index) - 1
+
+    result = []
+    for f in findings:
+        if f.get("start") is not None:
+            first = line_of(f["start"])
+            last = line_of(max(f.get("end") or f["start"], f["start"] + 1) - 1)
+        elif f.get("line"):
+            first = last = f["line"] - 1
+        else:
+            result.append(f)
+            continue
+        if any(first < end and last >= start for start, end in ranges):
+            result.append(f)
+    return result
 
 
 def _key(finding):
@@ -161,8 +206,9 @@ def handle(event, check_texts=None):
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:
         return _failure(str(e))
 
+    before_ranges, after_ranges = changed_line_ranges(before, after)
     errors, warnings = [], []
-    for f in introduced(results[0], results[1]):
+    for f in introduced(in_lines(before, results[0], before_ranges), in_lines(after, results[1], after_ranges)):
         (errors if f["severity"] == "error" else warnings).append((after, f))
     if not errors and not warnings:
         return None

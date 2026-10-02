@@ -242,8 +242,8 @@ def _utf16_indexer(text):
 def _finding(message, source, to_index=None):
     """textlint の 1 件の検出を、wording-guard が扱う形に変換する。
 
-    start は検出の始まりの Python の文字列の位置 (source の中の位置)。line と column は textlint の値のまま
-    (column は UTF-16 の単位で数える) なので、文字列を切り出すときは start を使う。
+    start と end は検出の始まりと終わりの Python の文字列の位置 (source の中の位置)。line と column は textlint の
+    値のまま (column は UTF-16 の単位で数える) なので、文字列を切り出すときは start を使う。
     to_index は _utf16_indexer(source) の結果。同じ source の検出を続けて変換するときは、1 回作って渡す。
     """
     severity = SEVERITIES.get(message.get("severity"))
@@ -253,11 +253,12 @@ def _finding(message, source, to_index=None):
     # 他の規則にも range が 1 文字だけのもの (ja-no-redundant-expression など) があり、
     # 1 文字では何を指すか読み取れないので、その場合は検出した文字列を空にする
     span = (message.get("fix") or {}).get("range") or message.get("range")
-    start, matched = None, ""
+    start, end, matched = None, None, ""
     if span and source is not None:
         if to_index is None:
             to_index = _utf16_indexer(source)
         start = to_index((message.get("range") or span)[0])
+        end = max(to_index((message.get("range") or span)[1]), to_index(span[1]))
         matched = source[to_index(span[0]):to_index(span[1])]
     if len(matched) <= 1:
         matched = ""
@@ -268,6 +269,7 @@ def _finding(message, source, to_index=None):
         "line": message.get("line"),
         "column": message.get("column"),
         "start": start,
+        "end": end,
         "matched": matched,
     }
 
