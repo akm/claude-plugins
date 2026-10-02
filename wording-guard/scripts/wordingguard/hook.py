@@ -162,7 +162,7 @@ def handle(event, check_texts=None):
             try:
                 before = reconstruct_before(after, _edits(tool, tool_input))
             except ValueError as e:
-                return _failure(f"{e} ので、書き換える前の内容を組み立てられない ({path})。"
+                return _failure(f"書き換える前の内容を組み立てられない ({path}): {e}。"
                                 "書いた直後に別の処理がファイルを変えた可能性がある")
         results = check_texts(root, cfg, term_list, [before, after], filename=os.path.basename(path))
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:

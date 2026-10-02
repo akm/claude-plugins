@@ -541,7 +541,10 @@ class TestHook(RepoTestCase):
         self.write("docs/a.md", "別の内容\n")
         out = hook.handle(self.event(old_string="a", new_string="b"), self.not_called)
         self.assertEqual(out["decision"], "block")
-        self.assertIn("new_string が見つからない", out["systemMessage"])
+        self.assertIn("書き換える前の内容を組み立てられない", out["systemMessage"])
+        self.assertIn("new_string が見つからない。", out["systemMessage"])
+        # 例外の文の後に、空白を挟んで助詞を続けない
+        self.assertNotIn("見つからない ので", out["systemMessage"])
 
     def test_unreadable_file_is_reported(self):
         self.configure(textlint={"hook": True})
