@@ -8,7 +8,7 @@
 ここでテストするのは、モデルの裁量ではなく決定的に決まるべき部分:
   - 発火頻度の間引き（1 セッションにつき 1 回だけ）
   - 各ツールの**実際の形**で発火すること
-  - 間引けないとき（書き込めない・並列）に鳴り続けないこと
+  - 間引けないとき（書き込めない・並列）に通知を出し続けないこと
   - 対象ツールの判定、リポジトリ外では通知を出さないこと
 """
 
@@ -42,7 +42,7 @@ class TestPlanContent(unittest.TestCase):
     """促す対象になる中身があるかの判定。
 
     内容の同一性は見ない（セッション単位で数えるため）。ここで見るのは
-    「状態を変えただけの呼び出しで鳴らさない」ことだけ。
+    「状態を変えただけの呼び出しで通知を出さない」ことだけ。
     """
 
     def test_todo_list_has_content(self):
@@ -245,7 +245,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(fired, 1, "6 タスクの計画で " + str(fired) + " 回発火した")
 
     def test_adding_a_task_later_does_not_renotify(self):
-        # 作業中にサブタスクを見つけて足すのはよくある。そのたびに鳴らさない。
+        # 作業中にサブタスクを見つけて足すのはよくある。そのたびに通知を出さない。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         grown = self._payload(todos=[{"content": "A を直す"}, {"content": "B も直す"}])
         self.assertEqual(self._run(grown)[0], SILENT)
@@ -272,7 +272,7 @@ class TestHookBehavior(unittest.TestCase):
 
     def test_a_rewritten_plan_does_not_renotify(self):
         # 割り切り: 計画を作り直しても 2 回目は出ない。促す機会は減るが、
-        # 鳴りすぎて無視されるほうが失敗として重い。
+        # 通知が出すぎて無視されるほうが失敗として重い。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         rewritten = self._payload(todos=[{"content": "まったく別の作業"}])
         self.assertEqual(self._run(rewritten)[0], SILENT)
@@ -368,7 +368,7 @@ class TestHookBehavior(unittest.TestCase):
     def test_falsy_session_ids_currently_share_one_marker(self):
         # 既知の割り切り。falsy な session_id はすべて同じマーカーになるため、
         # 別セッションどうしが打ち消し合う。実際の session_id は UUID なので
-        # 到達しない。**直したらこのテストを「別々に鳴る」に変える。**
+        # 到達しない。**直したらこのテストを「別々に通知が出る」に変える。**
         first = self._payload(session="s")
         del first["session_id"]
         self.assertEqual(self._run(first)[0], NOTIFIED)
@@ -382,7 +382,7 @@ class TestHookBehavior(unittest.TestCase):
     @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が効かない")
     def test_unwritable_state_dir_still_notifies(self):
         # 状態を保存できないと間引けない。ここで通知を出さないと、フックは二度と通知を出さなくなり、
-        # しかも利用者はそれを正常な間引きと区別できない。何も知らせずに機能しなくなるより鳴らす。
+        # しかも利用者はそれを正常な間引きと区別できない。何も知らせずに機能しなくなるより通知を出す。
         os.makedirs(self.state, exist_ok=True)
         os.chmod(self.state, 0o500)
         try:
@@ -409,7 +409,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
     def test_normal_throttling_is_unaffected(self):
-        # 「置けない」で鳴らす側を選んでも、「既に在る」の間引きは効いたまま。
+        # 「置けない」で通知を出す側を選んでも、「既に在る」の間引きは効いたまま。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
