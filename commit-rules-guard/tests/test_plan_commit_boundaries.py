@@ -379,7 +379,7 @@ class TestHookBehavior(unittest.TestCase):
             self.assertEqual(self._run(payload)[0], SILENT,
                              repr(falsy) + " が別セッションとして扱われた")
 
-    @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が効かない")
+    @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が適用されない")
     def test_unwritable_state_dir_still_notifies(self):
         # 状態を保存できないと間引けない。ここで通知を出さないと、フックは二度と通知を出さなくなり、
         # しかも利用者はそれを正常な間引きと区別できない。何も知らせずに機能しなくなるより通知を出す。
@@ -404,12 +404,12 @@ class TestHookBehavior(unittest.TestCase):
         self.assertFalse(os.path.exists(stale), "古いマーカーが残った")
 
     def test_sweep_does_not_remove_the_marker_just_claimed(self):
-        # 掃除がいま取ったマーカーを消すと、間引きが効かなくなる。
+        # 掃除がいま取ったマーカーを消すと、間引きが機能しなくなる。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
     def test_normal_throttling_is_unaffected(self):
-        # 「置けない」で通知を出す側を選んでも、「既に在る」の間引きは効いたまま。
+        # 「置けない」で通知を出す側を選んでも、「既に在る」の間引きは機能したまま。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
