@@ -8,8 +8,8 @@
 ここでテストするのは、モデルの裁量ではなく決定的に決まるべき部分:
   - 発火頻度の間引き（1 セッションにつき 1 回だけ）
   - 各ツールの**実際の形**で発火すること
-  - 間引けないとき（書き込めない・並列）に鳴り続けないこと
-  - 対象ツールの判定、リポジトリ外では黙ること
+  - 並列に呼ばれても通知は 1 回に限られ、状態を書き込めないときは間引かずに毎回通知すること
+  - 対象ツールの判定、リポジトリ外では通知を出さないこと
 """
 
 import importlib.util
@@ -42,7 +42,7 @@ class TestPlanContent(unittest.TestCase):
     """促す対象になる中身があるかの判定。
 
     内容の同一性は見ない（セッション単位で数えるため）。ここで見るのは
-    「状態を変えただけの呼び出しで鳴らさない」ことだけ。
+    「状態を変えただけの呼び出しで通知を出さない」ことだけ。
     """
 
     def test_todo_list_has_content(self):
@@ -132,7 +132,7 @@ class TestStateDir(unittest.TestCase):
 
     def test_does_not_default_to_the_shared_temp_dir(self):
         # Linux の /tmp は誰でも書ける。マーカー名は session_id から計算できるため、
-        # 先回りして置かれるとリマインダを黙らせられる。
+        # 先回りして置かれるとリマインダを出させないようにできる。
         os.environ.pop("COMMIT_GUARD_STATE_DIR", None)
         os.environ.pop("XDG_STATE_HOME", None)
         os.environ["HOME"] = "/home/someone"
@@ -169,7 +169,7 @@ class TestSweep(unittest.TestCase):
         self.assertTrue(os.path.exists(fresh))
 
     def test_does_not_touch_other_files(self):
-        # 自分が作ったもの以外には触らない。
+        # 自分が作ったもの以外は消さない。
         other = os.path.join(self.state, "someone-elses.txt")
         with open(other, "w") as f:
             f.write("x")
@@ -245,7 +245,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(fired, 1, "6 タスクの計画で " + str(fired) + " 回発火した")
 
     def test_adding_a_task_later_does_not_renotify(self):
-        # 作業中にサブタスクを見つけて足すのはよくある。そのたびに鳴らさない。
+        # 作業中にサブタスクを見つけて足すのはよくある。そのたびに通知を出さない。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         grown = self._payload(todos=[{"content": "A を直す"}, {"content": "B も直す"}])
         self.assertEqual(self._run(grown)[0], SILENT)
@@ -272,7 +272,7 @@ class TestHookBehavior(unittest.TestCase):
 
     def test_a_rewritten_plan_does_not_renotify(self):
         # 割り切り: 計画を作り直しても 2 回目は出ない。促す機会は減るが、
-        # 鳴りすぎて無視されるほうが失敗として重い。
+        # 通知が出すぎて無視されるほうが失敗として重い。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         rewritten = self._payload(todos=[{"content": "まったく別の作業"}])
         self.assertEqual(self._run(rewritten)[0], SILENT)
@@ -341,7 +341,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(payload)[0], SILENT)
 
     def test_silent_outside_a_repository(self):
-        # コミットの話が無関係な場所では黙る。
+        # コミットの話が無関係な場所では通知を出さない。
         outside = os.path.join(self._dir.name, "plain")
         os.makedirs(outside)
         payload = self._payload()
@@ -368,7 +368,7 @@ class TestHookBehavior(unittest.TestCase):
     def test_falsy_session_ids_currently_share_one_marker(self):
         # 既知の割り切り。falsy な session_id はすべて同じマーカーになるため、
         # 別セッションどうしが打ち消し合う。実際の session_id は UUID なので
-        # 到達しない。**直したらこのテストを「別々に鳴る」に変える。**
+        # 到達しない。**直したらこのテストを「別々に通知が出る」に変える。**
         first = self._payload(session="s")
         del first["session_id"]
         self.assertEqual(self._run(first)[0], NOTIFIED)
@@ -379,10 +379,10 @@ class TestHookBehavior(unittest.TestCase):
             self.assertEqual(self._run(payload)[0], SILENT,
                              repr(falsy) + " が別セッションとして扱われた")
 
-    @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が効かない")
+    @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が適用されない")
     def test_unwritable_state_dir_still_notifies(self):
-        # 状態を保存できないと間引けない。ここで黙ると、フックは永久に無言になり、
-        # しかも利用者はそれを正常な間引きと区別できない。静かに死ぬより鳴らす。
+        # 状態を保存できないと間引けない。ここで通知を出さないと、状態を保存できない間フックは一切通知を出さなくなり、
+        # しかも利用者はそれを正常な間引きと区別できない。何も知らせずに機能しなくなるより通知を出す。
         os.makedirs(self.state, exist_ok=True)
         os.chmod(self.state, 0o500)
         try:
@@ -404,12 +404,12 @@ class TestHookBehavior(unittest.TestCase):
         self.assertFalse(os.path.exists(stale), "古いマーカーが残った")
 
     def test_sweep_does_not_remove_the_marker_just_claimed(self):
-        # 掃除がいま取ったマーカーを消すと、間引きが効かなくなる。
+        # 掃除がいま取ったマーカーを消すと、間引きが機能しなくなる。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
     def test_normal_throttling_is_unaffected(self):
-        # 「置けない」を鳴らす側に倒しても、「既に在る」の間引きは効いたまま。
+        # 「置けない」で通知を出す側を選んでも、「既に在る」の間引きは機能したまま。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
@@ -445,7 +445,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(self._payload(session=base + "B"))[0], NOTIFIED)
 
     def test_outside_a_repo_does_not_spend_the_session_budget(self):
-        # リポジトリ外では黙るが、そこで通知枠を消費してはいけない。
+        # リポジトリ外では通知を出さないが、そこで通知枠を消費してはいけない。
         # main() が git の判定より後に claim() する順序を固定する。
         outside = os.path.join(self._dir.name, "plain2")
         os.makedirs(outside)

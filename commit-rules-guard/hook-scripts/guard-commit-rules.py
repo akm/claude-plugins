@@ -26,7 +26,7 @@
   - COMMIT_GUARD_RULES_FILE: 表示するルールファイルのパス。既定は
     ~/.claude/rules/commit-rules.md → プラグイン同梱の rules/commit-rules.md の順に探す。
 
-想定外で落ちたら全 Bash を止めないよう許可側に倒す（return 0）。
+想定外で落ちたら全 Bash を止めないよう許可する側を選ぶ（return 0）。
 """
 
 import fnmatch
@@ -130,7 +130,7 @@ def _string_list(value):
     """value が list ならその中の非空 str だけを返す。それ以外（str 単体・数値・dict 等）は空。
 
     JSON の型ミス（例: "db/schema.sql" を配列にし忘れた、数値を書いた）で
-    下流の反復処理が例外を投げ、本体全体が黙って無効化されるのを防ぐ。
+    下流の反復処理が例外を投げ、利用者が気づかないまま本体全体が無効化されるのを防ぐ。
     """
     if not isinstance(value, list):
         return []
