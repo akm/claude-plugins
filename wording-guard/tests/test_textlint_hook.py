@@ -632,6 +632,27 @@ class TestCheckCommand(RepoTestCase):
             with self.assertRaises(config.ConfigError):
                 wording_lint._markdown_files(self.root, config.load(self.root), [d])
 
+    def test_directory_needs_git_repository_root(self):
+        # git リポジトリでないルートでは、ディレクトリの指定は誤りになり、ファイルの指定は対象にできる
+        with tempfile.TemporaryDirectory() as tmp:
+            d = os.path.realpath(tmp)
+            if config.find_root(d) is not None:
+                self.skipTest("一時ディレクトリが git リポジトリの中にある")
+            os.makedirs(os.path.join(d, "docs"))
+            with open(os.path.join(d, "docs", "a.md"), "w", encoding="utf-8") as f:
+                f.write("x")
+            os.makedirs(os.path.dirname(os.path.join(d, config.CONFIG_RELPATH)))
+            with open(os.path.join(d, config.CONFIG_RELPATH), "w", encoding="utf-8") as f:
+                json.dump({"textlint": {}}, f)
+            err = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+                code = wording_lint.main(["check", os.path.join(d, "docs"), "--root", d])
+            self.assertEqual(code, 2)
+            self.assertIn("ディレクトリの指定は、ルート", err.getvalue())
+            self.assertIn("ファイルは直接指定すれば対象にできる", err.getvalue())
+            files, _ = wording_lint._markdown_files(d, None, [os.path.join(d, "docs", "a.md")])
+            self.assertEqual(files, [os.path.join(d, "docs", "a.md")])
+
     def test_check_without_textlint_installed(self):
         self.configure(textlint={})
         self.write("a.md", "x")

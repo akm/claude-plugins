@@ -111,7 +111,9 @@ def _git_markdown_files(root, directory):
     r = subprocess.run(["git", "-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", rel],
                        capture_output=True, text=True)
     if r.returncode != 0:
-        raise config.ConfigError(f"{directory} の下のファイルを git で列挙できない: {r.stderr.strip()}")
+        raise config.ConfigError(
+            f"{directory} の下の Markdown を git で列挙できない。ディレクトリの指定は、ルート ({root}) が git リポジトリの"
+            f"ときだけ使える (git に無視されたファイルを除くため)。ファイルは直接指定すれば対象にできる: {r.stderr.strip()}")
     names = [n for n in r.stdout.split("\0") if n.endswith(".md")]
     # 削除してまだコミットしていないファイルも --cached に出るので、存在するものだけにする
     return sorted(p for p in (os.path.join(root, n) for n in names) if os.path.isfile(p))
