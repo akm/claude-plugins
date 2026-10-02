@@ -6,9 +6,10 @@ Edit / MultiEdit / Write で Markdown に書き足した文字列を textlint �
   - 検査するのは、設定キー textlint.hook を true にしたリポジトリの Markdown だけ。それ以外は何もしない
     (プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くため)。textlint.hook は設定の型を
     検査する前に見るので、有効にしていないリポジトリでは設定の誤りでも何もしない。
-  - Edit / MultiEdit は、書き換える前の文字列 (old_string) と後の文字列 (new_string) を両方検査し、
-    後で増えた検出だけを返す。new_string には、一意に特定するために変えていない前後の行も入るので、
-    そこにあった検出 (他の人が既に書いた文章) を、今回持ち込んだものとして扱わないため。
+  - Edit / MultiEdit は、書き換えた後のファイルの全体 (ディスクから読む) と、old_string と new_string から
+    組み立てた書き換える前の内容の全体を検査し、増えた検出だけを返す。文字列だけを切り出して検査すると、
+    コードブロックや引用ブロックの中の行が本文として解析されるため、ファイルの全体で比べる。
+    書き換える箇所の前後の変えていない行にあった検出 (他の人が既に書いた文章) は、前後の両方にあるので返らない。
   - Write は、書いた内容の全体を検査する (書き換える前の内容は hook に渡されない)。
   - error (用語ファイルの避ける語) があれば decision: block で直すよう求め、warning (規則集の候補) だけなら
     additionalContext で判断の材料として渡す。
@@ -25,15 +26,35 @@ MAX_ITEMS = 30
 EVENT_NAME = "PostToolUse"
 
 
-def _pairs(tool, tool_input):
-    """(書き換える前の文字列, 後の文字列) の組を返す。対象外のツールなら空のリスト。"""
+TOOLS = ("Edit", "MultiEdit", "Write")
+
+
+def _edits(tool, tool_input):
+    """書き換えの列 [(old_string, new_string, replace_all)] を、行った順に返す。"""
     if tool == "Edit":
-        return [(tool_input.get("old_string", ""), tool_input.get("new_string", ""))]
+        return [(tool_input.get("old_string", ""), tool_input.get("new_string", ""),
+                 bool(tool_input.get("replace_all")))]
     if tool == "MultiEdit":
-        return [(e.get("old_string", ""), e.get("new_string", "")) for e in tool_input.get("edits", [])]
-    if tool == "Write":
-        return [("", tool_input.get("content", ""))]
+        return [(e.get("old_string", ""), e.get("new_string", ""), bool(e.get("replace_all")))
+                for e in tool_input.get("edits", [])]
     return []
+
+
+def reconstruct_before(after, edits):
+    """書き換えた後の内容 after から、書き換えを後ろから順に戻して、書き換える前の内容を組み立てる。
+
+    new_string が空の書き換え (削除) は、新しい文章を持ち込まず、戻す位置も決められないので戻さない。
+    new_string が複数の場所にあるときは、最初の場所を戻す (replace_all はすべての場所を戻す)。
+    new_string が見つからないとき (書いた直後に別の処理がファイルを変えたなど) は ValueError を送出する。
+    """
+    before = after
+    for old, new, replace_all in reversed(edits):
+        if not new:
+            continue
+        if new not in before:
+            raise ValueError("書き換えた後のファイルに new_string が見つからない")
+        before = before.replace(new, old) if replace_all else before.replace(new, old, 1)
+    return before
 
 
 def _key(finding):
@@ -100,10 +121,10 @@ def handle(event, check_texts=None):
 
     check_texts はテストで textlint の実行を差し替えるための引数。
     """
+    tool = event.get("tool_name")
     tool_input = event.get("tool_input") or {}
     path = tool_input.get("file_path") or ""
-    pairs = _pairs(event.get("tool_name"), tool_input)
-    if not pairs or not path.endswith(".md"):
+    if tool not in TOOLS or not path.endswith(".md"):
         return None
     root = config.find_root(path)
     if root is None:
@@ -130,15 +151,26 @@ def handle(event, check_texts=None):
         check_texts = textlint.check_texts
     try:
         term_list = terms.load_all(config.terms_paths(root, cfg))
-        texts = [t for pair in pairs for t in pair]
-        results = check_texts(root, cfg, term_list, texts, filename=os.path.basename(path))
+        if tool == "Write":
+            before, after = "", tool_input.get("content", "")
+        else:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    after = f.read()
+            except (OSError, UnicodeDecodeError) as e:
+                return _failure(f"書き換えた後のファイル {path} を読めない: {e}")
+            try:
+                before = reconstruct_before(after, _edits(tool, tool_input))
+            except ValueError as e:
+                return _failure(f"{e} ので、書き換える前の内容を組み立てられない ({path})。"
+                                "書いた直後に別の処理がファイルを変えた可能性がある")
+        results = check_texts(root, cfg, term_list, [before, after], filename=os.path.basename(path))
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:
         return _failure(str(e))
 
     errors, warnings = [], []
-    for i, (_, after_text) in enumerate(pairs):
-        for f in introduced(results[2 * i], results[2 * i + 1]):
-            (errors if f["severity"] == "error" else warnings).append((after_text, f))
+    for f in introduced(results[0], results[1]):
+        (errors if f["severity"] == "error" else warnings).append((after, f))
     if not errors and not warnings:
         return None
     rel = os.path.relpath(os.path.realpath(path), os.path.realpath(root))
