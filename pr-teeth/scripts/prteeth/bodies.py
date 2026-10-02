@@ -203,7 +203,7 @@ def prune(bodies_dir, alive=None, max_bodies=None):
         return []
 
     # 既定値は呼び出し時に読む。定義時に束縛すると、MAX_BODIES を差し替えても
-    # 反映されない（設定から上限を変えられるようにする際にも、この書き方が要る）。
+    # 反映されない（設定から上限を変えられるようにするときも、この書き方なら差し替えた値が使われる）。
     if max_bodies is None:
         max_bodies = MAX_BODIES
 

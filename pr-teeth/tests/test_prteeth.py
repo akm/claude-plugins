@@ -1384,7 +1384,7 @@ class TestDocument(unittest.TestCase):
             self.assertIn(missing, str(cm.exception))
 
     def test_typo_in_optional_key_is_an_error(self):
-        # main_changes のようなタイポを、警告を出さずに捨てるとセクションが消える。
+        # main_changes のようなタイポをエラーにせずに捨てるとセクションが消える。
         with self.assertRaises(document.InvalidDocument) as cm:
             document.from_payload(self._pr(main_changes=["x"]))
         self.assertIn("main_changes", str(cm.exception))
@@ -1569,7 +1569,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('crossorigin="anonymous"', h)
 
     def test_cdn_version_and_sri_are_consistent(self):
-        # バージョンだけ上げて SRI を更新し忘れると、図が、エラーにならずに出なくなる。
+        # バージョンだけ上げて SRI を更新し忘れると、画面には何も知らされずに図が出なくなる。
         h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
         self.assertIn(render._MERMAID_VERSION + "/mermaid.min.js", h)
         self.assertIn(render._MERMAID_SRI, h)

@@ -149,7 +149,7 @@ def _pr_from(raw, index):
             "期待する形: " + _EXPECTED
         )
 
-    # 未知のキーはタイポの可能性が高い。警告を出さずに捨てるとセクションが消える。
+    # 未知のキーはタイポの可能性が高い。エラーにせずに捨てるとセクションが消える。
     unknown = sorted(set(raw) - set(_PR_REQUIRED) - set(_PR_OPTIONAL))
     if unknown:
         raise InvalidDocument(
