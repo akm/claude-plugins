@@ -84,7 +84,7 @@
 | `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
 | `review_model` | 周回に指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
 
-**`max_rounds` に上限を設ける理由は、収束しない周回を止めるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ型の指摘に何度も応え続けることになる。記録の `runs` の要素数は周回をまたいだ累計で、上限の数え方 (正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
+**`max_rounds` に上限を設ける理由は、収束しない周回を止めるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ種類の指摘に何度も応え続けることになる。記録の `runs` の要素数は周回をまたいだ累計で、上限の数え方 (正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
 
 **`structure_rounds` は上限と別の関門で、修正が次の指摘を生んでいる形 (採択が前の回の修正の近傍に続き、減らない) を止めるためのもの。** 上限は費用の関門、こちらは構造の関門で、当たれば周回は人間に構造の見直しを問う (S6)。経緯は [#54](https://github.com/akm/claude-plugins/issues/54)。
 
