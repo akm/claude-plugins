@@ -150,15 +150,17 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
     規則が 1 つも無いときに textlint を実行すると、JSON ではなく案内の文を出すので、
     呼び出し側は規則が無ければ textlint を実行しない。
 
-    fix_only が True のときは、自動修正してよい避ける語だけを入れる (リポジトリの規則集と、
+    fix_only が True のときは、規則を自動修正してよい避ける語の辞書だけにする (リポジトリの規則集と、
     検出だけする避ける語は入れない)。自動修正で文脈によって言い換えが変わる語を書き換えないため。
+    リポジトリの設定のうち、規則 (rules) 以外 (検出から除く範囲の filters など) はそのまま使う —
+    check で検出しない範囲 (引用など) を、fix が書き換えないようにするため。
     """
     base, base_dir, where = {}, root, "設定"
     base_path = config.textlint_config_path(root, cfg)
-    if base_path and not fix_only:
+    if base_path:
         base, base_dir, where = _load_base(base_path), os.path.dirname(base_path), f"textlint の設定 {base_path}"
     composed = {k: v for k, v in base.items() if k not in ("rules", "filters")}
-    rules = dict(base.get("rules", {}))
+    rules = {} if fix_only else dict(base.get("rules", {}))
     filters = dict(base.get("filters", {}))
 
     fix, detect = terms.to_prh(term_list)

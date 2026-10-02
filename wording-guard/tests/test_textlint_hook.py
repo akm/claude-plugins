@@ -156,12 +156,19 @@ class TestCompose(RepoTestCase):
             self.assertEqual([r["pattern"] for r in json.load(f)["rules"]], ["/効(く|かない)/", "/触(る|ら|れ)/"])
 
     def test_fix_only_uses_autofix_terms_only(self):
-        self.write("conf/textlintrc.json", json.dumps({"rules": {"ja-no-redundant-expression": True}}))
+        base = {"rules": {"ja-no-redundant-expression": True, "prh": {"rulePaths": ["own.yml"]}},
+                "filters": {"allowlist": {"allow": ["/「[^」\\n]*」/"]}},
+                "plugins": {"markdown": True}}
+        self.write("conf/textlintrc.json", json.dumps(base))
         cfg = self.configure(textlint={"config": "conf/textlintrc.json"})
         composed, has_rules, work = self.compose(cfg, fix_only=True)
         self.assertTrue(has_rules)
+        # 規則は自動修正してよい辞書だけ (リポジトリの規則と、利用者が書いた prh の辞書は入れない)
         self.assertEqual(list(composed["rules"]), ["prh"])
         self.assertEqual(composed["rules"]["prh"]["rulePaths"], [os.path.join(work, "prh-fix.yml")])
+        # 規則以外のリポジトリの設定 (検出から除く範囲など) はそのまま使う
+        self.assertEqual(composed["filters"]["allowlist"]["allow"][0], "/「[^」\\n]*」/")
+        self.assertEqual(composed["plugins"], {"markdown": True})
         self.assertIn("BlockQuote", composed["filters"]["node-types"]["nodeTypes"])
 
     def test_disabled_prh_is_error(self):
