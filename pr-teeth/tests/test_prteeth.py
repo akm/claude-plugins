@@ -1569,7 +1569,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('crossorigin="anonymous"', h)
 
     def test_cdn_version_and_sri_are_consistent(self):
-        # バージョンだけ上げて SRI を更新し忘れると、画面にはエラーが表示されないまま、図の代わりにソースのコードが残る。
+        # バージョンだけ上げて SRI を更新し忘れると、画面にはエラーが表示されないまま、図の代わりに元のコードが残る。
         h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
         self.assertIn(render._MERMAID_VERSION + "/mermaid.min.js", h)
         self.assertIn(render._MERMAID_SRI, h)
