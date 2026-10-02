@@ -20,6 +20,23 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+
+def python_too_old(version_info=sys.version_info):
+    """Python が 3.11 より古ければ、その旨の案内の文を返す。足りていれば None を返す。
+
+    用語ファイルを標準ライブラリ tomllib (3.11 以降) で読むので、tomllib を使うモジュールを読み込む前に確かめる。
+    確かめないと ModuleNotFoundError の traceback で終了コード 1 になり、check の「error の検出がある」と区別できない。
+    """
+    if tuple(version_info[:2]) >= (3, 11):
+        return None
+    return ("Python 3.11 以降が必要 (用語ファイルを標準ライブラリ tomllib で読むため)。"
+            f"実行した Python: {'.'.join(str(v) for v in version_info[:3])}")
+
+
+if __name__ == "__main__" and python_too_old():
+    print(f"wording_lint.py: {python_too_old()}", file=sys.stderr)
+    sys.exit(3)  # EXIT_TEXTLINT と同じ値 (実行の環境が足りない)
+
 from wordingguard import config, terms, textlint  # noqa: E402
 
 EXIT_OK = 0

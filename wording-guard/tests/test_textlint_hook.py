@@ -514,6 +514,12 @@ class TestCheckCommand(RepoTestCase):
             code = wording_lint.main([*args, "--root", self.root])
         return code, out.getvalue(), err.getvalue()
 
+    def test_python_too_old(self):
+        self.assertIsNone(wording_lint.python_too_old((3, 11, 0)))
+        message = wording_lint.python_too_old((3, 9, 6))
+        self.assertIn("Python 3.11 以降が必要", message)
+        self.assertIn("3.9.6", message)
+
     def test_check_requires_textlint_setting(self):
         self.configure()
         self.write("a.md", "x")
