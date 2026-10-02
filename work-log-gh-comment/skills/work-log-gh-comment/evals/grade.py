@@ -218,7 +218,7 @@ def alert_after_readonly_cat(s):
     """Alert の直前の <details> が cat / grep など読み取りだけのコマンドでないか。
 
     読み取りは成功しているので、その直後の警告は対象が分からなくなる。
-    ただし Alert の本文で対象を名指ししていれば許す。
+    ただし Alert の本文で対象を明示していれば許す。
     """
     lines = s.split("\n")
     last_summary = None
@@ -242,7 +242,7 @@ def alert_after_readonly_cat(s):
             if last_summary and re.search(
                     r"<summary>\s*(?:\$\s*)?(cat|grep|head|tail|wc)\b",
                     last_summary):
-                # 直後 3 行に対象の名指しがあれば許容
+                # 直後 3 行で対象を明示していれば許容
                 body = "\n".join(lines[i:i + 4])
                 if not re.search(r"\.sh|コマンド|上の|終了コード", body):
                     return False, f"読み取りコマンドの直後に警告: {last_summary.strip()[:50]}"
@@ -335,7 +335,7 @@ def mentions_discrepancy(s):
     **地の文だけを見る** (mentions_error_count と同じ形)。全文だと
     「2 行」の出現だけで通り、食い違いに気づいたかを測れない。
 
-    食い違いの語が無くても、**サマリの数と明細の数を名指しで対比**して
+    食い違いの語が無くても、**サマリの数と明細の数を、どちらの数かを明示して対比**して
     いれば触れたとみなす。語を列挙すると列挙に無い言い方を検出できなくなるため、対比の形も拾う。
 
     **裸の数の並びは対比に数えない。** 題材の check-logs.sh はアプリを
@@ -346,7 +346,7 @@ def mentions_discrepancy(s):
     body = prose_only(s)
     if DISCREPANCY_WORDS.search(body):
         return True, "食い違いの語で言及"
-    # サマリ側の出所 (サマリ / 集計 / 3 errors) を名指ししたうえで、
+    # サマリ側の出所 (サマリ / 集計 / 3 errors) を明示したうえで、
     # 明細の行数と並べている形だけを対比とみなす。
     contrast = re.search(
         r"(サマリ|集計|要約|3\s*errors)[^。\n]*2\s*(行|件)"
@@ -545,7 +545,7 @@ CHECKS = {
         ("Alert で結論が強調されている",
          lambda s: (has_alert(s), f"検出: {[a for a in ALERTS if a in s]}")),
         # eval-2 と同じ判定。format.md:101 の規定は読み取りの作業一般が対象で、
-        # eval-1 の題材 (一覧の確認) はそこで名指しされている。
+        # eval-1 の題材 (一覧の確認) はそこで明示されている。
         ("読み取りのみの作業なので > [!TIP] を付けていない", alert_fits_readonly),
     ],
     3: [
