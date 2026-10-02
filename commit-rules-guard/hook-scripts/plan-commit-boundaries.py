@@ -83,7 +83,7 @@ _GIT_TIMEOUT = 5
 # 容量の問題ではない（0 バイト）。期限切れの状態を残さないための掃除。
 MAX_MARKER_AGE_DAYS = 7
 
-# マーカーの拡張子。掃除の対象をこれに限り、他のファイルには触らない。
+# マーカーの拡張子。掃除の対象をこれに限り、他のファイルは消さない。
 _MARKER_SUFFIX = ".seen"
 
 # 見た目に何も表示しない文字。str.strip() はこれらを落とさないため、
@@ -220,7 +220,7 @@ def sweep(state_dir, max_age_days=MAX_MARKER_AGE_DAYS, now=None):
 
     for name in names:
         if not name.endswith(_MARKER_SUFFIX):
-            # 自分が作ったもの以外には触らない。
+            # 自分が作ったもの以外は消さない。
             continue
         path = os.path.join(state_dir, name)
         try:

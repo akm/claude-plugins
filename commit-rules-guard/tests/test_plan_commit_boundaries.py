@@ -169,7 +169,7 @@ class TestSweep(unittest.TestCase):
         self.assertTrue(os.path.exists(fresh))
 
     def test_does_not_touch_other_files(self):
-        # 自分が作ったもの以外には触らない。
+        # 自分が作ったもの以外は消さない。
         other = os.path.join(self.state, "someone-elses.txt")
         with open(other, "w") as f:
             f.write("x")
