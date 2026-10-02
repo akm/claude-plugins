@@ -45,7 +45,7 @@ def repo_entry(config, repo):
 
     利用者が手で書くファイルなので、想定外の型（スカラーやリスト）が入りうる。
     そこで落とすと設定ミスがクラッシュになるため、空扱いにして呼び出し側の
-    既定へ倒す（第5.1節の fail-soft 方針）。
+    既定を使わせる（第5.1節の fail-soft 方針）。
     """
     repos = (config or {}).get("repos")
     if not isinstance(repos, dict):
@@ -83,7 +83,7 @@ def resolve_language(repo, config, cli_lang=None):
 def default_language(config, cli_lang=None):
     """ユーザー既定の言語。通知の地の文や HTML の lang 属性に使う（第5.3節）。
 
-    リポジトリ単位の設定は個々の PR にしか効かないため、ここでは参照しない。
+    リポジトリ単位の設定は個々の PR にしか適用されないため、ここでは参照しない。
     """
     if cli_lang and str(cli_lang).strip():
         return str(cli_lang).strip()

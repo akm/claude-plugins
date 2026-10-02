@@ -94,7 +94,7 @@ footer { color: var(--muted); font-size: .85rem; margin-top: 3rem; text-align: c
 """
 
 # Mermaid は CDN から読む。ライブラリは 3.2MB あり、図は補助でしかない（単純なら
-# 省略する）ため、PR ごとに埋め込むのは割に合わない。読めなくても本文は読めるよう、
+# 省略する）ため、PR ごとに埋め込むのは負担に見合わない。読めなくても本文は読めるよう、
 # 失敗時は元のコードを <pre> のまま残す。
 #
 # integrity は改竄検知のため。値は cdnjs が公開している sha512 と一致することを
@@ -155,10 +155,10 @@ def _render_index(prs, L, context):
     """ページ冒頭の PR インデックス。
 
     解説を上から順に並べただけでは、どのリポジトリが何件あるか・どこに目当ての PR が
-    あるかがスクロールしないと分からない（第9節の趣旨に反する）。件数が増えるほど効く。
+    あるかがスクロールしないと分からない（第9節の趣旨に反する）。件数が増えるほど必要になる。
 
     1件のときは出さない。インデックスが意味を持たず、縦を消費するだけになるため。
-    畳まれた PR も載せる（画面に在ることは目次から分かるべき）。
+    1行にまとめた PR も載せる（画面に在ることは目次から分かるべき）。
     """
     if len(prs) < 2:
         return ""
@@ -246,7 +246,7 @@ def _render_pr(pr, context=labels.CONTEXT_PATROL):
         out.append('<div class="scope">' + summary + "</div>")
 
     if collapsed:
-        # ignore のみの PR は1行に畳む。リンクは残す（第7節）。
+        # ignore のみの PR は1行にまとめる。リンクは残す（第7節）。
         if pr.summary:
             out.append("<div>" + _e(pr.summary) + "</div>")
         out.append("</article>")
@@ -336,7 +336,7 @@ def render(data):
     """解説データ全体を自己完結 HTML にする。
 
     data: document.Document（dict ではない）。
-    キー名の誤りは document.from_payload の時点で弾かれているので、
+    キー名の誤りは document.from_payload の時点で拒否されているので、
     ここで欠落を気にする必要はない。
     """
     lang = data.language or "ja"

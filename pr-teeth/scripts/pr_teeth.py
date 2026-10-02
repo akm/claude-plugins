@@ -73,7 +73,7 @@ def cmd_prepare(args):
     saved = {}
     if args.mode == "changes-only":
         # prepare は読むだけで保存しないため、壊れていても続行してよい。
-        # ただし黙って空扱いにすると全件が新規に見えるので、必ず理由を伝える。
+        # ただし利用者に知らせずに空扱いにすると全件が新規に見えるので、必ず理由を伝える。
         try:
             saved = store.load_precious(paths["state"], {})
         except store.Corrupt as e:
@@ -153,7 +153,7 @@ def _attach_body_diffs(targets, paths, warnings):
             continue
         previous = bodies.load(paths["bodies_dir"], item.get("repo"), item.get("number"))
         if previous is None:
-            # 初回・掃除済み・保存に失敗した回。異常ではないので黙って続行する。
+            # 初回・掃除済み・保存に失敗した回。異常ではないので、警告を出さずに続行する。
             continue
         item["body_diff_available"] = True
         item["body_diff"] = bodies.diff(previous, current)
@@ -166,7 +166,7 @@ def cmd_resolve(args):
     フラグメントの取り違えで**別の PR を正しい体裁で解説してしまう**（読み手には
     誤りと分からない）。ここで機械的に確定させる。
 
-    解釈できなかった指定は `invalid` に理由付きで返す。黙って捨てない。
+    解釈できなかった指定は `invalid` に理由付きで返す。理由を示さずに捨てない。
     """
     warnings = []
     _, _, cfg = _load(args, warnings)
@@ -286,7 +286,7 @@ def cmd_record(args):
 
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
-    # 形が違えば例外で止まる。黙って0件記録して成功を返さない。
+    # 形が違えば例外で止まる。0件を記録して、エラーを出さずに成功を返すことはしない。
     # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待たせない）。
     items, skipped = agent_input.terms(payload)
     warnings.extend(skipped)
@@ -368,7 +368,7 @@ def cmd_record(args):
 
             # 掃除は毎回行う。--open-prs が渡されたときは閉じた PR の分も消せるが、
             # SKILL.md は「迷ったら渡さない」と指示しているため、渡される保証は無い。
-            # ここを --open-prs 有りに限ると、件数の上限が通常の経路で効かなくなる。
+            # ここを --open-prs 有りに限ると、件数の上限が通常の経路で適用されなくなる。
             alive = None
             if prune_to is not None:
                 alive = {(p.get("repo"), p.get("number")) for p in prune_to}
@@ -404,7 +404,7 @@ def cmd_promote(args):
         entry = glossary.set_status(g, args.term, args.status, now=_now())
         store.save_json(paths["glossary"], g)
     if not existed:
-        # 綴り違いを黙って新規作成すると、直したつもりの語が別エントリになる。
+        # 綴り違いを、警告を出さずに新規作成すると、直したつもりの語が別エントリになる。
         warnings.append(
             "「" + args.term + "」は用語集にありませんでした。新規に登録しています"
             "（綴りが違っていないか確認してください）。"
@@ -469,8 +469,8 @@ def cmd_render(args):
 
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
-    # キー名の誤りや必須の欠落はここで弾く。黙って空のセクションを出さない。
-    # 畳み込みと並び替えも from_payload が行う。
+    # キー名の誤りや必須の欠落はここで拒否する。エラーにせずに空のセクションを出すことはしない。
+    # ignore だけの PR を 1 行で表示する判定と並び替えも from_payload が行う。
     # --context は入力 JSON の context より優先する（コマンド側が文脈を知っている）。
     if args.context:
         payload = dict(payload, context=args.context)
@@ -502,7 +502,7 @@ def cmd_glossary_html(args):
     """用語集をポートフォリオ HTML にする（/pr-glossary）。"""
     warnings = []
     config_dir, paths, cfg = _load(args, warnings)
-    # 表示するだけなので続行できるが、空のポートフォリオを黙って見せると
+    # 表示するだけなので続行できるが、空のポートフォリオを、理由を示さずに見せると
     # 「学習が消えた」と誤解させるため、理由を必ず添える。
     try:
         g = _load_glossary(paths)

@@ -4,10 +4,10 @@ CONCEPTS.md 第8節の実装。
 
 要点は「理解しているかどうかは出力言語に依存しない」こと。term / status / occurrences は
 言語非依存でエントリごとに1つ持ち、definitions だけを言語ごとに持つ。これにより日本語で
-積み上げた known が、英語で出力しても同じように効く。
+積み上げた known が、英語で出力しても同じように適用される。
 
 昇格は new → learning のみ自動。learning → known は人の確認を経る（第8節）。
-推定だけで自動確定すると、偽陽性で説明が勝手に消える事故になるため。
+推定だけで自動確定すると、偽陽性で、利用者が確認しないまま説明が消える障害が起きるため。
 """
 
 NEW = "new"
@@ -95,7 +95,7 @@ def record(glossary, term, language=None, definition=None, provenance=None, now=
     - 未登録なら new として登録する。
     - occurrences を加算し、閾値を超えたら new → learning に自動昇格する。
     - definition が渡され、その言語の定義がまだ無ければ書き込む（次回から再利用）。
-    - known は自動では触らない（降格は行わない。第8節）。
+    - known の status は自動では変更しない（降格は行わない。第8節）。
     """
     terms = glossary.setdefault("terms", {})
     entry = terms.get(term)

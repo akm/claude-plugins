@@ -100,7 +100,7 @@ class TestLanguageResolution(unittest.TestCase):
         self.assertEqual(config.default_language(cfg, None), "en")
 
     def test_malformed_config_does_not_crash(self):
-        # 利用者が手で書くファイルなので、想定外の型でも落とさず既定へ倒す。
+        # 利用者が手で書くファイルなので、想定外の型でも落とさず既定を使う。
         for bad in ({"repos": "nope"}, {"repos": {"o/r": "nope"}}, {"language": 42}):
             self.assertEqual(config.resolve_language("o/r", bad), "ja")
 
@@ -197,7 +197,7 @@ class TestScopeGlob(unittest.TestCase):
 
 class TestClassifyFiles(unittest.TestCase):
     def test_unconfigured_repo_is_should_review(self):
-        # 設定し忘れたリポジトリの変更を黙って隠さない（安全側）。
+        # 設定し忘れたリポジトリの変更を、利用者に知らせずに隠さない（安全側）。
         r = scope.classify_files(["a.md", "b.go"], "o/r", {"repos": {}})
         self.assertEqual(r["priority"], scope.SHOULD)
         self.assertEqual(r["counts"][scope.SHOULD], 2)
@@ -350,7 +350,7 @@ class TestToml(unittest.TestCase):
         self.assertEqual(store.load_toml("/nonexistent/config.toml", {"a": 1}), {"a": 1})
 
     def test_broken_toml_warns_and_defaults(self):
-        # 壊れていても落とさないが、黙って握りつぶさず理由を残す。
+        # 壊れていても落とさないが、握りつぶさず理由を残す。
         with tempfile.TemporaryDirectory() as d:
             warnings = []
             cfg = store.load_toml(self._write(d, "this is not toml ==\n"), {}, warnings)
@@ -422,7 +422,7 @@ class TestPreciousData(unittest.TestCase):
             self.assertEqual(store.load_precious(p, {})["terms"]["a"]["term"], "a")
 
     def test_lock_is_exclusive_between_processes(self):
-        # ロックが効いていなければ、子プロセスが即座に取得できてしまう。
+        # ロックが機能していなければ、子プロセスが即座に取得できてしまう。
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "g.json")
             with store.locked(p):
@@ -526,7 +526,7 @@ class TestAgentInput(unittest.TestCase):
         self.assertEqual(skipped, [])
 
     def test_missing_terms_key_is_an_error(self):
-        # 黙って0件記録して成功を返すと、記録できたと誤解される。
+        # 0件を記録して、エラーを出さずに成功を返すと、記録できたと誤解される。
         with self.assertRaises(agent_input.InvalidInput) as cm:
             agent_input.terms({"glossary": []})
         self.assertIn("terms", str(cm.exception))
@@ -740,7 +740,7 @@ class TestAuth(unittest.TestCase):
         self.assertEqual(auth.resolve()[0], "tok-gh")
 
     def test_unreadable_token_file_reports_reason(self):
-        # 指定されたのに読めないのは設定ミス。黙って進むと原因が分からない。
+        # 指定されたのに読めないのは設定ミス。エラーを出さずに進むと原因が分からない。
         os.environ[auth.ENV_TOKEN_FILE] = "/nonexistent/token"
         token, _, err = auth.resolve()
         self.assertIsNone(token)
@@ -763,7 +763,7 @@ class TestLabels(unittest.TestCase):
         self.assertEqual(labels.for_language("ja-JP")["summary"], "概要")
 
     def test_unknown_language_falls_back_to_english(self):
-        # 日本語に倒すと、日本語を読めない利用者に読めない画面を出すことになる。
+        # 日本語にフォールバックすると、日本語を読めない利用者に読めない画面を出すことになる。
         self.assertEqual(labels.for_language("ko")["summary"], "Summary")
         self.assertEqual(labels.for_language("")["summary"], "Summary")
 
@@ -863,7 +863,7 @@ class TestPRSpec(unittest.TestCase):
     def test_repo_case_is_normalized(self):
         # GitHub は大文字小文字を区別しないが、設定の引き当ては素の辞書引き。
         # 揃えないと [repos."owner/repo"] を取りこぼし、出力言語とレビュー範囲が
-        # 黙って既定値に落ちる。
+        # 利用者に知らせずに既定値になる。
         self.assertEqual(prspec.parse_one("Akm/Claude-Plugins#1")["repo"], "akm/claude-plugins")
 
     def test_case_variants_are_deduplicated(self):
@@ -1059,7 +1059,7 @@ class TestBodies(unittest.TestCase):
             self.assertEqual(bodies.load(self.dir, "o/r", i), "b")
 
     def test_prune_without_alive_applies_only_the_count_limit(self):
-        # alive が分からない場合でも件数の上限は効かせる。ただし生死による
+        # alive が分からない場合でも件数の上限は適用する。ただし生死による
         # 削除はしない（どれが閉じたか分からないため）。
         for i in range(4):
             path, _ = bodies.save(self.dir, "o/r", i, "b")
@@ -1296,7 +1296,7 @@ class TestRepoCache(unittest.TestCase):
         self.assertEqual([r["reason"] for r in out["removed"]], ["age"])
 
     def test_cleanup_respects_the_size_limit(self):
-        # 大きなモノレポが数個あると、件数の上限では効かない。
+        # 大きなモノレポが数個あると、件数の上限では機能しない。
         self._fake("o/a", used_at=1000, size=4000)
         self._fake("o/b", used_at=2000, size=4000)
         out = repos.cleanup(self.repos_dir, max_repos=99, max_bytes=5000,
@@ -1341,7 +1341,7 @@ class TestDocument(unittest.TestCase):
     """解説データの型（scripts/prteeth/document.py）。
 
     素の dict を .get() で読むと、キー名を間違えても None が空文字になり、
-    セクションが黙って消える。型で必須を持つことで組み立て時点で検出する。
+    エラーにならないままセクションが消える。型で必須を持つことで組み立て時点で検出する。
     """
 
     def _pr(self, **kw):
@@ -1375,7 +1375,7 @@ class TestDocument(unittest.TestCase):
         self.assertEqual(doc.prs[0].anchor, "pr-owner-repo-js-1")
 
     def test_missing_required_key_is_an_error(self):
-        # 従来は空文字になって黙って欠落していた。
+        # 従来は空文字になり、エラーにならずに欠落していた。
         for missing in ("repo", "number", "title", "priority"):
             payload = self._pr()
             del payload["prs"][0][missing]
@@ -1384,7 +1384,7 @@ class TestDocument(unittest.TestCase):
             self.assertIn(missing, str(cm.exception))
 
     def test_typo_in_optional_key_is_an_error(self):
-        # main_changes のようなタイポを黙って捨てるとセクションが消える。
+        # main_changes のようなタイポをエラーにせずに捨てるとセクションが消える。
         with self.assertRaises(document.InvalidDocument) as cm:
             document.from_payload(self._pr(main_changes=["x"]))
         self.assertIn("main_changes", str(cm.exception))
@@ -1424,7 +1424,7 @@ class TestDocument(unittest.TestCase):
         self.assertEqual([p.number for p in doc.prs], [1, 2, 3])
 
     def test_number_zero_is_not_treated_as_missing(self):
-        # 0 は falsy だが有効な値。required 判定で誤って弾かない。
+        # 0 は falsy だが有効な値。required 判定で誤って拒否しない。
         doc = document.from_payload(self._pr(number=0))
         self.assertEqual(doc.prs[0].number, 0)
 
@@ -1437,7 +1437,7 @@ class TestDocument(unittest.TestCase):
         self.assertEqual(document.from_payload(payload).context, labels.CONTEXT_PICK)
 
     def test_invalid_context_is_an_error(self):
-        # 黙って巡回扱いにすると、番号指定なのに「必須」と出る。
+        # エラーにせずに巡回扱いにすると、番号指定なのに「必須」と出る。
         payload = self._pr()
         payload["context"] = "browsing"
         with self.assertRaises(document.InvalidDocument) as cm:
@@ -1506,7 +1506,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('<a href="#pr-o-other-2">Second</a>', h)
 
     def test_index_anchors_match_article_ids(self):
-        # 飛び先が無いとリンクが黙って効かなくなる。
+        # 飛び先が無いとエラーにならないままリンクが機能しなくなる。
         h = render.render(self._two())
         self.assertIn('id="pr-o-r-1"', h)
         self.assertIn('id="pr-o-other-2"', h)
@@ -1523,7 +1523,7 @@ class TestRender(unittest.TestCase):
         self.assertIn("対象外: 1", head)
 
     def test_index_includes_collapsed_prs(self):
-        # ignore は1行に畳まれるが、画面に在ることは目次から分かるべき。
+        # ignore は1行にまとめられるが、画面に在ることは目次から分かるべき。
         h = render.render(self._two())
         self.assertIn("Second", h.split('<article')[0])
 
@@ -1569,7 +1569,7 @@ class TestRender(unittest.TestCase):
         self.assertIn('crossorigin="anonymous"', h)
 
     def test_cdn_version_and_sri_are_consistent(self):
-        # バージョンだけ上げて SRI を更新し忘れると、図が黙って出なくなる。
+        # バージョンだけ上げて SRI を更新し忘れると、画面にはエラーが表示されないまま、図の代わりに元のコードが残る。
         h = render.render(self._doc({"diagram": "flowchart LR\n A-->B"}))
         self.assertIn(render._MERMAID_VERSION + "/mermaid.min.js", h)
         self.assertIn(render._MERMAID_SRI, h)
@@ -1607,7 +1607,7 @@ class TestRender(unittest.TestCase):
         self.assertNotIn("レビュー依頼の PR", h)
 
     def test_pick_context_applies_to_pr_language_not_page_language(self):
-        # ページは ja、PR は en。文脈は両方に効き、言語はそれぞれのものを使う。
+        # ページは ja、PR は en。文脈は両方に適用され、言語はそれぞれのものを使う。
         doc = self._doc({"language": "en", "priority": "must_review",
                          "counts": {"must_review": 1}}, context="pick")
         h = render.render(doc)
@@ -1724,7 +1724,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(by_repo["other/x"], "ja")
 
     def test_resolve_mixed_case_spec_finds_repo_config(self):
-        # 打った表記の揺れで設定を取りこぼすと、出力言語が黙って変わる。
+        # 打った表記の揺れで設定を取りこぼすと、利用者が気づかないまま出力言語が変わる。
         with open(os.path.join(self._dir.name, "config.toml"), "w", encoding="utf-8") as f:
             f.write('language = "ja"\n[repos."o/r"]\nlanguage = "en"\n')
         out = self._run(self.mod.cmd_resolve, specs=["O/R#1"])
@@ -1873,7 +1873,7 @@ class TestCliCommands(unittest.TestCase):
 
     def test_body_count_limit_applies_without_open_prs(self):
         # SKILL.md は「迷ったら渡さない」と指示しているので、--open-prs 無しが
-        # 通常の経路。そこで上限が効かないと、README に書いた 200 件が成立しない。
+        # 通常の経路。そこで上限が適用されないと、README に書いた 200 件が成立しない。
         bodies_dir = os.path.join(self._dir.name, "bodies")
         for i in range(5):
             path, _ = bodies.save(bodies_dir, "o/r", i, "old")
@@ -1948,7 +1948,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertTrue(any("文字列ではない" in w for w in out["warnings"]))
 
     def test_long_body_is_reported_as_truncated(self):
-        # 黙って切り詰めると、次回の差分がずれた理由が分からない。
+        # 利用者に知らせずに切り詰めると、次回の差分がずれた理由が分からない。
         out = self._record_body("あ" * (bodies.MAX_BODY_BYTES))
         self.assertTrue(any("先頭のみ保存" in w for w in out["warnings"]))
 

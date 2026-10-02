@@ -80,7 +80,7 @@ class PullRequest:
         """
         raw = str(self.repo or "") + "-" + str(self.number)
         safe = "".join(c if c.isalnum() or c == "-" else "-" for c in raw.lower())
-        # 連続したハイフンを畳む。`owner/repo.js#1` のような名前でも読める id にする。
+        # 連続したハイフンを 1 つにまとめる。`owner/repo.js#1` のような名前でも読める id にする。
         while "--" in safe:
             safe = safe.replace("--", "-")
         return "pr-" + safe.strip("-")
@@ -149,7 +149,7 @@ def _pr_from(raw, index):
             "期待する形: " + _EXPECTED
         )
 
-    # 未知のキーはタイポの可能性が高い。黙って捨てるとセクションが消える。
+    # 未知のキーはタイポの可能性が高い。エラーにせずに捨てるとセクションが消える。
     unknown = sorted(set(raw) - set(_PR_REQUIRED) - set(_PR_OPTIONAL))
     if unknown:
         raise InvalidDocument(
@@ -192,7 +192,7 @@ def _pr_from(raw, index):
 def from_payload(payload):
     """エージェントが組み立てた JSON を Document にする。
 
-    不正なら InvalidDocument を投げる。黙って欠落させない。
+    不正なら InvalidDocument を投げる。エラーにせずに欠落させない。
     """
     if not isinstance(payload, dict):
         raise InvalidDocument(
@@ -210,7 +210,7 @@ def from_payload(payload):
 
     prs = [_pr_from(raw, i) for i, raw in enumerate(raw_prs)]
 
-    # ignore のみの PR は1行に畳む（第7節）。指定があればそれを尊重する。
+    # ignore のみの PR は1行にまとめる（第7節）。指定があればそれを尊重する。
     for pr in prs:
         if pr.collapsed is None:
             pr.collapsed = pr.priority == scope.IGNORE
@@ -219,7 +219,7 @@ def from_payload(payload):
 
     context = payload.get("context") or labels.CONTEXT_PATROL
     if context not in (labels.CONTEXT_PATROL, labels.CONTEXT_PICK):
-        # 誤った値を黙って巡回扱いにすると、番号指定なのに「必須」と出る。
+        # 誤った値を、エラーにせずに巡回扱いにすると、番号指定なのに「必須」と出る。
         raise InvalidDocument(
             "context は " + labels.CONTEXT_PATROL + " / " + labels.CONTEXT_PICK
             + " のいずれかです（実際: " + str(context) + "）"
