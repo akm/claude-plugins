@@ -8,8 +8,10 @@ textlint は語の一覧と文の形で照合する道具なので、**検出し
 
 | 種類 | 検出に使うもの | 重大度 |
 | --- | --- | --- |
-| 避ける語 | 用語ファイル ([terms.md](terms.md)) を、規則 textlint-rule-prh (語のパターンと置き換え先を照合する規則。以下 prh) の辞書に変換したもの | error (失敗にする) |
-| 不自然な言い回しの候補 | リポジトリの textlint の設定 (設定キー `textlint.config`) で有効にした規則集 | 設定で決める。warning (失敗にしない) を推奨 |
+| 避ける語 | 用語ファイル ([terms.md](terms.md)) を、規則 textlint-rule-prh (語のパターンと置き換え先を照合する規則。以下 prh) の辞書に変換したもの。リポジトリの textlint の設定に書いた prh の辞書の語も含む | error (失敗にする) |
+| 不自然な言い回しの候補 | リポジトリの textlint の設定 (設定キー `textlint.config`) で有効にした規則集 | 設定で決める。warning (失敗にしない) を推奨。指定しなければ textlint のデフォルト値の error になる |
+
+**重大度 (error / warning) は、検出の種類ではない。** 検出の種類は規則の名前で見分ける — 規則 `prh` の検出が避ける語、それ以外が規則集の検出。重大度は失敗にするかどうかだけを決め、`check` と hook は、種類に関わらず error の検出があれば失敗にする。この表とこの段落が、検出の種類と重大度の関係の正本。
 
 **次のものは検出しない。**
 
@@ -73,7 +75,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
 | 終了コード | 意味 |
 | --- | --- |
 | 0 | 成功。`check` では error の検出が無い (warning だけなら 0) |
-| 1 | `check` で error の検出 (用語ファイルの避ける語) がある |
+| 1 | `check` で error の検出がある (検出の種類は[「何を検出するか」](#何を検出するか)のとおり規則の名前で見分ける) |
 | 2 | 設定ファイル・用語ファイルの誤り、設定キー `textlint` が無い、git リポジトリの外で `--root` を付けずに実行した、または指定したパスが無いか、指定したディレクトリがリポジトリの外にあるか、ルートが git リポジトリでないのにディレクトリを指定したか、指定したファイルが Markdown (`.md`) でない (ディレクトリを指定すると、その下の Markdown のうち git に無視されていないものだけを対象にするので、git リポジトリが要る。ファイルの指定には要らない) |
 | 3 | Python が 3.11 より古い、textlint が入っていない、または textlint・npm の実行に失敗した |
 
@@ -91,7 +93,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
   - Claude Code は、差分の計算が時間切れになると `structuredPatch` を空にする。空なのに書き換える前と後の内容が違うときは、検査できなかったこととして知らせる (hook の中で差分を計算し直さない)
   - Write で新しいファイルを作ったとき (`originalFile` が null で、`type` が `create`) は、書いた内容の全体を検査する
   - 書き込みを保留したとき (`staged` が true。ファイルは変わっていない) は、何もしない
-- error (避ける語) があれば、Claude に直すよう求める (`decision: block`)。warning (規則集の候補) だけなら、判断の材料として渡す (`additionalContext`)
+- error の検出があれば、Claude に直すよう求める (`decision: block`)。規則 `prh` の検出 (避ける語) は言い換えの候補から選んで直すよう、それ以外の規則の検出は規則の message に従って直すよう案内する (見分け方の正本は[「何を検出するか」](#何を検出するか))。warning だけなら、判断の材料として渡す (`additionalContext`)
 - hook を有効にしたリポジトリで、設定・用語ファイルの誤り、textlint が入っていない、または書き換える前と後の内容か書き換えた行が分からない (`tool_response` に `originalFile` か `structuredPatch` が無い、既存のファイルなのに `originalFile` が null である、書き換えた後のファイルを読めない、`structuredPatch` が空なのに前後の内容が違う、または `structuredPatch` の行の内容がファイルの内容と一致しない) ときは、検査を省略せずに、Claude と利用者の両方に知らせる
 - 設定キー `textlint.hook` が `true` でないリポジトリ、Markdown 以外のファイル、設定キー `frozen_paths` の下のファイル、git リポジトリの外のファイルでは何もしない。**プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動く** ので、設定で有効にしたリポジトリでだけ検査する。`textlint.hook` は設定の型を検査する前に見るので、有効にしていないリポジトリでは、設定の誤りがあっても何もしない。設定ファイルが JSON として読めないときは、有効かを決められないので誤りとして知らせる
 - Python 3.11 以降が必要 (用語ファイルを標準ライブラリ `tomllib` で読むため)

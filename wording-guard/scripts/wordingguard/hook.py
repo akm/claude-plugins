@@ -14,8 +14,9 @@ Edit / Write で Markdown に書き足した文章を textlint で検査し、�
     structuredPatch (Claude Code が計算した行の差分) から取り、hook の中では差分を計算しない。ツールの入力
     (new_string) から書き換える前の内容を組み立てないのは、Edit が引用符をファイルに合わせて書き換えたり、
     利用者が提案を変えたりして、ファイルにツールの入力どおりの文字列が無いことがあるため。
-  - error (用語ファイルの避ける語) があれば decision: block で直すよう求め、warning (規則集の候補) だけなら
-    additionalContext で判断の材料として渡す。
+  - error の検出があれば decision: block で直すよう求め、warning だけなら additionalContext で判断の材料として渡す。
+    重大度は検出の種類ではないので、案内は規則の名前で分ける (規則 prh の検出は言い換えを決めた語、それ以外は
+    リポジトリの textlint の設定で error にした規則)。
   - 設定・用語ファイルの誤りや、textlint が入っていないときは、検査を省略せずに、Claude と利用者に知らせる。
 """
 
@@ -264,21 +265,32 @@ def handle(event, check_texts=None):
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:
         return _failure(str(e))
 
-    errors, warnings = [], []
+    # 重大度 (error / warning) は検出の種類ではない。規則集の規則も、重大度を指定しなければ error になる。
+    # 種類は規則の名前で見分ける (規則 prh の検出が、用語ファイルかリポジトリの prh の辞書で言い換えを決めた語)
+    term_errors, rule_errors, warnings = [], [], []
     for f in introduced(in_lines(before, results[0], removed), in_lines(after, results[1], added)):
-        (errors if f["severity"] == "error" else warnings).append((after, f))
-    if not errors and not warnings:
+        if f["severity"] != "error":
+            warnings.append((after, f))
+        elif f["rule"] == "prh":
+            term_errors.append((after, f))
+        else:
+            rule_errors.append((after, f))
+    if not term_errors and not rule_errors and not warnings:
         return None
     rel = os.path.relpath(os.path.realpath(path), os.path.realpath(root))
     parts = []
-    if errors:
-        parts.append(f"{rel} に書き足した文章に、用語ファイルで言い換えを決めた語がある。"
-                     f"言い換えの候補から文脈に合うものを選んで直す (引用なら直さず、そのことを報告する):\n"
-                     + _format(errors))
+    if term_errors:
+        parts.append(f"{rel} に書き足した文章に、用語ファイル (またはリポジトリの textlint の設定の prh の辞書) で"
+                     f"言い換えを決めた語がある。言い換えの候補から文脈に合うものを選んで直す"
+                     f" (引用なら直さず、そのことを報告する):\n" + _format(term_errors))
+    if rule_errors:
+        parts.append(f"{rel} に書き足した文章に、リポジトリの textlint の設定で error にした規則の検出がある。"
+                     f"規則の message に従って直す (引用なら直さず、そのことを報告する。検出が誤りだと考えるなら、"
+                     f"直さずにそのことを報告する):\n" + _format(rule_errors))
     if warnings:
         parts.append(f"{rel} に書き足した文章に、不自然な言い回しの候補がある (textlint の warning)。"
                      f"原則に照らして判断する。候補であって、直すべきものとは限らない:\n" + _format(warnings))
     message = "\n\n".join(parts)
-    if errors:
+    if term_errors or rule_errors:
         return {"decision": "block", "reason": message}
     return {"hookSpecificOutput": {"hookEventName": EVENT_NAME, "additionalContext": message}}

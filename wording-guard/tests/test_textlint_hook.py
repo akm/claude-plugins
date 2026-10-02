@@ -656,6 +656,19 @@ class TestHook(RepoTestCase):
                                                  tool_response=self.response("He said “hello”.\n")), check))
         self.assertEqual(calls[0][0], ["He said “hello”.\n", "He said “hello world”.\n"])
 
+    def test_rule_error_is_not_described_as_term(self):
+        # 規則集の規則も、重大度を指定しなければ error になる。用語ファイルの語としてではなく、規則の検出として案内する
+        self.configure(textlint={"hook": True})
+        self.write("docs/a.md", "とても長い文。\n")
+        long = finding("sentence-length", "Line 1 sentence length(52) exceeds the maximum sentence length of 40.",
+                       "とても長い文。")
+        check, _ = self.fake([[], [long]])
+        out = hook.handle(self.event(old_string="x", new_string="とても長い文。", tool_response=self.response("x\n")),
+                          check)
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("error にした規則の検出がある", out["reason"])
+        self.assertNotIn("言い換えを決めた語がある", out["reason"])
+
     def test_warning_only_is_additional_context(self):
         self.configure(textlint={"hook": True})
         self.write("docs/a.md", "レビューを行う。\n")
