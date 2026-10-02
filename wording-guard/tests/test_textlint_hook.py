@@ -443,6 +443,28 @@ class TestChangedLines(unittest.TestCase):
     def test_new_file(self):
         self.assertEqual(hook.changed_line_ranges("", "a\nb\n"), ([(0, 0)], [(0, 2)]))
 
+    def test_same_contents_have_no_ranges(self):
+        self.assertEqual(hook.changed_line_ranges("a\nb\n", "a\nb\n"), ([], []))
+
+    def test_ranges_keep_offsets_after_trimming(self):
+        # 共通の先頭と末尾の行を除いてから比べても、範囲はファイルの中の行の位置で返す
+        self.assertEqual(hook.changed_line_ranges("a\nb\n", "a\nb\nc\n"), ([(2, 2)], [(2, 3)]))
+        self.assertEqual(hook.changed_line_ranges("a\nb\nc\n", "a\nc\n"), ([(1, 2)], [(1, 1)]))
+        self.assertEqual(hook.changed_line_ranges("x\na\nb\ny\n", "x\nA\ny\nB\n"),
+                         ([(1, 3), (4, 4)], [(1, 2), (3, 4)]))
+
+    def test_large_file_with_repeated_lines_is_fast(self):
+        # 空行のような同じ行が多い 2 万行のファイルの中央に 1 行足す。全体を比べると 10 秒以上かかる
+        lines = []
+        for i in range(10000):
+            lines += [f"段落 {i} の文。", ""]
+        before = "\n".join(lines) + "\n"
+        after = "\n".join(lines[:10001] + ["足した行。"] + lines[10001:]) + "\n"
+        started = time.monotonic()
+        ranges = hook.changed_line_ranges(before, after)
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertEqual(ranges, ([(10001, 10001)], [(10001, 10002)]))
+
     def test_in_lines_uses_start_and_end(self):
         text = "一行目\n長い文の\n続き。\n四行目\n"
         long = {"rule": "sentence-length", "start": text.index("長い"), "end": text.index("。") + 1, "line": 2}

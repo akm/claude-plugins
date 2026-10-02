@@ -60,11 +60,20 @@ def changed_line_ranges(before, after):
     (textlint の行番号と同じ数え方)。行を足しただけの箇所は、前の範囲が空 (始まりと終わりが同じ) になる。
     """
     a, b = before.split("\n"), after.split("\n")
+    # 書き換えは局所的なので、前後に共通する先頭と末尾の行を先に除き、書き換えた付近の行だけを比べる。
+    # ファイルの全体を SequenceMatcher に渡すと、同じ行 (空行など) が多い大きなファイルでは時間が行数のほぼ 2 乗で増える
+    head = 0
+    while head < len(a) and head < len(b) and a[head] == b[head]:
+        head += 1
+    tail = 0
+    while tail < len(a) - head and tail < len(b) - head and a[-1 - tail] == b[-1 - tail]:
+        tail += 1
+    a, b = a[head:len(a) - tail], b[head:len(b) - tail]
     before_ranges, after_ranges = [], []
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
         if tag != "equal":
-            before_ranges.append((i1, i2))
-            after_ranges.append((j1, j2))
+            before_ranges.append((head + i1, head + i2))
+            after_ranges.append((head + j1, head + j2))
     return before_ranges, after_ranges
 
 
