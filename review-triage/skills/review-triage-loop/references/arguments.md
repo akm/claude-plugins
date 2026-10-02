@@ -46,7 +46,7 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 - `structure_rounds` は 0 以上の整数 (0 は判定しない)。負や整数でない値は、周回を始めずにエラーとして報告する。
 - `review_skill` は `code-review` か `ce-code-review`。それ以外の値は、対応する起動の経路が無いので ([review-invocation.md](review-invocation.md))、周回を始めずにエラーとして報告する。
 - `review_args` の中身は検査しない。レビュースキルにそのまま渡し、解釈はそちらに委ねる。
-- `review_model` の値は検査しない。指定が効かなかったときの報告の条件は [review-invocation.md](review-invocation.md) の「実効モデル」が正本。
+- `review_model` の値は検査しない。指定が適用されなかったときの報告の条件は [review-invocation.md](review-invocation.md) の「実効モデル」が正本。
 - `fix.threshold_rounds` (`--threshold`) は、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」の条件で検査する (条件はそちらが正本)。誤りは周回を始めずにエラーとして報告する — `review-triage-fix` を呼んだ回で初めて気づくと、そこまでのレビューの実行が無駄になる。
 - `fix.stages` (`--stage`) も同じく、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 (段の名前・`<値>` の形・effort の 5 値・`subagent` の真偽値・モデルの指定が実効モデルに解決できること) で検査する。誤りは周回を始めずにエラーとして報告する (例: `--stage investigate=sonnet:ultra` は effort が 5 値に無いので、周回を始めずにエラーになる)。
 - **記録** (置き場とファイル名の正本は [review-triage の record-schema.md](../../review-triage/references/record-schema.md) の「ファイルの単位」。引数や設定の値ではないが、周回を始める前に確かめる入力なのでここに置く) は、経路を問わず G0 で読めることを確かめる。記録が無ければ回は無いとする。記録があるのに読めない (YAML として壊れている・`runs` が無い) なら、周回を始めずにその旨を報告する ([review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 と同じ扱い) — 読めない記録を「無い」に寄せると、G2 と G3 が選択待ちと覆われていない採択を見落とし、記録に追記する回の番号も過去の回と重なる。
