@@ -55,7 +55,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py setup
 
 - 規則 `prh` とフィルタ `allowlist` を自分で書いてもよい。生成した辞書と一覧は、その後ろに足す。`rulePaths` と `allowlistConfigPaths` の相対パスは、設定ファイルの場所から解決する。辞書が 1 つも無いとき (`rulePaths` が無いか空で、用語ファイルに避ける語も無い) は、規則 `prh` を外して実行する — 辞書の無い prh では textlint が例外で終わり、検査できるものも無いため
 - **それ以外の規則の設定にパスを書くときは、絶対パスにする** — 合わせた設定は一時ディレクトリに置くので、相対パスが解決できない
-- 規則 `prh`・フィルタ `allowlist`・フィルタ `node-types` を `false` にすると誤りになる (用語ファイルの検査に使うため)
+- 規則 `prh`・フィルタ `allowlist`・フィルタ `node-types` を `false` にすると誤りになる (用語ファイルの検査に使うため)。規則 `prh` に `error` 以外の `severity` を書いても誤りになる — 用語ファイルの避ける語は error にするため ([「何を検出するか」](#何を検出するか))。設定を error に上書きして、利用者に知らせずに続けることはしない
 
 ## コマンド
 

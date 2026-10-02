@@ -181,6 +181,21 @@ class TestCompose(RepoTestCase):
             self.compose(cfg)
         self.assertIn("規則 prh を無効にしている", str(cm.exception))
 
+    def test_prh_severity_other_than_error_is_error(self):
+        # 用語ファイルの避ける語は error にする。規則 prh の重大度を下げる設定は誤りにする (利用者に知らせずに上書きしない)
+        for severity in ("warning", "info"):
+            self.write("conf/textlintrc.json", json.dumps({"rules": {"prh": {"severity": severity}}}))
+            cfg = self.configure(textlint={"config": "conf/textlintrc.json"})
+            with self.assertRaises(config.ConfigError) as cm:
+                self.compose(cfg)
+            self.assertIn("規則 prh の severity", str(cm.exception))
+
+    def test_prh_severity_error_is_allowed(self):
+        self.write("conf/textlintrc.json", json.dumps({"rules": {"prh": {"severity": "error"}}}))
+        cfg = self.configure(textlint={"config": "conf/textlintrc.json"})
+        composed, _, _ = self.compose(cfg)
+        self.assertEqual(composed["rules"]["prh"]["severity"], "error")
+
     def test_prh_without_dictionaries_is_removed(self):
         # リポジトリの設定が規則 prh を宣言し、用語ファイルに避ける語が無い (許容する語だけ)
         self.write(".claude/akm-claude-plugins/wording-guard/terms.toml",

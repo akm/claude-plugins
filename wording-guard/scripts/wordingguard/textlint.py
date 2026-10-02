@@ -176,6 +176,11 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
             dictionaries.append(path)
     if dictionaries or "prh" in rules:
         prh = _option(rules.get("prh"), "規則 prh", where)
+        # 用語ファイルの避ける語は error にする (正本は textlint.md の「何を検出するか」)。規則 prh に error 以外の重大度を
+        # 書くと、避ける語も失敗にならなくなるので誤りにする。利用者に知らせずに上書きすると、設定に書いた値が使われないことに気づけない
+        if "severity" in prh and prh["severity"] != "error":
+            raise config.ConfigError(f"{where} の規則 prh の severity が {prh['severity']!r}。用語ファイルの避ける語は "
+                                     "error にするので、規則 prh の severity は書かないか error にする")
         prh["rulePaths"] = _absolutize(prh.get("rulePaths", []), base_dir) + dictionaries
         if prh["rulePaths"]:
             rules["prh"] = prh
