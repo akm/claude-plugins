@@ -25,7 +25,7 @@ import (
 )
 
 // reviewTriageDir はトリアージの記録の置き場。この変数が唯一の定義 —
-// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が黙って外れる。
+// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が、利用者に知らせずに外れる。
 //
 // 既定は tmp/review-triages/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
 // 置き場が違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
@@ -315,7 +315,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 
 // recordLineCommentProblems は行内コメント (LineComment) を持つノードを検出する。
 // YAML の素のスカラーは半角スペースに続く # 以降をコメントとして落とすため、
-// 引用符の無い値に # を書くと値が黙って切り詰められる (実測で cause が「PR」だけに
+// 引用符の無い値に # を書くと値が警告なく切り詰められる (実測で cause が「PR」だけに
 // なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る —
 // 生テキストの正規表現で字句規則を再現する方式は、キーの形・空白・ブロックスカラー・
 // 値全体のコメントと境界のたびに穴が開いた (列挙する検査は穴を再生産する。既知の種類の欠陥)。
@@ -327,7 +327,7 @@ func recordLineCommentProblems(f string, root *yaml.Node) []string {
 	walk = func(n *yaml.Node) {
 		if n.LineComment != "" {
 			problems = append(problems, fmt.Sprintf(
-				"%s:%d: 行内コメント (%q) は使えません — YAML は ' #' 以降をコメントとして落とし、値が黙って切り詰められる。値に # を含めるときは引用符で囲む",
+				"%s:%d: 行内コメント (%q) は使えません — YAML は ' #' 以降をコメントとして落とし、値が警告なく切り詰められる。値に # を含めるときは引用符で囲む",
 				f, n.Line, n.LineComment))
 		}
 		for _, c := range n.Content {
@@ -413,7 +413,7 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 			}
 			if recordNullSilentKeys[k.Value] && v.Kind == yaml.ScalarNode && v.Tag == "!!null" {
 				problems = append(problems, fmt.Sprintf(
-					"%s:%d: %s の %s に値がありません。書くなら中身を書き、書かないならキーごと消す (値の無いキーは「無い」と同じに扱われ、書いたつもりの記録が黙って消える)",
+					"%s:%d: %s の %s に値がありません。書くなら中身を書き、書かないならキーごと消す (値の無いキーは「無い」と同じに扱われ、書いたつもりの記録が警告なく消える)",
 					f, k.Line, kind, k.Value))
 				continue
 			}
@@ -509,7 +509,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: %s がありません", fn, kv.key)
 				}
 			}
-			// audience の列挙。列挙外の値が黙って通ると D7 (被害者の判定) の入力が壊れる。
+			// audience の列挙。列挙外の値をエラーにせずに通すと D7 (被害者の判定) の入力が壊れる。
 			if fd.Audience != "" && !recordAudiences[fd.Audience] {
 				add("%s: audience は operator / admin / provider / developer のいずれか: %q", fn, fd.Audience)
 			}
@@ -593,7 +593,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// externalOnly は done-external 専用のキーが空であることを検査する。
 			// スキーマ表が「done-external のときだけ書く」と定める排他で、書かせる
 			// だけで検査しないと、done でコミット済みなのに外部 URL が残る記録が
-			// 黙って通る (sha の排他は前から検査されていた)。列挙外の status では
+			// エラーにならずに通る (sha の排他は前から検査されていた)。列挙外の status では
 			// 呼ばない — default が列挙違反を報告するので、そこへ重ねると 1 つの
 			// 誤字が 2 つの問題になる。
 			externalOnly := func() {
@@ -723,13 +723,13 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 		}
 		// 被覆: 採択は自回の plans か plan_ref で覆われる。覆われない採択は、
-		// 対処しないまま黙って消える。
+		// 対処しないまま、誰にも知らされずに消える。
 		//
 		// 免除するのは「plans がまだ無い最後の回」だけ — fix 前の状態を指す。
 		// 後続の回が追記された時点でその回はもう fix 前ではないので、免除を解く。
 		// 全回で len(run.Plans) > 0 を条件にしていた頃は、plans を書かないまま
 		// 次の回に進んだ過去の回の採択が、検査からも review-triage-fix (最後の回の
-		// findings しか見ない) からも見えなくなり、黙って消えていた。
+		// findings しか見ない) からも見えなくなり、誰にも知らされずに消えていた。
 		isLastRun := ri == len(doc.Runs)-1
 		if len(run.Plans) > 0 || !isLastRun {
 			covered := map[int]bool{}
@@ -1148,18 +1148,18 @@ var errRecordDirMissing = errors.New(
 // listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
-// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って成功する種類の欠陥) を塞ぐため。
+// git add 前の最初の記録が素通りする穴 (0 件マッチで何も検査しないまま成功する種類の欠陥) を塞ぐため。
 //
 // ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
 // (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。
 // 未指定 (既定値) のまま不在なのはスキル未導入の正常な状態で、nil を返す。
-// 判定を分けないと、置き場を移した時点で検査が黙って無効になる
+// 判定を分けないと、置き場を移した時点で検査が、利用者に知らせずに無効になる
 // (judgment_flow.go の explicit と同じ理由)。
 func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		// ディレクトリが無いのはスキル未導入の正常な状態 (明示指定のときを除く)。
-		// それ以外 (権限・I/O) のエラーを「記録 0 件」に潰すと、守りが黙って外れる。
+		// それ以外 (権限・I/O) のエラーを「記録 0 件」に潰すと、守りが、利用者に知らせずに外れる。
 		// 判定は judgment_flow.go と同じ errors.Is に揃える (ラップされたエラーも
 		// 正しく分類するため)。
 		if errors.Is(err, fs.ErrNotExist) {
@@ -1191,7 +1191,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 
 // writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
 // (-write-summary の経路)。explicit は listReviewTriageFiles と同じ意味 —
-// 明示指定した置き場が無いなら、0 件生成して黙って成功させない。
+// 明示指定した置き場が無いなら、0 件生成して、エラーを出さずに成功させない。
 func writeReviewTriageSummaries(dir string, explicit bool) error {
 	files, err := listReviewTriageFiles(dir, explicit)
 	if err != nil {

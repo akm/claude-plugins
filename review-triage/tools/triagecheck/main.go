@@ -54,13 +54,13 @@ func run(args []string) error {
 
 	// 明示的に渡されたフラグを拾う。既定値との一致では判定しない — 利用者が
 	// 既定と同じ値を明示的に渡すことがあり、そのとき「指定していない」と誤って
-	// 扱うと、不在を報告すべき経路が黙って通る。flag.Visit は実際に指定された
+	// 扱うと、不在を報告すべき経路が報告されないまま通る。flag.Visit は実際に指定された
 	// フラグだけを回すので、意思表示の有無をそのまま読める。
 	explicit := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
 
 	// 経路どうしの衝突は、パスの規則より前に見る。-install-wrapper と
-	// -write-summary=true は「何を書き出すか」が食い違うので、黙って片方を
+	// -write-summary=true は「何を書き出すか」が食い違うので、エラーを出さずに片方を
 	// 無視すると「指定したのに効かない」を作る。弾くのは「何かを要求したとき」
 	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
 	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
@@ -188,7 +188,7 @@ type resolvedInputs struct {
 //  2. 相対パスは -current-dir を基準に解決する (無ければ resolvePath がエラー)。
 //     基準は推測しない — go run -C で起動されるためカレントはツール側を指し、
 //     呼び出し元のカレントはプロセスの中から知りようがない。
-//  3. -current-dir を渡したのに一度も基準として使われなければエラー。黙って通すと
+//  3. -current-dir を渡したのに一度も基準として使われなければエラー。エラーにしないと
 //     「基準を渡したつもり」のまま別の解決結果を受け取る。
 //
 // 実在の要求は missingPathProblems が担う (全件をまとめて報告するため)。
@@ -396,7 +396,7 @@ func resolveBaseDir(currentDir string) (string, error) {
 // 使われなかった」ことを検出するために使う)。
 //
 // base が空 (= -current-dir が無い) のに相対を渡されたらエラーにする。ここで
-// 推測した基準を当てにいくと、外れたときに別の場所を検査して黙って成功を返す。
+// 推測した基準を当てにいくと、外れたときに別の場所を検査して、エラーを出さずに成功を返す。
 func resolvePath(p, base, flagName string) (string, bool, error) {
 	if filepath.IsAbs(p) {
 		return p, false, nil

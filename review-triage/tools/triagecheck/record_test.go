@@ -187,7 +187,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          included: [\"\"]\n", "investigation.included[0]"},
 		{"investigation の未知のキー", "order: 1\n",
 			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          found: [docs/bar.md]\n", "found"},
-		// 値を省いた構造キー (null) は「無い」と同一に扱われて黙る。書きかけの記録を
+		// 値を省いた構造キー (null) は「無い」と同一に扱われ、検査が何も報告しない。書きかけの記録を
 		// 未調査・束ね先なしに化けさせないため報告する。
 		{"investigation の値が無い (null)", "order: 1\n", "order: 1\n        investigation:\n", "investigation に値がありません"},
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
@@ -252,7 +252,7 @@ func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 	}{
 		{"コロン後の空白 2 個でも検出する",
 			"    notes: 最初の回。\n", "    notes:  PR #333 の件\n", true},
-		{"値全体がコメントでも検出する (任意項目が黙って null になる)",
+		{"値全体がコメントでも検出する (任意項目が警告なく null になる)",
 			"    notes: 最初の回。\n", "    notes: #おぼえがき\n", true},
 		{"シーケンス先頭キーのブロックスカラーの兄弟は検査される",
 			"      - problem_id: P1\n        cause: 数えずに書いた\n",
@@ -340,7 +340,7 @@ func TestReviewTriageSummaryEscapesFreeStrings(t *testing.T) {
 }
 
 // 修正計画を書いた回では、採択は自回の plans か plan_ref (束ね先の構造化参照) で
-// 覆われる。覆われない採択は「対処しないまま黙って消える」ので検査で捕まえる。
+// 覆われる。覆われない採択は「対処しないまま、誰にも知らされずに消える」ので検査で捕まえる。
 func TestReviewTriageRecordAdoptedCoverage(t *testing.T) {
 	extra := `      - id: 4
         file: docs/extra.md
@@ -815,7 +815,7 @@ func TestListReviewTriageFilesMissingDir(t *testing.T) {
 }
 
 // 置き場を明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
-// 意思表示なので、記録 0 件として黙って成功を返すと、置き場を移した時点で検査が
+// 意思表示なので、記録 0 件として、エラーを出さずに成功を返すと、置き場を移した時点で検査が
 // 無効になったことに気づけない (診断ツールの偽陰性)。
 func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
 	_, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"), true)
@@ -828,7 +828,7 @@ func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
 }
 
 // -write-summary も同じ — 明示指定した置き場が無いなら、0 件生成して
-// 黙って成功させない (生成されなかったことに気づけないため)。
+// エラーを出さずに成功させない (生成されなかったことに気づけないため)。
 func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 	if err := writeReviewTriageSummaries(filepath.Join(t.TempDir(), "no-such"), true); err == nil {
 		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")

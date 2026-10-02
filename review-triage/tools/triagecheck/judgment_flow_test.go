@@ -161,7 +161,7 @@ func TestJudgmentFlowMissingDiagram(t *testing.T) {
 	}
 }
 
-// readFile の失敗は問題として報告される (黙って成功させない)。
+// readFile の失敗は問題として報告される (報告せずに成功させない)。
 func TestJudgmentFlowReadError(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, os.ErrPermission }
 	problems := judgmentFlowProblems([]string{judgmentFlowPath}, read, "")
@@ -192,7 +192,7 @@ func TestJudgmentFlowMissingTable(t *testing.T) {
 }
 
 // git 追跡に依らず、ファイルが読めれば検査する — 追跡前の判定フローが
-// 素通りする「0 件マッチで黙って成功」の種類の欠陥 (B1 と同じ) を防ぐ。
+// 素通りする「0 件マッチで何も検査しないまま成功」の種類の欠陥 (B1 と同じ) を防ぐ。
 func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"), "")
 	if len(problems) == 0 {
@@ -200,7 +200,7 @@ func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 	}
 }
 
-// ファイルがそもそも無いリポジトリ (スキル未導入) では検査は黙って通る。
+// ファイルがそもそも無いリポジトリ (スキル未導入) では検査は何も報告せずに通る。
 // 在り処の指定が無い (origin が空) ときだけの扱いであることは、次のテストが対にする。
 func TestJudgmentFlowAbsentFileSkipped(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, fs.ErrNotExist }
@@ -211,7 +211,7 @@ func TestJudgmentFlowAbsentFileSkipped(t *testing.T) {
 }
 
 // 在り処を指定したのにファイルが無いなら報告する。指定は「そこを検査せよ」という
-// 意思表示なので、黙って通すと検査が無効になったことに気づけない (診断ツールの偽陰性)。
+// 意思表示なので、報告せずに通すと検査が無効になったことに気づけない (診断ツールの偽陰性)。
 // 報告にはどちらの指定を直せばよいか (origin) を載せる — 解決の経路が 2 つあるため。
 func TestJudgmentFlowAbsentFileReportedWhenOriginGiven(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, fs.ErrNotExist }

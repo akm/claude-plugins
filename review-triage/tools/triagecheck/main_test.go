@@ -159,7 +159,7 @@ func TestResolvePath(t *testing.T) {
 }
 
 // -current-dir を渡したのに全パスが絶対で一度も使われないなら、指定が効いて
-// いないのでエラーにする。黙って通すと「基準を渡したつもり」のまま別の解決結果を
+// いないのでエラーにする。エラーにしないと「基準を渡したつもり」のまま別の解決結果を
 // 受け取る。検査の経路と -write-summary の経路の両方で課す。
 func TestRunRejectsUnusedCurrentDir(t *testing.T) {
 	recs := filepath.Join(t.TempDir(), "recs")
@@ -217,7 +217,7 @@ func TestRunAcceptsRelativeRecordDirWithCurrentDir(t *testing.T) {
 }
 
 // 基準を渡さずに相対を指定したらエラー。ここで $PWD などを当てにいくと、
-// 外れたときに別の場所を検査して黙って成功を返す。
+// 外れたときに別の場所を検査して、エラーを出さずに成功を返す。
 func TestRunRejectsRelativeRecordDirWithoutCurrentDir(t *testing.T) {
 	withRunGlobals(t)
 	caller := t.TempDir()
@@ -303,7 +303,7 @@ func captureStderr(t *testing.T, fn func()) string {
 // -write-summary も run 経由で explicit が渡ることを固定する。関数を直接呼ぶ
 // テストだけだと、run から検査への配線を壊しても全テストが通る (配線を false に
 // 固定するミューテーションで実測した) — そのとき「明示指定した置き場が無いのに
-// 黙って成功する」挙動が復活する。
+// エラーを出さずに成功する」挙動が復活する。
 func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 	withRunGlobals(t)
 	missing := filepath.Join(t.TempDir(), "no-such")
@@ -482,7 +482,7 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 // CLAUDE_PLUGIN_ROOT 由来の判定フローは -current-dir の基準を使わない。
 // 環境変数の値は利用者が -current-dir を書いたかどうかとは無関係に決まるので、
 // そこへ基準を当てると「環境変数を設定していると -current-dir が使えない」
-// (逆に相対の環境変数が黙って解決される) ことになる。分岐の両側を固定する。
+// (逆に相対の環境変数が、エラーにならずに解決される) ことになる。分岐の両側を固定する。
 func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 	base := realTempDir(t)
 	recs := filepath.Join(base, "recs")
@@ -569,7 +569,7 @@ func TestRunWriteSummarySharesPathRules(t *testing.T) {
 }
 
 // -install-wrapper と -write-summary=true は「何を書き出すか」が食い違うので、
-// 黙って片方を無視せずエラーにする。無視すると「指定したのに効かない」を作る —
+// 片方を無視するのではなくエラーにする。無視すると「指定したのに効かない」を作る —
 // 検査の経路で errCurrentDirUnused として禁じているのと同じ種類の欠陥。
 // -current-dir は併用できる (相対パスの基準として、他の経路と同じ規則で使う)。
 func TestRunInstallWrapperRejectsUnusedFlags(t *testing.T) {
