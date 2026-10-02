@@ -20,7 +20,6 @@ Edit / Write で Markdown に書き足した文章を textlint で検査し、�
 
 import bisect
 import collections
-import difflib
 import os
 import sys
 
@@ -53,35 +52,36 @@ def contents_before(tool, tool_response):
     return original
 
 
-def changed_line_ranges(before, after):
-    """書き換える前と後で違う行の範囲を、(前の範囲のリスト, 後の範囲のリスト) で返す。
+def changed_lines(before, after):
+    """書き換えた行を、内容の数で比べて (書き換える前の側の行番号の集合, 書き換えた後の側の行番号の集合) で返す。
 
-    範囲は (始まりの行, 終わりの行) で、行は 0 から数え、終わりの行を含まない。行は改行 (\\n) で区切る
-    (textlint の行番号と同じ数え方)。行を足しただけの箇所は、前の範囲が空 (始まりと終わりが同じ) になる。
+    書き換えた後の側は、書き換える前に無かった内容の行 (同じ内容の行が増えた分を含む)。書き換える前の側は、
+    書き換えた後で減った内容の行。行は改行 (\\n) で区切り、0 から数える (textlint の行番号と同じ数え方)。
+    同じ内容の行が増えたときは、後ろにある行から数えて増えた分を選ぶ — どの行を書き換えたかは区別しないが、
+    検出は (rule, message, matched) の数で比べるので、同じ内容の行の検出は同じものとして数える。行を移しただけなら、
+    どちらの側にも入らない。位置の差分を計算しないので、時間は行数に比例し、書き換えた箇所の数や離れ方に関わらない。
     """
     a, b = before.split("\n"), after.split("\n")
-    # 書き換えは局所的なので、前後に共通する先頭と末尾の行を先に除き、書き換えた付近の行だけを比べる。
-    # ファイルの全体を SequenceMatcher に渡すと、同じ行 (空行など) が多い大きなファイルでは時間が行数のほぼ 2 乗で増える
-    head = 0
-    while head < len(a) and head < len(b) and a[head] == b[head]:
-        head += 1
-    tail = 0
-    while tail < len(a) - head and tail < len(b) - head and a[-1 - tail] == b[-1 - tail]:
-        tail += 1
-    a, b = a[head:len(a) - tail], b[head:len(b) - tail]
-    before_ranges, after_ranges = [], []
-    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
-        if tag != "equal":
-            before_ranges.append((head + i1, head + i2))
-            after_ranges.append((head + j1, head + j2))
-    return before_ranges, after_ranges
+    count_a, count_b = collections.Counter(a), collections.Counter(b)
+    return _extra_lines(a, count_a - count_b), _extra_lines(b, count_b - count_a)
 
 
-def in_lines(text, findings, ranges):
-    """findings (text の検出) のうち、行の範囲 ranges のどれかに重なるものを返す。
+def _extra_lines(lines, extra):
+    """lines のうち、内容ごとに extra の数だけ、後ろにある行から選んだ行番号の集合を返す。"""
+    extra = collections.Counter(extra)
+    result = set()
+    for i in range(len(lines) - 1, -1, -1):
+        if extra[lines[i]] > 0:
+            extra[lines[i]] -= 1
+            result.add(i)
+    return result
+
+
+def in_lines(text, findings, lines):
+    """findings (text の検出) のうち、行番号の集合 lines のどれかの行に重なるものを返す。
 
     検出の行は、始まり (start) から終わり (end) までの Python の文字列の位置から数える。複数の行にまたがる
-    検出 (長い文など) は、どれかの行が範囲に入れば重なるとする。位置の無い検出は範囲で絞れないので残す。
+    検出 (長い文など) は、どれかの行が lines に入れば重なるとする。位置の無い検出は行で絞れないので残す。
     """
     line_starts = [0] + [i + 1 for i, ch in enumerate(text) if ch == "\n"]
 
@@ -98,7 +98,7 @@ def in_lines(text, findings, ranges):
         else:
             result.append(f)
             continue
-        if any(first < end and last >= start for start, end in ranges):
+        if any(i in lines for i in range(first, last + 1)):
             result.append(f)
     return result
 
@@ -216,9 +216,9 @@ def handle(event, check_texts=None):
     except (config.ConfigError, terms.TermsError, textlint.TextlintError) as e:
         return _failure(str(e))
 
-    before_ranges, after_ranges = changed_line_ranges(before, after)
+    removed, added = changed_lines(before, after)
     errors, warnings = [], []
-    for f in introduced(in_lines(before, results[0], before_ranges), in_lines(after, results[1], after_ranges)):
+    for f in introduced(in_lines(before, results[0], removed), in_lines(after, results[1], added)):
         (errors if f["severity"] == "error" else warnings).append((after, f))
     if not errors and not warnings:
         return None

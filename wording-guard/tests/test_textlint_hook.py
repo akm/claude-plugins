@@ -434,48 +434,51 @@ class TestIntroduced(unittest.TestCase):
 
 
 class TestChangedLines(unittest.TestCase):
-    def test_inserted_line_has_empty_before_range(self):
-        self.assertEqual(hook.changed_line_ranges("a\nb\nc\n", "a\nX\nb\nc\n"), ([(1, 1)], [(1, 2)]))
+    def test_inserted_line(self):
+        self.assertEqual(hook.changed_lines("a\nb\nc\n", "a\nX\nb\nc\n"), (set(), {1}))
 
     def test_replaced_line(self):
-        self.assertEqual(hook.changed_line_ranges("a\nb\nc\n", "a\nB\nc\n"), ([(1, 2)], [(1, 2)]))
+        self.assertEqual(hook.changed_lines("a\nb\nc\n", "a\nB\nc\n"), ({1}, {1}))
 
     def test_new_file(self):
-        self.assertEqual(hook.changed_line_ranges("", "a\nb\n"), ([(0, 0)], [(0, 2)]))
+        self.assertEqual(hook.changed_lines("", "a\nb\n"), (set(), {0, 1}))
 
-    def test_same_contents_have_no_ranges(self):
-        self.assertEqual(hook.changed_line_ranges("a\nb\n", "a\nb\n"), ([], []))
+    def test_same_contents(self):
+        self.assertEqual(hook.changed_lines("a\nb\n", "a\nb\n"), (set(), set()))
 
-    def test_ranges_keep_offsets_after_trimming(self):
-        # 共通の先頭と末尾の行を除いてから比べても、範囲はファイルの中の行の位置で返す
-        self.assertEqual(hook.changed_line_ranges("a\nb\n", "a\nb\nc\n"), ([(2, 2)], [(2, 3)]))
-        self.assertEqual(hook.changed_line_ranges("a\nb\nc\n", "a\nc\n"), ([(1, 2)], [(1, 1)]))
-        self.assertEqual(hook.changed_line_ranges("x\na\nb\ny\n", "x\nA\ny\nB\n"),
-                         ([(1, 3), (4, 4)], [(1, 2), (3, 4)]))
+    def test_moved_line_is_not_changed(self):
+        # 行を移しただけなら、新しい文章を持ち込んでいないので、書き換えた行にならない
+        self.assertEqual(hook.changed_lines("a\nb\nc\n", "b\na\nc\n"), (set(), set()))
 
-    def test_large_file_with_repeated_lines_is_fast(self):
-        # 空行のような同じ行が多い 2 万行のファイルの中央に 1 行足す。全体を比べると 10 秒以上かかる
+    def test_added_copy_is_counted_from_the_end(self):
+        # 同じ内容の行が増えたときは、後ろにある行から数えて増えた分を選ぶ
+        self.assertEqual(hook.changed_lines("a\nb\n", "a\nb\na\n"), (set(), {2}))
+
+    def test_large_file_changed_at_both_ends_is_fast(self):
+        # 空行のような同じ行が多い 2 万行のファイルの、先頭と末尾の両方を書き換える (replace_all の Edit と同じ)。
+        # 位置の差分で比べると、間の行がすべて比べられて 10 秒近くかかる
         lines = []
         for i in range(10000):
             lines += [f"段落 {i} の文。", ""]
+        lines[0] = "用語A " + lines[0]
+        lines[-2] = "用語A " + lines[-2]
         before = "\n".join(lines) + "\n"
-        after = "\n".join(lines[:10001] + ["足した行。"] + lines[10001:]) + "\n"
         started = time.monotonic()
-        ranges = hook.changed_line_ranges(before, after)
+        changed = hook.changed_lines(before, before.replace("用語A", "用語B"))
         self.assertLess(time.monotonic() - started, 2)
-        self.assertEqual(ranges, ([(10001, 10001)], [(10001, 10002)]))
+        self.assertEqual(changed, ({0, 19998}, {0, 19998}))
 
     def test_in_lines_uses_start_and_end(self):
         text = "一行目\n長い文の\n続き。\n四行目\n"
         long = {"rule": "sentence-length", "start": text.index("長い"), "end": text.index("。") + 1, "line": 2}
         head = {"rule": "r", "start": 0, "end": 3, "line": 1}
         # 長い文は 2 行目から 3 行目にまたがるので、3 行目だけを書き換えても重なる
-        self.assertEqual(hook.in_lines(text, [long, head], [(2, 3)]), [long])
-        self.assertEqual(hook.in_lines(text, [long, head], [(3, 4)]), [])
+        self.assertEqual(hook.in_lines(text, [long, head], {2}), [long])
+        self.assertEqual(hook.in_lines(text, [long, head], {3}), [])
 
     def test_in_lines_without_start_uses_line(self):
-        self.assertEqual(hook.in_lines("a\nb\n", [KATA], [(0, 1)]), [KATA])
-        self.assertEqual(hook.in_lines("a\nb\n", [KATA], [(1, 2)]), [])
+        self.assertEqual(hook.in_lines("a\nb\n", [KATA], {0}), [KATA])
+        self.assertEqual(hook.in_lines("a\nb\n", [KATA], {1}), [])
 
 
 class TestHook(RepoTestCase):
