@@ -590,7 +590,7 @@ class TestMentionsDiscrepancy(unittest.TestCase):
                 ok, _ = grade.mentions_discrepancy(body)
                 self.assertFalse(ok)
 
-    def test_サマリと明細を名指しした対比で通す(self):
+    def test_サマリと明細の出所を明示した対比で通す(self):
         """どちらの数がどこから来たかを書いていれば、食い違いの認識。"""
         ok, _ = grade.mentions_discrepancy(
             "サマリは 3 errors だが、明細の ERROR 行は 2 行しかない。")
