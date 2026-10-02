@@ -116,7 +116,7 @@
 
 `fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<段>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
 
-**`stages` の設定は、回 N+1 以降の段 2 (`plan`) には効かない。** その回の段 2 は `review-triage-fix` が人間に尋ねた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。段 1 (`investigate`) と段 3 (`fix`) の設定は回の番号に関わらず効く。段の走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
+**`stages` の設定は、回 N+1 以降の段 2 (`plan`) には適用されない。** その回の段 2 は `review-triage-fix` が人間に尋ねた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。段 1 (`investigate`) と段 3 (`fix`) の設定は回の番号に関わらず適用される。段の走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
 
 ## `review_loop` — ワーカーに任せる周回の既定値
 
