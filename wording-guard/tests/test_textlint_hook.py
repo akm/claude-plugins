@@ -470,6 +470,24 @@ class TestHook(RepoTestCase):
         hook.handle(self.event(tool="Write", content="全体"), check)
         self.assertEqual(calls[0][0], ["", "全体"])
 
+    def test_config_error_without_hook_is_ignored(self):
+        # hook を有効にしていないリポジトリでは、設定の型の誤りがあっても何もしない
+        self.write(config.CONFIG_RELPATH, json.dumps({"terms_paths": "terms.toml"}))
+        self.assertIsNone(hook.handle(self.event(old_string="a", new_string="b"), self.not_called))
+
+    def test_config_error_with_hook_is_reported(self):
+        self.write(config.CONFIG_RELPATH, json.dumps({"terms_paths": "terms.toml", "textlint": {"hook": True}}))
+        out = hook.handle(self.event(old_string="a", new_string="b"), self.not_called)
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("terms_paths", out["systemMessage"])
+
+    def test_unreadable_config_is_reported(self):
+        # JSON として読めないと hook が有効かを決められないので、知らせる
+        self.write(config.CONFIG_RELPATH, "{")
+        out = hook.handle(self.event(old_string="a", new_string="b"), self.not_called)
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("読めない", out["systemMessage"])
+
     def test_terms_error_is_reported(self):
         self.configure(textlint={"hook": True})
         self.write(".claude/akm-claude-plugins/wording-guard/terms.toml", "[[terms]]\n")

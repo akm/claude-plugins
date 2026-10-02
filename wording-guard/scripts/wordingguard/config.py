@@ -38,11 +38,11 @@ def find_root(start):
     return r.stdout.strip()
 
 
-def load(root):
-    """リポジトリ root の設定を読んで dict で返す。設定ファイルが無ければ None を返す。
+def read_raw(root):
+    """リポジトリ root の設定ファイルを JSON として読み、型を検査せずに dict で返す。無ければ None を返す。
 
-    設定ファイルが無いことはエラーではない (wording-guard は設定なしで実行できる)。
-    ファイルがあるのに読めない・様式に合わないときは ConfigError を送出する。
+    JSON として読めない・最上位がオブジェクトでないときは ConfigError を送出する。
+    hook が、型の検査の前に textlint.hook を見るために使う。
     """
     path = os.path.join(root, CONFIG_RELPATH)
     if not os.path.exists(path):
@@ -54,6 +54,25 @@ def load(root):
         raise ConfigError(f"設定ファイル {path} を読めない: {e}") from e
     if not isinstance(data, dict):
         raise ConfigError(f"設定ファイル {path} の最上位が JSON のオブジェクトでない")
+    return data
+
+
+def hook_enabled(raw):
+    """read_raw で読んだ設定で、設定キー textlint.hook が true か (型を検査する前の判定)。"""
+    settings = (raw or {}).get("textlint")
+    return isinstance(settings, dict) and settings.get("hook") is True
+
+
+def load(root):
+    """リポジトリ root の設定を読んで dict で返す。設定ファイルが無ければ None を返す。
+
+    設定ファイルが無いことはエラーではない (wording-guard は設定なしで実行できる)。
+    ファイルがあるのに読めない・様式に合わないときは ConfigError を送出する。
+    """
+    data = read_raw(root)
+    if data is None:
+        return None
+    path = os.path.join(root, CONFIG_RELPATH)
     for key in ("terms_paths", "frozen_paths"):
         if key in data and not _is_str_list(data[key]):
             raise ConfigError(f"設定ファイル {path} のキー {key} は文字列の配列にする")

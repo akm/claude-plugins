@@ -4,7 +4,8 @@ Edit / MultiEdit / Write で Markdown に書き足した文字列を textlint �
 振る舞いの正本はファイル `wording-guard/skills/wording-guard/references/textlint.md` の「hook」。
 
   - 検査するのは、設定キー textlint.hook を true にしたリポジトリの Markdown だけ。それ以外は何もしない
-    (プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くため)。
+    (プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くため)。textlint.hook は設定の型を
+    検査する前に見るので、有効にしていないリポジトリでは設定の誤りでも何もしない。
   - Edit / MultiEdit は、書き換える前の文字列 (old_string) と後の文字列 (new_string) を両方検査し、
     後で増えた検出だけを返す。new_string には、一意に特定するために変えていない前後の行も入るので、
     そこにあった検出 (他の人が既に書いた文章) を、今回持ち込んだものとして扱わないため。
@@ -107,12 +108,16 @@ def handle(event, check_texts=None):
     root = config.find_root(path)
     if root is None:
         return None
+    # hook を有効にしていないリポジトリでは何もしない。型の検査より先に textlint.hook を見るのは、
+    # 有効にしていないリポジトリで、設定の誤りを理由に書き込みのたびに止めないため。
+    # JSON として読めないときは有効かを決められないので、知らせる (検査を省略しない)
     try:
+        if not config.hook_enabled(config.read_raw(root)):
+            return None
         cfg = config.load(root)
     except config.ConfigError as e:
         return _failure(str(e))
-    settings = config.textlint_settings(cfg) or {}
-    if settings.get("hook") is not True or config.is_frozen(root, cfg, path):
+    if config.is_frozen(root, cfg, path):
         return None
 
     if sys.version_info < (3, 11):
