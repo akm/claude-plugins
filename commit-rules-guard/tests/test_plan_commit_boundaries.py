@@ -9,7 +9,7 @@
   - 発火頻度の間引き（1 セッションにつき 1 回だけ）
   - 各ツールの**実際の形**で発火すること
   - 間引けないとき（書き込めない・並列）に鳴り続けないこと
-  - 対象ツールの判定、リポジトリ外では黙ること
+  - 対象ツールの判定、リポジトリ外では通知を出さないこと
 """
 
 import importlib.util
@@ -132,7 +132,7 @@ class TestStateDir(unittest.TestCase):
 
     def test_does_not_default_to_the_shared_temp_dir(self):
         # Linux の /tmp は誰でも書ける。マーカー名は session_id から計算できるため、
-        # 先回りして置かれるとリマインダを黙らせられる。
+        # 先回りして置かれるとリマインダを出させないようにできる。
         os.environ.pop("COMMIT_GUARD_STATE_DIR", None)
         os.environ.pop("XDG_STATE_HOME", None)
         os.environ["HOME"] = "/home/someone"
@@ -341,7 +341,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(payload)[0], SILENT)
 
     def test_silent_outside_a_repository(self):
-        # コミットの話が無関係な場所では黙る。
+        # コミットの話が無関係な場所では通知を出さない。
         outside = os.path.join(self._dir.name, "plain")
         os.makedirs(outside)
         payload = self._payload()
@@ -381,8 +381,8 @@ class TestHookBehavior(unittest.TestCase):
 
     @unittest.skipIf(os.geteuid() == 0, "root では chmod による書き込み禁止が効かない")
     def test_unwritable_state_dir_still_notifies(self):
-        # 状態を保存できないと間引けない。ここで黙ると、フックは永久に無言になり、
-        # しかも利用者はそれを正常な間引きと区別できない。静かに死ぬより鳴らす。
+        # 状態を保存できないと間引けない。ここで通知を出さないと、フックは二度と通知を出さなくなり、
+        # しかも利用者はそれを正常な間引きと区別できない。何も知らせずに機能しなくなるより鳴らす。
         os.makedirs(self.state, exist_ok=True)
         os.chmod(self.state, 0o500)
         try:
@@ -445,7 +445,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(self._payload(session=base + "B"))[0], NOTIFIED)
 
     def test_outside_a_repo_does_not_spend_the_session_budget(self):
-        # リポジトリ外では黙るが、そこで通知枠を消費してはいけない。
+        # リポジトリ外では通知を出さないが、そこで通知枠を消費してはいけない。
         # main() が git の判定より後に claim() する順序を固定する。
         outside = os.path.join(self._dir.name, "plain2")
         os.makedirs(outside)

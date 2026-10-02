@@ -130,7 +130,7 @@ def _string_list(value):
     """value が list ならその中の非空 str だけを返す。それ以外（str 単体・数値・dict 等）は空。
 
     JSON の型ミス（例: "db/schema.sql" を配列にし忘れた、数値を書いた）で
-    下流の反復処理が例外を投げ、本体全体が黙って無効化されるのを防ぐ。
+    下流の反復処理が例外を投げ、本体全体が、利用者に知らせずに無効化されるのを防ぐ。
     """
     if not isinstance(value, list):
         return []
