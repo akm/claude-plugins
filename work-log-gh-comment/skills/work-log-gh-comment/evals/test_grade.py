@@ -285,7 +285,7 @@ class TestEval5Coverage(unittest.TestCase):
     def test_宣言と判定の項目が一致する(self):
         """evals.json の assertions と CHECKS のラベルは同じ事実の二重記載。
 
-        突き合わせる関門が無いと、片方に足したとき黙って食い違う。
+        突き合わせる関門が無いと、片方に足したとき、どの検査も失敗しないまま食い違う。
         """
         import json
         import pathlib
@@ -549,7 +549,7 @@ class TestChunksHandled(unittest.TestCase):
     def test_無関係なまとめと行数の組み合わせでは通さない(self):
         """省略の明記は、省いた事実と行数が同じ文で結ばれていること。
 
-        別々の文の「まとめ」と「12 行」で通すと、6 行を黙って落とした
+        別々の文の「まとめ」と「12 行」で通すと、6 行を、省いたと書かずに省いた
         記録が合格する。
         """
         body = ("syncing chunk 1/8 ... done\n"
@@ -706,7 +706,7 @@ class TestFixtureExecution(unittest.TestCase):
     def test_出力が空なら満点にしない(self):
         """フィクスチャが失敗しても採点は続く。0/0 で満点にしない。
 
-        実行に依存する以上、実行が壊れたときに黙って通す形は危うい。
+        実行に依存する以上、実行が壊れたときに、壊れたことを示さずに合格させる形は危うい。
         """
         grade._fixture_cache["empty-probe.sh"] = []
         try:
