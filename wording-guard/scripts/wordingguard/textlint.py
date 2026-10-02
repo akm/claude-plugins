@@ -291,7 +291,8 @@ def check_files(root, cfg, term_list, paths):
         results = _run_textlint(directory, conf, [os.path.abspath(p) for p in paths], cwd=root)
     found = {}
     for r in results:
-        with open(r["filePath"], encoding="utf-8") as f:
+        # textlint は改行を変換せずに位置を数えるので、改行を変換せずに読む (CRLF を LF にすると、位置が行の数だけずれる)
+        with open(r["filePath"], encoding="utf-8", newline="") as f:
             source = f.read()
         to_index = _utf16_indexer(source)
         found[r["filePath"]] = [_finding(m, source, to_index) for m in r["messages"]]
@@ -316,7 +317,8 @@ def check_texts(root, cfg, term_list, texts, filename="text.md"):
             d = os.path.join(work, "input", str(i))
             os.makedirs(d)
             path = os.path.join(d, os.path.basename(filename))
-            with open(path, "w", encoding="utf-8") as f:
+            # 位置は text に当てるので、改行を変換せずに書く (Windows では LF が CRLF になり、位置がずれる)
+            with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write(text)
             paths.append(path)
         results = _run_textlint(directory, conf, paths, cwd=root)

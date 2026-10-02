@@ -262,6 +262,26 @@ class TestFinding(unittest.TestCase):
             for offset in range(-1, len(text.encode("utf-16-le")) // 2 + 3):
                 self.assertEqual(to_index(offset), counted(text, offset), f"{text!r} の位置 {offset}")
 
+    def test_check_files_keeps_crlf_for_positions(self):
+        # textlint は CRLF のまま位置を数える。読み直すときに CRLF を LF に変えると、2 行目以降の位置がずれる
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "crlf.md")
+            content = "一行目\r\n二行目\r\n同じ型の指摘\r\n"
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+            start = content.index("同じ型の")
+            message = {"ruleId": "prh", "severity": 2, "message": "m", "range": [start, start + 1],
+                       "fix": {"range": [start, start + 4], "text": "同じ種類の"}}
+
+            def run(directory, conf, paths, cwd):
+                return [{"filePath": p, "messages": [message]} for p in paths]
+
+            with mock.patch.object(textlint, "ensure_installed", return_value="dir"), \
+                    mock.patch.object(textlint, "compose", return_value=("conf.json", True)), \
+                    mock.patch.object(textlint, "_run_textlint", side_effect=run):
+                found = textlint.check_files(d, {}, [], [path])
+        self.assertEqual(found[path][0]["matched"], "同じ型の")
+
     def test_check_texts_converts_many_findings_in_large_text_quickly(self):
         # 位置の表は文字列ごとに 1 回だけ作る。検出ごとに先頭から数え直すと、この大きさでは数十秒かかる
         text = "🐛" + ("あ" * 99 + "\n") * 2000
