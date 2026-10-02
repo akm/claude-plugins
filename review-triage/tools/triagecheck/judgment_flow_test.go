@@ -192,7 +192,7 @@ func TestJudgmentFlowMissingTable(t *testing.T) {
 }
 
 // git 追跡に依らず、ファイルが読めれば検査する — 追跡前の判定フローが
-// 検査されないまま通過する「0 件マッチで何も検査しないまま成功」の種類の欠陥 (B1 と同じ) を防ぐ。
+// 0 件マッチのまま、何も検査せずに成功する種類の欠陥 (B1 と同じ) を防ぐ。
 func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"), "")
 	if len(problems) == 0 {

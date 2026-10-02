@@ -187,7 +187,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          included: [\"\"]\n", "investigation.included[0]"},
 		{"investigation の未知のキー", "order: 1\n",
 			"order: 1\n        investigation:\n          scope: grep -rn foo .\n          found: [docs/bar.md]\n", "found"},
-		// 値を省いた構造キー (null) は「無い」と同一に扱われ、検査が何も報告しない。書きかけの記録を
+		// 値を省いた構造キー (null) は「無い」と同一に扱われ、他の検査は何も報告しない。書きかけの記録を
 		// 未調査・束ね先なしとして扱わせないため報告する。
 		{"investigation の値が無い (null)", "order: 1\n", "order: 1\n        investigation:\n", "investigation に値がありません"},
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
@@ -241,7 +241,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 }
 
 // ' #' 検査の境界: コロン後の空白の揺れ・値全体がコメント・シーケンス先頭キーの
-// ブロックスカラーの兄弟・インデント指示子。正規表現では列挙するたびに検出漏れが生じた種類の境界
+// ブロックスカラーの兄弟・インデント指示子。正規表現で字句を列挙する方式では、検出漏れが繰り返し生じた種類の境界
 // (LineComment 走査への置き換えで構造的に守る)。
 func TestReviewTriageRecordHashLexicalEdges(t *testing.T) {
 	cases := []struct {
