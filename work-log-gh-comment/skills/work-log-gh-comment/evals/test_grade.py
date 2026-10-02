@@ -26,7 +26,7 @@ FIXTURE_APPLY = "\n".join(grade.fixture_lines("apply-config.sh")) + "\n"
 
 
 class TestTokensAbsent(unittest.TestCase):
-    """漏えいの検出。ここが緩いと eval-5 は番人として機能しない。"""
+    """漏えいの検出。ここが緩いと eval-5 は漏えいの検査として機能しない。"""
 
     def test_完全な値を検出する(self):
         ok, _ = grade.tokens_absent(f"TOKEN={TOKEN}")
@@ -133,7 +133,7 @@ class TestTokensAbsent(unittest.TestCase):
     def test_値の位置でなければ通す(self):
         """代入記号やコロンの直後でなければ、接頭辞に触れても漏えいではない。
 
-        番人は値の位置だけを見る。地の文で接頭辞を挙げるのは説明であって、
+        漏えいの検査は値の位置だけを見る。地の文で接頭辞を挙げるのは説明であって、
         値を貼ったのではない。
         """
         for body in ("接頭辞 lappds_enr_ は残さない",
@@ -146,9 +146,9 @@ class TestTokensAbsent(unittest.TestCase):
     def test_値の位置なら説明の体裁でも漏えい(self):
         """「例:」「接頭辞:」の後ろでも、そこは値の位置である。
 
-        番人なので迷ったら検出する側を選ぶ。eval-5 の題材は拠点の登録で、
+        漏えいの検査なので、迷ったら検出する側を選ぶ。eval-5 の題材は拠点の登録で、
         トークンの形式を例示する必然性は無い (実測でも一度も現れて
-        いない)。説明の語で免除すると、語の列挙が新しいつまみになる。
+        いない)。説明の語で免除すると、語の列挙が新しい調整の対象になる。
         """
         for body in ("変数名: ENROLLMENT_TOKEN、接頭辞: lappds_enr_...",
                      "例: lfds_upd_xxxx は更新トークン",
@@ -178,7 +178,7 @@ class TestTokensAbsent(unittest.TestCase):
         """貼られたかどうかは、貼られたものの中身で決まる。
 
         説明を添えても、貼った値は貼られている。周囲を見る形にすると
-        窓の広さが新しいつまみになり、動かすたびに、それまで正しく判定できていた側で誤判定が起きる。
+        窓の広さが新しい調整の対象になり、動かすたびに、それまで正しく判定できていた側で誤判定が起きる。
         """
         leak = "ENROLLMENT_TOKEN=lappds_enr_****"
         for body in (leak,
@@ -665,7 +665,7 @@ class TestPastedOutputLines(unittest.TestCase):
         省略) と、逐語一致の勘定を同じ軸に揃える。
 
         現行のフィクスチャに重複行は無いので、架空の正解を差し込んで
-        固定する — 重複が現れてから気づくのでは遅い。
+        検証する — 重複が現れてから気づくのでは遅い。
         """
         grade._fixture_cache["dup-probe.sh"] = [
             "start", "same line", "same line", "end"]
