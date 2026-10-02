@@ -283,7 +283,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 
 	// シンボリックリンク経由で起動しても実体の置き場を検査すること。
 	// dirname "$0" だけで基準を求めるとリンクの置き場が基準になり、その隣に
-	// 別の置き場があるとそちらを検査して緑になる (実測でそうなった)。
+	// 別の置き場があるとそちらを検査して成功する (実測でそうなった)。
 	// リンクの隣に紛らわしい置き場を実在させたうえで確かめる。
 	linkDir := filepath.Join(realTempDir(t), "localbin")
 	if err := os.MkdirAll(linkDir, 0o755); err != nil {
@@ -308,7 +308,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	}
 
 	// 経路のディレクトリ自体がシンボリックリンクでも、実体側の置き場を検査すること。
-	// cd -P が cd -L に変わると解決先がリンク側へ割れ、隣の囮を検査して緑になる。
+	// cd -P が cd -L に変わると解決先がリンク側へ割れ、隣の囮を検査して成功する。
 	// ラッパーそのものはリンクでないので、上の [ -L ] のループでは捕まらない経路。
 	//
 	// リンクは bin ディレクトリに張る。リポジトリごとリンクすると、リンク側から見た

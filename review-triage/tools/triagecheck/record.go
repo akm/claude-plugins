@@ -4,7 +4,7 @@
 // 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
 // 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・ピン値の
 // 誤りが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
-// 偽赤になる」穴を生んだ。数えるものを書かせないことで、この類を発生源から消す。
+// 誤って失敗する」穴を生んだ。数えるものを書かせないことで、この類を発生源から消す。
 // スキーマの意味の正本は skills/review-triage/references/record-schema.md。
 package main
 
@@ -55,7 +55,7 @@ var summaryCommand = defaultSummaryCommand
 //
 // 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧側 (listReviewTriageFiles)
 // は path.Join でパスを clean するため、置き場の表記だけを整えて接頭辞で照合すると
-// "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま緑になった。
+// "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま成功した。
 // 両辺を path.Clean に通せば、どちらの表記でも同じ判定になる。
 func inReviewTriageDir(f string) bool {
 	return path.Dir(f) == path.Clean(reviewTriageDir)
@@ -374,7 +374,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 	return problems, &doc
 }
 
-// recordNullSilentKeys は、値を省いて null にすると他のどの検査でも赤くならない
+// recordNullSilentKeys は、値を省いて null にすると他のどの検査でも失敗しない
 // 構造キー。キーの有無をポインタの nil で見る plan_ref / investigation は、
 // 「キーを書いて値を省いた」(書きかけ・インデントの誤り) が「キーが無い」と
 // 同一になり、書き手は書いたつもりのまま記録上は無い扱いになる (実測:
@@ -1143,12 +1143,12 @@ func recordStatusJa(s string) string {
 // 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れない。
 // 権限・I/O のエラーは続行しても意味が無いので、これとは区別して返す。
 var errRecordDirMissing = errors.New(
-	"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま緑になるため報告する)")
+	"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま成功するため報告する)")
 
 // listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
-// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って緑になる種類の欠陥) を塞ぐため。
+// git add 前の最初の記録が素通りする穴 (0 件マッチで黙って成功する種類の欠陥) を塞ぐため。
 //
 // ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
 // (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。

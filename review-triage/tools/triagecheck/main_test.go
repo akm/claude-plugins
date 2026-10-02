@@ -16,7 +16,7 @@ import (
 // あわせて、run が読む環境変数 CLAUDE_PLUGIN_ROOT をここでクリアする。run を呼ぶ
 // テストは必ずこの関数を最初に呼ぶので、環境に依存しない状態をこの 1 か所で作れる
 // (経路ごとに書くと、書き忘れたテストだけが環境依存になる — 実測で、この変数が
-// 設定された環境で 1 つだけ落ち、3 つが別の理由で赤になっていた)。環境変数を
+// 設定された環境で 1 つだけ落ち、3 つが別の理由で失敗していた)。環境変数を
 // 意図的に使うテストは、この関数の後で t.Setenv して上書きする。
 func withRunGlobals(t *testing.T) {
 	t.Helper()
@@ -29,7 +29,7 @@ func withRunGlobals(t *testing.T) {
 // 「検査が走って合格した」と「そもそも走らなかった」を区別できるようにするための
 // 中核の挙動なので、入口 (run) の側でも固定する。
 // 判定はエラーが返ること自体で行い、報告メッセージの文言には結合しない。
-// 文言で判定すると、挙動を変えない書式の変更だけで落ちる (偽の赤)。
+// 文言で判定すると、挙動を変えない書式の変更だけで落ちる (誤った失敗)。
 // 報告の本文は stderr に出るので err.Error() には載らず、文言に頼ると実質
 // 「書式が変わっていないこと」を検査するテストになる。
 func TestRunFailsOnMissingExplicitPaths(t *testing.T) {
@@ -83,7 +83,7 @@ func TestRunFailsWhenPluginRootFlowMissing(t *testing.T) {
 	}
 
 	if err := run([]string{"-record-dir", recs}); err == nil {
-		t.Fatal("CLAUDE_PLUGIN_ROOT が指す判定フローが無いのに緑になった")
+		t.Fatal("CLAUDE_PLUGIN_ROOT が指す判定フローが無いのに成功した")
 	}
 }
 
@@ -217,7 +217,7 @@ func TestRunAcceptsRelativeRecordDirWithCurrentDir(t *testing.T) {
 }
 
 // 基準を渡さずに相対を指定したらエラー。ここで $PWD などを当てにいくと、
-// 外れたときに別の場所を検査して黙って緑を返す。
+// 外れたときに別の場所を検査して黙って成功を返す。
 func TestRunRejectsRelativeRecordDirWithoutCurrentDir(t *testing.T) {
 	withRunGlobals(t)
 	caller := t.TempDir()
@@ -267,7 +267,7 @@ func TestRunReportsBothMissingPaths(t *testing.T) {
 	// 落ちる — 何を報告したかではなく、どう書いたかを検査することになる。
 	stderr := captureStderr(t, func() {
 		if err := run([]string{"-record-dir", recDir, "-judgment-flow", flow}); err == nil {
-			t.Error("両方が不在なのに緑になった")
+			t.Error("両方が不在なのに成功した")
 		}
 	})
 	for _, want := range []string{recDir, flow} {
@@ -342,7 +342,7 @@ func TestRunRejectsEmptyExplicitPaths(t *testing.T) {
 	assertEmpty := func(t *testing.T, err error, flag, label string) {
 		t.Helper()
 		if err == nil {
-			t.Fatalf("%s に%sを渡したのに緑になった", flag, label)
+			t.Fatalf("%s に%sを渡したのに成功した", flag, label)
 		}
 		// 文言ではなく番兵で識別する。この検査を外しても別のエラー
 		// (相対パスの基準要求など) が立ち、その文言にもフラグ名が
@@ -504,7 +504,7 @@ func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 		withRunGlobals(t)
 		t.Setenv("CLAUDE_PLUGIN_ROOT", "relplugin")
 		// -current-dir を渡しても、環境変数由来のパスの基準には使わない。
-		// 使ってしまうと上の judgment-flow.md が見つかり、緑になる。
+		// 使ってしまうと上の judgment-flow.md が見つかり、検査が成功する。
 		if err := run([]string{"-record-dir", recs, "-current-dir", base}); err == nil {
 			t.Fatal("相対の CLAUDE_PLUGIN_ROOT が -current-dir 基準で解決された")
 		}

@@ -48,7 +48,7 @@ var judgmentFlowDecorations = map[string]bool{
 }
 
 // judgmentFlowProblems は図と表の ID 集合を照合する。対象は git 追跡でなく
-// ファイルの実在で決める — 追跡前の判定フローが素通りする「0 件マッチで黙って緑」の
+// ファイルの実在で決める — 追跡前の判定フローが素通りする「0 件マッチで黙って成功」の
 // 種類の欠陥 (B1 と同じ) を防ぐ。
 //
 // ファイルが無いときの扱いは origin で分かれる。origin は在り処を指定したものの
@@ -68,7 +68,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 		if errors.Is(err, fs.ErrNotExist) {
 			if origin != "" {
 				return []string{fmt.Sprintf(
-					"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま緑になるため報告する)",
+					"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま成功するため報告する)",
 					judgmentFlowPath, origin)}
 			}
 			return nil

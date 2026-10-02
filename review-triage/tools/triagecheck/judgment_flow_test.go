@@ -161,7 +161,7 @@ func TestJudgmentFlowMissingDiagram(t *testing.T) {
 	}
 }
 
-// readFile の失敗は問題として報告される (黙って緑にしない)。
+// readFile の失敗は問題として報告される (黙って成功させない)。
 func TestJudgmentFlowReadError(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, os.ErrPermission }
 	problems := judgmentFlowProblems([]string{judgmentFlowPath}, read, "")
@@ -192,7 +192,7 @@ func TestJudgmentFlowMissingTable(t *testing.T) {
 }
 
 // git 追跡に依らず、ファイルが読めれば検査する — 追跡前の判定フローが
-// 素通りする「0 件マッチで黙って緑」の種類の欠陥 (B1 と同じ) を防ぐ。
+// 素通りする「0 件マッチで黙って成功」の種類の欠陥 (B1 と同じ) を防ぐ。
 func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"), "")
 	if len(problems) == 0 {

@@ -777,7 +777,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 // TestInReviewTriageDirNotationVariants は、置き場の表記が揺れても検査の対象が
 // 変わらないことを固定する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
 // "." / "./rec" / "rec//" で一覧側 (path.Join が clean する) と前置が一致せず、
-// 検査が 1 件も走らないまま緑になった。
+// 検査が 1 件も走らないまま成功した。
 func TestInReviewTriageDirNotationVariants(t *testing.T) {
 	saved := reviewTriageDir
 	t.Cleanup(func() { reviewTriageDir = saved })
@@ -815,7 +815,7 @@ func TestListReviewTriageFilesMissingDir(t *testing.T) {
 }
 
 // 置き場を明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
-// 意思表示なので、記録 0 件として黙って緑を返すと、置き場を移した時点で検査が
+// 意思表示なので、記録 0 件として黙って成功を返すと、置き場を移した時点で検査が
 // 無効になったことに気づけない (診断ツールの偽陰性)。
 func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
 	_, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"), true)
@@ -836,7 +836,7 @@ func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 }
 
 // ディレクトリが「無い」以外の読み取りエラー (ENOTDIR など) は握りつぶさず返す —
-// 権限や I/O のエラーを「記録 0 件」= 緑に化けさせない。
+// 権限や I/O のエラーを「記録 0 件」= 成功に化けさせない。
 func TestListReviewTriageFilesErrorReported(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {

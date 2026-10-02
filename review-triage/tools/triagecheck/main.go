@@ -265,7 +265,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	// そのもので、コミットされるサマリの 1 行目が叩き方ごとに変わり、生成直後の
 	// サマリが別の叩き方の検査で「食い違う」と報告される (実測)。絶対パスも
 	// 焼き込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットが
-	// 場所によって赤くなる。コミットされる値は、リポジトリ相対でなければならない。
+	// 場所によって検査が失敗する。コミットされる値は、リポジトリ相対でなければならない。
 	//
 	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する —
 	// -record-dir と同じ規則で、案内というパスの形をした値にも同じ規則を当てる。
@@ -329,7 +329,7 @@ func missingPathProblems(in resolvedInputs) []string {
 	if in.judgmentFlow != "" {
 		if _, err := os.Stat(in.judgmentFlow); errors.Is(err, fs.ErrNotExist) {
 			problems = append(problems, fmt.Sprintf(
-				"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま緑になるため報告する)",
+				"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま成功するため報告する)",
 				in.judgmentFlow, in.judgmentFlowOrigin))
 		}
 	}
@@ -396,7 +396,7 @@ func resolveBaseDir(currentDir string) (string, error) {
 // 使われなかった」ことを検出するために使う)。
 //
 // base が空 (= -current-dir が無い) のに相対を渡されたらエラーにする。ここで
-// 推測した基準を当てにいくと、外れたときに別の場所を検査して黙って緑を返す。
+// 推測した基準を当てにいくと、外れたときに別の場所を検査して黙って成功を返す。
 func resolvePath(p, base, flagName string) (string, bool, error) {
 	if filepath.IsAbs(p) {
 		return p, false, nil
@@ -428,7 +428,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 //
 // 指定の有無は値ではなく specified (呼び出し側が flag.Visit で読んだ意思表示) で
 // 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」に
-// 化け、検査が走らないまま緑になる (-record-dir で避けたはずの種類の欠陥と同じ)。
+// 化け、検査が走らないまま成功する (-record-dir で避けたはずの種類の欠陥と同じ)。
 func resolveJudgmentFlowPath(value string, specified bool) (flowPath, origin string) {
 	if specified {
 		return value, "-judgment-flow"
