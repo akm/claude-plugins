@@ -460,6 +460,7 @@ INTERRUPT_FILE=""      # 割り込みを記録するファイル (起動時の�
 INTERRUPT_TMP=""       # 割り込みを記録するファイルを書くときの一時名
 RELAY_SIG=""           # 親が最初に受けた割り込みのシグナルの名前 (関数 relay_interrupt)
 RELAY_CODE=""          # 親が最初に受けた割り込みの終了コード
+RELAY_WARNED=""        # 割り込みを記録するファイルを書けなかったことを、標準エラーに知らせたか (関数 write_interrupt_file)
 SELF_SIG=""            # 子が自分で最初に受けた TERM・HUP の名前 (プロセスグループに届いたもの。関数 body_main の trap が書く)
 WS=""                  # 回の作業場所のパス (起動時の確認が通った後に決める)
 WS_KEY=""              # 作業場所と準備のディレクトリの名前に共通する部分 (<周回 id>-<周回の置き場の実体パスのハッシュ>)
@@ -1710,26 +1711,39 @@ body_main() {
 
 # ---- 親 (シグナルを受け取るプロセス。正本は worker.md の「終わり方」) ----
 #
-# 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt と supervise_body)。bash は、コマンド置換を処理している
-# 間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。
-# テスト review-triage/tests/test_review_loop_worker.py が、この 2 つの関数と、そこから呼ぶ関数の本文にコマンド置換が無いことを
-# 確かめる
+# 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt・write_interrupt_file・supervise_body)。bash は、
+# コマンド置換を処理している間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。
+# テスト review-triage/tests/test_review_loop_worker.py が、親の trap を設定した後の行から呼ぶ関数をたどり、その本文にコマンド置換が
+# 無いことを確かめる
 
-# 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを割り込みを記録するファイルに書く (一時名に書いて
-# から改名する。子が書きかけを読まないため)。子への USR1 は関数 supervise_body が送る
+# 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを覚えて、割り込みを記録するファイルに書く。
+# 子への USR1 と、書けなかったときの書き直しは、関数 supervise_body が行う
 relay_interrupt() {
   [ -z "$RELAY_SIG" ] || return 0
   RELAY_SIG=$1
   RELAY_CODE=$2
-  if ! { printf '%s %s\n' "$1" "$2" >"$INTERRUPT_TMP" && mv -f "$INTERRUPT_TMP" "$INTERRUPT_FILE"; }; then
-    echo "review-loop-worker: 割り込みを記録するファイル $INTERRUPT_FILE を書けないので、子 (PID $BODY_PID) に割り込みを伝えられない。" >&2
-    echo "  止めるには kill -KILL $WORKER_PID を送る (子は親が無いことに気づいて、後始末をせずに終わる)" >&2
+  write_interrupt_file
+}
+
+# 親が最初に受けた割り込みのシグナルの名前と終了コードを、割り込みを記録するファイルに書く (一時名に書いてから改名する。子が
+# 書きかけを読まないため)。INT・TERM・HUP を無視するサブシェル (コマンド置換ではない) の中で書く — 親の trap は外部コマンド mv に
+# 引き継がれないので、親が続けて受けたシグナル (Ctrl-C を続けて押したときなど) のデフォルトの動作で mv が止まり、書けなくなるため
+# (無視は mv に引き継がれる)。書けなかったとき (サブシェルが無視を設定する前にシグナルが届いた場合を含む) は 1 を返し、最初の
+# 1 回だけ標準エラーに知らせる
+write_interrupt_file() {
+  ( trap '' INT TERM HUP; printf '%s %s\n' "$RELAY_SIG" "$RELAY_CODE" >"$INTERRUPT_TMP" && mv -f "$INTERRUPT_TMP" "$INTERRUPT_FILE" ) \
+    && return 0
+  if [ -z "$RELAY_WARNED" ]; then
+    RELAY_WARNED=1
+    echo "review-loop-worker: 割り込みを記録するファイル $INTERRUPT_FILE を書けない。子 (PID $BODY_PID) が終わるまで、1 秒おきに書き直す。" >&2
+    echo "  止まらなければ kill -KILL $WORKER_PID を送る (子は親が無いことに気づいて、後始末をせずに終わる)" >&2
   fi
+  return 1
 }
 
 # 子を起動し、終わるまで待つ。割り込みを受けていれば、子が終わるまで 1 秒おきに子へ USR1 を送る (子が USR1 を受け損ねても、
-# 次の USR1 で wait から戻るように)。子が終わったら割り込みを記録するファイルを消し、割り込みを受けていればそのシグナルの
-# 終了コードで、受けていなければ子の終了コードで終わる
+# 次の USR1 で wait から戻るように)。送る前に、割り込みを記録するファイルが無ければ (書けなかったとき) 書き直す。子が終わったら
+# 割り込みを記録するファイルを消し、割り込みを受けていればそのシグナルの終了コードで、受けていなければ子の終了コードで終わる
 supervise_body() {
   local rc=""
   ( body_main ) &
@@ -1739,6 +1753,7 @@ supervise_body() {
       wait "$BODY_PID"
       rc=$?
     else
+      [ -f "$INTERRUPT_FILE" ] || write_interrupt_file
       kill -USR1 "$BODY_PID" 2>/dev/null
       sleep 1 </dev/null >/dev/null 2>&1 &
       wait "$!"

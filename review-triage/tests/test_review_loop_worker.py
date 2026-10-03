@@ -2822,6 +2822,52 @@ class TestEnding(WorkerTestBase):
         self.assertEqual(self.worker_state().get("pid"), p.pid)
         self.assertIn("この起動で応じた回: 0 回", out)
 
+    def test_second_interrupt_while_parent_writes_interrupt_file(self):
+        # 親が割り込みを記録するファイルを書いている間に、2 回目の割り込み (Ctrl-C を続けて押したとき) がプロセスグループに届いても、
+        # ファイルは書かれ、ワーカーは終わる。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
+        # 偽の mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待つ
+        started = os.path.join(self.root, "mv-started")
+        path = os.path.join(self.bin, "mv")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nfor a in "$@"; do last=$a; done\n'
+                    'case "${last##*/}" in review-loop-interrupt-*) : >"$FAKE_MV_STARTED"; sleep 2 ;; esac\n'
+                    'exec "$FAKE_MV_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_MV_REAL=shutil.which("mv"), FAKE_MV_STARTED=started)
+        p = self.start()
+        self.wait_state("idle")
+        os.killpg(p.pid, signal.SIGINT)
+        self.wait_for(lambda: os.path.exists(started), what="親が割り込みを記録するファイルへの改名を始めること")
+        os.killpg(p.pid, signal.SIGINT)
+        out, err = p.communicate(timeout=20)
+        self.assertEqual(p.returncode, 130, err)
+        self.assertEqual(self.worker_state()["state"], "left", err)
+        self.assertNotIn("書き直す", err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
+    def test_interrupt_file_rewritten_when_write_fails(self):
+        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き直し、ワーカーは終わる。書けなかったことは
+        # 1 度だけ標準エラーに知らせる (関数 write_interrupt_file)。偽の mv は、ファイルへの最初の改名だけを失敗させる
+        failed = os.path.join(self.root, "mv-failed")
+        path = os.path.join(self.bin, "mv")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nfor a in "$@"; do last=$a; done\n'
+                    'case "${last##*/}" in review-loop-interrupt-*)\n'
+                    '  if [ ! -e "$FAKE_MV_FAILED" ]; then : >"$FAKE_MV_FAILED"; exit 1; fi ;;\n'
+                    'esac\n'
+                    'exec "$FAKE_MV_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_MV_REAL=shutil.which("mv"), FAKE_MV_FAILED=failed)
+        p = self.start()
+        self.wait_state("idle")
+        p.send_signal(signal.SIGTERM)
+        out, err = p.communicate(timeout=20)
+        self.assertTrue(os.path.exists(failed), "偽の mv が改名を失敗させていない")
+        self.assertEqual(p.returncode, 143, err)
+        self.assertEqual(self.worker_state()["state"], "left", err)
+        self.assertEqual(err.count("書き直す"), 1, err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
     def test_timeout(self):
         # AE15: 終わらない偽の claude を上限で止め、子プロセスも残さない
         self.env["FAKE_CLAUDE_MODE"] = "hang"
