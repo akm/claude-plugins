@@ -9,7 +9,9 @@
   FAKE_CLAUDE_REVS の各名前を `git rev-parse` で解決した SHA (解決できなければ null)・
   受けた `--settings` の値を JSON として読んだものの列・プロンプトが指す依頼文 (写し) の中身
 - FAKE_CLAUDE_REVS: 記録で解決する名前を空白で区切って並べたもの (既定 main)
-- FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang・hang_ignore_term・hang_leave_child・leave_child のとき)
+- FAKE_CLAUDE_PIDS: 終わらないプロセスの PID を書くファイル。テストの後片付け (メソッド tearDown) が、書かれた PID に
+  KILL を送る。mode ごとに書く PID は、hang_ignore_term は自分、hang は自分と子、hang_leave_child は自分と子 2 つ、
+  leave_child は残した子だけ
 - FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行 (init の行・Skill の呼び出し・
   result の行)。既定の init の行の permissionMode には、受けた `--permission-mode` の値を書く (受けていなければキーを書かない)
 - FAKE_CLAUDE_PERMISSION_MODE: 既定の init の行の permissionMode に、受けた `--permission-mode` の値の代わりに書く値
