@@ -2272,23 +2272,32 @@ class TestStartChecks(WorkerTestBase):
 
 class TestParentAvoidsCommandSubstitution(unittest.TestCase):
     """trap を設定した後の親 (worker.md の「終わり方」) は、コマンド置換を使わない。bash は、コマンド置換を処理している間に
-    受けたシグナルの trap を実行しないことがあるため (#105)。後から親の部分に $(...) を足すと、割り込みが失われうる。"""
+    受けたシグナルの trap を実行しないことがあるため (#105)。後から親の部分や、親が呼ぶ関数に $(...) を足すと、割り込みが
+    失われうる。"""
 
     def test_parent_code_has_no_command_substitution(self):
+        # 親の trap を設定した後の行から、呼ぶ関数を推移的にたどり、たどった関数の本文も調べる (コメントの行は除く)。親が呼ぶ
+        # 関数 (関数 log など) がコマンド置換を使えば、親がコマンド置換を実行することになるため。関数 body_main は、親が
+        # ( body_main ) & で子として起動するので、親の処理ではなく、たどらない
         with open(_WORKER, encoding="utf-8") as f:
             text = f.read()
-        parts = {}
-        for name in ("relay_interrupt", "supervise_body"):
-            m = re.search(rf"^{name}\(\) \{{\n(.*?)^\}}\n", text, re.S | re.M)
-            self.assertIsNotNone(m, f"関数 {name} が見つからない")
-            parts[f"関数 {name}"] = m.group(1)
+        bodies = {m.group(1): m.group(2) for m in re.finditer(r"^(\w+)\(\) \{\n(.*?)^\}\n", text, re.S | re.M)}
+        bodies.update({m.group(1): m.group(2) for m in re.finditer(r"^(\w+)\(\) \{ (.*) \}$", text, re.M)})
+        self.assertIn("( body_main ) &", bodies.get("supervise_body", ""), "関数 supervise_body が子を ( body_main ) & で起動していない")
         start = text.find("\ntrap 'relay_interrupt ")
         self.assertNotEqual(start, -1, "親の trap を設定する行が見つからない")
-        parts["親の trap を設定した後の行"] = text[start:]
-        for label, part in parts.items():
+        pending = [("親の trap を設定した後の行", text[start:])]
+        visited = set()
+        while pending:
+            label, part = pending.pop()
             code = "\n".join(line for line in part.splitlines() if not line.lstrip().startswith("#"))
             self.assertNotIn("$(", code, label)
             self.assertNotIn("`", code, label)
+            for name, body in bodies.items():
+                if name not in visited and name != "body_main" and re.search(rf"(?<![\w-]){name}(?![\w-])", code):
+                    visited.add(name)
+                    pending.append((f"関数 {name} (親が呼ぶ)", body))
+        self.assertLessEqual({"relay_interrupt", "supervise_body"}, visited)
 
 
 class TestArguments(WorkerTestBase):

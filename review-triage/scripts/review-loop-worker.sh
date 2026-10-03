@@ -1712,7 +1712,8 @@ body_main() {
 #
 # 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt と supervise_body)。bash は、コマンド置換を処理している
 # 間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。
-# テスト review-triage/tests/test_review_loop_worker.py が、この 2 つの関数の本文にコマンド置換が無いことを確かめる
+# テスト review-triage/tests/test_review_loop_worker.py が、この 2 つの関数と、そこから呼ぶ関数の本文にコマンド置換が無いことを
+# 確かめる
 
 # 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを割り込みを記録するファイルに書く (一時名に書いて
 # から改名する。子が書きかけを読まないため)。子への USR1 は関数 supervise_body が送る
