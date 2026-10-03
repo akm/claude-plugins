@@ -2882,6 +2882,22 @@ class TestEnding(WorkerTestBase):
             self.wait_for(lambda: not _pid_alive(pid), timeout=5, what=f"プロセス {pid} の終了")
         self.finish(p)
 
+    def test_sigkill_while_stopping_reviewer_after_timeout(self):
+        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に親を kill -9 で消しても、
+        # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終わる (worker.md の「終わり方」)。偽の claude は
+        # TERM を受けても終わらず、ワーカーが KILL を送るまで (STOP_GRACE_SECONDS 秒) 待たせる
+        received = os.path.join(self.root, "term-received")
+        self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
+        self.put_request()
+        p = self.start("--review-timeout-minutes", "0.05")
+        self.wait_for(lambda: os.path.exists(received), timeout=30, what="上限を越えて、レビュアの実行に TERM が送られること")
+        os.kill(p.pid, signal.SIGKILL)
+        p.communicate(timeout=20)
+        marker = self.wait_marker()
+        self.assertEqual(marker["status"], "failed")
+        self.assertEqual(marker["error"], "timeout")
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
+
     def test_interrupt_while_reviewing(self):
         # AE16: 割り込みを受けたら、レビュアの実行とその子を止めて failed の印と left を書く。作業場所は残らない
         for sig, code in ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129)):

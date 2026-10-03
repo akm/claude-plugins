@@ -21,6 +21,7 @@
 - FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作る印のファイルの名前の先頭
 - FAKE_CLAUDE_LINK_TARGET: mode が symlink_workspace のとき、作業場所を置き換えるシンボリックリンクの先
 - FAKE_CLAUDE_OUTSIDE: mode が result_symlink_outside のとき、結果のシンボリックリンクの先 (作業場所の外のファイル)
+- FAKE_CLAUDE_TERM_RECEIVED: mode が hang_ignore_term のとき、SIGTERM を受けたら作るファイル
 - FAKE_CLAUDE_MODE:
     ok                    結果を正しく書く (既定)
     no_result             結果を書かない
@@ -41,6 +42,7 @@
     result_dir            結果をディレクトリにする
     result_large          結果を、ワーカーの上限 (1 MiB) を越える大きさで書く
     hang                  子プロセスを起動して終わらない
+    hang_ignore_term      SIGTERM を受けても終わらず (受けたら FAKE_CLAUDE_TERM_RECEIVED を作る)、SIGKILL まで終わらない
     hang_leave_child      子プロセスを 2 つ (同じプロセスグループのものと、別のプロセスグループ (新しいセッション) のもの。
                           どちらも cwd は複製) 起動し、0.2 秒おきに標準出力に {"type": "fake_tick"} の行を書いて終わらない
 
@@ -51,6 +53,7 @@
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -190,6 +193,11 @@ def main():
     sys.stdout.flush()
 
     mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
+    if mode == "hang_ignore_term":
+        received = os.environ["FAKE_CLAUDE_TERM_RECEIVED"]
+        signal.signal(signal.SIGTERM, lambda *_: open(received, "w").close())
+        while True:
+            time.sleep(1)
     if mode == "hang":
         child = subprocess.Popen(["sleep", "1000"])
         write_pids(os.getpid(), child.pid)
