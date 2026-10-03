@@ -48,7 +48,7 @@
 /bin/bash "<ワーカーのスクリプトの絶対パス>" "<置き場の絶対パス>" --model "<worker.model>" --effort <worker.effort> --permission-mode <worker.permission_mode> [--allowed-tools '<ツール>']... [--sandbox-allow-write '<パス>']... [--sandbox-allowed-domain '<ドメイン>']... --idle-minutes <worker.idle_minutes> --review-timeout-minutes <worker.review_timeout_minutes>
 ```
 
-- **`bash` ではなく `/bin/bash` で起動する。** `bash` と書くと、`PATH` で先に見つかる bash (Homebrew の 5.2 など) で動く。理由の正本は [worker.md](worker.md) の「起動の仕方」の「要るもの」。
+- **`bash` ではなく `/bin/bash` で起動する。** `bash` と書くと、環境変数 `PATH` で先に見つかる bash (Homebrew の 5.2 など) で動く。理由の正本は [worker.md](worker.md) の「起動の仕方」の「要るもの」。
 - **ワーカーのスクリプトの絶対パス**は [SKILL.md](../SKILL.md) の「同梱のスクリプト」にある (`${CLAUDE_PLUGIN_ROOT}` が展開された絶対パス)。相対パスにしない — 人間が端末で `cd` した先で解決される。
 - **`--permission-mode` は常に付ける** (理由の正本は [arguments.md](arguments.md) の「様式」。0.13.0 の案内のコマンドでワーカーを起動したときの扱いは、[worker.md](worker.md) の「止められたときの直し方」の「権限モードの指定の食い違い」の行)。
 - `--allowed-tools` は、`worker.allowed_tools` の要素ごとに 1 つ付ける。**各要素を単一引用符で囲む** — `Bash(git diff:*)` の括弧と `*` をシェルが展開しないように。要素が単一引用符を含むときは `'\''` に置き換える。列が空なら付けない (ワーカーの既定の一覧を使う)。
