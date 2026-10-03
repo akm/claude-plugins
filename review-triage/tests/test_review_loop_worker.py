@@ -134,7 +134,8 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 """
 
 # 偽の date (PATH の先頭の bin/ に置く)。環境変数 FAKE_DATE_TRIGGER が指すファイルを消せた 1 回だけ、本物の date の出力を書いてから
-# 標準出力を閉じ、SIGINT を無視して FAKE_DATE_HOLD 秒待つ (待ち始めたときにファイル FAKE_DATE_STARTED を作る)。
+# 標準出力を閉じ、SIGINT を無視して FAKE_DATE_HOLD 秒 (無ければ 2 秒) 待つ (待ち始めたときにファイル FAKE_DATE_STARTED を作る)。
+# 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待たせる (ほかの呼び出しではファイルを消さない)。
 # コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
 if [ -n "${FAKE_DATE_TRIGGER:-}" ] && { [ -z "${FAKE_DATE_ARGS:-}" ] || [ "$*" = "$FAKE_DATE_ARGS" ]; } \\
@@ -492,9 +493,8 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_GIT_REAL"] = shutil.which("git")
 
     def install_fake_date(self, trigger, started):
-        """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。ファイル trigger を作ると、次の 1 回だけ、標準出力を閉じてから
-        SIGINT を無視して待つ (待ち始めたときにファイル started を作る)。環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと
-        一致する呼び出しだけを待たせる。待つ秒数は環境変数 FAKE_DATE_HOLD (無ければ 2)。"""
+        """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。引数 trigger と started は、環境変数 FAKE_DATE_TRIGGER と
+        FAKE_DATE_STARTED に渡す。待つ条件と秒数は、定数 _FAKE_DATE の上のコメントのとおり。"""
         path = os.path.join(self.bin, "date")
         with open(path, "w", encoding="utf-8") as f:
             f.write(_FAKE_DATE)
