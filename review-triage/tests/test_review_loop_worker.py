@@ -134,7 +134,8 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 """
 
 # 偽の date (PATH の先頭の bin/ に置く)。環境変数 FAKE_DATE_TRIGGER が指すファイルを消せた 1 回だけ、本物の date の出力を書いてから
-# 標準出力を閉じ、SIGINT を無視して FAKE_DATE_HOLD 秒 (無ければ 2 秒) 待つ (待ち始めたときにファイル FAKE_DATE_STARTED を作る)。
+# 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待つ (待ち始めたときに、環境変数
+# FAKE_DATE_STARTED が指すファイルを作る)。
 # 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待たせる (ほかの呼び出しではファイルを消さない)。
 # コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
