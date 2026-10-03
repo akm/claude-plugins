@@ -502,7 +502,7 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_DATE_STARTED"] = started
 
     def install_fake_ps(self, trigger, log, action):
-        """PATH の先頭の bin/ に偽の ps を置く。ファイル trigger がある間、プロセスの状態を尋ねる呼び出し (ps -o stat= -p <PID>。
+        """PATH の先頭の bin/ に偽のコマンド ps を置く。ファイル trigger がある間、プロセスの状態を尋ねる呼び出し (ps -o stat= -p <PID>。
         ワーカーの関数 pid_alive) では、呼んだプロセスとその親の PID をファイル log に書いてから、シェルのコマンド action を実行する。
         それ以外の呼び出しと、action の後は、本物の ps を実行する。"""
         path = os.path.join(self.bin, "ps")
