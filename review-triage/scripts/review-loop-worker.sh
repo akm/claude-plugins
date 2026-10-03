@@ -832,11 +832,15 @@ timed_out() {
   [ "$(date +%s)" -ge "$REQ_DEADLINE" ]
 }
 
-# 割り込みに応じられるように (親が送る USR1 で wait が途中で戻る)、sleep をバックグラウンドで起動して wait で待つ
+# 割り込みに応じられるように (親が送る USR1 で wait が途中で戻る)、sleep をバックグラウンドで起動して wait で待つ。
+# wait が途中で戻ったら sleep を止める — 残すと、割り込みで終わったワーカーの後に、標準出力と標準エラーを開いたまま最大
+# POLL_SECONDS 秒残る (端末やテストは、それが閉じるまで待つ)
 idle_sleep() {
   sleep "$1" &
   SLEEP_PID=$!
-  wait "$SLEEP_PID" 2>/dev/null
+  if ! wait "$SLEEP_PID" 2>/dev/null; then
+    kill "$SLEEP_PID" 2>/dev/null
+  fi
   SLEEP_PID=""
 }
 

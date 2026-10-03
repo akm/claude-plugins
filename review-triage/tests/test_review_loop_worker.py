@@ -2671,6 +2671,18 @@ class TestEnding(WorkerTestBase):
         self.assertEqual([n for n in os.listdir(self.loop) if n.startswith("delivered-")], [])
         self.wait_for(lambda: not _group_alive(p.pid), timeout=3, what="ワーカーのプロセスグループが空になる")
 
+    def test_interrupt_while_idle_leaves_no_idle_sleep(self):
+        # 待機中に割り込みを受けて終わったワーカーは、待機の sleep (最大 POLL_SECONDS 秒) を残さない。残すと、sleep が標準出力と
+        # 標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、残れば数秒はプロセスグループに残る
+        p = self.start()
+        self.wait_state("idle")
+        p.send_signal(signal.SIGTERM)
+        p.wait(timeout=20)
+        self.assertEqual(p.returncode, 143)
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=1.5,
+                      what="ワーカーが終わった後に、プロセスグループが空になる")
+        p.communicate(timeout=5)
+
     def test_interrupt_while_command_substitution_child_exits(self):
         # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
         # コマンド置換のために起動したプロセスが出力を閉じてから終わるまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
