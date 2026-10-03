@@ -1622,10 +1622,8 @@ next_request() {
 # 子の本体。worker.yaml を idle で書き、更新時刻を進める処理を始め、依頼文を探して回の処理を行う。親 (関数 supervise_body) が
 # バックグラウンドのサブシェルとして起動する
 body_main() {
-  local idle_since now wait_for rid
-  # 子の PID (上限を測る処理が USR1 を送る先)。サブシェルの中の $$ は親の PID のままで、bash 3.2 には変数 BASHPID が無いので、
-  # sh を exec したコマンド置換の、親のプロセス (この子) の PID として求める
-  BODY_PID=$(exec sh -c 'echo $PPID')
+  # trap は子が最初に設定する。設定する前に USR1 (親が割り込みを伝えるときに送る) や、プロセスグループに届いた TERM・HUP を受けると、
+  # デフォルトの動作で子が終わり、worker.yaml を left にしないまま終わるため。
   # SIGINT は無視する (端末の Ctrl-C は親だけが受ける)。子は ( ) & で起動したバックグラウンドのサブシェルなので、無視した状態で
   # 始まるが、bash の版や起動の仕方によっては無視にならない (bash 5.2 は、INT の trap を設定した親が関数を & で起動すると、
   # 子の SIGINT をデフォルトの動作にする) ので、ここで明示する。
@@ -1635,6 +1633,10 @@ body_main() {
   trap '' INT
   trap ':' TERM HUP USR1
   trap 'cleanup' EXIT
+  local idle_since now wait_for rid
+  # 子の PID (上限を測る処理が USR1 を送る先)。サブシェルの中の $$ は親の PID のままで、bash 3.2 には変数 BASHPID が無いので、
+  # sh を exec したコマンド置換の、親のプロセス (この子) の PID として求める
+  BODY_PID=$(exec sh -c 'echo $PPID')
 
   write_worker_yaml idle ""
   start_heartbeat

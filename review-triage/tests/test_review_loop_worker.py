@@ -2693,6 +2693,25 @@ class TestEnding(WorkerTestBase):
                          "割り込みを記録するファイルが残っている")
         self.wait_for(lambda: not _group_alive(p.pid), timeout=5, what="ワーカーのプロセスグループが空になる")
 
+    def test_interrupt_right_after_child_starts(self):
+        # 子が自分の PID を求めるコマンド置換 (PATH で見つかる sh を起動する) の間に親が割り込みを受けても、子は USR1 のデフォルトの
+        # 動作 (終了) で終わらず、worker.yaml を left にして終わる。子は trap を最初に設定する (関数 body_main)。
+        # 偽の sh は、最初の 1 回だけ待ち始めたことをファイルに書いてから 2 秒待ち、その区間を広げる
+        started = os.path.join(self.root, "sh-started")
+        path = os.path.join(self.bin, "sh")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nif [ ! -e "$FAKE_SH_STARTED" ]; then : >"$FAKE_SH_STARTED"; sleep 2; fi\nexec /bin/sh "$@"\n')
+        os.chmod(path, 0o755)
+        self.env["FAKE_SH_STARTED"] = started
+        p = self.start()
+        self.wait_for(lambda: os.path.exists(started), what="偽の sh が待ち始めること")
+        p.send_signal(signal.SIGTERM)
+        out, err = p.communicate(timeout=20)
+        self.assertEqual(p.returncode, 143, err)
+        self.assertEqual(self.worker_state().get("state"), "left", err)
+        self.assertEqual(self.worker_state().get("pid"), p.pid)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
     def test_timeout(self):
         # AE15: 終わらない偽の claude を上限で止め、子プロセスも残さない
         self.env["FAKE_CLAUDE_MODE"] = "hang"
