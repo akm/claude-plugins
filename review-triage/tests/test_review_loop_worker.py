@@ -501,6 +501,44 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_DATE_TRIGGER"] = trigger
         self.env["FAKE_DATE_STARTED"] = started
 
+    def install_fake_ps(self, trigger, log, action):
+        """PATH の先頭の bin/ に偽の ps を置く。ファイル trigger がある間、プロセスの状態を尋ねる呼び出し (ps -o stat= -p <PID>。
+        ワーカーの関数 pid_alive) では、呼んだプロセスとその親の PID をファイル log に書いてから、シェルのコマンド action を実行する。
+        それ以外の呼び出しと、action の後は、本物の ps を実行する。"""
+        path = os.path.join(self.bin, "ps")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nif [ -e "$FAKE_PS_TRIGGER" ]; then\n'
+                    '  case " $* " in *" stat= "*)\n'
+                    f'    echo "$PPID $("$FAKE_PS_REAL" -o ppid= -p "$PPID")" >>"$FAKE_PS_LOG"; {action} ;;\n'
+                    '  esac\nfi\n'
+                    'exec "$FAKE_PS_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_PS_TRIGGER=trigger, FAKE_PS_LOG=log, FAKE_PS_REAL=shutil.which("ps"))
+
+    def start_until_child_checks_parent(self, trigger, log):
+        """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
+        親の生存を確かめる ps を実行するまで待って、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
+        コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親の側に出る。"""
+        for f in (trigger, log):
+            if os.path.exists(f):
+                os.remove(f)
+        p = self.start()
+        self.wait_for(lambda: self.worker_state().get("pid") == p.pid and self.worker_state().get("state") == "idle",
+                      what="この起動の worker.yaml が idle になること")
+        children = subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split()
+        self.assertEqual(len(children), 1, children)
+        child = children[0]
+
+        def child_in_ps():
+            try:
+                with open(log, encoding="utf-8") as f:
+                    return child in f.read().split()
+            except OSError:
+                return False
+        open(trigger, "w").close()
+        self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+        return p
+
     def delay_git(self, sub):
         """偽の git を置き、サブコマンド sub を終わらせないようにする (PID は self.git_pids_file に書かれる)。"""
         self.install_fake_git()
@@ -2686,40 +2724,14 @@ class TestEnding(WorkerTestBase):
     def test_group_signal_while_child_checks_parent(self):
         # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まり、子は親が
         # 無いと判定する。それでも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) があるので、kill -9 のときの経路 (後始末を
-        # せずに終わる) ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps は、ファイル trigger がある間、
-        # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせ、呼んだプロセスとその親の PID をファイルに書く
-        # (コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID はその親の側に出る)
+        # せずに終わる) ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
+        # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせる
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
-        path = os.path.join(self.bin, "ps")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write('#!/bin/sh\nif [ -e "$FAKE_PS_TRIGGER" ]; then\n'
-                    '  case " $* " in *" stat= "*)\n'
-                    '    echo "$PPID $("$FAKE_PS_REAL" -o ppid= -p "$PPID")" >>"$FAKE_PS_LOG"; sleep 3 ;;\n'
-                    '  esac\nfi\n'
-                    'exec "$FAKE_PS_REAL" "$@"\n')
-        os.chmod(path, 0o755)
-        self.env.update(FAKE_PS_TRIGGER=trigger, FAKE_PS_LOG=log, FAKE_PS_REAL=shutil.which("ps"))
+        self.install_fake_ps(trigger, log, "sleep 3")
         for sig, code in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
             with self.subTest(sig=sig.name):
-                for f in (trigger, log):
-                    if os.path.exists(f):
-                        os.remove(f)
-                p = self.start()
-                self.wait_for(lambda: self.worker_state().get("pid") == p.pid and self.worker_state().get("state") == "idle",
-                              what="この起動の worker.yaml が idle になること")
-                children = subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split()
-                self.assertEqual(len(children), 1, children)
-                child = children[0]
-
-                def child_in_ps():
-                    try:
-                        with open(log, encoding="utf-8") as f:
-                            return child in f.read().split()
-                    except OSError:
-                        return False
-                open(trigger, "w").close()
-                self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+                p = self.start_until_child_checks_parent(trigger, log)
                 os.killpg(p.pid, sig)
                 out, err = p.communicate(timeout=30)
                 self.assertEqual(p.returncode, code, err)
