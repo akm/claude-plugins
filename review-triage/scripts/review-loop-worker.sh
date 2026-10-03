@@ -800,23 +800,26 @@ stop_heartbeat() {
 # 子が wait を始める直前に届いた USR1 は wait を戻さず、その wait に上限が掛からない。
 # 周期ごとに子が動いているかを確かめ、動いていなければ (kill -9 で trap が動かなかった場合も) 自分も終わる —
 # 消えた子の PID が別のプロセスに再利用されていると、USR1 (デフォルトの動作は終了) がそのプロセスを止めてしまうため。
-# 親が動いていなければ (kill -9)、子に USR1 を送ってから終わる。子は wait から戻ったときに親が消えたことに気づき、後始末をせずに終わる
-# (関数 check_interrupt)
+# 親が動いていなければ (kill -9)、上限の時刻を見ずに、子が終わるまで 1 秒おきに USR1 を送る (1 度だけでは足りない理由は、上の
+# 上限の USR1 と同じ)。子は wait から戻ったときに親が消えたことに気づき、後始末をせずに終わる (関数 check_interrupt)
 start_watchdog() {
   (
     wd_sleep=""
+    wd_orphan=""
     trap 'kill "$wd_sleep" 2>/dev/null; exit 0' TERM
     while pid_alive "$BODY_PID"; do
-      if ! worker_alive; then
-        kill -USR1 "$BODY_PID" 2>/dev/null
-        exit 0
-      fi
-      wd_left=$(( $1 - $(date +%s) ))
-      if [ "$wd_left" -le 0 ]; then
+      if [ -n "$wd_orphan" ] || ! worker_alive; then
+        wd_orphan=1
         kill -USR1 "$BODY_PID" 2>/dev/null
         wd_left=1
+      else
+        wd_left=$(( $1 - $(date +%s) ))
+        if [ "$wd_left" -le 0 ]; then
+          kill -USR1 "$BODY_PID" 2>/dev/null
+          wd_left=1
+        fi
+        [ "$wd_left" -gt "$POLL_SECONDS" ] && wd_left=$POLL_SECONDS
       fi
-      [ "$wd_left" -gt "$POLL_SECONDS" ] && wd_left=$POLL_SECONDS
       sleep "$wd_left" &
       wd_sleep=$!
       wait "$wd_sleep"

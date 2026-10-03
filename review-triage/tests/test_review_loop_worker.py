@@ -137,7 +137,8 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 # 標準出力を閉じ、SIGINT を無視して FAKE_DATE_HOLD 秒待つ (待ち始めたときにファイル FAKE_DATE_STARTED を作る)。
 # コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
-if [ -n "${FAKE_DATE_TRIGGER:-}" ] && rm "$FAKE_DATE_TRIGGER" 2>/dev/null; then
+if [ -n "${FAKE_DATE_TRIGGER:-}" ] && { [ -z "${FAKE_DATE_ARGS:-}" ] || [ "$*" = "$FAKE_DATE_ARGS" ]; } \\
+  && rm "$FAKE_DATE_TRIGGER" 2>/dev/null; then
   "$FAKE_DATE_REAL" "$@"
   exec >&-
   trap '' INT
@@ -492,7 +493,8 @@ class WorkerTestBase(unittest.TestCase):
 
     def install_fake_date(self, trigger, started):
         """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。ファイル trigger を作ると、次の 1 回だけ、標準出力を閉じてから
-        SIGINT を無視して待つ (待ち始めたときにファイル started を作る)。"""
+        SIGINT を無視して待つ (待ち始めたときにファイル started を作る)。環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと
+        一致する呼び出しだけを待たせる。待つ秒数は環境変数 FAKE_DATE_HOLD (無ければ 2)。"""
         path = os.path.join(self.bin, "date")
         with open(path, "w", encoding="utf-8") as f:
             f.write(_FAKE_DATE)
@@ -2943,6 +2945,33 @@ class TestEnding(WorkerTestBase):
         os.kill(p.pid, signal.SIGKILL)
         self.wait_for(lambda: not _group_alive(p.pid), timeout=10,
                       what="ワーカーのプロセスグループが空になる")
+        reviewer = _read_pids(self.pids_file)[0]
+        self.assertTrue(_pid_alive(reviewer))
+        self.assertEqual(self.worker_state()["state"], "reviewing")
+        self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")))
+
+    def test_sigkill_while_child_is_outside_wait(self):
+        # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終わるまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
+        # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) を待ち続ける。
+        # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待たせ、その間に親を消す (上限を測る処理は、
+        # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待たせないように、準備の
+        # 途中の複製の設定の確認 (偽の python3 で遅らせる) が始まってから、偽の date のトリガーを作る
+        touch = os.path.join(self.root, "delay-started")
+        self.delay_python("settings.local.json", 2, touch)
+        trigger = os.path.join(self.root, "date-trigger")
+        started = os.path.join(self.root, "date-started")
+        self.install_fake_date(trigger, started)
+        self.env.update(FAKE_DATE_ARGS="+%H:%M:%S", FAKE_DATE_HOLD="8", FAKE_CLAUDE_MODE="hang")
+        self.put_request()
+        p = self.start()
+        self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
+        open(trigger, "w").close()
+        self.wait_for(lambda: os.path.exists(started), timeout=20, what="手順 9 の確認の後の log の date が待ち始めること")
+        os.kill(p.pid, signal.SIGKILL)
+        p.wait(timeout=20)
+        self.wait_for(lambda: os.path.exists(self.pids_file), timeout=20, what="偽の claude の起動")
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
+        p.communicate(timeout=5)
         reviewer = _read_pids(self.pids_file)[0]
         self.assertTrue(_pid_alive(reviewer))
         self.assertEqual(self.worker_state()["state"], "reviewing")
