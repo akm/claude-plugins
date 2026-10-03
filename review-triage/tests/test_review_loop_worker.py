@@ -2722,9 +2722,9 @@ class TestEnding(WorkerTestBase):
         p.communicate(timeout=5)
 
     def test_group_signal_while_child_checks_parent(self):
-        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まり、子は親が
-        # 無いと判定する。それでも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) があるので、kill -9 のときの経路 (後始末を
-        # せずに終わる) ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
+        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まる。子は、
+        # ps がシグナルで止まったときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終わる)
+        # ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
         # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせる
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
@@ -2737,6 +2737,40 @@ class TestEnding(WorkerTestBase):
                 self.assertEqual(p.returncode, code, err)
                 self.assertEqual(self.worker_state().get("state"), "left", err)
                 self.assertIn("この起動で応じた回: 0 回", out)
+
+    def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
+        # 子が親の生存を確かめる ps がシグナルで止まっても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
+        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確かめる — 親が無いと判定すると、
+        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終わる) で子が終わる。偽の ps は自分に TERM を送って終わる
+        trigger = os.path.join(self.root, "ps-trigger")
+        log = os.path.join(self.root, "ps-callers")
+        self.install_fake_ps(trigger, log, 'kill -TERM "$$"')
+        p = self.start_until_child_checks_parent(trigger, log)
+        time.sleep(1)
+        self.assertIsNone(p.poll(), "ps が止まった後に、ワーカーが終わった")
+        with open(self.path("end"), "w", encoding="utf-8") as f:
+            f.write("人間が置いた\n")
+        out, err = p.communicate(timeout=20)
+        self.assertEqual(p.returncode, 0, err)
+        self.assertEqual(self.worker_state().get("state"), "left", err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
+    def test_sigkill_after_parent_records_interrupt(self):
+        # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終わる
+        # (worker.yaml を left にしない。worker.md の「終わり方」の kill -9 の箇条)。偽の ps で、子が親の生存を確かめる ps を
+        # 3 秒遅らせ、その間に親だけに TERM を送ってファイルを書かせてから、親を消す
+        trigger = os.path.join(self.root, "ps-trigger")
+        log = os.path.join(self.root, "ps-callers")
+        self.install_fake_ps(trigger, log, "sleep 3")
+        p = self.start_until_child_checks_parent(trigger, log)
+        interrupt_file = self.interrupt_paths()[0]
+        p.send_signal(signal.SIGTERM)
+        self.wait_for(lambda: os.path.exists(interrupt_file), what="親が割り込みを記録するファイルを書くこと")
+        os.kill(p.pid, signal.SIGKILL)
+        p.communicate(timeout=20)
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
+        self.assertEqual(self.worker_state().get("state"), "idle")
+        self.assertEqual(self.worker_state().get("pid"), p.pid)
 
     def test_interrupt_while_command_substitution_child_exits(self):
         # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
