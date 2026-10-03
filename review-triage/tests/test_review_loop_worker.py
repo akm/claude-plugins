@@ -2719,8 +2719,9 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=3, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_idle_leaves_no_idle_sleep(self):
-        # 待機中に割り込みを受けて終わったワーカーは、待機の sleep (最大 POLL_SECONDS 秒) を残さない。残すと、sleep が標準出力と
-        # 標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、残れば数秒はプロセスグループに残る
+        # 待機中に割り込みを受けて終わったワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
+        # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、
+        # 残れば数秒はプロセスグループに残る
         p = self.start()
         self.wait_state("idle")
         p.send_signal(signal.SIGTERM)
@@ -2825,7 +2826,7 @@ class TestEnding(WorkerTestBase):
     def test_second_interrupt_while_parent_writes_interrupt_file(self):
         # 親が割り込みを記録するファイルを書いている間に、2 回目の割り込み (Ctrl-C を続けて押したとき) がプロセスグループに届いても、
         # ファイルは書かれ、ワーカーは終わる。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
-        # 偽の mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待つ
+        # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待つ
         started = os.path.join(self.root, "mv-started")
         path = os.path.join(self.bin, "mv")
         with open(path, "w", encoding="utf-8") as f:
@@ -2885,7 +2886,7 @@ class TestEnding(WorkerTestBase):
     def test_sigkill_while_stopping_reviewer_after_timeout(self):
         # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に親を kill -9 で消しても、
         # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終わる (worker.md の「終わり方」)。偽の claude は
-        # TERM を受けても終わらず、ワーカーが KILL を送るまで (STOP_GRACE_SECONDS 秒) 待たせる
+        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
         received = os.path.join(self.root, "term-received")
         self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
         self.put_request()
