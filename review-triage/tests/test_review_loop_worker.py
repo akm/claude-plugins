@@ -2683,6 +2683,43 @@ class TestEnding(WorkerTestBase):
                       what="ワーカーが終わった後に、プロセスグループが空になる")
         p.communicate(timeout=5)
 
+    def test_group_signal_while_child_checks_parent(self):
+        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM が届くと、ps も止まり、子は親が
+        # 無いと判定する。それでも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) があるので、kill -9 のときの経路 (後始末を
+        # せずに終わる) ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps は、ファイル trigger がある間、
+        # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせ、呼んだプロセスとその親の PID をファイルに書く
+        # (コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID はその親の側に出る)
+        trigger = os.path.join(self.root, "ps-trigger")
+        log = os.path.join(self.root, "ps-callers")
+        path = os.path.join(self.bin, "ps")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nif [ -e "$FAKE_PS_TRIGGER" ]; then\n'
+                    '  case " $* " in *" stat= "*)\n'
+                    '    echo "$PPID $("$FAKE_PS_REAL" -o ppid= -p "$PPID")" >>"$FAKE_PS_LOG"; sleep 3 ;;\n'
+                    '  esac\nfi\n'
+                    'exec "$FAKE_PS_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_PS_TRIGGER=trigger, FAKE_PS_LOG=log, FAKE_PS_REAL=shutil.which("ps"))
+        p = self.start()
+        self.wait_state("idle")
+        children = subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split()
+        self.assertEqual(len(children), 1, children)
+        child = children[0]
+
+        def child_in_ps():
+            try:
+                with open(log, encoding="utf-8") as f:
+                    return child in f.read().split()
+            except OSError:
+                return False
+        open(trigger, "w").close()
+        self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+        os.killpg(p.pid, signal.SIGTERM)
+        out, err = p.communicate(timeout=30)
+        self.assertEqual(p.returncode, 143, err)
+        self.assertEqual(self.worker_state().get("state"), "left", err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
     def test_interrupt_while_command_substitution_child_exits(self):
         # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
         # コマンド置換のために起動したプロセスが出力を閉じてから終わるまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
