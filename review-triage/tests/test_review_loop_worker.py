@@ -3065,6 +3065,34 @@ class TestInterruptPhases(WorkerTestBase):
         marker, _ = self.run_round()
         self.assertEqual(marker["status"], "ok", marker)
 
+    def test_interrupt_while_stopping_reviewer_after_timeout(self):
+        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に割り込みを受けても、
+        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の
+        # PHASE=finish の分岐。worker.md の「終わり方」の、回の終わりの処理の途中の項)。偽の claude は TERM を受けても終わらず、
+        # ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        received = os.path.join(self.root, "term-received")
+        for sig, code in self.SIGNALS:
+            with self.subTest(sig=sig.name):
+                self.reset_loop()
+                if os.path.exists(received):
+                    os.remove(received)
+                self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
+                self.put_request()
+                p = self.start("--review-timeout-minutes", "0.05")
+                self.wait_for(lambda: os.path.exists(received), timeout=30,
+                              what="上限を越えて、レビュアの実行に TERM が送られること")
+                os.killpg(p.pid, sig)
+                _, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code, err)
+                self.assertTrue(os.path.exists(self.path(f"delivered-{RID}.yaml")), "その回の印が書かれていない")
+                marker = _read_yaml(self.path(f"delivered-{RID}.yaml"))
+                self.assertEqual(marker["status"], "failed", err)
+                self.assertEqual(marker["error"], "timeout", err)
+                state = self.worker_state()
+                self.assertEqual(state["state"], "left")
+                self.assertEqual(self.workspaces(), [])
+                self.wait_for(lambda: not _group_alive(p.pid), timeout=5, what="ワーカーのプロセスグループが空になる")
+
     def test_group_signal_while_child_runs_foreground_command(self):
         # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM か HUP
         # (端末を閉じたとき) が届くと、そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
