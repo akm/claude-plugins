@@ -2863,6 +2863,33 @@ class TestInterruptPhases(WorkerTestBase):
         marker, _ = self.run_round()
         self.assertEqual(marker["status"], "ok", marker)
 
+    def test_group_term_while_child_runs_foreground_command(self):
+        # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM が届くと、
+        # そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗として扱っても、子が自分で
+        # 受けた TERM を割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の子の箇条)。
+        # 偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
+        touch = os.path.join(self.root, "delay-started")
+        self.delay_python("settings.local.json", 30, touch)
+        path = os.path.join(self.bin, "mv")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nfor a in "$@"; do last=$a; done\n'
+                    'case "${last##*/}" in review-loop-interrupt-*) sleep 3 ;; esac\n'
+                    'exec "$FAKE_MV_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env["FAKE_MV_REAL"] = shutil.which("mv")
+        self.put_request()
+        p = self.start()
+        self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
+        os.killpg(p.pid, signal.SIGTERM)
+        _, err = p.communicate(timeout=30)
+        self.assertEqual(p.returncode, 143, err)
+        self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")), err)
+        state = self.worker_state()
+        self.assertEqual(state["state"], "left")
+        self.assertEqual(self.prep_dirs(), [])
+        self.assertEqual(self.workspaces(), [])
+        self.assertEqual(self.claude_calls(), [])
+
     def test_interrupt_during_finish(self):
         # 回の終わりの処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
         # 書き終えてから left で終わる。割り込みは回の終わりの処理が起動したコマンド (遅らせた複写) にも届くが、それで止まらない

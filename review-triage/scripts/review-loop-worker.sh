@@ -460,6 +460,7 @@ INTERRUPT_FILE=""      # 割り込みを記録するファイル (起動時の�
 INTERRUPT_TMP=""       # 割り込みを記録するファイルを書くときの一時名
 RELAY_SIG=""           # 親が最初に受けた割り込みのシグナルの名前 (関数 relay_interrupt)
 RELAY_CODE=""          # 親が最初に受けた割り込みの終了コード
+SELF_SIG=""            # 子が自分で最初に受けた TERM・HUP の名前 (プロセスグループに届いたもの。関数 body_main の trap が控える)
 WS=""                  # 回の作業場所のパス (起動時の確認が通った後に決める)
 WS_KEY=""              # 作業場所と準備のディレクトリの名前に共通する部分 (<周回 id>-<周回の置き場の実体パスのハッシュ>)
 # 回のどの部分を行っているか。割り込みを受けたときの扱いを決める (関数 on_signal)。
@@ -982,10 +983,10 @@ on_signal() {
 }
 
 # 親が割り込みを記録したか (worker.md の「終わり方」) と、親が動いているかを確かめる。どの時点で呼ぶかの正本は worker.md の
-# 「終わり方」の子の箇条。記録があれば関数 on_signal で扱う。
+# 「終わり方」の子の箇条。割り込みを記録するファイルか、子が自分で受けた TERM・HUP の控え (SELF_SIG) があれば、関数 on_signal で扱う。
 # 親が動いていなければ (kill -9)、後始末をせずに終わる (worker.yaml も印も書かない。起動し直したワーカーが片付ける)。
-# 割り込みかどうかをシグナルではなくファイルで確かめるのは、bash がコマンド置換を処理している間に受けたシグナルの trap を
-# 実行しないことがあるため。親は子が終わるまで 1 秒おきに USR1 を送るので、子が USR1 を受け損ねても、次の USR1 で wait から戻る
+# 割り込みかどうかを主にファイルで確かめるのは、bash がコマンド置換を処理している間に受けたシグナルの trap を実行しないことが
+# あるため。親は子が終わるまで 1 秒おきに USR1 を送るので、子が USR1 を受け損ねても、次の USR1 で wait から戻る
 check_interrupt() {
   local sig="" code=""
   [ "$FINISHING" = 0 ] || return 0
@@ -994,12 +995,23 @@ check_interrupt() {
     log "親 (PID $WORKER_PID) が無いので、後始末をせずに終わる"
     exit 1
   fi
-  [ -f "$INTERRUPT_FILE" ] || return 0
-  read -r sig code <"$INTERRUPT_FILE"
-  if [ -z "$sig" ] || ! echo "$code" | grep -Eq '^[0-9]+$'; then
-    log "割り込みを記録するファイル $INTERRUPT_FILE の中身を読めない。割り込みとして扱う"
-    sig="名前を読めないシグナル"
-    code=1
+  if [ -f "$INTERRUPT_FILE" ]; then
+    read -r sig code <"$INTERRUPT_FILE"
+    if [ -z "$sig" ] || ! echo "$code" | grep -Eq '^[0-9]+$'; then
+      log "割り込みを記録するファイル $INTERRUPT_FILE の中身を読めない。割り込みとして扱う"
+      sig="名前を読めないシグナル"
+      code=1
+    fi
+  elif [ -n "$SELF_SIG" ]; then
+    # プロセスグループに届いた TERM・HUP を子が自分で受け、親がまだファイルを書いていない。親も同じシグナルを受けているが、
+    # 子がフォアグラウンドで実行していたコマンドは同じシグナルで止まり、その失敗を準備の失敗として扱う前にここで割り込みにする
+    sig=$SELF_SIG
+    case "$sig" in
+      TERM) code=143 ;;
+      HUP) code=129 ;;
+    esac
+  else
+    return 0
   fi
   on_signal "$sig" "$code"
 }
@@ -1627,11 +1639,15 @@ body_main() {
   # SIGINT は無視する (端末の Ctrl-C は親だけが受ける)。子は ( ) & で起動したバックグラウンドのサブシェルなので、無視した状態で
   # 始まるが、bash の版や起動の仕方によっては無視にならない (bash 5.2 は、INT の trap を設定した親が関数を & で起動すると、
   # 子の SIGINT をデフォルトの動作にする) ので、ここで明示する。
-  # 子に届くほかのシグナル (親が送る USR1 と、プロセスグループに届いた TERM と HUP) は、待っている wait を途中で戻すためだけに使い、
-  # 割り込みかどうかは割り込みを記録するファイルで確かめる (関数 check_interrupt)。TERM と HUP は無視にしない — 無視は子が
-  # 起動するコマンドに引き継がれ、準備のコマンドやレビュアの実行が TERM で止まらなくなる
+  # 親が送る USR1 は、待っている wait を途中で戻すためだけに使い、割り込みかどうかは割り込みを記録するファイルで確かめる
+  # (関数 check_interrupt)。プロセスグループに届いた TERM・HUP は、wait を戻すほかに、受けたことを SELF_SIG に控える —
+  # 子がフォアグラウンドで実行しているコマンドも同じシグナルで止まり、親がファイルを書くより先に、子がその失敗を準備の失敗として
+  # 扱うことがあるため (控えがあれば、関数 check_interrupt が割り込みにする)。TERM と HUP は無視にしない — 無視は子が起動する
+  # コマンドに引き継がれ、準備のコマンドやレビュアの実行が TERM で止まらなくなる
   trap '' INT
-  trap ':' TERM HUP USR1
+  trap '[ -n "$SELF_SIG" ] || SELF_SIG=TERM' TERM
+  trap '[ -n "$SELF_SIG" ] || SELF_SIG=HUP' HUP
+  trap ':' USR1
   trap 'cleanup' EXIT
   local idle_since now wait_for rid
   # 子の PID (上限を測る処理が USR1 を送る先)。サブシェルの中の $$ は親の PID のままで、bash 3.2 には変数 BASHPID が無いので、
