@@ -2684,7 +2684,7 @@ class TestEnding(WorkerTestBase):
         p.communicate(timeout=5)
 
     def test_group_signal_while_child_checks_parent(self):
-        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM が届くと、ps も止まり、子は親が
+        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まり、子は親が
         # 無いと判定する。それでも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) があるので、kill -9 のときの経路 (後始末を
         # せずに終わる) ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps は、ファイル trigger がある間、
         # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせ、呼んだプロセスとその親の PID をファイルに書く
@@ -2700,25 +2700,31 @@ class TestEnding(WorkerTestBase):
                     'exec "$FAKE_PS_REAL" "$@"\n')
         os.chmod(path, 0o755)
         self.env.update(FAKE_PS_TRIGGER=trigger, FAKE_PS_LOG=log, FAKE_PS_REAL=shutil.which("ps"))
-        p = self.start()
-        self.wait_state("idle")
-        children = subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split()
-        self.assertEqual(len(children), 1, children)
-        child = children[0]
+        for sig, code in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
+            with self.subTest(sig=sig.name):
+                for f in (trigger, log):
+                    if os.path.exists(f):
+                        os.remove(f)
+                p = self.start()
+                self.wait_for(lambda: self.worker_state().get("pid") == p.pid and self.worker_state().get("state") == "idle",
+                              what="この起動の worker.yaml が idle になること")
+                children = subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split()
+                self.assertEqual(len(children), 1, children)
+                child = children[0]
 
-        def child_in_ps():
-            try:
-                with open(log, encoding="utf-8") as f:
-                    return child in f.read().split()
-            except OSError:
-                return False
-        open(trigger, "w").close()
-        self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
-        os.killpg(p.pid, signal.SIGTERM)
-        out, err = p.communicate(timeout=30)
-        self.assertEqual(p.returncode, 143, err)
-        self.assertEqual(self.worker_state().get("state"), "left", err)
-        self.assertIn("この起動で応じた回: 0 回", out)
+                def child_in_ps():
+                    try:
+                        with open(log, encoding="utf-8") as f:
+                            return child in f.read().split()
+                    except OSError:
+                        return False
+                open(trigger, "w").close()
+                self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+                os.killpg(p.pid, sig)
+                out, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code, err)
+                self.assertEqual(self.worker_state().get("state"), "left", err)
+                self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_interrupt_while_command_substitution_child_exits(self):
         # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
@@ -2912,11 +2918,11 @@ class TestInterruptPhases(WorkerTestBase):
         marker, _ = self.run_round()
         self.assertEqual(marker["status"], "ok", marker)
 
-    def test_group_term_while_child_runs_foreground_command(self):
-        # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM が届くと、
-        # そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗として扱っても、子が自分で
-        # 受けた TERM を割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の子の箇条)。
-        # 偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
+    def test_group_signal_while_child_runs_foreground_command(self):
+        # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM か HUP
+        # (端末を閉じたとき) が届くと、そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
+        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の
+        # 子の箇条)。偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 30, touch)
         path = os.path.join(self.bin, "mv")
@@ -2926,18 +2932,23 @@ class TestInterruptPhases(WorkerTestBase):
                     'exec "$FAKE_MV_REAL" "$@"\n')
         os.chmod(path, 0o755)
         self.env["FAKE_MV_REAL"] = shutil.which("mv")
-        self.put_request()
-        p = self.start()
-        self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
-        os.killpg(p.pid, signal.SIGTERM)
-        _, err = p.communicate(timeout=30)
-        self.assertEqual(p.returncode, 143, err)
-        self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")), err)
-        state = self.worker_state()
-        self.assertEqual(state["state"], "left")
-        self.assertEqual(self.prep_dirs(), [])
-        self.assertEqual(self.workspaces(), [])
-        self.assertEqual(self.claude_calls(), [])
+        for sig, code in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
+            with self.subTest(sig=sig.name):
+                self.reset_loop()
+                if os.path.exists(touch):
+                    os.remove(touch)
+                self.put_request()
+                p = self.start()
+                self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
+                os.killpg(p.pid, sig)
+                _, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code, err)
+                self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")), err)
+                state = self.worker_state()
+                self.assertEqual(state["state"], "left")
+                self.assertEqual(self.prep_dirs(), [])
+                self.assertEqual(self.workspaces(), [])
+                self.assertEqual(self.claude_calls(), [])
 
     def test_interrupt_during_finish(self):
         # 回の終わりの処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
