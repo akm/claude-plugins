@@ -3067,9 +3067,9 @@ class TestInterruptPhases(WorkerTestBase):
 
     def test_interrupt_while_stopping_reviewer_after_timeout(self):
         # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に割り込みを受けても、
-        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の
-        # PHASE=finish の分岐。worker.md の「終わり方」の、回の終わりの処理の途中の項)。偽の claude は TERM を受けても終わらず、
-        # ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の、
+        # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終わり方」の、回の終わりの処理の途中の項)。偽の claude は
+        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
         received = os.path.join(self.root, "term-received")
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
