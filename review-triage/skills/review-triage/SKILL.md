@@ -7,7 +7,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 
 レビュー指摘を一件ずつ吟味し、未対処時の帰結を自分で構成してから採否を決める。**成果物は判定済みの記録であって、修正ではない** — 採択した指摘を直すのは後段の [review-triage-fix](../review-triage-fix/SKILL.md)。呼ぶかどうかは人間が決める。
 
-**判定の順序・分岐・各ノードの条件は [references/judgment-flow.md](references/judgment-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (D1〜D7・E1・E2・A / H / R) はそこを指す。
+**判定の順序・分岐・各ノードの条件は [references/judgment-flow.md](references/judgment-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (D1〜D8・E1・E2・A / H / R) はそこを指す。
 
 ## 前提知識
 
