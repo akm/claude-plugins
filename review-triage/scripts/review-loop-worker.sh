@@ -776,7 +776,7 @@ start_heartbeat() {
 }
 
 # バックグラウンドの処理 (PID $1。更新時刻を進める処理か上限を測る処理) に TERM を送り、プロセスが残っている間だけ終わりを待つ。
-# 残っていなければ wait しない (正本は worker.md の「終わり方」)。これらの処理は親と子と同じプロセスグループで動くので、
+# 残っていなければ組み込みコマンド wait で待たない (正本は worker.md の「終わり方」)。これらの処理は親と子と同じプロセスグループで動くので、
 # プロセスグループに届いた HUP ではすぐに (trap が無い)、TERM では自分の trap で、子と同時に終わる (INT は、バックグラウンドの
 # コマンドなので無視する)。bash 5 (Linux の 5.2 で確かめた) は、trap を設定したシグナルで wait を途中で抜けるとき、その wait の中で
 # 回収した子プロセスの終わりを記録しないことがあるので、準備のコマンドやレビュアの実行を待つ wait が、同時に終わったこれらの処理を
@@ -841,7 +841,7 @@ timed_out() {
   [ "$(date +%s)" -ge "$REQ_DEADLINE" ]
 }
 
-# 割り込みに応じられるように (親が送る USR1 で wait が途中で戻る)、sleep をバックグラウンドで起動して wait で待つ。
+# 割り込みに応じられるように (親が送る USR1 で wait が途中で戻る)、コマンド sleep をバックグラウンドで起動して wait で待つ。
 # wait が途中で戻ったら sleep を止める — 残すと、割り込みで終わったワーカーの後に、標準出力と標準エラーを開いたまま最大
 # POLL_SECONDS 秒残る (端末やテストは、それが閉じるまで待つ)
 idle_sleep() {
@@ -1014,7 +1014,7 @@ check_interrupt() {
   fi
   if [ -f "$INTERRUPT_FILE" ]; then
     read -r sig code <"$INTERRUPT_FILE"
-    # 終了コードの形は case で確かめる — grep のような外部コマンドは、プロセスグループに届いた TERM・HUP で止まりうるため
+    # 終了コードの形はシェルの case 文で確かめる — grep のような外部コマンドは、プロセスグループに届いた TERM・HUP で止まりうるため
     case "$sig:$code" in
       :*|*:|*:*[!0-9]*) sig="" ;;
     esac
@@ -1672,7 +1672,7 @@ body_main() {
   trap 'cleanup' EXIT
   local idle_since now wait_for rid
   # 子の PID (上限を測る処理が USR1 を送る先)。サブシェルの中の $$ は親の PID のままで、bash 3.2 には変数 BASHPID が無いので、
-  # sh を exec したコマンド置換の、親のプロセス (この子) の PID として求める
+  # コマンド sh を組み込みコマンド exec で実行したコマンド置換の、親のプロセス (この子) の PID として求める
   BODY_PID=$(exec sh -c 'echo $PPID')
 
   write_worker_yaml idle ""
