@@ -1671,7 +1671,7 @@ body_main() {
   trap ':' USR1
   trap 'cleanup' EXIT
   local idle_since now wait_for rid
-  # 子の PID (上限を測る処理が USR1 を送る先)。サブシェルの中のシェルの特殊パラメータ $$ は親の PID のままで、bash 3.2 には
+  # 子の PID (上限を測る処理が USR1 を送る先)。シェルの特殊パラメータ $$ は、サブシェルの中でも親の PID のままで、bash 3.2 には
   # 変数 BASHPID が無いので、コマンド sh を組み込みコマンド exec で実行したコマンド置換の、親のプロセス (この子) の PID として求める
   BODY_PID=$(exec sh -c 'echo $PPID')
 
