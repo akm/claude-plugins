@@ -10,3 +10,4 @@ python work-log-gh-comment/skills/work-log-gh-comment/evals
 python wording-guard/tests
 go review-triage/tools/triagecheck
 go review-triage/tools/nearedges
+go review-triage/tools/lineorigin
