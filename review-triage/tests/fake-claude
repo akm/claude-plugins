@@ -9,7 +9,9 @@
   FAKE_CLAUDE_REVS の各名前を `git rev-parse` で解決した SHA (解決できなければ null)・
   受けた `--settings` の値を JSON として読んだものの列・プロンプトが指す依頼文 (写し) の中身
 - FAKE_CLAUDE_REVS: 記録で解決する名前を空白で区切って並べたもの (既定 main)
-- FAKE_CLAUDE_PIDS: 自分と、起動した子プロセスの PID を書くファイル (mode が hang・hang_leave_child・leave_child のとき)
+- FAKE_CLAUDE_PIDS: 終わらないプロセスの PID を書くファイル。テストの後片付け (メソッド tearDown) が、書かれた PID に
+  KILL を送る。mode ごとに書く PID は、hang_ignore_term は自分、hang は自分と子、hang_leave_child は自分と子 2 つ、
+  leave_child は残した子だけ
 - FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行 (init の行・Skill の呼び出し・
   result の行)。既定の init の行の permissionMode には、受けた `--permission-mode` の値を書く (受けていなければキーを書かない)
 - FAKE_CLAUDE_PERMISSION_MODE: 既定の init の行の permissionMode に、受けた `--permission-mode` の値の代わりに書く値
@@ -21,6 +23,7 @@
 - FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作る印のファイルの名前の先頭
 - FAKE_CLAUDE_LINK_TARGET: mode が symlink_workspace のとき、作業場所を置き換えるシンボリックリンクの先
 - FAKE_CLAUDE_OUTSIDE: mode が result_symlink_outside のとき、結果のシンボリックリンクの先 (作業場所の外のファイル)
+- FAKE_CLAUDE_TERM_RECEIVED: mode が hang_ignore_term のとき、SIGTERM を受けたら作るファイル
 - FAKE_CLAUDE_MODE:
     ok                    結果を正しく書く (既定)
     no_result             結果を書かない
@@ -41,6 +44,7 @@
     result_dir            結果をディレクトリにする
     result_large          結果を、ワーカーの上限 (1 MiB) を越える大きさで書く
     hang                  子プロセスを起動して終わらない
+    hang_ignore_term      SIGTERM を受けても終わらず (受けたら FAKE_CLAUDE_TERM_RECEIVED を作る)、SIGKILL まで終わらない
     hang_leave_child      子プロセスを 2 つ (同じプロセスグループのものと、別のプロセスグループ (新しいセッション) のもの。
                           どちらも cwd は複製) 起動し、0.2 秒おきに標準出力に {"type": "fake_tick"} の行を書いて終わらない
 
@@ -51,6 +55,7 @@
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -190,6 +195,12 @@ def main():
     sys.stdout.flush()
 
     mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
+    if mode == "hang_ignore_term":
+        received = os.environ["FAKE_CLAUDE_TERM_RECEIVED"]
+        write_pids(os.getpid())
+        signal.signal(signal.SIGTERM, lambda *_: open(received, "w").close())
+        while True:
+            time.sleep(1)
     if mode == "hang":
         child = subprocess.Popen(["sleep", "1000"])
         write_pids(os.getpid(), child.pid)

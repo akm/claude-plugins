@@ -134,10 +134,13 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 """
 
 # 偽の date (PATH の先頭の bin/ に置く)。環境変数 FAKE_DATE_TRIGGER が指すファイルを消せた 1 回だけ、本物の date の出力を書いてから
-# 標準出力を閉じ、SIGINT を無視して FAKE_DATE_HOLD 秒待つ (待ち始めたときにファイル FAKE_DATE_STARTED を作る)。
+# 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待つ (待ち始めたときに、環境変数
+# FAKE_DATE_STARTED が指すファイルを作る)。
+# 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待たせる (ほかの呼び出しではファイルを消さない)。
 # コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
-if [ -n "${FAKE_DATE_TRIGGER:-}" ] && rm "$FAKE_DATE_TRIGGER" 2>/dev/null; then
+if [ -n "${FAKE_DATE_TRIGGER:-}" ] && { [ -z "${FAKE_DATE_ARGS:-}" ] || [ "$*" = "$FAKE_DATE_ARGS" ]; } \\
+  && rm "$FAKE_DATE_TRIGGER" 2>/dev/null; then
   "$FAKE_DATE_REAL" "$@"
   exec >&-
   trap '' INT
@@ -491,8 +494,8 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_GIT_REAL"] = shutil.which("git")
 
     def install_fake_date(self, trigger, started):
-        """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。ファイル trigger を作ると、次の 1 回だけ、標準出力を閉じてから
-        SIGINT を無視して待つ (待ち始めたときにファイル started を作る)。"""
+        """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。引数 trigger と started は、環境変数 FAKE_DATE_TRIGGER と
+        FAKE_DATE_STARTED に渡す。待つ条件と秒数は、定数 _FAKE_DATE の上のコメントのとおり。"""
         path = os.path.join(self.bin, "date")
         with open(path, "w", encoding="utf-8") as f:
             f.write(_FAKE_DATE)
@@ -500,6 +503,44 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_DATE_REAL"] = shutil.which("date")
         self.env["FAKE_DATE_TRIGGER"] = trigger
         self.env["FAKE_DATE_STARTED"] = started
+
+    def install_fake_ps(self, trigger, log, action):
+        """PATH の先頭の bin/ に偽のコマンド ps を置く。ファイル trigger がある間、プロセスの状態を尋ねる呼び出し (ps -o stat= -p <PID>。
+        ワーカーの関数 pid_alive) では、呼んだプロセスとその親の PID をファイル log に書いてから、シェルのコマンド action を実行する。
+        それ以外の呼び出しと、action の後は、本物の ps を実行する。"""
+        path = os.path.join(self.bin, "ps")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nif [ -e "$FAKE_PS_TRIGGER" ]; then\n'
+                    '  case " $* " in *" stat= "*)\n'
+                    f'    echo "$PPID $("$FAKE_PS_REAL" -o ppid= -p "$PPID")" >>"$FAKE_PS_LOG"; {action} ;;\n'
+                    '  esac\nfi\n'
+                    'exec "$FAKE_PS_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_PS_TRIGGER=trigger, FAKE_PS_LOG=log, FAKE_PS_REAL=shutil.which("ps"))
+
+    def start_until_child_checks_parent(self, trigger, log):
+        """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
+        親の生存を確かめる ps を実行するまで待って、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
+        コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親の側に出る。"""
+        for f in (trigger, log):
+            if os.path.exists(f):
+                os.remove(f)
+        p = self.start()
+        self.wait_for(lambda: self.worker_state().get("pid") == p.pid and self.worker_state().get("state") == "idle",
+                      what="この起動の worker.yaml が idle になること")
+        children = subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split()
+        self.assertEqual(len(children), 1, children)
+        child = children[0]
+
+        def child_in_ps():
+            try:
+                with open(log, encoding="utf-8") as f:
+                    return child in f.read().split()
+            except OSError:
+                return False
+        open(trigger, "w").close()
+        self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+        return p
 
     def delay_git(self, sub):
         """偽の git を置き、サブコマンド sub を終わらせないようにする (PID は self.git_pids_file に書かれる)。"""
@@ -2234,23 +2275,32 @@ class TestStartChecks(WorkerTestBase):
 
 class TestParentAvoidsCommandSubstitution(unittest.TestCase):
     """trap を設定した後の親 (worker.md の「終わり方」) は、コマンド置換を使わない。bash は、コマンド置換を処理している間に
-    受けたシグナルの trap を実行しないことがあるため (#105)。後から親の部分に $(...) を足すと、割り込みが失われうる。"""
+    受けたシグナルの trap を実行しないことがあるため (#105)。後から親の部分や、親が呼ぶ関数に $(...) を足すと、割り込みが
+    失われうる。"""
 
     def test_parent_code_has_no_command_substitution(self):
+        # 親の trap を設定した後の行から、呼ぶ関数を推移的にたどり、たどった関数の本文も調べる (コメントの行は除く)。親が呼ぶ
+        # 関数 (関数 log など) がコマンド置換を使えば、親がコマンド置換を実行することになるため。関数 body_main は、親が
+        # ( body_main ) & で子として起動するので、親の処理ではなく、たどらない
         with open(_WORKER, encoding="utf-8") as f:
             text = f.read()
-        parts = {}
-        for name in ("relay_interrupt", "supervise_body"):
-            m = re.search(rf"^{name}\(\) \{{\n(.*?)^\}}\n", text, re.S | re.M)
-            self.assertIsNotNone(m, f"関数 {name} が見つからない")
-            parts[f"関数 {name}"] = m.group(1)
+        bodies = {m.group(1): m.group(2) for m in re.finditer(r"^(\w+)\(\) \{\n(.*?)^\}\n", text, re.S | re.M)}
+        bodies.update({m.group(1): m.group(2) for m in re.finditer(r"^(\w+)\(\) \{ (.*) \}$", text, re.M)})
+        self.assertIn("( body_main ) &", bodies.get("supervise_body", ""), "関数 supervise_body が子を ( body_main ) & で起動していない")
         start = text.find("\ntrap 'relay_interrupt ")
         self.assertNotEqual(start, -1, "親の trap を設定する行が見つからない")
-        parts["親の trap を設定した後の行"] = text[start:]
-        for label, part in parts.items():
+        pending = [("親の trap を設定した後の行", text[start:])]
+        visited = set()
+        while pending:
+            label, part = pending.pop()
             code = "\n".join(line for line in part.splitlines() if not line.lstrip().startswith("#"))
             self.assertNotIn("$(", code, label)
             self.assertNotIn("`", code, label)
+            for name, body in bodies.items():
+                if name not in visited and name != "body_main" and re.search(rf"(?<![\w-]){name}(?![\w-])", code):
+                    visited.add(name)
+                    pending.append((f"関数 {name} (親が呼ぶ)", body))
+        self.assertLessEqual({"relay_interrupt", "supervise_body"}, visited)
 
 
 class TestArguments(WorkerTestBase):
@@ -2672,8 +2722,9 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=3, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_idle_leaves_no_idle_sleep(self):
-        # 待機中に割り込みを受けて終わったワーカーは、待機の sleep (最大 POLL_SECONDS 秒) を残さない。残すと、sleep が標準出力と
-        # 標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、残れば数秒はプロセスグループに残る
+        # 待機中に割り込みを受けて終わったワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
+        # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、
+        # 残れば数秒はプロセスグループに残る
         p = self.start()
         self.wait_state("idle")
         p.send_signal(signal.SIGTERM)
@@ -2682,6 +2733,57 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=1.5,
                       what="ワーカーが終わった後に、プロセスグループが空になる")
         p.communicate(timeout=5)
+
+    def test_group_signal_while_child_checks_parent(self):
+        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まる。子は、
+        # ps がシグナルで止まったときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終わる)
+        # ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
+        # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせる
+        trigger = os.path.join(self.root, "ps-trigger")
+        log = os.path.join(self.root, "ps-callers")
+        self.install_fake_ps(trigger, log, "sleep 3")
+        for sig, code in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
+            with self.subTest(sig=sig.name):
+                p = self.start_until_child_checks_parent(trigger, log)
+                os.killpg(p.pid, sig)
+                out, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code, err)
+                self.assertEqual(self.worker_state().get("state"), "left", err)
+                self.assertIn("この起動で応じた回: 0 回", out)
+
+    def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
+        # 子が親の生存を確かめる ps がシグナルで止まっても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
+        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確かめる — 親が無いと判定すると、
+        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終わる) で子が終わる。偽の ps は自分に TERM を送って終わる
+        trigger = os.path.join(self.root, "ps-trigger")
+        log = os.path.join(self.root, "ps-callers")
+        self.install_fake_ps(trigger, log, 'kill -TERM "$$"')
+        p = self.start_until_child_checks_parent(trigger, log)
+        time.sleep(1)
+        self.assertIsNone(p.poll(), "ps が止まった後に、ワーカーが終わった")
+        with open(self.path("end"), "w", encoding="utf-8") as f:
+            f.write("人間が置いた\n")
+        out, err = p.communicate(timeout=20)
+        self.assertEqual(p.returncode, 0, err)
+        self.assertEqual(self.worker_state().get("state"), "left", err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
+    def test_sigkill_after_parent_records_interrupt(self):
+        # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終わる
+        # (worker.yaml を left にしない。worker.md の「終わり方」の kill -9 の箇条)。偽の ps で、子が親の生存を確かめる ps を
+        # 3 秒遅らせ、その間に親だけに TERM を送ってファイルを書かせてから、親を消す
+        trigger = os.path.join(self.root, "ps-trigger")
+        log = os.path.join(self.root, "ps-callers")
+        self.install_fake_ps(trigger, log, "sleep 3")
+        p = self.start_until_child_checks_parent(trigger, log)
+        interrupt_file = self.interrupt_paths()[0]
+        p.send_signal(signal.SIGTERM)
+        self.wait_for(lambda: os.path.exists(interrupt_file), what="親が割り込みを記録するファイルを書くこと")
+        os.kill(p.pid, signal.SIGKILL)
+        p.communicate(timeout=20)
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
+        self.assertEqual(self.worker_state().get("state"), "idle")
+        self.assertEqual(self.worker_state().get("pid"), p.pid)
 
     def test_interrupt_while_command_substitution_child_exits(self):
         # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
@@ -2724,6 +2826,52 @@ class TestEnding(WorkerTestBase):
         self.assertEqual(self.worker_state().get("pid"), p.pid)
         self.assertIn("この起動で応じた回: 0 回", out)
 
+    def test_second_interrupt_while_parent_writes_interrupt_file(self):
+        # 親が割り込みを記録するファイルを書いている間に、2 回目の割り込み (Ctrl-C を続けて押したとき) がプロセスグループに届いても、
+        # ファイルは書かれ、ワーカーは終わる。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
+        # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待つ
+        started = os.path.join(self.root, "mv-started")
+        path = os.path.join(self.bin, "mv")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nfor a in "$@"; do last=$a; done\n'
+                    'case "${last##*/}" in review-loop-interrupt-*) : >"$FAKE_MV_STARTED"; sleep 2 ;; esac\n'
+                    'exec "$FAKE_MV_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_MV_REAL=shutil.which("mv"), FAKE_MV_STARTED=started)
+        p = self.start()
+        self.wait_state("idle")
+        os.killpg(p.pid, signal.SIGINT)
+        self.wait_for(lambda: os.path.exists(started), what="親が割り込みを記録するファイルへの改名を始めること")
+        os.killpg(p.pid, signal.SIGINT)
+        out, err = p.communicate(timeout=20)
+        self.assertEqual(p.returncode, 130, err)
+        self.assertEqual(self.worker_state()["state"], "left", err)
+        self.assertNotIn("書き直す", err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
+    def test_interrupt_file_rewritten_when_write_fails(self):
+        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き直し、ワーカーは終わる。書けなかったことは
+        # 1 度だけ標準エラーに知らせる (関数 write_interrupt_file)。偽の mv は、ファイルへの最初の改名だけを失敗させる
+        failed = os.path.join(self.root, "mv-failed")
+        path = os.path.join(self.bin, "mv")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nfor a in "$@"; do last=$a; done\n'
+                    'case "${last##*/}" in review-loop-interrupt-*)\n'
+                    '  if [ ! -e "$FAKE_MV_FAILED" ]; then : >"$FAKE_MV_FAILED"; exit 1; fi ;;\n'
+                    'esac\n'
+                    'exec "$FAKE_MV_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_MV_REAL=shutil.which("mv"), FAKE_MV_FAILED=failed)
+        p = self.start()
+        self.wait_state("idle")
+        p.send_signal(signal.SIGTERM)
+        out, err = p.communicate(timeout=20)
+        self.assertTrue(os.path.exists(failed), "偽の mv が改名を失敗させていない")
+        self.assertEqual(p.returncode, 143, err)
+        self.assertEqual(self.worker_state()["state"], "left", err)
+        self.assertEqual(err.count("書き直す"), 1, err)
+        self.assertIn("この起動で応じた回: 0 回", out)
+
     def test_timeout(self):
         # AE15: 終わらない偽の claude を上限で止め、子プロセスも残さない
         self.env["FAKE_CLAUDE_MODE"] = "hang"
@@ -2737,6 +2885,22 @@ class TestEnding(WorkerTestBase):
         for pid in pids:
             self.wait_for(lambda: not _pid_alive(pid), timeout=5, what=f"プロセス {pid} の終了")
         self.finish(p)
+
+    def test_sigkill_while_stopping_reviewer_after_timeout(self):
+        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に親を kill -9 で消しても、
+        # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終わる (worker.md の「終わり方」)。偽の claude は
+        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        received = os.path.join(self.root, "term-received")
+        self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
+        self.put_request()
+        p = self.start("--review-timeout-minutes", "0.05")
+        self.wait_for(lambda: os.path.exists(received), timeout=30, what="上限を越えて、レビュアの実行に TERM が送られること")
+        os.kill(p.pid, signal.SIGKILL)
+        p.communicate(timeout=20)
+        marker = self.wait_marker()
+        self.assertEqual(marker["status"], "failed")
+        self.assertEqual(marker["error"], "timeout")
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_reviewing(self):
         # AE16: 割り込みを受けたら、レビュアの実行とその子を止めて failed の印と left を書く。作業場所は残らない
@@ -2782,6 +2946,33 @@ class TestEnding(WorkerTestBase):
         os.kill(p.pid, signal.SIGKILL)
         self.wait_for(lambda: not _group_alive(p.pid), timeout=10,
                       what="ワーカーのプロセスグループが空になる")
+        reviewer = _read_pids(self.pids_file)[0]
+        self.assertTrue(_pid_alive(reviewer))
+        self.assertEqual(self.worker_state()["state"], "reviewing")
+        self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")))
+
+    def test_sigkill_while_child_is_outside_wait(self):
+        # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終わるまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
+        # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) を待ち続ける。
+        # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待たせ、その間に親を消す (上限を測る処理は、
+        # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待たせないように、準備の
+        # 途中の複製の設定の確認 (偽の python3 で遅らせる) が始まってから、偽の date のトリガーを作る
+        touch = os.path.join(self.root, "delay-started")
+        self.delay_python("settings.local.json", 2, touch)
+        trigger = os.path.join(self.root, "date-trigger")
+        started = os.path.join(self.root, "date-started")
+        self.install_fake_date(trigger, started)
+        self.env.update(FAKE_DATE_ARGS="+%H:%M:%S", FAKE_DATE_HOLD="8", FAKE_CLAUDE_MODE="hang")
+        self.put_request()
+        p = self.start()
+        self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
+        open(trigger, "w").close()
+        self.wait_for(lambda: os.path.exists(started), timeout=20, what="手順 9 の確認の後の log の date が待ち始めること")
+        os.kill(p.pid, signal.SIGKILL)
+        p.wait(timeout=20)
+        self.wait_for(lambda: os.path.exists(self.pids_file), timeout=20, what="偽の claude の起動")
+        self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
+        p.communicate(timeout=5)
         reviewer = _read_pids(self.pids_file)[0]
         self.assertTrue(_pid_alive(reviewer))
         self.assertEqual(self.worker_state()["state"], "reviewing")
@@ -2875,11 +3066,39 @@ class TestInterruptPhases(WorkerTestBase):
         marker, _ = self.run_round()
         self.assertEqual(marker["status"], "ok", marker)
 
-    def test_group_term_while_child_runs_foreground_command(self):
-        # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM が届くと、
-        # そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗として扱っても、子が自分で
-        # 受けた TERM を割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の子の箇条)。
-        # 偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
+    def test_interrupt_while_stopping_reviewer_after_timeout(self):
+        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に割り込みを受けても、
+        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の、
+        # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終わり方」の、子の箇条の次の、回の終わりの処理の途中の項)。
+        # 偽の claude は TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        received = os.path.join(self.root, "term-received")
+        for sig, code in self.SIGNALS:
+            with self.subTest(sig=sig.name):
+                self.reset_loop()
+                if os.path.exists(received):
+                    os.remove(received)
+                self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
+                self.put_request()
+                p = self.start("--review-timeout-minutes", "0.05")
+                self.wait_for(lambda: os.path.exists(received), timeout=30,
+                              what="上限を越えて、レビュアの実行に TERM が送られること")
+                os.killpg(p.pid, sig)
+                _, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code, err)
+                self.assertTrue(os.path.exists(self.path(f"delivered-{RID}.yaml")), "その回の印が書かれていない")
+                marker = _read_yaml(self.path(f"delivered-{RID}.yaml"))
+                self.assertEqual(marker["status"], "failed", err)
+                self.assertEqual(marker["error"], "timeout", err)
+                state = self.worker_state()
+                self.assertEqual(state["state"], "left")
+                self.assertEqual(self.workspaces(), [])
+                self.wait_for(lambda: not _group_alive(p.pid), timeout=5, what="ワーカーのプロセスグループが空になる")
+
+    def test_group_signal_while_child_runs_foreground_command(self):
+        # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM か HUP
+        # (端末を閉じたとき) が届くと、そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
+        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の
+        # 子の箇条)。偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 30, touch)
         path = os.path.join(self.bin, "mv")
@@ -2889,18 +3108,23 @@ class TestInterruptPhases(WorkerTestBase):
                     'exec "$FAKE_MV_REAL" "$@"\n')
         os.chmod(path, 0o755)
         self.env["FAKE_MV_REAL"] = shutil.which("mv")
-        self.put_request()
-        p = self.start()
-        self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
-        os.killpg(p.pid, signal.SIGTERM)
-        _, err = p.communicate(timeout=30)
-        self.assertEqual(p.returncode, 143, err)
-        self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")), err)
-        state = self.worker_state()
-        self.assertEqual(state["state"], "left")
-        self.assertEqual(self.prep_dirs(), [])
-        self.assertEqual(self.workspaces(), [])
-        self.assertEqual(self.claude_calls(), [])
+        for sig, code in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
+            with self.subTest(sig=sig.name):
+                self.reset_loop()
+                if os.path.exists(touch):
+                    os.remove(touch)
+                self.put_request()
+                p = self.start()
+                self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
+                os.killpg(p.pid, sig)
+                _, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, code, err)
+                self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")), err)
+                state = self.worker_state()
+                self.assertEqual(state["state"], "left")
+                self.assertEqual(self.prep_dirs(), [])
+                self.assertEqual(self.workspaces(), [])
+                self.assertEqual(self.claude_calls(), [])
 
     def test_interrupt_during_finish(self):
         # 回の終わりの処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに

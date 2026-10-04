@@ -26,9 +26,9 @@
 # 読むが、使うのは起動時の確認と表示だけ。
 #
 # macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確かめたため)。
-# bash は macOS の /bin/bash (3.2) で動くように書き、1 行目でそれを指定する — PATH で先に見つかる bash (Homebrew の 5.2 など) を
-# 使わないため。bash 5.2 は、保留中の trap を $(...) の中身の構文解析の途中で実行することがあり、そのとき trap の文字列は構文の誤りに
-# なって実行されない (#105)。テストは CI (ubuntu) でも偽の uname で走らせるので、
+# bash は macOS の /bin/bash (3.2) で動くように書き、1 行目でそれを指定する — 環境変数 PATH で先に見つかる bash (Homebrew の 5.2
+# など) を使わないため。bash 5.2 は、保留中の trap をコマンド置換 $(...) の中身の構文解析の途中で実行することがあり、そのとき trap の
+# 文字列は構文の誤りになって実行されない (#105)。テストは CI (ubuntu) でも偽の uname で走らせるので、
 # GNU の stat と Linux の /proc でも動くようにしておく。python3 が要る (claude -p と準備のコマンドを専用のプロセスグループで
 # 起動する・ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
 # --settings の JSON を組み立てる・依頼文の写しを作る・準備のディレクトリを作業場所のパスに改名する・結果を確かめて複写する・
@@ -460,7 +460,8 @@ INTERRUPT_FILE=""      # 割り込みを記録するファイル (起動時の�
 INTERRUPT_TMP=""       # 割り込みを記録するファイルを書くときの一時名
 RELAY_SIG=""           # 親が最初に受けた割り込みのシグナルの名前 (関数 relay_interrupt)
 RELAY_CODE=""          # 親が最初に受けた割り込みの終了コード
-SELF_SIG=""            # 子が自分で最初に受けた TERM・HUP の名前 (プロセスグループに届いたもの。関数 body_main の trap が控える)
+RELAY_WARNED=""        # 割り込みを記録するファイルを書けなかったことを、標準エラーに知らせたか (関数 write_interrupt_file)
+SELF_SIG=""            # 子が自分で最初に受けた TERM・HUP の名前 (プロセスグループに届いたもの。関数 body_main の trap が書く)
 WS=""                  # 回の作業場所のパス (起動時の確認が通った後に決める)
 WS_KEY=""              # 作業場所と準備のディレクトリの名前に共通する部分 (<周回 id>-<周回の置き場の実体パスのハッシュ>)
 # 回のどの部分を行っているか。割り込みを受けたときの扱いを決める (関数 on_signal)。
@@ -739,10 +740,15 @@ SETTINGS_JSON=$(build_settings_json "${settings_args[@]}") && [ -n "$SETTINGS_JS
 
 # ---- バックグラウンドの処理 ----
 
-# プロセス $1 が動いているか。終わったのに、起動したプロセスが回収していない (ゾンビの) プロセスは動いていないとみなす
+# プロセス $1 が動いているか。終わったのに、起動したプロセスが回収していない (ゾンビの) プロセスは動いていないとみなす。
+# コマンド ps がシグナルで止まったとき (終了コードが 128 を越える。プロセスグループに届いた TERM・HUP など) は、分からないので
+# 動いているとみなす — 動いていないとみなすと、親が動いているのに、子が kill -9 のときの経路 (関数 check_interrupt) で後始末を
+# せずに終わる。本当に動いていなければ、次に確かめたときに分かる
 pid_alive() {
-  local st
+  local st rc
   st=$(ps -o stat= -p "$1" 2>/dev/null)
+  rc=$?
+  [ "$rc" -le 128 ] || return 0
   case "$st" in
     ""|Z*) return 1 ;;
   esac
@@ -770,7 +776,7 @@ start_heartbeat() {
 }
 
 # バックグラウンドの処理 (PID $1。更新時刻を進める処理か上限を測る処理) に TERM を送り、プロセスが残っている間だけ終わりを待つ。
-# 残っていなければ wait しない (正本は worker.md の「終わり方」)。これらの処理は親と子と同じプロセスグループで動くので、
+# 残っていなければ組み込みコマンド wait で待たない (正本は worker.md の「終わり方」)。これらの処理は親と子と同じプロセスグループで動くので、
 # プロセスグループに届いた HUP ではすぐに (trap が無い)、TERM では自分の trap で、子と同時に終わる (INT は、バックグラウンドの
 # コマンドなので無視する)。bash 5 (Linux の 5.2 で確かめた) は、trap を設定したシグナルで wait を途中で抜けるとき、その wait の中で
 # 回収した子プロセスの終わりを記録しないことがあるので、準備のコマンドやレビュアの実行を待つ wait が、同時に終わったこれらの処理を
@@ -793,24 +799,27 @@ stop_heartbeat() {
 # 上限を越えたかどうかは子が時計で確かめる (関数 timed_out)。過ぎた後は、止められるまで 1 秒おきに送る — 1 度だけだと、
 # 子が wait を始める直前に届いた USR1 は wait を戻さず、その wait に上限が掛からない。
 # 周期ごとに子が動いているかを確かめ、動いていなければ (kill -9 で trap が動かなかった場合も) 自分も終わる —
-# 消えた子の PID が別のプロセスに再利用されていると、USR1 (既定の動作は終了) がそのプロセスを止めてしまうため。
-# 親が動いていなければ (kill -9)、子に USR1 を送ってから終わる。子は wait から戻ったときに親が消えたことに気づき、後始末をせずに終わる
-# (関数 check_interrupt)
+# 消えた子の PID が別のプロセスに再利用されていると、USR1 (デフォルトの動作は終了) がそのプロセスを止めてしまうため。
+# 親が動いていなければ (kill -9)、上限の時刻を見ずに、子が終わるまで 1 秒おきに USR1 を送る (1 度だけでは足りない理由は、上の
+# 上限の USR1 と同じ)。子は wait から戻ったときに親が消えたことに気づき、後始末をせずに終わる (関数 check_interrupt)
 start_watchdog() {
   (
     wd_sleep=""
+    wd_orphan=""
     trap 'kill "$wd_sleep" 2>/dev/null; exit 0' TERM
     while pid_alive "$BODY_PID"; do
-      if ! worker_alive; then
-        kill -USR1 "$BODY_PID" 2>/dev/null
-        exit 0
-      fi
-      wd_left=$(( $1 - $(date +%s) ))
-      if [ "$wd_left" -le 0 ]; then
+      if [ -n "$wd_orphan" ] || ! worker_alive; then
+        wd_orphan=1
         kill -USR1 "$BODY_PID" 2>/dev/null
         wd_left=1
+      else
+        wd_left=$(( $1 - $(date +%s) ))
+        if [ "$wd_left" -le 0 ]; then
+          kill -USR1 "$BODY_PID" 2>/dev/null
+          wd_left=1
+        fi
+        [ "$wd_left" -gt "$POLL_SECONDS" ] && wd_left=$POLL_SECONDS
       fi
-      [ "$wd_left" -gt "$POLL_SECONDS" ] && wd_left=$POLL_SECONDS
       sleep "$wd_left" &
       wd_sleep=$!
       wait "$wd_sleep"
@@ -832,7 +841,7 @@ timed_out() {
   [ "$(date +%s)" -ge "$REQ_DEADLINE" ]
 }
 
-# 割り込みに応じられるように (親が送る USR1 で wait が途中で戻る)、sleep をバックグラウンドで起動して wait で待つ。
+# 割り込みに応じられるように (親が送る USR1 で wait が途中で戻る)、コマンド sleep をバックグラウンドで起動して wait で待つ。
 # wait が途中で戻ったら sleep を止める — 残すと、割り込みで終わったワーカーの後に、標準出力と標準エラーを開いたまま最大
 # POLL_SECONDS 秒残る (端末やテストは、それが閉じるまで待つ)
 idle_sleep() {
@@ -941,13 +950,13 @@ leave() {
   exit "$1"
 }
 
-# 割り込み (INT / TERM / HUP) を受けたときの子の処理。$1 はシグナルの名前、$2 は終了コード。子が割り込みを記録するファイルを
-# 見つけたときに呼ぶ (関数 check_interrupt)。受けた時点 (PHASE) で扱いが違う。
+# 割り込み (INT / TERM / HUP) を受けたときの子の処理。$1 はシグナルの名前、$2 は終了コード。子が割り込みを記録するファイルか、
+# 自分で受けたシグナルの名前 (変数 SELF_SIG) を見つけたときに呼ぶ (関数 check_interrupt)。受けた時点 (PHASE) で扱いが違う。
 #   prep   (準備の途中): 準備のコマンドのプロセスグループを止め、準備のディレクトリと作業場所を消す。印は書かない —
 #          レビュアの実行を起動していないので、起動し直したワーカーが同じ依頼文を初めから処理する
 #   review (レビュアの実行中): レビュアの実行を止め、回の終わりの処理を行って、failed・interrupted の印を書く
 #   finish (回の終わりの処理の途中。上限を越えてレビュアの実行を止めている間に見つけたとき): 何もせずに戻る。割り込みを記録する
-#          ファイルは残るので、その回の印を書き終えてから、もう一度見つけて終わる (関数 process_request)。
+#          ファイルも SELF_SIG も残るので、その回の印を書き終えてから、もう一度見つけて終わる (関数 process_request)。
 #          印の無い回と、消し残した作業場所を作らないため
 # finish のほかは、そのあと worker.yaml を left にして終わる
 INTERRUPT_NOTED=0
@@ -987,21 +996,29 @@ on_signal() {
 }
 
 # 親が割り込みを記録したか (worker.md の「終わり方」) と、親が動いているかを確かめる。どの時点で呼ぶかの正本は worker.md の
-# 「終わり方」の子の箇条。割り込みを記録するファイルか、子が自分で受けた TERM・HUP の控え (SELF_SIG) があれば、関数 on_signal で扱う。
-# 親が動いていなければ (kill -9)、後始末をせずに終わる (worker.yaml も印も書かない。起動し直したワーカーが片付ける)。
-# 割り込みかどうかを主にファイルで確かめるのは、bash がコマンド置換を処理している間に受けたシグナルの trap を実行しないことが
-# あるため。親は子が終わるまで 1 秒おきに USR1 を送るので、子が USR1 を受け損ねても、次の USR1 で wait から戻る
+# 「終わり方」の子の箇条。割り込みを記録するファイルか、子が自分で受けた TERM・HUP の名前 (SELF_SIG) があれば、関数 on_signal で扱う。
+# 親が動いていなければ (kill -9)、ファイルや SELF_SIG があっても、後始末をせずに終わる (worker.yaml も印も書かない。起動し直した
+# ワーカーが片付ける。回の終わりの処理の途中なら、その回の印を書き終えてから終わる)。親の確認に使う ps がプロセスグループに届いた TERM・HUP で止まったときは、親が動いていないとは判定しない
+# (関数 pid_alive)。割り込みかどうかを主にファイルで確かめるのは、bash がコマンド置換を処理している間に受けたシグナルの trap を
+# 実行しないことがあるため。親は子が終わるまで 1 秒おきに USR1 を送るので、子が USR1 を受け損ねても、次の USR1 で wait から戻る
 check_interrupt() {
   local sig="" code=""
   [ "$FINISHING" = 0 ] || return 0
   if ! worker_alive; then
+    # 回の終わりの処理の途中 (上限を越えてレビュアの実行を止めている間) は、その回の印を書き終えてから終わる。関数 process_request が
+    # 回の後に呼ぶ check_interrupt で、ここに戻る
+    [ "$PHASE" != finish ] || return 0
     FINISHING=1
     log "親 (PID $WORKER_PID) が無いので、後始末をせずに終わる"
     exit 1
   fi
   if [ -f "$INTERRUPT_FILE" ]; then
     read -r sig code <"$INTERRUPT_FILE"
-    if [ -z "$sig" ] || ! echo "$code" | grep -Eq '^[0-9]+$'; then
+    # 終了コードの形はシェルの case 文で確かめる — grep のような外部コマンドは、プロセスグループに届いた TERM・HUP で止まりうるため
+    case "$sig:$code" in
+      :*|*:|*:*[!0-9]*) sig="" ;;
+    esac
+    if [ -z "$sig" ]; then
       log "割り込みを記録するファイル $INTERRUPT_FILE の中身を読めない。割り込みとして扱う"
       sig="名前を読めないシグナル"
       code=1
@@ -1644,9 +1661,9 @@ body_main() {
   # 始まるが、bash の版や起動の仕方によっては無視にならない (bash 5.2 は、INT の trap を設定した親が関数を & で起動すると、
   # 子の SIGINT をデフォルトの動作にする) ので、ここで明示する。
   # 親が送る USR1 は、待っている wait を途中で戻すためだけに使い、割り込みかどうかは割り込みを記録するファイルで確かめる
-  # (関数 check_interrupt)。プロセスグループに届いた TERM・HUP は、wait を戻すほかに、受けたことを SELF_SIG に控える —
+  # (関数 check_interrupt)。プロセスグループに届いた TERM・HUP は、wait を戻すほかに、受けたシグナルの名前を SELF_SIG に書く —
   # 子がフォアグラウンドで実行しているコマンドも同じシグナルで止まり、親がファイルを書くより先に、子がその失敗を準備の失敗として
-  # 扱うことがあるため (控えがあれば、関数 check_interrupt が割り込みにする)。TERM と HUP は無視にしない — 無視は子が起動する
+  # 扱うことがあるため (SELF_SIG に名前があれば、関数 check_interrupt が割り込みにする)。TERM と HUP は無視にしない — 無視は子が起動する
   # コマンドに引き継がれ、準備のコマンドやレビュアの実行が TERM で止まらなくなる
   trap '' INT
   trap '[ -n "$SELF_SIG" ] || SELF_SIG=TERM' TERM
@@ -1654,8 +1671,8 @@ body_main() {
   trap ':' USR1
   trap 'cleanup' EXIT
   local idle_since now wait_for rid
-  # 子の PID (上限を測る処理が USR1 を送る先)。サブシェルの中の $$ は親の PID のままで、bash 3.2 には変数 BASHPID が無いので、
-  # sh を exec したコマンド置換の、親のプロセス (この子) の PID として求める
+  # 子の PID (上限を測る処理が USR1 を送る先)。シェルの特殊パラメータ $$ は、サブシェルの中でも親の PID のままで、bash 3.2 には
+  # 変数 BASHPID が無いので、コマンド sh を組み込みコマンド exec で実行したコマンド置換の、親のプロセス (この子) の PID として求める
   BODY_PID=$(exec sh -c 'echo $PPID')
 
   write_worker_yaml idle ""
@@ -1700,25 +1717,39 @@ body_main() {
 
 # ---- 親 (シグナルを受け取るプロセス。正本は worker.md の「終わり方」) ----
 #
-# 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt と supervise_body)。bash は、コマンド置換を処理している
-# 間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。
-# テスト review-triage/tests/test_review_loop_worker.py が、この 2 つの関数の本文にコマンド置換が無いことを確かめる
+# 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt・write_interrupt_file・supervise_body)。bash は、
+# コマンド置換を処理している間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。
+# テスト review-triage/tests/test_review_loop_worker.py が、親の trap を設定した後の行から呼ぶ関数をたどり、その本文にコマンド置換が
+# 無いことを確かめる
 
-# 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを割り込みを記録するファイルに書く (一時名に書いて
-# から改名する。子が書きかけを読まないため)。子への USR1 は関数 supervise_body が送る
+# 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを覚えて、割り込みを記録するファイルに書く。
+# 子への USR1 と、書けなかったときの書き直しは、関数 supervise_body が行う
 relay_interrupt() {
   [ -z "$RELAY_SIG" ] || return 0
   RELAY_SIG=$1
   RELAY_CODE=$2
-  if ! { printf '%s %s\n' "$1" "$2" >"$INTERRUPT_TMP" && mv -f "$INTERRUPT_TMP" "$INTERRUPT_FILE"; }; then
-    echo "review-loop-worker: 割り込みを記録するファイル $INTERRUPT_FILE を書けないので、子 (PID $BODY_PID) に割り込みを伝えられない。" >&2
-    echo "  止めるには kill -KILL $WORKER_PID を送る (子は親が無いことに気づいて、後始末をせずに終わる)" >&2
+  write_interrupt_file
+}
+
+# 親が最初に受けた割り込みのシグナルの名前と終了コードを、割り込みを記録するファイルに書く (一時名に書いてから改名する。子が
+# 書きかけを読まないため)。INT・TERM・HUP を無視するサブシェル (コマンド置換ではない) の中で書く — 親の trap は外部コマンド mv に
+# 引き継がれないので、親が続けて受けたシグナル (Ctrl-C を続けて押したときなど) のデフォルトの動作で mv が止まり、書けなくなるため
+# (無視は mv に引き継がれる)。書けなかったとき (サブシェルが無視を設定する前にシグナルが届いた場合を含む) は 1 を返し、最初の
+# 1 回だけ標準エラーに知らせる
+write_interrupt_file() {
+  ( trap '' INT TERM HUP; printf '%s %s\n' "$RELAY_SIG" "$RELAY_CODE" >"$INTERRUPT_TMP" && mv -f "$INTERRUPT_TMP" "$INTERRUPT_FILE" ) \
+    && return 0
+  if [ -z "$RELAY_WARNED" ]; then
+    RELAY_WARNED=1
+    echo "review-loop-worker: 割り込みを記録するファイル $INTERRUPT_FILE を書けない。子 (PID $BODY_PID) が終わるまで、1 秒おきに書き直す。" >&2
+    echo "  止まらなければ kill -KILL $WORKER_PID を送る (子は親が無いことに気づいて、後始末をせずに終わる)" >&2
   fi
+  return 1
 }
 
 # 子を起動し、終わるまで待つ。割り込みを受けていれば、子が終わるまで 1 秒おきに子へ USR1 を送る (子が USR1 を受け損ねても、
-# 次の USR1 で wait から戻るように)。子が終わったら割り込みを記録するファイルを消し、割り込みを受けていればそのシグナルの
-# 終了コードで、受けていなければ子の終了コードで終わる
+# 次の USR1 で wait から戻るように)。送る前に、割り込みを記録するファイルが無ければ (書けなかったとき) 書き直す。子が終わったら
+# 割り込みを記録するファイルを消し、割り込みを受けていればそのシグナルの終了コードで、受けていなければ子の終了コードで終わる
 supervise_body() {
   local rc=""
   ( body_main ) &
@@ -1728,6 +1759,7 @@ supervise_body() {
       wait "$BODY_PID"
       rc=$?
     else
+      [ -f "$INTERRUPT_FILE" ] || write_interrupt_file
       kill -USR1 "$BODY_PID" 2>/dev/null
       sleep 1 </dev/null >/dev/null 2>&1 &
       wait "$!"
