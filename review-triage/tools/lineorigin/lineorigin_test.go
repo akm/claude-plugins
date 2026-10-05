@@ -296,6 +296,41 @@ func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
+// シンボリックリンクは、リンクの先ではなくリンクの文字列で比べる。リンクを変えていなければ
+// 成り立ち、リンク先を替えればコミットしていない変更になる。
+func TestSymlinkIsComparedAsLink(t *testing.T) {
+	r := newRepo(t)
+	r.write("real.md", "r\n")
+	r.write("other.md", "o\n")
+	if err := os.Symlink("real.md", filepath.Join(r.dir, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+
+	wantKind(t, r.check(base, "-file", "link.md", "-lines", "1", "-rev", "HEAD"), holds)
+
+	link := filepath.Join(r.dir, "link.md")
+	os.Remove(link)
+	if err := os.Symlink("other.md", link); err != nil {
+		t.Fatal(err)
+	}
+	wantKind(t, r.check(base, "-file", "link.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
+}
+
+// 指摘のファイルを、作業ツリーでディレクトリに置き換えていたら、コミットしていない変更として扱う。
+func TestFileReplacedByDirectoryIsUncommittedChange(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	os.Remove(filepath.Join(r.dir, "f.md"))
+	r.write("f.md/inner.md", "i\n")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
+}
+
 // ほかのファイルの変更は、指摘のファイルの行番号を変えないので見ない。
 func TestUncommittedChangeInOtherFileIsIgnored(t *testing.T) {
 	r, base := branched(t)

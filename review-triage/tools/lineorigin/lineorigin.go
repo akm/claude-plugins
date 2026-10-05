@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -294,8 +295,14 @@ func findDotGit(dir string) (string, bool) {
 //
 // どのディレクトリから実行しても同じ結果になるよう、-C でルートを指定する。環境は gitEnv が作る。
 func (g gitRunner) run(args ...string) (string, int, error) {
+	return g.runIn(nil, args...)
+}
+
+// runIn は、stdin を標準入力に渡して run と同じように git を実行する。
+func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	cmd := exec.Command("git", append([]string{"-C", g.root, "-c", "core.quotePath=false"}, args...)...)
 	cmd.Env = gitEnv()
+	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
@@ -433,15 +440,36 @@ func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 		}
 		index = fields[1]
 	}
+	// 作業ツリーの内容のハッシュを、git が記録するのと同じ形で求める。git が記録するのは通常の
+	// ファイルとシンボリックリンクだけで、シンボリックリンクはリンクの先ではなくリンクの文字列を記録する
 	var worktree string
 	abs := filepath.Join(top, filepath.FromSlash(file))
-	if _, err := os.Lstat(abs); err == nil {
+	st, err := os.Lstat(abs)
+	switch {
+	case os.IsNotExist(err):
+		// 作業ツリーから消した。worktree は空のまま
+	case err != nil:
+		return false, runf("作業ツリーの -file を読めません: %v", err)
+	case st.Mode().IsRegular():
 		// --path で、そのパスの属性によるフィルタ (改行の変換など) を当ててからハッシュを求める。-w を付けないので書き込まない
 		out, _, err := g.run("hash-object", "--path="+file, "--", abs)
 		if err != nil {
 			return false, err
 		}
 		worktree = strings.TrimSpace(out)
+	case st.Mode()&os.ModeSymlink != 0:
+		link, err := os.Readlink(abs)
+		if err != nil {
+			return false, runf("作業ツリーの -file のリンクを読めません: %v", err)
+		}
+		out, _, err := g.runIn(strings.NewReader(link), "hash-object", "--no-filters", "--stdin")
+		if err != nil {
+			return false, err
+		}
+		worktree = strings.TrimSpace(out)
+	default:
+		// ディレクトリなど、git が記録しない種類に置き換わっている
+		return true, nil
 	}
 	return head != index || index != worktree, nil
 }
