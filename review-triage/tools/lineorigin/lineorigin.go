@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // 結果の 3 つの値。D8 の条件 (1) が成り立つ・成り立たない・確かめられない。
@@ -298,14 +300,24 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 	return g.runIn(nil, args...)
 }
 
+// gitTimeout は、git の 1 回の実行に許す時間。越えたら run-error にする。git や、git が起動する
+// フィルタのプログラムが止まったときに、道具が終わらなくなるのを防ぐ。テストが短くする。
+var gitTimeout = 5 * time.Minute
+
 // runIn は、stdin を標準入力に渡して run と同じように git を実行する。
 func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
-	cmd := exec.Command("git", append([]string{"-C", g.root, "-c", "core.quotePath=false"}, args...)...)
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false"}, args...)...)
+	cmd.WaitDelay = time.Second // 期限で止めた git の子のプロセスが出力を開いたままでも、待ち続けない
 	cmd.Env = gitEnv()
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", -1, runf("git %s が %s 以内に終わりませんでした", strings.Join(args, " "), gitTimeout)
+	}
 	if err == nil {
 		return stdout.String(), 0, nil
 	}
@@ -322,9 +334,15 @@ var gitVersionRe = regexp.MustCompile(`^git version ([0-9]+)\.([0-9]+)`)
 // git rev-parse --end-of-options が 2.30.0 から) であることを確かめる。古い git では、正しい版を
 // 渡しても解決できないので、入力の誤りと取り違えないよう、道具を実行できないこととして返す。
 func checkGitVersion() error {
-	cmd := exec.Command("git", "version")
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "version")
+	cmd.WaitDelay = time.Second
 	cmd.Env = gitEnv()
 	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return runf("git version が %s 以内に終わりませんでした", gitTimeout)
+	}
 	if err != nil {
 		return runf("git を起動できません: %v", err)
 	}
@@ -370,6 +388,11 @@ func gitEnv() []string {
 		"GIT_LITERAL_PATHSPECS=1",
 		// git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
 		"GIT_NO_REPLACE_OBJECTS=1",
+		// 部分クローンで欠けたオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
+		// 取得できないと git は失敗し、道具は run-error になる
+		"GIT_NO_LAZY_FETCH=1",
+		// 認証などで利用者に尋ねて待たない
+		"GIT_TERMINAL_PROMPT=0",
 	)
 	return append(env, extraGitEnv...)
 }

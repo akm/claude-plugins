@@ -784,6 +784,66 @@ func TestGitVersionBoundary(t *testing.T) {
 	})
 }
 
+// 部分クローンで欠けたオブジェクトを、道具がネットワークから取得してリポジトリに書き込まない。
+// GIT_NO_LAZY_FETCH は git 2.44 からなので、それより前の git では飛ばす。
+func TestPartialCloneDoesNotFetch(t *testing.T) {
+	out, err := exec.Command("git", "version").Output()
+	if major, minor, ok := parseGitVersion(string(out)); err != nil || !ok || major == 2 && minor < 44 {
+		t.Skipf("GIT_NO_LAZY_FETCH を受け付けない git: %s", strings.TrimSpace(string(out)))
+	}
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+	r.git("config", "uploadpack.allowFilter", "true")
+	clone := &repo{t: t, dir: filepath.Join(t.TempDir(), "clone")}
+	if out, err := exec.Command("git", "clone", "-q", "--no-local", "--filter=blob:none", "--branch", "br", "file://"+r.dir, clone.dir).CombinedOutput(); err != nil {
+		t.Fatalf("git clone: %v: %s", err, out)
+	}
+	missing := func() string { return clone.git("rev-list", "--objects", "--all", "--missing=print") }
+	before := missing()
+	if !strings.Contains(before, "?") {
+		t.Fatal("部分クローンに欠けたオブジェクトが無く、確かめられない")
+	}
+
+	o := clone.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+	if after := missing(); after != before {
+		t.Fatalf("道具が欠けたオブジェクトを取得した。前:\n%s\n後:\n%s", before, after)
+	}
+	if o.kind == holds {
+		t.Fatalf("起点の内容を読めないのに holds を返した: %s", o.stdout)
+	}
+}
+
+// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。
+func TestGitTimeoutIsRunError(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	script := "#!/bin/sh\ncase \" $* \" in *\" blame \"*) exec '" + sleep + "' 30;; esac\nexec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	saved := gitTimeout
+	gitTimeout = 2 * time.Second
+	t.Cleanup(func() { gitTimeout = saved })
+
+	start := time.Now()
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終わりませんでした")
+	if d := time.Since(start); d > 20*time.Second {
+		t.Fatalf("期限を越えても %s 待った", d)
+	}
+}
+
 func TestParseGitVersion(t *testing.T) {
 	cases := []struct {
 		in           string
