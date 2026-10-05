@@ -393,7 +393,7 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 			r.git("switch", "-q", "-c", "br")
 			r.write("g.md", "g\n")
 			r.commit("branch")
-			// 生の 3 行目 (y2) を書き換えた。フィルタが効くと、フィルタの後の 3 行目は起点のままの z
+			// 生の 3 行目 (y2) を書き換えた。フィルタが適用されると、フィルタの後の 3 行目は起点のままの z
 			r.write("f.md", "# h\nx\ny2\nz\n")
 
 			o := r.check(base, "-file", "f.md", "-lines", "3", "-worktree")
@@ -421,7 +421,7 @@ func TestUnsetDriverWithProcessOnly(t *testing.T) {
 }
 
 // scriptedGit は、引数に sub を含む呼び出しだけを、stdout を書いて終了コード code で終え、
-// ほかのコマンドは本物の git に渡す偽の git を置いたディレクトリを返す。stdout は printf の書式
+// ほかのコマンドは本物の git に渡す偽の git を書き込んだディレクトリを返す。stdout は printf の書式
 // (\000 で NUL) で渡す。
 func scriptedGit(t *testing.T, sub, stdout string, code int) string {
 	t.Helper()
@@ -875,7 +875,7 @@ func TestGitNotFoundIsRunError(t *testing.T) {
 }
 
 // fakeGit は、git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
-// git を置いたディレクトリを返す。PATH の先頭に置いて、版の確認を確かめるのに使う。
+// git を書き込んだディレクトリを返す。PATH の先頭に置いて、版の確認を確かめるのに使う。
 func fakeGit(t *testing.T, versionLine string) string {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -951,7 +951,7 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 }
 
 // stallingGit は、引数に word を含む呼び出しで止まり、ほかのコマンドは本物の git に渡す偽の git を
-// 置いたディレクトリを返す。止まるときは sleep を子のプロセスとして起動するので、期限で git (の偽物) を
+// 書き込んだディレクトリを返す。止まるときは sleep を子のプロセスとして起動するので、期限で git (の偽物) を
 // 止めても、sleep が標準出力を開いたまま残る。
 func stallingGit(t *testing.T, word string) string {
 	t.Helper()

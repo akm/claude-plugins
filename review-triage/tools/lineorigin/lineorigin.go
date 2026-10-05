@@ -513,8 +513,10 @@ func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 }
 
 // hasCleanFilter は、file に属性 filter (git add のときにファイルを変換するプログラム) が
-// 設定されているかを返す。設定の無いドライバの名前や、値の無い filter も「あり」とする
-// (確かめない側にする)。
+// 設定されているかを返す。属性 filter の値はドライバ (設定 filter.<名前>.clean などで登録する、
+// 変換のプログラムの名前) で、設定の無いドライバの名前や、値の無い filter も「あり」とする。
+// 「あり」なら呼び出し元は確かめずに unverifiable を返すので、迷う場合を「あり」として扱っても、
+// 誤った holds にはならない。
 func (g gitRunner) hasCleanFilter(file string) (bool, error) {
 	// -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
 	// filter だけを尋ねると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
