@@ -99,6 +99,16 @@ func check(opts options) (result, error) {
 		} else if !ok {
 			return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
 		}
+		// git blame --contents は、作業ツリーの内容を clean フィルタで変換してから見る。フィルタが行を
+		// 増やしたり消したりすると、指摘の行番号 (作業ツリーの生の内容の行番号) が別の行に当たり、
+		// 書き換えた行が起点のままと報告されうる (誤った holds)。行番号を対応させられないので確かめない
+		filtered, err := g.hasCleanFilter(opts.file)
+		if err != nil {
+			return result{}, err
+		}
+		if filtered {
+			return result{kind: unverifiable, reason: "指摘のファイルに clean フィルタ (属性 filter) が設定されていて、作業ツリーの行番号と、git blame が見るフィルタの後の内容の行番号がずれうる"}, nil
+		}
 	} else {
 		// 結果のファイルで受け取ったレビューは、共有の作業ツリーでコミットしていない変更を見た可能性があり、
 		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
@@ -500,6 +510,21 @@ func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 		return true, nil
 	}
 	return head != index || index != worktree, nil
+}
+
+// hasCleanFilter は、file に属性 filter (git add のときにファイルを変換するプログラム) が
+// 設定されているかを返す。
+func (g gitRunner) hasCleanFilter(file string) (bool, error) {
+	out, _, err := g.run("check-attr", "-z", "filter", "--", file)
+	if err != nil {
+		return false, asRun(err)
+	}
+	// -z の出力は「<パス> NUL filter NUL <値> NUL」
+	parts := strings.Split(out, "\x00")
+	if len(parts) < 3 {
+		return false, runf("git check-attr の出力を読めません: %q", out)
+	}
+	return parts[2] != "unspecified" && parts[2] != "unset", nil
 }
 
 // blob は、コミット commit の file のブロブの SHA を返す。そのパスが無ければ空。

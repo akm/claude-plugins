@@ -357,6 +357,30 @@ func TestWorktreeContent(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), holds)
 }
 
+// -worktree で、行数を変える clean フィルタが設定されたファイルは、作業ツリーの行番号と
+// git blame が見るフィルタの後の行番号がずれるので、確かめずに unverifiable にする。
+// 確かめると、書き換えた行が別の (起点のままの) 行に当たり、誤った holds になる。
+func TestWorktreeWithCleanFilterIsUnverifiable(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "filter.strip.clean", "grep -v '^#'")
+	r.git("config", "filter.strip.smudge", "cat")
+	r.write(".gitattributes", "f.md filter=strip\n")
+	r.write("f.md", "x\ny\nz\n")
+	r.write("h.md", "h\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("g.md", "g\n")
+	r.commit("branch")
+	r.write("f.md", "# h\nx\ny2\nz\n") // 生の 3 行目 (y2) を書き換えた。フィルタの後の 3 行目は z
+
+	o := r.check(base, "-file", "f.md", "-lines", "3", "-worktree")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "clean フィルタ")
+
+	// フィルタの無いファイルは今までどおり確かめる
+	wantKind(t, r.check(base, "-file", "h.md", "-lines", "1", "-worktree"), holds)
+}
+
 // 作業ツリーの内容の行番号で読む。コミットしていない行を上に足すと、起点の行は下にずれる。
 func TestWorktreeLineNumbersFollowWorktreeContent(t *testing.T) {
 	r, base := branched(t)
