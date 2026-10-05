@@ -27,7 +27,10 @@
 
 ## 保証すること
 
-**道具が保証するのは、誤って `holds` を返さないことだけ。** `holds` は、対象の行のどれもが、境界が全量の起点で、パスが `-file` と同じときにだけ返す (下の「どう確かめるか」)。D8 にとって危ないのは誤った `holds` だけで、ほかの誤り — エラーの種類 (`input-error:` と `run-error:`) の取り違えと、`not-holds` と `unverifiable` の取り違え — は、どれも D8 では「当たらない」になる ([judgment-flow.md](../../skills/review-triage/references/judgment-flow.md) の D8 の行)。
+**道具が保証するのは、誤って `holds` を返さないことだけ。** `holds` は、範囲を全量の起点で区切った `git blame` が、対象の行のどれもを起点のコミット (範囲の境界。`boundary`) のものと報告し、そのときのパスが `-file` と同じときにだけ返す (下の「どう確かめるか」)。D8 にとって危ないのは誤った `holds` だけで、ほかの誤りは、どれも最後は D8 が「当たらない」になる ([review-triage/skills/review-triage/references/judgment-flow.md](../../skills/review-triage/references/judgment-flow.md) の D8 の行)。
+
+- `not-holds` と `unverifiable` の取り違え、`run-error:` は、そのまま D8 が当たらない。
+- `input-error:` は、判定するエージェントがまず渡し方を直して実行し直し、値が原因で直せないときに (1) を確かめられないとして、D8 が当たらない ([review-triage/skills/review-triage/references/premise-check.md](../../skills/review-triage/references/premise-check.md) の「確かめ方」)。エラーの種類を取り違えると、直せない値を直そうとする手間が増えるが、誤った `holds` にはならない。
 
 そのため、珍しいリポジトリの状態では、エラーの種類や結果の理由が、実際の原因と違うことがある (一覧は下の「限界」)。テストは、誤った `holds` に関わる分岐 (境界と起点の比較・パスの比較・環境変数と設定の打ち消し・コミットしていない変更の確かめ方・`-worktree` の clean フィルタの確認) を検証する。エラーの種類を分ける分岐には、テストの無いものがある (環境変数 `LC_ALL=C` など)。
 
