@@ -224,12 +224,10 @@ func toplevel(dir string) (string, error) {
 
 // run は git を実行し、標準出力と終了コードを返す。終了コードが 0 でなければ error も返す。
 //
-// どのディレクトリから実行しても同じ結果になるよう、-C でルートを指定する。パスを pathspec
-// (パターンや先頭の : で始まる指定) として解釈させないよう GIT_LITERAL_PATHSPECS を立て、
-// 読むだけの道具がインデックスを書き換えないよう GIT_OPTIONAL_LOCKS を 0 にする。
+// どのディレクトリから実行しても同じ結果になるよう、-C でルートを指定する。環境は gitEnv が作る。
 func (g gitRunner) run(args ...string) (string, int, error) {
 	cmd := exec.Command("git", append([]string{"-C", g.root, "-c", "core.quotePath=false"}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_LITERAL_PATHSPECS=1", "GIT_OPTIONAL_LOCKS=0")
+	cmd.Env = gitEnv()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
@@ -241,6 +239,26 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 		return stdout.String(), exitErr.ExitCode(), fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(stderr.String()))
 	}
 	return "", -1, fmt.Errorf("git を実行できません: %w", err)
+}
+
+// gitEnv は git に渡す環境を作る。利用者の環境の GIT_ で始まる変数は、リポジトリの場所を替える
+// (GIT_DIR・GIT_WORK_TREE・GIT_INDEX_FILE など)、設定を注入する (GIT_CONFIG_PARAMETERS・
+// GIT_CONFIG_COUNT など)、パスの読み方を替える (GIT_GLOB_PATHSPECS など) ので、-root と違う
+// リポジトリや設定を読ませないよう、すべて取り除いてから道具が要るものだけを足す。
+func gitEnv() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "GIT_") {
+			env = append(env, kv)
+		}
+	}
+	return append(env,
+		// パスを pathspec (パターンや先頭の : で始まる指定) として解釈させない
+		"GIT_LITERAL_PATHSPECS=1",
+		"GIT_OPTIONAL_LOCKS=0",
+		// git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
+		"GIT_NO_REPLACE_OBJECTS=1",
+	)
 }
 
 // commit は版をコミットの完全な SHA に解決する。
@@ -292,6 +310,9 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 		"--root",
 		// 設定 blame.ignoreRevsFile に挙げたコミットを無視すると、そのコミットが書き換えた行が起点のままと報告される
 		"--ignore-revs-file", "",
+		// diff の textconv (比べる前にファイルを別の形へ変換する設定) で変換した行を比べると、
+		// 変換で消える部分だけを書き換えた行が、起点のままと報告される
+		"--no-textconv",
 		"--line-porcelain",
 		"-L", fmt.Sprintf("%d,%d", opts.from, opts.to),
 	}

@@ -10,8 +10,15 @@ import (
 )
 
 // TestMain は、利用者の git の設定 (グローバル・システム) がテストの結果を変えないように、
-// HOME を一時ディレクトリに替え、システムの設定を読ませない。
+// HOME を一時ディレクトリに替え、システムの設定を読ませない。GIT_ で始まる環境変数を先に
+// 取り除くのは、GIT_DIR などが設定されたまま走らせると、テストの git が一時ディレクトリではなく
+// その変数が指すリポジトリにコミットやブランチを作るため。
 func TestMain(m *testing.M) {
+	for _, kv := range os.Environ() {
+		if k, _, _ := strings.Cut(kv, "="); strings.HasPrefix(k, "GIT_") {
+			os.Unsetenv(k)
+		}
+	}
 	home, err := os.MkdirTemp("", "lineorigin-home")
 	if err != nil {
 		panic(err)
@@ -379,6 +386,72 @@ func TestIgnoreRevsFileConfigIsCleared(t *testing.T) {
 	r.write(".git-blame-ignore-revs", changed+"\n")
 	r.git("config", "blame.ignoreRevsFile", ".git-blame-ignore-revs")
 	r.commit("add ignore list")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD"), notHolds)
+}
+
+// 利用者の環境の GIT_ で始まる変数が別のリポジトリを指していても、-root のリポジトリを読み、
+// 別のリポジトリを変えない。パスの読み方を替える変数があっても、書いたとおりのファイル名として読む。
+func TestGitEnvironmentVariablesAreIgnored(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+	other := newRepo(t)
+	other.write("x.md", "x\n")
+	other.commit("other")
+	snapshot := func() string {
+		idx, err := os.ReadFile(filepath.Join(other.dir, ".git", "index"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return other.git("for-each-ref") + "\n" + other.git("symbolic-ref", "HEAD") + "\n" + string(idx)
+	}
+	before := snapshot()
+
+	vars := map[string]string{
+		"GIT_DIR":            filepath.Join(other.dir, ".git"),
+		"GIT_WORK_TREE":      other.dir,
+		"GIT_INDEX_FILE":     filepath.Join(other.dir, ".git", "index"),
+		"GIT_GLOB_PATHSPECS": "1",
+	}
+	for k, v := range vars {
+		t.Setenv(k, v)
+	}
+	o3 := r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD")
+	o1 := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+	for k := range vars {
+		os.Unsetenv(k) // 下の確認の git が、別のリポジトリを指さないようにする
+	}
+
+	wantKind(t, o3, notHolds)
+	wantKind(t, o1, holds)
+	if after := snapshot(); after != before {
+		t.Fatalf("GIT_DIR が指すリポジトリの参照かインデックスが変わった")
+	}
+}
+
+// diff の textconv があっても、変換した後ではなく元の行を比べる。
+func TestTextconvIsIgnored(t *testing.T) {
+	r := newRepo(t)
+	r.write(".gitattributes", "*.dat diff=csv\n")
+	r.write("f.dat", "a,1\nb,2\n")
+	base := r.commit("base")
+	r.git("config", "diff.csv.textconv", "cut -d, -f1")
+	r.git("switch", "-q", "-c", "br")
+	r.write("f.dat", "a,1\nb,CHANGED\n")
+	r.commit("change the second column")
+
+	wantKind(t, r.check(base, "-file", "f.dat", "-lines", "2", "-rev", "HEAD"), notHolds)
+	wantKind(t, r.check(base, "-file", "f.dat", "-lines", "1", "-rev", "HEAD"), holds)
+}
+
+// git replace で、行を書き換えたコミットを書き換えていないコミットに置き換えても、置き換えを見ない。
+func TestReplaceObjectsAreIgnored(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	changed := r.commit("change line 3")
+	fake := r.git("commit-tree", base+"^{tree}", "-p", base, "-m", "fake")
+	r.git("replace", changed, fake)
 
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD"), notHolds)
 }
