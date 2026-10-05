@@ -33,6 +33,8 @@
 
 **`go run -C` でツールのモジュールに入って実行する。** `go run -C` は作業ディレクトリを道具のディレクトリに変えるので、`-root` には調べるリポジトリのルートか、その中のディレクトリの絶対パスを渡す。
 
+`<プラグインの展開先>` は、review-triage のプラグインのディレクトリで、スキル review-triage を読み込んだときに示される基点ディレクトリ (`SKILL.md` のあるディレクトリ) の 2 つ上にあたる。環境によって違い、版ごとに分かれる (見つけ方の例は、triagecheck の README の「[Makefile に置く例](../triagecheck/README.md#makefile-に置く例)」)。
+
 ```sh
 # 結果のファイルで受け取ったレビュー: レビューした内容はその head のコミット
 go run -C <プラグインの展開先>/tools/lineorigin . -root "$(pwd)" -base <全量の起点> -file <ファイル> -lines 12 -rev <head>
