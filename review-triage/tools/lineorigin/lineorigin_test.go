@@ -36,6 +36,8 @@ func TestMain(m *testing.M) {
 	} {
 		os.Setenv(k, v)
 	}
+	// GIT_CONFIG_NOSYSTEM は、道具の gitEnv が取り除くので、取り除いた後に足す列にも入れる
+	extraGitEnv = []string{"GIT_CONFIG_NOSYSTEM=1"}
 	code := m.Run()
 	os.RemoveAll(home)
 	os.Exit(code)
@@ -517,6 +519,19 @@ func TestGitEnvironmentVariablesAreIgnored(t *testing.T) {
 	wantKind(t, o1, holds)
 	if after := snapshot(); after != before {
 		t.Fatalf("GIT_DIR が指すリポジトリの参照かインデックスが変わった")
+	}
+}
+
+// テストの隔離 (システムの git の設定を読ませない) が、道具の git にも届く。
+func TestGitEnvKeepsTestIsolation(t *testing.T) {
+	found := false
+	for _, kv := range gitEnv() {
+		if kv == "GIT_CONFIG_NOSYSTEM=1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("道具が git に渡す環境に GIT_CONFIG_NOSYSTEM=1 が無い")
 	}
 }
 

@@ -348,6 +348,10 @@ func parseGitVersion(s string) (major, minor int, ok bool) {
 	return major, minor, true
 }
 
+// extraGitEnv は、gitEnv が GIT_ で始まる変数を取り除いた後に足す変数。本番では空で、
+// テストがシステムの git の設定を読ませないために使う (取り除く前に設定しても届かないため)。
+var extraGitEnv []string
+
 // gitEnv は git に渡す環境を作る。利用者の環境の GIT_ で始まる変数は、リポジトリの場所を替える
 // (GIT_DIR・GIT_WORK_TREE・GIT_INDEX_FILE など)、設定を注入する (GIT_CONFIG_PARAMETERS・
 // GIT_CONFIG_COUNT など)、パスの読み方を替える (GIT_GLOB_PATHSPECS など) ので、-root と違う
@@ -359,7 +363,7 @@ func gitEnv() []string {
 			env = append(env, kv)
 		}
 	}
-	return append(env,
+	env = append(env,
 		// git の文言 (not a git repository など) を、利用者の言語の設定によらず英語にして比べられるようにする
 		"LC_ALL=C",
 		// パスを pathspec (パターンや先頭の : で始まる指定) として解釈させない
@@ -367,6 +371,7 @@ func gitEnv() []string {
 		// git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
 		"GIT_NO_REPLACE_OBJECTS=1",
 	)
+	return append(env, extraGitEnv...)
 }
 
 // commit は版をコミットの完全な SHA に解決する。版が無いとき (--quiet で終了コード 1) は
