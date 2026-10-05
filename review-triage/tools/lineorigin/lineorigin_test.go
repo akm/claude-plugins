@@ -559,6 +559,16 @@ func TestGitEnvKeepsTestIsolation(t *testing.T) {
 	}
 }
 
+// 道具が git に渡す環境に、取得と問い合わせを止める変数がある。
+func TestGitEnvStopsFetchAndPrompt(t *testing.T) {
+	env := strings.Join(gitEnv(), "\n")
+	for _, want := range []string{"GIT_NO_LAZY_FETCH=1", "GIT_TERMINAL_PROMPT=0"} {
+		if !strings.Contains("\n"+env+"\n", "\n"+want+"\n") {
+			t.Errorf("道具が git に渡す環境に %s が無い", want)
+		}
+	}
+}
+
 // diff の textconv があっても、変換した後ではなく元の行を比べる。
 func TestTextconvIsIgnored(t *testing.T) {
 	r := newRepo(t)
@@ -838,11 +848,11 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 	}
 }
 
-// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。
-func TestGitTimeoutIsRunError(t *testing.T) {
-	r, base := branched(t)
-	r.write("g.md", "branch\n")
-	r.commit("branch")
+// stallingGit は、引数に word を含む呼び出しで止まり、ほかのコマンドは本物の git に渡す偽の git を
+// 置いたディレクトリを返す。止まるときは sleep を子のプロセスとして起動するので、期限で git (の偽物) を
+// 止めても、sleep が標準出力を開いたまま残る。
+func stallingGit(t *testing.T, word string) string {
+	t.Helper()
 	real, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatal(err)
@@ -852,20 +862,39 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 		t.Fatal(err)
 	}
 	bin := t.TempDir()
-	script := "#!/bin/sh\ncase \" $* \" in *\" blame \"*) exec '" + sleep + "' 30;; esac\nexec '" + real + "' \"$@\"\n"
+	script := "#!/bin/sh\ncase \" $* \" in *\" " + word + " \"*) '" + sleep + "' 30;; esac\nexec '" + real + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", bin)
+	return bin
+}
+
+// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。止めた git の子の
+// プロセスが標準出力を開いたままでも待たない (待つと、子が終わる 30 秒後まで返らない)。
+func TestGitTimeoutIsRunError(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
 	saved := gitTimeout
 	gitTimeout = 2 * time.Second
 	t.Cleanup(func() { gitTimeout = saved })
 
-	start := time.Now()
-	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終わりませんでした")
-	if d := time.Since(start); d > 20*time.Second {
-		t.Fatalf("期限を越えても %s 待った", d)
-	}
+	t.Run("blame で止まる", func(t *testing.T) {
+		t.Setenv("PATH", stallingGit(t, "blame"))
+		start := time.Now()
+		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終わりませんでした")
+		if d := time.Since(start); d > 20*time.Second {
+			t.Fatalf("期限を越えても %s 待った", d)
+		}
+	})
+	t.Run("git version で止まる", func(t *testing.T) {
+		t.Setenv("PATH", stallingGit(t, "version"))
+		start := time.Now()
+		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git version が")
+		if d := time.Since(start); d > 20*time.Second {
+			t.Fatalf("期限を越えても %s 待った", d)
+		}
+	})
 }
 
 func TestParseGitVersion(t *testing.T) {
