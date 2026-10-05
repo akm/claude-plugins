@@ -43,17 +43,21 @@ func check(opts options) (result, error) {
 	}
 	g := gitRunner{root: top}
 
-	base, err := g.commit(opts.base)
+	base, found, err := g.commit(opts.base)
 	if err != nil {
-		return result{}, orInput(err, "-base をコミットに解決できません: %s", opts.base)
+		return result{}, err
+	} else if !found {
+		return result{}, inputf("-base をコミットに解決できません: %s", opts.base)
 	}
 	targetName := opts.rev
 	if opts.worktree {
 		targetName = "HEAD"
 	}
-	target, err := g.commit(targetName)
+	target, found, err := g.commit(targetName)
 	if err != nil {
-		return result{}, orInput(err, "レビューした内容のコミット (%s) を解決できません", targetName)
+		return result{}, err
+	} else if !found {
+		return result{}, inputf("レビューした内容のコミット (%s) を解決できません", targetName)
 	}
 
 	// 全量の起点がレビューした内容のコミットと同じなら、範囲 <起点>..<コミット> が空になり、
@@ -150,6 +154,30 @@ func classify(base, file string, blamed []blameLine) result {
 	return res
 }
 
+// lineCount は、レビューした内容の -file の行数を返す。数え方は git blame と同じで、
+// 末尾に改行の無い最後の行も 1 行と数える。
+func (g gitRunner) lineCount(target string, opts options) (int, error) {
+	var content []byte
+	if opts.worktree {
+		b, err := os.ReadFile(filepath.Join(g.root, filepath.FromSlash(opts.file)))
+		if err != nil {
+			return 0, runf("作業ツリーの -file を読めません: %v", err)
+		}
+		content = b
+	} else {
+		out, _, err := g.run("cat-file", "-p", target+":"+opts.file)
+		if err != nil {
+			return 0, asRun(err)
+		}
+		content = []byte(out)
+	}
+	n := bytes.Count(content, []byte("\n"))
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		n++
+	}
+	return n, nil
+}
+
 type blameLine struct {
 	final    int    // レビューした内容での行番号
 	commit   string // その行を最後に変えたコミット。範囲の外なら境界のコミット
@@ -223,12 +251,43 @@ func short(sha string) string {
 // gitRunner は、リポジトリのルートを基準に git を実行する。
 type gitRunner struct{ root string }
 
+// toplevel は -root からリポジトリのルートを求める。入力の誤りにするのは、-root が存在する
+// ディレクトリでないときと、-root から上のどこにも .git が無いときだけ。.git があるのに git が
+// リポジトリとして読めない (権限・所有者など) ときは、渡し方では直せないので run-error にする。
+// git は .git を読めないときも「not a git repository」と言うので、.git の有無は道具が確かめる。
 func toplevel(dir string) (string, error) {
-	out, _, err := gitRunner{root: dir}.run("rev-parse", "--show-toplevel")
-	if err != nil {
-		return "", orInput(err, "-root が git のリポジトリの中を指していません: %s", dir)
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		return "", inputf("-root が存在するディレクトリではありません: %s", dir)
 	}
-	return strings.TrimSpace(out), nil
+	out, _, err := gitRunner{root: dir}.run("rev-parse", "--show-toplevel")
+	if err == nil {
+		return strings.TrimSpace(out), nil
+	}
+	var re *runError
+	if errors.As(err, &re) {
+		return "", err
+	}
+	if strings.Contains(err.Error(), "not a git repository") {
+		if dotGit, ok := findDotGit(dir); ok {
+			return "", runf("%s があるが、git がリポジトリとして読めません: %v", dotGit, err)
+		}
+		return "", inputf("-root が git のリポジトリの中を指していません: %s", dir)
+	}
+	return "", runf("-root のリポジトリを git で読めません: %v", err)
+}
+
+// findDotGit は、dir から上のディレクトリをたどって、最初に見つかった .git (ディレクトリか、
+// 作業ツリーが持つファイル) のパスを返す。
+func findDotGit(dir string) (string, bool) {
+	for d := filepath.Clean(dir); ; d = filepath.Dir(d) {
+		p := filepath.Join(d, ".git")
+		if _, err := os.Lstat(p); err == nil {
+			return p, true
+		}
+		if filepath.Dir(d) == d {
+			return "", false
+		}
+	}
 }
 
 // run は git を実行し、標準出力と終了コードを返す。終了コードが 0 でなければ error も返す。
@@ -294,6 +353,8 @@ func gitEnv() []string {
 		}
 	}
 	return append(env,
+		// git の文言 (not a git repository など) を、利用者の言語の設定によらず英語にして比べられるようにする
+		"LC_ALL=C",
 		// パスを pathspec (パターンや先頭の : で始まる指定) として解釈させない
 		"GIT_LITERAL_PATHSPECS=1",
 		// git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
@@ -301,13 +362,18 @@ func gitEnv() []string {
 	)
 }
 
-// commit は版をコミットの完全な SHA に解決する。
-func (g gitRunner) commit(rev string) (string, error) {
-	out, _, err := g.run("rev-parse", "--verify", "--quiet", "--end-of-options", rev+"^{commit}")
-	if err != nil {
-		return "", err
+// commit は版をコミットの完全な SHA に解決する。版が無いとき (--quiet で終了コード 1) は
+// found を false にする。それ以外の失敗 (リポジトリを読めない、など) は run-error。
+func (g gitRunner) commit(rev string) (sha string, found bool, err error) {
+	out, code, err := g.run("rev-parse", "--verify", "--quiet", "--end-of-options", rev+"^{commit}")
+	switch {
+	case err == nil:
+		return strings.TrimSpace(out), true, nil
+	case code == 1:
+		return "", false, nil
+	default:
+		return "", false, asRun(err)
 	}
-	return strings.TrimSpace(out), nil
 }
 
 func (g gitRunner) isAncestor(a, b string) (bool, error) {
@@ -322,19 +388,23 @@ func (g gitRunner) isAncestor(a, b string) (bool, error) {
 	}
 }
 
-// exists は、コミット commit に file のパスがあるかを返す。git を起動できないときは、
-// パスが無いことと取り違えないよう error を返す。
+// exists は、コミット commit の file のパスにファイル (ブロブ) があるかを返す。パスが無いときと、
+// ファイルでないもの (ディレクトリなど) のときは false。git が失敗したとき (オブジェクトを読めない、
+// など) は、パスが無いことと取り違えないよう run-error を返す。commit は解決済みの SHA。
 func (g gitRunner) exists(commit, file string) (bool, error) {
-	_, _, err := g.run("cat-file", "-e", commit+":"+file)
-	var re *runError
-	switch {
-	case err == nil:
-		return true, nil
-	case errors.As(err, &re):
-		return false, err
-	default:
-		return false, nil
+	out, _, err := g.run("ls-tree", "-z", commit, "--", file)
+	if err != nil {
+		return false, asRun(err)
 	}
+	for _, entry := range strings.Split(out, "\x00") {
+		meta, path, ok := strings.Cut(entry, "\t")
+		if !ok || path != file {
+			continue
+		}
+		fields := strings.Fields(meta)
+		return len(fields) == 3 && fields[1] == "blob", nil
+	}
+	return false, nil
 }
 
 // hasUncommittedChange は、file に HEAD からのコミットしていない変更 (ステージしたものを含む) があるかを返す。
@@ -407,11 +477,19 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 	if opts.worktree {
 		args = append(args, "--contents", filepath.Join(g.root, filepath.FromSlash(opts.file)))
 	}
+	// 行がレビューした内容の行数を越えるのは渡し方の誤りなので、blame の前に道具が数えて
+	// input-error にする。blame そのものの失敗は、渡し方では説明できないので run-error にする
+	n, err := g.lineCount(target, opts)
+	if err != nil {
+		return nil, err
+	}
+	if opts.to > n {
+		return nil, inputf("行 %d が、レビューした内容の -file の行数 (%d) を越えます", opts.to, n)
+	}
 	args = append(args, base+".."+target, "--", opts.file)
 	out, _, err := g.run(args...)
 	if err != nil {
-		// 行がファイルの行数を越える、など。git の文言をそのまま添える
-		return nil, orInput(err, "%v", err)
+		return nil, asRun(err)
 	}
 	lines, err := parsePorcelain(out)
 	if err != nil {

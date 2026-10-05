@@ -191,6 +191,20 @@ func TestFileCreatedInBranchDoesNotHold(t *testing.T) {
 	wantContains(t, o.reason, "同じパスのファイルが無い")
 }
 
+// 起点ではディレクトリだったパスを、このブランチでファイルにしたなら、起点に同じパスのファイルは無い。
+func TestDirectoryAtBaseIsNotAFile(t *testing.T) {
+	r, base := branched(t)
+	r.write("x/inner.md", "i\n")
+	base = r.commit("add directory x") // 起点を、x がディレクトリのコミットにする
+	r.git("rm", "-q", "-r", "x")
+	r.write("x", "now a file\n")
+	r.commit("replace directory x with a file")
+
+	o := r.check(base, "-file", "x", "-lines", "1", "-rev", "HEAD")
+	wantKind(t, o, notHolds)
+	wantContains(t, o.reason, "同じパスのファイルが無い")
+}
+
 // このブランチで改名したファイルの行は、git blame が改名を追って起点まで遡るが、成り立たない。
 func TestFileRenamedInBranchDoesNotHold(t *testing.T) {
 	r, base := branched(t)
@@ -566,7 +580,9 @@ func TestInputErrors(t *testing.T) {
 		{"解決できない -rev", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "no-such-rev"}, "解決できません"},
 		{"レビューした内容に無いファイル", []string{"-root", r.dir, "-base", base, "-file", "none.md", "-lines", "1", "-rev", "HEAD"}, "ファイルがありません"},
 		{"作業ツリーに無いファイル", []string{"-root", r.dir, "-base", base, "-file", "none.md", "-lines", "1", "-worktree"}, "ファイルがありません"},
-		{"ファイルの行数を越える行", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "9", "-rev", "HEAD"}, "git blame"},
+		{"ファイルの行数を越える行", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "9", "-rev", "HEAD"}, "行数 (3) を越えます"},
+		{"作業ツリーのファイルの行数を越える行", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "2-4", "-worktree"}, "行数 (3) を越えます"},
+		{"存在しない -root", []string{"-root", filepath.Join(notRepo, "none"), "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, "存在するディレクトリではありません"},
 		{"余分な引数", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "extra"}, "余分な引数"},
 		{"未知のフラグ", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-unknown"}, "unknown"},
 	}
@@ -628,6 +644,38 @@ func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
 			}
 		})
 	}
+}
+
+// .git があるのに git がリポジトリとして読めないとき (権限など) は、渡し方では直せないので run-error にする。
+// git はこのときも「not a git repository」と言うので、入力の誤りと取り違えやすい。
+func TestUnreadableRepositoryIsRunError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root では権限を外しても読めてしまう")
+	}
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	dotGit := filepath.Join(r.dir, ".git")
+	if err := os.Chmod(dotGit, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dotGit, 0o755) })
+
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "git がリポジトリとして読めません")
+}
+
+// オブジェクトを読めないとき (壊れたリポジトリ) は、パスが無いことと取り違えず、run-error にする。
+// 取り違えると、起点にあるファイルが「起点に無い」として not-holds になる。
+func TestMissingObjectIsRunError(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	tree := r.git("rev-parse", base+"^{tree}")
+	if err := os.Remove(filepath.Join(r.dir, ".git", "objects", tree[:2], tree[2:])); err != nil {
+		t.Fatal(err)
+	}
+
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "ls-tree")
 }
 
 // git を起動できないときは、入力の誤りではなく、道具を実行できないこととして返す。

@@ -31,17 +31,8 @@ func inputf(format string, a ...any) error { return &inputError{msg: fmt.Sprintf
 
 func runf(format string, a ...any) error { return &runError{msg: fmt.Sprintf(format, a...)} }
 
-// orInput は、err が道具を実行できないことならそのまま返し、そうでなければ入力の誤りにする。
-// 版を解決できないなど、git が失敗した理由が渡したものにあるときに使う。
-func orInput(err error, format string, a ...any) error {
-	var re *runError
-	if errors.As(err, &re) {
-		return err
-	}
-	return inputf(format, a...)
-}
-
-// asRun は、err を道具を実行できないことにする。渡したものでは説明できない git の失敗に使う。
+// asRun は、err を道具を実行できないことにする。渡したものでは説明できない git の失敗に使い、
+// git の標準エラー出力を含む元の文言を残す。
 func asRun(err error) error {
 	var re *runError
 	if errors.As(err, &re) {
