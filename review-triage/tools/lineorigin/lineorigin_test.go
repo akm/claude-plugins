@@ -260,7 +260,7 @@ func TestUncommittedChangeInFileIsUnverifiableWithRev(t *testing.T) {
 }
 
 // 道具は読むだけで、インデックスを書き換えない。更新時刻だけが変わったファイル (git diff なら
-// インデックスの控えを更新して書き換える) があっても、-rev と -worktree のどちらでも変えない。
+// インデックスに記録した更新時刻などを更新して書き換える) があっても、-rev と -worktree のどちらでも変えない。
 func TestToolDoesNotWriteIndex(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
@@ -287,7 +287,7 @@ func TestToolDoesNotWriteIndex(t *testing.T) {
 	}
 }
 
-// skip-worktree を付けたファイルの編集は、インデックスの控えには現れないが、コミットしていない変更として扱う。
+// skip-worktree を付けたファイルの編集は、インデックスに記録した更新時刻などには現れないが、コミットしていない変更として扱う。
 func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")

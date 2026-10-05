@@ -42,7 +42,7 @@ func asRun(err error) error {
 }
 
 // report は err を印を付けて w に書き、終了コードを返す。どちらの種類でもないエラーは
-// 道具の側の想定外なので、道具を実行できないことにする。
+// 道具が想定していない失敗なので、道具を実行できないことにする。
 func report(w io.Writer, err error) int {
 	var ie *inputError
 	if errors.As(err, &ie) {
