@@ -522,8 +522,13 @@ func (g gitRunner) hasCleanFilter(file string) (bool, error) {
 	if err != nil {
 		return false, asRun(err)
 	}
-	// -z の出力は「<パス> NUL <属性> NUL <値> NUL」の繰り返し
+	// -z の出力は「<パス> NUL <属性> NUL <値> NUL」の繰り返しで、属性が無ければ空。NUL で分けると、
+	// 要素の数は 3 の倍数に 1 を足した数になり、最後は空になる。そうでない出力は読めないので run-error にする
+	// (フィルタ無しとして先へ進むと、誤った holds になりうる)
 	parts := strings.Split(out, "\x00")
+	if len(parts)%3 != 1 || parts[len(parts)-1] != "" {
+		return false, runf("git check-attr の出力を読めません: %q", out)
+	}
 	for k := 0; k+2 < len(parts); k += 3 {
 		if parts[k+1] != "filter" {
 			continue

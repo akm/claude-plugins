@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -375,6 +376,9 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 		{"名前が unset のドライバがあると -filter も確かめない", "f.md -filter\n", "unset", unverifiable},
 		{"値の無い filter は確かめない", "f.md filter\n", "", unverifiable},
 		{"設定の無いドライバの名前でも確かめない", "f.md filter=nodriver\n", "", unverifiable},
+		{"filter が 2 つ目の属性でも確かめない", "f.md diff=x filter=strip\n", "strip", unverifiable},
+		{"filter が 3 つ目の属性でも確かめない", "f.md -text -diff filter=strip\n", "strip", unverifiable},
+		{"filter ではない属性の値が filter でも確かめる", "f.md diff=filter\n", "", notHolds},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -397,6 +401,67 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 			if c.want == unverifiable {
 				wantContains(t, o.reason, "clean フィルタ")
 			}
+		})
+	}
+}
+
+// 名前が unset のドライバを process だけで設定しても、-filter と区別できないので確かめない。
+func TestUnsetDriverWithProcessOnly(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "filter.unset.process", "nonexistent-filter-process")
+	r.write(".gitattributes", "f.md -filter\n")
+	r.write("f.md", "x\ny\nz\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("g.md", "g\n")
+	r.commit("branch")
+	r.write("f.md", "x\ny2\nz\n")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-worktree"), unverifiable)
+}
+
+// scriptedGit は、引数に sub を含む呼び出しだけを、stdout を書いて終了コード code で終え、
+// ほかのコマンドは本物の git に渡す偽の git を置いたディレクトリを返す。stdout は printf の書式
+// (\000 で NUL) で渡す。
+func scriptedGit(t *testing.T, sub, stdout string, code int) string {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	script := fmt.Sprintf("#!/bin/sh\ncase \" $* \" in *\" %s \"*) printf '%s'; exit %d;; esac\nexec '%s' \"$@\"\n", sub, stdout, code, real)
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+// clean フィルタの確認で git が失敗したときや、出力の形が読めないときは、フィルタ無しとして
+// 先へ進まず、run-error にする (先へ進むと、誤った holds になりうる)。
+func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
+	r := newRepo(t)
+	r.write(".gitattributes", "f.md -filter\n")
+	r.write("f.md", "x\ny\nz\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("g.md", "g\n")
+	r.commit("branch")
+	args := []string{"-file", "f.md", "-lines", "1", "-worktree"}
+
+	cases := []struct {
+		name, sub, stdout string
+		code              int
+		want              string
+	}{
+		{"check-attr が失敗する", "check-attr", "", 1, "check-attr"},
+		{"check-attr の出力が三つ組にならない", "check-attr", "f.md\\000filter\\000", 0, "git check-attr の出力を読めません"},
+		{"config が想定していない終了コードで終わる", "config", "", 2, "config"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("PATH", scriptedGit(t, c.sub, c.stdout, c.code))
+			wantError(t, r.check(base, args...), 3, "run-error:", c.want)
 		})
 	}
 }
