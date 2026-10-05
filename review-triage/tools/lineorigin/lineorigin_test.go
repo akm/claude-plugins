@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestMain は、利用者の git の設定 (グローバル・システム) がテストの結果を変えないように、
@@ -238,6 +239,45 @@ func TestUncommittedChangeInFileIsUnverifiableWithRev(t *testing.T) {
 
 	// ステージした変更も同じ
 	r.git("add", "f.md")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
+}
+
+// 道具は読むだけで、インデックスを書き換えない。更新時刻だけが変わったファイル (git diff なら
+// インデックスの控えを更新して書き換える) があっても、-rev と -worktree のどちらでも変えない。
+func TestToolDoesNotWriteIndex(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	r.git("update-index", "--refresh")
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(r.dir, "f.md"), later, later); err != nil {
+		t.Fatal(err)
+	}
+	index := filepath.Join(r.dir, ".git", "index")
+	before, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), holds)
+	after, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("道具がインデックスを書き換えた")
+	}
+}
+
+// skip-worktree を付けたファイルの編集は、インデックスの控えには現れないが、コミットしていない変更として扱う。
+func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	r.git("update-index", "--skip-worktree", "f.md")
+	r.write("f.md", "a\nb\nc\nd\n")
+
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 

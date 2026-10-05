@@ -86,7 +86,7 @@ func check(opts options) (result, error) {
 	} else {
 		// 結果のファイルで受け取ったレビューは、共有の作業ツリーでコミットしていない変更を見た可能性があり、
 		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
-		changed, err := g.hasUncommittedChange(opts.file)
+		changed, err := g.hasUncommittedChange(top, opts.file)
 		if err != nil {
 			return result{}, err
 		}
@@ -255,7 +255,6 @@ func gitEnv() []string {
 	return append(env,
 		// パスを pathspec (パターンや先頭の : で始まる指定) として解釈させない
 		"GIT_LITERAL_PATHSPECS=1",
-		"GIT_OPTIONAL_LOCKS=0",
 		// git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
 		"GIT_NO_REPLACE_OBJECTS=1",
 	)
@@ -289,15 +288,54 @@ func (g gitRunner) exists(commit, file string) bool {
 }
 
 // hasUncommittedChange は、file に HEAD からのコミットしていない変更 (ステージしたものを含む) があるかを返す。
-func (g gitRunner) hasUncommittedChange(file string) (bool, error) {
-	_, code, err := g.run("diff", "--quiet", "HEAD", "--", file)
-	switch code {
-	case 0:
-		return false, nil
-	case 1:
-		return true, nil
-	default:
+//
+// git diff は使わない。インデックスの控え (更新時刻など) が古いファイルがあると、GIT_OPTIONAL_LOCKS=0 を
+// 立てても控えを更新してインデックスを書き換えるため。代わりに、HEAD・インデックス・作業ツリーの内容の
+// ハッシュを比べる。インデックスの控えに頼らないので、skip-worktree や assume-unchanged が付いた
+// ファイルの編集も変更として扱う。
+func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
+	head, err := g.blob("HEAD", file)
+	if err != nil {
 		return false, err
+	}
+	out, _, err := g.run("ls-files", "--stage", "--", file)
+	if err != nil {
+		return false, err
+	}
+	var index string
+	if entries := strings.Split(strings.TrimSpace(out), "\n"); out != "" {
+		if len(entries) != 1 {
+			return true, nil // 衝突の解消の途中 (段が複数ある)
+		}
+		fields := strings.Fields(entries[0])
+		if len(fields) < 3 || fields[2] != "0" {
+			return true, nil
+		}
+		index = fields[1]
+	}
+	var worktree string
+	abs := filepath.Join(top, filepath.FromSlash(file))
+	if _, err := os.Lstat(abs); err == nil {
+		// --path で、そのパスの属性によるフィルタ (改行の変換など) を当ててからハッシュを求める。-w を付けないので書き込まない
+		out, _, err := g.run("hash-object", "--path="+file, "--", abs)
+		if err != nil {
+			return false, err
+		}
+		worktree = strings.TrimSpace(out)
+	}
+	return head != index || index != worktree, nil
+}
+
+// blob は、コミット commit の file のブロブの SHA を返す。そのパスが無ければ空。
+func (g gitRunner) blob(commit, file string) (string, error) {
+	out, code, err := g.run("rev-parse", "--verify", "--quiet", commit+":"+file)
+	switch {
+	case err == nil:
+		return strings.TrimSpace(out), nil
+	case code == 1:
+		return "", nil
+	default:
+		return "", err
 	}
 }
 
