@@ -513,18 +513,37 @@ func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 }
 
 // hasCleanFilter は、file に属性 filter (git add のときにファイルを変換するプログラム) が
-// 設定されているかを返す。
+// 設定されているかを返す。設定の無いドライバの名前や、値の無い filter も「あり」とする
+// (確かめない側にする)。
 func (g gitRunner) hasCleanFilter(file string) (bool, error) {
-	out, _, err := g.run("check-attr", "-z", "filter", "--", file)
+	// -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
+	// filter だけを尋ねると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
+	out, _, err := g.run("check-attr", "-a", "-z", "--", file)
 	if err != nil {
 		return false, asRun(err)
 	}
-	// -z の出力は「<パス> NUL filter NUL <値> NUL」
+	// -z の出力は「<パス> NUL <属性> NUL <値> NUL」の繰り返し
 	parts := strings.Split(out, "\x00")
-	if len(parts) < 3 {
-		return false, runf("git check-attr の出力を読めません: %q", out)
+	for k := 0; k+2 < len(parts); k += 3 {
+		if parts[k+1] != "filter" {
+			continue
+		}
+		if parts[k+2] != "unset" {
+			return true, nil
+		}
+		// unset は、-filter (フィルタを外す) と、名前が unset のドライバを区別できないので、
+		// そのドライバの設定があれば「あり」とする
+		_, code, err := g.run("config", "--get-regexp", `^filter\.unset\.(clean|process)$`)
+		switch code {
+		case 0:
+			return true, nil
+		case 1:
+			return false, nil
+		default:
+			return false, asRun(err)
+		}
 	}
-	return parts[2] != "unspecified" && parts[2] != "unset", nil
+	return false, nil
 }
 
 // blob は、コミット commit の file のブロブの SHA を返す。そのパスが無ければ空。

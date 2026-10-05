@@ -357,28 +357,65 @@ func TestWorktreeContent(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), holds)
 }
 
-// -worktree で、行数を変える clean フィルタが設定されたファイルは、作業ツリーの行番号と
-// git blame が見るフィルタの後の行番号がずれるので、確かめずに unverifiable にする。
-// 確かめると、書き換えた行が別の (起点のままの) 行に当たり、誤った holds になる。
-func TestWorktreeWithCleanFilterIsUnverifiable(t *testing.T) {
+// -worktree で、clean フィルタが設定されたファイルは、作業ツリーの行番号と git blame が見る
+// フィルタの後の行番号がずれうるので、確かめずに unverifiable にする。確かめると、書き換えた行が
+// 別の (起点のままの) 行に当たり、誤った holds になる。属性の書き方ごとに確かめる。
+func TestWorktreeCleanFilterAttributes(t *testing.T) {
+	cases := []struct {
+		name       string
+		attributes string
+		driver     string // 設定する clean フィルタのドライバの名前 (空なら設定しない)
+		want       string
+	}{
+		{"-filter はフィルタを外すので確かめる", "f.md -filter\n", "", notHolds},
+		{"!filter は属性を無しに戻すので確かめる", "*.md filter=strip\nf.md !filter\n", "strip", notHolds},
+		{"filter=strip は確かめない", "f.md filter=strip\n", "strip", unverifiable},
+		{"ドライバの名前が unspecified でも確かめない", "f.md filter=unspecified\n", "unspecified", unverifiable},
+		{"ドライバの名前が unset でも確かめない", "f.md filter=unset\n", "unset", unverifiable},
+		{"名前が unset のドライバがあると -filter も確かめない", "f.md -filter\n", "unset", unverifiable},
+		{"値の無い filter は確かめない", "f.md filter\n", "", unverifiable},
+		{"設定の無いドライバの名前でも確かめない", "f.md filter=nodriver\n", "", unverifiable},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := newRepo(t)
+			if c.driver != "" {
+				r.git("config", "filter."+c.driver+".clean", "grep -v '^#'")
+				r.git("config", "filter."+c.driver+".smudge", "cat")
+			}
+			r.write(".gitattributes", c.attributes)
+			r.write("f.md", "x\ny\nz\n")
+			base := r.commit("base")
+			r.git("switch", "-q", "-c", "br")
+			r.write("g.md", "g\n")
+			r.commit("branch")
+			// 生の 3 行目 (y2) を書き換えた。フィルタが効くと、フィルタの後の 3 行目は起点のままの z
+			r.write("f.md", "# h\nx\ny2\nz\n")
+
+			o := r.check(base, "-file", "f.md", "-lines", "3", "-worktree")
+			wantKind(t, o, c.want)
+			if c.want == unverifiable {
+				wantContains(t, o.reason, "clean フィルタ")
+			}
+		})
+	}
+}
+
+// -rev では、clean フィルタがあっても確かめる。git blame はコミットの内容を見て、行番号も
+// その内容のものなので、ずれない。
+func TestRevIgnoresCleanFilter(t *testing.T) {
 	r := newRepo(t)
 	r.git("config", "filter.strip.clean", "grep -v '^#'")
 	r.git("config", "filter.strip.smudge", "cat")
 	r.write(".gitattributes", "f.md filter=strip\n")
 	r.write("f.md", "x\ny\nz\n")
-	r.write("h.md", "h\n")
 	base := r.commit("base")
 	r.git("switch", "-q", "-c", "br")
-	r.write("g.md", "g\n")
-	r.commit("branch")
-	r.write("f.md", "# h\nx\ny2\nz\n") // 生の 3 行目 (y2) を書き換えた。フィルタの後の 3 行目は z
+	r.write("f.md", "x\nY\nz\n")
+	r.commit("change line 2")
 
-	o := r.check(base, "-file", "f.md", "-lines", "3", "-worktree")
-	wantKind(t, o, unverifiable)
-	wantContains(t, o.reason, "clean フィルタ")
-
-	// フィルタの無いファイルは今までどおり確かめる
-	wantKind(t, r.check(base, "-file", "h.md", "-lines", "1", "-worktree"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-rev", "HEAD"), notHolds)
 }
 
 // 作業ツリーの内容の行番号で読む。コミットしていない行を上に足すと、起点の行は下にずれる。
