@@ -2,8 +2,11 @@
 // レビューした内容まで変わっていないかを確かめる。review-triage の判定ノード D8 の条件 (1)。
 //
 // 結果は「成り立つ」(holds)・「成り立たない」(not-holds)・「確かめられない」(unverifiable) の 3 つで、
-// 理由と行ごとの内訳を添えて標準出力に書く。入力の誤り (フラグの不足・解決できない版・
-// レビューした内容に無いファイルや行) は結果にせず、標準エラー出力に書いて終了コード 2 で終わる。
+// 理由と行ごとの内訳を添えて標準出力に書く。結果を出せないときは標準出力に何も書かず、
+// 標準エラー出力の最初の行に印を付けて書く。入力の誤り (フラグの不足・解決できない版・
+// レビューした内容に無いファイルや行) は input-error:、道具を実行できないこと (git を起動できない・
+// git が古い・git の出力を読めない) は run-error:。go run で実行すると終了コードは 1 になるので、
+// 終了コード (2 と 3) ではなく印で見分ける。
 //
 // 使い方 (-root はリポジトリのルートか、その中のディレクトリの絶対パス):
 //
@@ -26,17 +29,16 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// run はフラグを読んで確かめ、結果を stdout に書く。戻り値は終了コード (0: 結果を出した、2: 入力の誤り)。
+// run はフラグを読んで確かめ、結果を stdout に書く。戻り値は終了コード
+// (0: 結果を出した、2: 入力の誤り、3: 道具を実行できない)。
 func run(args []string, stdout, stderr io.Writer) int {
-	opts, err := parseFlags(args, stderr)
+	opts, err := parseFlags(args)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
-		return 2
+		return report(stderr, inputf("%v", err))
 	}
 	res, err := check(opts)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
-		return 2
+		return report(stderr, err)
 	}
 	writeResult(stdout, res)
 	return 0
@@ -51,9 +53,11 @@ type options struct {
 	worktree bool   // -worktree
 }
 
-func parseFlags(args []string, stderr io.Writer) (options, error) {
+func parseFlags(args []string) (options, error) {
 	fs := flag.NewFlagSet("lineorigin", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	// flag は誤りのときに使い方を書き出すが、標準エラー出力の最初の行を印にするため捨てる
+	// (フラグの一覧は README の「使い方」)
+	fs.SetOutput(io.Discard)
 	root := fs.String("root", "", "リポジトリのルートか、その中のディレクトリの絶対パス (必須)")
 	base := fs.String("base", "", "全量の起点 (必須)。コミットに解決できる版")
 	file := fs.String("file", "", "指摘の file (必須)。リポジトリのルートからの相対パス")

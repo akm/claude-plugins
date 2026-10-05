@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -567,18 +568,108 @@ func TestInputErrors(t *testing.T) {
 		{"作業ツリーに無いファイル", []string{"-root", r.dir, "-base", base, "-file", "none.md", "-lines", "1", "-worktree"}, "ファイルがありません"},
 		{"ファイルの行数を越える行", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "9", "-rev", "HEAD"}, "git blame"},
 		{"余分な引数", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "extra"}, "余分な引数"},
+		{"未知のフラグ", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-unknown"}, "unknown"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o := runTool(t, c.args...)
-			if o.code != 2 {
-				t.Fatalf("終了コードが %d (期待は 2)。stdout: %s stderr: %s", o.code, o.stdout, o.stderr)
-			}
-			if o.stdout != "" {
-				t.Fatalf("入力の誤りでは結果を出さないはずが、stdout に %q を出した", o.stdout)
-			}
-			wantContains(t, o.stderr, c.want)
+			wantError(t, runTool(t, c.args...), exitInputError, inputErrorLabel, c.want)
 		})
+	}
+}
+
+// wantError は、結果を出さずに、標準エラー出力の最初の行が印で始まり、終了コードが code であることを確かめる。
+func wantError(t *testing.T, o output, code int, label, want string) {
+	t.Helper()
+	if o.code != code {
+		t.Fatalf("終了コードが %d (期待は %d)。stdout: %s stderr: %s", o.code, code, o.stdout, o.stderr)
+	}
+	if o.stdout != "" {
+		t.Fatalf("結果を出せないときは標準出力に書かないはずが、%q を書いた", o.stdout)
+	}
+	first, _, _ := strings.Cut(o.stderr, "\n")
+	if !strings.HasPrefix(first, label+" ") {
+		t.Fatalf("標準エラー出力の最初の行が %q で始まらない: %q", label, o.stderr)
+	}
+	wantContains(t, o.stderr, want)
+}
+
+// ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が印で始まり、
+// 終了コードで種類が分かれる。フラグの誤りで flag が使い方を書き出すと、最初の行が印にならない。
+func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
+	r, _ := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	bin := filepath.Join(t.TempDir(), "lineorigin")
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v: %s", err, out)
+	}
+	cases := []struct {
+		name  string
+		args  []string
+		code  int
+		label string
+	}{
+		{"未知のフラグ", []string{"-unknown"}, exitInputError, inputErrorLabel},
+		{"解決できない -base", []string{"-root", r.dir, "-base", "no-such-rev", "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, exitInputError, inputErrorLabel},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cmd := exec.Command(bin, c.args...)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			err := cmd.Run()
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) || exitErr.ExitCode() != c.code {
+				t.Fatalf("終了コードが期待 (%d) と違う: %v", c.code, err)
+			}
+			first, _, _ := strings.Cut(stderr.String(), "\n")
+			if !strings.HasPrefix(first, c.label+" ") || stdout.Len() != 0 {
+				t.Fatalf("最初の行が %q で始まらないか、標準出力に書いた。stderr: %q stdout: %q", c.label, stderr.String(), stdout.String())
+			}
+		})
+	}
+}
+
+// git を起動できないときは、入力の誤りではなく、道具を実行できないこととして返す。
+func TestGitNotFoundIsRunError(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+
+	t.Setenv("PATH", t.TempDir())
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "git を起動できません")
+}
+
+// git が 2.30 より前 (rev-parse --end-of-options を受け付けない) なら、道具を実行できないこととして返す。
+func TestOldGitIsRunError(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho 'git version 2.29.2'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin)
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "git 2.30 以降が要ります")
+}
+
+func TestParseGitVersion(t *testing.T) {
+	cases := []struct {
+		in           string
+		major, minor int
+		ok           bool
+	}{
+		{"git version 2.50.1 (Apple Git-155)\n", 2, 50, true},
+		{"git version 2.30.0.windows.1", 2, 30, true},
+		{"git version 2.29.2", 2, 29, true},
+		{"not git", 0, 0, false},
+	}
+	for _, c := range cases {
+		major, minor, ok := parseGitVersion(c.in)
+		if major != c.major || minor != c.minor || ok != c.ok {
+			t.Errorf("parseGitVersion(%q) = %d, %d, %v (期待は %d, %d, %v)", c.in, major, minor, ok, c.major, c.minor, c.ok)
+		}
 	}
 }
 

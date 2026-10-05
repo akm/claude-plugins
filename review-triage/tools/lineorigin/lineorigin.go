@@ -34,6 +34,9 @@ type lineResult struct {
 // check は、opts の行が全量の起点からレビューした内容まで変わっていないかを確かめる。
 // 入力の誤り (解決できない版・レビューした内容に無いファイルや行) は error で返し、結果にしない。
 func check(opts options) (result, error) {
+	if err := checkGitVersion(); err != nil {
+		return result{}, err
+	}
 	top, err := toplevel(opts.root)
 	if err != nil {
 		return result{}, err
@@ -42,7 +45,7 @@ func check(opts options) (result, error) {
 
 	base, err := g.commit(opts.base)
 	if err != nil {
-		return result{}, fmt.Errorf("-base をコミットに解決できません: %s", opts.base)
+		return result{}, orInput(err, "-base をコミットに解決できません: %s", opts.base)
 	}
 	targetName := opts.rev
 	if opts.worktree {
@@ -50,7 +53,7 @@ func check(opts options) (result, error) {
 	}
 	target, err := g.commit(targetName)
 	if err != nil {
-		return result{}, fmt.Errorf("レビューした内容のコミット (%s) を解決できません", targetName)
+		return result{}, orInput(err, "レビューした内容のコミット (%s) を解決できません", targetName)
 	}
 
 	// 全量の起点がレビューした内容のコミットと同じなら、範囲 <起点>..<コミット> が空になり、
@@ -60,7 +63,7 @@ func check(opts options) (result, error) {
 	}
 	ok, err := g.isAncestor(base, target)
 	if err != nil {
-		return result{}, err
+		return result{}, asRun(err)
 	}
 	if !ok {
 		return result{kind: unverifiable, reason: fmt.Sprintf("全量の起点 %s が、レビューした内容のコミット (%s) の祖先ではない", short(base), targetName)}, nil
@@ -70,17 +73,23 @@ func check(opts options) (result, error) {
 	if opts.worktree {
 		st, err := os.Stat(filepath.Join(top, filepath.FromSlash(opts.file)))
 		if err != nil || !st.Mode().IsRegular() {
-			return result{}, fmt.Errorf("作業ツリーに -file のファイルがありません: %s", opts.file)
+			return result{}, inputf("作業ツリーに -file のファイルがありません: %s", opts.file)
 		}
-	} else if !g.exists(target, opts.file) {
-		return result{}, fmt.Errorf("レビューした内容 (%s) に -file のファイルがありません: %s", opts.rev, opts.file)
+	} else if ok, err := g.exists(target, opts.file); err != nil {
+		return result{}, err
+	} else if !ok {
+		return result{}, inputf("レビューした内容 (%s) に -file のファイルがありません: %s", opts.rev, opts.file)
 	}
 
-	if !g.exists(base, opts.file) {
+	if ok, err := g.exists(base, opts.file); err != nil {
+		return result{}, err
+	} else if !ok {
 		return result{kind: notHolds, reason: fmt.Sprintf("全量の起点 %s に同じパスのファイルが無い (このブランチで作った・改名した・移したファイル)", short(base))}, nil
 	}
 	if opts.worktree {
-		if !g.exists(target, opts.file) {
+		if ok, err := g.exists(target, opts.file); err != nil {
+			return result{}, err
+		} else if !ok {
 			return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
 		}
 	} else {
@@ -88,7 +97,7 @@ func check(opts options) (result, error) {
 		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
 		changed, err := g.hasUncommittedChange(top, opts.file)
 		if err != nil {
-			return result{}, err
+			return result{}, asRun(err)
 		}
 		if changed {
 			return result{kind: unverifiable, reason: "指摘のファイルにコミットしていない変更があり、レビューがそれを見たかが分からない"}, nil
@@ -217,7 +226,7 @@ type gitRunner struct{ root string }
 func toplevel(dir string) (string, error) {
 	out, _, err := gitRunner{root: dir}.run("rev-parse", "--show-toplevel")
 	if err != nil {
-		return "", fmt.Errorf("-root が git のリポジトリの中を指していません: %s", dir)
+		return "", orInput(err, "-root が git のリポジトリの中を指していません: %s", dir)
 	}
 	return strings.TrimSpace(out), nil
 }
@@ -238,7 +247,39 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 	if errors.As(err, &exitErr) {
 		return stdout.String(), exitErr.ExitCode(), fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(stderr.String()))
 	}
-	return "", -1, fmt.Errorf("git を実行できません: %w", err)
+	return "", -1, runf("git を起動できません: %v", err)
+}
+
+var gitVersionRe = regexp.MustCompile(`^git version ([0-9]+)\.([0-9]+)`)
+
+// checkGitVersion は、git を起動できることと、道具が要る版 (2.30 以降。関数 commit が使う
+// git rev-parse --end-of-options が 2.30.0 から) であることを確かめる。古い git では、正しい版を
+// 渡しても解決できないので、入力の誤りと取り違えないよう、道具を実行できないこととして返す。
+func checkGitVersion() error {
+	cmd := exec.Command("git", "version")
+	cmd.Env = gitEnv()
+	out, err := cmd.Output()
+	if err != nil {
+		return runf("git を起動できません: %v", err)
+	}
+	major, minor, ok := parseGitVersion(string(out))
+	if !ok {
+		return runf("git の版を読めません: %s", strings.TrimSpace(string(out)))
+	}
+	if major < 2 || major == 2 && minor < 30 {
+		return runf("git 2.30 以降が要ります (git rev-parse --end-of-options を使うため)。この git は %s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func parseGitVersion(s string) (major, minor int, ok bool) {
+	m := gitVersionRe.FindStringSubmatch(strings.TrimSpace(s))
+	if m == nil {
+		return 0, 0, false
+	}
+	major, _ = strconv.Atoi(m[1])
+	minor, _ = strconv.Atoi(m[2])
+	return major, minor, true
 }
 
 // gitEnv は git に渡す環境を作る。利用者の環境の GIT_ で始まる変数は、リポジトリの場所を替える
@@ -281,10 +322,19 @@ func (g gitRunner) isAncestor(a, b string) (bool, error) {
 	}
 }
 
-// exists は、コミット commit に file のパスがあるかを返す。
-func (g gitRunner) exists(commit, file string) bool {
+// exists は、コミット commit に file のパスがあるかを返す。git を起動できないときは、
+// パスが無いことと取り違えないよう error を返す。
+func (g gitRunner) exists(commit, file string) (bool, error) {
 	_, _, err := g.run("cat-file", "-e", commit+":"+file)
-	return err == nil
+	var re *runError
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.As(err, &re):
+		return false, err
+	default:
+		return false, nil
+	}
 }
 
 // hasUncommittedChange は、file に HEAD からのコミットしていない変更 (ステージしたものを含む) があるかを返す。
@@ -360,14 +410,15 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 	args = append(args, base+".."+target, "--", opts.file)
 	out, _, err := g.run(args...)
 	if err != nil {
-		return nil, err
+		// 行がファイルの行数を越える、など。git の文言をそのまま添える
+		return nil, orInput(err, "%v", err)
 	}
 	lines, err := parsePorcelain(out)
 	if err != nil {
-		return nil, err
+		return nil, asRun(err)
 	}
 	if want := opts.to - opts.from + 1; len(lines) != want {
-		return nil, fmt.Errorf("git blame が %d 行を返しました (求めたのは %d 行)", len(lines), want)
+		return nil, runf("git blame が %d 行を返しました (求めたのは %d 行)", len(lines), want)
 	}
 	return lines, nil
 }
