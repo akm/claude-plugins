@@ -536,7 +536,7 @@ func TestSpecialFileNames(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "[a].md", "-lines", "1", "-rev", "HEAD"), holds)
 	r.write("a.md", "a\n")
 
-	// 先頭の : を特別な指定として読むと、:c.md の変更を見逃す
+	// 先頭の : を特別な指定として読むと、:c.md に変更があっても無いと判定する
 	r.write(":c.md", "changed\n")
 	wantKind(t, r.check(base, "-file", ":c.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
