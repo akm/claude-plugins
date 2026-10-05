@@ -638,7 +638,7 @@ func TestInputErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			wantError(t, runTool(t, c.args...), exitInputError, inputErrorLabel, c.want)
+			wantError(t, runTool(t, c.args...), 2, "input-error:", c.want)
 		})
 	}
 }
@@ -675,8 +675,8 @@ func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
 		code  int
 		label string
 	}{
-		{"未知のフラグ", []string{"-unknown"}, exitInputError, inputErrorLabel},
-		{"解決できない -base", []string{"-root", r.dir, "-base", "no-such-rev", "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, exitInputError, inputErrorLabel},
+		{"未知のフラグ", []string{"-unknown"}, 2, "input-error:"},
+		{"解決できない -base", []string{"-root", r.dir, "-base", "no-such-rev", "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, 2, "input-error:"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -711,7 +711,7 @@ func TestUnreadableRepositoryIsRunError(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(dotGit, 0o755) })
 
-	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "git がリポジトリとして読めません")
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git がリポジトリとして読めません")
 }
 
 // オブジェクトを読めないとき (壊れたリポジトリ) は、パスが無いことと取り違えず、run-error にする。
@@ -725,7 +725,7 @@ func TestMissingObjectIsRunError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "ls-tree")
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "ls-tree")
 }
 
 // git を起動できないときは、入力の誤りではなく、道具を実行できないこととして返す。
@@ -735,21 +735,53 @@ func TestGitNotFoundIsRunError(t *testing.T) {
 	r.commit("branch")
 
 	t.Setenv("PATH", t.TempDir())
-	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "git を起動できません")
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git を起動できません")
 }
 
-// git が 2.30 より前 (rev-parse --end-of-options を受け付けない) なら、道具を実行できないこととして返す。
-func TestOldGitIsRunError(t *testing.T) {
+// fakeGit は、git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
+// git を置いたディレクトリを返す。PATH の先頭に置いて、版の確認を確かめるのに使う。
+func fakeGit(t *testing.T, versionLine string) string {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	script := "#!/bin/sh\nif [ \"$1\" = version ]; then echo '" + versionLine + "'; exit 0; fi\nexec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+// git の版の確認は、2.30 を受け付けて 2.29 を拒む (README の前提の節に書いた要件)。版を読めない
+// 出力も、道具を実行できないこととして返す。
+func TestGitVersionBoundary(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
 	r.commit("branch")
-	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho 'git version 2.29.2'\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	args := []string{"-file", "f.md", "-lines", "1", "-rev", "HEAD"}
 
-	t.Setenv("PATH", bin)
-	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), exitRunError, runErrorLabel, "git 2.30 以降が要ります")
+	t.Run("2.30.0 は受け付ける", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 2.30.0"))
+		wantKind(t, r.check(base, args...), holds)
+	})
+	t.Run("2.29.9 は拒む", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 2.29.9"))
+		wantError(t, r.check(base, args...), 3, "run-error:", "git 2.30 以降が要ります")
+	})
+	t.Run("1.99.0 は拒む", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 1.99.0"))
+		wantError(t, r.check(base, args...), 3, "run-error:", "git 2.30 以降が要ります")
+	})
+	t.Run("3.0.0 は受け付ける", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 3.0.0"))
+		wantKind(t, r.check(base, args...), holds)
+	})
+	t.Run("版を読めない", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "not a version"))
+		wantError(t, r.check(base, args...), 3, "run-error:", "git の版を読めません")
+	})
 }
 
 func TestParseGitVersion(t *testing.T) {
