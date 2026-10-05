@@ -27,7 +27,15 @@
 
 ## 保証すること
 
-**道具が保証するのは、誤って `holds` を返さないことだけ。** `holds` は、範囲を全量の起点で区切った `git blame` が、対象の行のどれもを起点のコミット (範囲の境界。`boundary`) のものと報告し、そのときのパスが `-file` と同じときにだけ返す (下の「どう確かめるか」)。D8 にとって危ないのは誤った `holds` だけで、ほかの誤りは、どれも最後は D8 が「当たらない」になる ([review-triage/skills/review-triage/references/judgment-flow.md](../../skills/review-triage/references/judgment-flow.md) の D8 の行)。
+**道具が保証するのは、誤って `holds` を返さないことだけ。** `holds` は、範囲を全量の起点で区切った `git blame` が、対象の行のどれもを起点のコミット (範囲の境界。`boundary`) のものと報告し、そのときのパスが `-file` と同じときにだけ返す (下の「どう確かめるか」)。
+
+`holds` が意味するのは、対象の行のそれぞれが、全量の起点の同じパスのファイルに、`git blame` が差分で対応させた同じ内容の行としてあること。誤った `holds` とは、その内容の行が起点に無いのに `holds` を返すことを言う。`git blame` は、HEAD から起点までのどの段でもその行が変わっていないときだけ、行を起点のコミットに帰す。起点の内容はコミットの SHA で決まるので、起点に帰した行は、起点のファイルに同じ内容で必ずある。
+
+- 履歴の親を差し替える仕組み (非推奨の `.git/info/grafts` など) があっても、この性質は崩れない。親が替わると、境界が起点でなくなって `unverifiable` になるか、行が変わったと見なされて `not-holds` になる (`git replace` の置き換えは打ち消す。下の「どう確かめるか」)。
+- 同じ内容の行が並ぶとき (空行・閉じ括弧など)、挿入した行と元の行のどちらを起点の行とするかは、差分が決める。どちらが `holds` になっても、その行の内容は起点の行と同じである。
+- 誤った `holds` になりうるのは、渡した行番号と、`git blame` が見る内容の行番号が対応しないときである。フラグ `-worktree` の clean フィルタはこれに当たるので、確かめずに `unverifiable` を返す。
+
+D8 にとって危ないのは誤った `holds` だけで、ほかの誤りは、どれも最後は D8 が「当たらない」になる ([review-triage/skills/review-triage/references/judgment-flow.md](../../skills/review-triage/references/judgment-flow.md) の D8 の行)。
 
 - `not-holds` と `unverifiable` の取り違え、`run-error:` は、そのまま D8 が当たらない。
 - `input-error:` は、判定するエージェントがまず渡し方を直して実行し直し、値が原因で直せないときに (1) を確かめられないとして、D8 が当たらない ([review-triage/skills/review-triage/references/premise-check.md](../../skills/review-triage/references/premise-check.md) の「確かめ方」)。エラーの種類を取り違えると、直せない値を直そうとする手間が増えるが、誤った `holds` にはならない。
