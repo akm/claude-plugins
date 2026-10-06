@@ -428,7 +428,7 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 	}
 }
 
-// 名前が unset のドライバを process だけで設定しても、-filter と区別できないので確かめない。
+// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter と区別できないので確かめない。
 func TestUnsetDriverWithProcessOnly(t *testing.T) {
 	r := newRepo(t)
 	r.git("config", "filter.unset.process", "nonexistent-filter-process")
@@ -461,7 +461,7 @@ func scriptedGit(t *testing.T, sub, stdout string, code int) string {
 }
 
 // clean フィルタの確認で git が失敗したときや、出力の形が読めないときは、フィルタ無しとして
-// 先へ進まず、run-error にする (先へ進むと、誤った holds になりうる)。
+// git blame で行を調べに進まず、run-error にする (調べに進むと、誤った holds になりうる)。
 func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 	r := newRepo(t)
 	r.write(".gitattributes", "f.md -filter\n")
