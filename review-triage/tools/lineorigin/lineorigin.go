@@ -146,7 +146,8 @@ func classify(base, file string, blamed []blameLine) result {
 		case b.filename != file:
 			l.kind, l.note = notHolds, fmt.Sprintf("このブランチで改名・移動したファイルの行 (全量の起点では %s)", b.filename)
 		default:
-			l.kind, l.note = holds, "全量の起点にあったまま"
+			// 境界が起点でパスも同じなので、orig は起点のファイルでの行番号
+			l.kind, l.note = holds, fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", b.orig)
 		}
 		res.lines = append(res.lines, l)
 		switch {
@@ -192,13 +193,14 @@ func (g gitRunner) lineCount(target string, opts options) (int, error) {
 }
 
 type blameLine struct {
+	orig     int    // その行を最後に変えたコミット (範囲の外なら境界のコミット) の内容での行番号
 	final    int    // レビューした内容での行番号
 	commit   string // その行を最後に変えたコミット。範囲の外なら境界のコミット
 	boundary bool   // 範囲 <起点>..<コミット> の境界のコミットか
 	filename string // そのコミットでのパス
 }
 
-var blameHeader = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64}) [0-9]+ ([0-9]+)( [0-9]+)?$`)
+var blameHeader = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64}) ([0-9]+) ([0-9]+)( [0-9]+)?$`)
 
 // parsePorcelain は git blame --line-porcelain の出力を読む。
 func parsePorcelain(out string) ([]blameLine, error) {
@@ -213,8 +215,9 @@ func parsePorcelain(out string) ([]blameLine, error) {
 			if m == nil {
 				return nil, fmt.Errorf("git blame の出力を読めません: %q", s)
 			}
-			n, _ := strconv.Atoi(m[2])
-			cur = &blameLine{final: n, commit: m[1]}
+			orig, _ := strconv.Atoi(m[2])
+			final, _ := strconv.Atoi(m[3])
+			cur = &blameLine{orig: orig, final: final, commit: m[1]}
 			continue
 		}
 		switch {

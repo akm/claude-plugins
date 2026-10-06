@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -180,7 +181,9 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 	r.write("f.md", "new\na\nb\nc\n")
 	r.commit("insert above")
 
-	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-rev", "HEAD"), holds)
+	o := r.check(base, "-file", "f.md", "-lines", "2", "-rev", "HEAD")
+	wantKind(t, o, holds)
+	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 1 行目)")
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
 }
 
@@ -200,11 +203,36 @@ func TestReorderedLinesFollowDiff(t *testing.T) {
 
 	o := r.check(base, "-file", "f.md", "-lines", "3-5", "-rev", "HEAD")
 	wantKind(t, o, holds)
-	for _, l := range []string{"line 3", "line 4", "line 5"} {
-		wantContains(t, o.lines[l], "全量の起点にあったまま")
+	for i, l := range []string{"line 3", "line 4", "line 5"} {
+		wantContains(t, o.lines[l], fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", i+1))
 	}
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-2", "-rev", "HEAD"), notHolds)
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-5", "-rev", "HEAD"), notHolds)
+}
+
+// 起点に同じ内容の行が複数あっても、内訳の起点の行番号は、git blame が対応させた起点の行を指す。
+// その行の内容は対象の行と同じ (D8 の (2) は、この行を起点の内容で読む)。
+func TestDuplicateLinesReportBaseLine(t *testing.T) {
+	r := newRepo(t)
+	r.write("f.md", "# t\n```\nx\n```\ny\n```\nz\n```\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("f.md", "# t\nnew\n```\nx\n```\ny\n```\nz\n```\n")
+	r.commit("insert above the fences")
+
+	baseLines := strings.Split(r.git("show", base+":f.md"), "\n")
+	for final := 3; final <= 9; final += 2 {
+		l := fmt.Sprintf("line %d", final)
+		o := r.check(base, "-file", "f.md", "-lines", strconv.Itoa(final), "-rev", "HEAD")
+		wantKind(t, o, holds)
+		var orig int
+		if _, err := fmt.Sscanf(strings.TrimPrefix(o.lines[l], "全量の起点にあったまま (起点の "), "%d", &orig); err != nil {
+			t.Fatalf("%s の内訳から起点の行番号を読めない: %q", l, o.lines[l])
+		}
+		if orig != final-1 || baseLines[orig-1] != "```" {
+			t.Fatalf("%s の起点の行が %d 行目 (期待は %d 行目の ```)。内訳: %q", l, orig, final-1, o.lines[l])
+		}
+	}
 }
 
 func TestFileCreatedInBranchDoesNotHold(t *testing.T) {
@@ -1063,7 +1091,7 @@ func TestParseGitVersion(t *testing.T) {
 
 func TestParsePorcelainUnquotesFileName(t *testing.T) {
 	out := strings.Join([]string{
-		"0123456789012345678901234567890123456789 1 1 1",
+		"0123456789012345678901234567890123456789 3 1 1",
 		"boundary",
 		`filename "\346\227\245.md"`,
 		"\tline",
@@ -1073,7 +1101,7 @@ func TestParsePorcelainUnquotesFileName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 1 || lines[0].filename != "日.md" || !lines[0].boundary || lines[0].final != 1 {
+	if len(lines) != 1 || lines[0].filename != "日.md" || !lines[0].boundary || lines[0].orig != 3 || lines[0].final != 1 {
 		t.Fatalf("読み取りが違う: %+v", lines)
 	}
 }
