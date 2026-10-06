@@ -175,6 +175,30 @@ func TestRangeWithOneChangedLineDoesNotHold(t *testing.T) {
 	}
 }
 
+// 連続しない行は、コンマで並べて 1 回で渡せる。範囲の順や重なりによらず、行はファイルの順に 1 回ずつ出る。
+func TestCommaSeparatedLines(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+
+	for _, lines := range []string{"1,3", "3,1"} {
+		o := r.check(base, "-file", "f.md", "-lines", lines, "-rev", "HEAD")
+		wantKind(t, o, notHolds)
+		if len(o.lines) != 2 || o.lines["line 1"] == "" || o.lines["line 3"] == "" {
+			t.Fatalf("-lines %s の内訳が 1 行目と 3 行目の 2 行でない。出力:\n%s", lines, o.stdout)
+		}
+		if strings.Index(o.stdout, "line 1:") > strings.Index(o.stdout, "line 3:") {
+			t.Fatalf("-lines %s の内訳がファイルの順でない。出力:\n%s", lines, o.stdout)
+		}
+	}
+	o := r.check(base, "-file", "f.md", "-lines", "1-2,2-3", "-rev", "HEAD")
+	wantKind(t, o, notHolds)
+	if len(o.lines) != 3 {
+		t.Fatalf("重なる範囲の内訳が %d 行 (期待は 3 行)。出力:\n%s", len(o.lines), o.stdout)
+	}
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1,2", "-rev", "HEAD"), holds)
+}
+
 // 上に行を足して行番号がずれても、行そのものが変わっていなければ成り立つ。
 func TestLineShiftedByInsertionHolds(t *testing.T) {
 	r, base := branched(t)
@@ -283,6 +307,43 @@ func TestFileRenamedOntoDeletedPathDoesNotHold(t *testing.T) {
 }
 
 // 起点より前に改名したファイルは、起点で同じパスにあるので成り立つ。
+// ブランチで書き換えた行を、マージ (衝突の解消などで相手の親の内容を取る) で起点の内容に戻すと、
+// git blame はその行を相手の親へたどり、起点にあったままと報告する (内容は起点と同じ)。
+// マージで取り込んだ、起点の後のコミットが書き換えた行は成り立たない。
+func TestLineRestoredByMergeHolds(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3 on the branch")
+	r.git("switch", "-q", "main")
+	r.write("f.md", "A\nb\nc\n")
+	r.commit("change line 1 on main")
+	r.git("switch", "-q", "br")
+	r.git("merge", "-q", "--no-commit", "--no-ff", "main")
+	r.write("f.md", "A\nb\nc\n")
+	r.commit("merge main and restore line 3")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
+}
+
+// 1 つのコミットで起点のファイルを消し、別のファイルをそのパスへ移すと、git は同じパスのファイルの
+// 書き換えとして扱う。移した先のパスの起点の内容と差分で対応した行は、起点にあったままと報告する
+// (その内容は起点の同じパスにある)。
+func TestFileMovedOntoPathInOneCommit(t *testing.T) {
+	r := newRepo(t)
+	r.write("f.md", "a\nb\nc\n")
+	r.write("g.md", "a\nx\nc\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.git("rm", "-q", "g.md")
+	r.git("mv", "f.md", "g.md")
+	r.commit("move f.md onto g.md")
+
+	wantKind(t, r.check(base, "-file", "g.md", "-lines", "1", "-rev", "HEAD"), holds)
+	wantKind(t, r.check(base, "-file", "g.md", "-lines", "3", "-rev", "HEAD"), holds)
+	wantKind(t, r.check(base, "-file", "g.md", "-lines", "2", "-rev", "HEAD"), notHolds)
+}
+
 func TestFileRenamedBeforeBaseHolds(t *testing.T) {
 	r := newRepo(t)
 	r.write("old/f.md", "a\nb\n")
@@ -850,6 +911,11 @@ func TestInputErrors(t *testing.T) {
 		{"行番号が 0", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "0", "-rev", "HEAD"}, "-lines"},
 		{"終わりが始めより前", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "3-2", "-rev", "HEAD"}, "-lines"},
 		{"数でない行番号", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "x", "-rev", "HEAD"}, "-lines"},
+		{"コンマの後が空", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1,", "-rev", "HEAD"}, "-lines"},
+		{"コンマの前が空", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", ",1", "-rev", "HEAD"}, "-lines"},
+		{"コンマの後が数でない", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1,x", "-rev", "HEAD"}, "-lines"},
+		{"コンマで並べた行が行数を越える", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1,9", "-rev", "HEAD"}, "行数 (3) を越えます"},
+		{"逆の順に並べた行が行数を越える", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "9,1", "-rev", "HEAD"}, "行数 (3) を越えます"},
 		{"ルートの外を指す -file", []string{"-root", r.dir, "-base", base, "-file", "../f.md", "-lines", "1", "-rev", "HEAD"}, "リポジトリの中のファイルを指していません"},
 		{"絶対パスの -file", []string{"-root", r.dir, "-base", base, "-file", filepath.Join(r.dir, "f.md"), "-lines", "1", "-rev", "HEAD"}, "相対パス"},
 		{"解決できない -base", []string{"-root", r.dir, "-base", "no-such-rev", "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, "-base をコミットに解決できません"},

@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -45,12 +46,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 }
 
 type options struct {
-	root     string // -root (絶対パス)
-	base     string // -base
-	file     string // -file (ルートからの相対パス。整えたもの)
-	from, to int    // -lines
-	rev      string // -rev (-worktree のときは空)
-	worktree bool   // -worktree
+	root     string      // -root (絶対パス)
+	base     string      // -base
+	file     string      // -file (ルートからの相対パス。整えたもの)
+	ranges   []lineRange // -lines (並べ替え、重なりと隣り合いをまとめたもの)
+	rev      string      // -rev (-worktree のときは空)
+	worktree bool        // -worktree
 }
 
 func parseFlags(args []string) (options, error) {
@@ -61,7 +62,7 @@ func parseFlags(args []string) (options, error) {
 	root := fs.String("root", "", "リポジトリのルートか、その中のディレクトリの絶対パス (必須)")
 	base := fs.String("base", "", "全量の起点 (必須)。コミットに解決できる版")
 	file := fs.String("file", "", "指摘の file (必須)。リポジトリのルートからの相対パス")
-	lines := fs.String("lines", "", "指摘の行 (必須)。「12」か「12-15」の形")
+	lines := fs.String("lines", "", "指摘の行 (必須)。「12」「12-15」か、それらをコンマで並べた形 (「12,20-23」)")
 	rev := fs.String("rev", "", "レビューした内容のコミット。結果のファイルで受け取ったレビューならその head。-worktree と同時には使えない")
 	worktree := fs.Bool("worktree", false, "レビューした内容が作業ツリー (コミットしていない変更を含む) のとき。-rev と同時には使えない")
 	if err := fs.Parse(args); err != nil {
@@ -91,11 +92,11 @@ func parseFlags(args []string) (options, error) {
 	if err != nil {
 		return options{}, err
 	}
-	from, to, err := parseLines(*lines)
+	ranges, err := parseLines(*lines)
 	if err != nil {
 		return options{}, err
 	}
-	return options{root: *root, base: *base, file: f, from: from, to: to, rev: *rev, worktree: *worktree}, nil
+	return options{root: *root, base: *base, file: f, ranges: ranges, rev: *rev, worktree: *worktree}, nil
 }
 
 // normalizeFile は -file をルートからの相対パスに整える。ルートの外を指すパスは受け付けない。
@@ -110,21 +111,41 @@ func normalizeFile(file string) (string, error) {
 	return clean, nil
 }
 
-// parseLines は「12」か「12-15」を読む。
-func parseLines(s string) (int, int, error) {
-	a, b, isRange := strings.Cut(s, "-")
-	from, err := strconv.Atoi(a)
-	if err != nil || from < 1 {
-		return 0, 0, fmt.Errorf("-lines は「12」か「12-15」の形で、1 以上の行番号を渡してください: %s", s)
+// lineRange は、両端を含む行の範囲。
+type lineRange struct {
+	from, to int
+}
+
+// parseLines は「12」「12-15」か、それらをコンマで並べた形 (「12,20-23」) を読み、範囲を始めの順に
+// 並べ、重なる範囲と隣り合う範囲をまとめて返す。連続しない行にまたがる指摘を 1 回で渡すため。
+func parseLines(s string) ([]lineRange, error) {
+	var ranges []lineRange
+	for _, part := range strings.Split(s, ",") {
+		a, b, isRange := strings.Cut(part, "-")
+		from, err := strconv.Atoi(a)
+		if err != nil || from < 1 {
+			return nil, fmt.Errorf("-lines は「12」「12-15」か、それらをコンマで並べた形 (「12,20-23」) で、1 以上の行番号を渡してください: %s", s)
+		}
+		to := from
+		if isRange {
+			to, err = strconv.Atoi(b)
+			if err != nil || to < from {
+				return nil, fmt.Errorf("-lines の範囲は、終わりを始め以上にしてください: %s", s)
+			}
+		}
+		ranges = append(ranges, lineRange{from, to})
 	}
-	if !isRange {
-		return from, from, nil
+	sort.Slice(ranges, func(i, j int) bool { return ranges[i].from < ranges[j].from })
+	merged := ranges[:1]
+	for _, r := range ranges[1:] {
+		last := &merged[len(merged)-1]
+		if r.from <= last.to+1 {
+			last.to = max(last.to, r.to)
+			continue
+		}
+		merged = append(merged, r)
 	}
-	to, err := strconv.Atoi(b)
-	if err != nil || to < from {
-		return 0, 0, fmt.Errorf("-lines は「12」か「12-15」の形で、終わりを始め以上にしてください: %s", s)
-	}
-	return from, to, nil
+	return merged, nil
 }
 
 func writeResult(w io.Writer, res result) {

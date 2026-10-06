@@ -605,7 +605,12 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 		// 変換で消える部分だけを書き換えた行が、起点のままと報告される
 		"--no-textconv",
 		"--line-porcelain",
-		"-L", fmt.Sprintf("%d,%d", opts.from, opts.to),
+	}
+	// 範囲はまとめてあるので、git blame はどの行も 1 回ずつ、ファイルの順に出す
+	want := 0
+	for _, r := range opts.ranges {
+		args = append(args, "-L", fmt.Sprintf("%d,%d", r.from, r.to))
+		want += r.to - r.from + 1
 	}
 	if opts.worktree {
 		args = append(args, "--contents", filepath.Join(g.root, filepath.FromSlash(opts.file)))
@@ -616,8 +621,8 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 	if err != nil {
 		return nil, err
 	}
-	if opts.to > n {
-		return nil, inputf("行 %d が、レビューした内容の -file の行数 (%d) を越えます", opts.to, n)
+	if last := opts.ranges[len(opts.ranges)-1].to; last > n {
+		return nil, inputf("行 %d が、レビューした内容の -file の行数 (%d) を越えます", last, n)
 	}
 	args = append(args, base+".."+target, "--", opts.file)
 	out, _, err := g.run(args...)
@@ -628,7 +633,7 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 	if err != nil {
 		return nil, asRun(err)
 	}
-	if want := opts.to - opts.from + 1; len(lines) != want {
+	if len(lines) != want {
 		return nil, runf("git blame が %d 行を返しました (求めたのは %d 行)", len(lines), want)
 	}
 	return lines, nil
