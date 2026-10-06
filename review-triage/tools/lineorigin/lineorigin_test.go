@@ -342,7 +342,6 @@ func TestFileRenamedOntoDeletedPathDoesNotHold(t *testing.T) {
 	wantContains(t, o.lines["line 1"], "全量の起点では f.md")
 }
 
-// 起点より前に改名したファイルは、起点で同じパスにあるので成り立つ。
 // ブランチで書き換えた行を、マージ (衝突の解消などで相手の親の内容を取る) で起点の内容に戻すと、
 // git blame はその行を相手の親へたどり、起点にあったままと報告する (内容は起点と同じ)。
 // マージで取り込んだ、起点の後のコミットが書き換えた行は成り立たない。
@@ -380,6 +379,7 @@ func TestFileMovedOntoPathInOneCommit(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "g.md", "-lines", "2", "-rev", "HEAD"), notHolds)
 }
 
+// 起点より前に改名したファイルは、起点で同じパスにあるので成り立つ。
 func TestFileRenamedBeforeBaseHolds(t *testing.T) {
 	r := newRepo(t)
 	r.write("old/f.md", "a\nb\n")
