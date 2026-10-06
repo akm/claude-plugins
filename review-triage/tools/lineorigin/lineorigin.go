@@ -493,16 +493,17 @@ func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// 項目のどれかのステージが 0 でなければ、変更ありとする。衝突の解消の途中は、インデックスに同じパスの
+	// 項目がステージ 1〜3 に分かれてあるので、これに当たる
 	var index string
-	if entries := strings.Split(strings.TrimSpace(out), "\n"); out != "" {
-		if len(entries) != 1 {
-			return true, nil // 衝突の解消の途中 (段が複数ある)
+	if out != "" {
+		for _, e := range strings.Split(strings.TrimSpace(out), "\n") {
+			fields := strings.Fields(e)
+			if len(fields) < 3 || fields[2] != "0" {
+				return true, nil
+			}
+			index = fields[1]
 		}
-		fields := strings.Fields(entries[0])
-		if len(fields) < 3 || fields[2] != "0" {
-			return true, nil
-		}
-		index = fields[1]
 	}
 	// 作業ツリーの内容のハッシュを、git が記録するのと同じ形で求める。git が記録するのは通常の
 	// ファイルとシンボリックリンクだけで、シンボリックリンクはリンクの先ではなくリンクの文字列を記録する
