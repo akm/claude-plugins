@@ -536,13 +536,16 @@ func TestRevIgnoresCleanFilter(t *testing.T) {
 }
 
 // 作業ツリーの内容の行番号で読む。コミットしていない行を上に足すと、起点の行は下にずれる。
+// 内訳に添える起点の行番号は、ずれた分を戻した起点のファイルでの位置になる。
 func TestWorktreeLineNumbersFollowWorktreeContent(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
 	r.commit("branch")
 
 	r.write("f.md", "new\na\nb\nc\n")
-	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-worktree"), holds)
+	o := r.check(base, "-file", "f.md", "-lines", "2", "-worktree")
+	wantKind(t, o, holds)
+	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 1 行目)")
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), notHolds)
 }
 
