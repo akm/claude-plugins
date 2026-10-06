@@ -184,6 +184,29 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
 }
 
+// ファイルの中で並べ替えた行は、差分が残ったと見なした行だけが成り立ち、消して足したと見なした行は
+// 成り立たない。末尾の 2 行を先頭へ動かすと、最も長く共通する並び (a・b・c) が 1 つに決まるので、
+// 残ったと見なす行が差分の作り方によらない。動かす 2 行は、git blame の移動の検出 (-M) が移動と
+// 見なす長さ (英数字 20 文字) を越えるので、道具が移動の検出を使うと 1〜2 行目も成り立ってしまう。
+func TestReorderedLinesFollowDiff(t *testing.T) {
+	a, b, c := "alpha line of the base file\n", "bravo line of the base file\n", "charlie line of the base file\n"
+	d, e := "delta line of the base file\n", "echo line of the base file\n"
+	r := newRepo(t)
+	r.write("f.md", a+b+c+d+e)
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("f.md", d+e+a+b+c)
+	r.commit("move d and e to the top")
+
+	o := r.check(base, "-file", "f.md", "-lines", "3-5", "-rev", "HEAD")
+	wantKind(t, o, holds)
+	for _, l := range []string{"line 3", "line 4", "line 5"} {
+		wantContains(t, o.lines[l], "全量の起点にあったまま")
+	}
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-2", "-rev", "HEAD"), notHolds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-5", "-rev", "HEAD"), notHolds)
+}
+
 func TestFileCreatedInBranchDoesNotHold(t *testing.T) {
 	r, base := branched(t)
 	r.write("n.md", "n\n")
@@ -456,6 +479,7 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 	}{
 		{"check-attr が失敗する", "check-attr", "", 1, "check-attr"},
 		{"check-attr の出力が三つ組にならない", "check-attr", "f.md\\000filter\\000", 0, "git check-attr の出力を読めません"},
+		{"check-attr の出力の最後の要素が空でない", "check-attr", "f.md\\000filter\\000set\\000x", 0, "git check-attr の出力を読めません"},
 		{"config が想定していない終了コードで終わる", "config", "", 2, "config"},
 	}
 	for _, c := range cases {
@@ -695,6 +719,25 @@ func TestReplaceObjectsAreIgnored(t *testing.T) {
 	r.git("replace", changed, fake)
 
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD"), notHolds)
+}
+
+// ファイル .git/info/grafts (非推奨) は打ち消さない。途中のコミットを隠すと、書き換えて元へ戻した行が
+// holds になるが、その行の内容は起点と同じなので、誤った holds には当たらない (README の「保証すること」)。
+func TestGraftsHidingRewriteAndRevert(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+	r.write("f.md", "a\nb\nc\n")
+	reverted := r.commit("revert line 3")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD"), notHolds)
+
+	r.git("config", "advice.graftFileDeprecated", "false")
+	r.write(".git/info/grafts", reverted+" "+base+"\n")
+	if r.git("rev-parse", "HEAD^") != base {
+		t.Skip("この版の git は .git/info/grafts を読まない")
+	}
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD"), holds)
 }
 
 // -root がルートの下のディレクトリでも、-file はルートからのパスとして読む。
