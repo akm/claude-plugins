@@ -35,7 +35,7 @@
 
 - 履歴の親を差し替える仕組み (ファイル `.git/info/grafts` (非推奨) など) があると、結果は本当の履歴と違いうる。親が替わって境界が起点でなくなれば `unverifiable`、行が変わったと見なされれば `not-holds` になる。途中のコミットを隠すと、ブランチが書き換えて元へ戻した行が `holds` になることもあるが、その行の内容は起点と同じなので、誤った `holds` には当たらない。環境変数 `GIT_NO_REPLACE_OBJECTS` が打ち消すのは `git replace` の置き換えだけで、grafts は打ち消さない (下の「どう確かめるか」)。
 - 同じ内容の行が並ぶとき (空行・閉じ括弧など) や、ファイルの中で行を並べ替えたとき、どの行を起点の行と対応させるかは、差分が決める (対応させた起点の行は、内訳に行番号で出す。上の「何を返すか」)。どの行が `holds` になっても、その行の内容は起点の行と同じである (扱いの正本は [review-triage/skills/review-triage/references/premise-check.md](../../skills/review-triage/references/premise-check.md) の「(1) 対象の行が変わっていないか」)。
-- 誤った `holds` になりうるのは、渡した行番号と、`git blame` が見る内容の行番号が対応しないときである。clean フィルタが設定されたファイルと、追跡中のシンボリックリンクはこれに当たるので、方式 (`-rev` / `-worktree`) によらず確かめずに `unverifiable` を返す。
+- 誤った `holds` になりうるのは、渡した行番号と、`git blame` が見る内容の行番号が対応しないときである。clean フィルタが設定されたファイルと、追跡中のシンボリックリンクはこれに当たるので、方式 (`-rev` / `-worktree`) によらず確かめずに `unverifiable` を返す (扱いの正本は、下の「どう確かめるか」の表)。
 
 D8 にとって危ないのは誤った `holds` だけで、ほかの誤りは、どれも最後は D8 が「当たらない」になる ([review-triage/skills/review-triage/references/judgment-flow.md](../../skills/review-triage/references/judgment-flow.md) の D8 の行)。
 
