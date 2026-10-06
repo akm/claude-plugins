@@ -196,6 +196,14 @@ func TestCommaSeparatedLines(t *testing.T) {
 	if len(o.lines) != 3 {
 		t.Fatalf("重なる範囲の内訳が %d 行 (期待は 3 行)。出力:\n%s", len(o.lines), o.stdout)
 	}
+	// ある範囲が別の範囲を含んでも、まとめた範囲の終わりは縮まない
+	for _, lines := range []string{"1-3,2", "2,1-3"} {
+		o := r.check(base, "-file", "f.md", "-lines", lines, "-rev", "HEAD")
+		wantKind(t, o, notHolds)
+		if len(o.lines) != 3 {
+			t.Fatalf("-lines %s の内訳が %d 行 (期待は 3 行)。出力:\n%s", lines, len(o.lines), o.stdout)
+		}
+	}
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1,2", "-rev", "HEAD"), holds)
 }
 
@@ -688,6 +696,33 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 			t.Setenv("PATH", scriptedGit(t, c.sub, c.stdout, c.code))
 			wantError(t, r.check(base, args...), 3, "run-error:", c.want)
 		})
+	}
+}
+
+// clean フィルタのあるファイルは、確かめる前に unverifiable を返すので、道具はフィルタのプログラムを
+// 実行しない (-rev のコミットしていない変更の確認の hash-object --path が実行すると、プログラムが
+// リポジトリに書きうる)。
+func TestCleanFilterProgramIsNotRun(t *testing.T) {
+	r := newRepo(t)
+	marker := filepath.Join(t.TempDir(), "ran")
+	r.git("config", "filter.mark.clean", "touch '"+marker+"'; cat")
+	r.git("config", "filter.mark.smudge", "cat")
+	r.write(".gitattributes", "f.md filter=mark\n")
+	r.write("f.md", "x\ny\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("g.md", "g\n")
+	r.commit("branch")
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err) // 準備の git add がフィルタを実行して作るはず
+	}
+
+	for _, mode := range [][]string{{"-rev", "HEAD"}, {"-worktree"}} {
+		o := r.check(base, append([]string{"-file", "f.md", "-lines", "1"}, mode...)...)
+		wantKind(t, o, unverifiable)
+		if _, err := os.Stat(marker); err == nil {
+			t.Fatalf("%v で、道具が clean フィルタのプログラムを実行した", mode)
+		}
 	}
 }
 
