@@ -700,8 +700,8 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 }
 
 // clean フィルタのあるファイルは、確かめる前に unverifiable を返すので、道具はフィルタのプログラムを
-// 実行しない (-rev のコミットしていない変更の確認の hash-object --path が実行すると、プログラムが
-// リポジトリに書きうる)。
+// 実行しない。-rev のときにコミットしていない変更を確かめるコマンド git hash-object --path がプログラムを
+// 実行すると、プログラムがリポジトリに書きうる。
 func TestCleanFilterProgramIsNotRun(t *testing.T) {
 	r := newRepo(t)
 	marker := filepath.Join(t.TempDir(), "ran")
@@ -915,7 +915,7 @@ func TestGitEnvironmentVariablesAreIgnored(t *testing.T) {
 }
 
 // 設定を注入する環境変数 (GIT_CONFIG_PARAMETERS・GIT_CONFIG_COUNT など) も取り除く。注入した
-// core.attributesFile で clean フィルタの属性を付けても、道具の git には届かない。
+// 設定 core.attributesFile で clean フィルタの属性を付けても、道具の git には届かない。
 func TestInjectedGitConfigIsIgnored(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")

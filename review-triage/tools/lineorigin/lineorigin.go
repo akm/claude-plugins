@@ -99,7 +99,7 @@ func check(opts options) (result, error) {
 		return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
 	}
 
-	// 次の 2 つは、レビュアが読む内容と git blame が見る内容の行番号が対応しない。指摘の行番号が別の行に
+	// 次の 2 つは、レビュアが読む内容とコマンド git blame が見る内容の行番号が対応しない。指摘の行番号が別の行に
 	// 当たり、書き換えた行が起点のままと報告されうる (誤った holds) ので、方式によらず確かめない。
 	// git はシンボリックリンクのリンクの文字列を 1 行のブロブとして記録し、git blame もそれを見るが、
 	// レビュアはリンクの先の内容を読む
@@ -109,7 +109,7 @@ func check(opts options) (result, error) {
 	// clean フィルタは、作業ツリーの内容 (レビュアが読む、フィルタの前の内容) を変換してから記録し、
 	// git blame もフィルタの後の内容 (コミットの内容と、--contents で渡した内容) を見る。フィルタが行を
 	// 増やしたり消したりすると、行番号がずれる。-rev では、コミットしていない変更の確認より前に確かめる
-	// (確認の hash-object --path がフィルタのプログラムを実行しないように)
+	// (その確認が実行するコマンド git hash-object --path が、フィルタのプログラムを実行しないように)
 	filtered, err := g.hasCleanFilter(opts.file)
 	if err != nil {
 		return result{}, err
