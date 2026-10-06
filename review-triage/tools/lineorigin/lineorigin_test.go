@@ -428,7 +428,8 @@ func TestToolDoesNotWriteIndex(t *testing.T) {
 	}
 }
 
-// skip-worktree を付けたファイルの編集は、インデックスに記録した更新時刻などには現れないが、コミットしていない変更として扱う。
+// skip-worktree (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) を
+// 付けたファイルの編集は、インデックスに記録した更新時刻などには現れないが、コミットしていない変更として扱う。
 func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")

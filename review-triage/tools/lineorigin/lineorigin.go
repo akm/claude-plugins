@@ -482,8 +482,9 @@ func (g gitRunner) entry(commit, file string) (string, error) {
 //
 // git diff は使わない。インデックスに記録した更新時刻などが作業ツリーのファイルと合わないと、
 // GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、HEAD・インデックス・
-// 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や assume-unchanged が付いた
-// ファイルの編集も変更として扱う。
+// 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や
+// assume-unchanged (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) が
+// 付いたファイルの編集も、変更として扱う。
 func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 	head, err := g.blob("HEAD", file)
 	if err != nil {
