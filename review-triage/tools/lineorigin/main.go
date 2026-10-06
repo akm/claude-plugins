@@ -8,10 +8,10 @@
 // git が古い・git の出力を読めない) は run-error:。go run で実行すると終了コードは 1 になるので、
 // 終了コード (2 と 3) ではなく印で見分ける。
 //
-// 使い方 (-root はリポジトリのルートか、その中のディレクトリの絶対パス):
+// 使い方 (-root はレビューした作業ツリーのルートか、その中のディレクトリの絶対パス。値は単一引用符で囲む):
 //
-//	go run -C <展開先>/tools/lineorigin . -root "$(pwd)" -base <全量の起点> -file <ファイル> -lines <行> -rev <コミット>
-//	go run -C <展開先>/tools/lineorigin . -root "$(pwd)" -base <全量の起点> -file <ファイル> -lines <開始>-<終了> -worktree
+//	go run -C '<展開先>/tools/lineorigin' . -root '<作業ツリーのルート>' -base '<全量の起点>' -file '<ファイル>' -lines '<行>' -rev '<コミット>'
+//	go run -C '<展開先>/tools/lineorigin' . -root '<作業ツリーのルート>' -base '<全量の起点>' -file '<ファイル>' -lines '<開始>-<終了>' -worktree
 package main
 
 import (
