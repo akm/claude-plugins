@@ -211,6 +211,34 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
 }
 
+// -rev に HEAD 以外のコミットを渡すと、そのコミットまでの範囲で確かめる。
+func TestRevOtherThanHead(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	c1 := r.commit("change line 3")
+	r.write("f.md", "A\nb\nC\n")
+	r.commit("change line 1")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", c1), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", c1), notHolds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
+}
+
+// 注釈付きのタグを -base と -rev に渡しても、タグが指すコミットとして扱い、SHA を渡したときと同じ結果になる。
+func TestAnnotatedTagsResolveToCommits(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+	r.git("tag", "-a", "-m", "base", "tbase", base)
+	r.git("tag", "-a", "-m", "head", "thead", "HEAD")
+
+	wantKind(t, r.check("tbase", "-file", "f.md", "-lines", "1", "-rev", "thead"), holds)
+	wantKind(t, r.check("tbase", "-file", "f.md", "-lines", "3", "-rev", "thead"), notHolds)
+	o := r.check("tbase", "-file", "f.md", "-lines", "1", "-rev", base)
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "同じ")
+}
+
 // ファイルの中で並べ替えた行は、差分が残ったと見なした行だけが成り立ち、消して足したと見なした行は
 // 成り立たない。末尾の 2 行を先頭へ動かすと、最も長く共通する並び (a・b・c) が 1 つに決まるので、
 // 残ったと見なす行が差分の作り方によらない。動かす 2 行は、git blame の移動の検出 (-M) が移動と
@@ -470,6 +498,56 @@ func TestFileReplacedByDirectoryIsUncommittedChange(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
+// インデックスの状態が HEAD と違えば、作業ツリーの内容が HEAD と同じでも、コミットしていない変更として扱う。
+func TestIndexStatesAreUncommittedChanges(t *testing.T) {
+	t.Run("衝突の解消の途中", func(t *testing.T) {
+		r, base := branched(t)
+		r.write("f.md", "a\nB\nc\n")
+		r.commit("branch")
+		r.git("switch", "-q", "main")
+		r.write("f.md", "a\nX\nc\n")
+		r.commit("main")
+		r.git("switch", "-q", "br")
+		cmd := exec.Command("git", "-C", r.dir, "merge", "-q", "main")
+		if err := cmd.Run(); err == nil {
+			t.Fatal("マージが衝突しなかった")
+		}
+		r.write("f.md", "a\nB\nc\n")
+
+		o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "コミットしていない変更")
+	})
+	t.Run("ステージが 0 でない項目だけがある", func(t *testing.T) {
+		r, base := branched(t)
+		r.write("h.md", "branch\n")
+		r.commit("branch")
+		blob := r.git("rev-parse", "HEAD:f.md")
+		r.git("rm", "-q", "--cached", "f.md")
+		cmd := exec.Command("git", "-C", r.dir, "update-index", "--index-info")
+		cmd.Stdin = strings.NewReader("100644 " + blob + " 2\tf.md\n")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("update-index: %v: %s", err, out)
+		}
+
+		o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "コミットしていない変更")
+	})
+	t.Run("作業ツリーから消した", func(t *testing.T) {
+		r, base := branched(t)
+		r.write("h.md", "branch\n")
+		r.commit("branch")
+		if err := os.Remove(filepath.Join(r.dir, "f.md")); err != nil {
+			t.Fatal(err)
+		}
+
+		o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "コミットしていない変更")
+	})
+}
+
 // ほかのファイルの変更は、指摘のファイルの行番号を変えないので見ない。
 func TestUncommittedChangeInOtherFileIsIgnored(t *testing.T) {
 	r, base := branched(t)
@@ -697,6 +775,26 @@ func TestLineFromHistoryForkedBeforeBaseIsUnverifiable(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "m.md", "-lines", "2", "-rev", "HEAD"), notHolds)
 }
 
+// 成り立たない行と確かめられない行が混ざる範囲は、成り立たない行を優先して not-holds になる。
+func TestNotHoldsTakesPrecedenceOverUnverifiable(t *testing.T) {
+	r := newRepo(t)
+	r.write("m.md", "m1\nm2\n")
+	r.commit("P")
+	r.git("switch", "-q", "-c", "side")
+	r.write("m.md", "m1\nSIDE\n")
+	r.commit("side")
+	r.git("switch", "-q", "main")
+	r.write("m.md", "m1\nMAIN\n")
+	base := r.commit("main")
+	r.git("switch", "-q", "-c", "br")
+	r.git("merge", "-q", "--no-edit", "-X", "theirs", "side")
+
+	o := r.check(base, "-file", "m.md", "-lines", "1-2", "-rev", "HEAD")
+	wantKind(t, o, notHolds)
+	wantContains(t, o.lines["line 1"], "境界のコミット")
+	wantContains(t, o.lines["line 2"], "全量の起点より後のコミット")
+}
+
 // 無関係な履歴をマージして入った行は、そのルートのコミットの行として報告され、成り立たない。
 // 起点にある同じパスのファイル (g.md) の行を、無関係な履歴の内容で置き換えて確かめる。
 func TestLineFromUnrelatedHistoryDoesNotHold(t *testing.T) {
@@ -777,6 +875,30 @@ func TestGitEnvironmentVariablesAreIgnored(t *testing.T) {
 	wantKind(t, o1, holds)
 	if after := snapshot(); after != before {
 		t.Fatalf("GIT_DIR が指すリポジトリの参照かインデックスが変わった")
+	}
+}
+
+// 設定を注入する環境変数 (GIT_CONFIG_PARAMETERS・GIT_CONFIG_COUNT など) も取り除く。注入した
+// core.attributesFile で clean フィルタの属性を付けても、道具の git には届かない。
+func TestInjectedGitConfigIsIgnored(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	attrs := filepath.Join(t.TempDir(), "attributes")
+	if err := os.WriteFile(attrs, []byte("f.md filter=strip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for name, vars := range map[string]map[string]string{
+		"GIT_CONFIG_PARAMETERS": {"GIT_CONFIG_PARAMETERS": "'core.attributesfile=" + attrs + "'"},
+		"GIT_CONFIG_COUNT":      {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.attributesFile", "GIT_CONFIG_VALUE_0": attrs},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for k, v := range vars {
+				t.Setenv(k, v)
+			}
+			wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), holds)
+			wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), holds)
+		})
 	}
 }
 
