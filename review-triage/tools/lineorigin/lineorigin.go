@@ -77,39 +77,48 @@ func check(opts options) (result, error) {
 	}
 
 	// 指摘の file は、レビューした内容にあるはず (根拠の照合 E1 を通っている)。無ければ入力の誤り。
+	targetEntry, err := g.entry(target, opts.file)
+	if err != nil {
+		return result{}, err
+	}
 	if opts.worktree {
 		st, err := os.Stat(filepath.Join(top, filepath.FromSlash(opts.file)))
 		if err != nil || !st.Mode().IsRegular() {
 			return result{}, inputf("作業ツリーに -file のファイルがありません: %s", opts.file)
 		}
-	} else if ok, err := g.exists(target, opts.file); err != nil {
-		return result{}, err
-	} else if !ok {
+	} else if targetEntry != entryFile && targetEntry != entrySymlink {
 		return result{}, inputf("レビューした内容 (%s) に -file のファイルがありません: %s", opts.rev, opts.file)
 	}
 
-	if ok, err := g.exists(base, opts.file); err != nil {
+	if baseEntry, err := g.entry(base, opts.file); err != nil {
 		return result{}, err
-	} else if !ok {
+	} else if baseEntry != entryFile && baseEntry != entrySymlink {
 		return result{kind: notHolds, reason: fmt.Sprintf("全量の起点 %s に同じパスのファイルが無い (このブランチで作った・改名した・移したファイル)", short(base))}, nil
 	}
-	if opts.worktree {
-		if ok, err := g.exists(target, opts.file); err != nil {
-			return result{}, err
-		} else if !ok {
-			return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
-		}
-		// git blame --contents は、作業ツリーの内容を clean フィルタで変換してから見る。フィルタが行を
-		// 増やしたり消したりすると、指摘の行番号 (作業ツリーの生の内容の行番号) が別の行に当たり、
-		// 書き換えた行が起点のままと報告されうる (誤った holds)。行番号を対応させられないので確かめない
-		filtered, err := g.hasCleanFilter(opts.file)
-		if err != nil {
-			return result{}, err
-		}
-		if filtered {
-			return result{kind: unverifiable, reason: "指摘のファイルに clean フィルタ (属性 filter) が設定されていて、作業ツリーの行番号と、git blame が見るフィルタの後の内容の行番号がずれうる"}, nil
-		}
-	} else {
+	if opts.worktree && targetEntry != entryFile && targetEntry != entrySymlink {
+		return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
+	}
+
+	// 次の 2 つは、レビュアが読む内容と git blame が見る内容の行番号が対応しない。指摘の行番号が別の行に
+	// 当たり、書き換えた行が起点のままと報告されうる (誤った holds) ので、方式によらず確かめない。
+	// git はシンボリックリンクのリンクの文字列を 1 行のブロブとして記録し、git blame もそれを見るが、
+	// レビュアはリンクの先の内容を読む
+	if targetEntry == entrySymlink {
+		return result{kind: unverifiable, reason: "指摘のファイルが追跡中のシンボリックリンクで、レビュアが読むリンクの先の内容と、git が記録するリンクの文字列の行番号が対応しない"}, nil
+	}
+	// clean フィルタは、作業ツリーの内容 (レビュアが読む、フィルタの前の内容) を変換してから記録し、
+	// git blame もフィルタの後の内容 (コミットの内容と、--contents で渡した内容) を見る。フィルタが行を
+	// 増やしたり消したりすると、行番号がずれる。-rev では、コミットしていない変更の確認より前に確かめる
+	// (確認の hash-object --path がフィルタのプログラムを実行しないように)
+	filtered, err := g.hasCleanFilter(opts.file)
+	if err != nil {
+		return result{}, err
+	}
+	if filtered {
+		return result{kind: unverifiable, reason: "指摘のファイルに clean フィルタ (属性 filter) が設定されていて、作業ツリーの内容 (フィルタの前) と、git blame が見るフィルタの後の内容の行番号がずれうる"}, nil
+	}
+
+	if !opts.worktree {
 		// 結果のファイルで受け取ったレビューは、共有の作業ツリーでコミットしていない変更を見た可能性があり、
 		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
 		changed, err := g.hasUncommittedChange(top, opts.file)
@@ -436,23 +445,37 @@ func (g gitRunner) isAncestor(a, b string) (bool, error) {
 	}
 }
 
-// exists は、コミット commit の file のパスにファイル (ブロブ) があるかを返す。パスが無いときと、
-// ファイルでないもの (ディレクトリなど) のときは false。git が失敗したとき (オブジェクトを読めない、
-// など) は、パスが無いことと取り違えないよう run-error を返す。commit は解決済みの SHA。
-func (g gitRunner) exists(commit, file string) (bool, error) {
+// コミットの tree での、file のパスの項目の種類。
+const (
+	entryNone    = "none"    // パスが無い
+	entryFile    = "file"    // 通常のファイル (100644・100755)
+	entrySymlink = "symlink" // シンボリックリンク (120000)
+	entryOther   = "other"   // ディレクトリ・サブモジュールなど、ファイルでないもの
+)
+
+// entry は、コミット commit の file のパスの項目の種類を返す。git が失敗したとき (オブジェクトを
+// 読めない、など) は、パスが無いことと取り違えないよう run-error を返す。commit は解決済みの SHA。
+func (g gitRunner) entry(commit, file string) (string, error) {
 	out, _, err := g.run("ls-tree", "-z", commit, "--", file)
 	if err != nil {
-		return false, asRun(err)
+		return "", asRun(err)
 	}
-	for _, entry := range strings.Split(out, "\x00") {
-		meta, path, ok := strings.Cut(entry, "\t")
+	for _, e := range strings.Split(out, "\x00") {
+		meta, path, ok := strings.Cut(e, "\t")
 		if !ok || path != file {
 			continue
 		}
 		fields := strings.Fields(meta)
-		return len(fields) == 3 && fields[1] == "blob", nil
+		switch {
+		case len(fields) != 3 || fields[1] != "blob":
+			return entryOther, nil
+		case fields[0] == "120000":
+			return entrySymlink, nil
+		default:
+			return entryFile, nil
+		}
 	}
-	return false, nil
+	return entryNone, nil
 }
 
 // hasUncommittedChange は、file に HEAD からのコミットしていない変更 (ステージしたものを含む) があるかを返す。

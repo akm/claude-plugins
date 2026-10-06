@@ -350,9 +350,10 @@ func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
-// シンボリックリンクは、リンクの先ではなくリンクの文字列で比べる。リンクを変えていなければ
-// 成り立ち、リンク先を替えればコミットしていない変更になる。
-func TestSymlinkIsComparedAsLink(t *testing.T) {
+// 追跡中のシンボリックリンクは、方式によらず確かめない。git はリンクの文字列を 1 行のブロブとして
+// 記録し、git blame もそれを見るが、レビュアはリンクの先の内容を読むので、行番号が対応しない
+// (リンクの先をブランチが書き換えても、リンクの文字列は起点のまま)。
+func TestTrackedSymlinkIsUnverifiable(t *testing.T) {
 	r := newRepo(t)
 	r.write("real.md", "r\n")
 	r.write("other.md", "o\n")
@@ -361,17 +362,40 @@ func TestSymlinkIsComparedAsLink(t *testing.T) {
 	}
 	base := r.commit("base")
 	r.git("switch", "-q", "-c", "br")
-	r.write("g.md", "branch\n")
-	r.commit("branch")
+	r.write("real.md", "R\n")
+	r.commit("change the link target")
 
-	wantKind(t, r.check(base, "-file", "link.md", "-lines", "1", "-rev", "HEAD"), holds)
+	for _, mode := range [][]string{{"-rev", "HEAD"}, {"-worktree"}} {
+		o := r.check(base, append([]string{"-file", "link.md", "-lines", "1"}, mode...)...)
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "シンボリックリンク")
+	}
 
 	link := filepath.Join(r.dir, "link.md")
 	os.Remove(link)
 	if err := os.Symlink("other.md", link); err != nil {
 		t.Fatal(err)
 	}
-	wantKind(t, r.check(base, "-file", "link.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
+	for _, mode := range [][]string{{"-rev", "HEAD"}, {"-worktree"}} {
+		wantKind(t, r.check(base, append([]string{"-file", "link.md", "-lines", "1"}, mode...)...), unverifiable)
+	}
+}
+
+// 作業ツリーで、HEAD の通常のファイルをシンボリックリンクに置き換えると (コミットしていない)、-rev では
+// コミットしていない変更になる。作業ツリーの側はリンクの文字列のハッシュで比べる。
+func TestFileReplacedBySymlinkIsUncommittedChange(t *testing.T) {
+	r, base := branched(t)
+	r.write("h.md", "branch\n")
+	r.commit("branch")
+	f := filepath.Join(r.dir, "f.md")
+	os.Remove(f)
+	if err := os.Symlink("g.md", f); err != nil {
+		t.Fatal(err)
+	}
+
+	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "コミットしていない変更")
 }
 
 // 指摘のファイルを、作業ツリーでディレクトリに置き換えていたら、コミットしていない変更として扱う。
@@ -452,6 +476,15 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 			if c.want == unverifiable {
 				wantContains(t, o.reason, "clean フィルタ")
 			}
+
+			// コミットしても、共有の作業ツリーのレビュアが読む生の内容と、コミットの内容 (フィルタの後) の
+			// 行番号はずれる。-rev でも同じ結果になる
+			r.commit("change raw line 3")
+			o = r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD")
+			wantKind(t, o, c.want)
+			if c.want == unverifiable {
+				wantContains(t, o.reason, "clean フィルタ")
+			}
 		})
 	}
 }
@@ -516,23 +549,6 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 			wantError(t, r.check(base, args...), 3, "run-error:", c.want)
 		})
 	}
-}
-
-// -rev では、clean フィルタがあっても確かめる。git blame はコミットの内容を見て、行番号も
-// その内容のものなので、ずれない。
-func TestRevIgnoresCleanFilter(t *testing.T) {
-	r := newRepo(t)
-	r.git("config", "filter.strip.clean", "grep -v '^#'")
-	r.git("config", "filter.strip.smudge", "cat")
-	r.write(".gitattributes", "f.md filter=strip\n")
-	r.write("f.md", "x\ny\nz\n")
-	base := r.commit("base")
-	r.git("switch", "-q", "-c", "br")
-	r.write("f.md", "x\nY\nz\n")
-	r.commit("change line 2")
-
-	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), holds)
-	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-rev", "HEAD"), notHolds)
 }
 
 // 作業ツリーの内容の行番号で読む。コミットしていない行を上に足すと、起点の行は下にずれる。
