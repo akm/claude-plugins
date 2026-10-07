@@ -58,7 +58,7 @@ YAML はトップレベルに `runs` (実行の列) を持ち、1 回の実行�
 
 #### 周回中に記録の外で直さない (residual の自己採択)
 
-**上流が `residual` に残した 1 行を周回中に直したいときは、記録の外で直さず、`review-triage` の手順 1 で `findings` に自己採択の指摘として足す** (`origin: residual`)。`summary` には residual の文をそのまま写し、判定の経路 (D1〜D7) は上流の指摘と同じく通す — 自己採択でも帰結の 4 項目と根拠の検証を書き、ゲートを評価する。採択になれば `review-triage-fix` が同じ段 1〜3 (調査・立案・修正の検証) で直す。記録の外で「ついでに」直した変更は検証を通らずに次の増分に乗り、その波及先が次の回の採択になる (経緯は [#55](https://github.com/akm/claude-plugins/issues/55))。`origin` を省いた指摘は `review` で、上流の指摘であることを表す。
+**上流が `residual` に残した 1 行を周回中に直したいときは、記録の外で直さず、`review-triage` の手順 1 で `findings` に自己採択の指摘として足す** (`origin: residual`)。`summary` には residual の文をそのまま写し、判定の経路 ([判定フロー](judgment-flow.md) の図のとおり) は上流の指摘と同じく通す — 自己採択でも帰結の 4 項目と根拠の検証を書き、ゲートを評価する。採択になれば `review-triage-fix` が同じ段 1〜3 (調査・立案・修正の検証) で直す。記録の外で「ついでに」直した変更は検証を通らずに次の増分に乗り、その波及先が次の回の採択になる (経緯は [#55](https://github.com/akm/claude-plugins/issues/55))。`origin` を省いた指摘は `review` で、上流の指摘であることを表す。
 
 #### 前からある欠陥 (`findings[].prior_defect`)
 
