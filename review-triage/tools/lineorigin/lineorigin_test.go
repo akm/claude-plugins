@@ -440,7 +440,7 @@ func TestUncommittedChangeCheckFailureIsRunError(t *testing.T) {
 	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "hash-object")
 }
 
-// 道具は読むだけで、インデックスを書き換えない。更新時刻だけが変わったファイル (git diff なら
+// 道具は読むだけで、インデックスを書き換えない。更新時刻だけが変わったファイル (コマンド git diff なら
 // インデックスに記録した更新時刻などを更新して書き換える) があっても、-rev と -worktree のどちらでも変えない。
 func TestToolDoesNotWriteIndex(t *testing.T) {
 	r, base := branched(t)
@@ -802,7 +802,7 @@ func TestUnsetDriverWithProcessOnly(t *testing.T) {
 }
 
 // scriptedGit は、引数に sub を含む呼び出しだけを、stdout を書いて終了コード code で終え、
-// ほかのコマンドは本物の git に渡す偽の git を書き込んだディレクトリを返す。stdout は printf の書式
+// ほかのコマンドは本物の git に渡す偽の git を書き込んだディレクトリを返す。stdout はコマンド printf の書式
 // (\000 で NUL) で渡す。
 func scriptedGit(t *testing.T, sub, stdout string, code int) string {
 	t.Helper()
@@ -1110,7 +1110,7 @@ func TestGitEnvStopsFetchAndPrompt(t *testing.T) {
 	}
 }
 
-// diff の textconv があっても、変換した後ではなく元の行を比べる。
+// diff の textconv (比べる前にファイルを別の形へ変換する設定) があっても、変換した後ではなく元の行を比べる。
 func TestTextconvIsIgnored(t *testing.T) {
 	r := newRepo(t)
 	r.write(".gitattributes", "*.dat diff=csv\n")
@@ -1283,7 +1283,7 @@ func wantError(t *testing.T, o output, code int, label, want string) {
 }
 
 // ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が印で始まり、
-// 終了コードで種類が分かれる。フラグの誤りで flag が使い方を書き出すと、最初の行が印にならない。
+// 終了コードで種類が分かれる。フラグの誤りでパッケージ flag が使い方を書き出すと、最初の行が印にならない。
 func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
 	r, _ := branched(t)
 	r.write("g.md", "branch\n")
@@ -1376,7 +1376,7 @@ func TestGitNotFoundIsRunError(t *testing.T) {
 }
 
 // fakeGit は、コマンド git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
-// git を書き込んだディレクトリを返す。PATH の先頭に置いて、版の確認を確かめるのに使う。
+// git を書き込んだディレクトリを返す。環境変数 PATH の先頭に置いて、版の確認を確かめるのに使う。
 func fakeGit(t *testing.T, versionLine string) string {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -1469,7 +1469,7 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 }
 
 // stallingGit は、引数に word を含む呼び出しで止まり、ほかのコマンドは本物の git に渡す偽の git を
-// 書き込んだディレクトリを返す。止まるときは sleep を子のプロセスとして起動するので、期限で git (の偽物) を
+// 書き込んだディレクトリを返す。止まるときはコマンド sleep を子のプロセスとして起動するので、期限で git (の偽物) を
 // 止めても、sleep が標準出力を開いたまま残る。
 func stallingGit(t *testing.T, word string) string {
 	t.Helper()

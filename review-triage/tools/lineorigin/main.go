@@ -56,7 +56,7 @@ type options struct {
 
 func parseFlags(args []string) (options, error) {
 	fs := flag.NewFlagSet("lineorigin", flag.ContinueOnError)
-	// flag は誤りのときに使い方を書き出すが、標準エラー出力の最初の行を印にするため捨てる
+	// パッケージ flag は誤りのときに使い方を書き出すが、標準エラー出力の最初の行を印にするため捨てる
 	// (フラグの一覧は、ファイル review-triage/tools/lineorigin/README.md の「使い方」)
 	fs.SetOutput(io.Discard)
 	root := fs.String("root", "", "リポジトリのルートか、その中のディレクトリの絶対パス (必須)")
