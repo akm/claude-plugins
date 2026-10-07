@@ -1,0 +1,696 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// 結果の 3 つの値。D8 の条件 (1) が成り立つ・成り立たない・確かめられない。
+const (
+	holds        = "holds"
+	notHolds     = "not-holds"
+	unverifiable = "unverifiable"
+)
+
+type result struct {
+	kind   string
+	reason string
+	lines  []lineResult // 行ごとの内訳。行を調べる前に結果が決まったときは空
+}
+
+type lineResult struct {
+	line int
+	kind string
+	note string
+}
+
+// check は、opts の行が全量の起点からレビューした内容まで変わっていないかを確かめる。
+// 入力の誤り (解決できない版・レビューした内容に無いファイルや行) は error で返し、結果にしない。
+func check(opts options) (result, error) {
+	if err := checkGitVersion(opts.worktree); err != nil {
+		return result{}, err
+	}
+	top, err := toplevel(opts.root)
+	if err != nil {
+		return result{}, err
+	}
+	g := gitRunner{root: top}
+
+	base, found, err := g.commit(opts.base)
+	if err != nil {
+		return result{}, err
+	} else if !found {
+		return result{}, inputf("-base をコミットに解決できません: %s", opts.base)
+	}
+	targetName := opts.rev
+	if opts.worktree {
+		targetName = "HEAD"
+	}
+	target, found, err := g.commit(targetName)
+	if err != nil {
+		return result{}, err
+	} else if !found {
+		return result{}, inputf("レビューした内容のコミット (%s) を解決できません", targetName)
+	}
+
+	// 全量の起点がレビューした内容のコミットと同じなら、範囲 <起点>..<コミット> が空になり、
+	// コミット済みのどの行も起点にあったままと報告される。ブランチの変更と前からある行を区別できない。
+	if base == target {
+		return result{kind: unverifiable, reason: fmt.Sprintf("全量の起点 %s が、レビューした内容のコミット (%s) と同じで、このブランチの変更と前からある行を区別できない", short(base), targetName)}, nil
+	}
+	ok, err := g.isAncestor(base, target)
+	if err != nil {
+		return result{}, asRun(err)
+	}
+	if !ok {
+		return result{kind: unverifiable, reason: fmt.Sprintf("全量の起点 %s が、レビューした内容のコミット (%s) の祖先ではない", short(base), targetName)}, nil
+	}
+
+	// 指摘の file は、レビューした内容にあるはず (根拠の照合 E1 を通っている)。無ければ入力の誤り。
+	targetEntry, err := g.entry(target, opts.file)
+	if err != nil {
+		return result{}, err
+	}
+	if opts.worktree {
+		st, err := os.Stat(filepath.Join(top, filepath.FromSlash(opts.file)))
+		if err != nil || !st.Mode().IsRegular() {
+			return result{}, inputf("作業ツリーに -file のファイルがありません: %s", opts.file)
+		}
+	} else if targetEntry != entryFile && targetEntry != entrySymlink {
+		return result{}, inputf("レビューした内容 (%s) に -file のファイルがありません: %s", opts.rev, opts.file)
+	}
+
+	if baseEntry, err := g.entry(base, opts.file); err != nil {
+		return result{}, err
+	} else if baseEntry != entryFile && baseEntry != entrySymlink {
+		return result{kind: notHolds, reason: fmt.Sprintf("全量の起点 %s に同じパスのファイルが無い (このブランチで作った・改名した・移したファイル)", short(base))}, nil
+	}
+	if opts.worktree && targetEntry != entryFile && targetEntry != entrySymlink {
+		return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
+	}
+
+	// 次の 3 つは、レビュアが読む内容とコマンド git blame が見る内容が違いうる。シンボリックリンクと clean
+	// フィルタは行番号が対応せず、属性 ident は行の中の書き換えを、比べる前の変換で戻す。どれも書き換えた行が
+	// 起点のままと報告されうる (誤った holds) ので、方式によらず確かめない。
+	// git はシンボリックリンクのリンクの文字列を 1 行のブロブとして記録し、git blame もそれを見るが、
+	// レビュアはリンクの先の内容を読む
+	if targetEntry == entrySymlink {
+		return result{kind: unverifiable, reason: "指摘のファイルが追跡中のシンボリックリンクで、レビュアが読むリンクの先の内容と、git が記録するリンクの文字列の行番号が対応しない"}, nil
+	}
+	// clean フィルタは、作業ツリーの内容 (レビュアが読む、フィルタの前の内容) を変換してから記録し、
+	// git blame もフィルタの後の内容 (コミットの内容と、オプション --contents で渡した内容) を見る。フィルタが
+	// 行を増やしたり消したりすると、行番号がずれる。属性 ident は、記録するときに「$Id: … $」を「$Id$」へ戻し、
+	// コマンド git hash-object --path と git blame --contents も同じ変換を当ててから比べるので、「$Id: … $」の
+	// 中の書き換えが見えない。-rev では、コミットしていない変更の確認より前に確かめる (その確認が実行する
+	// git hash-object --path が、フィルタのプログラムを実行しないように)
+	attr, err := g.convertingAttribute(opts.file)
+	if err != nil {
+		return result{}, err
+	}
+	switch attr {
+	case "filter":
+		return result{kind: unverifiable, reason: "指摘のファイルに clean フィルタ (属性 filter) が設定されていて、作業ツリーの内容 (フィルタの前) と、git blame が見るフィルタの後の内容の行番号がずれうる"}, nil
+	case "ident":
+		return result{kind: unverifiable, reason: "指摘のファイルに属性 ident が設定されていて、git は「$Id: … $」の中を「$Id$」へ戻してから内容を比べるので、レビュアが読んだその中の書き換えを確かめられない"}, nil
+	}
+
+	if !opts.worktree {
+		// 結果のファイルで受け取ったレビューは、共有の作業ツリーでコミットしていない変更を見た可能性があり、
+		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
+		// 比べる相手は HEAD ではなく、レビューした内容のコミットにする。-rev が HEAD より前なら、レビューの
+		// 時点ではコミットしていなかった編集が、その後のコミットに入っていることがあり、HEAD と比べても見つからない
+		changed, err := g.hasUncommittedChange(top, target, targetEntry, opts.file)
+		if err != nil {
+			return result{}, asRun(err)
+		}
+		if changed {
+			return result{kind: unverifiable, reason: fmt.Sprintf("指摘のファイルの作業ツリーかインデックスの内容が、レビューした内容のコミット (%s) と違う (コミットしていない変更があるか、そのコミットより後のコミットで変わった) ので、レビューがどの内容を見たかが分からない", targetName)}, nil
+		}
+	}
+
+	blamed, err := g.blame(base, target, opts)
+	if err != nil {
+		return result{}, err
+	}
+	return classify(base, opts.file, blamed), nil
+}
+
+// classify は blame の結果を行ごとに分類し、全体の結果を決める。
+// 成り立たない行が 1 つでもあれば成り立たない、無くて確かめられない行があれば確かめられない。
+func classify(base, file string, blamed []blameLine) result {
+	res := result{kind: holds}
+	for _, b := range blamed {
+		l := lineResult{line: b.final}
+		switch {
+		case isZero(b.commit):
+			l.kind, l.note = notHolds, "コミットしていない行"
+		case !b.boundary:
+			l.kind, l.note = notHolds, fmt.Sprintf("全量の起点より後のコミット %s が書いた・書き換えた行", short(b.commit))
+		case b.commit != base:
+			// 起点より前に分かれた履歴をマージすると、行がその分岐点まで遡り、そこが境界になる。
+			// その行が起点にもあったかは、この結果からは決められない。
+			l.kind, l.note = unverifiable, fmt.Sprintf("全量の起点を通らない履歴 (起点より前に分かれた履歴のマージなど) から来た行で、境界のコミットが %s。全量の起点にあったかを決められない", short(b.commit))
+		case b.filename != file:
+			l.kind, l.note = notHolds, fmt.Sprintf("このブランチで改名・移動したファイルの行 (全量の起点では %s)", b.filename)
+		default:
+			// 境界が起点でパスも同じなので、フィールド orig は起点のファイルでの行番号
+			l.kind, l.note = holds, fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", b.orig)
+		}
+		res.lines = append(res.lines, l)
+		switch {
+		case l.kind == notHolds:
+			res.kind = notHolds
+		case l.kind == unverifiable && res.kind == holds:
+			res.kind = unverifiable
+		}
+	}
+	switch res.kind {
+	case notHolds:
+		res.reason = "対象の行のうち、全量の起点から変わった行がある"
+	case unverifiable:
+		res.reason = "対象の行のうち、全量の起点にあったかを決められない行がある"
+	default:
+		res.reason = fmt.Sprintf("対象の行はどれも、全量の起点 %s にあったまま変わっていない", short(base))
+	}
+	return res
+}
+
+// lineCount は、レビューした内容の -file の行数を返す。数え方は git blame と同じで、
+// 末尾に改行の無い最後の行も 1 行と数える。
+func (g gitRunner) lineCount(target string, opts options) (int, error) {
+	var content []byte
+	if opts.worktree {
+		b, err := os.ReadFile(filepath.Join(g.root, filepath.FromSlash(opts.file)))
+		if err != nil {
+			return 0, runf("作業ツリーの -file を読めません: %v", err)
+		}
+		content = b
+	} else {
+		out, _, err := g.run("cat-file", "-p", target+":"+opts.file)
+		if err != nil {
+			return 0, asRun(err)
+		}
+		content = []byte(out)
+	}
+	n := bytes.Count(content, []byte("\n"))
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		n++
+	}
+	return n, nil
+}
+
+type blameLine struct {
+	orig     int    // その行を最後に変えたコミット (範囲の外なら境界のコミット) の内容での行番号
+	final    int    // レビューした内容での行番号
+	commit   string // その行を最後に変えたコミット。範囲の外なら境界のコミット
+	boundary bool   // 範囲 <起点>..<コミット> の境界のコミットか
+	filename string // そのコミットでのパス
+}
+
+var blameHeader = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64}) ([0-9]+) ([0-9]+)( [0-9]+)?$`)
+
+// parsePorcelain は git blame --line-porcelain の出力を読む。
+func parsePorcelain(out string) ([]blameLine, error) {
+	var lines []blameLine
+	var cur *blameLine
+	for _, s := range strings.Split(out, "\n") {
+		if cur == nil {
+			if s == "" {
+				continue
+			}
+			m := blameHeader.FindStringSubmatch(s)
+			if m == nil {
+				return nil, fmt.Errorf("git blame の出力を読めません: %q", s)
+			}
+			orig, _ := strconv.Atoi(m[2])
+			final, _ := strconv.Atoi(m[3])
+			cur = &blameLine{orig: orig, final: final, commit: m[1]}
+			continue
+		}
+		switch {
+		case strings.HasPrefix(s, "\t"):
+			if cur.filename == "" {
+				return nil, fmt.Errorf("git blame の出力に行 %d のファイル名がありません", cur.final)
+			}
+			lines = append(lines, *cur)
+			cur = nil
+		case s == "boundary":
+			cur.boundary = true
+		case strings.HasPrefix(s, "filename "):
+			name, err := unquotePath(strings.TrimPrefix(s, "filename "))
+			if err != nil {
+				return nil, err
+			}
+			cur.filename = name
+		}
+	}
+	if cur != nil {
+		return nil, fmt.Errorf("git blame の出力が行 %d の途中で終わっています", cur.final)
+	}
+	return lines, nil
+}
+
+// unquotePath は、git が引用符で囲んで出したパス (日本語や " を含むもの。例: "\346\227\245.md") を元に戻す。
+func unquotePath(s string) (string, error) {
+	if !strings.HasPrefix(s, `"`) {
+		return s, nil
+	}
+	u, err := strconv.Unquote(s)
+	if err != nil {
+		return "", fmt.Errorf("git blame の出力のファイル名を読めません: %s", s)
+	}
+	return u, nil
+}
+
+func isZero(sha string) bool { return strings.Trim(sha, "0") == "" }
+
+func short(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
+}
+
+// gitRunner は、リポジトリのルートを基準に git を実行する。
+type gitRunner struct{ root string }
+
+// toplevel は -root からリポジトリのルートを求める。入力の誤りにするのは、-root が存在する
+// ディレクトリでないときと、-root から上のどこにも .git が無いときだけ。.git があるのに git が
+// リポジトリとして読めない (権限・所有者など) ときは、渡し方では直せないので run-error にする。
+// git は .git を読めないときも「not a git repository」と言うので、.git の有無は道具が確かめる。
+func toplevel(dir string) (string, error) {
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		return "", inputf("-root が存在するディレクトリではありません: %s", dir)
+	}
+	out, _, err := gitRunner{root: dir}.run("rev-parse", "--show-toplevel")
+	if err == nil {
+		// 出力の末尾の改行 1 つだけを落とす。名前の末尾の空白はパスの一部なので削らない (削ると、空白の無い
+		// 名前の別のディレクトリを読む)
+		return strings.TrimSuffix(out, "\n"), nil
+	}
+	var re *runError
+	if errors.As(err, &re) {
+		return "", err
+	}
+	if strings.Contains(err.Error(), "not a git repository") {
+		if dotGit, ok := findDotGit(dir); ok {
+			return "", runf("%s があるが、git がリポジトリとして読めません: %v", dotGit, err)
+		}
+		return "", inputf("-root が git のリポジトリの中を指していません: %s", dir)
+	}
+	return "", runf("-root のリポジトリを git で読めません: %v", err)
+}
+
+// findDotGit は、dir から上のディレクトリをたどって、最初に見つかった .git (ディレクトリか、
+// 作業ツリーが持つファイル) のパスを返す。
+func findDotGit(dir string) (string, bool) {
+	for d := filepath.Clean(dir); ; d = filepath.Dir(d) {
+		p := filepath.Join(d, ".git")
+		if _, err := os.Lstat(p); err == nil {
+			return p, true
+		}
+		if filepath.Dir(d) == d {
+			return "", false
+		}
+	}
+}
+
+// run は git を実行し、標準出力と終了コードを返す。終了コードが 0 でなければ error も返す。
+//
+// どのディレクトリから実行しても同じ結果になるよう、git のオプション -C でルートを指定する。環境は関数 gitEnv が作る。
+func (g gitRunner) run(args ...string) (string, int, error) {
+	return g.runIn(nil, args...)
+}
+
+// gitTimeout は、git の 1 回の実行に許す時間。越えたら run-error にする。git や、git が起動する
+// フィルタのプログラムが止まったときに、道具が終わらなくなるのを防ぐ。テストが短くする。
+var gitTimeout = 5 * time.Minute
+
+// runIn は、stdin を標準入力に渡して run と同じように git を実行する。
+//
+// 設定 core.fsmonitor は打ち消す。打ち消さないと、git はそこに登録したプログラムを起動し、値が true なら
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作って、道具が終わった後も残る。
+func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false", "-c", "core.fsmonitor=false"}, args...)...)
+	cmd.WaitDelay = time.Second // 期限で止めた git の子のプロセスが出力を開いたままでも、待ち続けない
+	cmd.Env = gitEnv()
+	cmd.Stdin = stdin
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", -1, runf("git %s が %s 以内に終わりませんでした", strings.Join(args, " "), gitTimeout)
+	}
+	if err == nil {
+		return stdout.String(), 0, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return stdout.String(), exitErr.ExitCode(), fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(stderr.String()))
+	}
+	return "", -1, runf("git を起動できません: %v", err)
+}
+
+var gitVersionRe = regexp.MustCompile(`^git version ([0-9]+)\.([0-9]+)`)
+
+// checkGitVersion は、git を起動できることと、道具が要る版であることを確かめる。要るのは 2.30 以降
+// (関数 commit が使うコマンド git rev-parse --end-of-options が 2.30.0 から) で、フラグ -worktree では
+// 2.41 以降 (関数 blame がコマンド git blame にオプション --contents と範囲 <起点>..<コミット> を一緒に
+// 渡す形を、git は 2.41.0 から受け付ける)。古い git では、正しい版を渡しても解決できないか、git blame が
+// 毎回失敗するので、入力の誤りと取り違えないよう、道具を実行できないこととして返す。
+func checkGitVersion(worktree bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "version")
+	cmd.WaitDelay = time.Second
+	cmd.Env = gitEnv()
+	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return runf("git version が %s 以内に終わりませんでした", gitTimeout)
+	}
+	if err != nil {
+		return runf("git を起動できません: %v", err)
+	}
+	major, minor, ok := parseGitVersion(string(out))
+	if !ok {
+		return runf("git の版を読めません: %s", strings.TrimSpace(string(out)))
+	}
+	if major < 2 || major == 2 && minor < 30 {
+		return runf("git 2.30 以降が要ります (git rev-parse --end-of-options を使うため)。この git は %s", strings.TrimSpace(string(out)))
+	}
+	if worktree && major == 2 && minor < 41 {
+		return runf("フラグ -worktree には git 2.41 以降が要ります (git blame に --contents と範囲を一緒に渡すため)。この git は %s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func parseGitVersion(s string) (major, minor int, ok bool) {
+	m := gitVersionRe.FindStringSubmatch(strings.TrimSpace(s))
+	if m == nil {
+		return 0, 0, false
+	}
+	major, _ = strconv.Atoi(m[1])
+	minor, _ = strconv.Atoi(m[2])
+	return major, minor, true
+}
+
+// extraGitEnv は、gitEnv が GIT_ で始まる変数を取り除いた後に足す変数。本番では空で、
+// テストがシステムの git の設定を読ませないために使う (取り除く前に設定しても届かないため)。
+var extraGitEnv []string
+
+// gitEnv は git に渡す環境を作る。利用者の環境の GIT_ で始まる変数は、リポジトリの場所を替える
+// (GIT_DIR・GIT_WORK_TREE・GIT_INDEX_FILE など)、設定を注入する (GIT_CONFIG_PARAMETERS・
+// GIT_CONFIG_COUNT など)、パスの読み方を替える (GIT_GLOB_PATHSPECS など) ので、-root と違う
+// リポジトリや設定を読ませないよう、すべて取り除いてから道具が要るものだけを足す。
+func gitEnv() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "GIT_") {
+			env = append(env, kv)
+		}
+	}
+	env = append(env,
+		// git の文言 (not a git repository など) を、利用者の言語の設定によらず英語にして比べられるようにする
+		"LC_ALL=C",
+		// パスを pathspec (パターンや先頭の : で始まる指定) として解釈させない
+		"GIT_LITERAL_PATHSPECS=1",
+		// コマンド git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
+		"GIT_NO_REPLACE_OBJECTS=1",
+		// 部分クローンで欠けたオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
+		// 取得できないと git は失敗し、道具は run-error になる
+		"GIT_NO_LAZY_FETCH=1",
+		// 認証などで利用者に尋ねて待たない
+		"GIT_TERMINAL_PROMPT=0",
+	)
+	return append(env, extraGitEnv...)
+}
+
+// commit は版をコミットの完全な SHA に解決する。版が無いとき (オプション --quiet で終了コード 1) は
+// found を false にする。それ以外の失敗 (リポジトリを読めない、など) は run-error。
+func (g gitRunner) commit(rev string) (sha string, found bool, err error) {
+	out, code, err := g.run("rev-parse", "--verify", "--quiet", "--end-of-options", rev+"^{commit}")
+	switch {
+	case err == nil:
+		return strings.TrimSpace(out), true, nil
+	case code == 1:
+		return "", false, nil
+	default:
+		return "", false, asRun(err)
+	}
+}
+
+func (g gitRunner) isAncestor(a, b string) (bool, error) {
+	_, code, err := g.run("merge-base", "--is-ancestor", a, b)
+	switch code {
+	case 0:
+		return true, nil
+	case 1:
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+// コミットの tree での、file のパスの項目の種類。
+const (
+	entryNone    = "none"    // パスが無い
+	entryFile    = "file"    // 通常のファイル (100644・100755)
+	entrySymlink = "symlink" // シンボリックリンク (120000)
+	entryOther   = "other"   // ディレクトリ・サブモジュールなど、ファイルでないもの
+)
+
+// modeKind は、コマンド git ls-files --stage が出す項目の mode を、項目の種類 (関数 entry の値) にする。
+// 通常のファイルの mode は 100 で始まる (100644・100755)。
+func modeKind(mode string) string {
+	switch {
+	case mode == "120000":
+		return entrySymlink
+	case strings.HasPrefix(mode, "100"):
+		return entryFile
+	default:
+		return entryOther
+	}
+}
+
+// entry は、コミット commit の file のパスの項目の種類を返す。git が失敗したとき (オブジェクトを
+// 読めない、など) は、パスが無いことと取り違えないよう run-error を返す。commit は解決済みの SHA。
+func (g gitRunner) entry(commit, file string) (string, error) {
+	out, _, err := g.run("ls-tree", "-z", commit, "--", file)
+	if err != nil {
+		return "", asRun(err)
+	}
+	for _, e := range strings.Split(out, "\x00") {
+		meta, path, ok := strings.Cut(e, "\t")
+		if !ok || path != file {
+			continue
+		}
+		fields := strings.Fields(meta)
+		switch {
+		case len(fields) != 3 || fields[1] != "blob":
+			return entryOther, nil
+		case fields[0] == "120000":
+			return entrySymlink, nil
+		default:
+			return entryFile, nil
+		}
+	}
+	return entryNone, nil
+}
+
+// hasUncommittedChange は、file の作業ツリーかインデックスの内容が、コミット rev の内容と違うかを返す。
+// rev が HEAD なら、コミットしていない変更 (ステージしたものを含む) があるかと同じ。rev が HEAD より前なら、
+// その後のコミットで変わった内容も、違いとして返す。
+//
+// コマンド git diff は使わない。インデックスに記録した更新時刻などが作業ツリーのファイルと合わないと、
+// 環境変数 GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、rev・インデックス・
+// 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や
+// assume-unchanged (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) が
+// 付いたファイルの編集も、変更として扱う。
+//
+// kind は、コミット rev の file の項目の種類 (関数 entry の値)。インデックスか作業ツリーの種類がそれと違えば
+// (通常のファイルをシンボリックリンクに置き換えたなど)、ハッシュを比べずに変更ありとする。ハッシュだけを
+// 比べると、リンクの文字列がファイルの内容とちょうど同じときに、同じ内容と見なしてしまう。
+func (g gitRunner) hasUncommittedChange(top, rev, kind, file string) (bool, error) {
+	committed, err := g.blob(rev, file)
+	if err != nil {
+		return false, err
+	}
+	out, _, err := g.run("ls-files", "--stage", "--", file)
+	if err != nil {
+		return false, err
+	}
+	// 項目のどれかのステージが 0 でなければ、変更ありとする。衝突の解消の途中は、インデックスに同じパスの
+	// 項目がステージ 1〜3 に分かれてあるので、これに当たる。項目の種類 (mode) が kind と違うときも変更ありとする
+	var index string
+	if out != "" {
+		for _, e := range strings.Split(strings.TrimSpace(out), "\n") {
+			fields := strings.Fields(e)
+			if len(fields) < 3 || fields[2] != "0" || modeKind(fields[0]) != kind {
+				return true, nil
+			}
+			index = fields[1]
+		}
+	}
+	// 作業ツリーの内容のハッシュを、git が記録するのと同じ形で求める。git が記録するのは通常の
+	// ファイルとシンボリックリンクだけで、シンボリックリンクはリンクの先ではなくリンクの文字列を記録する
+	var worktree string
+	abs := filepath.Join(top, filepath.FromSlash(file))
+	st, err := os.Lstat(abs)
+	switch {
+	case os.IsNotExist(err):
+		// 作業ツリーから消した。worktree は空のまま
+	case err != nil:
+		return false, runf("作業ツリーの -file を読めません: %v", err)
+	case st.Mode().IsRegular():
+		if kind != entryFile {
+			return true, nil
+		}
+		// --path で、そのパスの属性によるフィルタ (改行の変換など) を当ててからハッシュを求める。オプション -w を付けないので書き込まない
+		out, _, err := g.run("hash-object", "--path="+file, "--", abs)
+		if err != nil {
+			return false, err
+		}
+		worktree = strings.TrimSpace(out)
+	case st.Mode()&os.ModeSymlink != 0:
+		if kind != entrySymlink {
+			return true, nil
+		}
+		link, err := os.Readlink(abs)
+		if err != nil {
+			return false, runf("作業ツリーの -file のリンクを読めません: %v", err)
+		}
+		out, _, err := g.runIn(strings.NewReader(link), "hash-object", "--no-filters", "--stdin")
+		if err != nil {
+			return false, err
+		}
+		worktree = strings.TrimSpace(out)
+	default:
+		// ディレクトリなど、git が記録しない種類に置き換わっている
+		return true, nil
+	}
+	return committed != index || index != worktree, nil
+}
+
+// convertingAttribute は、file に、レビュアが読む内容と git が比べる内容を違えうる属性が設定されて
+// いれば、その名前 (filter か ident) を返す。無ければ空を返す。両方あれば filter を返す。
+//
+// 属性 filter (コマンド git add のときにファイルを変換するプログラム) の値はドライバ (設定
+// filter.<名前>.clean などで登録する、変換のプログラムの名前) で、設定の無いドライバの名前や、値の無い
+// filter も「あり」とする。
+// 属性 ident (ファイルの中の「$Id$」を、取り出すときにブロブの SHA を入れた「$Id: … $」に展開し、記録する
+// ときに「$Id$」へ戻す仕組み) は、unset 以外の値なら「あり」とする (git が展開するのは値が set のときだけ)。
+// 「あり」なら呼び出し元は確かめずに unverifiable を返すので、迷う場合を「あり」として扱っても、
+// 誤った holds にはならない。
+func (g gitRunner) convertingAttribute(file string) (string, error) {
+	// オプション -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
+	// filter だけを尋ねると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
+	out, _, err := g.run("check-attr", "-a", "-z", "--", file)
+	if err != nil {
+		return "", asRun(err)
+	}
+	// オプション -z の出力は「<パス> NUL <属性> NUL <値> NUL」の繰り返しで、属性が無ければ空。NUL で分けると、
+	// 要素の数は 3 の倍数に 1 を足した数になり、最後は空になる。そうでない出力は読めないので run-error にする
+	// (読めない出力を属性無しとして扱い、git blame で行を調べに進むと、誤った holds になりうる)
+	parts := strings.Split(out, "\x00")
+	if len(parts)%3 != 1 || parts[len(parts)-1] != "" {
+		return "", runf("git check-attr の出力を読めません: %q", out)
+	}
+	ident := false
+	for k := 0; k+2 < len(parts); k += 3 {
+		switch parts[k+1] {
+		case "filter":
+			if parts[k+2] != "unset" {
+				return "filter", nil
+			}
+			// unset は、-filter (フィルタを外す) と、名前が unset のドライバを区別できないので、
+			// そのドライバの設定があれば「あり」とする
+			_, code, err := g.run("config", "--get-regexp", `^filter\.unset\.(clean|process)$`)
+			switch code {
+			case 0:
+				return "filter", nil
+			case 1:
+				// ドライバの設定が無いので、-filter (フィルタを外す)
+			default:
+				return "", asRun(err)
+			}
+		case "ident":
+			ident = parts[k+2] != "unset"
+		}
+	}
+	if ident {
+		return "ident", nil
+	}
+	return "", nil
+}
+
+// blob は、コミット commit の file のブロブの SHA を返す。そのパスが無ければ空。
+func (g gitRunner) blob(commit, file string) (string, error) {
+	out, code, err := g.run("rev-parse", "--verify", "--quiet", commit+":"+file)
+	switch {
+	case err == nil:
+		return strings.TrimSpace(out), nil
+	case code == 1:
+		return "", nil
+	default:
+		return "", err
+	}
+}
+
+// blame は、範囲 <起点>..<コミット> で opts の行を最後に変えたコミットを求める。
+// 範囲を起点で区切ると、起点から変わっていない行は起点が境界 (boundary) として報告される。
+func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error) {
+	args := []string{
+		"blame",
+		// 範囲の中のルートのコミット (無関係な履歴のマージ) を境界として扱わず、そのコミットの行として報告させる
+		"--root",
+		// 設定 blame.ignoreRevsFile に挙げたコミットを無視すると、そのコミットが書き換えた行が起点のままと報告される
+		"--ignore-revs-file", "",
+		// diff の textconv (比べる前にファイルを別の形へ変換する設定) で変換した行を比べると、
+		// 変換で消える部分だけを書き換えた行が、起点のままと報告される
+		"--no-textconv",
+		"--line-porcelain",
+	}
+	// 範囲はまとめてあるので、git blame はどの行も 1 回ずつ、ファイルの順に出す
+	want := 0
+	for _, r := range opts.ranges {
+		args = append(args, "-L", fmt.Sprintf("%d,%d", r.from, r.to))
+		want += r.to - r.from + 1
+	}
+	if opts.worktree {
+		args = append(args, "--contents", filepath.Join(g.root, filepath.FromSlash(opts.file)))
+	}
+	// 行がレビューした内容の行数を越えるのは渡し方の誤りなので、blame の前に道具が数えて
+	// input-error にする。blame そのものの失敗は、渡し方では説明できないので run-error にする
+	n, err := g.lineCount(target, opts)
+	if err != nil {
+		return nil, err
+	}
+	if last := opts.ranges[len(opts.ranges)-1].to; last > n {
+		return nil, inputf("行 %d が、レビューした内容の -file の行数 (%d) を越えます", last, n)
+	}
+	args = append(args, base+".."+target, "--", opts.file)
+	out, _, err := g.run(args...)
+	if err != nil {
+		return nil, asRun(err)
+	}
+	lines, err := parsePorcelain(out)
+	if err != nil {
+		return nil, asRun(err)
+	}
+	if len(lines) != want {
+		return nil, runf("git blame が %d 行を返しました (求めたのは %d 行)", len(lines), want)
+	}
+	return lines, nil
+}

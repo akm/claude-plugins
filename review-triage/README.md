@@ -36,6 +36,10 @@
 
 Markdown の修正の差分から、コミット前に読み直す範囲 — 同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 (近くの辺) — を列挙します。`review-triage-fix` の段 3 が観点 B (並びを読み直す) に使い、読んだ範囲を記録の `plans[].verification.near_edges` に残します。`-hints` で差分の種類に応じた観点 (B・C・F) も提示します。使い方は [tools/nearedges/README.md](tools/nearedges/README.md)。**Go が必要です** (triagecheck と同じく `go run` で都度実行)。
 
+## 同梱の道具 (lineorigin)
+
+レビューの指摘の対象の行が、全量の起点 (ブランチの作り始めのコミット) から、レビューした内容まで変わっていないかを確かめます。`review-triage` が判定ノード D8 (このブランチより前からある欠陥か) の条件 (1) に使い、結果 (成り立つ・成り立たない・確かめられない) を判定の記録に残します。使い方は [tools/lineorigin/README.md](tools/lineorigin/README.md)。**Go と git が要ります** (triagecheck と同じく `go run` で都度実行)。
+
 ## 同梱のワーカー (review-loop-worker)
 
 `review-loop` のレビューを行うスクリプト `scripts/review-loop-worker.sh` です。**端末で 1 回起動**すると、周回の置き場 (作業側との受け渡しに使うディレクトリ) に依頼文が現れるたびに `claude -p` を指定のモデルと effort で走らせ、結果を確かめてから完了の印を書き、次の依頼文を待ちます。起動コマンドは `review-loop` が案内します。Claude Desktop app で Terminal パネルのツールが使えるときは、`review-loop` がモデル・effort・コマンドを示して承認を求め、承認すると端末のタブで起動します。

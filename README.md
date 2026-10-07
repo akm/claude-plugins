@@ -178,6 +178,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── tests/                     # python3 -m unittest discover -s review-triage/tests
     ├── tools/triagecheck/         # 記録を検査する Go ツール (go test ./...)
     ├── tools/nearedges/           # Markdown の修正の差分から、コミット前に読み直す範囲を列挙する Go ツール (go test ./...)
+    ├── tools/lineorigin/          # 指摘の対象の行が、全量の起点から変わっていないかを確かめる Go ツール (go test ./...)
     └── README.md
 ```
 
