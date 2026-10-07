@@ -420,6 +420,26 @@ func TestUncommittedChangeInFileIsUnverifiableWithRev(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
+// -rev のときにコミットしていない変更を確かめられなければ、変更が無いとして git blame で行を調べに進まず、
+// run-error にする。調べに進むと、確かめられなかった編集の行が、起点にあったまま (誤った holds) と報告される。
+func TestUncommittedChangeCheckFailureIsRunError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root では権限を外しても読めてしまう")
+	}
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	// 1 行目を書き換え (コミットしない)、確かめるコマンド git hash-object --path が読めないように権限を外す
+	r.write("f.md", "A\nb\nc\n")
+	p := filepath.Join(r.dir, "f.md")
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(p, 0o644) })
+
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "hash-object")
+}
+
 // 道具は読むだけで、インデックスを書き換えない。更新時刻だけが変わったファイル (git diff なら
 // インデックスに記録した更新時刻などを更新して書き換える) があっても、-rev と -worktree のどちらでも変えない。
 func TestToolDoesNotWriteIndex(t *testing.T) {
@@ -1241,6 +1261,20 @@ func TestMissingObjectIsRunError(t *testing.T) {
 	}
 
 	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "ls-tree")
+}
+
+// git blame が求めた行の一部しか返さないときは、返った行だけで結果を出さず、run-error にする。
+// 結果を出すと、返らなかった行を調べないまま、起点にあったまま (誤った holds) と報告しうる。
+func TestBlameLineCountMismatchIsRunError(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nB\nc\n")
+	r.commit("change line 2")
+	// 偽の git は、git blame の呼び出しにだけ、起点の 1 行目 (境界) の 1 行分の出力を返す。
+	// 書き換えた 2 行目は返さない
+	out := base + " 1 1 1\\nboundary\\nfilename f.md\\n\\ta\\n"
+	t.Setenv("PATH", scriptedGit(t, "blame", out, 0))
+
+	wantError(t, r.check(base, "-file", "f.md", "-lines", "1-2", "-rev", "HEAD"), 3, "run-error:", "git blame が 1 行を返しました (求めたのは 2 行)")
 }
 
 // git を起動できないときは、入力の誤りではなく、道具を実行できないこととして返す。
