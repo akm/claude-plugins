@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 	} {
 		os.Setenv(k, v)
 	}
-	// 環境変数 GIT_CONFIG_NOSYSTEM は、道具の gitEnv が取り除くので、取り除いた後に足す列にも入れる
+	// 環境変数 GIT_CONFIG_NOSYSTEM は、道具の関数 gitEnv が取り除くので、取り除いた後に足す列にも入れる
 	extraGitEnv = []string{"GIT_CONFIG_NOSYSTEM=1"}
 	code := m.Run()
 	os.RemoveAll(home)

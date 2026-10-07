@@ -163,7 +163,7 @@ func classify(base, file string, blamed []blameLine) result {
 		case b.filename != file:
 			l.kind, l.note = notHolds, fmt.Sprintf("このブランチで改名・移動したファイルの行 (全量の起点では %s)", b.filename)
 		default:
-			// 境界が起点でパスも同じなので、orig は起点のファイルでの行番号
+			// 境界が起点でパスも同じなので、フィールド orig は起点のファイルでの行番号
 			l.kind, l.note = holds, fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", b.orig)
 		}
 		res.lines = append(res.lines, l)
@@ -325,7 +325,7 @@ func findDotGit(dir string) (string, bool) {
 
 // run は git を実行し、標準出力と終了コードを返す。終了コードが 0 でなければ error も返す。
 //
-// どのディレクトリから実行しても同じ結果になるよう、git のオプション -C でルートを指定する。環境は gitEnv が作る。
+// どのディレクトリから実行しても同じ結果になるよう、git のオプション -C でルートを指定する。環境は関数 gitEnv が作る。
 func (g gitRunner) run(args ...string) (string, int, error) {
 	return g.runIn(nil, args...)
 }
