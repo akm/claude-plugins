@@ -37,7 +37,7 @@ type lineResult struct {
 // check は、opts の行が全量の起点からレビューした内容まで変わっていないかを確かめる。
 // 入力の誤り (解決できない版・レビューした内容に無いファイルや行) は error で返し、結果にしない。
 func check(opts options) (result, error) {
-	if err := checkGitVersion(); err != nil {
+	if err := checkGitVersion(opts.worktree); err != nil {
 		return result{}, err
 	}
 	top, err := toplevel(opts.root)
@@ -360,10 +360,12 @@ func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 
 var gitVersionRe = regexp.MustCompile(`^git version ([0-9]+)\.([0-9]+)`)
 
-// checkGitVersion は、git を起動できることと、道具が要る版 (2.30 以降。関数 commit が使う
-// git rev-parse --end-of-options が 2.30.0 から) であることを確かめる。古い git では、正しい版を
-// 渡しても解決できないので、入力の誤りと取り違えないよう、道具を実行できないこととして返す。
-func checkGitVersion() error {
+// checkGitVersion は、git を起動できることと、道具が要る版であることを確かめる。要るのは 2.30 以降
+// (関数 commit が使うコマンド git rev-parse --end-of-options が 2.30.0 から) で、フラグ -worktree では
+// 2.41 以降 (関数 blame がコマンド git blame にオプション --contents と範囲 <起点>..<コミット> を一緒に
+// 渡す形を、git は 2.41.0 から受け付ける)。古い git では、正しい版を渡しても解決できないか、git blame が
+// 毎回失敗するので、入力の誤りと取り違えないよう、道具を実行できないこととして返す。
+func checkGitVersion(worktree bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", "version")
@@ -382,6 +384,9 @@ func checkGitVersion() error {
 	}
 	if major < 2 || major == 2 && minor < 30 {
 		return runf("git 2.30 以降が要ります (git rev-parse --end-of-options を使うため)。この git は %s", strings.TrimSpace(string(out)))
+	}
+	if worktree && major == 2 && minor < 41 {
+		return runf("フラグ -worktree には git 2.41 以降が要ります (git blame に --contents と範囲を一緒に渡すため)。この git は %s", strings.TrimSpace(string(out)))
 	}
 	return nil
 }

@@ -1303,13 +1303,14 @@ func fakeGit(t *testing.T, versionLine string) string {
 	return bin
 }
 
-// git の版の確認は、2.30 を受け付けて 2.29 を拒む (README の前提の節に書いた要件)。版を読めない
-// 出力も、道具を実行できないこととして返す。
+// git の版の確認は、2.30 を受け付けて 2.29 を拒み、フラグ -worktree では 2.41 を受け付けて 2.40 を拒む
+// (README の「前提」に書いた要件)。版を読めない出力も、道具を実行できないこととして返す。
 func TestGitVersionBoundary(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
 	r.commit("branch")
 	args := []string{"-file", "f.md", "-lines", "1", "-rev", "HEAD"}
+	worktree := []string{"-file", "f.md", "-lines", "1", "-worktree"}
 
 	t.Run("2.30.0 は受け付ける", func(t *testing.T) {
 		t.Setenv("PATH", fakeGit(t, "git version 2.30.0"))
@@ -1330,6 +1331,22 @@ func TestGitVersionBoundary(t *testing.T) {
 	t.Run("版を読めない", func(t *testing.T) {
 		t.Setenv("PATH", fakeGit(t, "not a version"))
 		wantError(t, r.check(base, args...), 3, "run-error:", "git の版を読めません")
+	})
+	t.Run("-worktree は 2.41.0 を受け付ける", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 2.41.0"))
+		wantKind(t, r.check(base, worktree...), holds)
+	})
+	t.Run("-worktree は 2.40.9 を拒む", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 2.40.9"))
+		wantError(t, r.check(base, worktree...), 3, "run-error:", "フラグ -worktree には git 2.41 以降が要ります")
+	})
+	t.Run("-worktree は 3.0.0 を受け付ける", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 3.0.0"))
+		wantKind(t, r.check(base, worktree...), holds)
+	})
+	t.Run("-rev は 2.40.9 を受け付ける", func(t *testing.T) {
+		t.Setenv("PATH", fakeGit(t, "git version 2.40.9"))
+		wantKind(t, r.check(base, args...), holds)
 	})
 }
 
