@@ -468,6 +468,28 @@ func TestToolDoesNotWriteIndex(t *testing.T) {
 	}
 }
 
+// 設定 core.fsmonitor に登録したプログラムを、道具の git に起動させない。起動させると、値が true のときは
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作り、道具が終わった後も残る。テストでは、
+// 印のファイルを作るスクリプトを登録する (値が true の常駐のプロセスは、Linux では動かない)。
+func TestFsmonitorProgramIsNotRun(t *testing.T) {
+	r, base := branched(t)
+	r.write("g.md", "branch\n")
+	r.commit("branch")
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "ran")
+	script := filepath.Join(dir, "fsmonitor.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\ntouch '"+marker+"'\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.git("config", "core.fsmonitor", script)
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), holds)
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("道具の git が、設定 core.fsmonitor のプログラムを起動した")
+	}
+}
+
 // skip-worktree (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) を
 // 付けたファイルの編集は、インデックスに記録した更新時刻などには現れないが、コミットしていない変更として扱う。
 func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {

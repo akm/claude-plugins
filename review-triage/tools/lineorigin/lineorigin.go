@@ -335,10 +335,13 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 var gitTimeout = 5 * time.Minute
 
 // runIn は、stdin を標準入力に渡して run と同じように git を実行する。
+//
+// 設定 core.fsmonitor は打ち消す。打ち消さないと、git はそこに登録したプログラムを起動し、値が true なら
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作って、道具が終わった後も残る。
 func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false"}, args...)...)
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false", "-c", "core.fsmonitor=false"}, args...)...)
 	cmd.WaitDelay = time.Second // 期限で止めた git の子のプロセスが出力を開いたままでも、待ち続けない
 	cmd.Env = gitEnv()
 	cmd.Stdin = stdin
