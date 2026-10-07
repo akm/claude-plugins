@@ -219,7 +219,10 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
 }
 
-// -rev に HEAD 以外のコミットを渡すと、そのコミットまでの範囲で確かめる。
+// -rev に HEAD より前のコミットを渡すと、作業ツリーとインデックスの内容を、HEAD ではなくそのコミットと比べる。
+// その後のコミットで指摘のファイルが変わっていれば、レビュアが共有の作業ツリーで見た、当時はコミットして
+// いなかった編集かもしれないので、確かめない。作業ツリーとインデックスの内容がそのコミットと同じなら、
+// そのコミットまでの範囲で確かめる (範囲の終わりを HEAD にすると、後のコミットの内容を調べてしまう)。
 func TestRevOtherThanHead(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -227,9 +230,18 @@ func TestRevOtherThanHead(t *testing.T) {
 	r.write("f.md", "A\nb\nC\n")
 	r.commit("change line 1")
 
+	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", c1)
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "後のコミット")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
+
+	// 作業ツリーとインデックスを c1 の内容に戻す (コミットしない)
+	r.git("restore", "--source="+c1, "--staged", "--worktree", "f.md")
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", c1), holds)
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", c1), notHolds)
-	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
+	o = r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "コミットしていない変更")
 }
 
 // 注釈付きのタグを -base と -rev に渡しても、タグが指すコミットとして扱い、SHA を渡したときと同じ結果になる。

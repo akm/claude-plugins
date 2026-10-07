@@ -121,12 +121,14 @@ func check(opts options) (result, error) {
 	if !opts.worktree {
 		// 結果のファイルで受け取ったレビューは、共有の作業ツリーでコミットしていない変更を見た可能性があり、
 		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
-		changed, err := g.hasUncommittedChange(top, opts.file)
+		// 比べる相手は HEAD ではなく、レビューした内容のコミットにする。-rev が HEAD より前なら、レビューの
+		// 時点ではコミットしていなかった編集が、その後のコミットに入っていることがあり、HEAD と比べても見つからない
+		changed, err := g.hasUncommittedChange(top, target, opts.file)
 		if err != nil {
 			return result{}, asRun(err)
 		}
 		if changed {
-			return result{kind: unverifiable, reason: "指摘のファイルにコミットしていない変更があり、レビューがそれを見たかが分からない"}, nil
+			return result{kind: unverifiable, reason: fmt.Sprintf("指摘のファイルの作業ツリーかインデックスの内容が、レビューした内容のコミット (%s) と違う (コミットしていない変更があるか、そのコミットより後のコミットで変わった) ので、レビューがどの内容を見たかが分からない", targetName)}, nil
 		}
 	}
 
@@ -478,15 +480,17 @@ func (g gitRunner) entry(commit, file string) (string, error) {
 	return entryNone, nil
 }
 
-// hasUncommittedChange は、file に HEAD からのコミットしていない変更 (ステージしたものを含む) があるかを返す。
+// hasUncommittedChange は、file の作業ツリーかインデックスの内容が、コミット rev の内容と違うかを返す。
+// rev が HEAD なら、コミットしていない変更 (ステージしたものを含む) があるかと同じ。rev が HEAD より前なら、
+// その後のコミットで変わった内容も、違いとして返す。
 //
 // git diff は使わない。インデックスに記録した更新時刻などが作業ツリーのファイルと合わないと、
-// GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、HEAD・インデックス・
+// GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、rev・インデックス・
 // 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や
 // assume-unchanged (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) が
 // 付いたファイルの編集も、変更として扱う。
-func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
-	head, err := g.blob("HEAD", file)
+func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
+	committed, err := g.blob(rev, file)
 	if err != nil {
 		return false, err
 	}
@@ -537,7 +541,7 @@ func (g gitRunner) hasUncommittedChange(top, file string) (bool, error) {
 		// ディレクトリなど、git が記録しない種類に置き換わっている
 		return true, nil
 	}
-	return head != index || index != worktree, nil
+	return committed != index || index != worktree, nil
 }
 
 // hasCleanFilter は、file に属性 filter (git add のときにファイルを変換するプログラム) が
