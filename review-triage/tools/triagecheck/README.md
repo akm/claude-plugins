@@ -8,7 +8,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 | 検査 | 内容 |
 | --- | --- |
-| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
+| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (根拠を確かめた指摘では必須。必須にするのは 2026-10-08 以降の回だけ) と、D8 が当たる記録の `verdict` が `held` であること。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
 **記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定の置き場 `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して止まり、`.gitignore` は変えない — 正本は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。

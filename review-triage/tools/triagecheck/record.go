@@ -134,8 +134,36 @@ type recordFinding struct {
 	VerdictReason   string            `yaml:"verdict_reason"`
 	PlanRef         *recordPlanRef    `yaml:"plan_ref"`
 	Origin          string            `yaml:"origin"`
-	Attrs           map[string]any    `yaml:"attrs"`
+	// PriorDefect は D8 (このブランチより前からある欠陥か) の結果。D8 で判定した指摘
+	// (premise_check.result が verified) にだけ書く。verdict_reason の自由記述に書く
+	// 規則だけでは、書き忘れても検査が何も報告しなかったため、キーにした (#110)。
+	PriorDefect *recordPriorDefect `yaml:"prior_defect"`
+	Attrs       map[string]any     `yaml:"attrs"`
 }
+
+// recordPriorDefect は findings[].prior_defect — D8 の条件 (1)(2) の結果。
+// line_check は (1) (対象の行が全量の起点から変わっていない) の結果で、同梱の道具
+// lineorigin の結果をそのまま書く。same_defect は (2) (全量の起点の内容でも同じ欠陥が
+// 成り立つ) の結果で、(1) が holds のときだけ書く。D8 が当たったかどうかは書かず、
+// (1)(2) から導く (priorDefectHit) — 導ける値を重ねて書くと、両者が食い違う記録を書けてしまう。
+type recordPriorDefect struct {
+	Base             string `yaml:"base"`
+	LineCheck        string `yaml:"line_check"`
+	LineReason       string `yaml:"line_reason"`
+	SameDefect       string `yaml:"same_defect"`
+	SameDefectReason string `yaml:"same_defect_reason"`
+}
+
+// priorDefectHit は D8 が当たったかを (1)(2) の結果から導く。(1) が成り立ち、(2) が
+// 成り立つか確かめられないときに当たる (judgment-flow.md の D8 の行)。
+func priorDefectHit(pd *recordPriorDefect) bool {
+	return pd.LineCheck == "holds" && (pd.SameDefect == "holds" || pd.SameDefect == "unverifiable")
+}
+
+// recordPriorDefectRequiredSince は prior_defect を必須にする最初の実行日。これより前の
+// 回は D8 の無い判定フローか、D8 の結果を verdict_reason に書く規則で判定したので、
+// 置き場に残る過去の記録を失敗させないよう、必須にしない (書いてあれば形は検査する)。
+const recordPriorDefectRequiredSince = "2026-10-08"
 
 type recordConsequence struct {
 	Condition     string `yaml:"condition"`
@@ -228,10 +256,11 @@ var recordAllowedKeys = map[string]map[string]bool{
 		"scope": true, "head": true, "findings": true, "plans": true, "recurrence": true, "notes": true},
 	"指摘": {"id": true, "file": true, "line": true, "summary": true, "category": true,
 		"audience": true, "audience_initial": true, "consequence": true, "premise_check": true,
-		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "attrs": true},
-	"束ね先":   {"run": true, "problem": true},
-	"帰結":    {"condition": true, "who": true, "what": true, "detectability": true},
-	"根拠の検証": {"stages": true, "result": true},
+		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "prior_defect": true, "attrs": true},
+	"束ね先":     {"run": true, "problem": true},
+	"前からある欠陥": {"base": true, "line_check": true, "line_reason": true, "same_defect": true, "same_defect_reason": true},
+	"帰結":      {"condition": true, "who": true, "what": true, "detectability": true},
+	"根拠の検証":   {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
 		"investigation": true, "verification": true, "doc_dag": true, "options": true, "order": true, "depends_on": true, "sha": true,
 		"status": true, "applied_external_url": true, "notes": true},
@@ -382,7 +411,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない — 重ねると 1 つの書き忘れが複数の問題になる。
-var recordNullSilentKeys = map[string]bool{"plan_ref": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
 // 値の無い構造キー (recordNullSilentKeys) を列挙する。
@@ -430,6 +459,8 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "根拠の検証")
 			case "plan_ref":
 				walkMap(v, "束ね先")
+			case "prior_defect":
+				walkMap(v, "前からある欠陥")
 			case "investigation":
 				walkMap(v, "調査")
 			case "verification":
@@ -553,6 +584,9 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			case "", "review", "residual":
 			default:
 				add("%s: origin は review / residual のいずれか (省略時は review): %q", fn, fd.Origin)
+			}
+			for _, m := range recordPriorDefectProblems(run.Date, fd) {
+				add("%s: %s", fn, m)
 			}
 			if fd.PlanRef != nil {
 				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
@@ -924,6 +958,67 @@ func recordRow(cells []string) string {
 	return "| " + strings.Join(cells, " | ") + " |\n"
 }
 
+// recordPriorDefectProblems は指摘 1 件の prior_defect (D8 の結果) を検査する。
+// 書く条件は D8 に進んだかで決まる — 判定フローでは、D4 で根拠を確かめた指摘
+// (premise_check.result が verified) だけが D8 に進む。date が
+// recordPriorDefectRequiredSince より前の回は、無くても報告しない。
+func recordPriorDefectProblems(date string, fd recordFinding) []string {
+	var problems []string
+	add := func(format string, args ...any) {
+		problems = append(problems, fmt.Sprintf(format, args...))
+	}
+	verified := fd.PremiseCheck.Result == "verified"
+	pd := fd.PriorDefect
+	if pd == nil {
+		// date の形の誤りは別に報告されるので、ここでは形の正しい date だけを比べる。
+		if verified && recordDateRe.MatchString(date) && date >= recordPriorDefectRequiredSince {
+			add("prior_defect がありません (D4 で根拠を確かめた指摘は D8 で判定するので、D8 の結果を書く)")
+		}
+		return problems
+	}
+	if !verified {
+		// D8 に進んでいない指摘の D8 の結果は、どの値でも判定の経路と矛盾するので、中身は検査しない。
+		add("prior_defect は D8 で判定した指摘 (premise_check.result が verified) にだけ書く (result %q)", fd.PremiseCheck.Result)
+		return problems
+	}
+	lineValid := true
+	switch pd.LineCheck {
+	case "holds", "not-holds", "unverifiable":
+	default:
+		lineValid = false
+		add("prior_defect.line_check は holds / not-holds / unverifiable のいずれか: %q", pd.LineCheck)
+	}
+	if pd.LineReason == "" {
+		add("prior_defect.line_reason がありません ((1) の結果の理由。道具 lineorigin の理由と行ごとの内訳)")
+	}
+	if (pd.LineCheck == "holds" || pd.LineCheck == "not-holds") && pd.Base == "" {
+		add("prior_defect.base がありません (line_check が %s なら、道具に渡した全量の起点がある)", pd.LineCheck)
+	}
+	switch {
+	case pd.LineCheck == "holds":
+		switch pd.SameDefect {
+		case "holds", "not-holds", "unverifiable":
+		case "":
+			add("prior_defect.same_defect がありません (line_check が holds なら (2) を確かめる)")
+		default:
+			add("prior_defect.same_defect は holds / not-holds / unverifiable のいずれか: %q", pd.SameDefect)
+		}
+		if pd.SameDefect != "" && pd.SameDefectReason == "" {
+			add("prior_defect.same_defect_reason がありません ((2) の根拠。全量の起点の内容の該当箇所)")
+		}
+	case lineValid:
+		// (1) が成り立たないか確かめられなければ D8 は当たらないと決まり、(2) は確かめない。
+		// line_check が列挙外のときは、(2) を書くべきかが決まらないので報告しない。
+		if pd.SameDefect != "" || pd.SameDefectReason != "" {
+			add("prior_defect.same_defect と same_defect_reason は、line_check が holds のときだけ書く (line_check %q)", pd.LineCheck)
+		}
+	}
+	if priorDefectHit(pd) && fd.Verdict != "held" {
+		add("prior_defect では D8 が当たる ((1) holds、(2) %s) のに、verdict が held ではありません (D8 が当たれば H7 の保留): %q", pd.SameDefect, fd.Verdict)
+	}
+	return problems
+}
+
 // renderFindingCells は指摘 1 件の表のセル列を返す。行を 1 つの書式文字列で
 // 組み立てると、テストがセル単位で分岐を検証できず、存在確認のアサーションが
 // 別のセルへの偶然一致で合格してしまう (実測で 3 度起きた種類の欠陥)。
@@ -961,9 +1056,21 @@ func renderFindingCells(fd recordFinding) []string {
 	}
 }
 
-// renderVerdictCell は判定セル (判定 — 経路。束ね先があれば添える) を返す。
+// renderVerdictCell は判定セル (判定 — 経路。D8 の結果と束ね先があれば添える) を返す。
+// D8 の結果は prior_defect を書いた指摘にだけ添える — 過去の記録の生成サマリを変えないため。
 func renderVerdictCell(fd recordFinding) string {
 	cell := recordVerdictJa(fd.Verdict) + " — " + recordCell(fd.VerdictReason)
+	if pd := fd.PriorDefect; pd != nil {
+		hit := "当たらない"
+		if priorDefectHit(pd) {
+			hit = "当たる"
+		}
+		cell += " (D8: " + hit + "。(1) " + recordCell(pd.LineCheck)
+		if pd.SameDefect != "" {
+			cell += "、(2) " + recordCell(pd.SameDefect)
+		}
+		cell += ")"
+	}
 	if fd.PlanRef != nil {
 		cell += fmt.Sprintf(" (束ね先: 回 %d の %s)", fd.PlanRef.Run, recordCell(fd.PlanRef.Problem))
 	}
