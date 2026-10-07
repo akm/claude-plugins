@@ -129,7 +129,7 @@ func check(opts options) (result, error) {
 		// 結果のファイルからは分からない。ほかのファイルの変更は、指摘の file の行番号を変えないので見ない。
 		// 比べる相手は HEAD ではなく、レビューした内容のコミットにする。-rev が HEAD より前なら、レビューの
 		// 時点ではコミットしていなかった編集が、その後のコミットに入っていることがあり、HEAD と比べても見つからない
-		changed, err := g.hasUncommittedChange(top, target, opts.file)
+		changed, err := g.hasUncommittedChange(top, target, targetEntry, opts.file)
 		if err != nil {
 			return result{}, asRun(err)
 		}
@@ -469,6 +469,19 @@ const (
 	entryOther   = "other"   // ディレクトリ・サブモジュールなど、ファイルでないもの
 )
 
+// modeKind は、コマンド git ls-files --stage が出す項目の mode を、項目の種類 (関数 entry の値) にする。
+// 通常のファイルの mode は 100 で始まる (100644・100755)。
+func modeKind(mode string) string {
+	switch {
+	case mode == "120000":
+		return entrySymlink
+	case strings.HasPrefix(mode, "100"):
+		return entryFile
+	default:
+		return entryOther
+	}
+}
+
 // entry は、コミット commit の file のパスの項目の種類を返す。git が失敗したとき (オブジェクトを
 // 読めない、など) は、パスが無いことと取り違えないよう run-error を返す。commit は解決済みの SHA。
 func (g gitRunner) entry(commit, file string) (string, error) {
@@ -503,7 +516,11 @@ func (g gitRunner) entry(commit, file string) (string, error) {
 // 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や
 // assume-unchanged (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) が
 // 付いたファイルの編集も、変更として扱う。
-func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
+//
+// kind は、コミット rev の file の項目の種類 (関数 entry の値)。インデックスか作業ツリーの種類がそれと違えば
+// (通常のファイルをシンボリックリンクに置き換えたなど)、ハッシュを比べずに変更ありとする。ハッシュだけを
+// 比べると、リンクの文字列がファイルの内容とちょうど同じときに、同じ内容と見なしてしまう。
+func (g gitRunner) hasUncommittedChange(top, rev, kind, file string) (bool, error) {
 	committed, err := g.blob(rev, file)
 	if err != nil {
 		return false, err
@@ -513,12 +530,12 @@ func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
 		return false, err
 	}
 	// 項目のどれかのステージが 0 でなければ、変更ありとする。衝突の解消の途中は、インデックスに同じパスの
-	// 項目がステージ 1〜3 に分かれてあるので、これに当たる
+	// 項目がステージ 1〜3 に分かれてあるので、これに当たる。項目の種類 (mode) が kind と違うときも変更ありとする
 	var index string
 	if out != "" {
 		for _, e := range strings.Split(strings.TrimSpace(out), "\n") {
 			fields := strings.Fields(e)
-			if len(fields) < 3 || fields[2] != "0" {
+			if len(fields) < 3 || fields[2] != "0" || modeKind(fields[0]) != kind {
 				return true, nil
 			}
 			index = fields[1]
@@ -535,6 +552,9 @@ func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
 	case err != nil:
 		return false, runf("作業ツリーの -file を読めません: %v", err)
 	case st.Mode().IsRegular():
+		if kind != entryFile {
+			return true, nil
+		}
 		// --path で、そのパスの属性によるフィルタ (改行の変換など) を当ててからハッシュを求める。オプション -w を付けないので書き込まない
 		out, _, err := g.run("hash-object", "--path="+file, "--", abs)
 		if err != nil {
@@ -542,6 +562,9 @@ func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
 		}
 		worktree = strings.TrimSpace(out)
 	case st.Mode()&os.ModeSymlink != 0:
+		if kind != entrySymlink {
+			return true, nil
+		}
 		link, err := os.Readlink(abs)
 		if err != nil {
 			return false, runf("作業ツリーの -file のリンクを読めません: %v", err)

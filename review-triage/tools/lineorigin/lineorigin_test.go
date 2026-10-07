@@ -533,21 +533,57 @@ func TestTrackedSymlinkIsUnverifiable(t *testing.T) {
 	}
 }
 
-// 作業ツリーで、HEAD の通常のファイルをシンボリックリンクに置き換えると (コミットしていない)、-rev では
-// コミットしていない変更になる。作業ツリーの側はリンクの文字列のハッシュで比べる。
+// 作業ツリーかインデックスで、HEAD の通常のファイルをシンボリックリンクに置き換えると (コミットしていない)、
+// -rev ではコミットしていない変更になる。リンクの文字列がファイルの内容とちょうど同じでも、ハッシュではなく
+// 種類の違いで変更と見なす (ハッシュで比べると同じになり、レビュアが読むリンクの先を見ずに holds を返す)。
 func TestFileReplacedBySymlinkIsUncommittedChange(t *testing.T) {
-	r, base := branched(t)
-	r.write("h.md", "branch\n")
-	r.commit("branch")
-	f := filepath.Join(r.dir, "f.md")
-	os.Remove(f)
-	if err := os.Symlink("g.md", f); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("リンクの文字列が内容と違う", func(t *testing.T) {
+		r, base := branched(t)
+		r.write("h.md", "branch\n")
+		r.commit("branch")
+		f := filepath.Join(r.dir, "f.md")
+		os.Remove(f)
+		if err := os.Symlink("g.md", f); err != nil {
+			t.Fatal(err)
+		}
 
-	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
-	wantKind(t, o, unverifiable)
-	wantContains(t, o.reason, "コミットしていない変更")
+		o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "コミットしていない変更")
+	})
+	// 内容が改行の無い 1 行「g.md」のファイルは、g.md を指すシンボリックリンクと、git が記録するブロブが同じになる
+	sameText := func(t *testing.T) (*repo, string) {
+		t.Helper()
+		r := newRepo(t)
+		r.write("f.md", "g.md")
+		r.write("g.md", "g\n")
+		base := r.commit("base")
+		r.git("switch", "-q", "-c", "br")
+		r.write("h.md", "branch\n")
+		r.commit("branch")
+		return r, base
+	}
+	t.Run("作業ツリーのリンクの文字列が内容とちょうど同じ", func(t *testing.T) {
+		r, base := sameText(t)
+		f := filepath.Join(r.dir, "f.md")
+		os.Remove(f)
+		if err := os.Symlink("g.md", f); err != nil {
+			t.Fatal(err)
+		}
+
+		o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "コミットしていない変更")
+	})
+	t.Run("インデックスにだけ、同じブロブのシンボリックリンクの項目がある", func(t *testing.T) {
+		r, base := sameText(t)
+		blob := r.git("rev-parse", "HEAD:f.md")
+		r.git("update-index", "--cacheinfo", "120000,"+blob+",f.md")
+
+		o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
+		wantKind(t, o, unverifiable)
+		wantContains(t, o.reason, "コミットしていない変更")
+	})
 }
 
 // 指摘のファイルを、作業ツリーでディレクトリに置き換えていたら、コミットしていない変更として扱う。
