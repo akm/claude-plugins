@@ -672,7 +672,9 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 // 属性 ident が設定されたファイルは、方式によらず確かめずに unverifiable にする。git はコマンド
 // git hash-object --path でも git blame --contents でも、比べる前に「$Id: … $」の中を「$Id$」へ戻すので、
 // 確かめると、作業ツリーでその中を書き換えた行が、起点にあったまま (誤った holds) と報告される。
-// 属性の書き方ごとに確かめる。
+// 属性の書き方ごとに確かめる。-filter (フィルタを外す書き方) と一緒に付けた場合も、書く順と行の分け方を
+// 変えて確かめる。関数 convertingAttribute は、filter の値が unset でドライバの設定が無いときに、戻らずに
+// 後の属性を調べ続けるので、同じファイルに付けた ident を順序によらず見落とさない。
 func TestIdentAttributeIsUnverifiable(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -683,6 +685,10 @@ func TestIdentAttributeIsUnverifiable(t *testing.T) {
 		{"値のある ident も確かめない", "f.md ident=x\n", "ident"},
 		{"ident が 2 つ目の属性でも確かめない", "f.md -text ident\n", "ident"},
 		{"filter と ident が両方あれば clean フィルタの理由にする", "f.md ident filter=nodriver\n", "clean フィルタ"},
+		{"-filter の後の ident も確かめない", "f.md -filter ident\n", "ident"},
+		{"-filter の前の ident も確かめない", "f.md ident -filter\n", "ident"},
+		{"-filter の行の後の行の ident も確かめない", "f.md -filter\nf.md ident\n", "ident"},
+		{"-filter の行の前の行の ident も確かめない", "f.md ident\nf.md -filter\n", "ident"},
 		{"-ident は展開を外すので確かめる", "f.md -ident\n", ""},
 		{"!ident は属性を無しに戻すので確かめる", "*.md ident\nf.md !ident\n", ""},
 		{"ident ではない属性の値が ident でも確かめる", "f.md diff=ident\n", ""},
