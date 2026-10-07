@@ -294,7 +294,9 @@ func toplevel(dir string) (string, error) {
 	}
 	out, _, err := gitRunner{root: dir}.run("rev-parse", "--show-toplevel")
 	if err == nil {
-		return strings.TrimSpace(out), nil
+		// 出力の末尾の改行 1 つだけを落とす。名前の末尾の空白はパスの一部なので削らない (削ると、空白の無い
+		// 名前の別のディレクトリを読む)
+		return strings.TrimSuffix(out, "\n"), nil
 	}
 	var re *runError
 	if errors.As(err, &re) {

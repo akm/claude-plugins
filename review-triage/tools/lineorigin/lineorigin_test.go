@@ -1170,6 +1170,29 @@ func TestRootMayBeSubdirectory(t *testing.T) {
 	wantKind(t, o, unverifiable)
 }
 
+// -root のディレクトリの名前が空白で終わっても、その名前のまま読む。空白を削ると、空白の無い名前の隣の
+// ディレクトリ (ここでは同じリポジトリの複製) を読み、レビューした作業ツリーのコミットしていない行を見ずに
+// holds を返す。
+func TestRootNameEndingWithSpace(t *testing.T) {
+	parent := t.TempDir()
+	r := &repo{t: t, dir: filepath.Join(parent, "repo ")}
+	if err := os.Mkdir(r.dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.git("init", "-q", "-b", "main")
+	r.write("f.md", "a\nb\nc\n")
+	base := r.commit("base")
+	r.git("switch", "-q", "-c", "br")
+	r.write("g.md", "g\n")
+	r.commit("branch")
+	r.git("clone", "-q", "--branch", "br", r.dir, filepath.Join(parent, "repo"))
+	// 名前が空白で終わる方にだけ、コミットしていない行を足す
+	r.write("f.md", "NEW\na\nb\nc\n")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), notHolds)
+}
+
 // パターンの文字や先頭の : を含む名前・日本語の名前・" を含む名前も、書いたとおりのファイル名として読む。
 func TestSpecialFileNames(t *testing.T) {
 	names := []string{"[a].md", ":c.md", "日本.md", `x"y.md`, "*.md"}
