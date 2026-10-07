@@ -107,7 +107,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - R14. **リポジトリの検査と変更の案。** スキル `repo-preflight` は、設定 (R32) の有無と妥当性、固定のポート (開発サーバの設定とスクリプト)、共有のデプロイ先 (`wrangler` の `name` など)、ツールが生成するファイルの候補 (ロックファイル) を調べ、指摘ごとに変更の案 (設定の JSON の雛形・設定ファイルの差分の案・環境変数でポートを変える案) を示す。適用は人間が行い、スキルはファイルを変えない。設定が無いリポジトリでも動き、「設定が無い」を報告する。
 - R15. **Project の検査。** フィールド 2 つ・Status の選択肢・ワークフローの有効を確かめる。不足は案を示し、承認を得て作る (フィールドは `gh project field-create`、選択肢は GraphQL の `updateProjectV2Field` で既存の選択肢の id を保ったまま足す)。ワークフローは API で変えられないので UI の手順を案内する。管理のセッションの開始 (R18) と `repo-preflight` の両方から呼べる。
 - R16. **セッションの検査。** `crossSessionInbound` の設定 (ユーザー設定が `accept` で、プロジェクトとローカルの設定に `refuse` が無い) を読み、無ければ、管理と作業のセッションの権限モードの組 (権限確認を省くモードかそれ以外か) が同じことを利用者に確かめる。Claude Code の版 (`ListAgents` と `notify_when_idle` が使える 2.1.236 以降) は、確かめられる経路 (Desktop は `get_session`、端末は `claude --version`) で読み、読めなければ「確かめていない」と報告する。作業のセッションは、自分専用の作業ツリー (`git worktree list` に出る worktree で、ほかの作業のセッションが申告していないもの) にいること。プラグインのフックが有効なこと (リポジトリに設定があること)。(KTD12)
-- R17. **フック。** PreToolUse (Bash) のフックが、同じリポジトリのほかの worktree の実体パス (と設定 `protected_paths` のパス) を含むコマンドと、そこへ `cd` するコマンドを拒否する。拒否の理由に、代わりの実行の仕方 (自分の作業ツリーで実行する・読むだけなら Read を使う) を書く。設定の無いリポジトリでは何もしない。入力が読めないときは許可側に寄せる。`git worktree` のサブコマンド自体は拒否しない。フックが検出しないもの (相対パス `../`、別の clone、シェルの変数を経たパス) を文書に書く。(KTD13)
+- R17. **フック。** PreToolUse のフックが、同じリポジトリのほかの worktree の実体パス (と設定 `protected_paths` のパス) を対象にした操作を拒否する。対象は、Bash のコマンドのうちそのパスを含むものとそこへ `cd` するもの、編集系のツール (Edit・Write・MultiEdit・NotebookEdit) のうち書き込むファイルのパスがその中にあるもの。読むだけのツール (Read など) は拒否しない。拒否の理由に、代わりの実行の仕方 (自分の作業ツリーで実行する・読むだけなら Read を使う) を書く。設定の無いリポジトリでは何もしない。入力が読めないときは許可側に寄せる。`git worktree` のサブコマンド自体は拒否しない。フックが検出しないもの (相対パス `../`、別の clone、シェルの変数を経たパス) を文書に書く。(KTD13)
 
 **管理のセッション (スキル `issue-dispatch`)**
 
@@ -275,8 +275,8 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - AE15. フックの拒否
   - **Covers R17.**
   - **Given:** 同じリポジトリの worktree `/w/a` と `/w/b`。`/w/a` のリポジトリに設定がある。
-  - **When:** `/w/a` のセッションで `pnpm --dir /w/b exec vitest` を実行する。
-  - **Then:** 拒否され、理由に自分の作業ツリーで実行することが書かれる。`ls /w/a/src` は許可される。設定の無いリポジトリでは何も出さない。
+  - **When:** `/w/a` のセッションで `pnpm --dir /w/b exec vitest` を実行する。Edit ツールで `/w/b/src/app.ts` を書き換える。
+  - **Then:** どちらも拒否され、理由に自分の作業ツリーで実行・編集することが書かれる。`ls /w/a/src` と、Edit ツールでの `/w/a/src/app.ts` の書き換えは許可される。設定の無いリポジトリでは何も出さない。
 - AE16. `repo-preflight` の指摘
   - **Covers R14.**
   - **Given:** `vite.config.ts` に `port: 5173`、設定が無い。
@@ -370,7 +370,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - GitHub GraphQL: `updateProjectV2ItemFieldValue` の入力は `projectId`・`itemId`・`fieldId`・`value` だけで、条件付き更新は無い。`ProjectV2.items` は `orderBy: {field: POSITION}` で位置の順に返す (指定しないときの順は文書に無い)。Status の選択肢は `updateProjectV2Field` の `singleSelectOptions` で、既存の選択肢の `id` を含めて渡す (含めないと値が消える)。`ProjectV2.workflows` は読めるが、有効と無効を変える mutation は無い。上限: 項目 50,000、フィールド 50、single select の選択肢 50、blocked by 50、sub-issue 100。レート制限は 1 時間 5,000 点で、項目 100 件の一覧は 1〜3 点。
 - 利用者の既存の Project (番号 2) では、ワークフロー「Item closed」「Pull request merged」「Auto-close issue」の 3 つが有効。
 - Claude Code: ツール `SendMessage` (入力 `to`・`message`・`notify_when_idle`・`summary`) と `ListAgents` がある。`ListAgents` の 1 行目はこのセッションの名前と短い識別子で、各行は `名前 [識別子] · 種類 (interactive / Remote Control) · 状態 (idle / busy / waiting / offline) · Claude Desktop session などの種別 · 経過時間`。Desktop のセッションの名前はセッションのタイトル。環境変数 `CLAUDE_CODE_SESSION_ID` (UUID)・`CLAUDE_CODE_HOST_SESSION_ID` (Desktop のみ。`local_<UUID>`)・`CLAUDE_CODE_MESSAGING_SOCKET`・`CLAUDE_CODE_MESSAGING_TOKEN` が Bash ツールの環境にある。Desktop のツール `get_session` (`self` で自分の `sessionId`・`title`・`permissionMode` を返す)・`list_sessions`・`set_session_title` がある。
-- Claude Code の公式文書 (cross-session-messaging・hooks・sub-agents・agent-view・sessions・plugins): 名前宛ては 1 つのセッションが応答するときは名前だけで届く。受け取る側は送り手ごとに連続送信を抑え、同じ内容の繰り返しを捨て、キューは 50 通まで。`notify_when_idle` は両側が 2.1.236 以降、主会話からだけ、12 時間で失効。知らせは相手が次に待機に入ったときか終了したときに 1 回だけ届き、単独で申し込むと相手が既に待機中なら直ちに届き、合図に添えると合図を届けた後に知らせる。権限モードの組 (権限確認を省くモードかそれ以外か) が違うと保留され、Desktop と `-p` では 5 分 (`dialogExpiry`) で捨てられる。`crossSessionInbound: accept` で保留を避けられる。PreToolUse のフックは sub-agent の中のツール呼び出しにも適用され、JSON の `permissionDecision: deny` で拒否でき、入力に `cwd`・`session_id`・`permission_mode`・`agent_id`・`tool_input.command` がある。`${CLAUDE_PLUGIN_ROOT}` は SKILL.md の本文とフックのコマンドで置換され、Bash ツールの環境変数には無い。
+- Claude Code の公式文書 (cross-session-messaging・hooks・sub-agents・agent-view・sessions・plugins): 名前宛ては 1 つのセッションが応答するときは名前だけで届く。受け取る側は送り手ごとに連続送信を抑え、同じ内容の繰り返しを捨て、キューは 50 通まで。`notify_when_idle` は両側が 2.1.236 以降、主会話からだけ、12 時間で失効。知らせは相手が次に待機に入ったときか終了したときに 1 回だけ届き、単独で申し込むと相手が既に待機中なら直ちに届き、合図に添えると合図を届けた後に知らせる。権限モードの組 (権限確認を省くモードかそれ以外か) が違うと保留され、Desktop と `-p` では 5 分 (`dialogExpiry`) で捨てられる。`crossSessionInbound: accept` で保留を避けられる。PreToolUse のフックは sub-agent の中のツール呼び出しにも適用され、JSON の `permissionDecision: deny` で拒否でき、入力に `cwd`・`session_id`・`permission_mode`・`agent_id`・`tool_input.command` がある。Edit と Write の入力では、書き込むファイルのパスが `tool_input.file_path` (絶対パス) にある。matcher は `Edit|Write` のように `|` で区切って複数のツールを書ける。`${CLAUDE_PLUGIN_ROOT}` は SKILL.md の本文とフックのコマンドで置換され、Bash ツールの環境変数には無い。
 - Issue #114 の実測 (2026-10-06): Desktop のセッション ID 宛ては、利用者の最後の入力から 10 通で断られ、`notify_when_idle` を申し込めない。名前宛ては、利用者の入力なしに 30 往復 (60 通) 届き、31 通目が捨てられて送り手に知らせが届いた。中継の履歴は、ほかのセッションからのメッセージで始まったターンごとに長くなる。
 - 対話セッションの背景の Bash は 660 秒の待機でも打ち切られず、終了で通知が届く (review-loop の計画の実測)。フォアグラウンドの `sleep` は拒否される。
 - 背景で起動したスクリプトを、PID を指定して止めると (SIGTERM)、その終わりも通知として届き、新しいターンが始まる。通知に出る終了コードはスクリプトの作りで変わる。止められたときの処理の無い bash のスクリプトは 143、SIGTERM を受けて `stopped` を書き終了コード 6 で終わる Python のスクリプトは 6 だった (2026-10-08、Desktop の Code タブのセッション。PR #115 の文書レビューのレビュアは終了コード 0 と報告したが、この確認では再現しなかった)。
@@ -436,7 +436,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD10. **セッションの識別は ID と名前の両方を作業のセッションが申告し、宛先は名前にする。** ID は `CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。名前は `ListAgents` の 1 行目。`Agent session ID` には ID、`Agent session title` には名前を書く。名前が `ListAgents` に無いときの引き直しは Desktop の `list_sessions` (ID → タイトル) で、端末のセッションは引き直せないので利用者に尋ねる。作業のセッションは名前を変えない (変わったら `renamed`)。R8, R23, R26, R30 を実装する。
 - KTD11. **合図の様式は先頭行 `issue-dispatch: <種類>` と `<キー>: <値>` の行にし、数を減らす。** 1 Issue あたり作業 → 管理が 3 通 (`ready`・`declared`・`review`)、管理 → 作業が 2 通 (`assigned`・`go` または `wait`)。`stop` は解放・close・項目の除去のときだけ。中継の履歴の扱いは U1 の実測で決める — 案 A: 背景の待機の通知で始まるターンから送った合図が履歴を引き継がないなら、管理のセッションは合図を通知で始まるターン (再入の手順の最後) でまとめて送る。案 B: 引き継ぐなら、合図が捨てられた知らせで利用者に 1 行の入力を求める (R9) だけにする。どちらでも、合図が失われたときの回復は KTD1 の表に従う。R7, R9 を実装する。
 - KTD12. **権限モードの組による保留は、設定 `crossSessionInbound` の確認で避ける。** スクリプトがユーザー設定 (`~/.claude/settings.json`) とプロジェクト・ローカルの設定を読み、`accept` が無ければ警告し、`refuse` があれば止める。権限モードそのものは対話セッションから読む公式の手段が無い (Desktop の `get_session` だけ) ので、同じ組であることは利用者に確かめる。R16 を実装する。
-- KTD13. **フックの規則は関数 1 つに閉じ、`git worktree list --porcelain` の実体パスで判定する。** 設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出さず終了コード 0。IO の前に正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
+- KTD13. **フックの規則 (パスの照合) は 1 か所に閉じ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。 設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U7 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出さず終了コード 0。Bash は、IO の前に正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
 - KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 関数に閉じる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`)。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project release` / `comment` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration overlap` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 4 つ (`Todo`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。R31 を実装する。
 - KTD15. **設定の様式は `project-config.md` に置き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files.*` (`generated`・`sectioned`・`indivisible`・`splittable` の 4 つ) は空 (すべて `unknown`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (設定の態度)。R32 を実装する。
 - KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U2・U3 の文書の「実測」の節に、日付と版を添えて書く。
@@ -564,7 +564,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 - **GitHub の書き込みの帰属**: `gh` は利用者のトークンで動くので、GitHub の履歴では管理のセッションの編集と人の編集が区別できない。管理のセッションの書き込みには先頭行で見分けられるコメントか `actions.log` の行を必ず伴わせる (KTD2・KTD5)。
 - **Issue のコメントの増加**: 1 Issue あたり宣言 1〜2 件と管理のセッションの 2〜5 件 (`割り当て`・`開始可` は必ず、`待機`・`解放`・`引き継ぎ` は起きたとき)。導出だけの変更はコメントにしない (R6)。
 - **ほかのプラグインとの併用**: `review-loop` などレビューの周回は作業のセッションの中で動き、この仕組みは関わらない (Scope Boundaries)。`commit-rules-guard` と `wording-guard` のフックは作業のセッションでそのまま動く。
-- **フックの範囲**: `issue-dispatch` のフックは、プラグインを有効にしたすべてのセッションで登録されるが、設定の無いリポジトリでは何もしない (KTD13)。sub-agent の中の Bash にも適用される。
+- **フックの範囲**: `issue-dispatch` のフックは、プラグインを有効にしたすべてのセッションで登録されるが、設定の無いリポジトリでは何もしない (KTD13)。sub-agent の中の Bash と編集系のツールにも適用される。
 - **CI**: Python のテストのディレクトリが 1 つ増え、`.github/test-targets.txt` に 1 行足す。テストは `gh` も `claude` も呼ばない。
 - **設定ファイル**: 既存のプラグインの設定と同じディレクトリに `issue-dispatch/config.json` が増える。
 
@@ -592,7 +592,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 issue-dispatch/
 ├── .claude-plugin/plugin.json
 ├── README.md
-├── hooks/hooks.json                       # PreToolUse (Bash) → hook-scripts/guard-other-worktrees.py
+├── hooks/hooks.json                       # PreToolUse (Bash と編集系のツール) → hook-scripts/guard-other-worktrees.py
 ├── hook-scripts/guard-other-worktrees.py
 ├── scripts/
 │   ├── issue_dispatch.py                  # CLI の入口 (サブコマンド)
@@ -811,8 +811,8 @@ issue-dispatch/
 - **Dependencies:** U6。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、生成ファイルの候補 → 指摘と案)、`project` (U6 の `check` を呼ぶ)、`session` (`crossSessionInbound` の読み取り、`git worktree list` と申告の突き合わせ、フックの設定の有無)。
-  - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の `Bash` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。
-  - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と理由文。
+  - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。
+  - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と、編集系のツールのパスを判定する `denies_path(path, cwd, worktrees, protected)` (同じパスの照合を使う) と理由文。
   - `issue-dispatch/skills/repo-preflight/SKILL.md` — 手順 (3 つの検査を呼ぶ → 指摘ごとに案を示す → 適用は人間)、原則、「このスキルが検出しないもの」。
   - `issue-dispatch/skills/repo-preflight/references/checks.md` — 検査の表 (項目 / 確かめ方 / 通らないときの案)、「フックが検出しないもの」の節。
   - `issue-dispatch/tests/test_preflight.py`、`issue-dispatch/tests/test_guard_other_worktrees.py`
@@ -829,6 +829,7 @@ issue-dispatch/
   - `git worktree list` と `git worktree remove /w/b` は拒否しない。
   - 設定の無いリポジトリ、`hooks.guard_other_worktrees` が偽、リポジトリでない `cwd`、入力が JSON でない、`git` が無い、のどれでも何も出さず終了コード 0。
   - sub-agent の入力 (`agent_id` あり) でも同じ規則で拒否する。
+  - Covers AE15. 編集系のツールの入力で、ほかの worktree の中のパスは deny の JSON と理由を返し、自分の worktree の中のパスと、どの worktree にも属さないパスは何も出さない。Read の入力には何も出さない。
   - Covers AE16. `vite.config.ts` の `port: 5173` と `package.json` の `"dev": "vite --port 5173"` を固定のポートの候補として挙げ、設定の無いリポジトリでは「設定が無い」と雛形を返す。ファイルは変えない。
   - 生成ファイルの候補 (`pnpm-lock.yaml`・`package-lock.json`・`go.sum`) を `files.generated` の案として返し、設定に既にあれば挙げない。
   - Covers AE22. ユーザー設定に `crossSessionInbound: "accept"` があれば通り、無ければ警告、プロジェクト設定に `refuse` があれば失敗を返す。設定ファイルが読めなければ「確かめていない」。
@@ -945,7 +946,7 @@ issue-dispatch/
 | J | 合図の往復で中継の上限に当てる (作業に意図的に往復させる) | 捨てられた知らせで利用者に入力を求め、入力の後に続く | AE13 |
 | K | `--end` → 新しい管理のセッションで開始 | 引き継ぎ (`Agent session ID` のある項目が記録に写る) | AE20 |
 | L | `repo-preflight` を検証用のリポジトリ (固定のポートあり・設定無し) で実行 | 指摘と案。ファイルは変わらない | AE16 |
-| M | フック: 作業のセッションでほかの worktree のパスを含むコマンドを実行 (sub-agent の中からも) | 拒否と理由。自分の作業ツリーのコマンドは通る | AE15 |
+| M | フック: 作業のセッションでほかの worktree のパスを含むコマンドを実行し、Edit でほかの worktree のファイルを書き換える (sub-agent の中からも) | 拒否と理由。自分の作業ツリーのコマンドと編集は通る | AE15 |
 | N | 利用者が `Agent session ID` を空にする / 項目を Project から除く | 解除と `stop` を利用者に尋ね、答えに従って書く | AE24 |
 | O | 記録を壊してから `--resume` / 設定の無い管理ディレクトリで開始 | 止めて知らせ、新規として扱わない / Project の owner と番号を尋ね、答えで続ける | AE10, AE17 |
 | P | 割り当てを受けた作業のセッションが、`assigned` を受け取らないまま `ready` を送り直す | 新しい項目は割り当てず、`assigned` の再送は通算 1 回 | AE25 |
