@@ -1981,12 +1981,12 @@ func TestRenderPlanCellsInvestigated(t *testing.T) {
 	}
 }
 
-// priorDefectRecordYAML は prior_defect (D8 の結果) を必須にした後の日付の記録。
-// validRecordYAML の根拠を確かめた指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって
-// H7 で保留にした指摘 (id 4) を足す。
+// priorDefectRecordYAML は prior_defect (D8 の結果) を書いた記録。validRecordYAML の
+// 根拠を確かめた指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって H7 で保留にした
+// 指摘 (id 4) を足す。
 func priorDefectRecordYAML(t *testing.T) string {
 	t.Helper()
-	src := strings.Replace(validRecordYAML, `- date: "2026-08-30"`, `- date: "`+recordPriorDefectRequiredSince+`"`, 1)
+	src := validRecordYAML
 	for _, r := range []struct{ old, new string }{
 		{"        verdict_reason: ゲート 0 件で採択 (A2)\n",
 			"        verdict_reason: ゲート 0 件で採択 (A2)\n" +
@@ -2039,20 +2039,45 @@ func TestReviewTriageRecordPriorDefectPasses(t *testing.T) {
 	}
 }
 
-// 必須にする日の前の回は、D8 の無い判定フローで書いた過去の記録なので、prior_defect が無くても
-// 報告しない。必須にする日の回からは、根拠を確かめた指摘で無ければ報告する。
-func TestReviewTriageRecordPriorDefectRequiredSince(t *testing.T) {
+// prior_defect を必須にするのは、記録の中で最初に prior_defect を書いた回と、それより
+// 後の回。それより前の回と、1 度も書いていない記録は、D8 の無い判定フローか、D8 の結果を
+// verdict_reason に書く規則で判定したものと見なし、無くても報告しない。回の date には
+// よらない (どの回も validRecordYAML と同じ date)。
+func TestReviewTriageRecordPriorDefectRequiredFromFirstRun(t *testing.T) {
+	// 2 つ目の回として足すときは、先頭の "runs:" を外して回の列だけにする。
+	asLaterRun := func(src string) string { return strings.TrimPrefix(src, "runs:\n") }
+	// D8 の結果を書いた回のうち、id 1 の prior_defect だけを書き忘れた回。
+	forgotID1 := func(t *testing.T) string {
+		old := "        prior_defect:\n" +
+			"          base: 1111111\n" +
+			"          line_check: not-holds\n" +
+			"          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n"
+		src := priorDefectRecordYAML(t)
+		if !strings.Contains(src, old) {
+			t.Fatalf("フィクスチャの置換が適用されていない: %q", old)
+		}
+		return strings.Replace(src, old, "", 1)
+	}
 	cases := []struct {
-		date string
-		want bool
+		name string
+		src  func(t *testing.T) string
+		want []string // 欠落が報告される指摘 (回と id)。空なら報告されない
 	}{
-		{"2026-10-07", false},
-		{recordPriorDefectRequiredSince, true},
-		{"2026-11-01", true},
+		{"1 度も書いていない記録は報告しない",
+			func(t *testing.T) string { return validRecordYAML }, nil},
+		{"書いた回より前の回は報告しない",
+			func(t *testing.T) string { return validRecordYAML + asLaterRun(forgotID1(t)) },
+			[]string{"runs[1] (2026-08-30 code-review): findings[0] (id 1)"}},
+		{"書いた回の中の書き忘れを報告する",
+			forgotID1,
+			[]string{"runs[0] (2026-08-30 code-review): findings[0] (id 1)"}},
+		{"書いた回より後の回の書き忘れを報告する",
+			func(t *testing.T) string { return priorDefectRecordYAML(t) + asLaterRun(validRecordYAML) },
+			[]string{"runs[1] (2026-08-30 code-review): findings[0] (id 1)", "runs[1] (2026-08-30 code-review): findings[2] (id 3)"}},
 	}
 	for _, tc := range cases {
-		t.Run(tc.date, func(t *testing.T) {
-			src := strings.Replace(validRecordYAML, `- date: "2026-08-30"`, `- date: "`+tc.date+`"`, 1)
+		t.Run(tc.name, func(t *testing.T) {
+			src := tc.src(t)
 			read := func(_ string) ([]byte, error) { return []byte(src), nil }
 			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
 			var got []string
@@ -2061,15 +2086,13 @@ func TestReviewTriageRecordPriorDefectRequiredSince(t *testing.T) {
 					got = append(got, p)
 				}
 			}
-			if !tc.want {
-				if len(got) != 0 {
-					t.Fatalf("必須にする日の前の回で prior_defect の欠落が報告された: %v", got)
-				}
-				return
+			if len(got) != len(tc.want) {
+				t.Fatalf("欠落の報告が %d 件、want %d 件 (%v)。出た問題: %v", len(got), len(tc.want), tc.want, problems)
 			}
-			// 根拠を確かめた指摘は id 1 と 3 の 2 件。確かめられなかった id 2 は D8 に進まない。
-			if len(got) != 2 || !strings.Contains(got[0], "(id 1)") || !strings.Contains(got[1], "(id 3)") {
-				t.Fatalf("id 1 と 3 の欠落だけが報告されるはず。出た問題: %v", got)
+			for i, w := range tc.want {
+				if !strings.Contains(got[i], w) {
+					t.Fatalf("欠落の報告 %d に %q が無い: %q", i, w, got[i])
+				}
 			}
 		})
 	}

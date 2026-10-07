@@ -160,10 +160,22 @@ func priorDefectHit(pd *recordPriorDefect) bool {
 	return pd.LineCheck == "holds" && (pd.SameDefect == "holds" || pd.SameDefect == "unverifiable")
 }
 
-// recordPriorDefectRequiredSince は prior_defect を必須にする最初の実行日。これより前の
-// 回は D8 の無い判定フローか、D8 の結果を verdict_reason に書く規則で判定したので、
-// 置き場に残る過去の記録を失敗させないよう、必須にしない (書いてあれば形は検査する)。
-const recordPriorDefectRequiredSince = "2026-10-08"
+// recordPriorDefectFirstRun は、記録の中で最初に prior_defect を書いた回の添字を返す。
+// 無ければ -1。この回と、それより後の回では prior_defect を必須にする。それより前の回と、
+// 1 度も書いていない記録は、D8 の無い判定フローか、D8 の結果を verdict_reason に書く
+// 規則で判定したものと見なす — 置き場に残る過去の記録と、利用者が版を上げる前に書いた
+// 回を、書き換えさせずに通すため。回の date で区切らないのは、日付が、どの規則で判定
+// したかを表さないため (同じ日に両方の規則の回がありうる。版を上げる日は利用者ごとに違う)。
+func recordPriorDefectFirstRun(runs []recordRun) int {
+	for ri, run := range runs {
+		for _, fd := range run.Findings {
+			if fd.PriorDefect != nil {
+				return ri
+			}
+		}
+	}
+	return -1
+}
 
 type recordConsequence struct {
 	Condition     string `yaml:"condition"`
@@ -505,6 +517,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			plansByRun[ri][pl.ProblemID] = true
 		}
 	}
+	priorDefectFirstRun := recordPriorDefectFirstRun(doc.Runs)
 	for ri, run := range doc.Runs {
 		rn := fmt.Sprintf("runs[%d] (%s %s)", ri, run.Date, run.Skill)
 		if !recordDateRe.MatchString(run.Date) {
@@ -523,6 +536,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			add("%s: head がありません (レビュー時点の短縮 SHA)", rn)
 		}
 
+		priorDefectRequired := priorDefectFirstRun >= 0 && ri >= priorDefectFirstRun
 		verdictByID := map[int]string{}
 		for fi, fd := range run.Findings {
 			fn := fmt.Sprintf("%s: findings[%d] (id %d)", rn, fi, fd.ID)
@@ -585,7 +599,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			default:
 				add("%s: origin は review / residual のいずれか (省略時は review): %q", fn, fd.Origin)
 			}
-			for _, m := range recordPriorDefectProblems(run.Date, fd) {
+			for _, m := range recordPriorDefectProblems(priorDefectRequired, fd) {
 				add("%s: %s", fn, m)
 			}
 			if fd.PlanRef != nil {
@@ -960,9 +974,9 @@ func recordRow(cells []string) string {
 
 // recordPriorDefectProblems は指摘 1 件の prior_defect (D8 の結果) を検査する。
 // 書く条件は D8 に進んだかで決まる — 判定フローでは、D4 で根拠を確かめた指摘
-// (premise_check.result が verified) だけが D8 に進む。date が
-// recordPriorDefectRequiredSince より前の回は、無くても報告しない。
-func recordPriorDefectProblems(date string, fd recordFinding) []string {
+// (premise_check.result が verified) だけが D8 に進む。required が偽の回
+// (recordPriorDefectFirstRun の回より前の回) では、無くても報告しない。
+func recordPriorDefectProblems(required bool, fd recordFinding) []string {
 	var problems []string
 	add := func(format string, args ...any) {
 		problems = append(problems, fmt.Sprintf(format, args...))
@@ -970,9 +984,8 @@ func recordPriorDefectProblems(date string, fd recordFinding) []string {
 	verified := fd.PremiseCheck.Result == "verified"
 	pd := fd.PriorDefect
 	if pd == nil {
-		// date の形の誤りは別に報告されるので、ここでは形の正しい date だけを比べる。
-		if verified && recordDateRe.MatchString(date) && date >= recordPriorDefectRequiredSince {
-			add("prior_defect がありません (D4 で根拠を確かめた指摘は D8 で判定するので、D8 の結果を書く)")
+		if verified && required {
+			add("prior_defect がありません (D4 で根拠を確かめた指摘は D8 で判定するので、D8 の結果を書く。この記録では、この回かそれより前の回で prior_defect を書いている)")
 		}
 		return problems
 	}
