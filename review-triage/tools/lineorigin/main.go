@@ -5,7 +5,7 @@
 // 理由と行ごとの内訳を添えて標準出力に書く。結果を出せないときは標準出力に何も書かず、
 // 標準エラー出力の最初の行に印を付けて書く。入力の誤り (フラグの不足・解決できない版・
 // レビューした内容に無いファイルや行) は input-error:、道具を実行できないこと (git を起動できない・
-// git が古い・git の出力を読めない) は run-error:。go run で実行すると終了コードは 1 になるので、
+// git が古い・git の出力を読めない) は run-error:。コマンド go run で実行すると終了コードは 1 になるので、
 // 終了コード (2 と 3) ではなく印で見分ける。
 //
 // 使い方 (-root はレビューした作業ツリーのルートか、その中のディレクトリの絶対パス。値は単一引用符で囲む):
@@ -57,7 +57,7 @@ type options struct {
 func parseFlags(args []string) (options, error) {
 	fs := flag.NewFlagSet("lineorigin", flag.ContinueOnError)
 	// flag は誤りのときに使い方を書き出すが、標準エラー出力の最初の行を印にするため捨てる
-	// (フラグの一覧は README の「使い方」)
+	// (フラグの一覧は、ファイル review-triage/tools/lineorigin/README.md の「使い方」)
 	fs.SetOutput(io.Discard)
 	root := fs.String("root", "", "リポジトリのルートか、その中のディレクトリの絶対パス (必須)")
 	base := fs.String("base", "", "全量の起点 (必須)。コミットに解決できる版")

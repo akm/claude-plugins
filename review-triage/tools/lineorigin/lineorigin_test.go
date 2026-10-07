@@ -14,8 +14,8 @@ import (
 )
 
 // TestMain は、利用者の git の設定 (グローバル・システム) がテストの結果を変えないように、
-// HOME を一時ディレクトリに替え、システムの設定を読ませない。GIT_ で始まる環境変数を先に
-// 取り除くのは、GIT_DIR などが設定されたまま走らせると、テストの git が一時ディレクトリではなく
+// 環境変数 HOME を一時ディレクトリに替え、システムの設定を読ませない。GIT_ で始まる環境変数を先に
+// 取り除くのは、環境変数 GIT_DIR などが設定されたまま走らせると、テストの git が一時ディレクトリではなく
 // その変数が指すリポジトリにコミットやブランチを作るため。
 func TestMain(m *testing.M) {
 	for _, kv := range os.Environ() {
@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 	} {
 		os.Setenv(k, v)
 	}
-	// GIT_CONFIG_NOSYSTEM は、道具の gitEnv が取り除くので、取り除いた後に足す列にも入れる
+	// 環境変数 GIT_CONFIG_NOSYSTEM は、道具の gitEnv が取り除くので、取り除いた後に足す列にも入れる
 	extraGitEnv = []string{"GIT_CONFIG_NOSYSTEM=1"}
 	code := m.Run()
 	os.RemoveAll(home)
@@ -138,7 +138,7 @@ func wantContains(t *testing.T, got, sub string) {
 	}
 }
 
-// branched は、f.md を持つ起点のコミットを作り、そこから作業ブランチ br に切り替えた状態を返す。
+// branched は、ファイル f.md を持つ起点のコミットを作り、そこから作業ブランチ br に切り替えた状態を返す。
 func branched(t *testing.T) (*repo, string) {
 	t.Helper()
 	r := newRepo(t)
@@ -261,7 +261,7 @@ func TestAnnotatedTagsResolveToCommits(t *testing.T) {
 
 // ファイルの中で並べ替えた行は、差分が残ったと見なした行だけが成り立ち、消して足したと見なした行は
 // 成り立たない。末尾の 2 行を先頭へ動かすと、最も長く共通する並び (a・b・c) が 1 つに決まるので、
-// 残ったと見なす行が差分の作り方によらない。動かす 2 行は、git blame の移動の検出 (-M) が移動と
+// 残ったと見なす行が差分の作り方によらない。動かす 2 行は、コマンド git blame の移動の検出 (オプション -M) が移動と
 // 見なす長さ (英数字 20 文字) を越えるので、道具が移動の検出を使うと 1〜2 行目も成り立ってしまう。
 func TestReorderedLinesFollowDiff(t *testing.T) {
 	a, b, c := "alpha line of the base file\n", "bravo line of the base file\n", "charlie line of the base file\n"
@@ -722,7 +722,7 @@ func TestIdentAttributeIsUnverifiable(t *testing.T) {
 	}
 }
 
-// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter と区別できないので確かめない。
+// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter (属性 filter を外す書き方) と区別できないので確かめない。
 func TestUnsetDriverWithProcessOnly(t *testing.T) {
 	r := newRepo(t)
 	r.git("config", "filter.unset.process", "nonexistent-filter-process")
@@ -799,7 +799,7 @@ func TestCleanFilterProgramIsNotRun(t *testing.T) {
 	r.write("g.md", "g\n")
 	r.commit("branch")
 	if err := os.Remove(marker); err != nil {
-		t.Fatal(err) // 準備の git add がフィルタを実行して作るはず
+		t.Fatal(err) // 準備のコマンド git add がフィルタを実行して作るはず
 	}
 
 	for _, mode := range [][]string{{"-rev", "HEAD"}, {"-worktree"}} {
@@ -1061,7 +1061,7 @@ func TestTextconvIsIgnored(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.dat", "-lines", "1", "-rev", "HEAD"), holds)
 }
 
-// git replace で、行を書き換えたコミットを書き換えていないコミットに置き換えても、置き換えを見ない。
+// コマンド git replace で、行を書き換えたコミットを書き換えていないコミットに置き換えても、置き換えを見ない。
 func TestReplaceObjectsAreIgnored(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -1073,7 +1073,8 @@ func TestReplaceObjectsAreIgnored(t *testing.T) {
 }
 
 // ファイル .git/info/grafts (非推奨) は打ち消さない。途中のコミットを隠すと、書き換えて元へ戻した行が
-// holds になるが、その行の内容は起点と同じなので、誤った holds には当たらない (README の「保証すること」)。
+// holds になるが、その行の内容は起点と同じなので、誤った holds には当たらない (ファイル
+// review-triage/tools/lineorigin/README.md の「保証すること」)。
 func TestGraftsHidingRewriteAndRevert(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -1112,7 +1113,7 @@ func TestSpecialFileNames(t *testing.T) {
 	for _, n := range names {
 		r.write(n, "1\n")
 	}
-	r.write("a.md", "a\n") // [a].md と *.md をパターンとして読むと一致する名前
+	r.write("a.md", "a\n") // ファイル名 [a].md と *.md をパターンとして読むと一致する名前
 	base := r.commit("base")
 	r.git("switch", "-q", "-c", "br")
 	r.write("other.md", "x\n")
@@ -1125,12 +1126,12 @@ func TestSpecialFileNames(t *testing.T) {
 		})
 	}
 
-	// パターンとして読むと a.md の変更を [a].md の変更とみなしてしまう
+	// パターンとして読むと、ファイル a.md の変更をファイル [a].md の変更とみなしてしまう
 	r.write("a.md", "changed\n")
 	wantKind(t, r.check(base, "-file", "[a].md", "-lines", "1", "-rev", "HEAD"), holds)
 	r.write("a.md", "a\n")
 
-	// 先頭の : を特別な指定として読むと、:c.md に変更があっても無いと判定する
+	// 先頭の : を特別な指定として読むと、ファイル :c.md に変更があっても無いと判定する
 	r.write(":c.md", "changed\n")
 	wantKind(t, r.check(base, "-file", ":c.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
@@ -1287,7 +1288,7 @@ func TestGitNotFoundIsRunError(t *testing.T) {
 	wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git を起動できません")
 }
 
-// fakeGit は、git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
+// fakeGit は、コマンド git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
 // git を書き込んだディレクトリを返す。PATH の先頭に置いて、版の確認を確かめるのに使う。
 func fakeGit(t *testing.T, versionLine string) string {
 	t.Helper()
@@ -1351,7 +1352,7 @@ func TestGitVersionBoundary(t *testing.T) {
 }
 
 // 部分クローンで欠けたオブジェクトを、道具がネットワークから取得してリポジトリに書き込まない。
-// GIT_NO_LAZY_FETCH は git 2.44 からなので、それより前の git では飛ばす。
+// 環境変数 GIT_NO_LAZY_FETCH は git 2.44 からなので、それより前の git では飛ばす。
 func TestPartialCloneDoesNotFetch(t *testing.T) {
 	out, err := exec.Command("git", "version").Output()
 	if major, minor, ok := parseGitVersion(string(out)); err != nil || !ok || major == 2 && minor < 44 {

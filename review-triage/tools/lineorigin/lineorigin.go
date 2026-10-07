@@ -325,7 +325,7 @@ func findDotGit(dir string) (string, bool) {
 
 // run は git を実行し、標準出力と終了コードを返す。終了コードが 0 でなければ error も返す。
 //
-// どのディレクトリから実行しても同じ結果になるよう、-C でルートを指定する。環境は gitEnv が作る。
+// どのディレクトリから実行しても同じ結果になるよう、git のオプション -C でルートを指定する。環境は gitEnv が作る。
 func (g gitRunner) run(args ...string) (string, int, error) {
 	return g.runIn(nil, args...)
 }
@@ -421,7 +421,7 @@ func gitEnv() []string {
 		"LC_ALL=C",
 		// パスを pathspec (パターンや先頭の : で始まる指定) として解釈させない
 		"GIT_LITERAL_PATHSPECS=1",
-		// git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
+		// コマンド git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
 		"GIT_NO_REPLACE_OBJECTS=1",
 		// 部分クローンで欠けたオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
 		// 取得できないと git は失敗し、道具は run-error になる
@@ -432,7 +432,7 @@ func gitEnv() []string {
 	return append(env, extraGitEnv...)
 }
 
-// commit は版をコミットの完全な SHA に解決する。版が無いとき (--quiet で終了コード 1) は
+// commit は版をコミットの完全な SHA に解決する。版が無いとき (オプション --quiet で終了コード 1) は
 // found を false にする。それ以外の失敗 (リポジトリを読めない、など) は run-error。
 func (g gitRunner) commit(rev string) (sha string, found bool, err error) {
 	out, code, err := g.run("rev-parse", "--verify", "--quiet", "--end-of-options", rev+"^{commit}")
@@ -495,8 +495,8 @@ func (g gitRunner) entry(commit, file string) (string, error) {
 // rev が HEAD なら、コミットしていない変更 (ステージしたものを含む) があるかと同じ。rev が HEAD より前なら、
 // その後のコミットで変わった内容も、違いとして返す。
 //
-// git diff は使わない。インデックスに記録した更新時刻などが作業ツリーのファイルと合わないと、
-// GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、rev・インデックス・
+// コマンド git diff は使わない。インデックスに記録した更新時刻などが作業ツリーのファイルと合わないと、
+// 環境変数 GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、rev・インデックス・
 // 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や
 // assume-unchanged (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) が
 // 付いたファイルの編集も、変更として扱う。
@@ -532,7 +532,7 @@ func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
 	case err != nil:
 		return false, runf("作業ツリーの -file を読めません: %v", err)
 	case st.Mode().IsRegular():
-		// --path で、そのパスの属性によるフィルタ (改行の変換など) を当ててからハッシュを求める。-w を付けないので書き込まない
+		// --path で、そのパスの属性によるフィルタ (改行の変換など) を当ててからハッシュを求める。オプション -w を付けないので書き込まない
 		out, _, err := g.run("hash-object", "--path="+file, "--", abs)
 		if err != nil {
 			return false, err
