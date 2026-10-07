@@ -1980,3 +1980,233 @@ func TestRenderPlanCellsInvestigated(t *testing.T) {
 		}
 	}
 }
+
+// priorDefectRecordYAML は prior_defect (D8 の結果) を書いた記録。validRecordYAML の
+// 根拠を確かめた指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって H7 で保留にした
+// 指摘 (id 4) を足す。
+func priorDefectRecordYAML(t *testing.T) string {
+	t.Helper()
+	src := validRecordYAML
+	for _, r := range []struct{ old, new string }{
+		{"        verdict_reason: ゲート 0 件で採択 (A2)\n",
+			"        verdict_reason: ゲート 0 件で採択 (A2)\n" +
+				"        prior_defect:\n" +
+				"          base: 1111111\n" +
+				"          line_check: not-holds\n" +
+				"          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n"},
+		{"        verdict_reason: 開発者の領域で却下 (R3)\n",
+			"        verdict_reason: 開発者の領域で却下 (R3)\n" +
+				"        prior_defect:\n" +
+				"          base: 1111111\n" +
+				"          line_check: holds\n" +
+				"          line_reason: 全量の起点にあったまま (起点の 20 行目)\n" +
+				"          same_defect: not-holds\n" +
+				"          same_defect_reason: 全量の起点では一時ファイルを作っていない\n" +
+				"      - id: 4\n" +
+				"        file: docs/qux.md\n" +
+				"        summary: 前からある節の手順が役に立たない\n" +
+				"        category: doc-other\n" +
+				"        audience: developer\n" +
+				"        consequence:\n" +
+				"          condition: 途中まで入ったデータベースで\n" +
+				"          who: developer\n" +
+				"          what: 手順が使えない\n" +
+				"          detectability: 気づく\n" +
+				"        premise_check:\n" +
+				"          stages: A\n" +
+				"          result: verified\n" +
+				"        verdict: held\n" +
+				"        verdict_reason: 前からある欠陥で保留 (H7)\n" +
+				"        prior_defect:\n" +
+				"          base: 1111111\n" +
+				"          line_check: holds\n" +
+				"          line_reason: 全量の起点にあったまま (起点の 5 行目)\n" +
+				"          same_defect: unverifiable\n" +
+				"          same_defect_reason: 起点の内容で手順を試す環境が無い\n"},
+	} {
+		if !strings.Contains(src, r.old) {
+			t.Fatalf("フィクスチャの置換が適用されていない: %q", r.old)
+		}
+		src = strings.Replace(src, r.old, r.new, 1)
+	}
+	return src
+}
+
+func TestReviewTriageRecordPriorDefectPasses(t *testing.T) {
+	files, read := recordFiles(t, priorDefectRecordYAML(t))
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("D8 の結果を書いた記録で問題が出た: %v", problems)
+	}
+}
+
+// prior_defect を必須にするのは、記録の中で最初に prior_defect を書いた回と、それより
+// 後の回。それより前の回と、1 度も書いていない記録は、D8 の無い判定フローか、D8 の結果を
+// verdict_reason に書く規則で判定したものと見なし、無くても報告しない。回の date には
+// よらない (どの回も validRecordYAML と同じ date)。
+func TestReviewTriageRecordPriorDefectRequiredFromFirstRun(t *testing.T) {
+	// 2 つ目の回として足すときは、先頭の "runs:" を外して回の列だけにする。
+	asLaterRun := func(src string) string { return strings.TrimPrefix(src, "runs:\n") }
+	// D8 の結果を書いた回のうち、id 1 の prior_defect だけを書き忘れた回。
+	forgotID1 := func(t *testing.T) string {
+		old := "        prior_defect:\n" +
+			"          base: 1111111\n" +
+			"          line_check: not-holds\n" +
+			"          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n"
+		src := priorDefectRecordYAML(t)
+		if !strings.Contains(src, old) {
+			t.Fatalf("フィクスチャの置換が適用されていない: %q", old)
+		}
+		return strings.Replace(src, old, "", 1)
+	}
+	cases := []struct {
+		name string
+		src  func(t *testing.T) string
+		want []string // 欠落が報告される指摘 (回と id)。空なら報告されない
+	}{
+		{"1 度も書いていない記録は報告しない",
+			func(t *testing.T) string { return validRecordYAML }, nil},
+		{"書いた回より前の回は報告しない",
+			func(t *testing.T) string { return validRecordYAML + asLaterRun(forgotID1(t)) },
+			[]string{"runs[1] (2026-08-30 code-review): findings[0] (id 1)"}},
+		{"書いた回の中の書き忘れを報告する",
+			forgotID1,
+			[]string{"runs[0] (2026-08-30 code-review): findings[0] (id 1)"}},
+		{"書いた回より後の回の書き忘れを報告する",
+			func(t *testing.T) string { return priorDefectRecordYAML(t) + asLaterRun(validRecordYAML) },
+			[]string{"runs[1] (2026-08-30 code-review): findings[0] (id 1)", "runs[1] (2026-08-30 code-review): findings[2] (id 3)"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := tc.src(t)
+			read := func(_ string) ([]byte, error) { return []byte(src), nil }
+			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+			var got []string
+			for _, p := range problems {
+				if strings.Contains(p, "prior_defect がありません") {
+					got = append(got, p)
+				}
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("欠落の報告が %d 件、want %d 件 (%v)。出た問題: %v", len(got), len(tc.want), tc.want, problems)
+			}
+			for i, w := range tc.want {
+				if !strings.Contains(got[i], w) {
+					t.Fatalf("欠落の報告 %d に %q が無い: %q", i, w, got[i])
+				}
+			}
+		})
+	}
+}
+
+func TestReviewTriageRecordPriorDefectViolations(t *testing.T) {
+	cases := []struct {
+		name string
+		old  string // priorDefectRecordYAML の中で置き換える文字列
+		new  string
+		want string // 問題文に含まれるべき語
+	}{
+		{"D8 に進んでいない指摘に書いた", "        attrs:\n",
+			"        prior_defect:\n          line_check: unverifiable\n          line_reason: r\n        attrs:\n",
+			"prior_defect は D8 で判定した指摘"},
+		{"値が無い (null)",
+			"        prior_defect:\n          base: 1111111\n          line_check: not-holds\n          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n",
+			"        prior_defect:\n", "prior_defect に値がありません"},
+		{"未知のキー", "          line_check: not-holds\n", "          line_check: not-holds\n          result: miss\n", "result"},
+		{"line_check の列挙値違反", "line_check: not-holds", "line_check: changed", "prior_defect.line_check"},
+		{"line_check が無い", "          line_check: not-holds\n", "", "prior_defect.line_check"},
+		{"line_reason が無い", "          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n", "", "prior_defect.line_reason"},
+		{"not-holds なのに base が無い", "          base: 1111111\n          line_check: not-holds\n", "          line_check: not-holds\n", "prior_defect.base"},
+		{"holds なのに base が無い", "          base: 1111111\n          line_check: holds\n          line_reason: 全量の起点にあったまま (起点の 20 行目)\n",
+			"          line_check: holds\n          line_reason: 全量の起点にあったまま (起点の 20 行目)\n", "prior_defect.base"},
+		{"holds なのに same_defect が無い", "          same_defect: not-holds\n          same_defect_reason: 全量の起点では一時ファイルを作っていない\n", "",
+			"prior_defect.same_defect がありません"},
+		{"same_defect の列挙値違反", "same_defect: not-holds", "same_defect: no", "prior_defect.same_defect は"},
+		{"same_defect_reason が無い", "          same_defect_reason: 全量の起点では一時ファイルを作っていない\n", "", "prior_defect.same_defect_reason"},
+		{"not-holds なのに same_defect がある", "          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n",
+			"          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n          same_defect: holds\n", "line_check が holds のときだけ"},
+		{"unverifiable なのに same_defect_reason がある",
+			"          base: 1111111\n          line_check: not-holds\n          line_reason: 10 行目はこのブランチのコミット 2222222 が書いた\n",
+			"          line_check: unverifiable\n          line_reason: 道具が印 run-error で終わった\n          same_defect_reason: r\n", "line_check が holds のときだけ"},
+		{"D8 が当たるのに採択", "        verdict: held\n        verdict_reason: 前からある欠陥で保留 (H7)\n",
+			"        verdict: adopted\n        verdict_reason: 前からある欠陥で保留 (H7)\n", "verdict が held ではありません"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := priorDefectRecordYAML(t)
+			mutated := strings.Replace(src, tc.old, tc.new, 1)
+			if mutated == src {
+				t.Fatalf("フィクスチャの置換が適用されていない: %q", tc.old)
+			}
+			read := func(_ string) ([]byte, error) { return []byte(mutated), nil }
+			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+			found := false
+			for _, p := range problems {
+				if strings.Contains(p, tc.want) {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("%q を含む問題が出ない。出た問題: %v", tc.want, problems)
+			}
+		})
+	}
+}
+
+// (2) を確かめられなかったときも D8 は当たる (judgment-flow.md の D8 の行)。当たったときに
+// 保留でない記録を、(2) の値ごとに報告するかを検証する。
+func TestReviewTriageRecordPriorDefectHitRequiresHeld(t *testing.T) {
+	cases := []struct {
+		sameDefect string
+		want       bool
+	}{
+		{"holds", true},
+		{"unverifiable", true},
+		{"not-holds", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.sameDefect, func(t *testing.T) {
+			src := strings.Replace(priorDefectRecordYAML(t), "same_defect: not-holds", "same_defect: "+tc.sameDefect, 1)
+			read := func(_ string) ([]byte, error) { return []byte(src), nil }
+			problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
+			var got []string
+			for _, p := range problems {
+				if strings.Contains(p, "verdict が held ではありません") {
+					got = append(got, p)
+				}
+			}
+			// 置き換えるのは却下 (R3) にした id 3 の (2)。
+			if tc.want != (len(got) == 1 && strings.Contains(got[0], "(id 3)")) || (!tc.want && len(got) != 0) {
+				t.Fatalf("same_defect %s で報告されるべきか: %v。出た問題: %v", tc.sameDefect, tc.want, problems)
+			}
+		})
+	}
+}
+
+func TestRenderVerdictCellPriorDefect(t *testing.T) {
+	base := recordFinding{Verdict: "held", VerdictReason: "H7"}
+	cases := []struct {
+		name string
+		pd   *recordPriorDefect
+		want string
+	}{
+		{"prior_defect が無ければ添えない", nil, "**保留** — H7"},
+		{"(1) が成り立たなければ (2) を出さない",
+			&recordPriorDefect{Base: "1111111", LineCheck: "not-holds", LineReason: "r"},
+			"**保留** — H7 (D8: 当たらない。(1) not-holds)"},
+		{"(2) を確かめられなければ当たる",
+			&recordPriorDefect{Base: "1111111", LineCheck: "holds", LineReason: "r", SameDefect: "unverifiable", SameDefectReason: "r"},
+			"**保留** — H7 (D8: 当たる。(1) holds、(2) unverifiable)"},
+		{"(2) が成り立たなければ当たらない",
+			&recordPriorDefect{Base: "1111111", LineCheck: "holds", LineReason: "r", SameDefect: "not-holds", SameDefectReason: "r"},
+			"**保留** — H7 (D8: 当たらない。(1) holds、(2) not-holds)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fd := base
+			fd.PriorDefect = tc.pd
+			if got := renderVerdictCell(fd); got != tc.want {
+				t.Fatalf("renderVerdictCell = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
