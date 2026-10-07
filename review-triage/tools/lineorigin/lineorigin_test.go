@@ -649,6 +649,59 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 	}
 }
 
+// 属性 ident が設定されたファイルは、方式によらず確かめずに unverifiable にする。git はコマンド
+// git hash-object --path でも git blame --contents でも、比べる前に「$Id: … $」の中を「$Id$」へ戻すので、
+// 確かめると、作業ツリーでその中を書き換えた行が、起点にあったまま (誤った holds) と報告される。
+// 属性の書き方ごとに確かめる。
+func TestIdentAttributeIsUnverifiable(t *testing.T) {
+	cases := []struct {
+		name       string
+		attributes string
+		want       string // 確かめないときに理由に含む語 (空なら確かめる)
+	}{
+		{"ident は確かめない", "f.md ident\n", "ident"},
+		{"値のある ident も確かめない", "f.md ident=x\n", "ident"},
+		{"ident が 2 つ目の属性でも確かめない", "f.md -text ident\n", "ident"},
+		{"filter と ident が両方あれば clean フィルタの理由にする", "f.md ident filter=nodriver\n", "clean フィルタ"},
+		{"-ident は展開を外すので確かめる", "f.md -ident\n", ""},
+		{"!ident は属性を無しに戻すので確かめる", "*.md ident\nf.md !ident\n", ""},
+		{"ident ではない属性の値が ident でも確かめる", "f.md diff=ident\n", ""},
+		{"属性が無ければ確かめる", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := newRepo(t)
+			r.write(".gitattributes", c.attributes)
+			r.write("f.md", "a\n$Id$\n")
+			base := r.commit("base")
+			r.git("switch", "-q", "-c", "br")
+			r.write("g.md", "g\n")
+			r.commit("branch")
+			// 2 行目の「$Id: … $」の中を書き換える (コミットしない)。属性 ident があると、git は比べる前に
+			// これを起点と同じ「$Id$」へ戻す
+			r.write("f.md", "a\n$Id: injected $\n")
+
+			if c.want != "" {
+				for _, mode := range []string{"-worktree", "-rev"} {
+					args := []string{"-file", "f.md", "-lines", "2", mode}
+					if mode == "-rev" {
+						args = append(args, "HEAD")
+					}
+					o := r.check(base, args...)
+					wantKind(t, o, unverifiable)
+					wantContains(t, o.reason, c.want)
+				}
+				return
+			}
+			wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-worktree"), notHolds)
+			o := r.check(base, "-file", "f.md", "-lines", "2", "-rev", "HEAD")
+			wantKind(t, o, unverifiable)
+			wantContains(t, o.reason, "コミットしていない変更")
+			wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), holds)
+		})
+	}
+}
+
 // 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter と区別できないので確かめない。
 func TestUnsetDriverWithProcessOnly(t *testing.T) {
 	r := newRepo(t)

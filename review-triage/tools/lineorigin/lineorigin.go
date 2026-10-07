@@ -99,23 +99,29 @@ func check(opts options) (result, error) {
 		return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
 	}
 
-	// 次の 2 つは、レビュアが読む内容とコマンド git blame が見る内容の行番号が対応しない。指摘の行番号が別の行に
-	// 当たり、書き換えた行が起点のままと報告されうる (誤った holds) ので、方式によらず確かめない。
+	// 次の 3 つは、レビュアが読む内容とコマンド git blame が見る内容が違いうる。シンボリックリンクと clean
+	// フィルタは行番号が対応せず、属性 ident は行の中の書き換えを、比べる前の変換で戻す。どれも書き換えた行が
+	// 起点のままと報告されうる (誤った holds) ので、方式によらず確かめない。
 	// git はシンボリックリンクのリンクの文字列を 1 行のブロブとして記録し、git blame もそれを見るが、
 	// レビュアはリンクの先の内容を読む
 	if targetEntry == entrySymlink {
 		return result{kind: unverifiable, reason: "指摘のファイルが追跡中のシンボリックリンクで、レビュアが読むリンクの先の内容と、git が記録するリンクの文字列の行番号が対応しない"}, nil
 	}
 	// clean フィルタは、作業ツリーの内容 (レビュアが読む、フィルタの前の内容) を変換してから記録し、
-	// git blame もフィルタの後の内容 (コミットの内容と、--contents で渡した内容) を見る。フィルタが行を
-	// 増やしたり消したりすると、行番号がずれる。-rev では、コミットしていない変更の確認より前に確かめる
-	// (その確認が実行するコマンド git hash-object --path が、フィルタのプログラムを実行しないように)
-	filtered, err := g.hasCleanFilter(opts.file)
+	// git blame もフィルタの後の内容 (コミットの内容と、オプション --contents で渡した内容) を見る。フィルタが
+	// 行を増やしたり消したりすると、行番号がずれる。属性 ident は、記録するときに「$Id: … $」を「$Id$」へ戻し、
+	// コマンド git hash-object --path と git blame --contents も同じ変換を当ててから比べるので、「$Id: … $」の
+	// 中の書き換えが見えない。-rev では、コミットしていない変更の確認より前に確かめる (その確認が実行する
+	// git hash-object --path が、フィルタのプログラムを実行しないように)
+	attr, err := g.convertingAttribute(opts.file)
 	if err != nil {
 		return result{}, err
 	}
-	if filtered {
+	switch attr {
+	case "filter":
 		return result{kind: unverifiable, reason: "指摘のファイルに clean フィルタ (属性 filter) が設定されていて、作業ツリーの内容 (フィルタの前) と、git blame が見るフィルタの後の内容の行番号がずれうる"}, nil
+	case "ident":
+		return result{kind: unverifiable, reason: "指摘のファイルに属性 ident が設定されていて、git は「$Id: … $」の中を「$Id$」へ戻してから内容を比べるので、レビュアが読んだその中の書き換えを確かめられない"}, nil
 	}
 
 	if !opts.worktree {
@@ -544,45 +550,56 @@ func (g gitRunner) hasUncommittedChange(top, rev, file string) (bool, error) {
 	return committed != index || index != worktree, nil
 }
 
-// hasCleanFilter は、file に属性 filter (git add のときにファイルを変換するプログラム) が
-// 設定されているかを返す。属性 filter の値はドライバ (設定 filter.<名前>.clean などで登録する、
-// 変換のプログラムの名前) で、設定の無いドライバの名前や、値の無い filter も「あり」とする。
+// convertingAttribute は、file に、レビュアが読む内容と git が比べる内容を違えうる属性が設定されて
+// いれば、その名前 (filter か ident) を返す。無ければ空を返す。両方あれば filter を返す。
+//
+// 属性 filter (コマンド git add のときにファイルを変換するプログラム) の値はドライバ (設定
+// filter.<名前>.clean などで登録する、変換のプログラムの名前) で、設定の無いドライバの名前や、値の無い
+// filter も「あり」とする。
+// 属性 ident (ファイルの中の「$Id$」を、取り出すときにブロブの SHA を入れた「$Id: … $」に展開し、記録する
+// ときに「$Id$」へ戻す仕組み) は、unset 以外の値なら「あり」とする (git が展開するのは値が set のときだけ)。
 // 「あり」なら呼び出し元は確かめずに unverifiable を返すので、迷う場合を「あり」として扱っても、
 // 誤った holds にはならない。
-func (g gitRunner) hasCleanFilter(file string) (bool, error) {
-	// -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
+func (g gitRunner) convertingAttribute(file string) (string, error) {
+	// オプション -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
 	// filter だけを尋ねると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
 	out, _, err := g.run("check-attr", "-a", "-z", "--", file)
 	if err != nil {
-		return false, asRun(err)
+		return "", asRun(err)
 	}
-	// -z の出力は「<パス> NUL <属性> NUL <値> NUL」の繰り返しで、属性が無ければ空。NUL で分けると、
+	// オプション -z の出力は「<パス> NUL <属性> NUL <値> NUL」の繰り返しで、属性が無ければ空。NUL で分けると、
 	// 要素の数は 3 の倍数に 1 を足した数になり、最後は空になる。そうでない出力は読めないので run-error にする
-	// (読めない出力をフィルタ無しとして扱い、git blame で行を調べに進むと、誤った holds になりうる)
+	// (読めない出力を属性無しとして扱い、git blame で行を調べに進むと、誤った holds になりうる)
 	parts := strings.Split(out, "\x00")
 	if len(parts)%3 != 1 || parts[len(parts)-1] != "" {
-		return false, runf("git check-attr の出力を読めません: %q", out)
+		return "", runf("git check-attr の出力を読めません: %q", out)
 	}
+	ident := false
 	for k := 0; k+2 < len(parts); k += 3 {
-		if parts[k+1] != "filter" {
-			continue
-		}
-		if parts[k+2] != "unset" {
-			return true, nil
-		}
-		// unset は、-filter (フィルタを外す) と、名前が unset のドライバを区別できないので、
-		// そのドライバの設定があれば「あり」とする
-		_, code, err := g.run("config", "--get-regexp", `^filter\.unset\.(clean|process)$`)
-		switch code {
-		case 0:
-			return true, nil
-		case 1:
-			return false, nil
-		default:
-			return false, asRun(err)
+		switch parts[k+1] {
+		case "filter":
+			if parts[k+2] != "unset" {
+				return "filter", nil
+			}
+			// unset は、-filter (フィルタを外す) と、名前が unset のドライバを区別できないので、
+			// そのドライバの設定があれば「あり」とする
+			_, code, err := g.run("config", "--get-regexp", `^filter\.unset\.(clean|process)$`)
+			switch code {
+			case 0:
+				return "filter", nil
+			case 1:
+				// ドライバの設定が無いので、-filter (フィルタを外す)
+			default:
+				return "", asRun(err)
+			}
+		case "ident":
+			ident = parts[k+2] != "unset"
 		}
 	}
-	return false, nil
+	if ident {
+		return "ident", nil
+	}
+	return "", nil
 }
 
 // blob は、コミット commit の file のブロブの SHA を返す。そのパスが無ければ空。
