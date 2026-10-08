@@ -25,7 +25,7 @@ execution: code
 - **着手の宣言 (宣言)**: 作業のセッションが着手の時点で Issue のコメントとして書く、変更予定のファイル・必要な資源・分ける必要の有無。
 - **資源**: 同時に 1 つしか使えないもの (検証用の Worker、固定のポートなど)。Issue のラベル `resource:<名前>` で表す。
 - **記録**: 管理のセッションが記録の置き場に持つファイル群 (`record.json`・`snapshot.json`・`actions.log`)。GitHub に無いもの (宣言の写し・資源の使用・手順の段階・時刻) を持つ。
-- **合図**: セッション間のメッセージ (Claude Code のツール `SendMessage`)。`ready` と `renamed` を除き GitHub に対応物を持ち、失われても処理が遅れるだけで食い違わない。この 2 つはセッションの状態を運ぶので対応物が無く、失われたときの回復の仕方を別に決める (KTD1)。
+- **合図**: セッション間のメッセージ (Claude Code のツール `SendMessage`)。`available` と `renamed` を除き GitHub に対応物を持ち、失われても処理が遅れるだけで食い違わない。この 2 つはセッションの状態を運ぶので対応物が無く、失われたときの回復の仕方を別に決める (KTD1)。
 - **待機**: GitHub の変化を待つために背景で起動する、同梱の Python のスクリプト (KTD6)。終わると Claude Code がそのセッションに通知を届け、通知で次のターンが始まる。割り当てを待っている作業のセッションは「待機中の作業のセッション」と呼ぶ。
 - **待機の知らせ**: ツール `SendMessage` の引数 `notify_when_idle` で申し込む知らせ。相手のセッションが次に入力待ち (ターンを終え、次の入力を待つ状態) になったときに 1 回届く (R10)。
 - **再入の手順**: 管理のセッションが、背景の待機の通知・合図・`--resume` のどれで動き出しても入る 1 つの入口。
@@ -96,7 +96,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 **仕様の正本 — セッション間の取り決めと記録**
 
-- R7. **メッセージは合図に限り、運ぶ情報は `ready` と `renamed` を除いて GitHub に対応物を持つ (`messaging.md`)。** この 2 つはセッションの状態 (着手できる・名前が変わった) を運ぶので対応物が無い。`ready` が失われたら、作業のセッションの待機が期限で終わったときに送り直す。`renamed` が失われたら、管理のセッションが宛先の名前を見つけられなかったときに、Desktop の `list_sessions` で ID から名前を引き直すか、利用者に尋ねる (R23)。作業 → 管理: `ready` (着手できる)・`declared` (宣言を書いた)・`review` (PR を ready にした)・`renamed` (名前を変えた)・`conflict` (衝突)。管理 → 作業: `assigned` (割り当て)・`go` (進めてよい)・`wait` (待つ。理由を含む)・`stop` (止める。理由は解放・close・項目の除去のいずれか)。先頭行は `issue-dispatch: <種類>`、続く行は `<キー>: <値>`。`ready` と `renamed` 以外のどの合図が失われても、受け手は GitHub を読めば同じ状態に至る (対応物の表は KTD1)。(KTD1, KTD11)
+- R7. **メッセージは合図に限り、運ぶ情報は `available` と `renamed` を除いて GitHub に対応物を持つ (`messaging.md`)。** この 2 つはセッションの状態 (着手できる・名前が変わった) を運ぶので対応物が無い。`available` が失われたら、作業のセッションの待機が期限で終わったときに送り直す。`renamed` が失われたら、管理のセッションが宛先の名前を見つけられなかったときに、Desktop の `list_sessions` で ID から名前を引き直すか、利用者に尋ねる (R23)。作業 → 管理: `available` (手が空いていて、次の Issue に着手できる)・`declared` (宣言を書いた)・`review` (PR を ready にした)・`renamed` (名前を変えた)・`conflict` (衝突)。管理 → 作業: `assigned` (割り当て)・`go` (進めてよい)・`wait` (待つ。理由を含む)・`stop` (止める。理由は解放・close・項目の除去のいずれか)。先頭行は `issue-dispatch: <種類>`、続く行は `<キー>: <値>`。`available` と `renamed` 以外のどの合図が失われても、受け手は GitHub を読めば同じ状態に至る (対応物の表は KTD1)。(KTD1, KTD11)
 - R8. **宛先はセッションの名前で書く。** 同じ名前が複数あるときだけ `ListAgents` の短い識別子を添える。Desktop のセッション ID (`local_…`) 宛てとツール `send_message` は使わない。(KTD10)
 - R9. **合図が捨てられた知らせ (中継の履歴の上限) を受けたら、利用者に 1 行の入力を求める。** 捨てられた合図を送ったものとして進まない。管理のセッションは、利用者の最後の入力からの送受の数を記録に持ち、報告に書く。(KTD11)
 - R10. **止まったことに気づく手段は、期限と待機の知らせの 2 つ。** 待機の知らせ (`notify_when_idle`) は、相手が次に入力待ち (ターンを終え、次の入力を待つ状態) になったときか終了したときに 1 回だけ届き、単独で申し込んだときに相手が既に入力待ちなら直ちに届く。作業のセッションは待機のスクリプトを背景で起動してターンを終えるので、普段は入力待ちである。そこで管理のセッションは、申し込みを合図 `assigned`・`go` に添えて行う (合図を届けた後、作業のセッションが次に入力待ちになったときに知らせが届く)。合図 `wait` には添えない。再入のたびには申し込み直さない。失効 (12 時間) の知らせを受けたときなど単独で申し込むときは、`ListAgents` で busy の作業のセッションにだけ申し込む。止まったかどうかは知らせの有無ではなく、GitHub 上の進み (宣言・PR) の有無で判断し、知らせはその確認を期限より早く行うきっかけに使う。待機の知らせの後に GitHub 上の進みが無ければ報告する。権限の確認で止まった作業のセッションは入力待ちにならないので、期限でしか気づけないことを文書に書く。(KTD6)
@@ -114,7 +114,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 **管理のセッション (スキル `issue-dispatch`)**
 
 - R18. **開始。** 設定を読む (無ければ Project の owner と番号を利用者に尋ね、設定の雛形を示す)。管理ディレクトリが git リポジトリなら、記録の置き場が無視されていることを `git check-ignore` で確かめ、無視されていなければ `.gitignore` への追加を案内して止まる (スキルは `.gitignore` を変えない)。Project を検査する (R15)。トークンのログインを `gh api user` で得て記録に持つ (R6)。自分の名前を規約 `issue-dispatch <owner>/<number>` に合わせる (Desktop はツール `set_session_title`、端末は利用者に `/rename` を頼む)。同じ名前のほかのセッションが `ListAgents` にあれば、起動せず報告する (管理の排他)。同期する (全項目の `Blocked` の導出、人の変更の検出、`Agent session ID` が入っているが記録に無い項目の検出)。記録を作るか読む。待機を起動してターンを終える。(KTD4)
-- R19. **割り当て。** 候補は、位置の順で、Status が `Todo` (Status が空の項目は対象にしない。R1)、`Agent session ID` が空、開いている blocker が無い、必要な資源 (ラベル) が記録で空いている、親 Issue でない、作業のセッションの `repo` と同じリポジトリの項目。書き込みの順は、記録に意図 (書く予定の ID・title・Status・割り当ての番号) → `Agent session ID` が空であることを読んで確かめる → `Agent session ID` → 読み直す → `Agent session title` → Status `In Progress` → コメント `割り当て` → 合図 `assigned` → 記録に完了。各手順は冪等 (同じ値を 2 度書いても害がなく、コメントは先頭行で既投稿を検出する)。割り当ての番号は、その Issue にある `割り当て` のコメント (書き手がトークンのログインと同じもの) の数に 1 を足した値で、意図に書いてから使う (途中で止まって再開しても同じ番号を使う)。書く前の読みが空でないか、読み直しが自分の値でなければ、上書きせず報告して候補を選び直す。1 ターンで複数を割り当てるときも 1 件ごとに読む。`ready` を送ったセッションが既に `in_review` 未満の項目を持っていれば新しく割り当てず、その項目の `assigned` を再送する (R24 の上限に数える)。既に待機中なら時刻を変えずに 1 件のまま。候補が無ければ記録に待機中 (時刻) と書き、空いたら送ると伝える。待機中が複数なら時刻の順に渡す。(KTD3)
+- R19. **割り当て。** 候補は、位置の順で、Status が `Todo` (Status が空の項目は対象にしない。R1)、`Agent session ID` が空、開いている blocker が無い、必要な資源 (ラベル) が記録で空いている、親 Issue でない、作業のセッションの `repo` と同じリポジトリの項目。書き込みの順は、記録に意図 (書く予定の ID・title・Status・割り当ての番号) → `Agent session ID` が空であることを読んで確かめる → `Agent session ID` → 読み直す → `Agent session title` → Status `In Progress` → コメント `割り当て` → 合図 `assigned` → 記録に完了。各手順は冪等 (同じ値を 2 度書いても害がなく、コメントは先頭行で既投稿を検出する)。割り当ての番号は、その Issue にある `割り当て` のコメント (書き手がトークンのログインと同じもの) の数に 1 を足した値で、意図に書いてから使う (途中で止まって再開しても同じ番号を使う)。書く前の読みが空でないか、読み直しが自分の値でなければ、上書きせず報告して候補を選び直す。1 ターンで複数を割り当てるときも 1 件ごとに読む。`available` を送ったセッションが既に `in_review` 未満の項目を持っていれば新しく割り当てず、その項目の `assigned` を再送する (R24 の上限に数える)。既に待機中なら時刻を変えずに 1 件のまま。候補が無ければ記録に待機中 (時刻) と書き、空いたら送ると伝える。待機中が複数なら時刻の順に渡す。(KTD3)
 - R20. **宣言の受け取りと重なりの判定。** 宣言のコメント (書き手がトークンのログインと同じもの。R6) を読んで形を検査し (誤りは `wait` の理由として差し戻す)、記録に写し、R5 で判定する。重なりが無ければコメント `開始可` を書いて `go`。あれば利用者に、待つ (`blockedBy` を足して `Blocked` にし、コメント `待機`) か、分けるリファクタリングを先に小さな PR で行うかを示して決めてもらい、作業に伝える。宣言の資源が Issue のラベルに無ければ、ラベルを足すことを提案する (承認)。`split` が真なら、進行中の Issue を親にせず、範囲を狭めて残りを同じリポジトリの新しい Issue にする案を利用者に示す (Project への追加は自動追加のワークフローか利用者)。宣言の更新は PR が ready になる前まで受け、同じ判定をする。(KTD8, KTD9)
 - R21. **ポーリングと導出。** 間隔は設定 (デフォルト 3 分)。見つける変化と処理: Issue が閉じた → 資源と宣言を解放 (`Done` は GitHub が書く)。`blockedBy` の変化 → `Blocked` を再導出する (範囲と戻り先は KTD7)。管理が足した blocker が閉じた項目は記録に最後に書いた Status (`In Progress`) に戻して `go` を送る。宣言のコメント → R20。PR の観測 → 開いていて draft でなく `closingIssuesReferences` に割り当ての Issue を含み、作者がトークンのログインと同じ PR があれば `In review` (無ければ作業に本文の追記を求める。KTD8)。PR がマージされたが Issue が開いている → 閉じるかを利用者に尋ねる。PR がマージされずに閉じた → Status の戻しと割り当ての解除を利用者に尋ねる。進行中の Issue が閉じられた → 作業に止めるよう伝えてよいかを利用者に尋ねる。Issue が reopen された → 報告。`Agent session ID` が人によって空にされた・別の値にされた、項目が Project から除かれた → 割り当ての解除 (資源と宣言の解放) と作業への `stop` を利用者に尋ねる (R13)。項目の追加と並び順の変化 → 次の割り当てから反映。処理の順は R12。(KTD6, KTD7, KTD8)
 - R22. **人の変更。** 記録に最後に書いた値を持ち、そこからの差分のうち、記録の意図と一致するもの (自分の部分書き込み。部分完了の続きとして扱う) と組み込みワークフローの遷移で説明できるものを除いた残りを人の変更として記録に印を付け、1 回だけ報告する。人が `In Progress`・`In review` の項目に足した `blockedBy` は導出せず報告する。上書きせず、記録を Project に合わせる。人が外した `blockedBy` を足し直さない (重なりの内容が変わるまで再提案しない)。手で `Blocked` にした項目は割り当てない。手で `Todo` にした項目も、blocker が開いていれば割り当てない。(KTD7)
@@ -124,10 +124,10 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 **作業のセッション (スキル `issue-work`)**
 
-- R26. **開始。** 引数 `--manager <名前>` (省けばリポジトリの設定の `project` から規約の名前を導く)。前提を確かめる (R16・R17)。自分の ID (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`)・名前 (`ListAgents` の 1 行目)・`repo` (`origin` の URL から `owner/repo`)・`worktree` (実体パス)・トークンのログイン (`gh api user`。R6) を決め、合図 `ready` を送る。管理の名前が `ListAgents` に無ければ、管理のセッションを起動してから `/issue-work` をやり直すよう利用者に伝えて止まる。合図を送ったら、割り当てを GitHub で確かめる待機 (自分の ID が `Agent session ID` に入った項目を探す) を背景で起動してターンを終える。待機が読む Project はリポジトリの設定の `project` で、設定が無ければ開始時に利用者に尋ねる (KTD6)。(KTD10)
+- R26. **開始。** 引数 `--manager <名前>` (省けばリポジトリの設定の `project` から規約の名前を導く)。前提を確かめる (R16・R17)。自分の ID (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`)・名前 (`ListAgents` の 1 行目)・`repo` (`origin` の URL から `owner/repo`)・`worktree` (実体パス)・トークンのログイン (`gh api user`。R6) を決め、合図 `available` を送る。管理の名前が `ListAgents` に無ければ、管理のセッションを起動してから `/issue-work` をやり直すよう利用者に伝えて止まる。合図を送ったら、割り当てを GitHub で確かめる待機 (自分の ID が `Agent session ID` に入った項目を探す) を背景で起動してターンを終える。待機が読む Project はリポジトリの設定の `project` で、設定が無ければ開始時に利用者に尋ねる (KTD6)。(KTD10)
 - R27. **割り当ての受け取り。** `assigned` を受けたら (または待機が項目を見つけたら)、`gh` でフィールドの値が自分の ID であることを確かめてから着手する。同じ Issue の `assigned` を 2 度受けたら了解だけ返す。合図と待機の通知の両方が届いても着手は 1 回。`in_review` 未満の別の Issue を持っているときに受けたら `conflict` を送る。宣言を書く前と PR を作る前にも、フィールドが自分の ID のままであることを確かめ、違えば止めて管理に `conflict` を送る (`stop` が失われても段の境目で気づく)。ブランチ名の案を使い、既存のブランチと衝突すれば連番を足す。
 - R28. **宣言。** Issue を調べ、リポジトリの設定を読んでファイルに種類を付け、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。`stop` を受けたら作業を止め、理由を報告する。変更予定が増えたら、PR を ready にする前にコメント `宣言の更新` を書いて `declared` を送る。
-- R29. **PR と次の Issue。** 本文に `Closes #<番号>` を書いて PR を作り、ready にしたら合図 `review` を送る (管理は PR の観測で `In review` にするので、合図は観測を早めるだけ)。次の Issue を求めるときは `ready` を送る (R26 と同じ待機を起動する)。
+- R29. **PR と次の Issue。** 本文に `Closes #<番号>` を書いて PR を作り、ready にしたら合図 `review` を送る (管理は PR の観測で `In review` にするので、合図は観測を早めるだけ)。次の Issue を求めるときは `available` を送る (R26 と同じ待機を起動する)。
 - R30. **作業のセッションがしないこと。** 記録の置き場に書かない。Project のフィールドと Status を書かない。ほかの作業のセッションに合図を送らない。自分で Issue を選んで着手しない。名前を変えない (変わったら `renamed` を送る)。
 
 **同梱のスクリプト・設定・登録**
@@ -147,11 +147,11 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - F2. 作業のセッションの開始
   - **起点:** 利用者が作業ツリーで `/issue-work` を入力する。
   - **関与:** A1, A3, A2。
-  - **手順:** 前提の確認 → 自分の ID・名前・`repo`・`worktree` を決める → 合図 `ready` → 割り当ての待機を起動してターンを終える。
-  - **結果:** 管理のセッションに `ready` が届く。
+  - **手順:** 前提の確認 → 自分の ID・名前・`repo`・`worktree` を決める → 合図 `available` → 割り当ての待機を起動してターンを終える。
+  - **結果:** 管理のセッションに `available` が届く。
   - **Covers R16, R17, R26.**
 - F3. 割り当て
-  - **起点:** 管理のセッションが `ready` を受ける (または、待機中の作業のセッションに割り当てられる項目ができる)。
+  - **起点:** 管理のセッションが `available` を受ける (または、待機中の作業のセッションに割り当てられる項目ができる)。
   - **関与:** A2, A3, A4。
   - **手順:** Project を読み直して候補を選ぶ → フィールドと Status を書く → 読み直す → コメント `割り当て` → 合図 `assigned` → 作業のセッションが `gh` で確かめて着手する。
   - **結果:** 項目の `Agent session ID` が作業のセッションの ID、Status が `In Progress`。
@@ -165,7 +165,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - F5. PR から次の Issue
   - **起点:** 作業のセッションが PR を ready にする。
   - **関与:** A3, A2, A4。
-  - **手順:** PR (`Closes #<番号>`) → ready → 合図 `review` → 管理のセッションが PR を観測して `In review` → 作業のセッションが `ready` を送る (F3 へ)。
+  - **手順:** PR (`Closes #<番号>`) → ready → 合図 `review` → 管理のセッションが PR を観測して `In review` → 作業のセッションが `available` を送る (F3 へ)。
   - **結果:** Status が `In review`。作業のセッションは次の Issue を待つ。
   - **Covers R21, R29.**
 - F6. ポーリング
@@ -213,10 +213,10 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 ### Acceptance Examples
 
-- AE1. 2 つの作業のセッションがほぼ同時に `ready` を送る
+- AE1. 2 つの作業のセッションがほぼ同時に `available` を送る
   - **Covers F3, R19.**
   - **Given:** `Todo` の項目が 3 件。作業のセッション A と B。
-  - **When:** A と B が続けて `ready` を送る。
+  - **When:** A と B が続けて `available` を送る。
   - **Then:** A と B に別の項目が割り当てられ、各項目の `Agent session ID` は 1 つの値だけ。管理のセッションは 1 件ごとに Project を読み直している (`actions.log` で分かる)。
 - AE2. 書いた直後の読み直しで別の ID が入っている
   - **Covers R19, R22.**
@@ -314,19 +314,19 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **Given:** #12 が B に割り当て済みで作業中。
   - **When:** 利用者が Project の画面で `Agent session ID` を空にする。
   - **Then:** 次のポーリングで管理のセッションは、割り当ての解除 (資源と宣言の解放) と B への `stop` を利用者に尋ね、答えに従って書く。自分では値を書き戻さない。
-- AE25. 項目を持つセッションからの `ready`
+- AE25. 項目を持つセッションからの `available`
   - **Covers R19, R24.**
-  - **Given:** B が #12 を割り当てられたが `assigned` が届かず、B の待機が期限で終わって B が `ready` を送り直す。
+  - **Given:** B が #12 を割り当てられたが `assigned` が届かず、B の待機が期限で終わって B が `available` を送り直す。
   - **Then:** 新しい項目は割り当てず、#12 の `assigned` を 1 回だけ再送する。2 度目以降は再送せず、B の待機に任せて 1 回報告する。
 - AE26. 使用中の資源を要する項目は、資源の解放まで割り当てない
   - **Covers R19, R21.**
   - **Given:** #9 がラベル `resource:workers-dev` を持ち、A に割り当て済みで、記録ではこの資源を使用中。キューの次は同じラベルを持つ #10、その次は資源の要らない #11。
-  - **When:** B が `ready` を送る。
-  - **Then:** B には #10 ではなく #11 が割り当てられる。#9 が閉じて資源が解放されると、次に `ready` を送った作業のセッションか、待機中の作業のセッションに #10 が割り当てられる。
+  - **When:** B が `available` を送る。
+  - **Then:** B には #10 ではなく #11 が割り当てられる。#9 が閉じて資源が解放されると、次に `available` を送った作業のセッションか、待機中の作業のセッションに #10 が割り当てられる。
 - AE27. 止めた待機の通知で再入を繰り返さない
   - **Covers R24.**
   - **Given:** 管理のセッションの待機 1 が動いている。
-  - **When:** 作業のセッションの `ready` で始まったターンが、割り当ての後に待機 1 を止め、待機 2 を起動してターンを終える。
+  - **When:** 作業のセッションの `available` で始まったターンが、割り当ての後に待機 1 を止め、待機 2 を起動してターンを終える。
   - **Then:** 待機 1 の通知 (出力に `stopped`) で始まったターンは、Project を読まず、待機 2 を止めずに終わる。`actions.log` に、このターンの書き込みは無い。
 - AE28. 第三者のコメントと PR は受け入れない
   - **Covers R6, R20, R21.**
@@ -341,7 +341,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - AE30. Status が空の項目は無視する
   - **Covers R1, R15, R19.**
   - **Given:** Project のワークフロー「Item added to project」が無効。キューの先頭に Status が空の項目、その次に `Todo` の項目がある。
-  - **When:** 作業のセッションが `ready` を送る。
+  - **When:** 作業のセッションが `available` を送る。
   - **Then:** Status が空の項目は割り当てず、Status も書かない。次の `Todo` の項目を割り当てる。Project の検査は、推奨のワークフローが無効なことと、Status が空の項目は割り当ての対象にならないことを報告し、止まらない。
 
 ### Success Criteria
@@ -422,11 +422,11 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 ### Key Technical Decisions
 
-- KTD1. **GitHub を正本にし、合図は `ready` と `renamed` を除いて GitHub に対応物を持つ** (session-settled: user-approved — chosen over メッセージで宣言と報告を運ぶ案: メッセージは上限で断られ、捨てられ、受け取りの確認が無い)。`ready` と `renamed` はセッションの状態を運ぶので対応物が無く、下の表の列「合図が失われたときの回復」の手段で回復する。対応物の表の正本は `messaging.md` (U3) で、下の表は計画の時点の内容。実装の後は `messaging.md` を読む。
+- KTD1. **GitHub を正本にし、合図は `available` と `renamed` を除いて GitHub に対応物を持つ** (session-settled: user-approved — chosen over メッセージで宣言と報告を運ぶ案: メッセージは上限で断られ、捨てられ、受け取りの確認が無い)。`available` と `renamed` はセッションの状態を運ぶので対応物が無く、下の表の列「合図が失われたときの回復」の手段で回復する。対応物の表の正本は `messaging.md` (U3) で、下の表は計画の時点の内容。実装の後は `messaging.md` を読む。
 
   | 合図 | 向き | GitHub の対応物 | 合図が失われたときの回復 |
   | --- | --- | --- | --- |
-  | `ready` | 作業 → 管理 | 無い (セッションの状態) | 作業のセッションの背景の待機が期限で終わり、作業のセッションが `ready` を送り直す |
+  | `available` | 作業 → 管理 | 無い (セッションの状態) | 作業のセッションの背景の待機が期限で終わり、作業のセッションが `available` を送り直す |
   | `assigned` | 管理 → 作業 | フィールド `Agent session ID`・Status `In Progress`・コメント `割り当て` | 作業のセッションの待機が自分の ID の項目を見つける |
   | `declared` | 作業 → 管理 | コメント `着手の宣言` / `宣言の更新` | 管理のセッションのポーリングがコメントを読む |
   | `go` | 管理 → 作業 | コメント `開始可` (宛先と、判定した宣言の ID を持つ) | 作業のセッションの判定の待機が、自分が書いた宣言に対する `開始可` を見つける |
@@ -446,7 +446,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD8. **`In review` は PR の観測から導き、解放と `Done` の契機は Issue が閉じたこと。** PR が開いていて draft でなく `closingIssuesReferences` に割り当ての Issue を含み、作者 (`author.login`) がトークンのログインと同じときだけ `In review` (第三者の PR で `In review` にしないため。R6 と同じ理由)。マージされたが Issue が開いている・マージされずに閉じた・進行中の Issue が閉じられた、の 3 つは利用者に尋ねる (R13)。資源の解放は作業のセッションの明示の報告 (宣言の更新で資源を外す) と Issue の close の 2 つ (session-settled: user-approved — chosen over PR を ready にした時点の解放)。R20, R21 を実装する。
 - KTD9. **重なりは R5 の種類別の規則で判定し、照合はスクリプトで行う。** `sectioned` どうしは (リポジトリ, パス, unit) の一致、それ以外の組 (`indivisible`・`splittable` を含む組) は (リポジトリ, パス) の一致で重なりとし、`generated` は判定しない。`unknown` を含む組で (リポジトリ, パス) が一致すれば、利用者に判定を求める。パスはリポジトリのルート基準に正規化し (`./a`・`a/`・`a//b` を同じに)、絶対パスとルートの外を指すパスは差し戻す。種類ごとの規則は R5。宣言の形の検査は必須キーと未知のキーで行い (`typed-contract-for-agent-input.md`)、照合は LLM に任せない (`extract-identifiers-in-code-not-llm.md`)。unit の表記はリポジトリの設定が種類ごとに決め、作業のセッションがそれを読んで `kind` と `unit` を付ける。設定の無いリポジトリの宣言は `unknown` とし、利用者が判定する。R4, R5, R20 を実装する。
 - KTD10. **セッションの識別は ID と名前の両方を作業のセッションが申告し、宛先は名前にする。** ID は `CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。名前は `ListAgents` の 1 行目。`Agent session ID` には ID、`Agent session title` には名前を書く。名前が `ListAgents` に無いときの引き直しは Desktop の `list_sessions` (ID → タイトル) で、端末のセッションは引き直せないので利用者に尋ねる。作業のセッションは名前を変えない (変わったら `renamed`)。R8, R23, R26, R30 を実装する。
-- KTD11. **合図の様式は先頭行 `issue-dispatch: <種類>` と `<キー>: <値>` の行にし、数を減らす。** 1 Issue あたり作業 → 管理が 3 通 (`ready`・`declared`・`review`)、管理 → 作業が 2 通 (`assigned`・`go` または `wait`)。`stop` は解放・close・項目の除去のときだけ。中継の履歴の扱いは U1 の実測で決める — 案 A: 背景の待機の通知で始まるターンから送った合図が履歴を引き継がないなら、管理のセッションは合図を通知で始まるターン (再入の手順の最後) でまとめて送る。案 B: 引き継ぐなら、合図が捨てられた知らせで利用者に 1 行の入力を求める (R9) だけにする。どちらでも、合図が失われたときの回復は KTD1 の表に従う。R7, R9 を実装する。
+- KTD11. **合図の様式は先頭行 `issue-dispatch: <種類>` と `<キー>: <値>` の行にし、数を減らす。** 1 Issue あたり作業 → 管理が 3 通 (`available`・`declared`・`review`)、管理 → 作業が 2 通 (`assigned`・`go` または `wait`)。`stop` は解放・close・項目の除去のときだけ。中継の履歴の扱いは U1 の実測で決める — 案 A: 背景の待機の通知で始まるターンから送った合図が履歴を引き継がないなら、管理のセッションは合図を通知で始まるターン (再入の手順の最後) でまとめて送る。案 B: 引き継ぐなら、合図が捨てられた知らせで利用者に 1 行の入力を求める (R9) だけにする。どちらでも、合図が失われたときの回復は KTD1 の表に従う。R7, R9 を実装する。
 - KTD12. **権限モードの組による保留は、設定 `crossSessionInbound` の確認で避ける。** スクリプトがユーザー設定 (`~/.claude/settings.json`) とプロジェクト・ローカルの設定を読み、`accept` が無ければ警告し、`refuse` があれば止める。権限モードそのものは対話セッションから読む公式の手段が無い (Desktop の `get_session` だけ) ので、同じ組であることは利用者に確かめる。R16 を実装する。
 - KTD13. **フックの規則 (パスの照合) は 1 か所にまとめ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U7 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出力せず終了コード 0。Bash は、IO の前に正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
 - KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`)。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project release` / `comment` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration overlap` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 4 つ (`Todo`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。R31 を実装する。
@@ -468,7 +468,7 @@ sequenceDiagram
 
   U->>W: /issue-work
   W->>W: 前提の確認・ID と名前・repo・worktree
-  W->>M: 合図 ready
+  W->>M: 合図 available
   W->>W: wait-assignment を背景で起動してターンを終える
   M->>G: 項目を位置の順に読む (Todo・blocker 無し・資源空き・親でない・同じ repo)
   M->>G: Agent session ID → title → Status In Progress (1 件ごとに読み直す)
@@ -493,7 +493,7 @@ sequenceDiagram
   M->>G: PR を観測して Status In review
   U->>G: PR をマージ (Issue が閉じ、ワークフローが Done を書く)
   M->>G: ポーリングで close を知り、資源と宣言を解放
-  W->>M: 合図 ready (次の Issue)
+  W->>M: 合図 available (次の Issue)
 ```
 
 項目の状態と、各遷移の書く側 (R2・R21・KTD7)。
@@ -545,7 +545,7 @@ flowchart TB
   C --> B["Blocked の再導出 (範囲は KTD7) → go"]
   B --> D["宣言のコメントの読み取り → 重なりの判定 → 開始可 + go / 利用者 → wait"]
   D --> P["PR の観測 → In review / 利用者に尋ねる"]
-  P --> A{"ready の合図か、待機中の作業のセッションがあるか"}
+  P --> A{"available の合図か、待機中の作業のセッションがあるか"}
   A -- ある --> AS["割り当て (1 件ごとに読んでから書き、読み直す。合図 assigned に notify_when_idle を添える)"]
   A -- 無い --> W
   AS --> W["動いている wait を止める → スナップショットを書く → wait を起動 → ターンを終える"]
@@ -850,15 +850,15 @@ issue-dispatch/
 
 ### U8. スキル `issue-work`
 
-- **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`ready`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue の求めが、文書の様式どおりに進む。
+- **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`available`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue の求めが、文書の様式どおりに進む。
 - **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19)。KTD1, KTD10, KTD11。
 - **Dependencies:** U4, U6。
 - **Files:**
-  - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の宣言 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `ready`)、原則、「このスキルがしないこと」(R30)。
+  - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の宣言 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
   - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (リポジトリの設定の読み方、`kind` の付け方、`unit` の決め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
 - **Approach:**
   1. 自分の ID と名前の決め方 (KTD10) を手順の最初に書き、`ListAgents` の 1 行目から名前を読むことを書く。
-  2. `ready` を送ったら `wait-assignment` を背景で起動してターンを終える。通知で始まったターンでは `gh` で項目を確かめる。合図 `assigned` で始まったターンでも同じ確認をする (合図を信じない)。
+  2. `available` を送ったら `wait-assignment` を背景で起動してターンを終える。通知で始まったターンでは `gh` で項目を確かめる。合図 `assigned` で始まったターンでも同じ確認をする (合図を信じない)。
   3. `declared` を送ったら、書いた宣言のコメントの ID を渡して `wait-decision` を背景で起動し、ターンを終える。通知で始まったターンでは結果 (`go` / `wait`) のとおりに進む。`wait` のときは `wait-assignment` を背景で起動する (自分の項目が `In Progress` に戻ったときに終わる。KTD6)。宣言の前と PR を作る前にフィールドが自分の ID のままであることを確かめる手順を書く (R27)。
   4. 作業の中で sub-agent を使うときの注意 (フックが拒否する範囲と、ほかのセッションの作業ツリーを読まない) を前提知識に書く。
 - **Patterns to follow:** `review-triage/skills/review-loop/SKILL.md` (正本の宣言・同梱のスクリプト・前提知識・原則・検出しないもの)、`session-handoff/skills/handoff-write/SKILL.md` (引数の表)。
@@ -887,7 +887,7 @@ issue-dispatch/
   5. 報告の様式 (開始・停止・`--end`) は、`review-triage/skills/review-triage-loop/references/reporting.md` の「必ず出すもの」の形に倣い、Project の URL・割り当ての一覧・待機中のセッション・保留の承認・最後の利用者の入力からの送受の数を含める。
 - **Patterns to follow:** `review-triage/skills/review-loop/SKILL.md`、`review-triage/skills/review-triage-loop/references/arguments.md`、`references/reporting.md`。
 - **Test scenarios** (通し確認で確かめる。自動テストは無い):
-  - Covers AE1. 作業のセッション 2 つがほぼ同時に `ready` を送ると、別の項目が割り当てられ、`actions.log` に 1 件ごとの読み直しが残る。
+  - Covers AE1. 作業のセッション 2 つがほぼ同時に `available` を送ると、別の項目が割り当てられ、`actions.log` に 1 件ごとの読み直しが残る。
   - Covers AE5, AE7. PR のマージで Issue が閉じると、資源が解放され待機中のセッションに次が割り当てられる。`Closes` の無い PR のマージでは利用者に尋ねる。
   - Covers AE8. 利用者が Status を手で変えると 1 回だけ報告され、上書きされない。
   - Covers AE9. 割り当ての途中 (フィールドを書いた後) で管理のセッションを閉じ、`--resume` すると `assigned` が 1 回だけ再送され、コメントは増えない。
@@ -898,7 +898,7 @@ issue-dispatch/
   - Covers AE17. 設定の無い管理ディレクトリで owner と番号を尋ねて続ける。
   - Covers AE20. `--end` で記録が `ended` になり、フィールドは残り、待機は起動されない。
   - Covers AE24. 利用者が `Agent session ID` を空にすると、解除と `stop` を尋ね、答えに従って書く。
-  - Covers AE25. 項目を持つセッションの `ready` には新しく割り当てず、再送は通算 1 回。
+  - Covers AE25. 項目を持つセッションの `available` には新しく割り当てず、再送は通算 1 回。
   - Covers AE26. 使用中の資源を要する項目は割り当てず、資源の解放の後に割り当てる。
   - Covers AE27. 合図で始まったターンが前の待機を止めても、その通知で始まったターンは何もせずに終わり、再入が繰り返されない。
   - `notify_when_idle` は合図 `assigned`・`go` に添えて申し込み、再入のたびには申し込み直さない。入力待ちの作業のセッションに単独で申し込まない。
@@ -961,7 +961,7 @@ issue-dispatch/
 | M | フック: 作業のセッションでほかの worktree のパスを含むコマンドを実行し、Edit でほかの worktree のファイルを書き換える (sub-agent の中からも) | 拒否と理由。自分の作業ツリーのコマンドと編集は許可される | AE15 |
 | N | 利用者が `Agent session ID` を空にする / 項目を Project から除く | 解除と `stop` を利用者に尋ね、答えに従って書く | AE24 |
 | O | 記録を壊してから `--resume` / 設定の無い管理ディレクトリで開始 | 止めて知らせ、新規として扱わない / Project の owner と番号を尋ね、答えで続ける | AE10, AE17 |
-| P | 割り当てを受けた作業のセッションが、`assigned` を受け取らないまま `ready` を送り直す | 新しい項目は割り当てず、`assigned` の再送は通算 1 回 | AE25 |
+| P | 割り当てを受けた作業のセッションが、`assigned` を受け取らないまま `available` を送り直す | 新しい項目は割り当てず、`assigned` の再送は通算 1 回 | AE25 |
 
 ## Definition of Done
 
