@@ -71,7 +71,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 ### Actors
 
-- A1. **利用者** (人間)。Project に Issue を入れ、管理のセッションと作業のセッションを作り、`/issue-dispatch`・`/issue-work`・`/repo-preflight` を打ち、PR をマージし、管理のセッションの問い (承認・判断) に答える。
+- A1. **利用者** (人間)。Project に Issue を入れ、管理のセッションと作業のセッションを作り、`/issue-dispatch`・`/issue-work`・`/repo-preflight` を入力し、PR をマージし、管理のセッションの問い (承認・判断) に答える。
 - A2. **管理のセッション**。Project を読み、割り当てを書き、宣言を読んで重なりを判定し、ポーリングで変化を知り、記録を書き、作業のセッションに合図を送る。
 - A3. **作業のセッション** (複数)。自分の作業ツリーで Issue の作業をし、宣言を Issue のコメントとして書き、PR を作り、管理のセッションに合図を送る。
 - A4. **GitHub**。Project のフィールドと組み込みワークフロー (`Done` を書く・Issue を閉じる)、Issue の依存関係とコメント、PR の状態を持つ。
@@ -137,13 +137,13 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 ### Key Flows
 
 - F1. 管理のセッションの開始
-  - **起点:** 利用者が管理ディレクトリで `/issue-dispatch` を打つ。
+  - **起点:** 利用者が管理ディレクトリで `/issue-dispatch` を入力する。
   - **関与:** A1, A2, A4。
   - **手順:** 設定を読む → 記録の置き場の確認 → Project の検査 (不足は承認を得て作る) → 名前の規約と排他 → 同期 → 記録を作るか読む → 待機を起動してターンを終える。
   - **結果:** 管理のセッションが待機中。Project の `Blocked` が依存関係と一致している。
   - **Covers R15, R18, R32.**
 - F2. 作業のセッションの開始
-  - **起点:** 利用者が作業ツリーで `/issue-work` を打つ。
+  - **起点:** 利用者が作業ツリーで `/issue-work` を入力する。
   - **関与:** A1, A3, A2。
   - **手順:** 前提の確認 → 自分の ID・名前・`repo`・`worktree` を決める → 合図 `ready` → 割り当ての待機を起動してターンを終える。
   - **結果:** 管理のセッションに `ready` が届く。
@@ -185,13 +185,13 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **結果:** 待機が続く。
   - **Covers R9, R24, R25.**
 - F9. 終了
-  - **起点:** 利用者が `/issue-dispatch --end` を打つ。
+  - **起点:** 利用者が `/issue-dispatch --end` を入力する。
   - **関与:** A1, A2。
   - **手順:** 記録に `ended` → 報告。Project のフィールドは消さない。
   - **結果:** 次の管理のセッションが F1 の同期で引き継げる。
   - **Covers R25.**
 - F10. 前提条件の検査
-  - **起点:** 利用者がリポジトリで `/repo-preflight` を打つ。
+  - **起点:** 利用者がリポジトリで `/repo-preflight` を入力する。
   - **関与:** A1, A4。
   - **手順:** リポジトリ・Project・セッションの検査 → 報告と変更の案 → 利用者が採否を決める。フックは、設定のあるリポジトリで常に有効になる。
   - **結果:** 仕組みの前提が満たされているか、何を直せばよいかが分かる。
@@ -260,7 +260,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - AE11. 2 つ目の管理のセッション
   - **Covers R18.**
   - **Given:** 名前 `issue-dispatch akm/3` のセッションが動いている。
-  - **When:** 別のセッションで `/issue-dispatch` を打つ。
+  - **When:** 別のセッションで `/issue-dispatch` を入力する。
   - **Then:** `ListAgents` に同じ名前があるので起動せず、報告する。
 - AE12. 作業のセッションが消えた
   - **Covers F12, R23.**
@@ -339,7 +339,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 ### Success Criteria
 
-- 通し確認の成功の経路で、利用者が行った操作が「Project に Issue を入れる」「セッションを作ってスキルを打つ」「PR をマージする」「承認と判断に答える」の 4 種類だけである。
+- 通し確認の成功の経路で、利用者が行った操作が「Project に Issue を入れる」「セッションを作ってスキルのコマンドを入力する」「PR をマージする」「承認と判断に答える」の 4 種類だけである。
 - どの項目も同時に 2 つのセッションに割り当てられない (AE1・AE2)。
 - 管理のセッションを閉じて開き直しても、Project と記録から同じ状態に戻る (AE9)。
 - 利用者は Project の Status と `Agent session title` を見るだけで、誰が何をしていて何が待っているかが分かる。
@@ -843,7 +843,7 @@ issue-dispatch/
 
 ### U8. スキル `issue-work`
 
-- **Goal:** 作業のセッションで `/issue-work` を打つと、前提の確認・自分の ID と名前・`ready`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue の求めが、文書の様式どおりに進む。
+- **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`ready`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue の求めが、文書の様式どおりに進む。
 - **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19)。KTD1, KTD10, KTD11。
 - **Dependencies:** U4, U6。
 - **Files:**
@@ -861,12 +861,12 @@ issue-dispatch/
   - Covers AE6. PR の本文に `Closes #<番号>` があり、draft のうちは `In review` にならず、ready にすると次のポーリングで `In review` になる。
   - 同じ Issue の `assigned` を 2 度受けても着手は 1 回。別の Issue を持っているときに受けると `conflict` を送る。
   - `--manager` を省いたとき、リポジトリの設定の `project` から規約の名前を導いて送る。設定も引数も無ければ利用者に尋ねる。
-  - 管理のセッションが無いときに `/issue-work` を打つと、起動の順を伝えて止まる。
+  - 管理のセッションが無いときに `/issue-work` を入力すると、起動の順を伝えて止まる。
 - **Verification:** 通し確認の成功の経路 (シナリオ A) で、作業のセッションの操作が利用者の指示なしに進む。`doc-dag` で `issue-work` の references が `issue-dispatch` の正本を参照するだけで複製していない。
 
 ### U9. スキル `issue-dispatch`
 
-- **Goal:** 管理のセッションで `/issue-dispatch` を打つと、開始・割り当て・宣言の判定・ポーリング・人の変更の報告・監視・再入・停止・`--resume`・`--end` が、`flow.md` と `reentry.md` を正本として進む。
+- **Goal:** 管理のセッションで `/issue-dispatch` を入力すると、開始・割り当て・宣言の判定・ポーリング・人の変更の報告・監視・再入・停止・`--resume`・`--end` が、`flow.md` と `reentry.md` を正本として進む。
 - **Requirements:** R18〜R25 (AE1, AE2, AE5, AE7〜AE14, AE17, AE20, AE24〜AE27)。KTD3, KTD4, KTD6, KTD7, KTD8, KTD11。
 - **Dependencies:** U4, U6, U7, U8。
 - **Files:**
