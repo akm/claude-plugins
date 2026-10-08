@@ -72,7 +72,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KD9. **資源の解放は、作業のセッションの明示の報告と、Issue が閉じたときの自動解放の 2 つ** (session-settled: user-approved — chosen over PR を ready for review (draft を解除した状態) にした時点で解放する案: レビューの修正で再デプロイしうる)。Governs R21。
 - KD10. **マージ・close・依存の解消は、管理のセッションが一定の間隔で `gh` を実行して知る** (session-settled: user-approved — chosen over 作業のセッションの報告だけに頼る案: PR のマージは人が行い、作業のセッションは気づけない)。Governs R21。
 - KD11. **優先順位は Project の並び順 (上が先)。sub-issue を持つ親 Issue は割り当てない** (session-settled: user-approved)。Governs R1, R3, R19。
-- KD12. Issue #114 の「これまでに決めたこと」のうち、この計画がそのまま引き継ぐもの (see origin: Issue #114): キューは GitHub Projects で 1 つの Project に複数のリポジトリの Issue を入れる。割り当ては管理のセッションが 1 件ずつ行う (Projects のフィールドの更新に、今の値を条件にした更新が無いため)。独自フィールドは `Agent session ID` (正本) と `Agent session title` (写し)。Status に `In review` を足し、依存で待つ状態は `Blocked` として `blockedBy` から導く。利用者の答えを待つ短い待ちは Status にしない。資源はラベルで表す。ファイルは 4 種類に分けて扱う。Issue を分ける必要は作る時点で見つける (順番 4 の範囲)。作業のセッションは Desktop と端末の両方。宛先は名前で書く。Governs R1, R3, R5, R8, R10, R19。
+- KD12. Issue #114 の「これまでに決めたこと」のうち、この計画がそのまま引き継ぐもの (see origin: Issue #114): キューは GitHub Projects で 1 つの Project に複数のリポジトリの Issue を入れる。割り当ては管理のセッションが 1 件ずつ行う (Projects のフィールドの更新に、今の値を条件にした更新が無いため)。独自フィールドは `Agent session ID` (正本) と `Agent session title` (写し)。Status に `In review` を足し、依存で待つ状態は `Blocked` として `blockedBy` から導く。利用者の答えを待つ短い待ちは Status にしない。資源はラベルで表す。ファイルは種類に分けて扱う (種類の分け方は KD22 で改めた)。Issue を分ける必要は作る時点で見つける (順番 4 の範囲)。作業のセッションは Desktop と端末の両方。宛先は名前で書く。Governs R1, R3, R5, R8, R10, R19。
 - KD13. **割り当ての対象は、利用者が Status を `Ready` にした項目だけにする** (session-settled: user-approved — chosen over `Todo` の項目を対象にする案と、`Todo` にすることを着手の合図にする案: ワークフロー「Item added to project」が有効だと、Project に入れた Issue がすぐ `Todo` になり、利用者が順を決めたり中身を整えたりする前に着手される。`Todo` を合図にする案は、このワークフローの設定に左右される。名前は GitHub の Project のテンプレートでも使われている `Ready` にし、同じ名前だった合図 `ready` は `available` に改めた)。Governs R1, R2, R19, R22。
 - KD14. **作業の途中で宣言に無いファイルを変える必要が分かったら、変える前に宣言を更新して判定を待つ。競合の可能性があるときの扱いは、待つ・共通の変更を先に小さな PR にする・競合しうるまま進める、の 3 つから利用者が選ぶ** (session-settled: user-approved — chosen over 変えた後でも PR を ready for review にする前に更新すればよい案: 競合の可能性に気づくのが、両方の作業ツリーで同じファイルを変えた後になる。待つ対象が相手の Issue の完了だけだと、数行の変更のために何時間も止まる)。ほぼ同時の宣言は投稿の順に判定し、順を決められなければ Project の中の項目の順で決める。Governs R4, R20, R21, R28。
 - KD15. **設定 `crossSessionInbound` が `refuse` (ほかのセッションからのメッセージをすべて捨てる) のとき、管理のセッションは開始を止め、作業のセッションは警告して続ける** (session-settled: user-approved — chosen over どちらも止めて、合図が届かない場面の通し確認では開始の後に `refuse` にする案: 途中で変えた設定が適用されるかが U1 の結果しだいで、確かめる手順も増える)。作業のセッションに届く合図はどれも GitHub に対応物があり、待機のスクリプトが回復するので、遅くはなるが動く。管理のセッションに届く `available` には対応物が無く、受け取れないと割り当てられない。Governs R16。
@@ -82,6 +82,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KD19. **`--end` で、管理のセッションの名前を規約の名前から外す** (session-settled: user-approved — chosen over 新しい管理のセッションを始める前に、利用者が古いセッションを閉じる手順を README に書くだけの案: 手順を忘れると、古いセッションが名前を持ったままになり、新しい管理のセッションは排他で起動しない。Claude Code は使われている名前を新しいセッションに渡さないので、新しいセッションは規約の名前を名乗れない。合図も終了した古いセッションに届き続ける)。Governs R25。
 - KD20. **判断が要るときは必ず利用者に尋ね、答えの無いまま進めない。問いはまとめて尋ね、答えを待つ間も問いに関係しない処理は続ける。問いの回数は記録するが、上限にはしない** (session-settled: user-directed — chosen over 成功の経路の問いを 0 回にする基準の案: 問いの回数を減らすことを目標にすると、確認しないまま進めて後で直す事態を招く。確認なしに進めないことと、まとめて尋ねて利用者が時間を確保しやすくすることを優先する)。答えを待つ間に管理のセッションが止まるツール `AskUserQuestion` は使わず、ターンの最後の文章で番号付きの問いとして尋ねる。Governs R13, R24, Success Criteria。
 - KD21. **作業の停滞と管理のセッションの停止を、Project の独自フィールド `Agent stuck state` に書く。空なら正常** (session-settled: user-approved — chosen over 停滞を Issue のコメントに書くだけの案: コメントは Issue を開かないと見えず、Project の表やボードで止まっている項目を見分けられない。Issue #114 の要望 2 は「止まっているか」を Project に記録することを求める)。値は `idle-no-progress`・`deadline-passed`・`session-missing`・`manager-stopped`。書くのは管理のセッションと、管理のセッションの停止に気づいた利用者。管理のセッションの停止は作業中の項目ごとに書く (Project 全体の「ステータスの更新」にはしない。表やボードで項目ごとに見えるようにするため)。Governs R1, R10, R23, R25。
+- KD22. **ファイルの種類は、パスについて 6 段の問いを順に当てて決める** (session-settled: user-directed — chosen over 計画の 5 種類 (`generated`・`sectioned`・`indivisible`・`splittable`・`unknown`) をリポジトリの設定に書く案: 「節の表記がある」は構造を知っていることの一部で、ほかの種類と並べると分類が重なる。分け方を知らないファイルまで分けられる扱いになる)。1. 内容を知らない → `unknown-content`、2. ツールが生成する → `generated`、3. 構造を知らない → `unknown-structure`、4. 分割できない → `indivisible`、5. 分割すると意味が変わる可能性がある → `unstable`、6. それ以外 → `divisible`。節 (unit) は種類ではなく、構造を知っている種類の判定の細かさとして扱う。種類は拡張子ではなくパスのパターンで決める (同じ `.js` でも、自前で書いたものと、`.ts` やビルドから生成したものがある)。パスから種類を決める処理は、ほかのモジュールに依存しない独立したモジュールにし、後で別のプラグインに切り出せるようにする。Governs R4, R5, R32。
 
 ### Actors
 
@@ -102,8 +103,25 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - 1 つの Project に複数のリポジトリ (別の owner も) の Issue を入れる。(KTD7)
 - R2. **管理のセッションが書く Status は `Todo`・`Ready`・`Blocked`・`In Progress`・`In review` の 5 つに限り、`Done` は書かない。** `Done` は組み込みワークフローが書く。`Todo` や空の項目を `Ready` にするのは利用者だけで、管理のセッションが `Ready` を書くのは、`Ready` だった項目を `Blocked` から戻すときだけ (KTD7)。管理のセッションが `Todo` を書くのは、割り当ての解除と、マージされずに閉じた PR の Issue の Status を戻すとき (どちらも利用者の承認。R13) で、着手してよいかを利用者が決め直す。利用者が手で変えた Status は上書きせず、1 回だけ報告する (R22)。(KTD7)
 - R3. **Issue の様式を定める (`issue-format.md`)。** 依存関係は Issue の blocked by (`blockedBy`)。必要な資源はラベル `resource:<名前>`。人が行う Issue はラベル `human-handed` を付けるか、担当者をほかの人にする (担当者が認証しているアカウント 1 つだけで `human-handed` が無い Issue は、作業のセッションの対象になる。KD16)。sub-issue を持つ親 Issue は割り当ての対象にしない (sub-issue は対象にする)。1 つの PR で閉じる大きさに作り、PR の本文に Issue を閉じる記法 (`Closes #<番号>`) を書く — マージで Issue が閉じ、`Done` と資源の解放がそれに続くため (R21)。作る時点で分ける規則は順番 4 の範囲で、この計画では着手の後に分ける必要が分かったときの扱い (R20) だけを定める。
-- R4. **宣言の様式を定める (`issue-format.md`)。** 宣言は作業のセッションが Issue のコメントとして書く。本文は R6 の先頭行と、1 つの JSON のコードブロック。JSON は `files` (要素は `path`・`kind`・`unit`)・`resources` (資源の名前の列)・`split` (分ける必要の有無と理由) を持つ。`kind` は `generated` / `sectioned` / `indivisible` / `splittable` / `unknown` の 5 つ。`path` はリポジトリのルートからの相対パス。`unit` は `kind` が `sectioned` のときだけ必須で、表記はリポジトリの設定が種類ごとに決める (JSON と YAML はトップレベルのキー、Markdown は見出し、Makefile はターゲット名)。宣言に無いファイルや資源が要ると分かったら、それを変える前に宣言を更新する (コメント `宣言の更新`)。更新では宣言の全体を書き直し、足したものだけを書かない (管理のセッションは最新の宣言 1 件だけを読めばよい)。更新を受け付けるのは、PR が ready for review になる前まで。(KTD2, KTD9, KD14)
-- R5. **ファイルの 4 種類と、競合の可能性の判定の規則を定める (`issue-format.md`)。** `generated` は判定しない。`sectioned` は (リポジトリ, パス, unit) が完全に一致すれば競合しうる。`indivisible` と `splittable` は (リポジトリ, パス) が一致すれば競合しうる。`indivisible` は分けることを勧めず待つ。`splittable` は分けるリファクタリングを勧める。`unknown` (設定が無いリポジトリ) は利用者が判定する。どれに当たるかはリポジトリの設定 (R32) に書く。レビューでの修正による競合の可能性は判定しない (競合しうる相手とのマージの衝突は利用者が解消する)。(KTD9)
+- R4. **宣言の様式を定める (`issue-format.md`)。** 宣言は作業のセッションが Issue のコメントとして書く。本文は R6 の先頭行と、1 つの JSON のコードブロック。JSON は `files` (要素は `path` と、省略できる `units`)・`resources` (資源の名前の列)・`split` (分ける必要の有無と理由) を持つ。`path` はリポジトリのルートからの相対パス。`units` は、そのファイルのうち変える予定の節の名前の列で、節の表記 (R5) があるファイルにだけ書ける。省けばファイル全体を変える予定とみなす。種類は宣言に書かず、スクリプトがパスから決める (R5・KD22)。宣言に無いファイルや資源が要ると分かったら、それを変える前に宣言を更新する (コメント `宣言の更新`)。更新では宣言の全体を書き直し、足したものだけを書かない (管理のセッションは最新の宣言 1 件だけを読めばよい)。更新を受け付けるのは、PR が ready for review になる前まで。(KTD2, KTD9, KD14, KD22)
+- R5. **ファイルの種類と、競合の可能性の判定の規則を定める (`file-kinds.md`)。** 種類は、パスについて次の問いを上から順に当て、最初に当てはまったものにする (KD22)。
+
+  | 段 | 問い | 当てはまれば | 競合の可能性の判定 | 競合の可能性があるときに示す扱い |
+  | --- | --- | --- | --- | --- |
+  | 1 | 内容を知らない (パスがリポジトリの設定にも既定の表にも当たらない) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に尋ねる | — |
+  | 2 | ツールが生成する | `generated` | 判定しない | — |
+  | 3 | 構造を知らない | `unknown-structure` | 同じパスなら競合しうる | R20 の 3 つ (待つ・共通の変更を先に小さな PR にする・競合しうるまま進める) |
+  | 4 | 分割できない | `indivisible` | 節で判定する (下) | 同上 |
+  | 5 | 分割すると意味が変わる可能性がある | `unstable` | 節で判定する | 同上。共通の変更を先にする小さな PR で、分けるリファクタリングも行える (意味が変わりうる点を添える) |
+  | 6 | (上のどれでもない) | `divisible` | 節で判定する | 同上。共通の変更を先にする小さな PR で、分けるリファクタリングも行える |
+
+  - **節で判定する**: 構造を知っている種類 (`indivisible`・`unstable`・`divisible`) は、両方の宣言がそのパスに `units` を書いていれば、節の名前が同じか、一方が他方の先頭部分 (`.` で区切った階層。`dependencies` と `dependencies.react` など) のときだけ競合しうる。どちらかが `units` を省けば、同じパスで競合しうる。
+  - **節の表記**: JSON と YAML のキー (深さはパスのパターンごとに指定できる。例: `package.json` の `dependencies.*`)、Markdown の見出しと frontmatter、Makefile のターゲット、TOML のテーブル、`go.mod` のディレクティブ (`require.<モジュール>` など)、Dockerfile のステージ、Terraform のブロック (`resource.<型>.<名前>` など)。節の名前は作業のセッションがファイルを読んで書き、スクリプトは名前を比べるだけで、ファイルを構文解析しない。
+  - **種類の決め方**: パスのパターン (glob。ディレクトリ単位を含む) で、リポジトリの設定 (R32) を先に、プラグインに同梱する既定の表を後に当てる。1 つのパスが、種類の違う 2 つ以上のパターンに当たれば、上の段の順で先の種類にする。
+  - **分けるリファクタリングと参照元**: `unstable` と `divisible` のパターンには、中身を移す仕組みが参照する単位 (ディレクトリ / ファイル) を書く。ファイル単位 (`import`・`include`・`@import` など) の場合は参照元も変わるので、リファクタリングの宣言には変わる参照元も含める。
+  - **マージできないファイル**: 画像など、差分でマージできないファイル (パターンに印を付ける) で「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて尋ねる。
+  - **共有の状態を持つファイル**: `terraform.tfstate` のように、ファイルより先に共有の状態があるものは、種類 (`generated`) とは別に資源 (ラベル `resource:…`) として扱う。
+  - レビューでの修正による競合の可能性は判定しない (競合しうる相手とのマージの衝突は利用者が解消する)。(KTD9)
 - R6. **Issue のコメントの先頭行に、書いたセッションの種類と識別子を書く。** 形は `issue-dispatch | <管理のセッション | 作業のセッション> | <セッションの名前> | <セッション ID> | <コメントの種類>`。コメントの種類は、作業のセッションが `着手の宣言`・`宣言の更新`、管理のセッションが `割り当て`・`開始可` (宣言に競合の可能性が無いという判定の結果)・`待機`・`解放`・`引き継ぎ`・`停滞` (`Agent stuck state` に値を書いた経緯。先頭行に値も書き、同じ割り当てで同じ値の停滞は 1 回だけ書く)。**管理のセッションの `割り当て`・`開始可`・`待機`・`解放`・`停滞` は、続けて宛先 (`対象 <作業のセッションの ID>`) と割り当ての番号 (`割り当て <番号>`。その Issue で何回目の割り当てか。1 から数える) を持ち、`開始可` と `待機` はさらに、判定した宣言のコメントの ID (`宣言 <ID>`。GitHub がコメントごとに付ける識別子で、どの値を使うかは U2 で決める) を持つ。** 同じ Issue で、同じ宛先に同じ種類のコメントを 2 度書く場面 (解放した Issue を同じ作業のセッションに割り当て直す・宣言を更新する) があり、書き手と種類だけでは前のコメントと見分けられないため。導出だけの変更 (`Blocked` ⇄ `Ready`) と `In review` はコメントにせず、記録のログだけに残す。**先頭行の形をしていても、書き手 (`author.login`) が `gh api user` で得たトークンのログインと違うコメントは、この仕組みのコメントとして扱わない** — 公開リポジトリでは第三者もコメントを書けるので、先頭行の形だけで受け入れると、第三者の 1 件のコメントで競合の可能性の判定を省いて作業を始めさせる・正規のコメントを既投稿と見せて書かせない、ができてしまう。この仕組みのセッションはすべて利用者のトークンで書くので、ログインで絞っても正規のコメントは除かれない。(KTD2)
 
 **仕様の正本 — セッション間の取り決めと記録**
@@ -127,7 +145,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 - R18. **開始。** 設定を読む (無ければ Project の owner と番号を利用者に尋ね、設定の雛形を示す)。管理ディレクトリが git リポジトリなら、記録の置き場が無視されていることを `git check-ignore` で確かめ、無視されていなければ `.gitignore` への追加を案内して止まる (スキルは `.gitignore` を変えない)。Project とセッションを検査する (R15・R16)。トークンのログインを `gh api user` で得て記録に持つ (R6)。自分の名前を規約 `issue-dispatch <owner>/<number>` に合わせる (Desktop はツール `set_session_title`、端末は利用者に `/rename` を頼む)。同じ名前のほかのセッションが `ListAgents` にあれば、起動せず報告する (管理の排他)。同期する (全項目の `Blocked` の導出、人の変更の検出、`Agent session ID` が入っているが記録に無い項目の検出)。記録を作るか読む。待機を起動してターンを終える。(KTD4)
 - R19. **割り当て。** 候補は、位置の順で、Status が `Ready` (`Todo` と Status が空の項目は対象にしない。R1)、`Agent session ID` が空、開いている blocker が無い、必要な資源 (ラベル) が記録で空いている、親 Issue でない、ラベル `human-handed` が付いていない、担当者が未設定か認証しているアカウント 1 つだけ (KD16)、作業のセッションの `repo` と同じリポジトリの項目。`Ready` なのに担当者かラベルの条件から外れる項目は割り当てず、理由 (ほかの人が担当者・`human-handed` が付いている) を項目ごとに 1 回だけ報告する。作者か本文の最後の編集者が認証しているアカウントと違う項目は、利用者が `Ready` にした時刻 (Status の値の更新時刻) より後に本文が編集されていれば割り当てず、1 回だけ報告する (KD17)。利用者が中身を確かめて、`Todo` に戻してから `Ready` にし直せば、候補に戻る。書き込みの順は、記録に意図 (書く予定の ID・title・Status・割り当ての番号) → `Agent session ID` が空であることを読んで確かめる → `Agent session ID` → 読み直す → `Agent session title` → Status `In Progress` → コメント `割り当て` → 合図 `assigned` → 記録に完了。各手順は冪等 (同じ値を 2 度書いても害がなく、コメントは先頭行で既投稿を検出する)。割り当ての番号は、その Issue にある `割り当て` のコメント (書き手がトークンのログインと同じもの) の数に 1 を足した値で、意図に書いてから使う (途中で止まって再開しても同じ番号を使う)。書く前の読みが空でないか、読み直しが自分の値でなければ、上書きせず報告して候補を選び直す。1 ターンで複数を割り当てるときも 1 件ごとに読む。`available` を送ったセッションが既に `in_review` 未満の項目を持っていれば新しく割り当てず、その項目の `assigned` を再送する (R24 の上限に数える)。既に待機中なら時刻を変えずに 1 件のまま。候補が無ければ記録に待機中 (時刻) と書き、空いたら送ると伝える。待機中が複数なら時刻の順に渡す。(KTD3)
-- R20. **宣言の受け取りと競合の可能性の判定。** 宣言のコメント (書き手がトークンのログインと同じもの。R6) を読んで形を検査し (誤りは `wait` の理由として差し戻す)、記録に写し、R5 で判定する。**判定は宣言のコメントの投稿の順に 1 件ずつ行い、比べる相手は既に `開始可` になった宣言 (競合しうるまま進めた宣言を含む) だけにする。** まだ判定していない宣言どうしは比べない。投稿の時刻が同じで順を決められないときは、Project の中の項目の順 (上が先) で決める。競合の可能性が無ければコメント `開始可` を書いて `go`。あれば利用者に次の 3 つを示して決めてもらい、作業に伝える。(1) 待つ: 相手の Issue を `blockedBy` に足して `Blocked` にし、コメント `待機`。待つのは相手の Issue が閉じるまで。(2) 共通の変更を先に小さな PR にする: 先に `開始可` になった側のセッションが、競合しうるファイルの変更だけを別のブランチの小さな PR にして先にマージし、待つ側はその PR のマージまで待つ。待つ側の項目は `Blocked` にし、コメント `待機` に PR の URL を書き、記録に待つ PR を持つ (`blockedBy` は Issue どうしの関係で PR には足せないため。U1 で確かめる)。分けられるファイル (`splittable`) では、分けるリファクタリングをこの小さな PR で行う。(3) 競合しうるまま進める: コメント `開始可` を書いて `go`。マージの衝突は利用者が解消する。宣言の資源が Issue のラベルに無ければ、ラベルを足すことを提案する (承認)。`split` が真なら、進行中の Issue を親にせず、範囲を狭めて残りを同じリポジトリの新しい Issue にする案を利用者に示す (Project への追加は自動追加のワークフローか利用者)。宣言の更新は PR が ready for review になる前まで受け、同じ判定をする。(KTD8, KTD9, KD14)
+- R20. **宣言の受け取りと競合の可能性の判定。** 宣言のコメント (書き手がトークンのログインと同じもの。R6) を読んで形を検査し (誤りは `wait` の理由として差し戻す)、記録に写し、R5 で判定する。**判定は宣言のコメントの投稿の順に 1 件ずつ行い、比べる相手は既に `開始可` になった宣言 (競合しうるまま進めた宣言を含む) だけにする。** まだ判定していない宣言どうしは比べない。投稿の時刻が同じで順を決められないときは、Project の中の項目の順 (上が先) で決める。競合の可能性が無ければコメント `開始可` を書いて `go`。あれば利用者に次の 3 つを示して決めてもらい、作業に伝える。(1) 待つ: 相手の Issue を `blockedBy` に足して `Blocked` にし、コメント `待機`。待つのは相手の Issue が閉じるまで。(2) 共通の変更を先に小さな PR にする: 先に `開始可` になった側のセッションが、競合しうるファイルの変更だけを別のブランチの小さな PR にして先にマージし、待つ側はその PR のマージまで待つ。待つ側の項目は `Blocked` にし、コメント `待機` に PR の URL を書き、記録に待つ PR を持つ (`blockedBy` は Issue どうしの関係で PR には足せないため。U1 で確かめる)。分けられるファイル (`unstable`・`divisible`。R5) では、分けるリファクタリングをこの小さな PR で行える (`unstable` では意味が変わりうる点を添えて示す)。(3) 競合しうるまま進める: コメント `開始可` を書いて `go`。マージの衝突は利用者が解消する。宣言の資源が Issue のラベルに無ければ、ラベルを足すことを提案する (承認)。`split` が真なら、進行中の Issue を親にせず、範囲を狭めて残りを同じリポジトリの新しい Issue にする案を利用者に示す (Project への追加は自動追加のワークフローか利用者)。宣言の更新は PR が ready for review になる前まで受け、同じ判定をする。(KTD8, KTD9, KD14)
 - R21. **ポーリングと導出。** 間隔は設定 (デフォルト 3 分)。見つける変化と処理: Issue が閉じた → 資源と宣言を解放 (`Done` は GitHub が書く)。`blockedBy` の変化 → `Blocked` を再導出する (範囲と戻り先は KTD7)。管理が足した blocker が閉じた項目と、待っていた小さな PR がマージされた項目は、待っていた宣言を判定し直してから戻す。待っていた項目が複数あれば、宣言の投稿の順 (同じなら Project の中の順) に 1 件ずつ判定し、`開始可` になった項目だけ記録に最後に書いた Status (`In Progress`) に戻して `go` を送る。競合の可能性が残る項目は、待つ相手が `開始可` になった項目に変わる。待つ相手が変わると待つ時間の見込みも変わるので、前に選んだ扱いを引き継がず、新しい相手を示して利用者に扱いを尋ね直す (ほかの問いとまとめて。R13・KD20)。答えが出るまでは `Blocked` のままにする。宣言のコメント → R20。PR の観測 → 開いていて draft でなく `closingIssuesReferences` に割り当ての Issue を含み、作者がトークンのログインと同じ PR があれば `In review` (無ければ作業に本文の追記を求める。KTD8)。PR がマージされたが Issue が開いている → 閉じるかを利用者に尋ねる。PR がマージされずに閉じた → Status の戻しと割り当ての解除を利用者に尋ねる。進行中の Issue が閉じられた → 作業に止めるよう伝えてよいかを利用者に尋ねる。Issue が reopen された → 報告。`Agent session ID` が人によって空にされた・別の値にされた、項目が Project から除かれた → 割り当ての解除 (資源と宣言の解放) と作業への `stop` を利用者に尋ねる (R13)。項目の追加と並び順の変化 → 次の割り当てから反映。処理の順は R12。(KTD6, KTD7, KTD8)
 - R22. **人の変更。** 記録に最後に書いた値を持ち、そこからの差分のうち、記録の意図と一致するもの (自分の部分書き込み。部分完了の続きとして扱う) と組み込みワークフローの遷移で説明できるものを除いた残りを人の変更として記録に印を付け、1 回だけ報告する。人が `In Progress`・`In review` の項目に足した `blockedBy` は導出せず報告する。上書きせず、記録を Project に合わせる。人が `Agent stuck state` を空にしたときも、上書きせず 1 回だけ報告する (`manager-stopped` を除く。R25)。人が外した `blockedBy` を足し直さない (競合しうる箇所が変わるまで再提案しない)。手で `Blocked` にした項目は割り当てない。手で `Blocked` から `Ready` に戻した項目も、blocker が開いていれば割り当てない。利用者が `Todo` や空の項目を `Ready` にすることは、着手してよいという通常の操作なので、人の変更として報告しない (開いている blocker があれば KTD7 の導出で `Blocked` にする)。(KTD7)
 - R23. **作業のセッションの監視。** 動き出すたびに `ListAgents` を取り、記録にある名前が無ければ報告して割り当ては保つ (利用者が解除を選べば、フィールドを空にして `Todo` に戻し、コメント `解放`)。合図の宛先が見つからなければ、Desktop のツール `list_sessions` で ID から名前を引き直せれば `Agent session title` を更新して続け、できなければ利用者に尋ねる。待機の知らせの後に宣言も PR も現れなければ報告する (R10)。記録にある名前が `ListAgents` に無いときは、`Agent stuck state` に `session-missing` を書き、名前が戻ったら空に戻す (KD21)。
@@ -138,14 +156,14 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 - R26. **開始。** 引数 `--manager <名前>` (省けばリポジトリの設定の `project` から規約の名前を導く)。前提を確かめる (R16・R17)。自分の ID (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`)・名前 (`ListAgents` の 1 行目)・`repo` (`origin` の URL から `owner/repo`)・`worktree` (実体パス)・トークンのログイン (`gh api user`。R6) を決め、合図 `available` を送る。管理の名前が `ListAgents` に無ければ、管理のセッションを起動してから `/issue-work` をやり直すよう利用者に伝えて止まる。合図を送ったら、割り当てを GitHub で確かめる待機 (自分の ID が `Agent session ID` に入った項目を探す) を背景で起動してターンを終える。待機が読む Project はリポジトリの設定の `project` で、設定が無ければ開始時に利用者に尋ねる (KTD6)。(KTD10)
 - R27. **割り当ての受け取り。** `assigned` を受けたら (または待機が項目を見つけたら)、`gh` でフィールドの値が自分の ID であることを確かめてから着手する。同じ Issue の `assigned` を 2 度受けたら了解だけ返す。合図と待機の通知の両方が届いても着手は 1 回。`in_review` 未満の別の Issue を持っているときに受けたら `assignment-mismatch` を送る。宣言を書く前と PR を作る前にも、フィールドが自分の ID のままであることを確かめ、違えば止めて管理に `assignment-mismatch` を送る (`stop` が失われても段の境目で気づく)。ブランチ名の案を使い、既存のブランチと衝突すれば連番を足す。
-- R28. **宣言。** Issue を調べ、リポジトリの設定を読んでファイルに種類を付け、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。`stop` を受けたら作業を止め、理由を報告する。宣言に無いファイルを変える必要が分かったら、そのファイルを変える前に手を止め、コメント `宣言の更新` (宣言の全体) を書いて `declared` を送り、更新したコメントの ID を渡して判定の待機を起動する。判定を待つ間は、宣言済みのファイルも含めて作業を止める。`開始可` ならそのファイルを変える。待つことになったら、待つ対象 (相手の Issue の完了か、小さな PR のマージ) の後に `main` に rebase してから変える。自分が先に `開始可` になった側で、利用者が小さな PR を選んだら、競合しうるファイルの変更だけを別のブランチの小さな PR にする。(KD14)
+- R28. **宣言。** Issue を調べ、変える予定のファイルと、節の表記があるファイルでは変える節を決め、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。`stop` を受けたら作業を止め、理由を報告する。宣言に無いファイルを変える必要が分かったら、そのファイルを変える前に手を止め、コメント `宣言の更新` (宣言の全体) を書いて `declared` を送り、更新したコメントの ID を渡して判定の待機を起動する。判定を待つ間は、宣言済みのファイルも含めて作業を止める。`開始可` ならそのファイルを変える。待つことになったら、待つ対象 (相手の Issue の完了か、小さな PR のマージ) の後に `main` に rebase してから変える。自分が先に `開始可` になった側で、利用者が小さな PR を選んだら、競合しうるファイルの変更だけを別のブランチの小さな PR にする。(KD14)
 - R29. **PR と次の Issue。** 本文に `Closes #<番号>` を書いて PR を作り、ready for review にしたら合図 `review` を送る (管理は PR の観測で `In review` にするので、合図は観測を早めるだけ)。次の Issue を求めるときは `available` を送る (R26 と同じ待機を起動する)。
 - R30. **作業のセッションがしないこと。** 記録の置き場に書かない。Project のフィールドと Status を書かない。ほかの作業のセッションに合図を送らない。自分で Issue を選んで着手しない。名前を変えない (変わったら `renamed` を送る)。
 
 **同梱のスクリプト・設定・登録**
 
 - R31. **スクリプト。** `gh` の実行は 1 つの関数にまとめる。入出力は JSON。終了コードで結果の種類を分ける。エージェントが組み立てる入力 (宣言・割り当ての引数) は形を検査し、未知のキーと欠けた必須キーは理由付きで差し戻す。テストは偽の `gh` (PATH の先頭に置く) と、実物の `--json` と GraphQL の出力を写した固定データで動き、`python3 -m unittest discover -s issue-dispatch/tests` で実行する。Python 3.11 の標準ライブラリだけを使う。(KTD14)
-- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files.generated`・`files.sectioned`・`files.indivisible`・`files.splittable`・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
+- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の列。要素は `pattern`・`kind` と、省略できる `units` (節の表記とキーの深さ)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に当てる。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
 - R33. **登録と文書。** ファイル `issue-dispatch/.claude-plugin/plugin.json` (版 0.1.0)、`.claude-plugin/marketplace.json`、ルートの `README.md` (収録プラグインの表・構成・プロジェクト固有の設定の表)、`issue-dispatch/README.md`、`CONCEPTS.md` の用語 (管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録)、`.github/test-targets.txt` の 1 行。文書はルートの `CLAUDE.md` の規則に従い、`doc-dag` と `wording-guard` を実行する。(KTD18)
 
 ### Key Flows
@@ -241,9 +259,9 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **Then:** B の背景の待機が自分の ID の項目を見つけ、B は `gh` で確かめて着手し、宣言の後はコメント `開始可` を見つけて作業を始める。
 - AE4. 宣言どうしが競合しうるので待ち、blocker の close で解除される
   - **Covers F4, F7, R5, R20, R21.**
-  - **Given:** A が #9 で `src/app.ts` (`splittable`) を宣言済み。
+  - **Given:** A が #9 で `src/app.ts` (`divisible`。節なし) を宣言済み。
   - **When:** B が #12 で同じパスを宣言する。
-  - **Then:** 管理のセッションは利用者に「待つ / 共通の変更を先に小さな PR にする (`splittable` なので分けるリファクタリング) / 競合しうるまま進める」を示す。「待つ」なら #12 に blocked by #9 を足し、Status を `Blocked` にし、コメント `待機` を書き、B に `wait` を送る。#9 が閉じると次のポーリングで #12 は `In Progress` に戻り、B に `go` が届く。
+  - **Then:** 管理のセッションは利用者に「待つ / 共通の変更を先に小さな PR にする (`divisible` なので分けるリファクタリング) / 競合しうるまま進める」を示す。「待つ」なら #12 に blocked by #9 を足し、Status を `Blocked` にし、コメント `待機` を書き、B に `wait` を送る。#9 が閉じると次のポーリングで #12 は `In Progress` に戻り、B に `go` が届く。
 - AE5. `Done` は GitHub が書き、資源の解放が続く
   - **Covers R2, R3, R21.**
   - **Given:** #9 の PR の本文に `Closes #9`。#9 がラベル `resource:workers-dev` を持ち、記録で使用中。
@@ -362,7 +380,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **Then:** A は `package.json` を変える前に、`src/app.ts` と `package.json` を含む宣言の全体をコメント `宣言の更新` に書き、`declared` を送り、判定を待つ。`開始可` が付くまで、どのファイルも変えない。
 - AE32. ほぼ同時の宣言の更新が 3 つ競合しうる
   - **Covers R20, R21.**
-  - **Given:** A・B・C がそれぞれ #9・#10・#11 で作業中。3 つとも、`package.json` の `dependencies` (`sectioned`) を足した `宣言の更新` を、A・B・C の順に投稿した。
+  - **Given:** A・B・C がそれぞれ #9・#10・#11 で作業中。3 つとも、`package.json` の節 `dependencies` (キーの深さを指定していない) を変える `宣言の更新` を、A・B・C の順に投稿した。
   - **When:** 管理のセッションが判定し、利用者は B と C について「待つ」を選ぶ。
   - **Then:** A の更新が `開始可` になる。B と C は A とだけ比べられて競合しうると判定され、#9 の完了待ちで `Blocked` になる。#9 が閉じると、B が先に判定し直されて `開始可` になり `In Progress` に戻る。C は B と競合しうるので、待つ相手が #10 に変わることを示して、利用者に扱い (待つ / 小さな PR / 許す) を尋ね直す。答えが出るまで C は `Blocked` のまま。
 - AE33. 共通の変更を先に小さな PR にする
@@ -405,6 +423,15 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **Given:** 作業中の項目が #9 と #12。
   - **When:** (1) 記録が壊れていて管理のセッションが止まる。(2) `gh` の認証切れで止まる。
   - **Then:** (1) では、止まる前に #9 と #12 の `Agent stuck state` を `manager-stopped` にする。(2) では GitHub に書けないので、報告に #9 と #12 の一覧を添え、利用者が `manager-stopped` を書ける。どちらも、`--resume` で再開すると `manager-stopped` が空に戻り、そのことが報告に書かれる。
+- AE41. Issue #114 の実例のファイル構成で、競合しうるものだけが競合する
+  - **Covers R5.**
+  - **Given:** 検証用リポジトリの設定と既定の表で、`README.md` は `divisible` (見出し)、`package.json` は `indivisible` (キー。`dependencies.*` の深さ)、`CLAUDE.md` は `unstable` (見出し)、`vite.config.ts` と `src/routes/+page.svelte` は `divisible`、`pnpm-lock.yaml` と `dist/**` は `generated`。
+  - **When:** 2 つの Issue が、次のどれかを宣言する。(1) `README.md` の別の見出し。(2) `package.json` の別のトップレベルのキー。(3) `package.json` の `dependencies` に別の依存。(4) `CLAUDE.md` の同じ見出し。(5) `src/routes/+page.svelte` (節なし)。(6) `pnpm-lock.yaml`。
+  - **Then:** (1)〜(3) と (6) は競合しない。(4) と (5) だけが競合しうる。(5) では分けるリファクタリングも示し、(4) では意味が変わりうる点を添えて示す。
+- AE42. パスから種類を決める
+  - **Covers R5, R32.**
+  - **Given:** リポジトリの設定に `dist/**` → `generated` の規則がある。既定の表に `**/*.js` → `divisible` と `**/*.xlsx` → `unknown-structure` がある。
+  - **Then:** `dist/app.js` は `generated`、`src/app.js` は `divisible`、`report.xlsx` は `unknown-structure`、どこにも当たらない `data/model.bin` は `unknown-content`。`unknown-content` のパスを 2 つの Issue が宣言すると、競合しうるかどうかを利用者に尋ねる。
 
 ### Success Criteria
 
@@ -436,6 +463,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - 連絡の取れない作業のセッションからの Issue の自動の回収 (初版は利用者が判断する)。
 - 書く前に案を見せるモード (信頼を段階的に上げる手段。初版は承認を要する行為だけ尋ねる)。
 - 資源のラベルの自動付与 (初版は提案と承認)。
+- パスから種類を決めるモジュール `filekinds` を、別のプラグインに切り出す (KD22。ほかの道具でも使えるようにする)。
 - `gh` の失敗の再試行の回数と待ちの長さの調整 (初版の値は R21・KTD6)。
 
 ### Dependencies / Assumptions
@@ -510,13 +538,13 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD6. **ポーリングは同梱の Python スクリプトを背景で起動し、通知で再入する。** コマンドは `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py" wait --record-dir <置き場> --minutes <分>` の形。作業のセッションは `wait-assignment --project <owner>/<番号> --session-id <ID> --minutes <分>` と `wait-decision --project <owner>/<番号> --issue <owner>/<repo>#<番号> --session-id <ID> --declaration <宣言のコメントの ID> --minutes <分>`。`--project` はリポジトリの設定の `project` から取り、設定が無ければ `/issue-work` の開始時に利用者に尋ねる。`--issue` は割り当てを受けた項目。作業のセッションの待機は、読む間隔と期限に KTD15 のデフォルト値 (3 分・60 分) を使う。終了コードは 0 (変化あり。標準出力の 1 行に種類)、124 (期限)、2 (`gh` の認証切れ)、3 (レート制限の再開を期限内に待てない)、4 (ネットワークの失敗が 3 回続いた)、5 (スナップショットが無い。先に同期が要る)、6 (止められた。標準出力に `stopped` の行)。変化の検出はスナップショットとの差分。レート制限は応答の再開時刻まで期限内なら待って続ける。待機はターンの最後にだけ起動する。起動の前に、動いている待機 (`wait.pid` の PID。所有者が別のセッションでも) を止め、スナップショットを書く。待機のスクリプトは起動時に `wait.pid` (PID・開始時刻・所有者のセッション ID) を書き、標準出力の最初の行に自分の PID を書く。終わるときは、`wait.pid` の PID が自分のときだけ消す (止められた待機が、後から起動した待機の `wait.pid` を消さないため)。SIGTERM を受けたら、`stopped` と自分の PID を標準出力の 1 行に書き、終了コード 6 で終わる。スナップショットは読むだけ。**止めた待機の通知で再入を繰り返さない。** 止めた待機も終わるので、その通知も届き、新しいターンが始まる。再入の手順は、出力に `stopped` の行があるか、`wait.pid` に通知と別の PID がある (別の待機が動いている) ときは、何もせずにターンを終える。見分けないと、通知で始まったターンが直前に起動した待機を止め、その通知でまた次のターンが始まる、という繰り返しが終わらない。見分けるのに終了コードだけを使わない — 止められたときに通知に出る終了コードは、スクリプトの作りで変わる (Dependencies / Assumptions)。上の表に無い終了コードで終わった通知は、停止の条件として報告する (R25)。作業のセッションの待機は 2 つ — `wait-assignment` は、自分の ID が `Agent session ID` に入った項目の Status が `In Progress` になったとき (初回の割り当てと、`Blocked` からの復帰の両方) に 0 で終わる。`wait-decision` は、自分宛てで、`--declaration` に渡した宣言の ID を持つコメント `開始可` (書き手がトークンのログインと同じもの。R6) が見つかるか、Status が `Blocked` になったときに 0 で終わる。前の割り当てや前の宣言に対する `開始可` では終わらない (待機の起動より前に書かれた `開始可` も対象にする)。フォアグラウンドの `sleep` は拒否されるので必ず背景で起動し、待機を起動したターンではほかのツールを呼び出さない。Bash の `description` に、何を待っているかと次に入る手順を書き (R24)、通知・合図・`--resume` を 1 つの入口に入れる (先例 `review-triage/skills/review-loop/references/reentry.md`)。R10, R21, R24 を実装する。
 - KTD7. **Status の書き換えと `Blocked` の導出の規則を 1 か所 (`flow.md` の決定表) に書く** (`Done` を書かず人の変更を上書きしないことは session-settled: user-approved — chosen over 「Auto-close issue」を無効にして自分で `Done` を書く案)。候補は Status が `Ready` で、`Agent session ID` が空で、かつ開いている blocker が無いもの (すべてを満たす。資源・親 Issue・担当者とラベル・リポジトリの条件は R19)。Status が空の項目と `Todo` の項目は、候補にせず、`Blocked` の導出でも書き換えない (R1)。`Blocked` の導出で書き換えるのは、割り当ての無い項目の `Ready` ⇄ `Blocked` (記録に無い項目は、初めて見つけたときに記録に加えてから書く) と、管理が自分で足した `blockedBy` による `In Progress` ⇄ `Blocked` だけ。人が `In Progress`・`In review` の項目に足した `blockedBy` は導出せず報告する。戻り先は記録に最後に書いた `Blocked` 以外の Status。Status の書き換えは、記録にある項目にだけ行う。差分のうち、組み込みワークフローの遷移 (閉じた → `Done`、reopen → `Todo`、追加 → `Todo`) と、利用者が着手を決める遷移 (`Todo` か空 → `Ready`) で説明できないものを人の変更とし、1 回だけ報告する。R1, R2, R21, R22 を実装する。
 - KTD8. **`In review` は PR の観測から導き、解放と `Done` の契機は Issue が閉じたこと。** PR が開いていて draft でなく `closingIssuesReferences` に割り当ての Issue を含み、作者 (`author.login`) がトークンのログインと同じときだけ `In review` (第三者の PR で `In review` にしないため。R6 と同じ理由)。マージされたが Issue が開いている・マージされずに閉じた・進行中の Issue が閉じられた、の 3 つは利用者に尋ねる (R13)。資源の解放は作業のセッションの明示の報告 (宣言の更新で資源を外す) と Issue の close の 2 つ (session-settled: user-approved — chosen over PR を ready for review にした時点の解放)。R20, R21 を実装する。
-- KTD9. **競合の可能性は R5 の種類別の規則で判定し、照合はスクリプトで行う。** `sectioned` どうしは (リポジトリ, パス, unit) の一致、それ以外の組 (`indivisible`・`splittable` を含む組) は (リポジトリ, パス) の一致で競合しうるとし、`generated` は判定しない。`unknown` を含む組で (リポジトリ, パス) が一致すれば、利用者に判定を求める。パスはリポジトリのルート基準に正規化し (`./a`・`a/`・`a//b` を同じに)、絶対パスとルートの外を指すパスは差し戻す。種類ごとの規則は R5。宣言の形の検査は必須キーと未知のキーで行い (`typed-contract-for-agent-input.md`)、照合は LLM に任せない (`extract-identifiers-in-code-not-llm.md`)。判定の順 (宣言の投稿の順、同じなら Project の中の順) と比べる相手 (既に `開始可` になった宣言だけ) も、スクリプトで決める (R20)。unit の表記はリポジトリの設定が種類ごとに決め、作業のセッションがそれを読んで `kind` と `unit` を付ける。設定の無いリポジトリの宣言は `unknown` とし、利用者が判定する。R4, R5, R20 を実装する。
+- KTD9. **種類はパスから独立したモジュールで決め、競合の可能性は R5 の規則でスクリプトが判定する。** モジュール `filekinds` は、パスと、リポジトリの設定の `files` と、既定の表 (プラグインに同梱するデータのファイル `file-kinds.json`) から、種類と属性 (節の表記・参照の単位・マージできるか) を返す。`filekinds` は `issue_dispatch` のほかのモジュールに依存しない (後で別のプラグインに切り出すため。KD22)。節の名前は `.` で区切った階層として、同じか先頭部分の一致で比べる。`unknown-content` を含む組で (リポジトリ, パス) が一致すれば、利用者に判定を求める。パスはリポジトリのルート基準に正規化し (`./a`・`a/`・`a//b` を同じに)、絶対パスとルートの外を指すパスは差し戻す。種類ごとの規則は R5。宣言の形の検査は必須キーと未知のキーで行い (`typed-contract-for-agent-input.md`)、種類の決定も照合も LLM に任せない (`extract-identifiers-in-code-not-llm.md`)。判定の順 (宣言の投稿の順、同じなら Project の中の順) と比べる相手 (既に `開始可` になった宣言だけ) も、スクリプトで決める (R20)。作業のセッションは宣言にパスと節の名前だけを書き、種類はスクリプトがパスから決める。R4, R5, R20 を実装する。
 - KTD10. **セッションの識別は ID と名前の両方を作業のセッションが申告し、宛先は名前にする。** ID は `CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。名前は `ListAgents` の 1 行目。`Agent session ID` には ID、`Agent session title` には名前を書く。名前が `ListAgents` に無いときの引き直しは Desktop の `list_sessions` (ID → タイトル) で、端末のセッションは引き直せないので利用者に尋ねる。作業のセッションは名前を変えない (変わったら `renamed`)。R8, R23, R26, R30 を実装する。
 - KTD11. **合図の様式は先頭行 `issue-dispatch: <種類>` と `<キー>: <値>` の行にし、数を減らす。** 1 Issue あたり作業 → 管理が 3 通 (`available`・`declared`・`review`)、管理 → 作業が 2 通 (`assigned`・`go` または `wait`)。`stop` は解放・close・項目の除去のときだけ。中継の履歴の扱いは U1 の実測で決める — 案 A: 背景の待機の通知で始まるターンから送った合図が履歴を引き継がないなら、管理のセッションは合図を通知で始まるターン (再入の手順の最後) でまとめて送る。案 B: 引き継ぐなら、合図が捨てられた知らせで利用者に 1 行の入力を求める (R9) だけにする。どちらでも、合図が失われたときの回復は KTD1 の表に従う。R7, R9 を実装する。
 - KTD12. **権限モードの組による保留は、設定 `crossSessionInbound` の確認で避ける。** スクリプトがユーザー設定 (`~/.claude/settings.json`) とプロジェクト・ローカルの設定を読み、`accept` が無ければ警告する。`refuse` があれば、管理のセッションでは止め、作業のセッションでは警告して続ける (R16・KD15)。スクリプトは役割を引数 (`preflight session --role manager|worker`) で受ける。同じ設定ファイルの `permissions.allow` と `permissions.defaultMode` も読み、R16 の権限の警告を出す。Desktop では `get_session` の `permissionMode` も見る。端末で起動の引数として渡した権限のモードは読めないので、「確かめていない」と報告する。権限モードそのものは対話セッションから読む公式の手段が無い (Desktop の `get_session` だけ) ので、同じ組であることは利用者に確かめる。R16 を実装する。
 - KTD13. **フックの規則 (パスの照合) は 1 か所にまとめ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U7 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出力せず終了コード 0。Bash は、IO の前に正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
-- KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`)。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration conflictability` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
-- KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files.*` (`generated`・`sectioned`・`indivisible`・`splittable` の 4 つ) は空 (すべて `unknown`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。R32 を実装する。
+- KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`filekinds.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`) と、既定の表 `file-kinds.json`。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration conflictability` / `files classify` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
+- KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files` は空 (既定の表だけを当てる。どちらにも当たらないパスは `unknown-content`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。R32 を実装する。
 - KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U2・U3 の文書の「実測」の節に、日付と版を添えて書く。
 - KTD17. **通し確認は、利用者のアカウントの検証用 Project と、検証用のリポジトリ 2 つ、管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ) で行う。** ブランチ版のプラグインは `claude --plugin-dir <リポジトリ>/issue-dispatch` で読み込む (端末)。Desktop のセッションには起動の引数を渡せないので、ブランチ版を読み込ませる手段を U1 で確かめる (Open Questions)。手段が無ければ、通し確認のセッションはすべて端末にし、Desktop にしかない経路 (`set_session_title`・`list_sessions`・`get_session`) は、マージの後にインストールした版で短く確かめる。費用は始める前に利用者に示す。Verification Contract を実装する。
 - KTD18. **変えないもの。** ほかのプラグインのディレクトリ、`.github/workflows/test.yml`、`.claude/` の設定。変えるのは新しいディレクトリ `issue-dispatch/` と、登録のためのファイル (`.claude-plugin/marketplace.json`・`README.md`・`CONCEPTS.md`・`.github/test-targets.txt`) だけ。版は 0.1.0 (新しいプラグイン)。
@@ -687,6 +715,8 @@ issue-dispatch/
 │       ├── project.py                     # 項目の読み取り・フィールドの書き込み・読み直し
 │       ├── issues.py                      # blockedBy・コメント・PR の観測
 │       ├── declaration.py                 # 宣言の検査・パスの正規化・競合の可能性の判定
+│       ├── filekinds.py                   # パスから種類と属性を決める (ほかのモジュールに依存しない)
+│       ├── file-kinds.json                # 既定の表 (パスのパターンと種類・属性)
 │       ├── record.py                      # 記録の読み書き・段階の印・資源の使用
 │       ├── poll.py                        # スナップショットの差分・待機
 │       └── preflight.py                   # リポジトリ・Project・セッションの検査
@@ -695,7 +725,8 @@ issue-dispatch/
 │   │   ├── SKILL.md
 │   │   └── references/
 │   │       ├── project-schema.md          # Project の様式 (R1)
-│   │       ├── issue-format.md            # Issue・宣言・コメントの様式 (R3〜R6)
+│   │       ├── issue-format.md            # Issue・宣言・コメントの様式 (R3・R4・R6)
+│   │       ├── file-kinds.md              # ファイルの種類と競合の可能性の判定の規則 (R5)
 │   │       ├── messaging.md               # 合図の取り決め (R7〜R10)
 │   │       ├── records.md                 # 記録の契約 (R11)
 │   │       ├── flow.md                    # 状態機械・決定表・行為の区分 (R12・R13)
@@ -714,6 +745,7 @@ issue-dispatch/
     ├── fake-gh                            # PATH の先頭に置く偽の gh
     ├── fixtures/                          # 実物の gh の出力を写した固定データ
     ├── test_declaration.py
+    ├── test_filekinds.py
     ├── test_record.py
     ├── test_project.py
     ├── test_poll.py
@@ -764,16 +796,17 @@ issue-dispatch/
 - **Dependencies:** U1。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」の宣言。フィールドの表 (名前 / 型 / 書く側 / 意味。`Agent stuck state` の 4 つの値の表を含む)、Status の選択肢の表 (名前 / 書く側 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
-  - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` (新設) — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、宣言の JSON の様式 (キーの表: キー / 必須 / 型 / 意味。`kind` の 5 つの表: 種類 / 判定 / 競合の可能性があるときの扱い。`unit` の表記の表: ファイルの種類 / 表記 / 例)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由)、「この例は様式を示すもので、そのまま写さない」の注記。
+  - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` (新設) — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、宣言の JSON の様式 (キーの表: キー / 必須 / 型 / 意味。`units` の書き方は `file-kinds.md` を参照し、言い直さない)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由)、「この例は様式を示すもので、そのまま写さない」の注記。
+  - `issue-dispatch/skills/issue-dispatch/references/file-kinds.md` (新設) — 冒頭に「このファイルがファイルの種類と競合の可能性の判定の規則の正本」の宣言。6 段の問いと種類の表 (段 / 問い / 種類 / 判定 / 示す扱い)、節で判定する規則 (階層と先頭部分の一致)、節の表記の表 (構造 / 表記 / 例)、パスのパターンの当て方 (設定が先・段の順)、参照の単位、マージできないファイル、共有の状態を持つファイル、既定の表の読み方と各行を選んだ理由 (表そのものの正本は `file-kinds.json` で、文書では言い直さない)。
 - **Approach:**
   1. 表の列は `review-triage/skills/review-triage/references/record-schema.md` の形 (キー / 必須 / 内容) に合わせる。
   2. 宣言の例は JSON のコードブロック 1 つにし、未知のキーが差し戻されることを書く。
   3. 先頭行の例を、管理と作業の両方で 1 つずつ示す。
-  4. 「競合の可能性の判定の規則」は R5 を写し、「レビューでの修正による競合の可能性は判定しない」理由を 1 文で添える。
+  4. `file-kinds.md` の規則は R5 を写し、「レビューでの修正による競合の可能性は判定しない」理由を 1 文で添える。
 - **Patterns to follow:** `review-triage/skills/review-loop/references/loop-files.md` (正本の宣言・表・一時名の節の形)、`review-triage/skills/review-triage/references/review-request-template.md` (様式に無いキーを足さない)。
 - **Test scenarios:**
   - Test expectation: none -- 文書だけ。U5 のテストが、宣言の検査がこの文書のキーの表と一致することを確かめる。
-- **Verification:** `issue-dispatch/skills/` を対象に `doc-dag` を実行して、様式が他の文書に複製されていない。U5 の宣言のテストの必須キーと `kind` の一覧がこの文書の表と同じ。
+- **Verification:** `issue-dispatch/skills/` を対象に `doc-dag` を実行して、様式が他の文書に複製されていない。U5 の宣言のテストの必須キーと、`filekinds` のテストの種類と属性の一覧が、これらの文書の表と同じ。
 
 ### U3. 合図の取り決めと記録・設定の契約
 
@@ -783,7 +816,7 @@ issue-dispatch/
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、権限モードの組と `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。
   - `issue-dispatch/skills/issue-dispatch/references/records.md` (新設) — 記録の置き場、`record.json` のキーの表 (`project`・`manager` (ID・名前・開始・`state`・最後の利用者の入力からの送受の数)・`sessions` (ID → 名前・`repo`・`worktree`・状態・待機中の時刻。所属する項目は `items` の `session_id` だけが持つ)・`items` (項目 → `item_id`・`session_id`・意図 (書く予定の ID・title・Status・割り当ての番号)・段階の印の時刻 (いつ付くかの正本は `flow.md`)・再送の回数・最後に書いた Status・宣言の写し・資源・自分が足した `blockedBy`・待っている小さな PR・競合の可能性があるときに選んだ扱い・報告済みの印 (人の変更・割り当てない理由))・`resources` (名前 → 使用中の Issue と時刻)・`notices`・`questions` (問い → 項目・種類・選択肢・尋ねた時刻・答えと答えた時刻))、`snapshot.json` (項目ごとの Status・フィールド・`blockedBy`・close・PR の状態・読んだコメントの id。書き手は再入のターンだけ)、`actions.log` (1 行 1 JSON のキー)、`wait.pid` (PID・開始時刻・所有者)、書く側・一時名と改名・種類ごとの扱いの表 (設定 / 記録 / スナップショット / ログ / 宣言)。
-  - `issue-dispatch/skills/issue-dispatch/references/project-config.md` (新設) — 様式 (管理側とリポジトリ側の JSON の例)、キーの表 (キー / 側 / 意味 / 未設定のときの扱い)、「未設定」の定義、ファイルの 4 種類のキー (`files.generated`・`files.sectioned`・`files.indivisible`・`files.splittable`) の書き方、`files.sectioned` の unit の表記の指定の仕方、`protected_paths`。
+  - `issue-dispatch/skills/issue-dispatch/references/project-config.md` (新設) — 様式 (管理側とリポジトリ側の JSON の例)、キーの表 (キー / 側 / 意味 / 未設定のときの扱い)、「未設定」の定義、`files` の規則の書き方 (`pattern`・`kind`・`units`・`reference`・`mergeable`。意味の正本は `file-kinds.md`)、`protected_paths`。
 - **Approach:**
   1. 記録のキーは、Project から導出できる値 (Issue の URL・タイトル) を持たない。項目のキーは `owner/repo#番号`。
   2. 扱いの表は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md` の列 (種類 / 失われるもの / 読めない・壊れているとき) にスナップショット (作り直せるキャッシュ) の行を足す。
@@ -812,30 +845,35 @@ issue-dispatch/
 
 ### U5. 記録・宣言・競合の可能性の判定のスクリプトとテスト
 
-- **Goal:** 記録の読み書きと段階の印、宣言の検査とパスの正規化、競合の可能性の判定、セッション ID と Issue の参照の正規化が、`gh` を使わずにテストできる Python のモジュールになる。
-- **Requirements:** R4, R5, R11, R31 (AE4, AE9, AE10, AE32)。KTD5, KTD9, KTD10, KTD14。
+- **Goal:** 記録の読み書きと段階の印、宣言の検査とパスの正規化、パスから種類を決める処理、競合の可能性の判定、セッション ID と Issue の参照の正規化が、`gh` を使わずにテストできる Python のモジュールになる。
+- **Requirements:** R4, R5, R11, R31 (AE4, AE9, AE10, AE32, AE41, AE42)。KTD5, KTD9, KTD10, KTD14。
 - **Dependencies:** U3, U4。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/__init__.py`
   - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの列、資源の使用、報告済みの印、`actions.log` への追記。
-  - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`kind`・`unit`)、パスの正規化、競合の可能性の判定 (R5)。
+  - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`units`)、パスの正規化、競合の可能性の判定 (R5)。
+  - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、既定の表を後に当て、段の順で決める)。`issue_dispatch` のほかのモジュールを import しない。
+  - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — 既定の表 (パターン・種類・節の表記・参照の単位・マージできるか)。
   - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無)、Issue の参照 (`owner/repo#番号`・URL) の正規化、コメントの先頭行の生成と解析。
-  - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`
+  - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_filekinds.py`
 - **Approach:**
   1. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
   2. 宣言の検査は dataclass で必須キーを位置引数にし、未知のキーをエラーにする (`docs/solutions/design-patterns/typed-contract-for-agent-input.md`)。
   3. パスの正規化は `posixpath.normpath` の後にルートの外 (`..` で始まる) と絶対パスを拒否する。基準はリポジトリのルートで、引数で受ける (`docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md`)。
-  4. 競合の可能性の判定は R5 の種類別の規則 (KTD9) に従う。`sectioned` どうしは unit まで一致したときだけ競合しうる、`indivisible`・`splittable` を含む組はパスが一致すれば競合しうる、`generated` は対象外、`unknown` を含む組でパスが一致すれば「利用者の判定が要る」を返す。
-- **Execution note:** テストを先に書く。記録の壊れ方 (JSON でない・キーが欠ける・型違い) と宣言の誤り (キーの誤字・`kind` の誤り・`unit` の欠け) を 1 件ずつ失敗させてから実装する。
+  4. 競合の可能性の判定は R5 の規則 (KTD9) に従う。種類は `filekinds` で決める。構造を知っている種類は、両方が `units` を書いていれば節の名前の同じか先頭部分の一致で、どちらかが省けば同じパスで競合しうる。`generated` は対象外、`unknown-structure` は同じパスで競合しうる、`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。
+- **Execution note:** テストを先に書く。記録の壊れ方 (JSON でない・キーが欠ける・型違い) と宣言の誤り (キーの誤字・節の表記が無いファイルへの `units`) を 1 件ずつ失敗させてから実装する。
 - **Patterns to follow:** `pr-teeth/scripts/prteeth/store.py` (`load_precious`・`_save_atomic`)、`review-triage/scripts/review-loop-worker/*.py` (1 ファイル 1 責務、docstring の冒頭に責務と正本の文書)。
 - **Test scenarios:**
   - 宣言の JSON に必須キーが揃っていれば受理し、`files` が 0 件でも受理して件数 0 を返す。
-  - 未知のキー (`file` の誤字)・欠けた必須キー・5 つ以外の `kind` は、理由と期待する形を含むエラーで拒否する。
-  - `kind` が `sectioned` で `unit` が無ければ拒否、`sectioned` 以外で `unit` があれば拒否する。
+  - 未知のキー (`file` の誤字)・欠けた必須キーは、理由と期待する形を含むエラーで拒否する。宣言に `kind` があれば未知のキーとして拒否する (種類はスクリプトが決める)。
+  - 節の表記が無いパス (種類が `generated`・`unknown-content`・`unknown-structure` か、当たった規則に節の表記が無い) に `units` があれば拒否する。
   - Covers AE32. まだ判定していない宣言が複数あるとき、投稿の順に 1 件ずつ判定し、比べる相手は既に `開始可` になった宣言だけにする。投稿の時刻が同じなら Project の中の順で並べる。
-  - Covers AE4. 同じリポジトリの同じパスを `splittable` で 2 つの宣言が持てば競合しうる。パスが `./src/app.ts`・`src/app.ts`・`src//app.ts` と違っても同じと判定する。
-  - `sectioned` の同じパスで `unit` が同じなら競合しうる、違えば競合しない。片方が `indivisible` で同じパスなら競合しうる。
-  - `generated` は同じパスでも競合しない。別のリポジトリの同じパスは競合しない。`unknown` を含む組で同じパスなら「利用者の判定が要る」を返す。
+  - Covers AE4. `divisible` の同じパスを、`units` を省いた 2 つの宣言が持てば競合しうる。パスが `./src/app.ts`・`src/app.ts`・`src//app.ts` と違っても同じと判定する。
+  - Covers AE41. 同じパスで両方が `units` を書けば、節の名前が同じか先頭部分の一致 (`dependencies` と `dependencies.react`) のときだけ競合しうる。`dependencies.react` と `dependencies.zod` は競合しない。一方が `units` を省けば競合しうる。
+  - `generated` は同じパスでも競合しない。別のリポジトリの同じパスは競合しない。`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。`unknown-structure` は同じパスで競合しうる。
+  - Covers AE42. `filekinds` は、設定の規則を既定の表より先に当てる (設定の `dist/**` → `generated` が、既定の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に当たれば、段の順で先の種類を返す。どちらにも当たらなければ `unknown-content`。
+  - `filekinds` は、既定の表のパターンごとに、種類・節の表記・参照の単位・マージできるかを返す。`file-kinds.json` の種類と属性の値の一覧が、`file-kinds.md` の表と一致する。
+  - `filekinds` は `issue_dispatch` のほかのモジュールを import しない (テストで import を確かめる)。
   - 絶対パスと、ルートの外を指すパス (`../x`) は拒否する。
   - Covers AE10. 記録が JSON として読めない・必須キーが欠ける・`items` が配列になっているときは `Corrupt` で止め、新規として扱わない。記録が無ければ新規として空の記録を返す。
   - 記録の保存は一時ファイルを経て置き換え、保存の途中で失敗しても元の記録が残る。
@@ -921,7 +959,7 @@ issue-dispatch/
   - sub-agent の入力 (`agent_id` あり) でも同じ規則で拒否する。
   - Covers AE15. 編集系のツールの入力で、ほかの worktree の中のパスは deny の JSON と理由を返し、自分の worktree の中のパスと、どの worktree にも属さないパスには何も出力しない。Read の入力には何も出力しない。
   - Covers AE16. `vite.config.ts` の `port: 5173` と `package.json` の `"dev": "vite --port 5173"` を固定のポートの候補として挙げ、設定の無いリポジトリでは「設定が無い」と雛形を返す。ファイルは変えない。
-  - 生成ファイルの候補 (`pnpm-lock.yaml`・`package-lock.json`・`go.sum`) を `files.generated` の案として返し、設定に既にあれば挙げない。
+  - 生成ファイルの候補 (`pnpm-lock.yaml`・`package-lock.json`・`go.sum`) を、`files` の `generated` の規則の案として返し、設定や既定の表に既にあれば挙げない。
   - Covers AE37. 役割が管理のとき、`permissions.allow` に `Bash(gh *)` や `Bash(*)` があるか、`defaultMode` が `bypassPermissions` なら警告を返す。役割が作業のときは、`bypassPermissions` だけを警告する。CLI だけを許可する設定には何も出さない。
   - Covers AE22, AE34. ユーザー設定に `crossSessionInbound: "accept"` があれば成功、無ければ警告を返す。プロジェクト設定に `refuse` があれば、役割が管理なら失敗、作業なら警告 (遅くなることと、止まったことに期限でしか気づけないこと) を返す。設定ファイルが読めなければ「確かめていない」。
   - Covers AE21. Project の検査は U6 の `check` の結果をそのまま報告に写す。
@@ -934,7 +972,7 @@ issue-dispatch/
 - **Dependencies:** U4, U6。
 - **Files:**
   - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の宣言 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
-  - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (リポジトリの設定の読み方、`kind` の付け方、`unit` の決め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
+  - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (節の名前の決め方 (表記の正本は `file-kinds.md`)、ファイル単位で分けるリファクタリングで変わる参照元の含め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
 - **Approach:**
   1. 自分の ID と名前の決め方 (KTD10) を手順の最初に書き、`ListAgents` の 1 行目から名前を読むことを書く。
   2. `available` を送ったら `wait-assignment` を背景で起動してターンを終える。通知で始まったターンでは `gh` で項目を確かめる。合図 `assigned` で始まったターンでも同じ確認をする (合図を信じない)。
@@ -1029,8 +1067,8 @@ issue-dispatch/
 
 | # | シナリオ | 期待 | Covers |
 | --- | --- | --- | --- |
-| A | 成功の経路: 管理を開始 → 作業 2 つを開始 → 2 件の割り当て → 宣言 (競合の可能性なし) → PR → マージ → 次の割り当て。キューには同じ資源のラベルを持つ `Ready` の項目を 2 件と、`Todo` のままの項目を 1 件入れる | 各項目の `Agent session ID` は 1 つ。`In Progress` → `In review` → `Done` (GitHub)。使用中の資源を要する項目は解放まで割り当てられず、解放の後に割り当てられる。`Todo` の項目は割り当てられない。利用者の操作は 4 種類だけ | AE1, AE5, AE6, AE26, AE30 |
-| B | 宣言の競合の可能性 → 待つ → blocker の close → 解除。続けて、作業の途中の宣言の更新 → 競合の可能性 → 共通の変更を先に小さな PR にする → そのマージ → 解除 | `blockedBy`・`Blocked`・コメント `待機`。close の後に `In Progress` と `go`。更新は変更の前に書かれ、小さな PR のマージの後に `go` | AE4, AE31, AE33 |
+| A | 成功の経路: 管理を開始 → 作業 2 つを開始 → 2 件の割り当て → 宣言 (競合の可能性なし) → PR → マージ → 次の割り当て。キューには同じ資源のラベルを持つ `Ready` の項目を 2 件と、`Todo` のままの項目を 1 件入れる。検証用リポジトリのファイルの構成と設定は AE41 の Given のとおりにし、2 件の宣言は AE41 の (1)〜(3)・(6) のどれかにする | 各項目の `Agent session ID` は 1 つ。`In Progress` → `In review` → `Done` (GitHub)。使用中の資源を要する項目は解放まで割り当てられず、解放の後に割り当てられる。`Todo` の項目は割り当てられない。利用者の操作は 4 種類だけ | AE1, AE5, AE6, AE26, AE30, AE41 |
+| B | 宣言の競合の可能性 (AE41 の (4) か (5)) → 待つ → blocker の close → 解除。続けて、作業の途中の宣言の更新 → 競合の可能性 → 共通の変更を先に小さな PR にする → そのマージ → 解除 | `blockedBy`・`Blocked`・コメント `待機`。close の後に `In Progress` と `go`。更新は変更の前に書かれ、小さな PR のマージの後に `go` | AE4, AE31, AE33, AE41 |
 | C | 合図が届かない作業のセッション (受信を `refuse`) | 開始時の検査は警告を出して続ける。`wait-assignment` が項目を見つけて着手し、`wait-decision` がコメント `開始可` を見つけて作業を始める | AE3, AE23, AE34 |
 | D | 利用者が Status を手で変える / `blockedBy` を手で外す | 1 回だけ報告。上書きしない。足し直さない | AE8 |
 | E | 管理の部分完了からの再開 (フィールドを書いた直後に閉じる → `--resume`) | `assigned` の再送は 1 回。コメントは増えない | AE9 |
