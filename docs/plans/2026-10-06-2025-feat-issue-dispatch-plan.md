@@ -876,7 +876,7 @@ issue-dispatch/
   1. 開始の手順は R18 の順。名前の規約への変更は Desktop では `set_session_title` を自分に使い、端末では利用者に `/rename` を頼んで待つ。
   2. 再入の手順は `reentry.md` を参照するだけにし、SKILL.md に遷移を書かない。
   3. 合図の送り方は KTD11 の案 (U1 の結果) に従う。案 A なら、合図は再入の手順の最後 (待機を起動する直前) にまとめて送る。
-  4. 利用者に尋ねる場面 (R13 の承認必要の行為) は blocking question tool (無ければ番号付きの選択肢) で尋ね、答えを記録に書く。
+  4. 利用者に尋ねる場面 (R13 の承認必要の行為) は 利用者に選択肢を示して答えを待つツール (Claude Code の `AskUserQuestion`。無ければ番号付きの選択肢) で尋ね、答えを記録に書く。
   5. 報告の様式 (開始・停止・`--end`) は、`review-triage/skills/review-triage-loop/references/reporting.md` の「必ず出すもの」の形に倣い、Project の URL・割り当ての一覧・待機中のセッション・保留の承認・最後の利用者の入力からの送受の数を含める。
 - **Patterns to follow:** `review-triage/skills/review-loop/SKILL.md`、`review-triage/skills/review-triage-loop/references/arguments.md`、`references/reporting.md`。
 - **Test scenarios** (通し確認で確かめる。自動テストは無い):
