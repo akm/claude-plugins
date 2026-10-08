@@ -591,7 +591,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 
 ## Output Structure
 
-新しいディレクトリ `issue-dispatch/` の構成。各単位の **Files** が正本で、この木は全体の形を示す。
+新しいディレクトリ `issue-dispatch/` の構成。各単位の **Files** が正本で、このツリーは全体の形を示す。
 
 ```
 issue-dispatch/
@@ -906,7 +906,7 @@ issue-dispatch/
 - **Files:**
   - `issue-dispatch/.claude-plugin/plugin.json` — `name`・`description`・`version` 0.1.0・`author`・`license`。
   - `.claude-plugin/marketplace.json` — 項目 1 つ (description は `plugin.json` と同文、`source` は git-subdir、`tags`)。
-  - `README.md` — 収録プラグインの表に 1 行、「構成」に `issue-dispatch/` の木とテストのコマンド、「プロジェクト固有の設定」の表に 1 行。
+  - `README.md` — 収録プラグインの表に 1 行、「構成」に `issue-dispatch/` のツリーとテストのコマンド、「プロジェクト固有の設定」の表に 1 行。
   - `issue-dispatch/README.md` — 概要、収録スキルの表 (スキル / 実行する場所 / 説明)、使い方 (管理ディレクトリの準備・Project の準備・作業のセッションの開き方)、フックの説明と限界、プロジェクト固有の設定 (任意)、しないこと、必要なもの (`gh` と `project` スコープ・`python3`・Claude Code 2.1.236 以降・設定 `crossSessionInbound` を `accept` にするか、管理と作業のセッションの権限モードの組をそろえること (R16・KTD12))、テスト。
   - `CONCEPTS.md` — 節「Issue の並行作業」に、管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録の項 (定義 1〜2 段落 + 正本への参照)。
   - `.github/test-targets.txt` — `python issue-dispatch/tests` の 1 行。
