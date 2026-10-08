@@ -390,7 +390,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - `gh project item-list` の出力の順が `POSITION` の順と同じか。同じでも、スクリプトは `gh api graphql` で `orderBy` を明示する (KTD14)。
 - Desktop のツール `set_session_title` で変えたタイトルが `ListAgents` の名前に反映されるか。端末の `/rename` で変えた名前との混在。
 - `/clear` の後に `CLAUDE_CODE_SESSION_ID` が変わったとき、作業のセッションの ID をどう扱うか。`CLAUDE_CODE_HOST_SESSION_ID` があるセッションでは変わらない見込み。
-- `blockedBy` を別の owner のリポジトリの Issue に張れるか (Project が別の owner の Issue を含むとき)。張れなければ、重なりの待機は記録とコメントだけで表し、`Blocked` にできないことを報告する。
+- `blockedBy` を別の owner のリポジトリの Issue に足せるか (Project が別の owner の Issue を含むとき)。足せなければ、重なりの待機は記録とコメントだけで表し、`Blocked` にできないことを報告する。
 - 割り当てのフィールドを書いた直後の読み直しが、自分の書いた値をすぐ返すか (読み取りの遅れ)。
 - 名前宛ての合図が管理のセッションに保留も破棄もされずに届く設定の組があるか (Goal Capsule の止まる条件 (1))。
 - 背景の待機を止めたときの通知 (終了コードと出力) が、端末のセッションでも Desktop と同じか (KTD6。Desktop では確かめた)。
@@ -562,7 +562,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 - **管理のセッションが `Done` を書き、「Auto-close issue」を無効にする** — ワークフローは API で変えられず、Project ごとに UI の操作が要る。`Done` を GitHub に任せれば、管理のセッションは Issue を閉じる行為に関わらない (KTD7)。
 - **宣言を Project のテキストフィールドに書く** — フィールドの長さの上限が文書に無く、更新の履歴が残らない。コメントなら履歴と理由が残る (KTD2)。後で要約を写すことは Deferred。
 - **フックが管理のセッションの記録を読んで、ほかのセッションの作業ディレクトリを知る** — 作業のセッションから管理ディレクトリへの経路が要る。`git worktree list` なら同じリポジトリの worktree をどのセッションからでも知れる (KTD13)。別の clone は検出しない (Scope Boundaries)。
-- **ポーリングの代わりにセッション内の Monitor ツールやソケットへの書き込みで変化を知る** — Monitor は期限が最長 30 分で張り直しが要り、ソケットへ直接書くメッセージの様式は公式文書に無い。背景の Bash と通知は review-loop で実測済み (KTD6)。
+- **ポーリングの代わりにセッション内の Monitor ツールやソケットへの書き込みで変化を知る** — Monitor は期限が最長 30 分で、期限ごとに起動し直す必要があり、ソケットへ直接書くメッセージの様式は公式文書に無い。背景の Bash と通知は review-loop で実測済み (KTD6)。
 
 ### System-Wide Impact
 
@@ -670,7 +670,7 @@ issue-dispatch/
   1. 始める前に、手順・作るもの (検証用の Project 1 つ・Issue 数件・セッション 2 つ)・費用の目安を利用者に示し、許可を得る。
   2. セッション間の合図: 管理のセッションと作業のセッションを 1 つずつ開き、(a) 名前宛てで往復し、捨てられるまでの通数と知らせの文面を控える。(b) 作業のセッションからの合図で始まったターンで管理のセッションが返した合図と、背景の待機 (短い `sleep` を背景で起動) の通知で始まったターンで返した合図の、中継の履歴の引き継ぎの違いを、同じ往復の数で比べる。(c) `notify_when_idle` を Desktop と端末の両方に申し込み、知らせの文面を控える。(d) 作業のセッションの受信を `refuse` にして合図が届かないことを確かめる (AE3 の前提)。(e) 止まる条件 (1) の確認: 名前宛ての合図が管理のセッションに保留 (承認待ち) も破棄もされずに届く設定 (`crossSessionInbound` の値と権限モードの組) を、Desktop と端末の組み合わせで確かめる。(f) 背景の待機を PID で止めたときの通知 (表示される終了コードと出力) を、Desktop と端末で確かめる (KTD6)。
   3. 名前と ID: Desktop の `set_session_title` で変えた名前が `ListAgents` に反映されるか。端末の `/rename` と同名にしたときの変名の有無。`/clear` の後に `CLAUDE_CODE_SESSION_ID` と `CLAUDE_CODE_HOST_SESSION_ID` が変わるか (Desktop と端末)。
-  4. GitHub: 検証用の Project で、`gh project item-list` の順と GraphQL の `POSITION` の順を比べる。`updateProjectV2Field` で Status に `In review` と `Blocked` を足し、既存の項目の値が残ることを確かめる。`gh project item-edit --field "Agent session ID" --text <値>` を書いた直後に読み直し、値が返るまでの遅れを測る (10 回)。フィールドの値の更新時刻が GraphQL で読めるか (R24 の作り直しで使う)。別の owner の Issue に `blockedBy` を張れるか。`closingIssuesReferences` が draft の PR でも返るか。新しい Project のワークフローの有効の初期値 (`workflows` の `enabled`)。
+  4. GitHub: 検証用の Project で、`gh project item-list` の順と GraphQL の `POSITION` の順を比べる。`updateProjectV2Field` で Status に `In review` と `Blocked` を足し、既存の項目の値が残ることを確かめる。`gh project item-edit --field "Agent session ID" --text <値>` を書いた直後に読み直し、値が返るまでの遅れを測る (10 回)。フィールドの値の更新時刻が GraphQL で読めるか (R24 の作り直しで使う)。別の owner の Issue に `blockedBy` を足せるか。`closingIssuesReferences` が draft の PR でも返るか。新しい Project のワークフローの有効の初期値 (`workflows` の `enabled`)。
   5. 結果を表 (項目 / 結果 / 日付 / 版) に書く。
 - **Patterns to follow:** `docs/plans/2026-09-26-1338-feat-review-loop-plan.md` の Dependencies / Assumptions の実測の書き方 (条件・回数・結果を 1 文ずつ)。
 - **Test scenarios:**
