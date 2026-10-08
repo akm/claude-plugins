@@ -820,7 +820,7 @@ issue-dispatch/
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、生成ファイルの候補 → 指摘と案)、`project` (U6 の `check` を使う)、`session` (`crossSessionInbound` の読み取り、`git worktree list` と申告の突き合わせ、フックの設定の有無)。
   - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。
   - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と、編集系のツールのパスを判定する `denies_path(path, cwd, worktrees, protected)` (同じパスの照合を使う) と理由文。
-  - `issue-dispatch/skills/repo-preflight/SKILL.md` — 手順 (3 つの検査を実行する → 指摘ごとに案を示す → 適用は人間)、原則、「このスキルが検出しないもの」。
+  - `issue-dispatch/skills/repo-preflight/SKILL.md` — 手順 (3 つを検査する → 指摘ごとに案を示す → 適用は人間)、原則、「このスキルが検出しないもの」。
   - `issue-dispatch/skills/repo-preflight/references/checks.md` — 検査の表 (項目 / 確かめ方 / 満たさないときの案)、「フックが検出しないもの」の節。
   - `issue-dispatch/tests/test_preflight.py`、`issue-dispatch/tests/test_guard_other_worktrees.py`
 - **Approach:**
