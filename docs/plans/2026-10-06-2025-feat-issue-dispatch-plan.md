@@ -445,6 +445,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - 名前宛ての合図が管理のセッションに保留も破棄もされずに届く設定の組があるか (Goal Capsule の止まる条件 (1))。
 - R20 の「共通の変更を先に小さな PR にする」で、先に `開始可` になった側のセッションに小さな PR を作るよう頼む手段。管理のセッションから作業のセッションへ依頼を運ぶ合図と、その GitHub の対応物は、まだ決めていない。決めるまでは、利用者がそのセッションに直接頼む。
 - 背景の待機を止めたときの通知 (終了コードと出力) が、端末のセッションでも Desktop と同じか (KTD6。Desktop では確かめた)。
+- Desktop のセッションにブランチ版のプラグインを読み込ませる手段があるか (KTD17)。無ければ、通し確認のセッションはすべて端末にする。
 
 ### Sources / Research
 
@@ -496,7 +497,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`)。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project release` / `comment` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration overlap` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
 - KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files.*` (`generated`・`sectioned`・`indivisible`・`splittable` の 4 つ) は空 (すべて `unknown`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。R32 を実装する。
 - KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U2・U3 の文書の「実測」の節に、日付と版を添えて書く。
-- KTD17. **通し確認は、利用者のアカウントの検証用 Project と、検証用のリポジトリ 2 つ、管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ) で行う。** ブランチ版のプラグインは `claude --plugin-dir <リポジトリ>/issue-dispatch` で読み込む (端末)。Desktop のセッションにはインストール済みの版が無いので、ブランチ版を一時的にインストールするか、端末のセッションを管理にする。費用は始める前に利用者に示す。Verification Contract を実装する。
+- KTD17. **通し確認は、利用者のアカウントの検証用 Project と、検証用のリポジトリ 2 つ、管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ) で行う。** ブランチ版のプラグインは `claude --plugin-dir <リポジトリ>/issue-dispatch` で読み込む (端末)。Desktop のセッションには起動の引数を渡せないので、ブランチ版を読み込ませる手段を U1 で確かめる (Open Questions)。手段が無ければ、通し確認のセッションはすべて端末にし、Desktop にしかない経路 (`set_session_title`・`list_sessions`・`get_session`) は、マージの後にインストールした版で短く確かめる。費用は始める前に利用者に示す。Verification Contract を実装する。
 - KTD18. **変えないもの。** ほかのプラグインのディレクトリ、`.github/workflows/test.yml`、`.claude/` の設定。変えるのは新しいディレクトリ `issue-dispatch/` と、登録のためのファイル (`.claude-plugin/marketplace.json`・`README.md`・`CONCEPTS.md`・`.github/test-targets.txt`) だけ。版は 0.1.0 (新しいプラグイン)。
 
 ### High-Level Technical Design
@@ -727,7 +728,8 @@ issue-dispatch/
   2. セッション間の合図: 管理のセッションと作業のセッションを 1 つずつ開き、(a) 名前宛てで往復し、捨てられるまでの通数と知らせの文面を控える。(b) 作業のセッションからの合図で始まったターンで管理のセッションが返した合図と、背景の待機 (短い `sleep` を背景で起動) の通知で始まったターンで返した合図の、中継の履歴の引き継ぎの違いを、同じ往復の数で比べる。(c) `notify_when_idle` を Desktop と端末の両方に申し込み、知らせの文面を控える。(d) 作業のセッションの受信を `refuse` にして合図が届かないことを確かめる (AE3 の前提)。(e) 止まる条件 (1) の確認: 名前宛ての合図が管理のセッションに保留 (承認待ち) も破棄もされずに届く設定 (`crossSessionInbound` の値と権限モードの組) を、Desktop と端末の組み合わせで確かめる。(f) 背景の待機を PID で止めたときの通知 (表示される終了コードと出力) を、Desktop と端末で確かめる (KTD6)。
   3. 名前と ID: Desktop の `set_session_title` で変えた名前が `ListAgents` に反映されるか。端末の `/rename` と同名にしたときの変名の有無。`/clear` の後に `CLAUDE_CODE_SESSION_ID` と `CLAUDE_CODE_HOST_SESSION_ID` が変わるか (Desktop と端末)。
   4. GitHub: 検証用の Project で、`gh project item-list` の順と GraphQL の `POSITION` の順を比べる。`updateProjectV2Field` で Status に `Ready`・`In review`・`Blocked` を足し、既存の項目の値が残ることを確かめる。`gh project item-edit --field "Agent session ID" --text <値>` を書いた直後に読み直し、値が返るまでの遅れを測る (10 回)。フィールドの値の更新時刻が GraphQL で読めるか (R24 の作り直しと R19 で使う)。Issue の本文の最後の編集の時刻と編集者が GraphQL で読めるか (R19)。別の owner の Issue に `blockedBy` を足せるか。`blockedBy` に PR を足せないこと (R20 の小さな PR を記録で待つ理由)。`closingIssuesReferences` が draft の PR でも返るか。新しい Project のワークフローの有効の初期値 (`workflows` の `enabled`)。
-  5. 結果を表 (項目 / 結果 / 日付 / 版) に書く。
+  5. Desktop のセッションにブランチ版のプラグインを読み込ませる手段 (KTD17): (a) このリポジトリの手元の作業ツリーをマーケットプレイスとして Desktop に追加し、そこからインストールする。(b) マーケットプレイスの追加で GitHub のブランチを指定する。どちらで読み込めたか、読み込めなかったかを控える。
+  6. 結果を表 (項目 / 結果 / 日付 / 版) に書く。
 - **Patterns to follow:** `docs/plans/2026-09-26-1338-feat-review-loop-plan.md` の Dependencies / Assumptions の実測の書き方 (条件・回数・結果を 1 文ずつ)。
 - **Test scenarios:**
   - Test expectation: none -- 実測の単位で、コードは書かない。
@@ -996,7 +998,7 @@ issue-dispatch/
 | 文書の構造 | `issue-dispatch/skills/` と `CONCEPTS.md` を対象にスキル `doc-dag` を実行する | U2〜U4, U8〜U10 | 正本が 1 か所にあり、重複と巡回が無い |
 | 言い回し | 変更した Markdown を対象にスキル `wording-guard` を実行する | U2〜U4, U7〜U10 | 最後の走査で新しい種類が見つからない |
 | 決定表の整合 | `flow.md` の図のノードと決定表の行、`messaging.md` の合図の表と KTD1 の表を目視で照合 | U3, U4 | 1:1 (機械検査は無い) |
-| 手順書の通し確認 | 管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ。端末はブランチ版を `--plugin-dir` で読み込む)、検証用の Project、検証用のリポジトリ 2 つ。始める前に回数・費用 (目安はセッション 3 つ × 数時間)・手順を利用者に示して許可を得る | U7, U8, U9 | 下のシナリオ |
+| 手順書の通し確認 | 管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ。端末はブランチ版を `--plugin-dir` で読み込み、Desktop は U1 で確かめた手段で読み込む。手段が無ければすべて端末にし、Desktop にしかない経路はマージの後に確かめる。KTD17)、検証用の Project、検証用のリポジトリ 2 つ。始める前に回数・費用 (目安はセッション 3 つ × 数時間)・手順を利用者に示して許可を得る | U7, U8, U9 | 下のシナリオ |
 
 通し確認のシナリオ (順に行う。各シナリオで、Project のフィールドと Status・Issue のコメントの先頭行・記録 (`record.json`・`actions.log`)・両側の報告・利用者の操作が 4 種類だけだったことを見る):
 
