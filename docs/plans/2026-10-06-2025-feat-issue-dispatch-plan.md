@@ -780,7 +780,7 @@ issue-dispatch/
 | U2 | Project・Issue・宣言・コメントの様式の正本 | `issue-dispatch/skills/issue-dispatch/references/project-schema.md`, `issue-format.md` | U1 |
 | U3 | 合図の取り決めと記録・設定の契約 | `references/messaging.md`, `records.md`, `project-config.md` | U1, U2 |
 | U4 | 状態機械と再入の手順 | `references/flow.md`, `reentry.md` | U2, U3 |
-| U5 | 記録・宣言・競合の可能性の判定のスクリプトとテスト | `scripts/issue_dispatch/{record,declaration,ids}.py`, `tests/test_{record,declaration}.py` | U3, U4 |
+| U5 | 記録・宣言・競合の可能性の判定のスクリプトとテスト | `scripts/issue_dispatch/{record,declaration,filekinds,ids}.py`, `scripts/issue_dispatch/file-kinds.json`, `tests/test_{record,declaration,filekinds}.py` | U3, U4 |
 | U6 | GitHub の読み書きとポーリングのスクリプトとテスト | `scripts/issue_dispatch/{gh,project,issues,poll}.py`, `scripts/issue_dispatch.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,poll}.py` | U5 |
 | U7 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/guard-other-worktrees.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees}.py` | U6 |
 | U8 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md` | U4, U6, U7 |
