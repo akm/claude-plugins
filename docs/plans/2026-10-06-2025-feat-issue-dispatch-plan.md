@@ -157,7 +157,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 - R26. **開始。** 引数 `--manager <名前>` (省けばリポジトリの設定の `project` から規約の名前を導く)。前提を確かめる (R16・R17)。自分の ID (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`)・名前 (`ListAgents` の 1 行目)・`repo` (`origin` の URL から `owner/repo`)・`worktree` (実体パス)・トークンのログイン (`gh api user`。R6) を決め、合図 `available` を送る。管理の名前が `ListAgents` に無ければ、管理のセッションを起動してから `/issue-work` をやり直すよう利用者に伝えて止まる。合図を送ったら、割り当てを GitHub で確かめる待機 (自分の ID が `Agent session ID` に入った項目を探す) を背景で起動してターンを終える。待機が読む Project はリポジトリの設定の `project` で、設定が無ければ開始時に利用者に尋ねる (KTD6)。(KTD10)
 - R27. **割り当ての受け取り。** `assigned` を受けたら (または待機が項目を見つけたら)、`gh` でフィールドの値が自分の ID であることを確かめてから着手する。同じ Issue の `assigned` を 2 度受けたら了解だけ返す。合図と待機の通知の両方が届いても着手は 1 回。`in_review` 未満の別の Issue を持っているときに受けたら `assignment-mismatch` を送る。宣言を書く前と PR を作る前にも、フィールドが自分の ID のままであることを確かめ、違えば止めて管理に `assignment-mismatch` を送る (`stop` が失われても段の境目で気づく)。ブランチ名の案を使い、既存のブランチと衝突すれば連番を足す。
-- R28. **宣言。** Issue を調べ、変える予定のファイルと、節の表記があるファイルでは変える節を決め、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。`stop` を受けたら作業を止め、理由を報告する。宣言に無いファイルや節を変える必要が分かったら、それを変える前に手を止め、コメント `宣言の更新` (宣言の全体) を書いて `declared` を送り、更新したコメントの ID を渡して判定の待機を起動する。判定を待つ間は、宣言済みのファイルも含めて作業を止める。`開始可` ならそれを変える。待つことになったら、待つ対象 (相手の Issue の完了か、小さな PR のマージ) の後に `main` に rebase してから変える。自分が先に `開始可` になった側で、利用者が小さな PR を選んだら、競合しうるファイルの変更だけを別のブランチの小さな PR にする。(KD14)
+- R28. **宣言。** Issue を調べて変える予定のファイルを決め、同梱の CLI のサブコマンド `files classify` で、各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる。節の表記があるファイルでは変える節を決め、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。`stop` を受けたら作業を止め、理由を報告する。宣言に無いファイルや節を変える必要が分かったら、それを変える前に手を止め、コメント `宣言の更新` (宣言の全体。足したファイルも `files classify` で確かめる) を書いて `declared` を送り、更新したコメントの ID を渡して判定の待機を起動する。判定を待つ間は、宣言済みのファイルも含めて作業を止める。`開始可` ならそれを変える。待つことになったら、待つ対象 (相手の Issue の完了か、小さな PR のマージ) の後に `main` に rebase してから変える。自分が先に `開始可` になった側で、利用者が小さな PR を選んだら、競合しうるファイルの変更だけを別のブランチの小さな PR にする。(KD14)
 - R29. **PR と次の Issue。** 本文に `Closes #<番号>` を書いて PR を作り、ready for review にしたら合図 `review` を送る (管理は PR の観測で `In review` にするので、合図は観測を早めるだけ)。次の Issue を求めるときは `available` を送る (R26 と同じ待機を起動する)。
 - R30. **作業のセッションがしないこと。** 記録の置き場に書かない。Project のフィールドと Status を書かない。ほかの作業のセッションに合図を送らない。自分で Issue を選んで着手しない。名前を変えない (変わったら `renamed` を送る)。
 
@@ -941,6 +941,7 @@ issue-dispatch/
   - Covers AE29. `wait-decision` は、自分宛てで渡した宣言の ID を持つ `開始可` が見つかると 0 と `go`、Status が `Blocked` になると 0 と `wait` を返し、どちらも無ければ期限で 124。別の宛先・前の割り当て・前の宣言に対する `開始可` では終わらない。
   - 差分の種類に「項目の除去」と「`Agent session ID` が空にされた・別の値にされた」が含まれ、処理の順の位置が決定表のとおり。
   - Covers AE30. `check` は、フィールドと選択肢の不足と、ワークフローの無効を列挙し (必須のワークフローと推奨のワークフローを分ける)、「Auto-add to project」が有効なら案内を返し、既存の選択肢の `id` を含めた `updateProjectV2Field` の入力を案として返す。
+  - `files classify` は、渡したパスごとに、種類・`unit_notation`・`split_reference`・`mergeable`・一致した規則 (設定か既定の表かと、そのパターン) を JSON で返す。種類の決定は U5 の `filekinds` を使い、`gh` を実行しない。
 - **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。U1 の検証用 Project で実物の `gh` を使い、`items`・`assign`・`release` が往復で元に戻る。
 
 ### U7. 前提条件の検査とフック
@@ -985,8 +986,8 @@ issue-dispatch/
 - **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE31, AE33)。KTD1, KTD10, KTD11。
 - **Dependencies:** U4, U6。
 - **Files:**
-  - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の宣言 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
-  - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (節の名前の決め方 (表記の正本は `file-kinds.md`。キーや見出しは、ファイルにある文字のまま写す)、ファイル単位で分けるリファクタリングで変わる参照元の含め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
+  - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の宣言 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`・`files classify`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
+  - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (`files classify` で変える予定の各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる手順、節の名前の決め方 (表記の正本は `file-kinds.md`。キーや見出しは、ファイルにある文字のまま写す)、ファイル単位で分けるリファクタリングで変わる参照元の含め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
 - **Approach:**
   1. 自分の ID と名前の決め方 (KTD10) を手順の最初に書き、`ListAgents` の 1 行目から名前を読むことを書く。
   2. `available` を送ったら `wait-assignment` を背景で起動してターンを終える。通知で始まったターンでは `gh` で項目を確かめる。合図 `assigned` で始まったターンでも同じ確認をする (合図を信じない)。
@@ -995,6 +996,7 @@ issue-dispatch/
 - **Patterns to follow:** `review-triage/skills/review-loop/SKILL.md` (正本の宣言・同梱のスクリプト・前提知識・原則・検出しないもの)、`session-handoff/skills/handoff-write/SKILL.md` (引数の表)。
 - **Test scenarios** (通し確認で確かめる。自動テストは無い):
   - Covers AE3, AE23. 受信を `refuse` にした作業のセッションでも、`wait-assignment` が項目を見つけて着手し、`wait-decision` がコメント `開始可` を見つけて作業を始める。
+  - 宣言の前に `files classify` を実行し、節の表記が無いファイルには `units` を書かない (宣言が `units` のために差し戻されない)。
   - Covers AE4. 宣言のコメントが `issue-format.md` の様式で投稿され、`declared` の後に `wait` を受けると作業を始めず、`go` を受けると始める。
   - Covers AE6. PR の本文に `Closes #<番号>` があり、draft のうちは `In review` にならず、ready for review にすると次のポーリングで `In review` になる。
   - 同じ Issue の `assigned` を 2 度受けても着手は 1 回。別の Issue を持っているときに受けると `assignment-mismatch` を送る。
