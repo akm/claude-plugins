@@ -965,6 +965,7 @@ issue-dispatch/
 - **Dependencies:** U5 (`filekinds`)、U6。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U5 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補 → 指摘と案)、`project` (U6 の `check` を使う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理 / 作業) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、`git worktree list` と申告の突き合わせ、フックの設定の有無)。
+  - `issue-dispatch/scripts/issue_dispatch.py` — U6 で作る CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` を足す。
   - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。
   - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と、編集系のツールのパスを判定する `denies_path(path, cwd, worktrees, protected)` (同じパスの照合を使う) と理由文。
   - `issue-dispatch/skills/repo-preflight/SKILL.md` — 手順 (3 つを検査する → 指摘を示し、生成ファイルの候補は案の書き方を利用者に尋ねる → 案を示す → 適用は人間)、原則、「このスキルが検出しないもの」(ビルドの出力先。利用者が調べて設定の `files` に書く)。
