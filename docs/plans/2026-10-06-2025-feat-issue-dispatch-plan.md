@@ -164,7 +164,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 **同梱のスクリプト・設定・登録**
 
 - R31. **スクリプト。** `gh` の実行は 1 つの関数にまとめる。入出力は JSON。終了コードで結果の種類を分ける。エージェントが組み立てる入力 (宣言・割り当ての引数) は形を検査し、未知のキーと欠けた必須キーは理由付きで差し戻す。テストは偽の `gh` (PATH の先頭に置く) と、実物の `--json` と GraphQL の出力を写した固定データで動き、`python3 -m unittest discover -s issue-dispatch/tests` で実行する。Python 3.11 の標準ライブラリだけを使う。(KTD14)
-- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の配列。要素は `pattern`・`kind` と、省略できる `units` (節の表記とキーの深さ)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
+- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の配列。要素は `pattern`・`kind` と、省略できる `unit_notation` (節の表記とキーの深さ。宣言の `units` と混同しないよう名前を分ける)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
 - R33. **登録と文書。** ファイル `issue-dispatch/.claude-plugin/plugin.json` (版 0.1.0)、`.claude-plugin/marketplace.json`、ルートの `README.md` (収録プラグインの表・構成・プロジェクト固有の設定の表)、`issue-dispatch/README.md`、`CONCEPTS.md` の用語 (管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録)、`.github/test-targets.txt` の 1 行。文書はルートの `CLAUDE.md` の規則に従い、`doc-dag` と `wording-guard` を実行する。(KTD18)
 
 ### Key Flows
@@ -823,7 +823,7 @@ issue-dispatch/
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、権限モードの組と `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。
   - `issue-dispatch/skills/issue-dispatch/references/records.md` (新設) — 記録の置き場、`record.json` のキーの表 (`project`・`manager` (ID・名前・開始・`state`・最後の利用者の入力からの送受の数)・`sessions` (ID → 名前・`repo`・`worktree`・状態・待機中の時刻。所属する項目は `items` の `session_id` だけが持つ)・`items` (項目 → `item_id`・`session_id`・意図 (書く予定の ID・title・Status・割り当ての番号)・段階の印の時刻 (いつ付くかの正本は `flow.md`)・再送の回数・最後に書いた Status・宣言の写し・資源・自分が足した `blockedBy`・待っている小さな PR・競合の可能性があるときに選んだ扱い・報告済みの印 (人の変更・割り当てない理由))・`resources` (名前 → 使用中の Issue と時刻)・`notices`・`questions` (問い → 項目・種類・選択肢・尋ねた時刻・答えと答えた時刻))、`snapshot.json` (項目ごとの Status・フィールド・`blockedBy`・close・PR の状態・読んだコメントの id。書き手は再入のターンだけ)、`actions.log` (1 行 1 JSON のキー)、`wait.pid` (PID・開始時刻・所有者)、書く側・一時名と改名・種類ごとの扱いの表 (設定 / 記録 / スナップショット / ログ / 宣言)。
-  - `issue-dispatch/skills/issue-dispatch/references/project-config.md` (新設) — 様式 (管理側とリポジトリ側の JSON の例)、キーの表 (キー / 側 / 意味 / 未設定のときの扱い)、「未設定」の定義、`files` の規則の書き方 (`pattern`・`kind`・`units`・`reference`・`mergeable`。意味の正本は `file-kinds.md`)、`protected_paths`。
+  - `issue-dispatch/skills/issue-dispatch/references/project-config.md` (新設) — 様式 (管理側とリポジトリ側の JSON の例)、キーの表 (キー / 側 / 意味 / 未設定のときの扱い)、「未設定」の定義、`files` の規則の書き方 (`pattern`・`kind`・`unit_notation`・`reference`・`mergeable`。意味の正本は `file-kinds.md`)、`protected_paths`。
 - **Approach:**
   1. 記録のキーは、Project から導出できる値 (Issue の URL・タイトル) を持たない。項目のキーは `owner/repo#番号`。
   2. 扱いの表は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md` の列 (種類 / 失われるもの / 読めない・壊れているとき) にスナップショット (作り直せるキャッシュ) の行を足す。
@@ -873,7 +873,7 @@ issue-dispatch/
 - **Test scenarios:**
   - 宣言の JSON に必須キーが揃っていれば受理し、`files` が 0 件でも受理して件数 0 を返す。
   - 未知のキー (`file` の誤字)・欠けた必須キーは、理由と期待する形を含むエラーで拒否する。宣言に `kind` があれば未知のキーとして拒否する (種類はスクリプトが決める)。
-  - 節の表記が無いパス (種類が `generated`・`unknown-content`・`unknown-structure` か、一致した規則に節の表記が無い) に `units` があれば拒否する。
+  - 節の表記が無いパス (種類が `generated`・`unknown-content`・`unknown-structure` か、一致した規則に `unit_notation` が無い) に `units` があれば拒否する。
   - `units` の要素が文字列 (`"dependencies.zod"`) か、空の配列か、文字列でない名前を含めば、理由と期待する形 (文字列の配列の配列) を含むエラーで拒否する。
   - Covers AE32. まだ判定していない宣言が複数あるとき、投稿の順に 1 件ずつ判定し、比べる相手は既に `開始可` になった宣言だけにする。投稿の時刻が同じなら Project の中の順で並べる。
   - Covers AE4. `divisible` の同じパスを、`units` を省いた 2 つの宣言が持てば競合しうる。パスが `./src/app.ts`・`src/app.ts`・`src//app.ts`・`src/../src/app.ts` と違っても同じと判定する。
