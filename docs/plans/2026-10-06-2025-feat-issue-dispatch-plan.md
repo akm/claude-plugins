@@ -913,7 +913,7 @@ issue-dispatch/
 - **Dependencies:** U5。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/gh.py` — `gh` の実行 (1 関数。引数の配列・タイムアウト・終了コード・stderr の末尾を返す)。
-  - `issue-dispatch/scripts/issue_dispatch/project.py` — `check` (フィールド・選択肢・ワークフローの報告と、作る手順の案)、`items` (GraphQL で `POSITION` の順、Status とその更新時刻・フィールド・担当者・ラベル・作者・本文の最後の編集の時刻と編集者・`blockedBy` の open/closed・`subIssuesSummary`・`closingIssuesReferences` を持つ PR・リポジトリ。`--write-snapshot` でスナップショットを書く)、`assign` (R19 の順で書き、読み直す)、`set-status` (5 つ以外の値と `Done` は `gh` を実行せずに拒否する)、`release` (フィールドを空にして `Todo`)、`set-stuck` (`Agent stuck state` の 4 つの値か空を書く。ほかの値は `gh` を実行せずに拒否する)。
+  - `issue-dispatch/scripts/issue_dispatch/project.py` — `check` (フィールド・選択肢・ワークフローの報告と、作る手順の案)、`items` (GraphQL で `POSITION` の順、Status とその更新時刻・フィールド・担当者・ラベル・作者・本文の最後の編集の時刻と編集者・`blockedBy` の open/closed・`subIssuesSummary`・`closingIssuesReferences` を持つ PR・リポジトリ。Issue を閉じる PR は、Issue のフィールド `closedByPullRequestsReferences` で 1 回のクエリで取る。`--write-snapshot` でスナップショットを書く)、`assign` (R19 の順で書き、読み直す)、`set-status` (5 つ以外の値と `Done` は `gh` を実行せずに拒否する)、`release` (フィールドを空にして `Todo`)、`set-stuck` (`Agent stuck state` の 4 つの値か空を書く。ほかの値は `gh` を実行せずに拒否する)。
   - `issue-dispatch/scripts/issue_dispatch/issues.py` — コメントの一覧と投稿 (先頭行で既投稿を検出。書き手のログインがトークンのログインと違うコメントは一覧から除く)、`blockedBy` の追加 (`gh issue edit --add-blocked-by <URL>`)、分割で作る Issue の作成 (本文の先頭行で既に作ったものを検出する)、ラベルの確認、PR の観測。
   - `issue-dispatch/scripts/issue_dispatch/poll.py` — スナップショットの読み書きと差分 (処理の順に並べる)、`wait` (間隔・期限・終了コード・`wait.pid`・SIGTERM を受けたときの `stopped`。スナップショットは読むだけ)、`wait-assignment` (自分の項目が `In Progress` になるまで)、`wait-decision` (コメント `開始可` か `Blocked` まで)。
   - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンドの入口。JSON の入出力。
