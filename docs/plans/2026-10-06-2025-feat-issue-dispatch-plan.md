@@ -1069,7 +1069,7 @@ issue-dispatch/
   - `issue-dispatch/.claude-plugin/plugin.json` — `name`・`description`・`version` 0.1.0・`author`・`license`。
   - `.claude-plugin/marketplace.json` — 項目 1 つ (description は `plugin.json` と同文、`source` は git-subdir、`tags`)。
   - `README.md` — 収録プラグインの表に 1 行、「構成」に `issue-dispatch/` のツリーとテストのコマンド、「プロジェクト固有の設定」の表に 1 行。
-  - `issue-dispatch/README.md` — 概要、収録スキルの表 (スキル / 実行する場所 / 説明)、使い方 (管理ディレクトリの準備・Project の準備・作業のセッションの開き方)、フックの説明と限界、管理のセッションに事前に許可する設定の例 (同梱の CLI だけ。KD18)、プロジェクト固有の設定 (任意)、しないこと、必要なもの (`gh` と `project` スコープ・`python3`・Claude Code 2.1.236 以降・設定 `crossSessionInbound` を `accept` にするか、管理と作業のセッションの権限モードの組をそろえること (R16・KTD12))、テスト。
+  - `issue-dispatch/README.md` — 概要、収録スキルの表 (スキル / 実行する場所 / 説明)、使い方 (管理ディレクトリの準備・Project の準備 (割り当ての順は Project の項目の並び (`POSITION`) で決まる。sort や group を付けたビューではこの並びが見えないので、sort と group の無いビューで並べ替える)・作業のセッションの開き方)、フックの説明と限界、管理のセッションに事前に許可する設定の例 (同梱の CLI だけ。KD18)、プロジェクト固有の設定 (任意)、しないこと、必要なもの (`gh` と `project` スコープ・`python3`・Claude Code 2.1.236 以降・設定 `crossSessionInbound` を `accept` にするか、管理と作業のセッションの権限モードの組をそろえること (R16・KTD12))、テスト。
   - `CONCEPTS.md` — 節「Issue の並行作業」に、管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録の項 (定義 1〜2 段落 + 正本への参照)。
   - `.github/test-targets.txt` — `python issue-dispatch/tests` の 1 行。
 - **Approach:**
