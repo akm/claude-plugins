@@ -103,7 +103,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - 1 つの Project に複数のリポジトリ (別の owner も) の Issue を入れる。(KTD7)
 - R2. **管理のセッションが書く Status は `Todo`・`Ready`・`Blocked`・`In Progress`・`In review` の 5 つに限り、`Done` は書かない。** `Done` は組み込みワークフローが書く。`Todo` や空の項目を `Ready` にするのは利用者だけで、管理のセッションが `Ready` を書くのは、`Ready` だった項目を `Blocked` から戻すときだけ (KTD7)。管理のセッションが `Todo` を書くのは、割り当ての解除と、マージされずに閉じた PR の Issue の Status を戻すとき (どちらも利用者の承認。R13) で、着手してよいかを利用者が決め直す。利用者が手で変えた Status は上書きせず、1 回だけ報告する (R22)。(KTD7)
 - R3. **Issue の様式を定める (`issue-format.md`)。** 依存関係は Issue の blocked by (`blockedBy`)。必要な資源はラベル `resource:<名前>`。人が行う Issue はラベル `human-handed` を付けるか、担当者をほかの人にする (担当者が認証しているアカウント 1 つだけで `human-handed` が無い Issue は、作業のセッションの対象になる。KD16)。sub-issue を持つ親 Issue は割り当ての対象にしない (sub-issue は対象にする)。1 つの PR で閉じる大きさに作り、PR の本文に Issue を閉じる記法 (`Closes #<番号>`) を書く — マージで Issue が閉じ、`Done` と資源の解放がそれに続くため (R21)。作る時点で分ける規則は順番 4 の範囲で、この計画では着手の後に分ける必要が分かったときの扱い (R20) だけを定める。
-- R4. **宣言の様式を定める (`issue-format.md`)。** 宣言は作業のセッションが Issue のコメントとして書く。本文は R6 の先頭行と、1 つの JSON のコードブロック。JSON は `files` (要素は `path` と、省略できる `units`)・`resources` (資源の名前の列)・`split` (分ける必要の有無と理由) を持つ。`path` はリポジトリのルートからの相対パス。`units` は、そのファイルのうち変える予定の節の配列で、1 つの節は、上の階層から順に名前を並べた文字列の配列で書く (例: `[["dependencies", "zod"], ["exports", "./utils"]]`)。名前は、ファイルにある文字のまま書く。節の表記 (R5) があるファイルにだけ書ける。省けばファイル全体を変える予定とみなす。種類は宣言に書かず、スクリプトがパスから決める (R5・KD22)。宣言に無いファイル・節・資源が要ると分かったら、それを変える前 (資源は使う前) に宣言を更新する (コメント `宣言の更新`)。節も含めるのは、節で比べた判定が、宣言に無い節の変更で意味を持たなくなるため。更新では宣言の全体を書き直し、足したものだけを書かない (管理のセッションは最新の宣言 1 件だけを読めばよい)。更新を受け付けるのは、PR が ready for review になる前まで。(KTD2, KTD9, KD14, KD22)
+- R4. **宣言の様式を定める (`issue-format.md`)。** 宣言は作業のセッションが Issue のコメントとして書く。本文は R6 の先頭行と、1 つの JSON のコードブロック。JSON は `files` (要素は `path` と、省略できる `units`)・`resources` (資源の名前の配列)・`split` (分ける必要の有無と理由) を持つ。`path` はリポジトリのルートからの相対パス。`units` は、そのファイルのうち変える予定の節の配列で、1 つの節は、上の階層から順に名前を並べた文字列の配列で書く (例: `[["dependencies", "zod"], ["exports", "./utils"]]`)。名前は、ファイルにある文字のまま書く。節の表記 (R5) があるファイルにだけ書ける。省けばファイル全体を変える予定とみなす。種類は宣言に書かず、スクリプトがパスから決める (R5・KD22)。宣言に無いファイル・節・資源が要ると分かったら、それを変える前 (資源は使う前) に宣言を更新する (コメント `宣言の更新`)。節も含めるのは、節で比べた判定が、宣言に無い節の変更で意味を持たなくなるため。更新では宣言の全体を書き直し、足したものだけを書かない (管理のセッションは最新の宣言 1 件だけを読めばよい)。更新を受け付けるのは、PR が ready for review になる前まで。(KTD2, KTD9, KD14, KD22)
 - R5. **ファイルの種類と、競合の可能性の判定の規則を定める (`file-kinds.md`)。** 種類は、パスについて次の問いに上から順に答え、最初に当てはまったものにする (KD22)。
 
   | 段 | 問い | 当てはまれば | 競合の可能性の判定 | 競合の可能性があるときに示す扱い |
@@ -163,7 +163,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 **同梱のスクリプト・設定・登録**
 
 - R31. **スクリプト。** `gh` の実行は 1 つの関数にまとめる。入出力は JSON。終了コードで結果の種類を分ける。エージェントが組み立てる入力 (宣言・割り当ての引数) は形を検査し、未知のキーと欠けた必須キーは理由付きで差し戻す。テストは偽の `gh` (PATH の先頭に置く) と、実物の `--json` と GraphQL の出力を写した固定データで動き、`python3 -m unittest discover -s issue-dispatch/tests` で実行する。Python 3.11 の標準ライブラリだけを使う。(KTD14)
-- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の列。要素は `pattern`・`kind` と、省略できる `units` (節の表記とキーの深さ)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
+- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の配列。要素は `pattern`・`kind` と、省略できる `units` (節の表記とキーの深さ)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
 - R33. **登録と文書。** ファイル `issue-dispatch/.claude-plugin/plugin.json` (版 0.1.0)、`.claude-plugin/marketplace.json`、ルートの `README.md` (収録プラグインの表・構成・プロジェクト固有の設定の表)、`issue-dispatch/README.md`、`CONCEPTS.md` の用語 (管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録)、`.github/test-targets.txt` の 1 行。文書はルートの `CLAUDE.md` の規則に従い、`doc-dag` と `wording-guard` を実行する。(KTD18)
 
 ### Key Flows
@@ -856,7 +856,7 @@ issue-dispatch/
 - **Dependencies:** U3, U4。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/__init__.py`
-  - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの列、資源の使用、報告済みの印、`actions.log` への追記。
+  - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの配列、資源の使用、報告済みの印、`actions.log` への追記。
   - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`units`)、パスの正規化、競合の可能性の判定 (R5)。
   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、既定の表を後に照合し、段の順で決める)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — 既定の表 (パターン・種類・節の表記・参照の単位・マージできるか)。
