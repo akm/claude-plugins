@@ -923,7 +923,7 @@ issue-dispatch/
   1. `gh` の呼び出しは `gh.py` の 1 関数だけ。テストは PATH の先頭の偽の `gh` で差し替える (先例 `review-triage/tests/fake-claude`)。
   2. 一覧は `gh api graphql` で `orderBy: {field: POSITION, direction: ASC}` と `rateLimit { cost remaining resetAt }` を明示し、ページを `pageInfo` で辿る。
   3. フィールドの更新は `gh project item-edit --url ... --field ... --text|--value` を使い、1 回に 1 フィールド。書き込みの間は 1 秒以上空ける。
-  4. `assign` は記録の意図の書き込みを CLI の外 (スキル) に残し、CLI は書く前の読み・書き込み・読み直しの結果を JSON で返す (空でない・読み直しが違う、のどちらも終了コード 4)。
+  4. `assign` は記録の意図の書き込みを CLI の外 (スキル) に残し、CLI は書く前の読み・書き込み・読み直しの結果を JSON で返す (空でない・読み直しが違う、のどちらも終了コード 7。終了コード 4 は待機の「ネットワークの失敗が 3 回続いた」に使っているため。KTD6)。
   5. `wait` は 5 秒おきに期限を見て、`poll_minutes` ごとに一覧を取り、差分があれば種類を標準出力の 1 行に書いて 0 で終わる。スナップショットは書かない。`gh` の失敗は種類で終了コードを分け、レート制限は `resetAt` が期限内なら待つ。
 - **Execution note:** 偽の `gh` と固定データを先に作り、一覧の解析から実装する。実物の `gh` は U1 の検証用 Project でだけ使う。
 - **Patterns to follow:** `review-triage/tests/fake-claude` (環境変数で振る舞いを切り替え、受けた引数を JSON で追記)、`review-triage/scripts/review-loop-wait.sh` の冒頭 (終了コードと標準出力の 1 行の規約)。
@@ -935,7 +935,7 @@ issue-dispatch/
   - Covers AE36. 作者か本文の最後の編集者がトークンのログインと違う項目は、Status を `Ready` にした時刻より後に本文が編集されていれば候補にせず、理由を返す。作者も編集者もトークンのログインなら、編集の時刻を問わず候補になる。
   - Covers AE35. 担当者が未設定の項目と、担当者がトークンのログイン 1 つだけの項目は候補になる。担当者にほかの人を含む項目と、ラベル `human-handed` が付いた項目 (担当者が未設定でも) は候補にならず、除いた理由を返す。
   - Covers AE1. `assign` は `Agent session ID` → `Agent session title` → Status の順に `gh` を実行し、実行の間が 1 秒以上空いている。
-  - Covers AE2. `Agent session ID` を書いた直後の読み直しで偽の `gh` が別の値を返すと、終了コード 4 で止まり、title と Status は書かない。書く前の読みで `Agent session ID` が空でなければ、書かずに終了コード 4。
+  - Covers AE2. `Agent session ID` を書いた直後の読み直しで偽の `gh` が別の値を返すと、終了コード 7 で止まり、title と Status は書かない。書く前の読みで `Agent session ID` が空でなければ、書かずに終了コード 7。
   - 同じ値をもう一度 `assign` しても書き込みの `gh` は実行されず、終了コード 0 で「変更なし」を返す (冪等)。
   - コメントの投稿は、先頭行の全体が同じコメントが既にあれば投稿せず「既投稿」を返す。宛先が同じでも、割り当ての番号か宣言の ID が違えば投稿する。
   - Covers AE28. 先頭行が正しくても書き手のログインが違うコメント (宣言・`開始可`) と、作者のログインが違う PR は、無いものとして扱う。既投稿の確認にも数えない。
