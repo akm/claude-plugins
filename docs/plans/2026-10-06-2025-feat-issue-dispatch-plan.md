@@ -946,7 +946,7 @@ issue-dispatch/
   - Covers AE32, AE33. 管理が足した blocker の close と、待っている小さな PR のマージを差分として返し、待っていた項目を宣言の投稿の順に並べる。
   - スナップショットの差分が、処理の順 (人の変更 → close → `blockedBy` → コメント → PR → 項目の追加) に並ぶ。
   - Covers AE14. 偽の `gh` が認証切れを返すと `wait` は終了コード 2。レート制限の `resetAt` が期限内なら待って続け、期限を越えるなら 3。ネットワークの失敗が 3 回続けば 4。
-  - スナップショットが無ければ `wait` は 5 で止まり、壊れていれば作り直して差分は「初回」として返す。
+  - スナップショットが無いか壊れていれば、`wait` は書き直さずに 5 で止まる (作り直すのは再入のターンで、待機はスナップショットを読むだけ。KTD5)。
   - `wait-assignment` は、自分の ID が `Agent session ID` に入った項目の Status が `In Progress` になると 0 と項目の参照を返し、`Blocked` のままなら返さず、期限で 124。
   - Covers AE45. `wait-assignment` は、自分宛ての `依頼` (本文の追記) があり、その PR の `closingIssuesReferences` にまだ Issue が無ければ、0 と `request` を返す。追記が済んだ PR の `依頼` では終わらない。
   - `wait` は起動時に `wait.pid` (PID・開始時刻・所有者) を書き、標準出力の最初の行に PID を書き、終わるときに `wait.pid` を消す。スナップショットは読むだけで書かない (書くのは `project items --write-snapshot`)。
