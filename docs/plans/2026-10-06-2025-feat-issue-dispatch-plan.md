@@ -82,7 +82,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KD19. **`--end` で、管理のセッションの名前を規約の名前から外す** (session-settled: user-approved — chosen over 新しい管理のセッションを始める前に、利用者が古いセッションを閉じる手順を README に書くだけの案: 手順を忘れると、古いセッションが名前を持ったままになり、新しい管理のセッションは排他で起動しない。Claude Code は使われている名前を新しいセッションに渡さないので、新しいセッションは規約の名前を名乗れない。合図も終了した古いセッションに届き続ける)。Governs R25。
 - KD20. **判断が要るときは必ず利用者に尋ね、答えの無いまま進めない。問いはまとめて尋ね、答えを待つ間も問いに関係しない処理は続ける。問いの回数は記録するが、上限にはしない** (session-settled: user-directed — chosen over 成功の経路の問いを 0 回にする基準の案: 問いの回数を減らすことを目標にすると、確認しないまま進めて後で直す事態を招く。確認なしに進めないことと、まとめて尋ねて利用者が時間を確保しやすくすることを優先する)。答えを待つ間に管理のセッションが止まるツール `AskUserQuestion` は使わず、ターンの最後の文章で番号付きの問いとして尋ねる。Governs R13, R24, Success Criteria。
 - KD21. **作業の停滞と管理のセッションの停止を、Project の独自フィールド `Agent stuck state` に書く。空なら正常** (session-settled: user-approved — chosen over 停滞を Issue のコメントに書くだけの案: コメントは Issue を開かないと見えず、Project の表やボードで止まっている項目を見分けられない。Issue #114 の要望 2 は「止まっているか」を Project に記録することを求める)。値は `idle-no-progress`・`deadline-passed`・`session-missing`・`manager-stopped`。書くのは管理のセッションと、管理のセッションの停止に気づいた利用者。管理のセッションの停止は作業中の項目ごとに書く (Project 全体の「ステータスの更新」にはしない。表やボードで項目ごとに見えるようにするため)。Governs R1, R10, R23, R25。
-- KD22. **ファイルの種類は、パスについて 6 段の問いを順に当てて決める** (session-settled: user-directed — chosen over 計画の 5 種類 (`generated`・`sectioned`・`indivisible`・`splittable`・`unknown`) をリポジトリの設定に書く案: 「節の表記がある」は構造を知っていることの一部で、ほかの種類と並べると分類が重なる。分け方を知らないファイルまで分けられる扱いになる)。1. 内容を知らない → `unknown-content`、2. ツールが生成する → `generated`、3. 構造を知らない → `unknown-structure`、4. 分割できない → `indivisible`、5. 分割すると意味が変わる可能性がある → `unstable`、6. それ以外 → `divisible`。節 (unit) は種類ではなく、構造を知っている種類の判定の細かさとして扱う。種類は拡張子ではなくパスのパターンで決める (同じ `.js` でも、自前で書いたものと、`.ts` やビルドから生成したものがある)。パスから種類を決める処理は、ほかのモジュールに依存しない独立したモジュールにし、後で別のプラグインに切り出せるようにする。Governs R4, R5, R32。
+- KD22. **ファイルの種類は、パスについて 6 段の問いに順に答えて決める** (session-settled: user-directed — chosen over 計画の 5 種類 (`generated`・`sectioned`・`indivisible`・`splittable`・`unknown`) をリポジトリの設定に書く案: 「節の表記がある」は構造を知っていることの一部で、ほかの種類と並べると分類が重なる。分け方を知らないファイルまで分けられる扱いになる)。1. 内容を知らない → `unknown-content`、2. ツールが生成する → `generated`、3. 構造を知らない → `unknown-structure`、4. 分割できない → `indivisible`、5. 分割すると意味が変わる可能性がある → `unstable`、6. それ以外 → `divisible`。節 (unit) は種類ではなく、構造を知っている種類の判定の細かさとして扱う。種類は拡張子ではなくパスのパターンで決める (同じ `.js` でも、自前で書いたものと、`.ts` やビルドから生成したものがある)。パスから種類を決める処理は、ほかのモジュールに依存しない独立したモジュールにし、後で別のプラグインに切り出せるようにする。Governs R4, R5, R32。
 
 ### Actors
 
@@ -104,11 +104,11 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - R2. **管理のセッションが書く Status は `Todo`・`Ready`・`Blocked`・`In Progress`・`In review` の 5 つに限り、`Done` は書かない。** `Done` は組み込みワークフローが書く。`Todo` や空の項目を `Ready` にするのは利用者だけで、管理のセッションが `Ready` を書くのは、`Ready` だった項目を `Blocked` から戻すときだけ (KTD7)。管理のセッションが `Todo` を書くのは、割り当ての解除と、マージされずに閉じた PR の Issue の Status を戻すとき (どちらも利用者の承認。R13) で、着手してよいかを利用者が決め直す。利用者が手で変えた Status は上書きせず、1 回だけ報告する (R22)。(KTD7)
 - R3. **Issue の様式を定める (`issue-format.md`)。** 依存関係は Issue の blocked by (`blockedBy`)。必要な資源はラベル `resource:<名前>`。人が行う Issue はラベル `human-handed` を付けるか、担当者をほかの人にする (担当者が認証しているアカウント 1 つだけで `human-handed` が無い Issue は、作業のセッションの対象になる。KD16)。sub-issue を持つ親 Issue は割り当ての対象にしない (sub-issue は対象にする)。1 つの PR で閉じる大きさに作り、PR の本文に Issue を閉じる記法 (`Closes #<番号>`) を書く — マージで Issue が閉じ、`Done` と資源の解放がそれに続くため (R21)。作る時点で分ける規則は順番 4 の範囲で、この計画では着手の後に分ける必要が分かったときの扱い (R20) だけを定める。
 - R4. **宣言の様式を定める (`issue-format.md`)。** 宣言は作業のセッションが Issue のコメントとして書く。本文は R6 の先頭行と、1 つの JSON のコードブロック。JSON は `files` (要素は `path` と、省略できる `units`)・`resources` (資源の名前の列)・`split` (分ける必要の有無と理由) を持つ。`path` はリポジトリのルートからの相対パス。`units` は、そのファイルのうち変える予定の節の名前の列で、節の表記 (R5) があるファイルにだけ書ける。省けばファイル全体を変える予定とみなす。種類は宣言に書かず、スクリプトがパスから決める (R5・KD22)。宣言に無いファイルや資源が要ると分かったら、それを変える前に宣言を更新する (コメント `宣言の更新`)。更新では宣言の全体を書き直し、足したものだけを書かない (管理のセッションは最新の宣言 1 件だけを読めばよい)。更新を受け付けるのは、PR が ready for review になる前まで。(KTD2, KTD9, KD14, KD22)
-- R5. **ファイルの種類と、競合の可能性の判定の規則を定める (`file-kinds.md`)。** 種類は、パスについて次の問いを上から順に当て、最初に当てはまったものにする (KD22)。
+- R5. **ファイルの種類と、競合の可能性の判定の規則を定める (`file-kinds.md`)。** 種類は、パスについて次の問いに上から順に答え、最初に当てはまったものにする (KD22)。
 
   | 段 | 問い | 当てはまれば | 競合の可能性の判定 | 競合の可能性があるときに示す扱い |
   | --- | --- | --- | --- | --- |
-  | 1 | 内容を知らない (パスがリポジトリの設定にも既定の表にも当たらない) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に尋ねる | — |
+  | 1 | 内容を知らない (パスに一致するパターンが、リポジトリの設定にも既定の表にも無い) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に尋ねる | — |
   | 2 | ツールが生成する | `generated` | 判定しない | — |
   | 3 | 構造を知らない | `unknown-structure` | 同じパスなら競合しうる | R20 の 3 つ (待つ・共通の変更を先に小さな PR にする・競合しうるまま進める) |
   | 4 | 分割できない | `indivisible` | 節で判定する (下) | 同上 |
@@ -117,7 +117,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
   - **節で判定する**: 構造を知っている種類 (`indivisible`・`unstable`・`divisible`) は、両方の宣言がそのパスに `units` を書いていれば、節の名前が同じか、一方が他方の先頭部分 (`.` で区切った階層。`dependencies` と `dependencies.react` など) のときだけ競合しうる。どちらかが `units` を省けば、同じパスで競合しうる。
   - **節の表記**: JSON と YAML のキー (深さはパスのパターンごとに指定できる。例: `package.json` の `dependencies.*`)、Markdown の見出しと frontmatter、Makefile のターゲット、TOML のテーブル、`go.mod` のディレクティブ (`require.<モジュール>` など)、Dockerfile のステージ、Terraform のブロック (`resource.<型>.<名前>` など)。節の名前は作業のセッションがファイルを読んで書き、スクリプトは名前を比べるだけで、ファイルを構文解析しない。
-  - **種類の決め方**: パスのパターン (glob。ディレクトリ単位を含む) で、リポジトリの設定 (R32) を先に、プラグインに同梱する既定の表を後に当てる。1 つのパスが、種類の違う 2 つ以上のパターンに当たれば、上の段の順で先の種類にする。
+  - **種類の決め方**: パスのパターン (glob。ディレクトリ単位を含む) で、リポジトリの設定 (R32) を先に、プラグインに同梱する既定の表を後に照合する。1 つのパスが、種類の違う 2 つ以上のパターンに一致すれば、上の段の順で先の種類にする。
   - **分けるリファクタリングと参照元**: `unstable` と `divisible` のパターンには、中身を移す仕組みが参照する単位 (ディレクトリ / ファイル) を書く。ファイル単位 (`import`・`include`・`@import` など) の場合は参照元も変わるので、リファクタリングの宣言には変わる参照元も含める。
   - **マージできないファイル**: 画像など、差分でマージできないファイル (パターンに印を付ける) で「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて尋ねる。
   - **共有の状態を持つファイル**: `terraform.tfstate` のように、ファイルより先に共有の状態があるものは、種類 (`generated`) とは別に資源 (ラベル `resource:…`) として扱う。
@@ -163,7 +163,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 **同梱のスクリプト・設定・登録**
 
 - R31. **スクリプト。** `gh` の実行は 1 つの関数にまとめる。入出力は JSON。終了コードで結果の種類を分ける。エージェントが組み立てる入力 (宣言・割り当ての引数) は形を検査し、未知のキーと欠けた必須キーは理由付きで差し戻す。テストは偽の `gh` (PATH の先頭に置く) と、実物の `--json` と GraphQL の出力を写した固定データで動き、`python3 -m unittest discover -s issue-dispatch/tests` で実行する。Python 3.11 の標準ライブラリだけを使う。(KTD14)
-- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の列。要素は `pattern`・`kind` と、省略できる `units` (節の表記とキーの深さ)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に当てる。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
+- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`・`manager_name`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の列。要素は `pattern`・`kind` と、省略できる `units` (節の表記とキーの深さ)・`reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
 - R33. **登録と文書。** ファイル `issue-dispatch/.claude-plugin/plugin.json` (版 0.1.0)、`.claude-plugin/marketplace.json`、ルートの `README.md` (収録プラグインの表・構成・プロジェクト固有の設定の表)、`issue-dispatch/README.md`、`CONCEPTS.md` の用語 (管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録)、`.github/test-targets.txt` の 1 行。文書はルートの `CLAUDE.md` の規則に従い、`doc-dag` と `wording-guard` を実行する。(KTD18)
 
 ### Key Flows
@@ -431,7 +431,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - AE42. パスから種類を決める
   - **Covers R5, R32.**
   - **Given:** リポジトリの設定に `dist/**` → `generated` の規則がある。既定の表に `**/*.js` → `divisible` と `**/*.xlsx` → `unknown-structure` がある。
-  - **Then:** `dist/app.js` は `generated`、`src/app.js` は `divisible`、`report.xlsx` は `unknown-structure`、どこにも当たらない `data/model.bin` は `unknown-content`。`unknown-content` のパスを 2 つの Issue が宣言すると、競合しうるかどうかを利用者に尋ねる。
+  - **Then:** `dist/app.js` は `generated`、`src/app.js` は `divisible`、`report.xlsx` は `unknown-structure`、どのパターンにも一致しない `data/model.bin` は `unknown-content`。`unknown-content` のパスを 2 つの Issue が宣言すると、競合しうるかどうかを利用者に尋ねる。
 
 ### Success Criteria
 
@@ -544,7 +544,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD12. **権限モードの組による保留は、設定 `crossSessionInbound` の確認で避ける。** スクリプトがユーザー設定 (`~/.claude/settings.json`) とプロジェクト・ローカルの設定を読み、`accept` が無ければ警告する。`refuse` があれば、管理のセッションでは止め、作業のセッションでは警告して続ける (R16・KD15)。スクリプトは役割を引数 (`preflight session --role manager|worker`) で受ける。同じ設定ファイルの `permissions.allow` と `permissions.defaultMode` も読み、R16 の権限の警告を出す。Desktop では `get_session` の `permissionMode` も見る。端末で起動の引数として渡した権限のモードは読めないので、「確かめていない」と報告する。権限モードそのものは対話セッションから読む公式の手段が無い (Desktop の `get_session` だけ) ので、同じ組であることは利用者に確かめる。R16 を実装する。
 - KTD13. **フックの規則 (パスの照合) は 1 か所にまとめ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U7 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出力せず終了コード 0。Bash は、IO の前に正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
 - KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`filekinds.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`) と、既定の表 `file-kinds.json`。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration conflictability` / `files classify` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
-- KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files` は空 (既定の表だけを当てる。どちらにも当たらないパスは `unknown-content`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。R32 を実装する。
+- KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files` は空 (既定の表だけと照合する。どちらのパターンにも一致しないパスは `unknown-content`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。R32 を実装する。
 - KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U2・U3 の文書の「実測」の節に、日付と版を添えて書く。
 - KTD17. **通し確認は、利用者のアカウントの検証用 Project と、検証用のリポジトリ 2 つ、管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ) で行う。** ブランチ版のプラグインは `claude --plugin-dir <リポジトリ>/issue-dispatch` で読み込む (端末)。Desktop のセッションには起動の引数を渡せないので、ブランチ版を読み込ませる手段を U1 で確かめる (Open Questions)。手段が無ければ、通し確認のセッションはすべて端末にし、Desktop にしかない経路 (`set_session_title`・`list_sessions`・`get_session`) は、マージの後にインストールした版で短く確かめる。費用は始める前に利用者に示す。Verification Contract を実装する。
 - KTD18. **変えないもの。** ほかのプラグインのディレクトリ、`.github/workflows/test.yml`、`.claude/` の設定。変えるのは新しいディレクトリ `issue-dispatch/` と、登録のためのファイル (`.claude-plugin/marketplace.json`・`README.md`・`CONCEPTS.md`・`.github/test-targets.txt`) だけ。版は 0.1.0 (新しいプラグイン)。
@@ -797,7 +797,7 @@ issue-dispatch/
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」の宣言。フィールドの表 (名前 / 型 / 書く側 / 意味。`Agent stuck state` の 4 つの値の表を含む)、Status の選択肢の表 (名前 / 書く側 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
   - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` (新設) — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、宣言の JSON の様式 (キーの表: キー / 必須 / 型 / 意味。`units` の書き方は `file-kinds.md` を参照し、言い直さない)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由)、「この例は様式を示すもので、そのまま写さない」の注記。
-  - `issue-dispatch/skills/issue-dispatch/references/file-kinds.md` (新設) — 冒頭に「このファイルがファイルの種類と競合の可能性の判定の規則の正本」の宣言。6 段の問いと種類の表 (段 / 問い / 種類 / 判定 / 示す扱い)、節で判定する規則 (階層と先頭部分の一致)、節の表記の表 (構造 / 表記 / 例)、パスのパターンの当て方 (設定が先・段の順)、参照の単位、マージできないファイル、共有の状態を持つファイル、既定の表の読み方と各行を選んだ理由 (表そのものの正本は `file-kinds.json` で、文書では言い直さない)。
+  - `issue-dispatch/skills/issue-dispatch/references/file-kinds.md` (新設) — 冒頭に「このファイルがファイルの種類と競合の可能性の判定の規則の正本」の宣言。6 段の問いと種類の表 (段 / 問い / 種類 / 判定 / 示す扱い)、節で判定する規則 (階層と先頭部分の一致)、節の表記の表 (構造 / 表記 / 例)、パスのパターンの照合の順 (設定が先・段の順)、参照の単位、マージできないファイル、共有の状態を持つファイル、既定の表の読み方と各行を選んだ理由 (表そのものの正本は `file-kinds.json` で、文書では言い直さない)。
 - **Approach:**
   1. 表の列は `review-triage/skills/review-triage/references/record-schema.md` の形 (キー / 必須 / 内容) に合わせる。
   2. 宣言の例は JSON のコードブロック 1 つにし、未知のキーが差し戻されることを書く。
@@ -852,7 +852,7 @@ issue-dispatch/
   - `issue-dispatch/scripts/issue_dispatch/__init__.py`
   - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの列、資源の使用、報告済みの印、`actions.log` への追記。
   - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`units`)、パスの正規化、競合の可能性の判定 (R5)。
-  - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、既定の表を後に当て、段の順で決める)。`issue_dispatch` のほかのモジュールを import しない。
+  - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、既定の表を後に照合し、段の順で決める)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — 既定の表 (パターン・種類・節の表記・参照の単位・マージできるか)。
   - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無)、Issue の参照 (`owner/repo#番号`・URL) の正規化、コメントの先頭行の生成と解析。
   - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_filekinds.py`
@@ -866,12 +866,12 @@ issue-dispatch/
 - **Test scenarios:**
   - 宣言の JSON に必須キーが揃っていれば受理し、`files` が 0 件でも受理して件数 0 を返す。
   - 未知のキー (`file` の誤字)・欠けた必須キーは、理由と期待する形を含むエラーで拒否する。宣言に `kind` があれば未知のキーとして拒否する (種類はスクリプトが決める)。
-  - 節の表記が無いパス (種類が `generated`・`unknown-content`・`unknown-structure` か、当たった規則に節の表記が無い) に `units` があれば拒否する。
+  - 節の表記が無いパス (種類が `generated`・`unknown-content`・`unknown-structure` か、一致した規則に節の表記が無い) に `units` があれば拒否する。
   - Covers AE32. まだ判定していない宣言が複数あるとき、投稿の順に 1 件ずつ判定し、比べる相手は既に `開始可` になった宣言だけにする。投稿の時刻が同じなら Project の中の順で並べる。
   - Covers AE4. `divisible` の同じパスを、`units` を省いた 2 つの宣言が持てば競合しうる。パスが `./src/app.ts`・`src/app.ts`・`src//app.ts` と違っても同じと判定する。
   - Covers AE41. 同じパスで両方が `units` を書けば、節の名前が同じか先頭部分の一致 (`dependencies` と `dependencies.react`) のときだけ競合しうる。`dependencies.react` と `dependencies.zod` は競合しない。一方が `units` を省けば競合しうる。
   - `generated` は同じパスでも競合しない。別のリポジトリの同じパスは競合しない。`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。`unknown-structure` は同じパスで競合しうる。
-  - Covers AE42. `filekinds` は、設定の規則を既定の表より先に当てる (設定の `dist/**` → `generated` が、既定の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に当たれば、段の順で先の種類を返す。どちらにも当たらなければ `unknown-content`。
+  - Covers AE42. `filekinds` は、設定の規則を既定の表より先に照合する (設定の `dist/**` → `generated` が、既定の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に一致すれば、段の順で先の種類を返す。どちらにも一致しなければ `unknown-content`。
   - `filekinds` は、既定の表のパターンごとに、種類・節の表記・参照の単位・マージできるかを返す。`file-kinds.json` の種類と属性の値の一覧が、`file-kinds.md` の表と一致する。
   - `filekinds` は `issue_dispatch` のほかのモジュールを import しない (テストで import を確かめる)。
   - 絶対パスと、ルートの外を指すパス (`../x`) は拒否する。
