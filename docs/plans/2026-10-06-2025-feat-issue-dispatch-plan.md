@@ -558,8 +558,8 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD11. **合図の様式は先頭行 `issue-dispatch: <種類>` と `<キー>: <値>` の行にし、数を減らす。** 1 Issue あたり作業 → 管理が 3 通 (`available`・`declared`・`review`)、管理 → 作業が 2 通 (`assigned`・`go` または `wait`)。`stop` は解放・close・項目の除去のときだけ。`request` は依頼が要るときだけ (宣言の形の誤り・`Closes` の無い PR・利用者が小さな PR を選んだとき)。中継の履歴の扱いは U1 の実測で決める — 案 A: 背景の待機の通知で始まるターンから送った合図が履歴を引き継がないなら、管理のセッションは合図を通知で始まるターン (再入の手順の最後) でまとめて送る。案 B: 引き継ぐなら、合図が捨てられた知らせで利用者に 1 行の入力を求める (R9) だけにする。どちらでも、合図が失われたときの回復は KTD1 の表に従う。R7, R9 を実装する。
 - KTD12. **権限モードの組による保留は、設定 `crossSessionInbound` の確認で避ける。** スクリプトがユーザー設定 (`~/.claude/settings.json`) とプロジェクト・ローカルの設定を読み、`accept` が無ければ警告する。`refuse` があれば、管理のセッションでは止め、作業のセッションでは警告して続ける (R16・KD15)。スクリプトは役割を引数 (`preflight session --role manager|worker`) で受ける。同じ設定ファイルの `permissions.allow` と `permissions.defaultMode` も読み、R16 の権限の警告を出す。Desktop では `get_session` の `permissionMode` も見る。端末で起動の引数として渡した権限のモードは読めないので、「確かめていない」と報告する。権限モードそのものは対話セッションから読む公式の手段が無い (Desktop の `get_session` だけ) ので、同じ組であることは利用者に確かめる。R16 を実装する。
 - KTD13. **フックの規則 (パスの照合) は 1 か所にまとめ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U7 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出力せず終了コード 0。Bash は、IO の前に正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
-- KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`filekinds.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`) と、既定の表 `file-kinds.json`。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `issue create` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration conflictability` / `files classify` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
-- KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files` は空 (既定の表だけと照合する。どちらのパターンにも一致しないパスは `unknown-content`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。`files` の `pattern` は読み込むときに表記をそろえる (先頭の `./` を取り除き、`//` を `/` にする)。宣言のパスと違って `posixpath.normpath` は使わない。`normpath` は末尾の `/` を取り除き、`dist/` を `dist` という名前のファイルだけに一致するパターンに変えてしまうため。絶対パスと `..` を含むパターンは、その規則を使わずに警告する。警告は、管理のセッションの開始時の検査と `repo-preflight` の報告に出す。R32 を実装する。
+- KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`filekinds.py`・`config.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`) と、既定の表 `file-kinds.json`。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `issue create` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration conflictability` / `files classify` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
+- KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 設定の読み込み・デフォルト値の適用・値の誤りの警告・`files` のパターンの表記をそろえることは、モジュール `config.py` が行う。`filekinds` は設定ファイルを読まず、そろえた後の規則を引数で受ける (`filekinds` をほかのモジュールに依存させないため。KD22)。 管理側とリポジトリ側で同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理側は必須、リポジトリ側は `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`manager_name` は規約の名前、`files` は空 (既定の表だけと照合する。どちらのパターンにも一致しないパスは `unknown-content`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。`files` の `pattern` は読み込むときに表記をそろえる (先頭の `./` を取り除き、`//` を `/` にする)。宣言のパスと違って `posixpath.normpath` は使わない。`normpath` は末尾の `/` を取り除き、`dist/` を `dist` という名前のファイルだけに一致するパターンに変えてしまうため。絶対パスと `..` を含むパターンは、その規則を使わずに警告する。警告は、管理のセッションの開始時の検査と `repo-preflight` の報告に出す。R32 を実装する。
 - KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U2・U3 の文書の「実測」の節に、日付と版を添えて書く。
 - KTD17. **通し確認は、利用者のアカウントの検証用 Project と、検証用のリポジトリ 2 つ、管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ) で行う。** ブランチ版のプラグインは `claude --plugin-dir <リポジトリ>/issue-dispatch` で読み込む (端末)。Desktop のセッションには起動の引数を渡せないので、ブランチ版を読み込ませる手段を U1 で確かめる (Open Questions)。手段が無ければ、通し確認のセッションはすべて端末にし、Desktop にしかない経路 (`set_session_title`・`list_sessions`・`get_session`) は、マージの後にインストールした版で短く確かめる。費用は始める前に利用者に示す。Verification Contract を実装する。
 - KTD18. **変えないもの。** ほかのプラグインのディレクトリ、`.github/workflows/test.yml`、`.claude/` の設定。変えるのは新しいディレクトリ `issue-dispatch/` と、登録のためのファイル (`.claude-plugin/marketplace.json`・`README.md`・`CONCEPTS.md`・`.github/test-targets.txt`) だけ。版は 0.1.0 (新しいプラグイン)。
@@ -729,6 +729,7 @@ issue-dispatch/
 │       ├── __init__.py
 │       ├── gh.py                          # gh の実行 (1 関数)
 │       ├── ids.py                         # セッション ID・名前・Issue の参照の正規化
+│       ├── config.py                      # 設定の読み込み・デフォルト値・パターンの表記をそろえる
 │       ├── project.py                     # 項目の読み取り・フィールドの書き込み・読み直し
 │       ├── issues.py                      # blockedBy・コメント・PR の観測
 │       ├── declaration.py                 # 宣言の検査・パスの正規化・競合の可能性の判定
@@ -761,6 +762,7 @@ issue-dispatch/
 └── tests/
     ├── fake-gh                            # PATH の先頭に置く偽の gh
     ├── fixtures/                          # 実物の gh の出力を写した固定データ
+    ├── test_config.py
     ├── test_declaration.py
     ├── test_filekinds.py
     ├── test_record.py
@@ -780,7 +782,7 @@ issue-dispatch/
 | U2 | Project・Issue・宣言・コメントの様式の正本 | `issue-dispatch/skills/issue-dispatch/references/project-schema.md`, `issue-format.md` | U1 |
 | U3 | 合図の取り決めと記録・設定の契約 | `references/messaging.md`, `records.md`, `project-config.md` | U1, U2 |
 | U4 | 状態機械と再入の手順 | `references/flow.md`, `reentry.md` | U2, U3 |
-| U5 | 記録・宣言・競合の可能性の判定のスクリプトとテスト | `scripts/issue_dispatch/{record,declaration,filekinds,ids}.py`, `scripts/issue_dispatch/file-kinds.json`, `tests/test_{record,declaration,filekinds}.py` | U3, U4 |
+| U5 | 記録・宣言・競合の可能性の判定のスクリプトとテスト | `scripts/issue_dispatch/{record,declaration,filekinds,config,ids}.py`, `scripts/issue_dispatch/file-kinds.json`, `tests/test_{record,declaration,filekinds,config}.py` | U3, U4 |
 | U6 | GitHub の読み書きとポーリングのスクリプトとテスト | `scripts/issue_dispatch/{gh,project,issues,poll}.py`, `scripts/issue_dispatch.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,poll}.py` | U5 |
 | U7 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/guard-other-worktrees.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees}.py` | U6 |
 | U8 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md` | U4, U6, U7 |
@@ -863,7 +865,7 @@ issue-dispatch/
 ### U5. 記録・宣言・競合の可能性の判定のスクリプトとテスト
 
 - **Goal:** 記録の読み書きと段階の印、宣言の検査とパスの正規化、パスから種類を決める処理、競合の可能性の判定、セッション ID と Issue の参照の正規化が、`gh` を使わずにテストできる Python のモジュールになる。
-- **Requirements:** R4, R5, R11, R31 (AE4, AE9, AE10, AE32, AE41, AE42, AE44)。KTD5, KTD9, KTD10, KTD14。
+- **Requirements:** R4, R5, R11, R31, R32 (AE4, AE9, AE10, AE32, AE41, AE42, AE44)。KTD5, KTD9, KTD10, KTD14, KTD15。
 - **Dependencies:** U3, U4。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/__init__.py`
@@ -871,8 +873,9 @@ issue-dispatch/
   - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`units`)、パスの正規化、競合の可能性の判定 (R5)。
   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、既定の表を後に照合し、段の順で決める。パターンは正規表現に変換して照合する)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — 既定の表 (パターン・種類・節の表記・分けたときの参照のされ方・マージできるか)。
+  - `issue-dispatch/scripts/issue_dispatch/config.py` — 管理側とリポジトリ側の設定の読み込み、未設定のキーへのデフォルト値の適用 (KTD15 の表)、値の誤りの警告、`files` のパターンの表記をそろえることと、ルートの外を指すパターンの警告。
   - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無)、Issue の参照 (`owner/repo#番号`・URL) の正規化、コメントの先頭行の生成と解析。
-  - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_filekinds.py`
+  - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_filekinds.py`、`issue-dispatch/tests/test_config.py`
 - **Approach:**
   1. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
   2. 宣言の検査は dataclass で必須キーを位置引数にし、未知のキーをエラーにする (`docs/solutions/design-patterns/typed-contract-for-agent-input.md`)。
@@ -892,7 +895,8 @@ issue-dispatch/
   - `["exports", "./utils"]` と `["exports", "utils"]` は別の節として比べる (名前を正規化しない)。`["require", "github.com/foo/bar"]` と `["require", "github"]` は、先頭部分の一致としない (名前の中の `.` を区切りとして扱わない)。
   - `generated` は同じパスでも競合しない。別のリポジトリの同じパスは競合しない。`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。`unknown-structure` は同じパスで競合しうる。
   - パターンの書き方: `*.pb.go` は `api.pb.go` に一致し、`gen/api.pb.go` に一致しない。`**/*.pb.go` は両方に一致する。`src/*.ts` は `src/app.ts` に一致し、`src/lib/a.ts` に一致しない。`dist/` は `dist/app.js` と `dist/assets/a.js` に一致する。
-  - 設定のパターン `./dist/**` と `dist//**` は、`dist/**` と同じに照合する。末尾の `/` は取り除かない。`/dist/**`・`../x/**`・`dist/../x` は、その規則を使わずに警告を返す。
+  - `config` は、未設定のキーに KTD15 の表のデフォルト値を使い、整数のキーの空文字列を未設定と読まず、値の誤りはデフォルト値で続行して警告を返す。管理側とリポジトリ側で同じファイル名を読み、キーで役割を分ける。
+  - `config` が読み込むとき、設定のパターン `./dist/**` と `dist//**` は、`dist/**` と同じに照合する。末尾の `/` は取り除かない。`/dist/**`・`../x/**`・`dist/../x` は、その規則を使わずに警告を返す。
   - Covers AE42. `filekinds` は、設定の規則を既定の表より先に照合する (設定の `dist/**` → `generated` が、既定の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に一致すれば、段の順で先の種類を返す。どちらにも一致しなければ `unknown-content`。
   - `filekinds` は、既定の表のパターンごとに、種類・節の表記・分けたときの参照のされ方・マージできるかを返す。`file-kinds.json` の種類と属性の値の一覧が、`file-kinds.md` の表と一致する。
   - `filekinds` は `issue_dispatch` のほかのモジュールを import しない (テストで import を確かめる)。
