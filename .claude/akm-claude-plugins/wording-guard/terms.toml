@@ -295,6 +295,14 @@ replacements = ["収束後の全量レビュー"]
 reason = "指摘が出れば直して増分の回に戻るので、「最終」ではない"
 decided_in = "https://github.com/akm/claude-plugins/issues/71"
 
+[[terms]]
+pattern = "の列"
+verdict = "avoid"
+replacements = ["の配列"]
+reason = "array を「列」と書くと、表の列 (column) と読めてしまう"
+decided_in = "https://github.com/akm/claude-plugins/pull/115"
+exceptions = ["表の列", "の列挙"]
+
 # ---- 許容する語 ----
 
 [[terms]]
