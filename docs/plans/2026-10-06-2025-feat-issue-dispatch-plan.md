@@ -867,7 +867,7 @@ issue-dispatch/
   1. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
   2. 宣言の検査は dataclass で必須キーを位置引数にし、未知のキーをエラーにする (`docs/solutions/design-patterns/typed-contract-for-agent-input.md`)。
   3. パスの正規化は `posixpath.normpath` の後にルートの外 (`..` で始まる) と絶対パスを拒否する。基準はリポジトリのルートで、引数で受ける (`docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md`)。
-  4. 競合の可能性の判定は R5 の規則 (KTD9) に従う。種類は `filekinds` で決める。構造を知っている種類は、両方が `units` を書いていれば節の名前の同じか先頭部分の一致で、どちらかが省けば同じパスで競合しうる。`generated` は対象外、`unknown-structure` は同じパスで競合しうる、`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。
+  4. 競合の可能性の判定は R5 の規則 (KTD9) に従う。種類は `filekinds` で決める。構造を知っている種類は、両方が `units` を書いていれば、節 (名前の配列) が同じか、一方が他方の先頭部分のときに競合しうる。どちらかが省けば、同じパスで競合しうる。`generated` は対象外、`unknown-structure` は同じパスで競合しうる、`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。
 - **Execution note:** テストを先に書く。記録の壊れ方 (JSON でない・キーが欠ける・型違い) と宣言の誤り (キーの誤字・節の表記が無いファイルへの `units`) を 1 件ずつ失敗させてから実装する。
 - **Patterns to follow:** `pr-teeth/scripts/prteeth/store.py` (`load_precious`・`_save_atomic`)、`review-triage/scripts/review-loop-worker/*.py` (1 ファイル 1 責務、docstring の冒頭に責務と正本の文書)。
 - **Test scenarios:**
