@@ -684,6 +684,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 - **宣言を Project のテキストフィールドに書く** — フィールドの長さの上限が文書に無く、更新の履歴が残らない。コメントなら履歴と理由が残る (KTD2)。後で要約を写すことは Deferred。
 - **フックが管理のセッションの記録を読んで、ほかのセッションの作業ディレクトリを知る** — 作業のセッションから管理ディレクトリへの経路が要る。`git worktree list` なら同じリポジトリの worktree をどのセッションからでも知れる (KTD13)。別の clone は検出しない (Scope Boundaries)。
 - **ポーリングの代わりにセッション内の Monitor ツールやソケットへの書き込みで変化を知る** — Monitor は期限が最長 30 分で、期限ごとに起動し直す必要があり、ソケットへ直接書くメッセージの様式は公式文書に無い。背景の Bash と通知は review-loop で実測済み (KTD6)。
+- **Claude Code の agent teams (1 つのリーダーのセッションが仲間のセッションを起動し、共有のタスクの一覧とメッセージで進める機能) を使う** — 公式文書 (https://code.claude.com/docs/en/agent-teams.md、2026-10-09 に確認) では、実験的な機能で既定では無効 (環境変数 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` で有効にする)。仲間はリーダーが起動するもので、利用者が既に開いたセッションを仲間に加える手段は文書に無い。Desktop では使えない (https://code.claude.com/docs/en/desktop.md)。チームは 1 つのセッションに閉じて共有できず、in-process の仲間は `/resume` で復元されない。仲間を worktree で分けないとも書かれている。この計画は、作業のセッションを利用者が Desktop か端末で開くこと (KD12) を前提にしているので合わない。セッションどうしの合図には、agent teams とは別の機能 (セッション間のメッセージ) を使う (KTD1)。
 
 ### System-Wide Impact
 
