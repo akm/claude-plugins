@@ -875,14 +875,14 @@ issue-dispatch/
   - 節の表記が無いパス (種類が `generated`・`unknown-content`・`unknown-structure` か、一致した規則に節の表記が無い) に `units` があれば拒否する。
   - `units` の要素が文字列 (`"dependencies.zod"`) か、空の配列か、文字列でない名前を含めば、理由と期待する形 (文字列の配列の配列) を含むエラーで拒否する。
   - Covers AE32. まだ判定していない宣言が複数あるとき、投稿の順に 1 件ずつ判定し、比べる相手は既に `開始可` になった宣言だけにする。投稿の時刻が同じなら Project の中の順で並べる。
-  - Covers AE4. `divisible` の同じパスを、`units` を省いた 2 つの宣言が持てば競合しうる。パスが `./src/app.ts`・`src/app.ts`・`src//app.ts` と違っても同じと判定する。
+  - Covers AE4. `divisible` の同じパスを、`units` を省いた 2 つの宣言が持てば競合しうる。パスが `./src/app.ts`・`src/app.ts`・`src//app.ts`・`src/../src/app.ts` と違っても同じと判定する。
   - Covers AE41. 同じパスで両方が `units` を書けば、節が同じか先頭部分の一致 (`["dependencies"]` と `["dependencies", "react"]`) のときだけ競合しうる。`["dependencies", "react"]` と `["dependencies", "zod"]` は競合しない。一方が `units` を省けば競合しうる。
   - `["exports", "./utils"]` と `["exports", "utils"]` は別の節として比べる (名前を正規化しない)。`["require", "github.com/foo/bar"]` と `["require", "github"]` は、先頭部分の一致としない (名前の中の `.` を区切りとして扱わない)。
   - `generated` は同じパスでも競合しない。別のリポジトリの同じパスは競合しない。`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。`unknown-structure` は同じパスで競合しうる。
   - Covers AE42. `filekinds` は、設定の規則を既定の表より先に照合する (設定の `dist/**` → `generated` が、既定の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に一致すれば、段の順で先の種類を返す。どちらにも一致しなければ `unknown-content`。
   - `filekinds` は、既定の表のパターンごとに、種類・節の表記・参照の単位・マージできるかを返す。`file-kinds.json` の種類と属性の値の一覧が、`file-kinds.md` の表と一致する。
   - `filekinds` は `issue_dispatch` のほかのモジュールを import しない (テストで import を確かめる)。
-  - 絶対パスと、ルートの外を指すパス (`../x`) は拒否する。
+  - 絶対パスと、ルートの外を指すパス (`../x`、正規化すると `../x` になる `src/../../x`) は拒否する。
   - Covers AE10. 記録が JSON として読めない・必須キーが欠ける・`items` が配列になっているときは `Corrupt` で止め、新規として扱わない。記録が無ければ新規として空の記録を返す。
   - 記録の保存は一時ファイルを経て置き換え、保存の途中で失敗しても元の記録が残る。
   - Covers AE9. 段階の印の付け方 — `fields_written` だけの項目は「`notified` が無い」として列挙され、同じ項目に同じ印を 2 度付けても時刻は最初のまま。意図 (ID・title・Status) を持つ項目の Project の値が意図と一致すれば「自分の書き込み」と判定し、再送の回数は項目ごとに数えて 1 を超えると「再送しない」を返す。
