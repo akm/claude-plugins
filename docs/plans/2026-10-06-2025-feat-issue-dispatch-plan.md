@@ -168,7 +168,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 **同梱のスクリプト・設定・登録**
 
 - R31. **スクリプト。** `gh` の実行は 1 つの関数にまとめる。入出力は JSON。終了コードで結果の種類を分ける。エージェントが組み立てる入力 (宣言・割り当ての引数) は形を検査し、未知のキーと欠けた必須キーは理由付きで差し戻す。テストは偽の `gh` (PATH の先頭に置く) と、実物の `--json` と GraphQL の出力を写した固定データで動き、`python3 -m unittest discover -s issue-dispatch/tests` で実行する。Python 3.11 の標準ライブラリだけを使う。(KTD14)
-- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く)・`files` (パスのパターンごとの種類の規則の配列。要素は `pattern`・`kind` と、省略できる `unit_notation` (節の表記とキーの深さ。宣言の `units` と混同しないよう名前を分ける)・`split_reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
+- R32. **設定。** 管理ディレクトリとリポジトリの同じパス `.claude/akm-claude-plugins/issue-dispatch/config.json`。管理側のキー: `project.owner`・`project.number`・`record_dir`・`poll_minutes`・`wait_minutes`。リポジトリ側のキー: `project` (owner と番号。`issue-work` が管理の名前を導く。1 つだけ書く。そのリポジトリの Issue がほかの Project にも入っていて、その Project の作業をさせるときは、作業のセッションの引数 `--manager` で管理のセッションの名前を渡す。利用者と相談して決めた)・`files` (パスのパターンごとの種類の規則の配列。要素は `pattern`・`kind` と、省略できる `unit_notation` (節の表記とキーの深さ。宣言の `units` と混同しないよう名前を分ける)・`split_reference` (`directory` / `file`)・`mergeable`。既定の表より先に照合する。R5)・`resources`・`protected_paths`・`hooks.guard_other_worktrees`。未設定の扱いを表で定め、設定が無くても動く (尋ねるか、その処理を行わずに報告する)。(KTD15)
 - R33. **登録と文書。** ファイル `issue-dispatch/.claude-plugin/plugin.json` (版 0.1.0)、`.claude-plugin/marketplace.json`、ルートの `README.md` (収録プラグインの表・構成・プロジェクト固有の設定の表)、`issue-dispatch/README.md`、`CONCEPTS.md` の用語 (管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録)、`.github/test-targets.txt` の 1 行。文書はルートの `CLAUDE.md` の規則に従い、`doc-dag` と `wording-guard` を実行する。(KTD18)
 
 ### Key Flows
@@ -1032,7 +1032,7 @@ issue-dispatch/
   - Covers AE4. 宣言のコメントが `issue-format.md` の様式で投稿され、`declared` の後に `wait` を受けると作業を始めず、`go` を受けると始める。
   - Covers AE6. PR の本文に `Closes #<番号>` があり、draft のうちは `In review` にならず、ready for review にすると次のポーリングで `In review` になる。
   - 同じ Issue の `assigned` を 2 度受けても着手は 1 回。別の Issue を持っているときに受けると `assignment-mismatch` を送る。
-  - `--manager` を省いたとき、リポジトリの設定の `project` と自分のトークンのログインから規約の名前 (`issue-dispatch <owner>/<number>/<login>`) を導いて送る。設定も引数も無ければ利用者に尋ねる。
+  - `--manager` を省いたとき、リポジトリの設定の `project` と自分のトークンのログインから規約の名前 (`issue-dispatch <owner>/<number>/<login>`) を導いて送る。`--manager` を渡したときは、設定の `project` から導いた名前ではなく、渡した名前に送る。設定も引数も無ければ利用者に尋ねる。
   - 管理のセッションが無いときに `/issue-work` を入力すると、起動の順を伝えて止まる。
 - **Verification:** 通し確認の成功の経路 (シナリオ A) で、作業のセッションの操作が利用者の指示なしに進む。`doc-dag` で `issue-work` の references が `issue-dispatch` の正本を参照するだけで複製していない。
 
@@ -1085,7 +1085,7 @@ issue-dispatch/
   - `issue-dispatch/.claude-plugin/plugin.json` — `name`・`description`・`version` 0.1.0・`author`・`license`。
   - `.claude-plugin/marketplace.json` — 項目 1 つ (description は `plugin.json` と同文、`source` は git-subdir、`tags`)。
   - `README.md` — 収録プラグインの表に 1 行、「構成」に `issue-dispatch/` のツリーとテストのコマンド、「プロジェクト固有の設定」の表に 1 行。
-  - `issue-dispatch/README.md` — 概要、収録スキルの表 (スキル / 実行する場所 / 説明)、使い方 (管理ディレクトリの準備・Project の準備 (担当者が未設定の Issue は割り当ての候補にならないので、`Ready` にする前に担当者を決める。割り当ての順は Project の項目の並び (`POSITION`) で決まる。sort や group を付けたビューではこの並びが見えないので、sort と group の無いビューで並べ替える)・作業のセッションの開き方)、フックの説明と限界、チームで使うときの前提と限界 (利用者ごとに自分のマシンで使うこと、同じ利用者は 1 つの Project の管理のセッションを 1 台のマシンでだけ開くこと、利用者をまたいだ競合の可能性と、共有の資源の取り合いは検出しないこと。KD23・KD24)、管理のセッションに事前に許可する設定の例 (同梱の CLI だけ。KD18)、プロジェクト固有の設定 (任意)、しないこと、必要なもの (`gh` と `project` スコープ・`python3`・Claude Code 2.1.236 以降・設定 `crossSessionInbound` を `accept` にするか、管理と作業のセッションの権限モードの組をそろえること (R16・KTD12))、テスト。
+  - `issue-dispatch/README.md` — 概要、収録スキルの表 (スキル / 実行する場所 / 説明)、使い方 (管理ディレクトリの準備・Project の準備 (担当者が未設定の Issue は割り当ての候補にならないので、`Ready` にする前に担当者を決める。割り当ての順は Project の項目の並び (`POSITION`) で決まる。sort や group を付けたビューではこの並びが見えないので、sort と group の無いビューで並べ替える)・作業のセッションの開き方 (リポジトリの設定の `project` と違う Project の作業をさせるときは `--manager` を渡す))、フックの説明と限界、チームで使うときの前提と限界 (利用者ごとに自分のマシンで使うこと、同じ利用者は 1 つの Project の管理のセッションを 1 台のマシンでだけ開くこと、利用者をまたいだ競合の可能性と、共有の資源の取り合いは検出しないこと。KD23・KD24)、管理のセッションに事前に許可する設定の例 (同梱の CLI だけ。KD18)、プロジェクト固有の設定 (任意)、しないこと、必要なもの (`gh` と `project` スコープ・`python3`・Claude Code 2.1.236 以降・設定 `crossSessionInbound` を `accept` にするか、管理と作業のセッションの権限モードの組をそろえること (R16・KTD12))、テスト。
   - `CONCEPTS.md` — 節「Issue の並行作業」に、管理のセッション・作業のセッション・割り当て・着手の宣言・資源・合図・記録の項 (定義 1〜2 段落 + 正本への参照)。
   - `.github/test-targets.txt` — `python issue-dispatch/tests` の 1 行。
 - **Approach:**
