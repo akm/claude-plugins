@@ -996,6 +996,7 @@ issue-dispatch/
 - **Patterns to follow:** `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`、`commit-rules-guard/hook-scripts/guard-commit-rules.py` (設定の正規化・想定外は許可)、`wording-guard/scripts/wordingguard/config.py` (有効にしたリポジトリだけ)。
 - **Test scenarios:**
   - Covers AE15. 2 つの worktree を持つ一時リポジトリで、ほかの worktree の絶対パスを含むコマンド (`pnpm --dir /w/b exec vitest`・`cd /w/b && make`) は deny の JSON と理由を返し、自分の worktree のパスだけのコマンドには何も出力しない。
+  - 設定 `protected_paths` に書いたパス (例: worktree の一覧に出てこない別の clone `/w/clone`) を含む Bash のコマンドと、その下のファイルへの Edit を拒否する。`protected_paths` が空なら、ほかの worktree のパスだけを対象にする。
   - パスの接頭辞一致 (`/w/b` と `/w/b2`) は一致としない。シンボリックリンクを経た同じ worktree は実体パスで一致とする。
   - `git worktree list` と `git worktree remove /w/b` は拒否しない。
   - 設定の無いリポジトリ、`hooks.guard_other_worktrees` が偽、リポジトリでない `cwd`、入力が JSON でない、`git` が無い、のどれでも何も出力せず終了コード 0。
