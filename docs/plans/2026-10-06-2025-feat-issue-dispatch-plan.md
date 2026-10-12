@@ -28,7 +28,7 @@ execution: code
 - **着手の宣言 (宣言)**: 作業のセッションが着手の時点で Issue のコメントとして書く、変更予定のファイル・必要な資源・分ける必要の有無。
 - **資源**: 同時に 1 つしか使えないもの (検証用の Worker、固定のポートなど)。Issue のラベル `resource:<名前>` で表す。
 - **記録**: 管理のセッションが記録の置き場に持つファイル群 (`record.json`・`snapshot.json`・`actions.log`・`wait.pid`)。GitHub に無いもの (宣言の写し・資源の使用・手順の段階・時刻) を持つ。
-- **合図**: セッション間のメッセージ (Claude Code のツール `SendMessage`)。`available` と `renamed` を除き GitHub に対応物を持ち、失われても処理が遅れるだけで食い違わない。この 2 つはセッションの状態を運ぶので対応物が無く、失われたときの回復の仕方を別に決める (KTD1)。
+- **合図**: セッション間のメッセージ (Claude Code のツール `SendMessage`)。`available` と `renamed` を除き GitHub に対応物を持ち、失われても処理が遅れるだけで食い違わない。この 2 つはセッションの状態を伝えるので対応物が無く、失われたときの回復の仕方を別に決める (KTD1)。
 - **待機**: GitHub の変化を待つためにバックグラウンドで起動する、同梱の Python のスクリプト (KTD6)。終わると Claude Code がそのセッションに通知を届け、通知で次のターンが始まる。割り当てを待っている作業のセッションは「待機中の作業のセッション」と呼ぶ。
 - **待機の知らせ**: ツール `SendMessage` の引数 `notify_when_idle` で申し込む知らせ。相手のセッションが次に入力待ち (ターンを終え、次の入力を待つ状態) になったときに 1 回届く (R10)。
 - **依頼**: 管理のセッションが作業のセッションに何かをしてもらうための、Issue のコメント `依頼` と合図 `request`。種類は、宣言の書き直し・PR の本文の追記・小さな PR の作成の 3 つ (R6)。
@@ -45,7 +45,7 @@ execution: code
 - **判断の原則**: この仕組みが利用者の手から外すのは、機械的に決まる判断 (割り当て・依存関係からの `Blocked`・競合の可能性の検出) だけ。決め方に選択の余地がある判断は、必ず利用者に尋ね、答えの無いまま進めない。問いの回数を減らすことより、確認しないまま進めて後で直すことを避けるほうを優先する。そのほうがやり取りの手間が減り、全体の作業時間も短くなる。問いが多くても、まとめて尋ねれば利用者は答える時間を確保しやすいので、問いはまとめて尋ねる (KD20)。
 - **進め方**: スクリプトとフックは、偽の `gh` と固定の入力で動かすテスト (Python の unittest) を先に書く。手順書 (Markdown) は、検証用の Project と小さなリポジトリ 2 つで、管理のセッション 1 つと作業のセッション 2 つを実際に開き、通し確認 (最初から最後まで動かして、期待どおりかを確かめること) をする (Verification Contract)。文書を変えたら `doc-dag` と `wording-guard` を実行する。
 - **後始末の担当**: PR は人間が作る。コミットは動機ごとに分ける (規範は利用者のコミットルール)。Issue #114 へのコメントは人間の指示を受けてから行う。
-- **Product Contract の保全**: 要件の出所は Issue #114 と 2026-10-06 の会話。Issue の「これまでに決めたこと」と食い違う点は 4 つで、いずれも会話で利用者が決めた。(1) 宣言と PR の報告を運ぶ手段を、メッセージから Issue のコメントと PR の観測に変えた (KD5)。(2) 管理のセッションは Status の `Done` を書かない (KD7)。(3) 記録の置き場を設定と分け、git が無視する場所にした (KD3・KTD5)。(4) 何日もかかる利用者の作業の Issue は、担当者を利用者にするだけでなく、ラベル `human-handed` を付けて表す (KD16)。
+- **Product Contract の保全**: 要件の出所は Issue #114 と 2026-10-06 の会話。Issue の「これまでに決めたこと」と食い違う点は 4 つで、いずれも会話で利用者が決めた。(1) 宣言と PR の報告を伝える手段を、メッセージから Issue のコメントと PR の観測に変えた (KD5)。(2) 管理のセッションは Status の `Done` を書かない (KD7)。(3) 記録の置き場を設定と分け、git が無視する場所にした (KD3・KTD5)。(4) 何日もかかる利用者の作業の Issue は、担当者を利用者にするだけでなく、ラベル `human-handed` を付けて表す (KD16)。
 
 ---
 
@@ -67,7 +67,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KD2. **プラグインの名前は `issue-dispatch`、スキルは `issue-dispatch` (管理) / `issue-work` (作業) / `repo-preflight` (前提条件の検査)** (session-settled: user-approved — chosen over `session-dispatch`・`issue-queue`: Issue を割り振ることが中心の機能で、PR のレビューは対象にしない)。Governs R18, R26, R33。
 - KD3. **Project 全体の設定と記録は、利用者が選ぶ管理ディレクトリに置く** (session-settled: user-approved — chosen over 対象リポジトリの 1 つ・ユーザーの設定 `~/.claude/` の下: Project が複数のリポジトリにまたがるので、どのリポジトリに置くかの規則が別に要り、作業のセッションと作業ツリーを共有する危険もある)。Governs R11, R32。
 - KD4. **作業のセッションは利用者が作る** (session-settled: user-approved — chosen over 管理のセッションが `claude --bg` で作る: 端末の `claude --bg` と Desktop の `start_session` は環境で使えるかが変わる。割り当ての手順は、誰がセッションを作ったかに依存しない形にする)。Governs R23, R26。
-- KD5. **GitHub を正本にし、メッセージは合図に限る** (session-settled: user-approved — chosen over メッセージで宣言と報告を運ぶ案: メッセージは平文で、上限で断られ、捨てられ、受け取りの確認が無い。GitHub に対応物があれば、失われても遅れるだけで食い違わない)。宣言は Issue のコメント、`In review` は PR の観測から導く。Governs R4, R7, R21, R28。
+- KD5. **GitHub を正本にし、メッセージは合図に限る** (session-settled: user-approved — chosen over メッセージで宣言と報告を伝える案: メッセージは平文で、上限で断られ、捨てられ、受け取りの確認が無い。GitHub に対応物があれば、失われても遅れるだけで食い違わない)。宣言は Issue のコメント、`In review` は PR の観測から導く。Governs R4, R7, R21, R28。
 - KD6. **Issue のコメントの先頭行に、書いたセッションの種類と識別子を書く** (session-settled: user-directed — chosen over 本文だけのコメント: 複数のセッションのコメントが同じ GitHub のユーザー名で書かれるので、どのセッションが書いたかを先頭で見分けられるようにする)。Governs R6。
 - KD7. **管理のセッションが書く Status は 5 つに限り、`Done` は書かず、利用者が手で変えた Status は上書きしない** (session-settled: user-approved — chosen over 「Auto-close issue」を無効にして自分で `Done` を書く案: 利用者の既存の Project ではワークフロー「Auto-close issue」が有効で、`Done` を書くと Issue が閉じる)。Governs R2, R22。
 - KD8. **ファイルの競合を避けるために待たせるときは、利用者の承認のうえで `blockedBy` を足して `Blocked` を導く** (session-settled: user-approved — chosen over 記録の中だけで待たせる案: GitHub 上で理由が見え、`Blocked` を 1 つの規則で導ける)。Governs R20。
@@ -132,7 +132,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 **仕様の正本 — セッション間の取り決めと記録**
 
-- R7. **メッセージは合図に限り、運ぶ情報は `available` と `renamed` を除いて GitHub に対応物を持つ (`messaging.md`)。** この 2 つはセッションの状態 (着手できる・名前が変わった) を運ぶので対応物が無い。`available` が失われたら、作業のセッションの待機が期限で終わったときに送り直す。`renamed` が失われたら、管理のセッションが宛先の名前を見つけられなかったときに、Desktop の `list_sessions` で ID から名前を引き直すか、利用者に尋ねる (R23)。作業 → 管理: `available` (手が空いていて、次の Issue に着手できる)・`declared` (宣言を書いた)・`review` (PR を ready for review にした)・`renamed` (名前を変えた)・`assignment-mismatch` (割り当ての食い違い)。管理 → 作業: `assigned` (割り当て)・`go` (進めてよい)・`wait` (待つ。理由を含む)・`stop` (止める。理由は解放・close・項目の除去のいずれか)・`request` (依頼。宣言の書き直し・PR の本文の追記・小さな PR の作成のいずれか。内容は Issue のコメント `依頼` に書く)。先頭行は `issue-dispatch: <種類>`、続く行は `<キー>: <値>`。`available` と `renamed` 以外のどの合図が失われても、受け手は GitHub を読めば同じ状態に至る (対応物の表は KTD1)。(KTD1, KTD11)
+- R7. **メッセージは合図に限り、メッセージで伝える情報は `available` と `renamed` を除いて GitHub に対応物を持つ (`messaging.md`)。** この 2 つはセッションの状態 (着手できる・名前が変わった) を伝えるので対応物が無い。`available` が失われたら、作業のセッションの待機が期限で終わったときに送り直す。`renamed` が失われたら、管理のセッションが宛先の名前を見つけられなかったときに、Desktop の `list_sessions` で ID から名前を引き直すか、利用者に尋ねる (R23)。作業 → 管理: `available` (手が空いていて、次の Issue に着手できる)・`declared` (宣言を書いた)・`review` (PR を ready for review にした)・`renamed` (名前を変えた)・`assignment-mismatch` (割り当ての食い違い)。管理 → 作業: `assigned` (割り当て)・`go` (進めてよい)・`wait` (待つ。理由を含む)・`stop` (止める。理由は解放・close・項目の除去のいずれか)・`request` (依頼。宣言の書き直し・PR の本文の追記・小さな PR の作成のいずれか。内容は Issue のコメント `依頼` に書く)。先頭行は `issue-dispatch: <種類>`、続く行は `<キー>: <値>`。`available` と `renamed` 以外のどの合図が失われても、受け手は GitHub を読めば同じ状態に至る (対応物の表は KTD1)。(KTD1, KTD11)
 - R8. **宛先はセッションの名前で書く。** 同じ名前が複数あるときだけ `ListAgents` の短い識別子を添える。Desktop のセッション ID (`local_…`) 宛てとツール `send_message` は使わない。(KTD10)
 - R9. **合図が捨てられた知らせ (中継の履歴の上限) を受けたら、利用者に 1 行の入力を求める。** 捨てられた合図を送ったものとして進まない。管理のセッションは、利用者の最後の入力からの送受の数を記録に持ち、報告に書く。(KTD11)
 - R10. **止まったことに気づく手段は、期限と待機の知らせの 2 つ。** 待機の知らせ (`notify_when_idle`) は、相手が次に入力待ち (ターンを終え、次の入力を待つ状態) になったときか終了したときに 1 回だけ届き、単独で申し込んだときに相手が既に入力待ちなら直ちに届く。作業のセッションは待機のスクリプトをバックグラウンドで起動してターンを終えるので、普段は入力待ちである。そこで管理のセッションは、申し込みを合図 `assigned`・`go` に添えて行う (合図を届けた後、作業のセッションが次に入力待ちになったときに知らせが届く)。合図 `wait` には添えない。再入のたびには申し込み直さない。失効 (12 時間) の知らせを受けたときなど単独で申し込むときは、`ListAgents` で busy の作業のセッションにだけ申し込む。止まったかどうかは知らせの有無ではなく、GitHub 上の進み (宣言・PR) の有無で判断し、知らせはその確認を期限より早く行うきっかけに使う。待機の知らせの後に GitHub 上の進みが無ければ、`Agent stuck state` に `idle-no-progress` を書き、コメント `停滞` を書いて報告する。期限を過ぎても進みが無ければ `deadline-passed` を書く。進み (宣言・PR) が現れたら、`Agent stuck state` を空に戻す (KD21)。権限の確認で止まった作業のセッションは入力待ちにならないが、`ListAgents` の状態 (`idle`・`busy`・`waiting`・`offline`) で `waiting` になると考えられる。管理のセッションは、動き出すたびに取る `ListAgents` (R23) で、記録にある作業のセッションが `waiting` のまま 2 回続けて見えたら、`Agent stuck state` に `waiting-for-user` を書き、利用者の入力か承認を待っている可能性を 1 回だけ報告する。`waiting` でなくなったら空に戻す。`waiting` が何を表すかは U1 で確かめ、権限の確認で止まった場合に `waiting` にならなければ、期限でしか気づけないことを文書に書く。(KTD6)
@@ -558,7 +558,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 ### Key Technical Decisions
 
-- KTD1. **GitHub を正本にし、合図は `available` と `renamed` を除いて GitHub に対応物を持つ** (session-settled: user-approved — chosen over メッセージで宣言と報告を運ぶ案: メッセージは上限で断られ、捨てられ、受け取りの確認が無い)。`available` と `renamed` はセッションの状態を運ぶので対応物が無く、下の表の列「合図が失われたときの回復」の手段で回復する。対応物の表の正本は `messaging.md` (U3) で、下の表は計画の時点の内容。実装の後は `messaging.md` を読む。
+- KTD1. **GitHub を正本にし、合図は `available` と `renamed` を除いて GitHub に対応物を持つ** (session-settled: user-approved — chosen over メッセージで宣言と報告を伝える案: メッセージは上限で断られ、捨てられ、受け取りの確認が無い)。`available` と `renamed` はセッションの状態を伝えるので対応物が無く、下の表の列「合図が失われたときの回復」の手段で回復する。対応物の表の正本は `messaging.md` (U3) で、下の表は計画の時点の内容。実装の後は `messaging.md` を読む。
 
   | 合図 | 向き | GitHub の対応物 | 合図が失われたときの回復 |
   | --- | --- | --- | --- |
