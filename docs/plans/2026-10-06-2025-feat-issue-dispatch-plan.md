@@ -161,8 +161,8 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 - R26. **開始。** 引数 `--manager <名前>` (省けば、リポジトリの設定の `project` と、自分のトークンのログイン (`gh api user`) から規約の名前を導く。KD23)。前提を確かめる (R16・R17)。リポジトリ側の設定が無ければ、設定が無いこと、そのためにほかの worktree への操作を拒否するフックが働かないこと、`--manager` が無ければ管理のセッションの名前を導けないことを知らせ、スキル `repo-preflight` を案内したうえで、続けるかを利用者に尋ねる (利用者と相談して決めた。KD20)。続けるときに `--manager` も無ければ、管理のセッションの名前を尋ねる。自分の ID (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`)・名前 (`ListAgents` の 1 行目)・`repo` (`origin` の URL から `owner/repo`)・`worktree` (実体パス)・トークンのログイン (`gh api user`。R6) を決め、合図 `available` を送る (`available` には ID・名前・`repo`・`worktree` を書く)。管理の名前が `ListAgents` に無ければ、管理のセッションを起動してから `/issue-work` をやり直すよう利用者に伝えて止まる。合図を送ったら、割り当てを GitHub で確かめる待機 (自分の ID が `Agent session ID` に入った項目を探す) を背景で起動してターンを終える。待機が読む Project はリポジトリの設定の `project` で、設定が無ければ開始時に利用者に尋ねる (KTD6)。(KTD10)
 - R27. **割り当ての受け取り。** `assigned` を受けたら (または待機が項目を見つけたら)、`gh` でフィールドの値が自分の ID であることを確かめてから着手する。同じ Issue の `assigned` を 2 度受けたら、何も送らずにその Issue の作業を続ける。合図と待機の通知の両方が届いても着手は 1 回。`in_review` 未満の別の Issue を持っているときに受けたら `assignment-mismatch` を送る。宣言を書く前と PR を作る前にも、フィールドが自分の ID のままであることを確かめ、違えば止めて管理に `assignment-mismatch` を送る (`stop` が失われても段の境目で気づく)。ブランチ名の案を使い、既存のブランチと衝突すれば連番を足す。
-- R28. **宣言。** Issue を調べて変える予定のファイルを決め、同梱の CLI のサブコマンド `files classify` で、各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる。節の表記があるファイルでは変える節を決め、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。待機を起動するときは前の待機が止められ、止められた待機の通知 (出力に `stopped`) では動き出さない (KTD6)。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`開始可` の本文に分割の結果があれば、新しい Issue に移した部分を作業の範囲から外して始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。判定の待機が期限で終わったら (終了コード 124)、1 回目は合図 `declared` を送り直して待機を起動し直す。2 回目も期限で終わったら、管理のセッションが止まっている可能性を自分のセッションに書いて (利用者が見たときに分かるように)、待機を起動し直す。`Agent stuck state` は書かない (Project のフィールドは管理のセッションが書く。R30)。`stop` を受けたら作業を止め、理由を報告する。`request` を受けたら、自分宛ての最新の `依頼` を読み、種類に従って行う (宣言の書き直し → 直した宣言の全体を `宣言の更新` で書いて判定を待つ。本文の追記 → PR の本文に `Closes #<番号>` を足す。小さな PR → 下の小さな PR を作る)。合図は失われうるので、判定の待機・PR を作る前・割り当ての待機が終わったときにも、自分宛てでまだ行っていない `依頼` があるかを確かめる。待機のスクリプトは、行ったかどうかを GitHub から判断できる依頼だけを見つけて終わる (判定の待機は、待っている宣言の ID を持つ `宣言の書き直し`。割り当ての待機は、PR の参照にまだ Issue が無い `本文の追記`)。`小さな PR` はスクリプトでは見つけず、合図と、PR を作る前の確かめで知る。宣言は投稿の前に同梱の CLI の `declaration parse` で形を確かめ、PR は ready for review にする前に本文に `Closes #<番号>` があることを確かめる (依頼が要る場面を減らすため)。宣言に無いファイルや節を変える必要が分かったら、それを変える前に手を止め、コメント `宣言の更新` (宣言の全体。足したファイルも `files classify` で確かめる) を書いて `declared` を送り、更新したコメントの ID を渡して判定の待機を起動する。判定を待つ間は、宣言済みのファイルも含めて作業を止める。`開始可` ならそれを変える。待つことになったら、待つ対象 (相手の Issue の完了か、小さな PR のマージ) の後に `main` に rebase してから変える。資源を使い終えたら、ready for review の前でも後でも、資源を外した宣言の全体を `宣言の更新` で書く (作業の途中でもう一度使うときは、資源を足した更新を書いて判定を待つ)。自分が先に `開始可` になった側で、利用者が小さな PR を選んだら (コメント `依頼` (小さな PR) で知らされる)、競合しうるファイルの変更だけを別のブランチの小さな PR にする。(KD14)
-- R29. **PR と次の Issue。** 本文に `Closes #<番号>` を書いて PR を作り、ready for review にしたら合図 `review` を送る (管理は PR の観測で `In review` にするので、合図は観測を早めるだけ)。次の Issue を求めるときは `available` を送る (R26 と同じ待機を起動する)。
+- R28. **宣言。** Issue を調べて変える予定のファイルを決め、同梱の CLI のサブコマンド `files classify` で、各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる。節の表記があるファイルでは変える節を決め、R4 の様式でコメントを書き、合図 `declared` を送り、判定の待機 (書いた宣言に対するコメント `開始可` か Status `Blocked` が現れるまで。KTD6) を背景で起動して待つ。待機を起動するときは前の待機が止められ、止められた待機の通知 (出力に `stopped`) では動き出さない (KTD6)。`go` を受けるかコメント `開始可` を見つけたら作業を始める。`開始可` の本文に分割の結果があれば、新しい Issue に移した部分を作業の範囲から外して始める。`wait` を受けるか Status が `Blocked` になったら理由を読んで待つ (利用者が判断を変えるか blocker が閉じるまで)。判定の待機が期限で終わったら (終了コード 124)、1 回目は合図 `declared` を送り直して待機を起動し直す。2 回目も期限で終わったら、管理のセッションが止まっている可能性を自分のセッションに書いて (利用者が見たときに分かるように)、待機を起動し直す。`Agent stuck state` は書かない (Project のフィールドは管理のセッションが書く。R30)。`stop` を受けたら作業を止め、理由を報告する。ただし、`stop` の対象が今の作業の Issue でなく、レビュー中の前の Issue なら (前の Issue が閉じた・解放された)、今の作業は止めずに報告だけする。`request` を受けたら、自分宛ての最新の `依頼` を読み、種類に従って行う (宣言の書き直し → 直した宣言の全体を `宣言の更新` で書いて判定を待つ。本文の追記 → PR の本文に `Closes #<番号>` を足す。小さな PR → 下の小さな PR を作る)。合図は失われうるので、判定の待機・PR を作る前・割り当ての待機が終わったときにも、自分宛てでまだ行っていない `依頼` があるかを確かめる。待機のスクリプトは、行ったかどうかを GitHub から判断できる依頼だけを見つけて終わる (判定の待機は、待っている宣言の ID を持つ `宣言の書き直し`。割り当ての待機は、PR の参照にまだ Issue が無い `本文の追記`)。`小さな PR` はスクリプトでは見つけず、合図と、PR を作る前の確かめで知る。宣言は投稿の前に同梱の CLI の `declaration parse` で形を確かめ、PR は ready for review にする前に本文に `Closes #<番号>` があることを確かめる (依頼が要る場面を減らすため)。宣言に無いファイルや節を変える必要が分かったら、それを変える前に手を止め、コメント `宣言の更新` (宣言の全体。足したファイルも `files classify` で確かめる) を書いて `declared` を送り、更新したコメントの ID を渡して判定の待機を起動する。判定を待つ間は、宣言済みのファイルも含めて作業を止める。`開始可` ならそれを変える。待つことになったら、待つ対象 (相手の Issue の完了か、小さな PR のマージ) の後に `main` に rebase してから変える。資源を使い終えたら、ready for review の前でも後でも、資源を外した宣言の全体を `宣言の更新` で書く (作業の途中でもう一度使うときは、資源を足した更新を書いて判定を待つ)。自分が先に `開始可` になった側で、利用者が小さな PR を選んだら (コメント `依頼` (小さな PR) で知らされる)、競合しうるファイルの変更だけを別のブランチの小さな PR にする。(KD14)
+- R29. **PR と次の Issue。** 本文に `Closes #<番号>` を書いて PR を作り、ready for review にしたら合図 `review` を送る (管理は PR の観測で `In review` にするので、合図は観測を早めるだけ)。`review` を送った後、次の Issue に移るか、この PR のレビューを待つかを利用者に尋ねる (レビューで直しが要りそうかを判断できるのは利用者なため。作業のセッションの作業ツリーは 1 つなので、移った後に前の PR を直すにはブランチを切り替えることになる。文書レビューの指摘を受けて、利用者と相談して決めた。KD20)。移ると答えたら `available` を送る。待つと答えたら、その Issue が閉じたときの合図 `stop` (理由 close) を受けるか、利用者に言われたときに `available` を送る。`available` を送るときは、R26 と同じ待機を起動する。
 - R30. **作業のセッションがしないこと。** 記録の置き場に書かない。Project のフィールドと Status を書かない。ほかの作業のセッションに合図を送らない。自分で Issue を選んで着手しない。名前を変えない (変わったら `renamed` を送る)。
 
 **同梱のスクリプト・設定・登録**
@@ -200,8 +200,8 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - F5. PR から次の Issue
   - **起点:** 作業のセッションが PR を ready for review にする。
   - **関与:** A3, A2, A4。
-  - **手順:** PR (`Closes #<番号>`) → ready for review → 合図 `review` → 管理のセッションが PR を観測して `In review` → 作業のセッションが `available` を送る (F3 へ)。
-  - **結果:** Status が `In review`。作業のセッションは次の Issue を待つ。
+  - **手順:** PR (`Closes #<番号>`) → ready for review → 合図 `review` → 管理のセッションが PR を観測して `In review` → 作業のセッションが、次の Issue に移るかレビューを待つかを利用者に尋ねる → 移るなら `available` を送る (F3 へ)。待つなら、Issue が閉じたときの `stop` (理由 close) を受けてから `available` を送る。
+  - **結果:** Status が `In review`。作業のセッションは、利用者の答えに従って、次の Issue を待つか、前の Issue が閉じるのを待つ。
   - **Covers R21, R29.**
 - F6. ポーリング
   - **起点:** 背景の待機が変化か期限で終わり、通知が届く。
@@ -465,6 +465,11 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **Given:** 作業のセッション A が `/w/a` で動いている (記録にあり、`ListAgents` に名前がある)。
   - **When:** 別の作業のセッション C が、同じ `/w/a` で `/issue-work` を始め、`available` を送る。
   - **Then:** 管理のセッションは C に割り当てず、A と C が同じ作業ツリーで動いていることを利用者に知らせて、扱いを尋ねる。A の割り当ては変わらない。
+- AE49. PR を ready for review にした後、次の Issue に移るかを利用者に尋ねる
+  - **Covers R28, R29.**
+  - **Given:** A が #9 の PR を ready for review にし、`review` を送った。
+  - **When:** A が、次の Issue に移るか、この PR のレビューを待つかを利用者に尋ねる。
+  - **Then:** (1) 移ると答えると、A は `available` を送り、次の Issue に着手する。その後 #9 が閉じて `stop` (理由 close) が届いても、A は今の作業を止めずに報告だけする。(2) 待つと答えると、A は `available` を送らず、#9 が閉じて `stop` (理由 close) を受けてから `available` を送る。
 
 ### Success Criteria
 
@@ -597,7 +602,7 @@ sequenceDiagram
   participant M as 管理のセッション (issue-dispatch)
   participant G as GitHub (Project / Issue / PR)
 
-  U->>G: Issue を Project に入れ、着手してよいものを Ready にして並べる
+  U->>G: Issue を Project に入れ、着手してよいものの担当者を決めて Ready にし、並べる
   U->>W: /issue-work
   W->>W: 前提の確認・ID と名前・repo・worktree
   W->>M: 合図 available
@@ -623,9 +628,17 @@ sequenceDiagram
   W->>G: PR (Closes #N) を作り ready for review にする
   W->>M: 合図 review
   M->>G: PR を観測して Status In review
-  U->>G: PR をマージ (Issue が閉じ、ワークフローが Done を書く)
-  M->>G: ポーリングで close を知り、資源と宣言を解放
-  W->>M: 合図 available (次の Issue)
+  W->>U: 次の Issue に移るか、この PR のレビューを待つかを尋ねる
+  alt 次の Issue に移る
+    W->>M: 合図 available (次の Issue)
+    U->>G: PR をマージ (Issue が閉じ、ワークフローが Done を書く)
+    M->>G: ポーリングで close を知り、資源と宣言を解放
+  else レビューを待つ
+    U->>G: PR をマージ (Issue が閉じ、ワークフローが Done を書く)
+    M->>G: ポーリングで close を知り、資源と宣言を解放
+    M->>W: 合図 stop (理由 close)
+    W->>M: 合図 available (次の Issue)
+  end
 ```
 
 項目の状態と、各遷移の書く側 (R2・R21・KTD7)。
@@ -1038,7 +1051,7 @@ issue-dispatch/
 ### U8. スキル `issue-work`
 
 - **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`available`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue の求めが、文書の様式どおりに進む。
-- **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE31, AE33, AE45〜AE47)。KTD1, KTD10, KTD11。
+- **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE31, AE33, AE45〜AE47, AE49)。KTD1, KTD10, KTD11。
 - **Dependencies:** U4, U6, U7 (開始の検査 R26 で `preflight session` を使う)。
 - **Files:**
   - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の宣言 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`・`files classify`・`preflight session`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
@@ -1051,6 +1064,7 @@ issue-dispatch/
 - **Patterns to follow:** `review-triage/skills/review-loop/SKILL.md` (正本の宣言・同梱のスクリプト・前提知識・原則・検出しないもの)、`session-handoff/skills/handoff-write/SKILL.md` (引数の表)。
 - **Test scenarios** (通し確認で確かめる。自動テストは無い):
   - Covers AE3, AE23. 受信を `refuse` にした作業のセッションでも、`wait-assignment` が項目を見つけて着手し、`wait-decision` がコメント `開始可` を見つけて作業を始める。
+  - Covers AE49. `review` を送った後、次の Issue に移るかレビューを待つかを利用者に尋ね、移るなら `available` を送り、待つなら `stop` (理由 close) を受けてから送る。レビュー中の前の Issue の `stop` では、今の作業を止めない。
   - Covers AE47. 判定の待機が期限で終わると、1 回目は `declared` を送り直して待機を起動し直し、2 回目は管理のセッションが止まっている可能性を自分のセッションに書いて待機を起動し直す。Project のフィールドは書かない。
   - Covers AE46. 資源を使い終えたら、ready for review の後でも、資源を外した宣言の全体を `宣言の更新` で書く。
   - Covers AE45. `request` を受けると自分宛ての `依頼` を読み、`宣言の書き直し` なら直した宣言の全体を `宣言の更新` で書いて判定を待ち、`本文の追記` なら PR の本文に `Closes #<番号>` を足す。宣言は投稿の前に `declaration parse` で確かめ、PR は ready for review の前に `Closes` を確かめる。
