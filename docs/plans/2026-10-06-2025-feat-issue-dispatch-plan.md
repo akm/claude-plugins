@@ -144,7 +144,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - R14. **リポジトリの検査と変更の案。** スキル `repo-preflight` は、設定 (R32) の有無と妥当性、固定のポート (開発サーバの設定とスクリプト)、共有のデプロイ先 (`wrangler` の `name` など)、ファイルの種類 (R5。Git が追跡しているファイルに設定と既定の表を照合した、種類ごとの件数と、どのパターンにも一致しないパス)、ツールが生成するファイルの候補 (ロックファイル・Go のファイル (`*.go`) のうち Go の決まった形の `// Code generated ... DO NOT EDIT.` の行があるもの・ファイル `.gitattributes` で `linguist-generated` の印があるパス) を調べ、指摘ごとに変更の案 (設定の JSON の雛形・`files` の規則の案・設定ファイルの差分の案・環境変数でポートを変える案) を示す。生成ファイルの候補の案の書き方 (1 ファイルごとにするか、ディレクトリや名前のパターンにまとめるか、`.gitattributes` のパターンを写すか) は、リポジトリによって適切なものが違うので、見つけたものを示して利用者に尋ねる (KD20)。ビルドの出力先 (vite や `tsc` が書き出すディレクトリ) は、ビルドツールの設定を読んで検出することはしない。出力先をコミットしているリポジトリでは、利用者が調べて設定の `files` に規則 (例: `dist/**`) を書く。適用は人間が行い、スキルはファイルを変えない。設定が無いリポジトリでも動き、「設定が無い」を報告する。
 - R15. **Project の検査。** フィールド 3 つ・Status の選択肢・`Agent stuck state` の値・ワークフローの有効を確かめる。不足は案を示し、承認を得て作る (フィールドは `gh project field-create`、選択肢は GraphQL の `updateProjectV2Field` で既存の選択肢の id を保ったまま足す)。ワークフローは API で変えられないので UI の手順を案内する。推奨のワークフロー (R1) が無効なら案内し、無効のままでも続ける (割り当ての対象は `Ready` の項目だけなので、割り当ては変わらない)。「Auto-add to project」が有効なら、第三者の Issue も Project に入るので `Ready` にする前に中身を確かめるよう案内する。管理のセッションの開始 (R18) と `repo-preflight` の両方から使える。
 - R16. **セッションの検査。** 管理のセッションと作業のセッションは、どちらも権限の確認を省かないモードで開くことを前提にし、設定 `crossSessionInbound` に `accept` を書くことは利用者に案内しない。両方が同じ権限モードの組 (権限の確認を省くモード `bypassPermissions` か、それ以外か) なら、`crossSessionInbound` の値が無くても、合図は受け手のセッションの会話に渡されるため。ユーザー設定の `accept` はマシンのすべてのセッションに及び、組の違うセッションからのメッセージを保留して確かめる仕組みを外してしまう。プロジェクトの設定とローカルの設定に書いた `accept` は適用されない (公式文書の Settings reference)。検査は、`crossSessionInbound` を読み、`refuse` か `hold` があれば合図が会話に渡されないので知らせる (`refuse` のときの扱いは、セッションの役割で分ける。KD15。`hold` も同じに扱う)。自分が権限の確認を省くモードなら、組の違う相手からの合図が保留されることを警告する (Desktop では保留されたメッセージが 5 分で捨てられる)。ユーザー設定に `accept` があれば成功とするが、マシンのすべてのセッションに及ぶことを知らせる (文書レビューの指摘を受けて、利用者と相談して決めた)。管理のセッションでは止める。作業のセッションでは、合図が届かず GitHub の読み取りで進むので遅くなることと、待機の知らせも届かないので止まったことには期限でしか気づけないことを警告し、続ける。Claude Code の版 (`ListAgents` と `notify_when_idle` が使える 2.1.236 以降) は、確かめられる経路 (Desktop は `get_session`、端末は `claude --version`) で読み、読めなければ「確かめていない」と報告する。作業のセッションは、同じ clone から `git worktree add` で作った worktree で開くことを前提にする (ほかの作業ツリーへの操作を拒否するフックが、設定なしで守れるのは、`git worktree list` で見える同じ clone の worktree だけなため。別の clone は、設定 `protected_paths` にパスを書かないと守れない。文書レビューの指摘を受けて、利用者と相談して決めた)。開始の検査では、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` が違うか) を確かめ、そうでなければ (元の clone の作業ツリーか、別の clone で開いた) 知らせて続ける。ほかの作業のセッションと同じ作業ツリーでないことは、作業のセッションからは確かめられない (ほかの作業のセッションの作業ツリーは、管理のセッションの記録にしか無い) ので、管理のセッションが `available` を受け取ったときに確かめる (R19)。プラグインのフックが有効なこと (リポジトリに設定があること)。ツールの権限: 管理のセッションでは、広すぎる事前の許可 (`Bash(gh *)`・`Bash(*)` など、CLI のほかのコマンドまで含む許可) と、権限の確認を省くモード (`bypassPermissions`) を警告する。作業のセッションでは、ふだんの作業と同じ権限が要るので許可は問わず、権限の確認を省くモードだけを警告する (KD18)。(KTD12)
-- R17. **フック。** PreToolUse のフックが、同じリポジトリのほかの worktree の実体パス (と設定 `protected_paths` のパス) を対象にした操作を拒否する。対象は、Bash のコマンドのうちそのパスを含むものとそこへ `cd` するもの、編集系のツール (Edit・Write・MultiEdit・NotebookEdit) のうち書き込むファイルのパスがその中にあるもの。読むだけのツール (Read など) は拒否しない。拒否の理由に、代わりの実行の仕方 (自分の作業ツリーで実行する・読むだけなら Read を使う) を書く。設定の無いリポジトリでは何もしない。入力が読めないときは拒否せず、何も出力しない。`git worktree` のサブコマンド自体は拒否しない。フックが検出しないもの (相対パス `../`、別の clone、シェルの変数を経たパス) を文書に書く。(KTD13)
+- R17. **フック。** PreToolUse のフックが、同じリポジトリのほかの worktree の実体パス (と設定 `protected_paths` のパス) を対象にした操作を拒否する。対象は、Bash のコマンドのうちそのパスを含むものとそこへ `cd` するもの、編集系のツール (Edit・Write・MultiEdit・NotebookEdit) のうち書き込むファイルのパスがその中にあるもの。読むだけのツール (Read など) は拒否しない。拒否の理由に、代わりの実行の仕方 (自分の作業ツリーで実行する・読むだけなら Read を使う) を書く。設定の無いリポジトリでは何もしない。入力が読めないときは拒否せず、何も出力しない。`git worktree` のサブコマンド自体は拒否しない。フックが検出しないもの (相対パス `../`、別の clone、シェルの変数を経たパス) を文書に書く。もう 1 つのフックが、Bash のコマンドとして直接実行される `gh` のうち、Project を書き換えるもの (`gh project item-edit`・`gh project item-delete`、`gh api graphql` で Project を書き換える mutation) と、人間だけが行う操作 (`gh pr merge`・`gh issue close`・`gh issue reopen`) を拒否する。作業のセッションは Project を書かず (R30)、管理のセッションは同梱の CLI だけを通す (KD18) ので、どちらの役割でも正しい手順を止めない (CLI は Python の中から `gh` を実行するので、Bash のコマンドには現れない)。拒否するのは、`gh` がコマンドとして実行される位置 (コマンドの先頭、`&&`・`;`・`|` の後など) にあるときだけで、コミットメッセージなどの文字列の中の `gh pr merge` は拒否しない。このフックは、この仕組みの設定ファイルがある場所 (管理ディレクトリかリポジトリ) で働く。シェルの変数や別名を経た実行は検出できないことを文書に書く (文書レビューの指摘を受けて、利用者と相談して決めた)。(KTD13)
 
 **管理のセッション (スキル `issue-dispatch`)**
 
@@ -724,7 +724,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 | --- | --- |
 | 中継の履歴の上限で、管理のセッションの合図が捨てられる | U1 で実測し、KTD11 の案を決める。どちらの案でも、合図は失われても GitHub から回復する (KTD1)。捨てられた知らせで利用者に入力を求める (R9) |
 | 書いた直後の読み直しが古い値を返し、割り当ての食い違いを検出できない | U1 で確かめる。遅れがあれば、読み直しを数秒後に 1 回繰り返す規則を KTD3 に足す |
-| 作業のセッションが手順に従わず Project を書く | フックでは防げない。`issue-work` の「しないこと」(R30) と通し確認。`actions.log` に無い書き込みは同期で人の変更として報告される (R22) |
+| 作業のセッションが手順に従わず Project を書く | Bash で直接実行する `gh` の書き込みと人間だけが行う操作は、フックで拒否する (R17)。シェルの変数や別名を経た実行は検出できないので、`issue-work` の「しないこと」(R30) と通し確認で補う。`actions.log` に無い書き込みは同期で人の変更として報告される (R22) |
 | ポーリングの間隔 (3 分) の遅れ | 合図で早める (`declared`・`review`)。間隔は設定で変えられる |
 | 利用者が Status を手で変え、導出と食い違う | 上書きせず 1 回だけ報告する (KTD7)。報告済みの印を記録に持つ |
 | Desktop のツール (`set_session_title`・`list_sessions`・`get_session`) が端末のセッションに無い | 端末では利用者に頼む・尋ねる経路を文書に書く (KTD4・KTD10・KTD12) |
@@ -746,8 +746,9 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 issue-dispatch/
 ├── .claude-plugin/plugin.json
 ├── README.md
-├── hooks/hooks.json                       # PreToolUse (Bash と編集系のツール) → hook-scripts/guard-other-worktrees.py
+├── hooks/hooks.json                       # PreToolUse (Bash と編集系のツール) → hook-scripts/guard-other-worktrees.py、(Bash) → hook-scripts/guard-direct-gh.py
 ├── hook-scripts/guard-other-worktrees.py
+├── hook-scripts/guard-direct-gh.py
 ├── scripts/
 │   ├── issue_dispatch.py                  # CLI の入口 (サブコマンド)
 │   └── issue_dispatch/
@@ -809,7 +810,7 @@ issue-dispatch/
 | U4 | 状態機械と再入の手順 | `references/flow.md`, `reentry.md` | U2, U3 |
 | U5 | 記録・宣言・競合の可能性の判定のスクリプトとテスト | `scripts/issue_dispatch/{record,declaration,filekinds,config,ids}.py`, `scripts/issue_dispatch/file-kinds.json`, `tests/test_{record,declaration,filekinds,config}.py` | U3, U4 |
 | U6 | GitHub の読み書きとポーリングのスクリプトとテスト | `scripts/issue_dispatch/{gh,project,issues,poll}.py`, `scripts/issue_dispatch.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,poll}.py` | U5 |
-| U7 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/guard-other-worktrees.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees}.py` | U6 |
+| U7 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U6 |
 | U8 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md` | U4, U6, U7 |
 | U9 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U4, U6, U7, U8 |
 | U10 | 登録・README・用語・CI の対象 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `issue-dispatch/README.md`, `CONCEPTS.md`, `.github/test-targets.txt` | U5〜U9 |
@@ -999,11 +1000,12 @@ issue-dispatch/
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U5 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補 → 指摘と案)、`project` (U6 の `check` を使う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理 / 作業) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` の比較)、フックの設定の有無)。
   - `issue-dispatch/scripts/issue_dispatch.py` — U6 で作る CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` を足す。
-  - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。
+  - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。もう 1 つ、matcher `Bash` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-direct-gh.py"`、`timeout` 10。
+  - `issue-dispatch/hook-scripts/guard-direct-gh.py` — 規則の関数 `denies_gh(command)` と理由文 (代わりの手順: 作業のセッションなら管理のセッションに任せる、人間だけが行う操作なら利用者に頼む)。設定ファイル (`.claude/akm-claude-plugins/issue-dispatch/config.json`) を Git のルート (Git でなければ `cwd`) で探し、無ければ何もしない。
   - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と、編集系のツールのパスを判定する `denies_path(path, cwd, worktrees, protected)` (同じパスの照合を使う) と理由文。
   - `issue-dispatch/skills/repo-preflight/SKILL.md` — 手順 (3 つを検査する → 指摘を示し、生成ファイルの候補は案の書き方を利用者に尋ねる → 案を示す → 適用は人間)、原則、「このスキルが検出しないもの」(ビルドの出力先。利用者が調べて設定の `files` に書く)。
   - `issue-dispatch/skills/repo-preflight/references/checks.md` — 検査の表 (項目 / 確かめ方 / 満たさないときの案)、「フックが検出しないもの」の節。
-  - `issue-dispatch/tests/test_preflight.py`、`issue-dispatch/tests/test_guard_other_worktrees.py`
+  - `issue-dispatch/tests/test_preflight.py`、`issue-dispatch/tests/test_guard_other_worktrees.py`、`issue-dispatch/tests/test_guard_direct_gh.py`
 - **Approach:**
   1. 固定のポートの候補は、開発サーバの設定 (`vite.config.*` の `port`、`package.json` の scripts の `--port`、`wrangler.toml` の `[dev] port`、`.env*` の `PORT`) を正規表現で挙げ、判断と案の文面はスキルが書く。`.env*` は秘密の値を含みうるので、スクリプトはファイル名・キー名・行番号だけを返して値を返さず、スキルは `.env*` を開かない (秘密の値をセッションの文脈に入れないため)。
   2. フックは `git worktree list --porcelain` の `worktree` 行を実体パスにし、自分の作業ツリー (`cwd` の実体パスを含む worktree) を除いた一覧と設定の `protected_paths` を拒否の対象にする。コマンドの中のパスはトークンの先頭一致で、続く文字がパスの区切り・空白・引用符・終端のときだけ一致とする。
@@ -1019,6 +1021,7 @@ issue-dispatch/
   - `git worktree list` と `git worktree remove /w/b` は拒否しない。
   - 設定の無いリポジトリ、`hooks.guard_other_worktrees` が偽、リポジトリでない `cwd`、入力が JSON でない、`git` が無い、のどれでも何も出力せず終了コード 0。
   - sub-agent の入力 (`agent_id` あり) でも同じ規則で拒否する。
+  - `guard-direct-gh`: `gh project item-edit …`・`cd x && gh pr merge 3`・`gh issue close 9`・`gh api graphql -f query='mutation { updateProjectV2ItemFieldValue … }'` は deny の JSON と理由を返す。`gh pr create`・`gh issue comment`・`gh pr edit --body …`・`gh api graphql` の query (読み取り)・`python3 …/issue_dispatch.py project assign …` と、`git commit -m "gh pr merge の手順を直す"` のように文字列の中にあるだけのものには何も出力しない。設定ファイルの無い場所では何も出力しない。
   - Covers AE15. 編集系のツールの入力で、ほかの worktree の中のパスは deny の JSON と理由を返し、自分の worktree の中のパスと、どの worktree にも属さないパスには何も出力しない。Read の入力には何も出力しない。
   - `.env` に `PORT=5173` と `API_KEY=<値>` があっても、返す候補はファイル名・キー `PORT`・行番号だけで、どちらの値も含まない。
   - Covers AE16. `vite.config.ts` の `port: 5173` と `package.json` の `"dev": "vite --port 5173"` を固定のポートの候補として挙げ、設定の無いリポジトリでは「設定が無い」と雛形を返す。ファイルは変えない。
