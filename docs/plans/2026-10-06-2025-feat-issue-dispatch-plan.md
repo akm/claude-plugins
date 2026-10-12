@@ -41,7 +41,7 @@ execution: code
 
 - **目的**: 1 つの Project に集めた Issue を複数の Claude Code のセッションで並行して進めるとき、どの Issue をどのセッションが受け持つか・ほかの Issue の完了を待つか・変更予定のファイルと資源が競合しないかを、利用者が手で判断しなくてよい。進み具合は Project に現れ、利用者は Project を見れば誰が何をしているか分かる。作業のセッションとその sub-agent が、ほかのセッションの作業ツリーでコマンドを実行しない (Issue #114 では、sub-agent がほかのセッションの作業ディレクトリでコマンドを実行し、マージの途中のロックファイルを書き換えた)。
 - **手段**: 新しいプラグイン `issue-dispatch` (スキル `issue-dispatch`・`issue-work`・`repo-preflight`、PreToolUse のフック (ほかの作業ツリーへの操作を拒否するものと、`gh` の直接の実行を拒否するもの)、Python のスクリプト。スキルは KD2、フックは R17) を足す。GitHub (Project のフィールド・Issue の依存関係とコメント・PR の状態) を正本にし、セッション間のメッセージは合図に限る (KTD1〜KTD3)。
-- **優先順位**: 重点は、様式と取り決めの正本 (U2〜U4)、割り当てと再入の手順 (U9)、LLM の判断を要しない処理をテストできるスクリプトとして書くこと (U5・U6)。U7 のうち、前提条件の検査は仕組みが成り立つ条件を利用者に示すもので、検査の項目は後から足せる。U7 のフックは、ほかの作業ツリーでのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を防ぐもので、検査とは別に初版で要る。
+- **優先順位**: 重点は、様式と取り決めの正本 (U2〜U7 の各単位の文書)、割り当てと再入の手順 (U10)、LLM の判断を要しない処理をテストできるスクリプトとして書くこと (U2〜U6)。U8 のうち、前提条件の検査は仕組みが成り立つ条件を利用者に示すもので、検査の項目は後から足せる。U8 のフックは、ほかの作業ツリーでのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を防ぐもので、検査とは別に初版で要る。
 - **正本の優先順位**: 製品の振る舞いは Product Contract の R-ID が正本。実装の選び方は Planning Contract の KTD が正本。実装単位 (U-ID) はどちらも書き換えない。
 - **止まる条件**: U1 の実測で次のどれかが分かったら、設計を変えずに止め、人間に判断を求める。(1) 名前宛てのメッセージが管理のセッションに届かない条件 (セッション間のメッセージの保留か破棄) を設定で解消できない。(2) 割り当てのフィールドを書いた後、数秒おいてもう 1 回読み直しても、自分の書いた値を返さないことがある (直後の読み直しだけが古い値を返すなら、読み直しを数秒後に 1 回繰り返す規則を KTD3 に足して進む。Risks)。(3) Project の組み込みワークフローを無効にしなければ成り立たない。実装の途中で、ほかのプラグインのファイルや `.github/workflows/test.yml` を変えなければ実装できないと分かったら止める (KTD18)。
 - **判断の原則**: この仕組みが利用者に代わって行うのは、機械的に決まる判断 (割り当て・依存関係からの `Blocked`・競合の可能性の検出) だけ。決め方に選択の余地がある判断は、必ず利用者に尋ね、答えの無いまま進めない。問いの回数を減らすことより、確認しないまま進めて後で直すことを避けるほうを優先する。そのほうがやり取りの手間が減り、全体の作業時間も短くなる。問いが多くても、まとめて尋ねれば利用者は答える時間を確保しやすいので、問いはまとめて尋ねる (KD20)。
@@ -130,7 +130,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   - **マージできないファイル**: 画像など、差分でマージできないファイル (パターンに印を付ける) で「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて尋ねる。
   - **共有の状態を持つファイル**: `terraform.tfstate` のように、ファイルが共有の状態 (実際のインフラ) を記録しているものは、種類 (`generated`) とは別に資源 (ラベル `resource:…`) として扱う。
   - レビューでの修正による競合の可能性は判定しない (競合しうる相手とのマージの衝突は利用者が解消する)。(KTD9)
-- R6. **Issue のコメントの先頭行に、書いたセッションの種類と識別子を書く。** 形は `issue-dispatch | <管理のセッション | 作業のセッション> | <セッションの名前> | <セッション ID> | <コメントの種類>`。コメントの種類は、作業のセッションが `着手の宣言`・`宣言の更新`、管理のセッションが `割り当て`・`開始可` (宣言に競合の可能性が無いという判定の結果)・`待機`・`解放`・`引き継ぎ` (新しい管理のセッションが、前の管理のセッションの作業中の項目を引き継いだ経緯。本文に、前の管理のセッションの名前と ID と、引き継いだ理由を書く。R24)・`停滞` (`Agent stuck state` に値を書いた経緯。先頭行に値も書き、同じ割り当てで同じ値の停滞は 1 回だけ書く)・`依頼` (作業のセッションにしてもらうこと。先頭行に依頼の種類 `宣言の書き直し` / `本文の追記` / `小さな PR` を書き、本文に理由と、何をすればよいかを書く)。**管理のセッションの `割り当て`・`開始可`・`待機`・`解放`・`停滞`・`依頼` は、続けて宛先 (`対象 <作業のセッションの ID>`) と割り当ての番号 (`割り当て <番号>`。その Issue で何回目の割り当てか。1 から数える) を持ち、`開始可` と `待機` と、種類が `宣言の書き直し` の `依頼` はさらに、判定した宣言のコメントの ID (`宣言 <ID>`。GitHub がコメントごとに付ける識別子で、どの値を使うかは U2 で決める) を持つ。** 同じ Issue で、同じ宛先に同じ種類のコメントを 2 度書く場面 (解放した Issue を同じ作業のセッションに割り当て直す・宣言を更新する) があり、書き手と種類だけでは前のコメントと見分けられないため。導出だけの変更 (`Blocked` ⇄ `Ready`) と `In review` はコメントにせず、記録のログだけに残す。**先頭行の形をしていても、書き手 (`author.login`) が `gh api user` で得たトークンのログインと違うコメントは、この仕組みのコメントとして扱わない** — 公開リポジトリでは第三者もコメントを書けるので、先頭行の形だけで受け入れると、第三者の 1 件のコメントで競合の可能性の判定を省いて作業を始めさせる・正規のコメントを既投稿と見せて書かせない、ができてしまう。この仕組みのセッションはすべて利用者のトークンで書くので、ログインで絞っても正規のコメントは除かれない。チームで使うときも、ほかの利用者のセッションが書いたコメントは扱わない (KD24)。(KTD2)
+- R6. **Issue のコメントの先頭行に、書いたセッションの種類と識別子を書く。** 形は `issue-dispatch | <管理のセッション | 作業のセッション> | <セッションの名前> | <セッション ID> | <コメントの種類>`。コメントの種類は、作業のセッションが `着手の宣言`・`宣言の更新`、管理のセッションが `割り当て`・`開始可` (宣言に競合の可能性が無いという判定の結果)・`待機`・`解放`・`引き継ぎ` (新しい管理のセッションが、前の管理のセッションの作業中の項目を引き継いだ経緯。本文に、前の管理のセッションの名前と ID と、引き継いだ理由を書く。R24)・`停滞` (`Agent stuck state` に値を書いた経緯。先頭行に値も書き、同じ割り当てで同じ値の停滞は 1 回だけ書く)・`依頼` (作業のセッションにしてもらうこと。先頭行に依頼の種類 `宣言の書き直し` / `本文の追記` / `小さな PR` を書き、本文に理由と、何をすればよいかを書く)。**管理のセッションの `割り当て`・`開始可`・`待機`・`解放`・`停滞`・`依頼` は、続けて宛先 (`対象 <作業のセッションの ID>`) と割り当ての番号 (`割り当て <番号>`。その Issue で何回目の割り当てか。1 から数える) を持ち、`開始可` と `待機` と、種類が `宣言の書き直し` の `依頼` はさらに、判定した宣言のコメントの ID (`宣言 <ID>`。GitHub がコメントごとに付ける識別子で、どの値を使うかは U5 で決める) を持つ。** 同じ Issue で、同じ宛先に同じ種類のコメントを 2 度書く場面 (解放した Issue を同じ作業のセッションに割り当て直す・宣言を更新する) があり、書き手と種類だけでは前のコメントと見分けられないため。導出だけの変更 (`Blocked` ⇄ `Ready`) と `In review` はコメントにせず、記録のログだけに残す。**先頭行の形をしていても、書き手 (`author.login`) が `gh api user` で得たトークンのログインと違うコメントは、この仕組みのコメントとして扱わない** — 公開リポジトリでは第三者もコメントを書けるので、先頭行の形だけで受け入れると、第三者の 1 件のコメントで競合の可能性の判定を省いて作業を始めさせる・正規のコメントを既投稿と見せて書かせない、ができてしまう。この仕組みのセッションはすべて利用者のトークンで書くので、ログインで絞っても正規のコメントは除かれない。チームで使うときも、ほかの利用者のセッションが書いたコメントは扱わない (KD24)。(KTD2)
 
 **仕様の正本 — セッション間の取り決めと記録**
 
@@ -509,7 +509,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - 管理のセッションの `gh` に、権限を絞ったトークン (fine-grained personal access token) を使う手段の案内 (個人のアカウントの Project と、複数の組織にまたがる Project では使えない。Desktop のセッションに個別の `GH_TOKEN` を渡せるかも確かめていない。GitHub の制限がなくなったときに改めて検討する)。
 - マシンをまたいだ管理のセッションの排他 (GitHub に稼働の印を書くなど。KTD4)。
 - 共有の資源 (検証用の Worker・共有のデプロイ先) の、利用者をまたいだ使用中の判断 (資源の種類の表し方と、解放の契機の取り決めが要る。KD24)。
-- Go 以外の言語 (TS/JS・Python など) の、生成ファイルの印の検出 (初版の `repo-preflight` は Go の決まった形だけを探す。言語ごとにコメントの書き方と印の形が違う。R14・U7)。
+- Go 以外の言語 (TS/JS・Python など) の、生成ファイルの印の検出 (初版の `repo-preflight` は Go の決まった形だけを探す。言語ごとにコメントの書き方と印の形が違う。R14・U8)。
 - `gh` の失敗の再試行の回数と待ちの長さの調整 (初版の値は R21・KTD6)。
 
 ### Dependencies / Assumptions
@@ -560,7 +560,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
 ### Key Technical Decisions
 
-- KTD1. **GitHub を正本にし、合図は `available` と `renamed` を除いて GitHub に対応物を持つ** (session-settled: user-approved — chosen over メッセージで宣言と報告を伝える案: メッセージは上限に達すると送り手のセッションで送信が拒否され、受け手の設定によっては捨てられ、受け取りの確認が無い)。`available` と `renamed` はセッションの状態を伝えるので対応物が無く、下の表の列「合図が失われたときの回復」の手段で回復する。対応物の表の正本は `messaging.md` (U3) で、下の表は計画の時点の内容。実装の後は `messaging.md` を読む。
+- KTD1. **GitHub を正本にし、合図は `available` と `renamed` を除いて GitHub に対応物を持つ** (session-settled: user-approved — chosen over メッセージで宣言と報告を伝える案: メッセージは上限に達すると送り手のセッションで送信が拒否され、受け手の設定によっては捨てられ、受け取りの確認が無い)。`available` と `renamed` はセッションの状態を伝えるので対応物が無く、下の表の列「合図が失われたときの回復」の手段で回復する。対応物の表の正本は `messaging.md` (U6) で、下の表は計画の時点の内容。実装の後は `messaging.md` を読む。
 
   | 合図 | 向き | GitHub の対応物 | 合図が失われたときの回復 |
   | --- | --- | --- | --- |
@@ -587,10 +587,10 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 - KTD10. **セッションの識別は ID と名前の両方を作業のセッションが申告し、宛先は名前にする。** ID は `CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。名前は `ListAgents` の 1 行目。`Agent session ID` には ID、`Agent session title` には名前を書く。名前が `ListAgents` に無いときの引き直しは Desktop の `list_sessions` (ID → タイトル) で、端末のセッションは引き直せないので利用者に尋ねる。作業のセッションは名前を変えない (変わったら `renamed`)。R8, R23, R26, R30 を実装する。
 - KTD11. **合図の様式は先頭行 `issue-dispatch: <種類>` と `<キー>: <値>` の行にし、数を減らす。** 1 Issue あたり作業のセッションから管理のセッションへ 3 通 (`available`・`declared`・`review`)、管理のセッションから作業のセッションへ 2 通 (`assigned`・`go` または `wait`)。`stop` は解放・close・項目の除去のときだけ。`request` は依頼が要るときだけ (宣言の形の誤り・`Closes` の無い PR・利用者が小さな PR を選んだとき)。中継の履歴の扱いは U1 の実測で決める — 案 A: バックグラウンドの待機の通知で始まるターンから送った合図が履歴を引き継がないなら、管理のセッションは合図を通知で始まるターン (再入の手順の最後) でまとめて送る。案 B: 引き継ぐなら、合図が捨てられた知らせで利用者に 1 行の入力を求める (R9) だけにする。どちらでも、合図が失われたときの回復は KTD1 の表に従う。R7, R9 を実装する。
 - KTD12. **Claude Code セッションの権限モードの組み合わせによるセッション間のメッセージの保留は、管理のセッションと作業のセッションを、どちらも権限の確認を省かないモードで開くことで避け、設定 `crossSessionInbound` の `accept` には頼らない。** スクリプトがユーザー設定 (`~/.claude/settings.json`) とプロジェクト・ローカルの設定を読む。`refuse` か `hold` があれば、管理のセッションでは止め、作業のセッションでは警告して続ける (R16・KD15)。ユーザー設定に `accept` があれば成功とし、マシンのすべてのセッションに及ぶことを知らせる。自分の権限モードが権限の確認を省くモードなら、権限の確認を省かないモードの相手からの合図が保留されることを警告する。スクリプトは役割を引数 (`preflight session --role manager|worker`) で受ける。同じ設定ファイルの `permissions.allow` と `permissions.defaultMode` も読み、R16 の権限の警告を出す。Desktop では `get_session` の `permissionMode` も見る。端末で起動の引数として渡した権限のモードは読めないので、「確かめていない」と報告する。権限モードそのものは対話セッションから読む公式の手段が無い (Desktop の `get_session` だけ) ので、両方とも権限の確認を省かないモードであることは利用者に確かめる。R16 を実装する。
-- KTD13. **フックの規則 (パスの照合) は 1 か所にまとめ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U7 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出力せず終了コード 0。Bash は、設定ファイルの読み込みや `git` の実行の前に、正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
+- KTD13. **フックの規則 (パスの照合) は 1 か所にまとめ、`git worktree list --porcelain` の実体パスで判定する。** Bash のコマンドと編集系のツールのパスの両方に、同じ照合を使う。設定 (`hooks.guard_other_worktrees`。デフォルトは設定があれば有効) の無いリポジトリでは何もしない。コマンドの中に、自分以外の worktree の実体パス (末尾がパスの区切りか空白かコマンドの終わり) が現れるか、`cd` の引数がそのパスなら拒否する。`git worktree` で始まるコマンドは拒否しない。編集系のツールは、入力の書き込むファイルのパス (Edit・Write は `file_path`。公式文書の PreToolUse の入力の表にあり、絶対パス) を実体パスにし、自分以外の worktree の中にあれば拒否する。MultiEdit・NotebookEdit は公式文書の入力の表に無いので、パスのキーを U8 で実物の入力から確かめる。拒否は JSON の `permissionDecision: deny` と、代わりの実行の仕方を書いた理由 (先例 `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`)。入力が読めない・`git` が無い・リポジトリでないときは何も出力せず終了コード 0。Bash は、設定ファイルの読み込みや `git` の実行の前に、正規表現で `/` を含むコマンドだけに絞る。R17 を実装する。
 - KTD14. **スクリプトは 1 つの CLI と 1 つのパッケージにし、`gh` の実行を 1 つの関数にまとめる。** ファイル `issue-dispatch/scripts/issue_dispatch.py` (入口) とディレクトリ `issue-dispatch/scripts/issue_dispatch/` (`gh.py`・`project.py`・`issues.py`・`declaration.py`・`filekinds.py`・`config.py`・`record.py`・`poll.py`・`preflight.py`・`ids.py`) と、デフォルトの表 `file-kinds.json`。サブコマンド: `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `issue create` / `blocked-by add` / `pr observe` / `declaration parse` / `declaration conflictability` / `files classify` / `record ...` / `wait` / `wait-assignment` / `wait-decision` / `preflight repo` / `preflight project` / `preflight session`。入出力は JSON。GraphQL は `gh api graphql` で `orderBy` と `rateLimit { cost remaining resetAt }` を明示する。変更系の呼び出しは 1 秒以上空ける。`project set-status` は、管理のセッションが書く 5 つ (`Todo`・`Ready`・`Blocked`・`In Progress`・`In review`) 以外の値を、`Done` を含めて `gh` を実行せずに拒否する (R2)。偽の `gh` は PATH の先頭に置く Python の実行ファイルで、環境変数で振る舞いを切り替え、応答は実物の `--json` と GraphQL の出力を写した固定データ (`issue-dispatch/tests/fixtures/`)。人間向けの表示は解析しない。管理のセッションの GitHub の読み書きは、すべてこの CLI を通す (KD18)。CLI には、承認なしに行う操作 (R13) と、承認を得た後に行う操作だけを実装し、PR のマージ・Issue の close と reopen・コメントの削除・`Done` の設定のサブコマンドは作らない。R31 を実装する。
 - KTD15. **設定の様式は `project-config.md` に書き、未設定の扱いを表で定める。** 設定の読み込み・デフォルト値の適用・値の誤りの警告・`files` のパターンの表記をそろえることは、モジュール `config.py` が行う。`filekinds` は設定ファイルを読まず、そろえた後の規則を引数で受ける (`filekinds` をほかのモジュールに依存させないため。KD22)。 管理ディレクトリとリポジトリで同じファイル名を使い、キーで役割が分かれる。`project` はどちらにも書ける (管理ディレクトリの設定では必須、リポジトリの設定では `issue-work` の名前の導出に使う)。未設定: `record_dir` は `tmp/issue-dispatch`、`poll_minutes` は 3、`wait_minutes` は 60、`files` は空 (デフォルトの表だけと照合する。どちらのパターンにも一致しないパスは `unknown-content`)、`resources` は空、`protected_paths` は空、`hooks.guard_other_worktrees` は設定があれば真。整数のキーは空文字列を未設定と読まない。値の誤りはデフォルト値で続行して警告 (R11 の設定の扱い)。`files` の `pattern` は読み込むときに表記をそろえる (先頭の `./` を取り除き、`//` を `/` にする)。宣言のパスと違って `posixpath.normpath` は使わない。`normpath` は末尾の `/` を取り除き、`dist/` を `dist` という名前のファイルだけに一致するパターンに変えてしまうため。絶対パスと `..` を含むパターンは、その規則を使わずに警告する。警告は、管理のセッションの開始時の検査と `repo-preflight` の報告に出す。R32 を実装する。
-- KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U2・U3 の文書の「実測」の節に、日付と版を添えて書く。
+- KTD16. **U1 の実測を最初の実装単位にし、結果で KTD11 の案と文書の「実測」の節を確定する。** 実測は書き込みを伴う (検証用の Project・Issue・セッション) ので、始める前に手順と費用を利用者に示して許可を得る。結果は U5・U6 の文書 (`project-schema.md`・`messaging.md`) の「実測」の節に、日付と版を添えて書く。
 - KTD17. **通し確認は、利用者のアカウントの検証用 Project と、検証用のリポジトリ 2 つ、管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ) で行う。** ブランチ版のプラグインは `claude --plugin-dir <リポジトリ>/issue-dispatch` で読み込む (端末)。Desktop のセッションには起動の引数を渡せないので、ブランチ版を読み込ませる手段を U1 で確かめる (Open Questions)。手段が無ければ、通し確認のセッションはすべて端末にし、Desktop にしかないツール (`set_session_title`・`list_sessions`・`get_session`) は、マージの後にインストールした版で短く確かめる。費用は始める前に利用者に示す。Verification Contract を実装する。
 - KTD18. **変えないもの。** ほかのプラグインのディレクトリ、`.github/workflows/test.yml`、`.claude/` の設定。変えるのは新しいディレクトリ `issue-dispatch/` と、登録のためのファイル (`.claude-plugin/marketplace.json`・`README.md`・`CONCEPTS.md`・`.github/test-targets.txt`) だけ。版は 0.1.0 (新しいプラグイン)。
 
@@ -715,7 +715,7 @@ flowchart TB
 
 ### Sequencing
 
-U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まるため。U2〜U4 (正本の文書) をスクリプトより先にするのは、スクリプトの入出力とテストがその契約に従うため。U5 (記録・宣言・競合の可能性の判定) を U6 (GitHub の読み書き) より先にするのは、`gh` を使わずにテストできるため。U8 (作業のセッション) を U9 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
+U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10 → U11。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、合図と待機 (U6) は記録と Project の読み書きを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、ファイルの種類 (U2) と Project の検査 (U5) を使う。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
 
 ### Alternatives Considered
 
@@ -752,7 +752,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10。U1 (実測)
 | `gh` のレート制限 | 一覧は 1 回 1〜3 ポイントで、3 分おきでも 1 時間 60 ポイント以内。変更系は 1 秒以上空ける (KTD14)。待機は `rateLimit` を読んで再開時刻まで待つ (KTD6) |
 | 通し確認の費用と時間 | シナリオを絞り、始める前に利用者に示す (KTD17) |
 | 割り当ての後で、Issue の作者 (第三者) が本文を書き換える | 割り当ての直前の確認 (R19) では防げない。作業のセッションが作業の途中で本文を読み直すときの扱いは、まだ決めていない |
-| 作業のセッションが節の名前を書き誤る (キー `./utils` を `utils` と書く) | スクリプトはファイルを読まないので検出できず、別の節として「競合しない」と判定される。その結果はマージのときの衝突で、利用者が解消する (「競合しうるまま進める」を選んだときと同じ)。`declare.md` に、ファイルにある文字のまま写すことを書く (U8) |
+| 作業のセッションが節の名前を書き誤る (キー `./utils` を `utils` と書く) | スクリプトはファイルを読まないので検出できず、別の節として「競合しない」と判定される。その結果はマージのときの衝突で、利用者が解消する (「競合しうるまま進める」を選んだときと同じ)。`declare.md` に、ファイルにある文字のまま写すことを書く (U9) |
 | チームで、共有の資源 (検証用の Worker など) を利用者をまたいで同時に使う | 資源の使用は利用者ごとの記録で見るので検出できず、互いのデプロイを上書きしうる。初版では受け入れ (KD24。利用者と相談して決めた)、README に書く。避けたいときは、共有の資源を要する Issue の担当者を 1 人にそろえる方法がある |
 | 依頼 `小さな PR` の合図が失われる | 待機のスクリプトでは見つけず、作業のセッションが自分の PR を作る前の確認で気づく。それまで待つほうの Issue の項目は `Blocked` のまま止まる。合図が失われることはまれなので、初版ではこれを受け入れる (利用者と相談して決めた) |
 | 新しい語が CLAUDE.md の規則に反する言い回しで広がる | `CONCEPTS.md` に定義し、文書を書いたら `wording-guard` を実行する (R33) |
@@ -811,6 +811,7 @@ issue-dispatch/
     ├── fixtures/                          # 実物の gh の出力を写した固定データ
     ├── test_config.py
     ├── test_declaration.py
+    ├── test_ids.py
     ├── test_filekinds.py
     ├── test_record.py
     ├── test_project.py
@@ -824,18 +825,21 @@ issue-dispatch/
 
 ## Implementation Units
 
+実装単位はドメインで分け、依存される単位を先にする。各単位の中は、正本の文書 (様式と取り決め) → テスト → 実装の順に進める (ドメインの意味と、分け方と順の理由は Sequencing)。
+
 | U-ID | 名前 | 主なファイル | 依存 |
 | --- | --- | --- | --- |
-| U1 | 前提の実測 | スクラッチパッドの記録 → U2・U3 の「実測」の節 | — |
-| U2 | Project・Issue・宣言・コメントの様式の正本 | `issue-dispatch/skills/issue-dispatch/references/project-schema.md`, `issue-format.md` | U1 |
-| U3 | 合図の取り決めと記録・設定の契約 | `references/messaging.md`, `records.md`, `project-config.md` | U1, U2 |
-| U4 | 状態機械と再入の手順 | `references/flow.md`, `reentry.md` | U2, U3 |
-| U5 | 記録・宣言・競合の可能性の判定のスクリプトとテスト | `scripts/issue_dispatch/{record,declaration,filekinds,config,ids}.py`, `scripts/issue_dispatch/file-kinds.json`, `tests/test_{record,declaration,filekinds,config}.py` | U3, U4 |
-| U6 | GitHub の読み書きとポーリングのスクリプトとテスト | `scripts/issue_dispatch/{gh,project,issues,poll}.py`, `scripts/issue_dispatch.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,poll}.py` | U5 |
-| U7 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U6 |
-| U8 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md` | U4, U6, U7 |
-| U9 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U4, U6, U7, U8 |
-| U10 | 登録・README・用語・CI の対象 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `issue-dispatch/README.md`, `CONCEPTS.md`, `.github/test-targets.txt` | U5〜U9 |
+| U1 | 前提の実測 | スクラッチパッドの記録 → U5・U6 の「実測」の節 | — |
+| U2 | ファイルの種類と設定 | `issue-dispatch/skills/issue-dispatch/references/file-kinds.md`, `references/project-config.md`, `scripts/issue_dispatch/{filekinds,config}.py`, `scripts/issue_dispatch/file-kinds.json`, `scripts/issue_dispatch.py`, `tests/test_{filekinds,config}.py` | U1 |
+| U3 | 宣言と競合の可能性の判定 | `references/issue-format.md` (宣言の節), `scripts/issue_dispatch/{declaration,ids}.py`, `tests/test_{declaration,ids}.py` | U2 |
+| U4 | 記録 | `references/records.md`, `scripts/issue_dispatch/record.py`, `tests/test_record.py` | U3 |
+| U5 | Project と Issue の読み書き | `references/project-schema.md`, `references/issue-format.md` (Issue とコメントの節), `scripts/issue_dispatch/{gh,project,issues,ids}.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,ids}.py` | U1, U3, U4 |
+| U6 | 合図と待機 | `references/messaging.md`, `scripts/issue_dispatch/poll.py`, `tests/test_poll.py` | U4, U5 |
+| U7 | 状態機械と再入の手順 | `references/flow.md`, `reentry.md` | U4, U5, U6 |
+| U8 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 |
+| U9 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md` | U2, U3, U5〜U8 |
+| U10 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U3〜U9 |
+| U11 | 登録・README・用語・CI の対象 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `issue-dispatch/README.md`, `CONCEPTS.md`, `.github/test-targets.txt` | U2〜U10 |
 
 ### U1. 前提の実測
 
@@ -843,12 +847,12 @@ issue-dispatch/
 - **Requirements:** R7, R9, R19 の前提 (Dependencies / Assumptions, Open Questions)。KTD11, KTD16。
 - **Dependencies:** 無し。
 - **Files:**
-  - スクラッチパッドの記録 (追跡外)。結果は U2・U3 で `project-schema.md` と `messaging.md` の「実測」の節に写す。
+  - スクラッチパッドの記録 (追跡外)。結果は U5・U6 で `project-schema.md` と `messaging.md` の「実測」の節に写す。
 - **Approach:**
   1. 始める前に、手順・作るもの (検証用の Project 1 つ・Issue 数件・セッション 2 つ)・費用の目安を利用者に示し、許可を得る。
   2. セッション間の合図: 管理のセッションと作業のセッションを 1 つずつ開き、(a) 名前宛てで往復し、捨てられるまでの通数と知らせの文面を控える。(b) 作業のセッションからの合図で始まったターンで管理のセッションが返した合図と、バックグラウンドの待機 (短い `sleep` をバックグラウンドで起動) の通知で始まったターンで返した合図の、中継の履歴の引き継ぎの違いを、同じ往復の数で比べる。(c) `notify_when_idle` を Desktop と端末の両方に申し込み、知らせの文面を控える。(d) 作業のセッションの受信を `refuse` にして合図が届かないことを確かめる (AE3 の前提)。(e) 止まる条件 (1) の確認: どちらも権限の確認を省かないモードの管理のセッションと作業のセッションの間で、`crossSessionInbound` の値が無くても、名前宛ての合図が保留 (承認待ち) も破棄もされずに受け手の会話に渡されることを、Desktop と端末の組み合わせで確かめる。(f) バックグラウンドの待機を PID で止めたときの通知 (表示される終了コードと出力) を、Desktop と端末で確かめる (KTD6)。(g) バックグラウンドの待機を 60 分 (設定 `wait_minutes` のデフォルト値) 動かし、打ち切られずに終わり、通知が届くかを Desktop と端末で確かめる。(h) 中継で捨てられて受け手に届かなかった合図と同じ本文の合図を、後から送り直したとき、受け手に届くか (同じ内容の繰り返しとして捨てられないか) を確かめる (R24 の `assigned` の再送が届くかどうか)。(i) 作業のセッションを権限の確認で止めたとき、`ListAgents` の状態が `waiting` になるか。ほかに `waiting` になる場面 (利用者への問いの答え待ちなど) があるか (R10 の `waiting-for-user`)。
   3. 名前と ID: Desktop の `set_session_title` で変えた名前が `ListAgents` に反映されるか。その名前が、ターンを何度か重ねた後も Desktop の自動のタイトル (会話の内容から付く名前) で上書きされないか (数ターン後に `ListAgents` で読み直す)。端末の `/rename` でほかのセッションと同じ名前にしたとき、名前が自動で変えられるか。`/clear` の後に `CLAUDE_CODE_SESSION_ID` と `CLAUDE_CODE_HOST_SESSION_ID` が変わるか (Desktop と端末)。
-  4. GitHub: 検証用の Project で、`updateProjectV2Field` で Status に `Ready`・`In review`・`Blocked` を足し、既存の項目の値が残ることを確かめる。`gh project item-edit --field "Agent session ID" --text <値>` を書いた直後に読み直し、値が返るまでの遅れを測る (10 回)。フィールドの値の更新時刻が GraphQL で読めるか (R24 の作り直しと R19 で使う)。Issue の本文の最後の編集の時刻と編集者が GraphQL で読めるか (R19)。個人のアカウントのリポジトリの Issue に、関係の無い組織のリポジトリの Issue を `blockedBy` で足せるか (組織どうしでは実例がある)。依存先の Issue のリポジトリで要る権限。`blockedBy` に PR を足せないこと (R20 の小さな PR を記録で待つ理由)。`closingIssuesReferences` が draft の PR でも返るか。新しい Project のワークフローが有効かどうかの初期値 (`workflows` の `enabled`)。U6 の `items` のクエリ (項目・フィールド・blocker・PR・コメントを入れ子で取るもの) の `rateLimit.cost` を、項目が 20 件と 100 件の Project で記録し、3 分おき (設定 `poll_minutes` のデフォルト値) のポーリングが 1 時間あたりの上限に収まるかを確かめる (R21・Risks の `gh` のレート制限)。
+  4. GitHub: 検証用の Project で、`updateProjectV2Field` で Status に `Ready`・`In review`・`Blocked` を足し、既存の項目の値が残ることを確かめる。`gh project item-edit --field "Agent session ID" --text <値>` を書いた直後に読み直し、値が返るまでの遅れを測る (10 回)。フィールドの値の更新時刻が GraphQL で読めるか (R24 の作り直しと R19 で使う)。Issue の本文の最後の編集の時刻と編集者が GraphQL で読めるか (R19)。個人のアカウントのリポジトリの Issue に、関係の無い組織のリポジトリの Issue を `blockedBy` で足せるか (組織どうしでは実例がある)。依存先の Issue のリポジトリで要る権限。`blockedBy` に PR を足せないこと (R20 の小さな PR を記録で待つ理由)。`closingIssuesReferences` が draft の PR でも返るか。新しい Project のワークフローが有効かどうかの初期値 (`workflows` の `enabled`)。U5 の `items` のクエリ (項目・フィールド・blocker・PR・コメントを入れ子で取るもの) の `rateLimit.cost` を、項目が 20 件と 100 件の Project で記録し、3 分おき (設定 `poll_minutes` のデフォルト値) のポーリングが 1 時間あたりの上限に収まるかを確かめる (R21・Risks の `gh` のレート制限)。
   5. Desktop のセッションにブランチ版のプラグインを読み込ませる手段 (KTD17): (a) このリポジトリの手元の作業ツリーをマーケットプレイスとして Desktop に追加し、そこからインストールする。(b) マーケットプレイスの追加で GitHub のブランチを指定する。どちらで読み込めたか、読み込めなかったかを控える。
   6. 結果を表 (項目 / 結果 / 日付 / 版) に書く。
 - **Patterns to follow:** `docs/plans/2026-09-26-1338-feat-review-loop-plan.md` の Dependencies / Assumptions の実測の書き方 (条件・回数・結果を 1 文ずつ)。
@@ -856,81 +860,54 @@ issue-dispatch/
   - Test expectation: none -- 実測の単位で、コードは書かない。
 - **Verification:** Open Questions の各項目に結果が付き、Goal Capsule の止まる条件 (1)〜(3) のどれに当たるかが分かり、KTD11 の案 (A か B) が決まっている。検証用の Project と Issue は消さずに通し確認で使う。
 
-### U2. Project・Issue・宣言・コメントの様式の正本
+### U2. ファイルの種類と設定
 
-- **Goal:** Project のフィールドと Status と順序、Issue の依存関係とラベル、宣言の JSON、コメントの先頭行の様式が 2 つの文書に揃い、スキルとスクリプトがそれに従う。
-- **Requirements:** R1〜R6 (AE4, AE5, AE18, AE21, AE35, AE36, AE39, AE40)。KTD2, KTD7, KTD9。
+- **Goal:** ファイルの種類と競合の可能性の判定の規則、設定のキーと未設定の扱いが正本の文書に揃い、パスから種類と属性を決める処理 (`filekinds`) と、設定の読み込み (`config`) が、`gh` を使わずにテストできる Python のモジュールになる。`filekinds` はほかのモジュールに依存しない (KD22) ので、最初のドメインにする。
+- **Requirements:** R5 (種類の決め方)、R31, R32 (AE17, AE42)。KTD9, KTD14, KTD15。
 - **Dependencies:** U1。
 - **Files:**
-  - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」であることの明記。フィールドの表 (名前 / 型 / 書き手 / 意味。`Agent stuck state` の 5 つの値の表を含む)、Status の選択肢の表 (名前 / 書き手 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
-  - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` (新設) — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、宣言の JSON の様式 (キーの表: キー / 必須 / 型 / 意味。`units` の書き方は `file-kinds.md` を参照し、言い直さない)、分割で作る Issue の本文の先頭行の様式 (分割の元の Issue と宣言の ID)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由)、「この例は様式を示すもので、そのまま写さない」の注記。
   - `issue-dispatch/skills/issue-dispatch/references/file-kinds.md` (新設) — 冒頭に「このファイルがファイルの種類と競合の可能性の判定の規則の正本」であることの明記。6 段の問いと種類の表 (段 / 問い / 種類 / 判定 / 示す扱い)、節で判定する規則 (階層と先頭部分の一致)、節の表記の表 (構造 / 表記 / 例)、パスのパターンの書き方と照合の順 (設定が先・段の順)、分けたときの参照のされ方 (`split_reference`)、マージできないファイル、共有の状態を持つファイル、デフォルトの表の読み方と各行を選んだ理由 (表そのものの正本は `file-kinds.json` で、文書では言い直さない)。
-- **Approach:**
-  1. 表の列は `review-triage/skills/review-triage/references/record-schema.md` の形 (キー / 必須 / 内容) に合わせる。
-  2. 宣言の例は JSON のコードブロック 1 つにし、未知のキーが差し戻されることを書く。
-  3. 先頭行の例を、管理のセッションと作業のセッションの両方で 1 つずつ示す。
-  4. `file-kinds.md` の規則は R5 を写し、「レビューでの修正による競合の可能性は判定しない」理由を 1 文で添える。
-- **Patterns to follow:** `review-triage/skills/review-loop/references/loop-files.md` (冒頭の、正本であることの明記・表・一時名の節の形)、`review-triage/skills/review-triage/references/review-request-template.md` (様式に無いキーを足さない)。
-- **Test scenarios:**
-  - Test expectation: none -- 文書だけ。U5 のテストが、宣言の検査がこの文書のキーの表と一致することを確かめる。
-- **Verification:** `issue-dispatch/skills/` を対象に `doc-dag` を実行して、様式が他の文書に複製されていない。U5 の宣言のテストの必須キーと、`filekinds` のテストの種類と属性の一覧が、これらの文書の表と同じ。
-
-### U3. 合図の取り決めと記録・設定の契約
-
-- **Goal:** 合図の種類と様式、宛先の決め方、捨てられた知らせの扱い、記録のファイルの様式と扱い、設定のキーと未設定の扱いが 3 つの文書に揃う。
-- **Requirements:** R7〜R11, R32 (AE3, AE9, AE10, AE13, AE17, AE22)。KTD1, KTD5, KTD10, KTD11, KTD12, KTD15。
-- **Dependencies:** U1, U2。
-- **Files:**
-  - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、Claude Code セッションの権限モードの組み合わせと `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。実測の節には、Claude Code の公式文書に無い振る舞いへの依存の表を書く (列は、文書に無い振る舞い / それに頼る要件と処理 (R・KTD・スキルの手順・スクリプトの関数) / 確かめた日と Claude Code の版 / 変わったときに直す場所)。最初に載せるのは、`ListAgents` の出力の形 (1 行目の名前・各行の状態) と、環境変数 `CLAUDE_CODE_HOST_SESSION_ID`。スキルの手順書は、文書に無い振る舞いに頼るところでこの表を参照する (版が上がって振る舞いが変わったとき、直す場所を 1 か所で見られるようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。
-  - `issue-dispatch/skills/issue-dispatch/references/records.md` (新設) — 記録の置き場、`record.json` のキーの表 (`project`・`manager` (ID・名前・開始・`state`・利用者の最後の入力からの送受の数)・`sessions` (ID → 名前・`repo`・`worktree`・状態・待機中の時刻。所属する項目は `items` の `session_id` だけが持つ)・`items` (項目 → `item_id`・`session_id`・意図 (書く予定の ID・title・Status・割り当ての番号)・段階の印の時刻 (いつ付くかの正本は `flow.md`)・再送の回数・最後に書いた Status・宣言の写し・資源・自分が足した `blockedBy`・待っている小さな PR・競合の可能性があるときに選んだ扱い・報告済みの印 (人の変更・割り当てない理由))・`resources` (名前 → 使用中の Issue と時刻)・`notices`・`questions` (問い → 項目・種類・選択肢・尋ねた時刻・答えと答えた時刻))、`snapshot.json` (項目ごとの Status・フィールド・`blockedBy`・close・PR の状態・読んだコメントの id。書き手は再入のターンだけ)、`actions.log` (1 行 1 JSON のキー)、`wait.pid` (PID・開始時刻・所有者)、書き手・一時名と改名・種類ごとの扱いの表 (設定 / 記録 / スナップショット / ログ / 宣言)。
   - `issue-dispatch/skills/issue-dispatch/references/project-config.md` (新設) — 様式 (管理ディレクトリの設定とリポジトリの設定の JSON の例)、キーの表 (キー / 置き場 (管理ディレクトリ / リポジトリ) / 意味 / 未設定のときの扱い)、「未設定」の定義、`files` の規則の書き方 (`pattern`・`kind`・`unit_notation`・`split_reference`・`mergeable`。意味の正本は `file-kinds.md`)、`protected_paths`。
-- **Approach:**
-  1. 記録のキーは、Project から導出できる値 (Issue の URL・タイトル) を持たない。項目のキーは `owner/repo#番号`。
-  2. 扱いの表は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md` の列 (種類 / 失われるもの / 読めない・壊れているとき) にスナップショット (作り直せるキャッシュ) の行を足す。
-  3. 設定の文書は `review-triage/skills/review-triage/references/project-config.md` の形。
-- **Patterns to follow:** `review-triage/skills/review-loop/references/loop-files.md`、`review-triage/skills/review-triage/references/project-config.md`。
-- **Test scenarios:**
-  - Test expectation: none -- 文書だけ。U5・U6 のテストが、スクリプトが書く記録と設定の読み方がこの文書と一致することを確かめる。
-- **Verification:** `doc-dag` で重複と巡回が無い。U5 のテストが書き出す `record.json` のキーが表と一致する。
-
-### U4. 状態機械と再入の手順
-
-- **Goal:** 項目の状態遷移、フィールド × 書き手 × いつ の表、ポーリングの処理の順、停止ノード、行為の区分と取り消し方、再入の手順が 2 つの文書に揃い、散文で言い直されない。
-- **Requirements:** R12, R13, R21〜R25 (AE2, AE7, AE8, AE9, AE11, AE12, AE14, AE20, AE38〜AE40)。KTD3, KTD6, KTD7, KTD8。
-- **Dependencies:** U2, U3。
-- **Files:**
-  - `issue-dispatch/skills/issue-dispatch/references/flow.md` (新設) — 状態遷移の図 (High-Level Technical Design の図をこの文書に移して正本にする)、フィールド × 書き手 × いつ の表、割り当ての書き込みの順と冪等性 (KTD3)、ポーリングの処理の順の決定表 (順 / 変化 / 条件 / 行うこと / 承認 / 報告に書くもの。部分完了の続きの行を含み、条件は記録の段階の印で書く。段階の印がいつ付くかの正本)、停止ノードの決定表 (ID / 条件 / 記録に書くもの / 報告に書くもの / 続け方)、行為の区分の表 (承認不要 / 承認必要 / 人間のみ) と取り消し方の表。
-  - `issue-dispatch/skills/issue-dispatch/references/reentry.md` (新設) — 入口 1 つ (通知・合図・利用者の答え・`--resume`)、手順 (記録と設定を読む → 利用者の答えがあれば記録に書く → 止めた待機の通知 (KTD6) なら何もしない → 記録の状態が `active` でなければ何もしない → 待機の結果を読む (表に無い終了コードなら停止) → `project items` で Project を読む → `flow.md` の決定表の順に処理 → 割り当て → 動いている待機を止める → スナップショットを書く → 待機の起動 → 利用者が未回答の管理のセッションからの問いをまとめて示してターンを終える)、待機の Bash 呼び出しの `description` の文、通知は人間の入力ではないこと、部分完了の表 (段階の印 / Project の状態 / 行うこと。条件は `flow.md` の行 ID を参照し、言い直さない)。
-- **Approach:**
-  1. 停止ノードの ID は `D1`〜 (dispatch の D) とし、review-loop の `RA` と区別する。
-  2. 決定表の「同時に成立したときの順」を表の先頭に書く (R12)。
-  3. 再送の規則 (`assigned` は 1 回だけ再送、コメントは先頭行で既投稿を検出) を部分完了の表に書く。
-- **Patterns to follow:** `review-triage/skills/review-triage-loop/references/loop-flow.md` (図が正本、決定表が条件と報告、散文はノード ID で参照)、`review-triage/skills/review-loop/references/reentry.md`、`references/stops.md`。
-- **Test scenarios:**
-  - Test expectation: none -- 文書だけ。U6 のポーリングのテストが、処理の順の決定表のとおりに変化を並べて返すことを確かめる。
-- **Verification:** 図のノードと決定表の行が 1:1 (目視)。`doc-dag` で巡回が無い。
-
-### U5. 記録・宣言・競合の可能性の判定のスクリプトとテスト
-
-- **Goal:** 記録の読み書きと段階の印、宣言の検査とパスの正規化、パスから種類を決める処理、競合の可能性の判定、セッション ID と Issue の参照の正規化が、`gh` を使わずにテストできる Python のモジュールになる。
-- **Requirements:** R4, R5, R11, R31, R32 (AE4, AE9, AE10, AE32, AE41, AE42, AE44, AE46)。KTD5, KTD9, KTD10, KTD14, KTD15。
-- **Dependencies:** U3, U4。
-- **Files:**
   - `issue-dispatch/scripts/issue_dispatch/__init__.py`
-  - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの配列、資源の使用、報告済みの印、`actions.log` への追記。
-  - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`units`)、パスの正規化、競合の可能性の判定 (R5)。
   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、デフォルトの表を後に照合し、段の順で決める。パターンは正規表現に変換して照合する)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — デフォルトの表 (パターン・種類・節の表記・分けたときの参照のされ方・マージできるか)。
   - `issue-dispatch/scripts/issue_dispatch/config.py` — 管理ディレクトリの設定とリポジトリの設定の読み込み、未設定のキーへのデフォルト値の適用 (KTD15 の表)、値の誤りの警告、`files` のパターンの表記をそろえることと、ルートの外を指すパターンの警告。
-  - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無)、Issue の参照 (`owner/repo#番号`・URL) の正規化、コメントの先頭行の生成と解析、環境変数からの自分のセッション ID の決定 (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。公式文書に無い振る舞いに頼るので、この関数 1 つにまとめる。KTD10)、管理のセッションの規約の名前の生成 (`issue-dispatch <owner>/<number>/<login>`。管理のセッションの起動・排他と、作業のセッションの宛先の導出が使う。KD23)。
-  - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_filekinds.py`、`issue-dispatch/tests/test_config.py`
+  - `issue-dispatch/scripts/issue_dispatch.py` (新設) — CLI の入口 (サブコマンドと JSON の入出力。KTD14)。この単位で `files classify` を作り、後の単位がサブコマンドを足す。
+  - `issue-dispatch/tests/test_filekinds.py`、`issue-dispatch/tests/test_config.py`
 - **Approach:**
-  1. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
+  1. 表の列は `review-triage/skills/review-triage/references/record-schema.md` の形 (キー / 必須 / 内容) に合わせる (U3〜U7 の文書の表も同じ)。
+  2. `file-kinds.md` の規則は R5 を写し、「レビューでの修正による競合の可能性は判定しない」理由を 1 文で添える。
+  3. 設定の文書は `review-triage/skills/review-triage/references/project-config.md` の形。
+- **Execution note:** テストを先に書く。
+- **Patterns to follow:** `review-triage/skills/review-loop/references/loop-files.md` (冒頭の、正本であることの明記・表の形)、`review-triage/skills/review-triage/references/project-config.md`、`review-triage/scripts/review-loop-worker/*.py` (1 ファイル 1 責務、docstring の冒頭に責務と正本の文書)。
+- **Test scenarios:**
+  - パターンの書き方: `*.pb.go` は `api.pb.go` に一致し、`gen/api.pb.go` に一致しない。`**/*.pb.go` は両方に一致する。`src/*.ts` は `src/app.ts` に一致し、`src/lib/a.ts` に一致しない。`dist/` は `dist/app.js` と `dist/assets/a.js` に一致する。
+  - `config` は、未設定のキーに KTD15 の表のデフォルト値を使い、整数のキーの空文字列を未設定と読まず、値の誤りはデフォルト値で続行して警告を返す。管理ディレクトリとリポジトリで同じファイル名を読み、キーで役割を分ける。
+  - `config` が読み込むとき、設定のパターン `./dist/**` と `dist//**` は、`dist/**` と同じに照合する。末尾の `/` は取り除かない。`/dist/**`・`../x/**`・`dist/../x` は、その規則を使わずに警告を返す。
+  - Covers AE42. `filekinds` は、設定の規則をデフォルトの表より先に照合する (設定の `dist/**` → `generated` が、デフォルトの表の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に一致すれば、段の順で先の種類を返す。どちらにも一致しなければ `unknown-content`。
+  - `filekinds` は、デフォルトの表のパターンごとに、種類・節の表記・分けたときの参照のされ方・マージできるかを返す。`file-kinds.json` の種類と属性の値の一覧が、`file-kinds.md` の表と一致する。
+  - `filekinds` は `issue_dispatch` のほかのモジュールを import しない (テストで import を確かめる)。
+  - `files classify` は、渡したパスごとに、種類・`unit_notation`・`split_reference`・`mergeable`・一致した規則 (設定かデフォルトの表かと、そのパターン) を JSON で返す。種類の決定は `filekinds` を使い、`gh` を実行しない。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`filekinds` のテストの種類と属性の一覧が、`file-kinds.md` の表と同じ。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、この単位の文書の規則がほかの文書に複製されていない。
+
+### U3. 宣言と競合の可能性の判定
+
+- **Goal:** 宣言の JSON の様式が正本の文書に揃い、宣言の検査とパスの正規化、Issue の参照の正規化、競合の可能性の判定 (判定の順と比べる相手を含む) が、`gh` を使わずにテストできる Python のモジュールになる。
+- **Requirements:** R4, R5 (競合の可能性の判定)、R20 のうち判定の順と比べる相手、R31 (AE4, AE32, AE41, AE44, AE46)。KTD9, KTD14。
+- **Dependencies:** U2 (`filekinds`)。
+- **Files:**
+  - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` (新設) — 宣言の JSON の様式 (キーの表: キー / 必須 / 型 / 意味。`units` の書き方は `file-kinds.md` を参照し、言い直さない)、「この例は様式を示すもので、そのまま写さない」の注記。Issue の様式とコメントの先頭行の様式は U5 で足す。
+  - `issue-dispatch/scripts/issue_dispatch/declaration.py` — 宣言の JSON の検査 (必須キー・未知のキー・`units`)、パスの正規化、競合の可能性の判定 (R5)。
+  - `issue-dispatch/scripts/issue_dispatch/ids.py` (新設) — Issue の参照 (`owner/repo#番号`・URL) の正規化。セッション ID・コメントの先頭行・規約の名前は U5 で足す。
+  - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `declaration parse` / `declaration conflictability` を足す。
+  - `issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_ids.py` (新設)
+- **Approach:**
+  1. 宣言の例は JSON のコードブロック 1 つにし、未知のキーが差し戻されることを書く。
   2. 宣言の検査は dataclass で必須キーを位置引数にし、未知のキーをエラーにする (`docs/solutions/design-patterns/typed-contract-for-agent-input.md`)。
   3. パスの正規化は `posixpath.normpath` の後にルートの外 (`..` で始まる) と絶対パスを拒否する。基準はリポジトリのルートで、引数で受ける (`docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md`)。
   4. 競合の可能性の判定は R5 の規則 (KTD9) に従う。種類は `filekinds` で決める。構造を知っている種類は、両方が `units` を書いていれば、節 (名前の配列) が同じか、一方が他方の先頭部分のときに競合しうる。どちらかが省けば、同じパスで競合しうる。`generated` は対象外、`unknown-structure` は同じパスで競合しうる、`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。
-- **Execution note:** テストを先に書く。記録の壊れ方 (JSON でない・キーが欠ける・型違い) と宣言の誤り (キーの誤字・節の表記が無いファイルへの `units`) を 1 件ずつ失敗させてから実装する。
-- **Patterns to follow:** `pr-teeth/scripts/prteeth/store.py` (`load_precious`・`_save_atomic`)、`review-triage/scripts/review-loop-worker/*.py` (1 ファイル 1 責務、docstring の冒頭に責務と正本の文書)。
+- **Execution note:** テストを先に書く。宣言の誤り (キーの誤字・節の表記が無いファイルへの `units`) を 1 件ずつ失敗させてから実装する。
+- **Patterns to follow:** `review-triage/skills/review-triage/references/review-request-template.md` (様式に無いキーを足さない)。
 - **Test scenarios:**
   - 宣言の JSON に必須キーが揃っていれば受理し、`files` が 0 件でも受理して件数 0 を返す。
   - 未知のキー (`file` の誤字)・欠けた必須キーは、理由と期待する形を含むエラーで拒否する。宣言に `kind` があれば未知のキーとして拒否する (種類はスクリプトが決める)。
@@ -943,49 +920,62 @@ issue-dispatch/
   - Covers AE41. 同じパスで両方が `units` を書けば、節が同じか先頭部分の一致 (`["dependencies"]` と `["dependencies", "react"]`) のときだけ競合しうる。`["dependencies", "react"]` と `["dependencies", "zod"]` は競合しない。一方が `units` を省けば競合しうる。
   - `["exports", "./utils"]` と `["exports", "utils"]` は別の節として比べる (名前を正規化しない)。`["require", "github.com/foo/bar"]` と `["require", "github"]` は、先頭部分の一致としない (名前の中の `.` を区切りとして扱わない)。
   - `generated` は同じパスでも競合しない。別のリポジトリの同じパスは競合しない。`unknown-content` を含む組で同じパスなら「利用者の判定が要る」を返す。`unknown-structure` は同じパスで競合しうる。
-  - パターンの書き方: `*.pb.go` は `api.pb.go` に一致し、`gen/api.pb.go` に一致しない。`**/*.pb.go` は両方に一致する。`src/*.ts` は `src/app.ts` に一致し、`src/lib/a.ts` に一致しない。`dist/` は `dist/app.js` と `dist/assets/a.js` に一致する。
-  - `config` は、未設定のキーに KTD15 の表のデフォルト値を使い、整数のキーの空文字列を未設定と読まず、値の誤りはデフォルト値で続行して警告を返す。管理ディレクトリとリポジトリで同じファイル名を読み、キーで役割を分ける。
-  - `config` が読み込むとき、設定のパターン `./dist/**` と `dist//**` は、`dist/**` と同じに照合する。末尾の `/` は取り除かない。`/dist/**`・`../x/**`・`dist/../x` は、その規則を使わずに警告を返す。
-  - Covers AE42. `filekinds` は、設定の規則をデフォルトの表より先に照合する (設定の `dist/**` → `generated` が、デフォルトの表の `**/*.js` → `divisible` より先)。1 つのパスが種類の違う 2 つの規則に一致すれば、段の順で先の種類を返す。どちらにも一致しなければ `unknown-content`。
-  - `filekinds` は、デフォルトの表のパターンごとに、種類・節の表記・分けたときの参照のされ方・マージできるかを返す。`file-kinds.json` の種類と属性の値の一覧が、`file-kinds.md` の表と一致する。
-  - `filekinds` は `issue_dispatch` のほかのモジュールを import しない (テストで import を確かめる)。
   - 絶対パスと、ルートの外を指すパス (`../x`、正規化すると `../x` になる `src/../../x`) は拒否する。
+  - Issue の参照は URL と `owner/repo#番号` を同じ正規形にする。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。宣言のテストの必須キーが、`issue-format.md` の宣言のキーの表と同じ。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、宣言の様式がほかの文書に複製されていない。
+
+### U4. 記録
+
+- **Goal:** 記録の置き場とファイルごとの様式と扱いが正本の文書に揃い、記録の読み書きと段階の印・資源の使用・待機中のセッションが、`gh` を使わずにテストできる Python のモジュールになる。
+- **Requirements:** R11, R31 (AE9, AE10)。KTD5。
+- **Dependencies:** U3 (記録は宣言の写しを持つ)。
+- **Files:**
+  - `issue-dispatch/skills/issue-dispatch/references/records.md` (新設) — 記録の置き場、`record.json` のキーの表 (`project`・`manager` (ID・名前・開始・`state`・利用者の最後の入力からの送受の数)・`sessions` (ID → 名前・`repo`・`worktree`・状態・待機中の時刻。所属する項目は `items` の `session_id` だけが持つ)・`items` (項目 → `item_id`・`session_id`・意図 (書く予定の ID・title・Status・割り当ての番号)・段階の印の時刻 (いつ付くかの正本は `flow.md`)・再送の回数・最後に書いた Status・宣言の写し・資源・自分が足した `blockedBy`・待っている小さな PR・競合の可能性があるときに選んだ扱い・報告済みの印 (人の変更・割り当てない理由))・`resources` (名前 → 使用中の Issue と時刻)・`notices`・`questions` (問い → 項目・種類・選択肢・尋ねた時刻・答えと答えた時刻))、`snapshot.json` (項目ごとの Status・フィールド・`blockedBy`・close・PR の状態・読んだコメントの id。書き手は再入のターンだけ)、`actions.log` (1 行 1 JSON のキー)、`wait.pid` (PID・開始時刻・所有者)、書き手・一時名と改名・種類ごとの扱いの表 (設定 / 記録 / スナップショット / ログ / 宣言)。
+  - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの配列、資源の使用、報告済みの印、`actions.log` への追記。
+  - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `record ...` を足す。
+  - `issue-dispatch/tests/test_record.py`
+- **Approach:**
+  1. 記録のキーは、Project から導出できる値 (Issue の URL・タイトル) を持たない。項目のキーは `owner/repo#番号`。
+  2. 扱いの表は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md` の列 (種類 / 失われるもの / 読めない・壊れているとき) にスナップショット (作り直せるキャッシュ) の行を足す。
+  3. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
+- **Execution note:** テストを先に書く。記録の壊れ方 (JSON でない・キーが欠ける・型違い) を 1 件ずつ失敗させてから実装する。
+- **Patterns to follow:** `review-triage/skills/review-loop/references/loop-files.md` (一時名の節の形)、`pr-teeth/scripts/prteeth/store.py` (`load_precious`・`_save_atomic`)。
+- **Test scenarios:**
   - Covers AE10. 記録が JSON として読めない・必須キーが欠ける・`items` が配列になっているときは `Corrupt` で止め、新規として扱わない。記録が無ければ新規として空の記録を返す。
   - 記録の保存は一時ファイルを経て置き換え、保存の途中で失敗しても元の記録が残る。
   - Covers AE9. 段階の印の付け方 — `fields_written` だけの項目は「`notified` が無い」として列挙され、同じ項目に同じ印を 2 度付けても時刻は最初のまま。意図 (ID・title・Status) を持つ項目の Project の値が意図と一致すれば「自分の書き込み」と判定し、再送の回数は項目ごとに数えて 1 を超えると「再送しない」を返す。
   - 待機中のセッションを時刻の順に返す。資源は項目に紐づけて使用中になり、項目の解放で空く。
-  - セッション ID の正規化: `local_<UUID>` と `<UUID>` を区別して保持し、別物として比べる。Issue の参照は URL と `owner/repo#番号` を同じ正規形にする。
-  - 規約の名前は owner・番号・login から作り、管理のセッションと作業のセッションで、同じ入力なら同じ名前になる (`akm`・`3`・`akm` → `issue-dispatch akm/3/akm`)。
-  - 先頭行の生成と解析が往復で一致し、区切り文字を含む名前でも正しく解析できる。宛先・割り当ての番号・宣言の ID を持つ先頭行 (`開始可` など) と、依頼の種類を持つ先頭行 (`依頼`) と、持たない先頭行 (作業のセッションのコメント・`引き継ぎ`) の 3 種類のどれでも確かめる。
-- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`record.json` のキーが `records.md` の表と一致する。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`record.json` のキーが `records.md` の表と一致する。`snapshot.json` と `wait.pid` の読み書きは U6 の待機のテストで確かめる。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、記録の様式がほかの文書に複製されていない。
 
-### U6. GitHub の読み書きとポーリングのスクリプトとテスト
+### U5. Project と Issue の読み書き
 
-- **Goal:** Project の項目の読み取り (位置の順・Status・フィールド・`blockedBy`・コメント・親の判定・PR の状態)、割り当ての書き込みと読み直し、Status とフィールドの更新、コメントの投稿と既投稿の検出、`blockedBy` の追加、PR の観測、スナップショットの差分による待機が、偽の `gh` でテストできる CLI になる。
-- **Requirements:** R1, R2, R19, R21, R24, R25, R31 (AE1, AE2, AE5, AE6, AE7, AE14, AE18, AE19, AE26〜AE30, AE32, AE33, AE35, AE36, AE39, AE40, AE44, AE45)。KTD3, KTD6, KTD7, KTD8, KTD14。
-- **Dependencies:** U5。
+- **Goal:** Project の様式と、Issue とコメントの先頭行の様式が正本の文書に揃い、Project の項目の読み取り (位置の順・Status・フィールド・`blockedBy`・コメント・親の判定・PR の状態)、割り当ての書き込みと読み直し、Status とフィールドの更新、コメントの投稿と既投稿の検出、`blockedBy` の追加、分割で作る Issue の作成、PR の観測が、偽の `gh` でテストできる CLI になる。
+- **Requirements:** R1〜R3, R6, R19, R21 のうち PR の観測, R31 (AE1, AE2, AE5, AE6, AE7, AE18, AE19, AE21, AE26, AE28, AE30, AE35, AE36, AE39, AE40, AE44)。KTD2, KTD3, KTD7, KTD8, KTD10, KTD14。
+- **Dependencies:** U1 (固定データと実測の節)、U3 (`ids.py`)、U4 (候補の資源の空きは記録で見る)。
 - **Files:**
+  - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」であることの明記。フィールドの表 (名前 / 型 / 書き手 / 意味。`Agent stuck state` の 5 つの値の表を含む)、Status の選択肢の表 (名前 / 書き手 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
+  - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、分割で作る Issue の本文の先頭行の様式 (分割の元の Issue と宣言の ID)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由) を足す。
   - `issue-dispatch/scripts/issue_dispatch/gh.py` — `gh` の実行 (1 関数。引数の配列・タイムアウト・終了コード・stderr の末尾を返す)。
   - `issue-dispatch/scripts/issue_dispatch/project.py` — `check` (フィールド・選択肢・ワークフローの報告と、作る手順の案)、`items` (GraphQL で `POSITION` の順、Status とその更新時刻・フィールド・担当者・ラベル・作者・本文の最後の編集の時刻と編集者・`blockedBy` の open/closed・コメント (id・書き手のログイン・本文の先頭行。書き手がトークンのログインと違うものは除く)・`subIssuesSummary`・`closingIssuesReferences` を持つ PR・リポジトリ。Issue を閉じる PR は、Issue のフィールド `closedByPullRequestsReferences` で 1 回のクエリで取る。`--write-snapshot` でスナップショットを書く)、`assign` (R19 の順で書き、読み直す)、`set-status` (5 つ以外の値と `Done` は `gh` を実行せずに拒否する)、`release` (フィールドを空にして `Todo`)、`set-stuck` (`Agent stuck state` の 5 つの値か空を書く。ほかの値は `gh` を実行せずに拒否する)。
   - `issue-dispatch/scripts/issue_dispatch/issues.py` — コメントの一覧と投稿 (先頭行で既投稿を検出。書き手のログインがトークンのログインと違うコメントは一覧から除く)、`blockedBy` の追加 (`gh issue edit --add-blocked-by <URL>`)、分割で作る Issue の作成 (本文の先頭行で既に作ったものを検出する)、ラベルの確認、PR の観測。
-  - `issue-dispatch/scripts/issue_dispatch/poll.py` — スナップショットの読み書きと差分 (処理の順に並べる)、`wait` (間隔・期限・終了コード・`wait.pid`・SIGTERM を受けたときの `stopped`。スナップショットは読むだけ)、`wait-assignment` と `wait-decision` (終わる条件と標準出力は KTD6)。
-  - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンドの入口。JSON の入出力。
+  - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無) の正規化、コメントの先頭行の生成と解析、環境変数からの自分のセッション ID の決定 (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。公式文書に無い振る舞いに頼るので、この関数 1 つにまとめる。KTD10)、管理のセッションの規約の名前の生成 (`issue-dispatch <owner>/<number>/<login>`。管理のセッションの起動・排他と、作業のセッションの宛先の導出が使う。KD23) を足す。
+  - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `issue create` / `blocked-by add` / `pr observe` を足す。
   - `issue-dispatch/tests/fake-gh` — PATH の先頭に置く偽の `gh`。環境変数で振る舞い (正常・認証切れ・レート制限・ネットワーク不通・書き込みの直後に別の値を返す・PR が draft など) を切り替え、受けた引数を記録する。
   - `issue-dispatch/tests/fixtures/` — 実物の `gh` の出力を写した JSON (U1 の検証用 Project から取る)。
-  - `issue-dispatch/tests/test_project.py`、`issue-dispatch/tests/test_poll.py`
+  - `issue-dispatch/tests/test_project.py`、`issue-dispatch/tests/test_ids.py`
 - **Approach:**
-  1. `gh` の呼び出しは `gh.py` の 1 関数だけ。テストは PATH の先頭の偽の `gh` で差し替える (先例 `review-triage/tests/fake-claude`)。
-  2. 一覧は `gh api graphql` で `orderBy: {field: POSITION, direction: ASC}` と `rateLimit { cost remaining resetAt }` を明示し、ページを `pageInfo` で辿る。
-  3. フィールドの更新は `gh project item-edit --url ... --field ... --text|--value` を使い、1 回に 1 フィールド。書き込みの間は 1 秒以上空ける。
-  4. `assign` は記録の意図の書き込みを CLI の外 (スキル) に残し、CLI は、書く前に読んだ値・書き込み・書いた後に読み直した値を JSON で返す (空でない・読み直した値が違う、のどちらも終了コード 7。終了コード 4 は待機の「ネットワークの失敗が 3 回続いた」に使っているため。KTD6)。
-  5. `wait` は 5 秒おきに期限を見て、`poll_minutes` ごとに一覧を取り、差分があれば種類を標準出力の 1 行に書いて 0 で終わる。スナップショットは書かない。`gh` の失敗は種類で終了コードを分け、レート制限は `resetAt` が期限内なら待つ。
+  1. 先頭行の例を、管理のセッションと作業のセッションの両方で 1 つずつ示す。
+  2. `gh` の呼び出しは `gh.py` の 1 関数だけ。テストは PATH の先頭の偽の `gh` で差し替える (先例 `review-triage/tests/fake-claude`)。
+  3. 一覧は `gh api graphql` で `orderBy: {field: POSITION, direction: ASC}` と `rateLimit { cost remaining resetAt }` を明示し、ページを `pageInfo` で辿る。
+  4. フィールドの更新は `gh project item-edit --url ... --field ... --text|--value` を使い、1 回に 1 フィールド。書き込みの間は 1 秒以上空ける。
+  5. `assign` は記録の意図の書き込みを CLI の外 (スキル) に残し、CLI は、書く前に読んだ値・書き込み・書いた後に読み直した値を JSON で返す (空でない・読み直した値が違う、のどちらも終了コード 7。終了コード 4 は待機の「ネットワークの失敗が 3 回続いた」に使っているため。KTD6)。
 - **Execution note:** 偽の `gh` と固定データを先に作り、一覧の解析から実装する。実物の `gh` は U1 の検証用 Project でだけ使う。
-- **Patterns to follow:** `review-triage/tests/fake-claude` (環境変数で振る舞いを切り替え、受けた引数を JSON で追記)、`review-triage/scripts/review-loop-wait.sh` の冒頭 (終了コードと標準出力の 1 行の規約)。
+- **Patterns to follow:** `review-triage/tests/fake-claude` (環境変数で振る舞いを切り替え、受けた引数を JSON で追記)。
 - **Test scenarios:**
   - Covers AE18, AE19. 一覧は固定データの `POSITION` の順を保ち、各項目に Status・フィールド・blocker の開閉・親かどうか・リポジトリ・PR の状態が付く。
   - 記録にあるどの作業のセッションの `repo` とも違うリポジトリの `Ready` の項目は候補にせず、理由「そのリポジトリの作業のセッションが無い」を付けて返す。
   - Covers AE26, AE30. 候補の絞り込み (位置の順・`Ready` (`Todo` と Status が空の項目は除く)・開いている blocker 無し・資源空き・親でない・担当者とラベル・同じリポジトリ) が、固定データの 6 件から期待の 2 件を順に返す。
-  - Covers AE39, AE40. `set-stuck` は 5 つの値と空だけを書き、ほかの値は `gh` を実行せずに拒否する。差分に、`Agent stuck state` を人が空にしたことが含まれる。
+  - Covers AE39, AE40. `set-stuck` は 5 つの値と空だけを書き、ほかの値は `gh` を実行せずに拒否する。
   - Covers AE36. 作者か本文の最後の編集者がトークンのログインと違う項目は、Status を `Ready` にした時刻より後に本文が編集されていれば候補にせず、理由を返す。作者も編集者もトークンのログインなら、編集の時刻を問わず候補になる。
   - Covers AE35. 担当者が自分 (トークンのログイン) だけの項目は候補になる。担当者が未設定の項目と、担当者に自分とほかの人を含む項目と、ラベル `human-handed` が付いた項目 (担当者が未設定でも) は候補にならず、除いた理由を返す。担当者がほかの人だけの項目は、理由ではなく「範囲の外」として返し、報告の対象にしない (KD25)。
   - Covers AE1. `assign` は `Agent session ID` → `Agent session title` → Status の順に `gh` を実行し、実行の間が 1 秒以上空いている。
@@ -995,8 +985,32 @@ issue-dispatch/
   - Covers AE28. 先頭行が正しくても書き手のログインが違うコメント (宣言・`開始可`) と、作者のログインが違う PR は、無いものとして扱う。既投稿の確認にも数えない。
   - Covers AE6. PR の観測: draft は `In review` にしない。`closingIssuesReferences` に Issue が無い PR は「本文の追記が要る」を返す。ready for review で参照がある PR は `In review` を返す。
   - Covers AE7. マージ済みの PR があるのに Issue が開いていれば、種類 `merged_issue_open` を返し、書き込みは無い。
-  - Covers AE5. Issue の close を差分として返し、`Done` を書く呼び出しは無い。`set-status` に `Done` か 5 つ以外の値を渡すと、`gh` を実行せずに理由付きで拒否する。
-  - `blockedBy` の再導出が、割り当ての有無で `In Progress` と `Ready` を分ける (`flow.md` の決定表のとおり)。
+  - Covers AE5. `set-status` に `Done` か 5 つ以外の値を渡すと、`gh` を実行せずに理由付きで拒否する。
+  - `blockedBy` の再導出が、割り当ての有無で `In Progress` と `Ready` を分ける (KTD7 のとおり)。
+  - Covers AE30. `check` は、フィールドと選択肢の不足と、無効になっているワークフローを列挙し (必須のワークフローと推奨のワークフローを分ける)、「Auto-add to project」が有効なら案内を返し、既存の選択肢の `id` を含めた `updateProjectV2Field` の入力を案として返す。
+  - Covers AE44. `issue create` は、リポジトリ・タイトル・本文・分割の元 (Issue と宣言の ID) を受けて Issue を作り、番号を返す。本文の先頭行に分割の元を書き、同じ先頭行を持つ開いた Issue が既にあれば作らずにその番号を返す (再開のときに 2 つ作らない)。Status と sub-issue の関係は書かない。
+  - セッション ID の正規化: `local_<UUID>` と `<UUID>` を区別して保持し、別物として比べる。
+  - 規約の名前は owner・番号・login から作り、管理のセッションと作業のセッションで、同じ入力なら同じ名前になる (`akm`・`3`・`akm` → `issue-dispatch akm/3/akm`)。
+  - 先頭行の生成と解析が往復で一致し、区切り文字を含む名前でも正しく解析できる。宛先・割り当ての番号・宣言の ID を持つ先頭行 (`開始可` など) と、依頼の種類を持つ先頭行 (`依頼`) と、持たない先頭行 (作業のセッションのコメント・`引き継ぎ`) の 3 種類のどれでも確かめる。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。U1 の検証用 Project で実物の `gh` を使い、`items`・`assign`・`release` が往復で元に戻る。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、Project・Issue・コメントの様式がほかの文書に複製されていない。
+
+### U6. 合図と待機
+
+- **Goal:** 合図の種類と様式、宛先の決め方、捨てられた知らせの扱い、`notify_when_idle` の使い方が正本の文書に揃い、スナップショットの差分による待機 (管理のセッションの `wait` と、作業のセッションの `wait-assignment`・`wait-decision`) が、偽の `gh` でテストできる CLI になる。
+- **Requirements:** R7〜R10, R24 のうち待機と止めた待機の通知, R25 のうち待機の終了コード, R31 (AE3, AE5, AE13, AE14, AE22, AE27, AE29, AE32, AE33, AE39, AE40, AE45)。KTD1, KTD6, KTD10, KTD11, KTD12。
+- **Dependencies:** U4 (スナップショットと `wait.pid` の様式)、U5 (`project items` とコメントの一覧)。
+- **Files:**
+  - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、Claude Code セッションの権限モードの組み合わせと `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。実測の節には、Claude Code の公式文書に無い振る舞いへの依存の表を書く (列は、文書に無い振る舞い / それに頼る要件と処理 (R・KTD・スキルの手順・スクリプトの関数) / 確かめた日と Claude Code の版 / 変わったときに直す場所)。最初に載せるのは、`ListAgents` の出力の形 (1 行目の名前・各行の状態) と、環境変数 `CLAUDE_CODE_HOST_SESSION_ID`。スキルの手順書は、文書に無い振る舞いに頼るところでこの表を参照する (版が上がって振る舞いが変わったとき、直す場所を 1 か所で見られるようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。
+  - `issue-dispatch/scripts/issue_dispatch/poll.py` — スナップショットの読み書きと差分 (処理の順に並べる)、`wait` (間隔・期限・終了コード・`wait.pid`・SIGTERM を受けたときの `stopped`。スナップショットは読むだけ)、`wait-assignment` と `wait-decision` (終わる条件と標準出力は KTD6)。
+  - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `wait` / `wait-assignment` / `wait-decision` を足す。
+  - `issue-dispatch/tests/test_poll.py`
+- **Approach:**
+  1. `wait` は 5 秒おきに期限を見て、`poll_minutes` ごとに一覧を取り、差分があれば種類を標準出力の 1 行に書いて 0 で終わる。スナップショットは書かない。`gh` の失敗は種類で終了コードを分け、レート制限は `resetAt` が期限内なら待つ。
+- **Execution note:** テストを先に書く。偽の `gh` と固定データは U5 のものを使う。
+- **Patterns to follow:** `review-triage/scripts/review-loop-wait.sh` の冒頭 (終了コードと標準出力の 1 行の規約)。
+- **Test scenarios:**
+  - Covers AE5. Issue の close を差分として返し、`Done` を書く呼び出しは無い。
+  - Covers AE39, AE40. 差分に、`Agent stuck state` を人が空にしたことが含まれる。
   - Covers AE32, AE33. 管理のセッションが足した blocker の close と、待っている小さな PR のマージを差分として返し、待っていた項目を宣言の投稿の順に並べる。
   - スナップショットの差分が、処理の順 (人の変更 → close → `blockedBy` → コメント → PR → 項目の追加) に並ぶ。
   - Covers AE14. 偽の `gh` が認証切れを返すと `wait` は終了コード 2。レート制限の `resetAt` が期限内なら待って続け、期限を越えるなら 3。ネットワークの失敗が 3 回続けば 4。
@@ -1008,20 +1022,34 @@ issue-dispatch/
   - `wait.pid` の PID のプロセスの開始時刻かコマンドが違えば (PID が再利用されている)、そのプロセスを止めずに `wait.pid` を消す。
   - `wait-assignment` と `wait-decision` も、起動時に `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/wait.pid` に書かれた前の待機を止め、自分の PID を書く。SIGTERM を受けると `stopped` の行を書いて終了コード 6 で終わる。作業ツリーの中には何も書かない。
   - Covers AE29. `wait-decision` は、自分宛てで渡した宣言の ID を持つ `開始可` が見つかると 0 と `go`、Status が `Blocked` になると 0 と `wait` を返し、自分宛てでその宣言の ID を持つ `依頼` (宣言の書き直し) が見つかると 0 と `request` を返し、どれも無ければ期限で 124。別の宛先・前の割り当て・前の宣言に対する `開始可` では終わらない。
-  - 差分の種類に「項目の除去」と「`Agent session ID` が空にされた・別の値にされた」が含まれ、処理の順の位置が決定表のとおり。
-  - Covers AE30. `check` は、フィールドと選択肢の不足と、無効になっているワークフローを列挙し (必須のワークフローと推奨のワークフローを分ける)、「Auto-add to project」が有効なら案内を返し、既存の選択肢の `id` を含めた `updateProjectV2Field` の入力を案として返す。
-  - `files classify` は、渡したパスごとに、種類・`unit_notation`・`split_reference`・`mergeable`・一致した規則 (設定かデフォルトの表かと、そのパターン) を JSON で返す。種類の決定は U5 の `filekinds` を使い、`gh` を実行しない。
-  - Covers AE44. `issue create` は、リポジトリ・タイトル・本文・分割の元 (Issue と宣言の ID) を受けて Issue を作り、番号を返す。本文の先頭行に分割の元を書き、同じ先頭行を持つ開いた Issue が既にあれば作らずにその番号を返す (再開のときに 2 つ作らない)。Status と sub-issue の関係は書かない。
-- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。U1 の検証用 Project で実物の `gh` を使い、`items`・`assign`・`release` が往復で元に戻る。
+  - 差分の種類に「項目の除去」と「`Agent session ID` が空にされた・別の値にされた」が含まれ、処理の順の位置が R12 のとおり (U7 で `flow.md` の決定表にする)。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、合図の取り決めがほかの文書に複製されていない。
 
-### U7. 前提条件の検査とフック
+### U7. 状態機械と再入の手順
+
+- **Goal:** 項目の状態遷移、フィールド × 書き手 × いつ の表、ポーリングの処理の順、停止ノード、行為の区分と取り消し方、再入の手順が 2 つの文書に揃い、散文で言い直されない。
+- **Requirements:** R12, R13, R21〜R25 (AE2, AE7, AE8, AE9, AE11, AE12, AE14, AE20, AE38〜AE40)。KTD3, KTD6, KTD7, KTD8。
+- **Dependencies:** U4, U5, U6。
+- **Files:**
+  - `issue-dispatch/skills/issue-dispatch/references/flow.md` (新設) — 状態遷移の図 (High-Level Technical Design の図をこの文書に移して正本にする)、フィールド × 書き手 × いつ の表、割り当ての書き込みの順と冪等性 (KTD3)、ポーリングの処理の順の決定表 (順 / 変化 / 条件 / 行うこと / 承認 / 報告に書くもの。部分完了の続きの行を含み、条件は記録の段階の印で書く。段階の印がいつ付くかの正本)、停止ノードの決定表 (ID / 条件 / 記録に書くもの / 報告に書くもの / 続け方)、行為の区分の表 (承認不要 / 承認必要 / 人間のみ) と取り消し方の表。
+  - `issue-dispatch/skills/issue-dispatch/references/reentry.md` (新設) — 入口 1 つ (通知・合図・利用者の答え・`--resume`)、手順 (記録と設定を読む → 利用者の答えがあれば記録に書く → 止めた待機の通知 (KTD6) なら何もしない → 記録の状態が `active` でなければ何もしない → 待機の結果を読む (表に無い終了コードなら停止) → `project items` で Project を読む → `flow.md` の決定表の順に処理 → 割り当て → 動いている待機を止める → スナップショットを書く → 待機の起動 → 利用者が未回答の管理のセッションからの問いをまとめて示してターンを終える)、待機の Bash 呼び出しの `description` の文、通知は人間の入力ではないこと、部分完了の表 (段階の印 / Project の状態 / 行うこと。条件は `flow.md` の行 ID を参照し、言い直さない)。
+- **Approach:**
+  1. 停止ノードの ID は `D1`〜 (dispatch の D) とし、review-loop の `RA` と区別する。
+  2. 決定表の「同時に成立したときの順」を表の先頭に書く (R12)。
+  3. 再送の規則 (`assigned` は 1 回だけ再送、コメントは先頭行で既投稿を検出) を部分完了の表に書く。
+- **Patterns to follow:** `review-triage/skills/review-triage-loop/references/loop-flow.md` (図が正本、決定表が条件と報告、散文はノード ID で参照)、`review-triage/skills/review-loop/references/reentry.md`、`references/stops.md`。
+- **Test scenarios:**
+  - Test expectation: none -- 文書だけ。決定表の処理の順は R12 のとおりにし、U6 のポーリングのテストが変化を並べる順と同じであることを、この単位で突き合わせる。
+- **Verification:** 図のノードと決定表の行が 1:1 (目視)。決定表の処理の順が、U6 のポーリングのテストの順と同じ (目視)。`doc-dag` で巡回が無い。
+
+### U8. 前提条件の検査とフック
 
 - **Goal:** リポジトリ・Project・セッションの検査が報告と変更の案を返し、フックが、ほかの worktree でのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を拒否し、スキル `repo-preflight` が検査の手順書になる。
 - **Requirements:** R14〜R17 (AE15, AE16, AE21, AE22, AE34, AE36, AE37, AE43)。KTD12, KTD13。
-- **Dependencies:** U5 (`filekinds`)、U6。
+- **Dependencies:** U2 (`filekinds`・`config`)、U5 (`project check`)。
 - **Files:**
-  - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U5 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補 → 指摘と案)、`project` (U6 の `check` を使う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理のセッション / 作業のセッション) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` の比較)、フックの設定の有無)。
-  - `issue-dispatch/scripts/issue_dispatch.py` — U6 で作る CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` を足す。
+  - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U2 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補 → 指摘と案)、`project` (U5 の `check` を使う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理のセッション / 作業のセッション) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` の比較)、フックの設定の有無)。
+  - `issue-dispatch/scripts/issue_dispatch.py` — CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` を足す。
   - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。もう 1 つ、matcher `Bash` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-direct-gh.py"`、`timeout` 10。
   - `issue-dispatch/hook-scripts/guard-direct-gh.py` — 規則の関数 `denies_gh(command)` と理由文 (代わりの手順: 作業のセッションなら管理のセッションに任せる、人間だけが行う操作なら利用者に頼む)。設定ファイル (`.claude/akm-claude-plugins/issue-dispatch/config.json`) を Git のルート (Git でなければ `cwd`) で探し、無ければ何もしない。
   - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と、編集系のツールのパスを判定する `denies_path(path, cwd, worktrees, protected)` (同じパスの照合を使う) と理由文。
@@ -1053,14 +1081,14 @@ issue-dispatch/
   - Covers AE37. 役割が管理のセッションのとき、`permissions.allow` に `Bash(gh *)` や `Bash(*)` があるか、`defaultMode` が `bypassPermissions` なら警告を返す。役割が作業のセッションのときは、`bypassPermissions` だけを警告する。CLI だけを許可する設定には何も出さない。
   - 追加の worktree (`git rev-parse --git-dir` と `--git-common-dir` が違う) では何も知らせない。元の clone の作業ツリーと、別の clone では、同じ clone の worktree で開く前提に合わないことを知らせて、成功として返す (止めない)。
   - Covers AE22, AE34. どの設定にも `crossSessionInbound` が無く、権限の確認を省かないモードなら、警告を返さない。自分が権限の確認を省くモードなら、合図が保留される警告を返す。ユーザー設定に `accept` があれば成功とし、マシンのすべてのセッションに及ぶ知らせを返す。プロジェクト設定に `refuse` か `hold` があれば、役割が管理のセッションなら失敗、作業のセッションなら警告 (遅くなることと、止まったことに期限でしか気づけないこと) を返す。設定ファイルが読めなければ「確かめていない」。
-  - Covers AE21. Project の検査は U6 の `check` の結果をそのまま報告に写す。
+  - Covers AE21. Project の検査は U5 の `check` の結果をそのまま報告に写す。
 - **Verification:** テストが成功する。このリポジトリ (設定無し) でフックが何も出力しないこと、一時リポジトリに設定を置いて Bash ツールからほかの worktree のパスを含むコマンドと `gh project item-edit` を含むコマンドを実行すると、どちらも拒否されることを、ブランチ版のプラグイン (`--plugin-dir`) で確かめる。
 
-### U8. スキル `issue-work`
+### U9. スキル `issue-work`
 
 - **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`available`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue に移るかの問いが、文書の様式どおりに進む。
 - **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE31, AE33, AE45〜AE47, AE49)。KTD1, KTD10, KTD11。
-- **Dependencies:** U4, U6, U7 (開始の検査 R26 で `preflight session` を使う)。
+- **Dependencies:** U2 (`files classify`)、U3 (`declaration parse`)、U5、U6、U7、U8 (開始の検査 R26 で `preflight session` を使う)。
 - **Files:**
   - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の明記 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`wait-decision`・`declaration parse`・`files classify`・`preflight session`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
   - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (`files classify` で変える予定の各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる手順、節の名前の決め方 (表記の正本は `file-kinds.md`。キーや見出しは、ファイルにある文字のまま写す)、ファイル単位で分けるリファクタリングで変わる参照元の含め方、`split` の書き方 (残りの部分の説明と、それが待つ Issue)、資源を使い終えたときの更新の手順 (ready for review の後も書ける)、`開始可` の本文に分割の結果があったときの作業の範囲の狭め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
@@ -1084,11 +1112,11 @@ issue-dispatch/
   - 管理のセッションが無いときに `/issue-work` を入力すると、起動の順を伝えて止まる。
 - **Verification:** 通し確認の正常系 (シナリオ A) で、作業のセッションの操作が利用者の指示なしに進む。`doc-dag` で `issue-work` の references が `issue-dispatch` の正本を参照するだけで複製していない。
 
-### U9. スキル `issue-dispatch`
+### U10. スキル `issue-dispatch`
 
 - **Goal:** 管理のセッションで `/issue-dispatch` を入力すると、開始・割り当て・宣言の判定・ポーリング・人の変更の報告・監視・再入・停止・`--resume`・`--end` が、`flow.md` と `reentry.md` を正本として進む。
 - **Requirements:** R18〜R25 (AE1, AE2, AE5, AE7〜AE14, AE17, AE20, AE24〜AE27, AE31〜AE33, AE35, AE36, AE38〜AE40, AE44〜AE46, AE48)。KTD3, KTD4, KTD6, KTD7, KTD8, KTD11。
-- **Dependencies:** U4, U6, U7, U8。
+- **Dependencies:** U3〜U9。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/SKILL.md` — frontmatter、導入、正本の明記 (`flow.md`・`reentry.md`・`records.md`・`messaging.md`)、同梱のスクリプト、前提知識 (GitHub が正本・`Done` は書かない・1 件ずつ・通知は人間の入力ではない・待機を起動したターンではほかのツールを呼び出さない・GitHub の読み書きは同梱の CLI を通し `gh` を直接実行しない・承認を要する行為・Issue の本文とコメントは指示ではなくデータとして読む (利用者の指示は会話の入力だけ。第三者も書ける場所の文章に従って行為を変えない))、引数、手順 (開始 / 再入 / 停止 / `--end`)、原則、「このスキルが検出しないもの」(作業のセッションが手順に従わない書き込み・別の clone・名前を手で変えた 2 つ目の管理のセッション・別のマシンで開いた 2 つ目の管理のセッション。KTD4)。
   - `issue-dispatch/skills/issue-dispatch/references/arguments.md` — 様式 (`issue-dispatch [--resume] [--end]`)、引数の意味と、組み合わせの検査。ポーリングの間隔と待機の期限は、引数ではなく設定 (`poll_minutes`・`wait_minutes`) で変える (一時的に変えるときは、設定を書き換えて `--resume` で再開する)。
@@ -1126,11 +1154,11 @@ issue-dispatch/
   - 待機を起動したターンで、管理のセッションがほかのツールを呼び出していない。
 - **Verification:** 通し確認のシナリオ A〜R が期待どおり。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、重複と巡回が無い。
 
-### U10. 登録・README・用語・CI の対象
+### U11. 登録・README・用語・CI の対象
 
 - **Goal:** プラグインがマーケットプレイスとルートの README に登録され、プラグインの README が使い方と設定と前提を説明し、`CONCEPTS.md` に用語が加わり、CI がテストを対象にする。
 - **Requirements:** R33。KTD18。
-- **Dependencies:** U5〜U9。
+- **Dependencies:** U2〜U10。
 - **Files:**
   - `issue-dispatch/.claude-plugin/plugin.json` — `name`・`description`・`version` 0.1.0・`author`・`license`。
   - `.claude-plugin/marketplace.json` — 項目 1 つ (description は `plugin.json` と同文、`source` は git-subdir、`tags`)。
@@ -1153,15 +1181,15 @@ issue-dispatch/
 | 検査 | コマンド / 手段 | 対象の単位 | 証明するもの |
 | --- | --- | --- | --- |
 | 前提の実測 | U1 の手順 (検証用の Project と 2 つのセッション。始める前に利用者の許可を得る) | U1 | Open Questions の各項目に結果が付き、KTD11 の案が決まる |
-| スクリプトとフックのテスト | `python3 -m unittest discover -s issue-dispatch/tests` (偽の `gh` と固定データ。実物の `gh` と `claude` は実行しない) | U5, U6, U7 | 宣言の検査と競合の可能性の判定、記録の扱い、割り当ての順序と食い違い、ポーリングの差分と終了コード、検査の指摘、フックが拒否すべき操作を拒否し、それ以外では何も出力しないこと |
-| CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (push で実行される)。ローカルでは `git ls-files` から同じように比べる | U10 | `.github/test-targets.txt` と実際の対象が一致する |
-| 実物の `gh` での往復 | U1 の検証用 Project で `items` → `assign` → `release` を 1 往復 | U6 | フィールドと Status が書かれて元に戻り、`actions.log` に記録される |
-| 変えないものの差分 | `git diff --stat main -- commit-rules-guard pr-teeth doc-dag mermaid-preview commit-squash review-triage work-log-gh-comment wording-guard session-handoff .github/workflows .claude` | U1〜U10 | 差分が無い (KTD18) |
-| 説明文の一致 | `issue-dispatch/.claude-plugin/plugin.json` と `.claude-plugin/marketplace.json` の description の比較 | U10 | 同文 |
-| 文書の構造 | `issue-dispatch/skills/` と `CONCEPTS.md` を対象にスキル `doc-dag` を実行する | U2〜U4, U8〜U10 | 正本が 1 か所にあり、重複と巡回が無い |
-| 言い回し | 変更した Markdown を対象にスキル `wording-guard` を実行する | U2〜U4, U7〜U10 | 最後の走査で、新しい種類の不自然な言い回しが見つからない |
-| 決定表の整合 | `flow.md` の図のノードと決定表の行、`messaging.md` の合図の表と KTD1 の表を目視で照合 | U3, U4 | 1:1 (機械検査は無い) |
-| 手順書の通し確認 | 管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ。端末はブランチ版を `--plugin-dir` で読み込み、Desktop は U1 で確かめた手段で読み込む。手段が無ければすべて端末にし、Desktop にしかないツールはマージの後に確かめる。KTD17)、検証用の Project、検証用のリポジトリ 2 つ。始める前に回数・費用 (目安はセッション 3 つ × 数時間)・手順を利用者に示して許可を得る | U7, U8, U9 | 下のシナリオ |
+| スクリプトとフックのテスト | `python3 -m unittest discover -s issue-dispatch/tests` (偽の `gh` と固定データ。実物の `gh` と `claude` は実行しない) | U2〜U6, U8 | 宣言の検査と競合の可能性の判定、記録の扱い、割り当ての順序と食い違い、ポーリングの差分と終了コード、検査の指摘、フックが拒否すべき操作を拒否し、それ以外では何も出力しないこと |
+| CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (push で実行される)。ローカルでは `git ls-files` から同じように比べる | U11 | `.github/test-targets.txt` と実際の対象が一致する |
+| 実物の `gh` での往復 | U1 の検証用 Project で `items` → `assign` → `release` を 1 往復 | U5 | フィールドと Status が書かれて元に戻り、`actions.log` に記録される |
+| 変えないものの差分 | `git diff --stat main -- commit-rules-guard pr-teeth doc-dag mermaid-preview commit-squash review-triage work-log-gh-comment wording-guard session-handoff .github/workflows .claude` | U1〜U11 | 差分が無い (KTD18) |
+| 説明文の一致 | `issue-dispatch/.claude-plugin/plugin.json` と `.claude-plugin/marketplace.json` の description の比較 | U11 | 同文 |
+| 文書の構造 | `issue-dispatch/skills/` と `CONCEPTS.md` を対象にスキル `doc-dag` を実行する | U2〜U11 | 正本が 1 か所にあり、重複と巡回が無い |
+| 言い回し | 変更した Markdown を対象にスキル `wording-guard` を実行する | U2〜U11 | 最後の走査で、新しい種類の不自然な言い回しが見つからない |
+| 決定表の整合 | `flow.md` の図のノードと決定表の行、`messaging.md` の合図の表と KTD1 の表を目視で照合 | U6, U7 | 1:1 (機械検査は無い) |
+| 手順書の通し確認 | 管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ。端末はブランチ版を `--plugin-dir` で読み込み、Desktop は U1 で確かめた手段で読み込む。手段が無ければすべて端末にし、Desktop にしかないツールはマージの後に確かめる。KTD17)、検証用の Project、検証用のリポジトリ 2 つ。始める前に回数・費用 (目安はセッション 3 つ × 数時間)・手順を利用者に示して許可を得る | U8, U9, U10 | 下のシナリオ |
 
 通し確認のシナリオ (順に行う。各シナリオで、Project のフィールドと Status・Issue のコメントの先頭行・記録のうち `record.json` と `actions.log`・管理のセッションと作業のセッションの報告・利用者の操作が 4 種類だけだったこと・承認を要する行為の前に答えが記録にあったこと・問いがまとめて尋ねられたことを見る):
 
@@ -1188,7 +1216,7 @@ issue-dispatch/
 
 ## Definition of Done
 
-- U1〜U10 がすべて完了し、上の Verification Contract の全項目が成功している。
+- U1〜U11 がすべて完了し、上の Verification Contract の全項目が成功している。
 - ほかのプラグインのディレクトリ・`.github/workflows/test.yml`・`.claude/` に差分が無い (KTD18)。
 - 各単位が動機ごとのコミットになっている。プラグインの追加とその登録 (marketplace・ルートの README) は同じコミット。`CONCEPTS.md` の用語の追加と `.github/test-targets.txt` の追加は、それぞれの動機のコミット。計画のコミットは実装と分かれている。
 - 通し確認のために作った検証用の Project・リポジトリ・ブランチは、残すか消すかを利用者が決め、差分には入らない。試行錯誤で残した文面・スクリプト・テストの名残が差分に無い。
