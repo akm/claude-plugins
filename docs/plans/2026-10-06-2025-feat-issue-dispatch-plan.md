@@ -853,7 +853,7 @@ issue-dispatch/
 - **Requirements:** R7〜R11, R32 (AE3, AE9, AE10, AE13, AE17, AE22)。KTD1, KTD5, KTD10, KTD11, KTD12, KTD15。
 - **Dependencies:** U1, U2。
 - **Files:**
-  - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、権限モードの組と `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。
+  - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、権限モードの組と `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。実測の節には、Claude Code の公式文書に無い振る舞いへの依存の表を書く (列は、文書に無い振る舞い / それに頼る要件と処理 (R・KTD・スキルの手順・スクリプトの関数) / 確かめた日と Claude Code の版 / 変わったときに直す場所)。最初に載せるのは、`ListAgents` の出力の形 (1 行目の名前・各行の状態) と、環境変数 `CLAUDE_CODE_HOST_SESSION_ID`。スキルの手順書は、文書に無い振る舞いに頼るところでこの表を参照する (版が上がって振る舞いが変わったとき、直す場所を 1 か所で見られるようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。
   - `issue-dispatch/skills/issue-dispatch/references/records.md` (新設) — 記録の置き場、`record.json` のキーの表 (`project`・`manager` (ID・名前・開始・`state`・最後の利用者の入力からの送受の数)・`sessions` (ID → 名前・`repo`・`worktree`・状態・待機中の時刻。所属する項目は `items` の `session_id` だけが持つ)・`items` (項目 → `item_id`・`session_id`・意図 (書く予定の ID・title・Status・割り当ての番号)・段階の印の時刻 (いつ付くかの正本は `flow.md`)・再送の回数・最後に書いた Status・宣言の写し・資源・自分が足した `blockedBy`・待っている小さな PR・競合の可能性があるときに選んだ扱い・報告済みの印 (人の変更・割り当てない理由))・`resources` (名前 → 使用中の Issue と時刻)・`notices`・`questions` (問い → 項目・種類・選択肢・尋ねた時刻・答えと答えた時刻))、`snapshot.json` (項目ごとの Status・フィールド・`blockedBy`・close・PR の状態・読んだコメントの id。書き手は再入のターンだけ)、`actions.log` (1 行 1 JSON のキー)、`wait.pid` (PID・開始時刻・所有者)、書く側・一時名と改名・種類ごとの扱いの表 (設定 / 記録 / スナップショット / ログ / 宣言)。
   - `issue-dispatch/skills/issue-dispatch/references/project-config.md` (新設) — 様式 (管理側とリポジトリ側の JSON の例)、キーの表 (キー / 側 / 意味 / 未設定のときの扱い)、「未設定」の定義、`files` の規則の書き方 (`pattern`・`kind`・`unit_notation`・`split_reference`・`mergeable`。意味の正本は `file-kinds.md`)、`protected_paths`。
 - **Approach:**
@@ -894,7 +894,7 @@ issue-dispatch/
   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、既定の表を後に照合し、段の順で決める。パターンは正規表現に変換して照合する)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — 既定の表 (パターン・種類・節の表記・分けたときの参照のされ方・マージできるか)。
   - `issue-dispatch/scripts/issue_dispatch/config.py` — 管理側とリポジトリ側の設定の読み込み、未設定のキーへのデフォルト値の適用 (KTD15 の表)、値の誤りの警告、`files` のパターンの表記をそろえることと、ルートの外を指すパターンの警告。
-  - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無)、Issue の参照 (`owner/repo#番号`・URL) の正規化、コメントの先頭行の生成と解析、管理のセッションの規約の名前の生成 (`issue-dispatch <owner>/<number>/<login>`。管理のセッションの起動・排他と、作業のセッションの宛先の導出が使う。KD23)。
+  - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無)、Issue の参照 (`owner/repo#番号`・URL) の正規化、コメントの先頭行の生成と解析、環境変数からの自分のセッション ID の決定 (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。公式文書に無い振る舞いに頼るので、この関数 1 つにまとめる。KTD10)、管理のセッションの規約の名前の生成 (`issue-dispatch <owner>/<number>/<login>`。管理のセッションの起動・排他と、作業のセッションの宛先の導出が使う。KD23)。
   - `issue-dispatch/tests/test_record.py`、`issue-dispatch/tests/test_declaration.py`、`issue-dispatch/tests/test_filekinds.py`、`issue-dispatch/tests/test_config.py`
 - **Approach:**
   1. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
@@ -1159,4 +1159,4 @@ issue-dispatch/
 - 各単位が動機ごとのコミットになっている。プラグインの追加とその登録 (marketplace・ルートの README) は同じコミット。`CONCEPTS.md` の用語の追加と `.github/test-targets.txt` の追加は、それぞれの動機のコミット。計画のコミットは実装と分かれている。
 - 通し確認のために作った検証用の Project・リポジトリ・ブランチは、残すか消すかを利用者が決め、差分には入らない。試行錯誤で残した文面・スクリプト・テストの名残が差分に無い。
 - `issue-dispatch/.claude-plugin/plugin.json` の版が 0.1.0 で、README が 3 つのスキルとフックの使い方 (管理ディレクトリと Project の準備、`gh` の `project` スコープ、管理と作業のセッションを同じ権限モードの組で開くこと) を説明している。
-- U1 の実測の結果が、`project-schema.md` と `messaging.md` の「実測」の節に日付と版とともに書かれている。
+- U1 の実測の結果が、`project-schema.md` と `messaging.md` の「実測」の節に日付と版とともに書かれている。`messaging.md` の実測の節に、公式文書に無い振る舞いへの依存の表がある。
