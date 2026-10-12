@@ -661,7 +661,10 @@ stateDiagram-v2
   InProgress --> InReview: PR の観測 (管理)
   InReview --> Done: Issue が閉じる (GitHub のワークフロー)
   InProgress --> Done: Issue が閉じる (GitHub のワークフロー)
+  Blocked --> Done: Issue が閉じる (割り当てのある項目。GitHub のワークフロー)
   InProgress --> Todo: 割り当ての解除 (管理。利用者の承認)
+  Blocked --> Todo: 割り当ての解除 (割り当てのある項目。管理。利用者の承認)
+  InReview --> Todo: 割り当ての解除 (管理。利用者の承認)
   InReview --> Todo: PR がマージされずに閉じた (管理。利用者の承認)
   Done --> Todo: reopen (GitHub のワークフロー Item reopened。推奨。管理は報告)
 ```
