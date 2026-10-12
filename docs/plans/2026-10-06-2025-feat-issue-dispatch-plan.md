@@ -1059,7 +1059,7 @@ issue-dispatch/
 - **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE31, AE33, AE45〜AE47, AE49)。KTD1, KTD10, KTD11。
 - **Dependencies:** U4, U6, U7 (開始の検査 R26 で `preflight session` を使う)。
 - **Files:**
-  - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の明記 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`declaration parse`・`files classify`・`preflight session`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
+  - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の明記 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`wait-decision`・`declaration parse`・`files classify`・`preflight session`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない)、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
   - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (`files classify` で変える予定の各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる手順、節の名前の決め方 (表記の正本は `file-kinds.md`。キーや見出しは、ファイルにある文字のまま写す)、ファイル単位で分けるリファクタリングで変わる参照元の含め方、`split` の書き方 (残りの部分の説明と、それが待つ Issue)、資源を使い終えたときの更新の手順 (ready for review の後も書ける)、`開始可` の本文に分割の結果があったときの作業の範囲の狭め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
 - **Approach:**
   1. 自分の ID と名前の決め方 (KTD10) を手順の最初に書き、`ListAgents` の 1 行目から名前を読むことを書く。
