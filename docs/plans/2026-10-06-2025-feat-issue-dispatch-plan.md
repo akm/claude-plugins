@@ -862,7 +862,7 @@ issue-dispatch/
 
 ### U2. ファイルの種類と設定
 
-- **Goal:** ファイルの種類と競合の可能性の判定の規則、設定のキーと未設定の扱いが正本の文書に揃い、パスから種類と属性を決める処理 (`filekinds`) と、設定の読み込み (`config`) が、`gh` を使わずにテストできる Python のモジュールになる。`filekinds` はほかのモジュールに依存しない (KD22) ので、最初のドメインにする。
+- **Goal:** ファイルの種類と競合の可能性の判定の規則、設定のキーと未設定の扱いが正本の文書に揃い、パスから種類と属性を決める処理 (`filekinds`) と、設定の読み込み (`config`) が、`gh` を使わずにテストできる Python のモジュールになる。`filekinds` はほかのモジュールに依存しない (KD22。この単位を最初のドメインにする理由は Sequencing)。
 - **Requirements:** R5 (種類の決め方)、R31, R32 (AE17, AE42)。KTD9, KTD14, KTD15。
 - **Dependencies:** U1。
 - **Files:**
@@ -872,7 +872,7 @@ issue-dispatch/
   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、デフォルトの表を後に照合し、段の順で決める。パターンは正規表現に変換して照合する)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — デフォルトの表 (パターン・種類・節の表記・分けたときの参照のされ方・マージできるか)。
   - `issue-dispatch/scripts/issue_dispatch/config.py` — 管理ディレクトリの設定とリポジトリの設定の読み込み、未設定のキーへのデフォルト値の適用 (KTD15 の表)、値の誤りの警告、`files` のパターンの表記をそろえることと、ルートの外を指すパターンの警告。
-  - `issue-dispatch/scripts/issue_dispatch.py` (新設) — CLI の入口 (サブコマンドと JSON の入出力。KTD14)。この単位で `files classify` を作り、後の単位がサブコマンドを足す。
+  - `issue-dispatch/scripts/issue_dispatch.py` (新設) — CLI の入口 (サブコマンドと JSON の入出力。サブコマンドの一覧の正本は KTD14)。この単位で `files classify` を作り、後の単位が、それぞれの Files に挙げたサブコマンドを足す。
   - `issue-dispatch/tests/test_filekinds.py`、`issue-dispatch/tests/test_config.py`
 - **Approach:**
   1. 表の列は `review-triage/skills/review-triage/references/record-schema.md` の形 (キー / 必須 / 内容) に合わせる (U3〜U7 の文書の表も同じ)。
