@@ -1037,7 +1037,7 @@ issue-dispatch/
 ### U5. Project と Issue の読み書き
 
 - **Goal:** Project の様式と、Issue とコメントの先頭行の様式が正本の文書に揃い、Project の項目の読み取り (位置の順・Status・フィールド・`blockedBy`・コメント・親の判定・PR の状態)、割り当ての書き込みと読み直し、Status とフィールドの更新、コメントの投稿と既投稿の検出、`blockedBy` の追加、分割で作る Issue の作成、PR の観測が、偽の `gh` でテストできる CLI になる。
-- **Requirements:** R1〜R3, R6, R13 と R15 のうち承認を得た後の書き込み, R19, R21 のうち PR の観測, R31 (AE1, AE2, AE5, AE6, AE7, AE18, AE19, AE21, AE26, AE28, AE30, AE35, AE36, AE39, AE40, AE44, AE52, AE58)。KTD2, KTD3, KTD7, KTD8, KTD10, KTD14。
+- **Requirements:** R1〜R3, R6, R13 と R15 のうち承認を得た後の書き込み, R19, R21 のうち PR の観測, R31 (AE1, AE2, AE5, AE6, AE7, AE18, AE19, AE21, AE26, AE28, AE30, AE35, AE36, AE39, AE40, AE44, AE52, AE55, AE58)。KTD2, KTD3, KTD7, KTD8, KTD10, KTD14。
 - **Dependencies:** U1 (固定データと実測の節)、U3 (`ids.py`)、U4 (候補の資源の空きは記録で見る)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」であることの明記。フィールドの表 (名前 / 型 / 書き手 / 意味。`Agent stuck state` の 5 つの値の表を含む)、Status の選択肢の表 (名前 / 書き手 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
@@ -1090,7 +1090,7 @@ issue-dispatch/
 ### U6. 合図と待機
 
 - **Goal:** 合図の種類と様式、宛先の決め方、捨てられた知らせの扱い、`notify_when_idle` の使い方が正本の文書に揃い、スナップショットの差分による待機 (管理のセッションの `wait` と、作業のセッションの `wait-assignment`・`wait-decision`) が、偽の `gh` でテストできる CLI になる。
-- **Requirements:** R7〜R10, R24 のうち待機と止めた待機の通知, R25 のうち待機の終了コード, R31 (AE3, AE5, AE13, AE14, AE22, AE27, AE29, AE32, AE33, AE36, AE39, AE40, AE45, AE57)。KTD1, KTD6, KTD10, KTD11, KTD12。
+- **Requirements:** R7〜R10, R24 のうち待機と止めた待機の通知, R25 のうち待機の終了コード, R31 (AE3, AE5, AE13, AE14, AE22, AE27, AE29, AE32, AE33, AE36, AE39, AE40, AE45, AE53, AE55, AE57)。KTD1, KTD6, KTD10, KTD11, KTD12。
 - **Dependencies:** U4 (スナップショットと `wait.pid` の様式)、U5 (`project items` とコメントの一覧)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` に添える・単独の申し込みは busy の相手だけ) と失効、Claude Code セッションの権限モードの組み合わせと `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。実測の節には、Claude Code の公式文書に無い振る舞いへの依存の表を書く (列は、文書に無い振る舞い / それに頼る要件と処理 (R・KTD・スキルの手順・スクリプトの関数) / 確かめた日と Claude Code の版 / 変わったときに直す場所)。最初に載せるのは、`ListAgents` の出力の形 (1 行目の名前・各行の状態) と、環境変数 `CLAUDE_CODE_HOST_SESSION_ID`。スキルの手順書は、文書に無い振る舞いに頼るところでこの表を参照する (版が上がって振る舞いが変わったとき、直す場所を 1 か所で見られるようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。
@@ -1185,7 +1185,7 @@ issue-dispatch/
 ### U9. スキル `issue-work`
 
 - **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`available`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue に移るかの問いが、文書の様式どおりに進む。
-- **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE31, AE33, AE36, AE45〜AE47, AE49, AE56)。KTD1, KTD10, KTD11。
+- **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE23, AE31, AE33, AE36, AE45〜AE47, AE49, AE53, AE56)。KTD1, KTD10, KTD11。
 - **Dependencies:** U2 (`files classify`)、U3 (`declaration parse`)、U5、U6、U7、U8 (開始の検査 R26 で `preflight session` を使う)。
 - **Files:**
   - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の明記 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`wait-decision`・`declaration parse`・`files classify`・`preflight session`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない・プラグインの更新で同梱の CLI のパスが消えうる (R26))、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
