@@ -660,7 +660,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
 
   フォアグラウンドの `sleep` は拒否されるので必ずバックグラウンドで起動し、待機を起動したターンではほかのツールを呼び出さない。Bash の `description` に、何を待っているかと次に入る手順を書き (R24)、通知・合図・`--resume` のどれで始まったターンも、同じ再入の手順で処理する (先例 `review-triage/skills/review-loop/references/reentry.md`)。R10, R21, R24 を実装する。
 - KTD7. **Status の書き換えと `Blocked` の導出の規則を 1 か所 (`flow.md` の決定表) に書く** (`Done` を書かず人の変更を上書きしないことは session-settled: user-approved — chosen over 「Auto-close issue」を無効にして自分で `Done` を書く案)。候補は Status が `Ready` で、`Agent session ID` が空で、かつ開いている blocker が無いもの (すべてを満たす。資源・親 Issue・担当者とラベル・リポジトリの条件は R19)。Status が空の項目と `Todo` の項目は、候補にせず、`Blocked` の導出でも書き換えない (R1)。`Blocked` の導出で書き換えるのは、担当者が自分 1 人の項目 (KD25) のうち、割り当ての無い項目の `Ready` ⇄ `Blocked` (記録に無い項目は、初めて見つけたときに記録に加えてから書く) と、管理のセッションが自分で足した `blockedBy` による `In Progress` ⇄ `Blocked` だけ。人が `In Progress`・`In review` の項目に足した `blockedBy` は導出せず報告する。戻り先は記録に最後に書いた `Blocked` 以外の Status。Status の書き換えは、記録にある項目にだけ行う。差分のうち、組み込みワークフローの遷移 (閉じた → `Done`、reopen → `Todo`、追加 → `Todo`) と、利用者が着手を決める遷移 (`Todo` か空 → `Ready`) で説明できないものを人の変更とし、1 回だけ報告する。R1, R2, R21, R22 を実装する。
-- KTD8. **`In review` は PR の観測から導き、解放と `Done` の契機は Issue が閉じたこと。** PR が開いていて draft でなく `closingIssuesReferences` に割り当ての Issue を含み、作者 (`author.login`) がトークンのログインと同じときだけ `In review` (第三者の PR で `In review` にしないため。R6 と同じ理由)。`In review` にするときに、PR が変えたファイルと宣言を比べる (R21)。マージされたが Issue が開いている・マージされずに閉じた・進行中の Issue が閉じられた、の 3 つは利用者に尋ねる (R13)。資源の確保と解放は、同じセッションが組で行う: 管理のセッションは割り当てか着手の宣言のときに予約し、Issue の close と割り当ての解除のときに解放する。作業のセッションは、着手の宣言の `resources` で使うと宣言し、使い終えたら資源を外した `宣言の更新` で使い終えたと宣言する (利用者と相談して決めた)。記録を書き換えるのは、どれも管理のセッション。資源の解放の契機は、作業のセッションの宣言の更新と、Issue の close と、割り当ての解除 (KD9。session-settled: user-approved — chosen over PR を ready for review にした時点の解放)。資源の扱いの規則は、下の 2 つの表をこの計画の正本にし、R19〜R21 はこの表を参照する。資源の種類で変わりうる判断は、すべて属性にする。属性は、管理ディレクトリの設定の `resources` に、資源の名前ごとに書く (R32)。設定に無い資源と、書かれていない属性はデフォルト値で扱い、デフォルト値は、資源の種類を区別しないときの扱いにする。新しい種類のために判断を変えるときは、属性の表に行を足し、契機の表の列「読む属性」を直す (いまは区別の必要が見えなくても、違う種類が 1 つでも見つかったときに、全体を見直さずに済むようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。資源の判断は 1 つの関数にまとめ、属性を引数で受ける (U4)。実装の後は、属性の表の正本は `project-config.md` (U2)、契機の表の正本は `flow.md` (U7)。R20, R21 を実装する。
+- KTD8. **`In review` は PR の観測から導き、解放と `Done` の契機は Issue が閉じたこと。** PR が開いていて draft でなく `closingIssuesReferences` に割り当ての Issue を含み、作者 (`author.login`) がトークンのログインと同じときだけ `In review` (第三者の PR で `In review` にしないため。R6 と同じ理由)。`In review` にするときに、PR が変えたファイルと宣言を比べる (R21)。マージされたが Issue が開いている・マージされずに閉じた・進行中の Issue が閉じられた、の 3 つは利用者に尋ねる (R13)。資源の確保と解放は、同じセッションが組で行う: 管理のセッションは割り当てか着手の宣言のときに予約し、Issue の close と割り当ての解除のときに解放する。作業のセッションは、着手の宣言の `resources` で使うと宣言し、使い終えたら資源を外した `宣言の更新` で使い終えたと宣言する (利用者と相談して決めた)。記録を書き換えるのは、どれも管理のセッション。資源の解放の契機は、作業のセッションの宣言の更新と、Issue の close と、割り当ての解除 (KD9。session-settled: user-approved — chosen over PR を ready for review にした時点の解放)。資源の扱いの規則は、下の 2 つの表をこの計画の正本にし、R19〜R21 はこの表を参照する。資源の種類で変わりうる判断は、すべて属性にする。属性は、管理ディレクトリの設定の `resources` に、資源の名前ごとに書く (R32)。設定に無い資源と、書かれていない属性はデフォルト値で扱い、デフォルト値は、資源の種類を区別しないときの扱いにする。新しい種類のために判断を変えるときは、属性の表に行を足し、契機の表の列「読む属性」を直す (いまは区別の必要が見えなくても、違う種類が 1 つでも見つかったときに、全体を見直さずに済むようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。資源の判断は 1 つの関数にまとめ、属性を引数で受ける (U4)。実装の後は、属性の表の正本は `project-config.md` (U2)、契機の表の正本は `flow.md` の資源の扱いの節 (U4)。R20, R21 を実装する。
 
   | 属性 | 決めること | 値 | デフォルト値 |
   | --- | --- | --- | --- |
@@ -816,7 +816,7 @@ flowchart TB
 
 ### Sequencing
 
-U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8 → U9 → U10 → U11。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、合図と待機 (U6) は記録と Project の読み書きを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、ファイルの種類 (U2) と Project の検査 (U5) を使う。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
+U1 → U2 → U3 → U4 → U5 → U6 → U7 → U9 → U10 → U11 の順に進め、U8 は 2 つの部分に分けて、この順の途中で作る: フックの部分は U2 の後に着手してよく、前提条件の検査と `plugin version` の部分は U5 の後に着手して U7 より前に終える (理由は下)。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、書き込みのたびにスナップショットに書いた値を反映するので、スナップショットの読み書きも U5 で作る。合図と待機 (U6) は、記録と Project の読み書きと、U5 のスナップショットの読み込みを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、使うものの違う 2 つの部分から成る。フックの部分は設定 (U2) だけを使うので、U2 の後に着手してよい。前提条件の検査と `plugin version` の部分は、ファイルの種類 (U2) と Project の検査 (U5) を使い、U7 の再入の手順の文書が `plugin version` を参照するので、U5 の後に着手して U7 より前に終える。U8 を 2 つの単位に分けず、着手の時期だけを分けるのは、単位を分けると U-ID が変わり、計画の中の U-ID の参照をすべて直すことになるため (文書レビューの指摘を受けて、利用者と相談して決めた)。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。資源の扱いの契機の表 (KTD8) は、U4 の資源の判断の関数が実装するので、U4 で `flow.md` の資源の扱いの節として先に書き、U7 は同じ `flow.md` に残りの図と決定表を足す。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
 
 ### Alternatives Considered
 
@@ -881,7 +881,7 @@ issue-dispatch/
 │       ├── gh.py                          # gh の実行 (1 関数)
 │       ├── ids.py                         # セッション ID・名前・Issue の参照の正規化
 │       ├── config.py                      # 設定の読み込み・デフォルト値・パターンの表記をそろえる
-│       ├── project.py                     # 項目の読み取り・フィールドの書き込み・読み直し
+│       ├── project.py                     # 項目の読み取り・フィールドの書き込み・読み直し・スナップショットの読み書き
 │       ├── issues.py                      # blockedBy・コメント・PR の観測
 │       ├── declaration.py                 # 宣言の検査・パスの正規化・競合の可能性の判定
 │       ├── filekinds.py                   # パスから種類と属性を決める (ほかのモジュールに依存しない)
@@ -937,11 +937,11 @@ issue-dispatch/
 | U1 | 前提の実測 | スクラッチパッドの記録 → U5・U6 の「実測」の節 | — |
 | U2 | ファイルの種類と設定 | `issue-dispatch/skills/issue-dispatch/references/file-kinds.md`, `references/project-config.md`, `scripts/issue_dispatch/{filekinds,config}.py`, `scripts/issue_dispatch/file-kinds.json`, `scripts/issue_dispatch.py`, `tests/test_{filekinds,config}.py` | U1 |
 | U3 | 宣言と競合の可能性の判定 | `references/issue-format.md` (宣言の節), `scripts/issue_dispatch/{declaration,ids}.py`, `tests/test_{declaration,ids}.py` | U2 |
-| U4 | 記録 | `references/records.md`, `scripts/issue_dispatch/record.py`, `tests/test_record.py` | U3 |
+| U4 | 記録 | `references/records.md`, `references/flow.md` (資源の扱いの節), `scripts/issue_dispatch/record.py`, `tests/test_record.py` | U3 |
 | U5 | Project と Issue の読み書き | `references/project-schema.md`, `references/issue-format.md` (Issue とコメントの節), `scripts/issue_dispatch/{gh,project,issues,ids}.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,ids}.py` | U1, U3, U4 |
 | U6 | 合図と待機 | `references/messaging.md`, `scripts/issue_dispatch/poll.py`, `tests/test_poll.py` | U4, U5 |
-| U7 | 状態機械と再入の手順 | `references/flow.md`, `reentry.md` | U4, U5, U6 |
-| U8 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 |
+| U7 | 状態機械と再入の手順 | `references/flow.md` (資源の扱いの節を除く), `reentry.md` | U4, U5, U6 |
+| U8 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 (フックの部分は U2 だけ) |
 | U9 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md`, `references/small-pr.md` | U2, U3, U5〜U8 |
 | U10 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U3〜U9 |
 | U11 | 登録・README・用語・CI の対象 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `issue-dispatch/README.md`, `CONCEPTS.md`, `.github/test-targets.txt` | U2〜U10 |
@@ -1042,13 +1042,15 @@ issue-dispatch/
 - **Dependencies:** U3 (記録は宣言の写しを持つ)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/records.md` (新設) — 記録の置き場、`record.json` のキーの表 (`project`・`manager` (ID・名前・開始・`state`・利用者の最後の入力からの送受の数)・`sessions` (ID → 名前・`repo`・`worktree`・状態・待機中の時刻。所属する項目は `items` の `session_id` だけが持つ)・`items` (項目 → `item_id`・`session_id`・意図 (書く予定の ID・title・Status・割り当ての番号)・段階の印の時刻 (いつ付くかの正本は `flow.md`)・再送の回数・最後に書いた Status・宣言の写し (照合で足したファイルには印を付ける。R21)・資源・自分が足した `blockedBy`・待っている小さな PR・競合の可能性があるときに選んだ扱い・報告済みの印 (人の変更・割り当てない理由)・利用者が確かめた本文の最新の編集の時刻 (KD17))・`opt_in_proposals` (第三者による本文の編集の確認のオプトインを提案したリポジトリと答え。KD17)・`resources` (名前 → 資源を持つ項目 (予約か宣言か) と時刻の配列・その資源で待っている宣言。KTD8)・`notices`・`questions` (問い → 項目・種類・選択肢・尋ねた時刻・答えと答えた時刻))、`snapshot.json` (項目ごとの Status・フィールド・`blockedBy`・close・PR の状態・読んだコメントの id。書き手は再入のターンだけ)、`actions.log` (1 行 1 JSON のキー)、`wait.pid` (PID・開始時刻・所有者)、書き手・一時名と改名・種類ごとの扱いの表 (設定 / 記録 / スナップショット / ログ / 宣言)。
-  - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの配列、資源の使用と資源の判断 (KTD8 の契機の表を 1 つの関数にし、属性を引数で受ける)、報告済みの印、`actions.log` への追記。
+  - `issue-dispatch/skills/issue-dispatch/references/flow.md` (新設) — 資源の扱いの節: 契機の表 (契機 / 行うこと / 読む属性。計画では KTD8 の表)。状態遷移の図と残りの決定表は U7 で足す。
+  - `issue-dispatch/scripts/issue_dispatch/record.py` — 読み込み (無い → 新規、壊れている → 例外)、一時ファイルからの置き換え、項目の段階の印、待機中のセッションの配列、資源の使用と資源の判断 (`flow.md` の資源の扱いの節の契機の表を 1 つの関数にし、属性を引数で受ける)、報告済みの印、`actions.log` への追記。
   - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `record ...` を足す。
   - `issue-dispatch/tests/test_record.py`
 - **Approach:**
   1. 記録のキーは、Project から導出できる値 (Issue の URL・タイトル) を持たない。項目のキーは `owner/repo#番号`。
   2. 扱いの表は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md` の列 (種類 / 失われるもの / 読めない・壊れているとき) にスナップショット (作り直せるキャッシュ) の行を足す。
   3. 記録の失敗時の扱いは `records.md` の表のとおり。壊れた記録は `Corrupt` の例外で止め、新規として扱わない (先例 `pr-teeth/scripts/prteeth/store.py` の `load_precious`)。
+  4. 資源の扱いは、`flow.md` の資源の扱いの節に契機の表を先に書き、資源の判断のテストと関数をその表に従って作る (正本の文書 → テスト → 実装)。
 - **Execution note:** テストを先に書く。記録の壊れ方 (JSON でない・キーが欠ける・型違い) を 1 件ずつ失敗させてから実装する。
 - **Patterns to follow:** `review-triage/skills/review-loop/references/loop-files.md` (一時名の節の形)、`pr-teeth/scripts/prteeth/store.py` (`load_precious`・`_save_atomic`)。
 - **Test scenarios:**
@@ -1058,18 +1060,18 @@ issue-dispatch/
   - 待機中のセッションを時刻の順に返す。資源は項目に紐づけて使用中になり、項目の解放で空く。
   - Covers AE26, AE50. 資源の判断は、属性がデフォルト値のとき、資源を持つ項目が 1 つあれば、割り当てではその資源を要する項目を候補から外し、着手の宣言では `待機` を返す。資源の解放では、その資源で待っていた宣言を投稿の順に返す。予約したのに宣言に無い資源には「利用者に尋ねる」を返す。
   - Covers AE51. `reserve` が `on_declare` の資源は割り当てで予約しない。`capacity` が 2 の資源は 2 つ目の項目まで待たせない。`when_busy` が `ask` なら「利用者に尋ねる」を返し、利用者の答えが待つなら、割り当てでは候補から外して、資源が解放されるまで「利用者に尋ねる」を返さず、着手の宣言では `待機` を返す。`release_undeclared` が `release` なら宣言に無い予約を解放し、その資源で待っていた宣言を投稿の順に返す。`release_undeclared` が `ask` なら、答えを待つ間もほかの判定が済んでいれば「`開始可` を書く」を返し、予約は残す。答えが解放してよいなら解放して待っていた宣言を返し、解放してはいけないなら予約を残して「宣言の書き直しを頼む」を返す。属性を 1 つ変えたとき、結果が変わるのは、その属性を読む契機だけ。
-- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`record.json` のキーが `records.md` の表と一致する。`snapshot.json` と `wait.pid` の読み書きは U6 の待機のテストで確かめる。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、記録の様式がほかの文書に複製されていない。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`record.json` のキーが `records.md` の表と一致する。資源の判断のテストのケースが、`flow.md` の資源の扱いの節の契機の表のすべての行を覆う (目視)。`snapshot.json` の読み書きは U5 のテストで、`wait.pid` の読み書きは U6 の待機のテストで確かめる。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、記録の様式がほかの文書に複製されていない。
 
 ### U5. Project と Issue の読み書き
 
-- **Goal:** Project の様式と、Issue とコメントの先頭行の様式が正本の文書に揃い、Project の項目の読み取り (位置の順・Status・フィールド・`blockedBy`・コメント・親の判定・PR の状態)、割り当ての書き込みと読み直し、Status とフィールドの更新、コメントの投稿と既投稿の検出、`blockedBy` の追加、分割で作る Issue の作成、PR の観測が、偽の `gh` でテストできる CLI になる。
-- **Requirements:** R1〜R3, R6, R13 と R15 のうち承認を得た後の書き込み, R19, R21 のうち PR の観測, R31 (AE1, AE2, AE5, AE6, AE7, AE18, AE19, AE21, AE26, AE28, AE30, AE35, AE36, AE39, AE40, AE44, AE45, AE52, AE53, AE55, AE58)。KTD2, KTD3, KTD7, KTD8, KTD10, KTD14。
+- **Goal:** Project の様式と、Issue とコメントの先頭行の様式が正本の文書に揃い、Project の項目の読み取り (位置の順・Status・フィールド・`blockedBy`・コメント・親の判定・PR の状態)、割り当ての書き込みと読み直し、Status とフィールドの更新、コメントの投稿と既投稿の検出、`blockedBy` の追加、分割で作る Issue の作成、PR の観測、スナップショットの読み書きが、偽の `gh` でテストできる CLI になる。
+- **Requirements:** R1〜R3, R6, R13 と R15 のうち承認を得た後の書き込み, R19, R21 のうち PR の観測, R31 (AE1, AE2, AE5, AE6, AE7, AE18, AE19, AE21, AE26, AE28, AE30, AE35, AE36, AE39, AE40, AE44, AE45, AE52, AE53, AE55, AE58)。KTD2, KTD3, KTD5, KTD7, KTD8, KTD10, KTD14。
 - **Dependencies:** U1 (固定データと実測の節)、U3 (`ids.py`)、U4 (候補の資源の空きは記録で見る)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」であることの明記。フィールドの表 (名前 / 型 / 書き手 / 意味。`Agent stuck state` の 5 つの値の表を含む)、Status の選択肢の表 (名前 / 書き手 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
   - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、分割で作る Issue の本文の先頭行の様式 (分割の元の Issue と宣言の ID)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由) を足す。
   - `issue-dispatch/scripts/issue_dispatch/gh.py` — `gh` の実行 (1 関数。引数の配列・タイムアウト・終了コード・stderr の末尾を返す)。
-  - `issue-dispatch/scripts/issue_dispatch/project.py` — `check` (フィールド・選択肢・ワークフローの報告と、作る手順の案)、`items` (GraphQL で `POSITION` の順、Status・フィールドとその更新時刻・担当者・ラベル・作者・本文の編集の履歴 (確認の対象のリポジトリの項目だけ。編集ごとの編集者と時刻)・`blockedBy` の open/closed・コメント (id・書き手のログイン・本文の先頭行。書き手がトークンのログインと違うものは除く)・`subIssuesSummary`・`closingIssuesReferences` を持つ PR・リポジトリとその公開範囲 (`visibility`)。Issue を閉じる PR は、Issue のフィールド `closedByPullRequestsReferences` で 1 回のクエリで取る。`--write-snapshot` で、読んだ内容をスナップショットに書く。書き込みのサブコマンド (`assign`・`set-status`・`set-stuck`・`release` と、`issues.py` の書き込み) は、書いた値をスナップショットに反映する。KTD5)、`assign` (R19 の順で書き、読み直す)、`set-status` (5 つ以外の値と `Done` は `gh` を実行せずに拒否する)、`release` (フィールドを空にして `Todo`。`--fields-only` ではフィールドだけを空にし、Status は変えない。reopen のときに使う。R21)、`set-stuck` (`Agent stuck state` の 5 つの値か空を書く。ほかの値は `gh` を実行せずに拒否する)、`add-fields` (`check` が挙げた不足のフィールドと Status の選択肢を作る。Status の選択肢は既存の選択肢の `id` を保って足す)。
+  - `issue-dispatch/scripts/issue_dispatch/project.py` — `check` (フィールド・選択肢・ワークフローの報告と、作る手順の案)、`items` (GraphQL で `POSITION` の順、Status・フィールドとその更新時刻・担当者・ラベル・作者・本文の編集の履歴 (確認の対象のリポジトリの項目だけ。編集ごとの編集者と時刻)・`blockedBy` の open/closed・コメント (id・書き手のログイン・本文の先頭行。書き手がトークンのログインと違うものは除く)・`subIssuesSummary`・`closingIssuesReferences` を持つ PR・リポジトリとその公開範囲 (`visibility`)。Issue を閉じる PR は、Issue のフィールド `closedByPullRequestsReferences` で 1 回のクエリで取る。`--write-snapshot` で、読んだ内容をスナップショットに書く。書き込みのサブコマンド (`assign`・`set-status`・`set-stuck`・`release` と、`issues.py` の書き込み) は、書いた値をスナップショットに反映する。KTD5)、スナップショットの読み書き (`snapshot.json` の読み込みと書き込み。読み込みは、無い・壊れているを区別して返す。U6 の `poll.py` もこれで読む)、`assign` (R19 の順で書き、読み直す)、`set-status` (5 つ以外の値と `Done` は `gh` を実行せずに拒否する)、`release` (フィールドを空にして `Todo`。`--fields-only` ではフィールドだけを空にし、Status は変えない。reopen のときに使う。R21)、`set-stuck` (`Agent stuck state` の 5 つの値か空を書く。ほかの値は `gh` を実行せずに拒否する)、`add-fields` (`check` が挙げた不足のフィールドと Status の選択肢を作る。Status の選択肢は既存の選択肢の `id` を保って足す)。
   - `issue-dispatch/scripts/issue_dispatch/issues.py` — コメントの一覧と投稿 (先頭行で既投稿を検出。書き手のログインがトークンのログインと違うコメントは一覧から除く)、作業のセッションの確認 `work check` (フィールドが自分の ID か・自分宛てで今の割り当ての番号の `解放`・自分宛てでまだ行っていない `依頼`・確認の対象なら `割り当て` より後の第三者の編集) と `work held` (自分の ID が入っている開いた Issue と Status)、`blockedBy` の追加 (`gh issue edit --add-blocked-by <URL>`) と削除 (記録 (`--record-dir`) で自分が足したと確かめたものだけ)、分割で作る Issue の作成 (本文の先頭行で既に作ったものを検出する)、ラベルの確認と追加 (リポジトリにラベルが無ければ作る)、PR の観測 (PR が変えたファイルの一覧を含む)。
   - `issue-dispatch/scripts/issue_dispatch/ids.py` — セッション ID (`local_` の有無) の正規化、コメントの先頭行の生成と解析、環境変数からの自分のセッション ID の決定 (`CLAUDE_CODE_HOST_SESSION_ID` があればそれ、無ければ `CLAUDE_CODE_SESSION_ID`。公式文書に無い振る舞いに頼るので、この関数 1 つにまとめる。KTD10)、管理のセッションの規約の名前の生成 (`issue-dispatch <owner>/<number>/<login>`。管理のセッションの起動・排他と、作業のセッションの宛先の導出が使う。KD23) を足す。
   - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `project check` / `project items` / `project assign` / `project set-status` / `project set-stuck` / `project release` / `comment` / `issue create` / `blocked-by add` / `pr observe` と、作業のセッションが読むだけの `work check` / `work held` と、承認を得た後に行う `project add-fields` / `issue add-label` / `blocked-by remove` を足す。
@@ -1108,6 +1110,7 @@ issue-dispatch/
   - `issue add-label` は、ラベルを Issue に足し、リポジトリにそのラベルが無ければ先に作る。既に付いていれば何もしない。
   - Covers AE30. `check` は、フィールドと選択肢の不足と、無効になっているワークフローを列挙し (必須のワークフローと推奨のワークフローを分ける)、「Auto-add to project」が有効なら案内を返し、既存の選択肢の `id` を含めた `updateProjectV2Field` の入力を案として返す。
   - Covers AE55. 書き込みのサブコマンドは、書いた値だけをスナップショットに反映し、読み取りの後にほかの人が変えた値は反映しない。`project items --write-snapshot` は、読んだ内容をそのままスナップショットに書く。
+  - スナップショットの読み込みは、書いた内容を往復で同じに返し、ファイルが無いときと壊れているとき (JSON でない・キーが欠ける) を区別して返す。
   - Covers AE44. `issue create` は、リポジトリ・タイトル・本文・分割の元 (Issue と宣言の ID) を受けて Issue を作り、番号を返す。本文の先頭行に分割の元を書き、同じ先頭行を持つ開いた Issue が既にあれば作らずにその番号を返す (再開のときに 2 つ作らない)。Status と sub-issue の関係は書かない。
   - セッション ID の正規化: `local_<UUID>` と `<UUID>` を区別して保持し、別物として比べる。
   - 規約の名前は owner・番号・login から作り、管理のセッションと作業のセッションで、同じ入力なら同じ名前になる (`akm`・`3`・`akm` → `issue-dispatch akm/3/akm`)。
@@ -1118,10 +1121,10 @@ issue-dispatch/
 
 - **Goal:** 合図の種類と様式、宛先の決め方、捨てられた知らせの扱い、`notify_when_idle` の使い方が正本の文書に揃い、スナップショットの差分による待機 (管理のセッションの `wait` と、作業のセッションの `wait-assignment`・`wait-decision`) が、偽の `gh` でテストできる CLI になる。
 - **Requirements:** R7〜R10, R24 のうち待機と止めた待機の通知, R25 のうち待機の終了コード, R31 (AE3, AE5, AE13, AE14, AE22, AE27, AE29, AE32, AE33, AE36, AE39, AE40, AE45, AE53, AE55, AE57)。KTD1, KTD6, KTD10, KTD11, KTD12。
-- **Dependencies:** U4 (スナップショットと `wait.pid` の様式)、U5 (`project items` とコメントの一覧)。
+- **Dependencies:** U4 (スナップショットと `wait.pid` の様式)、U5 (`project items`・コメントの一覧・スナップショットの読み込み)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` と、宣言の書き直しを頼む `request` に添える・単独の申し込みは busy の相手だけ) と失効、Claude Code セッションの権限モードの組み合わせと `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。実測の節には、Claude Code の公式文書に無い振る舞いへの依存の表を書く (列は、文書に無い振る舞い / それに頼る要件と処理 (R・KTD・スキルの手順・スクリプトの関数) / 確かめた日と Claude Code の版 / 変わったときに直す場所)。最初に載せるのは、`ListAgents` の出力の形 (1 行目の名前・各行の状態) と、環境変数 `CLAUDE_CODE_HOST_SESSION_ID`。スキルの手順書は、文書に無い振る舞いに頼るところでこの表を参照する (版が上がって振る舞いが変わったとき、直す場所を 1 か所で見られるようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。
-  - `issue-dispatch/scripts/issue_dispatch/poll.py` — スナップショットの読み書きと差分 (処理の順に並べる)、`wait` (間隔・期限・終了コード・`wait.pid`・SIGTERM を受けたときの `stopped`。スナップショットは読むだけ)、`wait-assignment` と `wait-decision` (終わる条件と標準出力は KTD6)。
+  - `issue-dispatch/scripts/issue_dispatch/poll.py` — スナップショット (U5 の `project.py` で読む) と今の Project の差分 (処理の順に並べる)、`wait` (間隔・期限・終了コード・`wait.pid`・SIGTERM を受けたときの `stopped`。スナップショットは読むだけ)、`wait-assignment` と `wait-decision` (終わる条件と標準出力は KTD6)。
   - `issue-dispatch/scripts/issue_dispatch.py` — サブコマンド `wait` / `wait-assignment` / `wait-decision` を足す。
   - `issue-dispatch/tests/test_poll.py`
 - **Approach:**
@@ -1155,7 +1158,7 @@ issue-dispatch/
 - **Requirements:** R12, R13, R21〜R25 (AE2, AE7, AE8, AE9, AE11, AE12, AE14, AE20, AE38〜AE40)。KTD3, KTD6, KTD7, KTD8。
 - **Dependencies:** U4, U5, U6。
 - **Files:**
-  - `issue-dispatch/skills/issue-dispatch/references/flow.md` (新設) — 状態遷移の図 (High-Level Technical Design の図をこの文書に移して正本にする)、フィールド × 書き手 × いつ の表、割り当ての書き込みの順と冪等性 (KTD3)、資源の扱いの表 (契機 / 行うこと / 読む属性。計画では KTD8 の表)、ポーリングの処理の順の決定表 (順 / 変化 / 条件 / 行うこと / 承認 / 報告に書くもの。部分完了の続きの行を含み、条件は記録の段階の印で書く。段階の印がいつ付くかの正本)、停止ノードの決定表 (ID / 条件 / 記録に書くもの / 報告に書くもの / 続け方)、行為の区分の表 (承認不要 / 承認必要 / 人間のみ) と取り消し方の表。
+  - `issue-dispatch/skills/issue-dispatch/references/flow.md` — U4 で作った資源の扱いの節に、状態遷移の図 (High-Level Technical Design の図をこの文書に移して正本にする)、フィールド × 書き手 × いつ の表、割り当ての書き込みの順と冪等性 (KTD3)、ポーリングの処理の順の決定表 (順 / 変化 / 条件 / 行うこと / 承認 / 報告に書くもの。部分完了の続きの行を含み、条件は記録の段階の印で書く。段階の印がいつ付くかの正本)、停止ノードの決定表 (ID / 条件 / 記録に書くもの / 報告に書くもの / 続け方)、行為の区分の表 (承認不要 / 承認必要 / 人間のみ) と取り消し方の表を足す。資源の扱いの節は書き直さず、決定表から参照する。
   - `issue-dispatch/skills/issue-dispatch/references/reentry.md` (新設) — 入口 1 つ (通知・合図・利用者の答え・`--resume`)、手順 (同梱の CLI のパスを確かめる (無ければ停止。R24) → 読み込んだ版とインストールされている版を比べる (新しい版があれば 1 回だけ報告。R24) → 記録と設定を読む → 利用者の答えがあれば記録に書く → 止めた待機の通知 (KTD6) なら何もしない → 記録の状態が `active` でなければ何もしない → 待機の結果を読む (KTD6 に挙げた終了コードに無いコードなら停止) → `project items --write-snapshot` で Project を読み、スナップショットを書く → `flow.md` の決定表の順に処理 → 割り当て (書き込みのたびに、CLI がスナップショットを更新する) → 動いている待機を止める → 待機の起動 → 利用者が未回答の管理のセッションからの問いをまとめて示してターンを終える)、待機の Bash 呼び出しの `description` の文、通知は人間の入力ではないこと、部分完了の表 (段階の印 / Project の状態 / 行うこと。条件は `flow.md` の行 ID を参照し、言い直さない)。
 - **Approach:**
   1. 停止ノードの ID は `D1`〜 (dispatch の D) とし、review-loop の `RA` と区別する。
@@ -1170,7 +1173,7 @@ issue-dispatch/
 
 - **Goal:** リポジトリ・Project・セッションの検査が報告と変更の案を返し、フックが、ほかの worktree でのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を拒否し、スキル `repo-preflight` が検査の手順書になる。
 - **Requirements:** R14〜R17, R24 と R26 のうちプラグインの版の比べ方 (AE15, AE16, AE21, AE22, AE34, AE36, AE37, AE43, AE52, AE56)。KTD12, KTD13。
-- **Dependencies:** U2 (`filekinds`・`config`)、U5 (`project check`)。
+- **Dependencies:** フックの部分 (`hooks.json`・2 つのフックのスクリプトとそのテスト) は U2 (`config`)。前提条件の検査と `plugin version` の部分 (`preflight.py`・`plugin version`・スキル `repo-preflight` とそのテスト) は U2 (`filekinds`・`config`)、U5 (`project check`)。2 つの部分の着手と終える時期は Sequencing のとおり。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U2 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補、リポジトリの公開範囲 → 指摘と案)、`project` (U5 の `check` を使う。管理ディレクトリの設定 `repositories` のパスの検査 (R15) も行う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理のセッション / 作業のセッション) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` の比較)、フックの設定の有無)。
   - `issue-dispatch/scripts/issue_dispatch.py` — CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` / `plugin version` を足す (`plugin version` は、読み込んだ版のディレクトリと `~/.claude/plugins/installed_plugins.json` の `installPath` を比べて返す。R24・R26)。
@@ -1328,7 +1331,7 @@ issue-dispatch/
 | 説明文の一致 | `issue-dispatch/.claude-plugin/plugin.json` と `.claude-plugin/marketplace.json` の description の比較 | U11 | 同文 |
 | 文書の構造 | `issue-dispatch/skills/` と `CONCEPTS.md` を対象にスキル `doc-dag` を実行する | U2〜U11 | 正本が 1 か所にあり、重複と巡回が無い |
 | 言い回し | 変更した Markdown を対象にスキル `wording-guard` を実行する | U2〜U11 | 最後の走査で、新しい種類の不自然な言い回しが見つからない |
-| 決定表の整合 | `flow.md` の図のノードと決定表の行、`messaging.md` の合図の表と KTD1 の表を目視で照合 | U6, U7 | 1:1 (機械検査は無い) |
+| 決定表の整合 | `flow.md` の図のノードと決定表の行、`flow.md` の資源の扱いの節の契機の表と U4 の資源の判断のテストのケース、`messaging.md` の合図の表と KTD1 の表を目視で照合 | U4, U6, U7 | 図のノードと決定表の行、合図の表と KTD1 の表は 1:1。契機の表のすべての行がテストのケースに覆われる (機械検査は無い) |
 | 手順書の通し確認 | 管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ。端末はブランチ版を `--plugin-dir` で読み込み、Desktop は U1 で確かめた手段で読み込む。手段が無ければすべて端末にし、Desktop にしかないツールはマージの後に確かめる。KTD17)、検証用の Project、検証用のリポジトリ 2 つ。始める前に回数・費用 (目安はセッション 3 つ × 数時間)・手順を利用者に示して許可を得る | U8, U9, U10 | 下のシナリオ |
 
 通し確認のシナリオ (順に行う。各シナリオで、Project のフィールドと Status・Issue のコメントの先頭行・記録のうち `record.json` と `actions.log`・管理のセッションと作業のセッションの報告・利用者の操作が 4 種類だけだったこと・承認を要する行為の前に答えが記録にあったこと・問いがまとめて尋ねられたことを見る):
