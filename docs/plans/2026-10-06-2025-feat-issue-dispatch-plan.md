@@ -817,7 +817,7 @@ flowchart TB
 
 ### Sequencing
 
-U1 → U2 → U3 → U4 → U5 → U6 → U7 → U9 → U10 → U11 の順に進め、U8 は 2 つの部分に分けて、この順の途中で作る: フックと `plugin version` の部分は U2 の後に着手して U7 より前に終え、前提条件の検査の部分は U5 の後に着手して U9 より前に終える (理由は下)。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、書き込みのたびにスナップショットに書いた値を反映するので、スナップショットの読み書きも U5 で作る。合図と待機 (U6) は、記録と Project の読み書きと、U5 のスナップショットの読み込みを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、使うものの違う 2 つの部分から成る。フックと `plugin version` の部分は、設定と CLI の入口 (U2) だけを使うので U2 の後に着手してよく、U7 の再入の手順の文書が `plugin version` を使うので U7 より前に終える。前提条件の検査の部分は、ファイルの種類 (U2) と Project の検査 (U5) を使うので U5 の後に着手し、U9 の開始の検査が `preflight session` を使うので U9 より前に終える (`plugin version` を前提条件の検査と同じ部分に入れると、U7 の着手が、U7 の使わない前提条件の検査の完成を待つため。文書レビューの指摘を受けて、利用者と相談して決めた)。U8 を 2 つの単位に分けず、着手の時期だけを分けるのは、単位を分けると U-ID が変わり、計画の中の U-ID の参照をすべて直すことになるため (文書レビューの指摘を受けて、利用者と相談して決めた)。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。資源の扱いの契機の表 (KTD8) は、U4 の資源の判断の関数が実装するので、U4 で `flow.md` の資源の扱いの節として先に書き、U7 は同じ `flow.md` に残りの図と決定表を足す。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
+U1 → U2 → U3 → U4 → U5 → U6 → U7 → U9 → U10 → U11 の順に進め、U8 は 2 つの部分に分けて、この順の途中で作る: フックと `plugin version` の部分は U2 の後に着手し、そのうち `plugin version` を U7 より前に終える。前提条件の検査の部分は U5 の後に着手して U9 より前に終える (理由は下)。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、書き込みのたびにスナップショットに書いた値を反映するので、スナップショットの読み書きも U5 で作る。合図と待機 (U6) は、記録と Project の読み書きと、U5 のスナップショットの読み込みを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、使うものの違う 2 つの部分から成る。フックと `plugin version` の部分は、設定と CLI の入口 (U2) だけを使うので U2 の後に着手してよい。そのうち `plugin version` は、U7 の再入の手順の文書が使うので U7 より前に終える。フックは U7 が使わないので、U7 の着手をフックの完成で待たせない (文書レビューの指摘を受けて直した)。前提条件の検査の部分は、ファイルの種類 (U2) と Project の検査 (U5) を使うので U5 の後に着手し、U9 の開始の検査が `preflight session` を使うので U9 より前に終える (`plugin version` を前提条件の検査と同じ部分に入れると、U7 の着手が、U7 の使わない前提条件の検査の完成を待つため。文書レビューの指摘を受けて、利用者と相談して決めた)。U8 を 2 つの単位に分けず、着手の時期だけを分けるのは、単位を分けると U-ID が変わり、計画の中の U-ID の参照をすべて直すことになるため (文書レビューの指摘を受けて、利用者と相談して決めた)。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。資源の扱いの契機の表 (KTD8) は、U4 の資源の判断の関数が実装するので、U4 で `flow.md` の資源の扱いの節として先に書き、U7 は同じ `flow.md` に残りの図と決定表を足す。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
 
 ### Alternatives Considered
 
@@ -940,9 +940,9 @@ issue-dispatch/
 | U3 | 宣言と競合の可能性の判定 | `references/issue-format.md` (宣言の節), `scripts/issue_dispatch/{declaration,ids}.py`, `tests/test_{declaration,ids}.py` | U2 |
 | U4 | 記録 | `references/records.md`, `references/flow.md` (資源の扱いの節), `scripts/issue_dispatch/record.py`, `tests/test_record.py` | U3 |
 | U5 | Project と Issue の読み書き | `references/project-schema.md`, `references/issue-format.md` (Issue とコメントの節), `scripts/issue_dispatch/{gh,project,issues,ids}.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,ids}.py` | U1, U3, U4 |
-| U6 | 合図と待機 | `references/messaging.md`, `scripts/issue_dispatch/poll.py`, `tests/test_poll.py` | U4, U5 |
-| U7 | 状態機械と再入の手順 | `references/flow.md` (資源の扱いの節を除く), `reentry.md` | U4, U5, U6, U8 (フックと `plugin version` の部分) |
-| U8 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 (フックと `plugin version` の部分は U2 だけ) |
+| U6 | 合図と待機 | `references/messaging.md`, `scripts/issue_dispatch/poll.py`, `tests/test_poll.py` | U2, U4, U5 |
+| U7 | 状態機械と再入の手順 | `references/flow.md` (資源の扱いの節を除く), `reentry.md` | U4, U5, U6, U8 (`plugin version`) |
+| U8 | 前提条件の検査とフック | `scripts/issue_dispatch/{preflight,plugin_version}.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,plugin_version,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 (フックと `plugin version` の部分は U2 だけ) |
 | U9 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md`, `references/small-pr.md` | U2, U3, U5〜U8 |
 | U10 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U3〜U9 |
 | U11 | 登録・README・用語・CI の対象 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `issue-dispatch/README.md`, `CONCEPTS.md`, `.github/test-targets.txt` | U2〜U10 |
@@ -970,8 +970,8 @@ issue-dispatch/
 
 ### U2. ファイルの種類と設定
 
-- **Goal:** ファイルの種類と競合の可能性の判定の規則、設定のキーと未設定の扱いが正本の文書に揃い、パスから種類と属性を決める処理 (`filekinds`) と、設定の読み込み (`config`) が、`gh` を使わずにテストできる Python のモジュールになる。`filekinds` はほかのモジュールに依存しない (KD22。この単位を最初のドメインにする理由は Sequencing)。
-- **Requirements:** R5 (種類の決め方)、R31, R32 (AE17, AE42, AE51)。KTD8 のうち資源の属性, KTD9, KTD14, KTD15。
+- **Goal:** ファイルの種類と競合の可能性の判定の規則、設定のキーと未設定の扱いが正本の文書に揃い、パスから種類と属性を決める処理 (`filekinds`) と、設定の読み込みと作業のセッションの一時ディレクトリのパスを作る処理 (`config`) が、`gh` を使わずにテストできる Python のモジュールになる。`filekinds` はほかのモジュールに依存しない (KD22。この単位を最初のドメインにする理由は Sequencing)。
+- **Requirements:** R5 (種類の決め方)、R31, R32 (AE17, AE42, AE51)。KTD6 のうち作業のセッションの一時ディレクトリ, KTD8 のうち資源の属性, KTD9, KTD14, KTD15。
 - **Dependencies:** U1。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/file-kinds.md` (新設) — 冒頭に「このファイルがファイルの種類と競合の可能性の判定の規則の正本」であることの明記。6 段の問いと種類の表 (段 / 問い / 種類 / 判定 / 示す扱い)、節で判定する規則 (階層と先頭部分の一致)、節の表記の表 (構造 / 表記 / 例)、パスのパターンの書き方と照合の順 (設定が先・段の順)、分けたときの参照のされ方 (`split_reference`)、マージできないファイル、共有の状態を持つファイル、デフォルトの表の読み方と各行を選んだ理由 (表そのものの正本は `file-kinds.json` で、文書では言い直さない)。
@@ -979,7 +979,7 @@ issue-dispatch/
   - `issue-dispatch/scripts/issue_dispatch/__init__.py`
   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` — パスから種類と属性を決める (設定の `files` を先に、デフォルトの表を後に照合し、段の順で決める。パターンは正規表現に変換して照合する)。`issue_dispatch` のほかのモジュールを import しない。
   - `issue-dispatch/scripts/issue_dispatch/file-kinds.json` — デフォルトの表 (パターン・種類・節の表記・分けたときの参照のされ方・マージできるか)。
-  - `issue-dispatch/scripts/issue_dispatch/config.py` — 管理ディレクトリの設定とリポジトリの設定の読み込み、未設定のキーへのデフォルト値の適用 (KTD15 の表)、値の誤りの警告、`files` のパターンの表記をそろえることと、ルートの外を指すパターンの警告、承認を得た後に管理ディレクトリの設定の `third_party_edit_check` へリポジトリを足すこと (R18。ほかのキーは変えない)、管理ディレクトリの設定の `repositories` のパスから、git で既定のブランチのリポジトリの設定を読むこと (「ある」「無い」「読めない」を分けて返し、「読めない」には理由 (設定 `repositories` にパスが無い・ディレクトリが無い・git リポジトリでない・clone のルートでない・`origin/HEAD` が無い・git の失敗) を添える。KTD9)。
+  - `issue-dispatch/scripts/issue_dispatch/config.py` — 管理ディレクトリの設定とリポジトリの設定の読み込み、未設定のキーへのデフォルト値の適用 (KTD15 の表)、値の誤りの警告、`files` のパターンの表記をそろえることと、ルートの外を指すパターンの警告、承認を得た後に管理ディレクトリの設定の `third_party_edit_check` へリポジトリを足すこと (R18。ほかのキーは変えない)、管理ディレクトリの設定の `repositories` のパスから、git で既定のブランチのリポジトリの設定を読むこと (「ある」「無い」「読めない」を分けて返し、「読めない」には理由 (設定 `repositories` にパスが無い・ディレクトリが無い・git リポジトリでない・clone のルートでない・`origin/HEAD` が無い・git の失敗) を添える。KTD9)、作業のセッションの一時ディレクトリのパス (`${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/`。作業ツリーの外。U6 の `poll.py` の `wait.pid` と U8 の `plugin_version.py` の印のファイルが、このパスを使う。KTD6・R26) を作ること。
   - `issue-dispatch/scripts/issue_dispatch.py` (新設) — CLI の入口 (サブコマンドと JSON の入出力。サブコマンドの一覧の正本は KTD14)。この単位で `files classify` と `config add-edit-check` を作り、後の単位が、それぞれの Files に挙げたサブコマンドを足す。
   - `issue-dispatch/tests/test_filekinds.py`、`issue-dispatch/tests/test_config.py`
 - **Approach:**
@@ -992,6 +992,7 @@ issue-dispatch/
   - パターンの書き方: `*.pb.go` は `api.pb.go` に一致し、`gen/api.pb.go` に一致しない。`**/*.pb.go` は両方に一致する。`src/*.ts` は `src/app.ts` に一致し、`src/lib/a.ts` に一致しない。`dist/` は `dist/app.js` と `dist/assets/a.js` に一致する。
   - `config` は、未設定のキーに KTD15 の表のデフォルト値を使い、整数のキーの空文字列を未設定と読まず、値の誤りはデフォルト値で続行して警告を返す。管理ディレクトリとリポジトリで同じファイル名を読み、キーで役割を分ける。
   - `config` は、`third_party_edit_check` が無ければ空 (どのリポジトリも確かめない) として読む。`config add-edit-check` は、`third_party_edit_check` にリポジトリを足し、ほかのキーの値を変えない。既にあれば何もしない。
+  - `config` の一時ディレクトリのパスは、環境変数 `TMPDIR` があればその下、無ければ `/tmp` の下の `issue-dispatch/<セッション ID>/` で、作業ツリーの中を指さない。
   - Covers AE51. `config` は、`resources` に書かれていない資源と属性にデフォルト値 (KTD8) を使い、未知の属性と誤った値は警告してデフォルト値を使う。
   - Covers AE42. `config` は、`repositories` のパスにある git リポジトリから、`origin/HEAD` の内容のリポジトリの設定を読む (一時ディレクトリに作ったリポジトリで、checkout しているブランチと編集中の内容を既定のブランチと変えておき、既定のブランチの内容を返すことを確かめる)。既定のブランチに設定ファイルが無ければ「無い」、パスが `repositories` に無い・パスが無い・git リポジトリでないときは「読めない」を返す。参照 `origin/HEAD` の無いリポジトリ (`git init` と `git remote add origin` だけの一時リポジトリ) では、「無い」ではなく「読めない」(理由: `origin/HEAD` が無い) を返す。`repositories` に clone のサブディレクトリを書くと、設定ファイルがあっても「無い」ではなく「読めない」(理由: clone のルートでない) を返す。シンボリックリンクを経た clone のルートのパスを書いたときは、ルートとして読む。`repositories` の相対パスは警告して使わない。
   - `config` が読み込むとき、設定のパターン `./dist/**` と `dist//**` は、`dist/**` と同じに照合する。末尾の `/` は取り除かない。`/dist/**`・`../x/**`・`dist/../x` は、その規則を使わずに警告を返す。
@@ -1123,7 +1124,7 @@ issue-dispatch/
 
 - **Goal:** 合図の種類と様式、宛先の決め方、捨てられた知らせの扱い、`notify_when_idle` の使い方が正本の文書に揃い、スナップショットの差分による待機 (管理のセッションの `wait` と、作業のセッションの `wait-assignment`・`wait-decision`) が、偽の `gh` でテストできる CLI になる。
 - **Requirements:** R7〜R10, R24 のうち待機と止めた待機の通知, R25 のうち待機の終了コード, R31 (AE3, AE5, AE13, AE14, AE22, AE27, AE29, AE32, AE33, AE36, AE39, AE40, AE45, AE53, AE55, AE57)。KTD1, KTD6, KTD10, KTD11, KTD12。
-- **Dependencies:** U4 (スナップショットと `wait.pid` の様式)、U5 (`project items`・コメントの一覧・スナップショットの読み込み)。
+- **Dependencies:** U2 (`config` の、作業のセッションの一時ディレクトリのパス)、U4 (スナップショットと `wait.pid` の様式)、U5 (`project items`・コメントの一覧・スナップショットの読み込み)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/messaging.md` (新設) — 合図の表 (種類 / 向き / 先頭行 / 行のキー / GitHub の対応物 / 失われたときの回復。この文書が正本で、計画の KTD1 の表は草稿)、宛先の決め方 (名前・識別子・Desktop の ID 宛てを使わない理由)、捨てられた知らせの扱い、`notify_when_idle` の使い方 (知らせは 1 回限り・合図 `assigned`・`go` と、宣言の書き直しを頼む `request` に添える・単独の申し込みは busy の相手だけ) と失効、Claude Code セッションの権限モードの組み合わせと `crossSessionInbound`、U1 の実測の節 (KTD11 の案の決定を含む)。実測の節には、Claude Code の公式文書に無い振る舞いへの依存の表を書く (列は、文書に無い振る舞い / それに頼る要件と処理 (R・KTD・スキルの手順・スクリプトの関数) / 確かめた日と Claude Code の版 / 変わったときに直す場所)。最初に載せるのは、`ListAgents` の出力の形 (1 行目の名前・各行の状態) と、環境変数 `CLAUDE_CODE_HOST_SESSION_ID`。スキルの手順書は、文書に無い振る舞いに頼るところでこの表を参照する (版が上がって振る舞いが変わったとき、直す場所を 1 か所で見られるようにするため。文書レビューの指摘を受けて、利用者と相談して決めた)。
   - `issue-dispatch/scripts/issue_dispatch/poll.py` — スナップショット (U5 の `project.py` で読む) と今の Project の差分 (処理の順に並べる)、`wait` (間隔・期限・終了コード・`wait.pid`・SIGTERM を受けたときの `stopped`。スナップショットは読むだけ)、`wait-assignment` と `wait-decision` (終わる条件と標準出力は KTD6)。
@@ -1158,7 +1159,7 @@ issue-dispatch/
 
 - **Goal:** 項目の状態遷移、フィールド × 書き手 × いつ の表、ポーリングの処理の順、停止ノード、行為の区分と取り消し方、再入の手順が 2 つの文書に揃い、散文で言い直されない。
 - **Requirements:** R12, R13, R21〜R25 (AE2, AE7, AE8, AE9, AE11, AE12, AE14, AE20, AE38〜AE40)。KTD3, KTD6, KTD7, KTD8。
-- **Dependencies:** U4, U5, U6、U8 のフックと `plugin version` の部分 (`reentry.md` の手順が `plugin version` を使う。Sequencing)。
+- **Dependencies:** U4, U5, U6、U8 のうち `plugin version` (`reentry.md` の手順が使う。フックは使わない。Sequencing)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/flow.md` — U4 で作った資源の扱いの節に、状態遷移の図 (High-Level Technical Design の図をこの文書に移して正本にする)、フィールド × 書き手 × いつ の表、割り当ての書き込みの順と冪等性 (KTD3)、ポーリングの処理の順の決定表 (順 / 変化 / 条件 / 行うこと / 承認 / 報告に書くもの。部分完了の続きの行を含み、条件は記録の段階の印で書く。段階の印がいつ付くかの正本)、停止ノードの決定表 (ID / 条件 / 記録に書くもの / 報告に書くもの / 続け方)、行為の区分の表 (承認不要 / 承認必要 / 人間のみ) と取り消し方の表を足す。資源の扱いの節は書き直さず、決定表から参照する。
   - `issue-dispatch/skills/issue-dispatch/references/reentry.md` (新設) — 入口 1 つ (通知・合図・利用者の答え・`--resume`)、手順 (同梱の CLI のパスを確かめる (無ければ停止。R24) → 記録と設定を読む → 利用者の答えがあれば記録に書く → 止めた待機の通知 (KTD6) なら何もしない → 記録の状態が `active` でなければ何もしない → 読み込んだ版とインストールされている版を比べる (報告済みの印が無い新しい版だけ報告。R24) → 待機の結果を読む (KTD6 に挙げた終了コードに無いコードなら停止) → `project items --write-snapshot` で Project を読み、スナップショットを書く → `flow.md` の決定表の順に処理 → 割り当て (書き込みのたびに、CLI がスナップショットを更新する) → 動いている待機を止める → 待機の起動 → 利用者が未回答の管理のセッションからの問いをまとめて示してターンを終える)、待機の Bash 呼び出しの `description` の文、通知は人間の入力ではないこと、部分完了の表 (段階の印 / Project の状態 / 行うこと。条件は `flow.md` の行 ID を参照し、言い直さない)。
@@ -1173,18 +1174,19 @@ issue-dispatch/
 
 ### U8. 前提条件の検査とフック
 
-- **Goal:** リポジトリ・Project・セッションの検査が報告と変更の案を返し、フックが、ほかの worktree でのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を拒否し、スキル `repo-preflight` が検査の手順書になる。
+- **Goal:** リポジトリ・Project・セッションの検査が報告と変更の案を返し、フックが、ほかの worktree でのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を拒否し、サブコマンド `plugin version` が、読み込んだプラグインの版とインストールされている版を比べた結果を返し、スキル `repo-preflight` が検査の手順書になる。
 - **Requirements:** R14〜R17, R24 と R26 のうちプラグインの版の比べ方 (AE15, AE16, AE21, AE22, AE34, AE36, AE37, AE43, AE52, AE56)。KTD12, KTD13。
-- **Dependencies:** フックと `plugin version` の部分 (`hooks.json`・2 つのフックのスクリプト・サブコマンド `plugin version` と、それらのテスト) は U2 (`config`・CLI の入口)。前提条件の検査の部分 (`preflight.py`・スキル `repo-preflight` とそのテスト) は U2 (`filekinds`・`config`)、U5 (`project check`)。2 つの部分の着手と終える時期は Sequencing のとおり。
+- **Dependencies:** フックと `plugin version` の部分 (`hooks.json`・2 つのフックのスクリプト・`plugin_version.py` と、それらのテスト) は U2 (`config`・CLI の入口。`plugin version` は `config` の、作業のセッションの一時ディレクトリのパスも使う)。前提条件の検査の部分 (`preflight.py`・スキル `repo-preflight` とそのテスト) は U2 (`filekinds`・`config`)、U5 (`project check`)。2 つの部分の着手と終える時期は Sequencing のとおり。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U2 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補、リポジトリの公開範囲 → 指摘と案)、`project` (U5 の `check` を使う。管理ディレクトリの設定 `repositories` のパスの検査 (R15) も行う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理のセッション / 作業のセッション) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` の比較)、フックの設定の有無)。
-  - `issue-dispatch/scripts/issue_dispatch.py` — CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` / `plugin version` を足す (`plugin version` は、読み込んだ版のディレクトリを、`~/.claude/plugins/installed_plugins.json` のそのプラグインのすべての要素の `installPath` と比べ、どれかと同じなら「違いなし」、どれとも違えば「新しい版あり」と要素の一覧 (scope・版) を返す。読み込んだディレクトリがプラグインのキャッシュの外なら「比べられない」、ファイルが読めなければ「読めない」を返す。`--session-id` を渡すと、作業のセッションの印のファイル (`${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/`) を読み、まだ伝えていない新しい版のときと、まだ伝えていない「読めない」のときだけ「伝える」を返して印を書く (読めるようになったら「読めない」の印を消す)。R24・R26)。
+  - `issue-dispatch/scripts/issue_dispatch.py` — CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` / `plugin version` を足す (`plugin version` の処理は `plugin_version.py`)。
+  - `issue-dispatch/scripts/issue_dispatch/plugin_version.py` — 読み込んだ版のディレクトリを、`~/.claude/plugins/installed_plugins.json` のそのプラグインのすべての要素の `installPath` と比べ、どれかと同じなら「違いなし」、どれとも違えば「新しい版あり」と要素の一覧 (scope・版) を返す。読み込んだディレクトリがプラグインのキャッシュの外なら「比べられない」、ファイルが読めなければ「読めない」を返す。`--session-id` を渡すと、作業のセッションの印のファイル (U2 の `config` が作る一時ディレクトリのパス `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` の中) を読み、まだ伝えていない新しい版のときと、まだ伝えていない「読めない」のときだけ「伝える」を返して印を書く (読めるようになったら「読めない」の印を消す。R24・R26)。
   - `issue-dispatch/hooks/hooks.json` — `PreToolUse` の matcher `Bash|Edit|Write|MultiEdit|NotebookEdit` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-other-worktrees.py"`、`timeout` 10。もう 1 つ、matcher `Bash` → `python3 "${CLAUDE_PLUGIN_ROOT}/hook-scripts/guard-direct-gh.py"`、`timeout` 10。
   - `issue-dispatch/hook-scripts/guard-direct-gh.py` — 規則の関数 `denies_gh(command)` と理由文 (代わりの手順: 作業のセッションなら管理のセッションに任せる、人間だけが行う操作なら利用者に頼む)。設定ファイル (`.claude/akm-claude-plugins/issue-dispatch/config.json`) を Git のルート (Git でなければ `cwd`) で探し、無ければ何もしない。
   - `issue-dispatch/hook-scripts/guard-other-worktrees.py` — 規則の関数 `denies(command, cwd, worktrees, protected)` と、編集系のツールのパスを判定する `denies_path(path, cwd, worktrees, protected)` (同じパスの照合を使う) と理由文。
   - `issue-dispatch/skills/repo-preflight/SKILL.md` — 手順 (3 つを検査する → 指摘を示し、生成ファイルの候補は案の書き方を利用者に尋ねる → 案を示す → 適用は人間)、原則、「このスキルが検出しないもの」(ビルドの出力先。利用者が調べて設定の `files` に書く)。
   - `issue-dispatch/skills/repo-preflight/references/checks.md` — 検査の表 (項目 / 確かめ方 / 満たさないときの案)、「フックが検出しないもの」の節。
-  - `issue-dispatch/tests/test_preflight.py`、`issue-dispatch/tests/test_guard_other_worktrees.py`、`issue-dispatch/tests/test_guard_direct_gh.py`
+  - `issue-dispatch/tests/test_preflight.py`、`issue-dispatch/tests/test_plugin_version.py`、`issue-dispatch/tests/test_guard_other_worktrees.py`、`issue-dispatch/tests/test_guard_direct_gh.py`
 - **Approach:**
   1. 固定のポートの候補は、開発サーバの設定 (`vite.config.*` の `port`、`package.json` の scripts の `--port`、`wrangler.toml` の `[dev] port`、`.env*` の `PORT`) を正規表現で挙げ、判断と案の文面はスキルが書く。`.env*` は秘密の値を含みうるので、スクリプトはファイル名・キー名・行番号だけを返して値を返さず、スキルは `.env*` を開かない (秘密の値をセッションの文脈に入れないため)。
   2. フックは `git worktree list --porcelain` の `worktree` 行を実体パスにし、自分の作業ツリー (`cwd` の実体パスを含む worktree) を除いた一覧と設定の `protected_paths` を拒否の対象にする。コマンドの中のパスは、コマンドの語 (空白で区切った単位) の先頭一致で、続く文字がパスの区切り・空白・引用符・終端のときだけ一致とする。
