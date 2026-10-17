@@ -899,7 +899,7 @@ issue-dispatch/
 │   │       ├── file-kinds.md              # ファイルの種類と競合の可能性の判定の規則 (R5)
 │   │       ├── messaging.md               # 合図の取り決め (R7〜R10)
 │   │       ├── records.md                 # 記録の契約 (R11)
-│   │       ├── flow.md                    # 状態機械・決定表・行為の区分 (R12・R13)
+│   │       ├── flow.md                    # 資源の扱いの節 (契機の表。KTD8)・状態機械・決定表・行為の区分 (R12・R13)
 │   │       ├── reentry.md                 # 再入の手順 (R24)
 │   │       ├── arguments.md               # 引数 (--resume・--end)
 │   │       └── project-config.md          # 設定の様式 (R32)
@@ -941,7 +941,7 @@ issue-dispatch/
 | U4 | 記録 | `references/records.md`, `references/flow.md` (資源の扱いの節), `scripts/issue_dispatch/record.py`, `tests/test_record.py` | U3 |
 | U5 | Project と Issue の読み書き | `references/project-schema.md`, `references/issue-format.md` (Issue とコメントの節), `scripts/issue_dispatch/{gh,project,issues,ids}.py`, `tests/fake-gh`, `tests/fixtures/`, `tests/test_{project,ids}.py` | U1, U3, U4 |
 | U6 | 合図と待機 | `references/messaging.md`, `scripts/issue_dispatch/poll.py`, `tests/test_poll.py` | U4, U5 |
-| U7 | 状態機械と再入の手順 | `references/flow.md` (資源の扱いの節を除く), `reentry.md` | U4, U5, U6 |
+| U7 | 状態機械と再入の手順 | `references/flow.md` (資源の扱いの節を除く), `reentry.md` | U4, U5, U6, U8 (フックと `plugin version` の部分) |
 | U8 | 前提条件の検査とフック | `scripts/issue_dispatch/preflight.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 (フックと `plugin version` の部分は U2 だけ) |
 | U9 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md`, `references/small-pr.md` | U2, U3, U5〜U8 |
 | U10 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U3〜U9 |
@@ -1039,7 +1039,7 @@ issue-dispatch/
 
 ### U4. 記録
 
-- **Goal:** 記録の置き場とファイルごとの様式と扱いが正本の文書に揃い、記録の読み書きと段階の印・資源の使用・待機中のセッションが、`gh` を使わずにテストできる Python のモジュールになる。
+- **Goal:** 記録の置き場とファイルごとの様式と扱い、資源の扱いの契機の表 (`flow.md` の資源の扱いの節) が正本の文書に揃い、記録の読み書きと段階の印・資源の使用と資源の判断・待機中のセッションが、`gh` を使わずにテストできる Python のモジュールになる。
 - **Requirements:** R11, R20 と R21 のうち資源の扱い, R31 (AE9, AE10, AE26, AE50, AE51)。KTD5, KTD8。
 - **Dependencies:** U3 (記録は宣言の写しを持つ)。
 - **Files:**
@@ -1068,7 +1068,7 @@ issue-dispatch/
 
 - **Goal:** Project の様式と、Issue とコメントの先頭行の様式が正本の文書に揃い、Project の項目の読み取り (位置の順・Status・フィールド・`blockedBy`・コメント・親の判定・PR の状態)、割り当ての書き込みと読み直し、Status とフィールドの更新、コメントの投稿と既投稿の検出、`blockedBy` の追加、分割で作る Issue の作成、PR の観測、スナップショットの読み書きが、偽の `gh` でテストできる CLI になる。
 - **Requirements:** R1〜R3, R6, R13 と R15 のうち承認を得た後の書き込み, R19, R21 のうち PR の観測, R31 (AE1, AE2, AE5, AE6, AE7, AE18, AE19, AE21, AE26, AE28, AE30, AE35, AE36, AE39, AE40, AE44, AE45, AE52, AE53, AE55, AE58)。KTD2, KTD3, KTD5, KTD7, KTD8, KTD10, KTD14。
-- **Dependencies:** U1 (固定データと実測の節)、U3 (`ids.py`)、U4 (候補の資源の空きは記録で見る)。
+- **Dependencies:** U1 (固定データと実測の節)、U3 (`ids.py`)、U4 (候補の資源の空きは記録で見る。スナップショットの読み書きは `records.md` の `snapshot.json` の様式に従う)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/project-schema.md` (新設) — 冒頭に「このファイルが Project の様式の正本」であることの明記。フィールドの表 (名前 / 型 / 書き手 / 意味。`Agent stuck state` の 5 つの値の表を含む)、Status の選択肢の表 (名前 / 書き手 / 意味)、キューの順、組み込みワークフローの前提 (必須と推奨の区別と、推奨が無効なときに Status が空の項目を無視すること)、複数のリポジトリ、作り方 (`gh project field-create` と GraphQL の `updateProjectV2Field` の手順。既存の選択肢の `id` を保つ理由)、実測の節。
   - `issue-dispatch/skills/issue-dispatch/references/issue-format.md` — Issue の様式 (依存関係・ラベル (`resource:<名前>`・`human-handed`)・担当者・親 Issue・大きさ・PR の `Closes`)、分割で作る Issue の本文の先頭行の様式 (分割の元の Issue と宣言の ID)、コメントの先頭行の様式と種類の表 (宛先・割り当ての番号・宣言の ID を持つ種類と、それが要る理由) を足す。
@@ -1158,7 +1158,7 @@ issue-dispatch/
 
 - **Goal:** 項目の状態遷移、フィールド × 書き手 × いつ の表、ポーリングの処理の順、停止ノード、行為の区分と取り消し方、再入の手順が 2 つの文書に揃い、散文で言い直されない。
 - **Requirements:** R12, R13, R21〜R25 (AE2, AE7, AE8, AE9, AE11, AE12, AE14, AE20, AE38〜AE40)。KTD3, KTD6, KTD7, KTD8。
-- **Dependencies:** U4, U5, U6。
+- **Dependencies:** U4, U5, U6、U8 のフックと `plugin version` の部分 (`reentry.md` の手順が `plugin version` を使う。Sequencing)。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/references/flow.md` — U4 で作った資源の扱いの節に、状態遷移の図 (High-Level Technical Design の図をこの文書に移して正本にする)、フィールド × 書き手 × いつ の表、割り当ての書き込みの順と冪等性 (KTD3)、ポーリングの処理の順の決定表 (順 / 変化 / 条件 / 行うこと / 承認 / 報告に書くもの。部分完了の続きの行を含み、条件は記録の段階の印で書く。段階の印がいつ付くかの正本)、停止ノードの決定表 (ID / 条件 / 記録に書くもの / 報告に書くもの / 続け方)、行為の区分の表 (承認不要 / 承認必要 / 人間のみ) と取り消し方の表を足す。資源の扱いの節は書き直さず、決定表から参照する。
   - `issue-dispatch/skills/issue-dispatch/references/reentry.md` (新設) — 入口 1 つ (通知・合図・利用者の答え・`--resume`)、手順 (同梱の CLI のパスを確かめる (無ければ停止。R24) → 記録と設定を読む → 利用者の答えがあれば記録に書く → 止めた待機の通知 (KTD6) なら何もしない → 記録の状態が `active` でなければ何もしない → 読み込んだ版とインストールされている版を比べる (報告済みの印が無い新しい版だけ報告。R24) → 待機の結果を読む (KTD6 に挙げた終了コードに無いコードなら停止) → `project items --write-snapshot` で Project を読み、スナップショットを書く → `flow.md` の決定表の順に処理 → 割り当て (書き込みのたびに、CLI がスナップショットを更新する) → 動いている待機を止める → 待機の起動 → 利用者が未回答の管理のセッションからの問いをまとめて示してターンを終える)、待機の Bash 呼び出しの `description` の文、通知は人間の入力ではないこと、部分完了の表 (段階の印 / Project の状態 / 行うこと。条件は `flow.md` の行 ID を参照し、言い直さない)。
