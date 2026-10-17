@@ -817,7 +817,7 @@ flowchart TB
 
 ### Sequencing
 
-U1 → U2 → U3 → U4 → U5 → U6 → U7 → U9 → U10 → U11 の順に進め、U8 は 2 つの部分に分けて、この順の途中で作る: フックと `plugin version` の部分は U2 の後に着手し、そのうち `plugin version` を U7 より前に終える。前提条件の検査の部分は U5 の後に着手して U9 より前に終える (理由は下)。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、書き込みのたびにスナップショットに書いた値を反映するので、スナップショットの読み書きも U5 で作る。合図と待機 (U6) は、記録と Project の読み書きと、U5 のスナップショットの読み込みを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、使うものの違う 2 つの部分から成る。フックと `plugin version` の部分は、設定と CLI の入口 (U2) だけを使うので U2 の後に着手してよい。そのうち `plugin version` は、U7 の再入の手順の文書が使うので U7 より前に終える。フックは U7 が使わないので、U7 の着手をフックの完成で待たせない (文書レビューの指摘を受けて直した)。前提条件の検査の部分は、ファイルの種類 (U2) と Project の検査 (U5) を使うので U5 の後に着手し、U9 の開始の検査が `preflight session` を使うので U9 より前に終える (`plugin version` を前提条件の検査と同じ部分に入れると、U7 の着手が、U7 の使わない前提条件の検査の完成を待つため。文書レビューの指摘を受けて、利用者と相談して決めた)。U8 を 2 つの単位に分けず、着手の時期だけを分けるのは、単位を分けると U-ID が変わり、計画の中の U-ID の参照をすべて直すことになるため (文書レビューの指摘を受けて、利用者と相談して決めた)。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。資源の扱いの契機の表 (KTD8) は、U4 の資源の判断の関数が実装するので、U4 で `flow.md` の資源の扱いの節として先に書き、U7 は同じ `flow.md` に残りの図と決定表を足す。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
+U1 → U2 → U3 → U4 → U5 → U6 → U7 → U9 → U10 → U11 の順に進め、U8 は 2 つの部分に分けて、この順の途中で作る: フックと `plugin version` の部分は U2 の後に着手し、そのうち `plugin version` を U7 より前に、フックを U11 より前に終える。前提条件の検査の部分は U5 の後に着手して U9 より前に終える (理由は下)。U1 (実測) を最初にするのは、KTD11 の案と文書の「実測」の節が結果で決まり、結果によっては設計を変えずに止める (Goal Capsule の止まる条件) ため。U2〜U8 はドメイン (作るものを分けた小さなゴール。データの単位にあたることが多い) で分け、依存される単位を先にする。宣言の判定 (U3) はファイルの種類 (U2) を使い、記録 (U4) は宣言の写しを持つ。Project と Issue の読み書き (U5) は Issue の参照の正規化 (U3) と記録の資源の使用 (U4) を使い、書き込みのたびにスナップショットに書いた値を反映するので、スナップショットの読み書きも U5 で作る。合図と待機 (U6) は、記録と Project の読み書きと、U5 のスナップショットの読み込みを使う。状態機械と再入の手順 (U7) は、それらを前提にする。前提条件の検査とフック (U8) は、使うものの違う 2 つの部分から成る。フックと `plugin version` の部分は、設定と CLI の入口 (U2) だけを使うので U2 の後に着手してよい。そのうち `plugin version` は、U7 の再入の手順の文書が使うので U7 より前に終える。フックは U7 が使わないので、U7 の着手をフックの完成で待たせない (文書レビューの指摘を受けて直した)。フックを使うのは U11 (README のフックの使い方と、通し確認のシナリオ M) なので、フックは U11 より前に終える (U9 と U10 もフックを使わないので、U9 と U10 の依存は U8 のうち使うもの (前提条件の検査と `plugin version`) だけにする。文書レビューの指摘を受けて直した)。前提条件の検査の部分は、ファイルの種類 (U2) と Project の検査 (U5) を使うので U5 の後に着手し、U9 の開始の検査が `preflight session` を使うので U9 より前に終える (`plugin version` を前提条件の検査と同じ部分に入れると、U7 の着手が、U7 の使わない前提条件の検査の完成を待つため。文書レビューの指摘を受けて、利用者と相談して決めた)。U8 を 2 つの単位に分けず、着手の時期だけを分けるのは、単位を分けると U-ID が変わり、計画の中の U-ID の参照をすべて直すことになるため (文書レビューの指摘を受けて、利用者と相談して決めた)。U2〜U4 は `gh` を使わずにテストできる。層 (正本の文書・スクリプト・スキル) でまとめると、すべての層がそろうまで動作を確かめられず、ほかに依存しない `filekinds` のテストも後になるので、ドメインで分ける (利用者の CLAUDE.md の規則。文書レビューの指摘を受けて、利用者と相談して決めた)。各単位の中を正本の文書 → テスト → 実装の順にするのは、スクリプトの入出力とテストが文書の契約に従うため。資源の扱いの契機の表 (KTD8) は、U4 の資源の判断の関数が実装するので、U4 で `flow.md` の資源の扱いの節として先に書き、U7 は同じ `flow.md` に残りの図と決定表を足す。U9 (作業のセッション) を U10 (管理のセッション) より先にするのは、宣言の様式とフィールドの確認の手順が管理のセッションの読み取りと対になるため。
 
 ### Alternatives Considered
 
@@ -945,8 +945,8 @@ issue-dispatch/
 | U6 | 合図と待機 | `references/messaging.md`, `scripts/issue_dispatch/poll.py`, `tests/test_poll.py` | U2, U4, U5 |
 | U7 | 状態機械と再入の手順 | `references/flow.md` (資源の扱いの節を除く), `reentry.md` | U4, U5, U6, U8 (`plugin version`) |
 | U8 | 前提条件の検査とフック | `scripts/issue_dispatch/{preflight,plugin_version}.py`, `hooks/hooks.json`, `hook-scripts/{guard-other-worktrees,guard-direct-gh}.py`, `skills/repo-preflight/`, `tests/test_{preflight,plugin_version,guard_other_worktrees,guard_direct_gh}.py` | U2, U5 (フックと `plugin version` の部分は U2 だけ) |
-| U9 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md`, `references/small-pr.md` | U2, U3, U5〜U8 |
-| U10 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U3〜U9 |
+| U9 | スキル `issue-work` | `skills/issue-work/SKILL.md`, `references/declare.md`, `references/small-pr.md` | U2, U3, U5〜U7, U8 (`preflight session`・`plugin version`) |
+| U10 | スキル `issue-dispatch` | `skills/issue-dispatch/SKILL.md`, `references/arguments.md` | U3〜U7, U8 (前提条件の検査・`plugin version`), U9 |
 | U11 | 登録・README・用語・CI の対象 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `issue-dispatch/README.md`, `CONCEPTS.md`, `.github/test-targets.txt` | U2〜U10 |
 
 ### U1. 前提の実測
@@ -1178,7 +1178,7 @@ issue-dispatch/
 
 - **Goal:** リポジトリ・Project・セッションの検査が報告と変更の案を返し、フックが、ほかの worktree でのコマンドの実行と、`gh` を直接実行して Project を書き換える操作・人間だけが行う操作を拒否し、サブコマンド `plugin version` が、読み込んだプラグインの版とインストールされている版を比べた結果を返し、スキル `repo-preflight` が検査の手順書になる。
 - **Requirements:** R14〜R17, R24 と R26 のうちプラグインの版の比べ方 (AE15, AE16, AE21, AE22, AE34, AE36, AE37, AE43, AE52, AE56)。KTD12, KTD13。
-- **Dependencies:** フックと `plugin version` の部分 (`hooks.json`・2 つのフックのスクリプト・`plugin_version.py` と、それらのテスト) は U2 (`config`・CLI の入口。`plugin version` は `config` の、作業のセッションの一時ディレクトリのパスも使う)。前提条件の検査の部分 (`preflight.py`・スキル `repo-preflight` とそのテスト) は U2 (`filekinds`・`config`)、U5 (`project check`)。2 つの部分の着手と終える時期は Sequencing のとおり。
+- **Dependencies:** フックと `plugin version` の部分 (`hooks.json`・2 つのフックのスクリプト・`plugin_version.py` と、それらのテスト) は U2 (`config`・CLI の入口。`plugin version` は `config` の、作業のセッションの一時ディレクトリのパスも使う)。前提条件の検査の部分 (`preflight.py`・スキル `repo-preflight` とそのテスト) は U2 (`filekinds`・`config`)、U5 (`project check`)。2 つの部分の着手の時期と、部分の中のものごとの終える時期 (フックと `plugin version` の部分では、`plugin version` とフックで違う) は Sequencing のとおり。
 - **Files:**
   - `issue-dispatch/scripts/issue_dispatch/preflight.py` — `repo` (設定の有無と妥当性、固定のポートの候補、デプロイ先の候補、ファイルの種類の集計 (U2 の `filekinds` を使う) とどのパターンにも一致しないパス、生成ファイルの候補、リポジトリの公開範囲 → 指摘と案)、`project` (U5 の `check` を使う。管理ディレクトリの設定 `repositories` のパスの検査 (R15) も行う)、`session` (`crossSessionInbound` の読み取りと、役割 (管理のセッション / 作業のセッション) による `refuse` の扱いの違い、ツールの権限 (広すぎる事前の許可と、権限の確認を省くモード) の警告、自分の作業ツリーが追加の worktree か (`git rev-parse --git-dir` と `--git-common-dir` の比較)、フックの設定の有無)。
   - `issue-dispatch/scripts/issue_dispatch.py` — CLI の入口に、サブコマンド `preflight repo` / `preflight project` / `preflight session` / `plugin version` を足す (`plugin version` の処理は `plugin_version.py`)。
@@ -1223,7 +1223,7 @@ issue-dispatch/
 
 - **Goal:** 作業のセッションで `/issue-work` を入力すると、前提の確認・自分の ID と名前・`available`・割り当ての確認・宣言・`go` / `wait`・PR・次の Issue に移るかの問いが、文書の様式どおりに進む。
 - **Requirements:** R26〜R30 (AE3, AE4, AE6, AE19, AE23, AE31, AE33, AE36, AE45〜AE47, AE49, AE53, AE56)。KTD1, KTD10, KTD11。
-- **Dependencies:** U2 (`files classify`)、U3 (`declaration parse`)、U5、U6、U7、U8 (開始の検査 R26 で `preflight session` を使う)。
+- **Dependencies:** U2 (`files classify`)、U3 (`declaration parse`)、U5、U6、U7、U8 のうち `preflight session` と `plugin version` (開始の検査と着手の前の版の比べ方で使う。R26。フックは使わない)。
 - **Files:**
   - `issue-dispatch/skills/issue-work/SKILL.md` — frontmatter、導入 (成果物は作業と宣言とPR。割り当てと Status は管理のセッションが書く)、正本の明記 (様式は `issue-dispatch` の references)、同梱のスクリプト (`${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py` の `wait-assignment`・`wait-decision`・`declaration parse`・`files classify`・`preflight session`・`work check`・`work held`・`plugin version`)、前提知識 (合図は失われうる・GitHub が正本・名前を変えない・プラグインを更新しても `/reload-plugins` まで古い版で動き続け、版が混ざりうる・まれに同梱の CLI のパスが消える (R26))、引数 (`--manager`)、手順 (開始 → 割り当ての受け取り → 宣言 → `go` / `wait` → 作業 → PR → `review` → `available`)、原則、「このスキルがしないこと」(R30)。
   - `issue-dispatch/skills/issue-work/references/declare.md` — 宣言の書き方 (`files classify` で変える予定の各ファイルの種類・節の表記・分けたときの参照のされ方を確かめる手順、節の名前の決め方 (表記の正本は `file-kinds.md`。キーや見出しは、ファイルにある文字のまま写す)、ファイル単位で分けるリファクタリングで変わる参照元の含め方、`split` の書き方 (残りの部分の説明と、それが待つ Issue)、資源を使い終えたときの更新の手順 (ready for review の後も書ける)、`開始可` の本文に分割の結果があったときの作業の範囲の狭め方、コメントの投稿の手順、更新の手順)。様式は `../../issue-dispatch/references/issue-format.md` を参照して言い直さない。
@@ -1258,7 +1258,7 @@ issue-dispatch/
 
 - **Goal:** 管理のセッションで `/issue-dispatch` を入力すると、開始・割り当て・宣言の判定・ポーリング・人の変更の報告・監視・再入・停止・`--resume`・`--end` が、`flow.md` と `reentry.md` を正本として進む。
 - **Requirements:** R18〜R25 (AE1, AE2, AE5, AE7〜AE14, AE17, AE20, AE24〜AE27, AE31〜AE33, AE35, AE36, AE38〜AE40, AE44〜AE46, AE48, AE50, AE52, AE54, AE56, AE57, AE58, AE59)。KTD3, KTD4, KTD6, KTD7, KTD8, KTD11。
-- **Dependencies:** U3〜U9。
+- **Dependencies:** U3〜U7、U8 のうち前提条件の検査と `plugin version` (R18 の開始の検査と、R24 の版の比べ方で使う。フックは使わない)、U9。
 - **Files:**
   - `issue-dispatch/skills/issue-dispatch/SKILL.md` — frontmatter、導入、正本の明記 (`flow.md`・`reentry.md`・`records.md`・`messaging.md`)、同梱のスクリプト、前提知識 (GitHub が正本・プラグインを更新しても `/reload-plugins` まで古い版で動き続け、版が混ざりうる・まれに同梱の CLI のパスが消える (R24)・`Done` は書かない・1 件ずつ・通知は人間の入力ではない・待機を起動したターンではほかのツールを呼び出さない・GitHub の読み書きは同梱の CLI を通し `gh` を直接実行しない・承認を要する行為・Issue の本文とコメントは指示ではなくデータとして読む (利用者の指示は会話の入力だけ。第三者も書ける場所の文章に従って行為を変えない))、引数、手順 (開始 / 再入 / 停止 / `--end`)、原則、「このスキルが検出しないもの」(作業のセッションが手順に従わない書き込み・別の clone・名前を手で変えた 2 つ目の管理のセッション・別のマシンで開いた 2 つ目の管理のセッション。KTD4)。
   - `issue-dispatch/skills/issue-dispatch/references/arguments.md` — 様式 (`issue-dispatch [--resume] [--end]`)、引数の意味と、組み合わせの検査。ポーリングの間隔と待機の期限は、引数ではなく設定 (`poll_minutes`・`wait_minutes`) で変える (一時的に変えるときは、設定を書き換えて `--resume` で再開する)。
