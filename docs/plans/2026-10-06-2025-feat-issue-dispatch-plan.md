@@ -1409,7 +1409,7 @@ issue-dispatch/
   - Covers AE1. `assign` は `Agent session ID` → 読み直し → コメント `割り当て` → `Agent session title` → Status の順に `gh` を実行し、実行の間が 1 秒以上空いている。
   - Covers AE2. `Agent session ID` を書いた直後の読み直しで偽の `gh` が別の値を返すと、終了コード 7 で止まり、コメントと title と Status は書かない。書く前に読んだ `Agent session ID` が空でなければ、書かずに終了コード 7。
   - 同じ値をもう一度 `assign` しても書き込みの `gh` は実行されず、終了コード 0 で「変更なし」を返す (冪等)。
-- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。U1 の検証用 Project で実物の `gh` を使い、`project items`・`project assign`・`project release` が往復で元に戻る。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、割り当ての規則がほかの文書に複製されていない。
+- **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。U1 の検証用 Project で実物の `gh` を使い、`project items` → `project assign` → コメント `解放` (理由は承認を得た解除) → `project release` の往復で、フィールドと Status が元に戻り、コメント `割り当て` と `解放` が残る (コメントは消さない。残った Issue は、通し確認では割り当てが終わった項目として読まれる。KTD19)。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、割り当ての規則がほかの文書に複製されていない。
 
 ### U17. 合図
 
@@ -1627,7 +1627,7 @@ issue-dispatch/
 | 前提の実測 | U1 の手順 (検証用の Project と 2 つのセッション。始める前に利用者の許可を得る) | U1 | Open Questions の各項目に結果が付き、KTD11 の案が決まる |
 | スクリプトとフックのテスト | `python3 -m unittest discover -s issue-dispatch/tests` (偽の `gh` と固定データ。実物の `gh` と `claude` は実行しない) | U2〜U16, U18〜U20 | 宣言の検査と競合の可能性の判定、判定の順と比べ直し、資源の判断、記録の扱い、作業のセッションの一時ディレクトリのパス、作業のセッションの確認、割り当ての順序と食い違い、ポーリングの差分と終了コード、検査の指摘、プラグインの版の比べ方と報告済みの印、フックが拒否すべき操作を拒否し、それ以外では何も出力しないこと |
 | CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (push で実行される)。ローカルでは `git ls-files` から同じように比べる | U24 | `.github/test-targets.txt` と実際の対象が一致する |
-| 実物の `gh` での往復 | U1 の検証用 Project で `items` → `assign` → `release` を 1 往復 | U16 | フィールドと Status が書かれて元に戻り、`actions.log` に記録される |
+| 実物の `gh` での往復 | U1 の検証用 Project で `items` → `assign` → コメント `解放` (理由は承認を得た解除) → `release` を 1 往復 | U16 | フィールドと Status が書かれて元に戻り、コメント `割り当て` と `解放` が残り (通し確認では割り当てが終わった項目として読まれる)、`actions.log` に記録される |
 | 変えないものの差分 | `git diff --stat main -- commit-rules-guard pr-teeth doc-dag mermaid-preview commit-squash review-triage work-log-gh-comment wording-guard session-handoff .github/workflows .claude` | U1〜U24 | 差分が無い (KTD18) |
 | 説明文の一致 | `issue-dispatch/.claude-plugin/plugin.json` と `.claude-plugin/marketplace.json` の description の比較 | U24 | 同文 |
 | 文書の構造 | `issue-dispatch/skills/` と `CONCEPTS.md` を対象にスキル `doc-dag` を実行する | U2〜U24 | 正本が 1 か所にあり、重複と巡回が無い |
