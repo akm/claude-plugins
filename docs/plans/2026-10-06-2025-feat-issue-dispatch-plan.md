@@ -647,7 +647,7 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   | 出来事 | 割り当てを待つ (`available` を送った後) | 判定を待つ (判定の要る宣言 (R20) を書いた後) | `Blocked` で待つ (理由が資源でない `wait` を受けた後) | レビューを待つ (R29 でレビューを待つと答えた後) |
   | --- | --- | --- | --- | --- |
   | 起動する待機と、渡す Issue | `wait-assignment`。レビュー中の Issue があれば `--in-review` に渡す | `wait-decision`。今の Issue を `--issue` に渡す。ready for review の後に書いた宣言の更新で判定を待つときは `--review-update` も渡す | `wait-assignment`。待っている Issue を `--blocked` に、レビュー中の Issue があれば `--in-review` に渡す | `wait-assignment`。レビュー中の Issue を `--in-review` に渡す |
-  | 新しい割り当て | 着手する (R27) | — | — | — |
+  | 新しい割り当て | 着手する (R27) | — | — | — (`wait-assignment` に `--in-review` で渡すので返らない) |
   | `--blocked` に渡した Issue が `In Progress` に戻った | — | — | 作業を再開する | — |
   | `go` (自分の宣言への `開始可`) | — | 作業を始める (作業中へ) | — | — |
   | `wait` (Status が `Blocked`) | — | `Blocked` で待つへ移る。合図 `wait` の理由が資源なら、判定を待つのまま (Status は変わらない) | — | — |
@@ -666,11 +666,11 @@ GitHub にはこれを支える道具がそろっている。Projects の独自�
   | --- | --- | --- |
   | `wait-assignment` | 新しい割り当て: `--blocked`・`--in-review` に渡した Issue 以外で、開いていて、自分の ID が `Agent session ID` に入り、自分宛ての最新のコメント `割り当て` があってその番号の `解放` が無く、Status が `In Progress` の項目 | その項目の参照 |
   | `wait-assignment` | `--blocked` に渡した Issue が `In Progress` に戻った | その項目の参照 |
-  | `wait-assignment` | 自分宛ての `依頼` (本文の追記) で、その PR の `closingIssuesReferences` にまだ Issue が無い | `request` |
+  | `wait-assignment` | 自分宛ての `依頼` (本文の追記) で、その PR が開いていて、`closingIssuesReferences` にまだ Issue が無い (PR が閉じていれば返さない。閉じた PR の扱いは管理のセッションが決める。R21) | `request` |
   | `wait-assignment` | `--in-review` に渡した Issue の解放か close | `stop` と理由 |
   | `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つコメント `開始可` | `go` |
   | `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つ `依頼` (宣言の書き直し) | `request` |
-  | `wait-decision` | 今の Issue (`--issue`) の Status が `Blocked` | `wait` |
+  | `wait-decision` | 今の Issue (`--issue`) の Status が `Blocked` で、自分宛ての `--declaration` の宣言への最新の `待機` の理由に `Issue` か `小さな PR` がある (管理のセッションが書いた `Blocked`。KTD19。利用者が手で付けた `Blocked` では返さず、判定を待つのまま) | `wait` |
   | `wait-decision` | `--review-update` を渡されたときの、今の Issue の close | `stop` と理由 close |
   | どちらも | 見る Issue の解放 (フィールドが自分の ID でなくなった、か、自分宛てで今の割り当ての番号のコメント `解放` がある) | `stop` と理由 |
 
@@ -1372,15 +1372,15 @@ issue-dispatch/
 - **Test scenarios:**
   - Covers AE14. 偽の `gh` が認証切れを返すと `wait` は終了コード 8。`wait` に誤った引数を渡すと、`argparse` の終了コード 2 で終わり、認証切れと区別される。レート制限の `resetAt` が期限内なら待って続け、期限を越えるなら 3。ネットワークの失敗が 3 回続けば 4。
   - スナップショットが無いか壊れていれば、`wait` は書き直さずに 5 で止まる (作り直すのは再入のターンで、待機はスナップショットを読むだけ。KTD5)。
-  - `wait-assignment` は、`--blocked`・`--in-review` に渡した Issue 以外で、開いていて自分の ID が `Agent session ID` に入り、自分宛ての今の割り当てのコメント `割り当て` がある項目の Status が `In Progress` なら、0 と項目の参照を返す (起動の前から `In Progress` でも、最初の読み取りで返す)。コメント `割り当て` が無い項目 (割り当ての書き込みの途中で止まった) では返さない。`--blocked` に渡した Issue は、`Blocked` のままなら返さず、`In Progress` に戻ると返す。`--in-review` に渡した Issue は、`In Progress` でも返さない。どれにも当たらなければ期限で 124。
+  - `wait-assignment` は、`--blocked`・`--in-review` に渡した Issue 以外で、開いていて自分の ID が `Agent session ID` に入り、自分宛ての今の割り当てのコメント `割り当て` があってその番号の `解放` が無い項目の Status が `In Progress` なら、0 と項目の参照を返す (`解放` の後、フィールドを空にする前に止まった項目は返さない) (起動の前から `In Progress` でも、最初の読み取りで返す)。コメント `割り当て` が無い項目 (割り当ての書き込みの途中で止まった) では返さない。`--blocked` に渡した Issue は、`Blocked` のままなら返さず、`In Progress` に戻ると返す。`--in-review` に渡した Issue は、`In Progress` でも返さない。どれにも当たらなければ期限で 124。
   - Covers AE53. `wait-assignment` と `wait-decision` は、見る Issue のフィールドが自分の ID でなくなるか、自分宛てで今の割り当ての番号の `解放` があると、0 と `stop` (理由は解放) を返す。Issue の close だけでは返さず、`--in-review` に渡した Issue だけは close でも `stop` (理由は close) を返す。`wait-decision` は、`--review-update` を渡されたときだけ、今の Issue の close で `stop` (理由は close) を返す。受け持って閉じた別の Issue が reopen されてフィールドが空になっても、見る Issue でなければ返さない。
-  - Covers AE45. `wait-assignment` は、自分宛ての `依頼` (本文の追記) があり、その PR の `closingIssuesReferences` にまだ Issue が無ければ、0 と `request` を返す。追記が済んだ PR の `依頼` では終わらない。
+  - Covers AE45. `wait-assignment` は、自分宛ての `依頼` (本文の追記) があり、その PR の `closingIssuesReferences` にまだ Issue が無ければ、0 と `request` を返す。追記が済んだ PR の `依頼` と、閉じた PR の `依頼` では終わらない。
   - `wait` は起動時に `wait.pid` (PID・開始時刻・所有者) を書き、標準出力の最初の行に PID を書き、終わるときに `wait.pid` を消す。スナップショットは読むだけで書かない (書くのは、管理のセッションのターンの `project items --write-snapshot` と書き込みのサブコマンド。KTD5)。
   - Covers AE55. ターンの間に、ほかの人が起こした変化 (スナップショットに入っていない変化) は、次の `wait` の最初の読み取りで差分として返す。
   - Covers AE27. `wait` は SIGTERM を受けると、`stopped` と PID の行を書いて終了コード 6 で終わる。`wait.pid` に別の PID が書かれていれば消さない。
   - `wait.pid` の PID のプロセスの開始時刻かコマンドが違えば (PID が再利用されている)、そのプロセスを止めずに `wait.pid` を消す。
   - `wait-assignment` と `wait-decision` も、起動時に `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/wait.pid` に書かれた前の待機を止め、自分の PID を書く。SIGTERM を受けると `stopped` の行を書いて終了コード 6 で終わる。作業ツリーの中には何も書かない。
-  - Covers AE29. `wait-decision` は、自分宛てで渡した宣言の ID を持つ `開始可` があると 0 と `go`、Status が `Blocked` なら 0 と `wait` を返し、自分宛てでその宣言の ID を持つ `依頼` (宣言の書き直し) が見つかると 0 と `request` を返し、どれも無ければ期限で 124。別の宛先・前の割り当て・前の宣言に対する `開始可` では終わらない。
+  - Covers AE29. `wait-decision` は、自分宛てで渡した宣言の ID を持つ `開始可` があると 0 と `go`、Status が `Blocked` で、その宣言への最新の `待機` の理由に `Issue` か `小さな PR` があれば 0 と `wait` を返し (そのような `待機` が無い `Blocked` (利用者が手で付けた) では返さない)、自分宛てでその宣言の ID を持つ `依頼` (宣言の書き直し) が見つかると 0 と `request` を返し、どれも無ければ期限で 124。別の宛先・前の割り当て・前の宣言に対する `開始可` では終わらない。
   - 待機の終わる条件は U13 の関数 (`work check` と同じもの) で判断する。同じ GitHub の状態で、待機が終わる条件と `work check` が返すもの (今の割り当て・今の番号の `解放`・まだ行っていない `依頼`) が食い違わない。
 - **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、待機が終わる条件がほかの文書に複製されていない。
 
