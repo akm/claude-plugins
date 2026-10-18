@@ -1434,7 +1434,7 @@ issue-dispatch/
   - Covers AE1. `assign` は `Agent session ID` → 読み直し → コメント `割り当て` → `Agent session title` → Status の順に `gh` を実行し、実行の間が 1 秒以上空いている。
   - Covers AE2. `Agent session ID` を書いた直後の読み直しで偽の `gh` が別の値を返すと、終了コード 7 で止まり、コメントと title と Status は書かない。書く前に読んだ `Agent session ID` が空でなければ、書かずに終了コード 7。
   - 同じ値をもう一度 `assign` しても書き込みの `gh` は実行されず、終了コード 0 で「変更なし」を返す (冪等)。
-  - `release` は、理由 `解除` の `解放` がある項目のフィールドを空にして `Todo` にし、`--status-only` では Status だけを `Todo` にしてフィールド (人が書いた値) を変えず、`--fields-only` ではフィールドだけを空にして Status を変えない。今の割り当ての `解放` が無い項目では `gh` を実行せずに拒否する。Project に無い項目 (理由 `除去`) では何も書かない。
+  - `release` は、理由 `解除` の `解放` がある項目のフィールドを空にして `Todo` にし、`--status-only` では Status だけを `Todo` にしてフィールド (人が書いた値) を変えず、`--fields-only` ではフィールドだけを空にして Status を変えない。割り当てが終わっていない項目 (今の割り当ての `解放` も正常な終わりも無い。KTD19) では `gh` を実行せずに拒否する (正常な終わりの後の reopen では、`解放` が無くても `--fields-only` で空にできる)。Project に無い項目 (理由 `除去`) では何も書かない。
 - **Verification:** `python3 -m unittest discover -s issue-dispatch/tests` が成功する。U1 の検証用 Project で実物の `gh` を使い、`project items` → `project assign` → コメント `解放` (理由は `解除`) → `project release` の往復で、フィールドが空に戻り、Status は `In Progress` から `Todo` になり (`Ready` には戻さない。KTD19)、コメント `割り当て` と `解放` が残る (コメントは消さない。残った Issue は、通し確認では割り当てが終わった項目として読まれる。KTD19)。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、割り当ての規則がほかの文書に複製されていない。
 
 ### U17. 合図
