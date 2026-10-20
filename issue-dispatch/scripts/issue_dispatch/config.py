@@ -72,17 +72,19 @@ def _read_file(path):
 def normalize_pattern(pattern):
     """`files` のパターンの表記をそろえる。返り値は (そろえたパターン, 警告の文)。警告の文があれば規則を使わない。
 
-    先頭の `./` を取り除き、`//` を `/` にする。末尾の `/` は取り除かない (`dist/` をファイル名 `dist` だけに
-    一致するパターンに変えないため、posixpath.normpath は使わない)。絶対パスと `..` を含むパターンは使わない。
+    `.` の区切り (先頭の `./` と途中の `/./`) を取り除き、`//` を `/` にする。末尾の `/` は取り除かない
+    (`dist/` をファイル名 `dist` だけに一致するパターンに変えないため、posixpath.normpath は使わない)。
+    絶対パスと `..` を含むパターンは使わない。
     """
     if not isinstance(pattern, str) or pattern == "":
         return None, "pattern は空でない文字列"
     if pattern.startswith("/"):
         return None, f"絶対パスのパターン {pattern!r} は使わない (ルートからの相対パスで書く)"
     normalized = re.sub(r"/{2,}", "/", pattern)
-    while normalized.startswith("./"):
-        normalized = normalized[2:]
-    if normalized == "" or normalized == ".":
+    trailing_slash = normalized.endswith("/")
+    segments = [s for s in normalized.split("/") if s not in (".", "")]
+    normalized = "/".join(segments) + ("/" if trailing_slash and segments else "")
+    if normalized == "" or normalized == "/":
         return None, f"パターン {pattern!r} はルートそのものを指すので使わない"
     if ".." in normalized.split("/"):
         return None, f"`..` を含むパターン {pattern!r} は使わない (ルートの外を指しうる)"
@@ -224,10 +226,10 @@ def load(root, role):
             warnings.append(_note("record_dir", f"record_dir は空でない文字列 (値 {record_dir!r})。デフォルト値で続ける"))
             record_dir = DEFAULTS["record_dir"]
         config["record_dir"] = record_dir
-        config["declare_deadline_minutes"] = (_check_integer("declare_deadline_minutes", raw["declare_deadline_minutes"], warnings)
-                                              if "declare_deadline_minutes" in raw else DEFAULTS["declare_deadline_minutes"])
         config["third_party_edit_check"] = (_check_repo_list("third_party_edit_check", raw["third_party_edit_check"], warnings)
                                             if "third_party_edit_check" in raw else [])
+        config["declare_deadline_minutes"] = (_check_integer("declare_deadline_minutes", raw["declare_deadline_minutes"], warnings)
+                                              if "declare_deadline_minutes" in raw else DEFAULTS["declare_deadline_minutes"])
         config["resources"] = _check_resources(raw["resources"], warnings) if "resources" in raw else {}
         config["repositories"] = _check_repositories(raw["repositories"], warnings) if "repositories" in raw else {}
     else:
