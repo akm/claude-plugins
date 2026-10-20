@@ -127,6 +127,16 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(r["kind"], "generated", "規則の並び順ではなく段の順で決めること")
         self.assertEqual(r["matched"]["pattern"], "**/*.go")
 
+    def test_first_rule_wins_among_the_same_kind(self):
+        """同じ種類の 2 つの規則に一致すれば、先に書いた規則の属性。"""
+        rules = [{"pattern": "**/package.json", "kind": "divisible", "unit_notation": {"notation": "json-key", "keys": ["dependencies"]}},
+                 {"pattern": "**/*.json", "kind": "divisible", "unit_notation": "json-key"}]
+        r = filekinds.classify("app/package.json", rules, _DEFAULT)
+        self.assertEqual(r["unit_notation"], {"notation": "json-key", "keys": ["dependencies"]})
+        self.assertEqual(r["matched"]["pattern"], "**/package.json")
+        r2 = filekinds.classify("app/package.json", rules[::-1], _DEFAULT)
+        self.assertEqual(r2["unit_notation"], "json-key", "並びを逆にすれば、先に書いた広い規則の属性になること")
+
     def test_unknown_content_when_nothing_matches(self):
         r = filekinds.classify("notes/x.unknownext", [], _DEFAULT)
         self.assertEqual(r, {"kind": "unknown-content", "unit_notation": None, "split_reference": None,

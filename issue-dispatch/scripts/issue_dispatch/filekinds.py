@@ -122,7 +122,8 @@ def _attributes(rule):
 
 
 def _pick(path, rules, source):
-    """規則の配列の中で path に一致するものから、6 段の順で先の種類の規則を 1 つ選ぶ。無ければ None。"""
+    """規則の配列の中で path に一致するものから、6 段の順で先の種類の規則を 1 つ選ぶ。無ければ None。
+    同じ種類なら先に書いた規則 (`<` で比べるので、後の規則は置き換えない。file-kinds.md の「照合の順」の 3)。"""
     best = None
     for rule in rules:
         if rule.get("kind") not in RULE_KINDS:
