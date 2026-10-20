@@ -17,7 +17,7 @@
 | 5 | 分割すると意味が変わる可能性がある | `unstable` | 節で判定する | 同上。共通の変更を先にする小さな PR で、分けるリファクタリングも行える (意味が変わりうる点を添える) |
 | 6 | (上のどれでもない) | `divisible` | 節で判定する | 同上。共通の変更を先にする小さな PR で、分けるリファクタリングも行える |
 
-`unknown-content` は、どの規則にも一致しないパスの種類なので、規則の `kind` には書けない。規則に書ける種類は段 2〜6 の 5 つで、それ以外の値の規則は設定の読み込みで警告して使わない (警告の様式は project-config.md)。
+`unknown-content` は、どの規則にも一致しないパスの種類なので、規則の `kind` には書けない。規則に書ける種類は段 2〜6 の 5 つ。
 
 節 (unit) は種類ではなく、構造を知っている種類 (段 4〜6) の判定の細かさとして扱う。
 
@@ -90,7 +90,7 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 ## デフォルトの表
 
-表そのものの正本は `file-kinds.json` で、ここでは行を言い直さない。行は `files` の規則と同じ様式 (project-config.md の「`files` の規則の書き方」) で、`filekinds` は設定の規則と同じ規則で照合する。各行を選んだ理由は次のとおり。
+表そのものの正本は `file-kinds.json` で、ここでは行を言い直さない。行は、パターンと種類と、この文書の各節の属性 (`unit_notation`・`split_reference`・`mergeable`) を持ち、`filekinds` は設定の規則と同じ規則で照合する。各行を選んだ理由は次のとおり。
 
 - **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成の印を名前に持つ Go のファイル (`**/*_generated.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
 - **`unknown-structure`** — 中身を読んで節を決められないもの: Excel のブック (`**/*.xlsx`)。

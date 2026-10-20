@@ -71,13 +71,13 @@ issue-dispatch は、管理ディレクトリ (管理のセッションが動く
 
 ## `files` の規則の書き方
 
-要素は `pattern` と `kind` が必須で、`unit_notation`・`split_reference`・`mergeable` は省略できる。**`kind` と省略できる属性の意味、パターンの照合の規則、デフォルトの表の正本は [file-kinds.md](file-kinds.md)** — この文書は様式と、読み込むときにそろえる表記だけを定める。
+要素は `pattern` と `kind` が必須で、`unit_notation`・`split_reference`・`mergeable` は省略できる。**`kind` と省略できる属性の意味と、パターンの照合の規則の正本は [file-kinds.md](file-kinds.md)** — この文書は様式と、読み込むときにそろえる表記だけを定める。
 
 | キー | 必須 | 内容 |
 | --- | --- | --- |
 | `pattern` | ✓ | パスのパターン (リポジトリのルートからの相対パス) |
-| `kind` | ✓ | ファイルの種類 (値の一覧は file-kinds.md。`unknown-content` と一覧に無い値の規則は、使わずに警告する) |
-| `unit_notation` | | 節の表記とキーの深さ。宣言の `units` と混同しないよう名前を分けている |
+| `kind` | ✓ | ファイルの種類 (値の一覧は file-kinds.md) |
+| `unit_notation` | | 節の表記とキーの深さ |
 | `split_reference` | | 分けたときの参照のされ方 (`directory` / `file`) |
 | `mergeable` | | マージできるか (真偽値) |
 
