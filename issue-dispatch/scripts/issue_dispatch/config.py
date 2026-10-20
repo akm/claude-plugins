@@ -228,8 +228,6 @@ def load(root, role):
         config["record_dir"] = record_dir
         config["third_party_edit_check"] = (_check_repo_list("third_party_edit_check", raw["third_party_edit_check"], warnings)
                                             if "third_party_edit_check" in raw else [])
-        config["declare_deadline_minutes"] = (_check_integer("declare_deadline_minutes", raw["declare_deadline_minutes"], warnings)
-                                              if "declare_deadline_minutes" in raw else DEFAULTS["declare_deadline_minutes"])
         config["resources"] = _check_resources(raw["resources"], warnings) if "resources" in raw else {}
         config["repositories"] = _check_repositories(raw["repositories"], warnings) if "repositories" in raw else {}
     else:
@@ -238,8 +236,11 @@ def load(root, role):
                                      if "protected_paths" in raw else [])
         config["hooks"] = _check_hooks(raw.get("hooks"), status != "missing", warnings)
     pair_warnings = []
-    for key in ("poll_minutes", "wait_minutes"):
-        config[key] = _check_integer(key, raw[key], pair_warnings) if key in raw else DEFAULTS[key]
+    for key in INTEGER_KEYS:
+        if key not in keys:
+            continue
+        target = pair_warnings if key in ("poll_minutes", "wait_minutes") else warnings
+        config[key] = _check_integer(key, raw[key], target) if key in raw else DEFAULTS[key]
     warnings.extend(pair_warnings)
     # 組の検査は、2 つとも値の検査を通ったときだけ行う (デフォルト値に置き換えた値と比べると、正しい値まで戻してしまう)
     if not pair_warnings and config["poll_minutes"] >= config["wait_minutes"]:
