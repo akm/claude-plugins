@@ -243,8 +243,8 @@ class RepoConfigTest(ConfigTestBase):
         _write_config(self.root, {"files": [
             {"pattern": "./dist/**", "kind": "generated"},
             {"pattern": "dist//**", "kind": "generated"},
-            {"pattern": "docs/", "kind": "sectioned", "unit_notation": "heading"},
-            {"pattern": "docs/./a.md", "kind": "sectioned"},
+            {"pattern": "docs/", "kind": "divisible", "unit_notation": "markdown-heading"},
+            {"pattern": "docs/./a.md", "kind": "unstable"},
             {"pattern": "././x/", "kind": "generated"},
             {"pattern": "dist/.", "kind": "generated"},
         ]})
@@ -252,7 +252,7 @@ class RepoConfigTest(ConfigTestBase):
         rules = result["config"]["files"]
         self.assertEqual([r["pattern"] for r in rules], ["dist/**", "dist/**", "docs/", "docs/a.md", "x/", "dist/"],
                          "途中の /./ と重ねた ./ も取り除き、末尾の / (/. で終わる場合も) は残すこと")
-        self.assertEqual(rules[2]["unit_notation"], "heading", "省略できる属性はそのまま渡すこと")
+        self.assertEqual(rules[2]["unit_notation"], "markdown-heading", "省略できる属性はそのまま渡すこと")
         self.assertEqual(result["warnings"], [])
 
     def test_file_patterns_outside_root_are_warned(self):
@@ -273,6 +273,17 @@ class RepoConfigTest(ConfigTestBase):
         result = config.load(self.root, "repo")
         self.assertEqual(result["config"]["files"], [])
         self.assertEqual(len(_warnings_about(result, "files")), 3)
+
+    def test_file_rule_kind_must_be_a_rule_kind(self):
+        """`kind` は規則に書ける種類 (file-kinds.md の段 2〜6)。`unknown-content` と知らない値は警告して外す。"""
+        _write_config(self.root, {"files": [
+            {"pattern": "a/**", "kind": "unknown-content"},
+            {"pattern": "b/**", "kind": "sectioned"},
+            {"pattern": "c/**", "kind": "unknown-structure"},
+        ]})
+        result = config.load(self.root, "repo")
+        self.assertEqual([r["pattern"] for r in result["config"]["files"]], ["c/**"])
+        self.assertEqual(len(_warnings_about(result, "files")), 2, "規則ごとに警告すること")
 
     def test_manager_only_keys_are_ignored_in_repo(self):
         _write_config(self.root, {"record_dir": "x", "repositories": {}})

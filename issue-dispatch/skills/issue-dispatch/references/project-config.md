@@ -32,7 +32,7 @@ issue-dispatch は、管理ディレクトリ (管理のセッションが動く
   "project": { "owner": "akm", "number": 3 },
   "files": [
     { "pattern": "dist/**", "kind": "generated" },
-    { "pattern": "docs/**/*.md", "kind": "sectioned", "unit_notation": "heading", "split_reference": "file", "mergeable": true }
+    { "pattern": "docs/**/*.md", "kind": "unstable", "unit_notation": "markdown-heading", "split_reference": "file", "mergeable": true }
   ],
   "protected_paths": ["infra/prod/"],
   "hooks": { "guard_other_worktrees": true },
@@ -76,12 +76,12 @@ issue-dispatch は、管理ディレクトリ (管理のセッションが動く
 | キー | 必須 | 内容 |
 | --- | --- | --- |
 | `pattern` | ✓ | パスのパターン (リポジトリのルートからの相対パス) |
-| `kind` | ✓ | ファイルの種類 (値の一覧は file-kinds.md) |
+| `kind` | ✓ | ファイルの種類 (値の一覧は file-kinds.md。`unknown-content` と一覧に無い値の規則は、使わずに警告する) |
 | `unit_notation` | | 節の表記とキーの深さ。宣言の `units` と混同しないよう名前を分けている |
 | `split_reference` | | 分けたときの参照のされ方 (`directory` / `file`) |
 | `mergeable` | | マージできるか (真偽値) |
 
-**読み込むときに `pattern` の表記をそろえる**: `.` の区切り (先頭の `./` と途中の `/./`) を取り除き、`//` を `/` にする。末尾の `/` は取り除かない (`posixpath.normpath` を使わないのは、`dist/` を `dist` という名前のファイルだけに一致するパターンに変えてしまうため)。**絶対パス (`/` で始まる) と `..` を含むパターンは、その規則を使わずに警告する** (ルートの外を指しうるため)。`pattern` か `kind` の無い要素も、使わずに警告する。
+**読み込むときに `pattern` の表記をそろえる**: `.` の区切り (先頭の `./` と途中の `/./`) を取り除き、`//` を `/` にする。末尾の `/` は取り除かない (`posixpath.normpath` を使わないのは、`dist/` を `dist` という名前のファイルだけに一致するパターンに変えてしまうため)。**絶対パス (`/` で始まる) と `..` を含むパターンは、その規則を使わずに警告する** (ルートの外を指しうるため)。`pattern` か `kind` の無い要素と、`kind` が規則に書ける種類 (file-kinds.md の段 2〜6) でない要素も、使わずに警告する。
 
 | 書いた値 | そろえた後 |
 | --- | --- |

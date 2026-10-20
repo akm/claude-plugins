@@ -5,13 +5,16 @@
 呼び出し元: CLI issue-dispatch/scripts/issue_dispatch.py の `config read` と `config add-edit-check`。
 ほかのモジュールは `load()` の結果の `config` を受け取り、設定ファイルを直接読まない。
 
-`files` の規則の意味 (`kind` などの値) はここでは確かめない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
+`files` の規則は、`kind` が規則に書ける種類 (モジュール filekinds の `RULE_KINDS`) であることだけを確かめ、
+属性の意味はここでは確かめない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
 `resources` の属性の意味とデフォルト値もここでは確かめない (正本は resources.md。属性の適用はモジュール resources)。
 """
 
 import json
 import os
 import re
+
+from issue_dispatch import filekinds
 
 # 設定ファイルの置き場 (管理ディレクトリとリポジトリのルートからの相対パス。両方で同じ)
 CONFIG_PATH = os.path.join(".claude", "akm-claude-plugins", "issue-dispatch", "config.json")
@@ -162,6 +165,9 @@ def _check_files(value, warnings):
     for rule in value:
         if not (isinstance(rule, dict) and isinstance(rule.get("kind"), str) and rule["kind"] != ""):
             warnings.append(_note("files", f"files の規則 {rule!r} には pattern と kind が要る。使わない"))
+            continue
+        if rule["kind"] not in filekinds.RULE_KINDS:
+            warnings.append(_note("files", f"files の規則 {rule!r} の kind は {', '.join(filekinds.RULE_KINDS)} のどれか。使わない"))
             continue
         normalized, problem = normalize_pattern(rule.get("pattern"))
         if problem:
