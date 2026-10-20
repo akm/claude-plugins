@@ -210,6 +210,8 @@ class DefaultTableTest(unittest.TestCase):
         self.assertEqual(pkg["unit_notation"], {"notation": "json-key", "keys": ["dependencies", "devDependencies"]},
                          "`**/*.json` より前の `**/package.json` の属性になること")
         self.assertEqual(filekinds.classify("config/app.json", [], _DEFAULT)["unit_notation"], "json-key")
+        self.assertEqual(filekinds.classify("a/npm-shrinkwrap.json", [], _DEFAULT)["kind"], "generated",
+                         "`**/*.json` より段の順で先の generated になること")
         self.assertEqual(filekinds.classify("cmd/main.go", [], _DEFAULT)["split_reference"], "directory")
         self.assertEqual(filekinds.classify("src/app.ts", [], _DEFAULT)["split_reference"], "file")
 

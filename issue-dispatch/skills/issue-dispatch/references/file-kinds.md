@@ -96,11 +96,11 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 表そのものの正本は `file-kinds.json` で、ここでは行を言い直さない。行は、パターンと種類と、この文書の各節の属性 (`unit_notation`・`split_reference`・`mergeable`) を持ち、`filekinds` は設定の規則と同じ規則で照合する。各行を選んだ理由は次のとおり。
 
-- **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成の印を名前に持つ Go のファイル (`**/*_generated.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
+- **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成の印を名前に持つ Go のファイル (`**/*_generated.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/npm-shrinkwrap.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
 - **`unknown-structure`** — 中身を読んで節を決められないもの: Excel のブック (`**/*.xlsx`)。
 - **`indivisible` で `mergeable` が偽** — 画像とフォントとバイナリの文書 (`**/*.png`・`**/*.jpg`・`**/*.jpeg`・`**/*.gif`・`**/*.svg`・`**/*.ico`・`**/*.pdf`・`**/*.woff`・`**/*.woff2`)。分けられず、差分でマージできない。SVG はテキストだが、描画ツールが全体を書き直すので画像と同じに扱う。
 - **`unstable`** — 分けると適用の順や意味が変わりうるもの: マイグレーション (`**/migrations/**`) と SQL (`**/*.sql`) は実行の順に意味があり、Protocol Buffers の定義 (`**/*.proto`) はフィールド番号の割り当てに意味がある。参照のされ方は `file`。
 - **`divisible` で節の表記があるもの** — `**/package.json` (`json-key`。`dependencies` と `devDependencies` の下を依存ごとの節にする。広い `**/*.json` より前に置く)、`**/*.json` (`json-key`)、`**/go.mod` (`go-mod-directive`。参照のされ方は `directory`)、`**/*.md` (`markdown-heading`)、`**/Makefile` (`make-target`)、`**/*.toml` (`toml-table`)、`**/*.yaml`・`**/*.yml` (`yaml-key`)、`**/Dockerfile` (`dockerfile-stage`)、`**/*.tf` (`terraform-block`。参照のされ方は `directory`)。
 - **`divisible` で節の表記の無いもの** — 自前で書くソースコード: `**/*.go` (参照のされ方は `directory`)、`**/*.ts`・`**/*.tsx`・`**/*.js`・`**/*.py`・`**/*.rb`・`**/*.css` (参照のされ方は `file`)。節の表記を決めていないので、宣言に `units` は書けない。
 
-リポジトリで扱いが違うもの (生成した `.js`・`.gitattributes` で `linguist-generated` にしたディレクトリなど) は、リポジトリの設定の `files` に書く。候補はスキル `repo-preflight` が示す。
+リポジトリで扱いが違うもの (生成した `.js`・`.gitattributes` で `linguist-generated` にしたディレクトリなど) は、リポジトリの設定の `files` に書く。広い規則 (`**/*.json`・`**/*.yaml`・`**/*.yml`・`**/*.toml`) に一致する生成ファイルは、名前でこの表に無ければ `divisible` になり、利用者に尋ねない。そのリポジトリで生成されるものは、設定の `files` に `generated` の規則を書く。候補はスキル `repo-preflight` が示す。
