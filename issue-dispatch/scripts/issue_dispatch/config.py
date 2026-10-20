@@ -235,19 +235,22 @@ def load(root, role):
         config["protected_paths"] = (_check_string_list("protected_paths", raw["protected_paths"], warnings)
                                      if "protected_paths" in raw else [])
         config["hooks"] = _check_hooks(raw.get("hooks"), status != "missing", warnings)
-    pair_warnings = []
+    warned = set()
     for key in INTEGER_KEYS:
         if key not in keys:
             continue
-        target = pair_warnings if key in ("poll_minutes", "wait_minutes") else warnings
-        config[key] = _check_integer(key, raw[key], target) if key in raw else DEFAULTS[key]
-    warnings.extend(pair_warnings)
-    # 組の検査は、2 つとも値の検査を通ったときだけ行う (デフォルト値に置き換えた値と比べると、正しい値まで戻してしまう)
-    if not pair_warnings and config["poll_minutes"] >= config["wait_minutes"]:
+        before = len(warnings)
+        config[key] = _check_integer(key, raw[key], warnings) if key in raw else DEFAULTS[key]
+        if len(warnings) > before:
+            warned.add(key)
+    # 組の検査は、個別の検査でデフォルト値を当てた後の組で行う (以上なら両方をデフォルト値に戻す。project-config.md)。
+    # 個別の検査で既に警告したキーには重ねて警告しない
+    if config["poll_minutes"] >= config["wait_minutes"]:
         message = (f"poll_minutes ({config['poll_minutes']}) は wait_minutes ({config['wait_minutes']}) より短くする "
                    "(間隔が期限以上だと、待機が 1 回読むごとに期限で終わる)。両方をデフォルト値で続ける")
-        warnings.append(_note("poll_minutes", message))
-        warnings.append(_note("wait_minutes", message))
+        for key in ("poll_minutes", "wait_minutes"):
+            if key not in warned:
+                warnings.append(_note(key, message))
         config["poll_minutes"], config["wait_minutes"] = DEFAULTS["poll_minutes"], DEFAULTS["wait_minutes"]
     return {"status": status, "path": path, "role": role, "config": config, "warnings": warnings, "errors": errors}
 

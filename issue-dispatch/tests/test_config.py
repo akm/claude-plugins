@@ -142,13 +142,25 @@ class ManagerConfigTest(ConfigTestBase):
         self.assertEqual((c["poll_minutes"], c["wait_minutes"]), (3, 60))
         self.assertEqual(sorted(w["key"] for w in result["warnings"]), ["poll_minutes", "wait_minutes"])
 
-    def test_pair_check_skipped_when_one_value_is_invalid(self):
-        """片方が値の誤りなら、そのキーだけをデフォルト値にし、組の検査は行わない (正しい小さい wait_minutes を戻さない)。"""
+    def test_pair_check_after_individual_defaults(self):
+        """組の検査は、個別の検査でデフォルト値を当てた後の組で行い、以上なら両方をデフォルト値に戻す。
+        個別の検査で警告したキーには重ねて警告しない。"""
         _write_config(self.root, {"project": {"owner": "akm", "number": 3}, "poll_minutes": 0, "wait_minutes": 2})
         result = config.load(self.root, "manager")
         c = result["config"]
-        self.assertEqual((c["poll_minutes"], c["wait_minutes"]), (3, 2))
-        self.assertEqual([w["key"] for w in result["warnings"]], ["poll_minutes"], "警告は値の誤りの 1 件だけ")
+        self.assertEqual((c["poll_minutes"], c["wait_minutes"]), (3, 60), "3 >= 2 なので両方をデフォルト値に戻す")
+        self.assertEqual([w["key"] for w in result["warnings"]], ["poll_minutes", "wait_minutes"],
+                         "poll_minutes は値の誤りの 1 件、wait_minutes は組の 1 件")
+
+    def test_pair_check_when_wait_is_invalid(self):
+        """wait_minutes が値の誤りでデフォルト値 60 になり、poll_minutes 90 が 60 以上なら、両方をデフォルト値に戻す
+        (誤った組 (90, 60) を返すと、作業のセッションの待機が引数の検査で拒否される)。"""
+        _write_config(self.root, {"project": {"owner": "akm", "number": 3}, "poll_minutes": 90, "wait_minutes": 0})
+        result = config.load(self.root, "manager")
+        c = result["config"]
+        self.assertEqual((c["poll_minutes"], c["wait_minutes"]), (3, 60))
+        self.assertEqual([w["key"] for w in result["warnings"]], ["wait_minutes", "poll_minutes"],
+                         "wait_minutes は値の誤り、poll_minutes は組の警告")
 
     def test_third_party_edit_check_elements(self):
         """`third_party_edit_check` は `owner/repo` の配列。形の違う要素は警告して外す。"""
