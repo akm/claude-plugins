@@ -6,8 +6,9 @@
   config read --dir <ルート> --role manager|repo   設定を読み、デフォルト値を当てた後の設定と警告・エラーを返す
   config add-edit-check --dir <ルート> --repo <owner/repo>   管理ディレクトリの設定の third_party_edit_check に足す
 
-終了コード: 0 = 正常。1 = エラーがある (JSON は出す)。2 = 引数の誤り (argparse)。
-停止の条件の正本は同じ計画の R25 (1 と 2 は Python 自身も使うので、サブコマンドの専用の終了コードには使わない)。
+終了コード: JSON を出せたときは、エラーの有無によらず 0 (エラーは JSON の `errors` で伝える)。0 以外は Python 自身の失敗
+(捕まえていない例外の 1・引数の誤りの 2) で、呼び出す側はそれを停止の条件として扱う (正本は同じ計画の R25。
+1 と 2 は Python 自身が使うので、サブコマンドの専用の終了コードには使わない)。
 """
 
 import argparse
@@ -23,15 +24,13 @@ def _emit(payload):
 
 
 def cmd_config_read(args):
-    result = config.load(args.dir, args.role)
-    _emit(result)
-    return 1 if result["errors"] else 0
+    _emit(config.load(args.dir, args.role))
+    return 0
 
 
 def cmd_config_add_edit_check(args):
-    result = config.add_edit_check(args.dir, args.repo)
-    _emit(result)
-    return 1 if result["errors"] else 0
+    _emit(config.add_edit_check(args.dir, args.repo))
+    return 0
 
 
 def build_parser():

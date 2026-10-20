@@ -312,12 +312,14 @@ class CliTest(ConfigTestBase):
         self.assertEqual(out["config"]["poll_minutes"], 3)
         self.assertEqual([w["key"] for w in out["warnings"]], ["poll_minutes"])
 
-    def test_config_read_exit_code_on_error(self):
-        """必須のキーが無いか読めないときは終了コード 1 (JSON は出す)。"""
+    def test_config_read_errors_are_in_json_not_exit_code(self):
+        """必須のキーが無いか読めないときも、JSON を出せれば終了コード 0 で、エラーは JSON の errors で伝える
+        (1 と 2 は Python 自身の失敗の終了コードなので使わない。R25)。"""
         p = self._run("config", "read", "--dir", self.root, "--role", "manager")
-        self.assertEqual(p.returncode, 1)
+        self.assertEqual(p.returncode, 0, p.stderr)
         out = json.loads(p.stdout)
         self.assertEqual(out["status"], "missing")
+        self.assertEqual([e["key"] for e in out["errors"]], ["project"])
 
     def test_config_read_repo_role(self):
         _write_config(self.root, {"wait_minutes": 30})
