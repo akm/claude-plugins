@@ -205,6 +205,13 @@ class RepoConfigTest(ConfigTestBase):
         self.assertFalse(result["config"]["hooks"]["guard_other_worktrees"])
         self.assertEqual(result["config"]["poll_minutes"], 3)
 
+    def test_unreadable_file_keeps_hooks_enabled(self):
+        """読めない設定でも、設定ファイルがあればフックは有効 (guard_other_worktrees は真)。"""
+        _write_config(self.root, "{ not json")
+        result = config.load(self.root, "repo")
+        self.assertEqual(result["status"], "unreadable")
+        self.assertTrue(result["config"]["hooks"]["guard_other_worktrees"], "書き損じた設定でフックを無効にしないこと")
+
     def test_hooks_value_must_be_bool(self):
         _write_config(self.root, {"hooks": {"guard_other_worktrees": "yes"}})
         result = config.load(self.root, "repo")

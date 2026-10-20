@@ -234,7 +234,7 @@ def load(root, role):
         config["files"] = _check_files(raw["files"], warnings) if "files" in raw else []
         config["protected_paths"] = (_check_string_list("protected_paths", raw["protected_paths"], warnings)
                                      if "protected_paths" in raw else [])
-        config["hooks"] = _check_hooks(raw.get("hooks"), status == "ok", warnings)
+        config["hooks"] = _check_hooks(raw.get("hooks"), status != "missing", warnings)
     for key in ("poll_minutes", "wait_minutes"):
         config[key] = _check_integer(key, raw[key], warnings) if key in raw else DEFAULTS[key]
     if config["poll_minutes"] >= config["wait_minutes"]:
