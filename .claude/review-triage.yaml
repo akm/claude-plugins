@@ -32,12 +32,15 @@ categories:
     patterns:
       - "commit-rules-guard/hook-scripts/**"
       - "commit-rules-guard/hooks/**"
+      - "issue-dispatch/hook-scripts/**"
+      - "issue-dispatch/hooks/**"
     audience: operator
 
   - id: plugin-code
     patterns:
       - "pr-teeth/scripts/**"
       - "review-triage/tools/**"
+      - "issue-dispatch/scripts/**"
     audience: operator
 
   - id: skill
