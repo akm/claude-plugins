@@ -84,7 +84,7 @@ def normalize_pattern(pattern):
     trailing_slash = normalized.endswith("/") or normalized.endswith("/.")
     segments = [s for s in normalized.split("/") if s not in (".", "")]
     normalized = "/".join(segments) + ("/" if trailing_slash and segments else "")
-    if normalized == "" or normalized == "/":
+    if normalized == "":
         return None, f"パターン {pattern!r} はルートそのものを指すので使わない"
     if ".." in normalized.split("/"):
         return None, f"`..` を含むパターン {pattern!r} は使わない (ルートの外を指しうる)"
