@@ -58,6 +58,22 @@ class PatternTest(unittest.TestCase):
         self.assertFalse(filekinds.matches("a.txt", "aXtxt"), "`.` はそのままの文字として照合すること")
 
 
+class NormalizePathTest(unittest.TestCase):
+    """照合の前のパスのそろえ方 (file-kinds.md の「照合の順」)。"""
+
+    def test_dot_segments_double_slashes_and_trailing_slash(self):
+        for raw, expected in (("./a", "a"), ("a/", "a"), ("a//b", "a/b"), ("./src/./a.ts", "src/a.ts"), ("dist/", "dist")):
+            with self.subTest(path=raw):
+                self.assertEqual(filekinds.normalize_path(raw), (expected, None))
+
+    def test_outside_root_is_rejected(self):
+        for raw in ("/abs/a.md", "../x", "a/../../x", ".", "./", ""):
+            with self.subTest(path=raw):
+                normalized, problem = filekinds.normalize_path(raw)
+                self.assertIsNone(normalized)
+                self.assertTrue(problem, "差し戻す理由を返すこと")
+
+
 class ClassifyTest(unittest.TestCase):
     """種類の決定 (file-kinds.md の「照合の順」)。"""
 
@@ -198,6 +214,25 @@ class CliTest(unittest.TestCase):
                          "設定のパターンは config がそろえた形で返ること")
         self.assertEqual(out["paths"][1]["split_reference"], "file")
         self.assertEqual(out["warnings"], [])
+
+    def test_classify_normalizes_paths_and_rejects_outside_root(self):
+        """`./src/a.ts`・`src//a.ts`・`src/a.ts/` は設定の `src/*.ts` に一致する。絶対パスと `..` は error。"""
+        cfg = os.path.join(self.root, ".claude", "akm-claude-plugins", "issue-dispatch", "config.json")
+        os.makedirs(os.path.dirname(cfg))
+        with open(cfg, "w", encoding="utf-8") as f:
+            json.dump({"files": [{"pattern": "src/*.ts", "kind": "generated"}]}, f)
+        p = self._run("files", "classify", "--dir", self.root, "./src/a.ts", "src//a.ts", "src/a.ts/", "/abs/a.ts", "../x/a.ts")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        out = json.loads(p.stdout)["paths"]
+        for r in out[:3]:
+            with self.subTest(path=r["path"]):
+                self.assertEqual(r["path"], "src/a.ts", "返す path はそろえた後の値であること")
+                self.assertEqual(r["kind"], "generated")
+        for r in out[3:]:
+            with self.subTest(path=r["path"]):
+                self.assertNotIn("kind", r, "差し戻したパスには種類を返さないこと")
+                self.assertTrue(r["error"])
+        self.assertEqual(out[3]["path"], "/abs/a.ts", "差し戻したパスは書いたままの値を返すこと")
 
     def test_classify_without_config(self):
         p = self._run("files", "classify", "--dir", self.root, "a.md")

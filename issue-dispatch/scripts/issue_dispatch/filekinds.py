@@ -61,6 +61,26 @@ def pattern_to_regex(pattern):
     return re.compile("".join(out) + r"\Z")
 
 
+def normalize_path(path):
+    """パス (リポジトリのルートからの相対パス) を、照合の前にそろえる。返り値は (そろえたパス, None) か (None, 問題)。
+
+    `//` を `/` に、`.` と空の区切りを除き、末尾の `/` を除く (`./a`・`a/`・`a//b` は `a`・`a/b`)。
+    絶対パス (`/` で始まる)・`..` を含むパス・ルートそのもの (空になるパス) は、ルートの外を指しうるか
+    ファイルを指さないので、そろえずに問題を返す (呼び出し元が差し戻す。KTD9)。
+    設定のパターンをそろえる規則 (末尾の `/` を残す) とは違うので、関数を分けている。
+    """
+    if not isinstance(path, str):
+        return None, f"パス {path!r} は文字列ではない"
+    if path.startswith("/"):
+        return None, f"絶対パス {path!r} は使えない (リポジトリのルートからの相対パスを書く)"
+    segments = [s for s in path.split("/") if s not in (".", "")]
+    if ".." in segments:
+        return None, f"`..` を含むパス {path!r} は使えない (ルートの外を指しうる)"
+    if not segments:
+        return None, f"パス {path!r} はルートそのものを指すので使えない"
+    return "/".join(segments), None
+
+
 def matches(pattern, path):
     """パターンがパス (ルートからの相対パス) に一致するか。"""
     return pattern_to_regex(pattern).match(path) is not None

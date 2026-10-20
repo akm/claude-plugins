@@ -37,7 +37,13 @@ def cmd_config_add_edit_check(args):
 def cmd_files_classify(args):
     loaded = config.load(args.dir, "repo")
     table = filekinds.load_default_table()
-    results = [{"path": path, **filekinds.classify(path, loaded["config"]["files"], table)} for path in args.paths]
+    results = []
+    for path in args.paths:
+        normalized, problem = filekinds.normalize_path(path)
+        if problem:
+            results.append({"path": path, "error": problem})
+            continue
+        results.append({"path": normalized, **filekinds.classify(normalized, loaded["config"]["files"], table)})
     _emit({"paths": results, "config_status": loaded["status"], "warnings": loaded["warnings"], "errors": loaded["errors"]})
     return 0
 
@@ -63,7 +69,7 @@ def build_parser():
     files_sub = p_files.add_subparsers(dest="subcommand", required=True)
     p_classify = files_sub.add_parser("classify", help="パスごとの種類と属性を返す (gh は実行しない)")
     p_classify.add_argument("--dir", required=True, help="リポジトリのルート (設定の files を読む)")
-    p_classify.add_argument("paths", nargs="+", help="ルートからの相対パス")
+    p_classify.add_argument("paths", nargs="+", help="ルートからの相対パス (照合の前にそろえる。絶対パスと `..` を含むパスは error を返す)")
     p_classify.set_defaults(func=cmd_files_classify)
     return parser
 
