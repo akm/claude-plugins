@@ -207,7 +207,9 @@ class DefaultTableTest(unittest.TestCase):
         self.assertEqual(filekinds.classify("db/migrations/001_init.sql", [], _DEFAULT)["kind"], "unstable")
         self.assertEqual(filekinds.classify("report.xlsx", [], _DEFAULT)["kind"], "unknown-structure")
         pkg = filekinds.classify("package.json", [], _DEFAULT)
-        self.assertEqual(pkg["unit_notation"], {"notation": "json-key", "keys": ["dependencies", "devDependencies"]})
+        self.assertEqual(pkg["unit_notation"], {"notation": "json-key", "keys": ["dependencies", "devDependencies"]},
+                         "`**/*.json` より前の `**/package.json` の属性になること")
+        self.assertEqual(filekinds.classify("config/app.json", [], _DEFAULT)["unit_notation"], "json-key")
         self.assertEqual(filekinds.classify("cmd/main.go", [], _DEFAULT)["split_reference"], "directory")
         self.assertEqual(filekinds.classify("src/app.ts", [], _DEFAULT)["split_reference"], "file")
 

@@ -28,6 +28,7 @@
 
   {"pattern": "**/package.json", "kind": "divisible",
    "unit_notation": {"notation": "json-key", "keys": ["dependencies", "devDependencies"]}, "split_reference": "file"},
+  {"pattern": "**/*.json", "kind": "divisible", "unit_notation": "json-key", "split_reference": "file"},
   {"pattern": "**/go.mod", "kind": "divisible", "unit_notation": "go-mod-directive", "split_reference": "directory"},
   {"pattern": "**/*.md", "kind": "divisible", "unit_notation": "markdown-heading", "split_reference": "file"},
   {"pattern": "**/Makefile", "kind": "divisible", "unit_notation": "make-target", "split_reference": "file"},
