@@ -202,6 +202,7 @@ class DefaultTableTest(unittest.TestCase):
     def test_specific_rows(self):
         self.assertEqual(filekinds.classify("api/v1/service.pb.go", [], _DEFAULT)["kind"], "generated")
         self.assertEqual(filekinds.classify("infra/terraform.tfstate.backup", [], _DEFAULT)["kind"], "generated")
+        self.assertEqual(filekinds.classify("pkg/apis/zz_generated.deepcopy.go", [], _DEFAULT)["kind"], "generated")
         png = filekinds.classify("assets/logo.png", [], _DEFAULT)
         self.assertEqual((png["kind"], png["mergeable"]), ("indivisible", False))
         self.assertEqual(filekinds.classify("db/migrations/001_init.sql", [], _DEFAULT)["kind"], "unstable")

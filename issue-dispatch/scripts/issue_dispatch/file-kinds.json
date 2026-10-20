@@ -1,6 +1,7 @@
 [
   {"pattern": "**/*.pb.go", "kind": "generated"},
   {"pattern": "**/*_generated.go", "kind": "generated"},
+  {"pattern": "**/zz_generated.*.go", "kind": "generated"},
   {"pattern": "**/package-lock.json", "kind": "generated"},
   {"pattern": "**/npm-shrinkwrap.json", "kind": "generated"},
   {"pattern": "**/yarn.lock", "kind": "generated"},
