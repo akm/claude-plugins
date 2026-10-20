@@ -235,9 +235,12 @@ def load(root, role):
         config["protected_paths"] = (_check_string_list("protected_paths", raw["protected_paths"], warnings)
                                      if "protected_paths" in raw else [])
         config["hooks"] = _check_hooks(raw.get("hooks"), status != "missing", warnings)
+    pair_warnings = []
     for key in ("poll_minutes", "wait_minutes"):
-        config[key] = _check_integer(key, raw[key], warnings) if key in raw else DEFAULTS[key]
-    if config["poll_minutes"] >= config["wait_minutes"]:
+        config[key] = _check_integer(key, raw[key], pair_warnings) if key in raw else DEFAULTS[key]
+    warnings.extend(pair_warnings)
+    # 組の検査は、2 つとも値の検査を通ったときだけ行う (デフォルト値に置き換えた値と比べると、正しい値まで戻してしまう)
+    if not pair_warnings and config["poll_minutes"] >= config["wait_minutes"]:
         message = (f"poll_minutes ({config['poll_minutes']}) は wait_minutes ({config['wait_minutes']}) より短くする "
                    "(間隔が期限以上だと、待機が 1 回読むごとに期限で終わる)。両方をデフォルト値で続ける")
         warnings.append(_note("poll_minutes", message))

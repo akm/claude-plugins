@@ -142,6 +142,14 @@ class ManagerConfigTest(ConfigTestBase):
         self.assertEqual((c["poll_minutes"], c["wait_minutes"]), (3, 60))
         self.assertEqual(sorted(w["key"] for w in result["warnings"]), ["poll_minutes", "wait_minutes"])
 
+    def test_pair_check_skipped_when_one_value_is_invalid(self):
+        """片方が値の誤りなら、そのキーだけをデフォルト値にし、組の検査は行わない (正しい小さい wait_minutes を戻さない)。"""
+        _write_config(self.root, {"project": {"owner": "akm", "number": 3}, "poll_minutes": 0, "wait_minutes": 2})
+        result = config.load(self.root, "manager")
+        c = result["config"]
+        self.assertEqual((c["poll_minutes"], c["wait_minutes"]), (3, 2))
+        self.assertEqual([w["key"] for w in result["warnings"]], ["poll_minutes"], "警告は値の誤りの 1 件だけ")
+
     def test_third_party_edit_check_elements(self):
         """`third_party_edit_check` は `owner/repo` の配列。形の違う要素は警告して外す。"""
         _write_config(self.root, {
