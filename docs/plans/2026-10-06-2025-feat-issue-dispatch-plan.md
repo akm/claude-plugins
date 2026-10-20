@@ -1083,7 +1083,7 @@ issue-dispatch/
 ### U1. 前提の実測
 
 - **Goal:** 設計が依存する未確認の前提 (Open Questions) を、検証用の Project と 2 つのセッションで確かめ、結果を日付と版とともに残す。
-- **状態:** 2026-10-20 に終えた。結果は Dependencies / Assumptions の「U1 の実測」と Open Questions の「U1 で確かめたこと」に書き、項目ごとの表は `tmp/issue-dispatch-u1/` にある。止まる条件 (1)〜(4) には当たらず、KTD11 は案 B。行わなかったこと: 中継のキューの上限 (50 通) の確認 (1 Issue あたりの合図は片方向 3 通以下で、受け手は次のツール呼び出しで inbox を読むので、たまりにくいと判断)、`git-subdir` のマーケットプレイスで版の違う user scope と project scope が並ぶときにどちらを読むか (別のプロジェクトのセッションが要る)、端末の `/clear` (U23)、版を消された編集の見え方 (U7・U13)、ADMIN 以外の権限での組織の Issue への `blockedBy` (U7・U15)、バックグラウンドの待機を動かしたまま権限の確認で止まったセッションの `ListAgents` の状態 (`waiting` か `shell` か)。
+- **状態:** 2026-10-20 に終えた。結果は Dependencies / Assumptions の「U1 の実測」と Open Questions の「U1 で確かめたこと」に書き、項目ごとの表は `tmp/issue-dispatch-u1/` にある。止まる条件 (1)〜(4) には当たらず、KTD11 は案 B。行わなかったこと: 中継のキューの上限 (50 通) の確認 (1 Issue あたりの合図は片方向 3 通以下で、受け手は次のツール呼び出しで inbox を読むので、たまりにくいと判断)、`git-subdir` のマーケットプレイスで版の違う user scope と project scope が並ぶときにどちらを読むか (別のプロジェクトのセッションが要る)、端末の `/clear` (U23)、版を消された編集の見え方 (U7・U13)、ADMIN 以外の権限での組織の Issue への `blockedBy` (U7・U15)、バックグラウンドの待機を動かしたまま権限の確認で止まったセッションの `ListAgents` の状態 (`waiting` か `shell` か)、`git-subdir` のマーケットプレイスで `/reload-plugins` の後に `${CLAUDE_PLUGIN_ROOT}` が新しい版のパスになるか (Verification Contract の AE56 の行で、マージの後に確かめる)。
 - **Requirements:** R7, R9, R19 の前提 (Dependencies / Assumptions, Open Questions)。KTD11, KTD16。
 - **Dependencies:** 無し。
 - **Files:**
@@ -1608,7 +1608,7 @@ issue-dispatch/
   - Covers AE22. 開始の検査 (`preflight session`) が、自分が権限の確認を省くモードであることの警告を返したら、その警告 (管理のセッションが権限の確認を省かないモードなら、送る `available` が保留されて割り当てられない) を利用者に伝え、尋ねずに続ける。
   - 管理のセッションが無いときに `/issue-work` を入力すると、起動の順を伝えて止まる。
   - Covers AE46. ready for review の後に資源を足した宣言の更新を書いて判定を待つ間 (`wait-decision` に `--review-update` を渡す) に Issue が閉じると (ready for review の後なので正常な終わり)、`stop` (理由は close) で気づき、報告して `available` を送る。資源で `待機` があっても、起動し直し続けない。
-  - Covers AE56. 同梱の CLI のパスが無ければ、CLI を実行せずに作業を止め、`/reload-plugins` の入力の後に `/issue-work` をやり直すよう案内する。新しい版がインストールされていれば、止まらずに 1 回だけ伝える (`plugin version --session-id` が「伝える」を返したときだけ。会話が要約された後に別の Issue に着手しても、同じ版は伝えない)。やり直したときは、`In Progress` か `Blocked` の Issue を持っていれば `available` を送らずに続け、`In review` の Issue だけなら R29 の問いを尋ね直す。ただし、`In review` の Issue の判定の要る宣言に `開始可` が無ければ (ready for review の後に資源を足した更新で判定を待っていた)、R29 の問いを尋ね直さずに `wait-decision --review-update` で判定を待つ。差し戻しの後に書き直した更新で判定を待っていた Issue は、書き直した更新の ID で `wait-decision` を起動する。`In Progress` の Issue は、`work held` が返す判定の要る宣言と `開始可` で、宣言の前・判定を待つ (その宣言の ID で `wait-decision` を起動する)・作業中を決め、判定を待っていた Issue のファイルを `開始可` の前に変えない。
+  - Covers AE56 (通し確認では確かめず、Verification Contract の行「プラグインの版の違いの報告」のとおりマージの後に確かめる)。同梱の CLI のパスが無ければ、CLI を実行せずに作業を止め、`/reload-plugins` の入力の後に `/issue-work` をやり直すよう案内する。新しい版がインストールされていれば、止まらずに 1 回だけ伝える (`plugin version --session-id` が「伝える」を返したときだけ。会話が要約された後に別の Issue に着手しても、同じ版は伝えない)。やり直したときは、`In Progress` か `Blocked` の Issue を持っていれば `available` を送らずに続け、`In review` の Issue だけなら R29 の問いを尋ね直す。ただし、`In review` の Issue の判定の要る宣言に `開始可` が無ければ (ready for review の後に資源を足した更新で判定を待っていた)、R29 の問いを尋ね直さずに `wait-decision --review-update` で判定を待つ。差し戻しの後に書き直した更新で判定を待っていた Issue は、書き直した更新の ID で `wait-decision` を起動する。`In Progress` の Issue は、`work held` が返す判定の要る宣言と `開始可` で、宣言の前・判定を待つ (その宣言の ID で `wait-decision` を起動する)・作業中を決め、判定を待っていた Issue のファイルを `開始可` の前に変えない。
   - `/issue-work` をやり直したとき、閉じて利用者の答えを待つ Issue を持っていれば、`available` を送らず、`wait-assignment --pending` でその Issue の `解放`・正常な終わり・Issue が戻ることを待つ (R26)。宣言の前に閉じられた Issue、reopen の直後で Status が `Todo` の Issue、フィールドを変えられた Issue でも同じ。利用者が手で `Blocked` にした Issue でやり直すと、`Blocked` で待つにはならず、宣言の段階に合わせて続ける。
   - Covers AE36. コメント `割り当て` の本文が本文の編集の確認の対象を示していれば、着手の前・宣言を書く前・PR を作る前に本文の編集の履歴を確かめ、割り当ての後の第三者の編集があれば作業を止める。対象を示していなければ確かめない。
 - **Verification:** 通し確認の正常系 (シナリオ A) で、作業のセッションの操作が利用者の指示なしに進む。`doc-dag` で `issue-work` の references が `issue-dispatch` の正本を参照するだけで複製していない。
@@ -1666,7 +1666,7 @@ issue-dispatch/
   - `notify_when_idle` は合図 `assigned`・`go` と、宣言の書き直しを頼む `request` に添えて申し込み、再入のたびには申し込み直さない。入力待ちの作業のセッションに単独で申し込まない。
   - 待機を起動したターンで、管理のセッションがほかのツールを呼び出していない。
   - Covers AE59. 会話を `/compact` で要約した後も、再入の手順に従って続け、止めた待機の通知では何もせず、二重に書かない。
-  - Covers AE56. 新しい版がインストールされていれば、止まらずに 1 回だけ、両方のセッションで `/reload-plugins` を入力するよう報告する (版を比べるのは記録を読んだ後で、報告済みの印のある版は報告しない。`installed_plugins.json` が読めなければ 1 回だけ報告して続け (記録に「読めない」の報告済みの印を書き、再入のたびには報告しない)、キャッシュの外から読み込んでいれば報告しない)。同梱の CLI のパスが無ければ、再入の手順の始めで止まり、記録に書かずに、`/reload-plugins` の入力の後に `/issue-dispatch --resume` を入力するよう報告する。
+  - Covers AE56 (通し確認では確かめず、Verification Contract の行「プラグインの版の違いの報告」のとおりマージの後に確かめる)。新しい版がインストールされていれば、止まらずに 1 回だけ、両方のセッションで `/reload-plugins` を入力するよう報告する (版を比べるのは記録を読んだ後で、報告済みの印のある版は報告しない。`installed_plugins.json` が読めなければ 1 回だけ報告して続け (記録に「読めない」の報告済みの印を書き、再入のたびには報告しない)、キャッシュの外から読み込んでいれば報告しない)。同梱の CLI のパスが無ければ、再入の手順の始めで止まり、記録に書かずに、`/reload-plugins` の入力の後に `/issue-dispatch --resume` を入力するよう報告する。
 - **Verification:** 通し確認のシナリオ A〜S が期待どおり。`issue-dispatch/skills/` を対象に `doc-dag` を実行して、重複と巡回が無い。
 
 ### U24. 登録・README・用語・CI の対象
@@ -1704,6 +1704,7 @@ issue-dispatch/
 | 言い回し | 変更した Markdown を対象にスキル `wording-guard` を実行する | U2〜U24 | 最後の走査で、新しい種類の不自然な言い回しが見つからない |
 | 決定表の整合 | `flow.md` の図のノードと決定表の行、`flow.md` の項目の状態の節の表と U13 の導出のテストのケース、`resources.md` の契機の表と U11 の資源の判断のテストのケース、`messaging.md` の合図の表と KTD1 の表を目視で照合 | U11, U13, U17, U21 | 図のノードと決定表の行、合図の表と KTD1 の表は 1:1。項目の状態の節の表と契機の表は、すべての行がテストのケースに覆われる (機械検査は無い) |
 | 受け入れ例の網羅 | 各単位の Test scenarios の `Covers` を集め、AE1〜AE59 のすべてがどれかの単位にあることをスクリプトで数える (計画を変えたときと、単位を終えるとき) | 計画 (U2〜U23) | 59 件すべてが 1 つ以上の単位の `Covers` にある。単位の Requirements には受け入れ例の番号を書かず、`Covers` だけを正本にする (2 か所に書くと片方だけが古びるため) |
+| プラグインの版の違いの報告 (AE56) | マージの後に、インストールした版で確かめる (通し確認では `directory` のマーケットプレイスと `--plugin-dir` のどちらも `plugin version` が「比べられない」を返すため。KTD17)。手順: 管理のセッションと作業のセッションを動かしたまま、`issue-dispatch` の `plugin.json` の patch を上げた版をマーケットプレイスに入れて `claude plugin marketplace update` と `claude plugin update` を実行し、動いているセッションが次のターンで 1 回だけ報告すること、`/reload-plugins` の後に CLI のパスが新しい版のディレクトリになることを確かめる | U18, U22, U23 | 両方のセッションが 1 回だけ報告し、2 回目のターンでは報告しない。`/reload-plugins` の後の `${CLAUDE_PLUGIN_ROOT}` が新しい版のディレクトリ |
 | 手順書の通し確認 | 管理のセッション 1 つ (Desktop)、作業のセッション 2 つ (Desktop 1 つと端末 1 つ。端末はブランチ版を `--plugin-dir` で読み込み、Desktop は `source` を相対パスにした検証用のマーケットプレイスからインストールして読み込む。KTD17。準備: git が無視する `tmp/` の下にディレクトリを作り、`.claude-plugin/marketplace.json` に `name`・`owner`・`plugins[]` (`name: issue-dispatch`、`source: "./issue-dispatch"`) を書き、`issue-dispatch` をブランチの作業ツリーへのシンボリックリンクにし、`claude plugin marketplace add <絶対パス>` と `claude plugin install issue-dispatch@<name>` を実行する。後片付け: `claude plugin uninstall` と `claude plugin marketplace remove`)、検証用の Project、検証用のリポジトリ 2 つ。始める前に回数・費用 (目安はセッション 3 つ × 数時間)・手順を利用者に示して許可を得る | U19, U22, U23 | 下のシナリオ |
 
 通し確認のシナリオ (順に行う。各シナリオで、Project のフィールドと Status・Issue のコメントの先頭行・記録のうち `record.json` と `actions.log`・管理のセッションと作業のセッションの報告・利用者の操作が 4 種類だけだったこと・承認を要する行為の前に答えが記録にあったこと・問いがまとめて尋ねられたことを見る):
@@ -1732,7 +1733,7 @@ issue-dispatch/
 
 ## Definition of Done
 
-- U1〜U24 がすべて完了し、上の Verification Contract の全項目が成功している。
+- U1〜U24 がすべて完了し、上の Verification Contract の全項目が成功している (行「プラグインの版の違いの報告 (AE56)」は、マージの後にインストールした版で確かめる行なので、マージの前には準備 (手順の確認) まででよい)。
 - ほかのプラグインのディレクトリ・`.github/workflows/test.yml`・`.claude/` に差分が無い (KTD18)。
 - 実装が計画と合わなかったところは、計画の R と KTD が実装に合わせて直され、直した理由が PR の本文にある。
 - 各単位が動機ごとのコミットになっている。プラグインの追加とその登録 (marketplace・ルートの README) は同じコミット。`CONCEPTS.md` の用語の追加と `.github/test-targets.txt` の追加は、それぞれの動機のコミット。計画のコミットは実装と分かれている。
