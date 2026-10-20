@@ -27,37 +27,64 @@ def load_default_table(path=DEFAULT_TABLE_PATH):
         return json.load(f)
 
 
-def pattern_to_regex(pattern):
-    """パターンを、ルートからのパス全体に完全一致で照合する正規表現に変換する。
-
-    `*` は 1 つのディレクトリの名前の中だけで一致し (`/` を越えない)、`**` は 0 個以上のディレクトリに一致する。
-    `?` は `/` 以外の 1 文字。末尾が `/` のパターンは、そのディレクトリの下のすべて (`/**` を付けたもの) と同じ。
-    Python 3.13 の PurePath.full_match と同じ規則で、`.gitignore` の規則 (`/` を含まないパターンがどの階層にも
-    一致する) とは違う。
-    """
-    if pattern.endswith("/"):
-        pattern = pattern + "**"
+def _translate_segment(segment):
+    """`/` を含まない 1 つの区切りを正規表現に変換する。`*` と `?` は `/` を越えない。`[seq]` は文字の集合
+    (`[!seq]` は否定。fnmatch と同じ読み方)。区切りの一部の `**` は `*` と同じ (`full_match` と同じ)。"""
     out = []
     i = 0
-    while i < len(pattern):
-        c = pattern[i]
-        if pattern.startswith("**", i):
-            after = pattern[i + 2:]
-            if after.startswith("/"):
-                out.append("(?:.*/)?")  # `**/` は 0 個以上のディレクトリ
-                i += 3
-            else:
-                out.append(".*")  # 末尾などの `**` は残り全部
-                i += 2
-        elif c == "*":
+    n = len(segment)
+    while i < n:
+        c = segment[i]
+        if c == "*":
             out.append("[^/]*")
             i += 1
         elif c == "?":
             out.append("[^/]")
             i += 1
+        elif c == "[":
+            j = i + 1
+            if j < n and segment[j] == "!":
+                j += 1
+            if j < n and segment[j] == "]":
+                j += 1
+            while j < n and segment[j] != "]":
+                j += 1
+            if j >= n:
+                out.append("\\[")  # 閉じない `[` はそのままの文字
+                i += 1
+            else:
+                stuff = segment[i + 1:j].replace("\\", "\\\\")
+                i = j + 1
+                if stuff[0] == "!":
+                    stuff = "^" + stuff[1:]
+                elif stuff[0] in ("^", "["):
+                    stuff = "\\" + stuff
+                out.append("[" + stuff + "]")
         else:
             out.append(re.escape(c))
             i += 1
+    return "".join(out)
+
+
+def pattern_to_regex(pattern):
+    """パターンを、ルートからのパス全体に完全一致で照合する正規表現に変換する。
+
+    規則は Python 3.13 の PurePath.full_match と同じ (3.11 には無いので、ここで変換する。fnmatch は `*` が `/` を
+    越えて一致するので使わない)。パターンを `/` で区切り、区切り全体が `**` なら 0 個以上のディレクトリに一致する
+    (末尾の `**` は 1 個以上の名前。`dist/**` は `dist` そのものと、名前が空の `dist/` には一致しない)。それ以外の
+    区切りは _translate_segment で変換する。`.gitignore` の規則 (`/` を含まないパターンがどの階層にも一致する)
+    とは違う。末尾が `/` のパターンは、そのディレクトリの下のすべて (`/**` を付けたもの) と同じ (この文書の拡張)。
+    """
+    if pattern.endswith("/"):
+        pattern = pattern + "**"
+    segments = pattern.split("/")
+    out = []
+    for index, segment in enumerate(segments):
+        last = index == len(segments) - 1
+        if segment == "**":
+            out.append("[^/]+(?:/[^/]+)*" if last else "(?:[^/]+/)*")
+        else:
+            out.append(_translate_segment(segment) + ("" if last else "/"))
     return re.compile("".join(out) + r"\Z")
 
 

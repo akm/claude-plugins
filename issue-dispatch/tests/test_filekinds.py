@@ -52,6 +52,39 @@ class PatternTest(unittest.TestCase):
         self.assertFalse(filekinds.matches("app.ts", "src/app.ts"), "ルートからのパス全体と照合すること (.gitignore の規則とは違う)")
         self.assertFalse(filekinds.matches("src/app", "src/app.ts"), "前方一致ではないこと")
 
+    def test_double_star_is_special_only_as_a_whole_segment(self):
+        self.assertTrue(filekinds.matches("src/**.go", "src/a.go"))
+        self.assertFalse(filekinds.matches("src/**.go", "src/x/a.go"), "区切りの一部の `**` は `*` と同じで `/` を越えないこと")
+        self.assertFalse(filekinds.matches("a**b", "a/x/b"))
+        self.assertFalse(filekinds.matches("foo**/bar", "foobar"))
+        self.assertTrue(filekinds.matches("a/**/b", "a/b"))
+        self.assertTrue(filekinds.matches("a/**/b", "a/c/d/b"))
+
+    def test_trailing_double_star_needs_a_name(self):
+        self.assertFalse(filekinds.matches("dist/**", "dist/"), "名前が空の要素には一致しないこと")
+        self.assertFalse(filekinds.matches("dist/**", "dist"))
+        self.assertTrue(filekinds.matches("dist/**", "dist/a"))
+
+    def test_character_class(self):
+        self.assertTrue(filekinds.matches("[ab].txt", "a.txt"))
+        self.assertFalse(filekinds.matches("[ab].txt", "c.txt"))
+        self.assertTrue(filekinds.matches("[!ab].txt", "c.txt"))
+        self.assertTrue(filekinds.matches("a[.txt", "a[.txt"), "閉じない `[` はそのままの文字であること")
+
+    @unittest.skipUnless(sys.version_info >= (3, 13), "PurePath.full_match は Python 3.13 から")
+    def test_same_as_full_match(self):
+        """正本の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確かめる (末尾が `/` のパターンは拡張なので除く)。"""
+        from pathlib import PurePosixPath
+        patterns = ("*.pb.go", "**/*.pb.go", "src/*.ts", "src/**.go", "**", "dist/**", "**/x", "a/**/b", "[ab].txt",
+                    "[!ab].txt", "*.md", "a?.txt", "a**b", "foo**/bar", "a/**b", "**/**/a", "a[.txt")
+        paths = ("api.pb.go", "gen/api.pb.go", "src/app.ts", "src/lib/a.ts", "src/a.go", "src/x/a.go", "a", "a/b", "dist",
+                 "dist/a", "dist/a/b", "x", "a/b/x", "a/c/b", "a/c/d/b", "a.txt", "c.txt", "README.MD", "ab.txt", "a/x/b",
+                 "foobar", "a/xb", "a/x/yb", "a[.txt")
+        for pattern in patterns:
+            for path in paths:
+                with self.subTest(pattern=pattern, path=path):
+                    self.assertEqual(filekinds.matches(pattern, path), PurePosixPath(path).full_match(pattern))
+
     def test_question_mark_and_escaping(self):
         self.assertTrue(filekinds.matches("a?.txt", "ab.txt"))
         self.assertFalse(filekinds.matches("a?.txt", "a/.txt"))
