@@ -291,6 +291,22 @@ class AddEditCheckTest(ConfigTestBase):
         with open(path, encoding="utf-8") as f:
             self.assertEqual(f.read(), "{ not json", "読めない設定を上書きしないこと")
 
+    def test_non_list_value_is_not_overwritten(self):
+        """既存の値が配列でなければ、捨てずにエラーを返す。"""
+        path = _write_config(self.root, {"project": {"owner": "akm", "number": 3}, "third_party_edit_check": "akm/x"})
+        result = config.add_edit_check(self.root, "akm/y")
+        self.assertFalse(result["changed"])
+        self.assertEqual([e["key"] for e in result["errors"]], ["third_party_edit_check"])
+        self.assertEqual(_read_json(path)["third_party_edit_check"], "akm/x", "利用者が書いた値を消さないこと")
+
+    def test_missing_root_dir_is_not_created(self):
+        """ルートのディレクトリが無ければ作らずにエラーを返す (--dir の打ち間違いで別の場所に設定を作らない)。"""
+        root = os.path.join(self.root, "typo", "dir")
+        result = config.add_edit_check(root, "akm/a")
+        self.assertFalse(result["changed"])
+        self.assertEqual([e["key"] for e in result["errors"]], ["(dir)"])
+        self.assertFalse(os.path.exists(root), "ディレクトリを作らないこと")
+
     def test_invalid_repo_is_rejected(self):
         _write_config(self.root, {"project": {"owner": "akm", "number": 3}})
         result = config.add_edit_check(self.root, "not a repo")

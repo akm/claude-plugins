@@ -249,21 +249,26 @@ def load(root, role):
 def add_edit_check(root, repo):
     """管理ディレクトリの設定の `third_party_edit_check` にリポジトリを足す (承認を得た後に呼ぶ。R18)。
 
-    ほかのキーは変えない (知らないキーも残す)。既にあれば何も書かない。設定ファイルが無ければ、このキーだけの
-    設定を作る。読めない設定は上書きしない。
+    ほかのキーは変えない (知らないキーも残す)。既にあれば何も書かない。設定ファイルが無ければ (ルートのディレクトリは
+    あること)、このキーだけの設定を作る。読めない設定と、既存の値が配列でない設定は上書きしない。
     返り値: {"changed": bool, "path": パス, "errors": [{"key", "message"}]}。
     """
     path = config_path(root)
     if not (isinstance(repo, str) and _REPO_RE.match(repo)):
         return {"changed": False, "path": path, "errors": [_note("repo", f"{repo!r} は owner/repo の形ではない")]}
+    if not os.path.isdir(root):
+        return {"changed": False, "path": path,
+                "errors": [_note("(dir)", f"ディレクトリ {root} が無いので書かない (--dir の打ち間違いを疑う)")]}
     status, data = _read_file(path)
     if status == "unreadable":
         return {"changed": False, "path": path,
                 "errors": [_note("(file)", f"設定ファイル {path} を読めないので書かない: {data}")]}
     data = data if status == "ok" else {}
-    current = data.get("third_party_edit_check")
+    current = data.get("third_party_edit_check", [])
     if not isinstance(current, list):
-        current = []
+        return {"changed": False, "path": path,
+                "errors": [_note("third_party_edit_check",
+                                 f"third_party_edit_check の値 {current!r} は配列ではないので書かない (手で直す)")]}
     if repo in current:
         return {"changed": False, "path": path, "errors": []}
     data["third_party_edit_check"] = current + [repo]
