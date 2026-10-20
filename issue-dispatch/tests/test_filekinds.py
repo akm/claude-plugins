@@ -253,7 +253,7 @@ class CliTest(unittest.TestCase):
         p = self._run("files", "classify", "--dir", self.root, "dist/app.js", "src/app.js", "x.unknownext")
         self.assertEqual(p.returncode, 0, p.stderr)
         out = json.loads(p.stdout)
-        kinds = {r["path"]: r["kind"] for r in out["paths"]}
+        kinds = {r["normalized"]: r["kind"] for r in out["paths"]}
         self.assertEqual(kinds, {"dist/app.js": "generated", "src/app.js": "divisible", "x.unknownext": "unknown-content"})
         self.assertEqual(out["paths"][0]["matched"], {"source": "config", "pattern": "dist/**"},
                          "設定のパターンは config がそろえた形で返ること")
@@ -269,15 +269,17 @@ class CliTest(unittest.TestCase):
         p = self._run("files", "classify", "--dir", self.root, "./src/a.ts", "src//a.ts", "src/a.ts/", "/abs/a.ts", "../x/a.ts")
         self.assertEqual(p.returncode, 0, p.stderr)
         out = json.loads(p.stdout)["paths"]
+        inputs = ["./src/a.ts", "src//a.ts", "src/a.ts/", "/abs/a.ts", "../x/a.ts"]
+        self.assertEqual([r["path"] for r in out], inputs, "要素は入力と同じ並びで、path は書いたままの値であること")
         for r in out[:3]:
             with self.subTest(path=r["path"]):
-                self.assertEqual(r["path"], "src/a.ts", "返す path はそろえた後の値であること")
+                self.assertEqual(r["normalized"], "src/a.ts", "normalized はそろえた後の値であること")
                 self.assertEqual(r["kind"], "generated")
         for r in out[3:]:
             with self.subTest(path=r["path"]):
                 self.assertNotIn("kind", r, "差し戻したパスには種類を返さないこと")
+                self.assertNotIn("normalized", r)
                 self.assertTrue(r["error"])
-        self.assertEqual(out[3]["path"], "/abs/a.ts", "差し戻したパスは書いたままの値を返すこと")
 
     def test_classify_without_config(self):
         p = self._run("files", "classify", "--dir", self.root, "a.md")
