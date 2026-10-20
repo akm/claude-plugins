@@ -246,11 +246,12 @@ class RepoConfigTest(ConfigTestBase):
             {"pattern": "docs/", "kind": "sectioned", "unit_notation": "heading"},
             {"pattern": "docs/./a.md", "kind": "sectioned"},
             {"pattern": "././x/", "kind": "generated"},
+            {"pattern": "dist/.", "kind": "generated"},
         ]})
         result = config.load(self.root, "repo")
         rules = result["config"]["files"]
-        self.assertEqual([r["pattern"] for r in rules], ["dist/**", "dist/**", "docs/", "docs/a.md", "x/"],
-                         "途中の /./ と重ねた ./ も取り除き、末尾の / は残すこと")
+        self.assertEqual([r["pattern"] for r in rules], ["dist/**", "dist/**", "docs/", "docs/a.md", "x/", "dist/"],
+                         "途中の /./ と重ねた ./ も取り除き、末尾の / (/. で終わる場合も) は残すこと")
         self.assertEqual(rules[2]["unit_notation"], "heading", "省略できる属性はそのまま渡すこと")
         self.assertEqual(result["warnings"], [])
 

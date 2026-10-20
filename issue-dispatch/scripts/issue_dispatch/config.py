@@ -81,7 +81,7 @@ def normalize_pattern(pattern):
     if pattern.startswith("/"):
         return None, f"絶対パスのパターン {pattern!r} は使わない (ルートからの相対パスで書く)"
     normalized = re.sub(r"/{2,}", "/", pattern)
-    trailing_slash = normalized.endswith("/")
+    trailing_slash = normalized.endswith("/") or normalized.endswith("/.")
     segments = [s for s in normalized.split("/") if s not in (".", "")]
     normalized = "/".join(segments) + ("/" if trailing_slash and segments else "")
     if normalized == "" or normalized == "/":
