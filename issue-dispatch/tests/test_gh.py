@@ -143,6 +143,14 @@ class RunTest(FakeGhTest):
                          "stderr": "gh: Could not resolve to an Issue (repository.issue2)\n", "exit": 1}])
         self.assertEqual(gh.run(["api", "graphql", "-f", "query=x"])["failure"], "other")
 
+    def test_graphql_errors_that_are_not_a_list(self):
+        """`errors` が null や配列でない応答でも、例外ではなく失敗の種類を返す。"""
+        for stdout in ('{"data": null, "errors": null}', '{"errors": "x"}', '[1, 2]', '{"errors": [1, {"type": "RATE_LIMITED"}]}'):
+            with self.subTest(stdout=stdout):
+                self.responses([{"prefix": ["api"], "stdout": stdout, "stderr": "gh: x\n", "exit": 1}])
+                self.assertIn(gh.run(["api", "graphql"])["failure"], ("other", "rate_limit"))
+        self.assertEqual(gh.classify(1, '{"errors": [1, {"type": "RATE_LIMITED"}]}', "", False), "rate_limit")
+
     def test_classify_uses_stderr_and_graphql_error_types(self):
         self.assertEqual(gh.classify(1, "", "gh: Bad credentials (HTTP 401)\n", False), "auth")
         self.assertEqual(gh.classify(1, '{"errors":[{"type":"RATE_LIMITED"}]}', "", False), "rate_limit",

@@ -33,9 +33,12 @@ def _graphql_error_types(stdout):
     """標準出力が GraphQL の応答なら、トップレベルの errors[].type の集合。読めなければ空。"""
     try:
         data = json.loads(stdout)
-        return {e.get("type") for e in data.get("errors", []) if isinstance(e, dict)}
-    except (ValueError, AttributeError):
+    except ValueError:
         return set()
+    errors = data.get("errors") if isinstance(data, dict) else None
+    if not isinstance(errors, list):
+        return set()  # errors が無い・null・配列でない応答
+    return {e.get("type") for e in errors if isinstance(e, dict)}
 
 
 def classify(exit_code, stdout, stderr, timed_out):
