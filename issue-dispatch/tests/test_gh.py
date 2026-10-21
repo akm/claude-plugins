@@ -89,10 +89,18 @@ class RunTest(FakeGhTest):
         self.assertIn("resetAt", r["json"]["data"]["rateLimit"])
 
     def test_non_json_stdout(self):
-        self.responses([{"prefix": ["auth"], "stdout": "Logged in to github.com\n"}])
+        self.responses([{"prefix": ["auth"], "stdout": "Logged in to github.com\n"},
+                        {"prefix": ["api", "repos/o/r/issues", "--paginate"], "stdout": '[{"a":1}][{"a":2}]'},
+                        {"prefix": ["api", "x"], "stdout": ""}])
         r = gh.run(["auth", "status"])
         self.assertIsNone(r["json"])
+        self.assertTrue(r["json_error"], "空でないのに JSON として読めなければ理由を返すこと")
         self.assertEqual(r["stdout"], "Logged in to github.com\n")
+        r = gh.run(["api", "repos/o/r/issues", "--paginate"])
+        self.assertEqual((r["exit_code"], r["failure"], r["json"]), (0, None, None))
+        self.assertTrue(r["json_error"], "--paginate のつないだ JSON は読めないことを返すこと (--slurp と一緒に使う)")
+        r = gh.run(["api", "x"])
+        self.assertEqual((r["json"], r["json_error"]), (None, None), "空の出力では json_error も None")
 
     def test_timeout(self):
         os.environ["FAKE_GH_MODE"] = "hang"

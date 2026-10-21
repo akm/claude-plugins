@@ -76,7 +76,11 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
 
     mutation が真なら、前の変更系の呼び出しの終わりから MUTATION_INTERVAL 秒以上空けてから実行する。
     返り値: {"args", "exit_code" (タイムアウトと起動できなかったときは None), "stdout", "stderr_tail", "timed_out",
-    "failure", "json" (標準出力が JSON として読めればその値、読めなければ None)}
+    "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (標準出力が空でないのに
+    JSON として読めなかったときの理由。空か読めたときは None)}
+
+    `gh api --paginate` は、ページごとの JSON をつないで出すので 1 つの JSON として読めない。`--slurp` と一緒に使い、
+    全ページを 1 つの配列で受け取る。
     """
     global _last_mutation_end
     args = list(args)
@@ -94,14 +98,16 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
         if mutation:
             _last_mutation_end = time.monotonic()
         return {"args": args, "exit_code": None, "stdout": "", "stderr_tail": f"gh を起動できない: {e}",
-                "timed_out": False, "failure": "missing", "json": None}
+                "timed_out": False, "failure": "missing", "json": None, "json_error": None}
     finally:
         if mutation:
             _last_mutation_end = time.monotonic()
-    try:
-        parsed = json.loads(stdout) if stdout.strip() else None
-    except ValueError:
-        parsed = None
+    parsed, json_error = None, None
+    if stdout.strip():
+        try:
+            parsed = json.loads(stdout)
+        except ValueError as e:
+            json_error = str(e)
     return {
         "args": args,
         "exit_code": exit_code,
@@ -110,6 +116,7 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
         "timed_out": timed_out,
         "failure": classify(exit_code, stdout, stderr, timed_out),
         "json": parsed,
+        "json_error": json_error,
     }
 
 
