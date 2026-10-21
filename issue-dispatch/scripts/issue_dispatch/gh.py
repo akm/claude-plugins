@@ -17,7 +17,7 @@ DEFAULT_TIMEOUT = 60
 STDERR_TAIL_LINES = 20
 MUTATION_INTERVAL = 1.0  # 変更系の呼び出しの後に待つ秒数 (次の変更系の呼び出しと 1 秒以上空ける。KTD14)
 
-# 失敗の種類。None は成功。`missing` は gh を起動できない (PATH に無い・実行権限が無い)
+# 失敗の種類。None は成功。`missing` は gh が PATH に無いか実行権限が無い (入れる・権限を直すのが直し方)
 FAILURES = ("auth", "rate_limit", "network", "timeout", "missing", "other")
 
 _AUTH_RE = re.compile(r"HTTP 401|Bad credentials|gh auth login|not logged in", re.IGNORECASE)
@@ -91,9 +91,11 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
     except subprocess.TimeoutExpired as e:
         exit_code, stdout, stderr, timed_out = None, _text(e.stdout), _text(e.stderr), True
     except OSError as e:
-        # gh が PATH に無い (FileNotFoundError)・実行権限が無い (PermissionError) など。起動できなかったことを返り値で伝える
+        # 起動できなかったことを返り値で伝える。gh が PATH に無い (FileNotFoundError)・実行権限が無い (PermissionError) は
+        # `missing`。それ以外 (引数が長すぎる E2BIG など、gh が入っていても起きるもの) は `other`
+        failure = "missing" if isinstance(e, (FileNotFoundError, PermissionError)) else "other"
         return {"args": args, "exit_code": None, "stdout": "", "stderr_tail": f"gh を起動できない: {e}",
-                "timed_out": False, "failure": "missing", "json": None, "json_error": None}
+                "timed_out": False, "failure": failure, "json": None, "json_error": None}
     finally:
         if mutation:
             time.sleep(MUTATION_INTERVAL)

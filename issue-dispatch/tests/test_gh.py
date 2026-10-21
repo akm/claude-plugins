@@ -119,6 +119,13 @@ class RunTest(FakeGhTest):
         self.assertIsNone(r["exit_code"])
         self.assertIn("gh", r["stderr_tail"])
 
+    def test_other_os_error_is_not_missing(self):
+        """gh が入っていても起きる起動の失敗 (引数が長すぎる) は missing にしない。"""
+        r = gh.run(["api", "x" * 3_000_000])
+        self.assertEqual(r["failure"], "other")
+        self.assertIsNone(r["exit_code"])
+        self.assertIn("gh を起動できない", r["stderr_tail"])
+
     def test_failure_classification_from_fixtures(self):
         cases = (("auth_expired", "auth"), ("not_logged_in", "auth"), ("rate_limited", "rate_limit"), ("network", "network"))
         for mode, expected in cases:
