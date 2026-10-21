@@ -170,12 +170,16 @@ class ApplyTest(unittest.TestCase):
     def test_resend_count(self):
         self.apply({"op": "set_intent", "item": "akm/r#12", "session_id": "s1", "session_title": "w", "status": "In Progress",
                     "assignment": 1, "at": T1})
-        self.assertTrue(record.can_resend(self.rec, "akm/r#12"))
+        self.assertTrue(record.can_resend(self.rec, "akm/r#12"), "まだ再送していなければ再送できる")
         self.apply({"op": "count_resend", "item": "akm/r#12"})
-        self.assertTrue(record.can_resend(self.rec, "akm/r#12"), "1 回目の再送は行う")
-        self.apply({"op": "count_resend", "item": "akm/r#12"})
-        self.assertFalse(record.can_resend(self.rec, "akm/r#12"), "再送の回数が 1 を超えれば再送しない")
-        self.assertEqual(self.rec["items"]["akm/r#12"]["resend_count"], 2)
+        self.assertFalse(record.can_resend(self.rec, "akm/r#12"), "再送は通算 1 回。1 回再送した後は再送しない")
+        self.assertEqual(self.rec["items"]["akm/r#12"]["resend_count"], 1)
+        resends = 0
+        rec = self.rec
+        while record.can_resend(rec, "akm/r#12"):
+            resends += 1
+            rec, _ = record.apply(rec, [{"op": "count_resend", "item": "akm/r#12"}])
+        self.assertEqual(resends, 0, "確かめる → 再送 → 数える の順で使っても通算 1 回を超えないこと")
 
     def test_manager_and_exchanges(self):
         self.apply({"op": "set_manager", "id": "m1", "name": "issue-dispatch akm/3/akm", "started_at": T1})
