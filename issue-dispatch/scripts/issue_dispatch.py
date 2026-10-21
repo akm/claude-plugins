@@ -5,6 +5,9 @@
 この版にあるサブコマンド:
   config read --dir <ルート> --role manager|repo   設定を読み、デフォルト値を当てた後の設定と警告・エラーを返す
   config add-edit-check --dir <ルート> --repo <owner/repo>   管理ディレクトリの設定の third_party_edit_check に足す
+  files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
+      `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
+      (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
 
 終了コード: JSON を出せたときは、エラーの有無によらず 0 (エラーは JSON の `errors` で伝える)。0 以外は Python 自身の失敗
 (捕まえていない例外の 1・引数の誤りの 2) で、呼び出す側はそれを停止の条件として扱う (正本は同じ計画の R25。
@@ -15,7 +18,7 @@ import argparse
 import json
 import sys
 
-from issue_dispatch import config
+from issue_dispatch import config, filekinds
 
 
 def _emit(payload):
@@ -30,6 +33,21 @@ def cmd_config_read(args):
 
 def cmd_config_add_edit_check(args):
     _emit(config.add_edit_check(args.dir, args.repo))
+    return 0
+
+
+def cmd_files_classify(args):
+    loaded = config.load(args.dir, "repo")
+    table = filekinds.load_default_table()
+    results = []
+    for path in args.paths:
+        normalized, problem = filekinds.normalize_path(path)
+        if problem:
+            results.append({"path": path, "error": problem})
+            continue
+        results.append({"path": path, "normalized": normalized,
+                        **filekinds.classify(normalized, loaded["config"]["files"], table)})
+    _emit({"paths": results, "config_status": loaded["status"], "warnings": loaded["warnings"], "errors": loaded["errors"]})
     return 0
 
 
@@ -49,6 +67,13 @@ def build_parser():
     p_add.add_argument("--dir", required=True, help="管理ディレクトリ")
     p_add.add_argument("--repo", required=True, help="owner/repo")
     p_add.set_defaults(func=cmd_config_add_edit_check)
+
+    p_files = sub.add_parser("files", help="ファイルの種類")
+    files_sub = p_files.add_subparsers(dest="subcommand", required=True)
+    p_classify = files_sub.add_parser("classify", help="パスごとの種類と属性を返す (gh は実行しない)")
+    p_classify.add_argument("--dir", required=True, help="リポジトリのルート (設定の files を読む)")
+    p_classify.add_argument("paths", nargs="+", help="ルートからの相対パス (照合の前にそろえる。絶対パスと `..` を含むパスは error を返す)")
+    p_classify.set_defaults(func=cmd_files_classify)
     return parser
 
 
