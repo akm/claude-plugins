@@ -67,7 +67,7 @@
 | サブコマンド | 入力 | 出力 (JSON) |
 | --- | --- | --- |
 | `project check --project <owner>/<番号>` | | `status`・`project` (`id`・`title`・`url`・`owner`・`number`)・`check` (`ok`・`missing_fields`・`missing_status_options`・`workflows` (`required_disabled`・`recommended_disabled`・`notice_enabled`・`discouraged_enabled`)・`proposals` (`field_create` の引数の配列と、`update_options` (単一選択のフィールドに選択肢を足す入力 (`field`・`fieldId`・`options`) の配列)))・`rate_limit`・`errors` |
-| `project items --project <owner>/<番号>` | | `status` (`ok` / `partial` 続きのページが読めなかった / `error`)・`project_id`・`items` (下の表)・`problems`・`rate_limit`・`errors` |
+| `project items --project <owner>/<番号>` | | `status` (`ok` / `partial` 一部を読めなかった / `error`)・`project_id`・`items` (下の表)・`problems` (`what`: `items-page` 続きのページ・`graphql-errors` data と一緒に返った errors・`comments` / `events` 続きのページ・`labels-truncated` / `blocked_by-truncated` / `body_edits-truncated` / `prs-truncated` / `fields-truncated` 入れ子の connection が 1 ページに収まらない)・`rate_limit`・`errors` |
 | `project set-status --project <owner>/<番号> --item <項目の ID> --status <値>` | 値は 5 つのどれか | `status` (`ok` / `rejected` / `error`)・`item_id`・`field`・`value`・`errors` |
 | `project add-fields --project <owner>/<番号>` | 承認を得た後に呼ぶ | `status`・`results` (実行ごとの `action` (`field-create` / `update-options`)・`field`・`ok`・`failure`)・`errors` |
 
@@ -91,7 +91,7 @@
 | `comments` | コメントの配列 (`id`・`database_id`・`url`・`author`・`created_at`・`body`)。先頭行の解析は comments の単位 |
 | `events` | タイムラインの出来事を時刻の順に (`type`・`at` と種類ごとの値: `label`・`blocking`・`status`・`previous_status`・`was_automated`・`closer_pr`・`state_reason`・`project_number`) |
 
-出来事の `type` は `ClosedEvent`・`ReopenedEvent`・`LabeledEvent`・`UnlabeledEvent`・`BlockedByAddedEvent`・`BlockedByRemovedEvent`・`ProjectV2ItemStatusChangedEvent`・`AddedToProjectV2Event`・`RemovedFromProjectV2Event`。コメントと出来事が 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。
+出来事の `type` は `ClosedEvent`・`ReopenedEvent`・`LabeledEvent`・`UnlabeledEvent`・`BlockedByAddedEvent`・`BlockedByRemovedEvent`・`ProjectV2ItemStatusChangedEvent`・`AddedToProjectV2Event`・`RemovedFromProjectV2Event`。コメントと出来事が 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。ラベル・blocker・本文の編集・PR・フィールドの値は上限 (blocker 50 と フィールド 50 は GitHub の上限。ほかは 50〜100) まで読み、超えていれば `problems` に入れて知らせる (欠けたまま返さない)。
 
 ## 実測 (U1。2026-10-19)
 

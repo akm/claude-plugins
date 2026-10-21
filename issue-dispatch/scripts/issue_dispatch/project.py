@@ -258,6 +258,15 @@ def simplify_item(node, position):
                 for p in content["closedByPullRequestsReferences"]["nodes"]],
     })
     problems = []
+    # 入れ子の connection は続きのページを読まない (件数の上限は上げてある)。超えていれば、欠けを知らせる
+    for key, what in (("labels", "labels"), ("blockedBy", "blocked_by"), ("userContentEdits", "body_edits"),
+                      ("closedByPullRequestsReferences", "prs")):
+        if (content.get(key, {}).get("pageInfo") or {}).get("hasNextPage"):
+            problems.append({"item": item["key"], "what": f"{what}-truncated", "failure": "other",
+                             "message": f"{what} が 1 ページ (最初の {len(content[key]['nodes'])} 件) に収まらず、残りを読んでいない", "exit_code": 0})
+    if (node["fieldValues"].get("pageInfo") or {}).get("hasNextPage"):
+        problems.append({"item": item["key"], "what": "fields-truncated", "failure": "other",
+                         "message": "フィールドの値が 1 ページに収まらず、残りを読んでいない", "exit_code": 0})
     comments, problem = _more_pages("issue-comments", repo, content["number"], content["comments"], "comments", _comment)
     if problem:
         problems.append({"item": item["key"], "what": "comments", **problem})

@@ -301,6 +301,18 @@ class ItemsTest(FakeGhCase):
         self.assertEqual(result["problems"][0]["what"], "comments")
         self.assertEqual(len(result["items"][0]["comments"]), 10)
 
+    def test_truncated_nested_connections_are_reported(self):
+        """ラベルなどの入れ子の connection が 1 ページに収まらなければ、欠けたまま返さずに problems に入れる。"""
+        data = fixture_json("project-items-ok")
+        node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
+        node["content"]["labels"]["pageInfo"] = {"hasNextPage": True}
+        node["content"]["blockedBy"]["pageInfo"] = {"hasNextPage": True}
+        self.responses([{"substring": "query ProjectItems", "stdout": data}])
+        result = project.items(PROJECT)
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual([p["what"] for p in result["problems"]], ["labels-truncated", "blocked_by-truncated"])
+        self.assertEqual(result["problems"][0]["item"], "akm/issue-dispatch-verify-a#3")
+
     def test_non_issue_items_are_kept_without_content(self):
         data = fixture_json("project-items-ok")
         nodes = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"]

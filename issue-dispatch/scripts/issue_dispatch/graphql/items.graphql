@@ -10,7 +10,8 @@ query ProjectItems($owner: String!, $number: Int!, $after: String) {
           nodes {
             id
             updatedAt
-            fieldValues(first: 30) {
+            fieldValues(first: 50) {
+              pageInfo { hasNextPage }
               nodes {
                 ... on ProjectV2ItemFieldTextValue { text updatedAt field { ... on ProjectV2FieldCommon { name } } }
                 ... on ProjectV2ItemFieldSingleSelectValue { name optionId updatedAt field { ... on ProjectV2FieldCommon { name } } }
@@ -28,12 +29,13 @@ query ProjectItems($owner: String!, $number: Int!, $after: String) {
                 author { login }
                 repository { nameWithOwner visibility isInOrganization }
                 assignees(first: 10) { nodes { login } }
-                labels(first: 30) { nodes { name } }
+                labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                 parent { number url repository { nameWithOwner } }
                 subIssuesSummary { total completed }
-                blockedBy(first: 30) { nodes { number url state repository { nameWithOwner } } }
-                userContentEdits(first: 30) { totalCount nodes { editedAt editor { login } deletedAt } }
-                closedByPullRequestsReferences(first: 20, includeClosedPrs: true) {
+                blockedBy(first: 50) { pageInfo { hasNextPage } nodes { number url state repository { nameWithOwner } } }
+                userContentEdits(first: 100) { pageInfo { hasNextPage } totalCount nodes { editedAt editor { login } deletedAt } }
+                closedByPullRequestsReferences(first: 50, includeClosedPrs: true) {
+                  pageInfo { hasNextPage }
                   nodes { number url state isDraft merged createdAt mergedAt closedAt author { login } baseRefName }
                 }
                 comments(first: 50) {
