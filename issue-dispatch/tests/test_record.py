@@ -268,6 +268,16 @@ class ApplyTest(unittest.TestCase):
         self.apply({"op": "answer", "question_id": "q1", "answer": "free text", "at": T2})
         self.assertEqual(record.unanswered_questions(self.rec), [])
 
+    def test_options_must_be_distinct_non_empty_strings(self):
+        """選択肢の要素は空でない文字列で重複しない (答えが文字列だけなので、文字列でない選択肢には答えられない)。"""
+        for options in ([1, 2], [None], [{"a": 1}], ["a", ""], ["a", "a"]):
+            with self.subTest(options=options):
+                _, errors = record.apply(self.rec, [{"op": "ask", "question_id": "q1", "item": "akm/r#1", "kind": "k", "options": options, "at": T1}])
+                self.assertEqual(len(errors), 1)
+        self.apply({"op": "ask", "question_id": "q1", "item": "akm/r#1", "kind": "k", "options": ["a", "b"], "at": T1},
+                   {"op": "answer", "question_id": "q1", "answer": "b", "at": T2})
+        self.assertEqual(self.rec["questions"]["q1"]["answer"], "b")
+
     def test_item_keys_must_be_issue_references(self):
         _, errors = record.apply(self.rec, [{"op": "mark_reported", "item": "https://github.com/akm/r/issues/5", "kind": "x", "at": T1}])
         self.assertEqual(len(errors), 1, "項目のキーは owner/repo#番号 の形")
