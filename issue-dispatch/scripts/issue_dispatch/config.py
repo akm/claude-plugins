@@ -41,7 +41,13 @@ DEFAULTS = {
 }
 INTEGER_KEYS = ("poll_minutes", "wait_minutes", "declare_deadline_minutes")
 
-_REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
+# リポジトリの名前 `owner/repo` の形。owner と repo のどちらも、名前に使える文字 (英数字と ._-) の 1 文字以上。
+# GitHub の規則 (アカウントの種類で違う) を写すのではなく、名前として扱えないもの (空白・読めないバイト・区切りの崩れ) だけを
+# 拒む (利用者と相談して決めた)。モジュール repo も origin の URL から取り出した名前の検査に使う。モジュール record は
+# 同じ形を写している (独立性のため import しない。テストで同じ文字列であることを確かめる)
+REPO_NAME_PATTERN = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"
+REPO_NAME_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
+_REPO_RE = REPO_NAME_RE
 
 
 def config_path(root):
@@ -58,18 +64,27 @@ def _is_int(value):
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _parse_text(text):
+    """設定の JSON の文字列を読む。返り値は (status, data)。status は ok / unreadable。"""
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        return "unreadable", str(e)
+    if not isinstance(data, dict):
+        return "unreadable", "JSON の最上位がオブジェクトではない"
+    return "ok", data
+
+
 def _read_file(path):
     """設定ファイルを読む。返り値は (status, data)。status は ok / missing / unreadable。"""
     if not os.path.exists(path):
         return "missing", None
     try:
         with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+            text = f.read()
     except (OSError, ValueError) as e:
         return "unreadable", str(e)
-    if not isinstance(data, dict):
-        return "unreadable", "JSON の最上位がオブジェクトではない"
-    return "ok", data
+    return _parse_text(text)
 
 
 def normalize_pattern(pattern):
@@ -139,6 +154,9 @@ def _check_repositories(value, warnings):
             warnings.append(_note("repositories", f"repositories のキー {name!r} は owner/repo の形ではない。使わない"))
         elif not (isinstance(path, str) and os.path.isabs(path)):
             warnings.append(_note("repositories", f"repositories の {name} の値 {path!r} は絶対パスではない。使わない"))
+        elif any(k.lower() == name.lower() for k in kept):
+            # GitHub のリポジトリ名は大文字小文字を区別しないので、綴りだけ違うキーは同じリポジトリ。先に書いたものを使う
+            warnings.append(_note("repositories", f"repositories のキー {name!r} は、大文字小文字だけ違うキーと重なる。使わない"))
         else:
             kept[name] = path
     return kept
@@ -213,6 +231,19 @@ def load(root, role):
         raise ValueError(f"role は {ROLES} のいずれか: {role!r}")
     path = config_path(root)
     status, data = _read_file(path)
+    return _interpret(status, data, path, role)
+
+
+def load_text(text, role, path):
+    """設定の JSON の文字列 (git で読んだ既定のブランチの内容など) を、`load` と同じ規則で読む。
+    text が None なら設定が無い (status missing)。path は警告とエラーの文に書く名前。返り値は `load` と同じ。"""
+    if role not in ROLES:
+        raise ValueError(f"role は {ROLES} のいずれか: {role!r}")
+    status, data = ("missing", None) if text is None else _parse_text(text)
+    return _interpret(status, data, path, role)
+
+
+def _interpret(status, data, path, role):
     warnings, errors = [], []
     raw = data if status == "ok" else {}
     if status == "unreadable":

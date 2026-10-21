@@ -1,0 +1,27 @@
+#!/bin/sh
+# テストで、PATH の先頭に ssh の名前で置く偽のコマンド。
+#
+# モジュール repo は、origin の URL の host が SSH の設定 (~/.ssh/config) の Host の別名のとき、`ssh -G <別名>` の
+# 出力の `hostname` の行で実際の host に解決する。テストは本物の ssh の設定に依存しないよう、この偽のコマンドのディレクトリを PATH の先頭に加える。
+#
+# - `ssh -G <別名>` には、環境変数 FAKE_SSH_HOSTS (`別名=hostname` を空白で区切って並べたもの) に別名があればその hostname を、
+#   無ければ別名そのものを `hostname` の行として返す (本物の ssh も、設定に無い名前はそのまま hostname にする)。
+# - FAKE_SSH_FAIL が空でなければ、何も書かずに終了コード 255 で終わる (ssh が無い・失敗する環境を真似る)。
+# - それ以外の引数は受け付けない (終了コード 2)。
+
+if [ -n "$FAKE_SSH_FAIL" ]; then
+  exit 255
+fi
+if [ "$#" -eq 2 ] && [ "$1" = "-G" ]; then
+  alias="$2"
+  for pair in $FAKE_SSH_HOSTS; do
+    case "$pair" in
+      "$alias"=*) echo "hostname ${pair#*=}"; echo "port 22"; exit 0 ;;
+    esac
+  done
+  echo "hostname $alias"
+  echo "port 22"
+  exit 0
+fi
+echo "fake-ssh: 受け付けない引数: $*" >&2
+exit 2

@@ -274,6 +274,14 @@ class RepoConfigTest(ConfigTestBase):
         self.assertEqual(result["config"]["files"], [])
         self.assertEqual(len(_warnings_about(result, "files")), 3)
 
+    def test_repository_names_use_allowed_characters(self):
+        """リポジトリの名前は、名前に使える文字 (英数字と ._-) の 1 文字以上を `/` で区切った形。空白や区切りの崩れは通らない。"""
+        _write_config(self.root, {"files": []})
+        for name, ok in (("akm/.github", True), ("akm/_private", True), ("my-org/a.b-c_d", True), ("alice_acme/notes", True),
+                         ("akm/", False), ("/x", False), ("akm/x y", False), ("akm/x/y", False), ("akm", False)):
+            with self.subTest(name=name):
+                self.assertEqual(bool(config.REPO_NAME_RE.match(name)), ok)
+
     def test_file_rule_kind_must_be_a_rule_kind(self):
         """`kind` は規則に書ける種類 (file-kinds.md の段 2〜6)。`unknown-content` と知らない値は警告して外す。"""
         _write_config(self.root, {"files": [

@@ -8,6 +8,7 @@
   record read --dir <管理ディレクトリ>   記録を返す (無ければ新規の空の記録。壊れていれば status corrupt と errors)
   record apply --dir <管理ディレクトリ>  標準入力の JSON (操作の配列) を記録に適用して保存する (1 つでも誤りがあれば保存しない)
   record log --dir <管理ディレクトリ>    標準入力の JSON (1 件) を actions.log に追記する
+  repo name --dir <作業ツリー>   今の作業ツリーの origin の URL から owner/repo を返す (gh は実行しない)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -22,7 +23,7 @@ import json
 import os
 import sys
 
-from issue_dispatch import config, filekinds, record
+from issue_dispatch import config, filekinds, record, repo
 
 
 def _emit(payload):
@@ -130,6 +131,16 @@ def cmd_record_log(args):
     return 0
 
 
+def cmd_repo_name(args):
+    result = repo.repo_name(args.dir)
+    if result["status"] == "ok":
+        _emit({"status": "ok", "repo": result["repo"], "host": result["host"], "errors": []})
+    else:
+        _emit({"status": "error", "reason": result["reason"], "repo": None, "host": None,
+               "errors": [{"key": "origin", "message": result["message"]}]})
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="issue_dispatch.py", description="issue-dispatch の同梱 CLI (入出力は JSON)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -155,6 +166,12 @@ def build_parser():
         p = record_sub.add_parser(name, help=help_text)
         p.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project と record_dir を読む)")
         p.set_defaults(func=func)
+
+    p_repo = sub.add_parser("repo", help="リポジトリ")
+    repo_sub = p_repo.add_subparsers(dest="subcommand", required=True)
+    p_name = repo_sub.add_parser("name", help="作業ツリーの origin の URL から owner/repo を返す")
+    p_name.add_argument("--dir", required=True, help="作業ツリー (その中のどのディレクトリでもよい)")
+    p_name.set_defaults(func=cmd_repo_name)
 
     p_files = sub.add_parser("files", help="ファイルの種類")
     files_sub = p_files.add_subparsers(dest="subcommand", required=True)
