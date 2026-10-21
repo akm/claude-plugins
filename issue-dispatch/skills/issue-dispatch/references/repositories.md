@@ -52,7 +52,7 @@ URL は `git -C <パス> remote get-url origin` の値 (`insteadOf` の設定を
 | `https://` / `http://` | `https://github.com/akm/verify-a` |
 | `git://` | `git://github.com/akm/verify-a.git` |
 
-owner と name は、設定のキーと同じ形 (英数字と `.`・`_`・`-`) に限る。それ以外の文字 (空白・UTF-8 として読めないバイトなど) を含む URL は読めない形として扱い、`repo name` は理由 `url-unparsable` を返す。
+owner と name は、設定のキーと同じ形 (GitHub の規則: owner は英数字とハイフンでハイフンで始まらず終わらない、name は英数字と `.`・`_`・`-` で `.github` のように `.` や `_` で始まってもよい) に限る。それ以外の文字 (空白・UTF-8 として読めないバイトなど) を含む URL は読めない形として扱い、`repo name` は理由 `url-unparsable` を返す。
 
 同じリポジトリと判定する条件:
 

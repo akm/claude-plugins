@@ -71,9 +71,16 @@ class ParseUrlTest(unittest.TestCase):
     def test_unparsable_urls(self):
         bad_bytes = b"git@github.com:ak\xffm/x.git".decode("utf-8", errors="surrogateescape")
         for url in ("", "github.com", "/local/path", "file:///tmp/x.git", "https://github.com/akm", "akm/verify-a",
-                    "https://github.com/ak m/x", "git@github.com:akm/x y.git", "https://github.com//x", bad_bytes):
+                    "https://github.com/ak m/x", "git@github.com:akm/x y.git", "https://github.com//x", bad_bytes,
+                    "https://github.com/-akm/x", "https://github.com/akm-/x"):
             with self.subTest(url=url):
                 self.assertIsNone(repo.parse_origin_url(url))
+
+    def test_names_starting_with_dot_or_underscore(self):
+        """GitHub のリポジトリ名は `.github` や `_private` のように . や _ で始まってもよい。"""
+        self.assertEqual(repo.parse_origin_url("git@github.com:akm/.github.git")["name"], ".github")
+        self.assertEqual(repo.parse_origin_url("https://github.com/akm/_private")["name"], "_private")
+        self.assertEqual(repo.parse_origin_url("https://github.com/my-org/a.b-c_d")["owner"], "my-org")
 
     def test_same_repository_ignores_case_and_git_suffix(self):
         self.assertTrue(repo.same_repository({"scheme": "https", "host": "github.com", "owner": "AKM", "name": "Verify-A"}, "akm/verify-a"))

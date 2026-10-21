@@ -41,8 +41,11 @@ DEFAULTS = {
 }
 INTEGER_KEYS = ("poll_minutes", "wait_minutes", "declare_deadline_minutes")
 
-# リポジトリの名前 `owner/repo` の形 (GitHub の名前に使える英数字と ._-)。モジュール repo も origin の URL から取り出した名前の検査に使う
-REPO_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
+# リポジトリの名前 `owner/repo` の形 (GitHub の規則: owner (ユーザーと組織) は英数字とハイフンでハイフンで始まらず終わらない、
+# リポジトリ名は英数字と ._- で `.github` のように . や _ で始まってもよい)。モジュール repo も origin の URL から取り出した
+# 名前の検査に使う。モジュール record は同じ形を写している (独立性のため import しない。テストで同じ文字列であることを確かめる)
+REPO_NAME_PATTERN = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+"
+REPO_NAME_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
 _REPO_RE = REPO_NAME_RE
 
 

@@ -283,6 +283,17 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(len(errors), 1, "項目のキーは owner/repo#番号 の形")
 
 
+class NamePatternTest(unittest.TestCase):
+
+    def test_pattern_matches_config(self):
+        """record は config を import しないので、リポジトリの名前の形を写している。同じ文字列であることを確かめる。"""
+        from issue_dispatch import config
+        self.assertEqual(record.REPO_NAME_PATTERN, config.REPO_NAME_PATTERN)
+        rec = record.new_record(PROJECT)
+        _, errors = record.apply(rec, [{"op": "mark_reported", "item": "akm/.github#1", "kind": "x", "at": T1}])
+        self.assertEqual(errors, [], "`.github` のような名前の項目も受け付けること")
+
+
 class ActionsLogTest(unittest.TestCase):
 
     def setUp(self):
