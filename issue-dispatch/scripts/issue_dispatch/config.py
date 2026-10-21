@@ -58,18 +58,27 @@ def _is_int(value):
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _parse_text(text):
+    """設定の JSON の文字列を読む。返り値は (status, data)。status は ok / unreadable。"""
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        return "unreadable", str(e)
+    if not isinstance(data, dict):
+        return "unreadable", "JSON の最上位がオブジェクトではない"
+    return "ok", data
+
+
 def _read_file(path):
     """設定ファイルを読む。返り値は (status, data)。status は ok / missing / unreadable。"""
     if not os.path.exists(path):
         return "missing", None
     try:
         with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+            text = f.read()
     except (OSError, ValueError) as e:
         return "unreadable", str(e)
-    if not isinstance(data, dict):
-        return "unreadable", "JSON の最上位がオブジェクトではない"
-    return "ok", data
+    return _parse_text(text)
 
 
 def normalize_pattern(pattern):
@@ -213,6 +222,19 @@ def load(root, role):
         raise ValueError(f"role は {ROLES} のいずれか: {role!r}")
     path = config_path(root)
     status, data = _read_file(path)
+    return _interpret(status, data, path, role)
+
+
+def load_text(text, role, path):
+    """設定の JSON の文字列 (git で読んだ既定のブランチの内容など) を、`load` と同じ規則で読む。
+    text が None なら設定が無い (status missing)。path は警告とエラーの文に書く名前。返り値は `load` と同じ。"""
+    if role not in ROLES:
+        raise ValueError(f"role は {ROLES} のいずれか: {role!r}")
+    status, data = ("missing", None) if text is None else _parse_text(text)
+    return _interpret(status, data, path, role)
+
+
+def _interpret(status, data, path, role):
     warnings, errors = [], []
     raw = data if status == "ok" else {}
     if status == "unreadable":
