@@ -1,0 +1,1 @@
+{"errors":[{"path":["query","repository","noSuchField"],"extensions":{"code":"undefinedField","typeName":"Repository","fieldName":"noSuchField"},"locations":[{"line":1,"column":65}],"message":"Field 'noSuchField' doesn't exist on type 'Repository'"}]}

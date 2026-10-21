@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""テストで、PATH の先頭に gh の名前で置く偽のコマンド。
+
+実際の gh の代わりに、環境変数の指示どおりに振る舞う (先例: review-triage/tests/fake-claude)。
+
+- FAKE_GH_ARGS: 受けた引数 (argv[1:]) と時刻と cwd を JSON の 1 行として追記するファイル
+- FAKE_GH_SLEEP: 応答の前に待つ秒数 (既定 0)
+- FAKE_GH_FIXTURES: 固定データのディレクトリ (既定はこのファイルと同じディレクトリの fixtures/gh)
+- FAKE_GH_MODE:
+    ok              FAKE_GH_RESPONSES の応答の指定に従う (既定)
+    auth_expired    固定データ auth-invalid-token を返す (終了コード 1)
+    not_logged_in   固定データ auth-not-logged-in を返す (終了コード 4)
+    rate_limited    固定データ graphql-rate-limited を返す (終了コード 1)
+    network         固定データ network-unreachable を返す (終了コード 1)
+    hang            応答せずに終わらない (呼び出し側のタイムアウトを試す)
+    exit            何も書かずに FAKE_GH_EXIT (既定 1) で終わる
+- FAKE_GH_RESPONSES: 応答の指定の JSON ファイル。要素の配列で、受けた引数に最初に一致した要素を返す。要素のキー:
+    prefix    引数の先頭がこの配列と同じなら一致 (例: ["issue", "view"])
+    contains  この配列の要素をすべて含めば一致 (prefix と両方書けば両方)
+    stdout    標準出力に書く文字列。オブジェクトや配列なら JSON にして書く。{"fixture": "<場合>"} なら固定データの <場合>.stdout の中身
+    stderr    標準エラー出力に書く文字列 (既定は空)
+    exit      終了コード (既定 0)
+    once      真なら 1 回だけ使い、使ったら used を真にしてファイルに書き戻す (書き込みの直後に別の値を返す場合を表す)
+  一致する要素が無ければ、標準エラー出力に引数を書いて終了コード 99 で終わる (指定の漏れを、成功した応答と取り違えないため)
+"""
+
+import json
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))  # シンボリックリンクで gh の名前に置かれるので、実体の場所
+
+
+def fixture(name, kind):
+    base = os.environ.get("FAKE_GH_FIXTURES") or os.path.join(HERE, "fixtures", "gh")
+    try:
+        with open(os.path.join(base, f"{name}.{kind}"), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def record(args):
+    path = os.environ.get("FAKE_GH_ARGS")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"args": args, "time": time.time(), "cwd": os.getcwd()}, ensure_ascii=False) + "\n")
+
+
+def respond(stdout, stderr, exit_code):
+    sys.stdout.write(stdout)
+    sys.stdout.flush()
+    sys.stderr.write(stderr)
+    sys.stderr.flush()
+    sys.exit(exit_code)
+
+
+def matches(entry, args):
+    prefix = entry.get("prefix")
+    contains = entry.get("contains")
+    if prefix is not None and args[:len(prefix)] != list(prefix):
+        return False
+    if contains is not None and not all(c in args for c in contains):
+        return False
+    return prefix is not None or contains is not None
+
+
+def main():
+    args = sys.argv[1:]
+    record(args)
+    sleep = float(os.environ.get("FAKE_GH_SLEEP", "0") or 0)
+    if sleep:
+        time.sleep(sleep)
+    mode = os.environ.get("FAKE_GH_MODE", "ok")
+    if mode == "hang":
+        while True:
+            time.sleep(1)
+    if mode == "auth_expired":
+        respond(fixture("auth-invalid-token", "stdout"), fixture("auth-invalid-token", "stderr"), 1)
+    if mode == "not_logged_in":
+        respond(fixture("auth-not-logged-in", "stdout"), fixture("auth-not-logged-in", "stderr"), 4)
+    if mode == "rate_limited":
+        respond(fixture("graphql-rate-limited", "stdout"), fixture("graphql-rate-limited", "stderr"), 1)
+    if mode == "network":
+        respond(fixture("network-unreachable", "stdout"), fixture("network-unreachable", "stderr"), 1)
+    if mode == "exit":
+        respond("", "", int(os.environ.get("FAKE_GH_EXIT", "1")))
+    if mode != "ok":
+        respond("", f"fake-gh: 知らないモード {mode!r}\n", 98)
+    path = os.environ.get("FAKE_GH_RESPONSES")
+    entries = []
+    if path:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        entries = json.loads(text) if text.strip() else []
+    for entry in entries:
+        if entry.get("used") or not matches(entry, args):
+            continue
+        if entry.get("once"):
+            entry["used"] = True
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(entries, f, ensure_ascii=False)
+        stdout = entry.get("stdout", "")
+        if isinstance(stdout, dict) and "fixture" in stdout:
+            stdout = fixture(stdout["fixture"], "stdout")
+        elif not isinstance(stdout, str):
+            stdout = json.dumps(stdout, ensure_ascii=False)
+        respond(stdout, entry.get("stderr", ""), int(entry.get("exit", 0)))
+    respond("", f"fake-gh: 応答の指定に一致しない引数 {args!r}\n", 99)
+
+
+if __name__ == "__main__":
+    main()
