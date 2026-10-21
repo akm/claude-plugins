@@ -17,8 +17,8 @@ DEFAULT_TIMEOUT = 60
 STDERR_TAIL_LINES = 20
 MUTATION_INTERVAL = 1.0  # 変更系の呼び出しの間隔 (秒。KTD14)
 
-# 失敗の種類。None は成功
-FAILURES = ("auth", "rate_limit", "network", "timeout", "other")
+# 失敗の種類。None は成功。`missing` は gh を起動できない (PATH に無い・実行権限が無い)
+FAILURES = ("auth", "rate_limit", "network", "timeout", "missing", "other")
 
 _AUTH_RE = re.compile(r"HTTP 401|Bad credentials|gh auth login|not logged in", re.IGNORECASE)
 _RATE_LIMIT_RE = re.compile(r"rate limit|RATE_LIMITED|secondary rate|abuse detection", re.IGNORECASE)
@@ -75,8 +75,8 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
     """`gh` を引数の配列で実行する。
 
     mutation が真なら、前の変更系の呼び出しの終わりから MUTATION_INTERVAL 秒以上空けてから実行する。
-    返り値: {"args", "exit_code" (タイムアウトなら None), "stdout", "stderr_tail", "timed_out", "failure", "json"
-    (標準出力が JSON として読めればその値、読めなければ None)}
+    返り値: {"args", "exit_code" (タイムアウトと起動できなかったときは None), "stdout", "stderr_tail", "timed_out",
+    "failure", "json" (標準出力が JSON として読めればその値、読めなければ None)}
     """
     global _last_mutation_end
     args = list(args)
@@ -89,6 +89,12 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
         exit_code, stdout, stderr, timed_out = completed.returncode, completed.stdout, completed.stderr, False
     except subprocess.TimeoutExpired as e:
         exit_code, stdout, stderr, timed_out = None, _text(e.stdout), _text(e.stderr), True
+    except OSError as e:
+        # gh が PATH に無い (FileNotFoundError)・実行権限が無い (PermissionError) など。起動できなかったことを返り値で伝える
+        if mutation:
+            _last_mutation_end = time.monotonic()
+        return {"args": args, "exit_code": None, "stdout": "", "stderr_tail": f"gh を起動できない: {e}",
+                "timed_out": False, "failure": "missing", "json": None}
     finally:
         if mutation:
             _last_mutation_end = time.monotonic()

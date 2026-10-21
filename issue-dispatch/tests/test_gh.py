@@ -103,6 +103,14 @@ class RunTest(FakeGhTest):
         self.assertIsNone(r["exit_code"])
         self.assertEqual(r["failure"], "timeout")
 
+    def test_gh_not_on_path(self):
+        os.environ["PATH"] = os.path.join(self.root, "empty-bin")
+        os.makedirs(os.environ["PATH"])
+        r = gh.run(["issue", "view", "1"])
+        self.assertEqual(r["failure"], "missing", "gh が無ければ例外ではなく失敗の種類を返すこと")
+        self.assertIsNone(r["exit_code"])
+        self.assertIn("gh", r["stderr_tail"])
+
     def test_failure_classification_from_fixtures(self):
         cases = (("auth_expired", "auth"), ("not_logged_in", "auth"), ("rate_limited", "rate_limit"), ("network", "network"))
         for mode, expected in cases:
