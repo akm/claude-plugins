@@ -212,6 +212,9 @@ def _more_pages(name, repo, number, first_page, key, convert):
         if not issue or not isinstance(issue.get(key), dict):
             return nodes, {"failure": "other", "message": "続きのページで Issue を読めない (移された・消された、または " +
                            json.dumps(errors, ensure_ascii=False) + ")", "exit_code": 0}
+        if errors:
+            # 最初のページと同じく、data と一緒に返った errors は捨てずに知らせる
+            return nodes, {"failure": "other", "message": "続きのページに errors がある: " + json.dumps(errors, ensure_ascii=False), "exit_code": 0}
         page = issue[key]
         nodes += [convert(n) for n in page["nodes"] if n]
         info = page.get("pageInfo") or {}

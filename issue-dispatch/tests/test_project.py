@@ -290,6 +290,18 @@ class ItemsTest(FakeGhCase):
         self.assertEqual((result["status"], len(result["items"])), ("partial", 3))
         self.assertEqual(result["problems"][0]["what"], "items-page")
 
+    def test_comment_page_errors_are_reported(self):
+        data = fixture_json("project-items-ok")
+        node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
+        node["content"]["comments"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C1"}
+        more = {"data": {"repository": {"issue": {"comments": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}},
+                "errors": [{"type": "FORBIDDEN", "message": "partial"}]}
+        self.responses([{"substring": "query ProjectItems", "stdout": data}, {"substring": "query IssueComments", "stdout": more}])
+        result = project.items(PROJECT)
+        self.assertEqual(result["status"], "partial", "続きのページの errors も捨てないこと")
+        self.assertEqual(result["problems"][0]["what"], "comments")
+        self.assertIn("FORBIDDEN", result["problems"][0]["message"])
+
     def test_comment_page_without_issue_is_a_problem(self):
         data = fixture_json("project-items-ok")
         node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
@@ -384,6 +396,22 @@ class CliTest(FakeGhCase):
         self.assertEqual(out["items"][0]["key"], "akm/issue-dispatch-verify-a#3")
         out = json.loads(self._run("project", "items", "--project", "akm").stdout)
         self.assertEqual(out["status"], "error")
+
+    def test_add_fields_refuses_partial_project(self):
+        """Project の一部が読めなかった (warnings) ときは、読めなかったフィールドを作り直さないよう add-fields を拒否する。"""
+        data = fixture_json("project-meta-ok")
+        nodes = data["data"]["repositoryOwner"]["projectV2"]["fields"]["nodes"]
+        idx = next(i for i, f in enumerate(nodes) if f and f["name"] == "Agent session ID")
+        nodes[idx] = None
+        data["errors"] = [{"type": "FORBIDDEN", "path": ["repositoryOwner", "projectV2", "fields", "nodes", idx], "message": "forbidden"}]
+        self.responses([self.meta_entry(data), {"prefix": ["project", "field-create"], "stdout": "{}"}])
+        out = json.loads(self._run("project", "add-fields", "--project", "akm/3").stdout)
+        self.assertEqual((out["status"], out["results"]), ("rejected", []))
+        self.assertEqual(len(self.recorded()), 1, "読むだけで、field-create を実行しないこと")
+        self.responses([self.meta_entry(data)])
+        out = json.loads(self._run("project", "check", "--project", "akm/3").stdout)
+        self.assertTrue(out["check"]["partial"], "一部のデータから作った案であることを知らせること")
+        self.assertEqual(out["warnings"][0]["type"], "FORBIDDEN")
 
     def test_set_status_rejects_before_reading_project(self):
         """Covers AE5. Done は Project を読む前に拒否し、gh を 1 度も実行しない。"""

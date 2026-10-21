@@ -168,6 +168,7 @@ def cmd_project_check(args):
     if meta is None:
         return 0
     checked = project.check(meta["project"])
+    checked["partial"] = bool(meta["warnings"])  # 一部が読めなかった応答から作った案 (add-fields は実行しない)
     _emit({"status": "ok", "project": {k: meta["project"][k] for k in ("id", "title", "url", "owner", "number")},
            "check": checked, "rate_limit": meta["rate_limit"], "warnings": meta["warnings"], "errors": []})
     return 0
@@ -207,6 +208,11 @@ def cmd_project_add_fields(args):
         return 0
     meta = _meta_or_emit(parsed)
     if meta is None:
+        return 0
+    if meta["warnings"]:
+        # 一部のフィールドが読めなかった応答から案を作って実行すると、読めなかったフィールドを作り直す (同じ名前が 2 つできる)
+        _emit({"status": "rejected", "results": [], "warnings": meta["warnings"],
+               "errors": [{"key": "project", "message": "Project の一部が読めなかった (warnings) ので、構造を変える書き込みは行わない。読めるようにしてから実行する"}]})
         return 0
     checked = project.check(meta["project"])
     results = project.add_fields(meta["project"], checked)
