@@ -142,6 +142,12 @@ class ReadRepoConfigTest(unittest.TestCase):
         self.assertEqual(r["warnings"], [])
         self.assertEqual(r["path"], self.clone)
 
+    def test_repositories_keys_are_case_insensitive(self):
+        make_clone(self.clone)
+        r = self.read({"akm/Verify-A": self.clone})
+        self.assertEqual(r["status"], "missing", "キーの大文字小文字が違っても引けること")
+        self.assertEqual(self.read({"AKM/VERIFY-A": self.clone}, "akm/verify-a")["path"], self.clone)
+
     def test_missing_config_on_default_branch(self):
         make_clone(self.clone)
         r = self.read({"akm/verify-a": self.clone})
@@ -279,6 +285,20 @@ class RepoNameTest(unittest.TestCase):
         os.makedirs(plain)
         out = json.loads(self._run("repo", "name", "--dir", plain).stdout)
         self.assertEqual((out["status"], out["reason"]), ("error", "not-git"))
+
+
+class RepositoriesConfigTest(unittest.TestCase):
+
+    def test_keys_differing_only_by_case_are_warned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = os.path.join(tmp, ".claude", "akm-claude-plugins", "issue-dispatch", "config.json")
+            os.makedirs(os.path.dirname(cfg))
+            with open(cfg, "w", encoding="utf-8") as f:
+                json.dump({"project": {"owner": "akm", "number": 3},
+                           "repositories": {"akm/verify-a": "/a", "akm/Verify-A": "/b", "akm/other": "/c"}}, f)
+            r = config.load(tmp, "manager")
+            self.assertEqual(r["config"]["repositories"], {"akm/verify-a": "/a", "akm/other": "/c"}, "先に書いたものを使うこと")
+            self.assertEqual(len([w for w in r["warnings"] if w["key"] == "repositories"]), 1)
 
 
 class ConfigTextTest(unittest.TestCase):

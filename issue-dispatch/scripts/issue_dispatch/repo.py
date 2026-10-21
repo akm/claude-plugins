@@ -152,7 +152,10 @@ def read_repo_config(repositories, repo):
     どれか)、"message", "fix" (直し方), "root_hint" (案内する clone のルート), "path", "config" (config.load_text の結果の config。
     missing ならデフォルト値), "warnings", "errors"}
     """
-    path = repositories.get(repo) if isinstance(repositories, dict) else None
+    # GitHub のリポジトリ名は大文字小文字を区別しないので、設定のキーも区別せずに引く
+    path = None
+    if isinstance(repositories, dict):
+        path = next((v for k, v in repositories.items() if k.lower() == repo.lower()), None)
     if path is None:
         return _unreadable("not-in-repositories", f"管理ディレクトリの設定の repositories に {repo} が無い",
                            f"repositories に {repo} と、worktree を作った元の clone のルートの絶対パスを書く")

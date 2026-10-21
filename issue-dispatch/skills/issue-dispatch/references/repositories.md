@@ -8,7 +8,7 @@
 
 ## 読む手順
 
-1. 設定 `repositories` にそのリポジトリ (`owner/name`) のパスがあるか。
+1. 設定 `repositories` にそのリポジトリ (`owner/name`) のパスがあるか。キーは大文字と小文字を区別せずに引く (GitHub のリポジトリ名は区別しないため。綴りだけ違うキーが 2 つあれば、設定の読み込みが後のものを警告して使わない)。
 2. パスが clone のルートで、`origin` がそのリポジトリを指し、参照 `origin/HEAD` があるか (下の「読めない」の理由の順に確かめる)。
 3. `git ls-tree --name-only refs/remotes/origin/HEAD -- <設定ファイルのパス>` で、既定のブランチに設定ファイルがあるかを確かめる。無ければ「無い」(設定が無いリポジトリと同じく、デフォルト値で続ける)。
 4. あれば `git show refs/remotes/origin/HEAD:<設定ファイルのパス>` で読み、`config.load_text` で解釈する。JSON として読めなければ「読めない」(理由 `config-unreadable`)。

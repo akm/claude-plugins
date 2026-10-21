@@ -148,6 +148,9 @@ def _check_repositories(value, warnings):
             warnings.append(_note("repositories", f"repositories のキー {name!r} は owner/repo の形ではない。使わない"))
         elif not (isinstance(path, str) and os.path.isabs(path)):
             warnings.append(_note("repositories", f"repositories の {name} の値 {path!r} は絶対パスではない。使わない"))
+        elif any(k.lower() == name.lower() for k in kept):
+            # GitHub のリポジトリ名は大文字小文字を区別しないので、綴りだけ違うキーは同じリポジトリ。先に書いたものを使う
+            warnings.append(_note("repositories", f"repositories のキー {name!r} は、大文字小文字だけ違うキーと重なる。使わない"))
         else:
             kept[name] = path
     return kept
