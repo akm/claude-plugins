@@ -1,0 +1,66 @@
+# Project の項目の一覧 (project items が読む)。位置の順 (POSITION) で、ページは pageInfo で辿る。
+# 導出に要る引数はデフォルト値に頼らずに渡す (closedByPullRequestsReferences の includeClosedPrs: true など。KTD14)
+query ProjectItems($owner: String!, $number: Int!, $after: String) {
+  repositoryOwner(login: $owner) {
+    ... on ProjectV2Owner {
+      projectV2(number: $number) {
+        id
+        items(first: 100, after: $after, orderBy: {field: POSITION, direction: ASC}) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id
+            updatedAt
+            fieldValues(first: 30) {
+              nodes {
+                ... on ProjectV2ItemFieldTextValue { text updatedAt field { ... on ProjectV2FieldCommon { name } } }
+                ... on ProjectV2ItemFieldSingleSelectValue { name optionId updatedAt field { ... on ProjectV2FieldCommon { name } } }
+              }
+            }
+            content {
+              __typename
+              ... on Issue {
+                id
+                number
+                title
+                url
+                state
+                createdAt
+                author { login }
+                repository { nameWithOwner visibility isInOrganization }
+                assignees(first: 10) { nodes { login } }
+                labels(first: 30) { nodes { name } }
+                parent { number url repository { nameWithOwner } }
+                subIssuesSummary { total completed }
+                blockedBy(first: 30) { nodes { number url state repository { nameWithOwner } } }
+                userContentEdits(first: 30) { totalCount nodes { editedAt editor { login } deletedAt } }
+                closedByPullRequestsReferences(first: 20, includeClosedPrs: true) {
+                  nodes { number url state isDraft merged createdAt mergedAt closedAt author { login } baseRefName }
+                }
+                comments(first: 50) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { id databaseId url createdAt author { login } body }
+                }
+                timelineItems(first: 100, itemTypes: [CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, BLOCKED_BY_ADDED_EVENT, BLOCKED_BY_REMOVED_EVENT, PROJECT_V2_ITEM_STATUS_CHANGED_EVENT, ADDED_TO_PROJECT_V2_EVENT, REMOVED_FROM_PROJECT_V2_EVENT]) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes {
+                    __typename
+                    ... on ClosedEvent { createdAt stateReason closer { __typename ... on PullRequest { number url } } }
+                    ... on ReopenedEvent { createdAt }
+                    ... on LabeledEvent { createdAt label { name } }
+                    ... on UnlabeledEvent { createdAt label { name } }
+                    ... on BlockedByAddedEvent { createdAt blockingIssue { number url repository { nameWithOwner } } }
+                    ... on BlockedByRemovedEvent { createdAt blockingIssue { number url repository { nameWithOwner } } }
+                    ... on ProjectV2ItemStatusChangedEvent { createdAt status previousStatus wasAutomated project { number } }
+                    ... on AddedToProjectV2Event { createdAt project { number } }
+                    ... on RemovedFromProjectV2Event { createdAt project { number } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  rateLimit { cost remaining resetAt }
+}

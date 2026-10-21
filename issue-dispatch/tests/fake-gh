@@ -17,6 +17,7 @@
 - FAKE_GH_RESPONSES: 応答の指定の JSON ファイル。要素の配列で、受けた引数に最初に一致した要素を返す。要素のキー:
     prefix    引数の先頭がこの配列と同じなら一致 (例: ["issue", "view"])
     contains  この配列の要素をすべて含めば一致 (prefix と両方書けば両方)
+    substring この文字列を含む引数が 1 つでもあれば一致 (GraphQL の操作名 "query ProjectItems" などで見分ける。ほかの条件と両方書けば両方)
     stdout    標準出力に書く文字列。オブジェクトや配列なら JSON にして書く。{"fixture": "<場合>"} なら固定データの <場合>.stdout の中身
     stderr    標準エラー出力に書く文字列 (既定は空)
     exit      終了コード (既定 0)
@@ -59,11 +60,14 @@ def respond(stdout, stderr, exit_code):
 def matches(entry, args):
     prefix = entry.get("prefix")
     contains = entry.get("contains")
+    substring = entry.get("substring")
     if prefix is not None and args[:len(prefix)] != list(prefix):
         return False
     if contains is not None and not all(c in args for c in contains):
         return False
-    return prefix is not None or contains is not None
+    if substring is not None and not any(substring in a for a in args):
+        return False
+    return prefix is not None or contains is not None or substring is not None
 
 
 def main():

@@ -1,0 +1,12 @@
+# Issue のコメントの続きのページ (項目の一覧で 50 件を超えたときに読む)
+query IssueComments($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      comments(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id databaseId url createdAt author { login } body }
+      }
+    }
+  }
+  rateLimit { cost remaining resetAt }
+}

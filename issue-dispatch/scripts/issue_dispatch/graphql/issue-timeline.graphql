@@ -1,0 +1,23 @@
+# Issue のタイムラインの出来事の続きのページ (項目の一覧で 100 件を超えたときに読む)
+query IssueTimeline($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      timelineItems(first: 100, after: $after, itemTypes: [CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, BLOCKED_BY_ADDED_EVENT, BLOCKED_BY_REMOVED_EVENT, PROJECT_V2_ITEM_STATUS_CHANGED_EVENT, ADDED_TO_PROJECT_V2_EVENT, REMOVED_FROM_PROJECT_V2_EVENT]) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          __typename
+          ... on ClosedEvent { createdAt stateReason closer { __typename ... on PullRequest { number url } } }
+          ... on ReopenedEvent { createdAt }
+          ... on LabeledEvent { createdAt label { name } }
+          ... on UnlabeledEvent { createdAt label { name } }
+          ... on BlockedByAddedEvent { createdAt blockingIssue { number url repository { nameWithOwner } } }
+          ... on BlockedByRemovedEvent { createdAt blockingIssue { number url repository { nameWithOwner } } }
+          ... on ProjectV2ItemStatusChangedEvent { createdAt status previousStatus wasAutomated project { number } }
+          ... on AddedToProjectV2Event { createdAt project { number } }
+          ... on RemovedFromProjectV2Event { createdAt project { number } }
+        }
+      }
+    }
+  }
+  rateLimit { cost remaining resetAt }
+}
