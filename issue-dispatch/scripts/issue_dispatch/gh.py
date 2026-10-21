@@ -60,6 +60,20 @@ def classify(exit_code, stdout, stderr, timed_out):
     return "other"
 
 
+def expects_json(args):
+    """引数から、標準出力に JSON を期待する呼び出しかを決める (`api` のサブコマンド・`--json`・`--format json`)。
+    `gh issue comment` など URL や文章を出すコマンドは期待しない。"""
+    args = list(args)
+    if args and args[0] == "api":
+        return True
+    if any(a == "--json" or a.startswith("--json=") for a in args):
+        return True
+    for i, a in enumerate(args):
+        if (a == "--format" and i + 1 < len(args) and args[i + 1] == "json") or a == "--format=json":
+            return True
+    return False
+
+
 def _tail(text, lines=STDERR_TAIL_LINES):
     return "\n".join(text.splitlines()[-lines:])
 
@@ -78,8 +92,9 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
     mutation が真なら、gh が終わった後に MUTATION_INTERVAL 秒待ってから返る。次の変更系の呼び出しがこのプロセスでも
     別のプロセス (CLI はサブコマンドごとに 1 プロセス) でも、1 秒以上空く (利用者と相談して決めた)。
     返り値: {"args", "exit_code" (タイムアウトと起動できなかったときは None), "stdout", "stderr_tail", "timed_out",
-    "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (標準出力が空でないのに
-    JSON として読めなかったときの理由。空か読めたときは None)}
+    "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (JSON を期待する呼び出し
+    (expects_json) で、標準出力が空でないのに JSON として読めなかったときの理由。それ以外は None。URL や文章を出す
+    コマンド (`gh issue comment` など) では入らない)}
 
     `gh api --paginate` は、ページごとの JSON をつないで出すので 1 つの JSON として読めない。`--slurp` と一緒に使い、
     全ページを 1 つの配列で受け取る。
@@ -104,7 +119,8 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
         try:
             parsed = json.loads(stdout)
         except ValueError as e:
-            json_error = str(e)
+            if expects_json(args):
+                json_error = str(e)
     return {
         "args": args,
         "exit_code": exit_code,

@@ -94,13 +94,26 @@ class RunTest(FakeGhTest):
                         {"prefix": ["api", "x"], "stdout": ""}])
         r = gh.run(["auth", "status"])
         self.assertIsNone(r["json"])
-        self.assertTrue(r["json_error"], "空でないのに JSON として読めなければ理由を返すこと")
+        self.assertIsNone(r["json_error"], "JSON を期待しない呼び出しでは json_error を入れないこと")
         self.assertEqual(r["stdout"], "Logged in to github.com\n")
         r = gh.run(["api", "repos/o/r/issues", "--paginate"])
         self.assertEqual((r["exit_code"], r["failure"], r["json"]), (0, None, None))
         self.assertTrue(r["json_error"], "--paginate のつないだ JSON は読めないことを返すこと (--slurp と一緒に使う)")
         r = gh.run(["api", "x"])
         self.assertEqual((r["json"], r["json_error"]), (None, None), "空の出力では json_error も None")
+
+    def test_json_error_only_when_json_is_expected(self):
+        url = "https://github.com/o/r/issues/1#issuecomment-1\n"
+        self.responses([{"prefix": ["issue", "comment"], "stdout": url},
+                        {"prefix": ["issue", "view"], "stdout": "not json"},
+                        {"prefix": ["project", "item-list"], "stdout": "not json"}])
+        r = gh.run(["issue", "comment", "1", "--body", "x"])
+        self.assertEqual((r["failure"], r["json"], r["json_error"]), (None, None, None), "URL を出す成功では json_error を入れないこと")
+        self.assertTrue(gh.run(["issue", "view", "1", "--json", "number"])["json_error"])
+        self.assertTrue(gh.run(["project", "item-list", "3", "--format", "json"])["json_error"])
+        self.assertTrue(gh.expects_json(["api", "graphql"]))
+        self.assertTrue(gh.expects_json(["pr", "view", "--json=number"]))
+        self.assertFalse(gh.expects_json(["pr", "create", "--title", "json"]))
 
     def test_timeout(self):
         os.environ["FAKE_GH_MODE"] = "hang"
