@@ -71,6 +71,54 @@ class LoadSaveTest(unittest.TestCase):
                     record.load(self.dir, PROJECT)
                 self.assertIn(record.RECORD_FILE, str(cm.exception))
 
+    def test_unreadable_bytes_and_broken_elements_are_corrupt(self):
+        """読めないバイト列と、要素の形の崩れも Corrupt で止める (ok として読んで後の操作で落ちない)。"""
+        base = {"project": PROJECT, "manager": None, "sessions": {}, "items": {}, "questions": {}}
+        cases = {
+            "manager is a string": dict(base, manager="x"),
+            "manager state unknown": dict(base, manager={"id": "m", "name": "n", "started_at": T1, "state": "paused",
+                                                         "stop_reason": None, "exchanges_since_input": 0}),
+            "session is a string": dict(base, sessions={"s1": "y"}),
+            "item lacks keys": dict(base, items={"akm/r#1": {"intent": None}}),
+            "item resend_count is bool": dict(base, items={"akm/r#1": {"intent": None, "notified_at": None, "resend_count": True,
+                                                                        "conflict_choice": None, "reported": {}, "body_edit_confirmed_at": None}}),
+            "question options not a list": dict(base, questions={"q1": {"item": "akm/r#1", "kind": "k", "options": "a",
+                                                                        "asked_at": T1, "answer": None, "answered_at": None}}),
+            "opt_in not an object": dict(base, opt_in_proposals={"akm/r": "yes"}),
+        }
+        for name, data in cases.items():
+            with self.subTest(case=name):
+                self._write(json.dumps(data))
+                with self.assertRaises(record.Corrupt):
+                    record.load(self.dir, PROJECT)
+        os.makedirs(self.dir, exist_ok=True)
+        with open(os.path.join(self.dir, record.RECORD_FILE), "wb") as f:
+            f.write(b"\xff\xfe{}")
+        with self.assertRaises(record.Corrupt):
+            record.load(self.dir, PROJECT)
+        os.unlink(os.path.join(self.dir, record.RECORD_FILE))
+        os.makedirs(os.path.join(self.dir, record.RECORD_FILE))
+        with self.assertRaises(record.Corrupt):
+            record.load(self.dir, PROJECT)
+
+    def test_saved_records_reload(self):
+        """apply で作った記録は、保存して読み直せる (要素の形の検査が自分の書いたものを壊れていると見ないこと)。"""
+        rec, errors = record.apply(record.new_record(PROJECT), [
+            {"op": "set_manager", "id": "m1", "name": "n", "started_at": T1},
+            {"op": "set_session", "id": "s1", "name": "w", "repo": "akm/r", "worktree": "/w"},
+            {"op": "set_waiting", "id": "s1", "since": T1},
+            {"op": "set_refused", "id": "s1", "at": T1, "signal": "go"},
+            {"op": "set_intent", "item": "akm/r#1", "session_id": "s1", "session_title": "w", "status": "In Progress", "assignment": 1, "at": T1},
+            {"op": "mark_reported", "item": "akm/r#1", "kind": "human_change", "at": T1},
+            {"op": "set_opt_in", "repo": "akm/r", "proposed_at": T1, "answer": True},
+            {"op": "ask", "question_id": "q1", "item": "akm/r#1", "kind": "conflict", "options": ["a"], "at": T1},
+            {"op": "answer", "question_id": "q1", "answer": "a", "at": T2},
+            {"op": "set_notice", "key": "n", "at": T1},
+        ])
+        self.assertEqual(errors, [])
+        record.save(self.dir, rec)
+        self.assertEqual(record.load(self.dir, PROJECT), rec)
+
     def test_save_is_atomic(self):
         rec = record.new_record(PROJECT)
         record.save(self.dir, rec)

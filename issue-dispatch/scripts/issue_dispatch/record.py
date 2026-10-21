@@ -61,6 +61,29 @@ def new_record(project):
     }
 
 
+# 要素の形。キー → 許す型の組 (None を許すものは NoneType を含む)
+_NONE = type(None)
+_MANAGER_SHAPE = {"id": (str,), "name": (str,), "started_at": (str,), "state": (str,), "stop_reason": (str, _NONE),
+                  "exchanges_since_input": (int,)}
+_SESSION_SHAPE = {"name": (str,), "repo": (str,), "worktree": (str,), "waiting_since": (str, _NONE),
+                  "seen_state": (str, _NONE), "refused": (dict, _NONE)}
+_ITEM_SHAPE = {"intent": (dict, _NONE), "notified_at": (str, _NONE), "resend_count": (int,), "conflict_choice": (str, _NONE),
+               "reported": (dict,), "body_edit_confirmed_at": (str, _NONE)}
+_QUESTION_SHAPE = {"item": (str,), "kind": (str,), "options": (list,), "asked_at": (str,), "answer": (str, _NONE),
+                   "answered_at": (str, _NONE)}
+_OPT_IN_SHAPE = {"proposed_at": (str,), "answer": (bool, _NONE)}
+
+
+def _check_element(path, where, value, shape):
+    if not isinstance(value, dict):
+        raise Corrupt(path, f"{where} がオブジェクトではない")
+    for key, kinds in shape.items():
+        if key not in value:
+            raise Corrupt(path, f"{where} に必須のキー {key} が無い")
+        if not isinstance(value[key], kinds) or (isinstance(value[key], bool) and bool not in kinds):
+            raise Corrupt(path, f"{where} の {key} の型が違う")
+
+
 def _check_shape(data, path, project):
     if not isinstance(data, dict):
         raise Corrupt(path, "最上位がオブジェクトではない")
@@ -77,6 +100,18 @@ def _check_shape(data, path, project):
         data.setdefault(key, {})
         if not isinstance(data[key], dict):
             raise Corrupt(path, f"{key} がオブジェクトではない")
+    if data["manager"] is not None:
+        _check_element(path, "manager", data["manager"], _MANAGER_SHAPE)
+        if data["manager"]["state"] not in MANAGER_STATES:
+            raise Corrupt(path, f"manager の state が {data['manager']['state']!r}")
+    for sid, s in data["sessions"].items():
+        _check_element(path, f"sessions[{sid}]", s, _SESSION_SHAPE)
+    for item, it in data["items"].items():
+        _check_element(path, f"items[{item}]", it, _ITEM_SHAPE)
+    for qid, q in data["questions"].items():
+        _check_element(path, f"questions[{qid}]", q, _QUESTION_SHAPE)
+    for repo, o in data["opt_in_proposals"].items():
+        _check_element(path, f"opt_in_proposals[{repo}]", o, _OPT_IN_SHAPE)
 
 
 def load(directory, project):
@@ -87,6 +122,10 @@ def load(directory, project):
             text = f.read()
     except FileNotFoundError:
         return new_record(project)
+    except UnicodeDecodeError as e:
+        raise Corrupt(path, f"UTF-8 として読めない: {e}")
+    except OSError as e:
+        raise Corrupt(path, f"読めない: {e}")
     if not text.strip():
         raise Corrupt(path, "空のファイル")
     try:
