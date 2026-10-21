@@ -72,7 +72,7 @@ def _text(value):
     return value
 
 
-def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False):
+def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False, stdin=None):
     """`gh` を引数の配列で実行する。
 
     mutation が真なら、gh が終わった後に MUTATION_INTERVAL 秒待ってから返る。次の変更系の呼び出しがこのプロセスでも
@@ -81,6 +81,7 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False):
     "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (expect_json が真で、
     標準出力が空でないのに JSON として読めなかったときの理由。それ以外は None)}
 
+    stdin は、標準入力に渡す文字列 (`gh api graphql --input -` の本文など)。None なら標準入力は渡さない (/dev/null)。
     expect_json は、呼び出し側が標準出力に JSON を期待するときに真を渡す (`gh api` や `--json` で JSON を受け取る
     呼び出し)。引数から推測しない。`--jq` や `--template` で文字列を取り出す呼び出しや、URL や文章を出すコマンド
     (`gh issue comment` など) では渡さない (利用者と相談して決めた)。
@@ -90,7 +91,8 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False):
     """
     args = list(args)
     try:
-        completed = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=timeout)
+        completed = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=timeout,
+                                   input=stdin, stdin=subprocess.DEVNULL if stdin is None else None)
         exit_code, stdout, stderr, timed_out = completed.returncode, completed.stdout, completed.stderr, False
     except subprocess.TimeoutExpired as e:
         exit_code, stdout, stderr, timed_out = None, _text(e.stdout), _text(e.stderr), True

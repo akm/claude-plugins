@@ -51,12 +51,10 @@ def graphql(name, variables, mutation=False, timeout=gh.DEFAULT_TIMEOUT):
     返り値は (data, problem, errors)。data が読めれば problem は None で、errors には GraphQL が data と一緒に返した
     errors (一部の項目だけ読めないときなど) の配列が入る (無ければ空)。data が無ければ problem に失敗の説明が入る。
     """
-    args = ["api", "graphql", "-f", f"query={load_query(name)}"]
-    for key, value in variables.items():
-        if value is None:
-            continue
-        args += (["-F", f"{key}={value}"] if isinstance(value, (int, bool)) and not isinstance(value, str) else ["-f", f"{key}={value}"])
-    r = gh.run(args, timeout=timeout, mutation=mutation, expect_json=True)
+    # 本文 (query と variables) を JSON で標準入力に渡す。-F は配列やオブジェクトを JSON として読まない (文字列のまま渡す) ので使わない
+    body = {"query": load_query(name), "variables": {k: v for k, v in variables.items() if v is not None}}
+    r = gh.run(["api", "graphql", "--input", "-"], timeout=timeout, mutation=mutation, expect_json=True,
+               stdin=json.dumps(body, ensure_ascii=False))
     if r["failure"] and r["json"] is None:
         return None, {"failure": r["failure"], "message": r["stderr_tail"] or r["json_error"] or "", "exit_code": r["exit_code"]}, []
     body = r["json"] if isinstance(r["json"], dict) else {}
@@ -158,12 +156,9 @@ def add_fields(meta_project, checked):
         results.append({"action": "field-create", "args": cmd, "ok": r["failure"] is None, "failure": r["failure"], "stderr": r["stderr_tail"]})
     proposal = checked["proposals"]["update_status_options"]
     if proposal:
-        args = ["api", "graphql", "-f", f"query={load_query('update-status-options')}", "-F", f"fieldId={proposal['fieldId']}",
-                "-F", "options=" + json.dumps(proposal["options"], ensure_ascii=False)]
-        r = gh.run(args, mutation=True, expect_json=True)
-        ok = r["failure"] is None and isinstance(r["json"], dict) and not r["json"].get("errors")
-        results.append({"action": "update-status-options", "ok": ok, "failure": r["failure"],
-                        "stderr": r["stderr_tail"], "errors": (r["json"] or {}).get("errors") if isinstance(r["json"], dict) else None})
+        data, problem, errors = graphql("update-status-options", {"fieldId": proposal["fieldId"], "options": proposal["options"]}, mutation=True)
+        results.append({"action": "update-status-options", "ok": problem is None and not errors,
+                        "failure": (problem or {}).get("failure"), "stderr": (problem or {}).get("message", ""), "errors": errors or None})
     return results
 
 

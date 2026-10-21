@@ -3,7 +3,7 @@
 
 実際の gh の代わりに、環境変数の指示どおりに振る舞う (先例: review-triage/tests/fake-claude)。
 
-- FAKE_GH_ARGS: 受けた引数 (argv[1:]) と時刻と cwd を JSON の 1 行として追記するファイル
+- FAKE_GH_ARGS: 受けた引数 (argv[1:]) と標準入力の中身 (stdin) と時刻と cwd を JSON の 1 行として追記するファイル
 - FAKE_GH_SLEEP: 応答の前に待つ秒数 (既定 0)
 - FAKE_GH_FIXTURES: 固定データのディレクトリ (既定はこのファイルと同じディレクトリの fixtures/gh)
 - FAKE_GH_MODE:
@@ -17,7 +17,8 @@
 - FAKE_GH_RESPONSES: 応答の指定の JSON ファイル。要素の配列で、受けた引数に最初に一致した要素を返す。要素のキー:
     prefix    引数の先頭がこの配列と同じなら一致 (例: ["issue", "view"])
     contains  この配列の要素をすべて含めば一致 (prefix と両方書けば両方)
-    substring この文字列を含む引数が 1 つでもあれば一致 (GraphQL の操作名 "query ProjectItems" などで見分ける。ほかの条件と両方書けば両方)
+    substring この文字列を含む引数が 1 つでもあるか、標準入力の中身に含まれれば一致 (GraphQL の操作名 "query ProjectItems" などで
+              見分ける。`gh api graphql --input -` の本文は標準入力に来る)。文字列の配列なら、すべてが一致すること。ほかの条件と両方書けば両方
     stdout    標準出力に書く文字列。オブジェクトや配列なら JSON にして書く。{"fixture": "<場合>"} なら固定データの <場合>.stdout の中身
     stderr    標準エラー出力に書く文字列 (既定は空)
     exit      終了コード (既定 0)
@@ -42,11 +43,11 @@ def fixture(name, kind):
         return ""
 
 
-def record(args):
+def record(args, stdin_text):
     path = os.environ.get("FAKE_GH_ARGS")
     if path:
         with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"args": args, "time": time.time(), "cwd": os.getcwd()}, ensure_ascii=False) + "\n")
+            f.write(json.dumps({"args": args, "stdin": stdin_text, "time": time.time(), "cwd": os.getcwd()}, ensure_ascii=False) + "\n")
 
 
 def respond(stdout, stderr, exit_code):
@@ -57,7 +58,7 @@ def respond(stdout, stderr, exit_code):
     sys.exit(exit_code)
 
 
-def matches(entry, args):
+def matches(entry, args, stdin_text):
     prefix = entry.get("prefix")
     contains = entry.get("contains")
     substring = entry.get("substring")
@@ -65,14 +66,17 @@ def matches(entry, args):
         return False
     if contains is not None and not all(c in args for c in contains):
         return False
-    if substring is not None and not any(substring in a for a in args):
-        return False
+    if substring is not None:
+        needles = [substring] if isinstance(substring, str) else list(substring)
+        if not all(any(s in a for a in args) or s in stdin_text for s in needles):
+            return False
     return prefix is not None or contains is not None or substring is not None
 
 
 def main():
     args = sys.argv[1:]
-    record(args)
+    stdin_text = "" if sys.stdin.isatty() else sys.stdin.read()
+    record(args, stdin_text)
     sleep = float(os.environ.get("FAKE_GH_SLEEP", "0") or 0)
     if sleep:
         time.sleep(sleep)
@@ -99,7 +103,7 @@ def main():
             text = f.read()
         entries = json.loads(text) if text.strip() else []
     for entry in entries:
-        if entry.get("used") or not matches(entry, args):
+        if entry.get("used") or not matches(entry, args, stdin_text):
             continue
         if entry.get("once"):
             entry["used"] = True

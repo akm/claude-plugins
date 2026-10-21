@@ -62,10 +62,18 @@ class FakeGhCase(unittest.TestCase):
             json.dump(entries, f, ensure_ascii=False)
 
     def recorded(self):
+        return [r["args"] for r in self.recorded_full()]
+
+    def recorded_full(self):
         if not os.path.exists(self.args_file):
             return []
         with open(self.args_file, encoding="utf-8") as f:
-            return [json.loads(line)["args"] for line in f if line.strip()]
+            return [json.loads(line) for line in f if line.strip()]
+
+    @staticmethod
+    def body(record):
+        """`gh api graphql --input -` の標準入力の本文 (query と variables)。"""
+        return json.loads(record["stdin"])
 
     @staticmethod
     def meta_entry(stdout=None):
@@ -84,7 +92,10 @@ class MetaAndCheckTest(FakeGhCase):
         self.assertEqual({o["name"] for o in p["fields"]["Status"]["options"]}, set(project.STATUS_OPTIONS), "選択肢の並びは問わない")
         self.assertEqual(p["fields"]["Agent stuck state"]["data_type"], "SINGLE_SELECT")
         self.assertTrue(p["workflows"]["Item closed"]["enabled"])
-        self.assertIn("-F", self.recorded()[0], "変数は -F で渡すこと")
+        call = self.recorded_full()[0]
+        self.assertEqual(call["args"], ["api", "graphql", "--input", "-"], "本文は --input - で標準入力に渡すこと")
+        self.assertEqual(self.body(call)["variables"], {"owner": "akm", "number": 3})
+        self.assertIn("query ProjectMeta", self.body(call)["query"])
 
     def test_check_passes_on_prepared_project(self):
         """Covers AE30. 検証用 Project (フィールドと選択肢がそろっている) では不足が無く、推奨のワークフローの無効と案内だけを返す。"""
@@ -141,11 +152,14 @@ class MetaAndCheckTest(FakeGhCase):
         results = project.add_fields(meta, project.check(meta))
         self.assertEqual([r["action"] for r in results], ["field-create", "update-status-options"])
         self.assertTrue(all(r["ok"] for r in results))
-        calls = self.recorded()
-        self.assertEqual(calls[1][:8], ["project", "field-create", "3", "--owner", "akm", "--name", "Agent session title", "--data-type"])
-        options = json.loads(next(a for a in calls[2] if a.startswith("options=")).split("=", 1)[1])
-        self.assertEqual([o.get("id") for o in options[:5]], [o["id"] for o in status["options"]])
-        self.assertEqual(options[-1]["name"], "Blocked")
+        calls = self.recorded_full()
+        self.assertEqual(calls[1]["args"][:8], ["project", "field-create", "3", "--owner", "akm", "--name", "Agent session title", "--data-type"])
+        self.assertEqual(calls[2]["args"], ["api", "graphql", "--input", "-"])
+        variables = self.body(calls[2])["variables"]
+        self.assertIsInstance(variables["options"], list, "入力オブジェクトの配列は本文の variables に JSON として渡すこと (-F では文字列になる)")
+        self.assertEqual([o.get("id") for o in variables["options"][:5]], [o["id"] for o in status["options"]])
+        self.assertEqual(variables["options"][-1]["name"], "Blocked")
+        self.assertEqual(variables["fieldId"], status["id"])
         self.responses([self.meta_entry()])
         meta = project.read_meta(PROJECT)["project"]
         self.assertEqual(project.add_fields(meta, project.check(meta)), [], "不足が無ければ gh を実行しないこと")
@@ -194,14 +208,15 @@ class ItemsTest(FakeGhCase):
 
     def test_items_follow_pages(self):
         """ページは pageInfo で辿り、2 ページ目は endCursor を after に渡す。位置は通しで数える。"""
-        self.responses([{"substring": "query ProjectItems", "contains": ["after=CURSOR-PAGE-1"], "stdout": {"fixture": "project-items-page2"}},
+        self.responses([{"substring": ["query ProjectItems", '"after": "CURSOR-PAGE-1"'], "stdout": {"fixture": "project-items-page2"}},
                         {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
         result = project.items(PROJECT)
         self.assertEqual(result["status"], "ok")
         self.assertEqual([i["position"] for i in result["items"]], [1, 2, 3, 4, 5])
-        self.assertEqual(len(self.recorded()), 2)
-        self.assertNotIn("after=CURSOR-PAGE-1", self.recorded()[0], "1 ページ目は after を渡さないこと")
-        self.assertIn("after=CURSOR-PAGE-1", self.recorded()[1])
+        calls = self.recorded_full()
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("after", self.body(calls[0])["variables"], "1 ページ目は after を渡さないこと")
+        self.assertEqual(self.body(calls[1])["variables"]["after"], "CURSOR-PAGE-1")
 
     def test_comment_pages_are_followed_per_issue(self):
         """コメントが 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。"""
@@ -212,7 +227,7 @@ class ItemsTest(FakeGhCase):
                                                             "nodes": [{"id": "IC_more", "databaseId": 1, "url": "u", "createdAt": "2026-10-20T00:00:00Z",
                                                                        "author": {"login": "akm"}, "body": "more"}]}}}, "rateLimit": {"cost": 1}}}
         self.responses([{"substring": "query ProjectItems", "stdout": data},
-                        {"substring": "query IssueComments", "contains": ["after=C1", "name=issue-dispatch-verify-a", "number=3"], "stdout": more}])
+                        {"substring": ["query IssueComments", '"after": "C1"', '"name": "issue-dispatch-verify-a"', '"number": 3'], "stdout": more}])
         result = project.items(PROJECT)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(len(result["items"][0]["comments"]), 11)
@@ -223,7 +238,7 @@ class ItemsTest(FakeGhCase):
         result = project.items(PROJECT)
         self.assertEqual((result["status"], result["failure"]), ("error", "auth"))
         os.environ.pop("FAKE_GH_MODE")
-        self.responses([{"substring": "query ProjectItems", "contains": ["after=CURSOR-PAGE-1"], "stdout": "", "stderr": "gh: boom\n", "exit": 1},
+        self.responses([{"substring": ["query ProjectItems", '"after": "CURSOR-PAGE-1"'], "stdout": "", "stderr": "gh: boom\n", "exit": 1},
                         {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
         result = project.items(PROJECT)
         self.assertEqual(result["status"], "partial", "2 ページ目が読めなければ 1 ページ目の結果と問題を返すこと")
@@ -250,7 +265,7 @@ class ItemsTest(FakeGhCase):
 
     def test_later_page_without_project_is_partial(self):
         """2 ページ目以降で Project が読めなくても、それまでに読んだ項目を捨てない。"""
-        self.responses([{"substring": "query ProjectItems", "contains": ["after=CURSOR-PAGE-1"], "stdout": {"data": {"repositoryOwner": None}}},
+        self.responses([{"substring": ["query ProjectItems", '"after": "CURSOR-PAGE-1"'], "stdout": {"data": {"repositoryOwner": None}}},
                         {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
         result = project.items(PROJECT)
         self.assertEqual((result["status"], len(result["items"])), ("partial", 3))
