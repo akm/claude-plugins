@@ -240,6 +240,7 @@ class ReadRepoConfigTest(unittest.TestCase):
         self.assertEqual(r["status"], "unreadable")
         self.assertEqual(r["reason"], "config-unreadable", "設定ファイルの JSON の誤りは config の規則で読めない")
         self.assertTrue(r["errors"])
+        self.assertIsNone(r["config"], "読めない設定をデフォルト値で続けさせないこと")
 
 
 class UnreadableBytesTest(unittest.TestCase):

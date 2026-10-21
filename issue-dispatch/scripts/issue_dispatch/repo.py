@@ -195,8 +195,10 @@ def read_repo_config(repositories, repo):
             result["errors"] = [{"key": "(file)", "message": f"UTF-8 として読めない: {e}"}]
             return result
     loaded = config.load_text(text, "repo", f"{path} の origin/HEAD:{config.CONFIG_PATH}")
+    # 読めない設定はデフォルト値で続けない (KTD9) ので、config は返さない (ほかの「読めない」と同じく None)
     result = {"status": loaded["status"], "reason": None, "message": None, "fix": None, "root_hint": None, "path": path,
-              "config": loaded["config"], "warnings": loaded["warnings"], "errors": loaded["errors"]}
+              "config": loaded["config"] if loaded["status"] != "unreadable" else None,
+              "warnings": loaded["warnings"], "errors": loaded["errors"]}
     if loaded["status"] == "unreadable":
         result.update({"reason": "config-unreadable", "message": "既定のブランチの設定ファイルを読めない (errors に理由)",
                        "fix": f"{repo} の既定のブランチの {config.CONFIG_PATH} を直す"})
