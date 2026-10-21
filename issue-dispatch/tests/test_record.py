@@ -236,6 +236,9 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(self.rec["questions"]["q1"]["answered_at"], T2)
         _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q9", "answer": "x", "at": T2}])
         self.assertEqual(len(errors), 1, "無い問いには答えられない")
+        _, errors = record.apply(self.rec, [{"op": "ask", "question_id": "q1", "item": "akm/r#5", "kind": "conflict", "options": ["wait"], "at": T3}])
+        self.assertEqual(len(errors), 1, "同じ ID の問いを立て直せない (答えが消えるため)")
+        self.assertEqual(self.rec["questions"]["q1"]["answer"], "proceed")
 
     def test_null_and_out_of_range_values_are_rejected(self):
         """必須のキーの null・bool や 0 の assignment・null や空の answer は、例外ではなく誤りとして差し戻す。"""

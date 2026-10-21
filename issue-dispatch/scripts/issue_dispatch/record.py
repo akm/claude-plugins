@@ -307,6 +307,8 @@ def _op_set_opt_in(rec, op):
 
 
 def _op_ask(rec, op):
+    if op["question_id"] in rec["questions"]:
+        return f"問い {op['question_id']} は既にある (答えを消さないため、同じ ID で立て直せない)"
     rec["questions"][op["question_id"]] = {"item": op["item"], "kind": op["kind"], "options": list(op["options"]),
                                            "asked_at": op["at"], "answer": None, "answered_at": None}
 

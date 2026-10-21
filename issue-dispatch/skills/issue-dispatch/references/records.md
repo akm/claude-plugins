@@ -111,7 +111,7 @@
 | `set_body_edit_confirmed` | `item`・`at` | 利用者が確かめた本文の編集の時刻を書く |
 | `set_notice` | `key`・`at` | 項目に紐づかない知らせの報告済みの印を付ける (2 度目は時刻を変えない) |
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と答えを書く |
-| `ask` | `question_id`・`item`・`kind`・`options`・`at` | 問いを記録する |
+| `ask` | `question_id`・`item`・`kind`・`options`・`at` | 問いを記録する (同じ ID の問いが既にあれば誤り。答えを消さないため。既にある問いは `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 答えを書く (問いが無い・選択肢に無い答えは誤り) |
 
 ## `actions.log`
