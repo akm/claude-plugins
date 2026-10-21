@@ -59,16 +59,17 @@
 
 - フィールドは `gh project field-create <番号> --owner <owner> --name <名前> --data-type TEXT|SINGLE_SELECT [--single-select-options <値,…>]` で作る。
 - Status の選択肢は GraphQL の `updateProjectV2Field` (`singleSelectOptions`) で足す。**既存の選択肢を `id` 付きで含めて渡す** — 含めないと既存の値が消える (U1 で確かめた)。足す選択肢の色と説明: `Ready` は GREEN「着手してよい」、`In review` は BLUE「PR が ready for review」、`Blocked` は RED「ほかの Issue か小さな PR を待つ」。既存の項目の Status の値は変わらない。
+- `Agent stuck state` の値の不足も、Status と同じく既存の値の `id` を保った `updateProjectV2Field` の案にする。
 - 既にあるフィールドの型が違うとき (`Agent stuck state` が単一選択でないなど) は作り直しが要るので、案を出さずに報告だけする。
 
 ## CLI
 
 | サブコマンド | 入力 | 出力 (JSON) |
 | --- | --- | --- |
-| `project check --project <owner>/<番号>` | | `status`・`project` (`id`・`title`・`url`・`owner`・`number`)・`check` (`ok`・`missing_fields`・`missing_status_options`・`workflows` (`required_disabled`・`recommended_disabled`・`notice_enabled`・`discouraged_enabled`)・`proposals` (`field_create` の引数の配列と `update_status_options` の入力))・`rate_limit`・`errors` |
+| `project check --project <owner>/<番号>` | | `status`・`project` (`id`・`title`・`url`・`owner`・`number`)・`check` (`ok`・`missing_fields`・`missing_status_options`・`workflows` (`required_disabled`・`recommended_disabled`・`notice_enabled`・`discouraged_enabled`)・`proposals` (`field_create` の引数の配列と、`update_options` (単一選択のフィールドに選択肢を足す入力 (`field`・`fieldId`・`options`) の配列)))・`rate_limit`・`errors` |
 | `project items --project <owner>/<番号>` | | `status` (`ok` / `partial` 続きのページが読めなかった / `error`)・`project_id`・`items` (下の表)・`problems`・`rate_limit`・`errors` |
 | `project set-status --project <owner>/<番号> --item <項目の ID> --status <値>` | 値は 5 つのどれか | `status` (`ok` / `rejected` / `error`)・`item_id`・`field`・`value`・`errors` |
-| `project add-fields --project <owner>/<番号>` | 承認を得た後に呼ぶ | `status`・`results` (実行ごとの `action`・`ok`・`failure`)・`errors` |
+| `project add-fields --project <owner>/<番号>` | 承認を得た後に呼ぶ | `status`・`results` (実行ごとの `action` (`field-create` / `update-options`)・`field`・`ok`・`failure`)・`errors` |
 
 終了コードは、JSON を出せれば 0 (誤りは JSON の `errors`)。
 

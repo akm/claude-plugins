@@ -109,7 +109,7 @@ class MetaAndCheckTest(FakeGhCase):
         self.assertEqual(wf["recommended_disabled"], ["Item reopened"], "一覧に無い推奨のワークフローは無効として数えること")
         self.assertEqual(wf["discouraged_enabled"], ["Pull request linked to issue"], "無効を推奨するワークフローが有効なら案内すること")
         self.assertEqual(wf["notice_enabled"], [], "Auto-add to project は検証用 Project では有効ではない")
-        self.assertEqual(checked["proposals"], {"field_create": [], "update_status_options": None})
+        self.assertEqual(checked["proposals"], {"field_create": [], "update_options": []})
 
     def test_check_lists_missing_fields_and_options(self):
         """Covers AE21, AE30. フィールドと Status の選択肢が無い Project では、不足と、既存の id を保った案を返す。"""
@@ -127,8 +127,8 @@ class MetaAndCheckTest(FakeGhCase):
         self.assertEqual(checked["missing_status_options"], ["Ready", "In review", "Blocked"])
         self.assertEqual(checked["workflows"]["required_disabled"], ["Item closed"])
         self.assertEqual(checked["workflows"]["notice_enabled"], ["Auto-add to project"])
-        proposal = checked["proposals"]["update_status_options"]
-        self.assertEqual(proposal["fieldId"], status["id"])
+        proposal = checked["proposals"]["update_options"][0]
+        self.assertEqual((proposal["field"], proposal["fieldId"]), ("Status", status["id"]))
         names = [o["name"] for o in proposal["options"]]
         self.assertEqual(names, ["Todo", "In Progress", "Done", "Ready", "In review", "Blocked"])
         self.assertEqual([o.get("id") for o in proposal["options"][:3]], [o["id"] for o in status["options"]], "既存の選択肢の id を保つこと")
@@ -137,6 +137,25 @@ class MetaAndCheckTest(FakeGhCase):
         self.assertEqual(cmds[0][:2], ["project", "field-create"])
         self.assertIn("--single-select-options", cmds[1])
         self.assertIn(",".join(project.STUCK_STATES), cmds[1])
+
+    def test_missing_stuck_state_values_get_a_proposal(self):
+        """Agent stuck state の値の不足も、既存の id を保った案になり、add-fields が実行する。"""
+        data = fixture_json("project-meta-ok")
+        node = data["data"]["repositoryOwner"]["projectV2"]
+        stuck = next(f for f in node["fields"]["nodes"] if f and f["name"] == "Agent stuck state")
+        stuck["options"] = [o for o in stuck["options"] if o["name"] != "waiting-for-user"]
+        self.responses([self.meta_entry(data),
+                        {"substring": "mutation UpdateStatusOptions", "stdout": {"data": {"updateProjectV2Field": {"projectV2Field": {"id": stuck["id"]}}}}}])
+        meta = project.read_meta(PROJECT)["project"]
+        checked = project.check(meta)
+        self.assertFalse(checked["ok"])
+        self.assertEqual(checked["missing_fields"][0]["problem"], "値 waiting-for-user が無い")
+        proposal = checked["proposals"]["update_options"][0]
+        self.assertEqual((proposal["field"], proposal["fieldId"]), ("Agent stuck state", stuck["id"]))
+        self.assertEqual([o.get("id") for o in proposal["options"][:4]], [o["id"] for o in stuck["options"]], "既存の値の id を保つこと")
+        self.assertEqual(proposal["options"][-1]["name"], "waiting-for-user")
+        results = project.add_fields(meta, checked)
+        self.assertEqual([(r["action"], r["field"], r["ok"]) for r in results], [("update-options", "Agent stuck state", True)])
 
     def test_add_fields_runs_proposals(self):
         """Covers AE21. add-fields は不足のフィールドを作り、Status の選択肢を既存の id を含めて足す。不足が無ければ何も実行しない。"""
@@ -150,7 +169,7 @@ class MetaAndCheckTest(FakeGhCase):
                         {"substring": "mutation UpdateStatusOptions", "stdout": {"data": {"updateProjectV2Field": {"projectV2Field": {"id": status["id"]}}}}}])
         meta = project.read_meta(PROJECT)["project"]
         results = project.add_fields(meta, project.check(meta))
-        self.assertEqual([r["action"] for r in results], ["field-create", "update-status-options"])
+        self.assertEqual([(r["action"], r.get("field")) for r in results], [("field-create", None), ("update-options", "Status")])
         self.assertTrue(all(r["ok"] for r in results))
         calls = self.recorded_full()
         self.assertEqual(calls[1]["args"][:8], ["project", "field-create", "3", "--owner", "akm", "--name", "Agent session title", "--data-type"])

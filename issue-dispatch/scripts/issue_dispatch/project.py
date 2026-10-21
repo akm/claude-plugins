@@ -110,19 +110,19 @@ def check(meta_project):
                 missing_fields.append({"name": name, "data_type": data_type, "problem": f"値 {', '.join(lacking)} が無い", "options": lacking})
     status = fields.get("Status")
     missing_options = []
-    proposal = None
+    update_options = []
     if status is None or status["data_type"] != "SINGLE_SELECT":
         missing_options = list(STATUS_OPTIONS)
     else:
         have = {o["name"] for o in status["options"]}
         missing_options = [name for name in STATUS_OPTIONS if name not in have]
         if missing_options:
-            options = [{"id": o["id"], "name": o["name"], "color": o["color"] or "GRAY", "description": o["description"] or ""}
-                       for o in status["options"]]
-            for name in missing_options:
-                color, description = ADDED_STATUS_OPTIONS.get(name, ("GRAY", ""))
-                options.append({"name": name, "color": color, "description": description})
-            proposal = {"fieldId": status["id"], "options": options}
+            update_options.append(_options_proposal("Status", status, missing_options, ADDED_STATUS_OPTIONS))
+    stuck = fields.get("Agent stuck state")
+    if stuck is not None and stuck["data_type"] == "SINGLE_SELECT":
+        lacking = [v for v in STUCK_STATES if v not in {o["name"] for o in stuck["options"]}]
+        if lacking:
+            update_options.append(_options_proposal("Agent stuck state", stuck, lacking, {}))
     workflows = meta_project["workflows"]
     enabled = {name for name, w in workflows.items() if w["enabled"]}
     wf = {
@@ -133,10 +133,8 @@ def check(meta_project):
     }
     field_create = []
     for f in missing_fields:
-        if "problem" in f and not f.get("options"):
-            continue  # 型の違いは作り直しが要るので案を出さず、報告だけ
         if "problem" in f:
-            continue  # 既にあるフィールドの値の追加は、案だけ (問題の文で報告)
+            continue  # 型の違いは作り直しが要るので案を出さず報告だけ。既にあるフィールドの値の不足は update_options が案を持つ
         cmd = ["project", "field-create", str(meta_project["number"]), "--owner", meta_project["owner"], "--name", f["name"],
                "--data-type", f["data_type"]]
         if f["options"]:
@@ -144,20 +142,29 @@ def check(meta_project):
         field_create.append(cmd)
     return {"ok": not missing_fields and not missing_options and not wf["required_disabled"],
             "missing_fields": missing_fields, "missing_status_options": missing_options, "workflows": wf,
-            "proposals": {"field_create": field_create, "update_status_options": proposal}}
+            "proposals": {"field_create": field_create, "update_options": update_options}}
+
+
+def _options_proposal(field_name, field, lacking, colors):
+    """単一選択のフィールドに選択肢を足す updateProjectV2Field の入力。既存の選択肢を id 付きで含める (含めないと消える。U1)。"""
+    options = [{"id": o["id"], "name": o["name"], "color": o["color"] or "GRAY", "description": o["description"] or ""}
+               for o in field["options"]]
+    for name in lacking:
+        color, description = colors.get(name, ("GRAY", ""))
+        options.append({"name": name, "color": color, "description": description})
+    return {"field": field_name, "fieldId": field["id"], "options": options}
 
 
 def add_fields(meta_project, checked):
-    """check の案を実行する (承認を得た後に呼ぶ)。不足のフィールドを gh project field-create で作り、Status の選択肢を
-    既存の id を保って足す。返り値は実行ごとの結果の配列。"""
+    """check の案を実行する (承認を得た後に呼ぶ)。不足のフィールドを gh project field-create で作り、単一選択のフィールド
+    (Status・Agent stuck state) の選択肢を既存の id を保って足す。返り値は実行ごとの結果の配列。"""
     results = []
     for cmd in checked["proposals"]["field_create"]:
         r = gh.run(cmd, mutation=True, expect_json=False)
         results.append({"action": "field-create", "args": cmd, "ok": r["failure"] is None, "failure": r["failure"], "stderr": r["stderr_tail"]})
-    proposal = checked["proposals"]["update_status_options"]
-    if proposal:
+    for proposal in checked["proposals"]["update_options"]:
         data, problem, errors = graphql("update-status-options", {"fieldId": proposal["fieldId"], "options": proposal["options"]}, mutation=True)
-        results.append({"action": "update-status-options", "ok": problem is None and not errors,
+        results.append({"action": "update-options", "field": proposal["field"], "ok": problem is None and not errors,
                         "failure": (problem or {}).get("failure"), "stderr": (problem or {}).get("message", ""), "errors": errors or None})
     return results
 
