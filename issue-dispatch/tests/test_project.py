@@ -230,6 +230,43 @@ class ItemsTest(FakeGhCase):
         self.assertEqual(len(result["items"]), 3)
         self.assertEqual(result["problems"][0]["what"], "items-page")
 
+    def test_data_with_errors_is_partial_not_error(self):
+        """data と errors が一緒に返る応答 (一部の項目だけ読めない) では、読めた項目を返し、errors を知らせる。"""
+        data = fixture_json("project-items-ok")
+        data["errors"] = [{"type": "FORBIDDEN", "path": ["repositoryOwner", "projectV2", "items", "nodes", 3, "content"],
+                           "message": "Resource protected by organization SAML enforcement."}]
+        self.responses([{"substring": "query ProjectItems", "stdout": data}])
+        result = project.items(PROJECT)
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(len(result["items"]), 5, "読めた項目を捨てないこと")
+        self.assertEqual(result["problems"][0]["what"], "graphql-errors")
+        self.assertEqual(result["problems"][0]["errors"][0]["type"], "FORBIDDEN")
+        meta = fixture_json("project-meta-ok")
+        meta["errors"] = data["errors"]
+        self.responses([self.meta_entry(meta)])
+        r = project.read_meta(PROJECT)
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["warnings"][0]["type"], "FORBIDDEN", "読めれば errors は warnings に入れること")
+
+    def test_later_page_without_project_is_partial(self):
+        """2 ページ目以降で Project が読めなくても、それまでに読んだ項目を捨てない。"""
+        self.responses([{"substring": "query ProjectItems", "contains": ["after=CURSOR-PAGE-1"], "stdout": {"data": {"repositoryOwner": None}}},
+                        {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
+        result = project.items(PROJECT)
+        self.assertEqual((result["status"], len(result["items"])), ("partial", 3))
+        self.assertEqual(result["problems"][0]["what"], "items-page")
+
+    def test_comment_page_without_issue_is_a_problem(self):
+        data = fixture_json("project-items-ok")
+        node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
+        node["content"]["comments"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C1"}
+        self.responses([{"substring": "query ProjectItems", "stdout": data},
+                        {"substring": "query IssueComments", "stdout": {"data": {"repository": {"issue": None}}, "errors": [{"type": "NOT_FOUND", "message": "gone"}]}}])
+        result = project.items(PROJECT)
+        self.assertEqual(result["status"], "partial", "続きのページの Issue が無くても例外にしないこと")
+        self.assertEqual(result["problems"][0]["what"], "comments")
+        self.assertEqual(len(result["items"][0]["comments"]), 10)
+
     def test_non_issue_items_are_kept_without_content(self):
         data = fixture_json("project-items-ok")
         nodes = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"]

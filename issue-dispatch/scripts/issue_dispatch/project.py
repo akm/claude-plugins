@@ -46,19 +46,26 @@ def load_query(name):
 
 
 def graphql(name, variables, mutation=False, timeout=gh.DEFAULT_TIMEOUT):
-    """graphql/<name>.graphql を変数つきで実行する。返り値は (data, None) か (None, 失敗の説明)。"""
+    """graphql/<name>.graphql を変数つきで実行する。
+
+    返り値は (data, problem, errors)。data が読めれば problem は None で、errors には GraphQL が data と一緒に返した
+    errors (一部の項目だけ読めないときなど) の配列が入る (無ければ空)。data が無ければ problem に失敗の説明が入る。
+    """
     args = ["api", "graphql", "-f", f"query={load_query(name)}"]
     for key, value in variables.items():
         if value is None:
             continue
         args += (["-F", f"{key}={value}"] if isinstance(value, (int, bool)) and not isinstance(value, str) else ["-f", f"{key}={value}"])
     r = gh.run(args, timeout=timeout, mutation=mutation, expect_json=True)
-    if r["failure"] or r["json"] is None:
-        return None, {"failure": r["failure"] or "other", "message": r["stderr_tail"] or r["json_error"] or "", "exit_code": r["exit_code"]}
-    data = r["json"].get("data") if isinstance(r["json"], dict) else None
-    if r["json"].get("errors") or data is None:
-        return None, {"failure": "other", "message": json.dumps(r["json"].get("errors"), ensure_ascii=False), "exit_code": r["exit_code"]}
-    return data, None
+    if r["failure"] and r["json"] is None:
+        return None, {"failure": r["failure"], "message": r["stderr_tail"] or r["json_error"] or "", "exit_code": r["exit_code"]}, []
+    body = r["json"] if isinstance(r["json"], dict) else {}
+    data = body.get("data")
+    errors = body.get("errors") or []
+    if data is None:
+        return None, {"failure": r["failure"] or "other", "message": json.dumps(errors, ensure_ascii=False) if errors else (r["stderr_tail"] or r["json_error"] or ""),
+                      "exit_code": r["exit_code"]}, errors
+    return data, None, errors
 
 
 def _project_node(data):
@@ -68,12 +75,13 @@ def _project_node(data):
 
 def read_meta(project):
     """フィールド・選択肢・ワークフローを読む。返り値: {"status": "ok", "project": {...}, "rate_limit"} か {"status": "error", ...}。"""
-    data, problem = graphql("project-meta", {"owner": project["owner"], "number": project["number"]})
+    data, problem, errors = graphql("project-meta", {"owner": project["owner"], "number": project["number"]})
     if problem:
         return {"status": "error", **problem}
     node = _project_node(data)
     if node is None:
-        return {"status": "error", "failure": "other", "message": f"Project {project['owner']}/{project['number']} が無いか読めない", "exit_code": 0}
+        return {"status": "error", "failure": "other", "message": f"Project {project['owner']}/{project['number']} が無いか読めない" +
+                (f" ({json.dumps(errors, ensure_ascii=False)})" if errors else ""), "exit_code": 0}
     fields = {}
     for f in node["fields"]["nodes"]:
         if not f:
@@ -84,7 +92,7 @@ def read_meta(project):
     workflows = {w["name"]: {"id": w["id"], "number": w["number"], "enabled": w["enabled"]} for w in node["workflows"]["nodes"]}
     return {"status": "ok", "project": {"id": node["id"], "title": node["title"], "url": node["url"], "owner": project["owner"],
                                         "number": project["number"], "fields": fields, "workflows": workflows},
-            "rate_limit": data.get("rateLimit")}
+            "rate_limit": data.get("rateLimit"), "warnings": errors}
 
 
 def check(meta_project):
@@ -195,10 +203,14 @@ def _more_pages(name, repo, number, first_page, key, convert):
     info = first_page.get("pageInfo") or {}
     owner, _, repo_name = repo.partition("/")
     while info.get("hasNextPage"):
-        data, problem = graphql(name, {"owner": owner, "name": repo_name, "number": number, "after": info.get("endCursor")})
+        data, problem, errors = graphql(name, {"owner": owner, "name": repo_name, "number": number, "after": info.get("endCursor")})
         if problem:
             return nodes, problem
-        page = data["repository"]["issue"][key]
+        issue = (data.get("repository") or {}).get("issue")
+        if not issue or not isinstance(issue.get(key), dict):
+            return nodes, {"failure": "other", "message": "続きのページで Issue を読めない (移された・消された、または " +
+                           json.dumps(errors, ensure_ascii=False) + ")", "exit_code": 0}
+        page = issue[key]
         nodes += [convert(n) for n in page["nodes"] if n]
         info = page.get("pageInfo") or {}
     return nodes, None
@@ -265,7 +277,7 @@ def items(project):
     rate = None
     position = 0
     while True:
-        data, problem = graphql("items", {"owner": project["owner"], "number": project["number"], "after": after})
+        data, problem, errors = graphql("items", {"owner": project["owner"], "number": project["number"], "after": after})
         if problem:
             if not result_items:
                 return {"status": "error", **problem}
@@ -273,7 +285,14 @@ def items(project):
             break
         node = _project_node(data)
         if node is None:
-            return {"status": "error", "failure": "other", "message": f"Project {project['owner']}/{project['number']} が無いか読めない", "exit_code": 0}
+            message = f"Project {project['owner']}/{project['number']} が無いか読めない" + (f" ({json.dumps(errors, ensure_ascii=False)})" if errors else "")
+            if not result_items:
+                return {"status": "error", "failure": "other", "message": message, "exit_code": 0}
+            problems.append({"what": "items-page", "after": after, "failure": "other", "message": message, "exit_code": 0})
+            break
+        if errors:
+            # data と一緒に返った errors (一部の項目だけ読めない、など)。読めた項目は返し、読めなかったことを知らせる
+            problems.append({"what": "graphql-errors", "after": after, "errors": errors})
         project_id = node["id"]
         rate = data.get("rateLimit")
         for n in node["items"]["nodes"]:

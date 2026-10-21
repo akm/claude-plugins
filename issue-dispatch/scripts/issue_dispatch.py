@@ -169,7 +169,7 @@ def cmd_project_check(args):
         return 0
     checked = project.check(meta["project"])
     _emit({"status": "ok", "project": {k: meta["project"][k] for k in ("id", "title", "url", "owner", "number")},
-           "check": checked, "rate_limit": meta["rate_limit"], "errors": []})
+           "check": checked, "rate_limit": meta["rate_limit"], "warnings": meta["warnings"], "errors": []})
     return 0
 
 
