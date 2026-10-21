@@ -46,18 +46,21 @@ def run_git(path, *args):
 
 
 def parse_origin_url(url):
-    """`origin` の URL から host と owner と name を取り出す。読めない形なら None。
+    """`origin` の URL から scheme と host と owner と name を取り出す。読めない形なら None。
 
-    受け付ける形: scp 形式 (`git@host:owner/name.git`)・`ssh://`・`https://`・`http://`・`git://`。
+    受け付ける形: scp 形式 (`git@host:owner/name.git`。scheme は `scp`)・`ssh://`・`https://`・`http://`・`git://`。
     末尾の `.git` と `/` は取り除く。owner と name の大文字小文字はそのまま返す (比べるときに区別しない)。
     """
     if not isinstance(url, str) or not url:
         return None
     m = _URL_RE.match(url)
-    if not m:
+    if m:
+        scheme = m.group("scheme")
+    else:
         m = _SCP_RE.match(url)
         if not m or "://" in url:
             return None
+        scheme = "scp"
     host = m.group("host")
     path = m.group("path").rstrip("/")
     if path.endswith(".git"):
@@ -65,7 +68,21 @@ def parse_origin_url(url):
     parts = path.split("/")
     if len(parts) != 2 or not all(parts):
         return None
-    return {"host": host, "owner": parts[0], "name": parts[1]}
+    return {"scheme": scheme, "host": host, "owner": parts[0], "name": parts[1]}
+
+
+SSH_SCHEMES = ("scp", "ssh")  # SSH で接続する形。SSH の設定 (Host の別名) が意味を持つのはこの形だけ
+
+
+def effective_host(parsed):
+    """比べるときの host。SSH で接続する形なら `ssh -G` で解決し、それ以外 (https・http・git) は URL の host のまま。
+    GitHub の別の接続先 (`ssh.github.com`) はどの形でも `github.com` にそろえる。"""
+    host = parsed["host"]
+    if parsed.get("scheme") in SSH_SCHEMES:
+        return resolve_host(host)
+    if host.lower() in GITHUB_HOST_ALIASES:
+        return GITHUB_HOST
+    return host.lower()
 
 
 def resolve_host(host):
@@ -89,10 +106,10 @@ def resolve_host(host):
 
 def same_repository(parsed, repo):
     """parse_origin_url の結果が、設定のリポジトリ `owner/name` と同じリポジトリを指すか。
-    host は解決して github.com と比べ、owner と name は大文字小文字を区別しない。"""
+    host は effective_host で github.com と比べ、owner と name は大文字小文字を区別しない。"""
     if not parsed:
         return False
-    if resolve_host(parsed["host"]) != GITHUB_HOST:
+    if effective_host(parsed) != GITHUB_HOST:
         return False
     return f"{parsed['owner']}/{parsed['name']}".lower() == repo.lower()
 
@@ -200,7 +217,7 @@ def repo_name(worktree):
     parsed = parse_origin_url(url)
     if not parsed:
         return {"status": "error", "reason": "url-unparsable", "message": f"origin の URL {url!r} から owner/name を読めない"}
-    host = resolve_host(parsed["host"])
+    host = effective_host(parsed)
     if host != GITHUB_HOST:
         return {"status": "error", "reason": "not-github", "message": f"origin の host {host!r} は GitHub ではない"}
     return {"status": "ok", "repo": f"{parsed['owner']}/{parsed['name']}", "host": host}

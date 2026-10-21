@@ -64,7 +64,9 @@ class ParseUrlTest(unittest.TestCase):
                     "ssh://git@github.com:22/akm/verify-a.git", "https://github.com/akm/verify-a.git", "https://github.com/akm/verify-a",
                     "git://github.com/akm/verify-a.git", "https://github.com/akm/verify-a/"):
             with self.subTest(url=url):
-                self.assertEqual(repo.parse_origin_url(url), {"host": "github.com", "owner": "akm", "name": "verify-a"})
+                parsed = repo.parse_origin_url(url)
+                self.assertEqual({k: parsed[k] for k in ("host", "owner", "name")}, {"host": "github.com", "owner": "akm", "name": "verify-a"})
+                self.assertEqual(parsed["scheme"], "scp" if "://" not in url else url.split("://")[0])
 
     def test_unparsable_urls(self):
         for url in ("", "github.com", "/local/path", "file:///tmp/x.git", "https://github.com/akm", "akm/verify-a"):
@@ -72,10 +74,10 @@ class ParseUrlTest(unittest.TestCase):
                 self.assertIsNone(repo.parse_origin_url(url))
 
     def test_same_repository_ignores_case_and_git_suffix(self):
-        self.assertTrue(repo.same_repository({"host": "github.com", "owner": "AKM", "name": "Verify-A"}, "akm/verify-a"))
-        self.assertFalse(repo.same_repository({"host": "github.com", "owner": "akm", "name": "verify-b"}, "akm/verify-a"),
+        self.assertTrue(repo.same_repository({"scheme": "https", "host": "github.com", "owner": "AKM", "name": "Verify-A"}, "akm/verify-a"))
+        self.assertFalse(repo.same_repository({"scheme": "https", "host": "github.com", "owner": "akm", "name": "verify-b"}, "akm/verify-a"),
                          "名前を変える前の URL は合わない")
-        self.assertFalse(repo.same_repository({"host": "gitlab.com", "owner": "akm", "name": "verify-a"}, "akm/verify-a"))
+        self.assertFalse(repo.same_repository({"scheme": "https", "host": "gitlab.com", "owner": "akm", "name": "verify-a"}, "akm/verify-a"))
 
 
 class HostTest(unittest.TestCase):
@@ -111,7 +113,17 @@ class HostTest(unittest.TestCase):
 
     def test_same_repository_resolves_alias(self):
         self.assertTrue(repo.same_repository(repo.parse_origin_url("git@gh-work:akm/verify-a.git"), "akm/verify-a"))
+        self.assertTrue(repo.same_repository(repo.parse_origin_url("ssh://git@gh-work/akm/verify-a.git"), "akm/verify-a"))
         self.assertFalse(repo.same_repository(repo.parse_origin_url("git@other:akm/verify-a.git"), "akm/verify-a"))
+
+    def test_https_host_is_not_resolved_with_ssh_config(self):
+        """SSH の設定に github.com の別の HostName があっても、https の origin は GitHub と判定する。"""
+        os.environ["FAKE_SSH_HOSTS"] = "github.com=ssh-proxy.corp.example"
+        self.assertTrue(repo.same_repository(repo.parse_origin_url("https://github.com/akm/verify-a.git"), "akm/verify-a"))
+        self.assertTrue(repo.same_repository(repo.parse_origin_url("git://github.com/akm/verify-a.git"), "akm/verify-a"))
+        self.assertFalse(repo.same_repository(repo.parse_origin_url("git@github.com:akm/verify-a.git"), "akm/verify-a"),
+                         "SSH の形は設定の HostName で解決する")
+        self.assertTrue(repo.same_repository(repo.parse_origin_url("https://ssh.github.com/akm/verify-a.git"), "akm/verify-a"))
 
 
 class ReadRepoConfigTest(unittest.TestCase):

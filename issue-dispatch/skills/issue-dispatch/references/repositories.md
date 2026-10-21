@@ -54,7 +54,7 @@ URL は `git -C <パス> remote get-url origin` の値 (`insteadOf` の設定を
 
 同じリポジトリと判定する条件:
 
-- host が `github.com` である。GitHub が案内するほかの接続先 (ポート 443 の SSH の `ssh.github.com`) も同じとみなす。SSH の設定 (`~/.ssh/config`) の Host の別名は、`ssh -G <別名>` の出力の `hostname` の行で解決する (ssh が無い・失敗したときは名前のまま比べるので、別名は合わない)。それ以外の host (GitHub Enterprise など) は合わない。
+- host が `github.com` である。GitHub が案内するほかの接続先 (ポート 443 の SSH の `ssh.github.com`) も同じとみなす。SSH で接続する形 (scp 形式と `ssh://`) では、SSH の設定 (`~/.ssh/config`) の Host の別名を `ssh -G <別名>` の出力の `hostname` の行で解決する (ssh が無い・失敗したときは名前のまま比べるので、別名は合わない)。`https://`・`http://`・`git://` は SSH で接続しないので解決せず、URL の host のまま比べる。それ以外の host (GitHub Enterprise など) は合わない。
 - `owner/name` が、大文字と小文字を区別せずに一致する。
 
 名前を変える前のリポジトリの URL は合わないと判定し、GitHub に問い合わせずにローカルで決める。別のリポジトリの clone に設定ファイルがあっても読まない。
