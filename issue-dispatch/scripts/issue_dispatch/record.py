@@ -126,13 +126,27 @@ def _item(rec, item):
     })
 
 
-def _need(op, keys, types=None):
-    missing = [k for k in keys if k not in op]
+# 省略できるキー (null でもよい)。それ以外のキーは、無い・null を「欠けている」として差し戻す (R31)
+OPTIONAL_KEYS = {"set_manager_state": ("stop_reason",), "set_opt_in": ("answer",)}
+
+
+def _need(op, keys, types=None, optional=()):
+    missing = [k for k in keys if op.get(k) is None]
     if missing:
-        return f"キー {', '.join(missing)} が無い"
+        return f"キー {', '.join(missing)} が無いか null"
     for k, t in (types or {}).items():
-        if k in op and op[k] is not None and not isinstance(op[k], t):
+        if k not in op:
+            continue
+        if op[k] is None:
+            if k in optional:
+                continue
+            return f"{k} が null"
+        if not isinstance(op[k], t) or (t is int and isinstance(op[k], bool)):
             return f"{k} の型が {t.__name__} ではない"
+    if "assignment" in types and op["assignment"] < 1:
+        return "assignment は 1 以上の整数"
+    if "answer" in keys and op["answer"] == "":
+        return "answer は空でない文字列"
     return None
 
 
@@ -291,7 +305,7 @@ OPERATIONS = {
     "set_opt_in": (("repo", "proposed_at"), {"repo": str, "proposed_at": str, "answer": bool}, _op_set_opt_in),
     "ask": (("question_id", "item", "kind", "options", "at"),
             {"question_id": str, "item": str, "kind": str, "options": list, "at": str}, _op_ask),
-    "answer": (("question_id", "answer", "at"), {"question_id": str, "at": str}, _op_answer),
+    "answer": (("question_id", "answer", "at"), {"question_id": str, "answer": str, "at": str}, _op_answer),
 }
 
 
@@ -310,7 +324,7 @@ def apply(rec, operations):
             errors.append({"index": i, "message": f"知らない操作 {op['op']!r}"})
             continue
         keys, types, func = spec
-        problem = _need(op, keys, types)
+        problem = _need(op, keys, types, OPTIONAL_KEYS.get(op["op"], ()))
         if problem is None and "item" in keys and not _ITEM_RE.match(op["item"]):
             problem = f"item {op['item']!r} は owner/repo#番号 の形ではない"
         if problem is None:

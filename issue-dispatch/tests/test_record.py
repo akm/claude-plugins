@@ -189,6 +189,30 @@ class ApplyTest(unittest.TestCase):
         _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q9", "answer": "x", "at": T2}])
         self.assertEqual(len(errors), 1, "無い問いには答えられない")
 
+    def test_null_and_out_of_range_values_are_rejected(self):
+        """必須のキーの null・bool や 0 の assignment・null や空の answer は、例外ではなく誤りとして差し戻す。"""
+        before = json.dumps(self.rec)
+        intent = {"op": "set_intent", "item": "akm/r#1", "session_id": "s", "session_title": "t", "status": "In Progress", "at": T1}
+        cases = [{"op": "clear_intent", "item": None},
+                 {"op": "set_manager", "id": None, "name": "n", "started_at": T1},
+                 {"op": "set_opt_in", "repo": None, "proposed_at": T1},
+                 dict(intent, assignment=True), dict(intent, assignment=0), dict(intent, assignment=-1), dict(intent, assignment="1")]
+        for op in cases:
+            with self.subTest(op=op):
+                rec, errors = record.apply(self.rec, [op])
+                self.assertEqual(len(errors), 1)
+                self.assertEqual(json.dumps(rec), before)
+        self.apply({"op": "set_manager", "id": "m", "name": "n", "started_at": T1},
+                   {"op": "set_manager_state", "state": "stopped", "stop_reason": None},
+                   {"op": "set_opt_in", "repo": "akm/r", "proposed_at": T1, "answer": None},
+                   {"op": "ask", "question_id": "q1", "item": "akm/r#1", "kind": "free", "options": [], "at": T1})
+        for answer in (None, "", 1):
+            with self.subTest(answer=answer):
+                _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q1", "answer": answer, "at": T2}])
+                self.assertEqual(len(errors), 1, "答えは空でない文字列に限ること")
+        self.apply({"op": "answer", "question_id": "q1", "answer": "free text", "at": T2})
+        self.assertEqual(record.unanswered_questions(self.rec), [])
+
     def test_item_keys_must_be_issue_references(self):
         _, errors = record.apply(self.rec, [{"op": "mark_reported", "item": "https://github.com/akm/r/issues/5", "kind": "x", "at": T1}])
         self.assertEqual(len(errors), 1, "項目のキーは owner/repo#番号 の形")
