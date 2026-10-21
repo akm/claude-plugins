@@ -15,7 +15,7 @@ import time
 
 DEFAULT_TIMEOUT = 60
 STDERR_TAIL_LINES = 20
-MUTATION_INTERVAL = 1.0  # 変更系の呼び出しの間隔 (秒。KTD14)
+MUTATION_INTERVAL = 1.0  # 変更系の呼び出しの後に待つ秒数 (次の変更系の呼び出しと 1 秒以上空ける。KTD14)
 
 # 失敗の種類。None は成功。`missing` は gh を起動できない (PATH に無い・実行権限が無い)
 FAILURES = ("auth", "rate_limit", "network", "timeout", "missing", "other")
@@ -27,8 +27,6 @@ _NETWORK_RE = re.compile(
     r"network is unreachable|error connecting|could not resolve host",
     re.IGNORECASE,
 )
-
-_last_mutation_end = None
 
 
 def _graphql_error_types(stdout):
@@ -74,7 +72,8 @@ def _text(value):
 def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
     """`gh` を引数の配列で実行する。
 
-    mutation が真なら、前の変更系の呼び出しの終わりから MUTATION_INTERVAL 秒以上空けてから実行する。
+    mutation が真なら、gh が終わった後に MUTATION_INTERVAL 秒待ってから返る。次の変更系の呼び出しがこのプロセスでも
+    別のプロセス (CLI はサブコマンドごとに 1 プロセス) でも、1 秒以上空く (利用者と相談して決めた)。
     返り値: {"args", "exit_code" (タイムアウトと起動できなかったときは None), "stdout", "stderr_tail", "timed_out",
     "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (標準出力が空でないのに
     JSON として読めなかったときの理由。空か読めたときは None)}
@@ -82,12 +81,7 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
     `gh api --paginate` は、ページごとの JSON をつないで出すので 1 つの JSON として読めない。`--slurp` と一緒に使い、
     全ページを 1 つの配列で受け取る。
     """
-    global _last_mutation_end
     args = list(args)
-    if mutation and _last_mutation_end is not None:
-        wait = MUTATION_INTERVAL - (time.monotonic() - _last_mutation_end)
-        if wait > 0:
-            time.sleep(wait)
     try:
         completed = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=timeout)
         exit_code, stdout, stderr, timed_out = completed.returncode, completed.stdout, completed.stderr, False
@@ -95,13 +89,11 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False):
         exit_code, stdout, stderr, timed_out = None, _text(e.stdout), _text(e.stderr), True
     except OSError as e:
         # gh が PATH に無い (FileNotFoundError)・実行権限が無い (PermissionError) など。起動できなかったことを返り値で伝える
-        if mutation:
-            _last_mutation_end = time.monotonic()
         return {"args": args, "exit_code": None, "stdout": "", "stderr_tail": f"gh を起動できない: {e}",
                 "timed_out": False, "failure": "missing", "json": None, "json_error": None}
     finally:
         if mutation:
-            _last_mutation_end = time.monotonic()
+            time.sleep(MUTATION_INTERVAL)
     parsed, json_error = None, None
     if stdout.strip():
         try:

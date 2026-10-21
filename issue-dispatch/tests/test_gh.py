@@ -8,6 +8,7 @@ PATH の先頭に偽の `gh` のディレクトリを加えて `gh.run` を実�
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -41,7 +42,6 @@ class FakeGhTest(unittest.TestCase):
         os.environ["FAKE_GH_RESPONSES"] = self.responses_file
         for k in ("FAKE_GH_MODE", "FAKE_GH_SLEEP", "FAKE_GH_EXIT"):
             os.environ.pop(k, None)
-        gh._last_mutation_end = None
 
     def tearDown(self):
         for k, v in self._saved.items():
@@ -157,10 +157,22 @@ class RunTest(FakeGhTest):
         self.responses([{"prefix": ["api"], "stdout": "{}"}])
         gh.run(["api", "graphql", "-f", "query=mutation{a}"], mutation=True)
         gh.run(["api", "graphql", "-f", "query=mutation{b}"], mutation=True)
+        started = time.monotonic()
         gh.run(["api", "graphql", "-f", "query=query{c}"])
+        gh.run(["api", "graphql", "-f", "query=query{d}"])
         times = [rec["time"] for rec in self.recorded()]
         self.assertGreaterEqual(times[1] - times[0], gh.MUTATION_INTERVAL, "変更系の呼び出しは 1 秒以上空けること")
-        self.assertLess(times[2] - times[1], gh.MUTATION_INTERVAL, "読むだけの呼び出しは待たないこと")
+        self.assertLess(time.monotonic() - started, gh.MUTATION_INTERVAL, "読むだけの呼び出しは待たないこと")
+
+    def test_mutation_spacing_holds_across_processes(self):
+        """CLI はサブコマンドごとに 1 プロセスなので、別のプロセスで続けて変更系を実行しても 1 秒以上空く。"""
+        self.responses([{"prefix": ["api"], "stdout": "{}"}])
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); from issue_dispatch import gh; "
+                "gh.run(['api', 'graphql', '-f', 'query=mutation{x}'], mutation=True)")
+        for _ in range(2):
+            subprocess.run([sys.executable, "-c", code, _SCRIPTS], check=True, env=dict(os.environ))
+        times = [rec["time"] for rec in self.recorded()]
+        self.assertGreaterEqual(times[1] - times[0], gh.MUTATION_INTERVAL)
 
     def test_rate_limit_reset_at(self):
         self.responses([{"prefix": ["api", "rate_limit"], "stdout": {"fixture": "rate-limit-status"}}])
