@@ -31,18 +31,30 @@ _NETWORK_RE = re.compile(
 _last_mutation_end = None
 
 
+def _graphql_error_types(stdout):
+    """標準出力が GraphQL の応答なら、トップレベルの errors[].type の集合。読めなければ空。"""
+    try:
+        data = json.loads(stdout)
+        return {e.get("type") for e in data.get("errors", []) if isinstance(e, dict)}
+    except (ValueError, AttributeError):
+        return set()
+
+
 def classify(exit_code, stdout, stderr, timed_out):
-    """終了コードと出力から失敗の種類を決める。成功 (終了コード 0) なら None。"""
+    """終了コードと出力から失敗の種類を決める。成功 (終了コード 0) なら None。
+
+    文言を見るのは `gh` 自身が書く標準エラー出力だけ。標準出力 (API の応答) には Issue の本文など利用者の書いた
+    文字列が入るので、正規表現では見ず、JSON として読めたときのトップレベルの errors[].type だけを見る。
+    """
     if timed_out:
         return "timeout"
     if exit_code == 0:
         return None
-    text = f"{stderr}\n{stdout}"
-    if _AUTH_RE.search(text):
+    if _AUTH_RE.search(stderr):
         return "auth"
-    if _RATE_LIMIT_RE.search(text):
+    if _RATE_LIMIT_RE.search(stderr) or "RATE_LIMITED" in _graphql_error_types(stdout):
         return "rate_limit"
-    if _NETWORK_RE.search(text):
+    if _NETWORK_RE.search(stderr):
         return "network"
     return "other"
 

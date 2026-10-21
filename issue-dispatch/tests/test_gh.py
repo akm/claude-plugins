@@ -118,10 +118,21 @@ class RunTest(FakeGhTest):
         self.assertEqual(gh.run(["api", "graphql"])["failure"], "other", "GraphQL のフィールドの誤りは other")
         self.assertEqual(gh.run(["issue", "view", "999"])["failure"], "other", "無い Issue は other")
 
-    def test_classify_uses_stderr_and_stdout(self):
+    def test_user_text_in_stdout_does_not_change_classification(self):
+        """標準出力の data (利用者の文字列) に「rate limit」や「gh auth login」があっても、分類は stderr と errors[].type で決まる。"""
+        body = "Please handle the rate limit and run gh auth login first"
+        self.responses([{"prefix": ["api", "graphql"],
+                         "stdout": {"data": {"repository": {"issue": {"body": body}}},
+                                    "errors": [{"type": "NOT_FOUND", "message": "Could not resolve to an Issue"}]},
+                         "stderr": "gh: Could not resolve to an Issue (repository.issue2)\n", "exit": 1}])
+        self.assertEqual(gh.run(["api", "graphql", "-f", "query=x"])["failure"], "other")
+
+    def test_classify_uses_stderr_and_graphql_error_types(self):
         self.assertEqual(gh.classify(1, "", "gh: Bad credentials (HTTP 401)\n", False), "auth")
         self.assertEqual(gh.classify(1, '{"errors":[{"type":"RATE_LIMITED"}]}', "", False), "rate_limit",
-                         "標準出力の errors の type でも分けること")
+                         "標準出力の errors[].type でも分けること")
+        self.assertEqual(gh.classify(1, '{"data":{"x":"Bad credentials HTTP 401 rate limit"}}', "gh: boom\n", False), "other",
+                         "標準出力の data の文字列では分けないこと")
         self.assertEqual(gh.classify(1, "", 'Post "https://api.github.com/graphql": dial tcp: i/o timeout\n', False), "network")
         self.assertEqual(gh.classify(0, "", "", False), None)
         self.assertEqual(gh.classify(None, "", "", True), "timeout")
