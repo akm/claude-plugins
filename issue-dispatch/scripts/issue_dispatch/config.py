@@ -41,7 +41,9 @@ DEFAULTS = {
 }
 INTEGER_KEYS = ("poll_minutes", "wait_minutes", "declare_deadline_minutes")
 
-_REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
+# リポジトリの名前 `owner/repo` の形 (GitHub の名前に使える英数字と ._-)。モジュール repo も origin の URL から取り出した名前の検査に使う
+REPO_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
+_REPO_RE = REPO_NAME_RE
 
 
 def config_path(root):

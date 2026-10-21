@@ -52,6 +52,8 @@ URL は `git -C <パス> remote get-url origin` の値 (`insteadOf` の設定を
 | `https://` / `http://` | `https://github.com/akm/verify-a` |
 | `git://` | `git://github.com/akm/verify-a.git` |
 
+owner と name は、設定のキーと同じ形 (英数字と `.`・`_`・`-`) に限る。それ以外の文字 (空白・UTF-8 として読めないバイトなど) を含む URL は読めない形として扱い、`repo name` は理由 `url-unparsable` を返す。
+
 同じリポジトリと判定する条件:
 
 - host が `github.com` である。GitHub が案内するほかの接続先 (ポート 443 の SSH の `ssh.github.com`) も同じとみなす。SSH で接続する形 (scp 形式と `ssh://`) では、SSH の設定 (`~/.ssh/config`) の Host の別名を `ssh -G <別名>` の出力の `hostname` の行で解決する (ssh が無い・失敗したときは名前のまま比べるので、別名は合わない)。`https://`・`http://`・`git://` は SSH で接続しないので解決せず、URL の host のまま比べる。それ以外の host (GitHub Enterprise など) は合わない。

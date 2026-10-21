@@ -69,7 +69,9 @@ class ParseUrlTest(unittest.TestCase):
                 self.assertEqual(parsed["scheme"], "scp" if "://" not in url else url.split("://")[0])
 
     def test_unparsable_urls(self):
-        for url in ("", "github.com", "/local/path", "file:///tmp/x.git", "https://github.com/akm", "akm/verify-a"):
+        bad_bytes = b"git@github.com:ak\xffm/x.git".decode("utf-8", errors="surrogateescape")
+        for url in ("", "github.com", "/local/path", "file:///tmp/x.git", "https://github.com/akm", "akm/verify-a",
+                    "https://github.com/ak m/x", "git@github.com:akm/x y.git", "https://github.com//x", bad_bytes):
             with self.subTest(url=url):
                 self.assertIsNone(repo.parse_origin_url(url))
 

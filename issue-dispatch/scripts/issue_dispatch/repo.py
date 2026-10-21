@@ -49,7 +49,8 @@ def parse_origin_url(url):
     """`origin` の URL から scheme と host と owner と name を取り出す。読めない形なら None。
 
     受け付ける形: scp 形式 (`git@host:owner/name.git`。scheme は `scp`)・`ssh://`・`https://`・`http://`・`git://`。
-    末尾の `.git` と `/` は取り除く。owner と name の大文字小文字はそのまま返す (比べるときに区別しない)。
+    末尾の `.git` と `/` は取り除く。owner と name は設定のキーと同じ形 (config.REPO_NAME_RE。英数字と ._-) に限り、
+    大文字小文字はそのまま返す (比べるときに区別しない)。
     """
     if not isinstance(url, str) or not url:
         return None
@@ -68,6 +69,8 @@ def parse_origin_url(url):
     parts = path.split("/")
     if len(parts) != 2 or not all(parts):
         return None
+    if not config.REPO_NAME_RE.match(path):
+        return None  # GitHub のリポジトリ名に使えない文字 (空白・読めないバイトなど) を含む
     return {"scheme": scheme, "host": host, "owner": parts[0], "name": parts[1]}
 
 
