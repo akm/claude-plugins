@@ -31,12 +31,18 @@ def _clean_env():
 
 
 def run_git(path, *args):
-    """`git -C <path> <args>` を実行し、(終了コード, 標準出力 (末尾の改行を除く), 標準エラー出力) を返す。"""
+    """`git -C <path> <args>` を実行し、(終了コード, 標準出力 (末尾の改行を除く), 標準エラー出力) を返す。
+
+    出力はバイト列で受け、UTF-8 として読む。読めないバイトは surrogateescape で文字列に残す (ロケールの文字コードに
+    依らず、落ちない)。設定ファイルの中身のように厳密に UTF-8 であるべきものは、呼び出し側が確かめる。
+    """
     try:
-        p = subprocess.run(["git", "-C", path, *args], capture_output=True, text=True, env=_clean_env())
+        p = subprocess.run(["git", "-C", path, *args], capture_output=True, env=_clean_env())
     except OSError as e:
         return None, "", f"git を起動できない: {e}"
-    return p.returncode, p.stdout.rstrip("\n"), p.stderr
+    out = p.stdout.decode("utf-8", errors="surrogateescape")
+    err = p.stderr.decode("utf-8", errors="surrogateescape")
+    return p.returncode, out.rstrip("\n"), err
 
 
 def parse_origin_url(url):
@@ -161,6 +167,13 @@ def read_repo_config(repositories, repo):
         code, text, err = run_git(path, "show", f"refs/remotes/origin/HEAD:{config.CONFIG_PATH}")
         if code != 0:
             return _unreadable("git-failed", f"git show が失敗した: {err.strip()}", path=path)
+        try:
+            text.encode("utf-8")  # surrogateescape で残った読めないバイトがあれば失敗する
+        except UnicodeEncodeError as e:
+            result = _unreadable("config-unreadable", "既定のブランチの設定ファイルを UTF-8 として読めない",
+                                 f"{repo} の既定のブランチの {config.CONFIG_PATH} を UTF-8 で保存し直す", path=path)
+            result["errors"] = [{"key": "(file)", "message": f"UTF-8 として読めない: {e}"}]
+            return result
     loaded = config.load_text(text, "repo", f"{path} の origin/HEAD:{config.CONFIG_PATH}")
     result = {"status": loaded["status"], "reason": None, "message": None, "fix": None, "root_hint": None, "path": path,
               "config": loaded["config"], "warnings": loaded["warnings"], "errors": loaded["errors"]}

@@ -224,6 +224,25 @@ class ReadRepoConfigTest(unittest.TestCase):
         self.assertTrue(r["errors"])
 
 
+class UnreadableBytesTest(unittest.TestCase):
+
+    def test_non_utf8_config_on_default_branch(self):
+        """既定のブランチの設定ファイルが UTF-8 でなければ、例外ではなく「読めない」(config-unreadable)。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            clone = os.path.join(tmp, "clone")
+            make_clone(clone)
+            os.makedirs(os.path.join(clone, os.path.dirname(CONFIG_REL)))
+            with open(os.path.join(clone, CONFIG_REL), "wb") as f:
+                f.write(b"\xff\xfe{}")
+            _git(clone, "add", "-A")
+            _git(clone, "commit", "-q", "-m", "non utf-8 config")
+            sha = _git(clone, "rev-parse", "HEAD").stdout.strip()
+            _git(clone, "update-ref", "refs/remotes/origin/main", sha)
+            r = repo.read_repo_config({"akm/verify-a": clone}, "akm/verify-a")
+            self.assertEqual((r["status"], r["reason"]), ("unreadable", "config-unreadable"))
+            self.assertIn("UTF-8", r["errors"][0]["message"])
+
+
 class RepoNameTest(unittest.TestCase):
 
     def setUp(self):
