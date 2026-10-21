@@ -66,7 +66,7 @@
 
 | サブコマンド | 入力 | 出力 (JSON) |
 | --- | --- | --- |
-| `project check --project <owner>/<番号>` | | `status`・`project` (`id`・`title`・`url`・`owner`・`number`)・`check` (`ok`・`missing_fields`・`missing_status_options`・`workflows` (`required_disabled`・`recommended_disabled`・`notice_enabled`・`discouraged_enabled`)・`proposals` (`field_create` の引数の配列と、`update_options` (単一選択のフィールドに選択肢を足す入力 (`field`・`fieldId`・`options`) の配列)))・`rate_limit`・`errors` |
+| `project check --project <owner>/<番号>` | | `status`・`project` (`id`・`title`・`url`・`owner`・`number`)・`check` (`ok`・`missing_fields`・`missing_status_options`・`workflows` (`required_disabled`・`recommended_disabled`・`notice_enabled`・`discouraged_enabled`)・`proposals` (`field_create` の引数の配列と、`update_options` (単一選択のフィールドに選択肢を足す入力 (`field`・`fieldId`・`options`) の配列)))・`rate_limit`・`warnings` (Project は読めたが GraphQL が一緒に返した errors)・`errors` |
 | `project items --project <owner>/<番号>` | | `status` (`ok` / `partial` 一部を読めなかった / `error`)・`project_id`・`items` (下の表)・`problems` (`what`: `items-page` 続きのページ・`graphql-errors` data と一緒に返った errors・`comments` / `events` 続きのページ・`labels-truncated` / `blocked_by-truncated` / `body_edits-truncated` / `prs-truncated` / `fields-truncated` 入れ子の connection が 1 ページに収まらない)・`rate_limit`・`errors` |
 | `project set-status --project <owner>/<番号> --item <項目の ID> --status <値>` | 値は 5 つのどれか | `status` (`ok` / `rejected` / `error`)・`item_id`・`field`・`value`・`errors` |
 | `project add-fields --project <owner>/<番号>` | 承認を得た後に呼ぶ | `status`・`results` (実行ごとの `action` (`field-create` / `update-options`)・`field`・`ok`・`failure`)・`errors` |
