@@ -274,11 +274,11 @@ class RepoConfigTest(ConfigTestBase):
         self.assertEqual(result["config"]["files"], [])
         self.assertEqual(len(_warnings_about(result, "files")), 3)
 
-    def test_repository_names_follow_github_rules(self):
-        """リポジトリの名前は GitHub の規則 (`.github` のような名前は通り、ハイフンで始まる owner は通らない)。"""
+    def test_repository_names_use_allowed_characters(self):
+        """リポジトリの名前は、名前に使える文字 (英数字と ._-) の 1 文字以上を `/` で区切った形。空白や区切りの崩れは通らない。"""
         _write_config(self.root, {"files": []})
-        for name, ok in (("akm/.github", True), ("akm/_private", True), ("my-org/a.b-c_d", True),
-                         ("-akm/x", False), ("akm-/x", False), ("akm/", False), ("akm/x y", False)):
+        for name, ok in (("akm/.github", True), ("akm/_private", True), ("my-org/a.b-c_d", True), ("alice_acme/notes", True),
+                         ("akm/", False), ("/x", False), ("akm/x y", False), ("akm/x/y", False), ("akm", False)):
             with self.subTest(name=name):
                 self.assertEqual(bool(config.REPO_NAME_RE.match(name)), ok)
 
