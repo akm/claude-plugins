@@ -22,6 +22,11 @@
   comment post --issue <参照> --role manager|worker --name <名前> --session-id <ID> --kind <種類> [値のオプション] (--body <本文> | --body-file <ファイル|->)
       先頭行を組み立てて投稿する。同じ出来事への同じコメントが既にあれば投稿せず posted false を返す (値のオプションは issue-format.md の「コメント」)
   comment parse --line <先頭行>   先頭行を解析する (gh は実行しない。形でなければ header は null)
+  declaration parse --dir <リポジトリのルート> (--body <JSON> | --body-file <ファイル|->)   宣言の JSON を検査し、パスをそろえ、種類を付けて返す
+      (リポジトリの設定の規則は --dir から読む。作業のセッションが投稿の前に確かめる)
+  declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body <JSON> | --body-file <ファイル|->)
+      標準入力の JSON {"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} で競合の可能性を判定する。リポジトリの設定は
+      repositories の clone から既定のブランチの内容として読み、読めなければ判定しない (KTD9)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -36,7 +41,7 @@ import json
 import os
 import sys
 
-from issue_dispatch import comments, config, filekinds, issues, project, record, repo
+from issue_dispatch import comments, config, declaration, filekinds, issues, project, record, repo
 
 
 def _emit(payload):
@@ -319,6 +324,71 @@ def cmd_comment_post(args):
     return 0
 
 
+def _read_json_body(args, key="body"):
+    """--body か --body-file の JSON を読む。返り値は (値, None) か (None, errors の要素)。"""
+    text, problem = _read_body(args)
+    if problem:
+        return None, {"key": "body-file", "message": problem, "failure": None}
+    try:
+        return json.loads(text), None
+    except ValueError as e:
+        return None, {"key": key, "message": f"JSON として読めない: {e}", "failure": None}
+
+
+def cmd_declaration_parse(args):
+    body, problem = _read_json_body(args)
+    if problem:
+        _emit({"status": "error", "declaration": None, "count": None, "config_status": None, "errors": [problem]})
+        return 0
+    loaded = config.load(args.dir, "repo")
+    result = declaration.parse(body, loaded["config"]["files"], filekinds.load_default_table())
+    _emit({**result, "config_status": loaded["status"], "warnings": loaded["warnings"], "config_errors": loaded["errors"]})
+    return 0
+
+
+def cmd_declaration_conflictability(args):
+    body, problem = _read_json_body(args)
+    if problem:
+        _emit({"status": "error", "result": None, "others": [], "repo_config": None, "errors": [problem]})
+        return 0
+    loaded = config.load(args.dir, "manager")
+    read = repo.read_repo_config(loaded["config"].get("repositories") or {}, args.repo)
+    repo_config = {k: read.get(k) for k in ("status", "reason", "message", "fix", "root_hint", "path", "warnings", "errors")}
+    if read["status"] == "unreadable":
+        # 読めない設定をデフォルト値で続けると誤った判定をするので、判定しない (KTD9)
+        _emit({"status": "error", "result": None, "others": [], "repo_config": repo_config,
+               "errors": [{"key": "repo-config", "message": f"{args.repo} のリポジトリの設定を読めない ({read['reason']}): {read['message']}。{read.get('fix') or ''}", "failure": None}]})
+        return 0
+    rules = read["config"]["files"]
+    table = filekinds.load_default_table()
+    if not isinstance(body, dict) or "declaration" not in body:
+        _emit({"status": "error", "result": None, "others": [], "repo_config": repo_config,
+               "errors": [{"key": "body", "message": "本文は {\"declaration\": <宣言>, \"others\": [{\"id\", \"repo\", \"declaration\"}]} のオブジェクト", "failure": None}]})
+        return 0
+    errors = []
+    mine = declaration.parse(body["declaration"], rules, table)
+    errors += [{"key": f"declaration.{e['key']}", "message": e["message"], "failure": None} for e in mine["errors"]]
+    others = []
+    for i, other in enumerate(body.get("others") or []):
+        if not isinstance(other, dict) or not isinstance(other.get("repo"), str) or "declaration" not in other:
+            errors.append({"key": f"others[{i}]", "message": "others の要素は {\"id\", \"repo\", \"declaration\"} のオブジェクト", "failure": None})
+            continue
+        if other["repo"].lower() != args.repo.lower():
+            # 別のリポジトリの宣言は競合しない (比べるパスが無い) ので、そのリポジトリの規則で検査せずに相手として残す
+            others.append({"id": other.get("id"), "repo": other["repo"], "declaration": {"files": [], "resources": [], "split": None}})
+            continue
+        parsed = declaration.parse(other["declaration"], rules, table)
+        errors += [{"key": f"others[{i}].{e['key']}", "message": e["message"], "failure": None} for e in parsed["errors"]]
+        if parsed["status"] == "ok":
+            others.append({"id": other.get("id"), "repo": other["repo"], "declaration": parsed["declaration"]})
+    if errors:
+        _emit({"status": "error", "result": None, "others": [], "repo_config": repo_config, "errors": errors})
+        return 0
+    result = declaration.conflictability({"repo": args.repo, "declaration": mine["declaration"]}, others)
+    _emit({"status": "ok", **result, "declaration": mine["declaration"], "repo_config": repo_config, "errors": []})
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="issue_dispatch.py", description="issue-dispatch の同梱 CLI (入出力は JSON)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -427,6 +497,22 @@ def build_parser():
     body.add_argument("--body", help="本文 (先頭行はこの CLI が足す)")
     body.add_argument("--body-file", help="本文のファイル (- なら標準入力)")
     p_cpost.set_defaults(func=cmd_comment_post)
+
+    p_decl = sub.add_parser("declaration", help="宣言")
+    decl_sub = p_decl.add_subparsers(dest="subcommand", required=True)
+    p_dparse = decl_sub.add_parser("parse", help="宣言の JSON を検査し、パスをそろえ、種類を付けて返す (gh は実行しない)")
+    p_dparse.add_argument("--dir", required=True, help="リポジトリのルート (設定の files の規則を読む)")
+    body = p_dparse.add_mutually_exclusive_group(required=True)
+    body.add_argument("--body", help="宣言の JSON")
+    body.add_argument("--body-file", help="宣言の JSON のファイル (- なら標準入力)")
+    p_dparse.set_defaults(func=cmd_declaration_parse)
+    p_dconf = decl_sub.add_parser("conflictability", help="競合の可能性を判定する (リポジトリの設定は repositories の clone から読む)")
+    p_dconf.add_argument("--dir", required=True, help="管理ディレクトリ")
+    p_dconf.add_argument("--repo", required=True, help="判定する Issue のリポジトリ (owner/name)")
+    body = p_dconf.add_mutually_exclusive_group(required=True)
+    body.add_argument("--body", help='{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} の JSON')
+    body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
+    p_dconf.set_defaults(func=cmd_declaration_conflictability)
 
     p_pr = sub.add_parser("pr", help="PR")
     pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)

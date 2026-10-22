@@ -1,6 +1,6 @@
 # Issue の様式
 
-このファイルが、この仕組み (issue-dispatch) が扱う Issue と PR の様式の正本。管理のセッションと作業のセッションが Issue のどこを読み、どこに何を書くかをここで決める。Project のフィールドと Status の様式は [project-schema.md](project-schema.md)、リポジトリの設定は [project-config.md](project-config.md) が正本で、ここには写さない。宣言 (作業のセッションが変える予定のファイルを書くコメント) の本文の様式は U10 で、この文書に足す。
+このファイルが、この仕組み (issue-dispatch) が扱う Issue と PR の様式の正本。管理のセッションと作業のセッションが Issue のどこを読み、どこに何を書くかをここで決める。Project のフィールドと Status の様式は [project-schema.md](project-schema.md)、リポジトリの設定は [project-config.md](project-config.md) が正本で、ここには写さない。宣言 (作業のセッションが変える予定のファイルを書くコメント) の本文の様式は「宣言」の節。
 
 ## Issue が持つもの
 
@@ -129,6 +129,68 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 
 `小さな PR の報告` は、先頭行の `待つ Issue`・`待つ側の宣言`・`前の PR` (あれば) が同じ `依頼` (種類 `小さな PR`) に答えたものとする。書いたセッションの名前と ID は比べない (小さな PR を作るのは依頼の宛先のセッションだが、名前は変わりうるため)。作り直しの依頼 (`前の PR` を持つ) には、`前の PR` を持つ報告だけが対応する。
 
+## 宣言
+
+作業のセッションは、変える予定のファイルと節と資源を、コメント `着手の宣言` (更新は `宣言の更新`。先頭行は「コメント」の節) の本文に **1 つの JSON のコードブロック**で書く (計画の R4)。管理のセッションは最新の宣言 1 件だけを読む (更新では全体を書き直し、足したものだけを書かない)。種類は宣言に書かず、スクリプトがパスから決める (計画の KTD9。`kind` を書くと未知のキーとして差し戻す)。形の検査とパスのそろえ方・更新の種類・競合の可能性・PR が変えたファイルとの照合は、モジュール `issue-dispatch/scripts/issue_dispatch/declaration.py` が行う (`gh` は使わない)。
+
+### JSON のキー
+
+| キー | 必須 | 型 | 意味 |
+| --- | --- | --- | --- |
+| `files` | ✓ | 配列 | 変える予定のファイル。0 件でもよい |
+| `files[].path` | ✓ | 文字列 | リポジトリのルートからの相対パス。`./a`・`a//b`・`a/../a/b` は同じパスにそろえる。絶対パスと、ルートの外を指すパス (`../x`。そろえると `../x` になる `src/../../x` も)・ルートそのものは差し戻す。同じパスを 2 度書けない |
+| `files[].units` | | 文字列の配列の配列 | そのファイルのうち変える予定の節。節の書き方 (階層ごとの名前の配列。名前は正規化しない) と、書ける種類 (節の表記 `unit_notation` がある種類) の正本は [file-kinds.md](file-kinds.md) の「節で判定する」と「節の表記」で、ここでは言い直さない。省けばファイル全体を変える予定 |
+| `resources` | ✓ | 文字列の配列 | 使う資源の名前 (ラベル `resource:<名前>` の `<名前>`)。空白を含まない |
+| `split` | ✓ | オブジェクト | 分ける必要 |
+| `split.needed` | ✓ | 真偽値 | 分ける必要があるか |
+| `split.reason` | ✓ | 文字列 | 理由。`needed` が偽なら空でよい |
+| `split.remaining` | `needed` が真なら ✓ | 文字列 | 新しい Issue にする残りの部分の説明。偽なら書かない |
+| `split.blocked_by` | `needed` が真なら ✓ | Issue の参照の配列 | 残りの部分が完了を待つ Issue (`owner/repo#番号` か URL。`owner/repo#番号` にそろえる)。大きさのために分けるなら空の配列。偽なら書かない |
+
+上の表に無いキー (`file` の誤字・`kind` など) と、欠けた必須キーは、理由と期待する形を含むエラーで差し戻す (`declaration parse` の `errors`。誤りはできるだけ全部集める)。
+
+例 (**この例は様式を示すもので、そのまま写さない**):
+
+```json
+{
+  "files": [
+    {"path": "package.json", "units": [["dependencies", "zod"]]},
+    {"path": "src/app.ts"}
+  ],
+  "resources": ["staging-db"],
+  "split": {"needed": false, "reason": ""}
+}
+```
+
+### 更新の種類
+
+宣言の更新を、最後に `開始可` を書いた宣言 (以下「`開始可` の宣言」) と比べて分ける (計画の R20)。**持っている資源**は、`開始可` の宣言の `resources` のうち、その後のどの宣言の更新にも残っているもの (`開始可` の宣言がまだ無ければ空)。差し戻された宣言は比べる相手にしない。
+
+| 種類 | 条件 | 扱い |
+| --- | --- | --- |
+| `initial` | `開始可` の宣言がまだ無い | 着手の宣言と同じに判定する |
+| `full` | ファイルか節が `開始可` の宣言と違う (または資源も含めて何も変わらない) | 競合の可能性を判定する |
+| `resources-only` | ファイルと節が同じで、資源だけが持っている資源と違い、足した資源がある | 資源だけを判定する (資源の扱いは U11)。ready for review の後も Issue が閉じるまで受け付ける |
+| `resources-removed-only` | ファイルと節が同じで、持っている資源から 1 つ以上を外し、足した資源が無い | 判定せず、`開始可` を書かない |
+
+足した資源と外した資源は持っている資源との差で数える: `{A, B}` が `開始可` → `{A}` → `{A, B}` では B を足したと数え、`{X, Y, Z}` → `{X, Y}` → `{X}` の 2 回目に外すのは Y だけ。
+
+### 競合の可能性
+
+2 つの宣言 (判定する宣言と、既に `開始可` になった宣言) の、同じリポジトリの同じパスごとに判定する (計画の R5。種類ごとの規則と節の比べ方の正本は [file-kinds.md](file-kinds.md))。別のリポジトリの同じパスは競合しない (リポジトリ名の大文字小文字は区別しない)。
+
+| 結果 | 意味 |
+| --- | --- |
+| `conflict` | 競合しうる |
+| `none` | 競合しない |
+| `needs-user` | 利用者の判定が要る (`unknown-content` を含む組で同じパス) |
+
+相手ごとにパスごとの結果と理由を返し、相手ごとの結果と全体の結論は `conflict` > `needs-user` > `none` の順で決める。
+
+### PR が変えたファイルとの照合
+
+`In review` にするとき、PR が変えたファイル (`pr observe` の `files`) を最新の宣言と比べ、宣言に無いファイル (種類が `generated` のものを除く) と、そのファイルを宣言しているほかの `開始可` の宣言を返す (計画の R21)。宣言にあるファイルだけを変えた PR では何も返さない。
+
 ## CLI
 
 | サブコマンド | 書き込み | 返すもの |
@@ -140,5 +202,7 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 | `comment list --issue <参照>` | 無し | `comments` (時刻の順。要素は `id`・`database_id`・`url`・`created_at`・`author`・`header` (先頭行の解析結果か null)・`body` (先頭行を除いた本文))・`excluded` (書き手が違うので除いた件数)・`login` |
 | `comment post --issue <参照> --role manager\|worker --name <名前> --session-id <ID> --kind <種類> [--to] [--assignment] [--declaration] [--reason <値>]... [--request-kind] [--waiting-issue] [--waiting-declaration] [--previous-pr] [--pr] [--release-reason] [--stuck-state] [--blocker <参照>]... (--body \| --body-file)` | `gh issue comment` (管理のセッションの種類で既投稿なら無し) | `posted`・`database_id`・`url`・`header` (組み立てた先頭行)。値のオプションは見出し語の表の順 |
 | `comment parse --line <先頭行>` | 無し | `header` (解析結果か null) |
+| `declaration parse --dir <リポジトリのルート> (--body <JSON> \| --body-file <ファイル \| ->)` | 無し | `declaration` (そろえたパスと種類付き。誤りがあれば null)・`count`・`config_status`。リポジトリの設定の規則は `--dir` から読む |
+| `declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body \| --body-file)` | 無し | 本文は `{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]}`。`result` (全体)・`others` (相手ごと・パスごとの結果と理由)・`declaration`・`repo_config` (設定の読み取りの結果)。リポジトリの設定は `repositories` の clone から既定のブランチの内容として読み (正本は [repositories.md](repositories.md))、読めなければ判定せず `errors` (key `repo-config`) で理由と直し方を返す |
 
 `<参照>` は `owner/repo#番号` か Issue の URL。どのサブコマンドも JSON を出せれば終了コード 0 で、失敗は `status: error` と `errors` (`key`・`message`・`failure`) で伝える。参照や URL の形が読めないときは `gh` を実行せずに返す。
