@@ -53,6 +53,7 @@ class ManagerNameTest(unittest.TestCase):
         self.assertEqual(sessions.manager_name("akm", 3, "akm"), "issue-dispatch akm/3/akm")
         self.assertEqual(sessions.manager_name("akm", 3, "akm"), sessions.manager_name("akm", "3", "akm"))
         self.assertEqual(sessions.manager_name({"owner": "akm", "number": 3}, login="someone"), "issue-dispatch akm/3/someone", "設定の project (dict) も受ける")
+        self.assertEqual(sessions.manager_name("AKM", 3, "Akm"), "issue-dispatch akm/3/akm", "owner と login の綴りが違っても同じ名前 (GitHub は区別しない)")
 
     def test_name_rejects_bad_inputs(self):
         for owner, number, login in (("", 3, "akm"), ("akm", 0, "akm"), ("akm", "x", "akm"), ("akm", 3, ""), ("a/b", 3, "akm"), ("akm", 3, "a b"), (None, 3, "akm")):
@@ -64,6 +65,7 @@ class ManagerNameTest(unittest.TestCase):
         self.assertEqual(parsed, {"owner": "akm", "number": 3, "login": "akm"})
         self.assertEqual(sessions.manager_name(**parsed), "issue-dispatch akm/3/akm")
         self.assertEqual(sessions.parse_manager_name("  issue-dispatch my-org/12/some-one  "), {"owner": "my-org", "number": 12, "login": "some-one"})
+        self.assertEqual(sessions.parse_manager_name("issue-dispatch AKM/3/Akm"), {"owner": "akm", "number": 3, "login": "akm"}, "読むときも小文字にそろえる")
         for bad in ("issue-dispatch akm/3", "issue-dispatch akm/3/akm/x", "issue-dispatch akm/0/akm", "issue-dispatch  akm/3/akm", "worker-a", "", None,
                     "issue-dispatch akm/3/akm [2c2f42]"):
             with self.subTest(bad=bad):

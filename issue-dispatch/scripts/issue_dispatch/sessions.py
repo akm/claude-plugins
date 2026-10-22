@@ -50,7 +50,9 @@ def own_session_id(environ):
 
 def manager_name(owner, number=None, login=None):
     """管理のセッションの規約の名前 `issue-dispatch <owner>/<number>/<login>` を作る (KD23)。owner に設定の project
-    (dict。owner と number) を渡してもよい。形が違えば ValueError。"""
+    (dict。owner と number) を渡してもよい。owner と login は小文字にそろえる (GitHub は大文字小文字を区別しないが、名前は
+    Claude Code が文字列として照合する宛先なので、設定に書かれた綴りが違っても同じ組から同じ名前を導くため)。
+    形が違えば ValueError。"""
     if isinstance(owner, dict):
         owner, number = owner.get("owner"), owner.get("number")
     if not isinstance(owner, str) or not _OWNER_RE.match(owner):
@@ -59,12 +61,12 @@ def manager_name(owner, number=None, login=None):
         raise ValueError(f"Project の番号は 1 以上の整数: {number!r}")
     if not isinstance(login, str) or not _LOGIN_RE.match(login):
         raise ValueError(f"login は名前に使える文字だけの文字列: {login!r}")
-    return f"{NAME_PREFIX}{owner}/{int(str(number).strip())}/{login}"
+    return f"{NAME_PREFIX}{owner.lower()}/{int(str(number).strip())}/{login.lower()}"
 
 
 def parse_manager_name(text):
-    """規約の名前を読む。返り値は {"owner", "number", "login"} か、形が違えば None。ListAgents の行に付く短い識別子
-    (`[2c2f42]`) は含まない形で渡す (呼び出し元が外す)。"""
+    """規約の名前を読む。返り値は {"owner", "number", "login"} (owner と login は小文字) か、形が違えば None。
+    ListAgents の行に付く短い識別子 (`[2c2f42]`) は含まない形で渡す (呼び出し元が外す)。"""
     if not isinstance(text, str):
         return None
     text = text.strip()
@@ -78,7 +80,7 @@ def parse_manager_name(text):
         manager_name(owner, number, login)
     except ValueError:
         return None
-    return {"owner": owner, "number": int(number), "login": login}
+    return {"owner": owner.lower(), "number": int(number), "login": login.lower()}
 
 
 def session_temp_dir(session_id, environ):
