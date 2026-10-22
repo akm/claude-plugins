@@ -6,7 +6,7 @@
 
 セッションは ID と名前の両方を持つ (計画の KTD10)。作業のセッションは割り当てを受けるときに両方を申告し、管理のセッションは Project のフィールド `Agent session ID` に ID、`Agent session title` に名前を書く (フィールドの正本は [project-schema.md](project-schema.md))。
 
-- **ID** は環境変数から決める: `CLAUDE_CODE_HOST_SESSION_ID` (Claude Desktop のセッション ID。`local_` で始まる) があればそれ、無ければ `CLAUDE_CODE_SESSION_ID` (会話の記録と同じ UUID。端末の `claude` にはこちらだけがある)。空の値と、空白か `/` を含む値は無いものとして扱う。どちらの環境変数も公式文書に無い振る舞いなので、読むのは関数 `own_session_id` の 1 か所にまとめる。`local_` の有無は区別して保持し、`local_<ID>` と `<ID>` は別のセッションとして比べる (関数 `normalize_session_id`・`same_session_id`)。中身の形 (UUID かどうか) には決め打ちしない。
+- **ID** は環境変数から決める: `CLAUDE_CODE_HOST_SESSION_ID` (Claude Desktop のセッション ID。`local_` で始まる) があればそれ、無ければ `CLAUDE_CODE_SESSION_ID` (会話の記録と同じ UUID。端末の `claude` にはこちらだけがある)。空の値と、空白か `/` を含む値、`.` で始まる値 (`.`・`..` を含む) は無いものとして扱う (ID は一時ディレクトリのパスの 1 区切りにも使うため)。どちらの環境変数も公式文書に無い振る舞いなので、読むのは関数 `own_session_id` の 1 か所にまとめる。`local_` の有無は区別して保持し、`local_<ID>` と `<ID>` は別のセッションとして比べる (関数 `normalize_session_id`・`same_session_id`)。中身の形 (UUID かどうか) には決め打ちしない。
 - **名前**は `ListAgents` の 1 行目 (`This session is <名前> [<短い識別子>]`) の名前で、行に付く短い識別子 (`[2c2f42]` の形。プロセスごとの値で、開き直すと変わる) を除いた部分。作業のセッションは名前を変えない (変わっていれば管理のセッションが `renamed` と見る)。名前が `ListAgents` に無いときの引き直しは、Desktop では `list_sessions` (ID → タイトル)、端末のセッションは引き直せないので利用者に尋ねる。
 
 ## 管理のセッションの規約の名前

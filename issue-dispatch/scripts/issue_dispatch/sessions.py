@@ -13,14 +13,16 @@ NAME_PREFIX = "issue-dispatch "
 # CLAUDE_CODE_SESSION_ID (会話の記録の UUID)。公式文書に無い振る舞いに頼るので、読むのは own_session_id の 1 か所 (KTD10)
 ENV_HOST_SESSION_ID = "CLAUDE_CODE_HOST_SESSION_ID"
 ENV_SESSION_ID = "CLAUDE_CODE_SESSION_ID"
-_ID_RE = re.compile(r"^(?:local_)?[^\s/]+$")  # `local_` の有無は区別して保持する。中身の形 (UUID など) には決め打ちしない
+# `local_` の有無は区別して保持する。中身の形 (UUID など) には決め打ちせず、パスの 1 区切りとして使える値 (空白と `/` を
+# 含まず、`.` で始まらない。`.`・`..` は通さない) だけを通す
+_ID_RE = re.compile(r"^(?:local_)?[^\s/.][^\s/]*$")
 _OWNER_RE = re.compile(r"^[A-Za-z0-9._-]+$")    # ids.REPO_NAME_PATTERN の owner の部分と同じ文字
 _LOGIN_RE = _OWNER_RE
 
 
 def normalize_session_id(text):
     """セッション ID をそろえる (前後の空白を除く)。`local_<ID>` と `<ID>` は別物として保持する。
-    空・空白や `/` を含む・`local_` だけ、は読めないので None。"""
+    空・空白や `/` を含む・`.` で始まる (`.`・`..` を含む)・`local_` だけ、は読めないので None (ID はパスの 1 区切りにも使う)。"""
     if not isinstance(text, str):
         return None
     text = text.strip()
@@ -87,5 +89,5 @@ def session_temp_dir(session_id, environ):
     if normalized is None:
         raise ValueError(f"セッション ID が読めない: {session_id!r}")
     tmpdir = (environ.get("TMPDIR") or "").strip()
-    base = tmpdir.rstrip("/") if tmpdir.startswith("/") else "/tmp"
-    return f"{base or '/'}/issue-dispatch/{normalized}".replace("//", "/")
+    base = tmpdir if tmpdir.startswith("/") else "/tmp"
+    return os.path.normpath(os.path.join(base, "issue-dispatch", normalized))

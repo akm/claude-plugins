@@ -33,7 +33,7 @@ class SessionIdTest(unittest.TestCase):
         self.assertFalse(sessions.same_session_id(HOST, None))
 
     def test_normalize_rejects_bad_ids(self):
-        for bad in ("", "   ", None, 12, "a b", "a/b", "local_", "a\nb"):
+        for bad in ("", "   ", None, 12, "a b", "a/b", "local_", "a\nb", ".", "..", ".hidden"):  # `local_.` は `.` で始まらず、パスの 1 区切りにできるので通す
             with self.subTest(bad=bad):
                 self.assertIsNone(sessions.normalize_session_id(bad))
 
@@ -80,6 +80,13 @@ class TempDirTest(unittest.TestCase):
         self.assertEqual(sessions.session_temp_dir(UUID, {"TMPDIR": ""}), f"/tmp/issue-dispatch/{UUID}", "空の TMPDIR は無いものとして扱う")
         self.assertEqual(sessions.session_temp_dir(UUID, {"TMPDIR": "relative/dir"}), f"/tmp/issue-dispatch/{UUID}", "相対パスの TMPDIR は使わない (作業ツリーの中を指しうる)")
         self.assertFalse(sessions.session_temp_dir(UUID, {"TMPDIR": "/var/folders/x/T"}).startswith(os.getcwd()))
+        self.assertEqual(sessions.session_temp_dir(UUID, {"TMPDIR": "/a///b/"}), f"/a/b/issue-dispatch/{UUID}", "続く / は 1 つにそろえる")
+
+    def test_rejects_dot_ids(self):
+        """`.`・`..` はパスの 1 区切りにできないので、一時ディレクトリが issue-dispatch/ そのものや TMPDIR を指さない。"""
+        for bad in (".", ".."):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                sessions.session_temp_dir(bad, {"TMPDIR": "/var/tmp"})
 
     def test_rejects_bad_session_id(self):
         with self.assertRaises(ValueError):
