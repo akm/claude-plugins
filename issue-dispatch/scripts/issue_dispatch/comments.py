@@ -359,9 +359,9 @@ def _repo_folded(text):
 
 
 # 既投稿の見分けで書き手のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
-# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ、作業のセッションの種類は値を持たず、
-# 作業のセッションには引き継ぎが無いので、ID で見分ける
-ID_KEYED_KINDS = ("引き継ぎ",) + WORKER_KINDS
+# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で見分ける。
+# 作業のセッションの種類は既投稿を確かめない (下の already_posted と post)
+ID_KEYED_KINDS = ("引き継ぎ",)
 
 
 def header_key(parsed):
@@ -384,6 +384,8 @@ def _freeze(value, key=None):
 
 def already_posted(parsed, own_comments):
     """同じ出来事への同じコメントが既にあればそのコメント (list_comments の要素) を、無ければ None を返す (KTD2)。
+    管理のセッションの種類だけが対象 (作業のセッションの種類は先頭行に出来事を見分ける値を持たず、投稿は自分の手順の 1 歩ごとに
+    1 回なので確かめない。渡されたら ValueError)。
 
     own_comments は list_comments が返した、書き手が自分のコメントの配列 (時刻の順)。種類ごとの規則:
     `待機` は同じ宣言への最新の `待機` とだけ比べる。`依存の待ち` は最新の `依存の待ち` と比べ、間に `依存の解消` があれば
@@ -391,6 +393,8 @@ def already_posted(parsed, own_comments):
     別のコメントがあっても既投稿。ほかの種類は、先頭行の鍵 (header_key) が同じコメントがあれば既投稿。
     """
     kind = parsed["kind"]
+    if kind not in MANAGER_KINDS:
+        raise ValueError(f"既投稿を確かめるのは管理のセッションの種類だけ: {kind!r}")
     key = header_key(parsed)
     headed = [c for c in own_comments if c.get("header")]
     if kind == "待機":
@@ -425,20 +429,24 @@ def already_posted(parsed, own_comments):
 
 
 def post(issue, role, name, session_id, kind, values, body, login=None):
-    """コメントを投稿する。先頭行は format_header で作り、同じ出来事への同じコメントが既にあれば投稿しない (already_posted)。
-    返り値: {"status": "ok", "posted": bool, "database_id", "url", "header"} か失敗の説明。一覧が読めなければ投稿しない
-    (既投稿かを確かめられないまま投稿すると二重になりうるため)。"""
+    """コメントを投稿する。先頭行は format_header で作る。管理のセッションの種類は、同じ出来事への同じコメントが既にあれば
+    投稿しない (already_posted。一覧が読めなければ投稿しない — 既投稿かを確かめられないまま投稿すると二重になりうるため)。
+    作業のセッションの種類は確かめずに投稿する (やり直しでの二重の投稿は作業のセッションのスキルが扱う)。
+    返り値: {"status": "ok", "posted": bool, "database_id", "url", "header"} か失敗の説明。"""
     try:
         line = format_header(role, name, session_id, kind, values)
     except ValueError as e:
         return {"status": "error", "failure": "other", "exit_code": None, "message": str(e), "key": "header"}
-    listed = list_comments(issue, login)
-    if listed["status"] != "ok":
-        return listed
-    existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確かめているので None にはならない
-    if existing is not None:
-        return {"status": "ok", "posted": False, "database_id": existing["database_id"], "url": existing["url"], "header": line}
     url = ids.issue_url(issue)
+    if url is None:
+        return {"status": "error", "failure": "other", "exit_code": None, "message": f"Issue の参照ではない: {issue!r}", "key": "issue"}
+    if role == "manager":
+        listed = list_comments(issue, login)
+        if listed["status"] != "ok":
+            return listed
+        existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確かめているので None にはならない
+        if existing is not None:
+            return {"status": "ok", "posted": False, "database_id": existing["database_id"], "url": existing["url"], "header": line}
     r = gh.run(["issue", "comment", url, "--body-file", "-"], mutation=True, stdin=f"{line}\n\n{body or ''}")
     m = re.search(r"#issuecomment-([0-9]+)\s*$", r["stdout"].strip()) if r["stdout"] else None
     if r["failure"] or r["exit_code"] != 0 or m is None:

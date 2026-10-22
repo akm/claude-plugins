@@ -234,16 +234,15 @@ class AlreadyPostedTest(unittest.TestCase):
         other_manager = header("割り当て", {"role": "manager", "name": "mgr", "session_id": "M-2"}, to="W-7", assignment=1)
         self.assertPosted(other_manager, [a1], True, "管理のセッションの種類は書き手の ID を比べない (引き継ぎの後も二重に書かない)")
 
-    def test_handover_and_worker_kinds_compare_session_id(self):
-        """`引き継ぎ` と作業のセッションの種類は、書き手のセッション ID も比べる。"""
+    def test_handover_compares_session_id_and_worker_kinds_are_not_checked(self):
+        """`引き継ぎ` は書き手のセッション ID も比べる。作業のセッションの種類は既投稿を確かめない (渡されたら ValueError)。"""
         h1 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-2"})
         h2 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-3"})
         self.assertPosted(h1, [h1], True)
         self.assertPosted(h2, [h1], False, "別の管理のセッションの引き継ぎは投稿する")
         d1 = header("着手の宣言", WORKER)
-        d2 = header("着手の宣言", {"role": "worker", "name": "w", "session_id": "W-8"})
-        self.assertPosted(d1, [d1], True)
-        self.assertPosted(d2, [d1], False, "別の作業のセッションの宣言は投稿する")
+        with self.assertRaises(ValueError):
+            comments.already_posted(comments.parse_header(d1), self.own(d1))
         self.assertPosted(header("依存の解消", {"role": "manager", "name": "mgr", "session_id": "M-3"}),
                           [header("依存の待ち", blockers=[OTHER]), header("依存の解消")], True, "依存の解消は書き手の ID を比べない")
         s1 = header("停滞", to="W-7", assignment=1, stuck_state="idle-no-progress")
@@ -314,8 +313,6 @@ class AlreadyPostedTest(unittest.TestCase):
         self.assertPosted(small2, [small], False, "2 つの Issue からの依頼は別")
         self.assertPosted(header("依頼", to="W-7", assignment=1, request_kind="小さな PR", waiting_issue=OTHER, waiting_declaration=777, previous_pr=PR9),
                           [small], False, "作り直しの依頼は別")
-        report = header("PR の報告", WORKER)
-        self.assertPosted(report, [report], True)
 
 
 class PostTest(FakeGhCase):
@@ -352,6 +349,13 @@ class PostTest(FakeGhCase):
         self.responses([USER_ENTRY, {"substring": "query IssueComments", "stdout": data},
                         {"prefix": ["issue", "comment"], "stdout": f"{ISSUE3}#issuecomment-99\n"}])
         self.assertTrue(comments.post(ISSUE3, "manager", "mgr", "M-1", "割り当て", {"to": "W-7", "assignment": 1}, "理由")["posted"])
+
+    def test_worker_kinds_post_without_checking(self):
+        """作業のセッションの種類は、同じ先頭行のコメントが既にあっても投稿する (一覧も読まない)。"""
+        self.responses([{"prefix": ["issue", "comment"], "stdout": f"{ISSUE3}#issuecomment-99\n"}])
+        result = comments.post(ISSUE3, "worker", "worker 1", "W-7", "宣言の更新", {}, "資源を足した")
+        self.assertEqual((result["status"], result["posted"], result["database_id"]), ("ok", True, 99))
+        self.assertEqual([c["args"][:2] for c in self.recorded_full()], [["issue", "comment"]], "api user も一覧も読まない")
 
     def test_bad_values_do_not_run_gh(self):
         result = comments.post(ISSUE3, "manager", "mgr", "M-1", "解放", {"to": "W-7", "assignment": 1, "release_reason": "気分"}, "")
