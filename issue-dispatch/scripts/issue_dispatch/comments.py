@@ -337,16 +337,35 @@ def list_comments(issue, login=None):
 
 # --- 既投稿の見分けと投稿 ---------------------------------------------------------
 
+# 意味で比べる値: Issue の参照と PR の URL は owner/repo の大文字小文字を区別しない (GitHub が区別しないため)
+_REF_KEYS = ("waiting_issue", "issue", "blockers")
+_URL_KEYS = ("pr", "previous_pr")
+
+
+def _repo_folded(text):
+    """Issue の参照 (`owner/repo#番号`) か PR の URL の owner/repo を小文字にする。ほかの文字列はそのまま。"""
+    ref = ids.parse_issue_ref(text)
+    if ref:
+        return f"{ref['repo'].lower()}#{ref['number']}"
+    pr = ids.parse_pr_url(text)
+    if pr:
+        return f"https://github.com/{pr['repo'].lower()}/pull/{pr['number']}"
+    return text
+
+
 def header_key(parsed):
-    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。書き手の ID・種類・値を比べる。"""
+    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。書き手の ID・種類・値を比べる。
+    値は意味で比べる: 配列 (待つもの・待つ Issue) は並びを問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別しない。"""
     return (parsed["role"], parsed["session_id"], parsed["kind"], _freeze(parsed["values"]))
 
 
-def _freeze(value):
+def _freeze(value, key=None):
     if isinstance(value, dict):
-        return tuple(sorted((k, _freeze(v)) for k, v in value.items()))
+        return tuple(sorted((k, _freeze(v, k)) for k, v in value.items()))
     if isinstance(value, list):
-        return tuple(_freeze(v) for v in value)
+        return tuple(sorted(_freeze(v, key) for v in value))
+    if isinstance(value, str) and key in _REF_KEYS + _URL_KEYS:
+        return _repo_folded(value)
     return value
 
 
@@ -427,4 +446,4 @@ def match_report(request, report):
         return False
     a, b = request["values"], report["values"]
     return (ids.same_issue(a["waiting_issue"], b["waiting_issue"]) and a["waiting_declaration"] == b["waiting_declaration"]
-            and a.get("previous_pr") == b.get("previous_pr"))
+            and _freeze(a.get("previous_pr"), "previous_pr") == _freeze(b.get("previous_pr"), "previous_pr"))

@@ -137,6 +137,8 @@ class HeaderFormatParseTest(unittest.TestCase):
         self.assertFalse(comments.match_report(request, redo), "作り直しの依頼でなければ、前の PR を持つ報告は対応しない")
         redo_request = comments.parse_header(header("依頼", to="W-7", assignment=1, request_kind="小さな PR", waiting_issue=OTHER, waiting_declaration=777, previous_pr=PR9))
         self.assertTrue(comments.match_report(redo_request, redo))
+        redo_upper = comments.parse_header(header("小さな PR の報告", WORKER, waiting_issue=OTHER.upper(), waiting_declaration=777, previous_pr=PR9.replace(REPO, REPO.upper())))
+        self.assertTrue(comments.match_report(redo_request, redo_upper), "前の PR の owner/repo の大文字小文字は区別しない")
         self.assertFalse(comments.match_report(redo_request, same))
         self.assertFalse(comments.match_report(request, request))
 
@@ -239,6 +241,19 @@ class AlreadyPostedTest(unittest.TestCase):
         pr = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "小さな PR", "issue": OTHER}])
         pr_made = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "小さな PR", "issue": OTHER, "pr": PR9}])
         self.assertPosted(pr_made, [pr], False, "PR ができたら待つ相手が変わるので投稿する")
+
+    def test_values_compare_by_meaning(self):
+        """繰り返す値は並びを問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別せずに比べる。"""
+        ab = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の答え"}, {"kind": "資源", "resource": "db"}])
+        ba = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "資源", "resource": "db"}, {"kind": "利用者の答え"}])
+        self.assertPosted(ba, [ab], True, "待つものの並びが違っても同じ")
+        w56 = header("依存の待ち", blockers=[OTHER, f"{REPO}#6"])
+        w65 = header("依存の待ち", blockers=[f"{REPO.upper()}#6", OTHER])
+        self.assertPosted(w65, [w56], True, "待つ Issue の並びと owner/repo の大文字小文字が違っても同じ")
+        req = header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR9)
+        upper = header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR9.replace(REPO, REPO.upper()))
+        self.assertPosted(upper, [req], True)
+        self.assertPosted(header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR10), [req], False)
 
     def test_dependency_wait_and_resolution(self):
         wait5 = header("依存の待ち", blockers=[OTHER])
