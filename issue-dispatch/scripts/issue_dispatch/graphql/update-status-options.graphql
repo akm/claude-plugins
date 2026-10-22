@@ -1,0 +1,6 @@
+# Status の選択肢を、既存の選択肢の id を保ったまま足す (project add-fields)。id を含めないと既存の値が消える (U1)
+mutation UpdateStatusOptions($fieldId: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
+  updateProjectV2Field(input: {fieldId: $fieldId, singleSelectOptions: $options}) {
+    projectV2Field { ... on ProjectV2SingleSelectField { id options { id name } } }
+  }
+}

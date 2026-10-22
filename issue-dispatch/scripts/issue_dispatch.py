@@ -9,6 +9,10 @@
   record apply --dir <管理ディレクトリ>  標準入力の JSON (操作の配列) を記録に適用して保存する (1 つでも誤りがあれば保存しない)
   record log --dir <管理ディレクトリ>    標準入力の JSON (1 件) を actions.log に追記する
   repo name --dir <作業ツリー>   今の作業ツリーの origin の URL から owner/repo を返す (gh は実行しない)
+  project check --project <owner>/<番号>     フィールド・Status の選択肢・ワークフローの不足と案内、作る手順の案を返す (読むだけ)
+  project items --project <owner>/<番号>     項目の一覧を位置の順に全部読む (キーの表は project-schema.md の「CLI」)
+  project set-status --project <owner>/<番号> --item <項目の ID> --status <値>   Status を書く (5 つ以外と Done は gh を実行せずに拒否)
+  project add-fields --project <owner>/<番号>   check の案を実行する (承認を得た後に呼ぶ)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -23,7 +27,7 @@ import json
 import os
 import sys
 
-from issue_dispatch import config, filekinds, record, repo
+from issue_dispatch import config, filekinds, project, record, repo
 
 
 def _emit(payload):
@@ -141,6 +145,82 @@ def cmd_repo_name(args):
     return 0
 
 
+def _project_arg(args):
+    parsed = project.parse_project(args.project)
+    if parsed is None:
+        _emit({"status": "error", "errors": [{"key": "project", "message": f"--project は owner/番号 の形 (値 {args.project!r})"}]})
+    return parsed
+
+
+def _meta_or_emit(parsed):
+    meta = project.read_meta(parsed)
+    if meta["status"] != "ok":
+        _emit({"status": "error", "errors": [{"key": "project", "message": meta["message"], "failure": meta.get("failure")}]})
+        return None
+    return meta
+
+
+def cmd_project_check(args):
+    parsed = _project_arg(args)
+    if parsed is None:
+        return 0
+    meta = _meta_or_emit(parsed)
+    if meta is None:
+        return 0
+    checked = project.check(meta["project"])
+    checked["partial"] = bool(meta["warnings"])  # 一部が読めなかった応答から作った案 (add-fields は実行しない)
+    _emit({"status": "ok", "project": {k: meta["project"][k] for k in ("id", "title", "url", "owner", "number")},
+           "check": checked, "rate_limit": meta["rate_limit"], "warnings": meta["warnings"], "errors": []})
+    return 0
+
+
+def cmd_project_items(args):
+    parsed = _project_arg(args)
+    if parsed is None:
+        return 0
+    result = project.items(parsed)
+    if result["status"] == "error":
+        _emit({"status": "error", "items": [], "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]})
+        return 0
+    _emit({"status": result["status"], "project_id": result["project_id"], "items": result["items"],
+           "problems": result["problems"], "rate_limit": result["rate_limit"], "errors": []})
+    return 0
+
+
+def cmd_project_set_status(args):
+    parsed = _project_arg(args)
+    if parsed is None:
+        return 0
+    if args.status not in project.MANAGER_STATUSES:
+        _emit({"status": "rejected", "errors": [{"key": "status", "message": f"Status {args.status!r} は書かない (書けるのは {', '.join(project.MANAGER_STATUSES)}。Done は組み込みワークフローが書く)"}]})
+        return 0
+    meta = _meta_or_emit(parsed)
+    if meta is None:
+        return 0
+    result = project.set_status(meta["project"], args.item, args.status)
+    _emit({**result, "errors": [] if result["status"] == "ok" else [{"key": "status", "message": result["message"]}]})
+    return 0
+
+
+def cmd_project_add_fields(args):
+    parsed = _project_arg(args)
+    if parsed is None:
+        return 0
+    meta = _meta_or_emit(parsed)
+    if meta is None:
+        return 0
+    if meta["warnings"]:
+        # 一部のフィールドが読めなかった応答から案を作って実行すると、読めなかったフィールドを作り直す (同じ名前が 2 つできる)
+        _emit({"status": "rejected", "results": [], "warnings": meta["warnings"],
+               "errors": [{"key": "project", "message": "Project の一部が読めなかった (warnings) ので、構造を変える書き込みは行わない。読めるようにしてから実行する"}]})
+        return 0
+    checked = project.check(meta["project"])
+    results = project.add_fields(meta["project"], checked)
+    _emit({"status": "ok" if all(r["ok"] for r in results) else "error", "results": results,
+           "errors": [{"key": r["action"], "message": r.get("stderr") or json.dumps(r.get("errors"), ensure_ascii=False)} for r in results if not r["ok"]]})
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="issue_dispatch.py", description="issue-dispatch の同梱 CLI (入出力は JSON)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -166,6 +246,20 @@ def build_parser():
         p = record_sub.add_parser(name, help=help_text)
         p.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project と record_dir を読む)")
         p.set_defaults(func=func)
+
+    p_project = sub.add_parser("project", help="Project")
+    project_sub = p_project.add_subparsers(dest="subcommand", required=True)
+    for name, func, help_text in (("check", cmd_project_check, "フィールド・選択肢・ワークフローの検査 (読むだけ)"),
+                                  ("items", cmd_project_items, "項目の一覧を位置の順に全部読む"),
+                                  ("add-fields", cmd_project_add_fields, "check の案を実行する (承認を得た後)")):
+        p = project_sub.add_parser(name, help=help_text)
+        p.add_argument("--project", required=True, help="owner/番号")
+        p.set_defaults(func=func)
+    p_set = project_sub.add_parser("set-status", help="Status を書く (5 つ以外と Done は拒否)")
+    p_set.add_argument("--project", required=True, help="owner/番号")
+    p_set.add_argument("--item", required=True, help="項目の ID (project items の item_id)")
+    p_set.add_argument("--status", required=True, help="Todo / Ready / Blocked / In Progress / In review")
+    p_set.set_defaults(func=cmd_project_set_status)
 
     p_repo = sub.add_parser("repo", help="リポジトリ")
     repo_sub = p_repo.add_subparsers(dest="subcommand", required=True)

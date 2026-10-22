@@ -1,0 +1,22 @@
+# Project のフィールド・Status の選択肢・ワークフロー (project check と add-fields が読む)
+query ProjectMeta($owner: String!, $number: Int!) {
+  repositoryOwner(login: $owner) {
+    ... on ProjectV2Owner {
+      projectV2(number: $number) {
+        id
+        title
+        url
+        fields(first: 50) {
+          nodes {
+            ... on ProjectV2FieldCommon { id name dataType }
+            ... on ProjectV2SingleSelectField { options { id name color description } }
+          }
+        }
+        workflows(first: 50) {
+          nodes { id name number enabled }
+        }
+      }
+    }
+  }
+  rateLimit { cost remaining resetAt }
+}
