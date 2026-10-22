@@ -358,10 +358,18 @@ def _repo_folded(text):
     return text
 
 
+# 既投稿の見分けで書き手のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
+# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ、作業のセッションの種類は値を持たず、
+# 作業のセッションには引き継ぎが無いので、ID で見分ける
+ID_KEYED_KINDS = ("引き継ぎ",) + WORKER_KINDS
+
+
 def header_key(parsed):
-    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。書き手の ID・種類・値を比べる。
-    値は意味で比べる: 配列 (待つもの・待つ Issue) は並びを問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別しない。"""
-    return (parsed["role"], parsed["session_id"], parsed["kind"], _freeze(parsed["values"]))
+    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ書き手の
+    セッション ID も比べる。値は意味で比べる: 配列 (待つもの・待つ Issue) は並びを問わず、Issue の参照と PR の URL は
+    owner/repo の大文字小文字を区別しない。"""
+    session_id = parsed["session_id"] if parsed["kind"] in ID_KEYED_KINDS else None
+    return (parsed["role"], session_id, parsed["kind"], _freeze(parsed["values"]))
 
 
 def _freeze(value, key=None):
@@ -410,8 +418,7 @@ def already_posted(parsed, own_comments):
         return next((c for c in after_latest_wait if header_key(c["header"]) == key), None)
     if kind == "停滞":
         v = parsed["values"]
-        return next((c for c in headed if c["header"]["kind"] == "停滞" and c["header"]["role"] == parsed["role"]
-                     and c["header"]["session_id"] == parsed["session_id"]
+        return next((c for c in headed if c["header"]["kind"] == "停滞"
                      and (c["header"]["values"]["to"], c["header"]["values"]["assignment"], c["header"]["values"]["stuck_state"])
                      == (v["to"], v["assignment"], v["stuck_state"])), None)
     return next((c for c in headed if header_key(c["header"]) == key), None)

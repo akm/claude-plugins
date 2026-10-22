@@ -232,7 +232,23 @@ class AlreadyPostedTest(unittest.TestCase):
         renamed = header("割り当て", {"role": "manager", "name": "renamed", "session_id": "M-1"}, to="W-7", assignment=1)
         self.assertPosted(renamed, [a1], True, "名前は比べない")
         other_manager = header("割り当て", {"role": "manager", "name": "mgr", "session_id": "M-2"}, to="W-7", assignment=1)
-        self.assertPosted(other_manager, [a1], False, "書き手の ID が違えば別のコメント")
+        self.assertPosted(other_manager, [a1], True, "管理のセッションの種類は書き手の ID を比べない (引き継ぎの後も二重に書かない)")
+
+    def test_handover_and_worker_kinds_compare_session_id(self):
+        """`引き継ぎ` と作業のセッションの種類は、書き手のセッション ID も比べる。"""
+        h1 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-2"})
+        h2 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-3"})
+        self.assertPosted(h1, [h1], True)
+        self.assertPosted(h2, [h1], False, "別の管理のセッションの引き継ぎは投稿する")
+        d1 = header("着手の宣言", WORKER)
+        d2 = header("着手の宣言", {"role": "worker", "name": "w", "session_id": "W-8"})
+        self.assertPosted(d1, [d1], True)
+        self.assertPosted(d2, [d1], False, "別の作業のセッションの宣言は投稿する")
+        self.assertPosted(header("依存の解消", {"role": "manager", "name": "mgr", "session_id": "M-3"}),
+                          [header("依存の待ち", blockers=[OTHER]), header("依存の解消")], True, "依存の解消は書き手の ID を比べない")
+        s1 = header("停滞", to="W-7", assignment=1, stuck_state="idle-no-progress")
+        self.assertPosted(header("停滞", {"role": "manager", "name": "mgr", "session_id": "M-3"}, to="W-7", assignment=1, stuck_state="idle-no-progress"),
+                          [s1], True, "停滞も書き手の ID を比べない")
 
     def test_declaration_id_distinguishes(self):
         go1 = header("開始可", to="W-7", assignment=1, declaration=1)
