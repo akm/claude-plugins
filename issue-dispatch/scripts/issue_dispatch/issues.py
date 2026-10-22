@@ -178,23 +178,34 @@ def add_blocked_by(issue, blocker):
 
 # --- ラベル ----------------------------------------------------------------------
 
+def _same_label(names, label):
+    """names の中で label と同じ名前 (GitHub はラベルの名前を大文字小文字を区別せずに一意にするので casefold で比べる) を返す。無ければ None。"""
+    wanted = label.casefold()
+    return next((n for n in names if isinstance(n, str) and n.casefold() == wanted), None)
+
+
 def add_label(issue, label, description=None):
     """Issue にラベルを足す。既に付いていれば何もしない。リポジトリにラベルが無ければ先に作る (色は gh のデフォルト、
-    説明は description)。返り値: {"status": "ok", "issue", "label", "label_created", "added"} か失敗の説明。"""
+    説明は description)。名前は大文字小文字を区別せずに比べ、リポジトリに綴りだけ違うラベルがあればその綴りで足す。
+    返り値: {"status": "ok", "issue", "label" (足した綴り), "label_created", "added"} か失敗の説明。"""
     ref = ids.parse_issue_ref(issue)
     if ref is None:
         return {"status": "error", "failure": "other", "exit_code": None, "message": f"Issue の参照ではない: {issue!r}"}
     r = gh.run(["issue", "view", ref["url"], "--json", "labels"], expect_json=True)
     if r["failure"] or not isinstance(r["json"], dict):
         return _error(r, "issue")
-    attached = {l.get("name") for l in r["json"].get("labels") or []}
-    result = {"status": "ok", "issue": ref["key"], "label": label, "label_created": False, "added": False}
-    if label in attached:
+    attached = _same_label([l.get("name") for l in r["json"].get("labels") or []], label)
+    result = {"status": "ok", "issue": ref["key"], "label": attached or label, "label_created": False, "added": False}
+    if attached is not None:
         return result
     r = gh.run(["label", "list", "-R", ref["repo"], "--json", "name", "--limit", str(LIST_LIMIT)], expect_json=True)
     if r["failure"] or not isinstance(r["json"], list):
         return _error(r, "labels")
-    if label not in {l.get("name") for l in r["json"]}:
+    existing = _same_label([l.get("name") for l in r["json"]], label)
+    if existing is not None:
+        label = existing  # 既にある綴りで足す (綴りだけ違う名前で作ろうとすると GitHub は「既にある」で拒む)
+        result["label"] = existing
+    else:
         args = ["label", "create", label, "-R", ref["repo"]]
         if description:
             args += ["--description", description]

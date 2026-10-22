@@ -28,6 +28,8 @@
 2. `gh label list` でリポジトリにラベルが無ければ、`gh label create <名前> [--description <説明>]` で作る (`label_created: true`)。色は `gh` のデフォルトに任せる (この仕組みは色を決めない)。説明は呼び出し元が任意で渡す。
 3. `gh issue edit <URL> --add-label <名前>` で足す (`added: true`)。
 
+名前は大文字小文字を区別せずに比べる (GitHub はラベルの名前を大文字小文字を区別せずに一意にするので、綴りだけ違う名前で作ろうとすると「既にある」で拒まれる)。リポジトリに綴りだけ違うラベル (`Resource:DB` に対する `resource:db` など) があれば、作らずにその綴りで足し、出力の `label` にその綴りを返す。
+
 ## 分割で作る Issue (`issue create`)
 
 着手の後に Issue を分ける必要が分かったとき (計画の R20) に、分けた部分を新しい Issue にする。新しい Issue は次の様式で作る。
