@@ -1,0 +1,28 @@
+query PrObserve($owner: String!, $name: String!, $number: Int!, $filesCursor: String) {
+  rateLimit { cost remaining resetAt }
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id
+      number
+      title
+      url
+      state
+      isDraft
+      createdAt
+      mergedAt
+      closedAt
+      baseRefName
+      headRefName
+      author { login }
+      closingIssuesReferences(first: 50) {
+        totalCount
+        nodes { number url state repository { nameWithOwner } }
+      }
+      files(first: 100, after: $filesCursor) {
+        totalCount
+        pageInfo { hasNextPage endCursor }
+        nodes { path additions deletions changeType }
+      }
+    }
+  }
+}

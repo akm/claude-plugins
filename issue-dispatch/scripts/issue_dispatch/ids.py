@@ -1,6 +1,7 @@
 """Issue の参照の正規化。`owner/repo#番号` と URL (`https://github.com/owner/repo/issues/番号`) を同じ正規形
 (キー `owner/repo#番号`) にする。宣言の `blocked_by`・記録の項目のキー・`gh issue edit --add-blocked-by` に渡す URL の
 変換に使う。リポジトリの名前の形は config.REPO_NAME_PATTERN と同じ (名前に使える文字だけで決める)。
+PR の参照は URL (`https://github.com/owner/repo/pull/番号`) だけ (`owner/repo#番号` の形は Issue と区別できないので使わない)。
 """
 
 import re
@@ -45,3 +46,15 @@ def same_issue(a, b):
     """2 つの参照が同じ Issue を指すか (リポジトリの名前は大文字小文字を区別しない)。どちらかが読めなければ偽。"""
     pa, pb = parse_issue_ref(a), parse_issue_ref(b)
     return bool(pa and pb and pa["repo"].lower() == pb["repo"].lower() and pa["number"] == pb["number"])
+
+
+def parse_pr_url(text):
+    """PR の URL を読む。返り値は {"repo": "owner/name", "number": int, "url"} か、読めなければ None。
+    `/pull/<番号>` の形だけ (Issue の URL と `owner/repo#番号` は None)。"""
+    if not isinstance(text, str):
+        return None
+    m = _URL_RE.match(text.strip())
+    if not m or m.group("kind") != "pull":
+        return None
+    repo, number = m.group("repo"), int(m.group("number"))
+    return {"repo": repo, "number": number, "url": f"https://github.com/{repo}/pull/{number}"}

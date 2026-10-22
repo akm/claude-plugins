@@ -13,6 +13,11 @@
   project items --project <owner>/<番号>     項目の一覧を位置の順に全部読む (キーの表は project-schema.md の「CLI」)
   project set-status --project <owner>/<番号> --item <項目の ID> --status <値>   Status を書く (5 つ以外と Done は gh を実行せずに拒否)
   project add-fields --project <owner>/<番号>   check の案を実行する (承認を得た後に呼ぶ)
+  issue create --repo <owner/name> --title <題> (--body <本文> | --body-file <ファイル|->) --split-from <宣言のコメントの URL> [--label ...] [--assignee ...]
+      分割で Issue を作る。本文の先頭行に分割の元を書き、同じ先頭行の開いた Issue があれば作らずにその番号を返す
+  issue add-label --issue <owner/repo#番号|URL> --label <名前> [--description <説明>]   ラベルを足す。無ければ先に作る (承認を得た後に呼ぶ)
+  blocked-by add --issue <owner/repo#番号|URL> --blocker <owner/repo#番号|URL>   blockedBy に足す (失敗は理由付きで返し、再試行しない)
+  pr observe --url <PR の URL>   PR の状態・参照する Issue・変えたファイルを読み、種類 (kind) を返す (読むだけ。表は issue-format.md)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -27,7 +32,7 @@ import json
 import os
 import sys
 
-from issue_dispatch import config, filekinds, project, record, repo
+from issue_dispatch import config, filekinds, issues, project, record, repo
 
 
 def _emit(payload):
@@ -221,6 +226,50 @@ def cmd_project_add_fields(args):
     return 0
 
 
+def _issue_error(result, key):
+    return {k: v for k, v in result.items() if k != "status"} | {"status": "error", "errors": [{"key": result.get("key") or key, "message": result["message"], "failure": result.get("failure")}]}
+
+
+def cmd_pr_observe(args):
+    result = issues.observe_pr(args.url)
+    if result["status"] != "ok":
+        _emit(_issue_error(result, "url"))
+        return 0
+    _emit({**result, "errors": []})
+    return 0
+
+
+def cmd_issue_create(args):
+    if args.body_file is not None:
+        try:
+            if args.body_file == "-":
+                body = sys.stdin.read()
+            else:
+                with open(args.body_file, encoding="utf-8") as f:
+                    body = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            _emit({"status": "error", "created": None, "number": None, "url": None,
+                   "errors": [{"key": "body-file", "message": f"本文のファイル {args.body_file!r} を読めない: {e}", "failure": None}]})
+            return 0
+    else:
+        body = args.body or ""
+    result = issues.create_issue(args.repo, args.title, body, args.split_from, labels=args.label or (), assignees=args.assignee or ())
+    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "create"))
+    return 0
+
+
+def cmd_issue_add_label(args):
+    result = issues.add_label(args.issue, args.label, description=args.description)
+    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "add-label"))
+    return 0
+
+
+def cmd_blocked_by_add(args):
+    result = issues.add_blocked_by(args.issue, args.blocker)
+    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "blocked-by"))
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="issue_dispatch.py", description="issue-dispatch の同梱 CLI (入出力は JSON)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -273,6 +322,37 @@ def build_parser():
     p_classify.add_argument("--dir", required=True, help="リポジトリのルート (設定の files を読む)")
     p_classify.add_argument("paths", nargs="+", help="ルートからの相対パス (照合の前にそろえる。絶対パスと `..` を含むパスは error を返す)")
     p_classify.set_defaults(func=cmd_files_classify)
+
+    p_issue = sub.add_parser("issue", help="Issue")
+    issue_sub = p_issue.add_subparsers(dest="subcommand", required=True)
+    p_create = issue_sub.add_parser("create", help="分割で Issue を作る (同じ先頭行の開いた Issue があれば作らない)")
+    p_create.add_argument("--repo", required=True, help="owner/name")
+    p_create.add_argument("--title", required=True)
+    body = p_create.add_mutually_exclusive_group()
+    body.add_argument("--body", help="本文 (先頭行はこの CLI が足す)")
+    body.add_argument("--body-file", help="本文のファイル (- なら標準入力)")
+    p_create.add_argument("--split-from", required=True, help="分割の元の宣言のコメントの URL (https://github.com/owner/repo/issues/番号#issuecomment-<id>)")
+    p_create.add_argument("--label", action="append", help="付けるラベル (繰り返せる)")
+    p_create.add_argument("--assignee", action="append", help="担当者のログイン (繰り返せる)")
+    p_create.set_defaults(func=cmd_issue_create)
+    p_label = issue_sub.add_parser("add-label", help="ラベルを足す。リポジトリに無ければ先に作る (承認を得た後)")
+    p_label.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
+    p_label.add_argument("--label", required=True)
+    p_label.add_argument("--description", help="ラベルを作るときの説明")
+    p_label.set_defaults(func=cmd_issue_add_label)
+
+    p_blocked = sub.add_parser("blocked-by", help="Issue の blockedBy")
+    blocked_sub = p_blocked.add_subparsers(dest="subcommand", required=True)
+    p_badd = blocked_sub.add_parser("add", help="blocker を足す (失敗しても再試行しない)")
+    p_badd.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
+    p_badd.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
+    p_badd.set_defaults(func=cmd_blocked_by_add)
+
+    p_pr = sub.add_parser("pr", help="PR")
+    pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)
+    p_observe = pr_sub.add_parser("observe", help="PR の状態・参照する Issue・変えたファイルを読み、種類を返す (読むだけ)")
+    p_observe.add_argument("--url", required=True, help="PR の URL")
+    p_observe.set_defaults(func=cmd_pr_observe)
     return parser
 
 
