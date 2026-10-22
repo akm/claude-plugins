@@ -18,6 +18,10 @@
   issue add-label --issue <owner/repo#番号|URL> --label <名前> [--description <説明>]   ラベルを足す。無ければ先に作る (承認を得た後に呼ぶ)
   blocked-by add --issue <owner/repo#番号|URL> --blocker <owner/repo#番号|URL>   blockedBy に足す (失敗は理由付きで返し、再試行しない)
   pr observe --url <PR の URL>   PR の状態・参照する Issue・変えたファイルを読み、種類 (kind) を返す (読むだけ。表は issue-format.md)
+  comment list --issue <owner/repo#番号|URL>   コメントを時刻の順に全部読む (書き手がトークンのログインと違うものは除く。先頭行は解析済み)
+  comment post --issue <参照> --role manager|worker --name <名前> --session-id <ID> --kind <種類> [値のオプション] (--body <本文> | --body-file <ファイル|->)
+      先頭行を組み立てて投稿する。同じ出来事への同じコメントが既にあれば投稿せず posted false を返す (値のオプションは issue-format.md の「コメント」)
+  comment parse --line <先頭行>   先頭行を解析する (gh は実行しない。形でなければ header は null)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -32,7 +36,7 @@ import json
 import os
 import sys
 
-from issue_dispatch import config, filekinds, issues, project, record, repo
+from issue_dispatch import comments, config, filekinds, issues, project, record, repo
 
 
 def _emit(payload):
@@ -270,6 +274,51 @@ def cmd_blocked_by_add(args):
     return 0
 
 
+def _read_body(args):
+    """--body か --body-file (- なら標準入力) から本文を読む。返り値は (本文, None) か (None, 理由)。"""
+    if args.body_file is None:
+        return args.body or "", None
+    try:
+        if args.body_file == "-":
+            return sys.stdin.read(), None
+        with open(args.body_file, encoding="utf-8") as f:
+            return f.read(), None
+    except (OSError, UnicodeDecodeError) as e:
+        return None, f"本文のファイル {args.body_file!r} を読めない: {e}"
+
+
+def cmd_comment_list(args):
+    result = comments.list_comments(args.issue)
+    if result["status"] != "ok":
+        _emit(_issue_error(result, "issue") | {"comments": [], "excluded": 0})
+        return 0
+    _emit({**result, "errors": []})
+    return 0
+
+
+def cmd_comment_parse(args):
+    _emit({"status": "ok", "header": comments.parse_header(args.line), "errors": []})
+    return 0
+
+
+def cmd_comment_post(args):
+    body, problem = _read_body(args)
+    if problem:
+        _emit({"status": "error", "posted": None, "errors": [{"key": "body-file", "message": problem, "failure": None}]})
+        return 0
+    values = {"to": args.to, "assignment": args.assignment, "declaration": args.declaration, "request_kind": args.request_kind,
+              "waiting_issue": args.waiting_issue, "waiting_declaration": args.waiting_declaration, "previous_pr": args.previous_pr,
+              "pr": args.pr, "release_reason": args.release_reason, "stuck_state": args.stuck_state, "blockers": args.blocker or []}
+    try:
+        values["waits"] = [comments.parse_wait_reason(r) for r in (args.reason or [])]
+    except ValueError as e:
+        _emit({"status": "error", "posted": None, "errors": [{"key": "header", "message": str(e), "failure": None}]})
+        return 0
+    result = comments.post(args.issue, args.role, args.name, args.session_id, args.kind, values, body)
+    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "post") | {"posted": None})
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="issue_dispatch.py", description="issue-dispatch の同梱 CLI (入出力は JSON)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -347,6 +396,37 @@ def build_parser():
     p_badd.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_badd.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
     p_badd.set_defaults(func=cmd_blocked_by_add)
+
+    p_comment = sub.add_parser("comment", help="Issue のコメント")
+    comment_sub = p_comment.add_subparsers(dest="subcommand", required=True)
+    p_clist = comment_sub.add_parser("list", help="コメントを時刻の順に全部読む (書き手が違うものは除く)")
+    p_clist.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
+    p_clist.set_defaults(func=cmd_comment_list)
+    p_cparse = comment_sub.add_parser("parse", help="先頭行を解析する (gh は実行しない)")
+    p_cparse.add_argument("--line", required=True)
+    p_cparse.set_defaults(func=cmd_comment_parse)
+    p_cpost = comment_sub.add_parser("post", help="先頭行を組み立てて投稿する (既投稿なら投稿しない)")
+    p_cpost.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
+    p_cpost.add_argument("--role", required=True, choices=("manager", "worker"))
+    p_cpost.add_argument("--name", required=True, help="書くセッションの名前")
+    p_cpost.add_argument("--session-id", required=True, help="書くセッションの ID")
+    p_cpost.add_argument("--kind", required=True, help="コメントの種類 (issue-format.md の表)")
+    p_cpost.add_argument("--to", help="対象 (作業のセッションの ID)")
+    p_cpost.add_argument("--assignment", help="割り当ての番号")
+    p_cpost.add_argument("--declaration", help="宣言のコメントの ID")
+    p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の答え / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
+    p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の書き直し / 本文の追記 / 小さな PR")
+    p_cpost.add_argument("--waiting-issue", help="待つ Issue (依頼 小さな PR と小さな PR の報告)")
+    p_cpost.add_argument("--waiting-declaration", help="待つ側の宣言のコメントの ID")
+    p_cpost.add_argument("--previous-pr", help="作り直しのとき、閉じた前の PR の URL")
+    p_cpost.add_argument("--pr", help="本文の追記を頼む PR の URL")
+    p_cpost.add_argument("--release-reason", help="解放の理由: 解除 / close / ID の変更 / 除去")
+    p_cpost.add_argument("--stuck-state", help="停滞の値 (Agent stuck state)")
+    p_cpost.add_argument("--blocker", action="append", help="依存の待ちで待つ Issue (繰り返せる)")
+    body = p_cpost.add_mutually_exclusive_group()
+    body.add_argument("--body", help="本文 (先頭行はこの CLI が足す)")
+    body.add_argument("--body-file", help="本文のファイル (- なら標準入力)")
+    p_cpost.set_defaults(func=cmd_comment_post)
 
     p_pr = sub.add_parser("pr", help="PR")
     pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)

@@ -22,6 +22,7 @@
 | `issue-list-open` | `gh issue list --state open --json number,url,title,body --limit 500` (開いた Issue #3 と #1) | 0 | 実物 (2026-10-22) |
 | `label-list` | `gh label list --json name,color,description --limit 200` (デフォルトのラベルと `resource:verify`) | 0 | 実物 (2026-10-22) |
 | `api-user` | `gh api user` (REST。トークンのログイン)。実物の応答から `login`・`id`・`node_id`・`html_url`・`type` だけを残した (ほかは個人の情報で、テストに要らない) | 0 | 実物を切り詰めた (2026-10-22) |
+| `issue-comments-ok` | `gh api graphql` で Issue #3 のコメント 10 件 (U1 の実測で書いた `u1 latency <n>`) を読む (クエリ `issue-dispatch/scripts/issue_dispatch/graphql/issue-comments.graphql`)。先頭行の形のコメントは検証用リポジトリに無いので、テストはこの応答の本文を書き換えて使う | 0 | 実物 (2026-10-22) |
 | `graphql-rate-limited` | GraphQL のレート制限の応答 (`errors[].type` が `RATE_LIMITED`) | 1 | **手で作った。** 実物のレート制限は起こせないので、GitHub の GraphQL API の文書の形で書いた。stderr は `gh` が `errors[].message` を書く形に合わせた |
 
 後の単位 (U7 以降) が自分のクエリの出力を足すときは、同じ名前の付け方でこの表に行を足す。
