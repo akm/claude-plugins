@@ -12,7 +12,7 @@
 | 担当者 (assignee) | 認証しているアカウント (`gh` のトークンのログイン) 1 つだけ | 利用者 | `human-handed` が無く、担当者がトークンのログイン 1 つだけの Issue が、作業のセッションの対象になる。担当者が未設定の Issue は対象にならないので、`Ready` にする前に担当者を決める |
 | 親 Issue | sub-issue を持つ Issue | 利用者 | 親 Issue は割り当ての対象にしない (sub-issue は対象にする)。項目の一覧の `is_parent` |
 | 大きさ | 1 つの PR で閉じる大きさ | 利用者 | 作る時点で分ける規則は定めない。着手の後に分ける必要が分かったときの扱いは「分割で作る Issue」 |
-| PR との結び付き | PR の本文に Issue を閉じる記法 (`Closes #<番号>`) | 作業のセッション | マージで Issue が閉じ、組み込みワークフロー `Item closed` が `Done` にし、資源の解放がそれに続く。PR の側から読むのは `closingIssuesReferences` (下の「PR の観測」) |
+| PR との結び付き | PR の本文に Issue を閉じる記法 (`Closes #<番号>`) | 作業のセッション | マージで Issue が閉じ、`Done` と資源の解放がそれに続く (`Done` を書く組み込みワークフローの正本は [project-schema.md](project-schema.md) の「組み込みワークフロー」)。PR の側から読むのは `closingIssuesReferences` (下の「PR の観測」) |
 
 ## `blockedBy` の追加 (`blocked-by add`)
 
@@ -48,7 +48,7 @@ PR の URL を受けて読むだけで、書き込みは無い。`PR の報告` 
 | `draft` | 開いていて draft | `In review` にしない |
 | `needs_closing_reference` | 開いていて draft ではなく、参照する Issue が無い | 本文に `Closes #<番号>` を足すよう作業のセッションに頼む (本文の追記が要る) |
 | `in_review` | 開いていて draft ではなく、参照する Issue がある | Status を `In review` にする |
-| `merged` | マージ済みで、参照する Issue がすべて閉じている | 何もしない (`Done` は組み込みワークフローが書く) |
+| `merged` | マージ済みで、参照する Issue がすべて閉じている | 何もしない (`Done` の書き手は [project-schema.md](project-schema.md) の「Status の選択肢」) |
 | `merged_issue_open` | マージ済みなのに、参照する Issue に開いたものがある | 書き込まず、利用者に知らせる (組み込みワークフローが無効か、参照が適用されなかった) |
 | `closed` | マージせずに閉じた | 作業のセッションに確かめる |
 
