@@ -347,6 +347,15 @@ class CliTest(FakeGhCase):
         create = self.recorded()[1]
         self.assertEqual(create[create.index("--body") + 1], f"split-from: {DECLARATION}\n\n標準入力の本文\n")
 
+    def test_issue_create_unreadable_body_file(self):
+        """--body-file のファイルが無ければ、traceback ではなく JSON の errors で返し、gh は実行しない。"""
+        code, out, err = cli("issue", "create", "--repo", REPO, "--title", "t", "--body-file", os.path.join(self.root, "no-such-file.md"),
+                             "--split-from", DECLARATION)
+        self.assertEqual((code, out["status"]), (0, "error"))
+        self.assertEqual(out["errors"][0]["key"], "body-file")
+        self.assertNotIn("Traceback", err)
+        self.assertEqual(self.recorded(), [])
+
     def test_blocked_by_add(self):
         self.responses([{"prefix": ["issue", "edit"], "stdout": ISSUE3 + "\n"}])
         code, out, _ = cli("blocked-by", "add", "--issue", f"{REPO}#3", "--blocker", f"{REPO}#1")

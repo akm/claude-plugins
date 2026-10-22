@@ -241,7 +241,16 @@ def cmd_pr_observe(args):
 
 def cmd_issue_create(args):
     if args.body_file is not None:
-        body = sys.stdin.read() if args.body_file == "-" else open(args.body_file, encoding="utf-8").read()
+        try:
+            if args.body_file == "-":
+                body = sys.stdin.read()
+            else:
+                with open(args.body_file, encoding="utf-8") as f:
+                    body = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            _emit({"status": "error", "created": None, "number": None, "url": None,
+                   "errors": [{"key": "body-file", "message": f"本文のファイル {args.body_file!r} を読めない: {e}", "failure": None}]})
+            return 0
     else:
         body = args.body or ""
     result = issues.create_issue(args.repo, args.title, body, args.split_from, labels=args.label or (), assignees=args.assignee or ())
