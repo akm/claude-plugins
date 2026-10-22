@@ -127,6 +127,18 @@ class HeaderFormatParseTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "Issue"}])  # 待つ Issue が無い
 
+    def test_format_rejects_lines_that_do_not_round_trip(self):
+        """作った先頭行を同じ内容に読み戻せない入力 (改行を含む値、`|` で終わる名前) は ValueError。"""
+        with self.assertRaises(ValueError):
+            header("停滞", to="W-7", assignment=1, stuck_state="idle\nx")
+        with self.assertRaises(ValueError):
+            header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "資源", "resource": "db\nx"}])
+        with self.assertRaises(ValueError):
+            header("割り当て", to="W-7\nx", assignment=1)
+        for name in ("a |", "a | "):  # `| a` は読み戻せるので許す
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                header("割り当て", {"role": "manager", "name": name, "session_id": "M-1"}, to="W-7", assignment=1)
+
     def test_match_report(self):
         request = comments.parse_header(header("依頼", to="W-7", assignment=1, request_kind="小さな PR", waiting_issue=OTHER, waiting_declaration=777))
         same = comments.parse_header(header("小さな PR の報告", {"role": "worker", "name": "renamed", "session_id": "W-8"}, waiting_issue=f"https://github.com/{REPO}/issues/5", waiting_declaration=777))

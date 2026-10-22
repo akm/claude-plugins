@@ -91,8 +91,8 @@ def _wait(item):
             out["pr"] = _pr_url(item["pr"], "小さな PR")
     elif kind == "資源":
         name = item.get("resource")
-        if not isinstance(name, str) or not name.strip() or SEP in name:
-            raise ValueError(f"資源の名前が無いか、区切り文字を含む: {name!r}")
+        if not isinstance(name, str) or not name.strip() or SEP in name or "\n" in name:
+            raise ValueError(f"資源の名前が無いか、区切り文字か改行を含む: {name!r}")
         out["resource"] = name.strip()
     return out
 
@@ -120,8 +120,8 @@ def normalize_values(kind, values):
         if v in (None, [], ()):
             continue
         if key == "to":
-            if not isinstance(v, str) or not v.strip() or SEP in v:
-                raise ValueError(f"対象 (作業のセッションの ID) が無いか、区切り文字を含む: {v!r}")
+            if not isinstance(v, str) or not v.strip() or SEP in v or "\n" in v:
+                raise ValueError(f"対象 (作業のセッションの ID) が無いか、区切り文字か改行を含む: {v!r}")
             out[key] = v.strip()
         elif key == "assignment":
             if not _ID_RE.match(str(v).strip()):
@@ -140,8 +140,8 @@ def normalize_values(kind, values):
                 raise ValueError(f"解放の理由は {', '.join(RELEASE_REASONS)} のどれか: {v!r}")
             out[key] = v
         elif key == "stuck_state":
-            if not isinstance(v, str) or not v.strip() or SEP in v:
-                raise ValueError(f"停滞の値が無いか、区切り文字を含む: {v!r}")
+            if not isinstance(v, str) or not v.strip() or SEP in v or "\n" in v:
+                raise ValueError(f"停滞の値が無いか、区切り文字か改行を含む: {v!r}")
             out[key] = v.strip()
         elif key == "waits":
             out[key] = [_wait(w) for w in v]
@@ -191,7 +191,12 @@ def format_header(role, name, session_id, kind, values=None):
     if not isinstance(session_id, str) or not session_id.strip() or SEP in session_id or "\n" in session_id or session_id.strip() in _SHAPE:
         raise ValueError(f"セッション ID が無いか、区切り文字か改行を含むか、種類の語と同じ: {session_id!r}")
     normalized = normalize_values(kind, values)
-    return SEP.join([PREFIX, ROLES[role], name.strip(), session_id.strip(), kind] + _value_fields(kind, normalized))
+    line = SEP.join([PREFIX, ROLES[role], name.strip(), session_id.strip(), kind] + _value_fields(kind, normalized))
+    # 作った先頭行を読み戻して同じ内容になることを確かめる (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで止める
+    expected = {"role": role, "name": name.strip(), "session_id": session_id.strip(), "kind": kind, "values": normalized}
+    if parse_header(line) != expected:
+        raise ValueError(f"作った先頭行を同じ内容に読み戻せない (名前や値の形を確かめる): {line!r}")
+    return line
 
 
 # --- 先頭行の解析 ----------------------------------------------------------------
@@ -423,7 +428,7 @@ def post(issue, role, name, session_id, kind, values, body, login=None):
     listed = list_comments(issue, login)
     if listed["status"] != "ok":
         return listed
-    existing = already_posted(parse_header(line), listed["comments"])
+    existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確かめているので None にはならない
     if existing is not None:
         return {"status": "ok", "posted": False, "database_id": existing["database_id"], "url": existing["url"], "header": line}
     url = ids.issue_url(issue)
