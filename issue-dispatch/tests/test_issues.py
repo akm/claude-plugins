@@ -74,6 +74,15 @@ class ObservePrTest(FakeGhCase):
         self.responses([USER_ENTRY, {"substring": "query PrObserve", "stdout": data}])
         self.assertEqual(issues.observe_pr(PR4)["kind"], "merged")
 
+    def test_merged_pr_without_reference(self):
+        """参照する Issue が無いマージ済みの PR は merged (何もしない) ではなく merged_without_reference (Issue はマージで閉じない)。"""
+        data = fixture_json("pr-observe-merged")
+        data["data"]["repository"]["pullRequest"]["closingIssuesReferences"] = {"totalCount": 0, "nodes": []}
+        self.responses([USER_ENTRY, {"substring": "query PrObserve", "stdout": data}])
+        result = issues.observe_pr(PR4)
+        self.assertEqual(result["kind"], "merged_without_reference")
+        self.assertEqual(result["pr"]["issues"], [])
+
     def test_closed_pr(self):
         self.responses([USER_ENTRY, pr_entry("pr-observe-closed")])
         result = issues.observe_pr(f"https://github.com/{REPO}/pull/5")

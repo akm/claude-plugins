@@ -48,8 +48,9 @@ PR の URL を受けて読むだけで、書き込みは無い。`PR の報告` 
 | `draft` | 開いていて draft | `In review` にしない |
 | `needs_closing_reference` | 開いていて draft ではなく、参照する Issue が無い | 本文に `Closes #<番号>` を足すよう作業のセッションに頼む (本文の追記が要る) |
 | `in_review` | 開いていて draft ではなく、参照する Issue がある | Status を `In review` にする |
-| `merged` | マージ済みで、参照する Issue がすべて閉じている | 何もしない (`Done` の書き手は [project-schema.md](project-schema.md) の「Status の選択肢」) |
+| `merged` | マージ済みで、参照する Issue があり、すべて閉じている | 何もしない (`Done` の書き手は [project-schema.md](project-schema.md) の「Status の選択肢」) |
 | `merged_issue_open` | マージ済みなのに、参照する Issue に開いたものがある | 書き込まず、利用者に知らせる (組み込みワークフローが無効か、参照が適用されなかった) |
+| `merged_without_reference` | マージ済みで、参照する Issue が無い | 書き込まず、利用者に知らせる (マージで Issue は閉じないので、利用者が Issue を閉じる。`Closes` の書き忘れか、既定のブランチ以外を base にした PR。U1 の実測では、既定のブランチ以外を base にした PR は参照を返さない) |
 | `closed` | マージせずに閉じた | 作業のセッションに確かめる |
 
 出力の `pr` のキー: `number`・`title`・`url`・`state` (`OPEN` / `MERGED` / `CLOSED`)・`draft`・`created_at`・`merged_at`・`closed_at`・`author`・`base_ref`・`head_ref`・`issues` (参照する Issue の配列。要素は `key` (`owner/repo#番号`)・`number`・`url`・`state`)・`issues_truncated` (参照が 50 を超えて一部しか読めていない)・`files` (変えたファイルの配列。要素は `path`・`additions`・`deletions`・`change_type`)。ほかに `rate_limit` と `warnings` (GraphQL が data と一緒に返した errors) を返す。

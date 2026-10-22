@@ -17,7 +17,7 @@ from issue_dispatch.project import graphql
 SPLIT_FROM_PREFIX = "split-from: "
 _DECLARATION_URL_RE = re.compile(rf"^https://github\.com/{ids.REPO_NAME_PATTERN}/issues/[1-9][0-9]*#issuecomment-[1-9][0-9]*$")
 # PR の観測の結果の種類 (issue-format.md の表)
-PR_KINDS = ("other_author", "draft", "needs_closing_reference", "in_review", "merged", "merged_issue_open", "closed")
+PR_KINDS = ("other_author", "draft", "needs_closing_reference", "in_review", "merged", "merged_issue_open", "merged_without_reference", "closed")
 # `gh issue list` / `gh label list` の --limit (既定の 30 では足りない。開いた Issue とラベルがこれを超えるリポジトリは想定しない)
 LIST_LIMIT = 1000
 
@@ -46,6 +46,9 @@ def _pr_kind(state, draft, issue_states):
     if state == "CLOSED":
         return "closed"
     if state == "MERGED":
+        # 参照が 1 つも無いマージ済みは、「すべて閉じている」とは別にする (マージで Issue は閉じないため)
+        if not issue_states:
+            return "merged_without_reference"
         return "merged_issue_open" if "OPEN" in issue_states else "merged"
     if draft:
         return "draft"
