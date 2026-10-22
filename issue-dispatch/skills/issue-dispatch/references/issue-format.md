@@ -40,9 +40,9 @@
 
 ## PR の観測 (`pr observe`)
 
-PR の URL を受けて読むだけで、書き込みは無い。`PR の報告` と `小さな PR の報告` (コメントの様式は U8) に書かれた PR と、項目の一覧の `prs` にある PR に使う。読むのは GraphQL (`graphql/pr-observe.graphql`) で、PR の状態・draft・作者・`closingIssuesReferences` (参照する Issue とその開閉)・変えたファイルの一覧 (ページを辿って全部) を 1 回の問い合わせで得る。
+PR の URL を受けて読むだけで、書き込みは無い。`PR の報告` と `小さな PR の報告` (下の「コメント」) に書かれた PR と、項目の一覧の `prs` にある PR に使う。読むのは GraphQL (`graphql/pr-observe.graphql`) で、PR の状態・draft・作者・`closingIssuesReferences` (参照する Issue とその開閉)・変えたファイルの一覧 (ページを辿って全部) を 1 回の問い合わせで得る。
 
-**作者 (`author.login`) がトークンのログイン (`gh api user`) と違う PR は、無いものとして扱う** (種類 `other_author`。中身 `pr` は返さず、`author` だけを返す)。公開リポジトリでは第三者も PR を作れるので、本文の `Closes` やコメントの URL だけでこの仕組みの PR とは見なさない。
+**作者 (`author.login`) がトークンのログイン (`gh api user`) と違う PR は、無いものとして扱う** (種類 `other_author`。中身 `pr` は返さず、`author` だけを返す)。理由は、下の「コメント」で書き手がトークンのログインと違うコメントを扱わないのと同じ (公開リポジトリでは第三者も PR を作れる)。
 
 | 種類 (`kind`) | 条件 | 管理のセッションがすること |
 | --- | --- | --- |
