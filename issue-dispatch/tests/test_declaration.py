@@ -127,6 +127,12 @@ class ParseTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertRejected(decl([path]), "files[0].path")
 
+    def test_collects_errors_across_files(self):
+        """誤りはできるだけ全部集める: 先のファイルに誤りがあっても、後のファイルの units の誤り (節の表記が無い) を集める。"""
+        result = declaration.parse(decl(["../x", ("src/app.ts", [["main"]]), ("package.json", ["bad"])]), RULES, TABLE)
+        self.assertEqual(result["status"], "error")
+        self.assertEqual([e["key"] for e in result["errors"]], ["files[0].path", "files[1].units", "files[2].units[0]"])
+
     def test_duplicate_paths_rejected(self):
         self.assertRejected(decl(["src/app.ts", "./src/app.ts"]), "files[1].path", "同じパス")
 

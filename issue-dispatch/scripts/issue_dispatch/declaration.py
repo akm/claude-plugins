@@ -45,13 +45,14 @@ def _check_units(units, key, errors):
     if not isinstance(units, list):
         errors.append({"key": key, "message": f"units は {expected}: {units!r}"})
         return None
-    out = []
+    out, own = [], []
     for i, unit in enumerate(units):
         if not isinstance(unit, list) or not unit or not all(isinstance(n, str) and n != "" for n in unit):
-            errors.append({"key": f"{key}[{i}]", "message": f"units の要素は {expected}: {unit!r}"})
+            own.append({"key": f"{key}[{i}]", "message": f"units の要素は {expected}: {unit!r}"})
             continue
         out.append(list(unit))
-    return out if not errors else None
+    errors.extend(own)
+    return out if not own else None  # 自分が足した誤りだけで決める (ほかのファイルの誤りで後の検査を飛ばさない)
 
 
 def _check_file(entry, index, rules, table, errors, seen):
