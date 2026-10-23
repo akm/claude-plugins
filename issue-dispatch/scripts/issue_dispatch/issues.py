@@ -112,6 +112,22 @@ def observe_pr(url, login=None):
             "rate_limit": rate_limit, "warnings": warnings}
 
 
+def pr_state(url):
+    """PR の状態 (state・draft・merged) だけを読む (スナップショットが GitHub 上の状態を写すため、作者で除かず、変えたファイルも読まない)。
+    返り値: {"status": "ok", "url", "state", "draft", "merged"} か失敗の説明。"""
+    parsed = ids.parse_pr_url(url)
+    if parsed is None:
+        return {"status": "error", "failure": "other", "message": f"PR の URL の形ではない: {url!r}", "exit_code": None}
+    owner, _, name = parsed["repo"].partition("/")
+    data, problem, errors = graphql("pr-observe", {"owner": owner, "name": name, "number": parsed["number"]})
+    if problem:
+        return {"status": "error", **problem}
+    pr = (data.get("repository") or {}).get("pullRequest")
+    if not pr:
+        return {"status": "error", "failure": "other", "exit_code": 0, "message": f"PR {parsed['url']} を読めない (無い・見えない: {errors!r})"}
+    return {"status": "ok", "url": parsed["url"], "state": pr["state"], "draft": bool(pr.get("isDraft")), "merged": pr["state"] == "MERGED"}
+
+
 def _file(node):
     return {"path": node["path"], "additions": node.get("additions"), "deletions": node.get("deletions"), "change_type": node.get("changeType")}
 

@@ -10,7 +10,11 @@
   record log --dir <管理ディレクトリ>    標準入力の JSON (1 件) を actions.log に追記する
   repo name --dir <作業ツリー>   今の作業ツリーの origin の URL から owner/repo を返す (gh は実行しない)
   project check --project <owner>/<番号>     フィールド・Status の選択肢・ワークフローの不足と案内、作る手順の案を返す (読むだけ)
-  project items --project <owner>/<番号>     項目の一覧を位置の順に全部読む (キーの表は project-schema.md の「CLI」)
+  project items --project <owner>/<番号> [--write-snapshot --dir <管理ディレクトリ>]   項目の一覧を位置の順に全部読む (キーの表は project-schema.md の「CLI」)。
+      --write-snapshot なら、読んだ内容とコメントの URL の PR の状態をスナップショットに書く (observation.md)
+  observe diff --dir <管理ディレクトリ> --project <owner>/<番号>   スナップショットと今の Project の差分を処理の順に返す (書かない)
+  書き込みのサブコマンド (project set-status / issue add-label / blocked-by add / comment post) の --snapshot-dir <管理ディレクトリ>:
+      書いた値だけをスナップショットに反映する (無い・壊れていれば反映せず warnings。書き込みの結果は変えない)
   project set-status --project <owner>/<番号> --item <項目の ID> --status <値>   Status を書く (5 つ以外と Done は gh を実行せずに拒否)
   project add-fields --project <owner>/<番号>   check の案を実行する (承認を得た後に呼ぶ)
   issue create --repo <owner/name> --title <題> (--body <本文> | --body-file <ファイル|->) --split-from <宣言のコメントの URL> [--label ...] [--assignee ...]
@@ -44,7 +48,9 @@ import json
 import os
 import sys
 
-from issue_dispatch import comments, config, declaration, filekinds, issues, project, record, repo, resources
+import datetime
+
+from issue_dispatch import comments, config, declaration, filekinds, ids, issues, observe, project, record, repo, resources
 
 
 def _emit(payload):
@@ -191,17 +197,136 @@ def cmd_project_check(args):
     return 0
 
 
+def _snapshot_dir(manager_dir, parsed_project=None):
+    """管理ディレクトリの設定からスナップショットの置き場 (記録の置き場と同じ) を決める。返り値は (ディレクトリ, 設定の project, errors)。"""
+    loaded = config.load(manager_dir, "manager")
+    project_setting = parsed_project or loaded["config"].get("project")
+    if not project_setting:
+        return None, None, [{"key": "project", "message": "管理ディレクトリの設定に project が無い", "failure": None}]
+    return record.record_dir(manager_dir, loaded["config"]["record_dir"], project_setting), project_setting, []
+
+
+def _now():
+    return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _read_comment_prs(items, login, extra_urls=()):
+    """開いている項目のコメントに URL で書かれた PR (と extra_urls) の状態を読む。返り値は (URL → 状態 (読めなければ {"partial": 理由}), problems)。"""
+    states, problems = {}, []
+    urls = observe.pr_urls_in_comments(items, login)
+    urls += [u for u in extra_urls if u not in urls]
+    for url in urls:
+        r = issues.pr_state(url)
+        if r["status"] == "ok":
+            states[url] = {"state": r["state"], "draft": r["draft"], "merged": r["merged"]}
+        else:
+            states[url] = {"partial": r["message"]}
+            problems.append({"what": "comment-pr", "url": url, "failure": r.get("failure"), "message": r["message"], "exit_code": r.get("exit_code")})
+    return states, problems
+
+
+def _list_problems(problems):
+    return [p for p in problems if p.get("what") in observe.LIST_PROBLEMS]
+
+
 def cmd_project_items(args):
     parsed = _project_arg(args)
     if parsed is None:
         return 0
+    if args.write_snapshot and not args.dir:
+        build_parser().error("--write-snapshot には --dir <管理ディレクトリ> が要る")
     result = project.items(parsed)
     if result["status"] == "error":
         _emit({"status": "error", "items": [], "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]})
         return 0
-    _emit({"status": result["status"], "project_id": result["project_id"], "items": result["items"],
-           "problems": result["problems"], "rate_limit": result["rate_limit"], "errors": []})
+    out = {"status": result["status"], "project_id": result["project_id"], "items": result["items"],
+           "problems": result["problems"], "rate_limit": result["rate_limit"], "errors": []}
+    if args.write_snapshot:
+        directory, _, errors = _snapshot_dir(args.dir, parsed)
+        if errors:
+            _emit({**out, "status": "error", "errors": errors})
+            return 0
+        login, problem = comments.token_login()
+        if problem:
+            _emit({**out, "status": "error", "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
+            return 0
+        if _list_problems(result["problems"]):
+            # 項目の一覧そのものが欠けていれば保存しない (読めなかっただけの項目を「除かれた」と読ませないため)
+            _emit({**out, "status": "error", "snapshot": None,
+                   "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
+            return 0
+        # 1 項目の中の欠けと PR の読み取りの失敗は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ partial を付けて保存する
+        previous = observe.load_snapshot(directory)
+        warnings = []
+        if previous["status"] == "corrupt":
+            warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに書き直す"})
+        # 読むのは今のコメントに書かれた PR だけ (前のスナップショットにだけある URL は保存に残さない。差分のための読み直しは observe diff が行う)
+        comment_prs, problems = _read_comment_prs(result["items"], login)
+        out["problems"] = out["problems"] + problems
+        snapshot = observe.build_snapshot(result, comment_prs, _now(), previous=previous["snapshot"])
+        path = observe.save_snapshot(directory, snapshot)
+        out["status"] = "partial" if out["problems"] else out["status"]
+        out["snapshot"] = {"path": path, "taken_at": snapshot["taken_at"], "comment_prs": comment_prs,
+                           "skipped": observe.skipped(snapshot, snapshot), "carried": observe.carried(snapshot), "warnings": warnings}
+    _emit(out)
     return 0
+
+
+def cmd_observe_diff(args):
+    parsed = _project_arg(args)
+    if parsed is None:
+        return 0
+    directory, _, errors = _snapshot_dir(args.dir, parsed)
+    if errors:
+        _emit({"status": "error", "diffs": [], "errors": errors})
+        return 0
+    loaded = observe.load_snapshot(directory)
+    if loaded["status"] != "ok":
+        _emit({"status": "error", "diffs": [], "errors": [{"key": "snapshot", "message": f"スナップショット {loaded['path']} が{'無い' if loaded['status'] == 'missing' else '壊れている (' + loaded.get('message', '') + ')'}。`project items --write-snapshot` で作る", "failure": None}]})
+        return 0
+    result = project.items(parsed)
+    if result["status"] == "error":
+        _emit({"status": "error", "diffs": [], "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]})
+        return 0
+    login, problem = comments.token_login()
+    if problem:
+        _emit({"status": "error", "diffs": [], "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
+        return 0
+    if _list_problems(result["problems"]):
+        # 項目の一覧そのものが欠けていれば差分を返さない (読めなかっただけの項目が removed として現れるため)
+        _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"],
+               "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
+        return 0
+    # スナップショットにある PR (コメントが消えても、待っていた PR の状態の変化を見つけるため) も読む
+    comment_prs, problems = _read_comment_prs(result["items"], login, extra_urls=list(loaded["snapshot"]["comment_prs"]))
+    current = observe.build_snapshot(result, comment_prs, _now(), previous=loaded["snapshot"])
+    all_problems = result["problems"] + problems
+    _emit({"status": "partial" if all_problems else "ok", "snapshot_taken_at": loaded["snapshot"]["taken_at"],
+           "diffs": observe.diff(loaded["snapshot"], current), "skipped": observe.skipped(loaded["snapshot"], current), "carried": observe.carried(current),
+           "problems": all_problems, "rate_limit": result["rate_limit"], "errors": []})
+    return 0
+
+
+def _reflect(args, ops):
+    """書き込みのサブコマンドの共通の処理: --snapshot-dir があれば、書いた値をスナップショットに反映する。
+    返り値は出力に足す {"snapshot": {"reflected", "warnings"}} (指定が無ければ空)。"""
+    if not getattr(args, "snapshot_dir", None):
+        return {}
+    directory, _, errors = _snapshot_dir(args.snapshot_dir)
+    warnings = [{"key": "snapshot", "message": e["message"]} for e in errors]
+    if not errors:
+        loaded = observe.load_snapshot(directory)
+        if loaded["status"] != "ok":
+            warnings.append({"key": "snapshot", "message": f"スナップショット {loaded['path']} が{'無い' if loaded['status'] == 'missing' else '壊れている'}ので反映しない"})
+        else:
+            snapshot = loaded["snapshot"]
+            for op in ops:
+                snapshot, problem = observe.reflect(snapshot, op)
+                if problem:
+                    warnings.append({"key": "snapshot", "message": f"反映できない: {problem}"})
+            if not warnings:
+                observe.save_snapshot(directory, snapshot)
+    return {"snapshot": {"reflected": not warnings, "warnings": warnings}}
 
 
 def cmd_project_set_status(args):
@@ -215,7 +340,14 @@ def cmd_project_set_status(args):
     if meta is None:
         return 0
     result = project.set_status(meta["project"], args.item, args.status)
-    _emit({**result, "errors": [] if result["status"] == "ok" else [{"key": "status", "message": result["message"]}]})
+    extra = {}
+    if result["status"] == "ok" and args.snapshot_dir:
+        # 項目の ID からキーを引く (スナップショットの項目は owner/repo#番号 で持つ)
+        directory, _, errors = _snapshot_dir(args.snapshot_dir)
+        loaded = observe.load_snapshot(directory) if not errors else {"status": "error"}
+        key = next((k for k, v in (loaded.get("snapshot") or {}).get("items", {}).items() if v["item_id"] == args.item), None) if loaded["status"] == "ok" else None
+        extra = _reflect(args, [{"kind": "status", "item": key or args.item, "value": args.status}])
+    _emit({**result, **extra, "errors": [] if result["status"] == "ok" else [{"key": "status", "message": result["message"]}]})
     return 0
 
 
@@ -272,13 +404,15 @@ def cmd_issue_create(args):
 
 def cmd_issue_add_label(args):
     result = issues.add_label(args.issue, args.label, description=args.description)
-    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "add-label"))
+    extra = _reflect(args, [{"kind": "labels", "item": result["issue"], "add": [result["label"]], "remove": []}]) if result["status"] == "ok" and result["added"] else {}
+    _emit({**result, **extra, "errors": []} if result["status"] == "ok" else _issue_error(result, "add-label"))
     return 0
 
 
 def cmd_blocked_by_add(args):
     result = issues.add_blocked_by(args.issue, args.blocker)
-    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "blocked-by"))
+    extra = _reflect(args, [{"kind": "blocked_by", "item": result["issue"], "action": "add", "blocker": result["blocker"], "state": "OPEN"}]) if result["status"] == "ok" else {}
+    _emit({**result, **extra, "errors": []} if result["status"] == "ok" else _issue_error(result, "blocked-by"))
     return 0
 
 
@@ -323,7 +457,8 @@ def cmd_comment_post(args):
         _emit({"status": "error", "posted": None, "errors": [{"key": "header", "message": str(e), "failure": None}]})
         return 0
     result = comments.post(args.issue, args.role, args.name, args.session_id, args.kind, values, body)
-    _emit({**result, "errors": []} if result["status"] == "ok" else _issue_error(result, "post") | {"posted": None})
+    extra = _reflect(args, [{"kind": "comment", "item": ids.issue_key(args.issue), "id": result["database_id"]}]) if result["status"] == "ok" and result["posted"] else {}
+    _emit({**result, **extra, "errors": []} if result["status"] == "ok" else _issue_error(result, "post") | {"posted": None})
     return 0
 
 
@@ -518,10 +653,14 @@ def build_parser():
         p = project_sub.add_parser(name, help=help_text)
         p.add_argument("--project", required=True, help="owner/番号")
         p.set_defaults(func=func)
+        if name == "items":
+            p.add_argument("--write-snapshot", action="store_true", help="読んだ内容をスナップショットに書く (--dir が要る)")
+            p.add_argument("--dir", help="管理ディレクトリ (スナップショットの置き場は設定の record_dir)")
     p_set = project_sub.add_parser("set-status", help="Status を書く (5 つ以外と Done は拒否)")
     p_set.add_argument("--project", required=True, help="owner/番号")
     p_set.add_argument("--item", required=True, help="項目の ID (project items の item_id)")
     p_set.add_argument("--status", required=True, help="Todo / Ready / Blocked / In Progress / In review")
+    p_set.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
     p_set.set_defaults(func=cmd_project_set_status)
 
     p_repo = sub.add_parser("repo", help="リポジトリ")
@@ -553,6 +692,7 @@ def build_parser():
     p_label.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_label.add_argument("--label", required=True)
     p_label.add_argument("--description", help="ラベルを作るときの説明")
+    p_label.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
     p_label.set_defaults(func=cmd_issue_add_label)
 
     p_blocked = sub.add_parser("blocked-by", help="Issue の blockedBy")
@@ -560,6 +700,7 @@ def build_parser():
     p_badd = blocked_sub.add_parser("add", help="blocker を足す (失敗しても再試行しない)")
     p_badd.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_badd.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
+    p_badd.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
     p_badd.set_defaults(func=cmd_blocked_by_add)
 
     p_comment = sub.add_parser("comment", help="Issue のコメント")
@@ -591,6 +732,7 @@ def build_parser():
     body = p_cpost.add_mutually_exclusive_group()
     body.add_argument("--body", help="本文 (先頭行はこの CLI が足す)")
     body.add_argument("--body-file", help="本文のファイル (- なら標準入力)")
+    p_cpost.add_argument("--snapshot-dir", help="管理ディレクトリ (投稿したコメントをスナップショットに反映する)")
     p_cpost.set_defaults(func=cmd_comment_post)
 
     p_decl = sub.add_parser("declaration", help="宣言")
@@ -622,6 +764,13 @@ def build_parser():
     body.add_argument("--body", help="契機ごとの JSON (キーは resources.md の契機の表)")
     body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
     p_rjudge.set_defaults(func=cmd_resources_judge)
+
+    p_obs = sub.add_parser("observe", help="観測 (スナップショットと差分)")
+    obs_sub = p_obs.add_subparsers(dest="subcommand", required=True)
+    p_odiff = obs_sub.add_parser("diff", help="スナップショットと今の Project の差分を処理の順に返す (書かない)")
+    p_odiff.add_argument("--dir", required=True, help="管理ディレクトリ")
+    p_odiff.add_argument("--project", required=True, help="owner/番号")
+    p_odiff.set_defaults(func=cmd_observe_diff)
 
     p_pr = sub.add_parser("pr", help="PR")
     pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)
