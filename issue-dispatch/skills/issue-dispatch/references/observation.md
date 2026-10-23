@@ -1,6 +1,6 @@
 # 観測 (スナップショットと差分)
 
-このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の正本。待機 (`wait.pid` の様式と待機の終わる条件) は U14 でこの文書に足す。置き場 (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。
+このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の正本。待機 (`wait.pid` の様式・終わる条件・終了コード・標準出力) は「待機」の節。置き場 (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
 
 ## 目的
 
@@ -81,6 +81,54 @@
 
 反映の操作: `status` (`value`)・`field` (`field`・`value`)・`comment` (`id`)・`blocked_by` (`action` `add` / `remove`・`blocker`・`state`)・`labels` / `assignees` (`add`・`remove`)。
 
+## 待機
+
+待機は、管理のセッションと作業のセッションがバックグラウンドで起動するプロセス (計画の KTD6)。管理のセッションの `wait` はスナップショットとの差分で終わり、作業のセッションの `wait-assignment`・`wait-decision` は項目の状態 ([flow.md](flow.md) の導出。`work check` と同じ判断) で終わる。どの待機も、**読んだ時点の状態で判定する** (起動の前から成り立っていれば、最初の読み取りで終わる)。スナップショットは読むだけで書かない (書くのは管理のセッションのターン)。待機は記録を読まない。
+
+間隔 (`--interval`) と期限 (`--minutes`) は分で、小数も書ける。間隔が期限以上なら `argparse` と同じ終了コード 2 で拒否する。`wait` では省略時に設定の `poll_minutes`・`wait_minutes` を使う ([project-config.md](project-config.md))。作業の待機は、作業中のブランチのリポジトリの設定から取った値を渡す。
+
+### `wait.pid`
+
+実行中の待機の印。置き場は、管理の `wait` では記録の置き場 ([records.md](records.md))、作業の待機では `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` ([messaging.md](messaging.md) の一時ディレクトリ。作業ツリーには何も書かない)。JSON で、`pid` (待機のプロセス)・`started_at` (そのプロセスの開始時刻。`ps -o lstart=` の文字列のまま)・`owner` (所有者のセッション ID)・`wait` (待機の名前)・`written_at` を持つ。一時名に書いてから改名する。
+
+- **起動時**: `wait.pid` があれば、その PID のプロセスの開始時刻が `started_at` と一致し、コマンドがこの CLI の待機 (`issue_dispatch.py` と待機の名前を含む) なら、SIGTERM を送って終わるのを待つ。一致しなければ (PID が別のプロセスに再利用されている)、止めずに `wait.pid` だけ消す。その後、自分の PID で `wait.pid` を書き、標準出力の最初の行に `pid <PID>` を書く。
+- **終わるとき**: `wait.pid` の PID が自分のときだけ消す (止められた待機が、後から起動した待機の `wait.pid` を消さないため)。
+- **SIGTERM を受けたとき**: 標準出力に `stopped <PID>` を書き、終了コード 6 で終わる。再入の手順は、出力に `stopped` の行があるか、`wait.pid` に通知と別の PID があるときは何もしない (止めた待機の通知で再入を繰り返さないため。計画の R24)。
+
+### 終わる条件と標準出力
+
+標準出力は、最初の行が `pid <PID>`、終わりの行が先頭の語で種類を示す 1 行 (期限と失敗の終了コードでは終わりの行を書かない)。スキルは先頭の語で分ける。
+
+| 待機 | 終わる条件 | 終わりの行 |
+| --- | --- | --- |
+| `wait` | スナップショットと今の Project (と `comment_prs` の PR の状態) に差分がある (「差分の種類と処理の順」) | `diff <種類,...>` (差分の種類を処理の順に、重複なく) |
+| `wait-assignment` | 新しい割り当て: `--blocked`・`--in-review`・`--pending` に渡した Issue 以外で、開いていて、自分の ID が `Agent session ID` に入り、自分宛ての最新の `割り当て` があってその番号の `解放` が無く、Status が `In Progress` の項目 (`割り当て` が無い項目は、割り当ての書き込みの途中なので返さない) | `assignment <項目>` |
+| `wait-assignment` | `--blocked` に渡した Issue が `In Progress` に戻った (フィールドが自分の ID) | `resumed <項目>` |
+| `wait-assignment` | `--pending` に渡した Issue が戻った: 開いていて、フィールドが自分の ID で、Status が `In Progress` か `Blocked` | `resumed <項目>` |
+| `wait-assignment` | `--in-review`・`--pending` に渡した Issue の正常な終わり ([flow.md](flow.md) の `end`。正常な終わりの後に reopen されてフィールドが空にされた場合を含む。進行中の Issue の close では終わらない) | `stop close` |
+| `wait-assignment` | 自分宛ての `依頼` (本文の追記) があり、その PR が開いていて、閉じる参照にまだ Issue が無い (追記が済んだ PR と閉じた PR では終わらない) | `request` |
+| `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つ `開始可` | `go` |
+| `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つ `依頼` (宣言の書き直し) | `request` |
+| `wait-decision` | 今の Issue の Status が `Blocked` で、それが管理のセッションが書いた `Blocked` ([flow.md](flow.md) の `manager_blocked`。利用者が手で付けた `Blocked` では終わらない) | `wait` |
+| `wait-decision` | `--review-update` を渡されたときの、今の Issue の正常な終わり | `stop close` |
+| どちらも | 見る Issue (`wait-assignment` では `--blocked`・`--in-review`・`--pending` に渡した Issue、`wait-decision` では `--issue`) に、自分宛てで今の割り当ての番号の `解放` がある (フィールドが自分の ID でなくなっただけでは終わらない) | `stop <理由>` (理由は `解放` の先頭行の値) |
+| どちらも | SIGTERM を受けた | `stopped <PID>` |
+
+複数が同時に当たれば、`wait-assignment` は `stop` → `request` → `resumed` → `assignment`、`wait-decision` は `stop` → `go` → `request` → `wait` の順で 1 つを返す。前の割り当て・別の宛先・別の宣言への `開始可`・`解放` では終わらない (コメントの書き手がトークンのログインと同じものだけを見る)。
+
+### 終了コード
+
+| 終了コード | 意味 | 作業のセッションの扱い (計画の KTD6) |
+| --- | --- | --- |
+| 0 | 終わる条件に当たった (終わりの行あり) | 終わりの行の語で分ける |
+| 124 | 期限 (期限切れを宣言する前にもう 1 度確かめる) | 状態ごとの扱い (`available` の送り直しなど) |
+| 8 | `gh` の認証切れ | 止まり、`gh auth login` を案内する |
+| 3 | レート制限の再開 (`gh api rate_limit`) を期限内に待てない、または再開時刻を読めない (期限内なら待って続ける) | 何も送らずに起動し直す |
+| 4 | ネットワークの失敗 (接続の失敗・タイムアウト・`gh` のほかの失敗) が続けて 3 回 (間に成功があれば数え直す) | 1 回目は起動し直す。2 回目も 4 なら止まる |
+| 5 | スナップショットが無い・壊れている (`wait` だけ。書き直さない。先に `project items --write-snapshot` が要る) | — |
+| 6 | 止められた (`stopped` の行) | 何もしない |
+| 2 | 引数の誤り (`argparse`) と、間隔が期限以上 | 止まる |
+
 ## CLI
 
 | サブコマンド | 書き込み | 返すもの |
@@ -88,3 +136,6 @@
 | `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが欠ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠けと読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠けの扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに書き直し、`snapshot.warnings` (key `snapshot`) で知らせる |
 | `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが欠ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠けと読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠けの扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待っていた PR の変化を見つけるため) |
 | 書き込みのサブコマンドの `--snapshot-dir <管理ディレクトリ>` | `snapshot.json` | 出力に `snapshot` (`reflected`・`warnings`) を足す |
+| `wait --dir <管理ディレクトリ> [--project <owner>/<番号>] [--interval <分>] [--minutes <分>]` | `wait.pid` (記録の置き場) | 「待機」の節。終了コードと標準出力の行 (JSON ではない)。スナップショットが無い・壊れていれば 5 |
+| `wait-assignment --project <owner>/<番号> [--session <ID>] [--blocked <Issue>]... [--in-review <Issue>]... [--pending <Issue>] --interval <分> --minutes <分>` | `wait.pid` (一時ディレクトリ) | 「待機」の節。`--session` を省けば環境変数 |
+| `wait-decision --project <owner>/<番号> --issue <Issue> [--session <ID>] --declaration <宣言のコメントの ID> [--review-update] --interval <分> --minutes <分>` | `wait.pid` (一時ディレクトリ) | 「待機」の節 |
