@@ -9,6 +9,7 @@
 import json
 import os
 import re
+import tempfile
 
 from issue_dispatch import comments, ids
 
@@ -41,14 +42,24 @@ def load_snapshot(directory):
 
 
 def save_snapshot(directory, snapshot):
-    """一時ファイルに書いて os.replace で置き換える。返り値はパス。"""
+    """一時ファイル (records.md の一時名の決まり: `.` で始まり `.tmp` で終わる名前。書き手ごとに別) に書き、fsync してから
+    os.replace で置き換える (record.save と同じ形)。返り値はパス。"""
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, SNAPSHOT_FILE)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, ensure_ascii=False, indent=2, sort_keys=True)
-        f.write("\n")
-    os.replace(tmp, path)
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".snapshot-", suffix=".json.tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, ensure_ascii=False, indent=2, sort_keys=True)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     return path
 
 

@@ -69,6 +69,12 @@ class SnapshotFileTest(unittest.TestCase):
             loaded = observe.load_snapshot(d)
             self.assertEqual((loaded["status"], loaded["snapshot"]), ("ok", snap))
             self.assertEqual(sorted(os.listdir(d)), [observe.SNAPSHOT_FILE], "一時ファイルを残さない")
+            # 一時名は records.md の決まり (`.` で始まり `.tmp` で終わる) で、書き手ごとに別の名前
+            import tempfile as _tempfile
+            fd, tmp = _tempfile.mkstemp(dir=d, prefix=".snapshot-", suffix=".json.tmp")
+            os.close(fd)
+            self.assertTrue(os.path.basename(tmp).startswith(".") and tmp.endswith(".tmp"))
+            os.unlink(tmp)
             with open(os.path.join(d, observe.SNAPSHOT_FILE), "w", encoding="utf-8") as f:
                 f.write("{not json")
             self.assertEqual(observe.load_snapshot(d)["status"], "corrupt")
