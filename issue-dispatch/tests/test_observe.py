@@ -94,8 +94,9 @@ class BuildTest(FakeGhCase):
         self.assertEqual(snap["project_id"], result["project_id"])
         self.assertEqual(sorted(snap["items"]), sorted([A1, A2, A3, "akm/issue-dispatch-verify-b#1", "akm/issue-dispatch-verify-b#2"]))
         item = snap["items"][A1]
-        self.assertEqual(set(item), {"item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs"},
+        self.assertEqual(set(item), {"item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs", "partial"},
                          "一覧に無い値 (title・url・events など) は持たない")
+        self.assertEqual(item["partial"], [])
         self.assertEqual(item["state"], "OPEN")
         self.assertEqual(item["prs"][f"https://github.com/{A}/pull/4"], {"state": "MERGED", "draft": False, "merged": True})
         self.assertEqual(snap["items"][A2]["state"], "CLOSED")
@@ -302,7 +303,7 @@ class CliTest(FakeGhCase):
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]["state"], "OPEN", "diff は書かない")
 
     def test_partial_read_yields_no_diff_and_no_save(self):
-        """一部しか読めなければ、diff は差分を返さず、--write-snapshot はスナップショットを書き換えない (読めなかった項目を removed にしない)。"""
+        """項目の一覧そのものが欠ければ、diff は差分を返さず、--write-snapshot はスナップショットを書き換えない (読めなかった項目を removed にしない)。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         taken = observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"]
@@ -316,11 +317,35 @@ class CliTest(FakeGhCase):
         code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         self.assertEqual((out["status"], out["snapshot"], out["errors"][0]["key"]), ("error", None, "partial"))
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"], taken, "書き換えない")
-        # コメントの URL の PR が読めないときも同じ
+        # コメントの URL の PR が読めないときは、その PR だけを比べずに続ける (読むたびに同じく出る欠けで観測を止めない)
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))},
                         {"substring": "query PrObserve", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}])
         code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
-        self.assertEqual((out["status"], out["problems"][0]["what"]), ("error", "comment-pr"))
+        self.assertEqual((out["status"], out["problems"][0]["what"]), ("partial", "comment-pr"))
+        self.assertEqual([d["kind"] for d in out["diffs"]], ["comment"], "読めない PR の差分は出ず、ほかの差分 (コメントの追加) は返る")
+        self.assertEqual(list(out["skipped"]["prs"]), [PR9])
+
+    def test_item_level_gaps_skip_only_that_item(self):
+        """1 項目の中の欠け (入れ子の connection の上限) は、その項目だけを比べずに差分と保存を続ける。"""
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        def mutate(nodes):
+            node_of(nodes, 1)["content"]["blockedBy"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C"}
+            node_of(nodes, 1)["content"]["labels"]["nodes"].append({"name": "x"})  # 欠けのある項目の変化は比べない
+            node_of(nodes, 3)["content"]["labels"]["nodes"].append({"name": "y"})  # ほかの項目の変化は返る
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["errors"]), (0, "partial", []), err)
+        self.assertEqual(out["diffs"], [{"kind": "labels", "item": A3, "added": ["y"], "removed": []}])
+        self.assertEqual(out["skipped"]["items"], {A1: ["blocked_by-truncated"]})
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual((out["status"], out["snapshot"]["skipped"]["items"]), ("partial", {A1: ["blocked_by-truncated"]}), "保存し、欠けの印を付ける")
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]["partial"], ["blocked_by-truncated"])
+        # 欠けが解けた次の差分では、その項目は比べられず (前の側に欠けがある)、removed にも added にもならない
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual([d["item"] for d in out["diffs"]], [A3], "欠けのあった項目は前の側の印で比べない")
 
     def test_diff_without_snapshot(self):
         code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")

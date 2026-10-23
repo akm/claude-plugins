@@ -210,16 +210,23 @@ def _now():
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _read_comment_prs(items, login):
-    """開いている項目のコメントに URL で書かれた PR の状態を読む。返り値は (URL → 状態, problems)。"""
+def _read_comment_prs(items, login, extra_urls=()):
+    """開いている項目のコメントに URL で書かれた PR (と extra_urls) の状態を読む。返り値は (URL → 状態 (読めなければ {"partial": 理由}), problems)。"""
     states, problems = {}, []
-    for url in observe.pr_urls_in_comments(items, login):
+    urls = observe.pr_urls_in_comments(items, login)
+    urls += [u for u in extra_urls if u not in urls]
+    for url in urls:
         r = issues.pr_state(url)
         if r["status"] == "ok":
             states[url] = {"state": r["state"], "draft": r["draft"], "merged": r["merged"]}
         else:
+            states[url] = {"partial": r["message"]}
             problems.append({"what": "comment-pr", "url": url, "failure": r.get("failure"), "message": r["message"], "exit_code": r.get("exit_code")})
     return states, problems
+
+
+def _list_problems(problems):
+    return [p for p in problems if p.get("what") in observe.LIST_PROBLEMS]
 
 
 def cmd_project_items(args):
@@ -243,16 +250,19 @@ def cmd_project_items(args):
         if problem:
             _emit({**out, "status": "error", "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
             return 0
+        if _list_problems(result["problems"]):
+            # 項目の一覧そのものが欠けていれば保存しない (読めなかっただけの項目を「除かれた」と読ませないため)
+            _emit({**out, "status": "error", "snapshot": None,
+                   "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
+            return 0
         comment_prs, problems = _read_comment_prs(result["items"], login)
         out["problems"] = out["problems"] + problems
-        if out["problems"]:
-            # 一部でも読めなければ保存しない。欠けたスナップショットは、読めなかっただけの項目や PR を「除かれた・消えた」と読ませる
-            _emit({**out, "status": "error", "snapshot": None,
-                   "errors": [{"key": "partial", "message": "一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
-            return 0
         snapshot = observe.build_snapshot(result, comment_prs, _now())
         path = observe.save_snapshot(directory, snapshot)
-        out["snapshot"] = {"path": path, "taken_at": snapshot["taken_at"], "comment_prs": comment_prs}
+        # 1 項目の中の欠けと PR の読み取りの失敗は、その項目・PR に欠けの印を付けて保存する (差分はそれらを比べない)
+        out["status"] = "partial" if out["problems"] else out["status"]
+        out["snapshot"] = {"path": path, "taken_at": snapshot["taken_at"], "comment_prs": comment_prs,
+                           "skipped": observe.skipped(snapshot, snapshot)}
     _emit(out)
     return 0
 
@@ -277,23 +287,18 @@ def cmd_observe_diff(args):
     if problem:
         _emit({"status": "error", "diffs": [], "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
         return 0
-    comment_prs, problems = _read_comment_prs(result["items"], login)
-    # スナップショットにある PR (コメントが消えても、待っていた PR の状態の変化を見つけるため) も読む
-    for url in loaded["snapshot"]["comment_prs"]:
-        if url not in comment_prs and not any(p.get("url") == url for p in problems):
-            r = issues.pr_state(url)
-            if r["status"] == "ok":
-                comment_prs[url] = {"state": r["state"], "draft": r["draft"], "merged": r["merged"]}
-            else:
-                problems.append({"what": "comment-pr", "url": url, "failure": r.get("failure"), "message": r["message"], "exit_code": r.get("exit_code")})
-    if result["problems"] or problems:
-        # 一部でも読めなければ差分を返さない。欠けた読み取りと比べると、読めなかっただけの項目や PR が removed や消えた PR として現れる
-        _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"] + problems,
-               "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
+    if _list_problems(result["problems"]):
+        # 項目の一覧そのものが欠けていれば差分を返さない (読めなかっただけの項目が removed として現れるため)
+        _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"],
+               "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
         return 0
+    # スナップショットにある PR (コメントが消えても、待っていた PR の状態の変化を見つけるため) も読む
+    comment_prs, problems = _read_comment_prs(result["items"], login, extra_urls=list(loaded["snapshot"]["comment_prs"]))
     current = observe.build_snapshot(result, comment_prs, _now())
-    _emit({"status": "ok", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": observe.diff(loaded["snapshot"], current),
-           "problems": [], "rate_limit": result["rate_limit"], "errors": []})
+    all_problems = result["problems"] + problems
+    _emit({"status": "partial" if all_problems else "ok", "snapshot_taken_at": loaded["snapshot"]["taken_at"],
+           "diffs": observe.diff(loaded["snapshot"], current), "skipped": observe.skipped(loaded["snapshot"], current),
+           "problems": all_problems, "rate_limit": result["rate_limit"], "errors": []})
     return 0
 
 

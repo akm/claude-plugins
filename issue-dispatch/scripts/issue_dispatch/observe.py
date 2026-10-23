@@ -16,7 +16,9 @@ from issue_dispatch import comments, ids
 SNAPSHOT_FILE = "snapshot.json"
 SNAPSHOT_VERSION = 1
 SNAPSHOT_KEYS = ("version", "taken_at", "project_id", "items", "comment_prs")
-ITEM_KEYS = ("item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs")
+ITEM_KEYS = ("item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs", "partial")
+# 項目の一覧そのものの欠け (読めなかった項目が除去と読まれる) と、1 項目の中の欠け (その項目だけ比べない) を分ける
+LIST_PROBLEMS = ("items-page", "graphql-errors")
 # 差分の種類と処理の順 (observation.md の表): 人の変更 → close・reopen と項目の除去 → blockedBy → コメント → PR → 項目の追加・並び順・本文の編集
 DIFF_KINDS = ("status", "field", "assignees", "labels", "closed", "reopened", "removed", "blocked_by", "comment", "pr", "added", "position", "body_edit")
 # コメントの本文から PR を読む種類
@@ -69,8 +71,8 @@ def _pr_state(p):
     return {"state": p["state"], "draft": bool(p.get("draft")), "merged": bool(p.get("merged"))}
 
 
-def snapshot_item(item):
-    """project.items の項目 (Issue) を、スナップショットが持つ値だけにする。"""
+def snapshot_item(item, partial=()):
+    """project.items の項目 (Issue) を、スナップショットが持つ値だけにする。partial はその項目の欠けの種類 (problems の what)。"""
     fields = {name: {"value": v.get("text") if "text" in v else v.get("name"), "updated_at": v.get("updated_at")} for name, v in (item.get("fields") or {}).items()}
     edits = [e.get("edited_at") for e in item.get("body_edits") or [] if e.get("edited_at")]
     return {"item_id": item["item_id"], "position": item["position"], "state": item.get("state"),
@@ -79,15 +81,38 @@ def snapshot_item(item):
             "blocked_by": {b["key"]: b["state"] for b in item.get("blocked_by") or []},
             "body_edited_at": max(edits) if edits else None,
             "comment_ids": sorted(c["database_id"] for c in item.get("comments") or [] if c.get("database_id") is not None),
-            "prs": {p["url"]: _pr_state(p) for p in item.get("prs") or []}}
+            "prs": {p["url"]: _pr_state(p) for p in item.get("prs") or []},
+            "partial": sorted(set(partial))}
 
 
 def build_snapshot(items_result, comment_prs, taken_at):
-    """project.items の結果と、コメントの URL の PR の状態 (URL → {state, draft, merged}) からスナップショットを作る。
-    Issue 以外の項目 (draft issue・PR) は持たない。"""
-    items = {it["key"]: snapshot_item(it) for it in items_result.get("items") or [] if it.get("key")}
-    return {"version": SNAPSHOT_VERSION, "taken_at": taken_at, "project_id": items_result.get("project_id"), "items": items,
-            "comment_prs": {url: _pr_state(v) for url, v in (comment_prs or {}).items()}}
+    """project.items の結果と、コメントの URL の PR の状態 (URL → {state, draft, merged}。読めなかった PR は {"partial": 理由}) から
+    スナップショットを作る。Issue 以外の項目 (draft issue・PR) は持たない。items_result の problems のうち項目 1 つの中の欠け
+    (item を持つもの) は、その項目の `partial` に種類を残す (差分はその項目を比べない)。項目の一覧そのものの欠け (LIST_PROBLEMS)
+    は呼び出し元が先に止める。"""
+    partial = {}
+    for p in items_result.get("problems") or []:
+        if p.get("item") and p.get("what") not in LIST_PROBLEMS:
+            partial.setdefault(p["item"], []).append(p["what"])
+    items = {it["key"]: snapshot_item(it, partial.get(it["key"], ())) for it in items_result.get("items") or [] if it.get("key")}
+    prs = {url: (dict(v) if "partial" in v else _pr_state(v)) for url, v in (comment_prs or {}).items()}
+    return {"version": SNAPSHOT_VERSION, "taken_at": taken_at, "project_id": items_result.get("project_id"), "items": items, "comment_prs": prs}
+
+
+def skipped(before, after):
+    """2 つのスナップショットで比べない項目と PR (どちらかで欠けがあるもの)。返り値は {"items": {キー: 欠けの種類}, "prs": {URL: 理由}}。"""
+    items = {}
+    for snap in (before, after):
+        for key, it in snap["items"].items():
+            if it.get("partial"):
+                items.setdefault(key, [])
+                items[key] = sorted(set(items[key]) | set(it["partial"]))
+    prs = {}
+    for snap in (before, after):
+        for url, v in snap["comment_prs"].items():
+            if isinstance(v, dict) and "partial" in v:
+                prs[url] = v["partial"]
+    return {"items": items, "prs": prs}
 
 
 def pr_urls_in_comments(items, login):
@@ -162,8 +187,11 @@ def diff(before, after):
     """2 つのスナップショットの違いを、処理の順 (DIFF_KINDS の順、同じ種類は今の位置の順) に並べて返す。意味づけはしない。
     要素は {"kind", "item" (コメントの URL の PR は None), ...} で、種類ごとの値は observation.md の表。"""
     out = []
+    skip = skipped(before, after)
     b_items, a_items = before["items"], after["items"]
     for key, a in a_items.items():
+        if key in skip["items"]:
+            continue  # 欠けがある項目は比べない (欠けを変化と読まないため)
         b = b_items.get(key)
         if b is None:
             out.append({"kind": "added", "item": key, "position": a["position"]})
@@ -194,7 +222,7 @@ def diff(before, after):
         if b["body_edited_at"] != a["body_edited_at"]:
             out.append({"kind": "body_edit", "item": key, "before": b["body_edited_at"], "after": a["body_edited_at"]})
     for key, b in b_items.items():
-        if key not in a_items:
+        if key not in a_items and key not in skip["items"]:
             out.append({"kind": "removed", "item": key, "position": b["position"]})
     # 並び順: 両方にある項目の相対の順が変わったときだけ 1 件 (位置の数値は追加・除去でずれるので比べない)
     common = [k for k in a_items if k in b_items]
@@ -203,6 +231,8 @@ def diff(before, after):
     if before_order != after_order:
         out.append({"kind": "position", "item": None, "before": before_order, "after": after_order})
     for url in sorted(set(before["comment_prs"]) | set(after["comment_prs"])):
+        if url in skip["prs"]:
+            continue
         if before["comment_prs"].get(url) != after["comment_prs"].get(url):
             out.append({"kind": "pr", "item": None, "url": url, "source": "comment", "before": before["comment_prs"].get(url), "after": after["comment_prs"].get(url)})
     positions = {k: v["position"] for k, v in a_items.items()}
