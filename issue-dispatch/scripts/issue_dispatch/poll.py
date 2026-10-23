@@ -102,12 +102,14 @@ def stop_previous(path, grace_seconds=10.0):
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline and process_start(entry["pid"]) is not None:
         time.sleep(0.1)
+    alive = process_start(entry["pid"]) is not None
     try:
         if read_pid_file(path) and read_pid_file(path)["pid"] == entry["pid"]:
             os.unlink(path)
     except OSError:
         pass
-    return {"stopped": entry["pid"]}
+    # 待ち時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止の印を見たときに終わる
+    return {"stopped": entry["pid"], "alive": True} if alive else {"stopped": entry["pid"]}
 
 
 def remove_pid_if_mine(path):
@@ -189,19 +191,26 @@ class Waiter:
             return EXIT_NETWORK
         return None
 
+    def _stopped_line(self):
+        return self._finish(EXIT_STOPPED, f"stopped {os.getpid()}")
+
     def run(self, poll):
+        """読み取りの結果より停止の印を優先する: 読み取り (gh の呼び出し) の間に SIGTERM を受けていれば、結果を捨てて stopped で終わる
+        (捨てた変化は、新しい待機が最初の読み取りで見つける。読んだ時点の状態で判定するため)。"""
         self.start()
         try:
             while True:
                 if self.stopped:
-                    return self._finish(EXIT_STOPPED, f"stopped {os.getpid()}")
+                    return self._stopped_line()
                 result = poll()
+                if self.stopped:
+                    return self._stopped_line()
                 if result is None:
                     self.network_failures = 0
                 elif result[0] == "failure":
                     code = self._failure(result[1])
-                    if code == EXIT_STOPPED:
-                        return self._finish(EXIT_STOPPED, f"stopped {os.getpid()}")
+                    if code == EXIT_STOPPED or self.stopped:
+                        return self._stopped_line()
                     if code is not None:
                         return self._finish(code)
                 else:
@@ -210,10 +219,12 @@ class Waiter:
                     return self._finish(EXIT_TIMEOUT)
                 state = self._sleep(self.interval)
                 if state == "stopped":
-                    return self._finish(EXIT_STOPPED, f"stopped {os.getpid()}")
+                    return self._stopped_line()
                 if state == "deadline":
                     # 期限切れを宣言する前にもう 1 度確かめる
                     result = poll()
+                    if self.stopped:
+                        return self._stopped_line()
                     if result is not None and result[0] != "failure":
                         return self._finish(result[0], result[1])
                     return self._finish(EXIT_TIMEOUT)

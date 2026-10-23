@@ -75,6 +75,37 @@ class WaiterTest(unittest.TestCase):
         self.assertEqual((code, "".join(self.out)), (0, f"pid {os.getpid()}\ndiff status\n"))
         self.assertFalse(os.path.exists(self.pid_path))
 
+    def test_stop_during_poll_discards_result(self):
+        """読み取りの間に SIGTERM を受けたら、その読み取りの結果 (終わる条件) を捨てて stopped と 6 で終わる。"""
+        w = self._waiter()
+
+        def poll_then_stop():
+            w.stopped = True
+            return (0, "diff status")
+        code = w.run(poll_then_stop)
+        self.assertEqual((code, "".join(self.out)), (6, f"pid {os.getpid()}\nstopped {os.getpid()}\n"))
+
+    def test_stop_previous_reports_alive_after_grace(self):
+        """前の待機が待ち時間の後も動いていれば alive を返し、起動は続ける (wait.pid は消す)。"""
+        import signal as _signal
+        holder = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)"])
+        try:
+            time.sleep(0.3)
+            fake_command_entry = {"pid": holder.pid, "started_at": poll.process_start(holder.pid), "owner": M1, "wait": "wait"}
+            original = poll.is_our_wait
+            poll.is_our_wait = lambda entry: True
+            try:
+                with open(self.pid_path, "w", encoding="utf-8") as f:
+                    json.dump(fake_command_entry, f)
+                result = poll.stop_previous(self.pid_path, grace_seconds=0.3)
+            finally:
+                poll.is_our_wait = original
+            self.assertEqual(result, {"stopped": holder.pid, "alive": True})
+            self.assertFalse(os.path.exists(self.pid_path))
+        finally:
+            holder.kill()
+            holder.wait()
+
     def test_timeout_checks_once_more_before_124(self):
         calls = []
         code = self._waiter(minutes=0.003, interval=0.001).run(lambda: calls.append(1))
