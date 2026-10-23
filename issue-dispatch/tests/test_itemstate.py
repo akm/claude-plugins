@@ -45,7 +45,7 @@ def wcomment(kind, values=None, at=None, cid=None, body="", name="worker 1", sid
 
 def decl_body(files=(("src/a.py", None),), resources=(), split=False):
     obj = {"files": [{"path": p, "units": u} for p, u in files], "resources": list(resources),
-           "split": {"needed": split, "reason": None, "remaining": None, "blocked_by": None}}
+           "split": {"needed": True, "reason": "大きい", "remaining": "残り", "blocked_by": []} if split else {"needed": False, "reason": ""}}
     return "```json\n" + json.dumps(obj, ensure_ascii=False) + "\n```"
 
 
@@ -304,6 +304,25 @@ class DeclarationStageTest(unittest.TestCase):
         d = stage_of(bad)
         self.assertEqual((d["judged"]["comment_id"], d["judged"]["declaration"], d["stage"]), (400, None, "undecided"))
         self.assertTrue(d["judged"]["error"])
+
+    def test_declaration_without_units_is_read(self):
+        """units を省いた (ファイル全体を変える) 宣言は様式どおりなので、読める宣言として扱う (units は None)。"""
+        body = "```json\n" + json.dumps({"files": [{"path": "src/app.ts"}], "resources": ["db"], "split": {"needed": False, "reason": ""}}) + "\n```"
+        d = stage_of(wcomment("着手の宣言", None, t(12), 400, body=body))
+        self.assertEqual((d["judged"]["error"], d["judged"]["declaration"]["files"]), (None, [{"path": "src/app.ts", "units": None, "kind": None}]))
+
+    def test_declaration_paths_are_normalized_for_update_kind(self):
+        """パスの綴りだけが違う (./src/a.py) 更新は同じファイルと数え、資源を外すだけなら判定の要る宣言にならない (declaration.parse と同じ正規化)。"""
+        update = wcomment("宣言の更新", None, t(14), 401, body=decl_body(files=(("./src/a.py", None),), resources=()))
+        d = stage_of(DECL1, _go(400, t(13), 500), update)
+        self.assertEqual((d["judged"]["comment_id"], d["stage"], d["held"]), (400, "go", []))
+
+    def test_declaration_with_shape_error_reports_parse_errors(self):
+        """形の誤り (必須のキーが無い・パスがルートの外) は declaration.parse の errors を理由にする。"""
+        body = "```json\n" + json.dumps({"files": [{"path": "../x"}], "resources": []}) + "\n```"
+        d = stage_of(wcomment("着手の宣言", None, t(12), 400, body=body))
+        self.assertIsNone(d["judged"]["declaration"])
+        self.assertIn("split", d["judged"]["error"])
 
     def test_results_for_other_declaration_are_not_counted(self):
         """ほかの宣言 (ID が違う) への `開始可` は、判定の要る宣言の結果にしない。"""

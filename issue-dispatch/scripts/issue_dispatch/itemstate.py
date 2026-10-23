@@ -176,7 +176,8 @@ def reopened_after(item, end):
 # --- 宣言の段階 ---------------------------------------------------------------------
 
 def declaration_json(text):
-    """宣言の本文の JSON のコードブロックを読む。返り値は (dict, None) か (None, 理由)。"""
+    """宣言の本文の JSON のコードブロックを読み、declaration.parse (種類は付けない) で形を検査してパスをそろえる。
+    返り値は (parse の declaration, None) か (None, 理由)。"""
     m = _JSON_BLOCK_RE.search(text or "")
     if not m:
         return None, "JSON のコードブロック (```json ... ```) が無い"
@@ -184,10 +185,10 @@ def declaration_json(text):
         obj = json.loads(m.group(1))
     except ValueError as e:
         return None, f"JSON として読めない: {e}"
-    if not isinstance(obj, dict) or not isinstance(obj.get("files"), list) or not isinstance(obj.get("resources"), list) \
-            or any(not isinstance(f, dict) or "path" not in f or "units" not in f for f in obj["files"]):
-        return None, "宣言の形 (files の配列 (path と units) と resources の配列) ではない"
-    return obj, None
+    parsed = declaration.parse(obj, None, None)
+    if parsed["status"] != "ok":
+        return None, "宣言の形の誤り: " + "; ".join(f"{e['key']}: {e['message']}" for e in parsed["errors"])
+    return parsed["declaration"], None
 
 
 def declarations(cs, asg):

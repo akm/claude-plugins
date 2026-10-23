@@ -82,11 +82,11 @@ def _check_file(entry, index, rules, table, errors, seen):
         errors.append({"key": f"{key}.path", "message": f"同じパス {path!r} が files[{seen[path]}] にもある (1 つにまとめる)"})
         return None
     seen[path] = index
-    kind = filekinds.classify(path, rules, table)
+    kind = filekinds.classify(path, rules, table) if rules is not None else None
     units = None
     if "units" in entry and entry["units"] is not None:
         units = _check_units(entry["units"], f"{key}.units", errors)
-        if units is not None and (kind["kind"] in _NO_UNITS_KINDS or not kind.get("unit_notation")):
+        if units is not None and kind is not None and (kind["kind"] in _NO_UNITS_KINDS or not kind.get("unit_notation")):
             matched = kind["matched"]
             how = (f"一致した規則: {matched['source']} の {matched['pattern']!r}" if matched else "どの規則にも一致しない")
             errors.append({"key": f"{key}.units", "message": f"パス {path!r} の種類は {kind['kind']} で節の表記 (unit_notation) が無いので、units は書けない ({how})"})
@@ -139,6 +139,8 @@ def parse(obj, rules, default_table):
     返り値: {"status": "ok", "declaration": {"files": [{"path", "units" (None なら全体), "kind" (filekinds.classify の結果)}],
     "resources": [...], "split": {"needed", "reason", "remaining", "blocked_by" (正規形の配列か None)}}, "count": ファイルの数, "errors": []}
     か、{"status": "error", "declaration": None, "count": None, "errors": [{"key", "message"}]} (誤りはできるだけ全部集める)。
+    rules が None なら種類を付けず (kind は None)、種類に依る検査 (節の表記の無いファイルの units) だけを飛ばす。形の検査とパスの正規化は同じ
+    (コメントの宣言を読む導出 (itemstate) が、リポジトリの設定を読まずに同じ検査を使うため)。
     """
     errors = []
     if not isinstance(obj, dict):
