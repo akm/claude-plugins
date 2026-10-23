@@ -114,6 +114,7 @@ class ParseTest(unittest.TestCase):
         for units in (["dependencies.zod"], [[]], [[1]], [["a", None]], "dependencies", [["a"], "b"]):
             with self.subTest(units=units):
                 self.assertRejected(decl([("package.json", units)]), "files[0].units", "文字列の配列の配列")
+        self.assertRejected(decl([("package.json", [])]), "files[0].units", "空の配列は書けない")
 
     def test_normalizes_paths(self):
         """Covers AE4. `./src/app.ts`・`src/app.ts`・`src//app.ts`・`src/../src/app.ts` は同じパス。"""

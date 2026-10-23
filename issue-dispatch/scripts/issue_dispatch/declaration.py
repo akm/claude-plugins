@@ -45,6 +45,9 @@ def _check_units(units, key, errors):
     if not isinstance(units, list):
         errors.append({"key": key, "message": f"units は {expected}: {units!r}"})
         return None
+    if not units:
+        errors.append({"key": key, "message": "units の空の配列は書けない (ファイル全体を変える予定なら units を省く)"})
+        return None
     out, own = [], []
     for i, unit in enumerate(units):
         if not isinstance(unit, list) or not unit or not all(isinstance(n, str) and n != "" for n in unit):
