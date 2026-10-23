@@ -298,7 +298,10 @@ class CliTest(unittest.TestCase):
                 ("declare", {"item": I2, "declared": ["db"], "reserved": [""], "usage": {}}, "body.reserved"),
                 ("declare", {"item": I2, "declared": ["db"], "reserved": [], "usage": {}, "answers": {"db": 1}}, "body.answers"),
                 ("close", {"item": I2, "usage": {"db": [1]}}, "body.usage.db"),
-                ("release", {"resource": "db", "waiting": [{"item": I1, "wait_for": "db"}]}, "body.waiting[0]")):
+                ("release", {"resource": "db", "waiting": [{"item": I1, "wait_for": "db"}]}, "body.waiting[0]"),
+                ("release", {"resource": "db", "waiting": [{"item": I1, "declaration": 1, "posted_at": "t", "position": "1", "wait_for": ["db"]},
+                                                           {"item": I2, "declaration": 2, "posted_at": "t", "position": 2, "wait_for": ["db"]}]}, "body.waiting[0]"),
+                ("release", {"resource": "db", "waiting": [{"item": I1, "declaration": 1, "posted_at": 5, "position": 1, "wait_for": ["db"]}]}, "body.waiting[0]")):
             with self.subTest(trigger=trigger, key=key):
                 code, out, err = self.cli("resources", "judge", "--dir", self.root, "--trigger", trigger, "--body", json.dumps(body))
                 self.assertEqual((code, out["status"]), (0, "error"), err)

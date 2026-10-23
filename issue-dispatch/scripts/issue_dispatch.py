@@ -445,8 +445,13 @@ def _check_judge_body(trigger, body):
             errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 答え (文字列) のオブジェクト: {body[key]!r}", "failure": None})
     if "waiting" in body:
         for i, w in enumerate(body["waiting"]):
-            if not isinstance(w, dict) or not _is_name(w.get("item")) or "declaration" not in w or not isinstance(w.get("wait_for"), list) or not all(_is_name(r) for r in w["wait_for"]):
-                errors.append({"key": f"body.waiting[{i}]", "message": f"waiting の要素は item・declaration・posted_at・position・wait_for (資源の名前の配列) を持つオブジェクト: {w!r}", "failure": None})
+            # judge_release が読むキーをすべて確かめる (絞り込みの item・wait_for と、並べ替えの posted_at・position)
+            ok = (isinstance(w, dict) and _is_name(w.get("item")) and "declaration" in w
+                  and isinstance(w.get("wait_for"), list) and all(_is_name(r) for r in w["wait_for"])
+                  and (w.get("posted_at") is None or isinstance(w["posted_at"], str))
+                  and (w.get("position") is None or (isinstance(w["position"], int) and not isinstance(w["position"], bool))))
+            if not ok:
+                errors.append({"key": f"body.waiting[{i}]", "message": f"waiting の要素は item (文字列)・declaration・posted_at (文字列)・position (整数)・wait_for (資源の名前の配列) を持つオブジェクト: {w!r}", "failure": None})
     if "kind" in body and body["kind"] not in declaration.UPDATE_KINDS:
         errors.append({"key": "body.kind", "message": f"kind は更新の種類 ({', '.join(declaration.UPDATE_KINDS)}): {body['kind']!r}", "failure": None})
     return errors
