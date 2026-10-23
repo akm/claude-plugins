@@ -1,0 +1,339 @@
+#!/usr/bin/env python3
+"""スナップショットと差分 (issue-dispatch/scripts/issue_dispatch/observe.py) と、CLI の `project items --write-snapshot` /
+`observe diff` / 書き込みのサブコマンドの反映のテスト。偽の gh (fake-gh) と固定データ (fixtures/gh/project-items-ok・
+pr-observe-*) で動く。偽の gh の用意は test_project.FakeGhCase と同じ。
+
+  python3 -m unittest discover -s issue-dispatch/tests
+
+様式の正本は issue-dispatch/skills/issue-dispatch/references/observation.md。
+"""
+
+import copy
+import json
+import os
+import subprocess
+import sys
+import unittest
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_SCRIPTS = os.path.join(_HERE, "..", "scripts")
+sys.path.insert(0, _SCRIPTS)
+sys.path.insert(0, _HERE)
+
+from issue_dispatch import comments, config, issues, observe, project  # noqa: E402
+from test_project import FakeGhCase, fixture_json  # noqa: E402
+
+_CLI = os.path.join(_SCRIPTS, "issue_dispatch.py")
+_DOC = os.path.join(_HERE, "..", "skills", "issue-dispatch", "references", "observation.md")
+PROJECT = {"owner": "akm", "number": 3}
+A = "akm/issue-dispatch-verify-a"
+A1, A2, A3 = f"{A}#1", f"{A}#2", f"{A}#3"
+PR9 = f"https://github.com/{A}/pull/9"
+USER_ENTRY = {"prefix": ["api", "user"], "stdout": {"fixture": "api-user"}}
+
+
+def items_data(mutate=None):
+    """固定データ project-items-ok の複製。mutate(nodes) で書き換える。"""
+    data = fixture_json("project-items-ok")
+    if mutate:
+        mutate(data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"])
+    return data
+
+
+def node_of(nodes, number, repo=A):
+    return next(n for n in nodes if (n.get("content") or {}).get("number") == number and n["content"]["repository"]["nameWithOwner"] == repo)
+
+
+def pr_report_comment(url, database_id=90001):
+    line = comments.format_header("worker", "w", "W-7", "PR の報告", {})
+    return {"id": f"IC_{database_id}", "databaseId": database_id, "url": f"https://github.com/{A}/issues/3#issuecomment-{database_id}",
+            "createdAt": "2026-10-23T00:00:00Z", "author": {"login": "akm"}, "body": f"{line}\n\n{url}"}
+
+
+def pr_fixture(state, draft=False, merged=False):
+    data = fixture_json("pr-observe-open-other-base")
+    pr = data["data"]["repository"]["pullRequest"]
+    pr["state"], pr["isDraft"], pr["mergedAt"] = state, draft, ("2026-10-23T00:00:00Z" if merged else None)
+    return data
+
+
+class SnapshotFileTest(unittest.TestCase):
+
+    def test_round_trip_and_missing_and_corrupt(self):
+        """書いた内容を往復で同じに返し、ファイルが無いときと壊れているとき (JSON でない・キーが欠ける) を区別する。"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(observe.load_snapshot(d)["status"], "missing")
+            snap = {"version": observe.SNAPSHOT_VERSION, "taken_at": "2026-10-23T00:00:00Z", "project_id": "P", "items": {A1: {"position": 1}}, "comment_prs": {}}
+            observe.save_snapshot(d, snap)
+            loaded = observe.load_snapshot(d)
+            self.assertEqual((loaded["status"], loaded["snapshot"]), ("ok", snap))
+            self.assertEqual(sorted(os.listdir(d)), [observe.SNAPSHOT_FILE], "一時ファイルを残さない")
+            with open(os.path.join(d, observe.SNAPSHOT_FILE), "w", encoding="utf-8") as f:
+                f.write("{not json")
+            self.assertEqual(observe.load_snapshot(d)["status"], "corrupt")
+            with open(os.path.join(d, observe.SNAPSHOT_FILE), "w", encoding="utf-8") as f:
+                json.dump({"version": observe.SNAPSHOT_VERSION, "items": {}}, f)
+            self.assertEqual(observe.load_snapshot(d)["status"], "corrupt", "キーが欠けていれば壊れている")
+
+
+class BuildTest(FakeGhCase):
+
+    def test_build_from_items(self):
+        """項目の読み取りから、R21 の見つける変化の一覧にある値だけを持つスナップショットを作る。"""
+        self.responses([{"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        result = project.items(PROJECT)
+        snap = observe.build_snapshot(result, {}, taken_at="2026-10-23T00:00:00Z")
+        self.assertEqual(snap["version"], observe.SNAPSHOT_VERSION)
+        self.assertEqual(snap["project_id"], result["project_id"])
+        self.assertEqual(sorted(snap["items"]), sorted([A1, A2, A3, "akm/issue-dispatch-verify-b#1", "akm/issue-dispatch-verify-b#2"]))
+        item = snap["items"][A1]
+        self.assertEqual(set(item), {"item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs"},
+                         "一覧に無い値 (title・url・events など) は持たない")
+        self.assertEqual(item["state"], "OPEN")
+        self.assertEqual(item["prs"][f"https://github.com/{A}/pull/4"], {"state": "MERGED", "draft": False, "merged": True})
+        self.assertEqual(snap["items"][A2]["state"], "CLOSED")
+        self.assertEqual(len(snap["items"][A3]["comment_ids"]), 10)
+        self.assertEqual(snap["items"][A3]["fields"]["Agent session ID"]["value"], result["items"][0]["fields"]["Agent session ID"]["text"])
+        self.assertEqual(snap["comment_prs"], {})
+
+    def test_pr_urls_in_comments_of_open_items(self):
+        """開いている項目のコメント (`PR の報告`・`待機` の理由の小さな PR) に URL で書かれた PR を集める。閉じた項目は読まない。"""
+        def mutate(nodes):
+            node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9))
+            wait = comments.format_header("manager", "m", "M-1", "待機", {"to": "W-7", "assignment": 1, "declaration": 5,
+                                                                      "waits": [{"kind": "小さな PR", "issue": A1, "pr": f"https://github.com/{A}/pull/10"}]})
+            node_of(nodes, 1)["content"]["comments"]["nodes"].append({"id": "IC_x", "databaseId": 90002, "url": "u", "createdAt": "2026-10-23T00:00:01Z",
+                                                                       "author": {"login": "akm"}, "body": wait + "\n\n理由"})
+            node_of(nodes, 2)["content"]["comments"]["nodes"].append(pr_report_comment(f"https://github.com/{A}/pull/11", 90003))  # 閉じた項目
+        self.responses([{"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        result = project.items(PROJECT)
+        self.assertEqual(observe.pr_urls_in_comments(result["items"], login="akm"), [PR9, f"https://github.com/{A}/pull/10"])
+
+    def test_pr_urls_ignore_other_authors(self):
+        def mutate(nodes):
+            c = pr_report_comment(PR9)
+            c["author"] = {"login": "someone-else"}
+            node_of(nodes, 3)["content"]["comments"]["nodes"].append(c)
+        self.responses([{"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        self.assertEqual(observe.pr_urls_in_comments(project.items(PROJECT)["items"], login="akm"), [])
+
+    def test_pr_state(self):
+        """PR の状態だけを読む (作者で除かない)。"""
+        data = pr_fixture("OPEN")
+        data["data"]["repository"]["pullRequest"]["author"] = {"login": "someone-else"}
+        self.responses([{"substring": "query PrObserve", "stdout": data}])
+        self.assertEqual(issues.pr_state(PR9), {"status": "ok", "url": PR9, "state": "OPEN", "draft": False, "merged": False})
+        self.assertEqual(issues.pr_state("not a url")["status"], "error")
+
+
+class DiffTest(FakeGhCase):
+
+    def snapshot(self, mutate=None, comment_prs=None):
+        self.responses([{"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        return observe.build_snapshot(project.items(PROJECT), comment_prs or {}, taken_at="t")
+
+    def diff(self, mutate=None, before=None, comment_prs=None):
+        before = before or self.snapshot()
+        return observe.diff(before, self.snapshot(mutate, comment_prs))
+
+    def test_no_change(self):
+        self.assertEqual(self.diff(), [])
+
+    def test_close_and_reopen(self):
+        """Covers AE5, AE57. Issue の close と reopen を差分として返す (Done を書く呼び出しは無い)。"""
+        d = self.diff(lambda nodes: node_of(nodes, 1)["content"].__setitem__("state", "CLOSED"))
+        self.assertEqual(d, [{"kind": "closed", "item": A1, "before": "OPEN", "after": "CLOSED"}])
+        self.assertEqual([c["args"][:2] for c in self.recorded_full()], [["api", "graphql"], ["api", "graphql"]], "読むだけ")
+        d = self.diff(lambda nodes: node_of(nodes, 2)["content"].__setitem__("state", "OPEN"))
+        self.assertEqual(d, [{"kind": "reopened", "item": A2, "before": "CLOSED", "after": "OPEN"}])
+
+    def test_human_changes(self):
+        """Covers AE39, AE40. Status・フィールド (Agent stuck state を空にした・Agent session ID を別の値にした)・担当者・ラベルの変化。"""
+        def mutate(nodes):
+            n = node_of(nodes, 3)
+            for fv in n["fieldValues"]["nodes"]:
+                if fv and fv.get("field", {}).get("name") == "Status":
+                    fv["name"] = "Ready"
+                if fv and fv.get("field", {}).get("name") == "Agent session ID":
+                    fv["text"] = "local_other"
+            n["content"]["assignees"]["nodes"].append({"login": "akm"})
+            n["content"]["labels"]["nodes"].append({"name": "resource:db"})
+        d = self.diff(mutate)
+        kinds = [(x["kind"], x.get("field")) for x in d]
+        self.assertEqual(kinds, [("status", None), ("field", "Agent session ID"), ("assignees", None), ("labels", None)], "人の変更の種類の順")
+        self.assertEqual(d[0]["before"], "In Progress")
+        self.assertEqual(d[0]["after"], "Ready")
+        self.assertEqual((d[1]["before"], d[1]["after"]), (self.snapshot()["items"][A3]["fields"]["Agent session ID"]["value"], "local_other"))
+        self.assertEqual((d[2]["added"], d[2]["removed"]), (["akm"], []))
+        self.assertEqual((d[3]["added"], d[3]["removed"]), (["resource:db"], []))
+        # Agent stuck state を人が空にした: 前にあって今は無い
+        before = self.snapshot()
+        before["items"][A3]["fields"]["Agent stuck state"] = {"value": "idle-no-progress", "updated_at": "t"}
+        d = observe.diff(before, self.snapshot())
+        self.assertEqual(d, [{"kind": "field", "item": A3, "field": "Agent stuck state", "before": "idle-no-progress", "after": None}])
+
+    def test_blocked_by_comment_pr_and_order(self):
+        """blocker の close・コメントの追加・待っている小さな PR の状態の変化を返し、処理の順 (人の変更 → close → blockedBy → コメント → PR → 項目の追加) に並ぶ。"""
+        before = self.snapshot(comment_prs={PR9: {"state": "OPEN", "draft": False, "merged": False}})
+        before["items"][A3]["blocked_by"] = {A1: "OPEN"}
+        def mutate(nodes):
+            n3 = node_of(nodes, 3)
+            n3["content"]["blockedBy"]["nodes"].append({"number": 1, "url": f"https://github.com/{A}/issues/1", "state": "CLOSED", "repository": {"nameWithOwner": A}})
+            n3["content"]["comments"]["nodes"].append(pr_report_comment(PR9))
+            node_of(nodes, 1)["content"]["labels"]["nodes"].append({"name": "x"})
+            node_of(nodes, 2)["content"]["state"] = "OPEN"
+            nodes.append(copy.deepcopy(node_of(nodes, 1)))
+            nodes[-1]["id"] = "PVTI_new"
+            nodes[-1]["content"]["number"] = 7
+            nodes[-1]["content"]["labels"]["nodes"] = []
+        d = self.diff(mutate, before=before, comment_prs={PR9: {"state": "MERGED", "draft": False, "merged": True}})
+        self.assertEqual([x["kind"] for x in d], ["labels", "reopened", "blocked_by", "comment", "pr", "added"])
+        self.assertEqual(d[2], {"kind": "blocked_by", "item": A3, "added": [], "removed": [], "state_changed": [{"key": A1, "before": "OPEN", "after": "CLOSED"}]})
+        self.assertEqual(d[3]["ids"], [90001])
+        self.assertEqual(d[4], {"kind": "pr", "item": None, "url": PR9, "source": "comment", "before": {"state": "OPEN", "draft": False, "merged": False}, "after": {"state": "MERGED", "draft": False, "merged": True}})
+        self.assertEqual(d[5]["item"], f"{A}#7")
+
+    def test_removed_position_body_edit_and_reference_pr(self):
+        def mutate(nodes):
+            nodes.remove(node_of(nodes, 2, "akm/issue-dispatch-verify-b"))
+            n1 = node_of(nodes, 1)
+            n1["content"]["userContentEdits"]["nodes"].append({"editor": {"login": "someone"}, "editedAt": "2026-10-24T00:00:00Z", "deletedAt": None})
+            n1["content"]["closedByPullRequestsReferences"]["nodes"][0]["state"] = "OPEN"
+        d = self.diff(mutate)
+        kinds = [x["kind"] for x in d]
+        self.assertEqual(kinds, ["removed", "pr", "position", "body_edit"])
+        self.assertEqual(d[0]["item"], "akm/issue-dispatch-verify-b#2")
+        self.assertEqual((d[1]["item"], d[1]["source"], d[1]["after"]["state"]), (A1, "reference", "OPEN"))
+        self.assertEqual((d[2]["item"], d[2]["before"], d[2]["after"]), ("akm/issue-dispatch-verify-b#1", 5, 4))
+        self.assertEqual((d[3]["item"], d[3]["after"]), (A1, "2026-10-24T00:00:00Z"))
+
+    def test_reflect_hides_own_writes(self):
+        """Covers AE55. 書いた値だけを反映し、反映した後の差分に自分の書き込みが現れない。読み取りの後にほかの人が変えた値は反映しない。"""
+        snap = self.snapshot()
+        ops = [{"kind": "status", "item": A3, "value": "In Progress"},
+               {"kind": "field", "item": A3, "field": "Agent session ID", "value": "local_new"},
+               {"kind": "comment", "item": A3, "id": 90001},
+               {"kind": "blocked_by", "item": A3, "action": "add", "blocker": A1, "state": "OPEN"},
+               {"kind": "labels", "item": A3, "add": ["resource:db"], "remove": []},
+               {"kind": "assignees", "item": A3, "add": ["akm"], "remove": []}]
+        for op in ops:
+            snap, problem = observe.reflect(snap, op)
+            self.assertIsNone(problem, op)
+        def mutate(nodes):
+            n = node_of(nodes, 3)
+            for fv in n["fieldValues"]["nodes"]:
+                if fv and fv.get("field", {}).get("name") == "Status":
+                    fv["name"] = "In Progress"
+                if fv and fv.get("field", {}).get("name") == "Agent session ID":
+                    fv["text"] = "local_new"
+            n["content"]["comments"]["nodes"].append(pr_report_comment(PR9))
+            n["content"]["blockedBy"]["nodes"].append({"number": 1, "url": f"https://github.com/{A}/issues/1", "state": "OPEN", "repository": {"nameWithOwner": A}})
+            n["content"]["labels"]["nodes"].append({"name": "resource:db"})
+            n["content"]["assignees"]["nodes"].append({"login": "akm"})
+            node_of(nodes, 1)["content"]["labels"]["nodes"].append({"name": "other"})  # ほかの人の変更
+        d = self.diff(mutate, before=snap)
+        self.assertEqual(d, [{"kind": "labels", "item": A1, "added": ["other"], "removed": []}], "自分の書き込みは現れず、ほかの人の変更だけ")
+        _, problem = observe.reflect(snap, {"kind": "status", "item": "akm/x#999", "value": "Ready"})
+        self.assertIsNotNone(problem, "無い項目への反映は問題を返す")
+        _, problem = observe.reflect(snap, {"kind": "nope", "item": A3})
+        self.assertIsNotNone(problem)
+
+
+class CliTest(FakeGhCase):
+
+    def setUp(self):
+        super().setUp()
+        self.manager = os.path.join(self.root, "manager")
+        os.makedirs(os.path.dirname(os.path.join(self.manager, config.CONFIG_PATH)))
+        with open(os.path.join(self.manager, config.CONFIG_PATH), "w", encoding="utf-8") as f:
+            json.dump({"project": PROJECT, "record_dir": "rec"}, f)
+        self.snapshot_dir = os.path.join(self.manager, "rec", "akm-3")
+
+    def cli(self, *args, stdin=None):
+        r = subprocess.run([sys.executable, _CLI, *args], capture_output=True, text=True, input=stdin)
+        return r.returncode, json.loads(r.stdout) if r.stdout.strip() else None, r.stderr
+
+    def test_write_snapshot_reads_comment_prs(self):
+        """project items --write-snapshot は読んだ内容と、コメントの URL の PR の状態をスナップショットに書く。記録は読まない。"""
+        self.responses([{"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))},
+                        USER_ENTRY, {"substring": "query PrObserve", "stdout": pr_fixture("MERGED", merged=True)}])
+        code, out, err = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual((code, out["status"]), (0, "ok"), err)
+        self.assertEqual(out["snapshot"]["path"], os.path.join(self.snapshot_dir, observe.SNAPSHOT_FILE))
+        self.assertEqual(out["snapshot"]["comment_prs"], {PR9: {"state": "MERGED", "draft": False, "merged": True}})
+        loaded = observe.load_snapshot(self.snapshot_dir)
+        self.assertEqual(loaded["status"], "ok")
+        self.assertEqual(loaded["snapshot"]["comment_prs"][PR9]["merged"], True)
+        self.assertNotIn("record.json", os.listdir(self.snapshot_dir))
+
+    def test_write_snapshot_requires_dir(self):
+        code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot")
+        self.assertEqual(code, 2, "--dir が無ければ引数の誤り")
+
+    def test_diff_cli(self):
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 1)["content"].__setitem__("state", "CLOSED"))}])
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["errors"]), (0, "ok", []), err)
+        self.assertEqual(out["diffs"], [{"kind": "closed", "item": A1, "before": "OPEN", "after": "CLOSED"}])
+        self.assertEqual(out["snapshot_taken_at"], observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"])
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]["state"], "OPEN", "diff は書かない")
+
+    def test_diff_without_snapshot(self):
+        code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["errors"][0]["key"]), (0, "error", "snapshot"))
+        self.assertEqual(self.recorded(), [], "スナップショットが無ければ gh を実行しない")
+
+    def test_write_subcommands_reflect(self):
+        """書き込みのサブコマンドは、--snapshot-dir があれば書いた値だけをスナップショットに反映する。"""
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        item_id = observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A3]["item_id"]
+        self.responses([{"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}},
+                        {"prefix": ["project", "item-edit"], "stdout": ""}])
+        code, out, err = self.cli("project", "set-status", "--project", "akm/3", "--item", item_id, "--status", "Ready", "--snapshot-dir", self.manager)
+        self.assertEqual((code, out["status"]), (0, "ok"), err)
+        self.assertEqual(out["snapshot"], {"reflected": True, "warnings": []})
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A3]["status"], "Ready")
+        # blocked-by add
+        self.responses([{"prefix": ["issue", "edit"], "stdout": f"https://github.com/{A}/issues/3\n"}])
+        code, out, _ = self.cli("blocked-by", "add", "--issue", A3, "--blocker", A1, "--snapshot-dir", self.manager)
+        self.assertEqual(out["snapshot"]["reflected"], True)
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A3]["blocked_by"], {A1: "OPEN"})
+        # issue add-label
+        self.responses([{"prefix": ["issue", "view"], "stdout": {"labels": []}}, {"prefix": ["label", "list"], "stdout": {"fixture": "label-list"}},
+                        {"prefix": ["issue", "edit"], "stdout": f"https://github.com/{A}/issues/3\n"}])
+        code, out, _ = self.cli("issue", "add-label", "--issue", A3, "--label", "resource:verify", "--snapshot-dir", self.manager)
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A3]["labels"], ["resource:verify"])
+        # comment post
+        data = fixture_json("issue-comments-ok")
+        data["data"]["repository"]["issue"]["comments"]["nodes"] = []
+        self.responses([USER_ENTRY, {"substring": "query IssueComments", "stdout": data}, {"prefix": ["issue", "comment"], "stdout": f"https://github.com/{A}/issues/3#issuecomment-777\n"}])
+        code, out, _ = self.cli("comment", "post", "--issue", A3, "--role", "manager", "--name", "m", "--session-id", "M-1", "--kind", "割り当て",
+                                "--to", "W-7", "--assignment", "1", "--body", "x", "--snapshot-dir", self.manager)
+        self.assertEqual(out["snapshot"]["reflected"], True)
+        self.assertIn(777, observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A3]["comment_ids"])
+
+    def test_reflect_warns_without_snapshot(self):
+        """スナップショットが無い・壊れていれば反映せず warnings で知らせ、書き込みの結果は変えない。"""
+        self.responses([{"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}}, {"prefix": ["project", "item-edit"], "stdout": ""}])
+        code, out, _ = self.cli("project", "set-status", "--project", "akm/3", "--item", "PVTI_x", "--status", "Ready", "--snapshot-dir", self.manager)
+        self.assertEqual((code, out["status"], out["snapshot"]["reflected"]), (0, "ok", False))
+        self.assertEqual(out["snapshot"]["warnings"][0]["key"], "snapshot")
+
+
+class DocTest(unittest.TestCase):
+
+    def test_doc_lists_kinds(self):
+        with open(_DOC, encoding="utf-8") as f:
+            doc = f.read()
+        for kind in observe.DIFF_KINDS:
+            self.assertIn(f"`{kind}`", doc, f"差分の種類 {kind} が文書に無い")
+        for key in ("`comment_prs`", "`comment_ids`", "`body_edited_at`", "`blocked_by`", "`--write-snapshot`", "`--snapshot-dir`", "`observe diff`"):
+            self.assertIn(key, doc)
+
+
+if __name__ == "__main__":
+    unittest.main()
