@@ -256,7 +256,7 @@ class DeclarationStageTest(unittest.TestCase):
     def test_waiting_for_issue_with_blocked_status_after_wait_is_managers(self):
         """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。戻り先は `In Progress`、自分が足した blockedBy は待つ Issue。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
-        self.assertEqual((d["stage"], d["manager_blocked"], d["return_status"], d["own_blockers"]), ("waiting", True, "In Progress", [A2]))
+        self.assertEqual((d["stage"], d["manager_blocked"], d["return_status"], d["own_blockers"], d["waiting_blockers"]), ("waiting", True, "In Progress", [A2], [A2]))
 
     def test_blocked_status_before_wait_is_users(self):
         """`Blocked` への変化が `待機` より前なら、利用者が付けたもの (時刻で見分ける。KTD19 の基準)。"""
@@ -271,7 +271,14 @@ class DeclarationStageTest(unittest.TestCase):
     def test_go_after_wait_ends_waiting(self):
         """`待機` の後に `開始可` があれば作業中 (最新の判定の結果で決める)。Status が `Blocked` のままでも管理のセッションのものではない (戻し済みのはず)。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), _go(400, t(15), 501), status="Blocked", events=[_status_event("Blocked", t(14))])
-        self.assertEqual((d["stage"], d["manager_blocked"], d["own_blockers"]), ("go", False, []))
+        self.assertEqual((d["stage"], d["manager_blocked"], d["waiting_blockers"], d["own_blockers"]), ("go", False, [], [A2]),
+                         "待っている blocker は無いが、自分が足した blocker として残る (`開始可` の後に外すため)")
+
+    def test_own_blockers_include_waits_of_previous_declarations(self):
+        """自分が足した blocker は、今の割り当てのすべての `待機` から導く (ファイルを変えた更新で判定の要る宣言が変わっても残る)。"""
+        update = wcomment("宣言の更新", None, t(20), 401, body=decl_body(files=(("src/b.py", None),), resources=("db",)))
+        d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), _go(400, t(15), 501), update)
+        self.assertEqual((d["judged"]["comment_id"], d["own_blockers"], d["waiting_blockers"]), (401, [A2], []))
 
     def test_small_pr_wait_reasons(self):
         d = stage_of(DECL1, _wait(400, [{"kind": "小さな PR", "issue": A2, "pr": PR10}], t(13), 500))
@@ -899,7 +906,7 @@ class DocTest(unittest.TestCase):
         with open(_DOC, encoding="utf-8") as f:
             doc = f.read()
         for key in ("`assigned`", "`in_progress`", "`end`", "`reopened`", "`pr`", "`judged`", "`stage`", "`manager_blocked`", "`return_status`",
-                    "`own_blockers`", "`held`", "`reserved`", "`item state`", "`work check`", "`work held`", "`actions`", "`questions`", "`reports`",
+                    "`own_blockers`", "`waiting_blockers`", "`held`", "`reserved`", "`item state`", "`work check`", "`work held`", "`actions`", "`questions`", "`reports`",
                     "`pending`", "`record_lost`", "`blocked-by remove`", "`--diffs`"):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:

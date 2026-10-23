@@ -247,8 +247,11 @@ def declaration_stage(item, cs, asg, project_number):
         else:
             later.append(d["declaration"])
     held = sorted(declaration.held_resources(go_declaration, later))
+    # 自分が足した blocker: 今の割り当てのすべての `待機` (判定の要る宣言が更新で変わった後の、前の宣言への `待機` も含む) の理由の Issue・小さな PR の依頼先
+    all_waits = [c for c in _for_assignment(cs, asg) if c["header"]["role"] == "manager" and c["header"]["kind"] == "待機"]
+    own = sorted({ids.issue_key(r["issue"]) for c in all_waits for r in _blocking_reasons(c["header"]["values"]["waits"])})
     out = {"judged": judged, "stage": None, "go": None, "wait": None, "returned": None, "manager_blocked": False, "blocked_wait": None,
-           "return_status": None, "own_blockers": [], "go_declaration": go_declaration, "held": held}
+           "return_status": None, "own_blockers": own, "waiting_blockers": [], "go_declaration": go_declaration, "held": held}
     if judged is None:
         return out
     res = results_for(cs, asg, judged["comment_id"])
@@ -260,7 +263,7 @@ def declaration_stage(item, cs, asg, project_number):
     go_at = res["go"]["at"] if res["go"] else None
     blocking_waits = [w for w in res["waits"] if _blocking_reasons(w["reasons"]) and (go_at is None or w["at"] > go_at)]
     if blocking_waits:
-        out["own_blockers"] = sorted({ids.issue_key(r["issue"]) for w in blocking_waits for r in _blocking_reasons(w["reasons"])})
+        out["waiting_blockers"] = sorted({ids.issue_key(r["issue"]) for w in blocking_waits for r in _blocking_reasons(w["reasons"])})
         first = blocking_waits[0]
         status_events = [e for e in _events(item, "ProjectV2ItemStatusChangedEvent")
                          if e.get("project_number") == project_number and e.get("status") == "Blocked" and (e.get("at") or "") >= first["at"]]
@@ -423,7 +426,7 @@ def expected_statuses(state):
     """割り当て中の開いている項目で、管理のセッションの書き込みとして説明できる Status。理由に Issue か 小さな PR を含む `待機` の後なら Blocked、
     それ以外は In Progress か In review。"""
     d = state.get("declaration") or {}
-    if d.get("own_blockers"):
+    if d.get("waiting_blockers"):
         return {"Blocked"}
     return {"In Progress", "In review"}
 
@@ -501,10 +504,10 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
             else:
                 actions.append(_action_status(item, "In Progress", continuation=True))
     # `待機` (Issue か 小さな PR) の続き: blockedBy と Blocked
-    if d.get("own_blockers") and d.get("wait") and not d.get("manager_blocked"):
+    if d.get("waiting_blockers") and d.get("wait") and not d.get("manager_blocked"):
         wait_at = d["wait"]["at"]
         present = {b["key"] for b in item.get("blocked_by") or []}
-        for blocker in d["own_blockers"]:
+        for blocker in d["waiting_blockers"]:
             if any(ids.same_issue(blocker, k) for k in present):
                 continue
             removed = [e for e in _events(item, "BlockedByRemovedEvent") if e.get("blocking") and ids.same_issue(e["blocking"], blocker) and (e.get("at") or "") > wait_at]
