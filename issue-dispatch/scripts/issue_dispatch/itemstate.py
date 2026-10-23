@@ -284,10 +284,16 @@ def labels_at(item, at):
     return labels
 
 
+def resource_labels(labels):
+    """ラベルの名前の並びから資源の名前 (`resource:<名前>` の名前。ラベルの綴りのまま、名前の順) を取る。接頭辞は大文字小文字を区別しない
+    (GitHub のラベルの名前は区別しないため。issues.add_label と同じ)。"""
+    n = len(LABEL_PREFIX)
+    return sorted(l[n:] for l in labels if isinstance(l, str) and l[:n].casefold() == LABEL_PREFIX and len(l) > n)
+
+
 def reserved_resources(item, asg, attrs_table):
     """割り当てのときに予約した資源: コメント `割り当て` の時点で付いていたラベル `resource:<名前>` のうち、属性 reserve が on_assign のもの (名前の順)。"""
-    names = sorted(l[len(LABEL_PREFIX):] for l in labels_at(item, asg["at"]) if l.startswith(LABEL_PREFIX) and len(l) > len(LABEL_PREFIX))
-    return [n for n in names if resources.attributes_of(attrs_table or {}, n)["reserve"] == "on_assign"]
+    return [n for n in resource_labels(labels_at(item, asg["at"])) if resources.attributes_of(attrs_table or {}, n)["reserve"] == "on_assign"]
 
 
 def resource_usage(states):

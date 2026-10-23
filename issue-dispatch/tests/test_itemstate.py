@@ -351,6 +351,12 @@ class ResourceUsageTest(unittest.TestCase):
         item = make_item(labels=["resource:db"], comments_=[ASSIGN1], events=events)
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["reserved"], [])
 
+    def test_label_prefix_is_case_insensitive(self):
+        """ラベルの名前は GitHub が大文字小文字を区別しないので、`Resource:DB` も資源 DB として予約に数える (名前はラベルの綴りのまま)。"""
+        item = make_item(labels=["Resource:DB"], comments_=[ASSIGN1], events=[_label_event("LabeledEvent", "Resource:DB", t(1))])
+        self.assertEqual(itemstate.resource_labels(["Resource:DB", "bug", "resource:"]), ["DB"])
+        self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["reserved"], ["DB"])
+
     def test_reserve_on_declare_label_is_not_reserved_at_assignment(self):
         """属性 reserve が on_declare の資源は、割り当てのときに予約しない。"""
         item = make_item(labels=["resource:db"], comments_=[ASSIGN1], events=[_label_event("LabeledEvent", "resource:db", t(1))])
