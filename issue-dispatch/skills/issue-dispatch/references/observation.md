@@ -63,7 +63,7 @@
 | `blocked_by-truncated` | `blocked_by` |
 | `body_edits-truncated` | `body_edit` |
 | `prs-truncated` | `pr` (`source` が `reference` のもの) |
-| `fields-truncated` | `field` |
+| `fields-truncated` | `field`・`status` (Status もフィールドの値の connection から読む) |
 | `comments` | `comment` |
 | `events` | 無し (出来事はスナップショットに持たない) |
 

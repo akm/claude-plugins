@@ -21,9 +21,10 @@ ITEM_KEYS = ("item_id", "position", "state", "status", "fields", "assignees", "l
 LIST_PROBLEMS = ("items-page", "graphql-errors")
 # 差分の種類と処理の順 (observation.md の表): 人の変更 → close・reopen と項目の除去 → blockedBy → コメント → PR → 項目の追加・並び順・本文の編集
 DIFF_KINDS = ("status", "field", "assignees", "labels", "closed", "reopened", "removed", "blocked_by", "comment", "pr", "added", "position", "body_edit")
-# 1 項目の中の欠けの種類 (project items の problems の what) → その欠けが狂わせる値の差分の種類 (比べない)。対応に無い種類は項目全体を比べない
+# 1 項目の中の欠けの種類 (project items の problems の what) → その欠けが狂わせる値の差分の種類 (比べない)。対応に無い種類は項目全体を比べない。
+# 対応は GraphQL の connection ごとに導く値で決める (fieldValues からは fields と Status の 2 つを読む)
 PARTIAL_SKIPS = {"labels-truncated": ("labels",), "blocked_by-truncated": ("blocked_by",), "body_edits-truncated": ("body_edit",),
-                 "prs-truncated": ("pr",), "fields-truncated": ("field",), "comments": ("comment",), "events": ()}
+                 "prs-truncated": ("pr",), "fields-truncated": ("field", "status"), "comments": ("comment",), "events": ()}
 # コメントの本文から PR を読む種類
 PR_URL_COMMENT_KINDS = ("PR の報告",)
 _PR_URL_RE = re.compile(rf"https://github\.com/{ids.REPO_NAME_PATTERN}/pull/[1-9][0-9]*")

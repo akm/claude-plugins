@@ -373,6 +373,21 @@ class CliTest(FakeGhCase):
         self.assertEqual((code, out["status"]), (0, "ok"), err)  # 今の読み取りに欠けは無い
         self.assertEqual([(d["kind"], d["item"]) for d in out["diffs"]], [("removed", A1)])
 
+    def test_fields_gap_skips_status_too(self):
+        """フィールドの値の欠け (fields-truncated) では、同じ connection から読む Status も比べない (Status が読めなかっただけで null になるため)。"""
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        def mutate(nodes):
+            n = node_of(nodes, 1)
+            n["fieldValues"]["pageInfo"] = {"hasNextPage": True, "endCursor": "F"}
+            n["fieldValues"]["nodes"] = [fv for fv in n["fieldValues"]["nodes"] if not (fv and fv.get("field") and fv["field"]["name"] == "Status")]
+            n["content"]["labels"]["nodes"].append({"name": "x"})  # 欠けと関係のない値の変化は返る
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["errors"]), (0, "partial", []), err)
+        self.assertEqual(out["diffs"], [{"kind": "labels", "item": A1, "added": ["x"], "removed": []}])
+        self.assertEqual(out["skipped"]["items"], {A1: ["fields-truncated"]})
+
     def test_unknown_partial_kind_skips_whole_item(self):
         """対応に無い欠けの種類は、どの値が狂うか分からないので項目全体を比べない。"""
         before = {"version": 1, "taken_at": "t0", "project_id": "P", "comment_prs": {},
