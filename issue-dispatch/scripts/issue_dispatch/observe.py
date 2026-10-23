@@ -21,6 +21,9 @@ ITEM_KEYS = ("item_id", "position", "state", "status", "fields", "assignees", "l
 LIST_PROBLEMS = ("items-page", "graphql-errors")
 # 差分の種類と処理の順 (observation.md の表): 人の変更 → close・reopen と項目の除去 → blockedBy → コメント → PR → 項目の追加・並び順・本文の編集
 DIFF_KINDS = ("status", "field", "assignees", "labels", "closed", "reopened", "removed", "blocked_by", "comment", "pr", "added", "position", "body_edit")
+# 1 項目の中の欠けの種類 (project items の problems の what) → その欠けが狂わせる値の差分の種類 (比べない)。対応に無い種類は項目全体を比べない
+PARTIAL_SKIPS = {"labels-truncated": ("labels",), "blocked_by-truncated": ("blocked_by",), "body_edits-truncated": ("body_edit",),
+                 "prs-truncated": ("pr",), "fields-truncated": ("field",), "comments": ("comment",), "events": ()}
 # コメントの本文から PR を読む種類
 PR_URL_COMMENT_KINDS = ("PR の報告",)
 _PR_URL_RE = re.compile(rf"https://github\.com/{ids.REPO_NAME_PATTERN}/pull/[1-9][0-9]*")
@@ -100,7 +103,8 @@ def build_snapshot(items_result, comment_prs, taken_at):
 
 
 def skipped(before, after):
-    """2 つのスナップショットで比べない項目と PR (どちらかで欠けがあるもの)。返り値は {"items": {キー: 欠けの種類}, "prs": {URL: 理由}}。"""
+    """2 つのスナップショットで欠けがある項目と PR (どちらかで欠けがあるもの)。項目は欠けの種類が狂わせる値だけを比べず (diff)、
+    PR は比べない。返り値は {"items": {キー: 欠けの種類}, "prs": {URL: 理由}}。"""
     items = {}
     for snap in (before, after):
         for key, it in snap["items"].items():
@@ -183,46 +187,64 @@ def _kind_index(kind):
     return DIFF_KINDS.index(kind)
 
 
+def _omitted_kinds(partial):
+    """項目の欠けの種類 (前後の partial の和) から、比べない差分の種類の集合を返す。対応 (PARTIAL_SKIPS) に無い種類があれば、
+    どの値が狂うか分からないので None (項目のすべての値を比べない)。"""
+    if any(what not in PARTIAL_SKIPS for what in partial):
+        return None
+    return {kind for what in partial for kind in PARTIAL_SKIPS[what]}
+
+
+def _item_diffs(key, b, a):
+    """両方にある 1 項目の値の違い (欠けは見ない)。"""
+    out = []
+    if b["status"] != a["status"]:
+        out.append({"kind": "status", "item": key, "before": b["status"], "after": a["status"]})
+    for name in sorted(set(b["fields"]) | set(a["fields"])):
+        bv, av = (b["fields"].get(name) or {}).get("value"), (a["fields"].get(name) or {}).get("value")
+        if bv != av:
+            out.append({"kind": "field", "item": key, "field": name, "before": bv, "after": av})
+    for kind in ("assignees", "labels"):
+        added, removed = sorted(set(a[kind]) - set(b[kind])), sorted(set(b[kind]) - set(a[kind]))
+        if added or removed:
+            out.append({"kind": kind, "item": key, "added": added, "removed": removed})
+    if b["state"] != a["state"]:
+        out.append({"kind": "closed" if a["state"] == "CLOSED" else "reopened", "item": key, "before": b["state"], "after": a["state"]})
+    added = sorted(set(a["blocked_by"]) - set(b["blocked_by"]))
+    removed = sorted(set(b["blocked_by"]) - set(a["blocked_by"]))
+    changed = [{"key": k, "before": b["blocked_by"][k], "after": a["blocked_by"][k]} for k in sorted(set(a["blocked_by"]) & set(b["blocked_by"])) if a["blocked_by"][k] != b["blocked_by"][k]]
+    if added or removed or changed:
+        out.append({"kind": "blocked_by", "item": key, "added": added, "removed": removed, "state_changed": changed})
+    new_comments = sorted(set(a["comment_ids"]) - set(b["comment_ids"]))
+    if new_comments:
+        out.append({"kind": "comment", "item": key, "ids": new_comments})
+    for url in sorted(set(a["prs"]) | set(b["prs"])):
+        if b["prs"].get(url) != a["prs"].get(url):
+            out.append({"kind": "pr", "item": key, "url": url, "source": "reference", "before": b["prs"].get(url), "after": a["prs"].get(url)})
+    if b["body_edited_at"] != a["body_edited_at"]:
+        out.append({"kind": "body_edit", "item": key, "before": b["body_edited_at"], "after": a["body_edited_at"]})
+    return out
+
+
 def diff(before, after):
     """2 つのスナップショットの違いを、処理の順 (DIFF_KINDS の順、同じ種類は今の位置の順) に並べて返す。意味づけはしない。
-    要素は {"kind", "item" (コメントの URL の PR は None), ...} で、種類ごとの値は observation.md の表。"""
+    要素は {"kind", "item" (コメントの URL の PR は None), ...} で、種類ごとの値は observation.md の表。
+    前後どちらかに欠け (partial) がある項目は、その欠けの種類が狂わせる値 (PARTIAL_SKIPS) だけを比べない (欠けを変化と読まないため)。
+    欠けと関係のない値と、項目の追加・除去・並び順は比べる。"""
     out = []
     skip = skipped(before, after)
     b_items, a_items = before["items"], after["items"]
     for key, a in a_items.items():
-        if key in skip["items"]:
-            continue  # 欠けがある項目は比べない (欠けを変化と読まないため)
         b = b_items.get(key)
         if b is None:
             out.append({"kind": "added", "item": key, "position": a["position"]})
             continue
-        if b["status"] != a["status"]:
-            out.append({"kind": "status", "item": key, "before": b["status"], "after": a["status"]})
-        for name in sorted(set(b["fields"]) | set(a["fields"])):
-            bv, av = (b["fields"].get(name) or {}).get("value"), (a["fields"].get(name) or {}).get("value")
-            if bv != av:
-                out.append({"kind": "field", "item": key, "field": name, "before": bv, "after": av})
-        for kind in ("assignees", "labels"):
-            added, removed = sorted(set(a[kind]) - set(b[kind])), sorted(set(b[kind]) - set(a[kind]))
-            if added or removed:
-                out.append({"kind": kind, "item": key, "added": added, "removed": removed})
-        if b["state"] != a["state"]:
-            out.append({"kind": "closed" if a["state"] == "CLOSED" else "reopened", "item": key, "before": b["state"], "after": a["state"]})
-        added = sorted(set(a["blocked_by"]) - set(b["blocked_by"]))
-        removed = sorted(set(b["blocked_by"]) - set(a["blocked_by"]))
-        changed = [{"key": k, "before": b["blocked_by"][k], "after": a["blocked_by"][k]} for k in sorted(set(a["blocked_by"]) & set(b["blocked_by"])) if a["blocked_by"][k] != b["blocked_by"][k]]
-        if added or removed or changed:
-            out.append({"kind": "blocked_by", "item": key, "added": added, "removed": removed, "state_changed": changed})
-        new_comments = sorted(set(a["comment_ids"]) - set(b["comment_ids"]))
-        if new_comments:
-            out.append({"kind": "comment", "item": key, "ids": new_comments})
-        for url in sorted(set(a["prs"]) | set(b["prs"])):
-            if b["prs"].get(url) != a["prs"].get(url):
-                out.append({"kind": "pr", "item": key, "url": url, "source": "reference", "before": b["prs"].get(url), "after": a["prs"].get(url)})
-        if b["body_edited_at"] != a["body_edited_at"]:
-            out.append({"kind": "body_edit", "item": key, "before": b["body_edited_at"], "after": a["body_edited_at"]})
+        omitted = _omitted_kinds(skip["items"].get(key, ()))
+        if omitted is None:
+            continue
+        out += [d for d in _item_diffs(key, b, a) if d["kind"] not in omitted]
     for key, b in b_items.items():
-        if key not in a_items and key not in skip["items"]:
+        if key not in a_items:
             out.append({"kind": "removed", "item": key, "position": b["position"]})
     # 並び順: 両方にある項目の相対の順が変わったときだけ 1 件 (位置の数値は追加・除去でずれるので比べない)
     common = [k for k in a_items if k in b_items]
