@@ -191,13 +191,17 @@ def diff(before, after):
         for url in sorted(set(a["prs"]) | set(b["prs"])):
             if b["prs"].get(url) != a["prs"].get(url):
                 out.append({"kind": "pr", "item": key, "url": url, "source": "reference", "before": b["prs"].get(url), "after": a["prs"].get(url)})
-        if b["position"] != a["position"]:
-            out.append({"kind": "position", "item": key, "before": b["position"], "after": a["position"]})
         if b["body_edited_at"] != a["body_edited_at"]:
             out.append({"kind": "body_edit", "item": key, "before": b["body_edited_at"], "after": a["body_edited_at"]})
     for key, b in b_items.items():
         if key not in a_items:
             out.append({"kind": "removed", "item": key, "position": b["position"]})
+    # 並び順: 両方にある項目の相対の順が変わったときだけ 1 件 (位置の数値は追加・除去でずれるので比べない)
+    common = [k for k in a_items if k in b_items]
+    before_order = sorted(common, key=lambda k: b_items[k]["position"])
+    after_order = sorted(common, key=lambda k: a_items[k]["position"])
+    if before_order != after_order:
+        out.append({"kind": "position", "item": None, "before": before_order, "after": after_order})
     for url in sorted(set(before["comment_prs"]) | set(after["comment_prs"])):
         if before["comment_prs"].get(url) != after["comment_prs"].get(url):
             out.append({"kind": "pr", "item": None, "url": url, "source": "comment", "before": before["comment_prs"].get(url), "after": after["comment_prs"].get(url)})

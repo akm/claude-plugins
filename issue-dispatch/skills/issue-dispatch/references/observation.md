@@ -51,7 +51,7 @@
 | 9 | `comment` | コメントが足された | `ids` (足されたコメントの `database_id`) |
 | 10 | `pr` | PR の状態 (`state`・`draft`・`merged`) が違う、または PR が現れた・消えた | `url`・`source` (`reference` Issue を閉じる参照 / `comment` コメントの URL)・`before`・`after` |
 | 11 | `added` | 項目が Project に足された | `position` |
-| 12 | `position` | 位置が変わった | `before`・`after` |
+| 12 | `position` | 両方にある項目の相対の順が変わった (項目の追加・除去で位置の数値がずれただけでは返さない)。1 件で、`item` は null | `before`・`after` (項目のキーの配列。位置の順) |
 | 13 | `body_edit` | 本文の最新の編集の時刻が違う | `before`・`after` |
 
 確認の対象か・割り当て中か・誰が足した blocker か・どの宣言が待っていたか、といった意味づけはここではしない (U13)。

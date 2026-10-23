@@ -208,11 +208,25 @@ class DiffTest(FakeGhCase):
             n1["content"]["closedByPullRequestsReferences"]["nodes"][0]["state"] = "OPEN"
         d = self.diff(mutate)
         kinds = [x["kind"] for x in d]
-        self.assertEqual(kinds, ["removed", "pr", "position", "body_edit"])
+        self.assertEqual(kinds, ["removed", "pr", "body_edit"], "除去で後ろの項目の位置がずれても、相対の順が同じなら position は返さない")
         self.assertEqual(d[0]["item"], "akm/issue-dispatch-verify-b#2")
         self.assertEqual((d[1]["item"], d[1]["source"], d[1]["after"]["state"]), (A1, "reference", "OPEN"))
-        self.assertEqual((d[2]["item"], d[2]["before"], d[2]["after"]), ("akm/issue-dispatch-verify-b#1", 5, 4))
-        self.assertEqual((d[3]["item"], d[3]["after"]), (A1, "2026-10-24T00:00:00Z"))
+        self.assertEqual((d[2]["item"], d[2]["after"]), (A1, "2026-10-24T00:00:00Z"))
+
+    def test_position_only_when_relative_order_changes(self):
+        """並び順の変化は、両方にある項目の相対の順が変わったときだけ 1 件。"""
+        def swap(nodes):
+            nodes[0], nodes[1] = nodes[1], nodes[0]
+        d = self.diff(swap)
+        self.assertEqual(len(d), 1)
+        self.assertEqual((d[0]["kind"], d[0]["item"]), ("position", None))
+        self.assertEqual(d[0]["before"][:2], [A3, A2])
+        self.assertEqual(d[0]["after"][:2], [A2, A3])
+        def insert_first(nodes):
+            nodes.insert(0, copy.deepcopy(node_of(nodes, 1)))
+            nodes[0]["id"] = "PVTI_new"
+            nodes[0]["content"]["number"] = 7
+        self.assertEqual([x["kind"] for x in self.diff(insert_first)], ["added"], "先頭に足しても後ろの項目に position は出ない")
 
     def test_reflect_hides_own_writes(self):
         """Covers AE55. 書いた値だけを反映し、反映した後の差分に自分の書き込みが現れない。読み取りの後にほかの人が変えた値は反映しない。"""
