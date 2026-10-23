@@ -304,6 +304,15 @@ def manager_poll(parsed, snapshot, login):
 
 # --- 作業のセッションの wait-assignment -------------------------------------------------------
 
+def _current_open_assignment(item, session_id, login):
+    """今の割り当てが自分宛てで、その番号の `解放` が無く、Issue が開いている項目か。"""
+    if item.get("state") != "OPEN":
+        return False
+    cs = itemstate.parsed_comments(item, login)
+    asg = itemstate.assignment(cs)
+    return bool(asg) and asg["to"] == session_id and itemstate.release(cs, asg) is None
+
+
 def _field_is_mine(item, session_id):
     return ((item.get("fields") or {}).get(itemstate.FIELD_ID) or {}).get("text") == session_id
 
@@ -315,12 +324,13 @@ def assignment_poll(parsed, session_id, login, blocked, in_review, pending):
     if failure:
         return ("failure", failure)
     items = [it for it in result["items"] if it.get("key")]
-    mine = [it for it in items if any(c["header"]["kind"] == "割り当て" and c["header"]["values"].get("to") == session_id for c in itemstate.parsed_comments(it, login))]
-    pr_states, pr_failure = report_pr_states(mine, login)
-    if pr_failure:
-        return ("failure", pr_failure)
     watched = {"blocked": list(blocked or []), "in_review": list(in_review or []), "pending": list(pending or [])}
     all_watched = watched["blocked"] + watched["in_review"] + watched["pending"]
+    # PR を読むのは、終わる条件に要る項目だけ: 見る Issue と、今の割り当てが自分宛てで解放されておらず開いている項目 (終わった項目の PR は読まない)
+    pr_items = [it for it in items if any(ids.same_issue(it["key"], w) for w in all_watched) or _current_open_assignment(it, session_id, login)]
+    pr_states, pr_failure = report_pr_states(pr_items, login)
+    if pr_failure:
+        return ("failure", pr_failure)
     found = {"stop": None, "request": None, "resumed": None, "assignment": None}
     for item in items:
         key = item["key"]

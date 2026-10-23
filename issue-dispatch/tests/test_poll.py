@@ -336,6 +336,22 @@ class WaitAssignmentTest(CliBase):
         self._respond(lambda nodes: assigned_item3(nodes, [DECL1, _go(400, t(13), 500), req], status="In Progress"), [{"substring": "query PrObserve", "stdout": done}])
         self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", "--in-review", A3, *FAST)[0], 124)
 
+    def test_prs_of_ended_items_are_not_read(self):
+        """終わった項目 (閉じていて見る Issue でない) の `PR の報告` の PR は読まない。今の割り当ての項目の PR だけを読む。"""
+        old_assign = mcomment("割り当て", {"to": W7, "assignment": 1}, t(1), 90, name="mgr", sid=M1)
+        old_report = wcomment("PR の報告", None, t(2), 91, body=f"https://github.com/{A}/pull/2")
+        report = wcomment("PR の報告", None, t(30), 300, body=PR9)
+        def mutate(nodes):
+            old = node_of(nodes, 2)["content"]
+            old["comments"]["nodes"] += [gql_comment(old_assign), gql_comment(old_report)]
+            assigned_item3(nodes, [DECL1, _go(400, t(13), 500), report], status="In Progress")
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}, {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
+        code, out, _ = self.run_cli("wait-assignment", "--project", "akm/3", "--in-review", A3, *FAST)
+        self.assertEqual(code, 124)
+        observed = [r for r in self.recorded_full() if "PrObserve" in (r.get("stdin") or "")]
+        self.assertTrue(observed, "今の割り当ての項目の PR は読む")
+        self.assertFalse(any("pull/2" in (r.get("stdin") or "") for r in observed), "終わった項目の PR は読まない")
+
     def test_interval_must_be_shorter_than_minutes(self):
         code, out, err = self.run_cli("wait-assignment", "--project", "akm/3", "--interval", "1", "--minutes", "1")
         self.assertEqual(code, 2, err)
