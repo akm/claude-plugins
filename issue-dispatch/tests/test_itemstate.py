@@ -868,6 +868,18 @@ class CliTest(FakeGhCase):
         self.assertEqual((out["questions"], out["pending"]), ([], []))
         self.assertFalse(any("mutation" in (r.get("stdin") or "") or r["args"][:2] == ["issue", "edit"] for r in self.recorded_full()), "書き込みの gh を実行しない")
 
+    def test_item_state_issue_filter_does_not_remove_other_items(self):
+        """--issue で 1 項目に絞っても、記録に意図のあるほかの項目を除去と読まない (除去の判断は一覧の全部で行う)。"""
+        rec_dir = os.path.join(self.manager, "rec", "akm-3")
+        os.makedirs(rec_dir)
+        with open(os.path.join(rec_dir, "record.json"), "w", encoding="utf-8") as f:
+            json.dump(rec_with(items={f"{A}#3": rec_item(), f"{A}#1": rec_item()}), f)
+        self.responses([USER_ENTRY, {"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}},
+                        {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [DECL1, _go(400, t(13), 500)]))}])
+        code, out, err = self.cli("item", "state", "--dir", self.manager, "--issue", f"{A}#3")
+        self.assertEqual((code, out["status"], [q["kind"] for q in out["questions"]]), (0, "ok", []), err)
+        self.assertEqual([i["key"] for i in out["items"]], [f"{A}#3"])
+
     def test_item_state_without_record_is_lost(self):
         self.responses([USER_ENTRY, {"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}}, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [DECL1]))}])
         code, out, err = self.cli("item", "state", "--dir", self.manager)

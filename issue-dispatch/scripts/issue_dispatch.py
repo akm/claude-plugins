@@ -468,7 +468,9 @@ def cmd_item_state(args):
     result, login = inputs["result"], inputs["login"]
     items = [it for it in result["items"] if it.get("key") and (not args.issue or ids.same_issue(it["key"], args.issue))]
     pr_states, pr_problems = _read_report_prs(items, login)
-    turn = itemstate.derive_turn(items, inputs["rec"], login, inputs["own_id"], inputs["parsed"]["number"], inputs["table"], pr_states, diffs, workflows, inputs["config"])
+    present_keys = [it["key"] for it in result["items"] if it.get("key")]  # 除去の判断は --issue で絞る前の一覧で行う
+    turn = itemstate.derive_turn(items, inputs["rec"], login, inputs["own_id"], inputs["parsed"]["number"], inputs["table"], pr_states, diffs, workflows, inputs["config"],
+                                 present_keys=present_keys)
     turn["items"] = [st for st in turn["items"] if st["assignment"]]
     problems = result["problems"] + pr_problems
     _emit({"status": "partial" if problems else "ok", **turn, "problems": problems, "rate_limit": result["rate_limit"], "warnings": inputs["warnings"], "errors": []})

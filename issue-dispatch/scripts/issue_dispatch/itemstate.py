@@ -597,9 +597,10 @@ def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
 
 # --- ターン ---------------------------------------------------------------------------
 
-def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_states, diffs, workflows, config):
+def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_states, diffs, workflows, config, present_keys=None):
     """管理のセッションのターンで、項目の状態と、行うこと (actions)・尋ねること (questions)・1 回だけ報告するもの (reports)・答えを待つ項目 (pending) を導く。
-    書き込みはしない。rec は記録 (無ければ None)。diffs は observe diff の差分 (無ければ空)。workflows は Project のワークフローの名前 → 有効か。"""
+    書き込みはしない。rec は記録 (無ければ None)。diffs は observe diff の差分 (無ければ空)。workflows は Project のワークフローの名前 → 有効か。
+    present_keys は Project の一覧にある項目のキーの全部 (items を絞って渡すときに、絞り込みで外れた項目を除去と読まないため。省略時は items のキー)。"""
     lost = record_lost(rec)
     states, actions, questions, reports, pending = [], [], [], [], []
     items_by_key, states_by_key = {}, {}
@@ -620,8 +621,9 @@ def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_state
         pending += [{"question_id": q["question_id"], "item": item["key"], "kind": q["kind"], "asked_at": q["asked_at"]} for q in _unanswered(rec, item["key"])]
     reports += human_changes(diffs, items_by_key, states_by_key, rec, workflows)
     # 記録の意図にある項目が一覧に無い: Project から除かれた (割り当ての解除を尋ねる)
+    present = list(present_keys) if present_keys is not None else list(items_by_key)
     for key, ri in sorted(((rec or {}).get("items") or {}).items()):
-        if ri.get("intent") and not any(ids.same_issue(key, k) for k in items_by_key) and not any(q["kind"] == "removed" for q in _unanswered(rec, key)):
+        if ri.get("intent") and not any(ids.same_issue(key, k) for k in present) and not any(q["kind"] == "removed" for q in _unanswered(rec, key)):
             questions.append({"kind": "removed", "item": key, "options": list(QUESTION_OPTIONS["removed"])})
     seen = set()
     unique = []
