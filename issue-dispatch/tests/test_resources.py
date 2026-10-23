@@ -177,6 +177,11 @@ class DeclareTest(unittest.TestCase):
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs({"db": {"release_undeclared": "release"}}), {}, {})
         self.assertEqual((r["result"], r["release"], r["ask_undeclared"]), ("go", ["db"], []))
 
+    def test_duplicate_names_reserved_once(self):
+        """宣言に同じ資源が綴りだけ違えて 2 度あっても (parse を通らない呼び出し)、1 つとして扱う。"""
+        r = resources.judge_declare(I2, ["db", "DB"], [], {}, attrs(), {}, {})
+        self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
+
     def test_wait_does_not_hold_new_resources(self):
         """待っている宣言は新しく要る資源を持たない (どれも予約しない)。"""
         r = resources.judge_declare(I2, ["db", "gpu"], [], {"db": [I1]}, attrs(), {}, {})

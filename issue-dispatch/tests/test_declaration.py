@@ -134,6 +134,11 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertEqual([e["key"] for e in result["errors"]], ["files[0].path", "files[1].units", "files[2].units[0]"])
 
+    def test_duplicate_resources_rejected(self):
+        """同じ資源 (綴りだけ違うものを含む) を 2 度書けない。"""
+        self.assertRejected(decl(resources=["db", "DB"]), "resources[1]", "同じ資源")
+        self.assertRejected(decl(resources=["db", "gpu", "db"]), "resources[2]", "同じ資源")
+
     def test_duplicate_paths_rejected(self):
         self.assertRejected(decl(["src/app.ts", "./src/app.ts"]), "files[1].path", "同じパス")
 

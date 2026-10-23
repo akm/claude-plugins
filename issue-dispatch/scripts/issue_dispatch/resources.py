@@ -93,6 +93,16 @@ def _busy(usage, name, item, attrs_table):
     return len(holders(usage, name, item)) >= attributes_of(attrs_table, name)["capacity"]
 
 
+def _unique(names):
+    """名前の重複 (大文字小文字を区別しない) を除き、最初の綴りを残す。"""
+    seen, out = set(), []
+    for n in names:
+        if _key(n) not in seen:
+            seen.add(_key(n))
+            out.append(n)
+    return out
+
+
 def _answer(answers, name):
     return next((v for k, v in (answers or {}).items() if _key(k) == _key(name)), None)
 
@@ -145,6 +155,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
     返り値: {"result": "go" (`開始可` を書くときに reserve を予約する) / "wait" (`待機`。どれも予約しない) / "ask",
     "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (答えを待つ・残す予約), "ask_undeclared" (尋ねる),
     "request_rewrite" (解放してはいけないので書き直しを頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
+    declared, reserved = _unique(declared), _unique(reserved)
     reserved_keys = {_key(r) for r in reserved}
     new = [r for r in declared if _key(r) not in reserved_keys]
     reserve, wait_for, ask = _check_new(item, new, usage, attrs_table, answers)
@@ -173,6 +184,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
 def judge_update(item, held, declared, usage, attrs_table, answers):
     """契機「宣言の更新」。held は持っている資源、declared は更新の resources。外した資源は解放し、足した資源 (前に外して足し直した
     ものも含む) は着手の宣言と同じに空きを確かめる。返り値: {"result": "go" / "wait" / "ask", "reserve", "wait_for", "ask", "release"}。"""
+    held, declared = _unique(held), _unique(declared)
     held_keys = {_key(r) for r in held}
     declared_keys = {_key(r) for r in declared}
     added = [r for r in declared if _key(r) not in held_keys]

@@ -24,6 +24,11 @@ CONFLICT_RESULTS = ("conflict", "none", "needs-user")
 _NO_UNITS_KINDS = ("generated", "unknown-content", "unknown-structure")
 
 
+def _resource_key(name):
+    # 資源の名前は大文字小文字を区別しない (ラベルの名前を GitHub が区別しないため。正本は resources.md)
+    return name.strip().casefold()
+
+
 # --- 形の検査とパスの正規化 ---------------------------------------------------------
 
 def normalize_path(path):
@@ -160,10 +165,15 @@ def parse(obj, rules, default_table):
     if not isinstance(obj["resources"], list):
         errors.append({"key": "resources", "message": f"resources は資源の名前 (文字列) の配列: {obj['resources']!r}"})
     else:
+        seen_resources = {}
         for i, r in enumerate(obj["resources"]):
             if not isinstance(r, str) or not r.strip() or any(c.isspace() for c in r):
                 errors.append({"key": f"resources[{i}]", "message": f"資源の名前は空白を含まない文字列: {r!r}"})
+            elif _resource_key(r) in seen_resources:
+                # 資源の名前は大文字小文字を区別しない (正本は resources.md) ので、綴りだけ違う重複も差し戻す
+                errors.append({"key": f"resources[{i}]", "message": f"同じ資源 {r!r} が resources[{seen_resources[_resource_key(r)]}] にもある (名前は大文字小文字を区別しない。1 つにまとめる)"})
             else:
+                seen_resources[_resource_key(r)] = i
                 resources.append(r)
     split = _check_split(obj["split"], errors)
     if errors:
@@ -180,11 +190,6 @@ def _file_key(f):
 def same_files(a, b):
     """2 つの宣言のファイルと節が同じか (並びは問わない)。"""
     return {_file_key(f) for f in a["files"]} == {_file_key(f) for f in b["files"]}
-
-
-def _resource_key(name):
-    # 資源の名前は大文字小文字を区別しない (ラベルの名前を GitHub が区別しないため。正本は resources.md)
-    return name.strip().casefold()
 
 
 def held_resources(go_declaration, later_updates):
