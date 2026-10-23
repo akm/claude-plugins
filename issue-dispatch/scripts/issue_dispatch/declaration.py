@@ -250,19 +250,27 @@ def conflictability(mine, others):
     """競合の可能性の判定。mine は {"repo": "owner/name", "declaration": parse の結果の declaration}、others はその配列
     (要素に "id" を付けられる。比べる相手は既に `開始可` になった宣言)。
 
+    相手の "declaration" が None なら解析できなかった相手 ("problems" に理由) で、自動では判定できないので needs-user にする
+    (過去に受理された宣言が、今のリポジトリの設定の規則では読めないときなど。相手 1 つのためにほかの判定を止めない)。
+
     返り値: {"result": 全体の結論 (CONFLICT_RESULTS。conflict > needs-user > none), "others": [{"id", "repo", "result",
-    "paths": [{"path", "result", "reason"}] (同じリポジトリの同じパスだけ)}]}。別のリポジトリの相手は paths が空で none。
+    "paths": [{"path", "result", "reason"}] (同じリポジトリの同じパスだけ), "problems" (解析できない相手の理由。無ければ空)}]}。
+    別のリポジトリの相手は paths が空で none。
     """
     my_files = {f["path"]: f for f in mine["declaration"]["files"]}
     out = []
     for other in others:
         paths = []
+        if other.get("declaration") is None:
+            out.append({"id": other.get("id"), "repo": other["repo"], "result": "needs-user", "paths": [],
+                        "problems": list(other.get("problems") or [{"key": "declaration", "message": "宣言を解析できない"}])})
+            continue
         if other["repo"].lower() == mine["repo"].lower():
             for f in other["declaration"]["files"]:
                 if f["path"] in my_files:
                     result, reason = judge_path(my_files[f["path"]], f)
                     paths.append({"path": f["path"], "result": result, "reason": reason})
-        out.append({"id": other.get("id"), "repo": other["repo"], "result": _worst([p["result"] for p in paths]), "paths": paths})
+        out.append({"id": other.get("id"), "repo": other["repo"], "result": _worst([p["result"] for p in paths]), "paths": paths, "problems": []})
     return {"result": _worst([o["result"] for o in out]), "others": out}
 
 

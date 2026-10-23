@@ -237,6 +237,17 @@ class ConflictabilityTest(unittest.TestCase):
         self.assertEqual(only_user["result"], "needs-user")
         self.assertEqual(declaration.conflictability({"repo": REPO, "declaration": mine}, [])["result"], "none")
 
+    def test_unparsable_other_needs_user(self):
+        """解析できない相手 (declaration が None) は needs-user にし、ほかの相手の判定は続ける。"""
+        mine = parsed(["src/app.ts"])
+        result = declaration.conflictability({"repo": REPO, "declaration": mine}, [
+            {"id": "old", "repo": REPO, "declaration": None, "problems": [{"key": "files[0].units", "message": "節の表記が無い"}]},
+            {"id": "o2", "repo": REPO, "declaration": parsed(["src/other.ts"])}])
+        self.assertEqual([o["result"] for o in result["others"]], ["needs-user", "none"])
+        self.assertEqual(result["others"][0]["problems"][0]["key"], "files[0].units")
+        self.assertEqual(result["others"][1]["problems"], [])
+        self.assertEqual(result["result"], "needs-user")
+
 
 class PrFilesCheckTest(unittest.TestCase):
 
@@ -334,6 +345,32 @@ class CliTest(unittest.TestCase):
         self.assertEqual(out["errors"][0]["key"], "repo-config")
         self.assertEqual(out["repo_config"]["reason"], "not-in-repositories")
         self.assertIsNone(out["result"])
+
+    def test_conflictability_keeps_going_when_other_is_unparsable(self):
+        """相手の宣言が今の規則で解析できなくても、その相手だけを needs-user にして判定を返す。"""
+        manager = os.path.join(self.root, "manager")
+        clone = os.path.join(self.root, "clone")
+        os.makedirs(clone)
+        env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+        env.update({"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+                    "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"})
+        def git(*a):
+            subprocess.run(["git", "-C", clone, *a], check=True, capture_output=True, env=env)
+        git("init", "-q", "-b", "main")
+        _write_config(clone, {})
+        git("add", "."); git("commit", "-q", "-m", "init")
+        git("remote", "add", "origin", f"https://github.com/{REPO}.git")
+        git("update-ref", "refs/remotes/origin/main", "HEAD")
+        git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        _write_config(manager, {"project": {"owner": "akm", "number": 3}, "repositories": {REPO: clone}})
+        body = {"declaration": decl(["src/app.ts"]), "others": [
+            {"id": "old", "repo": REPO, "declaration": decl([("notes.xyz", [["a"]])])},  # unknown-content に units: 今の規則では読めない
+            {"id": "o2", "repo": REPO, "declaration": decl(["src/app.ts"])}]}
+        code, out, err = self.cli("declaration", "conflictability", "--dir", manager, "--repo", REPO, "--body-file", "-", stdin=json.dumps(body))
+        self.assertEqual((code, out["status"], out["errors"]), (0, "ok", []), err)
+        self.assertEqual([o["result"] for o in out["others"]], ["needs-user", "conflict"])
+        self.assertEqual(out["others"][0]["problems"][0]["key"], "files[0].units")
+        self.assertEqual(out["result"], "conflict")
 
     def test_conflictability_rejects_bad_declaration(self):
         manager = os.path.join(self.root, "manager")

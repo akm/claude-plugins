@@ -183,9 +183,9 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 | --- | --- |
 | `conflict` | 競合しうる |
 | `none` | 競合しない |
-| `needs-user` | 利用者の判定が要る (`unknown-content` を含む組で同じパス) |
+| `needs-user` | 利用者の判定が要る (`unknown-content` を含む組で同じパス。相手の宣言が今の規則で解析できないときも、その相手はこれ) |
 
-相手ごとにパスごとの結果と理由を返し、相手ごとの結果と全体の結論は `conflict` > `needs-user` > `none` の順で決める。
+相手ごとにパスごとの結果と理由を返し、相手ごとの結果と全体の結論は `conflict` > `needs-user` > `none` の順で決める。相手の宣言 (過去に受理されたもの) が今のリポジトリの設定の規則では解析できないときは、その相手だけを `needs-user` (理由は `problems`) にし、ほかの相手の判定は続ける (相手 1 つのために、そのリポジトリの新しい宣言をどれも判定できなくならないようにする)。判定する宣言そのものの誤りは差し戻す。
 
 ### PR が変えたファイルとの照合
 
@@ -203,6 +203,6 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 | `comment post --issue <参照> --role manager\|worker --name <名前> --session-id <ID> --kind <種類> [--to] [--assignment] [--declaration] [--reason <値>]... [--request-kind] [--waiting-issue] [--waiting-declaration] [--previous-pr] [--pr] [--release-reason] [--stuck-state] [--blocker <参照>]... (--body \| --body-file)` | `gh issue comment` (管理のセッションの種類で既投稿なら無し) | `posted`・`database_id`・`url`・`header` (組み立てた先頭行)。値のオプションは見出し語の表の順 |
 | `comment parse --line <先頭行>` | 無し | `header` (解析結果か null) |
 | `declaration parse --dir <リポジトリのルート> (--body <JSON> \| --body-file <ファイル \| ->)` | 無し | `declaration` (そろえたパスと種類付き。誤りがあれば null)・`count`・`config_status`。リポジトリの設定の規則は `--dir` から読む |
-| `declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body \| --body-file)` | 無し | 本文は `{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]}`。`result` (全体)・`others` (相手ごと・パスごとの結果と理由)・`declaration`・`repo_config` (設定の読み取りの結果)。リポジトリの設定は `repositories` の clone から既定のブランチの内容として読み (正本は [repositories.md](repositories.md))、読めなければ判定せず `errors` (key `repo-config`) で理由と直し方を返す |
+| `declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body \| --body-file)` | 無し | 本文は `{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]}`。`result` (全体)・`others` (相手ごと・パスごとの結果と理由)・`declaration`・`repo_config` (設定の読み取りの結果)。リポジトリの設定は `repositories` の clone から既定のブランチの内容として読み (正本は [repositories.md](repositories.md))、読めなければ判定せず `errors` (key `repo-config`) で理由と直し方を返す。`others` の宣言が解析できなければ、その相手は `needs-user` (`problems` に理由) |
 
 `<参照>` は `owner/repo#番号` か Issue の URL。どのサブコマンドも JSON を出せれば終了コード 0 で、失敗は `status: error` と `errors` (`key`・`message`・`failure`) で伝える。参照や URL の形が読めないときは `gh` を実行せずに返す。
