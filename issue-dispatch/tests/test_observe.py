@@ -450,6 +450,20 @@ class CliTest(FakeGhCase):
         self.assertEqual(out["diffs"], [{"kind": "pr", "item": None, "url": PR9, "source": "comment",
                                         "before": {"state": "OPEN", "draft": False, "merged": False}, "after": {"state": "MERGED", "draft": False, "merged": True}}], err)
 
+    def test_write_snapshot_drops_prs_no_longer_in_comments(self):
+        """--write-snapshot は今のコメントに書かれた PR だけを読む。前のスナップショットにだけある URL は読み直さず、保存にも残らない
+        (項目が閉じた後の PR の URL が増え続けないため)。observe diff は差分のために読み直す (別のテスト)。"""
+        with_pr = items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": with_pr}, {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual(list(observe.load_snapshot(self.snapshot_dir)["snapshot"]["comment_prs"]), [PR9])
+        calls_before = len(self.recorded_full())
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])  # コメントが無い (PrObserve の応答は用意しない)
+        code, out, err = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual((code, out["status"], out["snapshot"]["comment_prs"]), (0, "ok", {}), err)
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["comment_prs"], {})
+        self.assertFalse(any("PrObserve" in (r.get("stdin") or "") for r in self.recorded_full()[calls_before:]), "前のスナップショットの URL を読み直さない")
+
     def test_no_carry_without_previous_complete_value(self):
         """最初のスナップショットから一部しか読めていない値は引き継ぐ元が無いので、partial のまま比べない。"""
         def comments_fail(nodes):
