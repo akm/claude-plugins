@@ -66,6 +66,6 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。コメントの URL の PR が読めなければ `problems` (`what`: `comment-pr`) に入れて `partial` |
-| `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待っていた PR の変化を見つけるため) |
+| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧かコメントの URL の PR (`problems` の `what`: `comment-pr`) が一部でも読めなければ、スナップショットを書かずに `errors` (key `partial`) で返す (欠けたスナップショットは、読めなかっただけの項目や PR を「除かれた・消えた」と読ませるため) |
+| `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧か PR の状態が一部でも読めなければ、差分を返さずに `errors` (key `partial`) と `problems` で返す (同じ理由)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待っていた PR の変化を見つけるため) |
 | 書き込みのサブコマンドの `--snapshot-dir <管理ディレクトリ>` | `snapshot.json` | 出力に `snapshot` (`reflected`・`warnings`) を足す |

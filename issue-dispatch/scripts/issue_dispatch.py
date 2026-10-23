@@ -245,8 +245,11 @@ def cmd_project_items(args):
             return 0
         comment_prs, problems = _read_comment_prs(result["items"], login)
         out["problems"] = out["problems"] + problems
-        if problems:
-            out["status"] = "partial"
+        if out["problems"]:
+            # 一部でも読めなければ保存しない。欠けたスナップショットは、読めなかっただけの項目や PR を「除かれた・消えた」と読ませる
+            _emit({**out, "status": "error", "snapshot": None,
+                   "errors": [{"key": "partial", "message": "一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
+            return 0
         snapshot = observe.build_snapshot(result, comment_prs, _now())
         path = observe.save_snapshot(directory, snapshot)
         out["snapshot"] = {"path": path, "taken_at": snapshot["taken_at"], "comment_prs": comment_prs}
@@ -283,9 +286,14 @@ def cmd_observe_diff(args):
                 comment_prs[url] = {"state": r["state"], "draft": r["draft"], "merged": r["merged"]}
             else:
                 problems.append({"what": "comment-pr", "url": url, "failure": r.get("failure"), "message": r["message"], "exit_code": r.get("exit_code")})
+    if result["problems"] or problems:
+        # 一部でも読めなければ差分を返さない。欠けた読み取りと比べると、読めなかっただけの項目や PR が removed や消えた PR として現れる
+        _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"] + problems,
+               "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
+        return 0
     current = observe.build_snapshot(result, comment_prs, _now())
-    _emit({"status": "ok" if not (result["problems"] or problems) else "partial", "snapshot_taken_at": loaded["snapshot"]["taken_at"],
-           "diffs": observe.diff(loaded["snapshot"], current), "problems": result["problems"] + problems, "rate_limit": result["rate_limit"], "errors": []})
+    _emit({"status": "ok", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": observe.diff(loaded["snapshot"], current),
+           "problems": [], "rate_limit": result["rate_limit"], "errors": []})
     return 0
 
 

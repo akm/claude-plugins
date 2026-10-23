@@ -301,6 +301,27 @@ class CliTest(FakeGhCase):
         self.assertEqual(out["snapshot_taken_at"], observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"])
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]["state"], "OPEN", "diff は書かない")
 
+    def test_partial_read_yields_no_diff_and_no_save(self):
+        """一部しか読めなければ、diff は差分を返さず、--write-snapshot はスナップショットを書き換えない (読めなかった項目を removed にしない)。"""
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        taken = observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"]
+        partial = [USER_ENTRY, {"substring": ["query ProjectItems", '"after": "CURSOR-PAGE-1"'], "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1},
+                   {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}]
+        self.responses(partial)
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["diffs"], out["errors"][0]["key"]), (0, "error", [], "partial"), err)
+        self.assertEqual(out["problems"][0]["what"], "items-page")
+        self.responses(partial)
+        code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual((out["status"], out["snapshot"], out["errors"][0]["key"]), ("error", None, "partial"))
+        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"], taken, "書き換えない")
+        # コメントの URL の PR が読めないときも同じ
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))},
+                        {"substring": "query PrObserve", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}])
+        code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((out["status"], out["problems"][0]["what"]), ("error", "comment-pr"))
+
     def test_diff_without_snapshot(self):
         code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
         self.assertEqual((code, out["status"], out["errors"][0]["key"]), (0, "error", "snapshot"))
