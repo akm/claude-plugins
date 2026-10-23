@@ -58,7 +58,7 @@
 
 ## 書いた値の反映
 
-書き込みのサブコマンド (`project set-status` / `issue add-label` / `blocked-by add` / `comment post`。後の単位の書き込みのサブコマンドも同じ) は、引数 `--snapshot-dir <管理ディレクトリ>` があれば、書いた値だけをスナップショットに反映する (関数 `reflect`)。読み取りの後にほかの人が変えた値は反映しない。スナップショットが無い・壊れている・項目が無いときは反映せず、出力の `snapshot.warnings` で知らせ、書き込みの結果は変えない。作業のセッションは管理ディレクトリを持たないので指定しない。
+書き込みのサブコマンド (`project set-status` / `issue add-label` / `blocked-by add` / `comment post`。後の単位の書き込みのサブコマンドも同じ) は、引数 `--snapshot-dir` (値は管理ディレクトリ) があれば、書いた値だけをスナップショットに反映する (関数 `reflect`)。読み取りの後にほかの人が変えた値は反映しない。スナップショットが無い・壊れている・項目が無いときは反映せず、出力の `snapshot.warnings` で知らせ、書き込みの結果は変えない。作業のセッションは管理ディレクトリを持たないので指定しない。
 
 反映の操作: `status` (`value`)・`field` (`field`・`value`)・`comment` (`id`)・`blocked_by` (`action` `add` / `remove`・`blocker`・`state`)・`labels` / `assignees` (`add`・`remove`)。
 
