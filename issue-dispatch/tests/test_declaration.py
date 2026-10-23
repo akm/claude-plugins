@@ -179,6 +179,13 @@ class UpdateKindTest(unittest.TestCase):
         self.assertEqual(declaration.update_kind(go2, parsed(["a.md"], ["X"]), held2), "resources-removed-only")
         self.assertEqual(declaration.resource_changes(parsed(["a.md"], ["X"]), held2), {"added": [], "removed": ["Y"]}, "2 回目は Y だけを外したと数える")
 
+    def test_resource_names_ignore_case(self):
+        """資源の名前は大文字小文字を区別しない (正本は resources.md)。"""
+        go = parsed(["a.md"], ["DB", "gpu"])
+        self.assertEqual(declaration.held_resources(go, [parsed(["a.md"], ["db"])]), {"DB"})
+        self.assertEqual(declaration.update_kind(go, parsed(["a.md"], ["db", "GPU"]), {"DB", "gpu"}), "full", "綴りだけ違えば何も変わらない更新")
+        self.assertEqual(declaration.resource_changes(parsed(["a.md"], ["db"]), {"DB", "gpu"}), {"added": [], "removed": ["gpu"]})
+
     def test_rewrite_after_rejection_is_not_removal(self):
         """差し戻された宣言を書き直した更新は、資源が持っている資源より少なくても資源を外すだけの更新と判定しない (開始可が無ければ initial)。"""
         rejected = parsed(["a.md"], ["A", "B"])  # 差し戻された (呼び出し元は比べる相手に渡さない)

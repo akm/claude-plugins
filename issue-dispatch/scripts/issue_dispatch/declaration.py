@@ -182,21 +182,30 @@ def same_files(a, b):
     return {_file_key(f) for f in a["files"]} == {_file_key(f) for f in b["files"]}
 
 
+def _resource_key(name):
+    # 資源の名前は大文字小文字を区別しない (ラベルの名前を GitHub が区別しないため。正本は resources.md)
+    return name.strip().casefold()
+
+
 def held_resources(go_declaration, later_updates):
-    """持っている資源: 最後に `開始可` を書いた宣言の resources のうち、その後のどの宣言の更新にも残っているもの (集合)。
-    `開始可` の宣言がまだ無ければ空。差し戻された宣言は later_updates に入れない。"""
+    """持っている資源: 最後に `開始可` を書いた宣言の resources のうち、その後のどの宣言の更新にも残っているもの (集合。
+    `開始可` の宣言の綴り)。`開始可` の宣言がまだ無ければ空。差し戻された宣言は later_updates に入れない。"""
     if go_declaration is None:
         return set()
-    held = set(go_declaration["resources"])
+    held = list(go_declaration["resources"])
     for update in later_updates:
-        held &= set(update["resources"])
-    return held
+        keys = {_resource_key(r) for r in update["resources"]}
+        held = [r for r in held if _resource_key(r) in keys]
+    return set(held)
 
 
 def resource_changes(new_declaration, held):
-    """新しい宣言の資源と持っている資源の差: {"added": 足した資源, "removed": 外した資源} (名前の順)。"""
-    new = set(new_declaration["resources"])
-    return {"added": sorted(new - set(held)), "removed": sorted(set(held) - new)}
+    """新しい宣言の資源と持っている資源の差: {"added": 足した資源 (新しい宣言の綴り), "removed": 外した資源 (held の綴り)}
+    (名前の順。大文字小文字は区別しない)。"""
+    held_keys = {_resource_key(r) for r in held}
+    new_keys = {_resource_key(r) for r in new_declaration["resources"]}
+    return {"added": sorted(r for r in new_declaration["resources"] if _resource_key(r) not in held_keys),
+            "removed": sorted(r for r in held if _resource_key(r) not in new_keys)}
 
 
 def update_kind(go_declaration, new_declaration, held):
