@@ -50,7 +50,7 @@ import sys
 
 import datetime
 
-from issue_dispatch import comments, config, declaration, filekinds, ids, issues, observe, project, record, repo, resources
+from issue_dispatch import comments, config, declaration, filekinds, ids, issues, itemstate, observe, project, record, repo, resources, sessions
 
 
 def _emit(payload):
@@ -372,6 +372,117 @@ def cmd_project_add_fields(args):
 
 def _issue_error(result, key):
     return {k: v for k, v in result.items() if k != "status"} | {"status": "error", "errors": [{"key": result.get("key") or key, "message": result["message"], "failure": result.get("failure")}]}
+
+
+def _read_report_prs(items, login):
+    """項目の今の割り当ての `PR の報告` に書かれた PR の状態を issues.observe_pr で読む。返り値は (URL → 結果, problems)。"""
+    states, problems = {}, []
+    for url in itemstate.report_pr_urls(items, login):
+        r = issues.observe_pr(url, login=login)
+        states[url] = r
+        if r["status"] != "ok":
+            problems.append({"what": "report-pr", "url": url, "failure": r.get("failure"), "message": r["message"], "exit_code": r.get("exit_code")})
+    return states, problems
+
+
+def _items_for_state(parsed):
+    """項目の状態の導出のために項目を読む。項目の一覧そのものが欠ければ (LIST_PROBLEMS) エラー (読めなかった項目を終わったと読まないため)。"""
+    result = project.items(parsed)
+    if result["status"] == "error":
+        return None, {"status": "error", "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]}
+    if _list_problems(result["problems"]):
+        return None, {"status": "error", "problems": result["problems"], "rate_limit": result["rate_limit"],
+                      "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、項目の状態を導かない", "failure": None}]}
+    return result, None
+
+
+def cmd_item_state(args):
+    loaded = config.load(args.dir, "manager")
+    project_setting = args.project or loaded["config"].get("project")
+    if isinstance(project_setting, dict) and isinstance(project_setting.get("owner"), str) and isinstance(project_setting.get("number"), int):
+        parsed = {"owner": project_setting["owner"], "number": project_setting["number"]}
+    else:
+        parsed = project.parse_project(project_setting) if isinstance(project_setting, str) else None
+    if parsed is None:
+        _emit({"status": "error", "items": [], "errors": [{"key": "project", "message": "管理ディレクトリの設定にも --project にも owner/番号 の Project が無い", "failure": None}]})
+        return 0
+    table, warnings = resources.attributes(loaded["config"].get("resources") or {})
+    login, problem = comments.token_login()
+    if problem:
+        _emit({"status": "error", "items": [], "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
+        return 0
+    result, error = _items_for_state(parsed)
+    if error:
+        _emit({**error, "items": []})
+        return 0
+    items = [it for it in result["items"] if it.get("key") and (not args.issue or ids.same_issue(it["key"], args.issue))]
+    pr_states, pr_problems = _read_report_prs(items, login)
+    states = [itemstate.derive(it, login, pr_states, parsed["number"], table) for it in items]
+    states = [st for st in states if st["assignment"]]
+    problems = result["problems"] + pr_problems
+    _emit({"status": "partial" if problems else "ok", "items": states, "usage": itemstate.resource_usage(states), "problems": problems,
+           "rate_limit": result["rate_limit"], "warnings": loaded["warnings"] + warnings, "errors": []})
+    return 0
+
+
+def _session_arg(args):
+    if args.session:
+        value = sessions.normalize_session_id(args.session)
+        if value is None:
+            _emit({"status": "error", "errors": [{"key": "session", "message": f"--session の値がセッション ID の形ではない: {args.session!r}", "failure": None}]})
+        return value
+    value, _ = sessions.own_session_id(os.environ)
+    if value is None:
+        _emit({"status": "error", "errors": [{"key": "session", "message": f"--session が無く、環境変数 {sessions.ENV_HOST_SESSION_ID} も {sessions.ENV_SESSION_ID} も無い", "failure": None}]})
+    return value
+
+
+def _work_common(args):
+    """`work check` / `work held` の共通: Project・セッション ID・ログイン・項目。返り値は (parsed, session_id, login, result) か None (出力済み)。"""
+    parsed = _project_arg(args)
+    if parsed is None:
+        return None
+    session_id = _session_arg(args)
+    if session_id is None:
+        return None
+    login, problem = comments.token_login()
+    if problem:
+        _emit({"status": "error", "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
+        return None
+    result, error = _items_for_state(parsed)
+    if error:
+        _emit(error)
+        return None
+    return parsed, session_id, login, result
+
+
+def cmd_work_check(args):
+    common = _work_common(args)
+    if common is None:
+        return 0
+    parsed, session_id, login, result = common
+    item = next((it for it in result["items"] if it.get("key") and ids.same_issue(it["key"], args.issue)), None)
+    if item is None:
+        _emit({"status": "error", "errors": [{"key": "issue", "message": f"Project に項目 {args.issue!r} が無い (除かれた・閉じて除かれた・参照の形が違う)", "failure": None}]})
+        return 0
+    pr_states, pr_problems = _read_report_prs([item], login)
+    checked = itemstate.work_check(item, session_id, login, pr_states)
+    problems = result["problems"] + pr_problems
+    _emit({"status": "partial" if problems else "ok", "session": session_id, **checked, "problems": problems, "rate_limit": result["rate_limit"], "errors": []})
+    return 0
+
+
+def cmd_work_held(args):
+    common = _work_common(args)
+    if common is None:
+        return 0
+    parsed, session_id, login, result = common
+    items = [it for it in result["items"] if it.get("key")]
+    pr_states, pr_problems = _read_report_prs(items, login)
+    held = itemstate.work_held(items, session_id, login, pr_states, parsed["number"])
+    problems = result["problems"] + pr_problems
+    _emit({"status": "partial" if problems else "ok", "session": session_id, "items": held, "problems": problems, "rate_limit": result["rate_limit"], "errors": []})
+    return 0
 
 
 def cmd_pr_observe(args):
@@ -771,6 +882,26 @@ def build_parser():
     p_odiff.add_argument("--dir", required=True, help="管理ディレクトリ")
     p_odiff.add_argument("--project", required=True, help="owner/番号")
     p_odiff.set_defaults(func=cmd_observe_diff)
+
+    p_item = sub.add_parser("item", help="項目の状態")
+    item_sub = p_item.add_subparsers(dest="subcommand", required=True)
+    p_istate = item_sub.add_parser("state", help="作業中の項目の状態 (割り当て・PR・宣言の段階・資源) を導く (読むだけ)")
+    p_istate.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project と resources を読む)")
+    p_istate.add_argument("--project", help="owner/番号 (省略時は設定の project)")
+    p_istate.add_argument("--issue", help="1 項目だけ (owner/repo#番号)")
+    p_istate.set_defaults(func=cmd_item_state)
+
+    p_work = sub.add_parser("work", help="作業のセッションの確認 (読むだけ)")
+    work_sub = p_work.add_subparsers(dest="subcommand", required=True)
+    p_wcheck = work_sub.add_parser("check", help="割り当ての確認: フィールド・`割り当て`・`解放`・まだ行っていない `依頼`・第三者の本文の編集")
+    p_wcheck.add_argument("--project", required=True, help="owner/番号")
+    p_wcheck.add_argument("--issue", required=True, help="owner/repo#番号")
+    p_wcheck.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
+    p_wcheck.set_defaults(func=cmd_work_check)
+    p_wheld = work_sub.add_parser("held", help="持っている Issue (割り当て中) と Status と宣言の段階")
+    p_wheld.add_argument("--project", required=True, help="owner/番号")
+    p_wheld.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
+    p_wheld.set_defaults(func=cmd_work_held)
 
     p_pr = sub.add_parser("pr", help="PR")
     pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)
