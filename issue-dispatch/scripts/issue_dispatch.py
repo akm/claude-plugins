@@ -27,6 +27,9 @@
   declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body <JSON> | --body-file <ファイル|->)
       標準入力の JSON {"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} で競合の可能性を判定する。リポジトリの設定は
       repositories の clone から既定のブランチの内容として読み、読めなければ判定しない (KTD9)
+  resources attributes --dir <管理ディレクトリ> [--name <資源>]   設定の resources にデフォルト値を当てた属性を返す (警告つき)
+  resources judge --dir <管理ディレクトリ> --trigger assign|declare|update|close|release (--body <JSON> | --body-file <ファイル|->)
+      契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・答えは呼び出し元が渡す。gh は実行しない)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -41,7 +44,7 @@ import json
 import os
 import sys
 
-from issue_dispatch import comments, config, declaration, filekinds, issues, project, record, repo
+from issue_dispatch import comments, config, declaration, filekinds, issues, project, record, repo, resources
 
 
 def _emit(payload):
@@ -392,6 +395,95 @@ def cmd_declaration_conflictability(args):
     return 0
 
 
+def cmd_resources_attributes(args):
+    loaded = config.load(args.dir, "manager")
+    table, warnings = resources.attributes(loaded["config"].get("resources") or {})
+    if args.name:
+        listed = [resources.attributes_of(table, args.name)]
+    else:
+        listed = [dict(v) for v in table.values()]
+    _emit({"status": "ok", "resources": listed, "defaults": resources.DEFAULTS, "config_status": loaded["status"],
+           "warnings": loaded["warnings"] + warnings, "errors": loaded["errors"]})
+    return 0
+
+
+# 契機ごとの本文のキー (必須, 型)。配列は資源の名前か項目の配列、オブジェクトは名前 → 値
+_JUDGE_KEYS = {
+    "assign": (("item", str), ("resources", list), ("usage", dict)),
+    "declare": (("item", str), ("declared", list), ("reserved", list), ("usage", dict)),
+    "update": (("item", str), ("kind", str), ("held", list), ("declared", list), ("usage", dict)),
+    "close": (("item", str), ("usage", dict)),
+    "release": (("resource", str), ("waiting", list)),
+}
+
+
+def _is_name(value):
+    return isinstance(value, str) and value.strip() != ""
+
+
+def _check_judge_body(trigger, body):
+    """`resources judge` の本文の形を、入れ子の中身まで検査する (本文はスキルが組み立てるので、誤った形を誤った判断にしない)。"""
+    errors = []
+    if not isinstance(body, dict):
+        return [{"key": "body", "message": "本文はオブジェクト", "failure": None}]
+    for key, kind in _JUDGE_KEYS[trigger]:
+        if key not in body:
+            errors.append({"key": "body", "message": f"契機 {trigger} の本文に {key} が無い (必須のキー: {', '.join(k for k, _ in _JUDGE_KEYS[trigger])})", "failure": None})
+        elif not isinstance(body[key], kind):
+            errors.append({"key": f"body.{key}", "message": f"{key} は {kind.__name__} ({body[key]!r})", "failure": None})
+    if errors:
+        return errors
+    for key in ("resources", "declared", "reserved", "held"):
+        if key in body and not all(_is_name(n) for n in body[key]):
+            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 (空でない文字列) の配列: {body[key]!r}", "failure": None})
+    if "usage" in body:
+        for name, items in body["usage"].items():
+            if not _is_name(name) or not isinstance(items, list) or not all(_is_name(i) for i in items):
+                errors.append({"key": f"body.usage.{name}", "message": f"usage は資源の名前 → 項目 (owner/repo#番号 の文字列) の配列: {items!r}", "failure": None})
+    for key in ("answers", "undeclared_answers"):
+        if key in body and (not isinstance(body[key], dict) or not all(_is_name(k) and isinstance(v, str) for k, v in body[key].items())):
+            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 答え (文字列) のオブジェクト: {body[key]!r}", "failure": None})
+    if "waiting" in body:
+        for i, w in enumerate(body["waiting"]):
+            # judge_release が読むキーをすべて確かめる (絞り込みの item・wait_for と、並べ替えの posted_at・position)
+            ok = (isinstance(w, dict) and _is_name(w.get("item")) and "declaration" in w
+                  and isinstance(w.get("wait_for"), list) and all(_is_name(r) for r in w["wait_for"])
+                  and (w.get("posted_at") is None or isinstance(w["posted_at"], str))
+                  and (w.get("position") is None or (isinstance(w["position"], int) and not isinstance(w["position"], bool))))
+            if not ok:
+                errors.append({"key": f"body.waiting[{i}]", "message": f"waiting の要素は item (文字列)・declaration・posted_at (文字列)・position (整数)・wait_for (資源の名前の配列) を持つオブジェクト: {w!r}", "failure": None})
+    if "kind" in body and body["kind"] not in declaration.UPDATE_KINDS:
+        errors.append({"key": "body.kind", "message": f"kind は更新の種類 ({', '.join(declaration.UPDATE_KINDS)}): {body['kind']!r}", "failure": None})
+    return errors
+
+
+def cmd_resources_judge(args):
+    body, problem = _read_json_body(args)
+    if problem:
+        _emit({"status": "error", "trigger": args.trigger, "result": None, "errors": [problem]})
+        return 0
+    errors = _check_judge_body(args.trigger, body)
+    if errors:
+        _emit({"status": "error", "trigger": args.trigger, "result": None, "errors": errors})
+        return 0
+    loaded = config.load(args.dir, "manager")
+    table, warnings = resources.attributes(loaded["config"].get("resources") or {})
+    answers = body.get("answers") or {}
+    if args.trigger == "assign":
+        result = resources.judge_assign(body["item"], body["resources"], body["usage"], table, answers)
+    elif args.trigger == "declare":
+        result = resources.judge_declare(body["item"], body["declared"], body["reserved"], body["usage"], table, answers, body.get("undeclared_answers") or {})
+    elif args.trigger == "update":
+        result = resources.judge_update(body["item"], body["kind"], body["held"], body["declared"], body["usage"], table, answers)
+    elif args.trigger == "close":
+        result = resources.judge_close(body["item"], body["usage"])
+    else:
+        result = resources.judge_release(body["resource"], body["waiting"])
+    _emit({"status": "ok", "trigger": args.trigger, **({"result": None} if "result" not in result else {}), **result,
+           "config_status": loaded["status"], "warnings": loaded["warnings"] + warnings, "errors": []})
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="issue_dispatch.py", description="issue-dispatch の同梱 CLI (入出力は JSON)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -516,6 +608,20 @@ def build_parser():
     body.add_argument("--body", help='{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} の JSON')
     body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
     p_dconf.set_defaults(func=cmd_declaration_conflictability)
+
+    p_res = sub.add_parser("resources", help="資源")
+    res_sub = p_res.add_subparsers(dest="subcommand", required=True)
+    p_rattr = res_sub.add_parser("attributes", help="設定の resources にデフォルト値を当てた属性を返す")
+    p_rattr.add_argument("--dir", required=True, help="管理ディレクトリ")
+    p_rattr.add_argument("--name", help="1 つの資源だけ (設定に無ければデフォルト値)")
+    p_rattr.set_defaults(func=cmd_resources_attributes)
+    p_rjudge = res_sub.add_parser("judge", help="契機ごとの資源の判断 (gh は実行しない)")
+    p_rjudge.add_argument("--dir", required=True, help="管理ディレクトリ (設定の resources を読む)")
+    p_rjudge.add_argument("--trigger", required=True, choices=resources.TRIGGERS, help="契機")
+    body = p_rjudge.add_mutually_exclusive_group(required=True)
+    body.add_argument("--body", help="契機ごとの JSON (キーは resources.md の契機の表)")
+    body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
+    p_rjudge.set_defaults(func=cmd_resources_judge)
 
     p_pr = sub.add_parser("pr", help="PR")
     pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)
