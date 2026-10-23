@@ -497,12 +497,15 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                 actions.append({"kind": "set-field", "item": key, "item_id": item["item_id"], "field": FIELD_TITLE, "value": intent["session_title"], "continuation": True})
     expected = expected_statuses(state)
     d = state.get("declaration") or {}
+    restore = "Blocked" if "Blocked" in expected else "In Progress"  # 続きの Status は期待する Status から 1 つに決める
+    status_continued = False
     if item.get("state") == "OPEN" and status not in expected and not (status == "Blocked" and d.get("manager_blocked")):
         if status not in ASSIGNED_STATUSES:
             if _status_events_after(item, asg["at"], project_number):
                 questions.append(_question(item, "status-changed", status=status))
             else:
-                actions.append(_action_status(item, "In Progress", continuation=True))
+                actions.append(_action_status(item, restore, continuation=True))
+                status_continued = True
     # `待機` (Issue か 小さな PR) の続き: blockedBy と Blocked
     if d.get("waiting_blockers") and d.get("wait") and not d.get("manager_blocked"):
         wait_at = d["wait"]["at"]
@@ -515,12 +518,12 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                 reports.append(_report(item, "blocked-by-removed", blockers=[blocker]))
             else:
                 actions.append({"kind": "blocked-by-add", "item": key, "blocker": blocker, "continuation": True})
-        if status != "Blocked" and item.get("state") == "OPEN":
+        if status != "Blocked" and item.get("state") == "OPEN" and not status_continued:
             if _status_events_after(item, wait_at, project_number):
                 if not any(q["kind"] == "status-changed" for q in questions):
                     reports.append(_report(item, "status-changed", status=status, after_comment=d["wait"]["comment_id"]))
             else:
-                actions.append(_action_status(item, "Blocked", continuation=True))
+                actions.append(_action_status(item, restore, continuation=True))
     # 第三者の本文の編集 (確認の対象のリポジトリだけ。確かめた時刻より後のもの)
     if any(item["repo"].casefold() == r.casefold() for r in (config or {}).get("third_party_edit_check") or []):
         confirmed = ri.get("body_edit_confirmed_at") or ""

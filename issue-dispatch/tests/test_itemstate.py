@@ -648,6 +648,12 @@ class AssignedScenesTest(unittest.TestCase):
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("blocked-by-add", A2), ("set-status", "Blocked")])
 
+    def test_todo_with_wait_continues_to_blocked_once(self):
+        """Status が `Todo` のまま (書かれずに止まった) で `待機` (Issue) もある項目は、続きの Status を `Blocked` 1 つだけにする (In Progress と Blocked の 2 つを返さない)。"""
+        item = make_item(status="Todo", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
+        out = turn_of(item)
+        self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("set-status", "Blocked"), ("blocked-by-add", A2)])
+
     def test_wait_continuation_respects_user_removal(self):
         """`待機` の後に人が blockedBy を外した (BlockedByRemovedEvent がコメントより後) なら足し直さず報告する。Status も利用者が変えていれば報告する。"""
         item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)],
