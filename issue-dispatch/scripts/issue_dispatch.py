@@ -417,23 +417,47 @@ _JUDGE_KEYS = {
 }
 
 
+def _is_name(value):
+    return isinstance(value, str) and value.strip() != ""
+
+
+def _check_judge_body(trigger, body):
+    """`resources judge` の本文の形を、入れ子の中身まで検査する (本文はスキルが組み立てるので、誤った形を誤った判断にしない)。"""
+    errors = []
+    if not isinstance(body, dict):
+        return [{"key": "body", "message": "本文はオブジェクト", "failure": None}]
+    for key, kind in _JUDGE_KEYS[trigger]:
+        if key not in body:
+            errors.append({"key": "body", "message": f"契機 {trigger} の本文に {key} が無い (必須のキー: {', '.join(k for k, _ in _JUDGE_KEYS[trigger])})", "failure": None})
+        elif not isinstance(body[key], kind):
+            errors.append({"key": f"body.{key}", "message": f"{key} は {kind.__name__} ({body[key]!r})", "failure": None})
+    if errors:
+        return errors
+    for key in ("resources", "declared", "reserved", "held"):
+        if key in body and not all(_is_name(n) for n in body[key]):
+            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 (空でない文字列) の配列: {body[key]!r}", "failure": None})
+    if "usage" in body:
+        for name, items in body["usage"].items():
+            if not _is_name(name) or not isinstance(items, list) or not all(_is_name(i) for i in items):
+                errors.append({"key": f"body.usage.{name}", "message": f"usage は資源の名前 → 項目 (owner/repo#番号 の文字列) の配列: {items!r}", "failure": None})
+    for key in ("answers", "undeclared_answers"):
+        if key in body and (not isinstance(body[key], dict) or not all(_is_name(k) and isinstance(v, str) for k, v in body[key].items())):
+            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 答え (文字列) のオブジェクト: {body[key]!r}", "failure": None})
+    if "waiting" in body:
+        for i, w in enumerate(body["waiting"]):
+            if not isinstance(w, dict) or not _is_name(w.get("item")) or "declaration" not in w or not isinstance(w.get("wait_for"), list) or not all(_is_name(r) for r in w["wait_for"]):
+                errors.append({"key": f"body.waiting[{i}]", "message": f"waiting の要素は item・declaration・posted_at・position・wait_for (資源の名前の配列) を持つオブジェクト: {w!r}", "failure": None})
+    if "kind" in body and body["kind"] not in declaration.UPDATE_KINDS:
+        errors.append({"key": "body.kind", "message": f"kind は更新の種類 ({', '.join(declaration.UPDATE_KINDS)}): {body['kind']!r}", "failure": None})
+    return errors
+
+
 def cmd_resources_judge(args):
     body, problem = _read_json_body(args)
     if problem:
         _emit({"status": "error", "trigger": args.trigger, "result": None, "errors": [problem]})
         return 0
-    errors = []
-    if not isinstance(body, dict):
-        errors.append({"key": "body", "message": "本文はオブジェクト", "failure": None})
-    else:
-        for key, kind in _JUDGE_KEYS[args.trigger]:
-            if key not in body:
-                errors.append({"key": "body", "message": f"契機 {args.trigger} の本文に {key} が無い (必須のキー: {', '.join(k for k, _ in _JUDGE_KEYS[args.trigger])})", "failure": None})
-            elif not isinstance(body[key], kind):
-                errors.append({"key": f"body.{key}", "message": f"{key} は {kind.__name__} ({body[key]!r})", "failure": None})
-        for key in ("answers", "undeclared_answers"):
-            if key in body and not isinstance(body[key], dict):
-                errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 答えのオブジェクト", "failure": None})
+    errors = _check_judge_body(args.trigger, body)
     if errors:
         _emit({"status": "error", "trigger": args.trigger, "result": None, "errors": errors})
         return 0
@@ -445,10 +469,6 @@ def cmd_resources_judge(args):
     elif args.trigger == "declare":
         result = resources.judge_declare(body["item"], body["declared"], body["reserved"], body["usage"], table, answers, body.get("undeclared_answers") or {})
     elif args.trigger == "update":
-        if body["kind"] not in declaration.UPDATE_KINDS:
-            _emit({"status": "error", "trigger": args.trigger, "result": None,
-                   "errors": [{"key": "body.kind", "message": f"kind は更新の種類 ({', '.join(declaration.UPDATE_KINDS)}): {body['kind']!r}", "failure": None}]})
-            return 0
         result = resources.judge_update(body["item"], body["kind"], body["held"], body["declared"], body["usage"], table, answers)
     elif args.trigger == "close":
         result = resources.judge_close(body["item"], body["usage"])

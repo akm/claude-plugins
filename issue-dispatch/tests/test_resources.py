@@ -291,6 +291,19 @@ class CliTest(unittest.TestCase):
         self.assertEqual(out["errors"][0]["key"], "body")
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "assign", "--body", json.dumps({"item": I2, "resources": "db", "usage": {}}))
         self.assertEqual(out["status"], "error")
+        # 入れ子の中身: usage の値が文字列・資源の名前が数値・答えが文字列でない・waiting の要素の形違い
+        for trigger, body, key in (
+                ("assign", {"item": I2, "resources": ["db"], "usage": {"db": I1}}, "body.usage.db"),
+                ("assign", {"item": I2, "resources": [1], "usage": {}}, "body.resources"),
+                ("declare", {"item": I2, "declared": ["db"], "reserved": [""], "usage": {}}, "body.reserved"),
+                ("declare", {"item": I2, "declared": ["db"], "reserved": [], "usage": {}, "answers": {"db": 1}}, "body.answers"),
+                ("close", {"item": I2, "usage": {"db": [1]}}, "body.usage.db"),
+                ("release", {"resource": "db", "waiting": [{"item": I1, "wait_for": "db"}]}, "body.waiting[0]")):
+            with self.subTest(trigger=trigger, key=key):
+                code, out, err = self.cli("resources", "judge", "--dir", self.root, "--trigger", trigger, "--body", json.dumps(body))
+                self.assertEqual((code, out["status"]), (0, "error"), err)
+                self.assertEqual(out["errors"][0]["key"], key)
+                self.assertNotIn("Traceback", err)
 
 
 class DocTest(unittest.TestCase):
