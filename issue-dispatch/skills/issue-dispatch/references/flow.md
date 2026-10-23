@@ -160,10 +160,10 @@
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
 | `item state --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>] [--diffs <ファイル \| ->]` | 無し | `items` (割り当てのある項目の状態。上の表)・`usage`・`actions`・`questions`・`reports`・`pending`・`record_lost` (「ターンで行うこと」)・`problems`・`rate_limit`・`warnings`・`errors`。設定の `project`・`resources` (属性)・`third_party_edit_check` と、記録 (無ければ記録を失った扱い。壊れていれば `errors` (key `record`)) と、Project のメタ情報 (ワークフローの有効・無効) を読む。`--diffs` は `observe diff` の出力 (JSON)。項目の一覧そのものが欠ければ (`problems` の `what` が `items-page`・`graphql-errors`) 導かずに `errors` (key `partial`) |
-| `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 自分が足した blockedBy (今の割り当ての `待機` の理由の Issue。`own_blockers`) だけを外し、それ以外は `gh` を実行せずに `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
+| `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (決まりの正本は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
 | `work check --project <owner>/<番号> --issue <owner/repo#番号> [--session <ID>]` | 無し | `session`・上の表の値・`problems`・`rate_limit`・`errors`。`--session` を省けば環境変数 (`CLAUDE_CODE_HOST_SESSION_ID`、無ければ `CLAUDE_CODE_SESSION_ID`)。項目が無ければ `errors` (key `issue`) |
 | `work held --project <owner>/<番号> [--session <ID>]` | 無し | `session`・`items` (上の表)・`problems`・`rate_limit`・`errors` |
 
 `PR の報告` の PR が読めなければ、`problems` (`what` が `report-pr`) で知らせ、その項目の `pr` は無しになる (上の表の行「今の割り当ての PR」)。
 
-`blocked-by remove` が自分が足した blockedBy だけを外す理由と、`gh` の呼び方は [issue-format.md](issue-format.md) の「`blockedBy` の削除」。
+`blocked-by remove` の `gh` の呼び方も [issue-format.md](issue-format.md) の「`blockedBy` の削除」。
