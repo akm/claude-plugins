@@ -540,8 +540,11 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
             else:
                 asked = any(r["kind"] == "本文の追記" and ids.parse_pr_url(r["values"]["pr"])["url"] == pr["url"] for r in pending_requests(item, cs, asg, asg["to"], pr_states))
                 if not asked:
+                    # 閉じる記法は、PR が Issue と同じリポジトリなら `#番号`、別のリポジトリなら `owner/repo#番号`
+                    pr_repo = ids.parse_pr_url(pr["url"])["repo"]
+                    ref = f"#{item['number']}" if pr_repo.casefold() == item["repo"].casefold() else item["key"]
                     actions.append(_action_comment(item, "依頼", {"to": asg["to"], "assignment": asg["number"], "request_kind": "本文の追記", "pr": pr["url"]},
-                                                   f"PR {pr['url']} の本文に `Closes #{item['number']}` を足す"))
+                                                   f"PR {pr['url']} の本文に `Closes {ref}` を足す"))
         if item.get("state") == "OPEN":
             if pr["merged"]:
                 questions.append(_question(item, "merged-issue-open", url=pr["url"]))

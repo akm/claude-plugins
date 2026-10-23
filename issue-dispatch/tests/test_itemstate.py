@@ -682,6 +682,19 @@ class AssignedScenesTest(unittest.TestCase):
         out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500), report, asked]), pr_states=prs)
         self.assertEqual(out["actions"], [])
 
+    def test_append_request_uses_cross_repo_reference_when_pr_is_elsewhere(self):
+        """PR が Issue と別のリポジトリにあれば、依頼の本文の閉じる記法は owner/repo#番号 の形 (同じなら #番号)。"""
+        other_pr = "https://github.com/akm/other/pull/5"
+        report = wcomment("PR の報告", None, t(30), 300, body=other_pr)
+        item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500), report])
+        base = observed(other_pr, issues=())
+        out = turn_of(item, pr_states={other_pr: {**base, "pr": {**base["pr"], "default_branch": "main"}}})
+        self.assertIn(f"`Closes {A9}`", out["actions"][0]["body"])
+        report = wcomment("PR の報告", None, t(30), 300, body=PR9)
+        base = observed(PR9, issues=())
+        out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500), report]), pr_states={PR9: {**base, "pr": {**base["pr"], "default_branch": "main"}}})
+        self.assertIn("`Closes #9`", out["actions"][0]["body"])
+
     def test_pr_to_non_default_branch_is_reported_not_requested(self):
         """既定のブランチ以外へ向けた PR の報告は、本文の追記を頼まず 1 回だけ報告する (利用者が決めた)。"""
         report = wcomment("PR の報告", None, t(30), 300, body=PR9)
