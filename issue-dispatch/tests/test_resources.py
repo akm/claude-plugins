@@ -111,6 +111,8 @@ class AssignTest(unittest.TestCase):
     def test_own_holding_does_not_count(self):
         r = resources.judge_assign(I1, ["db"], {"db": [I1]}, attrs(), {})
         self.assertEqual(r["result"], "assign", "自分が持っている分は数えない")
+        r = resources.judge_assign(I1, ["db"], {"db": [I1.upper()]}, attrs(), {})
+        self.assertEqual(r["result"], "assign", "項目のキーは owner/repo の大文字小文字を区別しない")
 
     def test_reserve_on_declare_is_not_reserved_at_assign(self):
         """Covers AE51. reserve が on_declare の資源は割り当てで予約せず、空きも待たない。"""
@@ -216,6 +218,7 @@ class CloseAndReleaseTest(unittest.TestCase):
         """Issue の close・割り当ての解除: その項目が持つ資源をすべて解放する。"""
         r = resources.judge_close(I2, {"db": [I1, I2], "gpu": [I2], "x": [I3]})
         self.assertEqual(r, {"release": ["db", "gpu"]})
+        self.assertEqual(resources.judge_close(I2, {"db": [I2.upper()]}), {"release": ["db"]}, "項目の綴りが違っても解放する")
 
     def test_release_returns_waiting_in_post_order(self):
         """資源の解放: その資源で待っていた宣言を、投稿の順 (同じなら Project の中の順) に返す。"""

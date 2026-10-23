@@ -7,7 +7,7 @@
 (宣言・ラベル・設定) のまま。
 """
 
-from issue_dispatch import declaration
+from issue_dispatch import declaration, ids
 
 # 属性 (名前 → デフォルト値)。意味と値は resources.md の属性の表
 DEFAULTS = {"capacity": 1, "reserve": "on_assign", "when_busy": "wait", "release_undeclared": "ask"}
@@ -75,12 +75,17 @@ def held_from_history(history):
 
 # --- 判断 ---------------------------------------------------------------------------
 
+def _same_item(a, b):
+    # 項目のキー (owner/repo#番号) は owner/repo の大文字小文字を区別しない (GitHub が区別しないため)。参照として読めなければ文字列で比べる
+    return ids.same_issue(a, b) or (ids.parse_issue_ref(a) is None and a == b)
+
+
 def holders(usage, name, except_item=None):
-    """資源を持つ項目 (使用 usage: 資源の名前 → 項目のキーの配列。綴りは問わない) のうち except_item 以外。"""
+    """資源を持つ項目 (使用 usage: 資源の名前 → 項目のキーの配列。資源の綴りも項目の綴りも問わない) のうち except_item 以外。"""
     out = []
     for key, items in (usage or {}).items():
         if _key(key) == _key(name):
-            out += [i for i in items if i != except_item]
+            out += [i for i in items if except_item is None or not _same_item(i, except_item)]
     return out
 
 
@@ -179,7 +184,7 @@ def judge_update(item, held, declared, usage, attrs_table, answers):
 
 def judge_close(item, usage):
     """契機「Issue の close・割り当ての解除」。その項目が持つ資源をすべて解放する。返り値: {"release": [資源 (usage の綴り)]}。"""
-    return {"release": [name for name, items in (usage or {}).items() if item in items]}
+    return {"release": [name for name, items in (usage or {}).items() if any(_same_item(i, item) for i in items)]}
 
 
 def judge_release(resource, waiting):
