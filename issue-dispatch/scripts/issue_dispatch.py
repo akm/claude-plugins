@@ -411,7 +411,7 @@ def cmd_resources_attributes(args):
 _JUDGE_KEYS = {
     "assign": (("item", str), ("resources", list), ("usage", dict)),
     "declare": (("item", str), ("declared", list), ("reserved", list), ("usage", dict)),
-    "update": (("item", str), ("held", list), ("declared", list), ("usage", dict)),
+    "update": (("item", str), ("kind", str), ("held", list), ("declared", list), ("usage", dict)),
     "close": (("item", str), ("usage", dict)),
     "release": (("resource", str), ("waiting", list)),
 }
@@ -445,7 +445,11 @@ def cmd_resources_judge(args):
     elif args.trigger == "declare":
         result = resources.judge_declare(body["item"], body["declared"], body["reserved"], body["usage"], table, answers, body.get("undeclared_answers") or {})
     elif args.trigger == "update":
-        result = resources.judge_update(body["item"], body["held"], body["declared"], body["usage"], table, answers)
+        if body["kind"] not in declaration.UPDATE_KINDS:
+            _emit({"status": "error", "trigger": args.trigger, "result": None,
+                   "errors": [{"key": "body.kind", "message": f"kind は更新の種類 ({', '.join(declaration.UPDATE_KINDS)}): {body['kind']!r}", "failure": None}]})
+            return 0
+        result = resources.judge_update(body["item"], body["kind"], body["held"], body["declared"], body["usage"], table, answers)
     elif args.trigger == "close":
         result = resources.judge_close(body["item"], body["usage"])
     else:

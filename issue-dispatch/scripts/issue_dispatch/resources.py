@@ -181,14 +181,20 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
             "release": release, "keep": keep, "ask_undeclared": ask_undeclared, "request_rewrite": request_rewrite}
 
 
-def judge_update(item, held, declared, usage, attrs_table, answers):
-    """契機「宣言の更新」。held は持っている資源、declared は更新の resources。外した資源は解放し、足した資源 (前に外して足し直した
-    ものも含む) は着手の宣言と同じに空きを確かめる。返り値: {"result": "go" / "wait" / "ask", "reserve", "wait_for", "ask", "release"}。"""
+def judge_update(item, kind, held, declared, usage, attrs_table, answers):
+    """契機「宣言の更新」。kind は更新の種類 (declaration.update_kind の結果。declaration.UPDATE_KINDS)、held は持っている資源、
+    declared は更新の resources。外した資源は解放し、足した資源 (前に外して足し直したものも含む) は着手の宣言と同じに空きを
+    確かめる。資源を外すだけの更新 (resources-removed-only) は判定せず `開始可` を書かないので result は "skip" (release は返す)。
+    返り値: {"result": "go" / "wait" / "ask" / "skip", "reserve", "wait_for", "ask", "release"}。kind が種類でなければ ValueError。"""
+    if kind not in declaration.UPDATE_KINDS:
+        raise ValueError(f"更新の種類は {', '.join(declaration.UPDATE_KINDS)} のどれか: {kind!r}")
     held, declared = _unique(held), _unique(declared)
     held_keys = {_key(r) for r in held}
     declared_keys = {_key(r) for r in declared}
     added = [r for r in declared if _key(r) not in held_keys]
     release = [r for r in held if _key(r) not in declared_keys]
+    if kind == "resources-removed-only":
+        return {"result": "skip", "reserve": [], "wait_for": [], "ask": [], "release": release}
     reserve, wait_for, ask = _check_new(item, added, usage, attrs_table, answers)
     result = "wait" if wait_for else ("ask" if ask else "go")
     return {"result": result, "reserve": reserve if result == "go" else [], "wait_for": wait_for, "ask": ask, "release": release}

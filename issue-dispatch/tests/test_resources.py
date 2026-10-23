@@ -202,18 +202,23 @@ class UpdateTest(unittest.TestCase):
     """契機「宣言の更新」。外した資源を解放し、足した資源は着手の宣言と同じに空きを確かめる。"""
 
     def test_removed_released_and_added_checked(self):
-        r = resources.judge_update(I2, ["A", "B"], ["A", "C"], {"A": [I2], "B": [I2], "C": [I1]}, attrs(), {})
+        r = resources.judge_update(I2, "resources-only", ["A", "B"], ["A", "C"], {"A": [I2], "B": [I2], "C": [I1]}, attrs(), {})
         self.assertEqual((r["result"], r["release"], r["wait_for"], r["reserve"]), ("wait", ["B"], ["C"], []))
-        r = resources.judge_update(I2, ["A", "B"], ["A", "C"], {"A": [I2], "B": [I2]}, attrs(), {})
+        r = resources.judge_update(I2, "resources-only", ["A", "B"], ["A", "C"], {"A": [I2], "B": [I2]}, attrs(), {})
         self.assertEqual((r["result"], r["release"], r["reserve"]), ("go", ["B"], ["C"]))
 
-    def test_remove_only(self):
-        r = resources.judge_update(I2, ["A", "B"], ["A"], {"A": [I2], "B": [I2]}, attrs(), {})
-        self.assertEqual((r["result"], r["release"], r["reserve"]), ("go", ["B"], []))
+    def test_remove_only_is_skipped(self):
+        """資源を外すだけの更新は判定せず開始可を書かない (skip)。外した資源は解放する。"""
+        r = resources.judge_update(I2, "resources-removed-only", ["A", "B"], ["A"], {"A": [I2], "B": [I2]}, attrs(), {})
+        self.assertEqual((r["result"], r["release"], r["reserve"]), ("skip", ["B"], []))
+        r = resources.judge_update(I2, "full", ["A", "B"], ["A"], {"A": [I2], "B": [I2]}, attrs(), {})
+        self.assertEqual((r["result"], r["release"]), ("go", ["B"]), "ファイルも変わる更新は判定する (資源は妨げない)")
+        with self.assertRaises(ValueError):
+            resources.judge_update(I2, "unknown", ["A"], ["A"], {}, attrs(), {})
 
     def test_readd_checks_availability(self):
         """前に外した資源を足し直したときも、足したとして空きを確かめる。"""
-        r = resources.judge_update(I2, ["A"], ["A", "B"], {"A": [I2], "B": [I3]}, attrs(), {})
+        r = resources.judge_update(I2, "resources-only", ["A"], ["A", "B"], {"A": [I2], "B": [I3]}, attrs(), {})
         self.assertEqual((r["result"], r["wait_for"]), ("wait", ["B"]))
 
 
@@ -268,9 +273,12 @@ class CliTest(unittest.TestCase):
         body = {"item": I2, "declared": ["db", "gpu"], "reserved": ["db"], "usage": {"db": [I2], "gpu": [I1]}, "answers": {}, "undeclared_answers": {}}
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "declare", "--body", json.dumps(body))
         self.assertEqual((out["result"], out["wait_for"]), ("wait", ["gpu"]))
-        body = {"item": I2, "held": ["db"], "declared": [], "usage": {"db": [I2]}, "answers": {}}
+        body = {"item": I2, "kind": "resources-removed-only", "held": ["db"], "declared": [], "usage": {"db": [I2]}, "answers": {}}
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "update", "--body", json.dumps(body))
-        self.assertEqual((out["result"], out["release"]), ("go", ["db"]))
+        self.assertEqual((out["result"], out["release"]), ("skip", ["db"]))
+        body["kind"] = "nope"
+        code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "update", "--body", json.dumps(body))
+        self.assertEqual((out["status"], out["errors"][0]["key"]), ("error", "body.kind"))
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "close", "--body", json.dumps({"item": I2, "usage": {"db": [I2]}}))
         self.assertEqual(out["release"], ["db"])
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "release", "--body",
@@ -293,7 +301,7 @@ class DocTest(unittest.TestCase):
         for name, default in resources.DEFAULTS.items():
             self.assertIn(f"`{name}`", doc)
             self.assertIn(f"`{default}`", doc)
-        for value in ("on_assign", "on_declare", "wait", "ask", "release", "assign", "skip", "go"):
+        for value in ("on_assign", "on_declare", "wait", "ask", "release", "assign", "skip", "go", "resources-removed-only"):
             self.assertIn(f"`{value}`", doc, f"{value} が文書に無い")
         for trigger in resources.TRIGGERS:
             self.assertIn(f"`{trigger}`", doc, f"契機 {trigger} が文書に無い")
