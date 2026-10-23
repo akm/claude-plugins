@@ -86,7 +86,22 @@
 | `item` / `kind` | 問いの対象の項目と種類 |
 | `options` | 選択肢の配列。要素は空でない文字列で、重複しない (答えは選択肢と同じ文字列で照合する)。空なら自由回答 |
 | `asked_at` | 尋ねた時刻 |
-| `answer` / `answered_at` | 答えと答えた時刻。未回答は null |
+| `answer` / `answered_at` | 答えと答えた時刻。未回答はどちらも null。取り下げた問い (`withdraw`) は `answer` が null で `answered_at` がある |
+
+問いの種類 (`kind`) と選択肢 (`options`)。導くのは項目の状態 ([flow.md](flow.md) の「ターンで行うこと」)。答えに従う処理は U15・U16・U21 で決める。
+
+| 種類 | 尋ねること | 選択肢 |
+| --- | --- | --- |
+| `close-in-progress` | 進行中の Issue が閉じられた。作業のセッションに止めるよう伝えるか、reopen して続けるか | `stop` / `reopen` |
+| `assignee-changed` | 割り当て中の項目の担当者が自分 1 人でなくなった。割り当てを解除するか、そのまま続けるか | `release` / `continue` |
+| `field-cleared` | `Agent session ID` が空にされた。解除するか、書き戻すか | `release` / `restore` |
+| `field-changed` | `Agent session ID` が別の値にされた。解除するか、書き戻すか | `release` / `restore` |
+| `removed` | 割り当て中の項目が Project から除かれた。解除するか、持ち続けるか | `release` / `keep` |
+| `status-changed` | 割り当て中の項目の Status を手で変えられた。解除するか、Status を戻すか | `release` / `restore` |
+| `third-party-edit` | 確認の対象の項目の本文を、割り当ての後に第三者が編集した。作業のセッションに止めるよう伝えてよいか | `stop` / `continue` |
+| `merged-issue-open` | PR がマージされたが Issue が開いている。閉じるか | `close` / `keep` |
+| `pr-closed-unmerged` | PR がマージされずに閉じた。Status を戻して解除するか | `release` / `keep` |
+| `user-answer-lost` | 記録を失ったので、`利用者の答え` を待っていた宣言の問いを尋ね直す (自由回答) | 無し |
 
 ### 操作 (`record apply`)
 
@@ -113,6 +128,7 @@
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と答えを書く |
 | `ask` | `question_id`・`item`・`kind`・`options`・`at` | 問いを記録する (同じ ID の問いが既にあれば誤り。答えを消さないため。既にある問いは `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 答えを書く (問いが無い・選択肢に無い答えは誤り) |
+| `withdraw` | `question_id`・`at` | 問いを取り下げる (答えを待つ理由が無くなったとき。答えは null のまま `answered_at` を書くので、未回答には数えない。答えのある問いは取り下げられない) |
 
 ## `actions.log`
 

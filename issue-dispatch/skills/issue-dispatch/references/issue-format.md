@@ -20,6 +20,10 @@
 
 失敗 (blocker が無い・権限が無い・レート制限など) は理由付きの JSON (`status: error`・`failure`・`message`・`exit_code`) で返し、CLI は再試行しない。再試行するかは呼び出し元のスキルが決める。自分が足した `blockedBy` の削除は U13 で足す (自分が足したものかの導出が要るため)。
 
+## `blockedBy` の削除 (`blocked-by remove`)
+
+自分が足した `blockedBy` (今の割り当ての `待機` の理由に書いた Issue) だけを外す。それ以外 (人が書いたもの) は `gh` を実行せずに拒否する (人が書いた `blockedBy` の削除は人間だけが行う。計画の R13)。自分が足したかは項目の状態から導く ([flow.md](flow.md) の CLI の表)。`gh issue edit <URL> --remove-blocked-by <URL>` で外す。
+
 ## ラベルの追加 (`issue add-label`)
 
 利用者の承認を得た後に呼ぶ (承認なしに行う操作ではない)。手順は次の順で、途中で失敗すればそこで止めて理由を返す。

@@ -62,7 +62,7 @@ def observe_pr(url, login=None):
 
     login はトークンのログイン (None なら `gh api user` で得る)。作者がそれと違う PR は無いものとして扱い、種類
     `other_author` で中身 (`pr`) を返さない (AE28。公開リポジトリでは第三者も PR を作れるため)。
-    返り値: {"status": "ok", "kind", "pr": {number, title, url, state, draft, created_at, merged_at, closed_at, author, base_ref,
+    返り値: {"status": "ok", "kind", "pr": {number, title, url, state, draft, created_at, merged_at, closed_at, author, base_ref, default_branch (リポジトリの既定のブランチ),
     head_ref, issues: [{key, number, url, state}], issues_truncated, files: [{path, additions, deletions, change_type}]},
     "author", "rate_limit", "warnings"} か、{"status": "error", "failure", "message", ...}。
     """
@@ -106,7 +106,8 @@ def observe_pr(url, login=None):
               for n in refs.get("nodes") or [] if n]
     out = {"number": pr["number"], "title": pr.get("title"), "url": pr["url"], "state": pr["state"], "draft": bool(pr.get("isDraft")),
            "created_at": pr.get("createdAt"), "merged_at": pr.get("mergedAt"), "closed_at": pr.get("closedAt"), "author": author,
-           "base_ref": pr.get("baseRefName"), "head_ref": pr.get("headRefName"), "issues": issues,
+           "base_ref": pr.get("baseRefName"), "head_ref": pr.get("headRefName"),
+           "default_branch": ((data.get("repository") or {}).get("defaultBranchRef") or {}).get("name"), "issues": issues,
            "issues_truncated": (refs.get("totalCount") or 0) > len(issues), "files": files}
     return {"status": "ok", "kind": _pr_kind(pr["state"], out["draft"], [i["state"] for i in issues]), "pr": out, "author": author,
             "rate_limit": rate_limit, "warnings": warnings}
@@ -187,6 +188,19 @@ def add_blocked_by(issue, blocker):
         return {"status": "error", "failure": "other", "exit_code": None,
                 "message": f"Issue の参照 (owner/repo#番号 か URL) ではない: {issue!r} / {blocker!r}"}
     r = gh.run(["issue", "edit", issue_ref["url"], "--add-blocked-by", blocker_ref["url"]], mutation=True)
+    if r["failure"] or r["exit_code"] != 0:
+        return _error(r)
+    return {"status": "ok", "issue": issue_ref["key"], "blocker": blocker_ref["key"]}
+
+
+def remove_blocked_by(issue, blocker):
+    """issue の `blockedBy` から blocker を外す (`gh issue edit <URL> --remove-blocked-by <URL>`)。自分が足したものだけを外す確かめは
+    呼び出し元 (CLI の `blocked-by remove`。項目の状態から導く) が行う。返り値は add_blocked_by と同じ形。"""
+    issue_ref, blocker_ref = ids.parse_issue_ref(issue), ids.parse_issue_ref(blocker)
+    if issue_ref is None or blocker_ref is None:
+        return {"status": "error", "failure": "other", "exit_code": None,
+                "message": f"Issue の参照 (owner/repo#番号 か URL) ではない: {issue!r} / {blocker!r}"}
+    r = gh.run(["issue", "edit", issue_ref["url"], "--remove-blocked-by", blocker_ref["url"]], mutation=True)
     if r["failure"] or r["exit_code"] != 0:
         return _error(r)
     return {"status": "ok", "issue": issue_ref["key"], "blocker": blocker_ref["key"]}

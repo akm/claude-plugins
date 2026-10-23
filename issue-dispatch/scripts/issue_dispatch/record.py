@@ -330,6 +330,17 @@ def _op_answer(rec, op):
     q["answered_at"] = op["at"]
 
 
+def _op_withdraw(rec, op):
+    """問いを取り下げる (答えを待つ理由が無くなった。R21 の reopen)。答えは None のまま answered_at を書くので、未回答には数えない。"""
+    q = rec["questions"].get(op["question_id"])
+    if q is None:
+        return f"問い {op['question_id']} が無い"
+    if q.get("answered_at") is not None:
+        return f"問い {op['question_id']} は答えがある (取り下げられない)"
+    q["answer"] = None
+    q["answered_at"] = op["at"]
+
+
 # 操作の種類 → (必須のキー, 型, 関数)。項目のキー (item) は owner/repo#番号 の形を検査する
 OPERATIONS = {
     "set_manager": (("id", "name", "started_at"), {"id": str, "name": str, "started_at": str}, _op_set_manager),
@@ -354,6 +365,7 @@ OPERATIONS = {
     "ask": (("question_id", "item", "kind", "options", "at"),
             {"question_id": str, "item": str, "kind": str, "options": list, "at": str}, _op_ask),
     "answer": (("question_id", "answer", "at"), {"question_id": str, "answer": str, "at": str}, _op_answer),
+    "withdraw": (("question_id", "at"), {"question_id": str, "at": str}, _op_withdraw),
 }
 
 
