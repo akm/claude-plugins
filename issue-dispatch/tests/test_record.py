@@ -244,6 +244,14 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(len(errors), 1, "同じ ID の問いを立て直せない (答えが消えるため)")
         self.assertEqual(self.rec["questions"]["q1"]["answer"], "proceed")
 
+    def test_withdraw_question(self):
+        """取り下げた問いは未回答に数えず、答えは null のまま。答えのある問いは取り下げられない。"""
+        self.apply({"op": "ask", "question_id": "q2", "item": "akm/r#6", "kind": "close-in-progress", "options": ["stop", "reopen"], "at": T1})
+        self.apply({"op": "withdraw", "question_id": "q2", "at": T2})
+        self.assertEqual((record.unanswered_questions(self.rec), self.rec["questions"]["q2"]["answer"], self.rec["questions"]["q2"]["answered_at"]), ([], None, T2))
+        _, errors = record.apply(self.rec, [{"op": "withdraw", "question_id": "q1", "at": T3}])
+        self.assertEqual(len(errors), 1, "答えのある問いは取り下げられない")
+
     def test_null_and_out_of_range_values_are_rejected(self):
         """必須のキーの null・bool や 0 の assignment・null や空の answer は、例外ではなく誤りとして差し戻す。"""
         before = json.dumps(self.rec)

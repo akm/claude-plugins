@@ -396,32 +396,106 @@ def _items_for_state(parsed):
     return result, None
 
 
-def cmd_item_state(args):
-    loaded = config.load(args.dir, "manager")
-    project_setting = args.project or loaded["config"].get("project")
+def _manager_project(args, loaded):
+    """管理ディレクトリの設定 (か --project) の Project。返り値は {"owner", "number"} か None。"""
+    project_setting = getattr(args, "project", None) or loaded["config"].get("project")
     if isinstance(project_setting, dict) and isinstance(project_setting.get("owner"), str) and isinstance(project_setting.get("number"), int):
-        parsed = {"owner": project_setting["owner"], "number": project_setting["number"]}
-    else:
-        parsed = project.parse_project(project_setting) if isinstance(project_setting, str) else None
+        return {"owner": project_setting["owner"], "number": project_setting["number"]}
+    return project.parse_project(project_setting) if isinstance(project_setting, str) else None
+
+
+def _load_record_or_none(directory, parsed):
+    """記録を読む。無ければ None (記録を失った扱い)。壊れていれば (None, 理由)。"""
+    if not os.path.exists(os.path.join(directory, record.RECORD_FILE)):
+        return None, None
+    try:
+        return record.load(directory, parsed), None
+    except record.Corrupt as e:
+        return None, str(e)
+
+
+def _read_diffs(args):
+    """--diffs (ファイル。- なら標準入力) から observe diff の出力 (JSON) を読み、diffs の配列を返す。無ければ空。"""
+    if not getattr(args, "diffs", None):
+        return [], None
+    try:
+        text = sys.stdin.read() if args.diffs == "-" else open(args.diffs, encoding="utf-8").read()
+        data = json.loads(text)
+    except (OSError, ValueError) as e:
+        return None, {"key": "diffs", "message": f"--diffs が読めない: {e}", "failure": None}
+    diffs = data.get("diffs") if isinstance(data, dict) else data
+    if not isinstance(diffs, list):
+        return None, {"key": "diffs", "message": "--diffs は observe diff の出力 (diffs の配列を持つオブジェクト) か差分の配列", "failure": None}
+    return diffs, None
+
+
+def _item_state_inputs(args):
+    """`item state` と `blocked-by remove` の共通の入力。返り値は (入力の dict, None) か (None, 出力済みのエラー)。"""
+    loaded = config.load(args.dir, "manager")
+    parsed = _manager_project(args, loaded)
     if parsed is None:
-        _emit({"status": "error", "items": [], "errors": [{"key": "project", "message": "管理ディレクトリの設定にも --project にも owner/番号 の Project が無い", "failure": None}]})
-        return 0
+        return None, {"status": "error", "errors": [{"key": "project", "message": "管理ディレクトリの設定にも --project にも owner/番号 の Project が無い", "failure": None}]}
     table, warnings = resources.attributes(loaded["config"].get("resources") or {})
     login, problem = comments.token_login()
     if problem:
-        _emit({"status": "error", "items": [], "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
-        return 0
+        return None, {"status": "error", "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]}
+    directory = record.record_dir(args.dir, loaded["config"]["record_dir"], parsed)
+    rec, corrupt = _load_record_or_none(directory, parsed)
+    if corrupt:
+        return None, {"status": "error", "errors": [{"key": "record", "message": f"記録が壊れている ({corrupt})。新規として扱わない", "failure": None}]}
     result, error = _items_for_state(parsed)
+    if error:
+        return None, error
+    own_id = (rec or {}).get("manager", {}).get("id") if rec and rec.get("manager") else sessions.own_session_id(os.environ)[0]
+    return {"loaded": loaded, "parsed": parsed, "table": table, "warnings": loaded["warnings"] + warnings, "login": login, "rec": rec,
+            "result": result, "own_id": own_id, "config": loaded["config"]}, None
+
+
+def cmd_item_state(args):
+    inputs, error = _item_state_inputs(args)
     if error:
         _emit({**error, "items": []})
         return 0
+    diffs, problem = _read_diffs(args)
+    if problem:
+        _emit({"status": "error", "items": [], "errors": [problem]})
+        return 0
+    meta = project.read_meta(inputs["parsed"])
+    if meta["status"] != "ok":
+        _emit({"status": "error", "items": [], "errors": [{"key": "project", "message": meta["message"], "failure": meta.get("failure")}]})
+        return 0
+    workflows = {name: w["enabled"] for name, w in meta["project"]["workflows"].items()}
+    result, login = inputs["result"], inputs["login"]
     items = [it for it in result["items"] if it.get("key") and (not args.issue or ids.same_issue(it["key"], args.issue))]
     pr_states, pr_problems = _read_report_prs(items, login)
-    states = [itemstate.derive(it, login, pr_states, parsed["number"], table) for it in items]
-    states = [st for st in states if st["assignment"]]
+    turn = itemstate.derive_turn(items, inputs["rec"], login, inputs["own_id"], inputs["parsed"]["number"], inputs["table"], pr_states, diffs, workflows, inputs["config"])
+    turn["items"] = [st for st in turn["items"] if st["assignment"]]
     problems = result["problems"] + pr_problems
-    _emit({"status": "partial" if problems else "ok", "items": states, "usage": itemstate.resource_usage(states), "problems": problems,
-           "rate_limit": result["rate_limit"], "warnings": loaded["warnings"] + warnings, "errors": []})
+    _emit({"status": "partial" if problems else "ok", **turn, "problems": problems, "rate_limit": result["rate_limit"], "warnings": inputs["warnings"], "errors": []})
+    return 0
+
+
+def cmd_blocked_by_remove(args):
+    """自分が足したと導いた blockedBy (今の割り当ての `待機` の理由に書いた Issue) だけを外す。それ以外は gh を実行せずに拒否する (KTD14)。"""
+    inputs, error = _item_state_inputs(args)
+    if error:
+        _emit(error)
+        return 0
+    item = next((it for it in inputs["result"]["items"] if it.get("key") and ids.same_issue(it["key"], args.issue)), None)
+    if item is None:
+        _emit({"status": "rejected", "errors": [{"key": "issue", "message": f"Project に項目 {args.issue!r} が無い", "failure": None}]})
+        return 0
+    pr_states, _ = _read_report_prs([item], inputs["login"])
+    state = itemstate.derive(item, inputs["login"], pr_states, inputs["parsed"]["number"], inputs["table"])
+    own = (state.get("declaration") or {}).get("own_blockers") or []
+    blocker = ids.issue_key(args.blocker)
+    if blocker is None or not any(ids.same_issue(blocker, o) for o in own):
+        _emit({"status": "rejected", "own_blockers": own,
+               "errors": [{"key": "blocker", "message": f"{args.blocker!r} は自分が足した blockedBy (今の割り当ての `待機` の理由の Issue) ではないので外さない (人が書いた blockedBy は人が外す)", "failure": None}]})
+        return 0
+    result = issues.remove_blocked_by(item["key"], blocker)
+    extra = _reflect(args, [{"kind": "blocked_by", "item": result["issue"], "action": "remove", "blocker": result["blocker"]}]) if result["status"] == "ok" else {}
+    _emit({**result, **extra, "errors": []} if result["status"] == "ok" else _issue_error(result, "blocked-by"))
     return 0
 
 
@@ -813,6 +887,12 @@ def build_parser():
     p_badd.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
     p_badd.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
     p_badd.set_defaults(func=cmd_blocked_by_add)
+    p_bremove = blocked_sub.add_parser("remove", help="自分が足した blocker だけを外す (項目の状態から確かめる。承認を得た後に呼ぶ)")
+    p_bremove.add_argument("--dir", required=True, help="管理ディレクトリ")
+    p_bremove.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
+    p_bremove.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
+    p_bremove.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
+    p_bremove.set_defaults(func=cmd_blocked_by_remove)
 
     p_comment = sub.add_parser("comment", help="Issue のコメント")
     comment_sub = p_comment.add_subparsers(dest="subcommand", required=True)
@@ -889,6 +969,7 @@ def build_parser():
     p_istate.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project と resources を読む)")
     p_istate.add_argument("--project", help="owner/番号 (省略時は設定の project)")
     p_istate.add_argument("--issue", help="1 項目だけ (owner/repo#番号)")
+    p_istate.add_argument("--diffs", help="observe diff の出力 (JSON ファイル。- なら標準入力)。人の変更の見分けに使う")
     p_istate.set_defaults(func=cmd_item_state)
 
     p_work = sub.add_parser("work", help="作業のセッションの確認 (読むだけ)")

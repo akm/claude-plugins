@@ -10,7 +10,7 @@
 import json
 import re
 
-from issue_dispatch import comments, declaration, ids, resources
+from issue_dispatch import comments, declaration, ids, resources, sessions
 
 # 宣言の段階: 判定の要る最新の宣言への最新の判定の結果で決める
 STAGES = ("undecided", "go", "returned", "waiting")
@@ -308,6 +308,325 @@ def resource_usage(states):
             if s["key"] not in usage.setdefault(key, []):
                 usage[key].append(s["key"])
     return usage
+
+
+# --- 行うこと・報告 -----------------------------------------------------------------
+
+# 行うこと (書き込みの候補。item state は書かず、管理のセッションが既存のサブコマンドで実行する)
+ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "set-field", "clear-field", "withdraw-question")
+# 1 回だけ報告するもの (記録の reported で重複を除く)
+REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
+                "pr-base-not-default", "pr-left-open")
+# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前の正本は records.md の問いの表
+QUESTION_OPTIONS = {"close-in-progress": ["stop", "reopen"], "assignee-changed": ["release", "continue"], "field-cleared": ["release", "restore"],
+                    "field-changed": ["release", "restore"], "removed": ["release", "keep"], "status-changed": ["release", "restore"],
+                    "third-party-edit": ["stop", "continue"], "merged-issue-open": ["close", "keep"], "pr-closed-unmerged": ["release", "keep"],
+                    "user-answer-lost": []}
+QUESTION_KINDS = tuple(QUESTION_OPTIONS)
+STATUS_OPTIONS_FOR_DEPENDENCY = ("Ready", "Blocked")
+FIELD_ID, FIELD_TITLE = "Agent session ID", "Agent session title"
+# 割り当て中の項目で、管理のセッションが書く Status (これ以外は利用者が変えたもの)
+ASSIGNED_STATUSES = ("In Progress", "In review", "Blocked")
+
+
+def _in_scope(item, login):
+    """範囲 (KD25): 担当者が自分 (トークンのログイン) 1 人の項目。"""
+    return [a.casefold() for a in item.get("assignees") or []] == [login.casefold()]
+
+
+def _status_events_after(item, at, project_number):
+    return [e for e in _events(item, "ProjectV2ItemStatusChangedEvent") if e.get("project_number") == project_number and (e.get("at") or "") > at]
+
+
+def _action_comment(item, kind, values, body):
+    return {"kind": "comment", "item": item["key"], "comment_kind": kind, "values": values, "body": body}
+
+
+def _action_status(item, status, continuation=False):
+    return {"kind": "set-status", "item": item["key"], "item_id": item["item_id"], "status": status, "continuation": continuation}
+
+
+def _report(item, kind, **values):
+    return {"kind": kind, "item": item["key"], **values}
+
+
+def dependency_actions(item, state, login, project_number):
+    """割り当ての無い項目の `Ready` ⇄ `Blocked` の再導出 (KTD7)。範囲は担当者が自分 1 人で、割り当て中でなく、Status が Ready か Blocked の項目。
+    開いている blocker があれば `依存の待ち` → `Blocked`、すべて閉じたら `依存の解消` → `Ready` (コメントが先)。`依存の待ち` の無い `Blocked` は
+    利用者が手で付けたものなので書き換えない。コメントの後に止まった書き込み (Status の変化がコメントより後に無い) は続きを書き (continuation)、
+    コメントより後に Status の変化があれば利用者の変更として報告する。返り値は (actions, reports)。"""
+    status = (item.get("status") or {}).get("name")
+    if state.get("assigned") or not _in_scope(item, login) or status not in STATUS_OPTIONS_FOR_DEPENDENCY:
+        return [], []
+    open_blockers = sorted(b["key"] for b in item.get("blocked_by") or [] if b.get("state") == "OPEN")
+    deps = [c for c in parsed_comments(item, login) if c["header"]["role"] == "manager" and c["header"]["kind"] in ("依存の待ち", "依存の解消")]
+    latest = deps[-1] if deps else None
+    waiting = latest is not None and latest["header"]["kind"] == "依存の待ち"
+    changed_after = bool(latest) and bool(_status_events_after(item, latest["created_at"], project_number))
+    if status == "Ready":
+        if not open_blockers:
+            return [], []
+        if waiting:
+            if changed_after:
+                return [], [_report(item, "status-changed", status=status, after_comment=latest["database_id"])]
+            return [_action_status(item, "Blocked", continuation=True)], []
+        body = "開いている blocker: " + "、".join(open_blockers)
+        return [_action_comment(item, "依存の待ち", {"blockers": open_blockers}, body), _action_status(item, "Blocked")], []
+    # Blocked
+    if waiting:
+        if open_blockers:
+            return [], []
+        return [_action_comment(item, "依存の解消", {}, "blocker がすべて閉じた"), _action_status(item, "Ready")], []
+    if latest is not None and not open_blockers and not changed_after:
+        return [_action_status(item, "Ready", continuation=True)], []
+    return [], []
+
+
+def human_blocked_by(item, state):
+    """割り当て中の項目の `blockedBy` のうち、自分が足したもの (own_blockers) でないもの (人が足した。導出せず報告する。KTD7)。"""
+    own = set((state.get("declaration") or {}).get("own_blockers") or [])
+    return sorted(b["key"] for b in item.get("blocked_by") or [] if not any(ids.same_issue(b["key"], o) for o in own))
+
+
+# --- 記録の読み出し ---------------------------------------------------------------------
+
+def record_lost(rec):
+    """記録を失ったか (記録が無い・管理のセッションが無い・前の記録が ended)。R24。"""
+    return rec is None or not rec.get("manager") or rec["manager"].get("state") == "ended"
+
+
+def _rec_item(rec, key):
+    for k, v in ((rec or {}).get("items") or {}).items():
+        if ids.same_issue(k, key):
+            return v
+    return None
+
+
+def _unanswered(rec, key):
+    """項目への未回答の問い (question_id 付き)。"""
+    return [dict(q, question_id=qid) for qid, q in sorted(((rec or {}).get("questions") or {}).items())
+            if ids.same_issue(q.get("item"), key) and q.get("answered_at") is None]
+
+
+def _is_reported(rec, key, kind):
+    ri = _rec_item(rec, key)
+    return bool(ri) and kind in (ri.get("reported") or {})
+
+
+def _question(item, kind, **extra):
+    return {"kind": kind, "item": item["key"], "options": list(QUESTION_OPTIONS[kind]), **extra}
+
+
+# --- 割り当て中の項目の場面 -------------------------------------------------------------
+
+def expected_statuses(state):
+    """割り当て中の開いている項目で、管理のセッションの書き込みとして説明できる Status。理由に Issue か 小さな PR を含む `待機` の後なら Blocked、
+    それ以外は In Progress か In review。"""
+    d = state.get("declaration") or {}
+    if d.get("own_blockers"):
+        return {"Blocked"}
+    return {"In Progress", "In review"}
+
+
+def _handover_action(item, cs, rec, own_id, lost):
+    """初めて扱う項目 (記録にその項目の情報が無い) で、最後に書いた管理のセッションの ID が自分と違えば `引き継ぎ` を書く (自分の `引き継ぎ` が既にあれば書かない)。"""
+    if _rec_item(rec, item["key"]) is not None:
+        return None
+    managers = [c for c in cs if c["header"]["role"] == "manager"]
+    if not managers or sessions.same_session_id(managers[-1]["header"]["session_id"], own_id):
+        return None
+    if any(c["header"]["kind"] == "引き継ぎ" and sessions.same_session_id(c["header"]["session_id"], own_id) for c in managers):
+        return None
+    prev = managers[-1]["header"]
+    reason = "記録が無い" if rec is None or not rec.get("manager") else ("前の記録が ended" if lost else "記録にこの項目の情報が無い")
+    body = f"前の管理のセッション: {prev['name']} ({prev['session_id']})。理由: {reason}"
+    return _action_comment(item, "引き継ぎ", {}, body)
+
+
+def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_states, lost):
+    """割り当てのある項目の場面ごとの扱い (flow.md の「場面ごとの扱い」)。返り値は (actions, questions, reports)。
+    未回答の問いがある項目には手を付けない (答えを待つ間の reopen による問いの取り下げを除く)。"""
+    actions, questions, reports = [], [], []
+    cs = parsed_comments(item, login)
+    asg = state["assignment"]
+    key = item["key"]
+    status = (item.get("status") or {}).get("name")
+    handover = _handover_action(item, cs, rec, own_id, lost)
+    if handover:
+        actions.append(handover)
+    pending = _unanswered(rec, key)
+    if pending and item.get("state") == "OPEN":
+        close_q = [q for q in pending if q["kind"] == "close-in-progress"]
+        if close_q and any((e.get("at") or "") > close_q[0]["asked_at"] for e in _events(item, "ReopenedEvent")):
+            # 答えを待つ間に reopen された: 問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
+            actions.append({"kind": "withdraw-question", "item": key, "question_id": close_q[0]["question_id"]})
+            restore = "Blocked" if "Blocked" in expected_statuses(state) else "In Progress"
+            if status != restore:
+                actions.append(_action_status(item, restore))
+            reports.append(_report(item, "reopened-while-pending", question_id=close_q[0]["question_id"]))
+            return actions, questions, reports
+    if pending:
+        return actions, questions, reports
+    if not state["assigned"]:
+        if state["reopened"]:
+            value = ((item.get("fields") or {}).get(FIELD_ID) or {}).get("text")
+            if value == asg["to"]:
+                actions.append({"kind": "clear-field", "item": key, "item_id": item["item_id"], "fields": [FIELD_ID, FIELD_TITLE]})
+            reports.append(_report(item, "reopened", at=state["reopened"]["at"], fields_cleared=value == asg["to"]))
+        if state["end"] and state["end"]["kind"] == "normal" and state["pr"] and state["pr"]["state"] == "OPEN":
+            reports.append(_report(item, "pr-left-open", url=state["pr"]["url"]))
+        return actions, questions, reports
+    if item.get("state") == "CLOSED" and state["in_progress"]:
+        questions.append(_question(item, "close-in-progress", record_lost=lost))
+        return actions, questions, reports
+    if not _in_scope(item, login):
+        questions.append(_question(item, "assignee-changed", assignees=list(item.get("assignees") or [])))
+    ri = _rec_item(rec, key) or {}
+    intent = ri.get("intent") or {}
+    field = (item.get("fields") or {}).get(FIELD_ID) or {}
+    value, updated = field.get("text"), field.get("updated_at")
+    if value != asg["to"]:
+        if updated and updated > asg["at"]:
+            questions.append(_question(item, "field-cleared" if not value else "field-changed", value=value))
+        else:
+            actions.append({"kind": "set-field", "item": key, "item_id": item["item_id"], "field": FIELD_ID, "value": asg["to"], "continuation": True})
+            if intent.get("session_title"):
+                actions.append({"kind": "set-field", "item": key, "item_id": item["item_id"], "field": FIELD_TITLE, "value": intent["session_title"], "continuation": True})
+    expected = expected_statuses(state)
+    d = state.get("declaration") or {}
+    if item.get("state") == "OPEN" and status not in expected and not (status == "Blocked" and d.get("manager_blocked")):
+        if status not in ASSIGNED_STATUSES:
+            if _status_events_after(item, asg["at"], project_number):
+                questions.append(_question(item, "status-changed", status=status))
+            else:
+                actions.append(_action_status(item, "In Progress", continuation=True))
+    # `待機` (Issue か 小さな PR) の続き: blockedBy と Blocked
+    if d.get("own_blockers") and d.get("wait") and not d.get("manager_blocked"):
+        wait_at = d["wait"]["at"]
+        present = {b["key"] for b in item.get("blocked_by") or []}
+        for blocker in d["own_blockers"]:
+            if any(ids.same_issue(blocker, k) for k in present):
+                continue
+            removed = [e for e in _events(item, "BlockedByRemovedEvent") if e.get("blocking") and ids.same_issue(e["blocking"], blocker) and (e.get("at") or "") > wait_at]
+            if removed:
+                reports.append(_report(item, "blocked-by-removed", blockers=[blocker]))
+            else:
+                actions.append({"kind": "blocked-by-add", "item": key, "blocker": blocker, "continuation": True})
+        if status != "Blocked" and item.get("state") == "OPEN":
+            if _status_events_after(item, wait_at, project_number):
+                if not any(q["kind"] == "status-changed" for q in questions):
+                    reports.append(_report(item, "status-changed", status=status, after_comment=d["wait"]["comment_id"]))
+            else:
+                actions.append(_action_status(item, "Blocked", continuation=True))
+    # 第三者の本文の編集 (確認の対象のリポジトリだけ。確かめた時刻より後のもの)
+    if any(item["repo"].casefold() == r.casefold() for r in (config or {}).get("third_party_edit_check") or []):
+        confirmed = ri.get("body_edit_confirmed_at") or ""
+        edits = [e for e in third_party_edits(item, asg, login) if (e["edited_at"] or "") > confirmed]
+        if edits:
+            questions.append(_question(item, "third-party-edit", edits=edits))
+    # PR
+    pr = state.get("pr")
+    if pr:
+        if pr["source"] == "report" and not pr["closing"]:
+            default = (((pr_states or {}).get(pr["url"]) or {}).get("pr") or {}).get("default_branch")
+            if default and pr.get("base_ref") and pr["base_ref"] != default:
+                reports.append(_report(item, "pr-base-not-default", url=pr["url"], base_ref=pr["base_ref"], default_branch=default))
+            else:
+                asked = any(r["kind"] == "本文の追記" and ids.parse_pr_url(r["values"]["pr"])["url"] == pr["url"] for r in pending_requests(item, cs, asg, asg["to"], pr_states))
+                if not asked:
+                    actions.append(_action_comment(item, "依頼", {"to": asg["to"], "assignment": asg["number"], "request_kind": "本文の追記", "pr": pr["url"]},
+                                                   f"PR {pr['url']} の本文に `Closes #{item['number']}` を足す"))
+        if item.get("state") == "OPEN":
+            if pr["merged"]:
+                questions.append(_question(item, "merged-issue-open", url=pr["url"]))
+            elif pr["state"] == "CLOSED":
+                questions.append(_question(item, "pr-closed-unmerged", url=pr["url"]))
+    if lost and d.get("wait") and any(r.get("kind") == "利用者の答え" for r in d["wait"]["reasons"]):
+        questions.append(_question(item, "user-answer-lost", declaration=d["judged"]["comment_id"] if d.get("judged") else None, record_lost=True))
+    return actions, questions, reports
+
+
+# --- 人の変更 (R22) ---------------------------------------------------------------------
+
+def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
+    """スナップショットの差分のうち、記録の意図 (自分の部分書き込み) と組み込みワークフローの遷移と利用者が着手を決める遷移で説明できないものを
+    報告する (KTD7)。割り当て中の項目の Status とフィールドの変化は assigned_scenes が問いにするのでここでは扱わない。"""
+    reports = []
+    for diff in diffs or []:
+        key = diff.get("item")
+        if not key:
+            continue
+        item, st = items_by_key.get(key), states_by_key.get(key)
+        assigned = bool(st and st.get("assigned"))
+        intent = (_rec_item(rec, key) or {}).get("intent") or {}
+        reopened = bool(item and _events(item, "ReopenedEvent"))
+        kind = diff.get("kind")
+        if kind == "status":
+            before, after = diff.get("before"), diff.get("after")
+            if assigned or intent.get("status") == after:
+                continue
+            if after == "Done" and item and item.get("state") == "CLOSED":
+                continue
+            if after == "Todo" and reopened and (workflows or {}).get("Item reopened"):
+                continue
+            if after == "Ready" and (before in (None, "Todo") or (before == "Done" and reopened)):
+                continue
+            reports.append({"kind": "status-changed", "item": key, "before": before, "after": after})
+        elif kind == "field":
+            if assigned or diff.get("field") not in (FIELD_ID, FIELD_TITLE):
+                continue
+            if (diff["field"] == FIELD_ID and intent.get("session_id") == diff.get("after")) or (diff["field"] == FIELD_TITLE and intent.get("session_title") == diff.get("after")):
+                continue
+            reports.append({"kind": "field-changed", "item": key, "field": diff["field"], "before": diff.get("before"), "after": diff.get("after")})
+        elif kind == "blocked_by" and assigned:
+            own = (st.get("declaration") or {}).get("own_blockers") or []
+            added = [b for b in diff.get("added") or [] if not any(ids.same_issue(b, o) for o in own)]
+            removed = [b for b in diff.get("removed") or [] if any(ids.same_issue(b, o) for o in own)]
+            if added:
+                reports.append({"kind": "blocked-by-added", "item": key, "blockers": added})
+            if removed:
+                reports.append({"kind": "blocked-by-removed", "item": key, "blockers": removed})
+    return reports
+
+
+# --- ターン ---------------------------------------------------------------------------
+
+def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_states, diffs, workflows, config):
+    """管理のセッションのターンで、項目の状態と、行うこと (actions)・尋ねること (questions)・1 回だけ報告するもの (reports)・答えを待つ項目 (pending) を導く。
+    書き込みはしない。rec は記録 (無ければ None)。diffs は observe diff の差分 (無ければ空)。workflows は Project のワークフローの名前 → 有効か。"""
+    lost = record_lost(rec)
+    states, actions, questions, reports, pending = [], [], [], [], []
+    items_by_key, states_by_key = {}, {}
+    for item in items:
+        if not item.get("key"):
+            continue
+        st = derive(item, login, pr_states, project_number, attrs_table)
+        states.append(st)
+        items_by_key[item["key"]], states_by_key[item["key"]] = item, st
+        if st["assignment"]:
+            a, q, r = assigned_scenes(item, st, rec, login, own_id, project_number, config, pr_states, lost)
+            actions += a
+            questions += q
+            reports += r
+        a, r = dependency_actions(item, st, login, project_number)
+        actions += a
+        reports += r
+        pending += [{"question_id": q["question_id"], "item": item["key"], "kind": q["kind"], "asked_at": q["asked_at"]} for q in _unanswered(rec, item["key"])]
+    reports += human_changes(diffs, items_by_key, states_by_key, rec, workflows)
+    # 記録の意図にある項目が一覧に無い: Project から除かれた (割り当ての解除を尋ねる)
+    for key, ri in sorted(((rec or {}).get("items") or {}).items()):
+        if ri.get("intent") and not any(ids.same_issue(key, k) for k in items_by_key) and not any(q["kind"] == "removed" for q in _unanswered(rec, key)):
+            questions.append({"kind": "removed", "item": key, "options": list(QUESTION_OPTIONS["removed"])})
+    seen = set()
+    unique = []
+    for r in reports:
+        mark = (r["item"], r["kind"])
+        if mark in seen or _is_reported(rec, r["item"], r["kind"]):
+            continue
+        seen.add(mark)
+        unique.append(r)
+    return {"items": states, "usage": resource_usage(states), "actions": actions, "questions": questions, "reports": unique, "pending": pending,
+            "record_lost": lost}
 
 
 # --- 作業のセッションの確認 -----------------------------------------------------------

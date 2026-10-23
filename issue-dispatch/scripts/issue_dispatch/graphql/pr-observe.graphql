@@ -1,6 +1,7 @@
 query PrObserve($owner: String!, $name: String!, $number: Int!, $filesCursor: String) {
   rateLimit { cost remaining resetAt }
   repository(owner: $owner, name: $name) {
+    defaultBranchRef { name }
     pullRequest(number: $number) {
       id
       number

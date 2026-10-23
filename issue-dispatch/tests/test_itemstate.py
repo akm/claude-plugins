@@ -50,12 +50,12 @@ def decl_body(files=(("src/a.py", None),), resources=(), split=False):
 
 
 def make_item(key=A9, state="OPEN", status="In Progress", session_field=W7, comments_=(), events=(), prs=(), labels=(), assignees=("akm",),
-              body_edits=(), position=1):
+              body_edits=(), position=1, blocked_by=()):
     return {"item_id": "I9", "position": position, "key": key, "repo": key.split("#")[0], "number": int(key.split("#")[1]),
             "url": f"https://github.com/{key.replace('#', '/issues/')}", "state": state, "created_at": t(0), "author": "akm",
             "status": {"name": status, "option_id": "o", "updated_at": t(1)} if status else None,
             "fields": {"Agent session ID": {"text": session_field, "updated_at": t(1)}} if session_field is not None else {},
-            "assignees": list(assignees), "labels": list(labels), "blocked_by": [], "body_edits": list(body_edits),
+            "assignees": list(assignees), "labels": list(labels), "blocked_by": list(blocked_by), "body_edits": list(body_edits),
             "prs": list(prs), "comments": sorted(comments_, key=lambda c: c["created_at"]), "events": sorted(events, key=lambda e: e["at"])}
 
 
@@ -445,6 +445,321 @@ class WorkHeldTest(unittest.TestCase):
         self.assertEqual((held[0]["judged"], held[0]["has_go"], held[0]["update_kind"]), (401, False, "resources-only"))
 
 
+def _blocker(key, state="OPEN"):
+    return {"key": key, "url": f"https://github.com/{key.replace('#', '/issues/')}", "state": state}
+
+
+def dep_wait(blockers, at, cid):
+    return mcomment("依存の待ち", {"blockers": list(blockers)}, at, cid)
+
+
+def dep_clear(at, cid):
+    return mcomment("依存の解消", None, at, cid)
+
+
+def dependency(item):
+    state = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
+    return itemstate.dependency_actions(item, state, LOGIN, PROJECT_NUMBER)
+
+
+class DependencyBlockedTest(unittest.TestCase):
+    """割り当ての無い項目の Ready ⇄ Blocked の再導出 (KTD7)。範囲は担当者が自分 1 人の項目で、Status が Ready か Blocked のもの。"""
+
+    def test_ready_with_open_blocker_waits(self):
+        """開いている blocker があれば、`依存の待ち` を書いてから `Blocked` にする (コメントが先)。"""
+        item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1), _blocker(A2, "CLOSED")])
+        actions, reports = dependency(item)
+        self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の待ち"), ("set-status", "Blocked")])
+        self.assertEqual((actions[0]["values"], reports), ({"blockers": [A1]}, []))
+
+    def test_blocked_by_manager_returns_to_ready_when_blockers_close(self):
+        """管理のセッションが書いた `Blocked` (最新が `依存の待ち`) は、blocker がすべて閉じたら `依存の解消` を書いてから `Ready` に戻す。"""
+        item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")], comments_=[dep_wait([A1], t(10), 100)],
+                         events=[_status_event("Blocked", t(11), previous="Ready")])
+        actions, _ = dependency(item)
+        self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の解消"), ("set-status", "Ready")])
+
+    def test_blocked_by_user_is_not_rewritten(self):
+        """`依存の待ち` の無い `Blocked` (利用者が手で付けた) は、blocker が閉じていても書き換えない。"""
+        item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")])
+        self.assertEqual(dependency(item), ([], []))
+        item = make_item(status="Blocked", session_field=None, blocked_by=[])
+        self.assertEqual(dependency(item), ([], []))
+
+    def test_blocked_with_open_blocker_stays(self):
+        item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)], events=[_status_event("Blocked", t(11))])
+        self.assertEqual(dependency(item), ([], []))
+
+    def test_todo_and_empty_status_are_not_touched(self):
+        """Status が空の項目と `Todo` の項目は書き換えない (R1)。"""
+        for status in (None, "Todo"):
+            item = make_item(status=status, session_field=None, blocked_by=[_blocker(A1)])
+            self.assertEqual(dependency(item), ([], []), status)
+
+    def test_items_not_assigned_to_me_alone_are_out_of_scope(self):
+        """担当者が自分 1 人でない項目は範囲の外 (KD25)。"""
+        for assignees in ((), ("akm", "other"), ("other",)):
+            item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], assignees=assignees)
+            self.assertEqual(dependency(item), ([], []), assignees)
+
+    def test_interrupted_after_wait_comment_continues_to_blocked(self):
+        """`依存の待ち` を書いた後に止まった (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、続きの `Blocked` を書く。"""
+        item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)])
+        actions, reports = dependency(item)
+        self.assertEqual(([(a["kind"], a["status"], a.get("continuation")) for a in actions], reports), ([("set-status", "Blocked", True)], []))
+
+    def test_user_returned_to_ready_after_wait_is_reported_not_rewritten(self):
+        """`依存の待ち` → `Blocked` の後に利用者が `Ready` に戻した (Status の変化がコメントより後) 項目は、書き換えずに人の変更として報告する。"""
+        item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)],
+                         events=[_status_event("Blocked", t(11), previous="Ready"), _status_event("Ready", t(12), previous="Blocked")])
+        actions, reports = dependency(item)
+        self.assertEqual((actions, [r["kind"] for r in reports]), ([], ["status-changed"]))
+
+    def test_interrupted_after_clear_comment_continues_to_ready(self):
+        item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")], comments_=[dep_wait([A1], t(10), 100), dep_clear(t(20), 101)],
+                         events=[_status_event("Blocked", t(11), previous="Ready")])
+        actions, _ = dependency(item)
+        self.assertEqual([(a["kind"], a["status"], a.get("continuation")) for a in actions], [("set-status", "Ready", True)])
+
+    def test_ended_assignment_counts_as_unassigned(self):
+        """割り当てが終わった (正常な終わりの後に reopen された) 項目も、割り当ての無い項目として扱う。"""
+        item = make_item(status="Ready", state="OPEN", blocked_by=[_blocker(A1)], comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
+                         events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
+        actions, _ = dependency(item)
+        self.assertEqual([a["kind"] for a in actions], ["comment", "set-status"])
+
+    def test_human_blocked_by_on_assigned_item_is_reported(self):
+        """`In Progress`・`In review` の項目に人が足した `blockedBy` (自分が足したものでない) は導出せず報告する。"""
+        item = make_item(status="In Progress", blocked_by=[_blocker(A1), _blocker(A2)], comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
+        state = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
+        self.assertEqual(itemstate.human_blocked_by(item, state), [A1])
+
+
+def rec_with(items=None, questions=None, manager_state="active"):
+    """記録 (record.json の形)。manager_state が None なら記録が無い (None を返す)。"""
+    if manager_state is None:
+        return None
+    return {"project": "akm/3", "manager": {"id": M1, "name": "issue-dispatch akm/3/akm", "started_at": t(0), "state": manager_state, "stop_reason": None, "exchanges_since_input": 0},
+            "sessions": {}, "items": items or {}, "opt_in_proposals": {}, "notices": {}, "questions": questions or {}}
+
+
+def rec_item(intent_status="In Progress", reported=None, confirmed=None):
+    return {"intent": {"session_id": W7, "session_title": "worker 1", "status": intent_status, "assignment": 1, "at": t(9)}, "notified_at": t(10),
+            "resend_count": 0, "conflict_choice": None, "reported": reported or {}, "body_edit_confirmed_at": confirmed}
+
+
+def turn_of(item, rec="default", config=None, diffs=(), workflows=None, pr_states=None):
+    if rec == "default":
+        rec = rec_with(items={A9: rec_item()})
+    return itemstate.derive_turn([item], rec, LOGIN, M1, PROJECT_NUMBER, {}, pr_states or {}, list(diffs), workflows or {"Item reopened": True},
+                                 config or {"third_party_edit_check": []})
+
+
+def kinds(entries):
+    return [e["kind"] for e in entries]
+
+
+class AssignedScenesTest(unittest.TestCase):
+    """割り当て中の項目の場面ごとの扱い (問い・続きの書き込み・報告)。"""
+
+    def test_nothing_to_do_for_item_in_expected_state(self):
+        out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)]))
+        self.assertEqual((out["actions"], out["questions"], out["reports"], out["record_lost"]), ([], [], [], False))
+
+    def test_close_in_progress_asks(self):
+        """進行中の Issue の close は、止めるか reopen して続けるかを尋ねる。答えが出るまで割り当て中のまま、ほかの書き込みはしない。"""
+        item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
+                         events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
+        out = turn_of(item)
+        self.assertEqual([(q["kind"], q["item"], q["options"]) for q in out["questions"]], [("close-in-progress", A9, ["stop", "reopen"])])
+        self.assertEqual(out["actions"], [])
+
+    def test_pending_question_is_not_asked_again_and_item_is_left_alone(self):
+        """同じ項目と種類の未回答の問いがあれば尋ね直さず、その項目には手を付けない (pending に返す)。"""
+        item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1],
+                         events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
+        rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
+        out = turn_of(item, rec=rec)
+        self.assertEqual((out["questions"], [p["question_id"] for p in out["pending"]]), ([], ["q1"]))
+
+    def test_reopen_while_close_question_pending_withdraws_and_restores_status(self):
+        """進行中の close の答えを待つ間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
+        item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
+                         events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
+        rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
+        out = turn_of(item, rec=rec)
+        self.assertEqual([(a["kind"], a.get("question_id") or a.get("status")) for a in out["actions"]], [("withdraw-question", "q1"), ("set-status", "In Progress")])
+        self.assertEqual(kinds(out["reports"]), ["reopened-while-pending"])
+
+    def test_reopen_after_end_clears_fields_and_reports(self):
+        """終わった後の reopen は、フィールドが自分の書いた値 (今の割り当ての宛先) なら空にして報告する。Status は変えない。"""
+        item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
+                         events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
+        out = turn_of(item)
+        self.assertEqual([(a["kind"], a["fields"]) for a in out["actions"]], [("clear-field", ["Agent session ID", "Agent session title"])])
+        self.assertEqual(kinds(out["reports"]), ["reopened"])
+        other = make_item(state="OPEN", status="Done", session_field="someone", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
+                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
+        out = turn_of(other)
+        self.assertEqual((out["actions"], kinds(out["reports"])), ([], ["reopened"]), "人が書いた値は消さない")
+
+    def test_assignee_change_asks(self):
+        item = make_item(assignees=("akm", "other"), comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
+        out = turn_of(item)
+        self.assertEqual([(q["kind"], q["options"]) for q in out["questions"]], [("assignee-changed", ["release", "continue"])])
+
+    def test_field_cleared_or_changed_by_user_asks(self):
+        """フィールドの値が宛先と違い、更新が `割り当て` より後なら利用者の変更として尋ねる。"""
+        item = make_item(session_field="", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
+        item["fields"]["Agent session ID"]["updated_at"] = t(30)
+        self.assertEqual(kinds(turn_of(item)["questions"]), ["field-cleared"])
+        item = make_item(session_field="W-8", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
+        item["fields"]["Agent session ID"]["updated_at"] = t(30)
+        self.assertEqual(kinds(turn_of(item)["questions"]), ["field-changed"])
+
+    def test_field_not_written_yet_is_continued(self):
+        """`割り当て` の後にフィールドが書かれていない (更新がコメントより前) 項目は、途中で止まったとして続きを書く。"""
+        item = make_item(session_field=None, status="Ready", comments_=[ASSIGN1])
+        out = turn_of(item)
+        self.assertEqual([(a["kind"], a.get("field"), a.get("value"), a.get("status")) for a in out["actions"]],
+                         [("set-field", "Agent session ID", W7, None), ("set-field", "Agent session title", "worker 1", None), ("set-status", None, None, "In Progress")])
+        self.assertTrue(all(a["continuation"] for a in out["actions"]))
+
+    def test_status_changed_by_user_asks_release(self):
+        """割り当て中の項目の Status を手で `Todo` にされたら、reopen とせず割り当てを保ち、解除するかを尋ねる (AE8)。"""
+        item = make_item(status="Todo", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], events=[_status_event("Todo", t(30))])
+        out = turn_of(item)
+        self.assertEqual([(q["kind"], q["options"]) for q in out["questions"]], [("status-changed", ["release", "restore"])])
+
+    def test_in_review_is_an_expected_status(self):
+        item = make_item(status="In review", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
+        self.assertEqual(turn_of(item)["questions"], [])
+
+    def test_wait_continuation_adds_blocker_and_blocked(self):
+        """`待機` (Issue) を書いた後に止まった項目は、blockedBy と `Blocked` の続きを書く。"""
+        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
+        out = turn_of(item)
+        self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("blocked-by-add", A2), ("set-status", "Blocked")])
+
+    def test_wait_continuation_respects_user_removal(self):
+        """`待機` の後に人が blockedBy を外した (BlockedByRemovedEvent がコメントより後) なら足し直さず報告する。Status も利用者が変えていれば報告する。"""
+        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)],
+                         events=[{"type": "BlockedByAddedEvent", "at": t(14), "blocking": A2}, {"type": "BlockedByRemovedEvent", "at": t(15), "blocking": A2},
+                                 _status_event("Blocked", t(14)), _status_event("In Progress", t(16), previous="Blocked")])
+        out = turn_of(item)
+        self.assertEqual((out["actions"], sorted(kinds(out["reports"]))), ([], ["blocked-by-removed", "status-changed"]))
+
+    def test_third_party_edit_asks_only_for_configured_repos(self):
+        edits = [{"editor": "someone", "edited_at": t(15), "deleted_at": None}]
+        item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], body_edits=edits)
+        self.assertEqual(kinds(turn_of(item)["questions"]), [])
+        config = {"third_party_edit_check": [A]}
+        self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item, config=config)["questions"]], [("third-party-edit", ["stop", "continue"])])
+        rec = rec_with(items={A9: rec_item(confirmed=t(15))})
+        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確かめた時刻までの編集は尋ねない")
+
+    def test_pr_without_closing_reference_requests_append(self):
+        """報告の PR が Issue を閉じる参照を持たなければ `依頼` (本文の追記) を書く (既に同じ依頼があれば書かない)。"""
+        report = wcomment("PR の報告", None, t(30), 300, body=PR9)
+        item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500), report])
+        prs = {PR9: {**observed(PR9, issues=()), "pr": {**observed(PR9, issues=())["pr"], "default_branch": "main"}}}
+        out = turn_of(item, pr_states=prs)
+        self.assertEqual([(a["kind"], a["comment_kind"], a["values"]["request_kind"], a["values"]["pr"]) for a in out["actions"]], [("comment", "依頼", "本文の追記", PR9)])
+        asked = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "本文の追記", "pr": PR9}, t(31), 301)
+        out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500), report, asked]), pr_states=prs)
+        self.assertEqual(out["actions"], [])
+
+    def test_pr_to_non_default_branch_is_reported_not_requested(self):
+        """既定のブランチ以外へ向けた PR の報告は、本文の追記を頼まず 1 回だけ報告する (利用者が決めた)。"""
+        report = wcomment("PR の報告", None, t(30), 300, body=PR9)
+        item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500), report])
+        base = observed(PR9, issues=(), base_ref="develop")
+        prs = {PR9: {**base, "pr": {**base["pr"], "default_branch": "main"}}}
+        out = turn_of(item, pr_states=prs)
+        self.assertEqual((out["actions"], kinds(out["reports"])), ([], ["pr-base-not-default"]))
+        rec = rec_with(items={A9: rec_item(reported={"pr-base-not-default": t(31)})})
+        self.assertEqual(kinds(turn_of(item, rec=rec, pr_states=prs)["reports"]), [], "報告済みの印があれば報告しない")
+
+    def test_merged_pr_with_open_issue_and_closed_pr_ask(self):
+        item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)])
+        self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item)["questions"]], [("merged-issue-open", ["close", "keep"])])
+        item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], prs=[ref_pr(PR9, t(25), state="CLOSED")])
+        self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item)["questions"]], [("pr-closed-unmerged", ["release", "keep"])])
+
+    def test_pr_left_open_after_normal_end_is_reported(self):
+        """正常な終わり (ready for review の後の close) の後に開いたまま残る PR は 1 回報告し、判定の相手にしない。"""
+        item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="OPEN")],
+                         events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
+        self.assertEqual(kinds(turn_of(item)["reports"]), ["pr-left-open"])
+
+    def test_handover_comment_for_item_unknown_to_record(self):
+        """初めて扱う項目 (記録にその項目の情報が無い) で、最後の管理のコメントの ID が自分と違えば `引き継ぎ` を書く。自分のならば書かない。"""
+        prev = mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100, name="old mgr", sid="M-0")
+        item = make_item(comments_=[prev, wcomment("着手の宣言", None, t(12), 400, body=decl_body())])
+        out = turn_of(item, rec=rec_with())
+        self.assertEqual([(a["kind"], a["comment_kind"]) for a in out["actions"] if a["kind"] == "comment"], [("comment", "引き継ぎ")])
+        self.assertIn("M-0", out["actions"][0]["body"])
+        out = turn_of(item, rec=rec_with(items={A9: rec_item()}))
+        self.assertEqual([a for a in out["actions"] if a.get("comment_kind") == "引き継ぎ"], [], "記録にある項目には書かない")
+        done = mcomment("引き継ぎ", None, t(20), 101)
+        out = turn_of(make_item(comments_=[prev, done]), rec=rec_with())
+        self.assertEqual([a for a in out["actions"] if a.get("comment_kind") == "引き継ぎ"], [], "自分の `引き継ぎ` が既にあれば書かない")
+
+    def test_record_lost_reasks_user_answer_waits(self):
+        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の答え` を待つ宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
+        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の答え"}], t(13), 500)])
+        for rec in (None, rec_with(manager_state="ended")):
+            out = turn_of(item, rec=rec)
+            self.assertEqual((out["record_lost"], [(q["kind"], q.get("record_lost")) for q in out["questions"]]), (True, [("user-answer-lost", True)]))
+
+    def test_removed_item_with_intent_asks(self):
+        """記録の意図にある項目が Project の一覧に無ければ、除去として解除を尋ねる。"""
+        out = itemstate.derive_turn([], rec_with(items={A9: rec_item()}), LOGIN, M1, PROJECT_NUMBER, {}, {}, [], {}, {"third_party_edit_check": []})
+        self.assertEqual([(q["kind"], q["item"], q["options"]) for q in out["questions"]], [("removed", A9, ["release", "keep"])])
+
+
+class HumanChangeTest(unittest.TestCase):
+    """スナップショットの差分のうち、自分の書き込みと組み込みワークフローの遷移で説明できないものを 1 回だけ報告する (R22)。"""
+
+    def _unassigned(self, status, state="OPEN", events=()):
+        return make_item(status=status, state=state, session_field=None, events=list(events))
+
+    def test_workflow_and_user_start_transitions_are_not_reported(self):
+        cases = [(self._unassigned("Done", state="CLOSED"), {"kind": "status", "item": A9, "before": "Ready", "after": "Done"}),
+                 (self._unassigned("Todo", events=[{"type": "ReopenedEvent", "at": t(5)}]), {"kind": "status", "item": A9, "before": "Done", "after": "Todo"}),
+                 (self._unassigned("Ready"), {"kind": "status", "item": A9, "before": "Todo", "after": "Ready"}),
+                 (self._unassigned("Ready"), {"kind": "status", "item": A9, "before": None, "after": "Ready"}),
+                 (self._unassigned("Ready", events=[{"type": "ReopenedEvent", "at": t(5)}]), {"kind": "status", "item": A9, "before": "Done", "after": "Ready"})]
+        for item, diff in cases:
+            self.assertEqual(turn_of(item, rec=rec_with(), diffs=[diff])["reports"], [], diff)
+
+    def test_unexplained_status_change_is_reported_once(self):
+        item = self._unassigned("Todo")
+        diff = {"kind": "status", "item": A9, "before": "Ready", "after": "Todo"}
+        out = turn_of(item, rec=rec_with(), diffs=[diff])
+        self.assertEqual([(r["kind"], r["before"], r["after"]) for r in out["reports"]], [("status-changed", "Ready", "Todo")])
+        rec = rec_with(items={A9: {**rec_item(), "intent": None, "reported": {"status-changed": t(1)}}})
+        self.assertEqual(turn_of(item, rec=rec, diffs=[diff])["reports"], [])
+
+    def test_reopen_to_todo_without_workflow_is_reported(self):
+        """ワークフロー「Item reopened」が無い Project では、reopen で `Todo` にならないので、`Todo` への変化は人の変更。"""
+        item = self._unassigned("Todo", events=[{"type": "ReopenedEvent", "at": t(5)}])
+        out = turn_of(item, rec=rec_with(), diffs=[{"kind": "status", "item": A9, "before": "Done", "after": "Todo"}], workflows={"Item reopened": False})
+        self.assertEqual(kinds(out["reports"]), ["status-changed"])
+
+    def test_own_partial_write_matching_intent_is_not_reported(self):
+        """記録の意図と一致する値 (自分の部分書き込み) は人の変更ではない。"""
+        item = make_item(status="In Progress", comments_=[ASSIGN1])
+        out = turn_of(item, diffs=[{"kind": "status", "item": A9, "before": "Ready", "after": "In Progress"},
+                                   {"kind": "field", "item": A9, "field": "Agent session ID", "before": None, "after": W7}])
+        self.assertEqual(out["reports"], [])
+
+    def test_human_blocked_by_on_assigned_item_is_reported(self):
+        item = make_item(status="In Progress", blocked_by=[_blocker(A1)], comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
+        out = turn_of(item, diffs=[{"kind": "blocked_by", "item": A9, "added": [A1], "removed": [], "state_changed": []}])
+        self.assertEqual([(r["kind"], r["blockers"]) for r in out["reports"]], [("blocked-by-added", [A1])])
+
+
 USER_ENTRY = {"prefix": ["api", "user"], "stdout": {"fixture": "api-user"}}
 
 
@@ -486,6 +801,7 @@ class CliTest(FakeGhCase):
 
     def _assigned_item3(self, nodes, extra=()):
         c = node_of(nodes, 3)["content"]
+        c["assignees"]["nodes"] = [{"login": LOGIN}]  # 範囲 (担当者が自分 1 人) に入れる
         # 固定データの項目 3 のフィールド Agent session ID は W-7 ではないので、W-7 に書き換える
         for fv in node_of(nodes, 3)["fieldValues"]["nodes"]:
             if fv and (fv.get("field") or {}).get("name") == "Agent session ID":
@@ -494,7 +810,7 @@ class CliTest(FakeGhCase):
 
     def test_item_state_cli(self):
         """item state は、割り当てのある項目の状態と資源の使用を返す (gh は読むだけ)。"""
-        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [DECL1, _go(400, t(13), 500)]))}])
+        self.responses([USER_ENTRY, {"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}}, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [DECL1, _go(400, t(13), 500)]))}])
         code, out, err = self.cli("item", "state", "--dir", self.manager)
         self.assertEqual((code, out["status"], out["errors"]), (0, "ok", []), err)
         self.assertEqual([i["key"] for i in out["items"]], [f"{A}#3"])
@@ -506,7 +822,7 @@ class CliTest(FakeGhCase):
     def test_item_state_reads_report_pr(self):
         """`PR の報告` の PR は issues.observe_pr で読む。閉じる参照が無ければ closing は偽。"""
         report = wcomment("PR の報告", None, t(30), 300, body=PR9)
-        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [report]))},
+        self.responses([USER_ENTRY, {"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}}, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [report]))},
                         {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
         code, out, err = self.cli("item", "state", "--dir", self.manager, "--issue", f"{A}#3")
         self.assertEqual((code, out["status"]), (0, "ok"), err)
@@ -518,6 +834,45 @@ class CliTest(FakeGhCase):
                         {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
         code, out, err = self.cli("item", "state", "--dir", self.manager)
         self.assertEqual((code, out["status"], out["errors"][0]["key"]), (0, "error", "partial"), err)
+
+    def test_item_state_turn_outputs(self):
+        """item state は、記録 (--dir) と差分 (--diffs) とワークフローを読み、actions・questions・reports・pending を返す (書かない)。"""
+        rec_dir = os.path.join(self.manager, "rec", "akm-3")
+        os.makedirs(rec_dir)
+        rec = rec_with(items={f"{A}#3": rec_item()})
+        with open(os.path.join(rec_dir, "record.json"), "w", encoding="utf-8") as f:
+            json.dump(rec, f)
+        diffs_path = os.path.join(self.root, "diffs.json")
+        with open(diffs_path, "w", encoding="utf-8") as f:
+            json.dump({"diffs": [{"kind": "status", "item": f"{A}#1", "before": "Ready", "after": "Todo"}]}, f)
+        def mutate(nodes):
+            self._assigned_item3(nodes, [DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)])
+        self.responses([USER_ENTRY, {"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}}, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
+        code, out, err = self.cli("item", "state", "--dir", self.manager, "--diffs", diffs_path)
+        self.assertEqual((code, out["status"], out["record_lost"]), (0, "ok", False), err)
+        self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("blocked-by-add", A1), ("set-status", "Blocked")])
+        self.assertEqual([(r["kind"], r["item"]) for r in out["reports"]], [("status-changed", f"{A}#1")])
+        self.assertEqual((out["questions"], out["pending"]), ([], []))
+        self.assertFalse(any("mutation" in (r.get("stdin") or "") or r["args"][:2] == ["issue", "edit"] for r in self.recorded_full()), "書き込みの gh を実行しない")
+
+    def test_item_state_without_record_is_lost(self):
+        self.responses([USER_ENTRY, {"substring": "query ProjectMeta", "stdout": {"fixture": "project-meta-ok"}}, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._assigned_item3(nodes, [DECL1]))}])
+        code, out, err = self.cli("item", "state", "--dir", self.manager)
+        self.assertEqual((code, out["status"], out["record_lost"]), (0, "ok", True), err)
+
+    def test_blocked_by_remove_only_own_blockers(self):
+        """blocked-by remove は、自分が足した blockedBy (今の割り当ての `待機` の理由の Issue) だけを外し、それ以外は gh を実行せずに拒否する。"""
+        def mutate(nodes):
+            self._assigned_item3(nodes, [DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)])
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}, {"prefix": ["issue", "edit"], "stdout": ""}])
+        code, out, err = self.cli("blocked-by", "remove", "--dir", self.manager, "--issue", f"{A}#3", "--blocker", A2)
+        self.assertEqual((code, out["status"], out["own_blockers"]), (0, "rejected", [A1]), err)
+        self.assertFalse(any(r["args"][:2] == ["issue", "edit"] for r in self.recorded_full()), "拒否のときは gh を実行しない")
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}, {"prefix": ["issue", "edit"], "stdout": ""}])
+        code, out, err = self.cli("blocked-by", "remove", "--dir", self.manager, "--issue", f"{A}#3", "--blocker", A1)
+        self.assertEqual((code, out["status"], out["blocker"]), (0, "ok", A1), err)
+        edit = [r["args"] for r in self.recorded_full() if r["args"][:2] == ["issue", "edit"]]
+        self.assertEqual(edit[-1][2:], [f"https://github.com/{A}/issues/3", "--remove-blocked-by", f"https://github.com/{A}/issues/1"])
 
     def test_work_check_and_held_cli(self):
         """work check と work held は、--session (無ければ環境変数) の作業のセッションについて返す。"""
@@ -544,10 +899,16 @@ class DocTest(unittest.TestCase):
         with open(_DOC, encoding="utf-8") as f:
             doc = f.read()
         for key in ("`assigned`", "`in_progress`", "`end`", "`reopened`", "`pr`", "`judged`", "`stage`", "`manager_blocked`", "`return_status`",
-                    "`own_blockers`", "`held`", "`reserved`", "`item state`", "`work check`", "`work held`"):
+                    "`own_blockers`", "`held`", "`reserved`", "`item state`", "`work check`", "`work held`", "`actions`", "`questions`", "`reports`",
+                    "`pending`", "`record_lost`", "`blocked-by remove`", "`--diffs`"):
             self.assertIn(key, doc, f"{key} が文書に無い")
-        for stage in itemstate.STAGES:
-            self.assertIn(f"`{stage}`", doc)
+        for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
+            self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
+        records = os.path.join(os.path.dirname(_DOC), "records.md")
+        with open(records, encoding="utf-8") as f:
+            rdoc = f.read()
+        for kind in itemstate.QUESTION_KINDS:
+            self.assertIn(f"`{kind}`", rdoc, f"問いの種類 {kind} が records.md に無い")
 
 
 if __name__ == "__main__":
