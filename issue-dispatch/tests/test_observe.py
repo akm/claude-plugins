@@ -94,7 +94,7 @@ class BuildTest(FakeGhCase):
         self.assertEqual(snap["project_id"], result["project_id"])
         self.assertEqual(sorted(snap["items"]), sorted([A1, A2, A3, "akm/issue-dispatch-verify-b#1", "akm/issue-dispatch-verify-b#2"]))
         item = snap["items"][A1]
-        self.assertEqual(set(item), {"item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs", "partial"},
+        self.assertEqual(set(item), {"item_id", "position", "state", "status", "fields", "assignees", "labels", "blocked_by", "body_edited_at", "comment_ids", "prs", "partial", "carried"},
                          "一覧に無い値 (title・url・events など) は持たない")
         self.assertEqual(item["partial"], [])
         self.assertEqual(item["state"], "OPEN")
@@ -326,7 +326,7 @@ class CliTest(FakeGhCase):
         self.assertEqual(list(out["skipped"]["prs"]), [PR9])
 
     def test_item_level_gaps_skip_only_affected_values(self):
-        """1 項目の中の欠け (入れ子の connection の上限) は、その種類が狂わせる値だけを比べず、ほかの値の変化と差分の保存は続ける。"""
+        """1 項目の中の欠け (入れ子の connection の上限) は、その種類が狂わせる値だけを前のスナップショットから引き継いで比べず、ほかの値の変化と差分の保存は続ける。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         def mutate(nodes):
@@ -340,15 +340,18 @@ class CliTest(FakeGhCase):
         self.assertEqual((code, out["status"], out["errors"]), (0, "partial", []), err)
         self.assertEqual(out["diffs"], [{"kind": "labels", "item": A3, "added": ["y"], "removed": []},
                                         {"kind": "labels", "item": A1, "added": ["x"], "removed": []}])
-        self.assertEqual(out["skipped"]["items"], {A1: ["blocked_by-truncated"]})
+        taken1 = observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"]
+        self.assertEqual((out["skipped"]["items"], out["carried"]["items"]), ({}, {A1: {"blocked_by-truncated": taken1}}), "前の値を引き継ぐので比べない値は無い")
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
         code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
-        self.assertEqual((out["status"], out["snapshot"]["skipped"]["items"]), ("partial", {A1: ["blocked_by-truncated"]}), "保存し、欠けの印を付ける")
-        self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]["partial"], ["blocked_by-truncated"])
-        # 欠けが解けた次の差分でも、前の側に欠けがある値 (blocked_by) は比べず、ほかの値は比べる
+        self.assertEqual((out["status"], out["snapshot"]["carried"]["items"]), ("partial", {A1: {"blocked_by-truncated": taken1}}), "保存し、引き継いだ種類を残す")
+        saved = observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]
+        self.assertEqual((saved["partial"], saved["carried"], saved["blocked_by"]), ([], {"blocked_by-truncated": taken1}, {}), "blocked_by は前の値 (空) を引き継ぐ")
+        # 全部読めるようになった次の差分では、引き継いだ値 (blocked_by) と今の値を比べる (この固定データでは同じ)
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
-        self.assertEqual([(d["kind"], d["item"]) for d in out["diffs"]], [("labels", A3), ("labels", A1)], "欠けのあった値だけを前の側の印で比べない")
+        self.assertEqual([(d["kind"], d["item"]) for d in out["diffs"]], [("labels", A3), ("labels", A1)])
+        self.assertEqual(out["carried"], {"items": {}, "prs": {}})
 
     def test_item_level_gap_does_not_hide_close_comment_and_removal(self):
         """欠けが続く項目でも、close・新しいコメント・Project からの除去は差分に出る。"""
@@ -374,7 +377,7 @@ class CliTest(FakeGhCase):
         self.assertEqual([(d["kind"], d["item"]) for d in out["diffs"]], [("removed", A1)])
 
     def test_fields_gap_skips_status_too(self):
-        """フィールドの値の欠け (fields-truncated) では、同じ connection から読む Status も比べない (Status が読めなかっただけで null になるため)。"""
+        """フィールドの値の欠け (fields-truncated) では、同じ connection から読む Status も引き継いで比べない (Status が読めなかっただけで null になるため)。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         def mutate(nodes):
@@ -386,7 +389,90 @@ class CliTest(FakeGhCase):
         code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
         self.assertEqual((code, out["status"], out["errors"]), (0, "partial", []), err)
         self.assertEqual(out["diffs"], [{"kind": "labels", "item": A1, "added": ["x"], "removed": []}])
-        self.assertEqual(out["skipped"]["items"], {A1: ["fields-truncated"]})
+        self.assertEqual(list(out["carried"]["items"][A1]), ["fields-truncated"])
+        self.assertEqual(out["skipped"]["items"], {})
+        # 引き継ぐ元が無ければ、status と field を比べない
+        before = {"version": 1, "taken_at": "t0", "project_id": "P", "comment_prs": {},
+                  "items": {A1: observe.snapshot_item({"item_id": "I1", "position": 1, "state": "OPEN", "status": {"name": "Todo"}}, partial=["fields-truncated"])}}
+        after = {"version": 1, "taken_at": "t1", "project_id": "P", "comment_prs": {},
+                 "items": {A1: observe.snapshot_item({"item_id": "I1", "position": 1, "state": "CLOSED", "status": {"name": "Done"}})}}
+        self.assertEqual([d["kind"] for d in observe.diff(before, after)], ["closed"])
+
+    def test_carry_forward_keeps_last_complete_value(self):
+        """コメントの続きのページが読めなかったターンは、前のスナップショットのコメント ID を引き継いで保存し (carried)、読めるようになったターンに
+        最後に全部読めたときからの変化だけを差分に出す。"""
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        first = observe.load_snapshot(self.snapshot_dir)["snapshot"]
+        ids_t1 = first["items"][A3]["comment_ids"]
+        def comments_fail(nodes):
+            node_of(nodes, 3)["content"]["comments"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C1"}
+        failing = [USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(comments_fail)},
+                   {"substring": "query IssueComments", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}]
+        self.responses(failing)
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["diffs"], out["skipped"]["items"]), (0, "partial", [], {}), err)
+        self.assertEqual(out["carried"]["items"], {A3: {"comments": first["taken_at"]}})
+        self.responses(failing)
+        code, out, err = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual((code, out["status"], out["snapshot"]["carried"]["items"]), (0, "partial", {A3: {"comments": first["taken_at"]}}), err)
+        second = observe.load_snapshot(self.snapshot_dir)["snapshot"]
+        self.assertEqual((second["items"][A3]["comment_ids"], second["items"][A3]["partial"], second["items"][A3]["carried"]),
+                         (ids_t1, [], {"comments": first["taken_at"]}), "前の値を引き継ぎ、partial には入れない")
+        # 続けて読めなければ、引き継いだ元 (最初に全部読めたとき) の taken_at を保つ
+        self.responses(failing)
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        third = observe.load_snapshot(self.snapshot_dir)["snapshot"]
+        self.assertEqual(third["items"][A3]["carried"], {"comments": first["taken_at"]})
+        # 読めるようになったターン: 最後に全部読めたときからの変化 (足されたコメント) だけが出る
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9, 90009)))},
+                        {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual([(d["kind"], d["item"], d.get("ids")) for d in out["diffs"] if d["kind"] == "comment"], [("comment", A3, [90009])], err)
+        self.assertEqual(out["carried"], {"items": {}, "prs": {}})
+
+    def test_carry_forward_comment_pr_state(self):
+        """コメントの URL の PR が読めなかったターンは前の状態を引き継ぎ、読めるようになったターンにその変化 (マージ) を差分に出す。"""
+        with_pr = items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": with_pr}, {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        taken1 = observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"]
+        failing = [USER_ENTRY, {"substring": "query ProjectItems", "stdout": with_pr}, {"substring": "query PrObserve", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}]
+        self.responses(failing)
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual((code, out["status"], out["diffs"], out["skipped"]["prs"], out["carried"]["prs"]), (0, "partial", [], {}, {PR9: taken1}), err)
+        self.responses(failing)
+        self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        saved = observe.load_snapshot(self.snapshot_dir)["snapshot"]["comment_prs"][PR9]
+        self.assertEqual(saved, {"state": "OPEN", "draft": False, "merged": False, "carried": taken1})
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": with_pr}, {"substring": "query PrObserve", "stdout": pr_fixture("MERGED", merged=True)}])
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual(out["diffs"], [{"kind": "pr", "item": None, "url": PR9, "source": "comment",
+                                        "before": {"state": "OPEN", "draft": False, "merged": False}, "after": {"state": "MERGED", "draft": False, "merged": True}}], err)
+
+    def test_no_carry_without_previous_complete_value(self):
+        """最初のスナップショットから一部しか読めていない値は引き継ぐ元が無いので、partial のまま比べない。"""
+        def comments_fail(nodes):
+            node_of(nodes, 3)["content"]["comments"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C1"}
+        failing = [USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(comments_fail)},
+                   {"substring": "query IssueComments", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}]
+        self.responses(failing)
+        code, out, err = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
+        self.assertEqual((code, out["snapshot"]["skipped"]["items"], out["snapshot"]["carried"]["items"]), (0, {A3: ["comments"]}, {}), err)
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9, 90009)))},
+                        {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
+        code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
+        self.assertEqual(([d["kind"] for d in out["diffs"]], out["skipped"]["items"]), (["pr"], {A3: ["comments"]}), "前の側が partial なら比べない")
+
+    def test_build_snapshot_does_not_carry_from_partial_previous(self):
+        """前のスナップショットでも同じ種類が partial なら引き継がない (引き継ぐ元が無い)。"""
+        base = {"item_id": "I3", "position": 1, "state": "OPEN", "status": {"name": "Todo"}, "comments": [{"database_id": 1}]}
+        prev_item = observe.snapshot_item(base, partial=["comments"])
+        previous = {"version": 1, "taken_at": "t0", "project_id": "P", "items": {A3: prev_item}, "comment_prs": {}}
+        result = {"project_id": "P", "items": [{**base, "key": A3, "comments": [{"database_id": 1}, {"database_id": 2}]}],
+                  "problems": [{"item": A3, "what": "comments", "failure": "other", "message": "x", "exit_code": 1}]}
+        snap = observe.build_snapshot(result, {}, "t1", previous=previous)
+        self.assertEqual((snap["items"][A3]["partial"], snap["items"][A3]["carried"], snap["items"][A3]["comment_ids"]), (["comments"], {}, [1, 2]))
 
     def test_unknown_partial_kind_skips_whole_item(self):
         """対応に無い欠けの種類は、どの値が狂うか分からないので項目全体を比べない。"""

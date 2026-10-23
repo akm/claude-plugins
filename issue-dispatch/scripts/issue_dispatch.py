@@ -255,14 +255,18 @@ def cmd_project_items(args):
             _emit({**out, "status": "error", "snapshot": None,
                    "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
             return 0
-        comment_prs, problems = _read_comment_prs(result["items"], login)
+        # 1 項目の中の欠けと PR の読み取りの失敗は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ partial を付けて保存する
+        previous = observe.load_snapshot(directory)
+        warnings = []
+        if previous["status"] == "corrupt":
+            warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに書き直す"})
+        comment_prs, problems = _read_comment_prs(result["items"], login, extra_urls=list((previous["snapshot"] or {}).get("comment_prs") or {}))
         out["problems"] = out["problems"] + problems
-        snapshot = observe.build_snapshot(result, comment_prs, _now())
+        snapshot = observe.build_snapshot(result, comment_prs, _now(), previous=previous["snapshot"])
         path = observe.save_snapshot(directory, snapshot)
-        # 1 項目の中の欠けと PR の読み取りの失敗は、その項目・PR に欠けの印を付けて保存する (差分はそれらを比べない)
         out["status"] = "partial" if out["problems"] else out["status"]
         out["snapshot"] = {"path": path, "taken_at": snapshot["taken_at"], "comment_prs": comment_prs,
-                           "skipped": observe.skipped(snapshot, snapshot)}
+                           "skipped": observe.skipped(snapshot, snapshot), "carried": observe.carried(snapshot), "warnings": warnings}
     _emit(out)
     return 0
 
@@ -294,10 +298,10 @@ def cmd_observe_diff(args):
         return 0
     # スナップショットにある PR (コメントが消えても、待っていた PR の状態の変化を見つけるため) も読む
     comment_prs, problems = _read_comment_prs(result["items"], login, extra_urls=list(loaded["snapshot"]["comment_prs"]))
-    current = observe.build_snapshot(result, comment_prs, _now())
+    current = observe.build_snapshot(result, comment_prs, _now(), previous=loaded["snapshot"])
     all_problems = result["problems"] + problems
     _emit({"status": "partial" if all_problems else "ok", "snapshot_taken_at": loaded["snapshot"]["taken_at"],
-           "diffs": observe.diff(loaded["snapshot"], current), "skipped": observe.skipped(loaded["snapshot"], current),
+           "diffs": observe.diff(loaded["snapshot"], current), "skipped": observe.skipped(loaded["snapshot"], current), "carried": observe.carried(current),
            "problems": all_problems, "rate_limit": result["rate_limit"], "errors": []})
     return 0
 
