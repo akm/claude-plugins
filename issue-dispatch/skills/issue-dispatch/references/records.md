@@ -105,7 +105,7 @@
 | `user-answer-lost` | 記録を失ったので、`利用者の答え` を待っていた宣言の問いを尋ね直す (自由回答) | 無し |
 | `conflict` | 宣言が相手 (`subject`) の `開始可` の宣言と競合しうる。相手の完了まで待つか、共通の変更を先に小さな PR にするか、競合しうるまま進めるか | `wait` / `small-pr` / `proceed` |
 | `unknown-content` | 種類 `unknown-content` の同じパス (`subject`) が競合しうるか | `conflict` / `none` |
-| `resource-busy` | 宣言の資源 (`subject`) が空いていない (属性 `when_busy` が `ask`)。待つか進めるか | `wait` / `proceed` |
+| `resource-busy` | 宣言の資源 (`subject`) が空いていない (属性 `when_busy` が `ask`)。待つか進めるか。答えを読む範囲は [flow.md](flow.md) の「資源の質問の回答が有効な範囲」 | `wait` / `proceed` |
 | `release-undeclared` | 割り当てで予約したのに宣言に無い資源 (`subject`) を解放してよいか (属性 `release_undeclared` が `ask`) | `release` / `keep` |
 | `small-pr-closed` | 待っていた小さな PR がマージされずに閉じた。相手の Issue の完了を待つか、作り直しを頼むか、競合しうるまま進めるか (U15 の後半) | `wait-issue` / `redo` / `proceed` |
 

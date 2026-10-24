@@ -37,6 +37,35 @@ def answer_for(rec, item, kind, subject):
     return max(answered, key=lambda q: q.get("answered_at") or "")["answer"]
 
 
+def answered_question(rec, item, kind, subject):
+    """項目・種類・対象が同じ問いのうち、答えのある最新のもの (dict)。無ければ None。"""
+    answered = [q for q in _questions(rec, item, kind, subject) if q.get("answer") is not None]
+    return max(answered, key=lambda q: q.get("answered_at") or "") if answered else None
+
+
+def released_since(st, name, at):
+    """項目が資源 name を時刻 at より後に解放したか (`開始可` になったどれかの宣言にあった資源が、at より後の読めた宣言の resources に無い)。
+    問い resource-busy の答えが有効な範囲を決める (flow.md の「資源の質問の回答が有効な範囲」)。"""
+    held_once, key = False, name.casefold()
+    for x in (st.get("declaration") or {}).get("declared_resources") or []:
+        has = any(r.casefold() == key for r in x["resources"])
+        if has and x.get("go"):
+            held_once = True
+        elif not has and held_once and (x.get("at") or "") > (at or ""):
+            return True
+    return False
+
+
+def busy_answers(st, rec, names):
+    """問い resource-busy の答え (資源の名前 → 答え)。答えの後にその資源を解放していれば、別の使用への答えなので読まない (無回答と同じ)。"""
+    out = {}
+    for n in names:
+        q = answered_question(rec, st["key"], "resource-busy", n)
+        if q is not None and not released_since(st, n, q.get("answered_at")):
+            out[n] = q["answer"]
+    return out
+
+
 def asked(rec, item, kind, subject):
     """項目・種類・対象が同じ未回答の問い (答えも取り下げも無い) が記録にあるか。あれば尋ね直さない。"""
     return any(q.get("answered_at") is None for q in _questions(rec, item, kind, subject))
@@ -319,7 +348,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     r = None
     if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
         declared = judged["declaration"]["resources"]
-        answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
+        answers = busy_answers(st, rec, declared)
         # 前の宣言で解放した予約は、もう予約していない (足し直せば新しい資源として空きを確かめる)
         released = released_reservations(st, rec, attrs_table, before=decl_id)
         reserved = [n for n in st.get("reserved") or [] if n not in released]
@@ -357,7 +386,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     if r is None:
         # 更新 (`開始可` の後): 外した資源を解放し、足した資源は空きを確かめる。宣言に無い予約の概念は無い
         declared = parsed["resources"]
-        answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
+        answers = busy_answers(st, rec, declared)
         r = {**resources.judge_update(key, judged["update_kind"], _held_before(st, judged), declared, usage, attrs_table or {}, answers),
              "keep": [], "ask_undeclared": [], "request_rewrite": []}
         j["release"] = r["release"]

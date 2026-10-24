@@ -334,6 +334,33 @@ class ResourceTest(unittest.TestCase):
         out = run_judge(items, rec=rec_with(questions=question("resource-busy", A9, "gpu", "proceed")), attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"]), ("go", ["gpu"]))
 
+    def test_busy_answer_is_read_only_until_the_item_releases_the_resource(self):
+        """resource-busy の答えは、その項目がその資源を解放するまで読む。解放した後に足し直した更新では (持ち主が同じでも) 読まずに質問を出す。
+        `開始可` の前の書き直しや、`開始可` の後の更新の出し直し (解放していない) では読む。"""
+        holder = self._holder("gpu")
+        rec = rec_with(questions=question("resource-busy", A9, "gpu", "proceed", asked=t(21)))
+        rec["questions"]["q1"]["answered_at"] = t(22)
+        # 書き直し (`開始可` の前): 400 が差し戻され 401 で gpu をもう一度宣言。解放していないので答えを読む
+        rewrite = item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",)), wait(400, t(21), 500, [{"kind": "利用者の答え"}]),
+                            mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(23), 501),
+                            decl(401, t(24), resources=("gpu",), kind="宣言の更新")])
+        out = run_judge([rewrite, holder], rec=rec, attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"], out["questions"]), ("go", ["gpu"], []))
+        # 解放の後の足し直し: 400 [gpu] に `開始可`、401 で外し、402 で足し直す。持ち主は同じでも質問を出す
+        readd = item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",)), go(400, t(23), 500), decl(401, t(24), resources=(), kind="宣言の更新"),
+                          decl(402, t(25), resources=("gpu",), kind="宣言の更新")])
+        states = states_of([readd, holder], attrs=self.attrs)
+        self.assertTrue(judge.released_since(states[0], "gpu", t(22)))
+        self.assertEqual(judge.busy_answers(states[0], rec, ["gpu"]), {})
+        out = run_judge([readd, holder], rec=rec, attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["resource-busy"]))
+        # `開始可` の後の更新の出し直し: 400 [] に `開始可`、401 [gpu] が差し戻され、402 [gpu] を出し直す。解放していないので答えを読む
+        redo = item(A9, [ASSIGN1, decl(400, t(20)), go(400, t(21), 500), decl(401, t(23), resources=("gpu",), kind="宣言の更新"),
+                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 401}, t(24), 501),
+                         decl(402, t(25), resources=("gpu",), kind="宣言の更新")])
+        out = run_judge([redo, holder], rec=rec, attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"], out["questions"]), ("go", ["gpu"], []))
+
     def test_resources_are_not_judged_while_conflict_waits(self):
         """競合の可能性で待つ・尋ねる宣言は、資源の空きを確かめない (待っている宣言は新しい資源を持たない)。"""
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",))]), item(A5, B_GO), self._holder("gpu")], attrs=self.attrs)
