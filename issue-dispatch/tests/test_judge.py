@@ -461,6 +461,13 @@ class ResourceTest(unittest.TestCase):
         out = run_judge([mine, other], attrs=self.attrs)
         self.assertEqual([(j["item"], j["result"]) for j in out["judgments"]], [(A9, "go"), (A5, "go")])
         self.assertEqual(out["judgments"][1]["reserve"], ["db"])
+        # 外した後に、その資源を含まない別の更新が `開始可` になっても (最新の `開始可` の宣言に db が無い)、外した db は解放したまま
+        later = item(A9, base + [decl(401, t(13), resources=(), kind="宣言の更新"), decl(402, t(14), files=(("src/b.py", None),), resources=(), kind="宣言の更新"),
+                              go(402, t(15), 502)], labels=["resource:db", "resource:gpu"], events=events)
+        states = states_of([later], attrs=self.attrs)
+        self.assertEqual((states[0]["declaration"]["go_declaration_id"], states[0]["declaration"]["held"]), (402, []))
+        self.assertEqual(judge.released_reservations(states[0], None, self.attrs), ["db"])
+        self.assertEqual(judge.usage_for(states, None, self.attrs), {"gpu": [A9]})
 
     def test_update_adds_resource_and_releases_removed(self):
         """`開始可` の後の更新は、足した資源の空きを確かめ、外した資源を解放する。"""

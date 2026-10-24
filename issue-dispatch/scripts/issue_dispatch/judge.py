@@ -126,7 +126,7 @@ def _releasable(name, item_key, rec, attrs_table):
 def released_reservations(st, rec, attrs_table, before=None):
     """割り当てで予約した資源 (reserved) のうち、宣言に無い予約として解放したもの (名前の順)。解放は GitHub への書き込みが無い導出なので、
     判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。読むのは項目の状態 (declared_resources・held) だけ。
-    条件: `開始可` の後は持っている資源 (held) に無い予約のうち、`開始可` の宣言にあったもの (更新で外した。結果に依らず解放) と、無かったもので属性
+    条件: `開始可` の後は持っている資源 (held) に無い予約のうち、`開始可` になったどれかの宣言にあったもの (更新で外した。結果に依らず解放) と、無かったもので属性
     release_undeclared が release か問い `release-undeclared` の答えが release のもの。`開始可` の前は今の割り当ての読めた着手の宣言 (書き直しを含む。before を
     渡せばそのコメントの ID の宣言より前のものだけ) のどれかに無い予約で、属性か答えが release のもの。"""
     d = st.get("declaration") or {}
@@ -135,12 +135,13 @@ def released_reservations(st, rec, attrs_table, before=None):
         return []
     if d.get("go_declaration_id") is not None and before is None:
         # `開始可` の後: 持っている資源 (held) が今の状態 (後の宣言で足し直して予約し直したものを含む)。`開始可` の前の宣言は見ない。
-        # held に無い予約は 2 つに分ける: `開始可` の宣言にあった資源は更新で外したものなので結果に依らず解放 (契機 update)、
-        # 無かった資源は宣言に書かれなかった予約なので release_undeclared に従う (契機 declare)
+        # held に無い予約は 2 つに分ける: `開始可` になったどれかの宣言にあった資源は、持った後に更新で外したものなので結果に依らず解放 (契機 update)。
+        # どの `開始可` の宣言にも無かった資源は宣言に書かれなかった予約なので release_undeclared に従う (契機 declare)。
+        # 最新の `開始可` の宣言だけを見ると、外した後に別の更新が `開始可` になったときに履歴が消える
         held = {h.casefold() for h in d.get("held") or []}
-        in_go = {r.casefold() for r in d["go_declaration"]["resources"]}
+        ever_held = {r.casefold() for x in d.get("declared_resources") or [] if x.get("go") for r in x["resources"]}
         return sorted(name for name in reserved if name.casefold() not in held
-                      and (name.casefold() in in_go or _releasable(name, st["key"], rec, attrs_table)))
+                      and (name.casefold() in ever_held or _releasable(name, st["key"], rec, attrs_table)))
     # `開始可` の前: 項目はまだ何も持たないので、読めた着手の宣言 (before より前) のどれかに無ければ解放した (release_undeclared に従う)
     sets = []
     for x in d.get("declared_resources") or []:
