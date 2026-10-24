@@ -368,6 +368,38 @@ class ResourceTest(unittest.TestCase):
         self.assertIn("db", out["actions"][0]["body"])
         self.assertEqual(out["signals"][0]["kind"], "request")
 
+    def test_undeclared_reservation_is_handled_while_waiting(self):
+        """宣言に無い予約の扱いは判定の結果に依らない: 競合や資源で待つ宣言でも、release なら解放し、ask なら尋ね、keep の答えなら `依頼` にする。"""
+        events = [{"type": "LabeledEvent", "at": t(9), "label": f"resource:{n}"} for n in ("cache", "db")]
+        mine = item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",))], labels=["resource:cache", "resource:db"], events=events)
+        # 競合で尋ねる
+        out = run_judge([mine, item(A5, B_GO)], attrs=self.attrs)
+        j = out["judgments"][0]
+        self.assertEqual((j["result"], j["release"], j["keep"]), ("ask", ["cache"], ["db"]))
+        self.assertEqual(sorted(q["kind"] for q in out["questions"]), ["conflict", "release-undeclared"])
+        self.assertEqual(kinds(out["actions"]), [("comment", "待機")])
+        self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"])
+        # 資源で待つ
+        out = run_judge([mine, self._holder("gpu")], rec=rec_with(questions=question("resource-busy", A9, "gpu", "wait")), attrs=self.attrs)
+        j = out["judgments"][0]
+        self.assertEqual((j["result"], j["waits"], j["release"], j["keep"]), ("wait", [{"kind": "資源", "resource": "gpu"}], ["cache"], ["db"]))
+        self.assertEqual([q["kind"] for q in out["questions"]], ["release-undeclared"])
+        # keep の答えがあれば、競合しうる相手がいても書き直しを頼んで終わる
+        out = run_judge([mine, item(A5, B_GO)], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], kinds(out["actions"])), ("request", [("comment", "依頼")]))
+
+    def test_release_while_waiting_frees_the_resource_for_later_declarations_and_usage(self):
+        """待つ宣言が解放した予約は、同じ実行の後の宣言と usage_for の両方で使用中でなくなる。"""
+        events = [{"type": "LabeledEvent", "at": t(9), "label": "resource:cache"}]
+        a = item(A9, [ASSIGN1, decl(400, t(20))], labels=["resource:cache"], events=events, position=1)
+        b = item(A5, B_GO, position=2)  # A9 と競合しうる相手
+        c = item(A6, [assign(W9, 1, t(10), 120), decl(420, t(21), files=(("src/c.py", None),), resources=("cache",), to=W9)], position=3)
+        states = states_of([a, b, c], attrs=self.attrs)
+        self.assertEqual(judge.usage_for(states, None, self.attrs), {}, "着手の宣言に無い予約 (属性 release) は `開始可` の前でも数えない")
+        out = run_judge([a, b, c], attrs=self.attrs)
+        self.assertEqual([(j["item"], j["result"]) for j in out["judgments"]], [(A9, "ask"), (A6, "go")])
+        self.assertEqual(out["judgments"][1]["reserve"], ["cache"])
+
     def test_update_adds_resource_and_releases_removed(self):
         """`開始可` の後の更新は、足した資源の空きを確かめ、外した資源を解放する。"""
         mine = item(A9, [ASSIGN1, decl(400, t(11), resources=("db",)), go(400, t(12), 500), decl(401, t(13), resources=("gpu",), kind="宣言の更新")])

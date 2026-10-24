@@ -170,10 +170,10 @@
 | --- | --- | --- |
 | 1 | リポジトリの設定が読めない (`repo.read_repo_config` が `unreadable`) | `wait`: `待機` (理由 `設定`)。本文に理由と直し方と、直したら管理のセッションに知らせることを書く。そのリポジトリの宣言は判定しない。設定ファイルが無い (`missing`) は読めないことではなく、デフォルトの表だけで照合して進む |
 | 2 | 宣言の形の誤り (コメントの JSON を、リポジトリの規則で種類を付けて `declaration.parse` で検査する) | `request`: `依頼` (宣言の書き直し)。本文に誤りの一覧と使った規則 (リポジトリの設定とデフォルトの表か、デフォルトの表だけか) を書く |
-| 3 | 競合の可能性 (`declaration.conflictability`) の相手ごとの結果 | 相手ごとに、記録の質問の回答で扱いを決める (下の表)。ready for review の後の資源だけを変える更新 (`resources-only`) は比較しない |
-| 4 | 宣言の資源 (着手の宣言は `resources.judge_declare`、更新は `judge_update`) | [resources.md](resources.md) の契機 `declare` / `update` の行のとおり。結果 `wait` は `待機` (理由 `資源`)、`ask` は質問 `resource-busy` (対象は資源の名前) を出して回答まで `待機` (理由 `利用者の答え`)。3 で待機・質問になった宣言は 4 に進まない |
-| 5 | 割り当てで予約したのに宣言に無い資源 (着手の宣言だけ。`judge_declare` の `release`・`keep`・`ask_undeclared`・`request_rewrite`) | 同じ行のとおり。`ask_undeclared` は `開始可` を書いてから質問 `release-undeclared` (対象は資源の名前) を出す。`request_rewrite` は `依頼` (宣言の書き直し: その資源を加える) にし、`開始可` は書かない |
-| 6 | どれにも当たらない | `go`: `開始可`。本文に比較した相手の数・予約した資源・解放した資源を書く |
+| 3 | 割り当てで予約したのに宣言に無い資源 (着手の宣言だけ。`resources.judge_declare` の `release`・`keep`・`ask_undeclared`・`request_rewrite`) | [resources.md](resources.md) の契機 `declare` の行のとおり、4 以降の結果に依らず扱う。`release` は結果の `release` に載せる (待つ宣言でも解放する)。`ask_undeclared` は質問 `release-undeclared` (対象は資源の名前) を出す (待つ宣言でも出す)。`request_rewrite` は `依頼` (宣言の書き直し: その資源を加える) にして終わり、`開始可` は書かない |
+| 4 | 競合の可能性 (`declaration.conflictability`) の相手ごとの結果 | 相手ごとに、記録の質問の回答で扱いを決める (下の表)。ready for review の後の資源だけを変える更新 (`resources-only`) は比較しない |
+| 5 | 宣言の資源の空き (着手の宣言は `judge_declare`、更新は `judge_update`) | 同じ契機 `declare` / `update` の行のとおり。結果 `wait` は `待機` (理由 `資源`)、`ask` は質問 `resource-busy` (対象は資源の名前) を出して回答まで `待機` (理由 `利用者の答え`)。4 で待機・質問になった宣言は 5 に進まない |
+| 6 | どれにも当たらない | `go`: `開始可`。本文に比較した相手の数・予約した資源・解放した資源・回答を待つ予約を書く (`待機` の本文にも解放した資源と回答を待つ予約を書く) |
 
 競合の可能性の相手ごとの扱い:
 
@@ -188,7 +188,7 @@
 
 **`開始可` を書く直前の比較**: 判定は常にその時点の `開始可` の宣言すべてと比較するので、利用者の回答や待機の解消の後に `開始可` を書くときも、その間に `開始可` になった宣言と比べ直すことになる (AE54)。例外は ready for review の後の資源だけを変える更新で、比較しない。
 
-**資源の使用** (`judge.usage_for`): `item state` の `usage` から、`開始可` の後に宣言に無い予約のうち解放するもの (属性 `release_undeclared` が `release`、または質問 `release-undeclared` の回答が `release`) を除く。
+**資源の使用** (`judge.usage_for`): `item state` の `usage` から、着手の宣言 (読めたもの) に無い予約のうち解放するもの (属性 `release_undeclared` が `release`、または質問 `release-undeclared` の回答が `release`) を除く。`開始可` の後は持っている資源 (`held`) に無い予約、前は判定の要る着手の宣言の `resources` に無い予約。
 
 **返すもの**: `judgments` (宣言ごと: `item`・`declaration`・`to`・`assignment`・`update_kind`・`repo_config` (読み取りの結果の `status`)・`result`・`waits` (`待機` の理由)・`compared` (比較した相手の宣言の ID)・`recompared` (ファイルの競合の可能性を比較したか)・`reserve`・`release`・`keep` (回答を待つ予約))、`actions` (「ターンで行うこと」の種類。宣言ごとにコメントを先にする (R24))、`questions` (`subject` 付き)、`signals` (作業のセッションに送る合図: `kind` が `go`・`wait`・`request`、`to`・`item`・`declaration`。`request` は `request_kind` も。送り方は U17)。`declaration judge` 自身は書かない。
 
