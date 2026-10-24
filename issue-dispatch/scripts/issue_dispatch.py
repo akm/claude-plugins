@@ -50,7 +50,7 @@ import sys
 
 import datetime
 
-from issue_dispatch import comments, config, declaration, filekinds, ids, issues, itemstate, observe, project, record, repo, resources, sessions
+from issue_dispatch import comments, config, declaration, filekinds, ids, issues, itemstate, observe, poll, project, record, repo, resources, sessions
 
 
 def _emit(payload):
@@ -548,6 +548,109 @@ def cmd_work_check(args):
     return 0
 
 
+# --- 待機 (U14) ---------------------------------------------------------------------
+
+def _wait_error(message):
+    sys.stderr.write(message + "\n")
+    return 2
+
+
+def _wait_session(args):
+    if args.session:
+        value = sessions.normalize_session_id(args.session)
+        return value, (None if value else f"--session の値がセッション ID の形ではない: {args.session!r}")
+    value, _ = sessions.own_session_id(os.environ)
+    return value, (None if value else f"--session が無く、環境変数 {sessions.ENV_HOST_SESSION_ID} も {sessions.ENV_SESSION_ID} も無い")
+
+
+class _Login:
+    """最初の読み取りでトークンのログインを読む (失敗は待機の失敗として扱う)。"""
+
+    def __init__(self):
+        self.login = None
+
+    def get(self):
+        if self.login is None:
+            login, problem = comments.token_login()
+            if problem:
+                return None, problem.get("failure") or "other"
+            self.login = login
+        return self.login, None
+
+
+def cmd_wait(args):
+    loaded = config.load(args.dir, "manager")
+    parsed = _manager_project(args, loaded)
+    if parsed is None:
+        return _wait_error("管理ディレクトリの設定に owner/番号 の Project が無い")
+    minutes = args.minutes if args.minutes is not None else loaded["config"]["wait_minutes"]
+    interval = args.interval if args.interval is not None else loaded["config"]["poll_minutes"]
+    if interval >= minutes:
+        return _wait_error(f"--interval ({interval} 分) は --minutes ({minutes} 分) より短くする")
+    directory = record.record_dir(args.dir, loaded["config"]["record_dir"], parsed)
+    loaded_snapshot = observe.load_snapshot(directory)
+    if loaded_snapshot["status"] != "ok":
+        sys.stderr.write(f"スナップショット {loaded_snapshot['path']} が{'無い' if loaded_snapshot['status'] == 'missing' else '壊れている'}。先に project items --write-snapshot で作る\n")
+        return poll.EXIT_NO_SNAPSHOT
+    rec, _ = _load_record_or_none(directory, parsed)
+    owner = rec["manager"]["id"] if rec and rec.get("manager") else sessions.own_session_id(os.environ)[0]
+    login = _Login()
+
+    def do_poll():
+        value, failure = login.get()
+        if failure:
+            return ("failure", failure)
+        return poll.manager_poll(parsed, loaded_snapshot["snapshot"], value)
+
+    return poll.Waiter(os.path.join(directory, poll.PID_FILE), owner, "wait", minutes, interval).run(do_poll)
+
+
+def _worker_waiter(args, name):
+    """作業のセッションの待機の共通: Project・セッション ID・wait.pid の置き場。返り値は (parsed, session_id, Waiter) か (None, None, 終了コード)。"""
+    parsed = project.parse_project(args.project)
+    if parsed is None:
+        return None, None, _wait_error(f"--project は owner/番号 の形 (値 {args.project!r})")
+    session_id, problem = _wait_session(args)
+    if problem:
+        return None, None, _wait_error(problem)
+    if args.interval >= args.minutes:
+        return None, None, _wait_error(f"--interval ({args.interval} 分) は --minutes ({args.minutes} 分) より短くする")
+    pid_path = os.path.join(sessions.session_temp_dir(session_id, os.environ), poll.PID_FILE)
+    return parsed, session_id, poll.Waiter(pid_path, session_id, name, args.minutes, args.interval)
+
+
+def cmd_wait_assignment(args):
+    parsed, session_id, waiter = _worker_waiter(args, "wait-assignment")
+    if parsed is None:
+        return waiter
+    login = _Login()
+
+    def do_poll():
+        value, failure = login.get()
+        if failure:
+            return ("failure", failure)
+        return poll.assignment_poll(parsed, session_id, value, args.blocked, args.in_review, [args.pending] if args.pending else [])
+
+    return waiter.run(do_poll)
+
+
+def cmd_wait_decision(args):
+    parsed, session_id, waiter = _worker_waiter(args, "wait-decision")
+    if parsed is None:
+        return waiter
+    if ids.issue_key(args.issue) is None:
+        return _wait_error(f"--issue は owner/repo#番号 か URL (値 {args.issue!r})")
+    login = _Login()
+
+    def do_poll():
+        value, failure = login.get()
+        if failure:
+            return ("failure", failure)
+        return poll.decision_poll(parsed, ids.issue_key(args.issue), session_id, value, args.declaration, args.review_update)
+
+    return waiter.run(do_poll)
+
+
 def cmd_work_held(args):
     common = _work_common(args)
     if common is None:
@@ -985,6 +1088,31 @@ def build_parser():
     p_wheld.add_argument("--project", required=True, help="owner/番号")
     p_wheld.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wheld.set_defaults(func=cmd_work_held)
+
+    p_wait = sub.add_parser("wait", help="管理のセッションの待機: スナップショットとの差分があれば終わる (バックグラウンドで起動する)")
+    p_wait.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project・poll_minutes・wait_minutes と記録の置き場を読む)")
+    p_wait.add_argument("--project", help="owner/番号 (省略時は設定の project)")
+    p_wait.add_argument("--minutes", type=float, help="期限 (分。省略時は設定の wait_minutes)")
+    p_wait.add_argument("--interval", type=float, help="読む間隔 (分。省略時は設定の poll_minutes)")
+    p_wait.set_defaults(func=cmd_wait)
+    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・戻り・解放・依頼で終わる")
+    p_wassign.add_argument("--project", required=True, help="owner/番号")
+    p_wassign.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
+    p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待っている Issue (owner/repo#番号。繰り返せる)")
+    p_wassign.add_argument("--in-review", action="append", default=[], help="レビュー中の Issue (繰り返せる)")
+    p_wassign.add_argument("--pending", help="利用者の答えを待つ Issue")
+    p_wassign.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
+    p_wassign.add_argument("--minutes", type=float, required=True, help="期限 (分)")
+    p_wassign.set_defaults(func=cmd_wait_assignment)
+    p_wdecision = sub.add_parser("wait-decision", help="作業のセッションの待機: 宣言への判定 (開始可・待機・依頼) で終わる")
+    p_wdecision.add_argument("--project", required=True, help="owner/番号")
+    p_wdecision.add_argument("--issue", required=True, help="割り当てを受けた Issue (owner/repo#番号)")
+    p_wdecision.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
+    p_wdecision.add_argument("--declaration", type=int, required=True, help="判定を待つ宣言のコメントの ID")
+    p_wdecision.add_argument("--review-update", action="store_true", help="ready for review の後の宣言の更新 (今の Issue の正常な終わりで stop)")
+    p_wdecision.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
+    p_wdecision.add_argument("--minutes", type=float, required=True, help="期限 (分)")
+    p_wdecision.set_defaults(func=cmd_wait_decision)
 
     p_pr = sub.add_parser("pr", help="PR")
     pr_sub = p_pr.add_subparsers(dest="subcommand", required=True)
