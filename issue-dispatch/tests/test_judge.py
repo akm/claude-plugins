@@ -445,6 +445,23 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual(judge.released_reservations(states[0], None, self.attrs), [])
         self.assertEqual(judge.usage_for(states, None, self.attrs), {"cache": [A9]})
 
+    def test_resource_removed_by_update_after_go_is_released_regardless_of_attribute(self):
+        """ラベルで予約した資源 (属性はデフォルト値 ask) を着手の宣言に書いて `開始可` になり、更新で外した後は、使用に数えない (契機 update は結果に依らず解放する)。
+        宣言に書かれなかった予約 (ask) は答えまで数える。"""
+        events = [{"type": "LabeledEvent", "at": t(9), "label": f"resource:{n}"} for n in ("db", "gpu")]
+        base = [ASSIGN1, decl(400, t(11), resources=("db",)), go(400, t(12), 500)]
+        for update in (decl(401, t(13), resources=(), kind="宣言の更新"),  # 資源を外すだけ (判定しない)
+                       decl(401, t(13), files=(("src/b.py", None),), resources=(), kind="宣言の更新")):  # ファイルも変える (判定の要る更新)
+            mine = item(A9, base + [update], labels=["resource:db", "resource:gpu"], events=events)
+            states = states_of([mine], attrs=self.attrs)
+            self.assertEqual((states[0]["declaration"]["held"], states[0]["reserved"]), ([], ["db", "gpu"]))
+            self.assertEqual(judge.released_reservations(states[0], None, self.attrs), ["db"], "db は外した (無条件)。gpu は宣言に無い予約 (ask) で答え待ち")
+            self.assertEqual(judge.usage_for(states, None, self.attrs), {"gpu": [A9]})
+        other = item(A5, [assign(W8, 1, t(10), 110), decl(410, t(20), files=(("src/c.py", None),), resources=("db",), to=W8)])
+        out = run_judge([mine, other], attrs=self.attrs)
+        self.assertEqual([(j["item"], j["result"]) for j in out["judgments"]], [(A9, "go"), (A5, "go")])
+        self.assertEqual(out["judgments"][1]["reserve"], ["db"])
+
     def test_update_adds_resource_and_releases_removed(self):
         """`開始可` の後の更新は、足した資源の空きを確かめ、外した資源を解放する。"""
         mine = item(A9, [ASSIGN1, decl(400, t(11), resources=("db",)), go(400, t(12), 500), decl(401, t(13), resources=("gpu",), kind="宣言の更新")])
