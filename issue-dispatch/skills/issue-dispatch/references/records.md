@@ -87,6 +87,7 @@
 | `options` | 選択肢の配列。要素は空でない文字列で、重複しない (答えは選択肢と同じ文字列で照合する)。空なら自由回答 |
 | `asked_at` | 尋ねた時刻 |
 | `answer` / `answered_at` | 答えと答えた時刻。未回答はどちらも null。取り下げた問い (`withdraw`) は `answer` が null で `answered_at` がある |
+| `subject` | 問いの対象 (任意。無ければ null)。同じ項目・種類でも対象が違えば別の問い。判定の問いが使う: 資源の名前、相手の宣言 (`<相手の項目>:<相手の宣言の ID>`)、パス付き (`<相手の項目>:<相手の宣言の ID>:<パス>`)。形の正本は [flow.md](flow.md) の「判定」 |
 
 問いの種類 (`kind`) と選択肢 (`options`)。導くのは項目の状態 ([flow.md](flow.md) の「ターンで行うこと」)。答えに従う処理は U15・U16・U21 で決める。
 
@@ -126,7 +127,7 @@
 | `set_body_edit_confirmed` | `item`・`at` | 利用者が確かめた本文の編集の時刻を書く |
 | `set_notice` | `key`・`at` | 項目に紐づかない知らせの報告済みの印を付ける (2 度目は時刻を変えない) |
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と答えを書く |
-| `ask` | `question_id`・`item`・`kind`・`options`・`at` | 問いを記録する (同じ ID の問いが既にあれば誤り。答えを消さないため。既にある問いは `record read` の `questions` で見る) |
+| `ask` | `question_id`・`item`・`kind`・`options`・`at`・`subject` (任意) | 問いを記録する (同じ ID の問いが既にあれば誤り。答えを消さないため。既にある問いは `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 答えを書く (問いが無い・選択肢に無い答えは誤り) |
 | `withdraw` | `question_id`・`at` | 問いを取り下げる (答えを待つ理由が無くなったとき。答えは null のまま `answered_at` を書くので、未回答には数えない。答えのある問いは取り下げられない) |
 

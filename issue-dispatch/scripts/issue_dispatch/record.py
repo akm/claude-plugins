@@ -72,7 +72,7 @@ _SESSION_SHAPE = {"name": (str,), "repo": (str,), "worktree": (str,), "waiting_s
 _ITEM_SHAPE = {"intent": (dict, _NONE), "notified_at": (str, _NONE), "resend_count": (int,), "conflict_choice": (str, _NONE),
                "reported": (dict,), "body_edit_confirmed_at": (str, _NONE)}
 _QUESTION_SHAPE = {"item": (str,), "kind": (str,), "options": (list,), "asked_at": (str,), "answer": (str, _NONE),
-                   "answered_at": (str, _NONE)}
+                   "answered_at": (str, _NONE), "subject": (str, _NONE)}
 _OPT_IN_SHAPE = {"proposed_at": (str,), "answer": (bool, _NONE)}
 
 
@@ -111,6 +111,8 @@ def _check_shape(data, path, project):
     for item, it in data["items"].items():
         _check_element(path, f"items[{item}]", it, _ITEM_SHAPE)
     for qid, q in data["questions"].items():
+        if isinstance(q, dict):
+            q.setdefault("subject", None)  # subject は U15 で足した任意のキー (前の版の記録には無い)
         _check_element(path, f"questions[{qid}]", q, _QUESTION_SHAPE)
     for repo, o in data["opt_in_proposals"].items():
         _check_element(path, f"opt_in_proposals[{repo}]", o, _OPT_IN_SHAPE)
@@ -168,7 +170,7 @@ def _item(rec, item):
 
 
 # 省略できるキー (null でもよい)。それ以外のキーは、無い・null を「欠けている」として差し戻す (R31)
-OPTIONAL_KEYS = {"set_manager_state": ("stop_reason",), "set_opt_in": ("answer",)}
+OPTIONAL_KEYS = {"set_manager_state": ("stop_reason",), "set_opt_in": ("answer",), "ask": ("subject",)}
 
 
 def _need(op, keys, types=None, optional=()):
@@ -316,8 +318,11 @@ def _op_ask(rec, op):
         return "options の要素は空でない文字列 (答えと同じ型で照合するため)"
     if len(set(options)) != len(options):
         return "options に同じ要素が 2 つ以上ある"
+    subject = op.get("subject")
+    if subject is not None and (not isinstance(subject, str) or subject == ""):
+        return "subject は空でない文字列 (質問の対象: 資源の名前・相手の宣言など)"
     rec["questions"][op["question_id"]] = {"item": op["item"], "kind": op["kind"], "options": list(op["options"]),
-                                           "asked_at": op["at"], "answer": None, "answered_at": None}
+                                           "asked_at": op["at"], "answer": None, "answered_at": None, "subject": subject}
 
 
 def _op_answer(rec, op):
