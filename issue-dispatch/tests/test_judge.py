@@ -395,10 +395,25 @@ class ResourceTest(unittest.TestCase):
         b = item(A5, B_GO, position=2)  # A9 と競合しうる相手
         c = item(A6, [assign(W9, 1, t(10), 120), decl(420, t(21), files=(("src/c.py", None),), resources=("cache",), to=W9)], position=3)
         states = states_of([a, b, c], attrs=self.attrs)
-        self.assertEqual(judge.usage_for(states, None, self.attrs), {}, "着手の宣言に無い予約 (属性 release) は `開始可` の前でも数えない")
+        self.assertEqual(judge.usage_for([a, b, c], states, None, self.attrs, LOGIN), {}, "着手の宣言に無い予約 (属性 release) は `開始可` の前でも数えない")
         out = run_judge([a, b, c], attrs=self.attrs)
         self.assertEqual([(j["item"], j["result"]) for j in out["judgments"]], [(A9, "ask"), (A6, "go")])
         self.assertEqual(out["judgments"][1]["reserve"], ["cache"])
+
+    def test_released_reservation_added_back_by_rewrite_is_checked_for_availability(self):
+        """待つ間に解放した予約 (属性 release) を書き直しで足し直すと、予約済みとは扱わず空きを確かめる。別の項目が持っていれば `待機` (理由 `資源`)。"""
+        events = [{"type": "LabeledEvent", "at": t(9), "label": "resource:cache"}]
+        mine = item(A9, [ASSIGN1, decl(400, t(20)), wait(400, t(21), 500, [{"kind": "利用者の答え"}]),
+                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(22), 501),
+                         decl(401, t(23), files=(("src/z.py", None),), resources=("cache",), kind="宣言の更新")], labels=["resource:cache"], events=events)
+        holder = item(A6, [assign(W9, 1, t(10), 120), decl(420, t(11), files=(("src/c.py", None),), resources=("cache",), to=W9), go(420, t(12), 520, to=W9)])
+        states = states_of([mine, holder], attrs=self.attrs)
+        self.assertEqual(judge.released_reservations(mine, states[0], None, self.attrs, LOGIN), ["cache"], "宣言 400 に無かったので解放した")
+        self.assertEqual(judge.released_reservations(mine, states[0], None, self.attrs, LOGIN, before=400), [], "400 より前の宣言は無い")
+        self.assertEqual(judge.usage_for([mine, holder], states, None, self.attrs, LOGIN), {"cache": [A6]})
+        out = run_judge([mine, holder], attrs=self.attrs)
+        j = out["judgments"][0]
+        self.assertEqual((j["declaration"], j["result"], j["waits"], j["reserve"]), (401, "wait", [{"kind": "資源", "resource": "cache"}], []))
 
     def test_update_adds_resource_and_releases_removed(self):
         """`開始可` の後の更新は、足した資源の空きを確かめ、外した資源を解放する。"""
@@ -412,7 +427,7 @@ class ResourceTest(unittest.TestCase):
         mine = item(A9, [ASSIGN1, decl(400, t(11)), go(400, t(12), 500)], labels=["resource:cache", "resource:db", "resource:gpu"],
                     events=[{"type": "LabeledEvent", "at": t(9), "label": f"resource:{n}"} for n in ("cache", "db", "gpu")])
         rec = rec_with(questions=question("release-undeclared", A9, "db", "release"))
-        usage = judge.usage_for(states_of([mine], attrs=self.attrs), rec, self.attrs)
+        usage = judge.usage_for([mine], states_of([mine], attrs=self.attrs), rec, self.attrs, LOGIN)
         self.assertEqual(usage, {"gpu": [A9]})
 
     def test_go_in_the_same_run_makes_the_resource_busy_for_later_declarations(self):
