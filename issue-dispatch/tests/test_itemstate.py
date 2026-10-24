@@ -341,6 +341,19 @@ def _label_event(kind, name, at):
     return {"type": kind, "at": at, "label": name}
 
 
+class DeclaredResourcesTest(unittest.TestCase):
+
+    def test_declared_resources_lists_parsed_declarations_in_order(self):
+        """declared_resources は、今の割り当ての読めた宣言ごとの資源を投稿の順に持ち、差し戻されたかも持つ (読めない宣言は入らない)。"""
+        item = make_item(comments_=[ASSIGN1, wcomment("着手の宣言", None, t(12), 400, body=decl_body(resources=("db",))),
+                                    mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500),
+                                    wcomment("宣言の更新", None, t(14), 401, body="宣言です"),
+                                    wcomment("宣言の更新", None, t(15), 402, body=decl_body(resources=("gpu",)))])
+        d = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["declaration"]
+        self.assertEqual(d["declared_resources"], [{"comment_id": 400, "at": t(12), "resources": ["db"], "returned": True},
+                                                   {"comment_id": 402, "at": t(15), "resources": ["gpu"], "returned": False}])
+
+
 class ResourceUsageTest(unittest.TestCase):
 
     def test_labels_at_assignment_time_from_events(self):

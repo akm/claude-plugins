@@ -233,15 +233,17 @@ def _blocking_reasons(reasons):
 
 def declaration_stage(item, cs, asg, project_number):
     """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・戻り先・自分が足した blockedBy・
-    持っている資源。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
+    持っている資源・読めた宣言ごとの資源 (declared_resources: 投稿の順に comment_id・at・resources・returned (差し戻されたか)。判定が、宣言に無い予約の
+    解放と更新の前に持っていた資源を、コメントを読み直さずに求めるため)。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
     差し戻された宣言を書き直した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、
     `待機` → waiting、`依頼` (宣言の書き直し) → returned、無ければ undecided)。"""
-    go_declaration, go_id, later, judged, prev_returned = None, None, [], None, False
+    go_declaration, go_id, later, judged, prev_returned, declared = None, None, [], None, False, []
     for d in declarations(cs, asg):
         res = results_for(cs, asg, d["comment_id"])
         if d["declaration"] is None:
             kind, needs = None, True
         else:
+            declared.append({"comment_id": d["comment_id"], "at": d["at"], "resources": list(d["declaration"]["resources"]), "returned": res["returned"] is not None})
             kind = declaration.update_kind(go_declaration, d["declaration"], declaration.held_resources(go_declaration, later))
             needs = kind != "resources-removed-only" or prev_returned
         if needs:
@@ -258,7 +260,8 @@ def declaration_stage(item, cs, asg, project_number):
     all_waits = [c for c in _for_assignment(cs, asg) if c["header"]["role"] == "manager" and c["header"]["kind"] == "待機"]
     own = sorted({ids.issue_key(r["issue"]) for c in all_waits for r in _blocking_reasons(c["header"]["values"]["waits"])})
     out = {"judged": judged, "stage": None, "go": None, "wait": None, "returned": None, "manager_blocked": False, "blocked_wait": None,
-           "return_status": None, "own_blockers": own, "waiting_blockers": [], "go_declaration": go_declaration, "go_declaration_id": go_id, "held": held}
+           "return_status": None, "own_blockers": own, "waiting_blockers": [], "go_declaration": go_declaration, "go_declaration_id": go_id, "held": held,
+           "declared_resources": declared}
     if judged is None:
         return out
     res = results_for(cs, asg, judged["comment_id"])

@@ -123,9 +123,9 @@ def _releasable(name, item_key, rec, attrs_table):
             or answer_for(rec, item_key, "release-undeclared", name) == "release")
 
 
-def released_reservations(item, st, rec, attrs_table, login, before=None):
+def released_reservations(st, rec, attrs_table, before=None):
     """割り当てで予約した資源 (reserved) のうち、宣言に無い予約として解放したもの (名前の順)。解放は GitHub への書き込みが無い導出なので、
-    判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。
+    判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。読むのは項目の状態 (declared_resources・held) だけ。
     条件: `開始可` の後は持っている資源 (held) に無い予約、`開始可` の前は今の割り当ての読めた着手の宣言 (書き直しを含む。before を渡せばそのコメントの ID の
     宣言より前のものだけ) のどれかに無い予約で、属性 release_undeclared が release か、問い `release-undeclared` の答えが release のもの。"""
     d = st.get("declaration") or {}
@@ -137,25 +137,20 @@ def released_reservations(item, st, rec, attrs_table, login, before=None):
         sets = [{h.casefold() for h in d.get("held") or []}]
     else:
         # `開始可` の前: 項目はまだ何も持たないので、読めた着手の宣言 (before より前) のどれかに無ければ解放した
-        cs = itemstate.parsed_comments(item, login)
         sets = []
-        for x in itemstate.declarations(cs, st["assignment"]):
+        for x in d.get("declared_resources") or []:
             if x["comment_id"] == before:
                 break
-            if x["declaration"] is not None:
-                sets.append({r.casefold() for r in x["declaration"]["resources"]})
+            sets.append({r.casefold() for r in x["resources"]})
     return sorted(name for name in reserved if any(name.casefold() not in s for s in sets) and _releasable(name, st["key"], rec, attrs_table))
 
 
-def usage_for(items, states, rec, attrs_table, login):
+def usage_for(states, rec, attrs_table):
     """資源の使用 (resources.judge_* の usage)。itemstate.resource_usage から、宣言に無い予約として解放したもの (released_reservations) を除く
     (resource_usage は割り当てのときの予約を割り当て中ずっと数えるため)。"""
     usage = itemstate.resource_usage(states)
-    by_key = _items_by_key(items)
     for st in states:
-        if st["key"] not in by_key:
-            continue
-        for name in released_reservations(by_key[st["key"]], st, rec, attrs_table, login):
+        for name in released_reservations(st, rec, attrs_table):
             _drop_usage(usage, name, st["key"])
     return usage
 
@@ -200,21 +195,18 @@ def _parse_mine(item, judged, rules, table):
     return parsed["declaration"], []
 
 
-def _held_before(item, st, judged, login):
-    """判定する更新の直前に持っていた資源: `開始可` の宣言の resources のうち、その後の (判定する更新より前の) どの更新にも残っているもの。
-    項目の状態の `held` は判定する更新も数えるので、更新で外した資源 (解放するもの) を求めるにはこちらを使う。"""
+def _held_before(st, judged):
+    """判定する更新の直前に持っていた資源: `開始可` の宣言の resources のうち、その後の (判定する更新より前の、差し戻されていない) どの更新にも残っているもの。
+    項目の状態の `held` は判定する更新も数えるので、更新で外した資源 (解放するもの) を求めるにはこちらを使う。読むのは項目の状態の declared_resources。"""
     d = st["declaration"]
-    cs = itemstate.parsed_comments(item, login)
     later, after_go = [], False
-    for x in itemstate.declarations(cs, st["assignment"]):
+    for x in d.get("declared_resources") or []:
         if x["comment_id"] == d["go_declaration_id"]:
             after_go = True
             continue
-        if not after_go or x["comment_id"] == judged["comment_id"] or x["declaration"] is None:
+        if not after_go or x["comment_id"] == judged["comment_id"] or x["returned"]:
             continue
-        if itemstate.results_for(cs, st["assignment"], x["comment_id"])["returned"]:
-            continue
-        later.append(x["declaration"])
+        later.append({"resources": x["resources"]})
     return sorted(declaration.held_resources(d["go_declaration"], later))
 
 
@@ -323,7 +315,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         declared = judged["declaration"]["resources"]
         answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
         # 前の宣言で解放した予約は、もう予約していない (足し直せば新しい資源として空きを確かめる)
-        released = released_reservations(item, st, rec, attrs_table, login, before=decl_id)
+        released = released_reservations(st, rec, attrs_table, before=decl_id)
         reserved = [n for n in st.get("reserved") or [] if n not in released]
         undeclared_answers = {n: answer_for(rec, key, "release-undeclared", n) for n in reserved}
         r = resources.judge_declare(key, declared, reserved, usage, attrs_table or {}, answers, undeclared_answers)
@@ -360,7 +352,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         # 更新 (`開始可` の後): 外した資源を解放し、足した資源は空きを確かめる。宣言に無い予約の概念は無い
         declared = parsed["resources"]
         answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
-        r = {**resources.judge_update(key, judged["update_kind"], _held_before(item, st, judged, login), declared, usage, attrs_table or {}, answers),
+        r = {**resources.judge_update(key, judged["update_kind"], _held_before(st, judged), declared, usage, attrs_table or {}, answers),
              "keep": [], "ask_undeclared": [], "request_rewrite": []}
         j["release"] = r["release"]
     # 4. 競合の可能性 (ready for review の後の資源だけの更新は比べない)
@@ -457,7 +449,7 @@ def judge(items, states, rec, attrs_table, pr_states, read_config, table=None, l
     後の宣言には空いていない。返り値: {"judgments": [judge_one の結果から actions・questions・signals・parsed を除いたもの], "actions", "questions", "signals"}。"""
     table = table if table is not None else filekinds.load_default_table()
     others = go_declarations(items, states, pr_states, login)
-    usage = usage_for(items, states, rec, attrs_table, login)
+    usage = usage_for(states, rec, attrs_table)
     configs = {}
     out = {"judgments": [], "actions": [], "questions": [], "signals": []}
     for entry in pending(items, states):

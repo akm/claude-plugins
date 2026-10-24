@@ -103,7 +103,7 @@
 | `end` | 割り当ての終わり (`kind` が `released` / `normal`・`at`・`released` なら `reason`)。無ければ null |
 | `assigned` | 割り当て中か |
 | `reopened` | 終わった後の reopen (`at`)。無ければ null |
-| `declaration` | `judged` (判定の要る最新の宣言: `comment_id`・`at`・`kind`・`declaration` (JSON。読めなければ null)・`error`・`update_kind`)・`stage`・`go`・`wait` (`comment_id`・`at`・`reasons`)・`returned`・`manager_blocked`・`blocked_wait` (その `待機` の ID)・`return_status`・`own_blockers`・`waiting_blockers` (Issue の参照の配列)・`go_declaration`・`go_declaration_id` (その `開始可` の宣言のコメントの ID)・`held` (名前の順) |
+| `declaration` | `judged` (判定の要る最新の宣言: `comment_id`・`at`・`kind`・`declaration` (JSON。読めなければ null)・`error`・`update_kind`)・`stage`・`go`・`wait` (`comment_id`・`at`・`reasons`)・`returned`・`manager_blocked`・`blocked_wait` (その `待機` の ID)・`return_status`・`own_blockers`・`waiting_blockers` (Issue の参照の配列)・`go_declaration`・`go_declaration_id` (その `開始可` の宣言のコメントの ID)・`held` (名前の順)・`declared_resources` (読めた宣言ごとの `comment_id`・`at`・`resources`・`returned` (差し戻されたか)。投稿の順。判定がコメントを読み直さずに、宣言に無い予約の解放と更新の前に持っていた資源を求める) |
 | `reserved` | 割り当てのときに予約した資源 (名前の順) |
 | `problems` | 導出を続けられるが知らせるもの (`what` が `pr-unreadable`: `PR の報告` の PR が読めない) |
 
