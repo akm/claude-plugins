@@ -127,7 +127,7 @@
 | キー | 内容 |
 | --- | --- |
 | `actions` | 書き込みの候補 (下の表の種類)。`continuation` が真なら途中で止まった書き込みの続き |
-| `questions` | 尋ねること (`kind`・`item`・`options`。種類と選択肢の正本は [records.md](records.md) の問いの表)。記録に同じ項目と種類の未回答の問いがあれば尋ね直さない。記録を失ったために尋ね直すものは `record_lost` が真 |
+| `questions` | 尋ねること (`kind`・`item`・`options`。判定の質問は対象 `subject` も。種類と選択肢の正本は [records.md](records.md) の問いの表)。記録に同じ項目と種類 (と対象) の未回答の問いがあれば尋ね直さない。記録を失ったために尋ね直すものは `record_lost` が真 |
 | `reports` | 1 回だけ報告するもの (`kind`・`item` と内容)。記録の報告済みの印 (`reported`) があるものは返さない |
 | `pending` | 答えを待つ項目 (`question_id`・`item`・`kind`・`asked_at`)。この項目には手を付けない (答えを待つ間の reopen による問いの取り下げを除く) |
 | `record_lost` | 記録を失ったか (記録が無い・前の記録が `ended`) |
@@ -156,12 +156,49 @@
 
 **記録を失ったとき** (記録が無い・前の記録が `ended`): 記録にだけある情報 (割り当ての意図・問いと答え・報告済みの印・確かめた本文の編集の時刻) を失い、同じ導出で続ける。`利用者の答え` を待つ宣言は `user-answer-lost` で尋ね直し、閉じて答えを待つ項目は `close-in-progress` を尋ね直し、報告済みの印が無いので人の変更などを 1 回ずつ報告し直すことがある。確認の対象の項目は、割り当ての前に利用者に確かめ直す (U16)。どれも `record_lost` を真にして返す。
 
-**処理の順**: 項目ごとに、割り当てのある項目の場面 (`引き継ぎ` → 答えを待つ間の reopen → 終わった後の reopen と残った PR → 進行中の close → 担当者 → フィールド → Status → `待機` の続き → 第三者の本文の編集 → PR) → 割り当ての無い項目の `Blocked` の再導出、の順に導き、最後に差分からの人の変更と、Project から除かれた項目を足す。差分の種類の順 (計画の R12) は [observation.md](observation.md)。待っていた宣言の判定し直しの順 (宣言の投稿の順。同じなら Project の中の順) は U15。
+**処理の順**: 項目ごとに、割り当てのある項目の場面 (`引き継ぎ` → 答えを待つ間の reopen → 終わった後の reopen と残った PR → 進行中の close → 担当者 → フィールド → Status → `待機` の続き → 第三者の本文の編集 → PR) → 割り当ての無い項目の `Blocked` の再導出、の順に導き、最後に差分からの人の変更と、Project から除かれた項目を足す。差分の種類の順 (計画の R12) は [observation.md](observation.md)。未判定の宣言の判定の順は下の「判定」。待機していた宣言の再判定は U15 の後半。
+
+## 判定
+
+宣言の判定 (計画の R20・KTD9・KTD14・AE32・AE54)。モジュール `issue-dispatch/scripts/issue_dispatch/judge.py` (関数 `judge.judge`) と CLI の `declaration judge` がこれに従う。競合の可能性の規則は [issue-format.md](issue-format.md) の「競合の可能性」、資源の判断は [resources.md](resources.md) の契機の表、リポジトリの設定の読み方は [repositories.md](repositories.md) が正本で、ここでは言い直さない。
+
+**判定の順序と比較の相手**: 未判定の宣言 (判定の要る最新の宣言で、段階が `undecided` のもの) を、投稿の順 (同じなら Project の中の順) に 1 件ずつ判定する。比較の相手は、その時点で `開始可` になっている宣言 (項目ごとに最新の `開始可` の宣言) だけで、未判定の宣言どうしは比較しない。同じ実行で先に `開始可` にした宣言は後の宣言の相手になり、予約した資源は後の宣言には空いていない。相手の項目の PR が ready for review の後なら、PR が変更したファイルのうち相手の宣言に無いものも、節なしのファイルとして相手に加える。別のリポジトリの宣言とは比較しない。
+
+**1 件の判定**: 上から順に分岐し、結果 (`result`) を `go`・`wait`・`ask`・`request` のどれかに決める。
+
+| 順 | 条件 | 結果 |
+| --- | --- | --- |
+| 1 | リポジトリの設定が読めない (`repo.read_repo_config` が `unreadable`) | `wait`: `待機` (理由 `設定`)。本文に理由と直し方と、直したら管理のセッションに知らせることを書く。そのリポジトリの宣言は判定しない。設定ファイルが無い (`missing`) は読めないことではなく、デフォルトの表だけで照合して進む |
+| 2 | 宣言の形の誤り (コメントの JSON を、リポジトリの規則で種類を付けて `declaration.parse` で検査する) | `request`: `依頼` (宣言の書き直し)。本文に誤りの一覧と使った規則 (リポジトリの設定とデフォルトの表か、デフォルトの表だけか) を書く |
+| 3 | 競合の可能性 (`declaration.conflictability`) の相手ごとの結果 | 相手ごとに、記録の質問の回答で扱いを決める (下の表)。ready for review の後の資源だけを変える更新 (`resources-only`) は比較しない |
+| 4 | 宣言の資源 (着手の宣言は `resources.judge_declare`、更新は `judge_update`。更新で外した資源は解放する) | 空いていない資源があれば属性 `when_busy` に従う。`wait` なら `待機` (理由 `資源`。Status は変えない)。`ask` なら質問 `resource-busy` (対象は資源の名前) を出し、回答まで `待機` (理由 `利用者の答え`)。回答 `wait` は `待機` (理由 `資源`)、`proceed` は進む。3 で待機・質問になった宣言は 4 に進まない (待機中の宣言は新しい資源を持たない) |
+| 5 | 割り当てで予約したのに宣言に無い資源 (着手の宣言だけ) | 属性 `release_undeclared` が `release` なら `開始可` と一緒に解放する。`ask` なら `開始可` を書いてから質問 `release-undeclared` (対象は資源の名前) を出し、回答まで予約を残す。回答 `release` は解放、`keep` は予約を残して `依頼` (宣言の書き直し: その資源を加える) にし、`開始可` は書かない |
+| 6 | どれにも当たらない | `go`: `開始可`。本文に比較した相手の数・予約した資源・解放した資源を書く |
+
+競合の可能性の相手ごとの扱い:
+
+| 相手の結果 | 記録の質問 (種類・対象 `subject`) | 回答と扱い |
+| --- | --- | --- |
+| `conflict` | `conflict`・`<相手の項目>:<相手の宣言の ID>` | 回答が無ければ質問し、回答まで `待機` (理由 `利用者の答え`)。`wait`: `待機` (理由 `Issue` 相手) と、相手を `blockedBy` に追加し Status を `Blocked` にする。`small-pr`: `待機` (理由 `小さな PR` 相手。相手の `小さな PR の報告` があれば PR も) と、相手のセッションへの `依頼` (小さな PR。待つ Issue がこの項目の `依頼` が相手の項目に既にあれば出さない) と `blockedBy`・`Blocked`。`proceed`: 競合しうるまま進む |
+| `needs-user` (種類 `unknown-content` の同じパス) | `unknown-content`・`<相手の項目>:<相手の宣言の ID>:<パス>` | 回答が無ければ質問し、回答まで `待機`。`conflict`: その相手を `conflict` として上の行で扱う。`none`: 競合しない。同じ相手に `conflict` のパスもあれば `conflict` の質問だけを出す |
+
+`待機` の理由には、その時点で待つものをすべて並べる (未回答の質問があれば `利用者の答え` を先頭に、回答済みの相手の `Issue`・`小さな PR` を続ける)。結果は、未回答の質問があれば `ask`、無ければ `wait`。
+
+**質問の対象と書き直し**: 質問は項目・種類・対象 (`subject`) で引き、回答の無いもの (未回答・取り下げ) は回答無しに数える。記録に同じ項目・種類・対象の未回答の質問があれば質問を出し直さない (`待機` は書く)。対象を相手の宣言の ID にするのは、判定を待つ宣言が書き直されて自分の宣言の ID が変わっても、同じ相手への回答を使い、新しい相手だけ質問するため (計画の U15 の Approach 2)。小さな PR の `依頼` と `小さな PR の報告` は前の宣言の ID で対応づけたまま読み、新しい `依頼` は出さない。前の `待機` のために書いた `Blocked` と `blockedBy` は、新しい判定で `Issue`・`小さな PR` を待たなければ Status を `In Progress` に戻し、自分が足した `blockedBy` のうち待たなくなった相手は外す候補 (`blocked-by-remove`) にする。待つ相手が変われば、新しい相手を追加し前の相手を外す候補にする。記録の項目の `conflict_choice` は判定では使わない (`conflict` の質問の回答で代える)。
+
+**`開始可` を書く直前の比較**: 判定は常にその時点の `開始可` の宣言すべてと比較するので、利用者の回答や待機の解消の後に `開始可` を書くときも、その間に `開始可` になった宣言と比べ直すことになる (AE54)。例外は ready for review の後の資源だけを変える更新で、比較しない。
+
+**資源の使用** (`judge.usage_for`): `item state` の `usage` から、`開始可` の後に宣言に無い予約のうち解放するもの (属性 `release_undeclared` が `release`、または質問 `release-undeclared` の回答が `release`) を除く。
+
+**返すもの**: `judgments` (宣言ごと: `item`・`declaration`・`to`・`assignment`・`update_kind`・`repo_config` (読み取りの結果の `status`)・`result`・`waits` (`待機` の理由)・`compared` (比較した相手の宣言の ID)・`recompared` (ファイルの競合の可能性を比較したか)・`reserve`・`release`・`keep` (回答を待つ予約))、`actions` (「ターンで行うこと」の種類。宣言ごとにコメントを先にする (R24))、`questions` (`subject` 付き)、`signals` (作業のセッションに送る合図: `kind` が `go`・`wait`・`request`、`to`・`item`・`declaration`。`request` は `request_kind` も。送り方は U17)。`declaration judge` 自身は書かない。
+
+待機の解消 (相手の割り当ての終了・小さな PR のマージ・資源の解放・設定が読めるようになったこと・回答) の検出と再判定、質問 `small-pr-closed` は U15 の後半。
 
 ## CLI
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
+| `declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]` | 無し | `judgments`・`actions`・`questions`・`signals` (「判定」)・`record_lost`・`problems`・`rate_limit`・`warnings`・`errors`。入力は `item state` と同じで、リポジトリの設定は設定の `repositories` の clone から読む。`--issue` はその項目の宣言だけ判定する (比較の相手はすべての項目から集める) |
 | `item state --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>] [--diffs <ファイル \| ->]` | 無し | `items` (割り当てのある項目の状態。上の表)・`usage`・`actions`・`questions`・`reports`・`pending`・`record_lost` (「ターンで行うこと」)・`problems`・`rate_limit`・`warnings`・`errors`。設定の `project`・`resources` (属性)・`third_party_edit_check` と、記録 (無ければ記録を失った扱い。壊れていれば `errors` (key `record`)) と、Project のメタ情報 (ワークフローの有効・無効) を読む。`--diffs` は `observe diff` の出力 (JSON)。項目の一覧そのものが欠ければ (`problems` の `what` が `items-page`・`graphql-errors`) 導かずに `errors` (key `partial`) |
 | `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (決まりの正本は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
 | `work check --project <owner>/<番号> --issue <owner/repo#番号> [--session <ID>]` | 無し | `session`・上の表の値・`problems`・`rate_limit`・`errors`。`--session` を省けば環境変数 (`CLAUDE_CODE_HOST_SESSION_ID`、無ければ `CLAUDE_CODE_SESSION_ID`)。項目が無ければ `errors` (key `issue`) |
