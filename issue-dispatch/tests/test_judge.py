@@ -596,6 +596,15 @@ class CliTest(FakeGhCase):
         self.assertEqual(out["signals"][0]["kind"], "request")
         self.assertFalse(any("mutation" in (r.get("stdin") or "") for r in self.recorded_full()), "書き込みの gh を実行しない")
 
+    def test_declaration_judge_cli_rejects_bad_or_missing_issue(self):
+        """--issue が参照の形でなければ gh を読まずに errors、Project に無い項目なら rejected。どちらも全項目を判定しない。"""
+        code, out, err = self.cli("declaration", "judge", "--dir", self.manager, "--issue", "#3")
+        self.assertEqual((code, out["status"], out["errors"][0]["key"], out["judgments"]), (0, "error", "issue", []), err)
+        self.assertEqual(self.recorded_full(), [], "gh を実行しない")
+        self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: self._item3(nodes, [ASSIGN1, decl(400, t(20))]))}])
+        code, out, err = self.cli("declaration", "judge", "--dir", self.manager, "--issue", f"{A}#999")
+        self.assertEqual((code, out["status"], out["errors"][0]["key"], out["judgments"]), (0, "rejected", "issue", []), err)
+
     def test_declaration_judge_cli_waits_when_repository_is_not_configured(self):
         """設定の repositories に無いリポジトリの宣言は `待機` (理由 `設定`)。"""
         self.write_config({"project": {"owner": "akm", "number": 3}, "record_dir": "rec"})

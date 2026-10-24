@@ -778,17 +778,25 @@ def cmd_declaration_parse(args):
 
 def cmd_declaration_judge(args):
     """未判定の宣言の判定 (judge.judge)。項目の状態と同じ入力を読み、リポジトリの設定は設定の repositories の clone から読む。書き込みはしない。"""
+    empty = {"judgments": [], "actions": [], "questions": [], "signals": []}
+    only = ids.issue_key(args.issue) if args.issue else None
+    if args.issue and only is None:
+        _emit({"status": "error", **empty, "errors": [{"key": "issue", "message": f"--issue は owner/repo#番号 か URL (値 {args.issue!r})", "failure": None}]})
+        return 0
     inputs, error = _item_state_inputs(args)
     if error:
-        _emit({**error, "judgments": [], "actions": [], "questions": [], "signals": []})
+        _emit({**error, **empty})
         return 0
     result, login = inputs["result"], inputs["login"]
     items = [it for it in result["items"] if it.get("key")]
+    if only is not None and not any(ids.same_issue(it["key"], only) for it in items):
+        _emit({"status": "rejected", **empty, "errors": [{"key": "issue", "message": f"Project に項目 {args.issue!r} が無い", "failure": None}]})
+        return 0
     pr_states, pr_problems = _read_report_prs(items, login)
     states = [itemstate.derive(it, login, pr_states, inputs["parsed"]["number"], inputs["table"]) for it in items]
     repositories = inputs["config"].get("repositories") or {}
     out = judge.judge(items, states, inputs["rec"], inputs["table"], pr_states, lambda name: repo.read_repo_config(repositories, name),
-                      filekinds.load_default_table(), login=login, only=ids.issue_key(args.issue) if args.issue else None)
+                      filekinds.load_default_table(), login=login, only=only)
     problems = result["problems"] + pr_problems
     _emit({"status": "partial" if problems else "ok", **out, "record_lost": itemstate.record_lost(inputs["rec"]), "problems": problems,
            "rate_limit": result["rate_limit"], "warnings": inputs["warnings"], "errors": []})
