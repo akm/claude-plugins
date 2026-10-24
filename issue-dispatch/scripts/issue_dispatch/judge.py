@@ -21,25 +21,26 @@ _PR_URL_RE = re.compile(rf"https://github\.com/{ids.REPO_NAME_PATTERN}/pull/[1-9
 
 # --- 記録の問いの答え ------------------------------------------------------------------
 
-def _questions(rec, item, kind, subject):
-    """記録の問いのうち、項目 (owner/repo の大文字小文字を区別しない)・種類・対象 (subject。大文字小文字を区別しない) が同じもの。"""
+def _questions(rec, item, kind, subject, since):
+    """記録の問いのうち、項目 (owner/repo の大文字小文字を区別しない)・種類・対象 (subject。大文字小文字を区別しない) が同じで、尋ねた時刻 (asked_at) が
+    since (今の割り当ての `割り当て` の時刻) 以後のもの。前の割り当ての問いと答えは、資源・宣言・相手が新しくなるので今の判定の材料にしない
+    (flow.md の「質問の対象と書き直し」)。"""
     folded = subject.casefold() if isinstance(subject, str) else None
     return [q for q in ((rec or {}).get("questions") or {}).values()
             if ids.same_issue(q.get("item"), item) and q.get("kind") == kind
-            and (q.get("subject").casefold() if isinstance(q.get("subject"), str) else None) == folded]
+            and (q.get("subject").casefold() if isinstance(q.get("subject"), str) else None) == folded
+            and (q.get("asked_at") or "") >= (since or "")]
 
 
-def answer_for(rec, item, kind, subject):
-    """項目・種類・対象が同じ問いの最新の答え。答えが無い (未回答・取り下げ (answer が null)) なら None。"""
-    answered = [q for q in _questions(rec, item, kind, subject) if q.get("answer") is not None]
-    if not answered:
-        return None
-    return max(answered, key=lambda q: q.get("answered_at") or "")["answer"]
+def answer_for(rec, item, kind, subject, since):
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の問いの最新の答え。答えが無い (未回答・取り下げ (answer が null)) なら None。"""
+    q = answered_question(rec, item, kind, subject, since)
+    return None if q is None else q["answer"]
 
 
-def answered_question(rec, item, kind, subject):
-    """項目・種類・対象が同じ問いのうち、答えのある最新のもの (dict)。無ければ None。"""
-    answered = [q for q in _questions(rec, item, kind, subject) if q.get("answer") is not None]
+def answered_question(rec, item, kind, subject, since):
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の問いのうち、答えのある最新のもの (dict)。無ければ None。"""
+    answered = [q for q in _questions(rec, item, kind, subject, since) if q.get("answer") is not None]
     return max(answered, key=lambda q: q.get("answered_at") or "") if answered else None
 
 
@@ -57,18 +58,18 @@ def released_since(st, name, at):
 
 
 def busy_answers(st, rec, names):
-    """問い resource-busy の答え (資源の名前 → 答え)。答えの後にその資源を解放していれば、別の使用への答えなので読まない (無回答と同じ)。"""
+    """問い resource-busy の答え (資源の名前 → 答え)。今の割り当ての問いだけを読み、答えの後にその資源を解放していれば、別の使用への答えなので読まない (無回答と同じ)。"""
     out = {}
     for n in names:
-        q = answered_question(rec, st["key"], "resource-busy", n)
+        q = answered_question(rec, st["key"], "resource-busy", n, st["assignment"]["at"])
         if q is not None and not released_since(st, n, q.get("answered_at")):
             out[n] = q["answer"]
     return out
 
 
-def asked(rec, item, kind, subject):
-    """項目・種類・対象が同じ未回答の問い (答えも取り下げも無い) が記録にあるか。あれば尋ね直さない。"""
-    return any(q.get("answered_at") is None for q in _questions(rec, item, kind, subject))
+def asked(rec, item, kind, subject, since):
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の問い (答えも取り下げも無い) が記録にあるか。あれば尋ね直さない。"""
+    return any(q.get("answered_at") is None for q in _questions(rec, item, kind, subject, since))
 
 
 # --- 判定の順と比べる相手 ----------------------------------------------------------------
@@ -147,9 +148,9 @@ def _drop_usage(usage, name, item):
         del usage[key]
 
 
-def _releasable(name, item_key, rec, attrs_table):
+def _releasable(name, st, rec, attrs_table):
     return (resources.attributes_of(attrs_table or {}, name)["release_undeclared"] == "release"
-            or answer_for(rec, item_key, "release-undeclared", name) == "release")
+            or answer_for(rec, st["key"], "release-undeclared", name, st["assignment"]["at"]) == "release")
 
 
 def released_reservations(st, rec, attrs_table, before=None):
@@ -170,14 +171,14 @@ def released_reservations(st, rec, attrs_table, before=None):
         held = {h.casefold() for h in d.get("held") or []}
         ever_held = {r.casefold() for x in d.get("declared_resources") or [] if x.get("go") for r in x["resources"]}
         return sorted(name for name in reserved if name.casefold() not in held
-                      and (name.casefold() in ever_held or _releasable(name, st["key"], rec, attrs_table)))
+                      and (name.casefold() in ever_held or _releasable(name, st, rec, attrs_table)))
     # `開始可` の前: 項目はまだ何も持たないので、読めた着手の宣言 (before より前) のどれかに無ければ解放した (release_undeclared に従う)
     sets = []
     for x in d.get("declared_resources") or []:
         if x["comment_id"] == before:
             break
         sets.append({r.casefold() for r in x["resources"]})
-    return sorted(name for name in reserved if any(name.casefold() not in s for s in sets) and _releasable(name, st["key"], rec, attrs_table))
+    return sorted(name for name in reserved if any(name.casefold() not in s for s in sets) and _releasable(name, st, rec, attrs_table))
 
 
 def usage_for(states, rec, attrs_table):
@@ -352,11 +353,11 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         # 前の宣言で解放した予約は、もう予約していない (足し直せば新しい資源として空きを確かめる)
         released = released_reservations(st, rec, attrs_table, before=decl_id)
         reserved = [n for n in st.get("reserved") or [] if n not in released]
-        undeclared_answers = {n: answer_for(rec, key, "release-undeclared", n) for n in reserved}
+        undeclared_answers = {n: answer_for(rec, key, "release-undeclared", n, asg["at"]) for n in reserved}
         r = resources.judge_declare(key, declared, reserved, usage, attrs_table or {}, answers, undeclared_answers)
         j["release"], j["keep"] = r["release"], r["keep"]
         for n in r["ask_undeclared"]:
-            if not asked(rec, key, "release-undeclared", n):
+            if not asked(rec, key, "release-undeclared", n, asg["at"]):
                 j["questions"].append(_question("release-undeclared", key, n, decl_id, resource=n))
         if r["request_rewrite"]:
             j["result"] = "request"
@@ -407,20 +408,20 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
                 # unknown-content の同じパス: 競合しうるかを利用者に尋ねる (相手の宣言とパスが対象)
                 for p in [p for p in res["paths"] if p["result"] == "needs-user"]:
                     subject = f"{o['item']}:{o['id']}:{p['path']}"
-                    answer = answer_for(rec, key, "unknown-content", subject)
+                    answer = answer_for(rec, key, "unknown-content", subject, asg["at"])
                     if answer == "conflict":
                         conflict_paths.append(p)
                     elif answer is None:
                         unanswered = True
-                        if not asked(rec, key, "unknown-content", subject):
+                        if not asked(rec, key, "unknown-content", subject, asg["at"]):
                             j["questions"].append(_question("unknown-content", key, subject, decl_id, other=other_ref, path=p["path"]))
             if not conflict_paths:
                 continue
             subject = f"{o['item']}:{o['id']}"
-            answer = answer_for(rec, key, "conflict", subject)
+            answer = answer_for(rec, key, "conflict", subject, asg["at"])
             if answer is None:
                 unanswered = True
-                if not asked(rec, key, "conflict", subject):
+                if not asked(rec, key, "conflict", subject, asg["at"]):
                     j["questions"].append(_question("conflict", key, subject, decl_id, other=other_ref, paths=conflict_paths))
             elif answer == "wait":
                 waits.append({"kind": "Issue", "issue": o["item"]})
@@ -457,7 +458,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     if r["ask"]:
         res_waits.insert(0, dict(_USER_ANSWER))
         for n in r["ask"]:
-            if not asked(rec, key, "resource-busy", n):
+            if not asked(rec, key, "resource-busy", n, asg["at"]):
                 j["questions"].append(_question("resource-busy", key, n, decl_id, resource=n, holders=resources.holders(usage, n, key)))
     if res_waits:
         j["result"], j["waits"] = ("ask" if r["ask"] else "wait"), res_waits

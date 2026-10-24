@@ -75,8 +75,9 @@ def states_of(items, pr_states=None, attrs=None):
 
 
 def question(kind, item_key, subject, answer=None, qid="q1", asked=None):
-    return {qid: {"item": item_key, "kind": kind, "options": list(judge.QUESTION_OPTIONS[kind]), "asked_at": asked or t(5), "answer": answer,
-                  "answered_at": t(6) if answer is not None else None, "subject": subject}}
+    # 尋ねた時刻は、固定の割り当て (ASSIGN1。t(10)) の後にする (判定は今の割り当ての質問だけを読む)
+    return {qid: {"item": item_key, "kind": kind, "options": list(judge.QUESTION_OPTIONS[kind]), "asked_at": asked or t(11), "answer": answer,
+                  "answered_at": t(12) if answer is not None else None, "subject": subject}}
 
 
 def run_judge(items, rec=None, read=None, attrs=None, pr_states=None, only=None):
@@ -360,6 +361,26 @@ class ResourceTest(unittest.TestCase):
                          decl(402, t(25), resources=("gpu",), kind="宣言の更新")])
         out = run_judge([redo, holder], rec=rec, attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"], out["questions"]), ("go", ["gpu"], []))
+
+    def test_questions_of_a_previous_assignment_are_not_read(self):
+        """前の割り当ての回答 (resource-busy・conflict) と未回答の質問は、新しい割り当ての判定で読まない (割り当てが終われば資源・宣言・相手が新しくなる)。"""
+        release = mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "解除"}, t(100), 150)
+        prev = [ASSIGN1, decl(400, t(20), resources=("gpu",)), go(400, t(23), 500), release]
+        assign2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
+        # 前の割り当てで proceed と答えた gpu: 新しい割り当ての宣言では尋ねる
+        rec = rec_with(questions=question("resource-busy", A9, "gpu", "proceed", asked=t(21)))
+        mine = item(A9, prev + [assign2, decl(700, t(210), resources=("gpu",))])
+        out = run_judge([mine, self._holder("gpu")], rec=rec, attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["assignment"], out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), (2, "ask", ["resource-busy"]))
+        # 前の割り当ての未回答の質問が残っていても、新しい割り当てでは質問を出す
+        rec = rec_with(questions=question("conflict", A9, f"{A5}:410", asked=t(21)))
+        mine = item(A9, prev + [assign2, decl(700, t(210))])
+        out = run_judge([mine, item(A5, B_GO)], rec=rec, attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["conflict"]))
+        # 前の割り当てで wait と答えた相手: 新しい割り当てでは読まずに尋ねる
+        rec = rec_with(questions=question("conflict", A9, f"{A5}:410", "wait", asked=t(21)))
+        out = run_judge([mine, item(A5, B_GO)], rec=rec, attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["conflict"]))
 
     def test_resources_are_not_judged_while_conflict_waits(self):
         """競合の可能性で待つ・尋ねる宣言は、資源の空きを確かめない (待っている宣言は新しい資源を持たない)。"""
@@ -668,9 +689,10 @@ class DocTest(unittest.TestCase):
                                     {"op": "withdraw", "question_id": "q2", "at": t(4)}])
         self.assertEqual(errors, [])
         self.assertEqual(rec["questions"]["q1"]["subject"], f"{A5}:410")
-        self.assertEqual(judge.answer_for(rec, A9, "conflict", f"{A5}:410"), "wait")
-        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A6}:420"), "取り下げた問いは答えに数えない")
-        self.assertIsNone(judge.answer_for(rec, A9, "conflict", None))
+        self.assertEqual(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(0)), "wait")
+        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A6}:420", t(0)), "取り下げた問いは答えに数えない")
+        self.assertIsNone(judge.answer_for(rec, A9, "conflict", None, t(0)))
+        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(2)), "尋ねた時刻が割り当ての時刻より前の問いは読まない")
         _, errors = record.apply(rec, [{"op": "ask", "question_id": "q3", "item": A9, "kind": "conflict", "options": ["wait"], "at": t(5), "subject": ""}])
         self.assertEqual([e["message"] for e in errors], ["subject は空でない文字列 (質問の対象: 資源の名前・相手の宣言など)"])
 
