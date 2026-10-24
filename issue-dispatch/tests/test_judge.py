@@ -388,6 +388,30 @@ class ResourceTest(unittest.TestCase):
         out = run_judge([mine, item(A5, B_GO)], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], kinds(out["actions"])), ("request", [("comment", "依頼")]))
 
+    def test_undeclared_reservation_is_handled_before_config_and_form_checks(self):
+        """宣言に無い予約の扱いは、リポジトリの設定が読めないときも、規則での形の誤りのときも行い、結果と本文に載せる (資源の使用と食い違わないため)。"""
+        events = [{"type": "LabeledEvent", "at": t(9), "label": f"resource:{n}"} for n in ("cache", "db")]
+        mine = item(A9, [ASSIGN1, decl(400, t(20), files=(("src/a.py", [["f"]]),), resources=("gpu",))], labels=["resource:cache", "resource:db"], events=events)
+        out = run_judge([mine], read=reader(UNREADABLE_CONFIG), attrs=self.attrs)
+        j = out["judgments"][0]
+        self.assertEqual((j["result"], j["waits"], j["release"], j["keep"]), ("wait", [{"kind": "設定"}], ["cache"], ["db"]))
+        self.assertEqual([q["kind"] for q in out["questions"]], ["release-undeclared"])
+        self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"])
+        self.assertIn("答えを待つ予約 (宣言に無い資源。解放してよいか利用者に尋ねている): db", out["actions"][0]["body"])
+        out = run_judge([mine], read=reader(ok_config([{"pattern": "src/**", "kind": "unknown-structure"}])), attrs=self.attrs)
+        j = out["judgments"][0]
+        self.assertEqual((j["result"], j["release"], j["keep"], kinds(out["actions"])), ("request", ["cache"], ["db"], [("comment", "依頼")]))
+        self.assertIn("files[0].units", out["actions"][0]["body"])
+        self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"])
+        out = run_judge([mine], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["release"]), ("request", ["cache"]))
+        self.assertIn("資源 db は", out["actions"][0]["body"])
+        self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"], "書き直しの依頼の本文にも解放した資源を書く")
+        unreadable = item(A9, [ASSIGN1, decl(400, t(20), body="宣言です")], labels=["resource:cache"], events=events[:1])
+        out = run_judge([unreadable], attrs=self.attrs)
+        self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["release"]), ("request", []), "JSON が読めない宣言は資源も分からないので解放しない")
+        self.assertEqual(judge.usage_for([unreadable], states_of([unreadable], attrs=self.attrs), None, self.attrs, LOGIN), {"cache": [A9]})
+
     def test_release_while_waiting_frees_the_resource_for_later_declarations_and_usage(self):
         """待つ宣言が解放した予約は、同じ実行の後の宣言と usage_for の両方で使用中でなくなる。"""
         events = [{"type": "LabeledEvent", "at": t(9), "label": "resource:cache"}]

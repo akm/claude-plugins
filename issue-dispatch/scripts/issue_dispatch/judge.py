@@ -316,48 +316,54 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     j = {"item": key, "declaration": decl_id, "to": asg["to"], "assignment": asg["number"], "update_kind": judged.get("update_kind"),
          "repo_config": repo_config["status"], "result": None, "waits": [], "compared": [], "recompared": False, "reserve": [], "release": [], "keep": [],
          "parsed": None, "actions": [], "questions": [], "signals": []}
-    # 1. リポジトリの設定
-    rules, rule_text = rules_for(repo_config)
-    if rules is None:
-        j["result"], j["waits"] = "wait", [{"kind": "設定"}]
-        body = (f"リポジトリ {item['repo']} の設定を読めないので、この宣言の判定を止めている。理由: {repo_config.get('message')}。"
-                f"直し方: {repo_config.get('fix') or '-'}。直したら管理のセッションに知らせる (設定を直したことは GitHub に現れないため)。")
-        j["actions"].append(_comment(key, "待機", {**base, "waits": j["waits"]}, body))
-        j["signals"].append(_signal("wait", asg["to"], key, decl_id))
-        return j
-    # 2. 宣言の形
-    parsed, errors = _parse_mine(item, judged, rules, table)
-    if parsed is None:
-        j["result"] = "request"
-        body = "宣言の形の誤り:\n" + "\n".join(f"- {e}" for e in errors) + f"\n\n使った規則: {rule_text}。直した宣言を `宣言の更新` で投稿する。"
-        j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の書き直し"}, body))
-        j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の書き直し"))
-        return j
-    j["parsed"] = parsed
-    # 3. 宣言に無い予約 (着手の宣言だけ)。結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待つ経路でも出し、
-    #    解放してはいけないと答えた資源があれば書き直しを頼んで終わる (予約は残す)
-    declared = parsed["resources"]
-    answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
-    if judged.get("update_kind") in (None, "initial"):
+    # 1. 宣言に無い予約 (着手の宣言だけ)。資源はリポジトリの規則に依らず itemstate が読んだ宣言から分かるので、設定の読み取りと形の検査の前に
+    #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待つ経路でも出し、解放してはいけないと答えた資源が
+    #    あれば書き直しを頼んで終わる (予約は残す)。解放した資源と答えを待つ予約は、どの経路の本文にも書く (_undeclared_lines)
+    r = None
+    if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
+        declared = judged["declaration"]["resources"]
+        answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
         # 前の宣言で解放した予約は、もう予約していない (足し直せば新しい資源として空きを確かめる)
         released = released_reservations(item, st, rec, attrs_table, login, before=decl_id)
         reserved = [n for n in st.get("reserved") or [] if n not in released]
         undeclared_answers = {n: answer_for(rec, key, "release-undeclared", n) for n in reserved}
         r = resources.judge_declare(key, declared, reserved, usage, attrs_table or {}, answers, undeclared_answers)
-    else:
-        r = {**resources.judge_update(key, judged["update_kind"], _held_before(item, st, judged, login), declared, usage, attrs_table or {}, answers),
-             "keep": [], "ask_undeclared": [], "request_rewrite": []}
-    j["release"], j["keep"] = r["release"], r["keep"]
-    for n in r["ask_undeclared"]:
-        if not asked(rec, key, "release-undeclared", n):
-            j["questions"].append(_question("release-undeclared", key, n, decl_id, resource=n))
-    if r["request_rewrite"]:
+        j["release"], j["keep"] = r["release"], r["keep"]
+        for n in r["ask_undeclared"]:
+            if not asked(rec, key, "release-undeclared", n):
+                j["questions"].append(_question("release-undeclared", key, n, decl_id, resource=n))
+        if r["request_rewrite"]:
+            j["result"] = "request"
+            body = (f"資源 {', '.join(r['request_rewrite'])} は、割り当てで予約したのに宣言に無く、解放してはいけないと利用者が答えたので予約を残している。"
+                    f"この資源を resources に加えた宣言を `宣言の更新` で投稿する。" + _undeclared_lines(j))
+            j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の書き直し"}, body))
+            j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の書き直し"))
+            return j
+    # 2. リポジトリの設定
+    rules, rule_text = rules_for(repo_config)
+    if rules is None:
+        j["result"], j["waits"] = "wait", [{"kind": "設定"}]
+        body = (f"リポジトリ {item['repo']} の設定を読めないので、この宣言の判定を止めている。理由: {repo_config.get('message')}。"
+                f"直し方: {repo_config.get('fix') or '-'}。直したら管理のセッションに知らせる (設定を直したことは GitHub に現れないため)。" + _undeclared_lines(j))
+        j["actions"].append(_comment(key, "待機", {**base, "waits": j["waits"]}, body))
+        j["signals"].append(_signal("wait", asg["to"], key, decl_id))
+        return j
+    # 3. 宣言の形
+    parsed, errors = _parse_mine(item, judged, rules, table)
+    if parsed is None:
         j["result"] = "request"
-        body = (f"資源 {', '.join(r['request_rewrite'])} は、割り当てで予約したのに宣言に無く、解放してはいけないと利用者が答えたので予約を残している。"
-                f"この資源を resources に加えた宣言を `宣言の更新` で投稿する。")
+        body = "宣言の形の誤り:\n" + "\n".join(f"- {e}" for e in errors) + f"\n\n使った規則: {rule_text}。直した宣言を `宣言の更新` で投稿する。" + _undeclared_lines(j)
         j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の書き直し"}, body))
         j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の書き直し"))
         return j
+    j["parsed"] = parsed
+    if r is None:
+        # 更新 (`開始可` の後): 外した資源を解放し、足した資源は空きを確かめる。宣言に無い予約の概念は無い
+        declared = parsed["resources"]
+        answers = {n: answer_for(rec, key, "resource-busy", n) for n in declared}
+        r = {**resources.judge_update(key, judged["update_kind"], _held_before(item, st, judged, login), declared, usage, attrs_table or {}, answers),
+             "keep": [], "ask_undeclared": [], "request_rewrite": []}
+        j["release"] = r["release"]
     # 4. 競合の可能性 (ready for review の後の資源だけの更新は比べない)
     recompare = not (st.get("pr") and itemstate.pr_ready(st["pr"]) and judged.get("update_kind") == "resources-only")
     j["recompared"] = recompare
@@ -420,7 +426,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         j["signals"] += request_signals
         return j
-    # 5. 資源の空き (競合の可能性で待つ・尋ねる宣言は、新しい資源の空きを確かめない)
+    # 5. 資源の空き (競合の可能性で待つ・尋ねる宣言は、新しい資源の空きを確かめない。1 か 3 で求めた r を使う)
     res_waits = [{"kind": "資源", "resource": n} for n in r["wait_for"]]
     if r["ask"]:
         res_waits.insert(0, dict(_USER_ANSWER))
@@ -433,7 +439,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["actions"] += _restore_and_removals(item, d, [])
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         return j
-    # 6. 開始可 (宣言に無い予約の問いは 3 で出してある。`開始可` を書いてから答えを待つ)
+    # 6. 開始可 (宣言に無い予約の問いは 1 で出してある。`開始可` を書いてから答えを待つ)
     j["result"], j["reserve"] = "go", r["reserve"]
     j["actions"].append(_comment(key, "開始可", base, _go_body(j, j["compared"], proceeds, recompare, rule_text)))
     j["actions"] += _restore_and_removals(item, d, [])
