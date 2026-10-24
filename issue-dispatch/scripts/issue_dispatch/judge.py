@@ -93,7 +93,8 @@ def pending(items, states):
 
 def go_declarations(items, states, pr_states, login):
     """比べる相手: 既に `開始可` になった宣言 (項目ごとに最新の `開始可` の宣言)。ready for review の後の PR が変えた、宣言に無いファイル (pr_paths) も相手に加える。
-    要素は {"id", "item", "repo", "declaration", "pr_paths", "to", "assignment", "comments" (項目の解析済みのコメント)}。"""
+    要素は {"id", "item", "repo", "declaration", "pr_paths", "to", "assignment", "item_data" (項目), "login"} (相手のコメントは、答えが small-pr の相手について
+    `小さな PR の報告`・`依頼` を探すときだけ _other_comments で解析する)。"""
     by_key = _items_by_key(items)
     out = []
     for st in states:
@@ -117,7 +118,14 @@ def go_declarations(items, states, pr_states, login):
 
 def _other(decl_id, item, state, decl, pr_paths, login):
     return {"id": decl_id, "item": item["key"], "repo": item["repo"], "declaration": decl, "pr_paths": pr_paths, "to": state["assignment"]["to"],
-            "assignment": state["assignment"]["number"], "comments": itemstate.parsed_comments(item, login)}
+            "assignment": state["assignment"]["number"], "item_data": item, "login": login}
+
+
+def _other_comments(other):
+    """相手の項目の解析済みのコメント。使うときに 1 回だけ解析し、other に入れて次からはそれを返す。"""
+    if "comments" not in other:
+        other["comments"] = itemstate.parsed_comments(other["item_data"], other["login"])
+    return other["comments"]
 
 
 def _other_files(other, rules, table):
@@ -248,7 +256,7 @@ def _held_before(st, judged):
 
 def _small_pr_report(other, item_key):
     """相手の項目の `小さな PR の報告` のうち、待つ Issue がこの項目のものの最新の PR の URL。無ければ None。"""
-    for c in reversed(other["comments"]):
+    for c in reversed(_other_comments(other)):
         h = c["header"]
         if h["role"] == "worker" and h["kind"] == "小さな PR の報告" and ids.same_issue(h["values"].get("waiting_issue"), item_key):
             m = _PR_URL_RE.search(c["text"] or "")
@@ -259,7 +267,7 @@ def _small_pr_report(other, item_key):
 
 def _small_pr_requested(other, item_key):
     """相手の今の割り当てのセッションに、待つ Issue がこの項目の `依頼` (小さな PR) を既に書いたか (宣言の書き直しで待つ側の宣言の ID が変わっても、同じ依頼とみなす)。"""
-    for c in other["comments"]:
+    for c in _other_comments(other):
         h = c["header"]
         v = h["values"]
         if (h["role"] == "manager" and h["kind"] == "依頼" and v.get("request_kind") == "小さな PR" and v.get("to") == other["to"]
