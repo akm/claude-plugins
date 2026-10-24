@@ -126,25 +126,24 @@ def _releasable(name, item_key, rec, attrs_table):
 def released_reservations(item, st, rec, attrs_table, login, before=None):
     """割り当てで予約した資源 (reserved) のうち、宣言に無い予約として解放したもの (名前の順)。解放は GitHub への書き込みが無い導出なので、
     判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。
-    条件: 今の割り当ての読めた着手の宣言 (`開始可` の前の書き直しを含む。before を渡せばそのコメントの ID の宣言より前のものだけ) のどれかに無い、
-    または `開始可` の後なら持っている資源 (held) に無い予約で、属性 release_undeclared が release か、問い `release-undeclared` の答えが release のもの。"""
+    条件: `開始可` の後は持っている資源 (held) に無い予約、`開始可` の前は今の割り当ての読めた着手の宣言 (書き直しを含む。before を渡せばそのコメントの ID の
+    宣言より前のものだけ) のどれかに無い予約で、属性 release_undeclared が release か、問い `release-undeclared` の答えが release のもの。"""
     d = st.get("declaration") or {}
     reserved = st.get("reserved") or []
     if not st.get("assigned") or not reserved or not d:
         return []
-    cs = itemstate.parsed_comments(item, login)
-    go_id = d.get("go_declaration_id")
-    sets = []
-    for x in itemstate.declarations(cs, st["assignment"]):
-        if x["comment_id"] == before:
-            break
-        if x["declaration"] is None:
-            continue
-        sets.append({r.casefold() for r in x["declaration"]["resources"]})
-        if x["comment_id"] == go_id:
-            break  # `開始可` の後の宣言は更新 (予約ではなく持っている資源の扱い)
-    if go_id is not None and before is None:
-        sets.append({h.casefold() for h in d.get("held") or []})
+    if d.get("go_declaration_id") is not None and before is None:
+        # `開始可` の後: 持っている資源 (held) が今の状態 (後の宣言で足し直して予約し直したものを含む)。`開始可` の前の宣言は見ない
+        sets = [{h.casefold() for h in d.get("held") or []}]
+    else:
+        # `開始可` の前: 項目はまだ何も持たないので、読めた着手の宣言 (before より前) のどれかに無ければ解放した
+        cs = itemstate.parsed_comments(item, login)
+        sets = []
+        for x in itemstate.declarations(cs, st["assignment"]):
+            if x["comment_id"] == before:
+                break
+            if x["declaration"] is not None:
+                sets.append({r.casefold() for r in x["declaration"]["resources"]})
     return sorted(name for name in reserved if any(name.casefold() not in s for s in sets) and _releasable(name, st["key"], rec, attrs_table))
 
 

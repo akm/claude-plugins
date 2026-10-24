@@ -438,6 +438,12 @@ class ResourceTest(unittest.TestCase):
         out = run_judge([mine, holder], attrs=self.attrs)
         j = out["judgments"][0]
         self.assertEqual((j["declaration"], j["result"], j["waits"], j["reserve"]), (401, "wait", [{"kind": "資源", "resource": "cache"}], []))
+        # 足し直した宣言が `開始可` になれば持っている (前の宣言に無かったことは解放とみなさない)
+        gone = item(A9, mine["comments"] + [go(401, t(24), 502)], labels=["resource:cache"], events=events)
+        states = states_of([gone], attrs=self.attrs)
+        self.assertEqual(states[0]["declaration"]["held"], ["cache"])
+        self.assertEqual(judge.released_reservations(gone, states[0], None, self.attrs, LOGIN), [])
+        self.assertEqual(judge.usage_for([gone], states, None, self.attrs, LOGIN), {"cache": [A9]})
 
     def test_update_adds_resource_and_releases_removed(self):
         """`開始可` の後の更新は、足した資源の空きを確かめ、外した資源を解放する。"""
