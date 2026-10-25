@@ -56,7 +56,7 @@ class HeaderFormatParseTest(unittest.TestCase):
         ("待機", MANAGER, {"to": "W-7", "assignment": 2, "declaration": 6262508431, "waits": [{"kind": "小さな PR", "issue": OTHER}]}),
         ("解放", MANAGER, {"to": "W-7", "assignment": 1, "release_reason": "ID の変更"}),
         ("停滞", MANAGER, {"to": "W-7", "assignment": 1, "stuck_state": "idle-no-progress"}),
-        ("依頼", MANAGER, {"to": "W-7", "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 6262508430}),
+        ("依頼", MANAGER, {"to": "W-7", "assignment": 1, "request_kind": "宣言の修正", "declaration": 6262508430}),
         ("依頼", MANAGER, {"to": "W-7", "assignment": 1, "request_kind": "本文の追記", "pr": PR9}),
         ("依頼", MANAGER, {"to": "W-7", "assignment": 1, "request_kind": "小さな PR", "waiting_issue": OTHER, "waiting_declaration": 777}),
         ("依頼", MANAGER, {"to": "W-7", "assignment": 1, "request_kind": "小さな PR", "waiting_issue": OTHER, "waiting_declaration": 777, "previous_pr": PR9}),

@@ -154,7 +154,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
     undeclared_answers は release_undeclared が ask の資源への回答 (名前 → release / keep)。
     返り値: {"result": "go" (`開始可` を書くときに reserve を予約する) / "wait" (`待機`。どれも予約しない) / "ask",
     "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待機する・残す予約), "ask_undeclared" (尋ねる),
-    "request_rewrite" (解放してはいけないので書き直しを頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
+    "request_rewrite" (解放してはいけないので修正を頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
     declared, reserved = _unique(declared), _unique(reserved)
     reserved_keys = {_key(r) for r in reserved}
     new = [r for r in declared if _key(r) not in reserved_keys]

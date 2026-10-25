@@ -108,7 +108,7 @@ class PendingTest(unittest.TestCase):
         waiting = item(A5, [assign(W8, 1, t(10), 110), decl(410, t(11), to=W8), wait(410, t(12), 510, [{"kind": "利用者の回答"}], to=W8)])
         gone = item(A6, [assign(W9, 1, t(10), 120), decl(420, t(11), to=W9), go(420, t(12), 520, to=W9)])
         returned = item(f"{A}#7", [assign(W9, 1, t(10), 130), decl(430, t(11), to=W9),
-                                   mcomment("依頼", {"to": W9, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 430}, t(12), 530)])
+                                   mcomment("依頼", {"to": W9, "assignment": 1, "request_kind": "宣言の修正", "declaration": 430}, t(12), 530)])
         unassigned = item(f"{A}#8", [decl(440, t(11))], session=None)
         items = [waiting, gone, returned, unassigned, item(A9, [ASSIGN1, decl(400, t(20))])]
         self.assertEqual([e["judged"]["comment_id"] for e in judge.pending(items, states_of(items))], [400])
@@ -190,21 +190,21 @@ class ConfigAndParseTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["repo_config"]), ("go", "missing"))
 
     def test_parse_error_with_repo_rules_requests_rewrite(self):
-        """宣言の形の誤り (リポジトリの設定の規則で種類を付けて検査する) は `依頼` (宣言の書き直し)。本文に誤りと使った規則を書く。"""
+        """宣言の形の誤り (リポジトリの設定の規則で種類を付けて検査する) は `依頼` (宣言の修正)。本文に誤りと使った規則を書く。"""
         rules = [{"pattern": "src/**", "kind": "unknown-structure"}]
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), files=(("src/a.py", [["f"]]),))])], read=reader(ok_config(rules)))
         j = out["judgments"][0]
         self.assertEqual(j["result"], "request")
         self.assertEqual(kinds(out["actions"]), [("comment", "依頼")])
         a = out["actions"][0]
-        self.assertEqual(a["values"], {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400})
+        self.assertEqual(a["values"], {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400})
         self.assertIn("files[0].units", a["body"])
         self.assertIn("リポジトリの設定", a["body"])
         self.assertIn("src/**", a["body"])
-        self.assertEqual(out["signals"], [{"kind": "request", "to": W7, "item": A9, "declaration": 400, "request_kind": "宣言の書き直し"}])
+        self.assertEqual(out["signals"], [{"kind": "request", "to": W7, "item": A9, "declaration": 400, "request_kind": "宣言の修正"}])
 
     def test_unreadable_json_requests_rewrite(self):
-        """JSON のコードブロックが無い・読めない宣言も `依頼` (宣言の書き直し)。本文に理由を書く。"""
+        """JSON のコードブロックが無い・読めない宣言も `依頼` (宣言の修正)。本文に理由を書く。"""
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), body="宣言です")])])
         self.assertEqual(out["judgments"][0]["result"], "request")
         self.assertIn("JSON のコードブロック", out["actions"][0]["body"])
@@ -270,7 +270,7 @@ class ConflictTest(unittest.TestCase):
 
     def test_small_pr_request_is_not_repeated_and_reported_pr_is_transcribed(self):
         """相手の項目に同じ待機する Issue への `依頼` (小さな PR) が既にあれば新しい依頼を出さず、`小さな PR の報告` があれば PR を `待機` の理由に写す
-        (書き直しで宣言の ID が変わっても、前の依頼と報告を使う)。"""
+        (修正で宣言の ID が変わっても、前の依頼と報告を使う)。"""
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410", "small-pr"))
         other = item(A5, B_GO + [mcomment("依頼", {"to": W8, "assignment": 1, "request_kind": "小さな PR", "waiting_issue": A9, "waiting_declaration": 399}, t(15), 512),
                                  wcomment("小さな PR の報告", {"waiting_issue": A9, "waiting_declaration": 399}, t(16), 513, body=PR9, sid=W8)])
@@ -352,13 +352,13 @@ class ResourceTest(unittest.TestCase):
 
     def test_busy_answer_is_read_only_until_the_item_releases_the_resource(self):
         """resource-busy の回答は、その項目がその資源を解放するまで読む。解放した後に足し直した更新では (持ち主が同じでも) 読まずに質問を出す。
-        `開始可` の前の書き直しや、`開始可` の後の更新の出し直し (解放していない) では読む。"""
+        `開始可` の前の修正や、`開始可` の後の更新の出し直し (解放していない) では読む。"""
         holder = self._holder("gpu")
         rec = rec_with(questions=question("resource-busy", A9, "gpu", "proceed", asked=t(21)))
         rec["questions"]["q1"]["answered_at"] = t(22)
-        # 書き直し (`開始可` の前): 400 が差し戻され 401 で gpu をもう一度宣言。解放していないので回答を読む
+        # 修正 (`開始可` の前): 400 が差し戻され 401 で gpu をもう一度宣言。解放していないので回答を読む
         rewrite = item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",)), wait(400, t(21), 500, [{"kind": "利用者の回答"}]),
-                            mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(23), 501),
+                            mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(23), 501),
                             decl(401, t(24), resources=("gpu",), kind="宣言の更新")])
         out = run_judge([rewrite, holder], rec=rec, attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"], out["questions"]), ("go", ["gpu"], []))
@@ -372,7 +372,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["resource-busy"]))
         # `開始可` の後の更新の出し直し: 400 [] に `開始可`、401 [gpu] が差し戻され、402 [gpu] を出し直す。解放していないので回答を読む
         redo = item(A9, [ASSIGN1, decl(400, t(20)), go(400, t(21), 500), decl(401, t(23), resources=("gpu",), kind="宣言の更新"),
-                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 401}, t(24), 501),
+                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 401}, t(24), 501),
                          decl(402, t(25), resources=("gpu",), kind="宣言の更新")])
         out = run_judge([redo, holder], rec=rec, attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"], out["questions"]), ("go", ["gpu"], []))
@@ -422,7 +422,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["release"], out["questions"]), ("go", ["db"], []))
 
     def test_undeclared_reservation_keep_answer_requests_rewrite(self):
-        """解放してはいけないと回答した資源は、予約を残して `依頼` (宣言の書き直し: その資源を足す)。`開始可` は書かない。"""
+        """解放してはいけないと回答した資源は、予約を残して `依頼` (宣言の修正: その資源を足す)。`開始可` は書かない。"""
         mine = item(A9, [ASSIGN1, decl(400, t(20))], labels=["resource:db"], events=[{"type": "LabeledEvent", "at": t(9), "label": "resource:db"}])
         out = run_judge([mine], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
         j = out["judgments"][0]
@@ -447,7 +447,7 @@ class ResourceTest(unittest.TestCase):
         j = out["judgments"][0]
         self.assertEqual((j["result"], j["waits"], j["release"], j["keep"]), ("wait", [{"kind": "資源", "resource": "gpu"}], ["cache"], ["db"]))
         self.assertEqual([q["kind"] for q in out["questions"]], ["release-undeclared"])
-        # keep の回答があれば、競合しうる相手がいても書き直しを頼んで終わる
+        # keep の回答があれば、競合しうる相手がいても修正を頼んで終わる
         out = run_judge([mine, item(A5, B_GO)], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], kinds(out["actions"])), ("request", [("comment", "依頼")]))
 
@@ -469,7 +469,7 @@ class ResourceTest(unittest.TestCase):
         out = run_judge([mine], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["release"]), ("request", ["cache"]))
         self.assertIn("資源 db は", out["actions"][0]["body"])
-        self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"], "書き直しの依頼の本文にも解放した資源を書く")
+        self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"], "修正の依頼の本文にも解放した資源を書く")
         unreadable = item(A9, [ASSIGN1, decl(400, t(20), body="宣言です")], labels=["resource:cache"], events=events[:1])
         out = run_judge([unreadable], attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["release"]), ("request", []), "JSON が読めない宣言は資源も分からないので解放しない")
@@ -488,10 +488,10 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual(out["judgments"][1]["reserve"], ["cache"])
 
     def test_released_reservation_added_back_by_rewrite_is_checked_for_availability(self):
-        """待機する間に解放した予約 (属性 release) を書き直しで足し直すと、予約済みとは扱わず空きを確かめる。別の項目が持っていれば `待機` (理由 `資源`)。"""
+        """待機する間に解放した予約 (属性 release) を修正で足し直すと、予約済みとは扱わず空きを確かめる。別の項目が持っていれば `待機` (理由 `資源`)。"""
         events = [{"type": "LabeledEvent", "at": t(9), "label": "resource:cache"}]
         mine = item(A9, [ASSIGN1, decl(400, t(20)), wait(400, t(21), 500, [{"kind": "利用者の回答"}]),
-                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(22), 501),
+                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(22), 501),
                          decl(401, t(23), files=(("src/z.py", None),), resources=("cache",), kind="宣言の更新")], labels=["resource:cache"], events=events)
         holder = item(A6, [assign(W9, 1, t(10), 120), decl(420, t(11), files=(("src/c.py", None),), resources=("cache",), to=W9), go(420, t(12), 520, to=W9)])
         states = states_of([mine, holder], attrs=self.attrs)
@@ -575,12 +575,12 @@ class RecompareTest(unittest.TestCase):
 
 
 class RewriteTest(unittest.TestCase):
-    """判定を待機する宣言の書き直し (計画の U15 の Approach 2)。"""
+    """判定を待機する宣言の修正 (計画の U15 の Approach 2)。"""
 
     def _rewritten(self, new_files=(("src/a.py", None),), other_go=True):
-        """宣言 400 が相手 A5 (410) との競合で wait と回答でき `待機` → blockedBy A5・Blocked。`依頼` の後に 401 に書き直した。"""
+        """宣言 400 が相手 A5 (410) との競合で wait と回答でき `待機` → blockedBy A5・Blocked。`依頼` の後に修正した宣言が 401。"""
         mine = item(A9, [ASSIGN1, decl(400, t(20)), wait(400, t(21), 500, [{"kind": "Issue", "issue": A5}]),
-                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(22), 501),
+                         mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(22), 501),
                          decl(401, t(23), files=new_files, kind="宣言の更新")],
                     status="Blocked", blocked_by=[{"key": A5, "url": "", "state": "OPEN"}],
                     events=[{"type": "ProjectV2ItemStatusChangedEvent", "at": t(21), "status": "Blocked", "previous_status": "In Progress",

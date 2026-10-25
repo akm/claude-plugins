@@ -318,7 +318,7 @@ class AddEditCheckTest(ConfigTestBase):
         before = os.stat(path).st_mtime_ns
         result = config.add_edit_check(self.root, "akm/a")
         self.assertFalse(result["changed"])
-        self.assertEqual(os.stat(path).st_mtime_ns, before, "既にあればファイルを書き直さないこと")
+        self.assertEqual(os.stat(path).st_mtime_ns, before, "既にあればファイルを上書きしないこと")
 
     def test_key_missing_is_created(self):
         path = _write_config(self.root, {"project": {"owner": "akm", "number": 3}})

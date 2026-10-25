@@ -323,8 +323,8 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["stage"], d["wait"]["reasons"][0]["pr"], d["own_blockers"]), ("waiting", PR10, [A2]))
 
     def test_returned_declaration_and_its_rewrite(self):
-        """`依頼` (宣言の書き直し) で差し戻された宣言は段階 returned。書き直した更新は、資源を外しただけでも判定の要る宣言になる。"""
-        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
+        """`依頼` (宣言の修正) で差し戻された宣言は段階 returned。修正した更新は、資源を外しただけでも判定の要る宣言になる。"""
+        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
         d = stage_of(DECL1, req)
         self.assertEqual((d["stage"], d["returned"]["comment_id"]), ("returned", 500))
         rewrite = wcomment("宣言の更新", None, t(14), 401, body=decl_body(resources=()))
@@ -384,7 +384,7 @@ class DeclaredResourcesTest(unittest.TestCase):
     def test_declared_resources_lists_parsed_declarations_in_order(self):
         """declared_resources は、今の割り当ての読めた宣言ごとの資源を投稿の順に持ち、差し戻されたか・`開始可` があるかも持つ (読めない宣言は入らない)。"""
         item = make_item(comments_=[ASSIGN1, wcomment("着手の宣言", None, t(12), 400, body=decl_body(resources=("db",))),
-                                    mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500),
+                                    mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500),
                                     wcomment("宣言の更新", None, t(14), 401, body="宣言です"),
                                     wcomment("宣言の更新", None, t(15), 402, body=decl_body(resources=("gpu",)))])
         d = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["declaration"]
@@ -454,8 +454,8 @@ class WorkCheckTest(unittest.TestCase):
         self.assertEqual(itemstate.work_check(item2, W7, LOGIN, {})["released"]["reason"], "解除")
 
     def test_pending_requests_by_kind(self):
-        """まだ行っていない `依頼`: 宣言の書き直しは後の宣言の更新で、本文の追記は PR の閉じる参照で、小さな PR は対応する `小さな PR の報告` で行ったとする。"""
-        rewrite = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
+        """まだ行っていない `依頼`: 宣言の修正は後の宣言の更新で、本文の追記は PR の閉じる参照で、小さな PR は対応する `小さな PR の報告` で行ったとする。"""
+        rewrite = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
         append = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "本文の追記", "pr": PR9}, t(14), 501)
         small = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "小さな PR", "waiting_issue": A2, "waiting_declaration": 777}, t(15), 502)
         item = make_item(comments_=[ASSIGN1, DECL1, rewrite, append, small])
@@ -467,8 +467,8 @@ class WorkCheckTest(unittest.TestCase):
         self.assertEqual(c["pending_requests"], [])
 
     def test_request_to_other_session_or_previous_assignment_is_not_mine(self):
-        req_other = mcomment("依頼", {"to": "W-8", "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
-        req_prev = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 501)
+        req_other = mcomment("依頼", {"to": "W-8", "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
+        req_prev = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 501)
         item = make_item(comments_=[ASSIGN1, req_other, req_prev, ASSIGN2])
         self.assertEqual(itemstate.work_check(item, W7, LOGIN, {})["pending_requests"], [])
 

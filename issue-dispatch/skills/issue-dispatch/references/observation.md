@@ -108,7 +108,7 @@
 | `wait-assignment` | `--in-review`・`--pending` に渡した Issue の正常な終わり ([flow.md](flow.md) の `end`。正常な終わりの後に reopen されてフィールドが空にされた場合を含む。進行中の Issue の close では終わらない) | `stop close` |
 | `wait-assignment` | 自分宛ての `依頼` (本文の追記) があり、その PR が開いていて、閉じる参照にまだ Issue が無い (追記が済んだ PR と閉じた PR では終わらない) | `request` |
 | `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つ `開始可` | `go` |
-| `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つ `依頼` (宣言の書き直し) | `request` |
+| `wait-decision` | 自分宛てで、`--declaration` に渡した宣言の ID を持つ `依頼` (宣言の修正) | `request` |
 | `wait-decision` | 今の Issue の Status が `Blocked` で、それが管理のセッションが書いた `Blocked` ([flow.md](flow.md) の `manager_blocked`。利用者が手で付けた `Blocked` では終わらない) | `wait` |
 | `wait-decision` | `--review-update` を渡されたときの、今の Issue の正常な終わり | `stop close` |
 | どちらも | 見る Issue (`wait-assignment` では `--blocked`・`--in-review`・`--pending` に渡した Issue、`wait-decision` では `--issue`) に、自分宛てで今の割り当ての番号の `解放` がある (フィールドが自分の ID でなくなっただけでは終わらない) | `stop <理由>` (理由は `解放` の先頭行の値) |
@@ -125,7 +125,7 @@
 | 8 | `gh` の認証切れ | 止まり、`gh auth login` を案内する |
 | 3 | レート制限の再開 (`gh api rate_limit`) を期限内に待機できない、または再開時刻を読めない (期限内なら待機して続ける) | 何も送らずに起動し直す |
 | 4 | ネットワークの失敗 (接続の失敗・タイムアウト・`gh` のほかの失敗) が続けて 3 回 (間に成功があれば数え直す) | 1 回目は起動し直す。2 回目も 4 なら止まる |
-| 5 | スナップショットが無い・壊れている (`wait` だけ。書き直さない。先に `project items --write-snapshot` が要る) | — |
+| 5 | スナップショットが無い・壊れている (`wait` だけ。上書きしない。先に `project items --write-snapshot` が要る) | — |
 | 6 | 止められた (`stopped` の行) | 何もしない |
 | 2 | 引数の誤り (`argparse`) と、間隔が期限以上 | 止まる |
 
@@ -133,7 +133,7 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが欠ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠けと読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠けの扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに書き直し、`snapshot.warnings` (key `snapshot`) で知らせる |
+| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが欠ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠けと読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠けの扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに上書きし、`snapshot.warnings` (key `snapshot`) で知らせる |
 | `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが欠ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠けと読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠けの扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待機していた PR の変化を見つけるため) |
 | 書き込みのサブコマンドの `--snapshot-dir <管理ディレクトリ>` | `snapshot.json` | 出力に `snapshot` (`reflected`・`warnings`) を足す |
 | `wait --dir <管理ディレクトリ> [--project <owner>/<番号>] [--interval <分>] [--minutes <分>]` | `wait.pid` (記録の置き場) | 「待機」の節。終了コードと標準出力の行 (JSON ではない)。スナップショットが無い・壊れていれば 5 |

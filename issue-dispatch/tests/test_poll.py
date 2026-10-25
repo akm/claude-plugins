@@ -195,7 +195,7 @@ class CliBase(FakeGhCase):
 class ManagerWaitTest(CliBase):
 
     def test_wait_without_snapshot_is_5(self):
-        """スナップショットが無い (壊れている) と、書き直さずに 5 で止まる。"""
+        """スナップショットが無い (壊れている) と、上書きせずに 5 で止まる。"""
         code, out, err = self.run_cli("wait", "--dir", self.manager, *FAST)
         self.assertEqual((code, out), (5, []), err)
         os.makedirs(self.record_dir, exist_ok=True)
@@ -204,7 +204,7 @@ class ManagerWaitTest(CliBase):
         code, out, err = self.run_cli("wait", "--dir", self.manager, *FAST)
         self.assertEqual(code, 5, err)
         with open(os.path.join(self.record_dir, "snapshot.json"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "{broken", "書き直さない")
+            self.assertEqual(f.read(), "{broken", "上書きしない")
 
     def test_wait_returns_diff_kinds_and_does_not_write_snapshot(self):
         """差分があれば種類を 1 行に書いて 0 で終わる (起動の前からの変化も最初の読み取りで返す)。スナップショットは書かない。"""
@@ -367,11 +367,11 @@ class WaitDecisionTest(CliBase):
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
 
     def test_go_request_wait(self):
-        """自分宛てで渡した宣言の ID の `開始可` で go、宣言の書き直しの `依頼` で request、管理のセッションが書いた Blocked で wait。"""
+        """自分宛てで渡した宣言の ID の `開始可` で go、宣言の修正の `依頼` で request、管理のセッションが書いた Blocked で wait。"""
         self._respond([DECL1, _go(400, t(13), 500)])
         code, out, _ = self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "400", *FAST)
         self.assertEqual((code, out[1]), (0, "go"))
-        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
+        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
         self._respond([DECL1, req])
         code, out, _ = self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "400", *FAST)
         self.assertEqual((code, out[1]), (0, "request"))

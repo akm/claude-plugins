@@ -24,7 +24,7 @@ _PR_URL_RE = re.compile(rf"https://github\.com/{ids.REPO_NAME_PATTERN}/pull/[1-9
 def _questions(rec, item, kind, subject, since):
     """記録の問いのうち、項目 (owner/repo の大文字小文字を区別しない)・種類・対象 (subject。大文字小文字を区別しない) が同じで、尋ねた時刻 (asked_at) が
     since (今の割り当ての `割り当て` の時刻) 以後のもの。前の割り当ての問いと回答は、資源・宣言・相手が新しくなるので今の判定の材料にしない
-    (flow.md の「質問の対象と書き直し」)。"""
+    (flow.md の「質問の対象と宣言の修正」)。"""
     folded = subject.casefold() if isinstance(subject, str) else None
     return [q for q in ((rec or {}).get("questions") or {}).values()
             if ids.same_issue(q.get("item"), item) and q.get("kind") == kind
@@ -165,7 +165,7 @@ def released_reservations(st, rec, attrs_table, before=None):
     """割り当てで予約した資源 (reserved) のうち、宣言に無い予約として解放したもの (名前の順)。解放は GitHub への書き込みが無い導出なので、
     判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。読むのは項目の状態 (declared_resources・held) だけ。
     条件: `開始可` の後は持っている資源 (held) に無い予約のうち、`開始可` になったどれかの宣言にあったもの (更新で外した。結果に依らず解放) と、無かったもので属性
-    release_undeclared が release か問い `release-undeclared` の回答が release のもの。`開始可` の前は今の割り当ての読めた着手の宣言 (書き直しを含む。before を
+    release_undeclared が release か問い `release-undeclared` の回答が release のもの。`開始可` の前は今の割り当ての読めた着手の宣言 (修正を含む。before を
     渡せばそのコメントの ID の宣言より前のものだけ) のどれかに無い予約で、属性か回答が release のもの。"""
     d = st.get("declaration") or {}
     reserved = st.get("reserved") or []
@@ -266,7 +266,7 @@ def _small_pr_report(other, item_key):
 
 
 def _small_pr_requested(other, item_key):
-    """相手の今の割り当てのセッションに、待機する Issue がこの項目の `依頼` (小さな PR) を既に書いたか (宣言の書き直しで待機する Issue の宣言の ID が変わっても、同じ依頼とみなす)。"""
+    """相手の今の割り当てのセッションに、待機する Issue がこの項目の `依頼` (小さな PR) を既に書いたか (宣言の修正で待機する Issue の宣言の ID が変わっても、同じ依頼とみなす)。"""
     for c in _other_comments(other):
         h = c["header"]
         v = h["values"]
@@ -353,7 +353,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
          "parsed": None, "actions": [], "questions": [], "signals": []}
     # 1. 宣言に無い予約 (着手の宣言だけ)。資源はリポジトリの規則に依らず itemstate が読んだ宣言から分かるので、設定の読み取りと形の検査の前に
     #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待機する経路でも出し、解放してはいけないと回答した資源が
-    #    あれば書き直しを頼んで終わる (予約は残す)。解放した資源と回答を待機する予約は、どの経路の本文にも書く (_undeclared_lines)
+    #    あれば修正を頼んで終わる (予約は残す)。解放した資源と回答を待機する予約は、どの経路の本文にも書く (_undeclared_lines)
     r = None
     if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
         declared = judged["declaration"]["resources"]
@@ -371,8 +371,8 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
             j["result"] = "request"
             body = (f"資源 {', '.join(r['request_rewrite'])} は、割り当てで予約したのに宣言に無く、解放してはいけないと利用者が回答したので予約を残している。"
                     f"この資源を resources に加えた宣言を `宣言の更新` で投稿する。" + _undeclared_lines(j))
-            j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の書き直し"}, body))
-            j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の書き直し"))
+            j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の修正"}, body))
+            j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の修正"))
             return j
     # 2. リポジトリの設定
     rules, rule_text = rules_for(repo_config)
@@ -388,8 +388,8 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     if parsed is None:
         j["result"] = "request"
         body = "宣言の形の誤り:\n" + "\n".join(f"- {e}" for e in errors) + f"\n\n使った規則: {rule_text}。直した宣言を `宣言の更新` で投稿する。" + _undeclared_lines(j)
-        j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の書き直し"}, body))
-        j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の書き直し"))
+        j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の修正"}, body))
+        j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の修正"))
         return j
     j["parsed"] = parsed
     if r is None:

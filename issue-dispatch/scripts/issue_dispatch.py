@@ -261,7 +261,7 @@ def cmd_project_items(args):
         previous = observe.load_snapshot(directory)
         warnings = []
         if previous["status"] == "corrupt":
-            warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに書き直す"})
+            warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに上書きする"})
         # 読むのは今のコメントに書かれた PR だけ (前のスナップショットにだけある URL は保存に残さない。差分のための読み直しは observe diff が行う)
         comment_prs, problems = _read_comment_prs(result["items"], login)
         out["problems"] = out["problems"] + problems
@@ -1046,7 +1046,7 @@ def build_parser():
     p_cpost.add_argument("--assignment", help="割り当ての番号")
     p_cpost.add_argument("--declaration", help="宣言のコメントの ID")
     p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の回答 / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
-    p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の書き直し / 本文の追記 / 小さな PR")
+    p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の修正 / 本文の追記 / 小さな PR")
     p_cpost.add_argument("--waiting-issue", help="待機する Issue (依頼 小さな PR と小さな PR の報告)")
     p_cpost.add_argument("--waiting-declaration", help="待機する Issue の宣言のコメントの ID")
     p_cpost.add_argument("--previous-pr", help="作り直しのとき、閉じた前の PR の URL")

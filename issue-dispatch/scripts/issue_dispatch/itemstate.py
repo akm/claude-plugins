@@ -210,7 +210,7 @@ def declarations(cs, asg):
 
 
 def results_for(cs, asg, decl_id):
-    """宣言 (コメントの ID) への判定の結果: {"go": 最新の `開始可`, "waits": `待機` の配列 (投稿の順), "returned": 最新の `依頼` (宣言の書き直し)}。
+    """宣言 (コメントの ID) への判定の結果: {"go": 最新の `開始可`, "waits": `待機` の配列 (投稿の順), "returned": 最新の `依頼` (宣言の修正)}。
     要素は {"comment_id", "at"} (`待機` は "reasons" も)。"""
     out = {"go": None, "waits": [], "returned": None}
     for c in _for_assignment(cs, asg):
@@ -222,7 +222,7 @@ def results_for(cs, asg, decl_id):
             out["go"] = entry
         elif h["kind"] == "待機":
             out["waits"].append({**entry, "reasons": h["values"]["waits"]})
-        elif h["kind"] == "依頼" and h["values"].get("request_kind") == "宣言の書き直し":
+        elif h["kind"] == "依頼" and h["values"].get("request_kind") == "宣言の修正":
             out["returned"] = entry
     return out
 
@@ -235,8 +235,8 @@ def declaration_stage(item, cs, asg, project_number):
     """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・戻り先・自分が足した blockedBy・
     持っている資源・読めた宣言ごとの資源 (declared_resources: 投稿の順に comment_id・at・resources・returned (差し戻されたか)・go (`開始可` があるか)。
     判定が、宣言に無い予約の解放と更新の前に持っていた資源を、コメントを読み直さずに求めるため)。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
-    差し戻された宣言を書き直した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、
-    `待機` → waiting、`依頼` (宣言の書き直し) → returned、無ければ undecided)。"""
+    差し戻された宣言を修正した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、
+    `待機` → waiting、`依頼` (宣言の修正) → returned、無ければ undecided)。"""
     go_declaration, go_id, later, judged, prev_returned, declared = None, None, [], None, False, []
     for d in declarations(cs, asg):
         res = results_for(cs, asg, d["comment_id"])
@@ -658,7 +658,7 @@ def _request_done(req, cs, asg, pr_states):
     v = req["header"]["values"]
     kind = v["request_kind"]
     later = _after(cs, req["created_at"])
-    if kind == "宣言の書き直し":
+    if kind == "宣言の修正":
         return any(c["header"]["role"] == "worker" and c["header"]["kind"] == "宣言の更新" for c in later)
     if kind == "本文の追記":
         got = pr_states.get(ids.parse_pr_url(v["pr"])["url"]) or {}

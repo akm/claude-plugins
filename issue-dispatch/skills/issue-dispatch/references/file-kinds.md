@@ -98,7 +98,7 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 - **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成の印を名前に持つ Go のファイル (`**/*_generated.go` と、Kubernetes の controller-gen が生成する `**/zz_generated.*.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/npm-shrinkwrap.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
 - **`unknown-structure`** — 中身を読んで節を決められないもの: Excel のブック (`**/*.xlsx`)。
-- **`indivisible` で `mergeable` が偽** — 画像とフォントとバイナリの文書 (`**/*.png`・`**/*.jpg`・`**/*.jpeg`・`**/*.gif`・`**/*.svg`・`**/*.ico`・`**/*.pdf`・`**/*.woff`・`**/*.woff2`)。分けられず、差分でマージできない。SVG はテキストだが、描画ツールが全体を書き直すので画像と同じに扱う。
+- **`indivisible` で `mergeable` が偽** — 画像とフォントとバイナリの文書 (`**/*.png`・`**/*.jpg`・`**/*.jpeg`・`**/*.gif`・`**/*.svg`・`**/*.ico`・`**/*.pdf`・`**/*.woff`・`**/*.woff2`)。分けられず、差分でマージできない。SVG はテキストだが、描画ツールが全体を上書きするので画像と同じに扱う。
 - **`unstable`** — 分けると適用の順や意味が変わりうるもの: マイグレーション (`**/migrations/**`) と SQL (`**/*.sql`) は実行の順に意味があり、Protocol Buffers の定義 (`**/*.proto`) はフィールド番号の割り当てに意味がある。参照のされ方は `file`。
 - **`divisible` で節の表記があるもの** — `**/package.json` (`json-key`。`dependencies` と `devDependencies` の下を依存ごとの節にする。広い `**/*.json` より前に置く)、`**/*.json` (`json-key`)、`**/go.mod` (`go-mod-directive`。参照のされ方は `directory`)、`**/*.md` (`markdown-heading`)、`**/Makefile` (`make-target`)、`**/*.toml` (`toml-table`)、`**/*.yaml`・`**/*.yml` (`yaml-key`)、`**/Dockerfile` (`dockerfile-stage`)、`**/*.tf` (`terraform-block`。参照のされ方は `directory`)。
 - **`divisible` で節の表記の無いもの** — 自前で書くソースコード: `**/*.go` (参照のされ方は `directory`)、`**/*.ts`・`**/*.tsx`・`**/*.js`・`**/*.py`・`**/*.rb`・`**/*.css` (参照のされ方は `file`)。節の表記を決めていないので、宣言に `units` は書けない。

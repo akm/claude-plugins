@@ -170,7 +170,7 @@ class DeclareTest(unittest.TestCase):
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "release"})
         self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", ["db"], [], []), "解放してよい")
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "keep"})
-        self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", [], ["db"], ["db"]), "解放してはいけないなら予約を残して書き直しを頼む")
+        self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", [], ["db"], ["db"]), "解放してはいけないなら予約を残して修正を頼む")
 
     def test_undeclared_release(self):
         """Covers AE51. release_undeclared が release なら宣言に無い予約を尋ねずに解放する。"""

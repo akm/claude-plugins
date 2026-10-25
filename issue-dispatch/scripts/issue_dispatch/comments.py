@@ -19,7 +19,7 @@ MANAGER_KINDS = ("割り当て", "開始可", "待機", "解放", "引き継ぎ"
 WORKER_KINDS = ("着手の宣言", "宣言の更新", "小さな PR の報告", "PR の報告")
 # 宛先 (対象) と割り当ての番号を持つ種類
 ADDRESSED_KINDS = ("割り当て", "開始可", "待機", "解放", "停滞", "依頼")
-REQUEST_KINDS = ("宣言の書き直し", "本文の追記", "小さな PR")
+REQUEST_KINDS = ("宣言の修正", "本文の追記", "小さな PR")
 RELEASE_REASONS = ("解除", "close", "ID の変更", "除去")
 WAIT_KINDS = ("利用者の回答", "Issue", "小さな PR", "資源", "設定")
 # 先頭行の値の見出し語 (値は `<見出し語> <値>` の 1 区切り)。解析は右からこの語で始まる区切りを値として取る
@@ -41,7 +41,7 @@ _SHAPE = {
     "小さな PR の報告": ("waiting_issue", "waiting_declaration", "previous_pr?"),
     "PR の報告": (),
 }
-_REQUEST_SHAPE = {"宣言の書き直し": ("declaration",), "本文の追記": ("pr",), "小さな PR": ("waiting_issue", "waiting_declaration", "previous_pr?")}
+_REQUEST_SHAPE = {"宣言の修正": ("declaration",), "本文の追記": ("pr",), "小さな PR": ("waiting_issue", "waiting_declaration", "previous_pr?")}
 _WORD_OF = {"to": "対象", "assignment": "割り当て", "declaration": "宣言", "request_kind": "種類", "waiting_issue": "待機する Issue",
             "waiting_declaration": "待機する Issue の宣言", "previous_pr": "前の PR", "pr": "PR", "release_reason": "理由", "stuck_state": "値",
             "waits": "理由", "blockers": "Issue"}

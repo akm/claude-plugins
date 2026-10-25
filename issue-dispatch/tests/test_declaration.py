@@ -192,7 +192,7 @@ class UpdateKindTest(unittest.TestCase):
         self.assertEqual(declaration.resource_changes(parsed(["a.md"], ["db"]), {"DB", "gpu"}), {"added": [], "removed": ["gpu"]})
 
     def test_rewrite_after_rejection_is_not_removal(self):
-        """差し戻された宣言を書き直した更新は、資源が持っている資源より少なくても資源を外すだけの更新と判定しない (開始可が無ければ initial)。"""
+        """差し戻された宣言を修正した更新は、資源が持っている資源より少なくても資源を外すだけの更新と判定しない (開始可が無ければ initial)。"""
         rejected = parsed(["a.md"], ["A", "B"])  # 差し戻された (呼び出し元は比べる相手に渡さない)
         rewritten = parsed(["a.md"], ["A"])
         self.assertEqual(declaration.update_kind(None, rewritten, declaration.held_resources(None, [])), "initial")
