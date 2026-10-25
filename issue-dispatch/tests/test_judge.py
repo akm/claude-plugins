@@ -14,7 +14,7 @@ sys.path.insert(0, _HERE)
 
 from issue_dispatch import comments, config, filekinds, itemstate, judge, record, resources  # noqa: E402
 from test_itemstate import (A, ASSIGN1, LOGIN, M1, PR9, PROJECT_NUMBER, W7, USER_ENTRY, decl_body, gql_comment, items_data, make_item,  # noqa: E402
-                            mcomment, node_of, observed, rec_with, t, wcomment)
+                            mcomment, node_of, observed, question_table, rec_with, t, wcomment)
 from test_project import FakeGhCase  # noqa: E402
 from test_repo import make_clone  # noqa: E402
 
@@ -690,10 +690,10 @@ class DocTest(unittest.TestCase):
     def test_question_kinds_are_documented(self):
         """判定の問いの種類と選択肢は flow.md の「判定」の表にある。記録の問いの `subject` は records.md に書かれている。"""
         with open(_FLOW, encoding="utf-8") as f:
-            doc = f.read()
+            table = question_table(f.read(), "判定の質問の種類 (`kind`) と選択肢 (`options`)")
         for kind, options in judge.QUESTION_OPTIONS.items():
-            self.assertIn(f"| `{kind}` |", doc)
-            self.assertIn(" / ".join(f"`{o}`" for o in options), doc)
+            self.assertIn(f"| `{kind}` |", table, f"質問の種類 {kind} が flow.md の判定の質問の表に無い")
+            self.assertIn(" / ".join(f"`{o}`" for o in options), table, f"質問の種類 {kind} の選択肢が flow.md の判定の質問の表に無い")
         with open(_RECORDS, encoding="utf-8") as f:
             self.assertIn("`subject`", f.read())
 

@@ -70,6 +70,15 @@ def observed(url, state="OPEN", draft=False, merged=False, issues=(A9,), author=
                                                       "created_at": created_at or t(20), "issues": [{"key": k, "state": "OPEN"} for k in issues]}}
 
 
+def question_table(doc, marker):
+    """文書から問いの表の範囲 (表の前置きの文 marker から、表の後の最初の空行まで) を切り出す。文書の別の表に同じ名前や選択肢があっても、問いの表だけを検査するため。
+    marker が無ければ失敗させる (表の所在が変わったことを検出するため)。"""
+    start = doc.index(marker)
+    table_start = doc.index("\n| ", start)
+    end = doc.find("\n\n", table_start)
+    return doc[start:end if end >= 0 else len(doc)]
+
+
 ASSIGN1 = mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100)
 ASSIGN2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
 
@@ -958,10 +967,11 @@ class DocTest(unittest.TestCase):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
+        table = question_table(doc, "項目の状態の問いの種類 (`kind`) と選択肢 (`options`)")
         for kind, options in itemstate.QUESTION_OPTIONS.items():
-            self.assertIn(f"| `{kind}` |", doc, f"問いの種類 {kind} が flow.md の問いの表に無い")
+            self.assertIn(f"| `{kind}` |", table, f"問いの種類 {kind} が flow.md の問いの表に無い")
             if options:
-                self.assertIn(" / ".join(f"`{o}`" for o in options), doc, f"問いの種類 {kind} の選択肢が flow.md に無い")
+                self.assertIn(" / ".join(f"`{o}`" for o in options), table, f"問いの種類 {kind} の選択肢が flow.md の問いの表に無い")
 
 
 if __name__ == "__main__":
