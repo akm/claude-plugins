@@ -42,7 +42,7 @@ def contents_before(tool, tool_response):
     Write で新しいファイルを作ったとき (originalFile が null で、type が create) は空の文字列を返す。
     originalFile が無い (この版の Claude Code は渡さない) か、それ以外で null (前の内容が大きすぎるなど) の
     ときは ValueError を送出する。tool_response のフィールドは Claude Code の公式の文書に載っていない
-    (Claude Code 2.1.273 の Edit と Write の出力の様式で確かめた)。
+    (Claude Code 2.1.273 の Edit と Write の出力の様式で確認した)。
     """
     if "originalFile" not in tool_response:
         raise ValueError("hook の入力の tool_response に originalFile が無い (この版の Claude Code は書き換える前の内容を渡さない)")
@@ -60,9 +60,9 @@ def patch_lines(tool, tool_response, before, after):
     行番号の集合で返す。
 
     structuredPatch は Claude Code が計算した行の差分で、範囲 (hunk) ごとに oldStart・newStart (1 から数える行番号) と
-    lines (先頭の 1 文字が " " は変えていない行、"-" は消した行、"+" は足した行、"\\" は末尾の改行の有無の印) を持つ。
+    lines (先頭の 1 文字が " " は変えていない行、"-" は消した行、"+" は足した行、"\\" は末尾の改行の有無を示す記号) を持つ。
     "-" の行を書き換える前の側、"+" の行を書き換えた後の側にする。行番号は 0 から数える (textlint の行番号と同じ数え方)。
-    hook の中では差分を計算しない。structuredPatch は公式の文書に載っていない (Claude Code 2.1.273 で確かめた)。
+    hook の中では差分を計算しない。structuredPatch は公式の文書に載っていない (Claude Code 2.1.273 で確認した)。
 
     次のときは ValueError を送出する (hook の中の差分の計算には戻らない)。
       - structuredPatch が無い、または様式が想定と違う
@@ -109,7 +109,7 @@ def patch_lines(tool, tool_response, before, after):
 
 
 def _expect_line(lines, number, text, side):
-    """structuredPatch の number 行目 (1 から数える) の内容 text が、lines の同じ行と一致することを確かめる。
+    """structuredPatch の number 行目 (1 から数える) の内容 text が、lines の同じ行と一致することを確認する。
 
     Claude Code は差分の行の先頭のタブを 1 つにつき空白 2 つに置き換えるので、比べる前にファイルの行も同じく置き換える。
     """
@@ -125,7 +125,7 @@ def _expect_line(lines, number, text, side):
 def in_lines(text, findings, lines):
     """findings (text の検出) のうち、行番号の集合 lines のどれかの行に重なるものを返す。
 
-    検出の行は、始まり (start) から終わり (end) までの Python の文字列の位置から数える。複数の行にまたがる
+    検出の行は、開始 (start) から終了 (end) までの Python の文字列の位置から数える。複数の行にまたがる
     検出 (長い文など) は、どれかの行が lines に入れば重なるとする。位置の無い検出は行で絞れないので残す。
     """
     line_starts = [0] + [i + 1 for i, ch in enumerate(text) if ch == "\n"]
@@ -227,7 +227,7 @@ def handle(event, check_texts=None):
     if root is None:
         return None
     # hook を有効にしていないリポジトリでは何もしない。型の検査より先に textlint.hook を見るのは、
-    # 有効にしていないリポジトリで、設定の誤りを理由に書き込みのたびに止めないため。
+    # 有効にしていないリポジトリで、設定の誤りを理由に書き込みのたびに中断させないため。
     # JSON として読めないときは有効かを決められないので、知らせる (検査を省略しない)
     try:
         if not config.hook_enabled(config.read_raw(root)):
@@ -241,7 +241,7 @@ def handle(event, check_texts=None):
     if sys.version_info < (3, 11):
         return _failure(f"Python 3.11 以降が必要 (用語ファイルを標準ライブラリ tomllib で読むため)。"
                         f"実行した Python: {sys.version.split()[0]}")
-    # tomllib を使うモジュールは、Python の版を確かめてから読み込む
+    # tomllib を使うモジュールは、Python の版を確認してから読み込む
     from . import terms, textlint
 
     if check_texts is None:
@@ -266,7 +266,7 @@ def handle(event, check_texts=None):
         return _failure(str(e))
 
     # 重大度 (error / warning) は検出の種類ではない。規則集の規則も、重大度を指定しなければ error になる。
-    # 種類は規則の名前で見分ける (規則 prh の検出が、用語ファイルかリポジトリの prh の辞書で言い換えを決めた語)
+    # 種類は規則の名前で判別する (規則 prh の検出が、用語ファイルかリポジトリの prh の辞書で言い換えを決めた語)
     term_errors, rule_errors, warnings = [], [], []
     for f in introduced(in_lines(before, results[0], removed), in_lines(after, results[1], added)):
         if f["severity"] != "error":
@@ -288,7 +288,7 @@ def handle(event, check_texts=None):
                      f"規則の message に従って直す (引用なら直さず、そのことを報告する。検出が誤りだと考えるなら、"
                      f"直さずにそのことを報告する):\n" + _format(rule_errors))
     if warnings:
-        parts.append(f"{rel} に書き足した文章に、不自然な言い回しの候補がある (textlint の warning)。"
+        parts.append(f"{rel} に書き足した文章に、不自然な表現の候補がある (textlint の warning)。"
                      f"原則に照らして判断する。候補であって、直すべきものとは限らない:\n" + _format(warnings))
     message = "\n\n".join(parts)
     if term_errors or rule_errors:

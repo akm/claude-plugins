@@ -1,6 +1,6 @@
 """wording-guard の設定ファイルを読む。
 
-設定ファイルの置き場は、リポジトリのルートからの相対パス
+設定ファイルの配置先は、リポジトリのルートからの相対パス
 `.claude/akm-claude-plugins/wording-guard/config.json`。各キーの意味の正本は
 ファイル `wording-guard/skills/wording-guard/references/project-config.md`。
 

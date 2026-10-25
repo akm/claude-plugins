@@ -2,8 +2,8 @@
 """Markdown に書き足した文章を textlint で検査する PostToolUse の hook (wording-guard プラグイン)。
 
 本体はモジュール wordingguard.hook。ここは標準入力の JSON を渡し、結果を標準出力に書くだけ。
-想定外の例外で終わったときは、標準エラー出力に書いて終了コード 1 で終わる
-(Claude Code は終了コード 0・2 以外を、ツールの実行を止めない誤りとして利用者に見せる)。
+想定外の例外で終了したときは、標準エラー出力に書いて終了コード 1 で終了する
+(Claude Code は終了コード 0・2 以外を non-blocking error として扱い、Claude の処理を続けたまま、誤りを利用者に見せる)。
 """
 
 import json
@@ -31,5 +31,5 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as e:  # noqa: BLE001 — 想定外の例外も、利用者に見える形で知らせる
-        print(f"wording-guard: hook が想定外の誤りで終わった: {type(e).__name__}: {e}", file=sys.stderr)
+        print(f"wording-guard: hook が想定外の誤りで終了した: {type(e).__name__}: {e}", file=sys.stderr)
         sys.exit(1)

@@ -263,7 +263,7 @@ class TestFinding(unittest.TestCase):
                 self.assertEqual(to_index(offset), counted(text, offset), f"{text!r} の位置 {offset}")
 
     def test_check_files_keeps_crlf_for_positions(self):
-        # textlint は CRLF のまま位置を数える。読み直すときに CRLF を LF に変えると、2 行目以降の位置がずれる
+        # textlint は CRLF のまま位置を数える。再度読み込むときに CRLF を LF に変えると、2 行目以降の位置がずれる
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "crlf.md")
             content = "一行目\r\n二行目\r\n同じ型の指摘\r\n"
@@ -303,7 +303,7 @@ class TestFinding(unittest.TestCase):
 
 
 class TestRunTextlint(unittest.TestCase):
-    """textlint を差し替えて、実行の結果の扱いを確かめる。"""
+    """textlint を差し替えて、実行の結果の扱いを確認する。"""
 
     def run_fake(self, script):
         with tempfile.TemporaryDirectory() as d:
@@ -315,7 +315,7 @@ class TestRunTextlint(unittest.TestCase):
             return textlint._run_textlint(d, "conf.json", ["a.md"], cwd=d)
 
     def test_empty_output_with_exit_1_is_error(self):
-        # 規則が例外で終わったときの textlint の形 (標準出力が空のまま終了コード 1)
+        # 規則が例外で終了したときの textlint の形 (標準出力が空のまま終了コード 1)
         with self.assertRaises(textlint.TextlintError) as cm:
             self.run_fake('echo "Unexpected error during file processing" >&2\nexit 1\n')
         self.assertIn("Unexpected error during file processing", str(cm.exception))
@@ -358,7 +358,7 @@ echo called >> "$FAKE_NPM_LOG"
 
 
 class TestSetup(unittest.TestCase):
-    """npm を差し替えて、setup の置き場の状態ごとの扱いを確かめる。"""
+    """npm を差し替えて、setup のディレクトリの状態ごとの扱いを確認する。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -412,7 +412,7 @@ class TestSetup(unittest.TestCase):
         os.makedirs(os.path.join(self.dest, "node_modules"))
         with self.assertRaises(textlint.TextlintError) as cm:
             self.setup_quietly()
-        self.assertIn("置き場が壊れている", str(cm.exception))
+        self.assertIn("ディレクトリが壊れている", str(cm.exception))
         self.assertIn("rm -rf", str(cm.exception))
         self.assertEqual(self.npm_calls(), 0)
         self.assertTrue(os.path.isdir(self.dest))

@@ -288,10 +288,10 @@ class TestToml(unittest.TestCase):
     """設定の読み込み（第5節）。
 
     以前は PyYAML があればそれを、無ければ同梱の簡易パーサを使う二重実装だった。
-    両者は実際に食い違い（リスト項目を親キーと同じインデントに置く正当な YAML を
+    両者は実際に一致せず（リスト項目を親キーと同じインデントに置く正当な YAML を
     簡易パーサが拒否し、レビュー範囲設定が丸ごと無効化された）、しかも PyYAML の
     有無で挙動が変わるため、利用者のマシン構成に依存する不具合になっていた。
-    tomllib は標準ライブラリなので実装は1つで済み、この種の食い違いが起きない。
+    tomllib は標準ライブラリなので実装は1つで済み、この種の不一致が起きない。
     """
 
     def _write(self, d, text):
@@ -396,7 +396,7 @@ class TestPreciousData(unittest.TestCase):
         return p
 
     def test_missing_file_is_not_corrupt(self):
-        # 初回実行を止めない。
+        # 初回実行を中断しない。
         self.assertEqual(store.load_precious("/nonexistent/g.json", {"a": 1}), {"a": 1})
 
     def test_empty_file_is_not_corrupt(self):
@@ -431,7 +431,7 @@ class TestPreciousData(unittest.TestCase):
             self.assertTrue(self._child_can_lock(p))
 
     def test_lock_times_out_instead_of_hanging(self):
-        # 取れないまま無限に待つと、利用者からは固まったようにしか見えない。
+        # 取れないまま無限に待機すると、利用者からは固まったようにしか見えない。
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "g.json")
             holder = self._spawn_holder(p, hold=3.0)
@@ -484,7 +484,7 @@ class TestPreciousData(unittest.TestCase):
         return subprocess.run(cmd, capture_output=True).returncode == 0
 
     def _spawn_holder(self, path, hold):
-        """ロックを掴んだまま待つ子プロセスを起こす。"""
+        """ロックを掴んだまま待機する子プロセスを起こす。"""
         import subprocess
         cmd = self._lock_snippet(path, "\n".join([
             "with store.locked(<PATH>):",
@@ -494,7 +494,7 @@ class TestPreciousData(unittest.TestCase):
         return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _wait_until_locked(self, path, timeout=5.0):
-        """子がロックを掴むまで待つ。掴んだ合図はファイルの出現で受ける。"""
+        """子がロックを掴むまで待機する。掴んだ合図はファイルの出現で受ける。"""
         import time
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -515,7 +515,7 @@ class TestAgentInput(unittest.TestCase):
     """エージェント入力の検証（docs/design/data-integrity.md）。
 
     エージェントが毎回組み立てるため、設定ファイルより間違いが起きやすい。
-    形が違えば止め、項目単位の不備はスキップして件数を返す。
+    形が違えば停止し、項目単位の不備はスキップして件数を返す。
     """
 
     def test_accepts_valid_terms(self):
@@ -607,7 +607,7 @@ class TestState(unittest.TestCase):
         self.assertEqual(t[0]["base_sha"], "aaa")
 
     def test_updated_at_change_alone_is_an_update(self):
-        # 本文の書き直しやレビューコメントはコミットを伴わない。
+        # 本文の修正やレビューコメントはコミットを伴わない。
         # sha だけ見ていると取りこぼす。
         t = state.select_targets(self._state(), [self._pr(updated="2026-08-02T00:00:00Z")])
         self.assertEqual(t[0]["status"], state.UPDATED)
@@ -734,7 +734,7 @@ class TestAuth(unittest.TestCase):
             self.assertEqual(auth.resolve()[0], "tok-file")
 
     def test_empty_env_falls_through(self):
-        # 空文字を「設定済み」と誤認して止まらない。
+        # 空文字を「設定済み」と誤認して停止しない。
         os.environ[auth.ENV_TOKEN] = "   "
         auth._from_gh_cli = lambda: ("tok-gh", "gh auth token")
         self.assertEqual(auth.resolve()[0], "tok-gh")
@@ -849,7 +849,7 @@ class TestPRSpec(unittest.TestCase):
     def test_hostlike_prefix_does_not_become_the_repo(self):
         # 素のパスの先頭がホストとして食われると、打っていないリポジトリに
         # 解決される（`foo/bar/baz/pull/9` -> `bar/baz`）。これが起きると
-        # 「別の PR の解説が正しい体裁で出る」= 読み手が誤りに気づけない。
+        # 「別の PR の解説が正しい体裁で出る」= 読者が誤りに気づけない。
         for bad in ("foo/bar/baz/pull/9", "orgs/owner/repo/pull/5"):
             with self.assertRaises(prspec.InvalidSpec):
                 prspec.parse_one(bad)
@@ -896,7 +896,7 @@ class TestPRSpec(unittest.TestCase):
         self.assertIn("bogus", errors[0])
 
     def test_invalid_spec_does_not_drop_the_valid_ones(self):
-        # 1件の誤りで全体を止めない（取得・解析の失敗と同じ扱い）。
+        # 1件の誤りで全体を中断しない（取得・解析の失敗と同じ扱い）。
         targets, _ = prspec.parse(["bogus", "o/r#1"])
         self.assertEqual(len(targets), 1)
 
@@ -904,7 +904,7 @@ class TestPRSpec(unittest.TestCase):
         # 同じ PR を2回解説しても情報が増えない。
         targets, errors = prspec.parse(["o/r#1", "https://github.com/o/r/pull/1"])
         self.assertEqual(len(targets), 1)
-        self.assertEqual(errors, [])  # 利用者の誤りではないので警告にしない
+        self.assertEqual(errors, [])  # 利用者のミスではないので警告にしない
 
     def test_same_number_in_different_repos_is_not_a_duplicate(self):
         targets, _ = prspec.parse(["a/r#1", "b/r#1"])
@@ -960,7 +960,7 @@ class TestBodies(unittest.TestCase):
         self.assertEqual(bodies.load(self.dir, "O/R", 1), "大文字")
 
     def test_number_and_repo_boundary_does_not_collide(self):
-        # `o/r-1` #2 と `o/r` #"1-2" は、区切りを潰すと同じ綴りになりうる。
+        # `o/r-1` #2 と `o/r` #"1-2" は、区切りを潰すと同じ表記になりうる。
         bodies.save(self.dir, "o/r-1", 2, "A")
         bodies.save(self.dir, "o/r", "1-2", "B")
         self.assertEqual(bodies.load(self.dir, "o/r-1", 2), "A")
@@ -986,7 +986,7 @@ class TestBodies(unittest.TestCase):
         self.assertIn(expected, bodies._name("o/r", 7))
 
     def test_long_body_is_truncated(self):
-        # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを止める。
+        # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを防ぐ。
         body = "x" * (bodies.MAX_BODY_BYTES + 5000)
         _, truncated = bodies.save(self.dir, "o/r", 1, body)
         self.assertTrue(truncated)
@@ -1065,7 +1065,7 @@ class TestBodies(unittest.TestCase):
             path, _ = bodies.save(self.dir, "o/r", i, "b")
             os.utime(path, (1000 + i, 1000 + i))
         removed = bodies.prune(self.dir, None, max_bodies=2)
-        # ファイル名の綴りではなく「どの PR が消えたか」を見る。
+        # ファイル名の表記ではなく「どの PR が消えたか」を見る。
         self.assertEqual(sorted(removed),
                          sorted([bodies._name("o/r", 0), bodies._name("o/r", 1)]))
         self.assertIsNone(bodies.load(self.dir, "o/r", 0))
@@ -1095,7 +1095,7 @@ class TestBodies(unittest.TestCase):
         self.assertIn("-消える行", d)
 
     def test_diff_is_empty_when_unchanged(self):
-        # 変わっていないのに「本文が変わった」と出すと、読み手を惑わせる。
+        # 変わっていないのに「本文が変わった」と出すと、読者を惑わせる。
         self.assertEqual(bodies.diff("同じ本文", "同じ本文"), "")
 
     def test_diff_is_empty_without_a_previous_body(self):
@@ -1110,7 +1110,7 @@ class TestBodies(unittest.TestCase):
 
     def test_capped_diff_keeps_both_deletions_and_additions(self):
         # 先頭から一律に切ると削除行だけが残り、「全部消された」と読めてしまう。
-        # 本文を書き直した PR で誤解を生むため、前後の両方を残す。
+        # 本文を修正した PR で誤解を生むため、前後の両方を残す。
         d = bodies.diff("\n".join("old %d" % i for i in range(300)),
                         "\n".join("new %d" % i for i in range(300)))
         lines = d.splitlines()
@@ -1149,7 +1149,7 @@ class TestRepoCache(unittest.TestCase):
     """作業リポジトリの管理（scripts/prteeth/repos.py）。
 
     ネットワークは使わない。ローカルに作った git リポジトリを origin にして、
-    clone / fetch の実際の挙動を確かめる。
+    clone / fetch の実際の挙動を確認する。
     """
 
     def setUp(self):
@@ -1236,7 +1236,7 @@ class TestRepoCache(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(path, "junk")))
 
     def test_failure_raises_repo_error(self):
-        # 1件の失敗で巡回全体を止めない形にする（呼び出し側が握れる型）。
+        # 1件の失敗で巡回全体を中断しない形にする（呼び出し側が握れる型）。
         with self.assertRaises(repos.RepoError):
             repos.ensure(self.repos_dir, "o/r",
                          url=os.path.join(self.root, "nonexistent"))
@@ -1662,7 +1662,7 @@ class TestCliCommands(unittest.TestCase):
 
     prspec / labels 単体のテストでは、引数の受け渡しの取り違えが見つからない。
     番号指定では `--context` の渡し忘れがそのまま「マージ済み PR にレビュー必須と
-    出る」不具合になるため、ここで配線ごと確かめる。
+    出る」不具合になるため、ここで配線ごと確認する。
     """
 
     def setUp(self):
@@ -1703,7 +1703,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertTrue(all(t["language"] for t in out["targets"]))
 
     def test_resolve_keeps_valid_specs_when_one_is_invalid(self):
-        # 1件の誤りで全体を止めない。
+        # 1件の誤りで全体を中断しない。
         out = self._run(self.mod.cmd_resolve, specs=["bogus", "o/r#1"])
         self.assertEqual(out["resolved"], 1)
         self.assertEqual(len(out["invalid"]), 1)
@@ -1760,7 +1760,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("重点", html)
 
     def test_render_output_filename_marks_the_context(self):
-        # 巡回と番号指定の生成物が out/ に混ざったとき、名前で見分けられるように。
+        # 巡回と番号指定の生成物が out/ に混ざったとき、名前で判別できるように。
         pick, _ = self._render("pick")
         patrol, _ = self._render(None)
         self.assertIn("pr-teeth-pick-", os.path.basename(pick["path"]))
@@ -1812,7 +1812,7 @@ class TestCliCommands(unittest.TestCase):
 
         slow = self._record_in_subprocess(["alpha"], delay=0.6)
         # 先行プロセスが「読み終えたが、まだ保存していない」窓に後続を入れる。
-        # ここを待たずに起こすと両者が順に走ってしまい、競合を再現できない。
+        # ここで待機せずに起こすと両者が順に走ってしまい、競合を再現できない。
         time.sleep(0.2)
         fast = self._record_in_subprocess(["beta"])
         self.assertEqual(slow.wait(), 0)
@@ -1851,7 +1851,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("+## 追記", target["body_diff"])
 
     def test_body_diff_is_empty_when_only_code_changed(self):
-        # 本文が変わっていないのに差分を出すと、読み手を惑わせる。
+        # 本文が変わっていないのに差分を出すと、読者を惑わせる。
         self._record_body("同じ本文")
         target = self._select("同じ本文")["targets"][0]
         self.assertTrue(target["body_diff_available"])
@@ -1993,7 +1993,7 @@ class TestCliCommands(unittest.TestCase):
         )
 
     def test_select_holds_the_state_lock_while_reading_bodies(self):
-        # 読む側も同じ。record の途中の state と本文の組み合わせを読まない。
+        # 読み込む処理も同じ。record の途中の state と本文の組み合わせを読まない。
         import threading
 
         self._record_body("前回の本文")

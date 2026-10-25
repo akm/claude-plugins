@@ -68,7 +68,7 @@ def load_file(path):
         errors.append(f"{path}: 最上位に置けるのは terms だけ (余分なキー: {', '.join(unknown_top)})")
     entries = data.get("terms", [])
     if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
-        errors.append(f"{path}: terms は [[terms]] の表の並びにする")
+        errors.append(f"{path}: terms は [[terms]] の表の配列にする")
         entries = []
 
     terms, seen = [], {}

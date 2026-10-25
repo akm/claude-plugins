@@ -48,7 +48,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 ユーザーが語を明示せずに「理解済みにして」とだけ言った場合は、**どの語かを確認してから**
 実行する。取り違えると、まだ理解していない語の説明が気づかれないまま消える。
 
-返り値の **`created` が `true` なら綴り違いを疑う。** その語は用語集に無く、新しく
+返り値の **`created` が `true` なら表記の違いを疑う。** その語は用語集に無く、新しく
 作られている。ユーザーに確認してから、不要なら元の語で入れ直す。
 
 用語集が壊れていて読めない場合、コマンドは**保存せずエラーで終了する**（上書きを避けるため）。
@@ -80,7 +80,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare
 
 ## fork する場合
 
-配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の置き場所**。
+配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の定義箇所**。
 fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md 側には書かない）。
 以前は各 SKILL.md にリテラルで書いており、一部だけ書き換えると設定ディレクトリが
 分かれて用語集を見失う状態だった。

@@ -20,10 +20,10 @@ import os
 import re
 import subprocess
 
-# 1リポジトリあたりの取得を打ち切るまでの秒数。巨大なモノレポで無制限に待たない。
+# 1リポジトリあたりの取得を打ち切るまでの秒数。巨大なモノレポで無制限に待機しない。
 CLONE_TIMEOUT = 300
 
-# fetch は clone より軽い（差分だけ）。同じ上限にすると異常時の待ちが長すぎる。
+# fetch は clone より軽い（差分だけ）。同じ上限にすると異常時の待機が長すぎる。
 FETCH_TIMEOUT = 120
 
 # 保持するリポジトリ数の上限。超えたら最終利用が古い順に消す。
@@ -43,7 +43,7 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
 
 class RepoError(Exception):
-    """取得に失敗した。1件の失敗で巡回全体を止めないため、呼び出し側で握る。"""
+    """取得に失敗した。1件の失敗で巡回全体を中断しないため、呼び出し側で握る。"""
 
 
 def _run(args, cwd=None, timeout=None):
@@ -54,7 +54,7 @@ def _run(args, cwd=None, timeout=None):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
     except subprocess.TimeoutExpired:
-        raise RepoError(" ".join(args[:2]) + " が " + str(timeout) + " 秒で終わりませんでした")
+        raise RepoError(" ".join(args[:2]) + " が " + str(timeout) + " 秒で終了しませんでした")
     except FileNotFoundError:
         raise RepoError("git コマンドが見つかりません")
     if p.returncode != 0:
@@ -66,7 +66,7 @@ def _run(args, cwd=None, timeout=None):
 
 
 def validate(repo):
-    """owner/repo の形を確かめる。
+    """owner/repo の形を確認する。
 
     パスの組み立てに使う値なので、`..` や絶対パスが混ざる経路を作らない。
     エージェントが渡す値であり、GitHub から取れた値とは限らない。
@@ -80,7 +80,7 @@ def validate(repo):
 
 
 def path_for(repos_dir, repo):
-    """作業リポジトリの置き場所。owner ごとにディレクトリを分ける。"""
+    """作業リポジトリの保存先。owner ごとにディレクトリを分ける。"""
     owner, name = validate(repo).split("/")
     return os.path.join(repos_dir, owner, name)
 
@@ -147,7 +147,7 @@ def touch(path):
     """最終利用日時を記録する。掃除の順序を決めるのに使う。
 
     git のファイルの mtime は fetch の有無で変わり、「利用した」と一致しない。
-    こちらで明示的に印を置く。
+    こちらで明示的にフラグファイルを置く。
     """
     try:
         with open(os.path.join(path, _STAMP), "w", encoding="utf-8") as f:
@@ -157,7 +157,7 @@ def touch(path):
 
 
 def used_at(path):
-    """最終利用日時（epoch 秒）。印が無ければディレクトリの mtime。"""
+    """最終利用日時（epoch 秒）。フラグファイルが無ければディレクトリの mtime。"""
     stamp = os.path.join(path, _STAMP)
     for target in (stamp, path):
         try:

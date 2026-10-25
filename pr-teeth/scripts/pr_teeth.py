@@ -109,11 +109,11 @@ def cmd_select(args):
     prs, skipped = agent_input.prs(raw)
     warnings.extend(skipped)
 
-    # state と本文は対で意味を持つ（記録に対応する本文が差分の基準）。読む側も
+    # state と本文は対で意味を持つ（記録に対応する本文が差分の基準）。読み込む処理も
     # 同じロックで囲み、record の途中の state と本文の組み合わせを読まない。
-    # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待たせない）。
+    # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待機させない）。
     with store.locked(paths["state"]):
-        # state も蓄積データ。壊れていれば止める（空扱いすると全件を再通知してしまう）。
+        # state も蓄積データ。壊れていれば停止する（空扱いすると全件を再通知してしまう）。
         saved = store.load_precious(paths["state"], {})
         targets = state.select_targets(saved, prs)
         _attach_body_diffs(targets, paths, warnings)
@@ -163,7 +163,7 @@ def cmd_resolve(args):
     """PR の指定（`owner/repo#123` や URL）を repo / number に解釈する。
 
     番号指定コマンド（/pr-teeth-pick）の入口。解釈をモデルに任せると、URL の末尾や
-    フラグメントの取り違えで**別の PR を正しい体裁で解説してしまう**（読み手には
+    フラグメントの取り違えで**別の PR を正しい体裁で解説してしまう**（読者には
     誤りと分からない）。ここで機械的に確定させる。
 
     解釈できなかった指定は `invalid` に理由付きで返す。理由を示さずに捨てない。
@@ -286,8 +286,8 @@ def cmd_record(args):
 
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
-    # 形が違えば例外で止まる。0件を記録して、エラーを出さずに成功を返すことはしない。
-    # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待たせない）。
+    # 形が違えば例外で停止する。0件を記録して、エラーを出さずに成功を返すことはしない。
+    # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待機させない）。
     items, skipped = agent_input.terms(payload)
     warnings.extend(skipped)
 
@@ -397,17 +397,17 @@ def cmd_promote(args):
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
     # ステータス変更は上書き意味論。record と重なったとき、こちらの確定操作が
-    # 相手の読み込み済みデータで巻き戻らないようロックの中で読み直す（#13）。
+    # 相手の読み込み済みデータで巻き戻らないようロックの中で再度読み込む（#13）。
     with store.locked(paths["glossary"]):
         g = _load_glossary(paths)
         existed = glossary.get(g, args.term) is not None
         entry = glossary.set_status(g, args.term, args.status, now=_now())
         store.save_json(paths["glossary"], g)
     if not existed:
-        # 綴り違いを、警告を出さずに新規作成すると、直したつもりの語が別エントリになる。
+        # 表記の違う語を、警告を出さずに新規作成すると、直したつもりの語が別エントリになる。
         warnings.append(
             "「" + args.term + "」は用語集にありませんでした。新規に登録しています"
-            "（綴りが違っていないか確認してください）。"
+            "（表記が違っていないか確認してください）。"
         )
     return _emit({
         "term": args.term,
@@ -421,7 +421,7 @@ def cmd_promote(args):
 def cmd_repo(args):
     """PR を読むための作業リポジトリを用意する（clone / fetch）。
 
-    置き場所と取得量をコード側で決める。散文の指示だとリポジトリが際限なく増え、
+    保存先と取得量をコード側で決める。散文の指示だとリポジトリが際限なく増え、
     取得量も実行のたびに揺れるため（第12節）。
     """
     warnings = []
@@ -686,13 +686,13 @@ def main(argv=None):
         json.dump({
             "error": str(e),
             "hint": "記録が失われるのを避けるため保存していません。"
-                    "他の pr-teeth の実行が終わってから再実行してください。",
+                    "他の pr-teeth の実行が終了してから再実行してください。",
             "path": e.path,
         }, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         return 1
     except repos.RepoError as e:
-        # 取得の失敗。1件で巡回全体を止めないよう、呼び出し側は注記して続行する。
+        # 取得の失敗。1件で巡回全体を中断しないよう、呼び出し側は注記して続行する。
         json.dump({
             "error": str(e),
             "hint": "この PR は取得できません。注記して他の PR の解説を続けてください。",

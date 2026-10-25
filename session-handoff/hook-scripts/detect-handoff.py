@@ -4,18 +4,18 @@ UserPromptSubmit フック（session-handoff プラグイン）。
 
 スキル handoff-write は最後に `/handoff-resume <保存先>` という 1 行を出すので、
 それを貼れば確実に再開できる。このフックは、保存先 (コメントの URL やファイルのパス)
-だけを貼った場合の補助で、引き継ぎ文だと確かめられたときに限り、スキルの実行を促す
+だけを貼った場合の補助で、引き継ぎ文だと確認できたときに限り、スキルの実行を促す
 文脈を差し込む。
 
 方針:
   - 候補の抽出は正規表現だけで行う。候補が無い通常のプロンプトでは、ファイルにも
-    ネットワークにもアクセスせずに終わる。
-  - 引き継ぎ文かどうかは、本文の 1 行目の目印で確かめる。URL やファイル名の形だけでは
+    ネットワークにもアクセスせずに終了する。
+  - 引き継ぎ文かどうかは、本文の 1 行目のマークで確認する。URL やファイル名の形だけでは
     判定しない（コメントの URL は、見ただけでは引き継ぎ文かどうか分からない）。
   - 差し込むのは保存先と実行の指示だけで、引き継ぎ文の本文は差し込まない。本文の取得と、
     投稿者が本人かどうかの確認は、スキルの手順が担う。
   - ブロックしない。gh が無い・未認証・タイムアウト・想定外の失敗では、何も出力せず
-    終了コード 0 で終わる。プロンプトは通常どおり処理される。
+    終了コード 0 で終了する。プロンプトは通常どおり処理される。
 """
 
 import json
@@ -26,7 +26,7 @@ import sys
 
 MARKER = "<!-- session-handoff v1 -->"
 
-# 1 つのプロンプトで確かめる候補の上限。URL の確認は gh を呼ぶので、数を抑える。
+# 1 つのプロンプトで確認する候補の上限。URL の確認は gh を呼ぶので、数を抑える。
 _MAX_CANDIDATES = 3
 
 # フック全体のタイムアウト (hooks.json の 10 秒) に収まるように、gh の 1 回あたりを短くする。
@@ -70,7 +70,7 @@ def _starts_with_marker(text):
 
 
 def file_is_handoff(path, cwd):
-    """ローカルファイルの 1 行目が目印なら、絶対パスを返す。違えば None。"""
+    """ローカルファイルの 1 行目がマークなら、絶対パスを返す。違えば None。"""
     full = os.path.expanduser(path)
     if not os.path.isabs(full):
         full = os.path.join(cwd, full)
@@ -83,7 +83,7 @@ def file_is_handoff(path, cwd):
 
 
 def comment_is_handoff(owner, repo, comment_id, cwd):
-    """GitHub のコメントの本文が目印で始まるかを gh で確かめる。確かめられなければ False。"""
+    """GitHub のコメントの本文がマークで始まるかを gh で確認する。確認できなければ False。"""
     try:
         r = subprocess.run(
             [
@@ -107,7 +107,7 @@ def comment_is_handoff(owner, repo, comment_id, cwd):
 
 
 def resolve(candidates, cwd):
-    """候補のうち、引き継ぎ文だと確かめられた最初のものの保存先を返す。無ければ None。"""
+    """候補のうち、引き継ぎ文だと確認できた最初のものの保存先を返す。無ければ None。"""
     for cand in candidates:
         if cand[0] == "path":
             full = file_is_handoff(cand[1], cwd)
@@ -124,7 +124,7 @@ def build_context(location):
             "## このプロンプトは引き継ぎ文を指しています（session-handoff）",
             "",
             "次の保存先は、スキル handoff-write が書いた引き継ぎ文です"
-            "（本文の 1 行目の目印で確認済み）。",
+            "（本文の 1 行目のマークで確認済み）。",
             "",
             "- " + location,
             "",

@@ -6,7 +6,7 @@
 判定の反転や恒真、検出漏れが繰り返し入った。
 
 **判定を足すときは、ここに正例と反例を先に書く。** 反例が Red になることを
-見てから実装する。「通ること」だけを確かめるテストは、恒真の判定を通す。
+見てから実装する。「通ること」だけを確認するテストは、恒真の判定を通す。
 
 実行:
     python3 -m unittest discover -s .claude/skills/work-log-gh-comment/evals
@@ -162,7 +162,7 @@ class TestTokensAbsent(unittest.TestCase):
         """値の位置に接頭辞が残っていれば、後ろが何であれ漏えい。
 
         規範は「値は全部消す。一部を残さない」と定める。省略記号でも
-        伏せ字でも、接頭辞が値の位置にある時点で読み手は形式を知る。
+        伏せ字でも、接頭辞が値の位置にある時点で読者は形式を知る。
         句読点や周囲の説明で判定が変わってはいけない。
         """
         for body in ("値は一切残していない ENROLLMENT_TOKEN: lappds_enr_...",
@@ -285,7 +285,7 @@ class TestEval5Coverage(unittest.TestCase):
     def test_宣言と判定の項目が一致する(self):
         """evals.json の assertions と CHECKS のラベルは同じ事実の二重記載。
 
-        突き合わせる関門が無いと、片方に足したとき、どの検査も失敗しないまま食い違う。
+        突き合わせる関門が無いと、片方に足したとき、どの検査も失敗しないまま一致しなくなる。
         """
         import json
         import pathlib
@@ -358,7 +358,7 @@ class TestAlertOutsideDetails(unittest.TestCase):
 
 
 class TestMainRobustness(unittest.TestCase):
-    """採点の実行。1 件の不備で全体が止まってはいけない。"""
+    """採点の実行。1 件の不備で全体が停止してはいけない。"""
 
     def test_壊れた_json_で止まらない(self):
         """eval_metadata.json は README の手順 3 で人が手作業で作る。
@@ -450,7 +450,7 @@ class TestMainRobustness(unittest.TestCase):
 class TestCheckLabels(unittest.TestCase):
     """判定のラベルは、実装が実際に求めるものと合っていなければならない。
 
-    ラベルは記録する側が読む唯一の手がかりなので、食い違うと
+    ラベルは記録する側が読む唯一の手がかりなので、一致しないと
     ラベルどおりに書いた記録が落ちる。
     """
 
@@ -560,7 +560,7 @@ class TestChunksHandled(unittest.TestCase):
 
 
 class TestMentionsDiscrepancy(unittest.TestCase):
-    """食い違いの言及。行数の出現だけで通してはいけない。"""
+    """不一致の言及。行数の出現だけで通してはいけない。"""
 
     def test_食い違いの語で通す(self):
         ok, _ = grade.mentions_discrepancy("サマリと明細が食い違っている。")
@@ -582,7 +582,7 @@ class TestMentionsDiscrepancy(unittest.TestCase):
 
     def test_題材の数を並べただけでは通さない(self):
         """check-logs.sh はアプリ 3 つを走査する。「3 つ」と「2 行」が
-        同じ文に並ぶのは eval-3 で自然な記述で、食い違いの認識ではない。
+        同じ文に並ぶのは eval-3 で自然な記述で、不一致の認識ではない。
         """
         for body in ("3 つのアプリケーションを確認し、ERROR は 2 行あった。",
                      "app-web / app-worker / app-db の 3 つで ERROR は 2 行。"):
@@ -591,13 +591,13 @@ class TestMentionsDiscrepancy(unittest.TestCase):
                 self.assertFalse(ok)
 
     def test_サマリと明細の出所を明示した対比で通す(self):
-        """どちらの数がどこから来たかを書いていれば、食い違いの認識。"""
+        """どちらの数がどこから来たかを書いていれば、不一致の認識。"""
         ok, _ = grade.mentions_discrepancy(
             "サマリは 3 errors だが、明細の ERROR 行は 2 行しかない。")
         self.assertTrue(ok)
 
     def test_解釈で均した文を通さない(self):
-        """3 件と 2 回を並べても、食い違いとして書いていない。"""
+        """3 件と 2 回を並べても、不一致として書いていない。"""
         ok, _ = grade.mentions_discrepancy(
             "エラーが 3 件あるが、内容はリトライ 2 回で自己回復している。")
         self.assertFalse(ok)
