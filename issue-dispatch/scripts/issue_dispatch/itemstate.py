@@ -367,7 +367,7 @@ def _report(item, kind, **values):
 def dependency_actions(item, state, login, project_number):
     """割り当ての無い項目の `Ready` ⇄ `Blocked` の再導出 (KTD7)。範囲は担当者が自分 1 人で、割り当て中でなく、Status が Ready か Blocked の項目。
     開いている blocker があれば `依存の待機` → `Blocked`、すべて閉じたら `依存の解消` → `Ready` (コメントが先)。`依存の待機` の無い `Blocked` は
-    利用者が手で付けたものなので書き換えない。コメントの後で中断された書き込み (Status の変化がコメントより後に無い) は続きを書き (continuation)、
+    利用者が手で付けたものなので書き換えない。コメントの後で中断された書き込み (Status の変化がコメントより後に無い) は残りの書き込みを行い (continuation)、
     コメントより後に Status の変化があれば利用者の変更として報告する。返り値は (actions, reports)。"""
     status = (item.get("status") or {}).get("name")
     if state.get("assigned") or not _in_scope(item, login) or status not in STATUS_OPTIONS_FOR_DEPENDENCY:
@@ -508,7 +508,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                 actions.append({"kind": "set-field", "item": key, "item_id": item["item_id"], "field": FIELD_TITLE, "value": intent["session_title"], "continuation": True})
     expected = expected_statuses(state)
     d = state.get("declaration") or {}
-    restore = "Blocked" if "Blocked" in expected else "In Progress"  # 続きの Status は期待する Status から 1 つに決める
+    restore = "Blocked" if "Blocked" in expected else "In Progress"  # 残りの書き込みで書く Status は、期待する Status から 1 つに決める
     status_continued = False
     if item.get("state") == "OPEN" and status not in expected and not (status == "Blocked" and d.get("manager_blocked")):
         if status not in ASSIGNED_STATUSES:
@@ -517,7 +517,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
             else:
                 actions.append(_action_status(item, restore, continuation=True))
                 status_continued = True
-    # `待機` (Issue か 小さな PR) の続き: blockedBy と Blocked
+    # `待機` (Issue か 小さな PR) の残りの書き込み: blockedBy と Blocked
     if d.get("waiting_blockers") and d.get("wait") and not d.get("manager_blocked"):
         wait_at = d["wait"]["at"]
         present = {b["key"] for b in item.get("blocked_by") or []}

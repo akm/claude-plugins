@@ -238,7 +238,7 @@ class ItemsTest(FakeGhCase):
         self.assertEqual(self.body(calls[1])["variables"]["after"], "CURSOR-PAGE-1")
 
     def test_comment_pages_are_followed_per_issue(self):
-        """コメントが 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。"""
+        """コメントが 1 ページに収まらない項目は、Issue ごとの残りのページを読んで全部返す。"""
         data = fixture_json("project-items-ok")
         node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
         node["content"]["comments"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C1"}
@@ -298,7 +298,7 @@ class ItemsTest(FakeGhCase):
                 "errors": [{"type": "FORBIDDEN", "message": "partial"}]}
         self.responses([{"substring": "query ProjectItems", "stdout": data}, {"substring": "query IssueComments", "stdout": more}])
         result = project.items(PROJECT)
-        self.assertEqual(result["status"], "partial", "続きのページの errors も捨てないこと")
+        self.assertEqual(result["status"], "partial", "残りのページの errors も捨てないこと")
         self.assertEqual(result["problems"][0]["what"], "comments")
         self.assertIn("FORBIDDEN", result["problems"][0]["message"])
 
@@ -309,7 +309,7 @@ class ItemsTest(FakeGhCase):
         self.responses([{"substring": "query ProjectItems", "stdout": data},
                         {"substring": "query IssueComments", "stdout": {"data": {"repository": {"issue": None}}, "errors": [{"type": "NOT_FOUND", "message": "gone"}]}}])
         result = project.items(PROJECT)
-        self.assertEqual(result["status"], "partial", "続きのページの Issue が無くても例外にしないこと")
+        self.assertEqual(result["status"], "partial", "残りのページの Issue が無くても例外にしないこと")
         self.assertEqual(result["problems"][0]["what"], "comments")
         self.assertEqual(len(result["items"][0]["comments"]), 10)
 

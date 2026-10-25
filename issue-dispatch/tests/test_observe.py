@@ -399,7 +399,7 @@ class CliTest(FakeGhCase):
         self.assertEqual([d["kind"] for d in observe.diff(before, after)], ["closed"])
 
     def test_carry_forward_keeps_last_complete_value(self):
-        """コメントの続きのページが読めなかったターンは、前のスナップショットのコメント ID を引き継いで保存し (carried)、読めるようになったターンに
+        """コメントの残りのページが読めなかったターンは、前のスナップショットのコメント ID を引き継いで保存し (carried)、読めるようになったターンに
         最後に全部読めたときからの変化だけを差分に出す。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)

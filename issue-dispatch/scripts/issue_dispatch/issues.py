@@ -97,7 +97,7 @@ def observe_pr(url, login=None):
         page_pr = (page.get("repository") or {}).get("pullRequest")
         if not page_pr or page_errors:
             return {"status": "error", "failure": "other", "exit_code": 0,
-                    "message": f"変えたファイルの続きのページを読めない: {page_errors!r}"}
+                    "message": f"変えたファイルの残りのページを読めない: {page_errors!r}"}
         files += [_file(n) for n in page_pr["files"]["nodes"] if n]
         info = page_pr["files"].get("pageInfo") or {}
         rate_limit = page.get("rateLimit") or rate_limit

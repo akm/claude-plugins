@@ -200,7 +200,7 @@ def _comment(node):
 
 
 def _more_pages(name, repo, number, first_page, key, convert):
-    """コメントか出来事の続きのページを読んで、変換した要素の配列を返す。読めなければ問題を返す。"""
+    """コメントか出来事の残りのページを読んで、変換した要素の配列を返す。読めなければ問題を返す。"""
     nodes = [convert(n) for n in first_page["nodes"] if n]
     info = first_page.get("pageInfo") or {}
     owner, _, repo_name = repo.partition("/")
@@ -210,11 +210,11 @@ def _more_pages(name, repo, number, first_page, key, convert):
             return nodes, problem
         issue = (data.get("repository") or {}).get("issue")
         if not issue or not isinstance(issue.get(key), dict):
-            return nodes, {"failure": "other", "message": "続きのページで Issue を読めない (移された・消された、または " +
+            return nodes, {"failure": "other", "message": "残りのページで Issue を読めない (移された・消された、または " +
                            json.dumps(errors, ensure_ascii=False) + ")", "exit_code": 0}
         if errors:
             # 最初のページと同じく、data と一緒に返った errors は捨てずに知らせる
-            return nodes, {"failure": "other", "message": "続きのページに errors がある: " + json.dumps(errors, ensure_ascii=False), "exit_code": 0}
+            return nodes, {"failure": "other", "message": "残りのページに errors がある:  " + json.dumps(errors, ensure_ascii=False), "exit_code": 0}
         page = issue[key]
         nodes += [convert(n) for n in page["nodes"] if n]
         info = page.get("pageInfo") or {}
@@ -261,7 +261,7 @@ def simplify_item(node, position):
                 for p in content["closedByPullRequestsReferences"]["nodes"]],
     })
     problems = []
-    # 入れ子の connection は続きのページを読まない (件数の上限は上げてある)。超えていれば、欠損を知らせる
+    # 入れ子の connection は残りのページを読まない (件数の上限は上げてある)。超えていれば、欠損を知らせる
     for key, what in (("labels", "labels"), ("blockedBy", "blocked_by"), ("userContentEdits", "body_edits"),
                       ("closedByPullRequestsReferences", "prs")):
         if (content.get(key, {}).get("pageInfo") or {}).get("hasNextPage"):
@@ -283,7 +283,7 @@ def simplify_item(node, position):
 
 def items(project):
     """項目の一覧を位置の順に全部読む。返り値: {"status": "ok", "project_id", "items": [...], "problems": [...], "rate_limit"} か
-    {"status": "error", ...} (最初のページが読めないとき)。続きのページやコメントの続きが読めなかったときは problems に入れて読み取りを中断する。"""
+    {"status": "error", ...} (最初のページが読めないとき)。残りのページやコメントの残りのページが読めなかったときは problems に入れて読み取りを中断する。"""
     result_items = []
     problems = []
     after = None

@@ -564,7 +564,7 @@ class DependencyBlockedTest(unittest.TestCase):
             self.assertEqual(dependency(item), ([], []), assignees)
 
     def test_interrupted_after_wait_comment_continues_to_blocked(self):
-        """`依存の待機` を書いた後で中断された (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、続きの `Blocked` を書く。"""
+        """`依存の待機` を書いた後で中断された (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、残りの書き込みとして `Blocked` を書く。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)])
         actions, reports = dependency(item)
         self.assertEqual(([(a["kind"], a["status"], a.get("continuation")) for a in actions], reports), ([("set-status", "Blocked", True)], []))
@@ -621,7 +621,7 @@ def kinds(entries):
 
 
 class AssignedScenesTest(unittest.TestCase):
-    """割り当て中の項目の場面ごとの扱い (質問・続きの書き込み・報告)。"""
+    """割り当て中の項目の場面ごとの扱い (質問・残りの書き込み・報告)。"""
 
     def test_nothing_to_do_for_item_in_expected_state(self):
         out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)]))
@@ -679,7 +679,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(kinds(turn_of(item)["questions"]), ["field-changed"])
 
     def test_field_not_written_yet_is_continued(self):
-        """`割り当て` の後にフィールドが書かれていない (更新がコメントより前) 項目は、途中で中断されたとして続きを書く。"""
+        """`割り当て` の後にフィールドが書かれていない (更新がコメントより前) 項目は、途中で中断されたとして残りを書く。"""
         item = make_item(session_field=None, status="Ready", comments_=[ASSIGN1])
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("field"), a.get("value"), a.get("status")) for a in out["actions"]],
@@ -697,13 +697,13 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(turn_of(item)["questions"], [])
 
     def test_wait_continuation_adds_blocker_and_blocked(self):
-        """`待機` (Issue) を書いた後で中断された項目は、blockedBy と `Blocked` の続きを書く。"""
+        """`待機` (Issue) を書いた後で中断された項目は、残りの書き込みとして blockedBy と `Blocked` を書く。"""
         item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("blocked-by-add", A2), ("set-status", "Blocked")])
 
     def test_todo_with_wait_continues_to_blocked_once(self):
-        """Status が `Todo` のまま (書かれずに中断された) で `待機` (Issue) もある項目は、続きの Status を `Blocked` 1 つだけにする (In Progress と Blocked の 2 つを返さない)。"""
+        """Status が `Todo` のまま (書かれずに中断された) で `待機` (Issue) もある項目は、残りの書き込みの Status を `Blocked` 1 つだけにする (In Progress と Blocked の 2 つを返さない)。"""
         item = make_item(status="Todo", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("set-status", "Blocked"), ("blocked-by-add", A2)])
