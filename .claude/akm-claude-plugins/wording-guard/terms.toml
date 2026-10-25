@@ -520,6 +520,13 @@ reason = "何を指すか分からない。データに付ける目印は「フ�
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
+pattern = "目印"
+verdict = "avoid"
+replacements = ["マーク"]
+reason = "英語 (marker) を訓読みで訳した語。識別のために付ける文字列や記号 (session-handoff の 1 行目の <!-- session-handoff v1 -->、wording-guard の設定キー quote_markers が指す行頭の文字列) は「マーク」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
 pattern = "言い回し"
 verdict = "avoid"
 replacements = ["表現", "語彙選択"]
