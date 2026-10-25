@@ -1,10 +1,10 @@
-"""待機 (ポーリング)。管理のセッションの `wait` (スナップショットとの差分で終わる) と、作業のセッションの `wait-assignment`・`wait-decision`
-(項目の状態 (itemstate) で終わる) を、バックグラウンドのプロセスとして動かす (計画の KTD6)。終わる条件・終了コード・標準出力・`wait.pid` の
+"""待機 (ポーリング)。管理のセッションの `wait` (スナップショットとの差分で終了する) と、作業のセッションの `wait-assignment`・`wait-decision`
+(項目の状態 (itemstate) で終了する) を、バックグラウンドのプロセスとして動かす (計画の KTD6)。終了条件・終了コード・標準出力・`wait.pid` の
 様式の正本は issue-dispatch/skills/issue-dispatch/references/observation.md の「待機」。
 
 - 起動時に前の待機を止め (PID の再利用を確認してから)、`wait.pid` に自分の PID・開始時刻・所有者を書き、標準出力の最初の行に `pid <PID>` を書く。
-- 読んだ時点の状態で判定する (起動の前から成り立っていれば最初の読み取りで終わる)。
-- SIGTERM を受けると `stopped <PID>` を書いて終了コード 6 で終わる。終わるときは `wait.pid` の PID が自分のときだけ消す。
+- 読んだ時点の状態で判定する (起動の前から成り立っていれば最初の読み取りで終了する)。
+- SIGTERM を受けると `stopped <PID>` を書いて終了コード 6 で終了する。終了するときは `wait.pid` の PID が自分のときだけ消す。
 - スナップショットは読むだけで書かない (書くのは管理のセッションのターン。KTD5)。
 """
 
@@ -25,7 +25,7 @@ WAIT_NAMES = ("wait", "wait-assignment", "wait-decision")
 EXIT_CHANGED, EXIT_RATE_LIMIT, EXIT_NETWORK, EXIT_NO_SNAPSHOT, EXIT_STOPPED, EXIT_AUTH, EXIT_TIMEOUT = 0, 3, 4, 5, 6, 8, 124
 NETWORK_FAILURE_LIMIT = 3   # ネットワークの失敗がこの回数続けば 4
 SLICE_SECONDS = 5.0         # 期限と停止の印を見る間隔
-# 終わりの行の先頭の語 (スキルはこの語で分ける)
+# 終了の行の先頭の語 (スキルはこの語で分ける)
 RESULT_WORDS = ("diff", "assignment", "resumed", "stop", "request", "go", "wait", "stopped")
 _NETWORK_LIKE = ("network", "timeout", "other", "missing")
 
@@ -84,7 +84,7 @@ def is_our_wait(entry):
 
 
 def stop_previous(path, grace_seconds=10.0):
-    """前の待機を止める。`wait.pid` の PID がこの CLI の待機なら SIGTERM を送って終わるのを待機し、そうでなければ止めずに `wait.pid` だけ消す。
+    """前の待機を止める。`wait.pid` の PID がこの CLI の待機なら SIGTERM を送って終了するのを待機し、そうでなければ止めずに `wait.pid` だけ消す。
     返り値: {"stopped": PID} / {"removed": PID} (再利用されていた) / {"none": True}。"""
     entry = read_pid_file(path)
     if entry is None:
@@ -108,7 +108,7 @@ def stop_previous(path, grace_seconds=10.0):
             os.unlink(path)
     except OSError:
         pass
-    # 待機時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止の印を見たときに終わる
+    # 待機時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止の印を見たときに終了する
     return {"stopped": entry["pid"], "alive": True} if alive else {"stopped": entry["pid"]}
 
 
@@ -128,7 +128,7 @@ def _now():
 # --- 待機の共通の処理 ---------------------------------------------------------------
 
 class Waiter:
-    """期限・間隔・停止 (SIGTERM)・gh の失敗の扱いをまとめた待機。poll() は None (続ける) か (終了コード, 終わりの行) か
+    """期限・間隔・停止 (SIGTERM)・gh の失敗の扱いをまとめた待機。poll() は None (続ける) か (終了コード, 終了の行) か
     ("failure", 失敗の種類) を返す。"""
 
     def __init__(self, pid_path, owner, name, minutes, interval_minutes, out=None):
@@ -195,7 +195,7 @@ class Waiter:
         return self._finish(EXIT_STOPPED, f"stopped {os.getpid()}")
 
     def run(self, poll):
-        """読み取りの結果より停止の印を優先する: 読み取り (gh の呼び出し) の間に SIGTERM を受けていれば、結果を捨てて stopped で終わる
+        """読み取りの結果より停止の印を優先する: 読み取り (gh の呼び出し) の間に SIGTERM を受けていれば、結果を捨てて stopped で終了する
         (捨てた変化は、新しい待機が最初の読み取りで見つける。読んだ時点の状態で判定するため)。"""
         self.start()
         try:
@@ -283,7 +283,7 @@ def report_pr_states(items, login):
 # --- 管理のセッションの wait ------------------------------------------------------------
 
 def manager_poll(parsed, snapshot, login):
-    """Project と PR を読み、スナップショットとの差分があれば ("diff <種類,...>") で終わる。"""
+    """Project と PR を読み、スナップショットとの差分があれば ("diff <種類,...>") で終了する。"""
     result = project.items(parsed)
     failure = _list_failure(result)
     if failure:
@@ -318,7 +318,7 @@ def _field_is_mine(item, session_id):
 
 
 def assignment_poll(parsed, session_id, login, blocked, in_review, pending):
-    """wait-assignment の終わる条件 (observation.md の表)。複数が当たれば stop → request → resumed → assignment の順。"""
+    """wait-assignment の終了条件 (observation.md の表)。複数が当たれば stop → request → resumed → assignment の順。"""
     result = project.items(parsed)
     failure = _list_failure(result)
     if failure:
@@ -326,7 +326,7 @@ def assignment_poll(parsed, session_id, login, blocked, in_review, pending):
     items = [it for it in result["items"] if it.get("key")]
     watched = {"blocked": list(blocked or []), "in_review": list(in_review or []), "pending": list(pending or [])}
     all_watched = watched["blocked"] + watched["in_review"] + watched["pending"]
-    # PR を読むのは、終わる条件に要る項目だけ: 見る Issue と、今の割り当てが自分宛てで解放されておらず開いている項目 (終わった項目の PR は読まない)
+    # PR を読むのは、終了条件に要る項目だけ: 見る Issue と、今の割り当てが自分宛てで解放されておらず開いている項目 (割り当てが終了した項目の PR は読まない)
     pr_items = [it for it in items if any(ids.same_issue(it["key"], w) for w in all_watched) or _current_open_assignment(it, session_id, login)]
     pr_states, pr_failure = report_pr_states(pr_items, login)
     if pr_failure:
@@ -365,7 +365,7 @@ def assignment_poll(parsed, session_id, login, blocked, in_review, pending):
 # --- 作業のセッションの wait-decision ----------------------------------------------------------
 
 def decision_poll(parsed, issue, session_id, login, declaration_id, review_update):
-    """wait-decision の終わる条件 (observation.md の表)。複数が当たれば stop → go → request → wait の順。"""
+    """wait-decision の終了条件 (observation.md の表)。複数が当たれば stop → go → request → wait の順。"""
     result = project.items(parsed)
     failure = _list_failure(result)
     if failure:

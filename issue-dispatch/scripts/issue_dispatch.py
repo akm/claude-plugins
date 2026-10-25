@@ -388,7 +388,7 @@ def _read_report_prs(items, login):
 
 
 def _items_for_state(parsed):
-    """項目の状態の導出のために項目を読む。項目の一覧そのものが無ければ (LIST_PROBLEMS) エラー (読めなかった項目を終わったと読まないため)。"""
+    """項目の状態の導出のために項目を読む。項目の一覧そのものが無ければ (LIST_PROBLEMS) エラー (読めなかった項目を、割り当てが終了したと読まないため)。"""
     result = project.items(parsed)
     if result["status"] == "error":
         return None, {"status": "error", "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]}
@@ -1123,13 +1123,13 @@ def build_parser():
     p_wheld.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wheld.set_defaults(func=cmd_work_held)
 
-    p_wait = sub.add_parser("wait", help="管理のセッションの待機: スナップショットとの差分があれば終わる (バックグラウンドで起動する)")
+    p_wait = sub.add_parser("wait", help="管理のセッションの待機: スナップショットとの差分があれば終了する (バックグラウンドで起動する)")
     p_wait.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project・poll_minutes・wait_minutes と記録の置き場を読む)")
     p_wait.add_argument("--project", help="owner/番号 (省略時は設定の project)")
     p_wait.add_argument("--minutes", type=float, help="期限 (分。省略時は設定の wait_minutes)")
     p_wait.add_argument("--interval", type=float, help="読む間隔 (分。省略時は設定の poll_minutes)")
     p_wait.set_defaults(func=cmd_wait)
-    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・戻り・解放・依頼で終わる")
+    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・戻り・解放・依頼で終了する")
     p_wassign.add_argument("--project", required=True, help="owner/番号")
     p_wassign.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待機している Issue (owner/repo#番号。繰り返せる)")
@@ -1138,12 +1138,12 @@ def build_parser():
     p_wassign.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wassign.add_argument("--minutes", type=float, required=True, help="期限 (分)")
     p_wassign.set_defaults(func=cmd_wait_assignment)
-    p_wdecision = sub.add_parser("wait-decision", help="作業のセッションの待機: 宣言への判定 (開始可・待機・依頼) で終わる")
+    p_wdecision = sub.add_parser("wait-decision", help="作業のセッションの待機: 宣言への判定 (開始可・待機・依頼) で終了する")
     p_wdecision.add_argument("--project", required=True, help="owner/番号")
     p_wdecision.add_argument("--issue", required=True, help="割り当てを受けた Issue (owner/repo#番号)")
     p_wdecision.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wdecision.add_argument("--declaration", type=int, required=True, help="判定を待機する宣言のコメントの ID")
-    p_wdecision.add_argument("--review-update", action="store_true", help="ready for review の後の宣言の更新 (今の Issue の正常な終わりで stop)")
+    p_wdecision.add_argument("--review-update", action="store_true", help="ready for review の後の宣言の更新 (今の Issue の正常な完了で stop)")
     p_wdecision.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wdecision.add_argument("--minutes", type=float, required=True, help="期限 (分)")
     p_wdecision.set_defaults(func=cmd_wait_decision)

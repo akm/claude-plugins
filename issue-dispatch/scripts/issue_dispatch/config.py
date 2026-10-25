@@ -284,7 +284,7 @@ def _interpret(status, data, path, role):
     # 個別の検査で既に警告したキーには重ねて警告しない
     if config["poll_minutes"] >= config["wait_minutes"]:
         message = (f"poll_minutes ({config['poll_minutes']}) は wait_minutes ({config['wait_minutes']}) より短くする "
-                   "(間隔が期限以上だと、待機が 1 回読むごとに期限で終わる)。両方をデフォルト値で続ける")
+                   "(間隔が期限以上だと、待機が 1 回読むごとに期限で終了する)。両方をデフォルト値で続ける")
         for key in ("poll_minutes", "wait_minutes"):
             if key not in warned:
                 warnings.append(_note(key, message))

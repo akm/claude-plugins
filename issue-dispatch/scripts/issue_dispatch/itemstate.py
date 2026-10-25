@@ -1,5 +1,5 @@
 """項目の状態の導出。管理のセッションがターンのたびに、Project の項目 (project.items の結果) とコメントと Issue の出来事から、
-割り当て中か・今の割り当ての PR・正常な終わり・reopen・宣言の段階・待機しているもの・持っている資源を導く (計画の R24・KTD19)。
+割り当て中か・今の割り当ての PR・正常な完了・reopen・宣言の段階・待機しているもの・持っている資源を導く (計画の R24・KTD19)。
 作業のセッションの確認 (`work check`・`work held`) も同じ導出の、自分の項目についての読み出し。
 状態ごとの出どころと場面ごとの扱いの正本は issue-dispatch/skills/issue-dispatch/references/flow.md。
 
@@ -16,7 +16,7 @@ from issue_dispatch import comments, declaration, ids, resources, sessions
 STAGES = ("undecided", "go", "returned", "waiting")
 # 今の割り当ての PR の出どころ
 PR_SOURCES = ("report", "reference")
-# 割り当ての終わりの種類
+# 割り当ての終了の種類
 END_KINDS = ("released", "normal")
 # 問題の種類 (導出を続けられるが、知らせるもの)
 PROBLEM_KINDS = ("pr-unreadable",)
@@ -138,17 +138,17 @@ def pr_ready(pr):
     return bool(pr) and (pr["merged"] or not pr["draft"])
 
 
-# --- 終わりと reopen -----------------------------------------------------------------
+# --- 終了と reopen -----------------------------------------------------------------
 
 def _events(item, kind):
     return [e for e in item.get("events") or [] if e.get("type") == kind]
 
 
 def assignment_end(item, cs, asg, pr):
-    """割り当ての終わり (KTD19 の表の行「割り当ての終わりと reopen」): 今の番号の `解放` か、正常な終わり。
-    正常な終わりは、Issue が閉じていて進行中でない (今の割り当ての PR が、読んだ時点で ready for review かマージ済み) こと。
+    """割り当ての終了 (KTD19 の表の行「割り当ての終わりと reopen」): 今の番号の `解放` か、正常な完了。
+    正常な完了は、Issue が閉じていて進行中でない (今の割り当ての PR が、読んだ時点で ready for review かマージ済み) こと。
     Issue が開いている (reopen された) ときは、今の割り当ての最新の `ClosedEvent` があり、その close の時点で PR が ready for review か
-    マージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な終わりと読む
+    マージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な完了と読む
     (PR の timeline は読まないので、close の時点で draft だった PR が reopen の後に ready になった場合は見分けられない。flow.md)。
     返り値は {"kind": "released", "at", "reason"} / {"kind": "normal", "at": 最新の ClosedEvent の時刻} / None。"""
     rel = release(cs, asg)
@@ -166,7 +166,7 @@ def assignment_end(item, cs, asg, pr):
 
 
 def reopened_after(item, end):
-    """終わった後の `ReopenedEvent`。無ければ None。"""
+    """終了した後の `ReopenedEvent`。無ければ None。"""
     if not end:
         return None
     later = [e for e in _events(item, "ReopenedEvent") if end.get("at") is None or (e.get("at") or "") > end["at"]]

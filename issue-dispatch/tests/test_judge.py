@@ -378,7 +378,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["reserve"], out["questions"]), ("go", ["gpu"], []))
 
     def test_questions_of_a_previous_assignment_are_not_read(self):
-        """前の割り当ての回答 (resource-busy・conflict) と未回答の質問は、新しい割り当ての判定で読まない (割り当てが終われば資源・宣言・相手が新しくなる)。"""
+        """前の割り当ての回答 (resource-busy・conflict) と未回答の質問は、新しい割り当ての判定で読まない (割り当てが終了すれば資源・宣言・相手が新しくなる)。"""
         release = mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "解除"}, t(100), 150)
         prev = [ASSIGN1, decl(400, t(20), resources=("gpu",)), go(400, t(23), 500), release]
         assign2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
@@ -447,7 +447,7 @@ class ResourceTest(unittest.TestCase):
         j = out["judgments"][0]
         self.assertEqual((j["result"], j["waits"], j["release"], j["keep"]), ("wait", [{"kind": "資源", "resource": "gpu"}], ["cache"], ["db"]))
         self.assertEqual([q["kind"] for q in out["questions"]], ["release-undeclared"])
-        # keep の回答があれば、競合しうる相手がいても修正を頼んで終わる
+        # keep の回答があれば、競合しうる相手がいても修正を頼んで終了する
         out = run_judge([mine, item(A5, B_GO)], rec=rec_with(questions=question("release-undeclared", A9, "db", "keep")), attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], kinds(out["actions"])), ("request", [("comment", "依頼")]))
 

@@ -282,7 +282,7 @@ def _wait_body(waits, usage, j=None):
         if w["kind"] == "利用者の回答":
             lines.append("利用者の回答: 管理のセッションが利用者に質問している (競合しうる相手の扱い・unknown-content のファイルの判定・資源の使用)")
         elif w["kind"] == "Issue":
-            lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が終わるまで待機する (利用者の回答: wait)")
+            lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が完了するまで待機する (利用者の回答: wait)")
         elif w["kind"] == "小さな PR":
             lines.append(f"小さな PR {w['issue']}: 相手に共通の変更を先に小さな PR にすることを依頼した" + (f" (PR {w['pr']})" if w.get("pr") else "") + " (利用者の回答: small-pr)")
         elif w["kind"] == "資源":
@@ -353,7 +353,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
          "parsed": None, "actions": [], "questions": [], "signals": []}
     # 1. 宣言に無い予約 (着手の宣言だけ)。資源はリポジトリの規則に依らず itemstate が読んだ宣言から分かるので、設定の読み取りと形の検査の前に
     #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、質問は待機する経路でも出し、解放してはいけないと回答した資源が
-    #    あれば修正を頼んで終わる (予約は残す)。解放した資源と回答を待機する予約は、どの経路の本文にも書く (_undeclared_lines)
+    #    あれば修正を頼んで終了する (予約は残す)。解放した資源と回答を待機する予約は、どの経路の本文にも書く (_undeclared_lines)
     r = None
     if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
         declared = judged["declaration"]["resources"]

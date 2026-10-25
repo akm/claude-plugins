@@ -75,7 +75,7 @@ def _text(value):
 def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False, stdin=None):
     """`gh` を引数の配列で実行する。
 
-    mutation が真なら、gh が終わった後に MUTATION_INTERVAL 秒待機してから返る。次の変更系の呼び出しがこのプロセスでも
+    mutation が真なら、gh が終了した後に MUTATION_INTERVAL 秒待機してから返る。次の変更系の呼び出しがこのプロセスでも
     別のプロセス (CLI はサブコマンドごとに 1 プロセス) でも、1 秒以上空く (利用者と相談して決めた)。
     返り値: {"args", "exit_code" (タイムアウトと起動できなかったときは None), "stdout", "stderr_tail", "timed_out",
     "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (expect_json が真で、

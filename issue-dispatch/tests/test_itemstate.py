@@ -129,7 +129,7 @@ class AssignmentTest(unittest.TestCase):
         self.assertTrue(s["assigned"])
 
     def test_release_with_current_number_ends_assignment(self):
-        """今の番号の `解放` があれば割り当ては終わり (理由と時刻を返す)。"""
+        """今の番号の `解放` があれば割り当ては終了 (理由と時刻を返す)。"""
         item = make_item(comments_=[ASSIGN1, mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "close"}, t(20), 101)], state="CLOSED")
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual(s["release"]["reason"], "close")
@@ -142,7 +142,7 @@ class AssignmentTest(unittest.TestCase):
         self.assertIsNone(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["assignment"])
 
     def test_status_todo_does_not_end_assignment(self):
-        """Status だけの `Todo`・`Done` は終わりでも reopen でもない (KTD19)。"""
+        """Status だけの `Todo`・`Done` は終了でも reopen でもない (KTD19)。"""
         item = make_item(status="Todo", comments_=[ASSIGN1])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertTrue(s["assigned"])
@@ -192,12 +192,12 @@ class EndTest(unittest.TestCase):
         return itemstate.derive(item, LOGIN, pr_states or {}, PROJECT_NUMBER)
 
     def test_close_with_merged_pr_is_normal_end(self):
-        """進行中でない Issue (今の割り当ての PR がマージ済み) の close は正常な終わり。"""
+        """進行中でない Issue (今の割り当ての PR がマージ済み) の close は正常な完了。"""
         s = self._closed(prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)])
         self.assertEqual((s["in_progress"], s["end"], s["assigned"]), (False, {"kind": "normal", "at": t(50)}, False))
 
     def test_close_with_ready_pr_not_merged_is_normal_end(self):
-        """ready for review の後の close は、PR がマージされていなくても正常な終わり (KD9)。"""
+        """ready for review の後の close は、PR がマージされていなくても正常な完了 (KD9)。"""
         s = self._closed(prs=[ref_pr(PR9, t(25), state="OPEN", draft=False)])
         self.assertEqual(s["end"]["kind"], "normal")
 
@@ -207,38 +207,38 @@ class EndTest(unittest.TestCase):
         self.assertEqual(s["end"]["kind"], "normal")
 
     def test_close_in_progress_keeps_assignment(self):
-        """進行中 (PR が無い・draft) の Issue の close は正常な終わりではなく、割り当て中のまま (利用者の回答を待機する。R21)。"""
+        """進行中 (PR が無い・draft) の Issue の close は正常な完了ではなく、割り当て中のまま (利用者の回答を待機する。R21)。"""
         for prs in ([], [ref_pr(PR9, t(25), draft=True)]):
             s = self._closed(prs=prs)
             self.assertEqual((s["in_progress"], s["end"], s["assigned"]), (True, None, True), prs)
 
     def test_close_with_previous_assignment_merged_pr_is_in_progress(self):
-        """reopen の後の割り当ての Issue を手で閉じても、前の割り当てのマージ済みの PR では正常な終わりにしない。"""
+        """reopen の後の割り当ての Issue を手で閉じても、前の割り当てのマージ済みの PR では正常な完了にしない。"""
         item = make_item(state="CLOSED", comments_=[ASSIGN2], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                          events=[{"type": "ClosedEvent", "at": t(250), "state_reason": "COMPLETED", "closer_pr": None}])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual((s["pr"], s["in_progress"], s["end"]), (None, True, None))
 
     def test_reopen_after_end_is_detected_and_reopen_while_pending_is_not(self):
-        """終わった後の `ReopenedEvent` は reopen。終わる前 (進行中の close の後) の reopen は、終わった後の reopen ではない。"""
+        """終了した後の `ReopenedEvent` は reopen。終了する前 (進行中の close の後) の reopen は、終了した後の reopen ではない。"""
         ended = make_item(state="OPEN", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                           events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(ended, LOGIN, {}, PROJECT_NUMBER)
-        self.assertEqual((s["end"]["kind"], s["reopened"]), ("normal", {"at": t(60)}), "閉じた時点で正常な終わり。reopen は終わった後")
+        self.assertEqual((s["end"]["kind"], s["reopened"]), ("normal", {"at": t(60)}), "閉じた時点で正常な完了。reopen は終了した後")
         pending = make_item(state="OPEN", status="Done", comments_=[ASSIGN1],
                             events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(pending, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual((s["end"], s["reopened"], s["assigned"]), (None, None, True))
 
     def test_reopened_issue_with_pr_created_after_close_is_not_ended(self):
-        """開いている Issue で、PR が close より後に作られたなら、その close は進行中の close (正常な終わりではない)。"""
+        """開いている Issue で、PR が close より後に作られたなら、その close は進行中の close (正常な完了ではない)。"""
         item = make_item(state="OPEN", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(70), state="OPEN", draft=False)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual((s["end"], s["reopened"], s["assigned"]), (None, None, True))
 
     def test_released_then_reopened(self):
-        """`解放` (理由 close) の後の `ReopenedEvent` も終わった後の reopen。"""
+        """`解放` (理由 close) の後の `ReopenedEvent` も終了した後の reopen。"""
         item = make_item(state="OPEN", comments_=[ASSIGN1, mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "close"}, t(55), 101)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
@@ -425,7 +425,7 @@ class ResourceUsageTest(unittest.TestCase):
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER, attrs_table=table)["reserved"], [])
 
     def test_usage_from_states(self):
-        """資源の使用 (資源 → 持つ項目) は、割り当て中の項目の予約と持っている資源から導く。終わった項目は持たない。待機している宣言の新しい資源は持たない。"""
+        """資源の使用 (資源 → 持つ項目) は、割り当て中の項目の予約と持っている資源から導く。割り当てが終了した項目は持たない。待機している宣言の新しい資源は持たない。"""
         held_item = make_item(key=A1, labels=["resource:db"], comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], events=[_label_event("LabeledEvent", "resource:db", t(1))])
         waiting_item = make_item(key=A2, comments_=[ASSIGN1, wcomment("着手の宣言", None, t(12), 410, body=decl_body(resources=("gpu",))),
                                                      _wait(410, [{"kind": "資源", "resource": "gpu"}], t(13), 510)])
@@ -483,7 +483,7 @@ class WorkCheckTest(unittest.TestCase):
 class WorkHeldTest(unittest.TestCase):
 
     def test_held_items_with_stage_and_blocked_owner(self):
-        """割り当て中の Issue (閉じて回答を待機するものを含む) を返し、終わった Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
+        """割り当て中の Issue (閉じて回答を待機するものを含む) を返し、割り当てが終了した Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
         no_decl = make_item(key=A1, comments_=[ASSIGN1])
         waiting = make_item(key=A2, status="Blocked", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)],
                             events=[_status_event("Blocked", t(14))])
@@ -583,7 +583,7 @@ class DependencyBlockedTest(unittest.TestCase):
         self.assertEqual([(a["kind"], a["status"], a.get("continuation")) for a in actions], [("set-status", "Ready", True)])
 
     def test_ended_assignment_counts_as_unassigned(self):
-        """割り当てが終わった (正常な終わりの後に reopen された) 項目も、割り当ての無い項目として扱う。"""
+        """割り当てが終了した (正常な完了の後に reopen された) 項目も、割り当ての無い項目として扱う。"""
         item = make_item(status="Ready", state="OPEN", blocked_by=[_blocker(A1)], comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
         actions, _ = dependency(item)
@@ -653,7 +653,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(kinds(out["reports"]), ["reopened-while-pending"])
 
     def test_reopen_after_end_clears_fields_and_reports(self):
-        """終わった後の reopen は、フィールドが自分の書いた値 (今の割り当ての宛先) なら空にして報告する。Status は変えない。"""
+        """終了した後の reopen は、フィールドが自分の書いた値 (今の割り当ての宛先) なら空にして報告する。Status は変えない。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
         out = turn_of(item)
@@ -767,7 +767,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item)["questions"]], [("pr-closed-unmerged", ["release", "keep"])])
 
     def test_pr_left_open_after_normal_end_is_reported(self):
-        """正常な終わり (ready for review の後の close) の後に開いたまま残る PR は 1 回報告し、判定の相手にしない。"""
+        """正常な完了 (ready for review の後の close) の後に開いたまま残る PR は 1 回報告し、判定の相手にしない。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="OPEN")],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         self.assertEqual(kinds(turn_of(item)["reports"]), ["pr-left-open"])
