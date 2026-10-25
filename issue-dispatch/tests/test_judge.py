@@ -14,7 +14,7 @@ sys.path.insert(0, _HERE)
 
 from issue_dispatch import comments, config, filekinds, itemstate, judge, record, resources  # noqa: E402
 from test_itemstate import (A, ASSIGN1, LOGIN, M1, PR9, PROJECT_NUMBER, W7, USER_ENTRY, decl_body, gql_comment, items_data, make_item,  # noqa: E402
-                            mcomment, node_of, observed, question_table, rec_with, t, wcomment)
+                            mcomment, node_of, observed, question_row, question_table, rec_with, t, wcomment)
 from test_project import FakeGhCase  # noqa: E402
 from test_repo import make_clone  # noqa: E402
 
@@ -692,8 +692,9 @@ class DocTest(unittest.TestCase):
         with open(_FLOW, encoding="utf-8") as f:
             table = question_table(f.read(), "判定の質問の種類 (`kind`) と選択肢 (`options`)")
         for kind, options in judge.QUESTION_OPTIONS.items():
-            self.assertIn(f"| `{kind}` |", table, f"質問の種類 {kind} が flow.md の判定の質問の表に無い")
-            self.assertIn(" / ".join(f"`{o}`" for o in options), table, f"質問の種類 {kind} の選択肢が flow.md の判定の質問の表に無い")
+            row = question_row(table, kind)
+            self.assertIsNotNone(row, f"質問の種類 {kind} が flow.md の判定の質問の表に無い")
+            self.assertIn(" / ".join(f"`{o}`" for o in options), row, f"質問の種類 {kind} の選択肢が flow.md の判定の質問の表の行に無い")
         with open(_RECORDS, encoding="utf-8") as f:
             self.assertIn("`subject`", f.read())
 

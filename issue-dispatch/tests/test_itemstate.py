@@ -79,6 +79,11 @@ def question_table(doc, marker):
     return doc[start:end if end >= 0 else len(doc)]
 
 
+def question_row(table, kind):
+    """問いの表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確かめる (別の行の同じ並びと取り違えないため)。"""
+    return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
+
+
 ASSIGN1 = mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100)
 ASSIGN2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
 
@@ -969,9 +974,10 @@ class DocTest(unittest.TestCase):
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
         table = question_table(doc, "項目の状態の問いの種類 (`kind`) と選択肢 (`options`)")
         for kind, options in itemstate.QUESTION_OPTIONS.items():
-            self.assertIn(f"| `{kind}` |", table, f"問いの種類 {kind} が flow.md の問いの表に無い")
+            row = question_row(table, kind)
+            self.assertIsNotNone(row, f"問いの種類 {kind} が flow.md の問いの表に無い")
             if options:
-                self.assertIn(" / ".join(f"`{o}`" for o in options), table, f"問いの種類 {kind} の選択肢が flow.md の問いの表に無い")
+                self.assertIn(" / ".join(f"`{o}`" for o in options), row, f"問いの種類 {kind} の選択肢が flow.md の問いの表の行に無い")
 
 
 if __name__ == "__main__":
