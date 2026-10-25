@@ -31,6 +31,8 @@
   declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body <JSON> | --body-file <ファイル|->)
       標準入力の JSON {"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} で競合の可能性を判定する。リポジトリの設定は
       repositories の clone から既定のブランチの内容として読み、読めなければ判定しない (KTD9)
+  declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]
+      未判定の宣言を投稿の順に判定し、judgments・actions (`開始可`・`待機`・`依頼`・Status・blockedBy の候補)・questions・signals を返す (書かない。正本は flow.md の「判定」)
   resources attributes --dir <管理ディレクトリ> [--name <資源>]   設定の resources にデフォルト値を当てた属性を返す (警告つき)
   resources judge --dir <管理ディレクトリ> --trigger assign|declare|update|close|release (--body <JSON> | --body-file <ファイル|->)
       契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・答えは呼び出し元が渡す。gh は実行しない)
@@ -50,7 +52,7 @@ import sys
 
 import datetime
 
-from issue_dispatch import comments, config, declaration, filekinds, ids, issues, itemstate, observe, poll, project, record, repo, resources, sessions
+from issue_dispatch import comments, config, declaration, filekinds, ids, issues, itemstate, judge, observe, poll, project, record, repo, resources, sessions
 
 
 def _emit(payload):
@@ -774,6 +776,33 @@ def cmd_declaration_parse(args):
     return 0
 
 
+def cmd_declaration_judge(args):
+    """未判定の宣言の判定 (judge.judge)。項目の状態と同じ入力を読み、リポジトリの設定は設定の repositories の clone から読む。書き込みはしない。"""
+    empty = {"judgments": [], "actions": [], "questions": [], "signals": []}
+    only = ids.issue_key(args.issue) if args.issue else None
+    if args.issue and only is None:
+        _emit({"status": "error", **empty, "errors": [{"key": "issue", "message": f"--issue は owner/repo#番号 か URL (値 {args.issue!r})", "failure": None}]})
+        return 0
+    inputs, error = _item_state_inputs(args)
+    if error:
+        _emit({**error, **empty})
+        return 0
+    result, login = inputs["result"], inputs["login"]
+    items = [it for it in result["items"] if it.get("key")]
+    if only is not None and not any(ids.same_issue(it["key"], only) for it in items):
+        _emit({"status": "rejected", **empty, "errors": [{"key": "issue", "message": f"Project に項目 {args.issue!r} が無い", "failure": None}]})
+        return 0
+    pr_states, pr_problems = _read_report_prs(items, login)
+    states = [itemstate.derive(it, login, pr_states, inputs["parsed"]["number"], inputs["table"]) for it in items]
+    repositories = inputs["config"].get("repositories") or {}
+    out = judge.judge(items, states, inputs["rec"], inputs["table"], pr_states, lambda name: repo.read_repo_config(repositories, name),
+                      filekinds.load_default_table(), login=login, only=only)
+    problems = result["problems"] + pr_problems
+    _emit({"status": "partial" if problems else "ok", **out, "record_lost": itemstate.record_lost(inputs["rec"]), "problems": problems,
+           "rate_limit": result["rate_limit"], "warnings": inputs["warnings"], "errors": []})
+    return 0
+
+
 def cmd_declaration_conflictability(args):
     body, problem = _read_json_body(args)
     if problem:
@@ -1046,6 +1075,11 @@ def build_parser():
     body.add_argument("--body", help='{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} の JSON')
     body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
     p_dconf.set_defaults(func=cmd_declaration_conflictability)
+    p_djudge = decl_sub.add_parser("judge", help="未判定の宣言を投稿の順に判定し、書き込みの候補・問い・合図を返す (書かない)")
+    p_djudge.add_argument("--dir", required=True, help="管理ディレクトリ")
+    p_djudge.add_argument("--project", help="Project (owner/番号)。省略時は設定の project")
+    p_djudge.add_argument("--issue", help="この項目の宣言だけ判定する (owner/repo#番号 か URL)。比べる相手はすべての項目から集める")
+    p_djudge.set_defaults(func=cmd_declaration_judge)
 
     p_res = sub.add_parser("resources", help="資源")
     res_sub = p_res.add_subparsers(dest="subcommand", required=True)

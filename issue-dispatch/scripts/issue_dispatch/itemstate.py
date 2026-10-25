@@ -175,16 +175,23 @@ def reopened_after(item, end):
 
 # --- 宣言の段階 ---------------------------------------------------------------------
 
-def declaration_json(text):
-    """宣言の本文の JSON のコードブロックを読み、declaration.parse (種類は付けない) で形を検査してパスをそろえる。
-    返り値は (parse の declaration, None) か (None, 理由)。"""
+def declaration_object(text):
+    """宣言の本文の JSON のコードブロックを読む。返り値は (JSON の値, None) か (None, 理由)。"""
     m = _JSON_BLOCK_RE.search(text or "")
     if not m:
         return None, "JSON のコードブロック (```json ... ```) が無い"
     try:
-        obj = json.loads(m.group(1))
+        return json.loads(m.group(1)), None
     except ValueError as e:
         return None, f"JSON として読めない: {e}"
+
+
+def declaration_json(text):
+    """宣言の本文の JSON のコードブロックを読み、declaration.parse (種類は付けない) で形を検査してパスをそろえる。
+    返り値は (parse の declaration, None) か (None, 理由)。"""
+    obj, error = declaration_object(text)
+    if error:
+        return None, error
     parsed = declaration.parse(obj, None, None)
     if parsed["status"] != "ok":
         return None, "宣言の形の誤り: " + "; ".join(f"{e['key']}: {e['message']}" for e in parsed["errors"])
@@ -226,15 +233,18 @@ def _blocking_reasons(reasons):
 
 def declaration_stage(item, cs, asg, project_number):
     """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・戻り先・自分が足した blockedBy・
-    持っている資源。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
+    持っている資源・読めた宣言ごとの資源 (declared_resources: 投稿の順に comment_id・at・resources・returned (差し戻されたか)・go (`開始可` があるか)。
+    判定が、宣言に無い予約の解放と更新の前に持っていた資源を、コメントを読み直さずに求めるため)。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
     差し戻された宣言を書き直した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、
     `待機` → waiting、`依頼` (宣言の書き直し) → returned、無ければ undecided)。"""
-    go_declaration, later, judged, prev_returned = None, [], None, False
+    go_declaration, go_id, later, judged, prev_returned, declared = None, None, [], None, False, []
     for d in declarations(cs, asg):
         res = results_for(cs, asg, d["comment_id"])
         if d["declaration"] is None:
             kind, needs = None, True
         else:
+            declared.append({"comment_id": d["comment_id"], "at": d["at"], "resources": list(d["declaration"]["resources"]), "returned": res["returned"] is not None,
+                             "go": res["go"] is not None})
             kind = declaration.update_kind(go_declaration, d["declaration"], declaration.held_resources(go_declaration, later))
             needs = kind != "resources-removed-only" or prev_returned
         if needs:
@@ -243,7 +253,7 @@ def declaration_stage(item, cs, asg, project_number):
         if prev_returned or d["declaration"] is None:
             continue
         if res["go"]:
-            go_declaration, later = d["declaration"], []
+            go_declaration, go_id, later = d["declaration"], d["comment_id"], []
         else:
             later.append(d["declaration"])
     held = sorted(declaration.held_resources(go_declaration, later))
@@ -251,7 +261,8 @@ def declaration_stage(item, cs, asg, project_number):
     all_waits = [c for c in _for_assignment(cs, asg) if c["header"]["role"] == "manager" and c["header"]["kind"] == "待機"]
     own = sorted({ids.issue_key(r["issue"]) for c in all_waits for r in _blocking_reasons(c["header"]["values"]["waits"])})
     out = {"judged": judged, "stage": None, "go": None, "wait": None, "returned": None, "manager_blocked": False, "blocked_wait": None,
-           "return_status": None, "own_blockers": own, "waiting_blockers": [], "go_declaration": go_declaration, "held": held}
+           "return_status": None, "own_blockers": own, "waiting_blockers": [], "go_declaration": go_declaration, "go_declaration_id": go_id, "held": held,
+           "declared_resources": declared}
     if judged is None:
         return out
     res = results_for(cs, asg, judged["comment_id"])
@@ -316,7 +327,7 @@ def resource_usage(states):
 # --- 行うこと・報告 -----------------------------------------------------------------
 
 # 行うこと (書き込みの候補。item state は書かず、管理のセッションが既存のサブコマンドで実行する)
-ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "set-field", "clear-field", "withdraw-question")
+ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "blocked-by-remove", "set-field", "clear-field", "withdraw-question")
 # 1 回だけ報告するもの (記録の reported で重複を除く)
 REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
                 "pr-base-not-default", "pr-left-open")
