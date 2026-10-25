@@ -487,7 +487,8 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 pattern = "/並び(?![順替])/"
 verdict = "avoid"
 replacements = ["順序", "順番"]
-reason = "英語 (order) を直訳した訓読みの語。「並び順」「並び替え」は対象にしない"
+exceptions = ["順に並び", "で並び"]
+reason = "英語 (order) を直訳した訓読みの語。「並び順」「並び替え」と、動詞「並ぶ」の連用形 (「〜の順に並び、」) は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
