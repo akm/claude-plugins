@@ -358,7 +358,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
         declared = judged["declaration"]["resources"]
         answers = busy_answers(st, rec, declared)
-        # 前の宣言で解放した予約は、もう予約していない (足し直せば新しい資源として空きを確かめる)
+        # 前の宣言で解放した予約は、もう予約していない (足し直せば新しい資源として空きを確認する)
         released = released_reservations(st, rec, attrs_table, before=decl_id)
         reserved = [n for n in st.get("reserved") or [] if n not in released]
         undeclared_answers = {n: answer_for(rec, key, "release-undeclared", n, asg["at"]) for n in reserved}
@@ -393,7 +393,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         return j
     j["parsed"] = parsed
     if r is None:
-        # 更新 (`開始可` の後): 外した資源を解放し、足した資源は空きを確かめる。宣言に無い予約の概念は無い
+        # 更新 (`開始可` の後): 外した資源を解放し、足した資源は空きを確認する。宣言に無い予約の概念は無い
         declared = parsed["resources"]
         answers = busy_answers(st, rec, declared)
         r = {**resources.judge_update(key, judged["update_kind"], _held_before(st, judged), declared, usage, attrs_table or {}, answers),
@@ -461,7 +461,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         j["signals"] += request_signals
         return j
-    # 5. 資源の空き (競合の可能性で待機する・質問する宣言は、新しい資源の空きを確かめない。1 か 3 で求めた r を使う)
+    # 5. 資源の空き (競合の可能性で待機する・質問する宣言は、新しい資源の空きを確認しない。1 か 3 で求めた r を使う)
     res_waits = [{"kind": "資源", "resource": n} for n in r["wait_for"]]
     if r["ask"]:
         res_waits.insert(0, dict(_USER_ANSWER))

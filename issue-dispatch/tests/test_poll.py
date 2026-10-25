@@ -1,4 +1,4 @@
-"""待機 (poll) のテスト。CLI を子プロセスで動かし、偽の gh (tests/fake-gh) と固定データで終わる条件・終了コード・wait.pid を確かめる。
+"""待機 (poll) のテスト。CLI を子プロセスで動かし、偽の gh (tests/fake-gh) と固定データで終わる条件・終了コード・wait.pid を確認する。
 間隔と期限は分の小数で短くする。項目の合成は test_itemstate の補助を使う。"""
 
 import json
@@ -110,7 +110,7 @@ class WaiterTest(unittest.TestCase):
         calls = []
         code = self._waiter(minutes=0.003, interval=0.001).run(lambda: calls.append(1))
         self.assertEqual((code, "".join(self.out)), (124, f"pid {os.getpid()}\n"))
-        self.assertGreaterEqual(len(calls), 2, "期限切れを宣言する前にもう 1 度確かめる")
+        self.assertGreaterEqual(len(calls), 2, "期限切れを宣言する前にもう 1 度確認する")
 
     def test_failures_by_kind(self):
         """認証切れは 8、ネットワークの失敗が 3 回続けば 4 (間に成功があれば数え直す)。"""

@@ -235,7 +235,7 @@ class AlreadyPostedTest(unittest.TestCase):
         self.assertPosted(other_manager, [a1], True, "管理のセッションの種類は書き手の ID を比べない (引き継ぎの後も二重に書かない)")
 
     def test_handover_compares_session_id_and_worker_kinds_are_not_checked(self):
-        """`引き継ぎ` は書き手のセッション ID も比べる。作業のセッションの種類は既投稿を確かめない (渡されたら ValueError)。"""
+        """`引き継ぎ` は書き手のセッション ID も比べる。作業のセッションの種類は既投稿を確認しない (渡されたら ValueError)。"""
         h1 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-2"})
         h2 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-3"})
         self.assertPosted(h1, [h1], True)
@@ -366,7 +366,7 @@ class PostTest(FakeGhCase):
         self.responses([USER_ENTRY, {"substring": "query IssueComments", "stdout": "", "stderr": "GraphQL: Could not resolve", "exit": 1}])
         result = comments.post(ISSUE3, "manager", "mgr", "M-1", "割り当て", {"to": "W-7", "assignment": 1}, "理由")
         self.assertEqual(result["status"], "error")
-        self.assertEqual([c["args"][:2] for c in self.recorded_full()], [["api", "user"], ["api", "graphql"]], "既投稿を確かめられなければ投稿しない")
+        self.assertEqual([c["args"][:2] for c in self.recorded_full()], [["api", "user"], ["api", "graphql"]], "既投稿を確認できなければ投稿しない")
 
     def test_post_failure(self):
         nodes = []

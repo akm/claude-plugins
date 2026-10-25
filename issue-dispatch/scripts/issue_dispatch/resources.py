@@ -135,7 +135,7 @@ def judge_assign(item, label_resources, usage, attrs_table, answers):
 
 
 def _check_new(item, names, usage, attrs_table, answers):
-    """予約していない資源の空きを確かめる。返り値は (reserve, wait_for, ask)。"""
+    """予約していない資源の空きを確認する。返り値は (reserve, wait_for, ask)。"""
     reserve, wait_for, ask = [], [], []
     for name in names:
         if _busy(usage, name, item, attrs_table):
@@ -184,7 +184,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
 def judge_update(item, kind, held, declared, usage, attrs_table, answers):
     """契機「宣言の更新」。kind は更新の種類 (declaration.update_kind の結果。declaration.UPDATE_KINDS)、held は持っている資源、
     declared は更新の resources。外した資源は解放し、足した資源 (前に外して足し直したものも含む) は着手の宣言と同じに空きを
-    確かめる。資源を外すだけの更新 (resources-removed-only) は判定せず `開始可` を書かないので result は "skip" (release は返す)。
+    確認する。資源を外すだけの更新 (resources-removed-only) は判定せず `開始可` を書かないので result は "skip" (release は返す)。
     返り値: {"result": "go" / "wait" / "ask" / "skip", "reserve", "wait_for", "ask", "release"}。kind が種類でなければ ValueError。"""
     if kind not in declaration.UPDATE_KINDS:
         raise ValueError(f"更新の種類は {', '.join(declaration.UPDATE_KINDS)} のどれか: {kind!r}")

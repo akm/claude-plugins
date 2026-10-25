@@ -192,10 +192,10 @@ def format_header(role, name, session_id, kind, values=None):
         raise ValueError(f"セッション ID が無いか、区切り文字か改行を含むか、種類の語と同じ: {session_id!r}")
     normalized = normalize_values(kind, values)
     line = SEP.join([PREFIX, ROLES[role], name.strip(), session_id.strip(), kind] + _value_fields(kind, normalized))
-    # 作った先頭行を読み戻して同じ内容になることを確かめる (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで止める
+    # 作った先頭行を読み戻して同じ内容になることを確認する (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで止める
     expected = {"role": role, "name": name.strip(), "session_id": session_id.strip(), "kind": kind, "values": normalized}
     if parse_header(line) != expected:
-        raise ValueError(f"作った先頭行を同じ内容に読み戻せない (名前や値の形を確かめる): {line!r}")
+        raise ValueError(f"作った先頭行を同じ内容に読み戻せない (名前や値の形を確認する): {line!r}")
     return line
 
 
@@ -360,7 +360,7 @@ def _repo_folded(text):
 
 # 既投稿の見分けで書き手のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
 # 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で見分ける。
-# 作業のセッションの種類は既投稿を確かめない (下の already_posted と post)
+# 作業のセッションの種類は既投稿を確認しない (下の already_posted と post)
 ID_KEYED_KINDS = ("引き継ぎ",)
 
 
@@ -385,7 +385,7 @@ def _freeze(value, key=None):
 def already_posted(parsed, own_comments):
     """同じ出来事への同じコメントが既にあればそのコメント (list_comments の要素) を、無ければ None を返す (KTD2)。
     管理のセッションの種類だけが対象。作業のセッションの種類は、投稿が自分の手順の 1 歩ごとに 1 回で、同じ出来事をもう一度書く
-    場面が gh の失敗の後のやり直しだけなので確かめない (値を持つ `小さな PR の報告` も同じ。渡されたら ValueError)。
+    場面が gh の失敗の後のやり直しだけなので確認しない (値を持つ `小さな PR の報告` も同じ。渡されたら ValueError)。
 
     own_comments は list_comments が返した、書き手が自分のコメントの配列 (時刻の順)。種類ごとの規則:
     `待機` は同じ宣言への最新の `待機` とだけ比べる。`依存の待機` は最新の `依存の待機` と比べ、間に `依存の解消` があれば
@@ -394,7 +394,7 @@ def already_posted(parsed, own_comments):
     """
     kind = parsed["kind"]
     if kind not in MANAGER_KINDS:
-        raise ValueError(f"既投稿を確かめるのは管理のセッションの種類だけ: {kind!r}")
+        raise ValueError(f"既投稿を確認するのは管理のセッションの種類だけ: {kind!r}")
     key = header_key(parsed)
     headed = [c for c in own_comments if c.get("header")]
     if kind == "待機":
@@ -430,8 +430,8 @@ def already_posted(parsed, own_comments):
 
 def post(issue, role, name, session_id, kind, values, body, login=None):
     """コメントを投稿する。先頭行は format_header で作る。管理のセッションの種類は、同じ出来事への同じコメントが既にあれば
-    投稿しない (already_posted。一覧が読めなければ投稿しない — 既投稿かを確かめられないまま投稿すると二重になりうるため)。
-    作業のセッションの種類は確かめずに投稿する (やり直しでの二重の投稿は作業のセッションのスキルが扱う)。
+    投稿しない (already_posted。一覧が読めなければ投稿しない — 既投稿かを確認できないまま投稿すると二重になりうるため)。
+    作業のセッションの種類は確認せずに投稿する (やり直しでの二重の投稿は作業のセッションのスキルが扱う)。
     返り値: {"status": "ok", "posted": bool, "database_id", "url", "header"} か失敗の説明。"""
     try:
         line = format_header(role, name, session_id, kind, values)
@@ -444,7 +444,7 @@ def post(issue, role, name, session_id, kind, values, body, login=None):
         listed = list_comments(issue, login)
         if listed["status"] != "ok":
             return listed
-        existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確かめているので None にはならない
+        existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確認しているので None にはならない
         if existing is not None:
             return {"status": "ok", "posted": False, "database_id": existing["database_id"], "url": existing["url"], "header": line}
     r = gh.run(["issue", "comment", url, "--body-file", "-"], mutation=True, stdin=f"{line}\n\n{body or ''}")

@@ -80,7 +80,7 @@ def question_table(doc, marker):
 
 
 def question_row(table, kind):
-    """質問の表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確かめる (別の行の同じ並びと取り違えないため)。"""
+    """質問の表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確認する (別の行の同じ並びと取り違えないため)。"""
     return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
 
 
@@ -723,7 +723,7 @@ class AssignedScenesTest(unittest.TestCase):
         config = {"third_party_edit_check": [A]}
         self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item, config=config)["questions"]], [("third-party-edit", ["stop", "continue"])])
         rec = rec_with(items={A9: rec_item(confirmed=t(15))})
-        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確かめた時刻までの編集は質問しない")
+        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確認した時刻までの編集は質問しない")
 
     def test_pr_without_closing_reference_requests_append(self):
         """報告の PR が Issue を閉じる参照を持たなければ `依頼` (本文の追記) を書く (既に同じ依頼があれば書かない)。"""

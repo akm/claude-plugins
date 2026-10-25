@@ -73,7 +73,7 @@ class PatternTest(unittest.TestCase):
 
     @unittest.skipUnless(sys.version_info >= (3, 13), "PurePath.full_match は Python 3.13 から")
     def test_same_as_full_match(self):
-        """正本の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確かめる (末尾が `/` のパターンは拡張なので除く)。"""
+        """正本の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確認する (末尾が `/` のパターンは拡張なので除く)。"""
         from pathlib import PurePosixPath
         patterns = ("*.pb.go", "**/*.pb.go", "src/*.ts", "src/**.go", "**", "dist/**", "**/x", "a/**/b", "[ab].txt",
                     "[!ab].txt", "*.md", "a?.txt", "a**b", "foo**/bar", "a/**b", "**/**/a", "a[.txt")

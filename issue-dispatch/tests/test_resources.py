@@ -147,7 +147,7 @@ class DeclareTest(unittest.TestCase):
 
     def test_free_resources_go_and_reserve(self):
         r = resources.judge_declare(I2, ["db", "gpu"], ["db"], {"db": [I2]}, attrs(), {}, {})
-        self.assertEqual((r["result"], r["reserve"], r["wait_for"], r["ask"]), ("go", ["gpu"], [], []), "予約していないものだけ空きを確かめて予約する")
+        self.assertEqual((r["result"], r["reserve"], r["wait_for"], r["ask"]), ("go", ["gpu"], [], []), "予約していないものだけ空きを確認して予約する")
 
     def test_busy_waits(self):
         """Covers AE26, AE50. 属性がデフォルト値のとき、資源を持つ項目が 1 つあれば着手の宣言では待機を返す。どれも予約しない。"""
@@ -199,7 +199,7 @@ class DeclareTest(unittest.TestCase):
 
 
 class UpdateTest(unittest.TestCase):
-    """契機「宣言の更新」。外した資源を解放し、足した資源は着手の宣言と同じに空きを確かめる。"""
+    """契機「宣言の更新」。外した資源を解放し、足した資源は着手の宣言と同じに空きを確認する。"""
 
     def test_removed_released_and_added_checked(self):
         r = resources.judge_update(I2, "resources-only", ["A", "B"], ["A", "C"], {"A": [I2], "B": [I2], "C": [I1]}, attrs(), {})
@@ -217,7 +217,7 @@ class UpdateTest(unittest.TestCase):
             resources.judge_update(I2, "unknown", ["A"], ["A"], {}, attrs(), {})
 
     def test_readd_checks_availability(self):
-        """前に外した資源を足し直したときも、足したとして空きを確かめる。"""
+        """前に外した資源を足し直したときも、足したとして空きを確認する。"""
         r = resources.judge_update(I2, "resources-only", ["A"], ["A", "B"], {"A": [I2], "B": [I3]}, attrs(), {})
         self.assertEqual((r["result"], r["wait_for"]), ("wait", ["B"]))
 

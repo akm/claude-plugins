@@ -47,7 +47,7 @@
 | `Item closed` | 必須 | Issue が閉じたときに `Done` を書く。`Done` と資源の解放はこれに続く |
 | `Item added to project` | 推奨 | 足した項目に Status (`Todo`) が付く。無効でも、`Ready` にするのは利用者なので割り当ては変わらない |
 | `Item reopened` | 推奨 | reopen した項目の Status を設定し直す。新しい Project のデフォルトには無く、無ければ reopen した Issue の Status は `Done` のまま残る (U1) |
-| `Auto-add to project` | 有効なら案内 | 公開リポジトリでは第三者が開いた Issue も Project に入るので、`Ready` にする前に中身を確かめるよう案内する |
+| `Auto-add to project` | 有効なら案内 | 公開リポジトリでは第三者が開いた Issue も Project に入るので、`Ready` にする前に中身を確認するよう案内する |
 | `Pull request linked to issue` | 有効なら無効を推奨 | 管理のセッションが書く `In Progress`・`In review` と別の値を書きうる (無効のままでも続ける) |
 | `Auto-close issue`・`Pull request merged`・`Auto-add sub-issues to project` | どちらでもよい | この仕組みは Issue だけを Project に入れる |
 
@@ -55,10 +55,10 @@
 
 ## 作り方 (`project check` と `project add-fields`)
 
-`project check` は、フィールド 3 つの有無と型、`Agent stuck state` の値、Status の選択肢、ワークフローを確かめ、不足と作る手順の案を返す (読むだけ)。利用者の承認を得てから `project add-fields` が案を実行する。
+`project check` は、フィールド 3 つの有無と型、`Agent stuck state` の値、Status の選択肢、ワークフローを確認し、不足と作る手順の案を返す (読むだけ)。利用者の承認を得てから `project add-fields` が案を実行する。
 
 - フィールドは `gh project field-create <番号> --owner <owner> --name <名前> --data-type TEXT|SINGLE_SELECT [--single-select-options <値,…>]` で作る。
-- Status の選択肢は GraphQL の `updateProjectV2Field` (`singleSelectOptions`) で足す。**既存の選択肢を `id` 付きで含めて渡す** — 含めないと既存の値が消える (U1 で確かめた)。足す選択肢の色と説明: `Ready` は GREEN「着手してよい」、`In review` は BLUE「PR が ready for review」、`Blocked` は RED「ほかの Issue か小さな PR を待機する」。既存の項目の Status の値は変わらない。
+- Status の選択肢は GraphQL の `updateProjectV2Field` (`singleSelectOptions`) で足す。**既存の選択肢を `id` 付きで含めて渡す** — 含めないと既存の値が消える (U1 で確認した)。足す選択肢の色と説明: `Ready` は GREEN「着手してよい」、`In review` は BLUE「PR が ready for review」、`Blocked` は RED「ほかの Issue か小さな PR を待機する」。既存の項目の Status の値は変わらない。
 - `Agent stuck state` の値の不足も、Status と同じく既存の値の `id` を保った `updateProjectV2Field` の案にする。
 - 既にあるフィールドの型が違うとき (`Agent stuck state` が単一選択でないなど) は作り直しが要るので、案を出さずに報告だけする。
 

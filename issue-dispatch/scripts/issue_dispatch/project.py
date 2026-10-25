@@ -24,7 +24,7 @@ ADDED_STATUS_OPTIONS = {"Ready": ("GREEN", "着手してよい"), "In review": (
 MANAGER_STATUSES = ("Todo", "Ready", "Blocked", "In Progress", "In review")
 REQUIRED_WORKFLOWS = ("Item closed",)
 RECOMMENDED_WORKFLOWS = ("Item added to project", "Item reopened")
-NOTICE_IF_ENABLED_WORKFLOWS = ("Auto-add to project",)         # 有効なら、Ready にする前に中身を確かめるよう案内する
+NOTICE_IF_ENABLED_WORKFLOWS = ("Auto-add to project",)         # 有効なら、Ready にする前に中身を確認するよう案内する
 DISCOURAGED_WORKFLOWS = ("Pull request linked to issue",)      # 有効なら無効を推奨する
 EVENT_TYPES = ("ClosedEvent", "ReopenedEvent", "LabeledEvent", "UnlabeledEvent", "BlockedByAddedEvent",
                "BlockedByRemovedEvent", "ProjectV2ItemStatusChangedEvent", "AddedToProjectV2Event", "RemovedFromProjectV2Event")

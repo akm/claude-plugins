@@ -23,7 +23,7 @@ MANAGER_STATES = ("active", "stopped", "ended")
 ACTION_KEYS = ("at", "kind", "target", "before", "after", "reason")
 RESEND_LIMIT = 1  # 再送は項目ごとに通算この回数まで (R24)。再送したら count_resend で数え、回数が達していれば再送しない
 
-# リポジトリの名前の形は config.REPO_NAME_PATTERN と同じ (このモジュールは config を import しないので写す。テストで一致を確かめる)
+# リポジトリの名前の形は config.REPO_NAME_PATTERN と同じ (このモジュールは config を import しないので写す。テストで一致を確認する)
 REPO_NAME_PATTERN = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"
 _ITEM_RE = re.compile(rf"^{REPO_NAME_PATTERN}#[1-9][0-9]*$")
 _REPO_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
@@ -417,7 +417,7 @@ def intent_matches(rec, item, values):
 
 
 def can_resend(rec, item):
-    """再送の回数が上限 (RESEND_LIMIT) に達していなければ真。呼ぶ順は、確かめる → 再送する → count_resend で数える。
+    """再送の回数が上限 (RESEND_LIMIT) に達していなければ真。呼ぶ順は、確認する → 再送する → count_resend で数える。
     上限が 1 なら、1 回再送した後は偽になる (通算 1 回。R24)。"""
     return rec["items"].get(item, {}).get("resend_count", 0) < RESEND_LIMIT
 

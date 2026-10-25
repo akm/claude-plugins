@@ -152,7 +152,7 @@ def create_issue(repo, title, body, declaration_url, labels=(), assignees=()):
     既にあれば作らずにその番号を返す (再開のときに 2 つ作らない。AE44)。Status と sub-issue の関係は書かない。
 
     返り値: {"status": "ok", "created": bool, "number", "url"} か失敗の説明。開いた Issue の一覧が読めなければ作らない
-    (既にあるかを確かめられないまま作ると 2 つになりうるため)。
+    (既にあるかを確認できないまま作ると 2 つになりうるため)。
     """
     first = split_from_line(declaration_url)
     if first is None:
@@ -194,7 +194,7 @@ def add_blocked_by(issue, blocker):
 
 
 def remove_blocked_by(issue, blocker):
-    """issue の `blockedBy` から blocker を外す (`gh issue edit <URL> --remove-blocked-by <URL>`)。自分が足したものだけを外す確かめは
+    """issue の `blockedBy` から blocker を外す (`gh issue edit <URL> --remove-blocked-by <URL>`)。自分が足したものだけを外す確認は
     呼び出し元 (CLI の `blocked-by remove`。項目の状態から導く) が行う。返り値は add_blocked_by と同じ形。"""
     issue_ref, blocker_ref = ids.parse_issue_ref(issue), ids.parse_issue_ref(blocker)
     if issue_ref is None or blocker_ref is None:

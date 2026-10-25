@@ -74,10 +74,10 @@
 | --- | --- |
 | `intent` | 割り当ての書き込みの意図 (`session_id`・`session_title`・`status` に書く予定の値、`assignment` 割り当ての番号、`at` 決めた時刻)。無ければ null。Project の値が意図と一致すれば自分の書き込みと判定する (再入の部分完了の続き。R24) |
 | `notified_at` | 合図 `assigned` を送った印 (時刻)。意図があって印が無い項目は、再入で合図を送り直す候補。同じ印を 2 度付けても最初の時刻のまま。いつ付くかの正本は [flow.md](flow.md) |
-| `resend_count` | 合図の再送の回数。再送は項目ごとに通算 1 回で、1 回再送した後は再送しない (R24)。再送の前に回数を確かめ、再送したら数える |
+| `resend_count` | 合図の再送の回数。再送は項目ごとに通算 1 回で、1 回再送した後は再送しない (R24)。再送の前に回数を確認し、再送したら数える |
 | `conflict_choice` | 競合の可能性があるときに選んだ扱い。判定 ([flow.md](flow.md) の「判定」) は書かず、質問 `conflict` の回答 (相手ごと) で代える。消すかは U21 で決める |
 | `reported` | 報告済みの印。報告の種類 (人の変更・割り当てない理由など) → 最初に報告した時刻 |
-| `body_edit_confirmed_at` | 利用者が確かめた本文の最新の編集の時刻 (KD17) |
+| `body_edit_confirmed_at` | 利用者が確認した本文の最新の編集の時刻 (KD17) |
 
 `questions` の要素 (質問):
 
@@ -111,7 +111,7 @@
 | `count_resend` | `item` | 再送の回数を 1 増やす (意図が無ければ誤り) |
 | `set_conflict_choice` | `item`・`choice` | 競合の可能性があるときに選んだ扱いを書く |
 | `mark_reported` | `item`・`kind`・`at` | 報告済みの印を付ける (2 度目は時刻を変えない) |
-| `set_body_edit_confirmed` | `item`・`at` | 利用者が確かめた本文の編集の時刻を書く |
+| `set_body_edit_confirmed` | `item`・`at` | 利用者が確認した本文の編集の時刻を書く |
 | `set_notice` | `key`・`at` | 項目に紐づかない知らせの報告済みの印を付ける (2 度目は時刻を変えない) |
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と回答を書く |
 | `ask` | `question_id`・`item`・`kind`・`options`・`at`・`subject` (任意) | 質問を記録する (同じ ID の質問が既にあれば誤り。回答を消さないため。既にある質問は `record read` の `questions` で見る) |

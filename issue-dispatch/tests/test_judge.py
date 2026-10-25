@@ -398,7 +398,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["conflict"]))
 
     def test_resources_are_not_judged_while_conflict_waits(self):
-        """競合の可能性で待機する・質問する宣言は、資源の空きを確かめない (待機している宣言は新しい資源を持たない)。"""
+        """競合の可能性で待機する・質問する宣言は、資源の空きを確認しない (待機している宣言は新しい資源を持たない)。"""
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",))]), item(A5, B_GO), self._holder("gpu")], attrs=self.attrs)
         self.assertEqual([q["kind"] for q in out["questions"]], ["conflict"])
         self.assertEqual(out["judgments"][0]["reserve"], [])
@@ -488,7 +488,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual(out["judgments"][1]["reserve"], ["cache"])
 
     def test_released_reservation_added_back_by_rewrite_is_checked_for_availability(self):
-        """待機する間に解放した予約 (属性 release) を修正で足し直すと、予約済みとは扱わず空きを確かめる。別の項目が持っていれば `待機` (理由 `資源`)。"""
+        """待機する間に解放した予約 (属性 release) を修正で足し直すと、予約済みとは扱わず空きを確認する。別の項目が持っていれば `待機` (理由 `資源`)。"""
         events = [{"type": "LabeledEvent", "at": t(9), "label": "resource:cache"}]
         mine = item(A9, [ASSIGN1, decl(400, t(20)), wait(400, t(21), 500, [{"kind": "利用者の回答"}]),
                          mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(22), 501),
@@ -533,7 +533,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual(judge.usage_for(states, None, self.attrs), {"gpu": [A9]})
 
     def test_update_adds_resource_and_releases_removed(self):
-        """`開始可` の後の更新は、足した資源の空きを確かめ、外した資源を解放する。"""
+        """`開始可` の後の更新は、足した資源の空きを確認し、外した資源を解放する。"""
         mine = item(A9, [ASSIGN1, decl(400, t(11), resources=("db",)), go(400, t(12), 500), decl(401, t(13), resources=("gpu",), kind="宣言の更新")])
         out = run_judge([mine], attrs=self.attrs)
         j = out["judgments"][0]

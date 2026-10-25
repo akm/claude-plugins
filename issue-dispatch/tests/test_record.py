@@ -179,7 +179,7 @@ class ApplyTest(unittest.TestCase):
         while record.can_resend(rec, "akm/r#12"):
             resends += 1
             rec, _ = record.apply(rec, [{"op": "count_resend", "item": "akm/r#12"}])
-        self.assertEqual(resends, 0, "確かめる → 再送 → 数える の順で使っても通算 1 回を超えないこと")
+        self.assertEqual(resends, 0, "確認する → 再送 → 数える の順で使っても通算 1 回を超えないこと")
 
     def test_manager_and_exchanges(self):
         self.apply({"op": "set_manager", "id": "m1", "name": "issue-dispatch akm/3/akm", "started_at": T1})
@@ -294,7 +294,7 @@ class ApplyTest(unittest.TestCase):
 class NamePatternTest(unittest.TestCase):
 
     def test_pattern_matches_config(self):
-        """record は config を import しないので、リポジトリの名前の形を写している。同じ文字列であることを確かめる。"""
+        """record は config を import しないので、リポジトリの名前の形を写している。同じ文字列であることを確認する。"""
         from issue_dispatch import config
         self.assertEqual(record.REPO_NAME_PATTERN, config.REPO_NAME_PATTERN)
         rec = record.new_record(PROJECT)

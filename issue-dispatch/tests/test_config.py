@@ -6,7 +6,7 @@
   python3 -m unittest discover -s issue-dispatch/tests
 
 一時ディレクトリを管理ディレクトリとリポジトリのルートに見立て、そこに設定ファイルを作って読み込みの結果
-(デフォルト値の適用・警告・エラー・`files` のパターンの表記) を確かめる。
+(デフォルト値の適用・警告・エラー・`files` のパターンの表記) を確認する。
 キーと未設定のときの扱いの正本は issue-dispatch/skills/issue-dispatch/references/project-config.md。
 """
 
@@ -69,7 +69,7 @@ class ManagerConfigTest(ConfigTestBase):
         self.assertEqual(c["poll_minutes"], 3, "poll_minutes のデフォルト値")
         self.assertEqual(c["wait_minutes"], 60, "wait_minutes のデフォルト値")
         self.assertEqual(c["declare_deadline_minutes"], 60, "declare_deadline_minutes のデフォルト値")
-        self.assertEqual(c["third_party_edit_check"], [], "third_party_edit_check は空 (どのリポジトリも確かめない)")
+        self.assertEqual(c["third_party_edit_check"], [], "third_party_edit_check は空 (どのリポジトリも確認しない)")
         self.assertEqual(c["resources"], {}, "resources は空")
         self.assertEqual(c["repositories"], {}, "repositories は空")
         self.assertEqual(result["warnings"], [], "未設定は値の誤りではないので警告しないこと")
@@ -128,7 +128,7 @@ class ManagerConfigTest(ConfigTestBase):
         self.assertEqual(result["errors"], [], "値の誤りはエラーにしないこと")
 
     def test_bool_is_not_an_integer(self):
-        """真偽値は整数と読まない (Python では bool が int の部分型のため、明示的に確かめる)。"""
+        """真偽値は整数と読まない (Python では bool が int の部分型のため、明示的に確認する)。"""
         _write_config(self.root, {"project": {"owner": "akm", "number": 3}, "poll_minutes": True})
         result = config.load(self.root, "manager")
         self.assertEqual(result["config"]["poll_minutes"], 3)
@@ -182,7 +182,7 @@ class ManagerConfigTest(ConfigTestBase):
         result = config.load(self.root, "manager")
         c = result["config"]
         self.assertEqual(c["repositories"], {"akm/a": "/Users/x/a"})
-        self.assertEqual(c["resources"], {"dev-port": {"capacity": 2}}, "属性の中身は確かめない (resources.md の正本は U11)")
+        self.assertEqual(c["resources"], {"dev-port": {"capacity": 2}}, "属性の中身は確認しない (resources.md の正本は U11)")
         self.assertEqual(len(_warnings_about(result, "repositories")), 2)
         self.assertEqual(len(_warnings_about(result, "resources")), 1)
 

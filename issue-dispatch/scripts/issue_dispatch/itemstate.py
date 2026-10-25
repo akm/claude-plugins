@@ -535,7 +535,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                     reports.append(_report(item, "status-changed", status=status, after_comment=d["wait"]["comment_id"]))
             else:
                 actions.append(_action_status(item, restore, continuation=True))
-    # 第三者の本文の編集 (確認の対象のリポジトリだけ。確かめた時刻より後のもの)
+    # 第三者の本文の編集 (確認の対象のリポジトリだけ。確認した時刻より後のもの)
     if any(item["repo"].casefold() == r.casefold() for r in (config or {}).get("third_party_edit_check") or []):
         confirmed = ri.get("body_edit_confirmed_at") or ""
         edits = [e for e in third_party_edits(item, asg, login) if (e["edited_at"] or "") > confirmed]

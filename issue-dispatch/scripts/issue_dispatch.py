@@ -27,7 +27,7 @@
       先頭行を組み立てて投稿する。同じ出来事への同じコメントが既にあれば投稿せず posted false を返す (値のオプションは issue-format.md の「コメント」)
   comment parse --line <先頭行>   先頭行を解析する (gh は実行しない。形でなければ header は null)
   declaration parse --dir <リポジトリのルート> (--body <JSON> | --body-file <ファイル|->)   宣言の JSON を検査し、パスをそろえ、種類を付けて返す
-      (リポジトリの設定の規則は --dir から読む。作業のセッションが投稿の前に確かめる)
+      (リポジトリの設定の規則は --dir から読む。作業のセッションが投稿の前に確認する)
   declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body <JSON> | --body-file <ファイル|->)
       標準入力の JSON {"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} で競合の可能性を判定する。リポジトリの設定は
       repositories の clone から既定のブランチの内容として読み、読めなければ判定しない (KTD9)
@@ -899,7 +899,7 @@ def _check_judge_body(trigger, body):
             errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 回答 (文字列) のオブジェクト: {body[key]!r}", "failure": None})
     if "waiting" in body:
         for i, w in enumerate(body["waiting"]):
-            # judge_release が読むキーをすべて確かめる (絞り込みの item・wait_for と、並べ替えの posted_at・position)
+            # judge_release が読むキーをすべて確認する (絞り込みの item・wait_for と、並べ替えの posted_at・position)
             ok = (isinstance(w, dict) and _is_name(w.get("item")) and "declaration" in w
                   and isinstance(w.get("wait_for"), list) and all(_is_name(r) for r in w["wait_for"])
                   and (w.get("posted_at") is None or isinstance(w["posted_at"], str))
@@ -1021,7 +1021,7 @@ def build_parser():
     p_badd.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
     p_badd.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
     p_badd.set_defaults(func=cmd_blocked_by_add)
-    p_bremove = blocked_sub.add_parser("remove", help="自分が足した blocker だけを外す (項目の状態から確かめる。承認を得た後に呼ぶ)")
+    p_bremove = blocked_sub.add_parser("remove", help="自分が足した blocker だけを外す (項目の状態から確認する。承認を得た後に呼ぶ)")
     p_bremove.add_argument("--dir", required=True, help="管理ディレクトリ")
     p_bremove.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_bremove.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")

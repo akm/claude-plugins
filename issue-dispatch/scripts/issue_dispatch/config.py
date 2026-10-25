@@ -5,9 +5,9 @@
 呼び出し元: CLI issue-dispatch/scripts/issue_dispatch.py の `config read` と `config add-edit-check`。
 ほかのモジュールは `load()` の結果の `config` を受け取り、設定ファイルを直接読まない。
 
-`files` の規則は、`kind` が規則に書ける種類 (モジュール filekinds の `RULE_KINDS`) であることだけを確かめ、
-属性の意味はここでは確かめない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
-`resources` の属性の意味とデフォルト値もここでは確かめない (正本は resources.md。属性の適用はモジュール resources)。
+`files` の規則は、`kind` が規則に書ける種類 (モジュール filekinds の `RULE_KINDS`) であることだけを確認し、
+属性の意味はここでは確認しない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
+`resources` の属性の意味とデフォルト値もここでは確認しない (正本は resources.md。属性の適用はモジュール resources)。
 """
 
 import json
@@ -44,7 +44,7 @@ INTEGER_KEYS = ("poll_minutes", "wait_minutes", "declare_deadline_minutes")
 # リポジトリの名前 `owner/repo` の形。owner と repo のどちらも、名前に使える文字 (英数字と ._-) の 1 文字以上。
 # GitHub の規則 (アカウントの種類で違う) を写すのではなく、名前として扱えないもの (空白・読めないバイト・区切りの崩れ) だけを
 # 拒む (利用者と相談して決めた)。モジュール repo も origin の URL から取り出した名前の検査に使う。モジュール record は
-# 同じ形を写している (独立性のため import しない。テストで同じ文字列であることを確かめる)
+# 同じ形を写している (独立性のため import しない。テストで同じ文字列であることを確認する)
 REPO_NAME_PATTERN = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"
 REPO_NAME_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
 _REPO_RE = REPO_NAME_RE
