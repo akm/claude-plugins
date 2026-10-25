@@ -1993,7 +1993,7 @@ class TestCliCommands(unittest.TestCase):
         )
 
     def test_select_holds_the_state_lock_while_reading_bodies(self):
-        # 読む側も同じ。record の途中の state と本文の組み合わせを読まない。
+        # 読み込む処理も同じ。record の途中の state と本文の組み合わせを読まない。
         import threading
 
         self._record_body("前回の本文")

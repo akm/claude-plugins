@@ -109,7 +109,7 @@ def cmd_select(args):
     prs, skipped = agent_input.prs(raw)
     warnings.extend(skipped)
 
-    # state と本文は対で意味を持つ（記録に対応する本文が差分の基準）。読む側も
+    # state と本文は対で意味を持つ（記録に対応する本文が差分の基準）。読み込む処理も
     # 同じロックで囲み、record の途中の state と本文の組み合わせを読まない。
     # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待機させない）。
     with store.locked(paths["state"]):
