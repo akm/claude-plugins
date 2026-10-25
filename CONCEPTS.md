@@ -94,7 +94,7 @@ LLM が手順書に従ってその場で組み立てる構造化データ。
 既定値・設定と引数のキー・数え方 (記録の回番号で数える) と、周回の上限との違いの正本は `review-triage` の [project-config.md](review-triage/skills/review-triage/references/project-config.md) の「`fix`」で、ここでは言い直さない。
 
 ### 立案者の選択
-[回数の閾値](#回数の閾値) N を越えた各回で、[段](#段) 2 (立案) を誰が行うかを人間が選ぶこと。選択肢 (セッションのモデル / 指定モデルの sub-agent / 人間自身)・尋ね方・設定で既定を持たない理由の正本は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の手順 4 で、ここでは言い直さない。
+[回数の閾値](#回数の閾値) N を越えた各回で、[段](#段) 2 (立案) を誰が行うかを人間が選ぶこと。選択肢 (セッションのモデル / 指定モデルの sub-agent / 人間自身)・質問の仕方・設定で既定を持たない理由の正本は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の手順 4 で、ここでは言い直さない。
 
 同じ種類の指摘が続いているかをスキルが判断する仕組みと、指摘の繰り返しを図にして人間と確認する作業を置き換えるもの — どちらも人間に読まれなくなっていて、判断の結果が何も駆動していなかった。
 
