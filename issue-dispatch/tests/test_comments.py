@@ -50,7 +50,7 @@ class HeaderFormatParseTest(unittest.TestCase):
         ("割り当て", MANAGER, {"to": "W-7", "assignment": 1}),
         ("開始可", MANAGER, {"to": "W-7", "assignment": 1, "declaration": 6262508430}),
         ("待機", MANAGER, {"to": "W-7", "assignment": 1, "declaration": 6262508430,
-                          "waits": [{"kind": "利用者の答え"}, {"kind": "資源", "resource": "staging-db"}]}),
+                          "waits": [{"kind": "利用者の回答"}, {"kind": "資源", "resource": "staging-db"}]}),
         ("待機", MANAGER, {"to": "W-7", "assignment": 2, "declaration": 6262508431,
                           "waits": [{"kind": "Issue", "issue": OTHER}, {"kind": "小さな PR", "issue": OTHER, "pr": PR9}, {"kind": "設定"}]}),
         ("待機", MANAGER, {"to": "W-7", "assignment": 2, "declaration": 6262508431, "waits": [{"kind": "小さな PR", "issue": OTHER}]}),
@@ -255,15 +255,15 @@ class AlreadyPostedTest(unittest.TestCase):
         self.assertPosted(go1, [go1], True)
 
     def test_wait_compares_with_latest_for_the_declaration(self):
-        w_user = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の答え"}])
+        w_user = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の回答"}])
         w_issue = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "Issue", "issue": OTHER}])
         self.assertPosted(w_user, [w_user], True)
         self.assertPosted(w_issue, [w_user], False, "待つ理由が違えば投稿する")
         self.assertPosted(w_user, [w_user, w_issue], False, "前と同じ理由の待ちに戻ったときも、最新と違えば投稿する")
         self.assertPosted(w_user, [w_issue, w_user], True, "最新と同じなら投稿しない")
-        both = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の答え"}, {"kind": "資源", "resource": "db"}])
+        both = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の回答"}, {"kind": "資源", "resource": "db"}])
         self.assertPosted(w_user, [both], False, "待つものの一部が解けて残りを書いたときも投稿する")
-        other_decl = header("待機", to="W-7", assignment=1, declaration=2, waits=[{"kind": "利用者の答え"}])
+        other_decl = header("待機", to="W-7", assignment=1, declaration=2, waits=[{"kind": "利用者の回答"}])
         self.assertPosted(w_user, [w_user, other_decl], True, "別の宣言への待機は比べる相手にしない")
         pr = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "小さな PR", "issue": OTHER}])
         pr_made = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "小さな PR", "issue": OTHER, "pr": PR9}])
@@ -271,8 +271,8 @@ class AlreadyPostedTest(unittest.TestCase):
 
     def test_values_compare_by_meaning(self):
         """繰り返す値は並びを問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別せずに比べる。"""
-        ab = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の答え"}, {"kind": "資源", "resource": "db"}])
-        ba = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "資源", "resource": "db"}, {"kind": "利用者の答え"}])
+        ab = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の回答"}, {"kind": "資源", "resource": "db"}])
+        ba = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "資源", "resource": "db"}, {"kind": "利用者の回答"}])
         self.assertPosted(ba, [ab], True, "待つものの並びが違っても同じ")
         w56 = header("依存の待ち", blockers=[OTHER, f"{REPO}#6"])
         w65 = header("依存の待ち", blockers=[f"{REPO.upper()}#6", OTHER])
@@ -400,12 +400,12 @@ class CliTest(FakeGhCase):
         self.responses([USER_ENTRY, {"substring": "query IssueComments", "stdout": data},
                         {"prefix": ["issue", "comment"], "stdout": f"{ISSUE3}#issuecomment-99\n"}])
         code, out, _ = cli("comment", "post", "--issue", ISSUE3, "--role", "manager", "--name", "mgr", "--session-id", "M-1", "--kind", "待機",
-                           "--to", "W-7", "--assignment", "1", "--declaration", "5", "--reason", "利用者の答え", "--reason", f"小さな PR {OTHER} PR {PR9}",
+                           "--to", "W-7", "--assignment", "1", "--declaration", "5", "--reason", "利用者の回答", "--reason", f"小さな PR {OTHER} PR {PR9}",
                            "--body-file", "-", stdin="本文\n")
         self.assertEqual((code, out["status"], out["posted"], out["database_id"]), (0, "ok", True, 99))
         stdin = self.recorded_full()[2]["stdin"]
         self.assertEqual(stdin.split("\n")[0], header("待機", to="W-7", assignment=1, declaration=5,
-                                                      waits=[{"kind": "利用者の答え"}, {"kind": "小さな PR", "issue": OTHER, "pr": PR9}]))
+                                                      waits=[{"kind": "利用者の回答"}, {"kind": "小さな PR", "issue": OTHER, "pr": PR9}]))
         self.assertTrue(stdin.endswith("\n\n本文\n"))
 
     def test_post_small_pr_request_and_dependency_wait(self):

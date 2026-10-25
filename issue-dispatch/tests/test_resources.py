@@ -126,16 +126,16 @@ class AssignTest(unittest.TestCase):
         self.assertEqual(resources.judge_assign(I3, ["db"], {"db": [I1, I2]}, a, {})["result"], "skip")
 
     def test_when_busy_ask(self):
-        """when_busy が ask なら利用者に尋ね、答えが待つなら候補から外して、解放されるまで尋ね直さない。"""
+        """when_busy が ask なら利用者に尋ね、回答が待つなら候補から外して、解放されるまで尋ね直さない。"""
         a = attrs({"db": {"when_busy": "ask"}})
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {})
         self.assertEqual((r["result"], r["ask"]), ("ask", ["db"]))
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {"db": "wait"})
         self.assertEqual((r["result"], r["ask"]), ("skip", []))
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {"db": "proceed"})
-        self.assertEqual((r["result"], r["reserve"]), ("assign", ["db"]), "進めると答えたら割り当てて予約する")
+        self.assertEqual((r["result"], r["reserve"]), ("assign", ["db"]), "進めると回答したら割り当てて予約する")
         r = resources.judge_assign(I2, ["db"], {}, a, {"DB": "wait"})
-        self.assertEqual(r["result"], "assign", "空いていれば答えに依らず割り当てる (答えは解放で消える前提)")
+        self.assertEqual(r["result"], "assign", "空いていれば回答に依らず割り当てる (回答は解放で消える前提)")
 
     def test_case_insensitive_names(self):
         r = resources.judge_assign(I2, ["DB"], {"db": [I1]}, attrs({"Db": {"when_busy": "ask"}}), {})
@@ -159,12 +159,12 @@ class DeclareTest(unittest.TestCase):
         r = resources.judge_declare(I2, ["db"], [], {"db": [I1]}, a, {}, {})
         self.assertEqual((r["result"], r["ask"]), ("ask", ["db"]))
         r = resources.judge_declare(I2, ["db"], [], {"db": [I1]}, a, {"db": "wait"}, {})
-        self.assertEqual((r["result"], r["wait_for"]), ("wait", ["db"]), "利用者が待つと答えたら wait と同じ")
+        self.assertEqual((r["result"], r["wait_for"]), ("wait", ["db"]), "利用者が待つと回答したら wait と同じ")
         r = resources.judge_declare(I2, ["db"], [], {"db": [I1]}, a, {"db": "proceed"}, {})
         self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
 
     def test_undeclared_default_ask(self):
-        """予約したのに宣言に無い資源には「利用者に尋ねる」を返す。答えを待つ間もほかの判定が済んでいれば開始可で、予約は残す。"""
+        """予約したのに宣言に無い資源には「利用者に尋ねる」を返す。回答を待つ間もほかの判定が済んでいれば開始可で、予約は残す。"""
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {})
         self.assertEqual((r["result"], r["ask_undeclared"], r["release"], r["keep"]), ("go", ["db"], [], ["db"]))
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "release"})
@@ -291,7 +291,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(out["errors"][0]["key"], "body")
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "assign", "--body", json.dumps({"item": I2, "resources": "db", "usage": {}}))
         self.assertEqual(out["status"], "error")
-        # 入れ子の中身: usage の値が文字列・資源の名前が数値・答えが文字列でない・waiting の要素の形違い
+        # 入れ子の中身: usage の値が文字列・資源の名前が数値・回答が文字列でない・waiting の要素の形違い
         for trigger, body, key in (
                 ("assign", {"item": I2, "resources": ["db"], "usage": {"db": I1}}, "body.usage.db"),
                 ("assign", {"item": I2, "resources": [1], "usage": {}}, "body.resources"),

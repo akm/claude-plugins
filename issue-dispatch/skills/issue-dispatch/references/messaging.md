@@ -32,11 +32,11 @@
 
 | 文書に無い振る舞い | 頼る要件と処理 | 確かめた日と版 | 変わったときに直す場所 |
 | --- | --- | --- | --- |
-| `ListAgents` の出力の形: 1 行目が自分 (`This session is <名前> [<識別子>]`)、2 行目以降が `<名前> [<識別子>] · interactive · <状態> · started …`。状態は `idle` / `busy` / `waiting` / `shell`。`waiting` は権限の確認待ちと問いの答え待ちの両方、`shell` はバックグラウンドの shell が動いている間 | R10 (止まったことに気づく手段)・R23 (作業のセッションの監視)・R18 (排他は状態を問わず数える) | 2026-10-19〜20。Desktop と端末 | スキルの手順書 (U21・U22・U23) の `ListAgents` の読み方。この文書の「自分の識別」の名前の取り出し方 |
+| `ListAgents` の出力の形: 1 行目が自分 (`This session is <名前> [<識別子>]`)、2 行目以降が `<名前> [<識別子>] · interactive · <状態> · started …`。状態は `idle` / `busy` / `waiting` / `shell`。`waiting` は権限の確認待ちと問いの回答待ちの両方、`shell` はバックグラウンドの shell が動いている間 | R10 (止まったことに気づく手段)・R23 (作業のセッションの監視)・R18 (排他は状態を問わず数える) | 2026-10-19〜20。Desktop と端末 | スキルの手順書 (U21・U22・U23) の `ListAgents` の読み方。この文書の「自分の識別」の名前の取り出し方 |
 | 環境変数 `CLAUDE_CODE_HOST_SESSION_ID` (Desktop のセッション ID。`local_` 付き) と `CLAUDE_CODE_SESSION_ID` (会話の記録の UUID) が Bash ツールの環境にある。端末の `claude` には後者だけ | KTD10 (自分の ID の決定) | 2026-10-19〜20。Desktop と端末 | `sessions.py` の `own_session_id` (読むのはここだけ) |
 | 使われている名前に変えても (Desktop の `set_session_title`、端末の `/rename`)、少し変えた名前にはならず、そのまま同じ名前が付く。警告も無い | R18 (排他は名前を変える前に確かめる)・KD19 (`--end` で名前を外す) | 2026-10-19〜20。Desktop と端末 | R18 の手順 (U21・U23) |
 | 同じ送り手の直前の合図と本文が同じ合図は、受け手の inbox で捨てられ、送り手に `[Cross-session delivery notice]` が後から届く (送った時点のツール結果は `success: true`)。間に別の本文を挟めば届く | KTD11・R9 (捨てられた知らせの扱い)・R24 (再送の本文に通番か時刻を足す) | 2026-10-19。Desktop | U17 の合図の取り決め (再送の本文) |
 | 届いた合図の `from` はソケットのパス (`uds:/tmp/cc-socks/<pid>.sock`) で、名前は `from-name`、Desktop のセッション ID は `from-session`。端末のセッションからの合図に `from-session` は無い | U17 の宛先の決め方 (返事は `from` へ。送り手の見分けは `from-name` と `from-session`) | 2026-10-19〜20。Desktop と端末 | U17 の合図の取り決め。この文書の「宛先の決め方」 |
 | アーカイブした Desktop のセッションの行は `ListAgents` から消える (`offline` の行は出ない)。`list_sessions` (`include_archived`) には名前のまま残る | R18 (排他で `offline` の行を数える必要が無い) | 2026-10-19。Desktop | R18 の手順 (U21・U23) |
-| 権限の確認待ち (`waiting`) のセッションは、ほかのセッションの `stop_session` で止められない (問いの答え待ちは止められる) | R10 (権限の確認で止まった作業のセッションは利用者に知らせるしかない) | 2026-10-19。Desktop | R10 の手順 (U21・U23) |
+| 権限の確認待ち (`waiting`) のセッションは、ほかのセッションの `stop_session` で止められない (問いの回答待ちは止められる) | R10 (権限の確認で止まった作業のセッションは利用者に知らせるしかない) | 2026-10-19。Desktop | R10 の手順 (U21・U23) |
 | Desktop で `/clear` と、アーカイブして開き直した後も、`CLAUDE_CODE_SESSION_ID` と `CLAUDE_CODE_HOST_SESSION_ID` は変わらない (`ListAgents` の短い識別子は変わる)。端末の `/clear` は未確認 | R24 (記録の ID と作業のセッションの ID の確認) | 2026-10-20。Desktop | R24 の手順 (U21・U23)。この文書の「自分の識別」 |

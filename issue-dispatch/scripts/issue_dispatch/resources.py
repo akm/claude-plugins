@@ -1,7 +1,7 @@
 """資源 (ラベル `resource:<名前>` と宣言の `resources` で表す、同時に使える数が限られるもの)。属性の読み込み (`attributes`。
 設定に無い資源と属性はデフォルト値)、持っている資源の求め方 (`held_from_history`。R20 の (1))、契機ごとの判断
 (`judge_assign`・`judge_declare`・`judge_update`・`judge_close`・`judge_release`。属性と、U13 が求めた資源の使用と、記録にある
-利用者の答えを引数で受ける)。属性の表と契機の表の正本は issue-dispatch/skills/issue-dispatch/references/resources.md。gh は使わない。
+利用者の回答を引数で受ける)。属性の表と契機の表の正本は issue-dispatch/skills/issue-dispatch/references/resources.md。gh は使わない。
 
 資源の名前は大文字小文字を区別せずに比べる (ラベルの名前を GitHub が区別しないため)。返す名前は、呼び出し元が渡した綴り
 (宣言・ラベル・設定) のまま。
@@ -13,7 +13,7 @@ from issue_dispatch import declaration, ids
 DEFAULTS = {"capacity": 1, "reserve": "on_assign", "when_busy": "wait", "release_undeclared": "ask"}
 VALUES = {"reserve": ("on_assign", "on_declare"), "when_busy": ("wait", "ask"), "release_undeclared": ("release", "ask")}
 TRIGGERS = ("assign", "declare", "update", "close", "release")
-# 利用者の答え。when_busy が ask のとき: wait (待つ) / proceed (進める)。release_undeclared が ask のとき: release (解放してよい) / keep (解放してはいけない)
+# 利用者の回答。when_busy が ask のとき: wait (待つ) / proceed (進める)。release_undeclared が ask のとき: release (解放してよい) / keep (解放してはいけない)
 BUSY_ANSWERS = ("wait", "proceed")
 UNDECLARED_ANSWERS = ("release", "keep")
 
@@ -108,7 +108,7 @@ def _answer(answers, name):
 
 
 def judge_assign(item, label_resources, usage, attrs_table, answers):
-    """契機「割り当て」。label_resources は項目のラベルの資源。answers は when_busy が ask の資源への答え (名前 → wait / proceed)。
+    """契機「割り当て」。label_resources は項目のラベルの資源。answers は when_busy が ask の資源への回答 (名前 → wait / proceed)。
     返り値: {"result": "assign" (割り当てて reserve を予約する) / "skip" (候補から外す) / "ask" (利用者に尋ねる),
     "reserve": 予約する資源, "busy": 空いていない資源, "ask": 尋ねる資源}。reserve が on_declare の資源は予約せず、空きも待たない。"""
     reserve, busy, ask = [], [], []
@@ -150,10 +150,10 @@ def _check_new(item, names, usage, attrs_table, answers):
 
 
 def judge_declare(item, declared, reserved, usage, attrs_table, answers, undeclared_answers):
-    """契機「着手の宣言」。declared は宣言の resources、reserved は割り当てで予約した資源。answers は when_busy が ask の資源への答え、
-    undeclared_answers は release_undeclared が ask の資源への答え (名前 → release / keep)。
+    """契機「着手の宣言」。declared は宣言の resources、reserved は割り当てで予約した資源。answers は when_busy が ask の資源への回答、
+    undeclared_answers は release_undeclared が ask の資源への回答 (名前 → release / keep)。
     返り値: {"result": "go" (`開始可` を書くときに reserve を予約する) / "wait" (`待機`。どれも予約しない) / "ask",
-    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (答えを待つ・残す予約), "ask_undeclared" (尋ねる),
+    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待つ・残す予約), "ask_undeclared" (尋ねる),
     "request_rewrite" (解放してはいけないので書き直しを頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
     declared, reserved = _unique(declared), _unique(reserved)
     reserved_keys = {_key(r) for r in reserved}

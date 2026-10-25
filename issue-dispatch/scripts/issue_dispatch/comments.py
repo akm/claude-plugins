@@ -21,7 +21,7 @@ WORKER_KINDS = ("着手の宣言", "宣言の更新", "小さな PR の報告", 
 ADDRESSED_KINDS = ("割り当て", "開始可", "待機", "解放", "停滞", "依頼")
 REQUEST_KINDS = ("宣言の書き直し", "本文の追記", "小さな PR")
 RELEASE_REASONS = ("解除", "close", "ID の変更", "除去")
-WAIT_KINDS = ("利用者の答え", "Issue", "小さな PR", "資源", "設定")
+WAIT_KINDS = ("利用者の回答", "Issue", "小さな PR", "資源", "設定")
 # 先頭行の値の見出し語 (値は `<見出し語> <値>` の 1 区切り)。解析は右からこの語で始まる区切りを値として取る
 VALUE_WORDS = ("対象", "割り当て", "宣言", "種類", "待つ Issue", "待つ側の宣言", "前の PR", "PR", "理由", "値", "Issue")
 
@@ -210,7 +210,7 @@ def _split_value(field):
 
 
 def _parse_wait(text):
-    for kind in ("利用者の答え", "設定"):
+    for kind in ("利用者の回答", "設定"):
         if text == kind:
             return {"kind": kind}
     if text.startswith("Issue "):
@@ -228,7 +228,7 @@ def _parse_wait(text):
 
 
 def parse_wait_reason(text):
-    """`理由 ` の後の文字列 (`利用者の答え` / `Issue <参照>` / `小さな PR <参照> [PR <URL>]` / `資源 <名前>` / `設定`) を
+    """`理由 ` の後の文字列 (`利用者の回答` / `Issue <参照>` / `小さな PR <参照> [PR <URL>]` / `資源 <名前>` / `設定`) を
     待つ理由の dict にする。CLI の --reason も同じ形。形が違えば ValueError。"""
     return _wait(_parse_wait(text.strip()))
 
@@ -458,7 +458,7 @@ def post(issue, role, name, session_id, kind, values, body, login=None):
 # --- 報告と依頼の対応づけ ---------------------------------------------------------
 
 def match_report(request, report):
-    """`小さな PR の報告` (report) が、種類 `小さな PR` の `依頼` (request) に答えたものか。先頭行の待つ Issue・待つ側の宣言・
+    """`小さな PR の報告` (report) が、種類 `小さな PR` の `依頼` (request) に回答したものか。先頭行の待つ Issue・待つ側の宣言・
     前の PR (あれば) が同じなら対応する。書いたセッションの名前と ID は比べない (名前は変わりうるため)。"""
     if not request or not report or request["kind"] != "依頼" or request["values"].get("request_kind") != "小さな PR":
         return False

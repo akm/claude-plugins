@@ -15,15 +15,15 @@ SIGNAL_KINDS = ("go", "wait", "request")
 QUESTION_OPTIONS = {"conflict": ["wait", "small-pr", "proceed"], "unknown-content": ["conflict", "none"], "resource-busy": ["wait", "proceed"],
                     "release-undeclared": ["release", "keep"], "small-pr-closed": ["wait-issue", "redo", "proceed"]}
 QUESTION_KINDS = tuple(QUESTION_OPTIONS)
-_USER_ANSWER = {"kind": "利用者の答え"}
+_USER_ANSWER = {"kind": "利用者の回答"}
 _PR_URL_RE = re.compile(rf"https://github\.com/{ids.REPO_NAME_PATTERN}/pull/[1-9][0-9]*")
 
 
-# --- 記録の問いの答え ------------------------------------------------------------------
+# --- 記録の問いの回答 ------------------------------------------------------------------
 
 def _questions(rec, item, kind, subject, since):
     """記録の問いのうち、項目 (owner/repo の大文字小文字を区別しない)・種類・対象 (subject。大文字小文字を区別しない) が同じで、尋ねた時刻 (asked_at) が
-    since (今の割り当ての `割り当て` の時刻) 以後のもの。前の割り当ての問いと答えは、資源・宣言・相手が新しくなるので今の判定の材料にしない
+    since (今の割り当ての `割り当て` の時刻) 以後のもの。前の割り当ての問いと回答は、資源・宣言・相手が新しくなるので今の判定の材料にしない
     (flow.md の「質問の対象と書き直し」)。"""
     folded = subject.casefold() if isinstance(subject, str) else None
     return [q for q in ((rec or {}).get("questions") or {}).values()
@@ -33,20 +33,20 @@ def _questions(rec, item, kind, subject, since):
 
 
 def answer_for(rec, item, kind, subject, since):
-    """項目・種類・対象が同じ、今の割り当て (since 以後) の問いの最新の答え。答えが無い (未回答・取り下げ (answer が null)) なら None。"""
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の問いの最新の回答。回答が無い (未回答・取り下げ (answer が null)) なら None。"""
     q = answered_question(rec, item, kind, subject, since)
     return None if q is None else q["answer"]
 
 
 def answered_question(rec, item, kind, subject, since):
-    """項目・種類・対象が同じ、今の割り当て (since 以後) の問いのうち、答えのある最新のもの (dict)。無ければ None。"""
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の問いのうち、回答のある最新のもの (dict)。無ければ None。"""
     answered = [q for q in _questions(rec, item, kind, subject, since) if q.get("answer") is not None]
     return max(answered, key=lambda q: q.get("answered_at") or "") if answered else None
 
 
 def released_since(st, name, at):
     """項目が資源 name を時刻 at より後に解放したか (`開始可` になったどれかの宣言にあった資源が、at より後の読めた宣言の resources に無い)。
-    問い resource-busy の答えが有効な範囲を決める (flow.md の「資源の質問の回答が有効な範囲」)。"""
+    問い resource-busy の回答が有効な範囲を決める (flow.md の「資源の質問の回答が有効な範囲」)。"""
     held_once, key = False, name.casefold()
     for x in (st.get("declaration") or {}).get("declared_resources") or []:
         has = any(r.casefold() == key for r in x["resources"])
@@ -58,7 +58,7 @@ def released_since(st, name, at):
 
 
 def busy_answers(st, rec, names):
-    """問い resource-busy の答え (資源の名前 → 答え)。今の割り当ての問いだけを読み、答えの後にその資源を解放していれば、別の使用への答えなので読まない (無回答と同じ)。"""
+    """問い resource-busy の回答 (資源の名前 → 回答)。今の割り当ての問いだけを読み、回答の後にその資源を解放していれば、別の使用への回答なので読まない (無回答と同じ)。"""
     out = {}
     for n in names:
         q = answered_question(rec, st["key"], "resource-busy", n, st["assignment"]["at"])
@@ -68,7 +68,7 @@ def busy_answers(st, rec, names):
 
 
 def asked(rec, item, kind, subject, since):
-    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の問い (答えも取り下げも無い) が記録にあるか。あれば尋ね直さない。"""
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の問い (回答も取り下げも無い) が記録にあるか。あれば尋ね直さない。"""
     return any(q.get("answered_at") is None for q in _questions(rec, item, kind, subject, since))
 
 
@@ -93,7 +93,7 @@ def pending(items, states):
 
 def go_declarations(items, states, pr_states, login):
     """比べる相手: 既に `開始可` になった宣言 (項目ごとに最新の `開始可` の宣言)。ready for review の後の PR が変えた、宣言に無いファイル (pr_paths) も相手に加える。
-    要素は {"id", "item", "repo", "declaration", "pr_paths", "to", "assignment", "item_data" (項目), "login"} (相手のコメントは、答えが small-pr の相手について
+    要素は {"id", "item", "repo", "declaration", "pr_paths", "to", "assignment", "item_data" (項目), "login"} (相手のコメントは、回答が small-pr の相手について
     `小さな PR の報告`・`依頼` を探すときだけ _other_comments で解析する)。"""
     by_key = _items_by_key(items)
     out = []
@@ -165,8 +165,8 @@ def released_reservations(st, rec, attrs_table, before=None):
     """割り当てで予約した資源 (reserved) のうち、宣言に無い予約として解放したもの (名前の順)。解放は GitHub への書き込みが無い導出なので、
     判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。読むのは項目の状態 (declared_resources・held) だけ。
     条件: `開始可` の後は持っている資源 (held) に無い予約のうち、`開始可` になったどれかの宣言にあったもの (更新で外した。結果に依らず解放) と、無かったもので属性
-    release_undeclared が release か問い `release-undeclared` の答えが release のもの。`開始可` の前は今の割り当ての読めた着手の宣言 (書き直しを含む。before を
-    渡せばそのコメントの ID の宣言より前のものだけ) のどれかに無い予約で、属性か答えが release のもの。"""
+    release_undeclared が release か問い `release-undeclared` の回答が release のもの。`開始可` の前は今の割り当ての読めた着手の宣言 (書き直しを含む。before を
+    渡せばそのコメントの ID の宣言より前のものだけ) のどれかに無い予約で、属性か回答が release のもの。"""
     d = st.get("declaration") or {}
     reserved = st.get("reserved") or []
     if not st.get("assigned") or not reserved or not d:
@@ -279,12 +279,12 @@ def _small_pr_requested(other, item_key):
 def _wait_body(waits, usage, j=None):
     lines = []
     for w in waits:
-        if w["kind"] == "利用者の答え":
-            lines.append("利用者の答え: 管理のセッションが利用者に尋ねている (競合しうる相手の扱い・unknown-content のファイルの判定・資源の使用)")
+        if w["kind"] == "利用者の回答":
+            lines.append("利用者の回答: 管理のセッションが利用者に尋ねている (競合しうる相手の扱い・unknown-content のファイルの判定・資源の使用)")
         elif w["kind"] == "Issue":
-            lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が終わるまで待つ (利用者の答え: wait)")
+            lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が終わるまで待つ (利用者の回答: wait)")
         elif w["kind"] == "小さな PR":
-            lines.append(f"小さな PR {w['issue']}: 相手に共通の変更を先に小さな PR にすることを依頼した" + (f" (PR {w['pr']})" if w.get("pr") else "") + " (利用者の答え: small-pr)")
+            lines.append(f"小さな PR {w['issue']}: 相手に共通の変更を先に小さな PR にすることを依頼した" + (f" (PR {w['pr']})" if w.get("pr") else "") + " (利用者の回答: small-pr)")
         elif w["kind"] == "資源":
             holders = usage.get(_usage_key(usage, w["resource"]) or w["resource"]) or []
             lines.append(f"資源 {w['resource']}: 使用中 (持つ項目: {', '.join(holders) or '-'})")
@@ -297,7 +297,7 @@ def _undeclared_lines(j):
     if j["release"]:
         lines.append(f"解放した資源 (宣言に無い予約・更新で外した資源): {', '.join(j['release'])}")
     if j["keep"]:
-        lines.append(f"答えを待つ予約 (宣言に無い資源。解放してよいか利用者に尋ねている): {', '.join(j['keep'])}")
+        lines.append(f"回答を待つ予約 (宣言に無い資源。解放してよいか利用者に尋ねている): {', '.join(j['keep'])}")
     return ("\n" + "\n".join(lines)) if lines else ""
 
 
@@ -330,7 +330,7 @@ def _restore_and_removals(item, d, blockers):
 def _go_body(j, compared, proceeds, recompared, rule_text):
     lines = []
     if recompared:
-        lines.append(f"競合の可能性: {'無し' if not proceeds else '利用者の答え proceed で進める'} (比べた `開始可` の宣言: {len(compared)} 件。規則: {rule_text})")
+        lines.append(f"競合の可能性: {'無し' if not proceeds else '利用者の回答 proceed で進める'} (比べた `開始可` の宣言: {len(compared)} 件。規則: {rule_text})")
         for p in proceeds:
             lines.append(f"- 競合しうるまま進める相手: {p['item']} の宣言 {p['declaration']} ({', '.join(x['path'] for x in p['paths'])})")
     else:
@@ -352,8 +352,8 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
          "repo_config": repo_config["status"], "result": None, "waits": [], "compared": [], "recompared": False, "reserve": [], "release": [], "keep": [],
          "parsed": None, "actions": [], "questions": [], "signals": []}
     # 1. 宣言に無い予約 (着手の宣言だけ)。資源はリポジトリの規則に依らず itemstate が読んだ宣言から分かるので、設定の読み取りと形の検査の前に
-    #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待つ経路でも出し、解放してはいけないと答えた資源が
-    #    あれば書き直しを頼んで終わる (予約は残す)。解放した資源と答えを待つ予約は、どの経路の本文にも書く (_undeclared_lines)
+    #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待つ経路でも出し、解放してはいけないと回答した資源が
+    #    あれば書き直しを頼んで終わる (予約は残す)。解放した資源と回答を待つ予約は、どの経路の本文にも書く (_undeclared_lines)
     r = None
     if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
         declared = judged["declaration"]["resources"]
@@ -369,7 +369,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
                 j["questions"].append(_question("release-undeclared", key, n, decl_id, resource=n))
         if r["request_rewrite"]:
             j["result"] = "request"
-            body = (f"資源 {', '.join(r['request_rewrite'])} は、割り当てで予約したのに宣言に無く、解放してはいけないと利用者が答えたので予約を残している。"
+            body = (f"資源 {', '.join(r['request_rewrite'])} は、割り当てで予約したのに宣言に無く、解放してはいけないと利用者が回答したので予約を残している。"
                     f"この資源を resources に加えた宣言を `宣言の更新` で投稿する。" + _undeclared_lines(j))
             j["actions"].append(_comment(key, "依頼", {**base, "request_kind": "宣言の書き直し"}, body))
             j["signals"].append(_signal("request", asg["to"], key, decl_id, "宣言の書き直し"))
@@ -443,7 +443,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
                 blockers.append(o["item"])
                 if not _small_pr_requested(o, key):
                     paths = "、".join(p["path"] for p in conflict_paths)
-                    body = (f"{key} の宣言 {decl_id} と競合しうるファイル ({paths}) の共通の変更を、先に小さな PR にしてマージする (利用者の答え: small-pr)。"
+                    body = (f"{key} の宣言 {decl_id} と競合しうるファイル ({paths}) の共通の変更を、先に小さな PR にしてマージする (利用者の回答: small-pr)。"
                             f"作ったら `小さな PR の報告` で PR の URL を書く。")
                     requests.append(_comment(o["item"], "依頼", {"to": o["to"], "assignment": o["assignment"], "request_kind": "小さな PR",
                                                                  "waiting_issue": key, "waiting_declaration": decl_id}, body))
@@ -474,7 +474,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["actions"] += _restore_and_removals(item, d, [])
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         return j
-    # 6. 開始可 (宣言に無い予約の問いは 1 で出してある。`開始可` を書いてから答えを待つ)
+    # 6. 開始可 (宣言に無い予約の問いは 1 で出してある。`開始可` を書いてから回答を待つ)
     j["result"], j["reserve"] = "go", r["reserve"]
     j["actions"].append(_comment(key, "開始可", base, _go_body(j, j["compared"], proceeds, recompare, rule_text)))
     j["actions"] += _restore_and_removals(item, d, [])

@@ -459,7 +459,7 @@ def _handover_action(item, cs, rec, own_id, lost):
 
 def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_states, lost):
     """割り当てのある項目の場面ごとの扱い (flow.md の「場面ごとの扱い」)。返り値は (actions, questions, reports)。
-    未回答の問いがある項目には手を付けない (答えを待つ間の reopen による問いの取り下げを除く)。"""
+    未回答の問いがある項目には手を付けない (回答を待つ間の reopen による問いの取り下げを除く)。"""
     actions, questions, reports = [], [], []
     cs = parsed_comments(item, login)
     asg = state["assignment"]
@@ -472,7 +472,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
     if pending and item.get("state") == "OPEN":
         close_q = [q for q in pending if q["kind"] == "close-in-progress"]
         if close_q and any((e.get("at") or "") > close_q[0]["asked_at"] for e in _events(item, "ReopenedEvent")):
-            # 答えを待つ間に reopen された: 問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
+            # 回答を待つ間に reopen された: 問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
             actions.append({"kind": "withdraw-question", "item": key, "question_id": close_q[0]["question_id"]})
             restore = "Blocked" if "Blocked" in expected_statuses(state) else "In Progress"
             if status != restore:
@@ -561,7 +561,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                 questions.append(_question(item, "merged-issue-open", url=pr["url"]))
             elif pr["state"] == "CLOSED":
                 questions.append(_question(item, "pr-closed-unmerged", url=pr["url"]))
-    if lost and d.get("wait") and any(r.get("kind") == "利用者の答え" for r in d["wait"]["reasons"]):
+    if lost and d.get("wait") and any(r.get("kind") == "利用者の回答" for r in d["wait"]["reasons"]):
         questions.append(_question(item, "user-answer-lost", declaration=d["judged"]["comment_id"] if d.get("judged") else None, record_lost=True))
     return actions, questions, reports
 
@@ -612,7 +612,7 @@ def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
 # --- ターン ---------------------------------------------------------------------------
 
 def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_states, diffs, workflows, config, present_keys=None):
-    """管理のセッションのターンで、項目の状態と、行うこと (actions)・尋ねること (questions)・1 回だけ報告するもの (reports)・答えを待つ項目 (pending) を導く。
+    """管理のセッションのターンで、項目の状態と、行うこと (actions)・尋ねること (questions)・1 回だけ報告するもの (reports)・回答を待つ項目 (pending) を導く。
     書き込みはしない。rec は記録 (無ければ None)。diffs は observe diff の差分 (無ければ空)。workflows は Project のワークフローの名前 → 有効か。
     present_keys は Project の一覧にある項目のキーの全部 (items を絞って渡すときに、絞り込みで外れた項目を除去と読まないため。省略時は items のキー)。"""
     lost = record_lost(rec)
@@ -703,7 +703,7 @@ def work_check(item, session_id, login, pr_states):
 
 
 def work_held(items, session_id, login, pr_states, project_number):
-    """作業のセッションが持っている Issue (`work held`。R26): 自分宛ての今の割り当てで割り当て中 (閉じて利用者の答えを待つ Issue を含む) のものを
+    """作業のセッションが持っている Issue (`work held`。R26): 自分宛ての今の割り当てで割り当て中 (閉じて利用者の回答を待つ Issue を含む) のものを
     Project の順に。要素は key・state・status・判定の要る宣言の ID (judged) と更新の種類・それへの `開始可`・`待機` の有無・
     `Blocked` が管理のセッションのものか・まだ行っていない `依頼`。"""
     out = []

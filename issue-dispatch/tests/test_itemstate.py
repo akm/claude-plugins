@@ -207,7 +207,7 @@ class EndTest(unittest.TestCase):
         self.assertEqual(s["end"]["kind"], "normal")
 
     def test_close_in_progress_keeps_assignment(self):
-        """進行中 (PR が無い・draft) の Issue の close は正常な終わりではなく、割り当て中のまま (利用者の答えを待つ。R21)。"""
+        """進行中 (PR が無い・draft) の Issue の close は正常な終わりではなく、割り当て中のまま (利用者の回答を待つ。R21)。"""
         for prs in ([], [ref_pr(PR9, t(25), draft=True)]):
             s = self._closed(prs=prs)
             self.assertEqual((s["in_progress"], s["end"], s["assigned"]), (True, None, True), prs)
@@ -286,10 +286,10 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["stage"], d["go"]["comment_id"], d["held"], d["manager_blocked"]), ("go", 500, ["db"], False))
 
     def test_waiting_for_user_answer_does_not_make_blocked_managers(self):
-        """理由が `利用者の答え` だけの `待機` では Status を変えないので、Status が `Blocked` でも管理のセッションのものではない。"""
-        d = stage_of(DECL1, _wait(400, [{"kind": "利用者の答え"}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
+        """理由が `利用者の回答` だけの `待機` では Status を変えないので、Status が `Blocked` でも管理のセッションのものではない。"""
+        d = stage_of(DECL1, _wait(400, [{"kind": "利用者の回答"}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["wait"]["reasons"], d["manager_blocked"], d["return_status"], d["own_blockers"]),
-                         ("waiting", [{"kind": "利用者の答え"}], False, None, []))
+                         ("waiting", [{"kind": "利用者の回答"}], False, None, []))
 
     def test_waiting_for_issue_with_blocked_status_after_wait_is_managers(self):
         """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。戻り先は `In Progress`、自分が足した blockedBy は待つ Issue。"""
@@ -483,7 +483,7 @@ class WorkCheckTest(unittest.TestCase):
 class WorkHeldTest(unittest.TestCase):
 
     def test_held_items_with_stage_and_blocked_owner(self):
-        """割り当て中の Issue (閉じて答えを待つものを含む) を返し、終わった Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
+        """割り当て中の Issue (閉じて回答を待つものを含む) を返し、終わった Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
         no_decl = make_item(key=A1, comments_=[ASSIGN1])
         waiting = make_item(key=A2, status="Blocked", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)],
                             events=[_status_event("Blocked", t(14))])
@@ -628,7 +628,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["actions"], out["questions"], out["reports"], out["record_lost"]), ([], [], [], False))
 
     def test_close_in_progress_asks(self):
-        """進行中の Issue の close は、止めるか reopen して続けるかを尋ねる。答えが出るまで割り当て中のまま、ほかの書き込みはしない。"""
+        """進行中の Issue の close は、止めるか reopen して続けるかを尋ねる。回答が出るまで割り当て中のまま、ほかの書き込みはしない。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         out = turn_of(item)
@@ -644,7 +644,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["questions"], [p["question_id"] for p in out["pending"]]), ([], ["q1"]))
 
     def test_reopen_while_close_question_pending_withdraws_and_restores_status(self):
-        """進行中の close の答えを待つ間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
+        """進行中の close の回答を待つ間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -786,8 +786,8 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([a for a in out["actions"] if a.get("comment_kind") == "引き継ぎ"], [], "自分の `引き継ぎ` が既にあれば書かない")
 
     def test_record_lost_reasks_user_answer_waits(self):
-        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の答え` を待つ宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
-        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の答え"}], t(13), 500)])
+        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の回答` を待つ宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
+        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の回答"}], t(13), 500)])
         for rec in (None, rec_with(manager_state="ended")):
             out = turn_of(item, rec=rec)
             self.assertEqual((out["record_lost"], [(q["kind"], q.get("record_lost")) for q in out["questions"]]), (True, [("user-answer-lost", True)]))

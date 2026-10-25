@@ -35,7 +35,7 @@
       未判定の宣言を投稿の順に判定し、judgments・actions (`開始可`・`待機`・`依頼`・Status・blockedBy の候補)・questions・signals を返す (書かない。正本は flow.md の「判定」)
   resources attributes --dir <管理ディレクトリ> [--name <資源>]   設定の resources にデフォルト値を当てた属性を返す (警告つき)
   resources judge --dir <管理ディレクトリ> --trigger assign|declare|update|close|release (--body <JSON> | --body-file <ファイル|->)
-      契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・答えは呼び出し元が渡す。gh は実行しない)
+      契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・回答は呼び出し元が渡す。gh は実行しない)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
       `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
@@ -896,7 +896,7 @@ def _check_judge_body(trigger, body):
                 errors.append({"key": f"body.usage.{name}", "message": f"usage は資源の名前 → 項目 (owner/repo#番号 の文字列) の配列: {items!r}", "failure": None})
     for key in ("answers", "undeclared_answers"):
         if key in body and (not isinstance(body[key], dict) or not all(_is_name(k) and isinstance(v, str) for k, v in body[key].items())):
-            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 答え (文字列) のオブジェクト: {body[key]!r}", "failure": None})
+            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 回答 (文字列) のオブジェクト: {body[key]!r}", "failure": None})
     if "waiting" in body:
         for i, w in enumerate(body["waiting"]):
             # judge_release が読むキーをすべて確かめる (絞り込みの item・wait_for と、並べ替えの posted_at・position)
@@ -1045,7 +1045,7 @@ def build_parser():
     p_cpost.add_argument("--to", help="対象 (作業のセッションの ID)")
     p_cpost.add_argument("--assignment", help="割り当ての番号")
     p_cpost.add_argument("--declaration", help="宣言のコメントの ID")
-    p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の答え / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
+    p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の回答 / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
     p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の書き直し / 本文の追記 / 小さな PR")
     p_cpost.add_argument("--waiting-issue", help="待つ Issue (依頼 小さな PR と小さな PR の報告)")
     p_cpost.add_argument("--waiting-declaration", help="待つ側の宣言のコメントの ID")
@@ -1134,7 +1134,7 @@ def build_parser():
     p_wassign.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待っている Issue (owner/repo#番号。繰り返せる)")
     p_wassign.add_argument("--in-review", action="append", default=[], help="レビュー中の Issue (繰り返せる)")
-    p_wassign.add_argument("--pending", help="利用者の答えを待つ Issue")
+    p_wassign.add_argument("--pending", help="利用者の回答を待つ Issue")
     p_wassign.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wassign.add_argument("--minutes", type=float, required=True, help="期限 (分)")
     p_wassign.set_defaults(func=cmd_wait_assignment)

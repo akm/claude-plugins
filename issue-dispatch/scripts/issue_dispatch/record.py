@@ -312,10 +312,10 @@ def _op_set_opt_in(rec, op):
 
 def _op_ask(rec, op):
     if op["question_id"] in rec["questions"]:
-        return f"問い {op['question_id']} は既にある (答えを消さないため、同じ ID で立て直せない)"
+        return f"問い {op['question_id']} は既にある (回答を消さないため、同じ ID で立て直せない)"
     options = op["options"]
     if not all(isinstance(o, str) and o != "" for o in options):
-        return "options の要素は空でない文字列 (答えと同じ型で照合するため)"
+        return "options の要素は空でない文字列 (回答と同じ型で照合するため)"
     if len(set(options)) != len(options):
         return "options に同じ要素が 2 つ以上ある"
     subject = op.get("subject")
@@ -330,18 +330,18 @@ def _op_answer(rec, op):
     if q is None:
         return f"問い {op['question_id']} が無い"
     if q["options"] and op["answer"] not in q["options"]:
-        return f"答え {op['answer']!r} は選択肢 {q['options']} に無い"
+        return f"回答 {op['answer']!r} は選択肢 {q['options']} に無い"
     q["answer"] = op["answer"]
     q["answered_at"] = op["at"]
 
 
 def _op_withdraw(rec, op):
-    """問いを取り下げる (答えを待つ理由が無くなった。R21 の reopen)。答えは None のまま answered_at を書くので、未回答には数えない。"""
+    """問いを取り下げる (回答を待つ理由が無くなった。R21 の reopen)。回答は None のまま answered_at を書くので、未回答には数えない。"""
     q = rec["questions"].get(op["question_id"])
     if q is None:
         return f"問い {op['question_id']} が無い"
     if q.get("answered_at") is not None:
-        return f"問い {op['question_id']} は答えがある (取り下げられない)"
+        return f"問い {op['question_id']} は回答がある (取り下げられない)"
     q["answer"] = None
     q["answered_at"] = op["at"]
 
