@@ -11,7 +11,7 @@ from . import comments, declaration, filekinds, ids, itemstate, resources
 
 RESULTS = ("go", "wait", "ask", "request")
 SIGNAL_KINDS = ("go", "wait", "request")
-# 判定の問い (種類 → 選択肢)。種類の名前と選択肢の正本は records.md の問いの表
+# 判定の問い (種類 → 選択肢)。種類の名前と選択肢の正本は flow.md の「判定」の問いの表
 QUESTION_OPTIONS = {"conflict": ["wait", "small-pr", "proceed"], "unknown-content": ["conflict", "none"], "resource-busy": ["wait", "proceed"],
                     "release-undeclared": ["release", "keep"], "small-pr-closed": ["wait-issue", "redo", "proceed"]}
 QUESTION_KINDS = tuple(QUESTION_OPTIONS)

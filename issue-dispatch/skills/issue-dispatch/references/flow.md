@@ -127,7 +127,7 @@
 | キー | 内容 |
 | --- | --- |
 | `actions` | 書き込みの候補 (下の表の種類)。`continuation` が真なら途中で止まった書き込みの続き |
-| `questions` | 尋ねること (`kind`・`item`・`options`。判定の質問は対象 `subject` も。種類と選択肢の正本は [records.md](records.md) の問いの表)。記録に同じ項目と種類 (と対象) の未回答の問いがあれば尋ね直さない。記録を失ったために尋ね直すものは `record_lost` が真 |
+| `questions` | 尋ねること (`kind`・`item`・`options`。判定の質問は対象 `subject` も。項目の状態の問いの種類と選択肢は下の問いの表、判定の質問は「判定」の問いの表)。記録に同じ項目と種類 (と対象) の未回答の問いがあれば尋ね直さない。記録を失ったために尋ね直すものは `record_lost` が真 |
 | `reports` | 1 回だけ報告するもの (`kind`・`item` と内容)。記録の報告済みの印 (`reported`) があるものは返さない |
 | `pending` | 答えを待つ項目 (`question_id`・`item`・`kind`・`asked_at`)。この項目には手を付けない (答えを待つ間の reopen による問いの取り下げを除く) |
 | `record_lost` | 記録を失ったか (記録が無い・前の記録が `ended`) |
@@ -151,6 +151,21 @@
 | `reopened-while-pending` | 答えを待つ間の reopen (問いを取り下げた) |
 | `pr-base-not-default` | `PR の報告` の PR の向け先が既定のブランチでない |
 | `pr-left-open` | 正常な終わりの後に PR が開いたまま残っている |
+
+項目の状態の問いの種類 (`kind`) と選択肢 (`options`)。答えに従う処理は U16・U21 で決める。
+
+| 種類 | 尋ねること | 選択肢 |
+| --- | --- | --- |
+| `close-in-progress` | 進行中の Issue が閉じられた。作業のセッションに止めるよう伝えるか、reopen して続けるか | `stop` / `reopen` |
+| `assignee-changed` | 割り当て中の項目の担当者が自分 1 人でなくなった。割り当てを解除するか、そのまま続けるか | `release` / `continue` |
+| `field-cleared` | `Agent session ID` が空にされた。解除するか、書き戻すか | `release` / `restore` |
+| `field-changed` | `Agent session ID` が別の値にされた。解除するか、書き戻すか | `release` / `restore` |
+| `removed` | 割り当て中の項目が Project から除かれた。解除するか、持ち続けるか | `release` / `keep` |
+| `status-changed` | 割り当て中の項目の Status を手で変えられた。解除するか、Status を戻すか | `release` / `restore` |
+| `third-party-edit` | 確認の対象の項目の本文を、割り当ての後に第三者が編集した。作業のセッションに止めるよう伝えてよいか | `stop` / `continue` |
+| `merged-issue-open` | PR がマージされたが Issue が開いている。閉じるか | `close` / `keep` |
+| `pr-closed-unmerged` | PR がマージされずに閉じた。Status を戻して解除するか | `release` / `keep` |
+| `user-answer-lost` | 記録を失ったので、`利用者の答え` を待っていた宣言の問いを尋ね直す (自由回答) | 無し |
 
 **人の変更の見分け** (計画の R22・KTD7): `--diffs` で渡した差分 (`observe diff` の出力) のうち、記録の意図 (自分の部分書き込み) と組み込みワークフローの遷移 (閉じた → `Done`、reopen → `Todo` (ワークフロー「Item reopened」が有効なとき)、追加 → `Todo`) と利用者が着手を決める遷移 (`Todo` か空 → `Ready`、reopen した項目の `Done` → `Ready`) で説明できないものを報告する。割り当て中の項目の Status とフィールドの変化は、場面の表のとおり問いにする。差分は報告のきっかけとしてだけ使い、続きを書くかの見分けには使わない (見分けは出来事の時刻で行う)。
 
@@ -182,7 +197,17 @@
 | `conflict` | `conflict`・`<相手の項目>:<相手の宣言の ID>` | 回答が無ければ質問し、回答まで `待機` (理由 `利用者の答え`)。`wait`: `待機` (理由 `Issue` 相手) と、相手を `blockedBy` に追加し Status を `Blocked` にする。`small-pr`: `待機` (理由 `小さな PR` 相手。相手の `小さな PR の報告` があれば PR も) と、相手のセッションへの `依頼` (小さな PR。待つ Issue がこの項目の `依頼` が相手の項目に既にあれば出さない) と `blockedBy`・`Blocked`。`proceed`: 競合しうるまま進む |
 | `needs-user` (種類 `unknown-content` の同じパス) | `unknown-content`・`<相手の項目>:<相手の宣言の ID>:<パス>` | 回答が無ければ質問し、回答まで `待機`。`conflict`: その相手を `conflict` として上の行で扱う。`none`: 競合しない。同じ相手に `conflict` のパスもあれば `conflict` の質問だけを出す |
 
-`待機` の理由 (すべて並べる決まりは [issue-format.md](issue-format.md) の「種類」) は、未回答の質問があれば `利用者の答え` を先頭に、回答済みの相手の `Issue`・`小さな PR` を続ける。結果は、未回答の質問があれば `ask`、無ければ `wait`。質問の種類と選択肢の正本は [records.md](records.md) の問いの表。
+`待機` の理由 (すべて並べる決まりは [issue-format.md](issue-format.md) の「種類」) は、未回答の質問があれば `利用者の答え` を先頭に、回答済みの相手の `Issue`・`小さな PR` を続ける。結果は、未回答の質問があれば `ask`、無ければ `wait`。
+
+判定の質問の種類 (`kind`) と選択肢 (`options`)。回答に従う処理はこの節が決める。
+
+| 種類 | 尋ねること | 選択肢 |
+| --- | --- | --- |
+| `conflict` | 宣言が相手 (`subject`) の `開始可` の宣言と競合しうる。相手の完了まで待つか、共通の変更を先に小さな PR にするか、競合しうるまま進めるか | `wait` / `small-pr` / `proceed` |
+| `unknown-content` | 種類 `unknown-content` の同じパス (`subject`) が競合しうるか | `conflict` / `none` |
+| `resource-busy` | 宣言の資源 (`subject`) が空いていない (属性 `when_busy` が `ask`)。待つか進めるか。答えを読む範囲は下の「資源の質問の回答が有効な範囲」 | `wait` / `proceed` |
+| `release-undeclared` | 割り当てで予約したのに宣言に無い資源 (`subject`) を解放してよいか (属性 `release_undeclared` が `ask`) | `release` / `keep` |
+| `small-pr-closed` | 待っていた小さな PR がマージされずに閉じた。相手の Issue の完了を待つか、作り直しを頼むか、競合しうるまま進めるか (U15 の後半) | `wait-issue` / `redo` / `proceed` |
 
 **質問の対象と書き直し**: 質問は項目・種類・対象 (`subject`) で引き、今の割り当て (コメント `割り当て` の時刻以後に尋ねたもの) の質問だけを読む (割り当てが終われば資源・宣言・相手が新しくなるので、前の割り当ての質問と回答は材料にしない)。回答の無いもの (未回答・取り下げ) は回答無しに数える。記録に同じ項目・種類・対象の未回答の質問があれば質問を出し直さない (`待機` は書く)。対象を相手の宣言の ID にするのは、判定を待つ宣言が書き直されて自分の宣言の ID が変わっても、同じ相手への回答を使い、新しい相手だけ質問するため (計画の U15 の Approach 2)。小さな PR の `依頼` と `小さな PR の報告` は前の宣言の ID で対応づけたまま読み、新しい `依頼` は出さない。前の `待機` のために書いた `Blocked` と `blockedBy` は、新しい判定で `Issue`・`小さな PR` を待たなければ Status を `In Progress` に戻し、自分が足した `blockedBy` のうち待たなくなった相手は外す候補 (`blocked-by-remove`) にする。待つ相手が変われば、新しい相手を追加し前の相手を外す候補にする。記録の項目の `conflict_choice` は判定では使わない (`conflict` の質問の回答で代える)。
 

@@ -331,7 +331,7 @@ ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "blocked-by-remove", 
 # 1 回だけ報告するもの (記録の reported で重複を除く)
 REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
                 "pr-base-not-default", "pr-left-open")
-# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前の正本は records.md の問いの表
+# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の問いの表
 QUESTION_OPTIONS = {"close-in-progress": ["stop", "reopen"], "assignee-changed": ["release", "continue"], "field-cleared": ["release", "restore"],
                     "field-changed": ["release", "restore"], "removed": ["release", "keep"], "status-changed": ["release", "restore"],
                     "third-party-edit": ["stop", "continue"], "merged-issue-open": ["close", "keep"], "pr-closed-unmerged": ["release", "keep"],

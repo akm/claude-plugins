@@ -958,11 +958,10 @@ class DocTest(unittest.TestCase):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
-        records = os.path.join(os.path.dirname(_DOC), "records.md")
-        with open(records, encoding="utf-8") as f:
-            rdoc = f.read()
-        for kind in itemstate.QUESTION_KINDS:
-            self.assertIn(f"`{kind}`", rdoc, f"問いの種類 {kind} が records.md に無い")
+        for kind, options in itemstate.QUESTION_OPTIONS.items():
+            self.assertIn(f"| `{kind}` |", doc, f"問いの種類 {kind} が flow.md の問いの表に無い")
+            if options:
+                self.assertIn(" / ".join(f"`{o}`" for o in options), doc, f"問いの種類 {kind} の選択肢が flow.md に無い")
 
 
 if __name__ == "__main__":

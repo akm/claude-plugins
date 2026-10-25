@@ -688,13 +688,14 @@ class DocTest(unittest.TestCase):
             self.assertIn(word, doc)
 
     def test_question_kinds_are_documented(self):
-        """判定の問いの種類と選択肢は records.md の表にある。記録の問いの `subject` も書かれている。"""
-        with open(_RECORDS, encoding="utf-8") as f:
+        """判定の問いの種類と選択肢は flow.md の「判定」の表にある。記録の問いの `subject` は records.md に書かれている。"""
+        with open(_FLOW, encoding="utf-8") as f:
             doc = f.read()
         for kind, options in judge.QUESTION_OPTIONS.items():
             self.assertIn(f"| `{kind}` |", doc)
             self.assertIn(" / ".join(f"`{o}`" for o in options), doc)
-        self.assertIn("`subject`", doc)
+        with open(_RECORDS, encoding="utf-8") as f:
+            self.assertIn("`subject`", f.read())
 
     def test_record_ask_accepts_subject_and_answer_for_reads_it(self):
         """記録の `ask` は任意の `subject` を受け、judge.answer_for は項目・種類・対象で答えを引く (取り下げた問いは数えない)。"""
