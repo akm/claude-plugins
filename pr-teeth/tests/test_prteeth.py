@@ -607,7 +607,7 @@ class TestState(unittest.TestCase):
         self.assertEqual(t[0]["base_sha"], "aaa")
 
     def test_updated_at_change_alone_is_an_update(self):
-        # 本文の書き直しやレビューコメントはコミットを伴わない。
+        # 本文の修正やレビューコメントはコミットを伴わない。
         # sha だけ見ていると取りこぼす。
         t = state.select_targets(self._state(), [self._pr(updated="2026-08-02T00:00:00Z")])
         self.assertEqual(t[0]["status"], state.UPDATED)
@@ -1110,7 +1110,7 @@ class TestBodies(unittest.TestCase):
 
     def test_capped_diff_keeps_both_deletions_and_additions(self):
         # 先頭から一律に切ると削除行だけが残り、「全部消された」と読めてしまう。
-        # 本文を書き直した PR で誤解を生むため、前後の両方を残す。
+        # 本文を修正した PR で誤解を生むため、前後の両方を残す。
         d = bodies.diff("\n".join("old %d" % i for i in range(300)),
                         "\n".join("new %d" % i for i in range(300)))
         lines = d.splitlines()
