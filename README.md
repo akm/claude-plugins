@@ -13,7 +13,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [commit-squash](commit-squash/README.md) | 未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす |
 | [review-triage](review-triage/README.md) | レビューの依頼文を生成し、レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直し、レビューから修正までを上限回数まで回す。レビューは同じセッションの sub-agent か、人間が端末で起動するワーカー (モデルと effort を人間が選ぶ) で走らせる。`review-triage-fix` の各段 (調査 / 立案 / 修正) は sub-agent で走らせられる (Go が必要) |
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
-| [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な言い回しを、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
+| [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な表現を、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに作業を継続したいときに使う) |
 
 ## 使い方

@@ -1,15 +1,15 @@
 # textlint による検査
 
-**textlint (文章を規則で検査するツール) で、用語ファイルの避ける語と、規則集 (textlint の規則をまとめたパッケージ) が出す不自然な言い回しの候補を検出する。** 使うのは、設定キー `textlint` を書いたリポジトリだけ (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。
+**textlint (文章を規則で検査するツール) で、用語ファイルの避ける語と、規則集 (textlint の規則をまとめたパッケージ) が出す不自然な表現の候補を検出する。** 使うのは、設定キー `textlint` を書いたリポジトリだけ (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。
 
-textlint は語の一覧と文の形で照合する道具なので、**検出したものは着手点であって、範囲ではない。** 検出されなかった言い回しも、SKILL.md の手順 2 で読んだ原則に照らして判断する (用語ファイルを範囲として扱わない理由の正本は [terms.md](terms.md) の「用語ファイルは例であって、範囲ではない」)。
+textlint は語の一覧と文の形で照合する道具なので、**検出したものは着手点であって、範囲ではない。** 検出されなかった表現も、SKILL.md の手順 2 で読んだ原則に照らして判断する (用語ファイルを範囲として扱わない理由の正本は [terms.md](terms.md) の「用語ファイルは例であって、範囲ではない」)。
 
 ## 何を検出するか
 
 | 種類 | 検出に使うもの | 重大度 |
 | --- | --- | --- |
 | 避ける語 | 用語ファイル ([terms.md](terms.md)) を、規則 textlint-rule-prh (語のパターンと置き換え先を照合する規則。以下 prh) の辞書に変換したもの。リポジトリの textlint の設定に書いた prh の辞書の語も含む | error (失敗にする) |
-| 不自然な言い回しの候補 | リポジトリの textlint の設定 (設定キー `textlint.config`) で有効にした規則集 | 設定で決める。warning (失敗にしない) を推奨。指定しなければ textlint のデフォルト値の error になる |
+| 不自然な表現の候補 | リポジトリの textlint の設定 (設定キー `textlint.config`) で有効にした規則集 | 設定で決める。warning (失敗にしない) を推奨。指定しなければ textlint のデフォルト値の error になる |
 
 **重大度 (error / warning) は、検出の種類ではない。** 検出の種類は規則の名前で判別する — 規則 `prh` の検出が避ける語、それ以外が規則集の検出。重大度は失敗にするかどうかだけを決め、`check` と hook は、種類に関わらず error の検出があれば失敗にする。この表とこの段落が、検出の種類と重大度の関係の正本。
 

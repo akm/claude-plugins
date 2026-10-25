@@ -288,7 +288,7 @@ def handle(event, check_texts=None):
                      f"規則の message に従って直す (引用なら直さず、そのことを報告する。検出が誤りだと考えるなら、"
                      f"直さずにそのことを報告する):\n" + _format(rule_errors))
     if warnings:
-        parts.append(f"{rel} に書き足した文章に、不自然な言い回しの候補がある (textlint の warning)。"
+        parts.append(f"{rel} に書き足した文章に、不自然な表現の候補がある (textlint の warning)。"
                      f"原則に照らして判断する。候補であって、直すべきものとは限らない:\n" + _format(warnings))
     message = "\n\n".join(parts)
     if term_errors or rule_errors:

@@ -8,7 +8,7 @@
 
 ```json
 {
-  "convention_paths": ["CLAUDE.md#文書の言い回し", ".claude/rules/wording.md"],
+  "convention_paths": ["CLAUDE.md#文書の表現", ".claude/rules/wording.md"],
   "frozen_paths": ["docs/plans/", "docs/solutions/", "tmp/review-triages/"],
   "quote_markers": ["> "],
   "terms_paths": [".claude/akm-claude-plugins/wording-guard/terms.toml"],
@@ -27,7 +27,7 @@
 | `frozen_paths` | 書き換えない過去の記録のパス接頭辞 | 書き換えないパスは無いものとする。ただし過去の記録らしき文書が見つかったら**人間に確認する** |
 | `quote_markers` | 引用の目印になる行頭の文字列。**値を設定しても、コードブロックは目印のまま** (行頭の文字列では表せないため) | 引用ブロック (`> ` で始まる行) とコードブロックを目印にする |
 | `terms_paths` | 用語ファイル (言い換えを決めた語と許容すると決めた語の記録) のパスの配列。相対パスはリポジトリのルートから、`~` で始まるパスはホームディレクトリから解決する。**書いたファイルが無ければ誤りとして報告する** | 用語ファイルを使わない |
-| `textlint` | textlint で検査するかどうかと、その設定。キーは `config` (不自然な言い回しの候補を出す規則を選ぶ textlint の設定ファイルのパス。省略すると用語ファイルだけで検査する) と `hook` (`true` なら、Markdown を書いた直後に hook で検査する)。**キーを書くと、textlint のセットアップが必要になる** | textlint を使わない |
+| `textlint` | textlint で検査するかどうかと、その設定。キーは `config` (不自然な表現の候補を出す規則を選ぶ textlint の設定ファイルのパス。省略すると用語ファイルだけで検査する) と `hook` (`true` なら、Markdown を書いた直後に hook で検査する)。**キーを書くと、textlint のセットアップが必要になる** | textlint を使わない |
 
 ## `convention_paths` — なぜ基準を外から読むか
 
@@ -46,7 +46,7 @@
 
 ## `quote_markers` — なぜ引用を避けるか
 
-引用は**原文と一致していることに意味がある**。言い回しを直すと、読者が原文を探しても見つからない。
+引用は**原文と一致していることに意味がある**。表現を直すと、読者が原文を探しても見つからない。
 
 **目印で機械的に判定できるのは引用ブロックとコードブロックだけである。** 目印は判定の助けであって、判定そのものではない。
 
