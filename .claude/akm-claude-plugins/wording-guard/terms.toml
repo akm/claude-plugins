@@ -388,7 +388,7 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 pattern = "続き"
 verdict = "avoid"
 replacements = ["次の", "残り", "継続"]
-exceptions = ["手続き", "引き続き"]
+exceptions = ["手続き", "引き続き", "続きま"]
 reason = "英語 (continuation) を直訳した訓読みの語。「続きのページ」は「次のページ」、ほかは「残り」「継続」と書く"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
