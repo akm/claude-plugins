@@ -60,7 +60,7 @@
 | フィールドに ID があるが、コメント `割り当て` が無い | 割り当て中ではない (出どころはコメント) |
 | 前の割り当ての `解放` があり、新しい `割り当て` がある | 新しい割り当てが今の割り当て。前の `解放` は数えない |
 | 割り当て中の項目の Status が `Todo` にされた (Status の変化が `割り当て` より後) | 終了でも reopen でもない。割り当て中のまま、解除するかを質問する (`status-changed`) |
-| `割り当て` の後にフィールドか Status が書かれていない (更新がコメントより前で、その後の Status の変化が無い) | 途中で止まった書き込み。続き (`set-field`・`set-status` `In Progress`) を書く |
+| `割り当て` の後にフィールドか Status が書かれていない (更新がコメントより前で、その後の Status の変化が無い) | 途中で中断された書き込み。続き (`set-field`・`set-status` `In Progress`) を書く |
 | フィールド `Agent session ID` の値が宛先と違い、更新が `割り当て` より後 | 利用者の変更。空なら `field-cleared`、別の値なら `field-changed` を質問する |
 | 担当者が自分 1 人でなくなった | `assignee-changed` を質問する。回答が出るまで作業中の項目のまま |
 | 進行中の Issue が閉じた | `close-in-progress` を質問する。回答が出るまで割り当て中で、ほかの書き込みはしない |
@@ -75,7 +75,7 @@
 | 正常な完了の後に PR が開いたまま残っている | 判定の相手にせず `pr-left-open` を 1 回報告する |
 | 記録の意図にある項目が Project の一覧に無い | 除去。`removed` を質問する |
 | 初めて扱う項目 (記録にその項目の情報が無い) で、最後に書いた管理のセッションの ID が自分と違う | `引き継ぎ` を書く (自分の `引き継ぎ` が既にあれば書かない) |
-| 割り当ての無い項目 (担当者が自分 1 人、Status が `Ready` か `Blocked`) に開いている blocker がある | `依存の待機` → `Blocked`。`依存の待機` の後に止まっていれば続きの `Blocked` を書き、利用者が `Ready` に戻していれば (Status の変化がコメントより後) 報告して書き換えない |
+| 割り当ての無い項目 (担当者が自分 1 人、Status が `Ready` か `Blocked`) に開いている blocker がある | `依存の待機` → `Blocked`。`依存の待機` の後で中断されていれば続きの `Blocked` を書き、利用者が `Ready` に戻していれば (Status の変化がコメントより後) 報告して書き換えない |
 | 管理のセッションが `Blocked` にした割り当ての無い項目の blocker がすべて閉じた | `依存の解消` → `Ready` |
 | `依存の待機` の無い `Blocked` (利用者が手で付けた) | blocker が閉じても書き換えない |
 | Issue が閉じていて、今の割り当ての PR がマージ済み・ready for review (開いている)・マージされずに閉じた (draft でない) | 正常な完了 (`end.kind` が `normal`) |
@@ -126,7 +126,7 @@
 
 | キー | 内容 |
 | --- | --- |
-| `actions` | 書き込みの候補 (下の表の種類)。`continuation` が真なら途中で止まった書き込みの続き |
+| `actions` | 書き込みの候補 (下の表の種類)。`continuation` が真なら途中で中断された書き込みの続き |
 | `questions` | 質問すること (`kind`・`item`・`options`。判定の質問は対象 `subject` も。項目の状態の質問の種類と選択肢は下の質問の表、判定の質問は「判定」の質問の表)。記録に同じ項目と種類 (と対象) の未回答の質問があれば質問し直さない。記録を失ったために質問し直すものは `record_lost` が真 |
 | `reports` | 1 回だけ報告するもの (`kind`・`item` と内容)。記録の報告済みの印 (`reported`) があるものは返さない |
 | `pending` | 回答を待機する項目 (`question_id`・`item`・`kind`・`asked_at`)。この項目には手を付けない (回答を待機する間の reopen による質問の取り下げを除く) |
@@ -156,13 +156,13 @@
 
 | 種類 | 質問の内容 | 選択肢 |
 | --- | --- | --- |
-| `close-in-progress` | 進行中の Issue が閉じられた。作業のセッションに止めるよう伝えるか、reopen して続けるか | `stop` / `reopen` |
+| `close-in-progress` | 進行中の Issue が閉じられた。作業のセッションに作業を中断するよう伝えるか、reopen して続けるか | `stop` / `reopen` |
 | `assignee-changed` | 割り当て中の項目の担当者が自分 1 人でなくなった。割り当てを解除するか、そのまま続けるか | `release` / `continue` |
 | `field-cleared` | `Agent session ID` が空にされた。解除するか、書き戻すか | `release` / `restore` |
 | `field-changed` | `Agent session ID` が別の値にされた。解除するか、書き戻すか | `release` / `restore` |
 | `removed` | 割り当て中の項目が Project から除かれた。解除するか、持ち続けるか | `release` / `keep` |
 | `status-changed` | 割り当て中の項目の Status を手で変えられた。解除するか、Status を戻すか | `release` / `restore` |
-| `third-party-edit` | 確認の対象の項目の本文を、割り当ての後に第三者が編集した。作業のセッションに止めるよう伝えてよいか | `stop` / `continue` |
+| `third-party-edit` | 確認の対象の項目の本文を、割り当ての後に第三者が編集した。作業のセッションに作業を中断するよう伝えてよいか | `stop` / `continue` |
 | `merged-issue-open` | PR がマージされたが Issue が開いている。閉じるか | `close` / `keep` |
 | `pr-closed-unmerged` | PR がマージされずに閉じた。Status を戻して解除するか | `release` / `keep` |
 | `user-answer-lost` | 記録を失ったので、`利用者の回答` を待機していた宣言の質問を出し直す (自由回答) | 無し |
@@ -225,7 +225,7 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]` | 無し | `judgments`・`actions`・`questions`・`signals` (「判定」)・`record_lost`・`problems`・`rate_limit`・`warnings`・`errors`。入力は `item state` と同じで、リポジトリの設定は設定の `repositories` の clone から読む。`--issue` は、投稿の順に並べた未判定の宣言のうち、その項目の宣言までを判定して止める (前に投稿された宣言も判定し、後の宣言は判定しない。その項目に未判定の宣言が無ければ何も判定しない。判定の順序の決まりを守るため。比較の相手はすべての項目から集める)。`--issue` が参照の形でなければ `errors` (key `issue`。`gh` を読まない)、Project に無ければ `rejected` (key `issue`) |
+| `declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]` | 無し | `judgments`・`actions`・`questions`・`signals` (「判定」)・`record_lost`・`problems`・`rate_limit`・`warnings`・`errors`。入力は `item state` と同じで、リポジトリの設定は設定の `repositories` の clone から読む。`--issue` は、投稿の順に並べた未判定の宣言のうち、その項目の宣言まで判定する (前に投稿された宣言も判定し、後の宣言は判定しない。その項目に未判定の宣言が無ければ何も判定しない。判定の順序の決まりを守るため。比較の相手はすべての項目から集める)。`--issue` が参照の形でなければ `errors` (key `issue`。`gh` を読まない)、Project に無ければ `rejected` (key `issue`) |
 | `item state --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>] [--diffs <ファイル \| ->]` | 無し | `items` (割り当てのある項目の状態。上の表)・`usage`・`actions`・`questions`・`reports`・`pending`・`record_lost` (「ターンで行うこと」)・`problems`・`rate_limit`・`warnings`・`errors`。設定の `project`・`resources` (属性)・`third_party_edit_check` と、記録 (無ければ記録を失った扱い。壊れていれば `errors` (key `record`)) と、Project のメタ情報 (ワークフローの有効・無効) を読む。`--diffs` は `observe diff` の出力 (JSON)。項目の一覧そのものが無ければ (`problems` の `what` が `items-page`・`graphql-errors`) 導かずに `errors` (key `partial`) |
 | `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (決まりの正本は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
 | `work check --project <owner>/<番号> --issue <owner/repo#番号> [--session <ID>]` | 無し | `session`・上の表の値・`problems`・`rate_limit`・`errors`。`--session` を省けば環境変数 (`CLAUDE_CODE_HOST_SESSION_ID`、無ければ `CLAUDE_CODE_SESSION_ID`)。項目が無ければ `errors` (key `issue`) |

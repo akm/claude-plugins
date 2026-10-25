@@ -142,17 +142,17 @@ class WaiterTest(unittest.TestCase):
             gh.rate_limit_reset_at = original
 
     def test_stop_previous_removes_reused_pid_without_killing(self):
-        """wait.pid の PID の開始時刻かコマンドが違えば (再利用)、そのプロセスを止めずに wait.pid だけ消す。"""
+        """wait.pid の PID の開始時刻かコマンドが違えば (再利用)、そのプロセスを停止せずに wait.pid だけ消す。"""
         sleeper = subprocess.Popen(["sleep", "30"])
         try:
             with open(self.pid_path, "w", encoding="utf-8") as f:
                 json.dump({"pid": sleeper.pid, "started_at": "not the real start", "owner": M1, "wait": "wait"}, f)
             self.assertEqual(poll.stop_previous(self.pid_path), {"removed": sleeper.pid})
             self.assertFalse(os.path.exists(self.pid_path))
-            self.assertIsNone(sleeper.poll(), "止めていない")
+            self.assertIsNone(sleeper.poll(), "停止していない")
             with open(self.pid_path, "w", encoding="utf-8") as f:
                 json.dump({"pid": sleeper.pid, "started_at": poll.process_start(sleeper.pid), "owner": M1, "wait": "wait"}, f)
-            self.assertEqual(poll.stop_previous(self.pid_path), {"removed": sleeper.pid}, "開始時刻が同じでもコマンドが待機でなければ止めない")
+            self.assertEqual(poll.stop_previous(self.pid_path), {"removed": sleeper.pid}, "開始時刻が同じでもコマンドが待機でなければ停止しない")
             self.assertIsNone(sleeper.poll())
         finally:
             sleeper.kill()
@@ -195,7 +195,7 @@ class CliBase(FakeGhCase):
 class ManagerWaitTest(CliBase):
 
     def test_wait_without_snapshot_is_5(self):
-        """スナップショットが無い (壊れている) と、上書きせずに 5 で止まる。"""
+        """スナップショットが無い (壊れている) と、上書きせずに 5 で終了する。"""
         code, out, err = self.run_cli("wait", "--dir", self.manager, *FAST)
         self.assertEqual((code, out), (5, []), err)
         os.makedirs(self.record_dir, exist_ok=True)
@@ -258,7 +258,7 @@ class ManagerWaitTest(CliBase):
         self.assertTrue(os.path.exists(pid_path), "別の PID の wait.pid は消さない")
 
     def test_new_wait_stops_previous_wait(self):
-        """起動の前に、動いている前の待機 (wait.pid の PID。開始時刻とコマンドが一致) を止める。"""
+        """起動の前に、動いている前の待機 (wait.pid の PID。開始時刻とコマンドが一致) を停止する。"""
         self.write_snapshot()
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         first = self.popen("wait", "--dir", self.manager, "--interval", "0.01", "--minutes", "1")

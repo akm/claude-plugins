@@ -283,7 +283,7 @@ def simplify_item(node, position):
 
 def items(project):
     """項目の一覧を位置の順に全部読む。返り値: {"status": "ok", "project_id", "items": [...], "problems": [...], "rate_limit"} か
-    {"status": "error", ...} (最初のページが読めないとき)。続きのページやコメントの続きが読めなかったときは problems に入れて止める。"""
+    {"status": "error", ...} (最初のページが読めないとき)。続きのページやコメントの続きが読めなかったときは problems に入れて読み取りを中断する。"""
     result_items = []
     problems = []
     after = None

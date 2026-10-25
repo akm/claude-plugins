@@ -56,7 +56,7 @@ class LoadSaveTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.dir, record.RECORD_FILE)), "読むだけでは作らないこと")
 
     def test_corrupt_records_stop(self):
-        """Covers AE10. 壊れた記録は Corrupt で止め、新規として扱わない。"""
+        """Covers AE10. 壊れた記録は Corrupt で中断し、新規として扱わない。"""
         cases = {
             "not json": "{",
             "top level not object": "[]",
@@ -72,7 +72,7 @@ class LoadSaveTest(unittest.TestCase):
                 self.assertIn(record.RECORD_FILE, str(cm.exception))
 
     def test_unreadable_bytes_and_broken_elements_are_corrupt(self):
-        """読めないバイト列と、要素の形の崩れも Corrupt で止める (ok として読んで後の操作で落ちない)。"""
+        """読めないバイト列と、要素の形の崩れも Corrupt で中断する (ok として読んで後の操作で落ちない)。"""
         base = {"project": PROJECT, "manager": None, "sessions": {}, "items": {}, "questions": {}}
         cases = {
             "manager is a string": dict(base, manager="x"),

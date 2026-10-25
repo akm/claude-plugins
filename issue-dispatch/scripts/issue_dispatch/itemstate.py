@@ -367,7 +367,7 @@ def _report(item, kind, **values):
 def dependency_actions(item, state, login, project_number):
     """割り当ての無い項目の `Ready` ⇄ `Blocked` の再導出 (KTD7)。範囲は担当者が自分 1 人で、割り当て中でなく、Status が Ready か Blocked の項目。
     開いている blocker があれば `依存の待機` → `Blocked`、すべて閉じたら `依存の解消` → `Ready` (コメントが先)。`依存の待機` の無い `Blocked` は
-    利用者が手で付けたものなので書き換えない。コメントの後に止まった書き込み (Status の変化がコメントより後に無い) は続きを書き (continuation)、
+    利用者が手で付けたものなので書き換えない。コメントの後で中断された書き込み (Status の変化がコメントより後に無い) は続きを書き (continuation)、
     コメントより後に Status の変化があれば利用者の変更として報告する。返り値は (actions, reports)。"""
     status = (item.get("status") or {}).get("name")
     if state.get("assigned") or not _in_scope(item, login) or status not in STATUS_OPTIONS_FOR_DEPENDENCY:

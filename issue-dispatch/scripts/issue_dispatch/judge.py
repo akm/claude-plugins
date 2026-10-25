@@ -378,7 +378,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
     rules, rule_text = rules_for(repo_config)
     if rules is None:
         j["result"], j["waits"] = "wait", [{"kind": "設定"}]
-        body = (f"リポジトリ {item['repo']} の設定を読めないので、この宣言の判定を止めている。理由: {repo_config.get('message')}。"
+        body = (f"リポジトリ {item['repo']} の設定を読めないので、この宣言の判定を中断している。理由: {repo_config.get('message')}。"
                 f"直し方: {repo_config.get('fix') or '-'}。直したら管理のセッションに知らせる (設定を直したことは GitHub に現れないため)。" + _undeclared_lines(j))
         j["actions"].append(_comment(key, "待機", {**base, "waits": j["waits"]}, body))
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
@@ -489,7 +489,7 @@ _SLIM_KEYS = ("item", "declaration", "to", "assignment", "update_kind", "repo_co
 
 def judge(items, states, rec, attrs_table, pr_states, read_config, table=None, login=None, only=None):
     """未判定の宣言を順に判定する。read_config はリポジトリ (owner/repo) → repo.read_repo_config の結果を返す関数 (リポジトリごとに 1 回呼ぶ)。
-    only を渡せば、投稿の順に並べた未判定の宣言のうち、その項目の宣言までを判定して止める (前に投稿された宣言も判定し、後の宣言は判定しない。
+    only を渡せば、投稿の順に並べた未判定の宣言のうち、その項目の宣言まで判定する (前に投稿された宣言も判定し、後の宣言は判定しない。
     その項目に未判定の宣言が無ければ何も判定しない)。判定の順序の決まり (投稿の順) を only のときも守るため。相手はすべての項目から集める。
     同じ実行で `開始可` にした宣言は、後の宣言の相手になり、予約した資源は後の宣言には空いていない。返り値: {"judgments": [judge_one の結果から actions・questions・signals・parsed を除いたもの], "actions", "questions", "signals"}。"""
     table = table if table is not None else filekinds.load_default_table()

@@ -4,7 +4,7 @@
 (`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。置き場・キー・扱いの正本は
 issue-dispatch/skills/issue-dispatch/references/records.md。
 
-記録は蓄積データなので、壊れていれば `Corrupt` で止めて新規として扱わない (無いときだけ新規)。保存は一時ファイルに
+記録は蓄積データなので、壊れていれば `Corrupt` で中断し、新規として扱わない (無いときだけ新規)。保存は一時ファイルに
 書いて `os.replace` で置き換える (先例 pr-teeth/scripts/prteeth/store.py の `load_precious`・`_save_atomic`)。
 更新は操作の配列 (`apply`) で受け、1 つでも誤りがあれば何も適用しない。
 呼び出し元: CLI issue-dispatch/scripts/issue_dispatch.py の `record read` / `record apply` / `record log`。

@@ -317,7 +317,7 @@ class CliTest(FakeGhCase):
         code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         self.assertEqual((out["status"], out["snapshot"], out["errors"][0]["key"]), ("error", None, "partial"))
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"], taken, "書き換えない")
-        # コメントの URL の PR が読めないときは、その PR だけを比べずに続ける (読むたびに同じく出る欠損で観測を止めない)
+        # コメントの URL の PR が読めないときは、その PR だけを比べずに続ける (読むたびに同じく出る欠損で観測を中断しない)
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))},
                         {"substring": "query PrObserve", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}])
         code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")

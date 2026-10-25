@@ -110,7 +110,7 @@ def build_snapshot(items_result, comment_prs, taken_at, previous=None):
     スナップショットを作る。Issue 以外の項目 (draft issue・PR) は持たない。items_result の problems のうち項目 1 つの中の欠損
     (item を持つもの) は、previous (前のスナップショット) に引き継ぐ元があれば前の値を引き継ぎ (snapshot_item)、無ければその項目の
     `partial` に種類を残す。読めなかった PR も、previous に状態があれば引き継いで `carried` (元の taken_at) を持たせる。項目の一覧
-    そのものの欠損 (LIST_PROBLEMS) は呼び出し元が先に止める。"""
+    そのものの欠損 (LIST_PROBLEMS) は呼び出し元が先に処理を中断する。"""
     partial = {}
     for p in items_result.get("problems") or []:
         if p.get("item") and p.get("what") not in LIST_PROBLEMS:

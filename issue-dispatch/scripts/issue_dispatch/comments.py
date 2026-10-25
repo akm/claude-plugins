@@ -192,7 +192,7 @@ def format_header(role, name, session_id, kind, values=None):
         raise ValueError(f"セッション ID が無いか、区切り文字か改行を含むか、種類の語と同じ: {session_id!r}")
     normalized = normalize_values(kind, values)
     line = SEP.join([PREFIX, ROLES[role], name.strip(), session_id.strip(), kind] + _value_fields(kind, normalized))
-    # 作った先頭行を読み戻して同じ内容になることを確認する (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで止める
+    # 作った先頭行を読み戻して同じ内容になることを確認する (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで拒否する
     expected = {"role": role, "name": name.strip(), "session_id": session_id.strip(), "kind": kind, "values": normalized}
     if parse_header(line) != expected:
         raise ValueError(f"作った先頭行を同じ内容に読み戻せない (名前や値の形を確認する): {line!r}")

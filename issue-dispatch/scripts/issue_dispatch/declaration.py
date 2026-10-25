@@ -267,7 +267,7 @@ def conflictability(mine, others):
     (要素に "id" を付けられる。比べる相手は既に `開始可` になった宣言)。
 
     相手の "declaration" が None なら解析できなかった相手 ("problems" に理由) で、自動では判定できないので needs-user にする
-    (過去に受理された宣言が、今のリポジトリの設定の規則では読めないときなど。相手 1 つのためにほかの判定を止めない)。
+    (過去に受理された宣言が、今のリポジトリの設定の規則では読めないときなど。相手 1 つのためにほかの判定を中断しない)。
 
     返り値: {"result": 全体の結論 (CONFLICT_RESULTS。conflict > needs-user > none), "others": [{"id", "repo", "result",
     "paths": [{"path", "result", "reason"}] (同じリポジトリの同じパスだけ), "problems" (解析できない相手の理由。無ければ空)}]}。

@@ -11,16 +11,16 @@
 | `Status` | 単一選択 (Project が最初から持つ) | 管理のセッション・利用者・組み込みワークフロー | 下の「Status の選択肢」 |
 | `Agent session ID` | テキスト | 管理のセッション | 割り当ての正本。割り当てた作業のセッションの ID。排他の印で、コメント `割り当て` より先に書く |
 | `Agent session title` | テキスト | 管理のセッション | 人が読む写し (作業のセッションの名前)。管理のセッションが ID に合わせる |
-| `Agent stuck state` | 単一選択 | 管理のセッション | 止まっているときだけ値が入り、空なら正常 (下の表)。利用者が空にしたときは上書きせず 1 回だけ報告する |
+| `Agent stuck state` | 単一選択 | 管理のセッション | 停止しているときだけ値が入り、空なら正常 (下の表)。利用者が空にしたときは上書きせず 1 回だけ報告する |
 
 `Agent stuck state` の値:
 
 | 値 | 意味 |
 | --- | --- |
 | `idle-no-progress` | 割り当ての後、作業のセッションが入力待ちになったのに着手の宣言が現れない。宣言の修正を頼んだ後は、修正した宣言が現れない |
-| `deadline-passed` | 割り当てから期限 (設定 `declare_deadline_minutes`) を過ぎても、形の検査を通った着手の宣言が無い (権限の確認で止まっている場合など) |
+| `deadline-passed` | 割り当てから期限 (設定 `declare_deadline_minutes`) を過ぎても、形の検査を通った着手の宣言が無い (権限の確認で停止している場合など) |
 | `session-missing` | 作業のセッションが `ListAgents` に見つからない |
-| `manager-stopped` | 管理のセッションが止まっている |
+| `manager-stopped` | 管理のセッションが停止している |
 | `waiting-for-user` | 作業のセッションが `ListAgents` で状態 `waiting` のまま 2 回続けて見えた (利用者の入力か権限の承認を待機している可能性がある) |
 
 ## Status の選択肢
@@ -51,7 +51,7 @@
 | `Pull request linked to issue` | 有効なら無効を推奨 | 管理のセッションが書く `In Progress`・`In review` と別の値を書きうる (無効のままでも続ける) |
 | `Auto-close issue`・`Pull request merged`・`Auto-add sub-issues to project` | どちらでもよい | この仕組みは Issue だけを Project に入れる |
 
-`project check` は、必須のワークフローが無効なら不足として、推奨が無効 (一覧に無いものも無効として数える) なら案内として列挙し、止まらない。ワークフローは API で有効・無効を変えられないので、UI の手順を案内する。
+`project check` は、必須のワークフローが無効なら不足として、推奨が無効 (一覧に無いものも無効として数える) なら案内として列挙し、中断しない。ワークフローは API で有効・無効を変えられないので、UI の手順を案内する。
 
 ## 作り方 (`project check` と `project add-fields`)
 

@@ -134,7 +134,7 @@ class OthersTest(unittest.TestCase):
         self.assertEqual(out["judgments"][1]["compared"], [400], "先に `開始可` になった宣言を、後の宣言の相手にする")
 
     def test_only_judges_up_to_that_item_in_posting_order(self):
-        """only (CLI の --issue) は、投稿の順に並べた未判定の宣言のうち、その項目の宣言までを判定して止める。前の宣言は飛ばさず、後の宣言は判定しない。
+        """only (CLI の --issue) は、投稿の順に並べた未判定の宣言のうち、その項目の宣言まで判定する。前の宣言は飛ばさず、後の宣言は判定しない。
         その項目に未判定の宣言が無ければ何も判定しない。"""
         first = item(A9, [ASSIGN1, decl(400, t(20))], position=1)  # 先に投稿。src/a.py
         target = item(A5, [assign(W8, 1, t(10), 110), decl(410, t(30), to=W8)], position=2)  # 後に投稿。同じ src/a.py
