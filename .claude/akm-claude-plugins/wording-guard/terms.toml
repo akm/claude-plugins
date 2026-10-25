@@ -328,10 +328,10 @@ reason = "英語 (location) を直訳した訓読みの語。実体がディレ�
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
-pattern = "/(?<![一-龯々])止(ま|め|っ)/"
+pattern = "/(?<![停中禁阻防抑静終廃制休])止(ま|め|っ)/"
 verdict = "avoid"
 replacements = ["停止する", "中断する", "拒否する"]
-reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く。3 つのどれにも当たらなければ、何が起きるかを書く (「実行が返らなくなる」など)。hook の終了コードの扱いは、Claude Code の文書の用語 (non-blocking error など) で書く"
+reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く。3 つのどれにも当たらなければ、何が起きるかを書く (「実行が返らなくなる」など)。hook の終了コードの扱いは、Claude Code の文書の用語 (non-blocking error など) で書く。二字漢語 (停止・中止・禁止 など) の「止」は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
@@ -364,10 +364,10 @@ reason = "英語 (question) を直訳した訓読みの語。利用者への質�
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
-pattern = "/(?<![一-龯々ァ-ヶー])待(ち|つ|た|て|っ)/"
+pattern = "/(?<![一-龯々ァ-ヶー])待ち|待(つ|た|て|っ)/"
 verdict = "avoid"
 replacements = ["待機", "待機する"]
-reason = "英語 (wait) を直訳した訓読みの語。音読みの二字漢語「待機」がある。「選択待ち」「ロック待ち」のような複合語は対象にしない (許容する語)"
+reason = "英語 (wait) を直訳した訓読みの語。音読みの二字漢語「待機」がある。前が漢字か片仮名の「〜待ち」(「選択待ち」「ロック待ち」のような複合語) は対象にしない (許容する語)。動詞の活用形 (「秒待って」など) は前の文字に関わらず検出する"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]

@@ -79,7 +79,7 @@ class Busy(Exception):
         self.path = path
         self.seconds = seconds
         super().__init__(
-            path + " を " + str(seconds) + " 秒待っても取得できませんでした"
+            path + " を " + str(seconds) + " 秒待機しても取得できませんでした"
             "（他の pr-teeth が更新中の可能性があります）"
         )
 
