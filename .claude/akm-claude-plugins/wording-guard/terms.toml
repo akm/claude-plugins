@@ -6,6 +6,11 @@
 #
 # #35 で言い換えた語のうち、パターンで表せるものを登録した。「落ちる」(意味が文脈で 3 つに分かれる) や
 # 「守る」(正しい用法が多い) のように、字面で区別できない語は登録していない。
+#
+# #135 で、次の 2 語も同じ理由で登録しないと決めた。文脈で書き分ける基準を残す。
+#   - 振る舞い: 仕様として定めた・期待する動作は「振る舞い」、実際に観測した動作は「動作」と書く。
+#   - 誤り: 人の作業の失敗 (書き間違い・書き忘れ・指定の取り違え) は「ミス」、値・入力・設定が規則に
+#     合わない状態 (「入力の誤り」「設定の誤り」) は「誤り」と書く。
 
 # ---- CI の画面の色の比喩 (6ed9786) ----
 
@@ -303,6 +308,230 @@ reason = "array を「列」と書くと、表の列 (column) と読めてしま
 decided_in = "https://github.com/akm/claude-plugins/pull/115"
 exceptions = ["表の列", "の列挙"]
 
+# ---- 英語を直訳した訓読みの語 (#135) ----
+#
+# 語を選ぶ優先順は #135 の本文のとおり。識別子・正式な用語・手順書に書かれうるものはそのまま使い、
+# 次に浸透したカタカナ語、次に音読みの二字漢語を選ぶ。英語を直訳した訓読みの語は避ける。
+
+[[terms]]
+pattern = "/確かめ/"
+verdict = "avoid"
+replacements = ["確認する", "確認の方法"]
+reason = "英語 (check / verify) を直訳した訓読みの語。音読みの二字漢語「確認」がある"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "置き場"
+verdict = "avoid"
+replacements = ["ディレクトリ", "保存先", "配置先"]
+reason = "英語 (location) を直訳した訓読みの語。実体がディレクトリなら「ディレクトリ」、保存する場所なら「保存先」、置く場所なら「配置先」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/(?<![一-龯々])止(ま|め|っ)/"
+verdict = "avoid"
+replacements = ["停止する", "中断する", "拒否する"]
+reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "答え"
+verdict = "avoid"
+replacements = ["回答", "回答する"]
+reason = "英語 (answer) を直訳した訓読みの語。音読みの二字漢語「回答」がある"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "終わ"
+verdict = "avoid"
+replacements = ["終了", "完了"]
+exceptions = ["で終わる名前", "で終わる文字列"]
+reason = "英語 (end / finish) を直訳した訓読みの語。プロセス・コマンド・待機は「終了」、作業・割り当ては「完了」と書く。文字列の末尾を言う「〜で終わる名前」は対象にしない"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "尋ね"
+verdict = "avoid"
+replacements = ["質問する"]
+reason = "英語 (ask) を直訳した訓読みの語。利用者への質問を指すので「質問」と書く (データの照会ではないので「クエリ」ではない)"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/問い(?!合)/"
+verdict = "avoid"
+replacements = ["質問", "判定の条件", "確認項目"]
+reason = "英語 (question) を直訳した訓読みの語。利用者への質問は「質問」、チェックリストの項目は「判定の条件」か「確認項目」と書く。「問い合わせ」は対象にしない"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/(?<![一-龯々ァ-ヶー])待(ち|つ|た|て|っ)/"
+verdict = "avoid"
+replacements = ["待機", "待機する"]
+reason = "英語 (wait) を直訳した訓読みの語。音読みの二字漢語「待機」がある。「選択待ち」「ロック待ち」のような複合語は対象にしない (許容する語)"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "見分け"
+verdict = "avoid"
+replacements = ["判別", "識別"]
+reason = "英語 (distinguish) を直訳した訓読みの語。区別がつくかは「判別」、どれかを特定するのは「識別」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "欠け"
+verdict = "avoid"
+replacements = ["欠損", "無い", "不足する"]
+reason = "英語 (missing) を直訳した訓読みの語。名詞は「欠損」、動詞「欠ける」は「無い」「不足する」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "続き"
+verdict = "avoid"
+replacements = ["次の", "残り", "継続"]
+exceptions = ["手続き", "引き続き"]
+reason = "英語 (continuation) を直訳した訓読みの語。「続きのページ」は「次のページ」、ほかは「残り」「継続」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "書き手"
+verdict = "avoid"
+replacements = ["投稿者", "書き込み元", "筆者"]
+reason = "英語 (writer) を直訳した訓読みの語。GitHub のコメントの作成者は「投稿者」、ファイル・フィールドに書くセッションやプログラムは「書き込み元」、文章を書く人は「筆者」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "読み手"
+verdict = "avoid"
+replacements = ["読者"]
+reason = "英語 (reader) を直訳した訓読みの語。文章や出力を読む人は「読者」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/(書く|読む)側/"
+verdict = "avoid"
+replacements = ["書き込み元", "読み込み先", "読み込み元"]
+reason = "方向・位置の比喩で、何を指すかを読者に推測させる。プログラムやセッションがファイルを書く・読む意味では「書き込み元」「読み込み先」(主語によっては「読み込み元」) と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "書き直"
+verdict = "avoid"
+replacements = ["修正", "上書き"]
+reason = "英語 (rewrite) を直訳した訓読みの語。宣言・文章は「修正」、ファイルは「上書き」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "読み直"
+verdict = "avoid"
+replacements = ["再確認", "再度読み込む"]
+reason = "英語 (reread) を直訳した訓読みの語。人が読み返すのは「再確認」、プログラムが読むのは「再度読み込む」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/戻り(?!値)/"
+verdict = "avoid"
+replacements = ["復元先", "復帰"]
+reason = "英語 (return) を直訳した訓読みの語。何に戻るのかを書く (「戻り先」は「復元に使うブランチ」など)。「戻り値」は対象にしない (許容する語)"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/決まり(?!ま)/"
+verdict = "avoid"
+replacements = ["規則"]
+reason = "英語 (rule) を直訳した訓読みの語。音読みの二字漢語「規則」がある。動詞の「決まります」は対象にしない"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "取り下げ"
+verdict = "avoid"
+replacements = ["撤回"]
+reason = "英語 (withdraw) を直訳した訓読みの語。音読みの二字漢語「撤回」がある"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "焼き込"
+verdict = "avoid"
+replacements = ["埋め込む"]
+reason = "英語 (bake in) を直訳した比喩"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "在り処"
+verdict = "avoid"
+replacements = ["場所", "パス"]
+reason = "技術文書で使わない訓読みの語"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "食い違"
+verdict = "avoid"
+replacements = ["不一致", "矛盾"]
+reason = "訓読みの語。値・内容が合わないのは「不一致」、記述どうしが両立しないのは「矛盾」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "綴り"
+verdict = "avoid"
+replacements = ["表記"]
+reason = "英語 (spelling) を直訳した訓読みの語。大文字小文字の違いなどは「表記」で通じる"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/知らせ(?![るずてたなまれら])/"
+verdict = "avoid"
+replacements = ["通知"]
+reason = "英語 (notification) を直訳した訓読みの語。名詞は「通知」と書く。動詞の「知らせる」は対象にしない (許容する語)"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/並び(?![順替])/"
+verdict = "avoid"
+replacements = ["順序", "順番"]
+reason = "英語 (order) を直訳した訓読みの語。「並び順」「並び替え」は対象にしない"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "行き先"
+verdict = "avoid"
+replacements = ["遷移先"]
+reason = "英語 (destination) を直訳した訓読みの語。判定フローの次のノードは「遷移先」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "見立て"
+verdict = "avoid"
+replacements = ["見解", "〜とみなす"]
+reason = "訓読みの語。判断の内容は「見解」、テストで「〜に見立てる」は「〜とみなす」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "出どころ"
+verdict = "avoid"
+replacements = ["取得元"]
+reason = "訓読みの語。「取得元」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/(?<![一-龯々])印(?![一-龯々])/"
+verdict = "avoid"
+replacements = ["フラグ", "完了のフラグファイル", "接頭辞"]
+reason = "何を指すか分からない。データに付ける目印は「フラグ」、review-loop の完了を知らせるファイルは「完了のフラグファイル」、道具の出力の先頭に付ける `input-error:` などは「接頭辞」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "言い回し"
+verdict = "avoid"
+replacements = ["表現", "語彙選択"]
+reason = "文章の表し方の総称は「表現」、語の選び方に限る箇所は「語彙選択」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "周回"
+verdict = "avoid"
+replacements = ["ループ"]
+reason = "日本語の「周回」はコースや軌道を回ること。処理の繰り返しの全体 (開始から停止まで) は「ループ」、その中の 1 回分は「1 回」と書く (スキル名 review-loop・ファイル loop.yaml とそろう)"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+
 # ---- 許容する語 ----
 
 [[terms]]
@@ -310,3 +539,45 @@ pattern = "近くの辺"
 verdict = "allow"
 reason = "グラフ理論の edge の直訳だが、用語として定義して使い続けると決めた (定義は review-triage-fix の verification.md。2bfdf82)"
 decided_in = "https://github.com/akm/claude-plugins/issues/35"
+
+[[terms]]
+pattern = "/書き込|読み取|読み込|書き換|置き換|呼び出|割り当|割り込/"
+verdict = "allow"
+reason = "訓読みの語だが、技術用語として定着している"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "引き継"
+verdict = "allow"
+reason = "handoff の訳として定着した業務の語で、同じ意味の二字漢語が無い (「継承」は inheritance、「移管」は所管を移す意味)"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/(?<=[一-龯々ァ-ヶー])待ち/"
+verdict = "allow"
+reason = "「承認待ち」と同じ、定着した複合語の形 (選択待ち・ロック待ち など)"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "受け渡"
+verdict = "allow"
+reason = "「データの受け渡し」として技術文書で定着している"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/返り値|戻り値/"
+verdict = "allow"
+reason = "定着した技術用語"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/知らせ(?=[るずてたなまれら])/"
+verdict = "allow"
+reason = "動詞の「知らせる」は英語の直訳ではない日本語。名詞の「知らせ」は避ける語"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
+
+[[terms]]
+pattern = "/突き合わ|成り立|取り違|1 始まり/"
+verdict = "allow"
+reason = "英語の直訳ではない日本語"
+decided_in = "https://github.com/akm/claude-plugins/issues/135"
