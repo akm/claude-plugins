@@ -628,7 +628,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["actions"], out["questions"], out["reports"], out["record_lost"]), ([], [], [], False))
 
     def test_close_in_progress_asks(self):
-        """進行中の Issue の close は、止めるか reopen して続けるかを尋ねる。回答が出るまで割り当て中のまま、ほかの書き込みはしない。"""
+        """進行中の Issue の close は、止めるか reopen して続けるかを質問する。回答が出るまで割り当て中のまま、ほかの書き込みはしない。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         out = turn_of(item)
@@ -636,7 +636,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(out["actions"], [])
 
     def test_pending_question_is_not_asked_again_and_item_is_left_alone(self):
-        """同じ項目と種類の未回答の質問があれば尋ね直さず、その項目には手を付けない (pending に返す)。"""
+        """同じ項目と種類の未回答の質問があれば質問し直さず、その項目には手を付けない (pending に返す)。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -670,7 +670,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([(q["kind"], q["options"]) for q in out["questions"]], [("assignee-changed", ["release", "continue"])])
 
     def test_field_cleared_or_changed_by_user_asks(self):
-        """フィールドの値が宛先と違い、更新が `割り当て` より後なら利用者の変更として尋ねる。"""
+        """フィールドの値が宛先と違い、更新が `割り当て` より後なら利用者の変更として質問する。"""
         item = make_item(session_field="", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
         item["fields"]["Agent session ID"]["updated_at"] = t(30)
         self.assertEqual(kinds(turn_of(item)["questions"]), ["field-cleared"])
@@ -687,7 +687,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertTrue(all(a["continuation"] for a in out["actions"]))
 
     def test_status_changed_by_user_asks_release(self):
-        """割り当て中の項目の Status を手で `Todo` にされたら、reopen とせず割り当てを保ち、解除するかを尋ねる (AE8)。"""
+        """割り当て中の項目の Status を手で `Todo` にされたら、reopen とせず割り当てを保ち、解除するかを質問する (AE8)。"""
         item = make_item(status="Todo", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], events=[_status_event("Todo", t(30))])
         out = turn_of(item)
         self.assertEqual([(q["kind"], q["options"]) for q in out["questions"]], [("status-changed", ["release", "restore"])])
@@ -723,7 +723,7 @@ class AssignedScenesTest(unittest.TestCase):
         config = {"third_party_edit_check": [A]}
         self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item, config=config)["questions"]], [("third-party-edit", ["stop", "continue"])])
         rec = rec_with(items={A9: rec_item(confirmed=t(15))})
-        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確かめた時刻までの編集は尋ねない")
+        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確かめた時刻までの編集は質問しない")
 
     def test_pr_without_closing_reference_requests_append(self):
         """報告の PR が Issue を閉じる参照を持たなければ `依頼` (本文の追記) を書く (既に同じ依頼があれば書かない)。"""
@@ -786,14 +786,14 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([a for a in out["actions"] if a.get("comment_kind") == "引き継ぎ"], [], "自分の `引き継ぎ` が既にあれば書かない")
 
     def test_record_lost_reasks_user_answer_waits(self):
-        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の回答` を待機する宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
+        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の回答` を待機する宣言を質問し直す項目として返し、報告に記録を失ったためと書く。"""
         item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の回答"}], t(13), 500)])
         for rec in (None, rec_with(manager_state="ended")):
             out = turn_of(item, rec=rec)
             self.assertEqual((out["record_lost"], [(q["kind"], q.get("record_lost")) for q in out["questions"]]), (True, [("user-answer-lost", True)]))
 
     def test_removed_item_with_intent_asks(self):
-        """記録の意図にある項目が Project の一覧に無ければ、除去として解除を尋ねる。"""
+        """記録の意図にある項目が Project の一覧に無ければ、除去として解除を質問する。"""
         out = itemstate.derive_turn([], rec_with(items={A9: rec_item()}), LOGIN, M1, PROJECT_NUMBER, {}, {}, [], {}, {"third_party_edit_check": []})
         self.assertEqual([(q["kind"], q["item"], q["options"]) for q in out["questions"]], [("removed", A9, ["release", "keep"])])
 

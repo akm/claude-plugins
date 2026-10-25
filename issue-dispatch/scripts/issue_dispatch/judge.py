@@ -1,7 +1,7 @@
 """宣言の判定 (計画の U15。正本は flow.md の「判定」)。
 
 項目の状態 (itemstate) が導いた「判定の要る宣言」を、投稿の順 (同じなら Project の中の順) に 1 件ずつ判定し、`開始可`・`待機`・`依頼`
-の書き込みの候補 (actions)・利用者に尋ねること (questions)・作業のセッションに送る合図 (signals) を返す。gh は実行せず、書き込みもしない。
+の書き込みの候補 (actions)・利用者に質問すること (questions)・作業のセッションに送る合図 (signals) を返す。gh は実行せず、書き込みもしない。
 競合の可能性は declaration.conflictability、資源は resources.judge_declare / judge_update、リポジトリの設定は repo.read_repo_config の結果で判断する。
 """
 
@@ -22,7 +22,7 @@ _PR_URL_RE = re.compile(rf"https://github\.com/{ids.REPO_NAME_PATTERN}/pull/[1-9
 # --- 記録の質問の回答 ------------------------------------------------------------------
 
 def _questions(rec, item, kind, subject, since):
-    """記録の質問のうち、項目 (owner/repo の大文字小文字を区別しない)・種類・対象 (subject。大文字小文字を区別しない) が同じで、尋ねた時刻 (asked_at) が
+    """記録の質問のうち、項目 (owner/repo の大文字小文字を区別しない)・種類・対象 (subject。大文字小文字を区別しない) が同じで、質問した時刻 (asked_at) が
     since (今の割り当ての `割り当て` の時刻) 以後のもの。前の割り当ての質問と回答は、資源・宣言・相手が新しくなるので今の判定の材料にしない
     (flow.md の「質問の対象と宣言の修正」)。"""
     folded = subject.casefold() if isinstance(subject, str) else None
@@ -68,7 +68,7 @@ def busy_answers(st, rec, names):
 
 
 def asked(rec, item, kind, subject, since):
-    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の質問 (回答も取り下げも無い) が記録にあるか。あれば尋ね直さない。"""
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の質問 (回答も取り下げも無い) が記録にあるか。あれば質問し直さない。"""
     return any(q.get("answered_at") is None for q in _questions(rec, item, kind, subject, since))
 
 
@@ -280,7 +280,7 @@ def _wait_body(waits, usage, j=None):
     lines = []
     for w in waits:
         if w["kind"] == "利用者の回答":
-            lines.append("利用者の回答: 管理のセッションが利用者に尋ねている (競合しうる相手の扱い・unknown-content のファイルの判定・資源の使用)")
+            lines.append("利用者の回答: 管理のセッションが利用者に質問している (競合しうる相手の扱い・unknown-content のファイルの判定・資源の使用)")
         elif w["kind"] == "Issue":
             lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が終わるまで待機する (利用者の回答: wait)")
         elif w["kind"] == "小さな PR":
@@ -297,7 +297,7 @@ def _undeclared_lines(j):
     if j["release"]:
         lines.append(f"解放した資源 (宣言に無い予約・更新で外した資源): {', '.join(j['release'])}")
     if j["keep"]:
-        lines.append(f"回答を待機する予約 (宣言に無い資源。解放してよいか利用者に尋ねている): {', '.join(j['keep'])}")
+        lines.append(f"回答を待機する予約 (宣言に無い資源。解放してよいか利用者に質問している): {', '.join(j['keep'])}")
     return ("\n" + "\n".join(lines)) if lines else ""
 
 
@@ -413,7 +413,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
             other_ref = {"item": o["item"], "declaration": o["id"], "to": o["to"]}
             conflict_paths = [p for p in res["paths"] if p["result"] == "conflict"]
             if not conflict_paths:
-                # unknown-content の同じパス: 競合しうるかを利用者に尋ねる (相手の宣言とパスが対象)
+                # unknown-content の同じパス: 競合しうるかを利用者に質問する (相手の宣言とパスが対象)
                 for p in [p for p in res["paths"] if p["result"] == "needs-user"]:
                     subject = f"{o['item']}:{o['id']}:{p['path']}"
                     answer = answer_for(rec, key, "unknown-content", subject, asg["at"])
@@ -461,7 +461,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         j["signals"] += request_signals
         return j
-    # 5. 資源の空き (競合の可能性で待機する・尋ねる宣言は、新しい資源の空きを確かめない。1 か 3 で求めた r を使う)
+    # 5. 資源の空き (競合の可能性で待機する・質問する宣言は、新しい資源の空きを確かめない。1 か 3 で求めた r を使う)
     res_waits = [{"kind": "資源", "resource": n} for n in r["wait_for"]]
     if r["ask"]:
         res_waits.insert(0, dict(_USER_ANSWER))

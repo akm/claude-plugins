@@ -75,7 +75,7 @@ def states_of(items, pr_states=None, attrs=None):
 
 
 def question(kind, item_key, subject, answer=None, qid="q1", asked=None):
-    # 尋ねた時刻は、固定の割り当て (ASSIGN1。t(10)) の後にする (判定は今の割り当ての質問だけを読む)
+    # 質問した時刻は、固定の割り当て (ASSIGN1。t(10)) の後にする (判定は今の割り当ての質問だけを読む)
     return {qid: {"item": item_key, "kind": kind, "options": list(judge.QUESTION_OPTIONS[kind]), "asked_at": asked or t(11), "answer": answer,
                   "answered_at": t(12) if answer is not None else None, "subject": subject}}
 
@@ -214,7 +214,7 @@ class ConfigAndParseTest(unittest.TestCase):
 class ConflictTest(unittest.TestCase):
 
     def test_conflict_without_answer_asks_and_waits_for_answer(self):
-        """競合しうる相手への回答が記録に無ければ、3 つの扱いを尋ね、回答まで `待機` (理由 `利用者の回答`)。Status と blockedBy は変えない。"""
+        """競合しうる相手への回答が記録に無ければ、3 つの扱いを質問し、回答まで `待機` (理由 `利用者の回答`)。Status と blockedBy は変えない。"""
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20))]), item(A5, B_GO)])
         j = out["judgments"][0]
         self.assertEqual((j["result"], j["waits"], j["compared"]), ("ask", [{"kind": "利用者の回答"}], [410]))
@@ -226,13 +226,13 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual(out["signals"], [{"kind": "wait", "to": W7, "item": A9, "declaration": 400}])
 
     def test_unanswered_question_in_record_is_not_asked_again(self):
-        """記録に同じ項目・種類・対象の未回答の質問があれば尋ね直さない (`待機` は書く)。"""
+        """記録に同じ項目・種類・対象の未回答の質問があれば質問し直さない (`待機` は書く)。"""
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410"))
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20))]), item(A5, B_GO)], rec=rec)
         self.assertEqual((out["judgments"][0]["result"], out["questions"], kinds(out["actions"])), ("ask", [], [("comment", "待機")]))
 
     def test_withdrawn_question_counts_as_unanswered(self):
-        """取り下げた質問 (answer が null で answered_at がある) は回答に数えず、尋ね直す。"""
+        """取り下げた質問 (answer が null で answered_at がある) は回答に数えず、質問し直す。"""
         q = question("conflict", A9, f"{A5}:410")
         q["q1"]["answered_at"] = t(7)
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20))]), item(A5, B_GO)], rec=rec_with(questions=q))
@@ -289,7 +289,7 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual(out["signals"], [{"kind": "go", "to": W7, "item": A9, "declaration": 400}])
 
     def test_mixed_others_list_all_waits_and_ask_for_the_unanswered(self):
-        """相手が 2 つで、1 つは wait と回答済み、1 つは未回答なら、`待機` の理由に `利用者の回答` と `Issue` を並べ、未回答の相手だけ尋ねる。"""
+        """相手が 2 つで、1 つは wait と回答済み、1 つは未回答なら、`待機` の理由に `利用者の回答` と `Issue` を並べ、未回答の相手だけ質問する。"""
         c_go = [assign(W9, 1, t(10), 120), decl(420, t(11), to=W9), go(420, t(12), 520, to=W9)]
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410", "wait"))
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20))]), item(A5, B_GO), item(A6, c_go)], rec=rec)
@@ -299,7 +299,7 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual(kinds(out["actions"]), [("comment", "待機"), ("blocked-by-add",), ("set-status",)])
 
     def test_needs_user_asks_whether_unknown_content_path_conflicts(self):
-        """種類 unknown-content の同じパスは、競合しうるかを利用者に尋ねる (相手の宣言とパスが対象)。"""
+        """種類 unknown-content の同じパスは、競合しうるかを利用者に質問する (相手の宣言とパスが対象)。"""
         other = [assign(W8, 1, t(10), 110), decl(410, t(11), files=(("data/x.bin", None),), to=W8), go(410, t(12), 510, to=W8)]
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), files=(("data/x.bin", None),))]), item(A5, other)])
         self.assertEqual(out["judgments"][0]["result"], "ask")
@@ -307,7 +307,7 @@ class ConflictTest(unittest.TestCase):
                          [("unknown-content", f"{A5}:410:data/x.bin", ["conflict", "none"])])
 
     def test_unknown_content_answers(self):
-        """unknown-content の回答が conflict なら、その相手について 3 つの扱いを尋ねる。none なら競合しないとして `開始可`。"""
+        """unknown-content の回答が conflict なら、その相手について 3 つの扱いを質問する。none なら競合しないとして `開始可`。"""
         other = [assign(W8, 1, t(10), 110), decl(410, t(11), files=(("data/x.bin", None),), to=W8), go(410, t(12), 510, to=W8)]
         items = [item(A9, [ASSIGN1, decl(400, t(20), files=(("data/x.bin", None),))]), item(A5, other)]
         out = run_judge(items, rec=rec_with(questions=question("unknown-content", A9, f"{A5}:410:data/x.bin", "conflict")))
@@ -316,7 +316,7 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], out["questions"]), ("go", []))
 
     def test_other_with_conflict_path_is_not_asked_unknown_content(self):
-        """同じ相手に競合しうるパスと unknown-content のパスの両方があれば、3 つの扱いだけを尋ねる。"""
+        """同じ相手に競合しうるパスと unknown-content のパスの両方があれば、3 つの扱いだけを質問する。"""
         other = [assign(W8, 1, t(10), 110), decl(410, t(11), files=(("data/x.bin", None), ("src/a.py", None)), to=W8), go(410, t(12), 510, to=W8)]
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), files=(("data/x.bin", None), ("src/a.py", None)))]), item(A5, other)])
         self.assertEqual([q["kind"] for q in out["questions"]], ["conflict"])
@@ -340,7 +340,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual(kinds(out["actions"]), [("comment", "待機")])
 
     def test_busy_resource_with_when_busy_ask_asks_then_follows_answer(self):
-        """when_busy が ask なら尋ねて `待機` (理由 `利用者の回答`)。回答が wait なら `待機` (理由 `資源`)、proceed なら `開始可` で予約する。"""
+        """when_busy が ask なら質問して `待機` (理由 `利用者の回答`)。回答が wait なら `待機` (理由 `資源`)、proceed なら `開始可` で予約する。"""
         items = [item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",))]), self._holder("gpu")]
         out = run_judge(items, attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], out["judgments"][0]["waits"]), ("ask", [{"kind": "利用者の回答"}]))
@@ -382,7 +382,7 @@ class ResourceTest(unittest.TestCase):
         release = mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "解除"}, t(100), 150)
         prev = [ASSIGN1, decl(400, t(20), resources=("gpu",)), go(400, t(23), 500), release]
         assign2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
-        # 前の割り当てで proceed と回答した gpu: 新しい割り当ての宣言では尋ねる
+        # 前の割り当てで proceed と回答した gpu: 新しい割り当ての宣言では質問する
         rec = rec_with(questions=question("resource-busy", A9, "gpu", "proceed", asked=t(21)))
         mine = item(A9, prev + [assign2, decl(700, t(210), resources=("gpu",))])
         out = run_judge([mine, self._holder("gpu")], rec=rec, attrs=self.attrs)
@@ -392,13 +392,13 @@ class ResourceTest(unittest.TestCase):
         mine = item(A9, prev + [assign2, decl(700, t(210))])
         out = run_judge([mine, item(A5, B_GO)], rec=rec, attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["conflict"]))
-        # 前の割り当てで wait と回答した相手: 新しい割り当てでは読まずに尋ねる
+        # 前の割り当てで wait と回答した相手: 新しい割り当てでは読まずに質問する
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410", "wait", asked=t(21)))
         out = run_judge([mine, item(A5, B_GO)], rec=rec, attrs=self.attrs)
         self.assertEqual((out["judgments"][0]["result"], [q["kind"] for q in out["questions"]]), ("ask", ["conflict"]))
 
     def test_resources_are_not_judged_while_conflict_waits(self):
-        """競合の可能性で待機する・尋ねる宣言は、資源の空きを確かめない (待機している宣言は新しい資源を持たない)。"""
+        """競合の可能性で待機する・質問する宣言は、資源の空きを確かめない (待機している宣言は新しい資源を持たない)。"""
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",))]), item(A5, B_GO), self._holder("gpu")], attrs=self.attrs)
         self.assertEqual([q["kind"] for q in out["questions"]], ["conflict"])
         self.assertEqual(out["judgments"][0]["reserve"], [])
@@ -411,7 +411,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((j["result"], j["release"], j["keep"]), ("go", ["cache"], []))
 
     def test_undeclared_reservation_ask_goes_and_asks_after(self):
-        """release_undeclared が ask なら、ほかの判定が済んでいれば `開始可` を書いてから尋ね、回答まで予約を残す (KTD8)。"""
+        """release_undeclared が ask なら、ほかの判定が済んでいれば `開始可` を書いてから質問し、回答まで予約を残す (KTD8)。"""
         mine = item(A9, [ASSIGN1, decl(400, t(20))], labels=["resource:db"], events=[{"type": "LabeledEvent", "at": t(9), "label": "resource:db"}])
         out = run_judge([mine], attrs=self.attrs)
         j = out["judgments"][0]
@@ -432,10 +432,10 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual(out["signals"][0]["kind"], "request")
 
     def test_undeclared_reservation_is_handled_while_waiting(self):
-        """宣言に無い予約の扱いは判定の結果に依らない: 競合や資源で待機する宣言でも、release なら解放し、ask なら尋ね、keep の回答なら `依頼` にする。"""
+        """宣言に無い予約の扱いは判定の結果に依らない: 競合や資源で待機する宣言でも、release なら解放し、ask なら質問し、keep の回答なら `依頼` にする。"""
         events = [{"type": "LabeledEvent", "at": t(9), "label": f"resource:{n}"} for n in ("cache", "db")]
         mine = item(A9, [ASSIGN1, decl(400, t(20), resources=("gpu",))], labels=["resource:cache", "resource:db"], events=events)
-        # 競合で尋ねる
+        # 競合で質問する
         out = run_judge([mine, item(A5, B_GO)], attrs=self.attrs)
         j = out["judgments"][0]
         self.assertEqual((j["result"], j["release"], j["keep"]), ("ask", ["cache"], ["db"]))
@@ -460,7 +460,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((j["result"], j["waits"], j["release"], j["keep"]), ("wait", [{"kind": "設定"}], ["cache"], ["db"]))
         self.assertEqual([q["kind"] for q in out["questions"]], ["release-undeclared"])
         self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"])
-        self.assertIn("回答を待機する予約 (宣言に無い資源。解放してよいか利用者に尋ねている): db", out["actions"][0]["body"])
+        self.assertIn("回答を待機する予約 (宣言に無い資源。解放してよいか利用者に質問している): db", out["actions"][0]["body"])
         out = run_judge([mine], read=reader(ok_config([{"pattern": "src/**", "kind": "unknown-structure"}])), attrs=self.attrs)
         j = out["judgments"][0]
         self.assertEqual((j["result"], j["release"], j["keep"], kinds(out["actions"])), ("request", ["cache"], ["db"], [("comment", "依頼")]))
@@ -588,7 +588,7 @@ class RewriteTest(unittest.TestCase):
         return [mine] + ([item(A5, B_GO)] if other_go else [])
 
     def test_rewrite_reuses_answer_for_the_same_other(self):
-        """新しい宣言も同じ相手と競合しうるなら、前の宣言への回答 (相手で対応づける) を使い、尋ね直さない。blockedBy は残す。"""
+        """新しい宣言も同じ相手と競合しうるなら、前の宣言への回答 (相手で対応づける) を使い、質問し直さない。blockedBy は残す。"""
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410", "wait"))
         out = run_judge(self._rewritten(), rec=rec)
         j = out["judgments"][0]
@@ -597,7 +597,7 @@ class RewriteTest(unittest.TestCase):
         self.assertEqual(kinds(out["actions"]), [("comment", "待機")], "blockedBy と Blocked は既にあるので書かない")
 
     def test_rewrite_asks_only_for_new_other(self):
-        """新しい相手だけ尋ねる。"""
+        """新しい相手だけ質問する。"""
         c_go = [assign(W9, 1, t(10), 120), decl(420, t(11), to=W9), go(420, t(12), 520, to=W9)]
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410", "wait"))
         out = run_judge(self._rewritten() + [item(A6, c_go)], rec=rec)
@@ -710,7 +710,7 @@ class DocTest(unittest.TestCase):
         self.assertEqual(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(0)), "wait")
         self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A6}:420", t(0)), "取り下げた質問は回答に数えない")
         self.assertIsNone(judge.answer_for(rec, A9, "conflict", None, t(0)))
-        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(2)), "尋ねた時刻が割り当ての時刻より前の質問は読まない")
+        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(2)), "質問した時刻が割り当ての時刻より前の質問は読まない")
         _, errors = record.apply(rec, [{"op": "ask", "question_id": "q3", "item": A9, "kind": "conflict", "options": ["wait"], "at": t(5), "subject": ""}])
         self.assertEqual([e["message"] for e in errors], ["subject は空でない文字列 (質問の対象: 資源の名前・相手の宣言など)"])
 

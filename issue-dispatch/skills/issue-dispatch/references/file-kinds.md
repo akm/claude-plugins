@@ -10,7 +10,7 @@
 
 | 段 | 判定の条件 | 当てはまれば | 競合の可能性の判定 | 競合の可能性があるときに示す扱い |
 | --- | --- | --- | --- | --- |
-| 1 | 内容を知らない (パスに一致するパターンが、リポジトリの設定にもデフォルトの表にも無い) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に尋ねる | — |
+| 1 | 内容を知らない (パスに一致するパターンが、リポジトリの設定にもデフォルトの表にも無い) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に質問する | — |
 | 2 | ツールが生成する | `generated` | 判定しない | — |
 | 3 | 構造を知らない | `unknown-structure` | 同じパスなら競合しうる | 待機する・共通の変更を先に小さな PR にする・競合しうるまま進める、の 3 つ |
 | 4 | 分割できない | `indivisible` | 節で判定する (下) | 同上 |
@@ -86,7 +86,7 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 ## マージできないファイル (`mergeable`)
 
-画像など、差分でマージできないファイルは、規則に `"mergeable": false` を書く (省略は真)。そのファイルで「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて尋ねる。
+画像など、差分でマージできないファイルは、規則に `"mergeable": false` を書く (省略は真)。そのファイルで「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて質問する。
 
 ## 共有の状態を持つファイル
 
@@ -103,4 +103,4 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 - **`divisible` で節の表記があるもの** — `**/package.json` (`json-key`。`dependencies` と `devDependencies` の下を依存ごとの節にする。広い `**/*.json` より前に置く)、`**/*.json` (`json-key`)、`**/go.mod` (`go-mod-directive`。参照のされ方は `directory`)、`**/*.md` (`markdown-heading`)、`**/Makefile` (`make-target`)、`**/*.toml` (`toml-table`)、`**/*.yaml`・`**/*.yml` (`yaml-key`)、`**/Dockerfile` (`dockerfile-stage`)、`**/*.tf` (`terraform-block`。参照のされ方は `directory`)。
 - **`divisible` で節の表記の無いもの** — 自前で書くソースコード: `**/*.go` (参照のされ方は `directory`)、`**/*.ts`・`**/*.tsx`・`**/*.js`・`**/*.py`・`**/*.rb`・`**/*.css` (参照のされ方は `file`)。節の表記を決めていないので、宣言に `units` は書けない。
 
-リポジトリで扱いが違うもの (生成した `.js`・`.gitattributes` で `linguist-generated` にしたディレクトリなど) は、リポジトリの設定の `files` に書く。`generated` の行に名前で一致しない生成ファイルは、どの規則に一致しても (ビルドした `bundle.css` が `**/*.css` に、生成した Go のファイルが `**/*.go` に、など) その規則の種類 (`divisible` など) になり、利用者に尋ねない。そのリポジトリで生成されるものは、設定の `files` に `generated` の規則を書く。候補はスキル `repo-preflight` が示す。
+リポジトリで扱いが違うもの (生成した `.js`・`.gitattributes` で `linguist-generated` にしたディレクトリなど) は、リポジトリの設定の `files` に書く。`generated` の行に名前で一致しない生成ファイルは、どの規則に一致しても (ビルドした `bundle.css` が `**/*.css` に、生成した Go のファイルが `**/*.go` に、など) その規則の種類 (`divisible` など) になり、利用者に質問しない。そのリポジトリで生成されるものは、設定の `files` に `generated` の規則を書く。候補はスキル `repo-preflight` が示す。

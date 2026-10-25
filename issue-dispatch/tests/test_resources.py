@@ -126,7 +126,7 @@ class AssignTest(unittest.TestCase):
         self.assertEqual(resources.judge_assign(I3, ["db"], {"db": [I1, I2]}, a, {})["result"], "skip")
 
     def test_when_busy_ask(self):
-        """when_busy が ask なら利用者に尋ね、回答が wait なら候補から外して、解放されるまで尋ね直さない。"""
+        """when_busy が ask なら利用者に質問し、回答が wait なら候補から外して、解放されるまで質問し直さない。"""
         a = attrs({"db": {"when_busy": "ask"}})
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {})
         self.assertEqual((r["result"], r["ask"]), ("ask", ["db"]))
@@ -164,7 +164,7 @@ class DeclareTest(unittest.TestCase):
         self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
 
     def test_undeclared_default_ask(self):
-        """予約したのに宣言に無い資源には「利用者に尋ねる」を返す。回答を待機する間もほかの判定が済んでいれば開始可で、予約は残す。"""
+        """予約したのに宣言に無い資源には「利用者に質問する」を返す。回答を待機する間もほかの判定が済んでいれば開始可で、予約は残す。"""
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {})
         self.assertEqual((r["result"], r["ask_undeclared"], r["release"], r["keep"]), ("go", ["db"], [], ["db"]))
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "release"})
@@ -173,7 +173,7 @@ class DeclareTest(unittest.TestCase):
         self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", [], ["db"], ["db"]), "解放してはいけないなら予約を残して修正を頼む")
 
     def test_undeclared_release(self):
-        """Covers AE51. release_undeclared が release なら宣言に無い予約を尋ねずに解放する。"""
+        """Covers AE51. release_undeclared が release なら宣言に無い予約を質問せずに解放する。"""
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs({"db": {"release_undeclared": "release"}}), {}, {})
         self.assertEqual((r["result"], r["release"], r["ask_undeclared"]), ("go", ["db"], []))
 

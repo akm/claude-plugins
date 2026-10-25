@@ -331,7 +331,7 @@ ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "blocked-by-remove", 
 # 1 回だけ報告するもの (記録の reported で重複を除く)
 REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
                 "pr-base-not-default", "pr-left-open")
-# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の質問の表
+# 利用者に質問すること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の質問の表
 QUESTION_OPTIONS = {"close-in-progress": ["stop", "reopen"], "assignee-changed": ["release", "continue"], "field-cleared": ["release", "restore"],
                     "field-changed": ["release", "restore"], "removed": ["release", "keep"], "status-changed": ["release", "restore"],
                     "third-party-edit": ["stop", "continue"], "merged-issue-open": ["close", "keep"], "pr-closed-unmerged": ["release", "keep"],
@@ -612,7 +612,7 @@ def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
 # --- ターン ---------------------------------------------------------------------------
 
 def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_states, diffs, workflows, config, present_keys=None):
-    """管理のセッションのターンで、項目の状態と、行うこと (actions)・尋ねること (questions)・1 回だけ報告するもの (reports)・回答を待機する項目 (pending) を導く。
+    """管理のセッションのターンで、項目の状態と、行うこと (actions)・質問すること (questions)・1 回だけ報告するもの (reports)・回答を待機する項目 (pending) を導く。
     書き込みはしない。rec は記録 (無ければ None)。diffs は observe diff の差分 (無ければ空)。workflows は Project のワークフローの名前 → 有効か。
     present_keys は Project の一覧にある項目のキーの全部 (items を絞って渡すときに、絞り込みで外れた項目を除去と読まないため。省略時は items のキー)。"""
     lost = record_lost(rec)
@@ -634,7 +634,7 @@ def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_state
         reports += r
         pending += [{"question_id": q["question_id"], "item": item["key"], "kind": q["kind"], "asked_at": q["asked_at"]} for q in _unanswered(rec, item["key"])]
     reports += human_changes(diffs, items_by_key, states_by_key, rec, workflows)
-    # 記録の意図にある項目が一覧に無い: Project から除かれた (割り当ての解除を尋ねる)
+    # 記録の意図にある項目が一覧に無い: Project から除かれた (割り当ての解除を質問する)
     present = list(present_keys) if present_keys is not None else list(items_by_key)
     for key, ri in sorted(((rec or {}).get("items") or {}).items()):
         if ri.get("intent") and not any(ids.same_issue(key, k) for k in present) and not any(q["kind"] == "removed" for q in _unanswered(rec, key)):

@@ -109,8 +109,8 @@ def _answer(answers, name):
 
 def judge_assign(item, label_resources, usage, attrs_table, answers):
     """契機「割り当て」。label_resources は項目のラベルの資源。answers は when_busy が ask の資源への回答 (名前 → wait / proceed)。
-    返り値: {"result": "assign" (割り当てて reserve を予約する) / "skip" (候補から外す) / "ask" (利用者に尋ねる),
-    "reserve": 予約する資源, "busy": 空いていない資源, "ask": 尋ねる資源}。reserve が on_declare の資源は予約せず、空きも待機しない。"""
+    返り値: {"result": "assign" (割り当てて reserve を予約する) / "skip" (候補から外す) / "ask" (利用者に質問する),
+    "reserve": 予約する資源, "busy": 空いていない資源, "ask": 質問する資源}。reserve が on_declare の資源は予約せず、空きも待機しない。"""
     reserve, busy, ask = [], [], []
     for name in label_resources:
         a = attributes_of(attrs_table, name)
@@ -153,7 +153,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
     """契機「着手の宣言」。declared は宣言の resources、reserved は割り当てで予約した資源。answers は when_busy が ask の資源への回答、
     undeclared_answers は release_undeclared が ask の資源への回答 (名前 → release / keep)。
     返り値: {"result": "go" (`開始可` を書くときに reserve を予約する) / "wait" (`待機`。どれも予約しない) / "ask",
-    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待機する・残す予約), "ask_undeclared" (尋ねる),
+    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待機する・残す予約), "ask_undeclared" (質問する),
     "request_rewrite" (解放してはいけないので修正を頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
     declared, reserved = _unique(declared), _unique(reserved)
     reserved_keys = {_key(r) for r in reserved}
