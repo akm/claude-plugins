@@ -1149,7 +1149,7 @@ class TestRepoCache(unittest.TestCase):
     """作業リポジトリの管理（scripts/prteeth/repos.py）。
 
     ネットワークは使わない。ローカルに作った git リポジトリを origin にして、
-    clone / fetch の実際の挙動を確かめる。
+    clone / fetch の実際の挙動を確認する。
     """
 
     def setUp(self):
@@ -1662,7 +1662,7 @@ class TestCliCommands(unittest.TestCase):
 
     prspec / labels 単体のテストでは、引数の受け渡しの取り違えが見つからない。
     番号指定では `--context` の渡し忘れがそのまま「マージ済み PR にレビュー必須と
-    出る」不具合になるため、ここで配線ごと確かめる。
+    出る」不具合になるため、ここで配線ごと確認する。
     """
 
     def setUp(self):

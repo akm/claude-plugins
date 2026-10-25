@@ -303,7 +303,7 @@ class TestFinding(unittest.TestCase):
 
 
 class TestRunTextlint(unittest.TestCase):
-    """textlint を差し替えて、実行の結果の扱いを確かめる。"""
+    """textlint を差し替えて、実行の結果の扱いを確認する。"""
 
     def run_fake(self, script):
         with tempfile.TemporaryDirectory() as d:
@@ -358,7 +358,7 @@ echo called >> "$FAKE_NPM_LOG"
 
 
 class TestSetup(unittest.TestCase):
-    """npm を差し替えて、setup の置き場の状態ごとの扱いを確かめる。"""
+    """npm を差し替えて、setup の置き場の状態ごとの扱いを確認する。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

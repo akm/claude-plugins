@@ -74,7 +74,7 @@ def setup(out=sys.stdout):
     npm ci は一時的な名前のディレクトリで行い、終わってから置き場の名前に変える。置き場の状態ごとの扱い:
       - textlint が入っている: 何もしない。
       - 置き場があるのに textlint が無い (中身が消えた・壊れた): 取得を始める前に TextlintError で止め、
-        置き場を消すよう案内する。置き場はこの関数では消さない (中身を利用者が確かめられるように)。
+        置き場を消すよう案内する。置き場はこの関数では消さない (中身を利用者が確認できるように)。
       - 置き場が無い: 取得して名前を変える。名前を変える前に、同時に実行した別の setup が置き場を
         作り終えていたら (改名が失敗し、置き場に textlint がある)、入ったものとして扱う。
     一時的な名前のディレクトリは、成否に関わらず最後に消す。置き場の名前に変わらなかった木を残しても、
@@ -219,7 +219,7 @@ def _run_textlint(directory, conf, paths, cwd, fix=False):
         raise TextlintError(f"textlint を実行できない ({cmd[0]}): {e}") from e
     # textlint は、検出が無いか warning だけなら 0、error があれば 1 で終わる。それ以外は実行の失敗。
     # 規則の読み込みや実行が例外で終わったときも 1 で終わるが、そのときは標準出力に何も出さない
-    # (textlint 15.8.0 で確かめた)。検出が無いときもファイルごとの結果を JSON で出すので、空の出力は失敗として扱う
+    # (textlint 15.8.0 で確認した)。検出が無いときもファイルごとの結果を JSON で出すので、空の出力は失敗として扱う
     if r.returncode not in (0, 1) or not r.stdout.strip():
         raise TextlintError(f"textlint が失敗した (終了コード {r.returncode}):\n{r.stderr.strip() or r.stdout.strip()}")
     try:

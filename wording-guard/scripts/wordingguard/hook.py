@@ -42,7 +42,7 @@ def contents_before(tool, tool_response):
     Write で新しいファイルを作ったとき (originalFile が null で、type が create) は空の文字列を返す。
     originalFile が無い (この版の Claude Code は渡さない) か、それ以外で null (前の内容が大きすぎるなど) の
     ときは ValueError を送出する。tool_response のフィールドは Claude Code の公式の文書に載っていない
-    (Claude Code 2.1.273 の Edit と Write の出力の様式で確かめた)。
+    (Claude Code 2.1.273 の Edit と Write の出力の様式で確認した)。
     """
     if "originalFile" not in tool_response:
         raise ValueError("hook の入力の tool_response に originalFile が無い (この版の Claude Code は書き換える前の内容を渡さない)")
@@ -62,7 +62,7 @@ def patch_lines(tool, tool_response, before, after):
     structuredPatch は Claude Code が計算した行の差分で、範囲 (hunk) ごとに oldStart・newStart (1 から数える行番号) と
     lines (先頭の 1 文字が " " は変えていない行、"-" は消した行、"+" は足した行、"\\" は末尾の改行の有無の印) を持つ。
     "-" の行を書き換える前の側、"+" の行を書き換えた後の側にする。行番号は 0 から数える (textlint の行番号と同じ数え方)。
-    hook の中では差分を計算しない。structuredPatch は公式の文書に載っていない (Claude Code 2.1.273 で確かめた)。
+    hook の中では差分を計算しない。structuredPatch は公式の文書に載っていない (Claude Code 2.1.273 で確認した)。
 
     次のときは ValueError を送出する (hook の中の差分の計算には戻らない)。
       - structuredPatch が無い、または様式が想定と違う
@@ -109,7 +109,7 @@ def patch_lines(tool, tool_response, before, after):
 
 
 def _expect_line(lines, number, text, side):
-    """structuredPatch の number 行目 (1 から数える) の内容 text が、lines の同じ行と一致することを確かめる。
+    """structuredPatch の number 行目 (1 から数える) の内容 text が、lines の同じ行と一致することを確認する。
 
     Claude Code は差分の行の先頭のタブを 1 つにつき空白 2 つに置き換えるので、比べる前にファイルの行も同じく置き換える。
     """
@@ -241,7 +241,7 @@ def handle(event, check_texts=None):
     if sys.version_info < (3, 11):
         return _failure(f"Python 3.11 以降が必要 (用語ファイルを標準ライブラリ tomllib で読むため)。"
                         f"実行した Python: {sys.version.split()[0]}")
-    # tomllib を使うモジュールは、Python の版を確かめてから読み込む
+    # tomllib を使うモジュールは、Python の版を確認してから読み込む
     from . import terms, textlint
 
     if check_texts is None:

@@ -44,14 +44,14 @@ compact との違いは、**書く側が「次に何をするか」を知って�
 
 ### 引き継ぎ文に書くもの
 
-節の構成の正本は [skills/handoff-write/references/template.md](skills/handoff-write/references/template.md)、各節の埋め方の正本は [skills/handoff-write/references/what-to-carry.md](skills/handoff-write/references/what-to-carry.md) です。目的・次にやること・決めたことと理由・却下した案・確かめた事実・未確認のこと・現在の状態・人間からの指示を書きます。会話の経過と、リポジトリを読めば分かることは書きません。
+節の構成の正本は [skills/handoff-write/references/template.md](skills/handoff-write/references/template.md)、各節の埋め方の正本は [skills/handoff-write/references/what-to-carry.md](skills/handoff-write/references/what-to-carry.md) です。目的・次にやること・決めたことと理由・却下した案・確認した事実・未確認のこと・現在の状態・人間からの指示を書きます。会話の経過と、リポジトリを読めば分かることは書きません。
 
 ## 保存先を貼るだけでも再開できる (フック)
 
 `/handoff-resume` を付けずに、コメントの URL やファイルのパスだけを貼った場合のために、プロンプト送信時のフック (UserPromptSubmit) を同梱しています。
 
 - プロンプトに、コメントの URL (`…#issuecomment-<ID>`) か、引き継ぎ文のファイル名 (`handoff-<日時>-….md`) の形があるときだけ働きます
-- 形の一致だけでは判定しません。**本文の 1 行目の目印 `<!-- session-handoff v1 -->` を確かめ**、引き継ぎ文だったときに限り、スキル `handoff-resume` の実行を促す文脈をセッションに差し込みます
+- 形の一致だけでは判定しません。**本文の 1 行目の目印 `<!-- session-handoff v1 -->` を確認し**、引き継ぎ文だったときに限り、スキル `handoff-resume` の実行を促す文脈をセッションに差し込みます
 - 引き継ぎ文の本文は差し込みません。本文の取得と、投稿者が本人かどうかの確認は、スキルの手順が行います
 
 **このフックは補助で、確実なのは `/handoff-resume` の 1 行を貼るほうです。** 理由は 2 つあります。
@@ -59,7 +59,7 @@ compact との違いは、**書く側が「次に何をするか」を知って�
 - フックにできるのは文脈を差し込むところまでで、スキルを実行するかどうかはモデルが決めます
 - URL の確認は `gh` とネットワークに依存します。`gh` が無い・未認証・3 秒以内に応答が無い場合は、何も差し込みません (プロンプトは通常どおり処理されます)
 
-## 再開のときに確かめること
+## 再開のときに確認すること
 
 新しいセッションは、引き継ぎ文をそのまま信じません。正本は [skills/handoff-resume/SKILL.md](skills/handoff-resume/SKILL.md) と [skills/handoff-resume/references/verify-state.md](skills/handoff-resume/references/verify-state.md) です。
 

@@ -66,7 +66,7 @@ def _run(args, cwd=None, timeout=None):
 
 
 def validate(repo):
-    """owner/repo の形を確かめる。
+    """owner/repo の形を確認する。
 
     パスの組み立てに使う値なので、`..` や絶対パスが混ざる経路を作らない。
     エージェントが渡す値であり、GitHub から取れた値とは限らない。
