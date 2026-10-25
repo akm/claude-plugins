@@ -37,7 +37,7 @@
   resources judge --dir <管理ディレクトリ> --trigger assign|declare|update|close|release (--body <JSON> | --body-file <ファイル|->)
       契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・回答は呼び出し元が渡す。gh は実行しない)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
-      `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
+      `paths` の要素は入力と同じ順序で、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
 
 終了コード: JSON を出せたときは、エラーの有無によらず 0 (エラーは JSON の `errors` で伝える)。0 以外は Python 自身の失敗

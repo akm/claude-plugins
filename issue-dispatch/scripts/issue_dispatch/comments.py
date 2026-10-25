@@ -25,7 +25,7 @@ WAIT_KINDS = ("利用者の回答", "Issue", "小さな PR", "資源", "設定")
 # 先頭行の値の見出し語 (値は `<見出し語> <値>` の 1 区切り)。解析は右からこの語で始まる区切りを値として取る
 VALUE_WORDS = ("対象", "割り当て", "宣言", "種類", "待機する Issue", "待機する Issue の宣言", "前の PR", "PR", "理由", "値", "Issue")
 
-# 種類ごとに持つ値 (キー) と並び。waits と blockers は配列で、1 要素 1 区切り
+# 種類ごとに持つ値 (キー) と順序。waits と blockers は配列で、1 要素 1 区切り
 _SHAPE = {
     "割り当て": ("to", "assignment"),
     "開始可": ("to", "assignment", "declaration"),
@@ -366,7 +366,7 @@ ID_KEYED_KINDS = ("引き継ぎ",)
 
 def header_key(parsed):
     """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ投稿者の
-    セッション ID も比べる。値は意味で比べる: 配列 (待機するもの・待機する Issue) は並びを問わず、Issue の参照と PR の URL は
+    セッション ID も比べる。値は意味で比べる: 配列 (待機するもの・待機する Issue) は順序を問わず、Issue の参照と PR の URL は
     owner/repo の大文字小文字を区別しない。"""
     session_id = parsed["session_id"] if parsed["kind"] in ID_KEYED_KINDS else None
     return (parsed["role"], session_id, parsed["kind"], _freeze(parsed["values"]))

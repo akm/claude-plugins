@@ -89,7 +89,7 @@ class MetaAndCheckTest(FakeGhCase):
         p = meta["project"]
         self.assertEqual((p["owner"], p["number"], p["title"]), ("akm", 3, "issue-dispatch verify"))
         self.assertEqual(p["fields"]["Status"]["data_type"], "SINGLE_SELECT")
-        self.assertEqual({o["name"] for o in p["fields"]["Status"]["options"]}, set(project.STATUS_OPTIONS), "選択肢の並びは問わない")
+        self.assertEqual({o["name"] for o in p["fields"]["Status"]["options"]}, set(project.STATUS_OPTIONS), "選択肢の順序は問わない")
         self.assertEqual(p["fields"]["Agent stuck state"]["data_type"], "SINGLE_SELECT")
         self.assertTrue(p["workflows"]["Item closed"]["enabled"])
         call = self.recorded_full()[0]

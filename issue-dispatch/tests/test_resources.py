@@ -70,7 +70,7 @@ class AttributesTest(unittest.TestCase):
 
 
 class HeldResourcesTest(unittest.TestCase):
-    """持っている資源 (R20 の (1)) を宣言の並びから求める。"""
+    """持っている資源 (R20 の (1)) を宣言の配列から求める。"""
 
     def test_remove_only_update_releases(self):
         """{A, B} が開始可 → {A} (B を外すだけの更新) で B を解放し、持っている資源は {A}。"""

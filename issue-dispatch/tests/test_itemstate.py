@@ -80,7 +80,7 @@ def question_table(doc, marker):
 
 
 def question_row(table, kind):
-    """質問の表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確認する (別の行の同じ並びと取り違えないため)。"""
+    """質問の表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確認する (別の行にある同じ順序の選択肢と取り違えないため)。"""
     return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
 
 

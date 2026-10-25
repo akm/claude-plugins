@@ -60,7 +60,7 @@ def attributes_of(table, name):
 # --- 持っている資源 (R20 の (1)) ------------------------------------------------------
 
 def held_from_history(history):
-    """今の割り当ての宣言の並び (投稿の順) から持っている資源を求める。history の要素は {"declaration": parse の結果の declaration,
+    """今の割り当ての宣言の配列 (投稿の順) から持っている資源を求める。history の要素は {"declaration": parse の結果の declaration,
     "go": `開始可` を書いたか, "rejected": 差し戻されたか (省略は偽)}。
     最後に `開始可` を書いた宣言の resources のうち、その後の差し戻されていない更新のすべてに残っているもの (その宣言の表記)。
     `開始可` の宣言が無ければ空。"""

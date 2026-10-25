@@ -190,7 +190,7 @@ def _file_key(f):
 
 
 def same_files(a, b):
-    """2 つの宣言のファイルと節が同じか (並びは問わない)。"""
+    """2 つの宣言のファイルと節が同じか (順序は問わない)。"""
     return {_file_key(f) for f in a["files"]} == {_file_key(f) for f in b["files"]}
 
 

@@ -162,11 +162,11 @@ class UpdateKindTest(unittest.TestCase):
         self.assertEqual(declaration.update_kind(go, same_files(["A", "B", "C"]), held), "resources-only", "C を足した")
         self.assertEqual(declaration.update_kind(go, same_files(["A", "C"]), held), "resources-only", "B を外して C を足した (足した資源があるので外すだけではない)")
         self.assertEqual(declaration.update_kind(go, same_files(["A", "B"]), held), "full", "持っている資源と同じ更新は資源だけを変える更新ではない")
-        self.assertEqual(declaration.update_kind(go, same_files(["B", "A"]), held), "full", "並びだけ違っても同じ")
+        self.assertEqual(declaration.update_kind(go, same_files(["B", "A"]), held), "full", "順序だけ違っても同じ")
         self.assertEqual(declaration.update_kind(go, parsed(["src/app.ts", "src/b.ts"], ["A"]), held), "full", "ファイルが違えばどちらとも判定しない")
         self.assertEqual(declaration.update_kind(go, parsed(["src/app.ts", ("package.json", [["dependencies", "react"]])], ["A"]), held), "full", "節が違っても同じ")
         self.assertEqual(declaration.update_kind(go, parsed([("package.json", [["dependencies", "zod"]]), "src/app.ts"], ["A"]), held),
-                         "resources-removed-only", "ファイルの並びは問わない")
+                         "resources-removed-only", "ファイルの順序は問わない")
 
     def test_readd_and_successive_removals(self):
         """{A, B} が開始可 → {A} → {A, B} で B を足したと判定する。{X, Y, Z} → {X, Y} → {X} の 2 回目に外すのは Y だけ。"""

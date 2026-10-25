@@ -270,13 +270,13 @@ class AlreadyPostedTest(unittest.TestCase):
         self.assertPosted(pr_made, [pr], False, "PR ができたら待機する相手が変わるので投稿する")
 
     def test_values_compare_by_meaning(self):
-        """繰り返す値は並びを問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別せずに比べる。"""
+        """繰り返す値は順序を問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別せずに比べる。"""
         ab = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の回答"}, {"kind": "資源", "resource": "db"}])
         ba = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "資源", "resource": "db"}, {"kind": "利用者の回答"}])
-        self.assertPosted(ba, [ab], True, "待機するものの並びが違っても同じ")
+        self.assertPosted(ba, [ab], True, "待機するものの順序が違っても同じ")
         w56 = header("依存の待機", blockers=[OTHER, f"{REPO}#6"])
         w65 = header("依存の待機", blockers=[f"{REPO.upper()}#6", OTHER])
-        self.assertPosted(w65, [w56], True, "待機する Issue の並びと owner/repo の大文字小文字が違っても同じ")
+        self.assertPosted(w65, [w56], True, "待機する Issue の順序と owner/repo の大文字小文字が違っても同じ")
         req = header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR9)
         upper = header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR9.replace(REPO, REPO.upper()))
         self.assertPosted(upper, [req], True)

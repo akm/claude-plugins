@@ -299,7 +299,7 @@ def labels_at(item, at):
 
 
 def resource_labels(labels):
-    """ラベルの名前の並びから資源の名前 (`resource:<名前>` の名前。ラベルの表記のまま、名前の順) を取る。接頭辞は大文字小文字を区別しない
+    """ラベルの名前の配列から資源の名前 (`resource:<名前>` の名前。ラベルの表記のまま、名前の順) を取る。接頭辞は大文字小文字を区別しない
     (GitHub のラベルの名前は区別しないため。issues.add_label と同じ)。"""
     n = len(LABEL_PREFIX)
     return sorted(l[n:] for l in labels if isinstance(l, str) and l[:n].casefold() == LABEL_PREFIX and len(l) > n)
