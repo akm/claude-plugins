@@ -71,7 +71,7 @@ def observed(url, state="OPEN", draft=False, merged=False, issues=(A9,), author=
 
 
 def question_table(doc, marker):
-    """文書から問いの表の範囲 (表の前置きの文 marker から、表の後の最初の空行まで) を切り出す。文書の別の表に同じ名前や選択肢があっても、問いの表だけを検査するため。
+    """文書から質問の表の範囲 (表の前置きの文 marker から、表の後の最初の空行まで) を切り出す。文書の別の表に同じ名前や選択肢があっても、質問の表だけを検査するため。
     marker が無ければ失敗させる (表の所在が変わったことを検出するため)。"""
     start = doc.index(marker)
     table_start = doc.index("\n| ", start)
@@ -80,12 +80,12 @@ def question_table(doc, marker):
 
 
 def question_row(table, kind):
-    """問いの表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確かめる (別の行の同じ並びと取り違えないため)。"""
+    """質問の表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確かめる (別の行の同じ並びと取り違えないため)。"""
     return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
 
 
 def question_kinds(table):
-    """問いの表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
+    """質問の表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
     種類の行は表の構造で見分ける (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
     kinds = set()
     for line in table.splitlines():
@@ -99,12 +99,12 @@ def question_kinds(table):
 
 
 def question_options_cell(row):
-    """問いの表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
+    """質問の表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
     return row.strip().strip("|").split("|")[-1].strip()
 
 
 def options_text(options):
-    """コードの選択肢を、問いの表の選択肢の欄の書き方 (`a` / `b`。自由回答は「無し」) にする。"""
+    """コードの選択肢を、質問の表の選択肢の欄の書き方 (`a` / `b`。自由回答は「無し」) にする。"""
     return " / ".join(f"`{o}`" for o in options) if options else "無し"
 
 
@@ -621,7 +621,7 @@ def kinds(entries):
 
 
 class AssignedScenesTest(unittest.TestCase):
-    """割り当て中の項目の場面ごとの扱い (問い・続きの書き込み・報告)。"""
+    """割り当て中の項目の場面ごとの扱い (質問・続きの書き込み・報告)。"""
 
     def test_nothing_to_do_for_item_in_expected_state(self):
         out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)]))
@@ -636,7 +636,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(out["actions"], [])
 
     def test_pending_question_is_not_asked_again_and_item_is_left_alone(self):
-        """同じ項目と種類の未回答の問いがあれば尋ね直さず、その項目には手を付けない (pending に返す)。"""
+        """同じ項目と種類の未回答の質問があれば尋ね直さず、その項目には手を付けない (pending に返す)。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -644,7 +644,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["questions"], [p["question_id"] for p in out["pending"]]), ([], ["q1"]))
 
     def test_reopen_while_close_question_pending_withdraws_and_restores_status(self):
-        """進行中の close の回答を待機する間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
+        """進行中の close の回答を待機する間に reopen されたら、質問を取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -996,12 +996,12 @@ class DocTest(unittest.TestCase):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
-        table = question_table(doc, "項目の状態の問いの種類 (`kind`) と選択肢 (`options`)")
-        self.assertEqual(question_kinds(table), set(itemstate.QUESTION_OPTIONS), "flow.md の問いの表の種類とコードの種類が一致しない")
+        table = question_table(doc, "項目の状態の質問の種類 (`kind`) と選択肢 (`options`)")
+        self.assertEqual(question_kinds(table), set(itemstate.QUESTION_OPTIONS), "flow.md の質問の表の種類とコードの種類が一致しない")
         for kind, options in itemstate.QUESTION_OPTIONS.items():
             row = question_row(table, kind)
-            self.assertIsNotNone(row, f"問いの種類 {kind} が flow.md の問いの表に無い")
-            self.assertEqual(question_options_cell(row), options_text(options), f"問いの種類 {kind} の選択肢が flow.md の問いの表の行と一致しない")
+            self.assertIsNotNone(row, f"質問の種類 {kind} が flow.md の質問の表に無い")
+            self.assertEqual(question_options_cell(row), options_text(options), f"質問の種類 {kind} の選択肢が flow.md の質問の表の行と一致しない")
 
 
 if __name__ == "__main__":

@@ -1075,7 +1075,7 @@ def build_parser():
     body.add_argument("--body", help='{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} の JSON')
     body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
     p_dconf.set_defaults(func=cmd_declaration_conflictability)
-    p_djudge = decl_sub.add_parser("judge", help="未判定の宣言を投稿の順に判定し、書き込みの候補・問い・合図を返す (書かない)")
+    p_djudge = decl_sub.add_parser("judge", help="未判定の宣言を投稿の順に判定し、書き込みの候補・質問・合図を返す (書かない)")
     p_djudge.add_argument("--dir", required=True, help="管理ディレクトリ")
     p_djudge.add_argument("--project", help="Project (owner/番号)。省略時は設定の project")
     p_djudge.add_argument("--issue", help="この項目の宣言だけ判定する (owner/repo#番号 か URL)。比べる相手はすべての項目から集める")

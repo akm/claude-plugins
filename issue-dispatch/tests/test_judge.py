@@ -226,13 +226,13 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual(out["signals"], [{"kind": "wait", "to": W7, "item": A9, "declaration": 400}])
 
     def test_unanswered_question_in_record_is_not_asked_again(self):
-        """記録に同じ項目・種類・対象の未回答の問いがあれば尋ね直さない (`待機` は書く)。"""
+        """記録に同じ項目・種類・対象の未回答の質問があれば尋ね直さない (`待機` は書く)。"""
         rec = rec_with(questions=question("conflict", A9, f"{A5}:410"))
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20))]), item(A5, B_GO)], rec=rec)
         self.assertEqual((out["judgments"][0]["result"], out["questions"], kinds(out["actions"])), ("ask", [], [("comment", "待機")]))
 
     def test_withdrawn_question_counts_as_unanswered(self):
-        """取り下げた問い (answer が null で answered_at がある) は回答に数えず、尋ね直す。"""
+        """取り下げた質問 (answer が null で answered_at がある) は回答に数えず、尋ね直す。"""
         q = question("conflict", A9, f"{A5}:410")
         q["q1"]["answered_at"] = t(7)
         out = run_judge([item(A9, [ASSIGN1, decl(400, t(20))]), item(A5, B_GO)], rec=rec_with(questions=q))
@@ -688,7 +688,7 @@ class DocTest(unittest.TestCase):
             self.assertIn(word, doc)
 
     def test_question_kinds_are_documented(self):
-        """判定の問いの種類と選択肢は flow.md の「判定」の表にある。記録の問いの `subject` は records.md に書かれている。"""
+        """判定の質問の種類と選択肢は flow.md の「判定」の表にある。記録の質問の `subject` は records.md に書かれている。"""
         with open(_FLOW, encoding="utf-8") as f:
             table = question_table(f.read(), "判定の質問の種類 (`kind`) と選択肢 (`options`)")
         self.assertEqual(question_kinds(table), set(judge.QUESTION_OPTIONS), "flow.md の判定の質問の表の種類とコードの種類が一致しない")
@@ -700,7 +700,7 @@ class DocTest(unittest.TestCase):
             self.assertIn("`subject`", f.read())
 
     def test_record_ask_accepts_subject_and_answer_for_reads_it(self):
-        """記録の `ask` は任意の `subject` を受け、judge.answer_for は項目・種類・対象で回答を引く (取り下げた問いは数えない)。"""
+        """記録の `ask` は任意の `subject` を受け、judge.answer_for は項目・種類・対象で回答を引く (取り下げた質問は数えない)。"""
         rec, errors = record.apply(record.new_record("akm/3"), [{"op": "ask", "question_id": "q1", "item": A9, "kind": "conflict", "options": ["wait", "small-pr", "proceed"], "at": t(1), "subject": f"{A5}:410"},
                                     {"op": "answer", "question_id": "q1", "answer": "wait", "at": t(2)},
                                     {"op": "ask", "question_id": "q2", "item": A9, "kind": "conflict", "options": ["wait"], "at": t(3), "subject": f"{A6}:420"},
@@ -708,9 +708,9 @@ class DocTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(rec["questions"]["q1"]["subject"], f"{A5}:410")
         self.assertEqual(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(0)), "wait")
-        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A6}:420", t(0)), "取り下げた問いは回答に数えない")
+        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A6}:420", t(0)), "取り下げた質問は回答に数えない")
         self.assertIsNone(judge.answer_for(rec, A9, "conflict", None, t(0)))
-        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(2)), "尋ねた時刻が割り当ての時刻より前の問いは読まない")
+        self.assertIsNone(judge.answer_for(rec, A9, "conflict", f"{A5}:410", t(2)), "尋ねた時刻が割り当ての時刻より前の質問は読まない")
         _, errors = record.apply(rec, [{"op": "ask", "question_id": "q3", "item": A9, "kind": "conflict", "options": ["wait"], "at": t(5), "subject": ""}])
         self.assertEqual([e["message"] for e in errors], ["subject は空でない文字列 (質問の対象: 資源の名前・相手の宣言など)"])
 

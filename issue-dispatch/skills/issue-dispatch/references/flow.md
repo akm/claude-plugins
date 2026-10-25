@@ -10,7 +10,7 @@
 
 | 状態 | 出どころ | 書き手と書く順 |
 | --- | --- | --- |
-| 割り当て中か (`assigned`) | 今の割り当てのコメント `割り当て` (宛先と番号) があり、その番号の `解放` が無く、正常な終わり (下の行) もしていない。進行中の Issue が閉じて、利用者の問いに回答が出ていない間は割り当て中。担当者と Status では決めない | 管理 (`Agent session ID` は排他の印で、コメントより先) |
+| 割り当て中か (`assigned`) | 今の割り当てのコメント `割り当て` (宛先と番号) があり、その番号の `解放` が無く、正常な終わり (下の行) もしていない。進行中の Issue が閉じて、利用者の質問に回答が出ていない間は割り当て中。担当者と Status では決めない | 管理 (`Agent session ID` は排他の印で、コメントより先) |
 | 割り当ての終わり (`end`) と reopen (`reopened`) | 終わり = 今の番号の `解放` (`kind` が `released`) か、正常な終わり (`kind` が `normal`): Issue が閉じていて、進行中 (`in_progress`) でない。進行中 = 今の割り当ての PR が無いか、読んだ時点で ready for review にもマージ済みにもなっていない。閉じたもの (`ClosedEvent` の `closer`) は問わない。Issue が開いている (reopen された) ときは、今の割り当ての最新の `ClosedEvent` の時点で PR が ready for review かマージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な終わりと読む。reopen = 終わった後の `ReopenedEvent`。Status だけの `Todo`・`Done` は、終わりでも reopen でもない | 管理 (`解放`。理由ごとに続けて書くものは [issue-format.md](issue-format.md) の `解放`)・利用者 (reopen) |
 | 宣言の段階 (`declaration`) | 今の割り当ての判定の要る最新の宣言 (`judged`) と、その宣言への `開始可`・`待機`・宣言の修正の `依頼` のうち最新のもの | 作業 (宣言)・管理 (結果のコメント → Status → 合図) |
 | 待機しているもの (`waiting_blockers`)・管理のセッションが書いた `Blocked` (`manager_blocked`) | 判定の要る最新の宣言への、最新の `開始可` より後の `待機` の理由と相手。管理のセッションが書いた `Blocked` かは、理由に `Issue` か `小さな PR` を含む最初の `待機` と、`Blocked` への Status の変化の時刻で見分ける (下の基準) | 管理 (`待機` → 理由が `Issue` か `小さな PR` のときだけ `blockedBy` → `Blocked` → 合図。資源・設定・利用者の回答の理由では Status を変えない) |
@@ -19,8 +19,8 @@
 | 資源の使用 (`reserved`・`held`) | 予約 = コメント `割り当て` の時点で付いていたラベル `resource:<名前>` (接頭辞は大文字小文字を区別しない。GitHub のラベルの名前が区別しないため) のうち、属性 `reserve` が `on_assign` のもの。持っている資源 (定義の正本は [issue-format.md](issue-format.md) の「更新の種類」。差し戻された宣言は数えない)。空いていない資源がある宣言は、`開始可` まで何も持たない | 利用者 (ラベル)・作業 (宣言)・管理 (`開始可`) |
 | 小さな PR | `待機` の理由の `小さな PR` と依頼先の Issue (と、報告の後は PR の URL) | 管理 (依頼・`待機`)・作業 (報告) |
 | 割り当ての無い項目の `Blocked` | 最新の `依存の待機` があり、その後に `依存の解消` が無い (管理のセッションが書いたもの)。無ければ利用者が手で付けたもの | 管理 (コメント → Status) |
-| 担当者の変化 | Issue の担当者 (範囲は担当者がトークンのログイン 1 人の項目) と、記録の未回答の問い | 利用者。割り当て中なら、回答が出るまで作業中の項目のまま |
-| 記録だけにあるもの | `record.json` (割り当ての意図・問いと回答・報告済みの印・確かめた本文の編集の時刻。[records.md](records.md)) | 管理。記録を失えば失う (「記録を失ったとき」) |
+| 担当者の変化 | Issue の担当者 (範囲は担当者がトークンのログイン 1 人の項目) と、記録の未回答の質問 | 利用者。割り当て中なら、回答が出るまで作業中の項目のまま |
+| 記録だけにあるもの | `record.json` (割り当ての意図・質問と回答・報告済みの印・確かめた本文の編集の時刻。[records.md](records.md)) | 管理。記録を失えば失う (「記録を失ったとき」) |
 
 **判断の基準** (場面ごとの扱いを決めるときに使う):
 
@@ -64,7 +64,7 @@
 | フィールド `Agent session ID` の値が宛先と違い、更新が `割り当て` より後 | 利用者の変更。空なら `field-cleared`、別の値なら `field-changed` を尋ねる |
 | 担当者が自分 1 人でなくなった | `assignee-changed` を尋ねる。回答が出るまで作業中の項目のまま |
 | 進行中の Issue が閉じた | `close-in-progress` を尋ねる。回答が出るまで割り当て中で、ほかの書き込みはしない |
-| `close-in-progress` の回答を待機する間に reopen された | 問いを取り下げ (`withdraw-question`)、フィールドは空にせず、Status を導いた状態 (`Blocked` か `In Progress`) に戻し、`reopened-while-pending` を報告する |
+| `close-in-progress` の回答を待機する間に reopen された | 質問を取り下げ (`withdraw-question`)、フィールドは空にせず、Status を導いた状態 (`Blocked` か `In Progress`) に戻し、`reopened-while-pending` を報告する |
 | `待機` (理由に `Issue` か `小さな PR`) の後に blockedBy か `Blocked` が無い | その blocker の `BlockedByRemovedEvent` が `待機` より後に無ければ続き (`blocked-by-add`) を書き、あれば `blocked-by-removed` を報告して足し直さない。Status の変化が `待機` より後に無ければ続き (`set-status` `Blocked`) を書き、あれば `status-changed` を報告する |
 | `In Progress`・`In review` の項目に人が足した blockedBy | 導出せず `blocked-by-added` を報告する |
 | 確認の対象のリポジトリ (設定 `third_party_edit_check`) で、`割り当て` より後 (記録の確かめた時刻より後) に第三者が本文を編集した | `third-party-edit` を尋ねる |
@@ -127,9 +127,9 @@
 | キー | 内容 |
 | --- | --- |
 | `actions` | 書き込みの候補 (下の表の種類)。`continuation` が真なら途中で止まった書き込みの続き |
-| `questions` | 尋ねること (`kind`・`item`・`options`。判定の質問は対象 `subject` も。項目の状態の問いの種類と選択肢は下の問いの表、判定の質問は「判定」の問いの表)。記録に同じ項目と種類 (と対象) の未回答の問いがあれば尋ね直さない。記録を失ったために尋ね直すものは `record_lost` が真 |
+| `questions` | 尋ねること (`kind`・`item`・`options`。判定の質問は対象 `subject` も。項目の状態の質問の種類と選択肢は下の質問の表、判定の質問は「判定」の質問の表)。記録に同じ項目と種類 (と対象) の未回答の質問があれば尋ね直さない。記録を失ったために尋ね直すものは `record_lost` が真 |
 | `reports` | 1 回だけ報告するもの (`kind`・`item` と内容)。記録の報告済みの印 (`reported`) があるものは返さない |
-| `pending` | 回答を待機する項目 (`question_id`・`item`・`kind`・`asked_at`)。この項目には手を付けない (回答を待機する間の reopen による問いの取り下げを除く) |
+| `pending` | 回答を待機する項目 (`question_id`・`item`・`kind`・`asked_at`)。この項目には手を付けない (回答を待機する間の reopen による質問の取り下げを除く) |
 | `record_lost` | 記録を失ったか (記録が無い・前の記録が `ended`) |
 
 | `actions` の種類 (`kind`) | 値 | 実行するサブコマンド |
@@ -148,11 +148,11 @@
 | `field-changed` | 人が `Agent session ID`・`Agent session title` を変えた (割り当ての無い項目) |
 | `blocked-by-added` / `blocked-by-removed` | 人が blockedBy を足した / 自分が足した blockedBy を外した (足し直さない) |
 | `reopened` | 終わった後の reopen (`fields_cleared` 空にしたか) |
-| `reopened-while-pending` | 回答を待機する間の reopen (問いを取り下げた) |
+| `reopened-while-pending` | 回答を待機する間の reopen (質問を取り下げた) |
 | `pr-base-not-default` | `PR の報告` の PR の向け先が既定のブランチでない |
 | `pr-left-open` | 正常な終わりの後に PR が開いたまま残っている |
 
-項目の状態の問いの種類 (`kind`) と選択肢 (`options`)。回答に従う処理は U16・U21 で決める。
+項目の状態の質問の種類 (`kind`) と選択肢 (`options`)。回答に従う処理は U16・U21 で決める。
 
 | 種類 | 尋ねること | 選択肢 |
 | --- | --- | --- |
@@ -165,11 +165,11 @@
 | `third-party-edit` | 確認の対象の項目の本文を、割り当ての後に第三者が編集した。作業のセッションに止めるよう伝えてよいか | `stop` / `continue` |
 | `merged-issue-open` | PR がマージされたが Issue が開いている。閉じるか | `close` / `keep` |
 | `pr-closed-unmerged` | PR がマージされずに閉じた。Status を戻して解除するか | `release` / `keep` |
-| `user-answer-lost` | 記録を失ったので、`利用者の回答` を待機していた宣言の問いを尋ね直す (自由回答) | 無し |
+| `user-answer-lost` | 記録を失ったので、`利用者の回答` を待機していた宣言の質問を尋ね直す (自由回答) | 無し |
 
-**人の変更の見分け** (計画の R22・KTD7): `--diffs` で渡した差分 (`observe diff` の出力) のうち、記録の意図 (自分の部分書き込み) と組み込みワークフローの遷移 (閉じた → `Done`、reopen → `Todo` (ワークフロー「Item reopened」が有効なとき)、追加 → `Todo`) と利用者が着手を決める遷移 (`Todo` か空 → `Ready`、reopen した項目の `Done` → `Ready`) で説明できないものを報告する。割り当て中の項目の Status とフィールドの変化は、場面の表のとおり問いにする。差分は報告のきっかけとしてだけ使い、続きを書くかの見分けには使わない (見分けは出来事の時刻で行う)。
+**人の変更の見分け** (計画の R22・KTD7): `--diffs` で渡した差分 (`observe diff` の出力) のうち、記録の意図 (自分の部分書き込み) と組み込みワークフローの遷移 (閉じた → `Done`、reopen → `Todo` (ワークフロー「Item reopened」が有効なとき)、追加 → `Todo`) と利用者が着手を決める遷移 (`Todo` か空 → `Ready`、reopen した項目の `Done` → `Ready`) で説明できないものを報告する。割り当て中の項目の Status とフィールドの変化は、場面の表のとおり質問にする。差分は報告のきっかけとしてだけ使い、続きを書くかの見分けには使わない (見分けは出来事の時刻で行う)。
 
-**記録を失ったとき** (記録が無い・前の記録が `ended`): 記録にだけある情報 (割り当ての意図・問いと回答・報告済みの印・確かめた本文の編集の時刻) を失い、同じ導出で続ける。`利用者の回答` を待機する宣言は `user-answer-lost` で尋ね直し、閉じて回答を待機する項目は `close-in-progress` を尋ね直し、報告済みの印が無いので人の変更などを 1 回ずつ報告し直すことがある。確認の対象の項目は、割り当ての前に利用者に確かめ直す (U16)。どれも `record_lost` を真にして返す。
+**記録を失ったとき** (記録が無い・前の記録が `ended`): 記録にだけある情報 (割り当ての意図・質問と回答・報告済みの印・確かめた本文の編集の時刻) を失い、同じ導出で続ける。`利用者の回答` を待機する宣言は `user-answer-lost` で尋ね直し、閉じて回答を待機する項目は `close-in-progress` を尋ね直し、報告済みの印が無いので人の変更などを 1 回ずつ報告し直すことがある。確認の対象の項目は、割り当ての前に利用者に確かめ直す (U16)。どれも `record_lost` を真にして返す。
 
 **処理の順**: 項目ごとに、割り当てのある項目の場面 (`引き継ぎ` → 回答を待機する間の reopen → 終わった後の reopen と残った PR → 進行中の close → 担当者 → フィールド → Status → `待機` の続き → 第三者の本文の編集 → PR) → 割り当ての無い項目の `Blocked` の再導出、の順に導き、最後に差分からの人の変更と、Project から除かれた項目を足す。差分の種類の順 (計画の R12) は [observation.md](observation.md)。未判定の宣言の判定の順は下の「判定」。待機していた宣言の再判定は U15 の後半。
 

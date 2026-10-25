@@ -239,18 +239,18 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(record.unanswered_questions(self.rec), [])
         self.assertEqual(self.rec["questions"]["q1"]["answered_at"], T2)
         _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q9", "answer": "x", "at": T2}])
-        self.assertEqual(len(errors), 1, "無い問いには回答できない")
+        self.assertEqual(len(errors), 1, "無い質問には回答できない")
         _, errors = record.apply(self.rec, [{"op": "ask", "question_id": "q1", "item": "akm/r#5", "kind": "conflict", "options": ["wait"], "at": T3}])
-        self.assertEqual(len(errors), 1, "同じ ID の問いを立て直せない (回答が消えるため)")
+        self.assertEqual(len(errors), 1, "同じ ID の質問を立て直せない (回答が消えるため)")
         self.assertEqual(self.rec["questions"]["q1"]["answer"], "proceed")
 
     def test_withdraw_question(self):
-        """取り下げた問いは未回答に数えず、回答は null のまま。回答のある問いは取り下げられない。"""
+        """取り下げた質問は未回答に数えず、回答は null のまま。回答のある質問は取り下げられない。"""
         self.apply({"op": "ask", "question_id": "q2", "item": "akm/r#6", "kind": "close-in-progress", "options": ["stop", "reopen"], "at": T1})
         self.apply({"op": "withdraw", "question_id": "q2", "at": T2})
         self.assertEqual((record.unanswered_questions(self.rec), self.rec["questions"]["q2"]["answer"], self.rec["questions"]["q2"]["answered_at"]), ([], None, T2))
         _, errors = record.apply(self.rec, [{"op": "withdraw", "question_id": "q1", "at": T3}])
-        self.assertEqual(len(errors), 1, "回答のある問いは取り下げられない")
+        self.assertEqual(len(errors), 1, "回答のある質問は取り下げられない")
 
     def test_null_and_out_of_range_values_are_rejected(self):
         """必須のキーの null・bool や 0 の assignment・null や空の answer は、例外ではなく誤りとして差し戻す。"""

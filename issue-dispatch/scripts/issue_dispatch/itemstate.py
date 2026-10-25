@@ -331,7 +331,7 @@ ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "blocked-by-remove", 
 # 1 回だけ報告するもの (記録の reported で重複を除く)
 REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
                 "pr-base-not-default", "pr-left-open")
-# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の問いの表
+# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の質問の表
 QUESTION_OPTIONS = {"close-in-progress": ["stop", "reopen"], "assignee-changed": ["release", "continue"], "field-cleared": ["release", "restore"],
                     "field-changed": ["release", "restore"], "removed": ["release", "keep"], "status-changed": ["release", "restore"],
                     "third-party-edit": ["stop", "continue"], "merged-issue-open": ["close", "keep"], "pr-closed-unmerged": ["release", "keep"],
@@ -417,7 +417,7 @@ def _rec_item(rec, key):
 
 
 def _unanswered(rec, key):
-    """項目への未回答の問い (question_id 付き)。"""
+    """項目への未回答の質問 (question_id 付き)。"""
     return [dict(q, question_id=qid) for qid, q in sorted(((rec or {}).get("questions") or {}).items())
             if ids.same_issue(q.get("item"), key) and q.get("answered_at") is None]
 
@@ -459,7 +459,7 @@ def _handover_action(item, cs, rec, own_id, lost):
 
 def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_states, lost):
     """割り当てのある項目の場面ごとの扱い (flow.md の「場面ごとの扱い」)。返り値は (actions, questions, reports)。
-    未回答の問いがある項目には手を付けない (回答を待機する間の reopen による問いの取り下げを除く)。"""
+    未回答の質問がある項目には手を付けない (回答を待機する間の reopen による質問の取り下げを除く)。"""
     actions, questions, reports = [], [], []
     cs = parsed_comments(item, login)
     asg = state["assignment"]
@@ -472,7 +472,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
     if pending and item.get("state") == "OPEN":
         close_q = [q for q in pending if q["kind"] == "close-in-progress"]
         if close_q and any((e.get("at") or "") > close_q[0]["asked_at"] for e in _events(item, "ReopenedEvent")):
-            # 回答を待機する間に reopen された: 問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
+            # 回答を待機する間に reopen された: 質問を取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
             actions.append({"kind": "withdraw-question", "item": key, "question_id": close_q[0]["question_id"]})
             restore = "Blocked" if "Blocked" in expected_statuses(state) else "In Progress"
             if status != restore:
@@ -570,7 +570,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
 
 def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
     """スナップショットの差分のうち、記録の意図 (自分の部分書き込み) と組み込みワークフローの遷移と利用者が着手を決める遷移で説明できないものを
-    報告する (KTD7)。割り当て中の項目の Status とフィールドの変化は assigned_scenes が問いにするのでここでは扱わない。"""
+    報告する (KTD7)。割り当て中の項目の Status とフィールドの変化は assigned_scenes が質問にするのでここでは扱わない。"""
     reports = []
     for diff in diffs or []:
         key = diff.get("item")
