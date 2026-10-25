@@ -53,7 +53,7 @@ def _name(repo, number):
 
     そこで**末尾に鍵のハッシュを付けて一意にする**。鍵は state.key と同じ
     `owner/repo#番号` にし、state の記録と本文の対応が定義上ずれないようにする。
-    先頭の読みやすい部分は人がファイルを見分けるためのもので、一意性は担わない。
+    先頭の読みやすい部分は人がファイルを識別するためのもので、一意性は担わない。
     """
     key = state.key(repo, number)
     fingerprint = hashlib.sha256(key.encode("utf-8")).hexdigest()[:_DIGEST_CHARS]

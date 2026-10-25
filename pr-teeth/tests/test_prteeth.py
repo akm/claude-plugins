@@ -1760,7 +1760,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("重点", html)
 
     def test_render_output_filename_marks_the_context(self):
-        # 巡回と番号指定の生成物が out/ に混ざったとき、名前で見分けられるように。
+        # 巡回と番号指定の生成物が out/ に混ざったとき、名前で判別できるように。
         pick, _ = self._render("pick")
         patrol, _ = self._render(None)
         self.assertIn("pr-teeth-pick-", os.path.basename(pick["path"]))

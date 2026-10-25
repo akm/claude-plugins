@@ -266,7 +266,7 @@ def handle(event, check_texts=None):
         return _failure(str(e))
 
     # 重大度 (error / warning) は検出の種類ではない。規則集の規則も、重大度を指定しなければ error になる。
-    # 種類は規則の名前で見分ける (規則 prh の検出が、用語ファイルかリポジトリの prh の辞書で言い換えを決めた語)
+    # 種類は規則の名前で判別する (規則 prh の検出が、用語ファイルかリポジトリの prh の辞書で言い換えを決めた語)
     term_errors, rule_errors, warnings = [], [], []
     for f in introduced(in_lines(before, results[0], removed), in_lines(after, results[1], added)):
         if f["severity"] != "error":
