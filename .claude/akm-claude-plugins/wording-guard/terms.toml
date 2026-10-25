@@ -345,7 +345,7 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 pattern = "終わ"
 verdict = "avoid"
 replacements = ["終了", "完了"]
-exceptions = ["で終わる名前", "で終わる文字列"]
+exceptions = ["` で終わ", "で終わる名前", "で終わる文字列"]
 reason = "英語 (end / finish) を直訳した訓読みの語。プロセス・コマンド・待機は「終了」、作業・割り当ては「完了」と書く。文字列の末尾を言う「〜で終わる名前」は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
