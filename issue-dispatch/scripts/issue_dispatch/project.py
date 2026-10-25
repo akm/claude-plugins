@@ -2,7 +2,7 @@
 不足の作成 (`add_fields`)・Status とフィールドの書き込み。様式の正本は
 issue-dispatch/skills/issue-dispatch/references/project-schema.md。
 
-GraphQL は同じディレクトリの graphql/*.graphql を `gh api graphql` で実行する (操作名で偽の gh が見分ける)。
+GraphQL は同じディレクトリの graphql/*.graphql を `gh api graphql` で実行する (操作名で偽の gh が識別する)。
 書き込みは `gh project item-edit` と `gh project field-create` と mutation で、どれも gh.run の mutation=True で行う。
 """
 

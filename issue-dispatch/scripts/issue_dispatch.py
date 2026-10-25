@@ -1108,7 +1108,7 @@ def build_parser():
     p_istate.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project と resources を読む)")
     p_istate.add_argument("--project", help="owner/番号 (省略時は設定の project)")
     p_istate.add_argument("--issue", help="1 項目だけ (owner/repo#番号)")
-    p_istate.add_argument("--diffs", help="observe diff の出力 (JSON ファイル。- なら標準入力)。人の変更の見分けに使う")
+    p_istate.add_argument("--diffs", help="observe diff の出力 (JSON ファイル。- なら標準入力)。人の変更の判別に使う")
     p_istate.set_defaults(func=cmd_item_state)
 
     p_work = sub.add_parser("work", help="作業のセッションの確認 (読むだけ)")

@@ -340,7 +340,7 @@ def list_comments(issue, login=None):
     return {"status": "ok", "login": login, "comments": out, "excluded": excluded, "rate_limit": rate_limit}
 
 
-# --- 既投稿の見分けと投稿 ---------------------------------------------------------
+# --- 既投稿の判別と投稿 ---------------------------------------------------------
 
 # 意味で比べる値: Issue の参照と PR の URL は owner/repo の大文字小文字を区別しない (GitHub が区別しないため)
 _REF_KEYS = ("waiting_issue", "issue", "blockers")
@@ -358,8 +358,8 @@ def _repo_folded(text):
     return text
 
 
-# 既投稿の見分けで投稿者のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
-# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で見分ける。
+# 既投稿の判別で投稿者のセッション ID も比べる種類。管理のセッションの種類は値だけで判別する (引き継がれて ID が変わっても
+# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で判別する。
 # 作業のセッションの種類は既投稿を確認しない (下の already_posted と post)
 ID_KEYED_KINDS = ("引き継ぎ",)
 

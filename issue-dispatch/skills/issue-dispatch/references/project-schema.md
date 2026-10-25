@@ -97,6 +97,6 @@
 
 - 書き込み (テキストのフィールド・Status・コメント・`blockedBy`・ラベル) の直後に項目の一覧を読むと、1 回目の読み取りで書いた値が返る。
 - フィールドの値の `updatedAt` が読め、Status の `updatedAt` は最後に変えた時刻と一致する。
-- ワークフローが付けた Status の変化も `ProjectV2ItemStatusChangedEvent` の `wasAutomated` は false で、ワークフローの変更と人の変更は `wasAutomated` では見分けられない。
+- ワークフローが付けた Status の変化も `ProjectV2ItemStatusChangedEvent` の `wasAutomated` は false で、ワークフローの変更と人の変更は `wasAutomated` では判別できない。
 - `Item closed` で、Issue が閉じた 1 秒後に `Done` が付く。reopen しても Status は `Done` のまま残る (デフォルトに `Item reopened` は無い)。
 - 一覧のクエリの費用は、項目 20 件で 1、100 件で 7〜8 ポイント (上限は 1 時間 5,000)。

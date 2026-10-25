@@ -86,7 +86,7 @@ def question_row(table, kind):
 
 def question_kinds(table):
     """質問の表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
-    種類の行は表の構造で見分ける (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
+    種類の行は表の構造で判別する (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
     kinds = set()
     for line in table.splitlines():
         if not line.startswith("|"):
@@ -297,7 +297,7 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["stage"], d["manager_blocked"], d["return_status"], d["own_blockers"], d["waiting_blockers"]), ("waiting", True, "In Progress", [A2], [A2]))
 
     def test_blocked_status_before_wait_is_users(self):
-        """`Blocked` への変化が `待機` より前なら、利用者が付けたもの (時刻で見分ける。KTD19 の基準)。"""
+        """`Blocked` への変化が `待機` より前なら、利用者が付けたもの (時刻で判別する。KTD19 の基準)。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(12))])
         self.assertEqual((d["manager_blocked"], d["return_status"]), (False, None))
 

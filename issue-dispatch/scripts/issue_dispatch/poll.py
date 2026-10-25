@@ -74,7 +74,7 @@ def write_pid_file(path, owner, name):
 
 
 def is_our_wait(entry):
-    """`wait.pid` の PID が、書かれた開始時刻と同じ開始時刻で動いていて、コマンドがこの CLI の待機なら真 (PID の再利用を見分ける)。"""
+    """`wait.pid` の PID が、書かれた開始時刻と同じ開始時刻で動いていて、コマンドがこの CLI の待機なら真 (PID の再利用を判別する)。"""
     pid = entry["pid"]
     start = process_start(pid)
     if start is None or start != entry.get("started_at"):

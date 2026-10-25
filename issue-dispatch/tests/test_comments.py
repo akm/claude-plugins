@@ -207,7 +207,7 @@ class ListTest(FakeGhCase):
 
 
 class AlreadyPostedTest(unittest.TestCase):
-    """既投稿の見分け (KTD2)。"""
+    """既投稿の判別 (KTD2)。"""
 
     @staticmethod
     def own(*lines):

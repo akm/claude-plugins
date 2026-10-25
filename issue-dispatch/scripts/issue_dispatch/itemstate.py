@@ -149,7 +149,7 @@ def assignment_end(item, cs, asg, pr):
     正常な完了は、Issue が閉じていて進行中でない (今の割り当ての PR が、読んだ時点で ready for review かマージ済み) こと。
     Issue が開いている (reopen された) ときは、今の割り当ての最新の `ClosedEvent` があり、その close の時点で PR が ready for review か
     マージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な完了と読む
-    (PR の timeline は読まないので、close の時点で draft だった PR が reopen の後に ready になった場合は見分けられない。flow.md)。
+    (PR の timeline は読まないので、close の時点で draft だった PR が reopen の後に ready になった場合は判別できない。flow.md)。
     返り値は {"kind": "released", "at", "reason"} / {"kind": "normal", "at": 最新の ClosedEvent の時刻} / None。"""
     rel = release(cs, asg)
     if rel:
