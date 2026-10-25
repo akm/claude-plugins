@@ -1,6 +1,6 @@
 # 観測 (スナップショットと差分)
 
-このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の正本。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。置き場 (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
+このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の正本。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
 
 ## 目的
 
@@ -89,7 +89,7 @@
 
 ### `wait.pid`
 
-実行中の待機を示すファイル。置き場は、管理の `wait` では記録の置き場 ([records.md](records.md))、作業の待機では `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` ([messaging.md](messaging.md) の一時ディレクトリ。作業ツリーには何も書かない)。JSON で、`pid` (待機のプロセス)・`started_at` (そのプロセスの開始時刻。`ps -o lstart=` の文字列のまま)・`owner` (所有者のセッション ID)・`wait` (待機の名前)・`written_at` を持つ。一時名に書いてから改名する。
+実行中の待機を示すファイル。保存先は、管理の `wait` では記録のディレクトリ ([records.md](records.md))、作業の待機では `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` ([messaging.md](messaging.md) の一時ディレクトリ。作業ツリーには何も書かない)。JSON で、`pid` (待機のプロセス)・`started_at` (そのプロセスの開始時刻。`ps -o lstart=` の文字列のまま)・`owner` (所有者のセッション ID)・`wait` (待機の名前)・`written_at` を持つ。一時名に書いてから改名する。
 
 - **起動時**: `wait.pid` があれば、その PID のプロセスの開始時刻が `started_at` と一致し、コマンドがこの CLI の待機 (`issue_dispatch.py` と待機の名前を含む) なら、SIGTERM を送って終了するのを待機する。一致しなければ (PID が別のプロセスに再利用されている)、停止せずに `wait.pid` だけ消す。その後、自分の PID で `wait.pid` を書き、標準出力の最初の行に `pid <PID>` を書く。
 - **終了するとき**: `wait.pid` の PID が自分のときだけ消す (停止された待機が、後から起動した待機の `wait.pid` を消さないため)。
@@ -136,6 +136,6 @@
 | `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが無ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠損と読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠損の扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに上書きし、`snapshot.warnings` (key `snapshot`) で知らせる |
 | `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが無ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠損と読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠損の扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待機していた PR の変化を見つけるため) |
 | 書き込みのサブコマンドの `--snapshot-dir <管理ディレクトリ>` | `snapshot.json` | 出力に `snapshot` (`reflected`・`warnings`) を足す |
-| `wait --dir <管理ディレクトリ> [--project <owner>/<番号>] [--interval <分>] [--minutes <分>]` | `wait.pid` (記録の置き場) | 「待機」の節。終了コードと標準出力の行 (JSON ではない)。スナップショットが無い・壊れていれば 5 |
+| `wait --dir <管理ディレクトリ> [--project <owner>/<番号>] [--interval <分>] [--minutes <分>]` | `wait.pid` (記録のディレクトリ) | 「待機」の節。終了コードと標準出力の行 (JSON ではない)。スナップショットが無い・壊れていれば 5 |
 | `wait-assignment --project <owner>/<番号> [--session <ID>] [--blocked <Issue>]... [--in-review <Issue>]... [--pending <Issue>] --interval <分> --minutes <分>` | `wait.pid` (一時ディレクトリ) | 「待機」の節。`--session` を省けば環境変数 |
 | `wait-decision --project <owner>/<番号> --issue <Issue> [--session <ID>] --declaration <宣言のコメントの ID> [--review-update] --interval <分> --minutes <分>` | `wait.pid` (一時ディレクトリ) | 「待機」の節 |

@@ -1,7 +1,7 @@
 """記録 (管理のセッションが持つ、GitHub から導けないもの) の読み書き。
 
-置き場は `<管理ディレクトリ>/<record_dir>/<owner>-<number>/` で、本体 `record.json` と追記専用の `actions.log` を扱う
-(`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。置き場・キー・扱いの正本は
+ディレクトリは `<管理ディレクトリ>/<record_dir>/<owner>-<number>/` で、本体 `record.json` と追記専用の `actions.log` を扱う
+(`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。ディレクトリ・キー・扱いの正本は
 issue-dispatch/skills/issue-dispatch/references/records.md。
 
 記録は蓄積データなので、壊れていれば `Corrupt` で中断し、新規として扱わない (無いときだけ新規)。保存は一時ファイルに
@@ -46,7 +46,7 @@ def project_key(project):
 
 
 def record_dir(manager_root, record_dir_setting, project):
-    """記録の置き場 `<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。"""
+    """記録のディレクトリ `<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。"""
     owner, number = project_key(project).split("/")
     return os.path.join(manager_root, record_dir_setting, f"{owner}-{number}")
 

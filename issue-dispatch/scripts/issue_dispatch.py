@@ -86,7 +86,7 @@ def cmd_files_classify(args):
 
 
 def _record_target(args):
-    """管理ディレクトリの設定から、記録の置き場と project を決める。設定に誤りがあれば (None, None, errors)。"""
+    """管理ディレクトリの設定から、記録のディレクトリと project を決める。設定に誤りがあれば (None, None, errors)。"""
     loaded = config.load(args.dir, "manager")
     if loaded["errors"]:
         return None, None, loaded["errors"]
@@ -200,7 +200,7 @@ def cmd_project_check(args):
 
 
 def _snapshot_dir(manager_dir, parsed_project=None):
-    """管理ディレクトリの設定からスナップショットの置き場 (記録の置き場と同じ) を決める。返り値は (ディレクトリ, 設定の project, errors)。"""
+    """管理ディレクトリの設定からスナップショットのディレクトリ (記録のディレクトリと同じ) を決める。返り値は (ディレクトリ, 設定の project, errors)。"""
     loaded = config.load(manager_dir, "manager")
     project_setting = parsed_project or loaded["config"].get("project")
     if not project_setting:
@@ -608,7 +608,7 @@ def cmd_wait(args):
 
 
 def _worker_waiter(args, name):
-    """作業のセッションの待機の共通: Project・セッション ID・wait.pid の置き場。返り値は (parsed, session_id, Waiter) か (None, None, 終了コード)。"""
+    """作業のセッションの待機の共通: Project・セッション ID・wait.pid のパス。返り値は (parsed, session_id, Waiter) か (None, None, 終了コード)。"""
     parsed = project.parse_project(args.project)
     if parsed is None:
         return None, None, _wait_error(f"--project は owner/番号 の形 (値 {args.project!r})")
@@ -974,7 +974,7 @@ def build_parser():
         p.set_defaults(func=func)
         if name == "items":
             p.add_argument("--write-snapshot", action="store_true", help="読んだ内容をスナップショットに書く (--dir が要る)")
-            p.add_argument("--dir", help="管理ディレクトリ (スナップショットの置き場は設定の record_dir)")
+            p.add_argument("--dir", help="管理ディレクトリ (スナップショットのディレクトリは設定の record_dir)")
     p_set = project_sub.add_parser("set-status", help="Status を書く (5 つ以外と Done は拒否)")
     p_set.add_argument("--project", required=True, help="owner/番号")
     p_set.add_argument("--item", required=True, help="項目の ID (project items の item_id)")
@@ -1124,7 +1124,7 @@ def build_parser():
     p_wheld.set_defaults(func=cmd_work_held)
 
     p_wait = sub.add_parser("wait", help="管理のセッションの待機: スナップショットとの差分があれば終了する (バックグラウンドで起動する)")
-    p_wait.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project・poll_minutes・wait_minutes と記録の置き場を読む)")
+    p_wait.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project・poll_minutes・wait_minutes と記録のディレクトリを読む)")
     p_wait.add_argument("--project", help="owner/番号 (省略時は設定の project)")
     p_wait.add_argument("--minutes", type=float, help="期限 (分。省略時は設定の wait_minutes)")
     p_wait.add_argument("--interval", type=float, help="読む間隔 (分。省略時は設定の poll_minutes)")

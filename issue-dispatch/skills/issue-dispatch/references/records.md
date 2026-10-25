@@ -1,12 +1,12 @@
 # 記録
 
-**このファイルが、記録 (管理のセッションが手元に持つファイル群) の置き場・様式・扱いの正本。** モジュール `issue-dispatch/scripts/issue_dispatch/record.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `record read` / `record apply` / `record log` はこれに従う。ほかの文書はキーの名前を参照するだけで、様式と扱いを言い直さない。
+**このファイルが、記録 (管理のセッションが手元に持つファイル群) のディレクトリ・様式・扱いの正本。** モジュール `issue-dispatch/scripts/issue_dispatch/record.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `record read` / `record apply` / `record log` はこれに従う。ほかの文書はキーの名前を参照するだけで、様式と扱いを言い直さない。
 
 **記録には、GitHub から導けないものだけを書く。** 導けるもの (下の「記録が持たないもの」) はターンのたびに GitHub から導く。記録と GitHub が食い違う場面と、記録を失ったときに作り直す別の手順を無くすため。
 
-## 置き場
+## ディレクトリ
 
-`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。`record_dir` は管理ディレクトリの設定のキー (デフォルト値はキーの表 [project-config.md](project-config.md) が持つ)。`<owner>-<number>` は設定の `project` から作る。置き場を Project ごとに分けるのは、設定の `project` を後で別の Project に書き換えたときに、前の Project の記録と混ざらないようにするため。置き場は git が無視する (設定は追跡し、記録は追跡しない)。
+`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。`record_dir` は管理ディレクトリの設定のキー (デフォルト値はキーの表 [project-config.md](project-config.md) が持つ)。`<owner>-<number>` は設定の `project` から作る。ディレクトリを Project ごとに分けるのは、設定の `project` を後で別の Project に書き換えたときに、前の Project の記録と混ざらないようにするため。このディレクトリは git が無視する (設定は追跡し、記録は追跡しない)。
 
 | ファイル | 書き込み元 | 内容 | 様式の正本 |
 | --- | --- | --- | --- |

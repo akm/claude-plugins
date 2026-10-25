@@ -16,7 +16,7 @@ import re
 
 from issue_dispatch import filekinds
 
-# 設定ファイルの置き場 (管理ディレクトリとリポジトリのルートからの相対パス。両方で同じ)
+# 設定ファイルのパス (管理ディレクトリとリポジトリのルートからの相対パス。両方で同じ)
 CONFIG_PATH = os.path.join(".claude", "akm-claude-plugins", "issue-dispatch", "config.json")
 
 ROLES = ("manager", "repo")

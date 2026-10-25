@@ -43,10 +43,10 @@ issue-dispatch は、管理ディレクトリ (管理のセッションが動く
 
 ## キーの表
 
-| キー | 置き場 | 意味 | 未設定のときの扱い |
+| キー | 配置先 | 意味 | 未設定のときの扱い |
 | --- | --- | --- | --- |
 | `project` | 管理 / リポジトリ | Project の `owner` (文字列) と `number` (1 以上の整数)。管理ディレクトリでは、管理のセッションが読む Project。リポジトリでは、`issue-work` が管理のセッションの規約の名前を導くのに使う (1 つだけ書く。ほかの Project の作業をさせるときは `issue-work` の引数 `--manager` で名前を渡す) | 管理ディレクトリでは**必須**で、無ければ `config read` がエラーを返し、管理のセッションは Project の owner と番号を利用者に質問して設定の雛形を示す。リポジトリでは省略できる (`issue-work` は開始時に利用者に質問する) |
-| `record_dir` | 管理 | 記録の置き場 (管理ディレクトリからの相対パス)。記録の契約は [records.md](records.md) | `tmp/issue-dispatch` |
+| `record_dir` | 管理 | 記録のディレクトリ (管理ディレクトリからの相対パス)。記録の契約は [records.md](records.md) | `tmp/issue-dispatch` |
 | `poll_minutes` | 管理 / リポジトリ | 管理ディレクトリでは、管理のセッションのポーリングの間隔 (分)。リポジトリでは、作業のセッションの待機 (`wait-assignment`・`wait-decision`) の間隔 (`--interval`) | 3 |
 | `wait_minutes` | 管理 / リポジトリ | 管理ディレクトリでは、管理のセッションの待機の期限 (分)。リポジトリでは、作業のセッションの待機の期限 (`--minutes`) | 60 |
 | `declare_deadline_minutes` | 管理 | 割り当てから着手の宣言までの期限 (分)。過ぎると `Agent stuck state` に `deadline-passed` を書く | 60 |
