@@ -263,7 +263,7 @@ class TestFinding(unittest.TestCase):
                 self.assertEqual(to_index(offset), counted(text, offset), f"{text!r} の位置 {offset}")
 
     def test_check_files_keeps_crlf_for_positions(self):
-        # textlint は CRLF のまま位置を数える。読み直すときに CRLF を LF に変えると、2 行目以降の位置がずれる
+        # textlint は CRLF のまま位置を数える。再度読み込むときに CRLF を LF に変えると、2 行目以降の位置がずれる
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "crlf.md")
             content = "一行目\r\n二行目\r\n同じ型の指摘\r\n"

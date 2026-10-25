@@ -397,7 +397,7 @@ def cmd_promote(args):
     warnings = []
     config_dir, paths, _ = _load(args, warnings)
     # ステータス変更は上書き意味論。record と重なったとき、こちらの確定操作が
-    # 相手の読み込み済みデータで巻き戻らないようロックの中で読み直す（#13）。
+    # 相手の読み込み済みデータで巻き戻らないようロックの中で再度読み込む（#13）。
     with store.locked(paths["glossary"]):
         g = _load_glossary(paths)
         existed = glossary.get(g, args.term) is not None
