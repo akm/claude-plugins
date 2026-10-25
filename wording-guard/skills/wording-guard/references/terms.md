@@ -53,7 +53,7 @@ decided_in = "https://github.com/akm/claude-plugins/issues/35"
 | --- | --- | --- |
 | `pattern` | ○ | 対象の語。`/` で始まり `/` で終わる文字列は正規表現 (JavaScript の正規表現。textlint の規則 textlint-rule-prh と同じ書き方)、それ以外は文字列のまま照合する |
 | `verdict` | ○ | `avoid` (避ける) か `allow` (許容する) |
-| `reason` | ○ | 決めた理由。読み手が言い換えを選ぶ材料になるように、何が問題なのかを書く |
+| `reason` | ○ | 決めた理由。読者が言い換えを選ぶ材料になるように、何が問題なのかを書く |
 | `decided_in` | ○ | 決めた場所 (Issue・PR の URL など)。後から理由の正当性を確認できるようにする |
 | `replacements` | 避ける語は ○ | 言い換えの候補。文脈で選ぶものは複数書く。許容する語には書けない |
 | `autofix` | | 自動修正してよいか (省略時は `false`)。`true` にできるのは、どの文脈でも同じ言い換えになる語だけで、`replacements` を 1 つに決める。許容する語には書けない |

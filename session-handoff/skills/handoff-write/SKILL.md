@@ -59,7 +59,7 @@ description: いまのセッションの作業を別のセッションへ引き�
    - `writer_model` は、このセッションのモデル名。分からなければ「不明」と書き、推測しない
    - `reader_model_and_effort` は、`--model` / `--effort` の値。無ければ「指定なし」
 
-4. **読み手の立場で検査する。** [references/what-to-carry.md](references/what-to-carry.md) の「読み手の立場での検査」の各項目を確認し、見つけたものを直す。埋め残した `{{…}}` が無いことも確認する。
+4. **読者の立場で検査する。** [references/what-to-carry.md](references/what-to-carry.md) の「読者の立場での検査」の各項目を確認し、見つけたものを直す。埋め残した `{{…}}` が無いことも確認する。
 
 5. **保存する。**
 

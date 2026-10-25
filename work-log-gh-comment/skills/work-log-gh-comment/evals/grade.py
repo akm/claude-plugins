@@ -475,7 +475,7 @@ def not_called_omission(s):
 
 
 def secret_handling_explained(s):
-    """マスクした値をどう受け取ればよいかが読み手に分かるか。
+    """マスクした値をどう受け取ればよいかが読者に分かるか。
 
     値を伏せたまま放り出すと、読む人は次の手順に進めない。
 
@@ -498,7 +498,7 @@ CHECKS = {
         ("トークンをマスクした事実が本文に書かれている", masking_stated),
         ("機密でない値が記録されている (地の文に書ける 2 つだけでなく、出力にしか現れない値まで見る)", nonsecret_kept),
         ("マスクを「省略」と書いていない", not_called_omission),
-        ("伏せた値をどう受け取るかが読み手に分かる", secret_handling_explained),
+        ("伏せた値をどう受け取るかが読者に分かる", secret_handling_explained),
     ],
     4: [
         ("コマンドと出力が <details> で折りたたまれている (開きタグと閉じタグが対で存在する)",

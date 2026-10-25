@@ -849,7 +849,7 @@ class TestPRSpec(unittest.TestCase):
     def test_hostlike_prefix_does_not_become_the_repo(self):
         # 素のパスの先頭がホストとして食われると、打っていないリポジトリに
         # 解決される（`foo/bar/baz/pull/9` -> `bar/baz`）。これが起きると
-        # 「別の PR の解説が正しい体裁で出る」= 読み手が誤りに気づけない。
+        # 「別の PR の解説が正しい体裁で出る」= 読者が誤りに気づけない。
         for bad in ("foo/bar/baz/pull/9", "orgs/owner/repo/pull/5"):
             with self.assertRaises(prspec.InvalidSpec):
                 prspec.parse_one(bad)
@@ -1095,7 +1095,7 @@ class TestBodies(unittest.TestCase):
         self.assertIn("-消える行", d)
 
     def test_diff_is_empty_when_unchanged(self):
-        # 変わっていないのに「本文が変わった」と出すと、読み手を惑わせる。
+        # 変わっていないのに「本文が変わった」と出すと、読者を惑わせる。
         self.assertEqual(bodies.diff("同じ本文", "同じ本文"), "")
 
     def test_diff_is_empty_without_a_previous_body(self):
@@ -1851,7 +1851,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("+## 追記", target["body_diff"])
 
     def test_body_diff_is_empty_when_only_code_changed(self):
-        # 本文が変わっていないのに差分を出すと、読み手を惑わせる。
+        # 本文が変わっていないのに差分を出すと、読者を惑わせる。
         self._record_body("同じ本文")
         target = self._select("同じ本文")["targets"][0]
         self.assertTrue(target["body_diff_available"])
