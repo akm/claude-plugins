@@ -431,7 +431,7 @@ class TestPreciousData(unittest.TestCase):
             self.assertTrue(self._child_can_lock(p))
 
     def test_lock_times_out_instead_of_hanging(self):
-        # 取れないまま無限に待つと、利用者からは固まったようにしか見えない。
+        # 取れないまま無限に待機すると、利用者からは固まったようにしか見えない。
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "g.json")
             holder = self._spawn_holder(p, hold=3.0)
@@ -484,7 +484,7 @@ class TestPreciousData(unittest.TestCase):
         return subprocess.run(cmd, capture_output=True).returncode == 0
 
     def _spawn_holder(self, path, hold):
-        """ロックを掴んだまま待つ子プロセスを起こす。"""
+        """ロックを掴んだまま待機する子プロセスを起こす。"""
         import subprocess
         cmd = self._lock_snippet(path, "\n".join([
             "with store.locked(<PATH>):",
@@ -494,7 +494,7 @@ class TestPreciousData(unittest.TestCase):
         return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _wait_until_locked(self, path, timeout=5.0):
-        """子がロックを掴むまで待つ。掴んだ合図はファイルの出現で受ける。"""
+        """子がロックを掴むまで待機する。掴んだ合図はファイルの出現で受ける。"""
         import time
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -1812,7 +1812,7 @@ class TestCliCommands(unittest.TestCase):
 
         slow = self._record_in_subprocess(["alpha"], delay=0.6)
         # 先行プロセスが「読み終えたが、まだ保存していない」窓に後続を入れる。
-        # ここを待たずに起こすと両者が順に走ってしまい、競合を再現できない。
+        # ここで待機せずに起こすと両者が順に走ってしまい、競合を再現できない。
         time.sleep(0.2)
         fast = self._record_in_subprocess(["beta"])
         self.assertEqual(slow.wait(), 0)

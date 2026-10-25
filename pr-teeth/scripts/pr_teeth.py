@@ -111,7 +111,7 @@ def cmd_select(args):
 
     # state と本文は対で意味を持つ（記録に対応する本文が差分の基準）。読む側も
     # 同じロックで囲み、record の途中の state と本文の組み合わせを読まない。
-    # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待たせない）。
+    # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待機させない）。
     with store.locked(paths["state"]):
         # state も蓄積データ。壊れていれば停止する（空扱いすると全件を再通知してしまう）。
         saved = store.load_precious(paths["state"], {})
@@ -287,7 +287,7 @@ def cmd_record(args):
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
     # 形が違えば例外で停止する。0件を記録して、エラーを出さずに成功を返すことはしない。
-    # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待たせない）。
+    # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待機させない）。
     items, skipped = agent_input.terms(payload)
     warnings.extend(skipped)
 
