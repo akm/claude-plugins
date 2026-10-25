@@ -346,7 +346,7 @@ pattern = "終わ"
 verdict = "avoid"
 replacements = ["終了", "完了"]
 exceptions = ["` で終わ", "で終わる名前", "で終わる文字列"]
-reason = "英語 (end / finish) を直訳した訓読みの語。プロセス・コマンド・待機は「終了」、作業・割り当ては「完了」と書く。文字列の末尾を言う「〜で終わる名前」は対象にしない"
+reason = "英語 (end / finish) を直訳した訓読みの語。プロセス・コマンド・待機は「終了」、作業・割り当ては「完了」と書く。文字列の末尾を言う用法は、末尾の文字列をバッククォートで囲んだ形 (「`.md` で終わる」) と、「で終わる名前」「で終わる文字列」だけを対象にしない。囲まない書き方は検出する"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
@@ -388,8 +388,8 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 pattern = "続き"
 verdict = "avoid"
 replacements = ["次の", "残り", "継続"]
-exceptions = ["手続き", "引き続き", "続きま"]
-reason = "英語 (continuation) を直訳した訓読みの語。「続きのページ」は「次のページ」、ほかは「残り」「継続」と書く"
+exceptions = ["手続き", "引き続き", "続き、", "続きま"]
+reason = "英語 (continuation) を直訳した訓読みの語。「続きのページ」は「次のページ」、ほかは「残り」「継続」と書く。動詞「続く」の連用形 (「続き、」) とます形 (「続きます」) は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
@@ -435,10 +435,10 @@ reason = "英語 (return) を直訳した訓読みの語。何に戻るのかを
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
-pattern = "/決まり(?!ま)/"
+pattern = "/決まり(?![ま、])/"
 verdict = "avoid"
 replacements = ["規則"]
-reason = "英語 (rule) を直訳した訓読みの語。音読みの二字漢語「規則」がある。動詞の「決まります」は対象にしない"
+reason = "英語 (rule) を直訳した訓読みの語。音読みの二字漢語「規則」がある。動詞「決まる」の連用形 (「決まり、」) とます形 (「決まります」) は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
@@ -477,18 +477,18 @@ reason = "英語 (spelling) を直訳した訓読みの語。大文字小文字�
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
-pattern = "/知らせ(?![るずてたなまれら])/"
+pattern = "/知らせ(?![るずてたなまれらよ、])/"
 verdict = "avoid"
 replacements = ["通知"]
-reason = "英語 (notification) を直訳した訓読みの語。名詞は「通知」と書く。動詞の「知らせる」は対象にしない (許容する語)"
+reason = "英語 (notification) を直訳した訓読みの語。名詞は「通知」と書く。動詞「知らせる」の活用形 (後ろに活用語尾が続く「知らせる」「知らせよう」などと、連用形の「知らせ、」) は対象にしない (許容する語)"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
 pattern = "/並び(?![順替])/"
 verdict = "avoid"
 replacements = ["順序", "順番"]
-exceptions = ["順に並び", "で並び"]
-reason = "英語 (order) を直訳した訓読みの語。「並び順」「並び替え」と、動詞「並ぶ」の連用形 (「〜の順に並び、」) は対象にしない"
+exceptions = ["並び、", "並びま"]
+reason = "英語 (order) を直訳した訓読みの語。「並び順」「並び替え」と、動詞「並ぶ」の連用形 (「並び、」) とます形 (「並びます」) は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
@@ -572,9 +572,9 @@ reason = "定着した技術用語"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
-pattern = "/知らせ(?=[るずてたなまれら])/"
+pattern = "/知らせ(?=[るずてたなまれらよ、])/"
 verdict = "allow"
-reason = "動詞の「知らせる」は英語の直訳ではない日本語。名詞の「知らせ」は避ける語"
+reason = "動詞「知らせる」の活用形は英語の直訳ではない日本語。名詞の「知らせ」は避ける語"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
