@@ -216,8 +216,8 @@ def _same_label(names, label):
 
 def add_label(issue, label, description=None):
     """Issue にラベルを足す。既に付いていれば何もしない。リポジトリにラベルが無ければ先に作る (色は gh のデフォルト、
-    説明は description)。名前は大文字小文字を区別せずに比べ、リポジトリに綴りだけ違うラベルがあればその綴りで足す。
-    返り値: {"status": "ok", "issue", "label" (足した綴り), "label_created", "added"} か失敗の説明。"""
+    説明は description)。名前は大文字小文字を区別せずに比べ、リポジトリに表記だけ違うラベルがあればその表記で足す。
+    返り値: {"status": "ok", "issue", "label" (足した表記), "label_created", "added"} か失敗の説明。"""
     ref = ids.parse_issue_ref(issue)
     if ref is None:
         return {"status": "error", "failure": "other", "exit_code": None, "message": f"Issue の参照ではない: {issue!r}"}
@@ -233,7 +233,7 @@ def add_label(issue, label, description=None):
         return _error(r, "labels")
     existing = _same_label([l.get("name") for l in r["json"]], label)
     if existing is not None:
-        label = existing  # 既にある綴りで足す (綴りだけ違う名前で作ろうとすると GitHub は「既にある」で拒む)
+        label = existing  # 既にある表記で足す (表記だけ違う名前で作ろうとすると GitHub は「既にある」で拒む)
         result["label"] = existing
     else:
         args = ["label", "create", label, "-R", ref["repo"]]

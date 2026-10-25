@@ -53,7 +53,7 @@ class AttributesTest(unittest.TestCase):
         self.assertEqual(resources.attributes_of(table, "staging-db"), {"name": "staging-db", "capacity": 2, "reserve": "on_assign", "when_busy": "ask", "release_undeclared": "ask"})
         self.assertEqual(resources.attributes_of(table, "gpu")["reserve"], "on_declare")
         self.assertEqual(resources.attributes_of(table, "GPU")["reserve"], "on_declare", "名前は大文字小文字を区別しない")
-        self.assertEqual(resources.attributes_of(table, "GPU")["name"], "gpu", "設定に書かれた綴りを返す")
+        self.assertEqual(resources.attributes_of(table, "GPU")["name"], "gpu", "設定に書かれた表記を返す")
 
     def test_warns_unknown_and_bad_values(self):
         table, warnings = resources.attributes({"db": {"capacity": 0, "when_busy": "maybe", "color": "red", "reserve": 3}, "x": {"capacity": "2"}})
@@ -65,7 +65,7 @@ class AttributesTest(unittest.TestCase):
 
     def test_duplicate_names_differing_in_case(self):
         table, warnings = resources.attributes({"DB": {"capacity": 2}, "db": {"capacity": 3}})
-        self.assertEqual(resources.attributes_of(table, "db")["capacity"], 2, "綴りだけ違う 2 つ目は使わない")
+        self.assertEqual(resources.attributes_of(table, "db")["capacity"], 2, "表記だけ違う 2 つ目は使わない")
         self.assertEqual([w["key"] for w in warnings], ["resources.db"])
 
 
@@ -95,7 +95,7 @@ class HeldResourcesTest(unittest.TestCase):
 
     def test_case_insensitive(self):
         history = [{"declaration": decl(["DB", "gpu"]), "go": True}, {"declaration": decl(["db"]), "go": False}]
-        self.assertEqual(resources.held_from_history(history), ["DB"], "名前は大文字小文字を区別せず、開始可の宣言の綴りで返す")
+        self.assertEqual(resources.held_from_history(history), ["DB"], "名前は大文字小文字を区別せず、開始可の宣言の表記で返す")
 
 
 class AssignTest(unittest.TestCase):
@@ -139,7 +139,7 @@ class AssignTest(unittest.TestCase):
 
     def test_case_insensitive_names(self):
         r = resources.judge_assign(I2, ["DB"], {"db": [I1]}, attrs({"Db": {"when_busy": "ask"}}), {})
-        self.assertEqual(r["result"], "ask", "ラベル・使用・設定の綴りが違っても同じ資源")
+        self.assertEqual(r["result"], "ask", "ラベル・使用・設定の表記が違っても同じ資源")
 
 
 class DeclareTest(unittest.TestCase):
@@ -178,7 +178,7 @@ class DeclareTest(unittest.TestCase):
         self.assertEqual((r["result"], r["release"], r["ask_undeclared"]), ("go", ["db"], []))
 
     def test_duplicate_names_reserved_once(self):
-        """宣言に同じ資源が綴りだけ違えて 2 度あっても (parse を通らない呼び出し)、1 つとして扱う。"""
+        """宣言に同じ資源が表記だけ違えて 2 度あっても (parse を通らない呼び出し)、1 つとして扱う。"""
         r = resources.judge_declare(I2, ["db", "DB"], [], {}, attrs(), {}, {})
         self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
 
@@ -228,7 +228,7 @@ class CloseAndReleaseTest(unittest.TestCase):
         """Issue の close・割り当ての解除: その項目が持つ資源をすべて解放する。"""
         r = resources.judge_close(I2, {"db": [I1, I2], "gpu": [I2], "x": [I3]})
         self.assertEqual(r, {"release": ["db", "gpu"]})
-        self.assertEqual(resources.judge_close(I2, {"db": [I2.upper()]}), {"release": ["db"]}, "項目の綴りが違っても解放する")
+        self.assertEqual(resources.judge_close(I2, {"db": [I2.upper()]}), {"release": ["db"]}, "項目の表記が違っても解放する")
 
     def test_release_returns_waiting_in_post_order(self):
         """資源の解放: その資源で待機していた宣言を、投稿の順 (同じなら Project の中の順) に返す。"""
@@ -237,7 +237,7 @@ class CloseAndReleaseTest(unittest.TestCase):
                    {"item": I1, "declaration": 10, "posted_at": "2026-10-23T00:00:00Z", "position": 2, "wait_for": ["gpu"]},
                    {"item": f"{REPO}#4", "declaration": 40, "posted_at": "2026-10-23T00:00:00Z", "position": 3, "wait_for": ["db"]}]
         r = resources.judge_release("db", waiting)
-        self.assertEqual([w["declaration"] for w in r["rejudge"]], [40, 20, 30], "投稿の順、同じなら Project の中の順。綴りは区別しない")
+        self.assertEqual([w["declaration"] for w in r["rejudge"]], [40, 20, 30], "投稿の順、同じなら Project の中の順。表記は区別しない")
 
 
 class CliTest(unittest.TestCase):

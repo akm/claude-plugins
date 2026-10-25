@@ -357,7 +357,7 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["judged"]["error"], d["judged"]["declaration"]["files"]), (None, [{"path": "src/app.ts", "units": None, "kind": None}]))
 
     def test_declaration_paths_are_normalized_for_update_kind(self):
-        """パスの綴りだけが違う (./src/a.py) 更新は同じファイルと数え、資源を外すだけなら判定の要る宣言にならない (declaration.parse と同じ正規化)。"""
+        """パスの表記だけが違う (./src/a.py) 更新は同じファイルと数え、資源を外すだけなら判定の要る宣言にならない (declaration.parse と同じ正規化)。"""
         update = wcomment("宣言の更新", None, t(14), 401, body=decl_body(files=(("./src/a.py", None),), resources=()))
         d = stage_of(DECL1, _go(400, t(13), 500), update)
         self.assertEqual((d["judged"]["comment_id"], d["stage"], d["held"]), (400, "go", []))
@@ -413,7 +413,7 @@ class ResourceUsageTest(unittest.TestCase):
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["reserved"], [])
 
     def test_label_prefix_is_case_insensitive(self):
-        """ラベルの名前は GitHub が大文字小文字を区別しないので、`Resource:DB` も資源 DB として予約に数える (名前はラベルの綴りのまま)。"""
+        """ラベルの名前は GitHub が大文字小文字を区別しないので、`Resource:DB` も資源 DB として予約に数える (名前はラベルの表記のまま)。"""
         item = make_item(labels=["Resource:DB"], comments_=[ASSIGN1], events=[_label_event("LabeledEvent", "Resource:DB", t(1))])
         self.assertEqual(itemstate.resource_labels(["Resource:DB", "bug", "resource:"]), ["DB"])
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["reserved"], ["DB"])

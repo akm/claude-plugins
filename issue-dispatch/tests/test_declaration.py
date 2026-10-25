@@ -135,7 +135,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual([e["key"] for e in result["errors"]], ["files[0].path", "files[1].units", "files[2].units[0]"])
 
     def test_duplicate_resources_rejected(self):
-        """同じ資源 (綴りだけ違うものを含む) を 2 度書けない。"""
+        """同じ資源 (表記だけ違うものを含む) を 2 度書けない。"""
         self.assertRejected(decl(resources=["db", "DB"]), "resources[1]", "同じ資源")
         self.assertRejected(decl(resources=["db", "gpu", "db"]), "resources[2]", "同じ資源")
 
@@ -188,7 +188,7 @@ class UpdateKindTest(unittest.TestCase):
         """資源の名前は大文字小文字を区別しない (正本は resources.md)。"""
         go = parsed(["a.md"], ["DB", "gpu"])
         self.assertEqual(declaration.held_resources(go, [parsed(["a.md"], ["db"])]), {"DB"})
-        self.assertEqual(declaration.update_kind(go, parsed(["a.md"], ["db", "GPU"]), {"DB", "gpu"}), "full", "綴りだけ違えば何も変わらない更新")
+        self.assertEqual(declaration.update_kind(go, parsed(["a.md"], ["db", "GPU"]), {"DB", "gpu"}), "full", "表記だけ違えば何も変わらない更新")
         self.assertEqual(declaration.resource_changes(parsed(["a.md"], ["db"]), {"DB", "gpu"}), {"added": [], "removed": ["gpu"]})
 
     def test_rewrite_after_rejection_is_not_removal(self):

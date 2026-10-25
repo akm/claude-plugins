@@ -2,7 +2,7 @@
 
 このファイルが、この仕組み (issue-dispatch) の資源の扱いの正本。資源は、同時に使える数が限られるもの (検証用の DB・GPU など) で、Issue のラベル `resource:<名前>` (正本は [issue-format.md](issue-format.md) の「Issue が持つもの」) と宣言の `resources` (同じ文書の「宣言」) で表す。資源の種類で変わりうる判断はすべて属性にし、属性は管理ディレクトリの設定の `resources` に資源の名前ごとに書く (設定のキーの正本は [project-config.md](project-config.md))。設定に無い資源と、書かれていない属性はデフォルト値で扱い、デフォルト値は資源の種類を区別しないときの扱い。新しい種類のために判断を変えるときは、属性の表に行を足し、契機の表の「読む属性」を直す (計画の KTD8)。モジュール `issue-dispatch/scripts/issue_dispatch/resources.py` が、属性の適用と契機ごとの判断を実装する (`gh` は使わない)。
 
-**資源の名前は大文字小文字を区別しない** (ラベルの名前を GitHub が区別しないため)。設定の `resources` のキー・ラベル・宣言の `resources`・使用の表の名前を同じ規則で比べ、返す名前は渡された綴りのまま。設定で綴りだけ違う 2 つ目以降の資源は警告して使わない。
+**資源の名前は大文字小文字を区別しない** (ラベルの名前を GitHub が区別しないため)。設定の `resources` のキー・ラベル・宣言の `resources`・使用の表の名前を同じ規則で比べ、返す名前は渡された表記のまま。設定で表記だけ違う 2 つ目以降の資源は警告して使わない。
 
 ## 属性
 
@@ -39,5 +39,5 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `resources attributes --dir <管理ディレクトリ> [--name <資源>]` | 無し | `resources` (設定の資源ごとの属性。`--name` なら その資源 1 つで、設定に無ければデフォルト値)・`defaults`・`warnings` (未知の属性・誤った値・綴りだけ違う名前) |
+| `resources attributes --dir <管理ディレクトリ> [--name <資源>]` | 無し | `resources` (設定の資源ごとの属性。`--name` なら その資源 1 つで、設定に無ければデフォルト値)・`defaults`・`warnings` (未知の属性・誤った値・表記だけ違う名前) |
 | `resources judge --dir <管理ディレクトリ> --trigger <契機> (--body <JSON> \| --body-file <ファイル \| ->)` | 無し | 契機の表の「結果」に書いたキー。本文のキーは契機ごと: `assign` は `item`・`resources` (ラベルの資源)・`usage`・`answers`。`declare` は `item`・`declared`・`reserved`・`usage`・`answers`・`undeclared_answers`。`update` は `item`・`kind` (更新の種類)・`held`・`declared`・`usage`・`answers`。`close` は `item`・`usage`。`release` は `resource`・`waiting` (要素は `item`・`declaration`・`posted_at` (文字列)・`position` (整数)・`wait_for`)。`usage` は資源の名前 → 持っている項目 (`owner/repo#番号`) の配列。資源の名前の配列は空でない文字列の配列、`answers` と `undeclared_answers` は資源の名前 → 回答 (文字列)。入れ子の中身まで検査し、形が違えば `errors` で返す |

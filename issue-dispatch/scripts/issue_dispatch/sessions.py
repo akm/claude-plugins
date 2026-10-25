@@ -51,7 +51,7 @@ def own_session_id(environ):
 def manager_name(owner, number=None, login=None):
     """管理のセッションの規約の名前 `issue-dispatch <owner>/<number>/<login>` を作る (KD23)。owner に設定の project
     (dict。owner と number) を渡してもよい。owner と login は小文字にそろえる (GitHub は大文字小文字を区別しないが、名前は
-    Claude Code が文字列として照合する宛先なので、設定に書かれた綴りが違っても同じ組から同じ名前を導くため)。
+    Claude Code が文字列として照合する宛先なので、設定に書かれた表記が違っても同じ組から同じ名前を導くため)。
     形が違えば ValueError。"""
     if isinstance(owner, dict):
         owner, number = owner.get("owner"), owner.get("number")

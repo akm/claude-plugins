@@ -34,7 +34,7 @@
 | `Blocked` | 管理のセッション・利用者 | ほかの Issue か小さな PR を待機する |
 | `Done` | 組み込みワークフロー (管理のセッションは書かない) | Issue が閉じた |
 
-`Todo`・`In Progress`・`Done` は Project が最初から持ち、`Ready`・`In review`・`Blocked` はこの仕組みが足す (`In Progress` の綴りは Project のまま使う)。管理のセッションが書く Status は `Todo`・`Ready`・`Blocked`・`In Progress`・`In review` の 5 つに限り、`Done` は書かない (CLI の `project set-status` は、ほかの値を `gh` を実行せずに拒否する)。**Status が空の項目は無視する** — 管理のセッションは Status を書き足さない (Project によって選択肢の名前が違い、空の項目に何を書けばよいかを決められないため)。利用者が手で変えた Status は上書きせず、1 回だけ報告する。
+`Todo`・`In Progress`・`Done` は Project が最初から持ち、`Ready`・`In review`・`Blocked` はこの仕組みが足す (`In Progress` の表記は Project のまま使う)。管理のセッションが書く Status は `Todo`・`Ready`・`Blocked`・`In Progress`・`In review` の 5 つに限り、`Done` は書かない (CLI の `project set-status` は、ほかの値を `gh` を実行せずに拒否する)。**Status が空の項目は無視する** — 管理のセッションは Status を書き足さない (Project によって選択肢の名前が違い、空の項目に何を書けばよいかを決められないため)。利用者が手で変えた Status は上書きせず、1 回だけ報告する。
 
 ## キューの順
 

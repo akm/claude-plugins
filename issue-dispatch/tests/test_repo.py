@@ -226,7 +226,7 @@ class ReadRepoConfigTest(unittest.TestCase):
         self.assertEqual(self.read({"akm/verify-a": link})["status"], "ok", "シンボリックリンクを経たルートも読む")
         variant = os.path.join(self.root, "CLONE")
         if os.path.isdir(variant) and os.path.samefile(variant, self.clone):
-            self.assertEqual(self.read({"akm/verify-a": variant})["status"], "ok", "大文字と小文字だけ違う綴りも読む")
+            self.assertEqual(self.read({"akm/verify-a": variant})["status"], "ok", "大文字と小文字だけ違う表記も読む")
 
     def test_origin_url_forms_and_alias(self):
         for url in ("https://github.com/AKM/Verify-A.git", "ssh://git@github.com/akm/verify-a", "git@ssh.github.com:akm/verify-a.git"):

@@ -53,7 +53,7 @@ class ManagerNameTest(unittest.TestCase):
         self.assertEqual(sessions.manager_name("akm", 3, "akm"), "issue-dispatch akm/3/akm")
         self.assertEqual(sessions.manager_name("akm", 3, "akm"), sessions.manager_name("akm", "3", "akm"))
         self.assertEqual(sessions.manager_name({"owner": "akm", "number": 3}, login="someone"), "issue-dispatch akm/3/someone", "設定の project (dict) も受ける")
-        self.assertEqual(sessions.manager_name("AKM", 3, "Akm"), "issue-dispatch akm/3/akm", "owner と login の綴りが違っても同じ名前 (GitHub は区別しない)")
+        self.assertEqual(sessions.manager_name("AKM", 3, "Akm"), "issue-dispatch akm/3/akm", "owner と login の表記が違っても同じ名前 (GitHub は区別しない)")
 
     def test_name_rejects_bad_inputs(self):
         for owner, number, login in (("", 3, "akm"), ("akm", 0, "akm"), ("akm", "x", "akm"), ("akm", 3, ""), ("a/b", 3, "akm"), ("akm", 3, "a b"), (None, 3, "akm")):

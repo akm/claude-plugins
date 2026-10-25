@@ -3,7 +3,7 @@
 (`judge_assign`・`judge_declare`・`judge_update`・`judge_close`・`judge_release`。属性と、U13 が求めた資源の使用と、記録にある
 利用者の回答を引数で受ける)。属性の表と契機の表の正本は issue-dispatch/skills/issue-dispatch/references/resources.md。gh は使わない。
 
-資源の名前は大文字小文字を区別せずに比べる (ラベルの名前を GitHub が区別しないため)。返す名前は、呼び出し元が渡した綴り
+資源の名前は大文字小文字を区別せずに比べる (ラベルの名前を GitHub が区別しないため)。返す名前は、呼び出し元が渡した表記
 (宣言・ラベル・設定) のまま。
 """
 
@@ -26,13 +26,13 @@ def _key(name):
 
 def attributes(config_resources):
     """設定の `resources` (資源の名前 → 属性のオブジェクト。config が形だけ検査したもの) に、書かれていない属性のデフォルト値を
-    当てる。返り値は (表: 名前の casefold → {"name": 設定の綴り, 属性...}, warnings: [{"key", "message"}])。
-    未知の属性と誤った値は警告してデフォルト値を使う。綴りだけ違う 2 つ目以降の資源は警告して使わない。"""
+    当てる。返り値は (表: 名前の casefold → {"name": 設定の表記, 属性...}, warnings: [{"key", "message"}])。
+    未知の属性と誤った値は警告してデフォルト値を使う。表記だけ違う 2 つ目以降の資源は警告して使わない。"""
     table, warnings = {}, []
     for name, raw in (config_resources or {}).items():
         key = _key(name)
         if key in table:
-            warnings.append({"key": f"resources.{name}", "message": f"資源 {name!r} は {table[key]['name']!r} と綴りだけが違う (名前は大文字小文字を区別しない)。使わない"})
+            warnings.append({"key": f"resources.{name}", "message": f"資源 {name!r} は {table[key]['name']!r} と表記だけが違う (名前は大文字小文字を区別しない)。使わない"})
             continue
         entry = {"name": name, **DEFAULTS}
         for attr, value in (raw or {}).items():
@@ -53,7 +53,7 @@ def attributes(config_resources):
 
 
 def attributes_of(table, name):
-    """資源の属性。設定に無ければデフォルト値 (name は渡された綴り)。"""
+    """資源の属性。設定に無ければデフォルト値 (name は渡された表記)。"""
     return dict(table.get(_key(name)) or {"name": name, **DEFAULTS})
 
 
@@ -62,7 +62,7 @@ def attributes_of(table, name):
 def held_from_history(history):
     """今の割り当ての宣言の並び (投稿の順) から持っている資源を求める。history の要素は {"declaration": parse の結果の declaration,
     "go": `開始可` を書いたか, "rejected": 差し戻されたか (省略は偽)}。
-    最後に `開始可` を書いた宣言の resources のうち、その後の差し戻されていない更新のすべてに残っているもの (その宣言の綴り)。
+    最後に `開始可` を書いた宣言の resources のうち、その後の差し戻されていない更新のすべてに残っているもの (その宣言の表記)。
     `開始可` の宣言が無ければ空。"""
     accepted = [h for h in history if not h.get("rejected")]
     go_index = max((i for i, h in enumerate(accepted) if h.get("go")), default=None)
@@ -81,7 +81,7 @@ def _same_item(a, b):
 
 
 def holders(usage, name, except_item=None):
-    """資源を持つ項目 (使用 usage: 資源の名前 → 項目のキーの配列。資源の綴りも項目の綴りも問わない) のうち except_item 以外。"""
+    """資源を持つ項目 (使用 usage: 資源の名前 → 項目のキーの配列。資源の表記も項目の表記も問わない) のうち except_item 以外。"""
     out = []
     for key, items in (usage or {}).items():
         if _key(key) == _key(name):
@@ -94,7 +94,7 @@ def _busy(usage, name, item, attrs_table):
 
 
 def _unique(names):
-    """名前の重複 (大文字小文字を区別しない) を除き、最初の綴りを残す。"""
+    """名前の重複 (大文字小文字を区別しない) を除き、最初の表記を残す。"""
     seen, out = set(), []
     for n in names:
         if _key(n) not in seen:
@@ -201,7 +201,7 @@ def judge_update(item, kind, held, declared, usage, attrs_table, answers):
 
 
 def judge_close(item, usage):
-    """契機「Issue の close・割り当ての解除」。その項目が持つ資源をすべて解放する。返り値: {"release": [資源 (usage の綴り)]}。"""
+    """契機「Issue の close・割り当ての解除」。その項目が持つ資源をすべて解放する。返り値: {"release": [資源 (usage の表記)]}。"""
     return {"release": [name for name, items in (usage or {}).items() if any(_same_item(i, item) for i in items)]}
 
 
