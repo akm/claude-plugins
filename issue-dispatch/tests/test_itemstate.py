@@ -84,6 +84,16 @@ def question_row(table, kind):
     return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
 
 
+def question_options_cell(row):
+    """問いの表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
+    return row.strip().strip("|").split("|")[-1].strip()
+
+
+def options_text(options):
+    """コードの選択肢を、問いの表の選択肢の欄の書き方 (`a` / `b`。自由回答は「無し」) にする。"""
+    return " / ".join(f"`{o}`" for o in options) if options else "無し"
+
+
 ASSIGN1 = mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100)
 ASSIGN2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
 
@@ -976,8 +986,7 @@ class DocTest(unittest.TestCase):
         for kind, options in itemstate.QUESTION_OPTIONS.items():
             row = question_row(table, kind)
             self.assertIsNotNone(row, f"問いの種類 {kind} が flow.md の問いの表に無い")
-            if options:
-                self.assertIn(" / ".join(f"`{o}`" for o in options), row, f"問いの種類 {kind} の選択肢が flow.md の問いの表の行に無い")
+            self.assertEqual(question_options_cell(row), options_text(options), f"問いの種類 {kind} の選択肢が flow.md の問いの表の行と一致しない")
 
 
 if __name__ == "__main__":
