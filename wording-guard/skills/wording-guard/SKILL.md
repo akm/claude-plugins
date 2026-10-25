@@ -5,7 +5,7 @@ description: これから外へ出す日本語の文章から、説明のない�
 
 # wording-guard: 書いた本人に見えない言い回しを、原則から探す
 
-**書き手が自分の文章に混ぜた比喩・口語・擬人化は、書いた本人には見えない。** 指摘されて 1 語を直しても、同じ原則に反する別の語が残る。指摘と修正を 3 往復してようやく完了する、という事態はこうして起きる (実例はファイル [wording-guard/skills/wording-guard/references/kind-expansion.md](references/kind-expansion.md))。
+**筆者が自分の文章に混ぜた比喩・口語・擬人化は、書いた本人には見えない。** 指摘されて 1 語を直しても、同じ原則に反する別の語が残る。指摘と修正を 3 往復してようやく完了する、という事態はこうして起きる (実例はファイル [wording-guard/skills/wording-guard/references/kind-expansion.md](references/kind-expansion.md))。
 
 このスキルは、**見つけた 1 件から、その 1 件が反している原則と種類を言葉にし、同じ種類の他の表現を対象全体から探す**。語の一覧との照合ではない。
 
