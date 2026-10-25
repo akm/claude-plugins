@@ -133,6 +133,21 @@ class OthersTest(unittest.TestCase):
         self.assertEqual([j["result"] for j in out["judgments"]], ["go", "ask"])
         self.assertEqual(out["judgments"][1]["compared"], [400], "先に `開始可` になった宣言を、後の宣言の相手にする")
 
+    def test_only_judges_up_to_that_item_in_posting_order(self):
+        """only (CLI の --issue) は、投稿の順に並べた未判定の宣言のうち、その項目の宣言までを判定して止める。前の宣言は飛ばさず、後の宣言は判定しない。
+        その項目に未判定の宣言が無ければ何も判定しない。"""
+        first = item(A9, [ASSIGN1, decl(400, t(20))], position=1)  # 先に投稿。src/a.py
+        target = item(A5, [assign(W8, 1, t(10), 110), decl(410, t(30), to=W8)], position=2)  # 後に投稿。同じ src/a.py
+        later = item(A6, [assign(W9, 1, t(10), 120), decl(420, t(40), files=(("src/c.py", None),), to=W9)], position=3)
+        out = run_judge([first, target, later], only=A5)
+        self.assertEqual([(j["item"], j["result"]) for j in out["judgments"]], [(A9, "go"), (A5, "ask")], "前の宣言を先に判定し、後の宣言は判定しない")
+        self.assertEqual(out["judgments"][1]["compared"], [400], "先に `開始可` にした前の宣言が相手になる")
+        out = run_judge([first, target, later], only=A9)
+        self.assertEqual([(j["item"], j["result"]) for j in out["judgments"]], [(A9, "go")])
+        no_pending = item(f"{A}#7", [assign(W9, 1, t(10), 130), decl(430, t(11), to=W9), go(430, t(12), 530, to=W9)])
+        out = run_judge([first, target, no_pending], only=f"{A}#7")
+        self.assertEqual(out["judgments"], [], "その項目に未判定の宣言が無ければ何も判定しない")
+
     def test_other_repository_is_not_compared(self):
         """別のリポジトリの `開始可` の宣言とは比べない。"""
         other = item(OTHER_REPO_ITEM, [assign(W8, 1, t(10), 110), decl(410, t(11), to=W8), go(410, t(12), 510, to=W8)])

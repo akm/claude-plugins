@@ -489,17 +489,21 @@ _SLIM_KEYS = ("item", "declaration", "to", "assignment", "update_kind", "repo_co
 
 def judge(items, states, rec, attrs_table, pr_states, read_config, table=None, login=None, only=None):
     """未判定の宣言を順に判定する。read_config はリポジトリ (owner/repo) → repo.read_repo_config の結果を返す関数 (リポジトリごとに 1 回呼ぶ)。
-    only を渡せばその項目の宣言だけ判定する (相手はすべての項目から集める)。同じ実行で `開始可` にした宣言は、後の宣言の相手になり、予約した資源は
-    後の宣言には空いていない。返り値: {"judgments": [judge_one の結果から actions・questions・signals・parsed を除いたもの], "actions", "questions", "signals"}。"""
+    only を渡せば、投稿の順に並べた未判定の宣言のうち、その項目の宣言までを判定して止める (前に投稿された宣言も判定し、後の宣言は判定しない。
+    その項目に未判定の宣言が無ければ何も判定しない)。判定の順序の決まり (投稿の順) を only のときも守るため。相手はすべての項目から集める。
+    同じ実行で `開始可` にした宣言は、後の宣言の相手になり、予約した資源は後の宣言には空いていない。返り値: {"judgments": [judge_one の結果から actions・questions・signals・parsed を除いたもの], "actions", "questions", "signals"}。"""
     table = table if table is not None else filekinds.load_default_table()
     others = go_declarations(items, states, pr_states, login)
     usage = usage_for(states, rec, attrs_table)
     configs = {}
     out = {"judgments": [], "actions": [], "questions": [], "signals": []}
-    for entry in pending(items, states):
+    entries = pending(items, states)
+    if only is not None:
+        # only の項目の宣言の位置まで (前の宣言を飛ばさない。無ければ何も判定しない)
+        stop = next((i for i, e in enumerate(entries) if ids.same_issue(e["item"]["key"], only)), None)
+        entries = [] if stop is None else entries[:stop + 1]
+    for entry in entries:
         key, repo_name = entry["item"]["key"], entry["item"]["repo"]
-        if only is not None and not ids.same_issue(key, only):
-            continue
         if repo_name.casefold() not in configs:
             configs[repo_name.casefold()] = read_config(repo_name)
         j = judge_one(entry, others, rec, usage, attrs_table, configs[repo_name.casefold()], table, login)
