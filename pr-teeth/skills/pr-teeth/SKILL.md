@@ -101,7 +101,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
 `ignore` のみの PR は軽く要約するだけでよく、clone もしない。
 
 1. 作業リポジトリを用意する。**`git clone` を直接実行しない**
-   （置き場所・取得量・掃除をコード側で決めるため）。
+   （保存先・取得量・掃除をコード側で決めるため）。
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" repo \
@@ -339,7 +339,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 
 ## fork する場合
 
-配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の置き場所**で、
+配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の定義箇所**で、
 設定ディレクトリの場所を決める。fork して別のマーケットプレイスから配布する場合は、
 **そこ 1 箇所だけを** fork 側の配布元に書き換える。設定ディレクトリの場所が変わるため、
 既存利用者には移行を案内する。

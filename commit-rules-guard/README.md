@@ -65,7 +65,7 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 間引きの状態は **`$XDG_STATE_HOME/commit-rules-guard`** (未設定なら
 `~/.local/state/commit-rules-guard`) に 1 セッション 1 ファイル (0 バイト) で置かれ、
 **7 日を過ぎたものは自動で削除されます** (通知した回にまとめて掃除します)。
-`COMMIT_GUARD_STATE_DIR` で置き場所を変えられます。
+`COMMIT_GUARD_STATE_DIR` で保存先を変えられます。
 
 共有の一時ディレクトリ (`/tmp`) は使いません。Linux では誰でも書ける場所であり、
 マーカー名はセッション ID から計算できるため、先回りして置かれるとリマインダの

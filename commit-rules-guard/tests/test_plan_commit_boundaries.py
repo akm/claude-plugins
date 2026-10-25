@@ -100,7 +100,7 @@ class TestPlanContent(unittest.TestCase):
 
 
 class TestStateDir(unittest.TestCase):
-    """マーカーの置き場所。共有の一時ディレクトリを使わない。"""
+    """マーカーの保存先。共有の一時ディレクトリを使わない。"""
 
     def setUp(self):
         self._saved = {k: os.environ.get(k) for k in

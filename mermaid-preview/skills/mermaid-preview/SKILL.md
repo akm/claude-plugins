@@ -1,6 +1,6 @@
 ---
 name: mermaid-preview
-description: mermaid の図を含む HTML をプロジェクト内の tmp/ に生成し、ブラウザで人間に見せる。「この図を HTML で見せて」「mermaid をプレビューして」「mermaid-preview を実行して」のような依頼や、他のスキル (doc-dag など) が図の提示を必要とするときに使う。引数に図のソース (mermaid 記法) かその置き場を渡す。
+description: mermaid の図を含む HTML をプロジェクト内の tmp/ に生成し、ブラウザで人間に見せる。「この図を HTML で見せて」「mermaid をプレビューして」「mermaid-preview を実行して」のような依頼や、他のスキル (doc-dag など) が図の提示を必要とするときに使う。引数に図のソース (mermaid 記法) かその保存先を渡す。
 ---
 
 # mermaid-preview: mermaid 図の HTML プレビュー

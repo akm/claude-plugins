@@ -2,7 +2,7 @@
 
 このスキルは、リポジトリごとに違う 2 つのことを設定から読む。**設定が無くても動く** — 既定で進み、該当する場面で人間に確認する。
 
-置き場は `.claude/akm-claude-plugins/doc-dag/config.json`。[commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の規則を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
+配置先は `.claude/akm-claude-plugins/doc-dag/config.json`。[commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の規則を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
 
 ## 様式
 

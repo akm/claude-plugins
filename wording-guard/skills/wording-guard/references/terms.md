@@ -1,6 +1,6 @@
 # 用語ファイル
 
-**用語ファイルは、言い換えを決めた語 (避ける語) と、使い続けると決めた語 (許容する語) を、理由と決めた場所とともに記録するファイル。** 置き場は設定キー `terms_paths` で指定する (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。
+**用語ファイルは、言い換えを決めた語 (避ける語) と、使い続けると決めた語 (許容する語) を、理由と決めた場所とともに記録するファイル。** ファイルのパスは設定キー `terms_paths` で指定する (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。
 
 ## 用語ファイルは例であって、範囲ではない
 

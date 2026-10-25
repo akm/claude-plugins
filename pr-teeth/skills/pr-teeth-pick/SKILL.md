@@ -128,7 +128,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 `/pr-teeth` の手順 4 と同じ。**ただし「前回からの差分」は見ない**（毎回全体が対象）。
 
 1. 作業リポジトリを用意する。**`git clone` を直接実行しない**
-   （置き場所・取得量・掃除をコード側で決めるため）。
+   （保存先・取得量・掃除をコード側で決めるため）。
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" repo \
@@ -303,7 +303,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 
 ## fork する場合
 
-配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の置き場所**。
+配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の定義箇所**。
 fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md 側には書かない）。
 
 実行時に配布元を推定する手段は採らない（`${CLAUDE_PLUGIN_ROOT}` はインストール先しか

@@ -22,7 +22,7 @@ description: スキル handoff-write が保存した引き継ぎ文 (GitHub の 
    | コメントの URL (`https://github.com/<owner>/<repo>/(pull\|issues)/<番号>#issuecomment-<ID>`) | `gh api repos/<owner>/<repo>/issues/comments/<ID>` |
    | ローカルファイルのパス | そのファイルを読む |
    | PR / Issue の番号 | `gh api repos/<owner/repo>/issues/<番号>/comments --paginate` で列挙し、本文が目印で始まるもののうち最新を採る |
-   | 省略 | 現在のブランチの PR のコメントと、置き場 (`tmp/`・`$(git rev-parse --git-dir)/session-handoff/`) の `handoff-*.md` を探し、作成日時が最も新しいものを採る |
+   | 省略 | 現在のブランチの PR のコメントと、ローカルの保存先 (`tmp/`・`$(git rev-parse --git-dir)/session-handoff/`) の `handoff-*.md` を探し、作成日時が最も新しいものを採る |
 
    PR のコメントも Issue のコメントも、API の経路は `issues/comments` で共通。
 

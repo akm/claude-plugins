@@ -80,7 +80,7 @@ def validate(repo):
 
 
 def path_for(repos_dir, repo):
-    """作業リポジトリの置き場所。owner ごとにディレクトリを分ける。"""
+    """作業リポジトリの保存先。owner ごとにディレクトリを分ける。"""
     owner, name = validate(repo).split("/")
     return os.path.join(repos_dir, owner, name)
 

@@ -2,8 +2,8 @@
 
 textlint と規則集は、プラグインに同梱した `wording-guard/textlint/package.json` と
 `package-lock.json` で版を固定し、コマンド `wording_lint.py setup` が利用者のキャッシュに
-`npm ci` で入れる。置き場はロックファイルの内容のハッシュで分けるので、プラグインを更新して
-版が変わると、新しい置き場に入れ直すことになる。
+`npm ci` で入れる。入れるディレクトリはロックファイルの内容のハッシュで分けるので、プラグインを更新して
+版が変わると、新しいディレクトリに入れ直すことになる。
 
 実行するたびに、次の 3 つを合わせた textlint の設定を一時ディレクトリに作る。
   1. リポジトリの textlint の設定 (設定キー textlint.config。候補を出す規則集の選び方)
@@ -48,7 +48,7 @@ def cache_root():
 
 
 def install_dir():
-    """同梱のロックファイルに対応する、textlint の置き場。"""
+    """同梱のロックファイルに対応する、textlint のディレクトリ。"""
     with open(os.path.join(PACKAGE_DIR, "package-lock.json"), "rb") as f:
         key = hashlib.sha256(f.read()).hexdigest()[:16]
     return os.path.join(cache_root(), f"textlint-{key}")
@@ -59,7 +59,7 @@ def textlint_bin(directory):
 
 
 def ensure_installed():
-    """textlint の置き場を返す。入っていなければ TextlintError を送出する。"""
+    """textlint のディレクトリを返す。入っていなければ TextlintError を送出する。"""
     d = install_dir()
     if not os.path.exists(textlint_bin(d)):
         raise TextlintError(
@@ -71,13 +71,13 @@ def ensure_installed():
 def setup(out=sys.stdout):
     """同梱の package.json と package-lock.json の版で、textlint をキャッシュに入れる。
 
-    npm ci は一時的な名前のディレクトリで行い、終わってから置き場の名前に変える。置き場の状態ごとの扱い:
+    npm ci は一時的な名前のディレクトリで行い、終わってから textlint のディレクトリの名前に変える。ディレクトリの状態ごとの扱い:
       - textlint が入っている: 何もしない。
-      - 置き場があるのに textlint が無い (中身が消えた・壊れた): 取得を始める前に TextlintError で止め、
-        置き場を消すよう案内する。置き場はこの関数では消さない (中身を利用者が確認できるように)。
-      - 置き場が無い: 取得して名前を変える。名前を変える前に、同時に実行した別の setup が置き場を
-        作り終えていたら (改名が失敗し、置き場に textlint がある)、入ったものとして扱う。
-    一時的な名前のディレクトリは、成否に関わらず最後に消す。置き場の名前に変わらなかった木を残しても、
+      - ディレクトリがあるのに textlint が無い (中身が消えた・壊れた): 取得を始める前に TextlintError で止め、
+        ディレクトリを消すよう案内する。ディレクトリはこの関数では消さない (中身を利用者が確認できるように)。
+      - ディレクトリが無い: 取得して名前を変える。名前を変える前に、同時に実行した別の setup がディレクトリを
+        作り終えていたら (改名が失敗し、ディレクトリに textlint がある)、入ったものとして扱う。
+    一時的な名前のディレクトリは、成否に関わらず最後に消す。textlint のディレクトリの名前に変わらなかったディレクトリを残しても、
     次の setup は使わないため。ファイル操作の失敗 (OSError) は TextlintError にして呼び出し側に返す。
     """
     try:
@@ -93,8 +93,8 @@ def _setup(out):
         return d
     if os.path.exists(d):
         raise TextlintError(
-            f"textlint の置き場 {d} があるのに、textlint が入っていない (置き場が壊れている)。"
-            f"置き場を消してから (rm -rf \"{d}\")、もう一度実行する")
+            f"textlint のディレクトリ {d} があるのに、textlint が入っていない (ディレクトリが壊れている)。"
+            f"ディレクトリを消してから (rm -rf \"{d}\")、もう一度実行する")
     npm = shutil.which("npm")
     if npm is None:
         raise TextlintError("npm が見つからない。Node (npm を含む) を入れてから実行する")
@@ -113,7 +113,7 @@ def _setup(out):
             if os.path.exists(textlint_bin(d)):
                 print(f"textlint は、同時に実行した別の setup が先に入れた: {d}", file=out)
                 return d
-            raise TextlintError(f"取得した textlint を置き場 {d} に移せない: {e}") from e
+            raise TextlintError(f"取得した textlint をディレクトリ {d} に移せない: {e}") from e
     finally:
         if os.path.exists(work):
             shutil.rmtree(work, ignore_errors=True)

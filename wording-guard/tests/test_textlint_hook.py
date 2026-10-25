@@ -358,7 +358,7 @@ echo called >> "$FAKE_NPM_LOG"
 
 
 class TestSetup(unittest.TestCase):
-    """npm を差し替えて、setup の置き場の状態ごとの扱いを確認する。"""
+    """npm を差し替えて、setup のディレクトリの状態ごとの扱いを確認する。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -412,7 +412,7 @@ class TestSetup(unittest.TestCase):
         os.makedirs(os.path.join(self.dest, "node_modules"))
         with self.assertRaises(textlint.TextlintError) as cm:
             self.setup_quietly()
-        self.assertIn("置き場が壊れている", str(cm.exception))
+        self.assertIn("ディレクトリが壊れている", str(cm.exception))
         self.assertIn("rm -rf", str(cm.exception))
         self.assertEqual(self.npm_calls(), 0)
         self.assertTrue(os.path.isdir(self.dest))

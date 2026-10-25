@@ -2,7 +2,7 @@
 
 このスキルは、リポジトリごとに違う 5 つのことを設定から読む。**設定が無くても実行できる** — デフォルトのまま進み、該当する場面で人間に確認する。
 
-置き場はファイル `.claude/akm-claude-plugins/wording-guard/config.json`。プラグイン [doc-dag](https://github.com/akm/claude-plugins/tree/main/doc-dag)・[commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の手順を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
+配置先はファイル `.claude/akm-claude-plugins/wording-guard/config.json`。プラグイン [doc-dag](https://github.com/akm/claude-plugins/tree/main/doc-dag)・[commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の手順を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
 
 ## 様式
 
@@ -19,14 +19,14 @@
 }
 ```
 
-**この例は様式を示すもので、そのまま写さない。** 規約の置き場も、書き換えない過去の記録の置き場も、リポジトリごとに違う。とくに設定キー `frozen_paths` は、そのリポジトリの規約が書き換えない対象として明示しているものを漏らさずに挙げる。
+**この例は様式を示すもので、そのまま写さない。** 規約のパスも、書き換えない過去の記録のパスも、リポジトリごとに違う。とくに設定キー `frozen_paths` は、そのリポジトリの規約が書き換えない対象として明示しているものを漏らさずに挙げる。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `convention_paths` | 判断の基準になる規約の置き場。`#` の後に見出しのアンカーを付けると、その節だけを読む | リポジトリのルートの `CLAUDE.md` を読む。規約が見つからなければ、**ファイル [wording-guard/skills/wording-guard/SKILL.md](../SKILL.md) の手順 2 が挙げる 3 原則だけで判断することを報告して**進む |
+| `convention_paths` | 判断の基準になる規約のファイルのパス。`#` の後に見出しのアンカーを付けると、その節だけを読む | リポジトリのルートの `CLAUDE.md` を読む。規約が見つからなければ、**ファイル [wording-guard/skills/wording-guard/SKILL.md](../SKILL.md) の手順 2 が挙げる 3 原則だけで判断することを報告して**進む |
 | `frozen_paths` | 書き換えない過去の記録のパス接頭辞 | 書き換えないパスは無いものとする。ただし過去の記録らしき文書が見つかったら**人間に確認する** |
 | `quote_markers` | 引用の目印になる行頭の文字列。**値を設定しても、コードブロックは目印のまま** (行頭の文字列では表せないため) | 引用ブロック (`> ` で始まる行) とコードブロックを目印にする |
-| `terms_paths` | 用語ファイル (言い換えを決めた語と許容すると決めた語の記録) の置き場の配列。相対パスはリポジトリのルートから、`~` で始まるパスはホームディレクトリから解決する。**書いたファイルが無ければ誤りとして報告する** | 用語ファイルを使わない |
+| `terms_paths` | 用語ファイル (言い換えを決めた語と許容すると決めた語の記録) のパスの配列。相対パスはリポジトリのルートから、`~` で始まるパスはホームディレクトリから解決する。**書いたファイルが無ければ誤りとして報告する** | 用語ファイルを使わない |
 | `textlint` | textlint で検査するかどうかと、その設定。キーは `config` (不自然な言い回しの候補を出す規則を選ぶ textlint の設定ファイルのパス。省略すると用語ファイルだけで検査する) と `hook` (`true` なら、Markdown を書いた直後に hook で検査する)。**キーを書くと、textlint のセットアップが必要になる** | textlint を使わない |
 
 ## `convention_paths` — なぜ基準を外から読むか
