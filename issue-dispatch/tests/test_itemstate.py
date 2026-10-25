@@ -85,8 +85,17 @@ def question_row(table, kind):
 
 
 def question_kinds(table):
-    """問いの表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。"""
-    return {line.strip().strip("|").split("|")[0].strip().strip("`") for line in table.splitlines() if line.startswith("| `")}
+    """問いの表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
+    種類の行は表の構造で見分ける (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
+    kinds = set()
+    for line in table.splitlines():
+        if not line.startswith("|"):
+            continue
+        first = line.strip().strip("|").split("|")[0].strip()
+        if first == "種類" or set(first) <= {"-"}:
+            continue
+        kinds.add(first.strip("`"))
+    return kinds
 
 
 def question_options_cell(row):
