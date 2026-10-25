@@ -84,6 +84,11 @@ def question_row(table, kind):
     return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
 
 
+def question_kinds(table):
+    """問いの表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。"""
+    return {line.strip().strip("|").split("|")[0].strip().strip("`") for line in table.splitlines() if line.startswith("| `")}
+
+
 def question_options_cell(row):
     """問いの表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
     return row.strip().strip("|").split("|")[-1].strip()
@@ -983,6 +988,7 @@ class DocTest(unittest.TestCase):
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
         table = question_table(doc, "項目の状態の問いの種類 (`kind`) と選択肢 (`options`)")
+        self.assertEqual(question_kinds(table), set(itemstate.QUESTION_OPTIONS), "flow.md の問いの表の種類とコードの種類が一致しない")
         for kind, options in itemstate.QUESTION_OPTIONS.items():
             row = question_row(table, kind)
             self.assertIsNotNone(row, f"問いの種類 {kind} が flow.md の問いの表に無い")
