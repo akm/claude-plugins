@@ -904,7 +904,7 @@ class TestPRSpec(unittest.TestCase):
         # 同じ PR を2回解説しても情報が増えない。
         targets, errors = prspec.parse(["o/r#1", "https://github.com/o/r/pull/1"])
         self.assertEqual(len(targets), 1)
-        self.assertEqual(errors, [])  # 利用者の誤りではないので警告にしない
+        self.assertEqual(errors, [])  # 利用者のミスではないので警告にしない
 
     def test_same_number_in_different_repos_is_not_a_duplicate(self):
         targets, _ = prspec.parse(["a/r#1", "b/r#1"])
