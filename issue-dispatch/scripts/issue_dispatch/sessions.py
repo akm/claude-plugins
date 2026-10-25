@@ -85,7 +85,7 @@ def parse_manager_name(text):
 
 def session_temp_dir(session_id, environ):
     """作業のセッションの一時ディレクトリ `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` のパス (末尾の `/` は付けない)。
-    作業ツリーの外に置く (待機の wait.pid と、伝えた版の印のファイルの置き場。KTD6・R26)。TMPDIR は絶対パスのときだけ使う
+    作業ツリーの外に置く (待機の wait.pid と、伝えた版を記録するファイルの置き場。KTD6・R26)。TMPDIR は絶対パスのときだけ使う
     (相対パスは作業ツリーの中を指しうる)。セッション ID が読めなければ ValueError。"""
     normalized = normalize_session_id(session_id)
     if normalized is None:

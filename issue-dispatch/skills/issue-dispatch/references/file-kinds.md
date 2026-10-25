@@ -96,7 +96,7 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 表そのものの正本は `file-kinds.json` で、ここでは行を言い直さない。行は、パターンと種類と、この文書の各節の属性 (`unit_notation`・`split_reference`・`mergeable`) を持ち、`filekinds` は設定の規則と同じ規則で照合する。各行を選んだ理由は次のとおり。
 
-- **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成の印を名前に持つ Go のファイル (`**/*_generated.go` と、Kubernetes の controller-gen が生成する `**/zz_generated.*.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/npm-shrinkwrap.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
+- **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成されたことを示す語 (`generated`) を名前に持つ Go のファイル (`**/*_generated.go` と、Kubernetes の controller-gen が生成する `**/zz_generated.*.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/npm-shrinkwrap.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
 - **`unknown-structure`** — 中身を読んで節を決められないもの: Excel のブック (`**/*.xlsx`)。
 - **`indivisible` で `mergeable` が偽** — 画像とフォントとバイナリの文書 (`**/*.png`・`**/*.jpg`・`**/*.jpeg`・`**/*.gif`・`**/*.svg`・`**/*.ico`・`**/*.pdf`・`**/*.woff`・`**/*.woff2`)。分けられず、差分でマージできない。SVG はテキストだが、描画ツールが全体を上書きするので画像と同じに扱う。
 - **`unstable`** — 分けると適用の順や意味が変わりうるもの: マイグレーション (`**/migrations/**`) と SQL (`**/*.sql`) は実行の順に意味があり、Protocol Buffers の定義 (`**/*.proto`) はフィールド番号の割り当てに意味がある。参照のされ方は `file`。

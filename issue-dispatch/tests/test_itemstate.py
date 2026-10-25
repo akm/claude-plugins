@@ -758,7 +758,7 @@ class AssignedScenesTest(unittest.TestCase):
         out = turn_of(item, pr_states=prs)
         self.assertEqual((out["actions"], kinds(out["reports"])), ([], ["pr-base-not-default"]))
         rec = rec_with(items={A9: rec_item(reported={"pr-base-not-default": t(31)})})
-        self.assertEqual(kinds(turn_of(item, rec=rec, pr_states=prs)["reports"]), [], "報告済みの印があれば報告しない")
+        self.assertEqual(kinds(turn_of(item, rec=rec, pr_states=prs)["reports"]), [], "報告済みのフラグがあれば報告しない")
 
     def test_merged_pr_with_open_issue_and_closed_pr_ask(self):
         item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)])

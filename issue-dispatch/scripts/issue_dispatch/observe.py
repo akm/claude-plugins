@@ -223,7 +223,7 @@ def _kind_index(kind):
 
 
 def _pr_view(v):
-    """comment_prs の値のうち比べる部分 (state・draft・merged。引き継ぎの印 carried は比べない)。"""
+    """comment_prs の値のうち比べる部分 (state・draft・merged。引き継ぎのフラグ carried は比べない)。"""
     return None if v is None else _pr_state(v)
 
 

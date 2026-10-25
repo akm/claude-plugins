@@ -404,7 +404,7 @@ def apply(rec, operations):
 # ----- 読み取りの補助 -----
 
 def items_without_notified(rec):
-    """割り当ての意図があって印 notified が無い項目 (再入で合図を送り直す候補)。"""
+    """割り当ての意図があってフラグ notified が無い項目 (再入で合図を送り直す候補)。"""
     return sorted(k for k, it in rec["items"].items() if it.get("intent") and it.get("notified_at") is None)
 
 

@@ -89,7 +89,7 @@
 
 ### `wait.pid`
 
-実行中の待機の印。置き場は、管理の `wait` では記録の置き場 ([records.md](records.md))、作業の待機では `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` ([messaging.md](messaging.md) の一時ディレクトリ。作業ツリーには何も書かない)。JSON で、`pid` (待機のプロセス)・`started_at` (そのプロセスの開始時刻。`ps -o lstart=` の文字列のまま)・`owner` (所有者のセッション ID)・`wait` (待機の名前)・`written_at` を持つ。一時名に書いてから改名する。
+実行中の待機を示すファイル。置き場は、管理の `wait` では記録の置き場 ([records.md](records.md))、作業の待機では `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` ([messaging.md](messaging.md) の一時ディレクトリ。作業ツリーには何も書かない)。JSON で、`pid` (待機のプロセス)・`started_at` (そのプロセスの開始時刻。`ps -o lstart=` の文字列のまま)・`owner` (所有者のセッション ID)・`wait` (待機の名前)・`written_at` を持つ。一時名に書いてから改名する。
 
 - **起動時**: `wait.pid` があれば、その PID のプロセスの開始時刻が `started_at` と一致し、コマンドがこの CLI の待機 (`issue_dispatch.py` と待機の名前を含む) なら、SIGTERM を送って終了するのを待機する。一致しなければ (PID が別のプロセスに再利用されている)、停止せずに `wait.pid` だけ消す。その後、自分の PID で `wait.pid` を書き、標準出力の最初の行に `pid <PID>` を書く。
 - **終了するとき**: `wait.pid` の PID が自分のときだけ消す (停止された待機が、後から起動した待機の `wait.pid` を消さないため)。

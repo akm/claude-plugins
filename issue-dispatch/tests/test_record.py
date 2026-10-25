@@ -151,7 +151,7 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(json.dumps(rec), before, "1 つでも誤りがあれば何も適用しないこと")
 
     def test_intent_and_notified(self):
-        """Covers AE9. 意図があって notified が無い項目は列挙され、同じ印を 2 度付けても時刻は最初のまま。"""
+        """Covers AE9. 意図があって notified が無い項目は列挙され、同じフラグを 2 度付けても時刻は最初のまま。"""
         self.apply({"op": "set_intent", "item": "akm/r#12", "session_id": "s1", "session_title": "worker", "status": "In Progress",
                     "assignment": 1, "at": T1})
         self.assertEqual(record.items_without_notified(self.rec), ["akm/r#12"])
@@ -165,7 +165,7 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(record.items_without_notified(self.rec), [])
         self.apply({"op": "clear_intent", "item": "akm/r#12"})
         self.assertIsNone(self.rec["items"]["akm/r#12"]["intent"])
-        self.assertIsNone(self.rec["items"]["akm/r#12"]["notified_at"], "意図を消せば印も消える")
+        self.assertIsNone(self.rec["items"]["akm/r#12"]["notified_at"], "意図を消せばフラグも消える")
 
     def test_resend_count(self):
         self.apply({"op": "set_intent", "item": "akm/r#12", "session_id": "s1", "session_title": "w", "status": "In Progress",
@@ -214,7 +214,7 @@ class ApplyTest(unittest.TestCase):
     def test_reported_marks_choice_and_body_edit(self):
         self.apply({"op": "mark_reported", "item": "akm/r#5", "kind": "human_change", "at": T1},
                    {"op": "mark_reported", "item": "akm/r#5", "kind": "human_change", "at": T2})
-        self.assertEqual(self.rec["items"]["akm/r#5"]["reported"], {"human_change": T1}, "報告済みの印は最初の時刻のまま")
+        self.assertEqual(self.rec["items"]["akm/r#5"]["reported"], {"human_change": T1}, "報告済みのフラグは最初の時刻のまま")
         self.assertTrue(record.is_reported(self.rec, "akm/r#5", "human_change"))
         self.assertFalse(record.is_reported(self.rec, "akm/r#5", "not_assigned"))
         self.apply({"op": "set_conflict_choice", "item": "akm/r#5", "choice": "proceed"},

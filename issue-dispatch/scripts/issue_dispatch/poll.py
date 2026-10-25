@@ -24,7 +24,7 @@ WAIT_NAMES = ("wait", "wait-assignment", "wait-decision")
 # 終了コード (KTD6)
 EXIT_CHANGED, EXIT_RATE_LIMIT, EXIT_NETWORK, EXIT_NO_SNAPSHOT, EXIT_STOPPED, EXIT_AUTH, EXIT_TIMEOUT = 0, 3, 4, 5, 6, 8, 124
 NETWORK_FAILURE_LIMIT = 3   # ネットワークの失敗がこの回数続けば 4
-SLICE_SECONDS = 5.0         # 期限と停止の印を見る間隔
+SLICE_SECONDS = 5.0         # 期限と停止のフラグを見る間隔
 # 終了の行の先頭の語 (スキルはこの語で分ける)
 RESULT_WORDS = ("diff", "assignment", "resumed", "stop", "request", "go", "wait", "stopped")
 _NETWORK_LIKE = ("network", "timeout", "other", "missing")
@@ -108,7 +108,7 @@ def stop_previous(path, grace_seconds=10.0):
             os.unlink(path)
     except OSError:
         pass
-    # 待機時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止の印を見たときに終了する
+    # 待機時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止のフラグを見たときに終了する
     return {"stopped": entry["pid"], "alive": True} if alive else {"stopped": entry["pid"]}
 
 
@@ -195,7 +195,7 @@ class Waiter:
         return self._finish(EXIT_STOPPED, f"stopped {os.getpid()}")
 
     def run(self, poll):
-        """読み取りの結果より停止の印を優先する: 読み取り (gh の呼び出し) の間に SIGTERM を受けていれば、結果を捨てて stopped で終了する
+        """読み取りの結果より停止のフラグを優先する: 読み取り (gh の呼び出し) の間に SIGTERM を受けていれば、結果を捨てて stopped で終了する
         (捨てた変化は、新しい待機が最初の読み取りで見つける。読んだ時点の状態で判定するため)。"""
         self.start()
         try:

@@ -28,7 +28,7 @@
 | 種類 | ファイル | 失われるもの | 読めない・壊れているとき |
 | --- | --- | --- | --- |
 | 設定 | `config.json` | 利用者が書いた数行 | デフォルト値で続けて警告する ([project-config.md](project-config.md)) |
-| 記録 | `record.json` | 割り当ての意図・質問と回答・印 (作り直せない) | 中断して知らせ、新規として扱わない (`Corrupt`)。無いときだけ新規 |
+| 記録 | `record.json` | 割り当ての意図・質問と回答・フラグ (作り直せない) | 中断して知らせ、新規として扱わない (`Corrupt`)。無いときだけ新規 |
 | スナップショット | `snapshot.json` | 無い (Project から導出し直せる) | 作り直して 1 行報告する |
 | ログ | `actions.log` | 書き込みの履歴 | 読まない (追記だけ)。壊れた行は読む側が飛ばす |
 | 宣言 (エージェントが組み立てる入力) | Issue のコメント | その 1 件 | 形を検査して差し戻す ([issue-format.md](issue-format.md)) |
@@ -46,7 +46,7 @@
 | `sessions` | 作業のセッションの ID → 下の表 |
 | `items` | 項目 (`owner/repo#番号`) → 下の表。項目が属する作業のセッションは記録に持たず、Project のフィールド `Agent session ID` から導く |
 | `opt_in_proposals` | リポジトリ (`owner/repo`) → 第三者による本文の編集の確認のオプトインの提案 (`proposed_at` 提案した時刻・`answer` 回答。未回答は null) |
-| `notices` | 項目に紐づかない「1 回だけ報告する」知らせの印。知らせの名前 → 報告した時刻 |
+| `notices` | 項目に紐づかない「1 回だけ報告する」知らせのフラグ。知らせの名前 → 報告した時刻 |
 | `questions` | 質問の ID → 下の表 |
 
 `manager`:
@@ -73,10 +73,10 @@
 | キー | 内容 |
 | --- | --- |
 | `intent` | 割り当ての書き込みの意図 (`session_id`・`session_title`・`status` に書く予定の値、`assignment` 割り当ての番号、`at` 決めた時刻)。無ければ null。Project の値が意図と一致すれば自分の書き込みと判定する (再入のときに、途中まで書いた割り当てを継続するため。R24) |
-| `notified_at` | 合図 `assigned` を送った印 (時刻)。意図があって印が無い項目は、再入で合図を送り直す候補。同じ印を 2 度付けても最初の時刻のまま。いつ付くかの正本は [flow.md](flow.md) |
+| `notified_at` | 合図 `assigned` を送ったことを示すフラグ (時刻)。意図があってフラグが無い項目は、再入で合図を送り直す候補。同じフラグを 2 度付けても最初の時刻のまま。いつ付くかの正本は [flow.md](flow.md) |
 | `resend_count` | 合図の再送の回数。再送は項目ごとに通算 1 回で、1 回再送した後は再送しない (R24)。再送の前に回数を確認し、再送したら数える |
 | `conflict_choice` | 競合の可能性があるときに選んだ扱い。判定 ([flow.md](flow.md) の「判定」) は書かず、質問 `conflict` の回答 (相手ごと) で代える。消すかは U21 で決める |
-| `reported` | 報告済みの印。報告の種類 (人の変更・割り当てない理由など) → 最初に報告した時刻 |
+| `reported` | 報告済みのフラグ。報告の種類 (人の変更・割り当てない理由など) → 最初に報告した時刻 |
 | `body_edit_confirmed_at` | 利用者が確認した本文の最新の編集の時刻 (KD17) |
 
 `questions` の要素 (質問):
@@ -93,7 +93,7 @@
 
 ### 操作 (`record apply`)
 
-`record.json` は、操作の配列を標準入力で受ける CLI の `record apply` で更新する。1 ターンの複数の更新を 1 回の保存にまとめ、**1 つでも誤りがあれば何も適用せず、誤りを返す** (部分的に適用すると、意図と印の対応が崩れるため)。各操作は `op` と、種類ごとのキーを持つ。項目のキー `item` は `owner/repo#番号` の形。時刻は呼び出し側が書く (ISO 8601、UTC)。
+`record.json` は、操作の配列を標準入力で受ける CLI の `record apply` で更新する。1 ターンの複数の更新を 1 回の保存にまとめ、**1 つでも誤りがあれば何も適用せず、誤りを返す** (部分的に適用すると、意図とフラグの対応が崩れるため)。各操作は `op` と、種類ごとのキーを持つ。項目のキー `item` は `owner/repo#番号` の形。時刻は呼び出し側が書く (ISO 8601、UTC)。
 
 | `op` | キー | 何をするか |
 | --- | --- | --- |
@@ -105,14 +105,14 @@
 | `set_session_state` | `id`・`state` | `ListAgents` で見た状態を記録する |
 | `set_waiting` / `clear_waiting` | `id`・`since` / `id` | 待機中の時刻を書く / 消す |
 | `set_refused` | `id`・`at`・`signal` | 受信拒否を記録する (最初の 1 回だけ残す) |
-| `set_intent` | `item`・`session_id`・`session_title`・`status`・`assignment`・`at` | 割り当ての意図を書く。印 `notified_at` と再送の回数は消える |
-| `clear_intent` | `item` | 意図と印と再送の回数を消す (割り当ての解除・完了) |
-| `mark_notified` | `item`・`at` | 合図 `assigned` を送った印を付ける (意図が無ければ誤り。2 度目は時刻を変えない) |
+| `set_intent` | `item`・`session_id`・`session_title`・`status`・`assignment`・`at` | 割り当ての意図を書く。フラグ `notified_at` と再送の回数は消える |
+| `clear_intent` | `item` | 意図とフラグと再送の回数を消す (割り当ての解除・完了) |
+| `mark_notified` | `item`・`at` | 合図 `assigned` を送ったことを示すフラグを付ける (意図が無ければ誤り。2 度目は時刻を変えない) |
 | `count_resend` | `item` | 再送の回数を 1 増やす (意図が無ければ誤り) |
 | `set_conflict_choice` | `item`・`choice` | 競合の可能性があるときに選んだ扱いを書く |
-| `mark_reported` | `item`・`kind`・`at` | 報告済みの印を付ける (2 度目は時刻を変えない) |
+| `mark_reported` | `item`・`kind`・`at` | 報告済みのフラグを付ける (2 度目は時刻を変えない) |
 | `set_body_edit_confirmed` | `item`・`at` | 利用者が確認した本文の編集の時刻を書く |
-| `set_notice` | `key`・`at` | 項目に紐づかない知らせの報告済みの印を付ける (2 度目は時刻を変えない) |
+| `set_notice` | `key`・`at` | 項目に紐づかない知らせの報告済みのフラグを付ける (2 度目は時刻を変えない) |
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と回答を書く |
 | `ask` | `question_id`・`item`・`kind`・`options`・`at`・`subject` (任意) | 質問を記録する (同じ ID の質問が既にあれば誤り。回答を消さないため。既にある質問は `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 回答を書く (質問が無い・選択肢に無い回答は誤り) |
