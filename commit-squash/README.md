@@ -13,12 +13,12 @@
 ## 特徴
 
 - **`git rebase -i` を使わず、起点から積み直す。** 順序の入れ替えで衝突が起きず、最終ツリーのハッシュ比較で「中身が 1 バイトも変わっていない」ことを機械的に証明できます (理由は同梱の [why-not-rebase.md](skills/commit-squash/references/why-not-rebase.md))。
-- **push 済みのコミットは変更しない。** 判定の軸はこれだけで、1 つでも該当すればその場で止まります (正本は同梱の [history-rewriting.md](skills/commit-squash/references/history-rewriting.md))。
+- **push 済みのコミットは変更しない。** 判定の軸はこれだけで、1 つでも該当すればその場で中断します (正本は同梱の [history-rewriting.md](skills/commit-squash/references/history-rewriting.md))。
 - **`git reset --hard` を使わない。** ブランチの付け替えは `--keep` で行うため、未コミットの作業を消しません (同上)。
 
 ## 前提
 
-確認の手順の正本は同梱の [SKILL.md](skills/commit-squash/SKILL.md) の「前提の確認」、止まる条件の正本は [history-rewriting.md](skills/commit-squash/references/history-rewriting.md) の「止まるべきとき」です。
+確認の手順の正本は同梱の [SKILL.md](skills/commit-squash/SKILL.md) の「前提の確認」、中断する条件の正本は [history-rewriting.md](skills/commit-squash/references/history-rewriting.md) の「中断すべきとき」です。
 
 - **まとめる範囲がすべて未 push であること。** push 済みのコミットが含まれる場合、スキルは実行せずに報告して終わります。
 - **作業ツリーがクリーンであること。**

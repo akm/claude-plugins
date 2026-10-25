@@ -227,7 +227,7 @@ def handle(event, check_texts=None):
     if root is None:
         return None
     # hook を有効にしていないリポジトリでは何もしない。型の検査より先に textlint.hook を見るのは、
-    # 有効にしていないリポジトリで、設定の誤りを理由に書き込みのたびに止めないため。
+    # 有効にしていないリポジトリで、設定の誤りを理由に書き込みのたびに中断させないため。
     # JSON として読めないときは有効かを決められないので、知らせる (検査を省略しない)
     try:
         if not config.hook_enabled(config.read_raw(root)):

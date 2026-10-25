@@ -88,7 +88,7 @@ def fixture_lines(name):
         # ループも待ちも無い (実測 0.00 秒)。発火しない経路のために例外を
         # 投げる仕掛けを置くと、その受けを決める必要が生まれ、守るための
         # テストも要る — 実際にそれで 2 つの欠陥を作った。判定器は開発者
-        # だけが使う道具なので、止まったら気づいて直せばよい。
+        # だけが使う道具なので、停止したら気づいて直せばよい。
         r = subprocess.run(["sh", str(FIXTURES / name)] + _fixture_args(name),
                            capture_output=True, text=True)
         out = ANSI.sub("", r.stdout + r.stderr)
@@ -583,7 +583,7 @@ def main(root):
             print(f"{eval_dir.name:40s} eval_metadata.json が無いので飛ばす")
             continue
         # eval_metadata.json は README の手順 3 で人が手作業で作る。
-        # 1 件の不備で全体を止めると、正常な eval の採点まで消える。
+        # 1 件の不備で全体を停止すると、正常な eval の採点まで消える。
         try:
             meta = json.loads(meta_path.read_text())
             eid = meta["eval_id"]

@@ -113,7 +113,7 @@ def cmd_select(args):
     # 同じロックで囲み、record の途中の state と本文の組み合わせを読まない。
     # 入力の解釈はロックの外で済ませてある（不正な入力で他の実行を待たせない）。
     with store.locked(paths["state"]):
-        # state も蓄積データ。壊れていれば止める（空扱いすると全件を再通知してしまう）。
+        # state も蓄積データ。壊れていれば停止する（空扱いすると全件を再通知してしまう）。
         saved = store.load_precious(paths["state"], {})
         targets = state.select_targets(saved, prs)
         _attach_body_diffs(targets, paths, warnings)
@@ -286,7 +286,7 @@ def cmd_record(args):
 
     with open(args.input, "r", encoding="utf-8") as f:
         payload = json.load(f)
-    # 形が違えば例外で止まる。0件を記録して、エラーを出さずに成功を返すことはしない。
+    # 形が違えば例外で停止する。0件を記録して、エラーを出さずに成功を返すことはしない。
     # 入力の解釈はロックの外で済ませる（不正な入力で他の実行を待たせない）。
     items, skipped = agent_input.terms(payload)
     warnings.extend(skipped)
@@ -692,7 +692,7 @@ def main(argv=None):
         sys.stdout.write("\n")
         return 1
     except repos.RepoError as e:
-        # 取得の失敗。1件で巡回全体を止めないよう、呼び出し側は注記して続行する。
+        # 取得の失敗。1件で巡回全体を中断しないよう、呼び出し側は注記して続行する。
         json.dump({
             "error": str(e),
             "hint": "この PR は取得できません。注記して他の PR の解説を続けてください。",

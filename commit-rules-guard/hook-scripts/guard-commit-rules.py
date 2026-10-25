@@ -2,7 +2,7 @@
 """`git commit` の直前にコミットルールを思い出させる PreToolUse フック（commit-rules-guard プラグイン）。
 
 長い作業の後だとコミットの動機（何のために変更したか）が忘れられ、複数の動機を 1 つの
-コミットに混ぜてしまいやすい。そこで `git commit`（新規コミット）の直前に一度だけ止め、
+コミットに混ぜてしまいやすい。そこで `git commit`（新規コミット）の直前に一度だけ拒否し、
 コミットルールの要点とステージ内容のサマリ、動機の混在の疑いを提示して自己確認させる。
 
 方針（弱・リマインダ注入 + マーカー方式）:
@@ -26,7 +26,7 @@
   - COMMIT_GUARD_RULES_FILE: 表示するルールファイルのパス。既定は
     ~/.claude/rules/commit-rules.md → プラグイン同梱の rules/commit-rules.md の順に探す。
 
-想定外で落ちたら全 Bash を止めないよう許可する側を選ぶ（return 0）。
+想定外で落ちたら全 Bash を拒否しないよう許可する側を選ぶ（return 0）。
 """
 
 import fnmatch
@@ -107,7 +107,7 @@ def git(repo, *args):
     try:
         return subprocess.run(base + list(args), capture_output=True, text=True)
     except OSError:
-        # git が PATH に無い等でも本体を止めない（呼び出し側は returncode!=0 で扱う）。
+        # git が PATH に無い等でも本体を停止させない（呼び出し側は returncode!=0 で扱う）。
         return _GitFail()
 
 
@@ -163,7 +163,7 @@ def _load_project_config(repo):
     """commit 対象リポジトリの config.json を読み、正規化して返す。
 
     無い・壊れている・型が仕様外のいずれでも、例外を投げず正規化済み dict を返す
-    （汎用パターンのみで本体は止まらない）。
+    （汎用パターンのみで本体は停止しない）。
     """
     top = _repo_toplevel(repo)
     if not top:
@@ -175,7 +175,7 @@ def _load_project_config(repo):
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
-        # 設定が壊れていても本体を止めない（汎用パターンのみで続行）。
+        # 設定が壊れていても本体を停止させない（汎用パターンのみで続行）。
         return {}
     return _normalize_config(data)
 

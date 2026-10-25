@@ -396,7 +396,7 @@ class TestPreciousData(unittest.TestCase):
         return p
 
     def test_missing_file_is_not_corrupt(self):
-        # 初回実行を止めない。
+        # 初回実行を中断しない。
         self.assertEqual(store.load_precious("/nonexistent/g.json", {"a": 1}), {"a": 1})
 
     def test_empty_file_is_not_corrupt(self):
@@ -515,7 +515,7 @@ class TestAgentInput(unittest.TestCase):
     """エージェント入力の検証（docs/design/data-integrity.md）。
 
     エージェントが毎回組み立てるため、設定ファイルより間違いが起きやすい。
-    形が違えば止め、項目単位の不備はスキップして件数を返す。
+    形が違えば停止し、項目単位の不備はスキップして件数を返す。
     """
 
     def test_accepts_valid_terms(self):
@@ -734,7 +734,7 @@ class TestAuth(unittest.TestCase):
             self.assertEqual(auth.resolve()[0], "tok-file")
 
     def test_empty_env_falls_through(self):
-        # 空文字を「設定済み」と誤認して止まらない。
+        # 空文字を「設定済み」と誤認して停止しない。
         os.environ[auth.ENV_TOKEN] = "   "
         auth._from_gh_cli = lambda: ("tok-gh", "gh auth token")
         self.assertEqual(auth.resolve()[0], "tok-gh")
@@ -896,7 +896,7 @@ class TestPRSpec(unittest.TestCase):
         self.assertIn("bogus", errors[0])
 
     def test_invalid_spec_does_not_drop_the_valid_ones(self):
-        # 1件の誤りで全体を止めない（取得・解析の失敗と同じ扱い）。
+        # 1件の誤りで全体を中断しない（取得・解析の失敗と同じ扱い）。
         targets, _ = prspec.parse(["bogus", "o/r#1"])
         self.assertEqual(len(targets), 1)
 
@@ -986,7 +986,7 @@ class TestBodies(unittest.TestCase):
         self.assertIn(expected, bodies._name("o/r", 7))
 
     def test_long_body_is_truncated(self):
-        # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを止める。
+        # 自動生成のログ貼り付け等で state ディレクトリが膨らむのを防ぐ。
         body = "x" * (bodies.MAX_BODY_BYTES + 5000)
         _, truncated = bodies.save(self.dir, "o/r", 1, body)
         self.assertTrue(truncated)
@@ -1236,7 +1236,7 @@ class TestRepoCache(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(path, "junk")))
 
     def test_failure_raises_repo_error(self):
-        # 1件の失敗で巡回全体を止めない形にする（呼び出し側が握れる型）。
+        # 1件の失敗で巡回全体を中断しない形にする（呼び出し側が握れる型）。
         with self.assertRaises(repos.RepoError):
             repos.ensure(self.repos_dir, "o/r",
                          url=os.path.join(self.root, "nonexistent"))
@@ -1703,7 +1703,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertTrue(all(t["language"] for t in out["targets"]))
 
     def test_resolve_keeps_valid_specs_when_one_is_invalid(self):
-        # 1件の誤りで全体を止めない。
+        # 1件の誤りで全体を中断しない。
         out = self._run(self.mod.cmd_resolve, specs=["bogus", "o/r#1"])
         self.assertEqual(out["resolved"], 1)
         self.assertEqual(len(out["invalid"]), 1)

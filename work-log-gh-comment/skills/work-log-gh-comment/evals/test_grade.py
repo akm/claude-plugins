@@ -358,7 +358,7 @@ class TestAlertOutsideDetails(unittest.TestCase):
 
 
 class TestMainRobustness(unittest.TestCase):
-    """採点の実行。1 件の不備で全体が止まってはいけない。"""
+    """採点の実行。1 件の不備で全体が停止してはいけない。"""
 
     def test_壊れた_json_で止まらない(self):
         """eval_metadata.json は README の手順 3 で人が手作業で作る。
