@@ -147,7 +147,7 @@ def touch(path):
     """最終利用日時を記録する。掃除の順序を決めるのに使う。
 
     git のファイルの mtime は fetch の有無で変わり、「利用した」と一致しない。
-    こちらで明示的に印を置く。
+    こちらで明示的にフラグファイルを置く。
     """
     try:
         with open(os.path.join(path, _STAMP), "w", encoding="utf-8") as f:
@@ -157,7 +157,7 @@ def touch(path):
 
 
 def used_at(path):
-    """最終利用日時（epoch 秒）。印が無ければディレクトリの mtime。"""
+    """最終利用日時（epoch 秒）。フラグファイルが無ければディレクトリの mtime。"""
     stamp = os.path.join(path, _STAMP)
     for target in (stamp, path):
         try:
