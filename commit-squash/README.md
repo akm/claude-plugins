@@ -20,7 +20,7 @@
 
 確認の手順の正本は同梱の [SKILL.md](skills/commit-squash/SKILL.md) の「前提の確認」、中断する条件の正本は [history-rewriting.md](skills/commit-squash/references/history-rewriting.md) の「中断すべきとき」です。
 
-- **まとめる範囲がすべて未 push であること。** push 済みのコミットが含まれる場合、スキルは実行せずに報告して終わります。
+- **まとめる範囲がすべて未 push であること。** push 済みのコミットが含まれる場合、スキルは実行せずに報告して終了します。
 - **作業ツリーがクリーンであること。**
 
 バックアップブランチはスキルが自動で作りますが、**削除は行いません** (人間に依頼します)。まとめ方に問題が見つかったときの唯一の戻り先のためです (正本は [SKILL.md](skills/commit-squash/SKILL.md) の手順 10)。

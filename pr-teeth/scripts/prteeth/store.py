@@ -38,7 +38,7 @@ try:  # pragma: no cover - 環境依存
 except ImportError:  # pragma: no cover - Windows
     fcntl = None
 
-# ロック取得を諦めるまでの秒数。用語集の更新は数十ミリ秒で終わるので、これだけ
+# ロック取得を諦めるまでの秒数。用語集の更新は数十ミリ秒で完了するので、これだけ
 # 待って取れないのは異常（別プロセスの停止など）と見なしてよい。
 LOCK_TIMEOUT = 10.0
 

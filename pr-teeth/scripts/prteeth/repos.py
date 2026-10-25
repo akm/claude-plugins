@@ -54,7 +54,7 @@ def _run(args, cwd=None, timeout=None):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
     except subprocess.TimeoutExpired:
-        raise RepoError(" ".join(args[:2]) + " が " + str(timeout) + " 秒で終わりませんでした")
+        raise RepoError(" ".join(args[:2]) + " が " + str(timeout) + " 秒で終了しませんでした")
     except FileNotFoundError:
         raise RepoError("git コマンドが見つかりません")
     if p.returncode != 0:

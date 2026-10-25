@@ -686,7 +686,7 @@ def main(argv=None):
         json.dump({
             "error": str(e),
             "hint": "記録が失われるのを避けるため保存していません。"
-                    "他の pr-teeth の実行が終わってから再実行してください。",
+                    "他の pr-teeth の実行が終了してから再実行してください。",
             "path": e.path,
         }, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")

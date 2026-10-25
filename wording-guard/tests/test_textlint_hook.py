@@ -315,7 +315,7 @@ class TestRunTextlint(unittest.TestCase):
             return textlint._run_textlint(d, "conf.json", ["a.md"], cwd=d)
 
     def test_empty_output_with_exit_1_is_error(self):
-        # 規則が例外で終わったときの textlint の形 (標準出力が空のまま終了コード 1)
+        # 規則が例外で終了したときの textlint の形 (標準出力が空のまま終了コード 1)
         with self.assertRaises(textlint.TextlintError) as cm:
             self.run_fake('echo "Unexpected error during file processing" >&2\nexit 1\n')
         self.assertIn("Unexpected error during file processing", str(cm.exception))

@@ -71,7 +71,7 @@ def ensure_installed():
 def setup(out=sys.stdout):
     """同梱の package.json と package-lock.json の版で、textlint をキャッシュに入れる。
 
-    npm ci は一時的な名前のディレクトリで行い、終わってから textlint のディレクトリの名前に変える。ディレクトリの状態ごとの扱い:
+    npm ci は一時的な名前のディレクトリで行い、完了してから textlint のディレクトリの名前に変える。ディレクトリの状態ごとの扱い:
       - textlint が入っている: 何もしない。
       - ディレクトリがあるのに textlint が無い (中身が消えた・壊れた): 取得を始める前に TextlintError で中断し、
         ディレクトリを消すよう案内する。ディレクトリはこの関数では消さない (中身を利用者が確認できるように)。
@@ -185,7 +185,7 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
         if prh["rulePaths"]:
             rules["prh"] = prh
         else:
-            # 辞書が 1 つも無い prh では、textlint が例外で終わり、検査できるものも無いので外す
+            # 辞書が 1 つも無い prh では、textlint が例外で終了し、検査できるものも無いので外す
             rules.pop("prh", None)
 
     allow = terms.to_allowlist(term_list)
@@ -217,8 +217,8 @@ def _run_textlint(directory, conf, paths, cwd, fix=False):
         r = subprocess.run(cmd + paths, cwd=cwd, capture_output=True, text=True)
     except OSError as e:
         raise TextlintError(f"textlint を実行できない ({cmd[0]}): {e}") from e
-    # textlint は、検出が無いか warning だけなら 0、error があれば 1 で終わる。それ以外は実行の失敗。
-    # 規則の読み込みや実行が例外で終わったときも 1 で終わるが、そのときは標準出力に何も出さない
+    # textlint は、検出が無いか warning だけなら 0、error があれば 1 で終了する。それ以外は実行の失敗。
+    # 規則の読み込みや実行が例外で終了したときも 1 で終了するが、そのときは標準出力に何も出さない
     # (textlint 15.8.0 で確認した)。検出が無いときもファイルごとの結果を JSON で出すので、空の出力は失敗として扱う
     if r.returncode not in (0, 1) or not r.stdout.strip():
         raise TextlintError(f"textlint が失敗した (終了コード {r.returncode}):\n{r.stderr.strip() or r.stdout.strip()}")
@@ -247,7 +247,7 @@ def _utf16_indexer(text):
 def _finding(message, source, to_index=None):
     """textlint の 1 件の検出を、wording-guard が扱う形に変換する。
 
-    start と end は検出の始まりと終わりの Python の文字列の位置 (source の中の位置)。line と column は textlint の
+    start と end は検出の開始と終了の Python の文字列の位置 (source の中の位置)。line と column は textlint の
     値のまま (column は UTF-16 の単位で数える) なので、文字列を切り出すときは start を使う。
     to_index は _utf16_indexer(source) の結果。同じ source の検出を続けて変換するときは、1 回作って渡す。
     """

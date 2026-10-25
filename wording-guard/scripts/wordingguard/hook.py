@@ -125,7 +125,7 @@ def _expect_line(lines, number, text, side):
 def in_lines(text, findings, lines):
     """findings (text の検出) のうち、行番号の集合 lines のどれかの行に重なるものを返す。
 
-    検出の行は、始まり (start) から終わり (end) までの Python の文字列の位置から数える。複数の行にまたがる
+    検出の行は、開始 (start) から終了 (end) までの Python の文字列の位置から数える。複数の行にまたがる
     検出 (長い文など) は、どれかの行が lines に入れば重なるとする。位置の無い検出は行で絞れないので残す。
     """
     line_starts = [0] + [i + 1 for i, ch in enumerate(text) if ch == "\n"]
