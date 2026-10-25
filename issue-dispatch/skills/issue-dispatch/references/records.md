@@ -8,14 +8,14 @@
 
 `<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。`record_dir` は管理ディレクトリの設定のキー (デフォルト値はキーの表 [project-config.md](project-config.md) が持つ)。`<owner>-<number>` は設定の `project` から作る。置き場を Project ごとに分けるのは、設定の `project` を後で別の Project に書き換えたときに、前の Project の記録と混ざらないようにするため。置き場は git が無視する (設定は追跡し、記録は追跡しない)。
 
-| ファイル | 書き手 | 内容 | 様式の正本 |
+| ファイル | 書き込み元 | 内容 | 様式の正本 |
 | --- | --- | --- | --- |
 | `record.json` | 管理のセッション (CLI の `record apply`) | 本体。下の「`record.json`」 | この文書 |
 | `actions.log` | 管理のセッション (CLI の `record log`) | GitHub への書き込みの追記専用のログ。下の「`actions.log`」 | この文書 |
 | `snapshot.json` | 管理のセッション (観測の単位) | ポーリングの基準になる Project の状態の写し。作り直せるキャッシュ | [observation.md](observation.md) |
 | `wait.pid` | 待機のスクリプト | 実行中の待機の PID・開始時刻・所有者のセッション ID | [observation.md](observation.md) |
 
-**書き手は管理のセッション (とそのスクリプト) だけ。** 作業のセッションは記録を持たない。
+**書き込み元は管理のセッション (とそのスクリプト) だけ。** 作業のセッションは記録を持たない。
 
 ## 一時名と改名
 

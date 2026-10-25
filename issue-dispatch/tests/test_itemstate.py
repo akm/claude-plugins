@@ -137,7 +137,7 @@ class AssignmentTest(unittest.TestCase):
         self.assertFalse(s["assigned"])
 
     def test_comments_by_other_authors_are_ignored(self):
-        """書き手がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない (R6)。"""
+        """投稿者がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない (R6)。"""
         item = make_item(comments_=[mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100, author="someone")])
         self.assertIsNone(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["assignment"])
 
@@ -483,7 +483,7 @@ class WorkCheckTest(unittest.TestCase):
 class WorkHeldTest(unittest.TestCase):
 
     def test_held_items_with_stage_and_blocked_owner(self):
-        """割り当て中の Issue (閉じて回答を待機するものを含む) を返し、割り当てが終了した Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
+        """割り当て中の Issue (閉じて回答を待機するものを含む) を返し、割り当てが終了した Issue は返さない。宣言の段階と `Blocked` の書き込み元を添える。"""
         no_decl = make_item(key=A1, comments_=[ASSIGN1])
         waiting = make_item(key=A2, status="Blocked", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)],
                             events=[_status_event("Blocked", t(14))])

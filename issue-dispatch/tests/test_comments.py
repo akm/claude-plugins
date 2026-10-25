@@ -173,7 +173,7 @@ class ListTest(FakeGhCase):
         return entry
 
     def test_lists_own_comments_with_headers(self):
-        """Covers AE28. 先頭行が正しくても書き手のログインが違うコメントは、無いものとして扱う。"""
+        """Covers AE28. 先頭行が正しくても投稿者のログインが違うコメントは、無いものとして扱う。"""
         nodes = [_comment(1, "u1 latency 0"), _comment(2, header("割り当て", to="W-7", assignment=1) + "\n\n理由"),
                  _comment(3, header("開始可", to="W-7", assignment=1, declaration=2), author="someone-else"),
                  _comment(4, header("着手の宣言", WORKER) + "\n\n## 変えるファイル\n- a.go")]
@@ -232,10 +232,10 @@ class AlreadyPostedTest(unittest.TestCase):
         renamed = header("割り当て", {"role": "manager", "name": "renamed", "session_id": "M-1"}, to="W-7", assignment=1)
         self.assertPosted(renamed, [a1], True, "名前は比べない")
         other_manager = header("割り当て", {"role": "manager", "name": "mgr", "session_id": "M-2"}, to="W-7", assignment=1)
-        self.assertPosted(other_manager, [a1], True, "管理のセッションの種類は書き手の ID を比べない (引き継ぎの後も二重に書かない)")
+        self.assertPosted(other_manager, [a1], True, "管理のセッションの種類は投稿者の ID を比べない (引き継ぎの後も二重に書かない)")
 
     def test_handover_compares_session_id_and_worker_kinds_are_not_checked(self):
-        """`引き継ぎ` は書き手のセッション ID も比べる。作業のセッションの種類は既投稿を確認しない (渡されたら ValueError)。"""
+        """`引き継ぎ` は投稿者のセッション ID も比べる。作業のセッションの種類は既投稿を確認しない (渡されたら ValueError)。"""
         h1 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-2"})
         h2 = header("引き継ぎ", {"role": "manager", "name": "mgr", "session_id": "M-3"})
         self.assertPosted(h1, [h1], True)
@@ -244,10 +244,10 @@ class AlreadyPostedTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             comments.already_posted(comments.parse_header(d1), self.own(d1))
         self.assertPosted(header("依存の解消", {"role": "manager", "name": "mgr", "session_id": "M-3"}),
-                          [header("依存の待機", blockers=[OTHER]), header("依存の解消")], True, "依存の解消は書き手の ID を比べない")
+                          [header("依存の待機", blockers=[OTHER]), header("依存の解消")], True, "依存の解消は投稿者の ID を比べない")
         s1 = header("停滞", to="W-7", assignment=1, stuck_state="idle-no-progress")
         self.assertPosted(header("停滞", {"role": "manager", "name": "mgr", "session_id": "M-3"}, to="W-7", assignment=1, stuck_state="idle-no-progress"),
-                          [s1], True, "停滞も書き手の ID を比べない")
+                          [s1], True, "停滞も投稿者の ID を比べない")
 
     def test_declaration_id_distinguishes(self):
         go1 = header("開始可", to="W-7", assignment=1, declaration=1)
@@ -342,7 +342,7 @@ class PostTest(FakeGhCase):
         self.assertEqual([c["args"][:2] for c in self.recorded_full()], [["api", "user"], ["api", "graphql"]], "issue comment を実行しない")
 
     def test_other_author_does_not_count(self):
-        """Covers AE28. 書き手が違うコメントは既投稿の確認にも数えない。"""
+        """Covers AE28. 投稿者が違うコメントは既投稿の確認にも数えない。"""
         nodes = [_comment(1, header("割り当て", to="W-7", assignment=1), author="someone-else")]
         data = fixture_json("issue-comments-ok")
         data["data"]["repository"]["issue"]["comments"]["nodes"] = nodes

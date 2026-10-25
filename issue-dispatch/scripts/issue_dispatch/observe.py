@@ -52,7 +52,7 @@ def load_snapshot(directory):
 
 
 def save_snapshot(directory, snapshot):
-    """一時ファイル (records.md の一時名の決まり: `.` で始まり `.tmp` で終わる名前。書き手ごとに別) に書き、fsync してから
+    """一時ファイル (records.md の一時名の決まり: `.` で始まり `.tmp` で終わる名前。書き込み元ごとに別) に書き、fsync してから
     os.replace で置き換える (record.save と同じ形)。返り値はパス。"""
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, SNAPSHOT_FILE)
@@ -155,7 +155,7 @@ def skipped(before, after):
 
 
 def pr_urls_in_comments(items, login):
-    """開いている項目のコメントのうち、書き手が login で、`PR の報告` の本文に書かれた PR の URL と、`待機` の理由 `小さな PR` の PR を、
+    """開いている項目のコメントのうち、投稿者が login で、`PR の報告` の本文に書かれた PR の URL と、`待機` の理由 `小さな PR` の PR を、
     見つけた順に (重複なく) 返す。閉じた項目は読まない。"""
     out = []
     for item in items:

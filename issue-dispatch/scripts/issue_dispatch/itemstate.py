@@ -28,7 +28,7 @@ _JSON_BLOCK_RE = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
 # --- コメント -----------------------------------------------------------------------
 
 def parsed_comments(item, login):
-    """項目のコメントのうち、先頭行がこの仕組みの形で、書き手がトークンのログインのものを、時刻の順に返す。
+    """項目のコメントのうち、先頭行がこの仕組みの形で、投稿者がトークンのログインのものを、時刻の順に返す。
     要素は project.items の comments の要素に header (parse_header の結果) と text (先頭行を除いた本文) を足したもの。"""
     out = []
     for c in sorted(item.get("comments") or [], key=lambda c: c.get("created_at") or ""):

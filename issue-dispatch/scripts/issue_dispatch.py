@@ -22,7 +22,7 @@
   issue add-label --issue <owner/repo#番号|URL> --label <名前> [--description <説明>]   ラベルを足す。無ければ先に作る (承認を得た後に呼ぶ)
   blocked-by add --issue <owner/repo#番号|URL> --blocker <owner/repo#番号|URL>   blockedBy に足す (失敗は理由付きで返し、再試行しない)
   pr observe --url <PR の URL>   PR の状態・参照する Issue・変えたファイルを読み、種類 (kind) を返す (読むだけ。表は issue-format.md)
-  comment list --issue <owner/repo#番号|URL>   コメントを時刻の順に全部読む (書き手がトークンのログインと違うものは除く。先頭行は解析済み)
+  comment list --issue <owner/repo#番号|URL>   コメントを時刻の順に全部読む (投稿者がトークンのログインと違うものは除く。先頭行は解析済み)
   comment post --issue <参照> --role manager|worker --name <名前> --session-id <ID> --kind <種類> [値のオプション] (--body <本文> | --body-file <ファイル|->)
       先頭行を組み立てて投稿する。同じ出来事への同じコメントが既にあれば投稿せず posted false を返す (値のオプションは issue-format.md の「コメント」)
   comment parse --line <先頭行>   先頭行を解析する (gh は実行しない。形でなければ header は null)
@@ -1030,7 +1030,7 @@ def build_parser():
 
     p_comment = sub.add_parser("comment", help="Issue のコメント")
     comment_sub = p_comment.add_subparsers(dest="subcommand", required=True)
-    p_clist = comment_sub.add_parser("list", help="コメントを時刻の順に全部読む (書き手が違うものは除く)")
+    p_clist = comment_sub.add_parser("list", help="コメントを時刻の順に全部読む (投稿者が違うものは除く)")
     p_clist.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_clist.set_defaults(func=cmd_comment_list)
     p_cparse = comment_sub.add_parser("parse", help="先頭行を解析する (gh は実行しない)")

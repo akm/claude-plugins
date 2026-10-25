@@ -1,4 +1,4 @@
-"""Issue のコメント。先頭行 (書いたセッションの種類と識別子とコメントの種類と値。R6) の生成と解析、コメントの一覧 (書き手が
+"""Issue のコメント。先頭行 (書いたセッションの種類と識別子とコメントの種類と値。R6) の生成と解析、コメントの一覧 (投稿者が
 トークンのログインと違うものを除く)、投稿 (同じ出来事への同じコメントが既にあれば投稿しない。KTD2)、小さな PR の報告と依頼の
 対応づけ。様式の正本は issue-dispatch/skills/issue-dispatch/references/issue-format.md の「コメント」。
 
@@ -301,7 +301,7 @@ def token_login():
 
 
 def list_comments(issue, login=None):
-    """Issue のコメントを時刻の順に全部読む。書き手がトークンのログイン (login。None なら `gh api user`) と違うコメントは除く
+    """Issue のコメントを時刻の順に全部読む。投稿者がトークンのログイン (login。None なら `gh api user`) と違うコメントは除く
     (R6。公開リポジトリでは第三者も書けるため)。返り値: {"status": "ok", "login", "comments": [{id, database_id, url,
     created_at, author, header (parse_header の結果か None), body (先頭行を除いた本文)}], "excluded" (除いた件数), "rate_limit"}
     か失敗の説明。"""
@@ -358,14 +358,14 @@ def _repo_folded(text):
     return text
 
 
-# 既投稿の見分けで書き手のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
+# 既投稿の見分けで投稿者のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
 # 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で見分ける。
 # 作業のセッションの種類は既投稿を確認しない (下の already_posted と post)
 ID_KEYED_KINDS = ("引き継ぎ",)
 
 
 def header_key(parsed):
-    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ書き手の
+    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ投稿者の
     セッション ID も比べる。値は意味で比べる: 配列 (待機するもの・待機する Issue) は並びを問わず、Issue の参照と PR の URL は
     owner/repo の大文字小文字を区別しない。"""
     session_id = parsed["session_id"] if parsed["kind"] in ID_KEYED_KINDS else None
@@ -387,7 +387,7 @@ def already_posted(parsed, own_comments):
     管理のセッションの種類だけが対象。作業のセッションの種類は、投稿が自分の手順の 1 歩ごとに 1 回で、同じ出来事をもう一度書く
     場面が gh の失敗の後のやり直しだけなので確認しない (値を持つ `小さな PR の報告` も同じ。渡されたら ValueError)。
 
-    own_comments は list_comments が返した、書き手が自分のコメントの配列 (時刻の順)。種類ごとの規則:
+    own_comments は list_comments が返した、投稿者が自分のコメントの配列 (時刻の順)。種類ごとの規則:
     `待機` は同じ宣言への最新の `待機` とだけ比べる。`依存の待機` は最新の `依存の待機` と比べ、間に `依存の解消` があれば
     投稿する。`依存の解消` は最新の `依存の待機` より後のコメントとだけ比べる。`停滞` は同じ対象・割り当て・値なら、間に
     別のコメントがあっても既投稿。ほかの種類は、先頭行の鍵 (header_key) が同じコメントがあれば既投稿。

@@ -8,7 +8,7 @@
 
 状態ごとに出どころを 1 つに決める。導出・作業のセッションの確認・待機の終了条件 (U14) は、どれもこの表の出どころを読む。Status (利用者と組み込みワークフローも変える) と担当者では決めない。
 
-| 状態 | 出どころ | 書き手と書く順 |
+| 状態 | 出どころ | 書き込み元と書く順 |
 | --- | --- | --- |
 | 割り当て中か (`assigned`) | 今の割り当てのコメント `割り当て` (宛先と番号) があり、その番号の `解放` が無く、正常な完了 (下の行) もしていない。進行中の Issue が閉じて、利用者の質問に回答が出ていない間は割り当て中。担当者と Status では決めない | 管理 (`Agent session ID` は排他の印で、コメントより先) |
 | 割り当ての終了 (`end`) と reopen (`reopened`) | 終了 = 今の番号の `解放` (`kind` が `released`) か、正常な完了 (`kind` が `normal`): Issue が閉じていて、進行中 (`in_progress`) でない。進行中 = 今の割り当ての PR が無いか、読んだ時点で ready for review にもマージ済みにもなっていない。閉じたもの (`ClosedEvent` の `closer`) は問わない。Issue が開いている (reopen された) ときは、今の割り当ての最新の `ClosedEvent` の時点で PR が ready for review かマージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な完了と読む。reopen = 終了した後の `ReopenedEvent`。Status だけの `Todo`・`Done` は、終了でも reopen でもない | 管理 (`解放`。理由ごとに続けて書くものは [issue-format.md](issue-format.md) の `解放`)・利用者 (reopen) |
@@ -24,9 +24,9 @@
 
 **判断の基準** (場面ごとの扱いを決めるときに使う):
 
-- 時刻は、コメントの投稿の時刻と Issue の出来事 (`ClosedEvent`・`ReopenedEvent`・`LabeledEvent`・`UnlabeledEvent`・`ProjectV2ItemStatusChangedEvent` など) の時刻で比べる。出来事の書き手 (`actor`) は使えない (管理のセッションと利用者は同じアカウントで書く)。Status の出来事は、この Project のもの (`project_number`) だけを見る。
+- 時刻は、コメントの投稿の時刻と Issue の出来事 (`ClosedEvent`・`ReopenedEvent`・`LabeledEvent`・`UnlabeledEvent`・`ProjectV2ItemStatusChangedEvent` など) の時刻で比べる。出来事を起こしたアカウント (`actor`) は使えない (管理のセッションと利用者は同じアカウントで書く)。Status の出来事は、この Project のもの (`project_number`) だけを見る。
 - ある時点の状態 (そのとき付いていたラベルなど) は、その時点までの出来事を時刻の順に全部読んで求める。最初や最新の出来事だけで決めない。
-- 書き手がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない ([issue-format.md](issue-format.md) の「コメント」)。
+- 投稿者がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない ([issue-format.md](issue-format.md) の「コメント」)。
 - 宛先と番号を持つ種類のコメント (`開始可`・`待機`・`解放`・`依頼`) は、今の割り当ての宛先と番号のものだけを使う。前の割り当てのものは使わない。
 - 同じ場面に 2 つの決まりが当たるときは、利用者の変更を上書きしないほうを選ぶ。
 
