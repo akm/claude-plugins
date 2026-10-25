@@ -423,8 +423,8 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 [[terms]]
 pattern = "読み直"
 verdict = "avoid"
-replacements = ["再確認", "再度読み込む"]
-reason = "英語 (reread) を直訳した訓読みの語。人が読み返すのは「再確認」、プログラムが読むのは「再度読み込む」と書く"
+replacements = ["再確認", "通読する", "再度読み込む"]
+reason = "英語 (reread) を直訳した訓読みの語。人が確認し直すのは「再確認」、人が文書を最初から通して読むのは「通読」(範囲を読むだけなら「読む」)、プログラムが読むのは「再度読み込む」と書く"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
