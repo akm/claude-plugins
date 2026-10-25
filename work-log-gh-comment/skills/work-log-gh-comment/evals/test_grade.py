@@ -285,7 +285,7 @@ class TestEval5Coverage(unittest.TestCase):
     def test_宣言と判定の項目が一致する(self):
         """evals.json の assertions と CHECKS のラベルは同じ事実の二重記載。
 
-        突き合わせる関門が無いと、片方に足したとき、どの検査も失敗しないまま食い違う。
+        突き合わせる関門が無いと、片方に足したとき、どの検査も失敗しないまま一致しなくなる。
         """
         import json
         import pathlib
@@ -450,7 +450,7 @@ class TestMainRobustness(unittest.TestCase):
 class TestCheckLabels(unittest.TestCase):
     """判定のラベルは、実装が実際に求めるものと合っていなければならない。
 
-    ラベルは記録する側が読む唯一の手がかりなので、食い違うと
+    ラベルは記録する側が読む唯一の手がかりなので、一致しないと
     ラベルどおりに書いた記録が落ちる。
     """
 
@@ -560,7 +560,7 @@ class TestChunksHandled(unittest.TestCase):
 
 
 class TestMentionsDiscrepancy(unittest.TestCase):
-    """食い違いの言及。行数の出現だけで通してはいけない。"""
+    """不一致の言及。行数の出現だけで通してはいけない。"""
 
     def test_食い違いの語で通す(self):
         ok, _ = grade.mentions_discrepancy("サマリと明細が食い違っている。")
@@ -582,7 +582,7 @@ class TestMentionsDiscrepancy(unittest.TestCase):
 
     def test_題材の数を並べただけでは通さない(self):
         """check-logs.sh はアプリ 3 つを走査する。「3 つ」と「2 行」が
-        同じ文に並ぶのは eval-3 で自然な記述で、食い違いの認識ではない。
+        同じ文に並ぶのは eval-3 で自然な記述で、不一致の認識ではない。
         """
         for body in ("3 つのアプリケーションを確認し、ERROR は 2 行あった。",
                      "app-web / app-worker / app-db の 3 つで ERROR は 2 行。"):
@@ -591,13 +591,13 @@ class TestMentionsDiscrepancy(unittest.TestCase):
                 self.assertFalse(ok)
 
     def test_サマリと明細の出所を明示した対比で通す(self):
-        """どちらの数がどこから来たかを書いていれば、食い違いの認識。"""
+        """どちらの数がどこから来たかを書いていれば、不一致の認識。"""
         ok, _ = grade.mentions_discrepancy(
             "サマリは 3 errors だが、明細の ERROR 行は 2 行しかない。")
         self.assertTrue(ok)
 
     def test_解釈で均した文を通さない(self):
-        """3 件と 2 回を並べても、食い違いとして書いていない。"""
+        """3 件と 2 回を並べても、不一致として書いていない。"""
         ok, _ = grade.mentions_discrepancy(
             "エラーが 3 件あるが、内容はリトライ 2 回で自己回復している。")
         self.assertFalse(ok)
