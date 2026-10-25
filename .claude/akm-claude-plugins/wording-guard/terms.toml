@@ -328,10 +328,10 @@ reason = "英語 (location) を直訳した訓読みの語。実体がディレ�
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
-pattern = "/(?<![停中禁阻防抑静終廃制休])止(ま|め|っ)/"
+pattern = "/(?<![一-龯々])止(ま|め|っ)/"
 verdict = "avoid"
 replacements = ["停止する", "中断する", "拒否する"]
-reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く。3 つのどれにも当たらなければ、何が起きるかを書く (「実行が返らなくなる」など)。hook の終了コードの扱いは、Claude Code の文書の用語 (non-blocking error など) で書く。二字漢語 (停止・中止・禁止 など) の「止」は対象にしない"
+reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く。3 つのどれにも当たらなければ、何が起きるかを書く (「実行が返らなくなる」など)。hook の終了コードの扱いは、Claude Code の文書の用語 (non-blocking error など) で書く。前が漢字の形 (二字漢語の「停止」、和語の複合名詞の「通行止め」、漢字に続く動詞の「一度止められた」) は検出しないので、目で確認する"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]
