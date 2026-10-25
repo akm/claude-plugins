@@ -331,7 +331,7 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 pattern = "/(?<![一-龯々])止(ま|め|っ)/"
 verdict = "avoid"
 replacements = ["停止する", "中断する", "拒否する"]
-reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く"
+reason = "英語 (stop) を直訳した訓読みの語。プロセス・待機は「停止」、手順を途中でやめて人間に返すのは「中断」、サンドボックスや hook が実行させないのは「拒否」と書く。3 つのどれにも当たらなければ、何が起きるかを書く (「実行が返らなくなる」など)。hook の終了コードの扱いは、Claude Code の文書の用語 (non-blocking error など) で書く"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]

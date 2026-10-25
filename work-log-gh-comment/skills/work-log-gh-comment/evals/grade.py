@@ -88,7 +88,7 @@ def fixture_lines(name):
         # ループも待機も無い (実測 0.00 秒)。発火しない経路のために例外を
         # 投げる仕掛けを置くと、その受けを決める必要が生まれ、守るための
         # テストも要る — 実際にそれで 2 つの欠陥を作った。判定器は開発者
-        # だけが使う道具なので、停止したら気づいて直せばよい。
+        # だけが使う道具なので、実行が返らなくなったら気づいて直せばよい。
         r = subprocess.run(["sh", str(FIXTURES / name)] + _fixture_args(name),
                            capture_output=True, text=True)
         out = ANSI.sub("", r.stdout + r.stderr)
