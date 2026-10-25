@@ -84,7 +84,7 @@ def is_our_wait(entry):
 
 
 def stop_previous(path, grace_seconds=10.0):
-    """前の待機を止める。`wait.pid` の PID がこの CLI の待機なら SIGTERM を送って終わるのを待ち、そうでなければ止めずに `wait.pid` だけ消す。
+    """前の待機を止める。`wait.pid` の PID がこの CLI の待機なら SIGTERM を送って終わるのを待機し、そうでなければ止めずに `wait.pid` だけ消す。
     返り値: {"stopped": PID} / {"removed": PID} (再利用されていた) / {"none": True}。"""
     entry = read_pid_file(path)
     if entry is None:
@@ -108,7 +108,7 @@ def stop_previous(path, grace_seconds=10.0):
             os.unlink(path)
     except OSError:
         pass
-    # 待ち時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止の印を見たときに終わる
+    # 待機時間の後も動いていれば (gh の呼び出しの途中など)、起動は続ける。前の待機は、その読み取りの結果を捨てて次に停止の印を見たときに終わる
     return {"stopped": entry["pid"], "alive": True} if alive else {"stopped": entry["pid"]}
 
 

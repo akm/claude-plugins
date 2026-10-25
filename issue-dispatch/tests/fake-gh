@@ -4,7 +4,7 @@
 実際の gh の代わりに、環境変数の指示どおりに振る舞う (先例: review-triage/tests/fake-claude)。
 
 - FAKE_GH_ARGS: 受けた引数 (argv[1:]) と標準入力の中身 (stdin) と時刻と cwd を JSON の 1 行として追記するファイル
-- FAKE_GH_SLEEP: 応答の前に待つ秒数 (既定 0)
+- FAKE_GH_SLEEP: 応答の前に待機する秒数 (既定 0)
 - FAKE_GH_FIXTURES: 固定データのディレクトリ (既定はこのファイルと同じディレクトリの fixtures/gh)
 - FAKE_GH_MODE:
     ok              FAKE_GH_RESPONSES の応答の指定に従う (既定)

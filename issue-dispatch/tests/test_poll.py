@@ -86,7 +86,7 @@ class WaiterTest(unittest.TestCase):
         self.assertEqual((code, "".join(self.out)), (6, f"pid {os.getpid()}\nstopped {os.getpid()}\n"))
 
     def test_stop_previous_reports_alive_after_grace(self):
-        """前の待機が待ち時間の後も動いていれば alive を返し、起動は続ける (wait.pid は消す)。"""
+        """前の待機が待機時間の後も動いていれば alive を返し、起動は続ける (wait.pid は消す)。"""
         import signal as _signal
         holder = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)"])
         try:
@@ -124,7 +124,7 @@ class WaiterTest(unittest.TestCase):
         self.assertEqual(len(calls), 5, "成功 (2 回目) で数え直すので、4 で終わるのは 5 回目")
 
     def test_rate_limit_waits_until_reset_within_deadline(self):
-        """レート制限の再開が期限内なら待って続け、期限を越えるか読めなければ 3。"""
+        """レート制限の再開が期限内なら待機して続け、期限を越えるか読めなければ 3。"""
         calls = []
         original = gh.rate_limit_reset_at
         try:

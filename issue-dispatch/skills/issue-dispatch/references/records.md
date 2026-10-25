@@ -116,7 +116,7 @@
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と回答を書く |
 | `ask` | `question_id`・`item`・`kind`・`options`・`at`・`subject` (任意) | 問いを記録する (同じ ID の問いが既にあれば誤り。回答を消さないため。既にある問いは `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 回答を書く (問いが無い・選択肢に無い回答は誤り) |
-| `withdraw` | `question_id`・`at` | 問いを取り下げる (回答を待つ理由が無くなったとき。回答は null のまま `answered_at` を書くので、未回答には数えない。回答のある問いは取り下げられない) |
+| `withdraw` | `question_id`・`at` | 問いを取り下げる (回答を待機する理由が無くなったとき。回答は null のまま `answered_at` を書くので、未回答には数えない。回答のある問いは取り下げられない) |
 
 ## `actions.log`
 
@@ -144,5 +144,5 @@ GitHub への書き込み (割り当て・Status・フィールド・コメン�
 
 次のものは GitHub から導けるので記録に持たず、ターンのたびに導く (導く単位は項目の状態の文書 [flow.md](flow.md))。
 
-- 宣言 (Issue のコメント)、資源の使用 (ラベルと宣言)、自分が足した `blockedBy`、待っている小さな PR、Status の戻り先
+- 宣言 (Issue のコメント)、資源の使用 (ラベルと宣言)、自分が足した `blockedBy`、待機している小さな PR、Status の戻り先
 - Issue の URL・タイトル・本文、項目が属する作業のセッション (フィールド `Agent session ID`)

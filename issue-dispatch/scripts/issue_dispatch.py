@@ -299,7 +299,7 @@ def cmd_observe_diff(args):
         _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"],
                "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
         return 0
-    # スナップショットにある PR (コメントが消えても、待っていた PR の状態の変化を見つけるため) も読む
+    # スナップショットにある PR (コメントが消えても、待機していた PR の状態の変化を見つけるため) も読む
     comment_prs, problems = _read_comment_prs(result["items"], login, extra_urls=list(loaded["snapshot"]["comment_prs"]))
     current = observe.build_snapshot(result, comment_prs, _now(), previous=loaded["snapshot"])
     all_problems = result["problems"] + problems
@@ -1047,13 +1047,13 @@ def build_parser():
     p_cpost.add_argument("--declaration", help="宣言のコメントの ID")
     p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の回答 / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
     p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の書き直し / 本文の追記 / 小さな PR")
-    p_cpost.add_argument("--waiting-issue", help="待つ Issue (依頼 小さな PR と小さな PR の報告)")
-    p_cpost.add_argument("--waiting-declaration", help="待つ側の宣言のコメントの ID")
+    p_cpost.add_argument("--waiting-issue", help="待機する Issue (依頼 小さな PR と小さな PR の報告)")
+    p_cpost.add_argument("--waiting-declaration", help="待機する Issue の宣言のコメントの ID")
     p_cpost.add_argument("--previous-pr", help="作り直しのとき、閉じた前の PR の URL")
     p_cpost.add_argument("--pr", help="本文の追記を頼む PR の URL")
     p_cpost.add_argument("--release-reason", help="解放の理由: 解除 / close / ID の変更 / 除去")
     p_cpost.add_argument("--stuck-state", help="停滞の値 (Agent stuck state)")
-    p_cpost.add_argument("--blocker", action="append", help="依存の待ちで待つ Issue (繰り返せる)")
+    p_cpost.add_argument("--blocker", action="append", help="依存の待機で待機する Issue (繰り返せる)")
     body = p_cpost.add_mutually_exclusive_group()
     body.add_argument("--body", help="本文 (先頭行はこの CLI が足す)")
     body.add_argument("--body-file", help="本文のファイル (- なら標準入力)")
@@ -1132,9 +1132,9 @@ def build_parser():
     p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・戻り・解放・依頼で終わる")
     p_wassign.add_argument("--project", required=True, help="owner/番号")
     p_wassign.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
-    p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待っている Issue (owner/repo#番号。繰り返せる)")
+    p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待機している Issue (owner/repo#番号。繰り返せる)")
     p_wassign.add_argument("--in-review", action="append", default=[], help="レビュー中の Issue (繰り返せる)")
-    p_wassign.add_argument("--pending", help="利用者の回答を待つ Issue")
+    p_wassign.add_argument("--pending", help="利用者の回答を待機する Issue")
     p_wassign.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wassign.add_argument("--minutes", type=float, required=True, help="期限 (分)")
     p_wassign.set_defaults(func=cmd_wait_assignment)
@@ -1142,7 +1142,7 @@ def build_parser():
     p_wdecision.add_argument("--project", required=True, help="owner/番号")
     p_wdecision.add_argument("--issue", required=True, help="割り当てを受けた Issue (owner/repo#番号)")
     p_wdecision.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
-    p_wdecision.add_argument("--declaration", type=int, required=True, help="判定を待つ宣言のコメントの ID")
+    p_wdecision.add_argument("--declaration", type=int, required=True, help="判定を待機する宣言のコメントの ID")
     p_wdecision.add_argument("--review-update", action="store_true", help="ready for review の後の宣言の更新 (今の Issue の正常な終わりで stop)")
     p_wdecision.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wdecision.add_argument("--minutes", type=float, required=True, help="期限 (分)")

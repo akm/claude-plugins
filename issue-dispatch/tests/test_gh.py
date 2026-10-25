@@ -191,7 +191,7 @@ class RunTest(FakeGhTest):
         gh.run(["api", "graphql", "-f", "query=query{d}"])
         times = [rec["time"] for rec in self.recorded()]
         self.assertGreaterEqual(times[1] - times[0], gh.MUTATION_INTERVAL, "変更系の呼び出しは 1 秒以上空けること")
-        self.assertLess(time.monotonic() - started, gh.MUTATION_INTERVAL, "読むだけの呼び出しは待たないこと")
+        self.assertLess(time.monotonic() - started, gh.MUTATION_INTERVAL, "読むだけの呼び出しは待機しないこと")
 
     def test_mutation_spacing_holds_across_processes(self):
         """CLI はサブコマンドごとに 1 プロセスなので、別のプロセスで続けて変更系を実行しても 1 秒以上空く。"""

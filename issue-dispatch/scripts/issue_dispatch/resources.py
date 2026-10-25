@@ -13,7 +13,7 @@ from issue_dispatch import declaration, ids
 DEFAULTS = {"capacity": 1, "reserve": "on_assign", "when_busy": "wait", "release_undeclared": "ask"}
 VALUES = {"reserve": ("on_assign", "on_declare"), "when_busy": ("wait", "ask"), "release_undeclared": ("release", "ask")}
 TRIGGERS = ("assign", "declare", "update", "close", "release")
-# 利用者の回答。when_busy が ask のとき: wait (待つ) / proceed (進める)。release_undeclared が ask のとき: release (解放してよい) / keep (解放してはいけない)
+# 利用者の回答。when_busy が ask のとき: wait (待機する) / proceed (進める)。release_undeclared が ask のとき: release (解放してよい) / keep (解放してはいけない)
 BUSY_ANSWERS = ("wait", "proceed")
 UNDECLARED_ANSWERS = ("release", "keep")
 
@@ -110,7 +110,7 @@ def _answer(answers, name):
 def judge_assign(item, label_resources, usage, attrs_table, answers):
     """契機「割り当て」。label_resources は項目のラベルの資源。answers は when_busy が ask の資源への回答 (名前 → wait / proceed)。
     返り値: {"result": "assign" (割り当てて reserve を予約する) / "skip" (候補から外す) / "ask" (利用者に尋ねる),
-    "reserve": 予約する資源, "busy": 空いていない資源, "ask": 尋ねる資源}。reserve が on_declare の資源は予約せず、空きも待たない。"""
+    "reserve": 予約する資源, "busy": 空いていない資源, "ask": 尋ねる資源}。reserve が on_declare の資源は予約せず、空きも待機しない。"""
     reserve, busy, ask = [], [], []
     for name in label_resources:
         a = attributes_of(attrs_table, name)
@@ -153,7 +153,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
     """契機「着手の宣言」。declared は宣言の resources、reserved は割り当てで予約した資源。answers は when_busy が ask の資源への回答、
     undeclared_answers は release_undeclared が ask の資源への回答 (名前 → release / keep)。
     返り値: {"result": "go" (`開始可` を書くときに reserve を予約する) / "wait" (`待機`。どれも予約しない) / "ask",
-    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待つ・残す予約), "ask_undeclared" (尋ねる),
+    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待機する・残す予約), "ask_undeclared" (尋ねる),
     "request_rewrite" (解放してはいけないので書き直しを頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
     declared, reserved = _unique(declared), _unique(reserved)
     reserved_keys = {_key(r) for r in reserved}
@@ -207,6 +207,6 @@ def judge_close(item, usage):
 
 def judge_release(resource, waiting):
     """契機「資源の解放」。waiting は `待機` になっている宣言の配列 ({"item", "declaration", "posted_at", "position", "wait_for": [資源]})。
-    その資源で待っていた宣言を、投稿の順 (同じなら Project の中の順) に返す。返り値: {"rejudge": [...]}。"""
+    その資源で待機していた宣言を、投稿の順 (同じなら Project の中の順) に返す。返り値: {"rejudge": [...]}。"""
     hit = [w for w in waiting if any(_key(r) == _key(resource) for r in w.get("wait_for") or [])]
     return {"rejudge": sorted(hit, key=lambda w: (w.get("posted_at") or "", w.get("position") if w.get("position") is not None else 0))}

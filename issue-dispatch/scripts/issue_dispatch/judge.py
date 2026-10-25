@@ -255,7 +255,7 @@ def _held_before(st, judged):
 
 
 def _small_pr_report(other, item_key):
-    """相手の項目の `小さな PR の報告` のうち、待つ Issue がこの項目のものの最新の PR の URL。無ければ None。"""
+    """相手の項目の `小さな PR の報告` のうち、待機する Issue がこの項目のものの最新の PR の URL。無ければ None。"""
     for c in reversed(_other_comments(other)):
         h = c["header"]
         if h["role"] == "worker" and h["kind"] == "小さな PR の報告" and ids.same_issue(h["values"].get("waiting_issue"), item_key):
@@ -266,7 +266,7 @@ def _small_pr_report(other, item_key):
 
 
 def _small_pr_requested(other, item_key):
-    """相手の今の割り当てのセッションに、待つ Issue がこの項目の `依頼` (小さな PR) を既に書いたか (宣言の書き直しで待つ側の宣言の ID が変わっても、同じ依頼とみなす)。"""
+    """相手の今の割り当てのセッションに、待機する Issue がこの項目の `依頼` (小さな PR) を既に書いたか (宣言の書き直しで待機する Issue の宣言の ID が変わっても、同じ依頼とみなす)。"""
     for c in _other_comments(other):
         h = c["header"]
         v = h["values"]
@@ -282,13 +282,13 @@ def _wait_body(waits, usage, j=None):
         if w["kind"] == "利用者の回答":
             lines.append("利用者の回答: 管理のセッションが利用者に尋ねている (競合しうる相手の扱い・unknown-content のファイルの判定・資源の使用)")
         elif w["kind"] == "Issue":
-            lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が終わるまで待つ (利用者の回答: wait)")
+            lines.append(f"Issue {w['issue']}: 競合しうる相手の作業が終わるまで待機する (利用者の回答: wait)")
         elif w["kind"] == "小さな PR":
             lines.append(f"小さな PR {w['issue']}: 相手に共通の変更を先に小さな PR にすることを依頼した" + (f" (PR {w['pr']})" if w.get("pr") else "") + " (利用者の回答: small-pr)")
         elif w["kind"] == "資源":
             holders = usage.get(_usage_key(usage, w["resource"]) or w["resource"]) or []
             lines.append(f"資源 {w['resource']}: 使用中 (持つ項目: {', '.join(holders) or '-'})")
-    body = "待つもの:\n" + "\n".join(f"- {line}" for line in lines)
+    body = "待機するもの:\n" + "\n".join(f"- {line}" for line in lines)
     return body + _undeclared_lines(j) if j else body
 
 
@@ -297,7 +297,7 @@ def _undeclared_lines(j):
     if j["release"]:
         lines.append(f"解放した資源 (宣言に無い予約・更新で外した資源): {', '.join(j['release'])}")
     if j["keep"]:
-        lines.append(f"回答を待つ予約 (宣言に無い資源。解放してよいか利用者に尋ねている): {', '.join(j['keep'])}")
+        lines.append(f"回答を待機する予約 (宣言に無い資源。解放してよいか利用者に尋ねている): {', '.join(j['keep'])}")
     return ("\n" + "\n".join(lines)) if lines else ""
 
 
@@ -314,8 +314,8 @@ def _blocking_actions(item, blockers):
 
 
 def _restore_and_removals(item, d, blockers):
-    """前の宣言の `待機` のために書いた Blocked と blockedBy の扱い。新しい判定で Issue・小さな PR を待たないなら Status を In Progress に戻し、
-    自分が足した blockedBy のうち待たなくなった相手は外す候補 (承認を得て `blocked-by remove`)。"""
+    """前の宣言の `待機` のために書いた Blocked と blockedBy の扱い。新しい判定で Issue・小さな PR を待機しないなら Status を In Progress に戻し、
+    自分が足した blockedBy のうち待機しなくなった相手は外す候補 (承認を得て `blocked-by remove`)。"""
     actions = []
     own = d.get("own_blockers") or []
     if not blockers and own and item.get("state") == "OPEN" and (item.get("status") or {}).get("name") == "Blocked":
@@ -352,8 +352,8 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
          "repo_config": repo_config["status"], "result": None, "waits": [], "compared": [], "recompared": False, "reserve": [], "release": [], "keep": [],
          "parsed": None, "actions": [], "questions": [], "signals": []}
     # 1. 宣言に無い予約 (着手の宣言だけ)。資源はリポジトリの規則に依らず itemstate が読んだ宣言から分かるので、設定の読み取りと形の検査の前に
-    #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待つ経路でも出し、解放してはいけないと回答した資源が
-    #    あれば書き直しを頼んで終わる (予約は残す)。解放した資源と回答を待つ予約は、どの経路の本文にも書く (_undeclared_lines)
+    #    行い、結果に依らず分ける (resources.md の契機 declare の行): 解放は結果に載せ、問いは待機する経路でも出し、解放してはいけないと回答した資源が
+    #    あれば書き直しを頼んで終わる (予約は残す)。解放した資源と回答を待機する予約は、どの経路の本文にも書く (_undeclared_lines)
     r = None
     if judged.get("update_kind") in (None, "initial") and judged.get("declaration") is not None:
         declared = judged["declaration"]["resources"]
@@ -461,7 +461,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         j["signals"] += request_signals
         return j
-    # 5. 資源の空き (競合の可能性で待つ・尋ねる宣言は、新しい資源の空きを確かめない。1 か 3 で求めた r を使う)
+    # 5. 資源の空き (競合の可能性で待機する・尋ねる宣言は、新しい資源の空きを確かめない。1 か 3 で求めた r を使う)
     res_waits = [{"kind": "資源", "resource": n} for n in r["wait_for"]]
     if r["ask"]:
         res_waits.insert(0, dict(_USER_ANSWER))
@@ -474,7 +474,7 @@ def judge_one(entry, others, rec, usage, attrs_table, repo_config, table, login)
         j["actions"] += _restore_and_removals(item, d, [])
         j["signals"].append(_signal("wait", asg["to"], key, decl_id))
         return j
-    # 6. 開始可 (宣言に無い予約の問いは 1 で出してある。`開始可` を書いてから回答を待つ)
+    # 6. 開始可 (宣言に無い予約の問いは 1 で出してある。`開始可` を書いてから回答を待機する)
     j["result"], j["reserve"] = "go", r["reserve"]
     j["actions"].append(_comment(key, "開始可", base, _go_body(j, j["compared"], proceeds, recompare, rule_text)))
     j["actions"] += _restore_and_removals(item, d, [])
@@ -511,7 +511,7 @@ def judge(items, states, rec, attrs_table, pr_states, read_config, table=None, l
         out["actions"] += j["actions"]
         out["questions"] += j["questions"]
         out["signals"] += j["signals"]
-        for n in j["release"]:  # 解放は結果に依らない (待つ宣言の、宣言に無い予約の解放も含む)
+        for n in j["release"]:  # 解放は結果に依らない (待機する宣言の、宣言に無い予約の解放も含む)
             _drop_usage(usage, n, key)
         if j["result"] == "go":
             others = [o for o in others if not ids.same_issue(o["item"], key)]

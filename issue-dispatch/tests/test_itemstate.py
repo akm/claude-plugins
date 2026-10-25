@@ -207,7 +207,7 @@ class EndTest(unittest.TestCase):
         self.assertEqual(s["end"]["kind"], "normal")
 
     def test_close_in_progress_keeps_assignment(self):
-        """進行中 (PR が無い・draft) の Issue の close は正常な終わりではなく、割り当て中のまま (利用者の回答を待つ。R21)。"""
+        """進行中 (PR が無い・draft) の Issue の close は正常な終わりではなく、割り当て中のまま (利用者の回答を待機する。R21)。"""
         for prs in ([], [ref_pr(PR9, t(25), draft=True)]):
             s = self._closed(prs=prs)
             self.assertEqual((s["in_progress"], s["end"], s["assigned"]), (True, None, True), prs)
@@ -268,7 +268,7 @@ def stage_of(*cs, status="In Progress", events=()):
 class DeclarationStageTest(unittest.TestCase):
 
     def test_no_declaration(self):
-        """宣言のコメントが無い項目は、判定の要る宣言が無く段階も無い (何も求めず作業のセッションの宣言を待つ)。"""
+        """宣言のコメントが無い項目は、判定の要る宣言が無く段階も無い (何も求めず作業のセッションの宣言を待機する)。"""
         d = stage_of()
         self.assertEqual((d["judged"], d["stage"], d["held"]), (None, None, []))
 
@@ -292,7 +292,7 @@ class DeclarationStageTest(unittest.TestCase):
                          ("waiting", [{"kind": "利用者の回答"}], False, None, []))
 
     def test_waiting_for_issue_with_blocked_status_after_wait_is_managers(self):
-        """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。戻り先は `In Progress`、自分が足した blockedBy は待つ Issue。"""
+        """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。戻り先は `In Progress`、自分が足した blockedBy は待機する Issue。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["manager_blocked"], d["return_status"], d["own_blockers"], d["waiting_blockers"]), ("waiting", True, "In Progress", [A2], [A2]))
 
@@ -310,7 +310,7 @@ class DeclarationStageTest(unittest.TestCase):
         """`待機` の後に `開始可` があれば作業中 (最新の判定の結果で決める)。Status が `Blocked` のままでも管理のセッションのものではない (戻し済みのはず)。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), _go(400, t(15), 501), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["manager_blocked"], d["waiting_blockers"], d["own_blockers"]), ("go", False, [], [A2]),
-                         "待っている blocker は無いが、自分が足した blocker として残る (`開始可` の後に外すため)")
+                         "待機している blocker は無いが、自分が足した blocker として残る (`開始可` の後に外すため)")
 
     def test_own_blockers_include_waits_of_previous_declarations(self):
         """自分が足した blocker は、今の割り当てのすべての `待機` から導く (ファイルを変えた更新で判定の要る宣言が変わっても残る)。"""
@@ -425,7 +425,7 @@ class ResourceUsageTest(unittest.TestCase):
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER, attrs_table=table)["reserved"], [])
 
     def test_usage_from_states(self):
-        """資源の使用 (資源 → 持つ項目) は、割り当て中の項目の予約と持っている資源から導く。終わった項目は持たない。待っている宣言の新しい資源は持たない。"""
+        """資源の使用 (資源 → 持つ項目) は、割り当て中の項目の予約と持っている資源から導く。終わった項目は持たない。待機している宣言の新しい資源は持たない。"""
         held_item = make_item(key=A1, labels=["resource:db"], comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], events=[_label_event("LabeledEvent", "resource:db", t(1))])
         waiting_item = make_item(key=A2, comments_=[ASSIGN1, wcomment("着手の宣言", None, t(12), 410, body=decl_body(resources=("gpu",))),
                                                      _wait(410, [{"kind": "資源", "resource": "gpu"}], t(13), 510)])
@@ -483,7 +483,7 @@ class WorkCheckTest(unittest.TestCase):
 class WorkHeldTest(unittest.TestCase):
 
     def test_held_items_with_stage_and_blocked_owner(self):
-        """割り当て中の Issue (閉じて回答を待つものを含む) を返し、終わった Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
+        """割り当て中の Issue (閉じて回答を待機するものを含む) を返し、終わった Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
         no_decl = make_item(key=A1, comments_=[ASSIGN1])
         waiting = make_item(key=A2, status="Blocked", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)],
                             events=[_status_event("Blocked", t(14))])
@@ -511,7 +511,7 @@ def _blocker(key, state="OPEN"):
 
 
 def dep_wait(blockers, at, cid):
-    return mcomment("依存の待ち", {"blockers": list(blockers)}, at, cid)
+    return mcomment("依存の待機", {"blockers": list(blockers)}, at, cid)
 
 
 def dep_clear(at, cid):
@@ -527,21 +527,21 @@ class DependencyBlockedTest(unittest.TestCase):
     """割り当ての無い項目の Ready ⇄ Blocked の再導出 (KTD7)。範囲は担当者が自分 1 人の項目で、Status が Ready か Blocked のもの。"""
 
     def test_ready_with_open_blocker_waits(self):
-        """開いている blocker があれば、`依存の待ち` を書いてから `Blocked` にする (コメントが先)。"""
+        """開いている blocker があれば、`依存の待機` を書いてから `Blocked` にする (コメントが先)。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1), _blocker(A2, "CLOSED")])
         actions, reports = dependency(item)
-        self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の待ち"), ("set-status", "Blocked")])
+        self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の待機"), ("set-status", "Blocked")])
         self.assertEqual((actions[0]["values"], reports), ({"blockers": [A1]}, []))
 
     def test_blocked_by_manager_returns_to_ready_when_blockers_close(self):
-        """管理のセッションが書いた `Blocked` (最新が `依存の待ち`) は、blocker がすべて閉じたら `依存の解消` を書いてから `Ready` に戻す。"""
+        """管理のセッションが書いた `Blocked` (最新が `依存の待機`) は、blocker がすべて閉じたら `依存の解消` を書いてから `Ready` に戻す。"""
         item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")], comments_=[dep_wait([A1], t(10), 100)],
                          events=[_status_event("Blocked", t(11), previous="Ready")])
         actions, _ = dependency(item)
         self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の解消"), ("set-status", "Ready")])
 
     def test_blocked_by_user_is_not_rewritten(self):
-        """`依存の待ち` の無い `Blocked` (利用者が手で付けた) は、blocker が閉じていても書き換えない。"""
+        """`依存の待機` の無い `Blocked` (利用者が手で付けた) は、blocker が閉じていても書き換えない。"""
         item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")])
         self.assertEqual(dependency(item), ([], []))
         item = make_item(status="Blocked", session_field=None, blocked_by=[])
@@ -564,13 +564,13 @@ class DependencyBlockedTest(unittest.TestCase):
             self.assertEqual(dependency(item), ([], []), assignees)
 
     def test_interrupted_after_wait_comment_continues_to_blocked(self):
-        """`依存の待ち` を書いた後に止まった (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、続きの `Blocked` を書く。"""
+        """`依存の待機` を書いた後に止まった (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、続きの `Blocked` を書く。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)])
         actions, reports = dependency(item)
         self.assertEqual(([(a["kind"], a["status"], a.get("continuation")) for a in actions], reports), ([("set-status", "Blocked", True)], []))
 
     def test_user_returned_to_ready_after_wait_is_reported_not_rewritten(self):
-        """`依存の待ち` → `Blocked` の後に利用者が `Ready` に戻した (Status の変化がコメントより後) 項目は、書き換えずに人の変更として報告する。"""
+        """`依存の待機` → `Blocked` の後に利用者が `Ready` に戻した (Status の変化がコメントより後) 項目は、書き換えずに人の変更として報告する。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)],
                          events=[_status_event("Blocked", t(11), previous="Ready"), _status_event("Ready", t(12), previous="Blocked")])
         actions, reports = dependency(item)
@@ -644,7 +644,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["questions"], [p["question_id"] for p in out["pending"]]), ([], ["q1"]))
 
     def test_reopen_while_close_question_pending_withdraws_and_restores_status(self):
-        """進行中の close の回答を待つ間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
+        """進行中の close の回答を待機する間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -786,7 +786,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([a for a in out["actions"] if a.get("comment_kind") == "引き継ぎ"], [], "自分の `引き継ぎ` が既にあれば書かない")
 
     def test_record_lost_reasks_user_answer_waits(self):
-        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の回答` を待つ宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
+        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の回答` を待機する宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
         item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の回答"}], t(13), 500)])
         for rec in (None, rec_with(manager_state="ended")):
             out = turn_of(item, rec=rec)

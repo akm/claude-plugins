@@ -336,7 +336,7 @@ def _op_answer(rec, op):
 
 
 def _op_withdraw(rec, op):
-    """問いを取り下げる (回答を待つ理由が無くなった。R21 の reopen)。回答は None のまま answered_at を書くので、未回答には数えない。"""
+    """問いを取り下げる (回答を待機する理由が無くなった。R21 の reopen)。回答は None のまま answered_at を書くので、未回答には数えない。"""
     q = rec["questions"].get(op["question_id"])
     if q is None:
         return f"問い {op['question_id']} が無い"
