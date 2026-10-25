@@ -89,25 +89,7 @@
 | `answer` / `answered_at` | 答えと答えた時刻。未回答はどちらも null。取り下げた問い (`withdraw`) は `answer` が null で `answered_at` がある |
 | `subject` | 問いの対象 (任意。無ければ null)。同じ項目・種類でも対象が違えば別の問い。判定の問いが使う: 資源の名前、相手の宣言 (`<相手の項目>:<相手の宣言の ID>`)、パス付き (`<相手の項目>:<相手の宣言の ID>:<パス>`)。形の正本は [flow.md](flow.md) の「判定」 |
 
-問いの種類 (`kind`) と選択肢 (`options`)。導くのは項目の状態と判定 ([flow.md](flow.md) の「ターンで行うこと」と「判定」)。判定の問い (`conflict`・`unknown-content`・`resource-busy`・`release-undeclared`・`small-pr-closed`) の答えに従う処理は「判定」が決め、ほかは U16・U21 で決める。
-
-| 種類 | 尋ねること | 選択肢 |
-| --- | --- | --- |
-| `close-in-progress` | 進行中の Issue が閉じられた。作業のセッションに止めるよう伝えるか、reopen して続けるか | `stop` / `reopen` |
-| `assignee-changed` | 割り当て中の項目の担当者が自分 1 人でなくなった。割り当てを解除するか、そのまま続けるか | `release` / `continue` |
-| `field-cleared` | `Agent session ID` が空にされた。解除するか、書き戻すか | `release` / `restore` |
-| `field-changed` | `Agent session ID` が別の値にされた。解除するか、書き戻すか | `release` / `restore` |
-| `removed` | 割り当て中の項目が Project から除かれた。解除するか、持ち続けるか | `release` / `keep` |
-| `status-changed` | 割り当て中の項目の Status を手で変えられた。解除するか、Status を戻すか | `release` / `restore` |
-| `third-party-edit` | 確認の対象の項目の本文を、割り当ての後に第三者が編集した。作業のセッションに止めるよう伝えてよいか | `stop` / `continue` |
-| `merged-issue-open` | PR がマージされたが Issue が開いている。閉じるか | `close` / `keep` |
-| `pr-closed-unmerged` | PR がマージされずに閉じた。Status を戻して解除するか | `release` / `keep` |
-| `user-answer-lost` | 記録を失ったので、`利用者の答え` を待っていた宣言の問いを尋ね直す (自由回答) | 無し |
-| `conflict` | 宣言が相手 (`subject`) の `開始可` の宣言と競合しうる。相手の完了まで待つか、共通の変更を先に小さな PR にするか、競合しうるまま進めるか | `wait` / `small-pr` / `proceed` |
-| `unknown-content` | 種類 `unknown-content` の同じパス (`subject`) が競合しうるか | `conflict` / `none` |
-| `resource-busy` | 宣言の資源 (`subject`) が空いていない (属性 `when_busy` が `ask`)。待つか進めるか。答えを読む範囲は [flow.md](flow.md) の「資源の質問の回答が有効な範囲」 | `wait` / `proceed` |
-| `release-undeclared` | 割り当てで予約したのに宣言に無い資源 (`subject`) を解放してよいか (属性 `release_undeclared` が `ask`) | `release` / `keep` |
-| `small-pr-closed` | 待っていた小さな PR がマージされずに閉じた。相手の Issue の完了を待つか、作り直しを頼むか、競合しうるまま進めるか (U15 の後半) | `wait-issue` / `redo` / `proceed` |
+問いの種類 (`kind`) と選択肢 (`options`) の一覧は、問いを導く文書 [flow.md](flow.md) が持つ (項目の状態の問いは「ターンで行うこと」の問いの表、判定の問いは「判定」の問いの表)。答えに従う処理も同じ文書が決める (項目の状態の問いは U16・U21 で決める)。記録は種類の一覧を持たず、`answer` は問いに書かれた `options` と照合する。
 
 ### 操作 (`record apply`)
 

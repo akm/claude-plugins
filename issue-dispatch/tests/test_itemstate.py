@@ -70,6 +70,44 @@ def observed(url, state="OPEN", draft=False, merged=False, issues=(A9,), author=
                                                       "created_at": created_at or t(20), "issues": [{"key": k, "state": "OPEN"} for k in issues]}}
 
 
+def question_table(doc, marker):
+    """文書から問いの表の範囲 (表の前置きの文 marker から、表の後の最初の空行まで) を切り出す。文書の別の表に同じ名前や選択肢があっても、問いの表だけを検査するため。
+    marker が無ければ失敗させる (表の所在が変わったことを検出するため)。"""
+    start = doc.index(marker)
+    table_start = doc.index("\n| ", start)
+    end = doc.find("\n\n", table_start)
+    return doc[start:end if end >= 0 else len(doc)]
+
+
+def question_row(table, kind):
+    """問いの表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確かめる (別の行の同じ並びと取り違えないため)。"""
+    return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
+
+
+def question_kinds(table):
+    """問いの表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
+    種類の行は表の構造で見分ける (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
+    kinds = set()
+    for line in table.splitlines():
+        if not line.startswith("|"):
+            continue
+        first = line.strip().strip("|").split("|")[0].strip()
+        if first == "種類" or set(first) <= {"-"}:
+            continue
+        kinds.add(first.strip("`"))
+    return kinds
+
+
+def question_options_cell(row):
+    """問いの表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
+    return row.strip().strip("|").split("|")[-1].strip()
+
+
+def options_text(options):
+    """コードの選択肢を、問いの表の選択肢の欄の書き方 (`a` / `b`。自由回答は「無し」) にする。"""
+    return " / ".join(f"`{o}`" for o in options) if options else "無し"
+
+
 ASSIGN1 = mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100)
 ASSIGN2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
 
@@ -958,11 +996,12 @@ class DocTest(unittest.TestCase):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
-        records = os.path.join(os.path.dirname(_DOC), "records.md")
-        with open(records, encoding="utf-8") as f:
-            rdoc = f.read()
-        for kind in itemstate.QUESTION_KINDS:
-            self.assertIn(f"`{kind}`", rdoc, f"問いの種類 {kind} が records.md に無い")
+        table = question_table(doc, "項目の状態の問いの種類 (`kind`) と選択肢 (`options`)")
+        self.assertEqual(question_kinds(table), set(itemstate.QUESTION_OPTIONS), "flow.md の問いの表の種類とコードの種類が一致しない")
+        for kind, options in itemstate.QUESTION_OPTIONS.items():
+            row = question_row(table, kind)
+            self.assertIsNotNone(row, f"問いの種類 {kind} が flow.md の問いの表に無い")
+            self.assertEqual(question_options_cell(row), options_text(options), f"問いの種類 {kind} の選択肢が flow.md の問いの表の行と一致しない")
 
 
 if __name__ == "__main__":
