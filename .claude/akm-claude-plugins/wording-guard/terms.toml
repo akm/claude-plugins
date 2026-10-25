@@ -516,7 +516,7 @@ decided_in = "https://github.com/akm/claude-plugins/issues/135"
 pattern = "/(?<![一-龯々])印(?![一-龯々])/"
 verdict = "avoid"
 replacements = ["フラグ", "完了のフラグファイル", "接頭辞"]
-reason = "何を指すか分からない。データに付ける目印は「フラグ」、review-loop の完了を知らせるファイルは「完了のフラグファイル」、道具の出力の先頭に付ける `input-error:` などは「接頭辞」と書く"
+reason = "何を指すか分からない。データに付けるマークは「フラグ」、review-loop の完了を知らせるファイルは「完了のフラグファイル」、道具の出力の先頭に付ける `input-error:` などは「接頭辞」と書く"
 decided_in = "https://github.com/akm/claude-plugins/issues/135"
 
 [[terms]]

@@ -10,7 +10,7 @@ UserPromptSubmit フック（session-handoff プラグイン）。
 方針:
   - 候補の抽出は正規表現だけで行う。候補が無い通常のプロンプトでは、ファイルにも
     ネットワークにもアクセスせずに終了する。
-  - 引き継ぎ文かどうかは、本文の 1 行目の目印で確認する。URL やファイル名の形だけでは
+  - 引き継ぎ文かどうかは、本文の 1 行目のマークで確認する。URL やファイル名の形だけでは
     判定しない（コメントの URL は、見ただけでは引き継ぎ文かどうか分からない）。
   - 差し込むのは保存先と実行の指示だけで、引き継ぎ文の本文は差し込まない。本文の取得と、
     投稿者が本人かどうかの確認は、スキルの手順が担う。
@@ -70,7 +70,7 @@ def _starts_with_marker(text):
 
 
 def file_is_handoff(path, cwd):
-    """ローカルファイルの 1 行目が目印なら、絶対パスを返す。違えば None。"""
+    """ローカルファイルの 1 行目がマークなら、絶対パスを返す。違えば None。"""
     full = os.path.expanduser(path)
     if not os.path.isabs(full):
         full = os.path.join(cwd, full)
@@ -83,7 +83,7 @@ def file_is_handoff(path, cwd):
 
 
 def comment_is_handoff(owner, repo, comment_id, cwd):
-    """GitHub のコメントの本文が目印で始まるかを gh で確認する。確認できなければ False。"""
+    """GitHub のコメントの本文がマークで始まるかを gh で確認する。確認できなければ False。"""
     try:
         r = subprocess.run(
             [
@@ -124,7 +124,7 @@ def build_context(location):
             "## このプロンプトは引き継ぎ文を指しています（session-handoff）",
             "",
             "次の保存先は、スキル handoff-write が書いた引き継ぎ文です"
-            "（本文の 1 行目の目印で確認済み）。",
+            "（本文の 1 行目のマークで確認済み）。",
             "",
             "- " + location,
             "",
