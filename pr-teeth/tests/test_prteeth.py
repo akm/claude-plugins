@@ -960,7 +960,7 @@ class TestBodies(unittest.TestCase):
         self.assertEqual(bodies.load(self.dir, "O/R", 1), "大文字")
 
     def test_number_and_repo_boundary_does_not_collide(self):
-        # `o/r-1` #2 と `o/r` #"1-2" は、区切りを潰すと同じ綴りになりうる。
+        # `o/r-1` #2 と `o/r` #"1-2" は、区切りを潰すと同じ表記になりうる。
         bodies.save(self.dir, "o/r-1", 2, "A")
         bodies.save(self.dir, "o/r", "1-2", "B")
         self.assertEqual(bodies.load(self.dir, "o/r-1", 2), "A")
@@ -1065,7 +1065,7 @@ class TestBodies(unittest.TestCase):
             path, _ = bodies.save(self.dir, "o/r", i, "b")
             os.utime(path, (1000 + i, 1000 + i))
         removed = bodies.prune(self.dir, None, max_bodies=2)
-        # ファイル名の綴りではなく「どの PR が消えたか」を見る。
+        # ファイル名の表記ではなく「どの PR が消えたか」を見る。
         self.assertEqual(sorted(removed),
                          sorted([bodies._name("o/r", 0), bodies._name("o/r", 1)]))
         self.assertIsNone(bodies.load(self.dir, "o/r", 0))

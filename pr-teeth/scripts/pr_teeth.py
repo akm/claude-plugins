@@ -404,10 +404,10 @@ def cmd_promote(args):
         entry = glossary.set_status(g, args.term, args.status, now=_now())
         store.save_json(paths["glossary"], g)
     if not existed:
-        # 綴り違いを、警告を出さずに新規作成すると、直したつもりの語が別エントリになる。
+        # 表記の違う語を、警告を出さずに新規作成すると、直したつもりの語が別エントリになる。
         warnings.append(
             "「" + args.term + "」は用語集にありませんでした。新規に登録しています"
-            "（綴りが違っていないか確認してください）。"
+            "（表記が違っていないか確認してください）。"
         )
     return _emit({
         "term": args.term,
