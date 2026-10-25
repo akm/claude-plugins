@@ -1,7 +1,7 @@
 """項目の状態の導出。管理のセッションがターンのたびに、Project の項目 (project.items の結果) とコメントと Issue の出来事から、
 割り当て中か・今の割り当ての PR・正常な完了・reopen・宣言の段階・待機しているもの・持っている資源を導く (計画の R24・KTD19)。
 作業のセッションの確認 (`work check`・`work held`) も同じ導出の、自分の項目についての読み出し。
-状態ごとの出どころと場面ごとの扱いの正本は issue-dispatch/skills/issue-dispatch/references/flow.md。
+状態ごとの取得元と場面ごとの扱いの正本は issue-dispatch/skills/issue-dispatch/references/flow.md。
 
 このモジュールは gh を実行しない (項目は project.items、`PR の報告` の PR の状態は issues.observe_pr を呼び出し元が読んで渡す)。
 時刻は GraphQL の ISO 8601 (UTC、`Z`) の文字列のまま比べる。
@@ -14,7 +14,7 @@ from issue_dispatch import comments, declaration, ids, resources, sessions
 
 # 宣言の段階: 判定の要る最新の宣言への最新の判定の結果で決める
 STAGES = ("undecided", "go", "returned", "waiting")
-# 今の割り当ての PR の出どころ
+# 今の割り当ての PR の取得元
 PR_SOURCES = ("report", "reference")
 # 割り当ての終了の種類
 END_KINDS = ("released", "normal")

@@ -115,7 +115,7 @@ ASSIGN2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
 class AssignmentTest(unittest.TestCase):
 
     def test_no_assignment_comment_means_not_assigned_even_with_field(self):
-        """コメント `割り当て` が無ければ、フィールドに ID があっても割り当て中ではない (出どころはコメント。KTD19)。"""
+        """コメント `割り当て` が無ければ、フィールドに ID があっても割り当て中ではない (取得元はコメント。KTD19)。"""
         s = itemstate.derive(make_item(), LOGIN, {}, PROJECT_NUMBER)
         self.assertIsNone(s["assignment"])
         self.assertFalse(s["assigned"])
