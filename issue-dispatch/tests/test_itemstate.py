@@ -909,7 +909,7 @@ class CliTest(FakeGhCase):
         self.assertEqual((out["items"][0]["pr"]["url"], out["items"][0]["pr"]["source"]), (PR9, "report"))
 
     def test_item_state_stops_on_list_problems(self):
-        """項目の一覧そのものが欠ければ導かない。"""
+        """項目の一覧そのものが無ければ導かない。"""
         self.responses([USER_ENTRY, {"substring": ["query ProjectItems", '"after": "CURSOR-PAGE-1"'], "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1},
                         {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
         code, out, err = self.cli("item", "state", "--dir", self.manager)

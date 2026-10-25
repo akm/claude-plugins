@@ -225,7 +225,7 @@ def load(root, role):
 
     返り値: {"status": "ok" | "missing" | "unreadable", "path": 設定ファイルのパス, "role": role,
              "config": デフォルト値を当てた後の設定, "warnings": [{"key", "message"}], "errors": [{"key", "message"}]}。
-    値の誤りはデフォルト値で続行して warnings に、必須のキーの欠けと読めない設定は errors に入れる。
+    値の誤りはデフォルト値で続行して warnings に、必須のキーの欠損と読めない設定は errors に入れる。
     """
     if role not in ROLES:
         raise ValueError(f"role は {ROLES} のいずれか: {role!r}")

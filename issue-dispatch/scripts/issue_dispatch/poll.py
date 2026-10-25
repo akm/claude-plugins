@@ -235,7 +235,7 @@ class Waiter:
 # --- 読み取りの共通 -------------------------------------------------------------------
 
 def _list_failure(result):
-    """project.items の結果が失敗か、項目の一覧そのものが欠けていれば、失敗の種類を返す (無ければ None)。"""
+    """project.items の結果が失敗か、項目の一覧そのものが無ければ、失敗の種類を返す (無ければ None)。"""
     if result["status"] == "error":
         return result.get("failure") or "other"
     for p in result.get("problems") or []:

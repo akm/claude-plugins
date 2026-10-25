@@ -261,7 +261,7 @@ def simplify_item(node, position):
                 for p in content["closedByPullRequestsReferences"]["nodes"]],
     })
     problems = []
-    # 入れ子の connection は続きのページを読まない (件数の上限は上げてある)。超えていれば、欠けを知らせる
+    # 入れ子の connection は続きのページを読まない (件数の上限は上げてある)。超えていれば、欠損を知らせる
     for key, what in (("labels", "labels"), ("blockedBy", "blocked_by"), ("userContentEdits", "body_edits"),
                       ("closedByPullRequestsReferences", "prs")):
         if (content.get(key, {}).get("pageInfo") or {}).get("hasNextPage"):

@@ -314,7 +314,7 @@ class ItemsTest(FakeGhCase):
         self.assertEqual(len(result["items"][0]["comments"]), 10)
 
     def test_truncated_nested_connections_are_reported(self):
-        """ラベルなどの入れ子の connection が 1 ページに収まらなければ、欠けたまま返さずに problems に入れる。"""
+        """ラベルなどの入れ子の connection が 1 ページに収まらなければ、欠損したまま返さずに problems に入れる。"""
         data = fixture_json("project-items-ok")
         node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
         node["content"]["labels"]["pageInfo"] = {"hasNextPage": True}

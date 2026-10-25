@@ -253,11 +253,11 @@ def cmd_project_items(args):
             _emit({**out, "status": "error", "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
             return 0
         if _list_problems(result["problems"]):
-            # 項目の一覧そのものが欠けていれば保存しない (読めなかっただけの項目を「除かれた」と読ませないため)
+            # 項目の一覧そのものが無ければ保存しない (読めなかっただけの項目を「除かれた」と読ませないため)
             _emit({**out, "status": "error", "snapshot": None,
                    "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
             return 0
-        # 1 項目の中の欠けと PR の読み取りの失敗は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ partial を付けて保存する
+        # 1 項目の中の欠損と PR の読み取りの失敗は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ partial を付けて保存する
         previous = observe.load_snapshot(directory)
         warnings = []
         if previous["status"] == "corrupt":
@@ -295,7 +295,7 @@ def cmd_observe_diff(args):
         _emit({"status": "error", "diffs": [], "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
         return 0
     if _list_problems(result["problems"]):
-        # 項目の一覧そのものが欠けていれば差分を返さない (読めなかっただけの項目が removed として現れるため)
+        # 項目の一覧そのものが無ければ差分を返さない (読めなかっただけの項目が removed として現れるため)
         _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"],
                "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
         return 0
@@ -388,7 +388,7 @@ def _read_report_prs(items, login):
 
 
 def _items_for_state(parsed):
-    """項目の状態の導出のために項目を読む。項目の一覧そのものが欠ければ (LIST_PROBLEMS) エラー (読めなかった項目を終わったと読まないため)。"""
+    """項目の状態の導出のために項目を読む。項目の一覧そのものが無ければ (LIST_PROBLEMS) エラー (読めなかった項目を終わったと読まないため)。"""
     result = project.items(parsed)
     if result["status"] == "error":
         return None, {"status": "error", "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]}

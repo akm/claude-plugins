@@ -91,7 +91,7 @@
 | `comments` | コメントの配列 (`id`・`database_id`・`url`・`author`・`created_at`・`body`)。先頭行の解析は comments の単位 |
 | `events` | タイムラインの出来事を時刻の順に (`type`・`at` と種類ごとの値: `label`・`blocking`・`status`・`previous_status`・`was_automated`・`closer_pr`・`state_reason`・`project_number`) |
 
-出来事の `type` は `ClosedEvent`・`ReopenedEvent`・`LabeledEvent`・`UnlabeledEvent`・`BlockedByAddedEvent`・`BlockedByRemovedEvent`・`ProjectV2ItemStatusChangedEvent`・`AddedToProjectV2Event`・`RemovedFromProjectV2Event`。コメントと出来事が 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。ラベル・blocker・本文の編集・PR・フィールドの値は上限 (blocker 50 と フィールド 50 は GitHub の上限。ほかは 50〜100) まで読み、超えていれば `problems` に入れて知らせる (欠けたまま返さない)。
+出来事の `type` は `ClosedEvent`・`ReopenedEvent`・`LabeledEvent`・`UnlabeledEvent`・`BlockedByAddedEvent`・`BlockedByRemovedEvent`・`ProjectV2ItemStatusChangedEvent`・`AddedToProjectV2Event`・`RemovedFromProjectV2Event`。コメントと出来事が 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。ラベル・blocker・本文の編集・PR・フィールドの値は上限 (blocker 50 と フィールド 50 は GitHub の上限。ほかは 50〜100) まで読み、超えていれば `problems` に入れて知らせる (欠損したまま返さない)。
 
 ## 実測 (U1。2026-10-19)
 

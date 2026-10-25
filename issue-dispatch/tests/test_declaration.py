@@ -79,7 +79,7 @@ class ParseTest(unittest.TestCase):
         return result
 
     def test_rejects_unknown_and_missing_keys(self):
-        """未知のキー (file の誤字)・欠けた必須キーは、理由と期待する形を含むエラーで拒否する。kind も未知のキー。"""
+        """未知のキー (file の誤字)・欠損した必須キーは、理由と期待する形を含むエラーで拒否する。kind も未知のキー。"""
         self.assertRejected({"file": [], "resources": [], "split": {"needed": False, "reason": ""}}, "file", "未知のキー")
         self.assertRejected({"resources": [], "split": {"needed": False, "reason": ""}}, "files", "必須")
         self.assertRejected({"files": [{"path": "a.md", "kind": "divisible"}], "resources": [], "split": {"needed": False, "reason": ""}}, "files[0].kind", "未知のキー")

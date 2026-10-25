@@ -18,7 +18,7 @@
 | `taken_at` | Project を読んだ時刻 (UTC) |
 | `project_id` | Project の ID |
 | `items` | 項目のキー (`owner/repo#番号`) → 下の表。Issue 以外の項目 (draft issue・PR) は持たない |
-| `comment_prs` | 開いている項目のコメント (`PR の報告` の本文の URL と、`待機` の理由 `小さな PR` の PR。書き手がトークンのログインのものだけ) に書かれた PR の URL → `state`・`draft`・`merged`。読めなかった PR は、前のスナップショットに状態があればそれを引き継いで `carried` (引き継いだ値の元の `taken_at`) を持ち、無ければ `partial` に理由を持つ (「欠けの扱い」)。どの割り当てのものかは区別しない (意味づけは U13)。閉じた項目のコメントは読まない |
+| `comment_prs` | 開いている項目のコメント (`PR の報告` の本文の URL と、`待機` の理由 `小さな PR` の PR。書き手がトークンのログインのものだけ) に書かれた PR の URL → `state`・`draft`・`merged`。読めなかった PR は、前のスナップショットに状態があればそれを引き継いで `carried` (引き継いだ値の元の `taken_at`) を持ち、無ければ `partial` に理由を持つ (「欠損の扱い」)。どの割り当てのものかは区別しない (意味づけは U13)。閉じた項目のコメントは読まない |
 
 項目の値:
 
@@ -33,8 +33,8 @@
 | `body_edited_at` | 本文の最新の編集の時刻 (作成も編集に数える) |
 | `comment_ids` | 読んだコメントの `database_id` (昇順) |
 | `prs` | Issue を閉じる参照の PR の URL → `state`・`draft`・`merged` (閉じたものも含む) |
-| `partial` | その項目の中の欠けの種類 (`project items` の `problems` の `what` のうち項目を持つもの: 入れ子の connection の上限 `*-truncated`、コメントと出来事の続き `comments`・`events`) のうち、前のスナップショットから値を引き継げなかったもの (フラグ)。無ければ空の配列。差分で比べない値は「欠けの扱い」の表 |
-| `carried` | 欠けの種類 → 引き継いだ値の元の `taken_at`。その種類が狂わせる値 (「欠けの扱い」の表) は、今読んだ値ではなく前のスナップショットの値 (最後に全部読めたときの値) を持つ。無ければ空のオブジェクト |
+| `partial` | その項目の中の欠損の種類 (`project items` の `problems` の `what` のうち項目を持つもの: 入れ子の connection の上限 `*-truncated`、コメントと出来事の続き `comments`・`events`) のうち、前のスナップショットから値を引き継げなかったもの (フラグ)。無ければ空の配列。差分で比べない値は「欠損の扱い」の表 |
+| `carried` | 欠損の種類 → 引き継いだ値の元の `taken_at`。その種類が狂わせる値 (「欠損の扱い」の表) は、今読んだ値ではなく前のスナップショットの値 (最後に全部読めたときの値) を持つ。無ければ空のオブジェクト |
 
 ## 差分の種類と処理の順
 
@@ -56,14 +56,14 @@
 | 12 | `position` | 両方にある項目の相対の順が変わった (項目の追加・除去で位置の数値がずれただけでは返さない)。1 件で、`item` は null | `before`・`after` (項目のキーの配列。位置の順) |
 | 13 | `body_edit` | 本文の最新の編集の時刻が違う | `before`・`after` |
 
-**欠けの扱い。** 項目の一覧そのものの欠け (`problems` の `what` が `items-page`・`graphql-errors`) があれば、読めなかっただけの項目が `removed` と読まれるので、差分を返さず保存もしない。1 項目の中の欠け (入れ子の connection の上限、コメントと出来事の続きのページの読み取りの失敗) と読めなかった PR では観測を止めず、次のように扱う。
+**欠損の扱い。** 項目の一覧そのものの欠損 (`problems` の `what` が `items-page`・`graphql-errors`) があれば、読めなかっただけの項目が `removed` と読まれるので、差分を返さず保存もしない。1 項目の中の欠損 (入れ子の connection の上限、コメントと出来事の続きのページの読み取りの失敗) と読めなかった PR では観測を止めず、次のように扱う。
 
-- **前のスナップショットに引き継ぐ元があるとき** (前のスナップショットにその項目 (PR) があり、同じ種類が `partial` に無い): その種類が狂わせる値 (下の表) に、今読んだ値ではなく前のスナップショットの値を書き、`carried` に元の `taken_at` を残す (前のスナップショットでも引き継いでいれば、その元の `taken_at`)。差分は普通に比べる。欠けが続くあいだは引き継いだ値どうしなので差分は出ず、全部読めるようになったターンに、最後に全部読めたときからの変化だけが出る。
-- **引き継ぐ元が無いとき** (前のスナップショットが無い・その項目が無い・前のスナップショットでも同じ種類が `partial`): 今読んだ値のまま、その種類を `partial` (フラグ) に入れる。差分は、前後どちらかの `partial` にある種類が狂わせる値だけを比べない (読めなかっただけの分を変化と読まないため)。欠けと関係のない値 (close・Status・担当者など) と、項目の追加・除去・並び順は比べる。表に無い種類の欠けは、どの値が狂うか分からないので、引き継がず、その項目のすべての値を比べない。
+- **前のスナップショットに引き継ぐ元があるとき** (前のスナップショットにその項目 (PR) があり、同じ種類が `partial` に無い): その種類が狂わせる値 (下の表) に、今読んだ値ではなく前のスナップショットの値を書き、`carried` に元の `taken_at` を残す (前のスナップショットでも引き継いでいれば、その元の `taken_at`)。差分は普通に比べる。欠損が続くあいだは引き継いだ値どうしなので差分は出ず、全部読めるようになったターンに、最後に全部読めたときからの変化だけが出る。
+- **引き継ぐ元が無いとき** (前のスナップショットが無い・その項目が無い・前のスナップショットでも同じ種類が `partial`): 今読んだ値のまま、その種類を `partial` (フラグ) に入れる。差分は、前後どちらかの `partial` にある種類が狂わせる値だけを比べない (読めなかっただけの分を変化と読まないため)。欠損と関係のない値 (close・Status・担当者など) と、項目の追加・除去・並び順は比べる。表に無い種類の欠損は、どの値が狂うか分からないので、引き継がず、その項目のすべての値を比べない。
 
-読めなかった PR は `comment_prs` の値そのものが欠けなので、引き継げなければ比べない。`partial` のある項目と PR は `skipped` (`items`: キー → 欠けの種類、`prs`: URL → 理由) で、引き継いだ項目と PR は `carried` (`items`: キー → 種類 → 元の `taken_at`、`prs`: URL → 元の `taken_at`) で知らせる。
+読めなかった PR は `comment_prs` の値そのものが欠損なので、引き継げなければ比べない。`partial` のある項目と PR は `skipped` (`items`: キー → 欠損の種類、`prs`: URL → 理由) で、引き継いだ項目と PR は `carried` (`items`: キー → 種類 → 元の `taken_at`、`prs`: URL → 元の `taken_at`) で知らせる。
 
-| 欠けの種類 (`partial`。名前と意味の正本は [project-schema.md](project-schema.md) の CLI の表の `problems`) | 引き継ぐ値 (項目のキー) | 比べない差分の種類 |
+| 欠損の種類 (`partial`。名前と意味の正本は [project-schema.md](project-schema.md) の CLI の表の `problems`) | 引き継ぐ値 (項目のキー) | 比べない差分の種類 |
 | --- | --- | --- |
 | `labels-truncated` | `labels` | `labels` |
 | `blocked_by-truncated` | `blocked_by` | `blocked_by` |
@@ -133,8 +133,8 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが欠ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠けと読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠けの扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに上書きし、`snapshot.warnings` (key `snapshot`) で知らせる |
-| `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが欠ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠けと読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠けの扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待機していた PR の変化を見つけるため) |
+| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが無ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠損と読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠損の扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに上書きし、`snapshot.warnings` (key `snapshot`) で知らせる |
+| `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが無ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠損と読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠損の扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待機していた PR の変化を見つけるため) |
 | 書き込みのサブコマンドの `--snapshot-dir <管理ディレクトリ>` | `snapshot.json` | 出力に `snapshot` (`reflected`・`warnings`) を足す |
 | `wait --dir <管理ディレクトリ> [--project <owner>/<番号>] [--interval <分>] [--minutes <分>]` | `wait.pid` (記録の置き場) | 「待機」の節。終了コードと標準出力の行 (JSON ではない)。スナップショットが無い・壊れていれば 5 |
 | `wait-assignment --project <owner>/<番号> [--session <ID>] [--blocked <Issue>]... [--in-review <Issue>]... [--pending <Issue>] --interval <分> --minutes <分>` | `wait.pid` (一時ディレクトリ) | 「待機」の節。`--session` を省けば環境変数 |

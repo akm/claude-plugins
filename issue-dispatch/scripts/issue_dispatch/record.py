@@ -169,7 +169,7 @@ def _item(rec, item):
     })
 
 
-# 省略できるキー (null でもよい)。それ以外のキーは、無い・null を「欠けている」として差し戻す (R31)
+# 省略できるキー (null でもよい)。それ以外のキーは、無い・null を「欠損している」として差し戻す (R31)
 OPTIONAL_KEYS = {"set_manager_state": ("stop_reason",), "set_opt_in": ("answer",), "ask": ("subject",)}
 
 
