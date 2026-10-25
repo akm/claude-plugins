@@ -33,7 +33,7 @@ def _questions(rec, item, kind, subject, since):
 
 
 def answer_for(rec, item, kind, subject, since):
-    """項目・種類・対象が同じ、今の割り当て (since 以後) の質問の最新の回答。回答が無い (未回答・取り下げ (answer が null)) なら None。"""
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の質問の最新の回答。回答が無い (未回答・撤回 (answer が null)) なら None。"""
     q = answered_question(rec, item, kind, subject, since)
     return None if q is None else q["answer"]
 
@@ -68,7 +68,7 @@ def busy_answers(st, rec, names):
 
 
 def asked(rec, item, kind, subject, since):
-    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の質問 (回答も取り下げも無い) が記録にあるか。あれば質問し直さない。"""
+    """項目・種類・対象が同じ、今の割り当て (since 以後) の未回答の質問 (回答も撤回も無い) が記録にあるか。あれば質問し直さない。"""
     return any(q.get("answered_at") is None for q in _questions(rec, item, kind, subject, since))
 
 

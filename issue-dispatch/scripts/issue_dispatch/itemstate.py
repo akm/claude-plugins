@@ -459,7 +459,7 @@ def _handover_action(item, cs, rec, own_id, lost):
 
 def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_states, lost):
     """割り当てのある項目の場面ごとの扱い (flow.md の「場面ごとの扱い」)。返り値は (actions, questions, reports)。
-    未回答の質問がある項目には手を付けない (回答を待機する間の reopen による質問の取り下げを除く)。"""
+    未回答の質問がある項目には手を付けない (回答を待機する間の reopen による質問の撤回を除く)。"""
     actions, questions, reports = [], [], []
     cs = parsed_comments(item, login)
     asg = state["assignment"]
@@ -472,7 +472,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
     if pending and item.get("state") == "OPEN":
         close_q = [q for q in pending if q["kind"] == "close-in-progress"]
         if close_q and any((e.get("at") or "") > close_q[0]["asked_at"] for e in _events(item, "ReopenedEvent")):
-            # 回答を待機する間に reopen された: 質問を取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
+            # 回答を待機する間に reopen された: 質問を撤回し、フィールドは空にせず、Status を導いた状態に戻す (R21)
             actions.append({"kind": "withdraw-question", "item": key, "question_id": close_q[0]["question_id"]})
             restore = "Blocked" if "Blocked" in expected_statuses(state) else "In Progress"
             if status != restore:

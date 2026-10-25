@@ -86,7 +86,7 @@
 | `item` / `kind` | 質問の対象の項目と種類 |
 | `options` | 選択肢の配列。要素は空でない文字列で、重複しない (回答は選択肢と同じ文字列で照合する)。空なら自由回答 |
 | `asked_at` | 質問した時刻 |
-| `answer` / `answered_at` | 回答と回答した時刻。未回答はどちらも null。取り下げた質問 (`withdraw`) は `answer` が null で `answered_at` がある |
+| `answer` / `answered_at` | 回答と回答した時刻。未回答はどちらも null。撤回した質問 (`withdraw`) は `answer` が null で `answered_at` がある |
 | `subject` | 質問の対象 (任意。無ければ null)。同じ項目・種類でも対象が違えば別の質問。判定の質問が使う: 資源の名前、相手の宣言 (`<相手の項目>:<相手の宣言の ID>`)、パス付き (`<相手の項目>:<相手の宣言の ID>:<パス>`)。形の正本は [flow.md](flow.md) の「判定」 |
 
 質問の種類 (`kind`) と選択肢 (`options`) の一覧は、質問を導く文書 [flow.md](flow.md) が持つ (項目の状態の質問は「ターンで行うこと」の質問の表、判定の質問は「判定」の質問の表)。回答に従う処理も同じ文書が決める (項目の状態の質問は U16・U21 で決める)。記録は種類の一覧を持たず、`answer` は質問に書かれた `options` と照合する。
@@ -116,7 +116,7 @@
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と回答を書く |
 | `ask` | `question_id`・`item`・`kind`・`options`・`at`・`subject` (任意) | 質問を記録する (同じ ID の質問が既にあれば誤り。回答を消さないため。既にある質問は `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 回答を書く (質問が無い・選択肢に無い回答は誤り) |
-| `withdraw` | `question_id`・`at` | 質問を取り下げる (回答を待機する理由が無くなったとき。回答は null のまま `answered_at` を書くので、未回答には数えない。回答のある質問は取り下げられない) |
+| `withdraw` | `question_id`・`at` | 質問を撤回する (回答を待機する理由が無くなったとき。回答は null のまま `answered_at` を書くので、未回答には数えない。回答のある質問は撤回できない) |
 
 ## `actions.log`
 

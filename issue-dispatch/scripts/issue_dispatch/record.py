@@ -336,12 +336,12 @@ def _op_answer(rec, op):
 
 
 def _op_withdraw(rec, op):
-    """質問を取り下げる (回答を待機する理由が無くなった。R21 の reopen)。回答は None のまま answered_at を書くので、未回答には数えない。"""
+    """質問を撤回する (回答を待機する理由が無くなった。R21 の reopen)。回答は None のまま answered_at を書くので、未回答には数えない。"""
     q = rec["questions"].get(op["question_id"])
     if q is None:
         return f"質問 {op['question_id']} が無い"
     if q.get("answered_at") is not None:
-        return f"質問 {op['question_id']} は回答がある (取り下げられない)"
+        return f"質問 {op['question_id']} は回答がある (撤回できない)"
     q["answer"] = None
     q["answered_at"] = op["at"]
 

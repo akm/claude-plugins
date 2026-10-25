@@ -644,7 +644,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["questions"], [p["question_id"] for p in out["pending"]]), ([], ["q1"]))
 
     def test_reopen_while_close_question_pending_withdraws_and_restores_status(self):
-        """進行中の close の回答を待機する間に reopen されたら、質問を取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
+        """進行中の close の回答を待機する間に reopen されたら、質問を撤回し、フィールドは空にせず、Status を導いた状態に戻す。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
