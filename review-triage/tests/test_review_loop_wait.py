@@ -5,7 +5,7 @@
 
   python3 -m unittest discover -s review-triage/tests
 
-一時ディレクトリを周回のディレクトリとして使い、スクリプトを subprocess で起動して、
+一時ディレクトリをループのディレクトリとして使い、スクリプトを subprocess で起動して、
 ファイルを置いたときに返る終了コードと標準出力の 1 行を確認する。
 ファイルの様式と事象の正本は review-triage/skills/review-loop/references/loop-files.md。
 """

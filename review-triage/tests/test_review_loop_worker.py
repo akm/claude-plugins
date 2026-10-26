@@ -5,7 +5,7 @@
 
   python3 -m unittest discover -s review-triage/tests
 
-一時ディレクトリに git のリポジトリと周回のディレクトリを作り、claude の名前で偽のコマンド
+一時ディレクトリに git のリポジトリとループのディレクトリを作り、claude の名前で偽のコマンド
 (review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で走らせる。
 実際の claude は呼ばない。依頼文は、実際の雛形 (review-triage/skills/review-triage/references/
 review-request-template.md) を埋めて作る — ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
@@ -18,7 +18,7 @@ uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で
 ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終了時に消す。
 
 振る舞いの正本は review-triage/skills/review-loop/references/worker.md、
-周回のディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
+ループのディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
 """
 
 import hashlib
@@ -191,7 +191,7 @@ def _lstat(path, *, dir_fd=None):
 _os.stat, _os.lstat = _stat, _lstat
 """
 
-# サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側と周回のディレクトリがこの下にあると起動しない
+# サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側とループのディレクトリがこの下にあると起動しない
 _SANDBOX_TMP = f"/private/tmp/claude-{os.getuid()}"
 
 RID = "20260926-1400-feat-x-1-code-review-opus"
@@ -316,7 +316,7 @@ def _read_pids(path):
 
 
 def _workspace_path(tmpdir, loop):
-    """ワーカーが周回のディレクトリ loop のために TMPDIR (tmpdir) の下に作る作業場所のパス (worker.md の「回の処理」の手順 5)。"""
+    """ワーカーがループのディレクトリ loop のために TMPDIR (tmpdir) の下に作る作業場所のパス (worker.md の「回の処理」の手順 5)。"""
     loop_real = os.path.realpath(loop)
     digest = hashlib.sha256(loop_real.encode("utf-8")).hexdigest()[:8]
     return os.path.join(os.path.realpath(tmpdir), f"review-loop-{os.path.basename(loop_real)}-{digest}")
@@ -356,7 +356,7 @@ def _make_repo(repo):
 
 
 def _make_loop_dir(loop, repo):
-    """loop に周回のディレクトリを作り、repo を作業側とする loop.yaml を置く。"""
+    """loop にループのディレクトリを作り、repo を作業側とする loop.yaml を置く。"""
     os.makedirs(loop)
     with open(os.path.join(loop, "loop.yaml"), "w", encoding="utf-8") as f:
         f.write(f'id: "{LOOP_ID}"\nrepo_dir: "{repo}"\nstate: active\n')
@@ -472,7 +472,7 @@ class WorkerTestBase(unittest.TestCase):
         os.rename(tmp, self.path(f"review-request-{rid}.md"))
 
     def reset_loop(self):
-        """subTest の間で、周回のディレクトリを loop.yaml だけに戻し、偽の claude の記録を消す。"""
+        """subTest の間で、ループのディレクトリを loop.yaml だけに戻し、偽の claude の記録を消す。"""
         for n in os.listdir(self.loop):
             if n == "loop.yaml":
                 continue
@@ -578,18 +578,18 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_PY_PRELUDE"] = path
 
     def ws_path(self):
-        """この周回の作業場所のパス。"""
+        """このループの作業場所のパス。"""
         return _workspace_path(self.tmpdir, self.loop)
 
     def interrupt_paths(self):
-        """この周回の割り込みを記録するファイルのパスと、それを書くときの一時名 (worker.md の「終了の仕方」) の組。"""
+        """このループの割り込みを記録するファイルのパスと、それを書くときの一時名 (worker.md の「終了の仕方」) の組。"""
         tmp, name = os.path.split(self.ws_path())
         key = name[len("review-loop-"):]
         return (os.path.join(tmp, f"review-loop-interrupt-{key}"),
                 os.path.join(tmp, f".review-loop-interrupt-{key}.tmp"))
 
     def prep_dirs(self):
-        """TMPDIR の下に残っている、この周回の準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの列。"""
+        """TMPDIR の下に残っている、このループの準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの列。"""
         prefix = "review-loop-prep-" + os.path.basename(self.ws_path())[len("review-loop-"):] + "."
         tmp = os.path.realpath(self.tmpdir)
         return sorted(os.path.join(tmp, n) for n in os.listdir(tmp) if n.startswith(prefix))
@@ -619,7 +619,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def write_user_settings(self, content, config_dir=None):
         """利用者の設定 settings.json を書く。config_dir を省略すると HOME/.claude、指定するとそのディレクトリの直下
-        (環境変数 CLAUDE_CONFIG_DIR を指定したときの周回のディレクトリ)。content が文字列ならそのまま書く。"""
+        (環境変数 CLAUDE_CONFIG_DIR を指定したときのループのディレクトリ)。content が文字列ならそのまま書く。"""
         d = config_dir if config_dir is not None else os.path.join(self.home, ".claude")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "settings.json"), "w", encoding="utf-8") as f:
@@ -868,7 +868,7 @@ class TestHappyPath(WorkerTestBase):
         p = self.start()
         self.wait_marker(RID)
         self.wait_marker(RID2)
-        # 作業場所のパスは周回の間変わらず、写しの名前が識別子で変わる
+        # 作業場所のパスはループの間変わらず、写しの名前が識別子で変わる
         prompts = [c[1] for c in self.claude_calls()]
         ws = os.path.dirname(self.claude_records()[0]["cwd"])
         self.assertEqual(prompts, [
@@ -887,7 +887,7 @@ class TestHappyPath(WorkerTestBase):
         self.finish(p)
 
     def test_allowed_tools_replace_default(self):
-        # 権限モードを指定すれば既定 (auto) に代わる。0.13.0 で始めた周回は default を指定して続ける
+        # 権限モードを指定すれば既定 (auto) に代わる。0.13.0 で始めたループは default を指定して続ける
         self.put_request()
         p = self.start("--allowed-tools", "Read", "--allowed-tools", "Bash(git diff:*)",
                        "--permission-mode", "default")
@@ -932,7 +932,7 @@ class TestResultChecks(WorkerTestBase):
         return marker
 
     def test_empty_run_id(self):
-        # AE5。failed の回でも、結果が通常のファイルなら周回のディレクトリに複写する (人間が RA1 の報告から読めるように)
+        # AE5。failed の回でも、結果が通常のファイルならループのディレクトリに複写する (人間が RA1 の報告から読めるように)
         marker = self.run_one("empty_run_id")
         self.assertEqual(marker["status"], "failed")
         self.assertIn("run_id mismatch", marker["error"])
@@ -959,7 +959,7 @@ class TestResultChecks(WorkerTestBase):
         self.assertIn("tree not clean (README.md)", marker["error"])
 
     def test_loop_dir_modified(self):
-        # レビュアの実行が周回のディレクトリに依頼文を置くと failed にし、その依頼文をレビュアの実行に回さない
+        # レビュアの実行がループのディレクトリに依頼文を置くと failed にし、その依頼文をレビュアの実行に回さない
         marker = self.run_one("write_request")
         bogus = "29990101-0000-x-9-code-review-opus"
         self.assertEqual(marker["status"], "failed")
@@ -977,7 +977,7 @@ class TestResultChecks(WorkerTestBase):
         self.finish(p)
 
     def test_loop_yaml_rewritten_during_review_is_not_a_modification(self):
-        # 作業側が再開や停止のときにレビュー中に loop.yaml を書き換えても、周回のディレクトリの変化として数えない
+        # 作業側が再開や停止のときにレビュー中に loop.yaml を書き換えても、ループのディレクトリの変化として数えない
         self.env["FAKE_CLAUDE_SLEEP"] = "4"
         self.put_request()
         p = self.start()
@@ -1049,13 +1049,13 @@ class TestWorkspace(WorkerTestBase):
 
     def test_reviewer_runs_in_clone(self):
         # AE1: cwd は作業場所の tree/ で、依頼の head を detached で取り出し、remote が無い。
-        # 結果はフラグファイルより先に周回のディレクトリに現れ、回の後に作業場所は残らない
+        # 結果はフラグファイルより先にループのディレクトリに現れ、回の後に作業場所は残らない
         self.put_request()
         full = _git(self.repo, "rev-parse", "HEAD")
         p = self.start()
         marker_path = self.path(f"delivered-{RID}.yaml")
         self.wait_for(lambda: os.path.exists(marker_path), what="完了のフラグファイル")
-        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "フラグファイルが現れた時点で結果が周回のディレクトリに無い")
+        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "フラグファイルが現れた時点で結果がループのディレクトリに無い")
         self.wait_state("idle")
         self.finish(p)
         marker = _read_yaml(marker_path)
@@ -1290,13 +1290,13 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(rec["branch"], "")
 
     def test_request_copy_cannot_be_made(self):
-        # AE6: 扱いの行が無い (0.13.0 の依頼文)・2 つある・出力先が周回のディレクトリを指さない・作業ツリーのパスが無い依頼文では、
+        # AE6: 扱いの行が無い (0.13.0 の依頼文)・2 つある・出力先がループのディレクトリを指さない・作業ツリーのパスが無い依頼文では、
         # レビュアの実行を起動せずに failed のフラグファイルを書き、作業場所を残さない
         line = "- 作業ツリーの扱い: 共有\n"
         cases = (
             ("扱いの行が無い", lambda t: t.replace(line, ""), "handling lines: 0"),
             ("扱いの行が 2 つ", lambda t: t.replace(line, line + line), "handling lines: 2"),
-            ("出力先が周回のディレクトリを指さない",
+            ("出力先がループのディレクトリを指さない",
              lambda t: t.replace(self.path(f"review-{RID}.yaml"), os.path.join(self.root, f"review-{RID}.yaml")),
              "output path does not point to the loop dir"),
             ("作業ツリーのパスが無い", lambda t: t.replace(f"`{self.repo}`", "`/nowhere`"), "worktree path not found"),
@@ -1408,7 +1408,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(self.workspaces(), [])
 
     def test_reviewer_writes_loop_result_directly(self):
-        # AE13: レビュアの実行が周回のディレクトリの出力先に直接書くと、周回のディレクトリが変わったとして failed
+        # AE13: レビュアの実行がループのディレクトリの出力先に直接書くと、ループのディレクトリが変わったとして failed
         self.env["FAKE_CLAUDE_MODE"] = "write_loop_result"
         self.put_request()
         marker, _ = self.run_round()
@@ -1416,7 +1416,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertIn(f"loop dir modified (review-{RID}.yaml)", marker["error"])
 
     def test_result_copy_failure(self):
-        # AE15: 周回のディレクトリの結果の一時名の場所にディレクトリがあると複写が失敗し、failed のフラグファイルの error に複写の失敗を書く。ok のフラグファイルは書かない
+        # AE15: ループのディレクトリの結果の一時名の場所にディレクトリがあると複写が失敗し、failed のフラグファイルの error に複写の失敗を書く。ok のフラグファイルは書かない
         os.makedirs(self.path(f".review-{RID}.yaml.tmp"))
         self.put_request()
         marker, _ = self.run_round()
@@ -1427,7 +1427,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_result_file_conditions(self):
         # 結果がシンボリックリンク・FIFO・ディレクトリのとき、実体が作業場所の外にあるとき、大きさが上限を越えるときに、
-        # 停止せずに failed のフラグファイルを書き、結果を周回のディレクトリに複写しない
+        # 停止せずに failed のフラグファイルを書き、結果をループのディレクトリに複写しない
         outside = os.path.join(self.root, "outside-result.yaml")
         self.env["FAKE_CLAUDE_OUTSIDE"] = outside
         cases = (
@@ -1449,7 +1449,7 @@ class TestWorkspace(WorkerTestBase):
                 self.assertEqual(self.workspaces(), [])
 
     def test_end_during_preparation(self):
-        # 準備の途中 (複製の作成中) に周回のディレクトリに end が現れた回は、failed・loop dir modified のフラグファイルを書いてから、end を見て終了する
+        # 準備の途中 (複製の作成中) にループのディレクトリに end が現れた回は、failed・loop dir modified のフラグファイルを書いてから、end を見て終了する
         self.install_fake_git()
         self.env["FAKE_GIT_TOUCH_ON"] = "clone"
         self.env["FAKE_GIT_TOUCH"] = self.path("end")
@@ -1693,7 +1693,7 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual(marker["status"], "failed", marker)
         self.assertEqual(marker["error"], "permission mode mismatch (expected auto, actual default)")
         self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "default"})
-        # failed の回でも、結果が通常のファイルなら周回のディレクトリに複写する
+        # failed の回でも、結果が通常のファイルならループのディレクトリに複写する
         self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")))
 
     def test_permission_mode_without_init_line_is_unknown(self):
@@ -1862,7 +1862,7 @@ class TestLogReading(WorkerTestBase):
         _git(self.repo, "commit", "-q", "-m", message)
         return self.head()
 
-    # 照合に使う行。#86 の周回で、表示しただけで数えられた行 (ワーカーの実装・テスト・文書) と同じ形にする
+    # 照合に使う行。#86 のループで、表示しただけで数えられた行 (ワーカーの実装・テスト・文書) と同じ形にする
     PY_PHRASE = 'PHRASE = "operation not permitted"   # ファイルの書き込みを止められたときの文面 (大文字と小文字を区別しない)'
     PY_TAG = 'TAG = "<sandbox_violations>"         # 接続を止められたときに本文に付くタグ'
     PY_TAG_END = 'TAG_END = "</sandbox_violations>"'
@@ -1871,7 +1871,7 @@ class TestLogReading(WorkerTestBase):
     DOC_NET = '      message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"'
     OLD_LINE = '旧い説明: サンドボックスの中から起動すると `sandbox-exec: sandbox_apply: Operation not permitted` で止まる。'
     MID_LINE = '途中のコミットにだけある行: Operation not permitted の例'
-    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 の周回の回 1 で、git log で表示しただけで数えられた形)
+    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 のループの回 1 で、git log で表示しただけで数えられた形)
     MID_SUBJECT = 'mid: operation not permitted の例を足す'
     MID_BODY = 'ワーカーは、本文に文面 operation not permitted かタグ <sandbox_violations> があれば数える。'
     # 開きタグと閉じタグを同じ行に書いた文書の行 (worker.md の「サンドボックスが拒否した確認の数え方」の 3 にある形)
@@ -1901,7 +1901,7 @@ class TestLogReading(WorkerTestBase):
         # レビュー対象のコミット (base と base..head の各コミット) の行を表示したものなら、サンドボックスが拒否した確認に数えず、
         # repo_text_displayed に数える。表示の形は、行そのもの (sed)・差分の + と - と文脈の行 (git diff・git log -p)・
         # 行番号とタブ (cat -n)・grep -n のファイル名と行番号 (git grep -n のコミットの名前つきを含む)・1 つのファイルを
-        # grep -n したときの行番号・hunk の見出し。#86 の周回で照合できずに数えられた形 (コミットメッセージ・git blame・
+        # grep -n したときの行番号・hunk の見出し。#86 のループで照合できずに数えられた形 (コミットメッセージ・git blame・
         # git log --oneline・-n 無しの grep と git grep) も含める
         base = self.make_review_range()
         head_full = _git(self.repo, "rev-parse", "HEAD")
@@ -1910,7 +1910,7 @@ class TestLogReading(WorkerTestBase):
         self.env["FAKE_GIT_LOG"] = git_log
         diff_body = "\n".join([
             "diff --git a/worker/read_log_facts.py b/worker/read_log_facts.py",
-            # git は見出しの後ろに、hunk の前にある行の先頭を 80 バイトまで付ける (#86 の周回で実際に現れた形)
+            # git は見出しの後ろに、hunk の前にある行の先頭を 80 バイトまで付ける (#86 のループで実際に現れた形)
             '@@ -2,6 +2,7 @@ PHRASE = "operation not permitted"   # ファイルの書き込みを止めら',
             " " + self.PY_TAG,
             " " + self.PY_TAG_END,
@@ -1992,7 +1992,7 @@ class TestLogReading(WorkerTestBase):
         mixed = (f"{self.PY_TAG}\n{self.PY_TAG_END}\n{self.DOC_OPEN}\n"
                  "touch: /Users/x/y: Operation not permitted")
         # 本物のタグのブロックの中に、開きタグと閉じタグを同じ行に書いた文書の行を表示した行があっても、そこでタグの中の行を終え、
-        # 後ろの無関係な出力を message に含めない (#86 の周回の回 3 の指摘)
+        # 後ろの無関係な出力を message に含めない (#86 のループの回 3 の指摘)
         net_with_doc = ("Exit code 56\n<sandbox_violations>\n"
                         "deny network-outbound a.example:443 (host is not on the allow list)\n"
                         f"{self.BOTH_TAGS}\n後続の無関係な出力")
@@ -2081,7 +2081,7 @@ class TestWorkerHook(WorkerTestBase):
     """ワーカーがレビュアの実行に渡す PreToolUse のフック (worker.md の「/tmp を含むコマンドを拒否するフック」)。
     ワーカーが --settings に埋め込んだコマンドを、Claude Code と同じくシェルで実行して確認する。"""
 
-    # 拒否するコマンド。先頭の 3 つは goose-ut の周回で、サンドボックスが /tmp への書き込みを拒否したもの (#80)
+    # 拒否するコマンド。先頭の 3 つは goose-ut のループで、サンドボックスが /tmp への書き込みを拒否したもの (#80)
     DENIED = [
         "cat > /tmp/x.go 2>/dev/null <<'EOF'\nEOF\nmkdir -p \"$TMPDIR/rx\" && cat > \"$TMPDIR/rx/main.go\" <<'EOF'\nEOF",
         "cat > /tmp/x.go 2>/dev/null; mkdir -p ./tmp/markerprobe && cat > ./tmp/markerprobe/main_test.go <<'EOF'\nEOF",
@@ -2380,7 +2380,7 @@ class TestWorkerYamlOnStart(WorkerTestBase):
 
 class TestPythonScriptsLoadedAtStart(WorkerTestBase):
     """ワーカーは、python3 で実行するファイル (ディレクトリ review-triage/scripts/review-loop-worker/ の .py) の中身を
-    起動時に読み込み、読み込んだ中身を実行する (worker.md の「要るもの」)。周回の間に別のセッションがプラグインを更新して、
+    起動時に読み込み、読み込んだ中身を実行する (worker.md の「要るもの」)。ループの間に別のセッションがプラグインを更新して、
     古いバージョンのディレクトリの中身が消えても、ワーカーが動き続けるようにするため。"""
 
     def test_keeps_running_after_python_dir_moved(self):
@@ -2453,15 +2453,15 @@ class TestSandboxStartChecks(WorkerTestBase):
                 self.start_unavailable(env=env, contains=contains)
 
     def test_sandbox_tmp(self):
-        # AE11: 作業側か周回のディレクトリが、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
+        # AE11: 作業側かループのディレクトリが、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
         if not (os.path.isdir(_SANDBOX_TMP) and os.access(_SANDBOX_TMP, os.W_OK)):
             self.skipTest(f"{_SANDBOX_TMP} が無い (macOS で Claude Code のサンドボックスを使った機材でだけ確認できる)")
         base = tempfile.mkdtemp(prefix="review-loop-worker-test-", dir=_SANDBOX_TMP)
         self.addCleanup(shutil.rmtree, base, True)
-        with self.subTest("周回のディレクトリ"):
+        with self.subTest("ループのディレクトリ"):
             loop = os.path.join(base, "loop")
             _make_loop_dir(loop, self.repo)
-            self.start_unavailable(loop=loop, contains=["周回のディレクトリ", "サンドボックスの一時ディレクトリ"])
+            self.start_unavailable(loop=loop, contains=["ループのディレクトリ", "サンドボックスの一時ディレクトリ"])
         with self.subTest("作業側"):
             repo = os.path.join(base, "repo")
             _make_repo(repo)
@@ -2470,16 +2470,16 @@ class TestSandboxStartChecks(WorkerTestBase):
             self.start_unavailable(loop=loop, cwd=repo, contains=["作業側", "サンドボックスの一時ディレクトリ"])
 
     def test_special_characters_in_paths(self):
-        # 許可と拒否の規則に書けない文字を、作業側・周回のディレクトリ・TMPDIR の実体パスに含まない
+        # 許可と拒否の規則に書けない文字を、作業側・ループのディレクトリ・TMPDIR の実体パスに含まない
         for c in "()[]{}*?!#":
             with self.subTest(f"TMPDIR に {c}"):
                 tmpdir = os.path.join(self.root, f"tmp{c}dir")
                 os.makedirs(tmpdir)
                 self.start_unavailable(env=dict(self.env, TMPDIR=tmpdir), contains=["TMPDIR", f"「{c}」"])
-        with self.subTest("周回のディレクトリに #"):
+        with self.subTest("ループのディレクトリに #"):
             loop = os.path.join(self.root, "loop#1")
             _make_loop_dir(loop, self.repo)
-            self.start_unavailable(loop=loop, contains=["周回のディレクトリ", "「#」"])
+            self.start_unavailable(loop=loop, contains=["ループのディレクトリ", "「#」"])
         with self.subTest("作業側に ("):
             repo = os.path.join(self.root, "repo (copy)")
             _make_repo(repo)
@@ -2488,7 +2488,7 @@ class TestSandboxStartChecks(WorkerTestBase):
             self.start_unavailable(loop=loop, cwd=repo, contains=["作業側", "「(」"])
 
     def test_sandbox_allow_write_must_not_contain_protected_places(self):
-        # AE11: --sandbox-allow-write ~ など。ホーム・作業側・周回のディレクトリと同じか、その祖先の値は受け付けない。
+        # AE11: --sandbox-allow-write ~ など。ホーム・作業側・ループのディレクトリと同じか、その祖先の値は受け付けない。
         # 1 つ目に問題の無い値を置いて、2 つ目以降の値も確認していることを見る
         link = os.path.join(self.root, "home-link")
         os.symlink(self.home, link)
@@ -2500,8 +2500,8 @@ class TestSandboxStartChecks(WorkerTestBase):
             ("ホームの祖先", self.root, "ホーム"),
             ("/", "/", "ホーム"),
             ("作業側", self.repo, "作業側"),
-            ("周回のディレクトリ", self.loop, "周回のディレクトリ"),
-            ("周回のディレクトリの祖先", os.path.join(self.repo, "tmp"), "周回のディレクトリ"),
+            ("ループのディレクトリ", self.loop, "ループのディレクトリ"),
+            ("ループのディレクトリの祖先", os.path.join(self.repo, "tmp"), "ループのディレクトリ"),
         )
         for label, value, contains in cases:
             with self.subTest(label):
@@ -2510,14 +2510,14 @@ class TestSandboxStartChecks(WorkerTestBase):
                                        contains=["--sandbox-allow-write", contains])
 
     def test_sandbox_allow_write_must_not_be_below_repo_or_loop(self):
-        # 作業側と周回のディレクトリは、その下の場所も受け付けない (作業側の .git や、git が無視する場所への書き込みを許さないため)。
+        # 作業側とループのディレクトリは、その下の場所も受け付けない (作業側の .git や、git が無視する場所への書き込みを許さないため)。
         # ホームの下の場所は受け付ける (Go のビルドのキャッシュなど)
         loop_outside = os.path.join(self.root, "loops", LOOP_ID)
         _make_loop_dir(loop_outside, self.repo)
         cases = (
             ("作業側の .git", os.path.join(self.repo, ".git"), self.loop, "作業側"),
             ("作業側の下のまだ無い場所", os.path.join(self.repo, ".venv", "cache"), self.loop, "作業側"),
-            ("作業側の外にある周回のディレクトリの下", os.path.join(loop_outside, "x"), loop_outside, "周回のディレクトリ"),
+            ("作業側の外にあるループのディレクトリの下", os.path.join(loop_outside, "x"), loop_outside, "ループのディレクトリ"),
         )
         for label, value, loop, contains in cases:
             with self.subTest(label):
@@ -3231,7 +3231,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assertFalse(os.path.lexists(ws))
 
     def test_cleanup_even_when_unavailable(self):
-        # 周回のディレクトリに end がある状態や、ほかの確認で unavailable になる起動でも、残ったプロセスと作業場所を片付けてから停止する。
+        # ループのディレクトリに end がある状態や、ほかの確認で unavailable になる起動でも、残ったプロセスと作業場所を片付けてから停止する。
         # worker.yaml が無ければ (作業場所のパスが記録されていなければ)、決まったパスを片付ける
         cases = (
             ("end がある", True, {}, "end"),
@@ -3276,8 +3276,8 @@ class TestRestartCleanup(WorkerTestBase):
                 self.assertTrue(os.path.islink(ws))
 
     def test_prep_dirs_are_found_by_name(self):
-        # worker.yaml が無くても (準備のディレクトリのパスは記録しない)、TMPDIR の実体の下の、この周回の準備のディレクトリの名前の形
-        # (review-loop-prep-<周回 id>-<ハッシュ>.<6 文字>) に合うディレクトリは、中を cwd にしているプロセスを停止してから消す。
+        # worker.yaml が無くても (準備のディレクトリのパスは記録しない)、TMPDIR の実体の下の、このループの準備のディレクトリの名前の形
+        # (review-loop-prep-<ループ id>-<ハッシュ>.<6 文字>) に合うディレクトリは、中を cwd にしているプロセスを停止してから消す。
         # 名前の形に合わないものと、シンボリックリンクは片付けない
         key = os.path.basename(self.ws_path())[len("review-loop-"):]
         tmp = os.path.realpath(self.tmpdir)
@@ -3307,7 +3307,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assertTrue(os.path.exists(keep))
 
     def test_end_removes_workspace(self):
-        # end を見て終了するとき、周回の作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
+        # end を見て終了するとき、ループの作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
         target = os.path.join(self.root, "link-target")
         os.makedirs(target)
         keep = os.path.join(target, "keep.txt")
