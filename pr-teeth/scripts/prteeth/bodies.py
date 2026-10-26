@@ -216,7 +216,7 @@ def prune(bodies_dir, alive=None, max_bodies=None):
             continue
         # 他プロセスが書き込み中の一時ファイルは消さない。store の原子的書き込みは
         # 一時ファイル + os.replace で成り立っているため、ここで消すとその保証が崩れる
-        # （書き込み側は消えたファイルを replace しようとして失敗する）。
+        # （書き込むプロセスは消えたファイルを replace しようとして失敗する）。
         if name.startswith(".tmp-"):
             continue
         if keep is not None and name not in keep:

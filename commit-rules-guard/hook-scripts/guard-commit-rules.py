@@ -26,7 +26,7 @@
   - COMMIT_GUARD_RULES_FILE: 表示するルールファイルのパス。既定は
     ~/.claude/rules/commit-rules.md → プラグイン同梱の rules/commit-rules.md の順に探す。
 
-想定外で落ちたら全 Bash を拒否しないよう許可する側を選ぶ（return 0）。
+想定外で落ちたら全 Bash を拒否しないよう許可する方を選ぶ（return 0）。
 """
 
 import fnmatch

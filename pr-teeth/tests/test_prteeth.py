@@ -1780,11 +1780,11 @@ class TestCliCommands(unittest.TestCase):
             {"term": t, "language": "ja", "definition": "d"} for t in terms
         ]})
         env = dict(os.environ, PR_TEETH_CONFIG_DIR=self._dir.name)
-        env.pop("PYTHONPATH", None)  # 遅延させない側に hook を継承させない
+        env.pop("PYTHONPATH", None)  # 遅延させない子プロセスに hook を継承させない
         if delay:
             # save_json を遅らせる。sitecustomize は子の起動時に自動で読まれる。
             # hook は専用ディレクトリに置く。設定ディレクトリに置くと、
-            # PYTHONPATH を渡さない側の子もこれを読む経路が生まれうる。
+            # PYTHONPATH を渡さない子プロセスもこれを読む経路が生まれうる。
             hook_dir = os.path.join(self._dir.name, "hook")
             os.makedirs(hook_dir, exist_ok=True)
             hook = os.path.join(hook_dir, "sitecustomize.py")
