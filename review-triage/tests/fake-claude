@@ -20,7 +20,7 @@
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
 - FAKE_CLAUDE_REPO: 作業側の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
 - FAKE_CLAUDE_LOOP: ループのディレクトリの絶対パス (mode が write_request と write_loop_result のとき使う)
-- FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作るフラグファイルのファイルの名前の先頭
+- FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作るフラグファイルの名前の先頭
 - FAKE_CLAUDE_LINK_TARGET: mode が symlink_workspace のとき、作業場所を置き換えるシンボリックリンクの先
 - FAKE_CLAUDE_OUTSIDE: mode が result_symlink_outside のとき、結果のシンボリックリンクの先 (作業場所の外のファイル)
 - FAKE_CLAUDE_TERM_RECEIVED: mode が hang_ignore_term のとき、SIGTERM を受けたら作るファイル
@@ -33,7 +33,7 @@
     write_request         結果を書き、ループのディレクトリに依頼文を 1 つ置く
     write_loop_result     結果を、写しの出力先ではなくループのディレクトリの出力先に直接書く
     git_config            結果を書き、複製の .git/config に core.fsmonitor・core.hooksPath・filter.<名前>.clean を、
-                          .git/hooks/ に post-checkout を置く (どれも、git が実行するとフラグファイルのファイルを作る)
+                          .git/hooks/ に post-checkout を置く (どれも、git が実行するとフラグファイルを作る)
     symlink_workspace     作業場所を別の名前に移し、元の名前を FAKE_CLAUDE_LINK_TARGET へのシンボリックリンクにしてから、
                           写しの出力先に結果を書く (結果はリンクの先に書かれる)
     leave_child           結果を書き、別のプロセスグループ (新しいセッション) で cwd が複製の中の子を残して終了する
