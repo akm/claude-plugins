@@ -201,7 +201,7 @@ language = "ja"
   - 1ファイルが複数範囲に一致したら **優先度 must_review > should_review > ignore** で最上位を採用
     (重要な範囲を ignore で誤って隠さないため)。
   - どの範囲にも一致しないファイルは `repo_defaults.unmatched`(既定 `should_review`)として扱う。
-  - リポジトリ自体が未設定なら、全ファイルを `should_review` 扱い(安全側)。
+  - リポジトリ自体が未設定なら、全ファイルを `should_review` 扱いにする(見落としを出さないため)。
 - **出力への反映**:
   - 各PRの解説に「レビュー範囲サマリ」を付ける。例:
     「このPRの変更 12ファイルのうち、**レビュー必須**(src/auth/)3、見たほうが良い(src/api/)5、見なくてよい(docs/)4。

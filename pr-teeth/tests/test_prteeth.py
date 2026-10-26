@@ -197,7 +197,7 @@ class TestScopeGlob(unittest.TestCase):
 
 class TestClassifyFiles(unittest.TestCase):
     def test_unconfigured_repo_is_should_review(self):
-        # 設定し忘れたリポジトリの変更を、利用者に知らせずに隠さない（安全側）。
+        # 設定し忘れたリポジトリの変更を、利用者に知らせずに隠さない（見落としを出さないため）。
         r = scope.classify_files(["a.md", "b.go"], "o/r", {"repos": {}})
         self.assertEqual(r["priority"], scope.SHOULD)
         self.assertEqual(r["counts"][scope.SHOULD], 2)
