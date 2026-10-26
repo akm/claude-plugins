@@ -212,7 +212,7 @@ type recordPlan struct {
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の正本は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
-	// Verification は修正の後の検証のうち、観点 B (並びを再確認する) で読んだ範囲。任意だが、
+	// Verification は修正の後の検証のうち、観点 B (周りの記述を再確認する) で読んだ範囲。任意だが、
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
 	Verification *recordVerification `yaml:"verification"`

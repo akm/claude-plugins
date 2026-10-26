@@ -151,7 +151,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 }
 
 // sortedMapKeys はマップのキーを昇順で返す。出力の順序を入力の反復順に
-// 依存させないため (問題の並びが実行ごとに変わると差分が読めない)。
+// 依存させないため (問題の順序が実行ごとに変わると差分が読めない)。
 func sortedMapKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
