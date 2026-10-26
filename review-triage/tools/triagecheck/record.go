@@ -418,7 +418,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // recordNullSilentKeys は、値を省いて null にすると他のどの検査でも失敗しない
 // 構造キー。キーの有無をポインタの nil で見る plan_ref / investigation は、
 // 「キーを書いて値を省いた」(書きかけ・インデントの誤り) が「キーが無い」と
-// 同一になり、書き手は書いたつもりのまま記録上は無い扱いになる (実測:
+// 同一になり、書き込み元は書いたつもりのまま記録上は無い扱いになる (実測:
 // investigation: だけの記録が検査 0 件でサマリにも出なかった)。
 // 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので

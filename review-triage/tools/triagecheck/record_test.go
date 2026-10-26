@@ -1801,7 +1801,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 }
 
 // 列挙に無い状態は従来どおり報告し、文言の列挙に investigated が入る (状態を足したのに
-// 案内の列挙が古いままだと、書き手は正しい値を知る手段が無い)。
+// 案内の列挙が古いままだと、書き込み元は正しい値を知る手段が無い)。
 func TestReviewTriageRecordUnknownStatusListsInvestigated(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "status: pending", "status: investigating", 1)
 	if mutated == validRecordYAML {
