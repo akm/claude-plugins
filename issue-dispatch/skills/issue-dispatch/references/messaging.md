@@ -1,12 +1,12 @@
 # セッションの宛先と識別
 
-このファイルが、この仕組み (issue-dispatch) のセッションの識別 (ID と名前)・管理のセッションの規約の名前・宛先の決め方・作業のセッションの一時ディレクトリの正本。セッションどうしが送る合図 (本文の様式と種類) の取り決めは U17 でこの文書に足す。スキルの手順書は、Claude Code の公式文書に無い振る舞いに頼るところで、下の「実測」の表を参照する。モジュール `issue-dispatch/scripts/issue_dispatch/sessions.py` がここで決めた規則を実装する (`gh` も `ListAgents` も使わず、環境変数は引数で受ける)。
+このファイルが、この仕組み (issue-dispatch) のセッションの識別 (ID と名前)・管理のセッションの規約の名前・宛先の決め方・作業のセッションの一時ディレクトリの正本。セッションどうしが送る合図 (本文の様式と種類) の取り決めは U17 でこの文書に足す。スキルの手順書は、Claude Code の公式文書に無い動作に頼るところで、下の「実測」の表を参照する。モジュール `issue-dispatch/scripts/issue_dispatch/sessions.py` がここで決めた規則を実装する (`gh` も `ListAgents` も使わず、環境変数は引数で受ける)。
 
 ## 自分の識別 (ID と名前)
 
 セッションは ID と名前の両方を持つ (計画の KTD10)。作業のセッションは割り当てを受けるときに両方を申告し、管理のセッションは Project のフィールド `Agent session ID` に ID、`Agent session title` に名前を書く (フィールドの正本は [project-schema.md](project-schema.md))。
 
-- **ID** は環境変数から決める: `CLAUDE_CODE_HOST_SESSION_ID` (Claude Desktop のセッション ID。`local_` で始まる) があればそれ、無ければ `CLAUDE_CODE_SESSION_ID` (会話の記録と同じ UUID。端末の `claude` にはこちらだけがある)。空の値と、空白か `/` を含む値、`.` で始まる値 (`.`・`..` を含む) は無いものとして扱う (ID は一時ディレクトリのパスの 1 区切りにも使うため)。どちらの環境変数も公式文書に無い振る舞いなので、読むのは関数 `own_session_id` の 1 か所にまとめる。`local_` の有無は区別して保持し、`local_<ID>` と `<ID>` は別のセッションとして比べる (関数 `normalize_session_id`・`same_session_id`)。中身の形 (UUID かどうか) には決め打ちしない。
+- **ID** は環境変数から決める: `CLAUDE_CODE_HOST_SESSION_ID` (Claude Desktop のセッション ID。`local_` で始まる) があればそれ、無ければ `CLAUDE_CODE_SESSION_ID` (会話の記録と同じ UUID。端末の `claude` にはこちらだけがある)。空の値と、空白か `/` を含む値、`.` で始まる値 (`.`・`..` を含む) は無いものとして扱う (ID は一時ディレクトリのパスの 1 区切りにも使うため)。どちらの環境変数も公式文書に無い動作なので、読むのは関数 `own_session_id` の 1 か所にまとめる。`local_` の有無は区別して保持し、`local_<ID>` と `<ID>` は別のセッションとして比べる (関数 `normalize_session_id`・`same_session_id`)。中身の形 (UUID かどうか) には決め打ちしない。
 - **名前**は `ListAgents` の 1 行目 (`This session is <名前> [<短い識別子>]`) の名前で、行に付く短い識別子 (`[2c2f42]` の形。プロセスごとの値で、開き直すと変わる) を除いた部分。作業のセッションは名前を変えない (変わっていれば管理のセッションが `renamed` と見る)。名前が `ListAgents` に無いときの引き直しは、Desktop では `list_sessions` (ID → タイトル)、端末のセッションは引き直せないので利用者に質問する。
 
 ## 管理のセッションの規約の名前
@@ -28,9 +28,9 @@
 
 ## 実測 (U1。2026-10-19〜20、Claude Code 2.1.285)
 
-公式文書に無い振る舞いへの依存。版が上がって振る舞いが変わったとき、直す場所をここで見る。出所は U1 の記録 (`tmp/issue-dispatch-u1/02-signals.md`・`03-names-and-ids.md`。追跡外)。
+公式文書に無い動作への依存。版が上がって動作が変わったとき、直す場所をここで見る。出所は U1 の記録 (`tmp/issue-dispatch-u1/02-signals.md`・`03-names-and-ids.md`。追跡外)。
 
-| 文書に無い振る舞い | 頼る要件と処理 | 確認した日と版 | 変わったときに直す場所 |
+| 文書に無い動作 | 頼る要件と処理 | 確認した日と版 | 変わったときに直す場所 |
 | --- | --- | --- | --- |
 | `ListAgents` の出力の形: 1 行目が自分 (`This session is <名前> [<識別子>]`)、2 行目以降が `<名前> [<識別子>] · interactive · <状態> · started …`。状態は `idle` / `busy` / `waiting` / `shell`。`waiting` は権限の確認待ちと質問の回答待ちの両方、`shell` はバックグラウンドの shell が動いている間 | R10 (停止したことに気づく手段)・R23 (作業のセッションの監視)・R18 (排他は状態を問わず数える) | 2026-10-19〜20。Desktop と端末 | スキルの手順書 (U21・U22・U23) の `ListAgents` の読み方。この文書の「自分の識別」の名前の取り出し方 |
 | 環境変数 `CLAUDE_CODE_HOST_SESSION_ID` (Desktop のセッション ID。`local_` 付き) と `CLAUDE_CODE_SESSION_ID` (会話の記録の UUID) が Bash ツールの環境にある。端末の `claude` には後者だけ | KTD10 (自分の ID の決定) | 2026-10-19〜20。Desktop と端末 | `sessions.py` の `own_session_id` (読むのはここだけ) |

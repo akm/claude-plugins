@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """リポジトリの設定の読み方 (issue-dispatch/scripts/issue_dispatch/repo.py) と、CLI の `repo name` のテスト。
 
-git の振る舞いは一時ディレクトリに作ったリポジトリで確認する。`gh` は使わない。`ssh -G` は偽の ssh
+git の動作は一時ディレクトリに作ったリポジトリで確認する。`gh` は使わない。`ssh -G` は偽の ssh
 (issue-dispatch/tests/fake-ssh) のディレクトリを PATH の先頭に加えて差し替える。
 
   python3 -m unittest discover -s issue-dispatch/tests

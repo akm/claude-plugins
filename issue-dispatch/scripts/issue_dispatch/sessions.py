@@ -1,6 +1,6 @@
 """セッションの識別。セッション ID の正規化、環境変数からの自分のセッション ID の決定、管理のセッションの規約の名前の生成と
 解析、作業のセッションの一時ディレクトリのパス。gh も ListAgents も使わず、環境変数は引数の辞書で受ける (テストのため)。
-宛先の決め方と、公式文書に無い振る舞いへの依存の正本は issue-dispatch/skills/issue-dispatch/references/messaging.md。
+宛先の決め方と、公式文書に無い動作への依存の正本は issue-dispatch/skills/issue-dispatch/references/messaging.md。
 """
 
 import os
@@ -10,7 +10,7 @@ from issue_dispatch import ids
 
 NAME_PREFIX = "issue-dispatch "
 # 環境変数。CLAUDE_CODE_HOST_SESSION_ID (Desktop のセッション ID。`local_` で始まる) があればそれ、無ければ
-# CLAUDE_CODE_SESSION_ID (会話の記録の UUID)。公式文書に無い振る舞いに頼るので、読むのは own_session_id の 1 か所 (KTD10)
+# CLAUDE_CODE_SESSION_ID (会話の記録の UUID)。公式文書に無い動作に頼るので、読むのは own_session_id の 1 か所 (KTD10)
 ENV_HOST_SESSION_ID = "CLAUDE_CODE_HOST_SESSION_ID"
 ENV_SESSION_ID = "CLAUDE_CODE_SESSION_ID"
 # `local_` の有無は区別して保持する。中身の形 (UUID など) には決め打ちせず、パスの 1 区切りとして使える値 (空白と `/` を
