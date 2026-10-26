@@ -2,7 +2,7 @@
 不足の作成 (`add_fields`)・Status とフィールドの書き込み。様式の正本は
 issue-dispatch/skills/issue-dispatch/references/project-schema.md。
 
-GraphQL は同じディレクトリの graphql/*.graphql を `gh api graphql` で実行する (操作名で偽の gh が見分ける)。
+GraphQL は同じディレクトリの graphql/*.graphql を `gh api graphql` で実行する (操作名で偽の gh が識別する)。
 書き込みは `gh project item-edit` と `gh project field-create` と mutation で、どれも gh.run の mutation=True で行う。
 """
 
@@ -19,12 +19,12 @@ STUCK_STATES = ("idle-no-progress", "deadline-passed", "session-missing", "manag
 # Status の選択肢。Todo・In Progress・Done は Project が最初から持ち、ほかの 3 つはこの仕組みが足す (色と説明は足すときの値)
 STATUS_OPTIONS = ("Todo", "Ready", "In Progress", "In review", "Blocked", "Done")
 ADDED_STATUS_OPTIONS = {"Ready": ("GREEN", "着手してよい"), "In review": ("BLUE", "PR が ready for review"),
-                        "Blocked": ("RED", "ほかの Issue か小さな PR を待つ")}
+                        "Blocked": ("RED", "ほかの Issue か小さな PR の完了まで待機する")}
 # 管理のセッションが書く Status (R2)。Done は書かない
 MANAGER_STATUSES = ("Todo", "Ready", "Blocked", "In Progress", "In review")
 REQUIRED_WORKFLOWS = ("Item closed",)
 RECOMMENDED_WORKFLOWS = ("Item added to project", "Item reopened")
-NOTICE_IF_ENABLED_WORKFLOWS = ("Auto-add to project",)         # 有効なら、Ready にする前に中身を確かめるよう案内する
+NOTICE_IF_ENABLED_WORKFLOWS = ("Auto-add to project",)         # 有効なら、Ready にする前に中身を確認するよう案内する
 DISCOURAGED_WORKFLOWS = ("Pull request linked to issue",)      # 有効なら無効を推奨する
 EVENT_TYPES = ("ClosedEvent", "ReopenedEvent", "LabeledEvent", "UnlabeledEvent", "BlockedByAddedEvent",
                "BlockedByRemovedEvent", "ProjectV2ItemStatusChangedEvent", "AddedToProjectV2Event", "RemovedFromProjectV2Event")
@@ -200,7 +200,7 @@ def _comment(node):
 
 
 def _more_pages(name, repo, number, first_page, key, convert):
-    """コメントか出来事の続きのページを読んで、変換した要素の配列を返す。読めなければ問題を返す。"""
+    """コメントか出来事の残りのページを読んで、変換した要素の配列を返す。読めなければ問題を返す。"""
     nodes = [convert(n) for n in first_page["nodes"] if n]
     info = first_page.get("pageInfo") or {}
     owner, _, repo_name = repo.partition("/")
@@ -210,11 +210,11 @@ def _more_pages(name, repo, number, first_page, key, convert):
             return nodes, problem
         issue = (data.get("repository") or {}).get("issue")
         if not issue or not isinstance(issue.get(key), dict):
-            return nodes, {"failure": "other", "message": "続きのページで Issue を読めない (移された・消された、または " +
+            return nodes, {"failure": "other", "message": "残りのページで Issue を読めない (移された・消された、または " +
                            json.dumps(errors, ensure_ascii=False) + ")", "exit_code": 0}
         if errors:
             # 最初のページと同じく、data と一緒に返った errors は捨てずに知らせる
-            return nodes, {"failure": "other", "message": "続きのページに errors がある: " + json.dumps(errors, ensure_ascii=False), "exit_code": 0}
+            return nodes, {"failure": "other", "message": "残りのページに errors がある:  " + json.dumps(errors, ensure_ascii=False), "exit_code": 0}
         page = issue[key]
         nodes += [convert(n) for n in page["nodes"] if n]
         info = page.get("pageInfo") or {}
@@ -261,7 +261,7 @@ def simplify_item(node, position):
                 for p in content["closedByPullRequestsReferences"]["nodes"]],
     })
     problems = []
-    # 入れ子の connection は続きのページを読まない (件数の上限は上げてある)。超えていれば、欠けを知らせる
+    # 入れ子の connection は残りのページを読まない (件数の上限は上げてある)。超えていれば、欠損を知らせる
     for key, what in (("labels", "labels"), ("blockedBy", "blocked_by"), ("userContentEdits", "body_edits"),
                       ("closedByPullRequestsReferences", "prs")):
         if (content.get(key, {}).get("pageInfo") or {}).get("hasNextPage"):
@@ -283,7 +283,7 @@ def simplify_item(node, position):
 
 def items(project):
     """項目の一覧を位置の順に全部読む。返り値: {"status": "ok", "project_id", "items": [...], "problems": [...], "rate_limit"} か
-    {"status": "error", ...} (最初のページが読めないとき)。続きのページやコメントの続きが読めなかったときは problems に入れて止める。"""
+    {"status": "error", ...} (最初のページが読めないとき)。残りのページやコメントの残りのページが読めなかったときは problems に入れて読み取りを中断する。"""
     result_items = []
     problems = []
     after = None

@@ -60,7 +60,7 @@ def pr_fixture(state, draft=False, merged=False):
 class SnapshotFileTest(unittest.TestCase):
 
     def test_round_trip_and_missing_and_corrupt(self):
-        """書いた内容を往復で同じに返し、ファイルが無いときと壊れているとき (JSON でない・キーが欠ける) を区別する。"""
+        """書いた内容を往復で同じに返し、ファイルが無いときと壊れているとき (JSON でない・キーが無い) を区別する。"""
         import tempfile
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(observe.load_snapshot(d)["status"], "missing")
@@ -69,7 +69,7 @@ class SnapshotFileTest(unittest.TestCase):
             loaded = observe.load_snapshot(d)
             self.assertEqual((loaded["status"], loaded["snapshot"]), ("ok", snap))
             self.assertEqual(sorted(os.listdir(d)), [observe.SNAPSHOT_FILE], "一時ファイルを残さない")
-            # 一時名は records.md の決まり (`.` で始まり `.tmp` で終わる) で、書き手ごとに別の名前
+            # 一時名は records.md の規則 (`.` で始まり `.tmp` で終わる) で、書き込み元ごとに別の名前
             import tempfile as _tempfile
             fd, tmp = _tempfile.mkstemp(dir=d, prefix=".snapshot-", suffix=".json.tmp")
             os.close(fd)
@@ -80,7 +80,7 @@ class SnapshotFileTest(unittest.TestCase):
             self.assertEqual(observe.load_snapshot(d)["status"], "corrupt")
             with open(os.path.join(d, observe.SNAPSHOT_FILE), "w", encoding="utf-8") as f:
                 json.dump({"version": observe.SNAPSHOT_VERSION, "items": {}}, f)
-            self.assertEqual(observe.load_snapshot(d)["status"], "corrupt", "キーが欠けていれば壊れている")
+            self.assertEqual(observe.load_snapshot(d)["status"], "corrupt", "キーが無ければ壊れている")
 
 
 class BuildTest(FakeGhCase):
@@ -181,7 +181,7 @@ class DiffTest(FakeGhCase):
         self.assertEqual(d, [{"kind": "field", "item": A3, "field": "Agent stuck state", "before": "idle-no-progress", "after": None}])
 
     def test_blocked_by_comment_pr_and_order(self):
-        """blocker の close・コメントの追加・待っている小さな PR の状態の変化を返し、処理の順 (人の変更 → close → blockedBy → コメント → PR → 項目の追加) に並ぶ。"""
+        """blocker の close・コメントの追加・マージ待ちの小さな PR の状態の変化を返し、処理の順 (人の変更 → close → blockedBy → コメント → PR → 項目の追加) に並ぶ。"""
         before = self.snapshot(comment_prs={PR9: {"state": "OPEN", "draft": False, "merged": False}})
         before["items"][A3]["blocked_by"] = {A1: "OPEN"}
         def mutate(nodes):
@@ -303,7 +303,7 @@ class CliTest(FakeGhCase):
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["items"][A1]["state"], "OPEN", "diff は書かない")
 
     def test_partial_read_yields_no_diff_and_no_save(self):
-        """項目の一覧そのものが欠ければ、diff は差分を返さず、--write-snapshot はスナップショットを書き換えない (読めなかった項目を removed にしない)。"""
+        """項目の一覧そのものが無ければ、diff は差分を返さず、--write-snapshot はスナップショットを書き換えない (読めなかった項目を removed にしない)。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         taken = observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"]
@@ -317,7 +317,7 @@ class CliTest(FakeGhCase):
         code, out, _ = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         self.assertEqual((out["status"], out["snapshot"], out["errors"][0]["key"]), ("error", None, "partial"))
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["taken_at"], taken, "書き換えない")
-        # コメントの URL の PR が読めないときは、その PR だけを比べずに続ける (読むたびに同じく出る欠けで観測を止めない)
+        # コメントの URL の PR が読めないときは、その PR だけを比べずに続ける (読むたびに同じく出る欠損で観測を中断しない)
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))},
                         {"substring": "query PrObserve", "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1}])
         code, out, _ = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
@@ -326,14 +326,14 @@ class CliTest(FakeGhCase):
         self.assertEqual(list(out["skipped"]["prs"]), [PR9])
 
     def test_item_level_gaps_skip_only_affected_values(self):
-        """1 項目の中の欠け (入れ子の connection の上限) は、その種類が狂わせる値だけを前のスナップショットから引き継いで比べず、ほかの値の変化と差分の保存は続ける。"""
+        """1 項目の中の欠損 (入れ子の connection の上限) は、その種類が狂わせる値だけを前のスナップショットから引き継いで比べず、ほかの値の変化と差分の保存は続ける。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         def mutate(nodes):
             c = node_of(nodes, 1)["content"]
             c["blockedBy"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C"}
-            c["blockedBy"]["nodes"].append({"number": 7, "url": f"https://github.com/{A}/issues/7", "state": "OPEN", "repository": {"nameWithOwner": A}})  # 欠けた値は比べない
-            c["labels"]["nodes"].append({"name": "x"})  # 欠けと関係のない値の変化は返る
+            c["blockedBy"]["nodes"].append({"number": 7, "url": f"https://github.com/{A}/issues/7", "state": "OPEN", "repository": {"nameWithOwner": A}})  # 欠損した値は比べない
+            c["labels"]["nodes"].append({"name": "x"})  # 欠損と関係のない値の変化は返る
             node_of(nodes, 3)["content"]["labels"]["nodes"].append({"name": "y"})  # ほかの項目の変化は返る
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
         code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
@@ -354,7 +354,7 @@ class CliTest(FakeGhCase):
         self.assertEqual(out["carried"], {"items": {}, "prs": {}})
 
     def test_item_level_gap_does_not_hide_close_comment_and_removal(self):
-        """欠けが続く項目でも、close・新しいコメント・Project からの除去は差分に出る。"""
+        """欠損が続く項目でも、close・新しいコメント・Project からの除去は差分に出る。"""
         def truncated(nodes):
             node_of(nodes, 1)["content"]["blockedBy"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C"}
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(truncated)}])
@@ -373,18 +373,18 @@ class CliTest(FakeGhCase):
             nodes.remove(node_of(nodes, 1))
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(removed)}])
         code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
-        self.assertEqual((code, out["status"]), (0, "ok"), err)  # 今の読み取りに欠けは無い
+        self.assertEqual((code, out["status"]), (0, "ok"), err)  # 今の読み取りに欠損は無い
         self.assertEqual([(d["kind"], d["item"]) for d in out["diffs"]], [("removed", A1)])
 
     def test_fields_gap_skips_status_too(self):
-        """フィールドの値の欠け (fields-truncated) では、同じ connection から読む Status も引き継いで比べない (Status が読めなかっただけで null になるため)。"""
+        """フィールドの値の欠損 (fields-truncated) では、同じ connection から読む Status も引き継いで比べない (Status が読めなかっただけで null になるため)。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         def mutate(nodes):
             n = node_of(nodes, 1)
             n["fieldValues"]["pageInfo"] = {"hasNextPage": True, "endCursor": "F"}
             n["fieldValues"]["nodes"] = [fv for fv in n["fieldValues"]["nodes"] if not (fv and fv.get("field") and fv["field"]["name"] == "Status")]
-            n["content"]["labels"]["nodes"].append({"name": "x"})  # 欠けと関係のない値の変化は返る
+            n["content"]["labels"]["nodes"].append({"name": "x"})  # 欠損と関係のない値の変化は返る
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
         code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
         self.assertEqual((code, out["status"], out["errors"]), (0, "partial", []), err)
@@ -399,7 +399,7 @@ class CliTest(FakeGhCase):
         self.assertEqual([d["kind"] for d in observe.diff(before, after)], ["closed"])
 
     def test_carry_forward_keeps_last_complete_value(self):
-        """コメントの続きのページが読めなかったターンは、前のスナップショットのコメント ID を引き継いで保存し (carried)、読めるようになったターンに
+        """コメントの残りのページが読めなかったターンは、前のスナップショットのコメント ID を引き継いで保存し (carried)、読めるようになったターンに
         最後に全部読めたときからの変化だけを差分に出す。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
@@ -451,8 +451,8 @@ class CliTest(FakeGhCase):
                                         "before": {"state": "OPEN", "draft": False, "merged": False}, "after": {"state": "MERGED", "draft": False, "merged": True}}], err)
 
     def test_write_snapshot_drops_prs_no_longer_in_comments(self):
-        """--write-snapshot は今のコメントに書かれた PR だけを読む。前のスナップショットにだけある URL は読み直さず、保存にも残らない
-        (項目が閉じた後の PR の URL が増え続けないため)。observe diff は差分のために読み直す (別のテスト)。"""
+        """--write-snapshot は今のコメントに書かれた PR だけを読む。前のスナップショットにだけある URL は再度読み込まず、保存にも残らない
+        (項目が閉じた後の PR の URL が増え続けないため)。observe diff は差分のために再度読み込む (別のテスト)。"""
         with_pr = items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9)))
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": with_pr}, {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
@@ -462,7 +462,7 @@ class CliTest(FakeGhCase):
         code, out, err = self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         self.assertEqual((code, out["status"], out["snapshot"]["comment_prs"]), (0, "ok", {}), err)
         self.assertEqual(observe.load_snapshot(self.snapshot_dir)["snapshot"]["comment_prs"], {})
-        self.assertFalse(any("PrObserve" in (r.get("stdin") or "") for r in self.recorded_full()[calls_before:]), "前のスナップショットの URL を読み直さない")
+        self.assertFalse(any("PrObserve" in (r.get("stdin") or "") for r in self.recorded_full()[calls_before:]), "前のスナップショットの URL を再度読み込まない")
 
     def test_no_carry_without_previous_complete_value(self):
         """最初のスナップショットから一部しか読めていない値は引き継ぐ元が無いので、partial のまま比べない。"""
@@ -489,7 +489,7 @@ class CliTest(FakeGhCase):
         self.assertEqual((snap["items"][A3]["partial"], snap["items"][A3]["carried"], snap["items"][A3]["comment_ids"]), (["comments"], {}, [1, 2]))
 
     def test_unknown_partial_kind_skips_whole_item(self):
-        """対応に無い欠けの種類は、どの値が狂うか分からないので項目全体を比べない。"""
+        """対応に無い欠損の種類は、どの値が狂うか分からないので項目全体を比べない。"""
         before = {"version": 1, "taken_at": "t0", "project_id": "P", "comment_prs": {},
                   "items": {A1: dict(observe.snapshot_item({"item_id": "I1", "position": 1, "state": "OPEN", "status": {"name": "Todo"}}), partial=["new-kind"])}}
         after = {"version": 1, "taken_at": "t1", "project_id": "P", "comment_prs": {},

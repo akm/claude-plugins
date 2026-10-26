@@ -79,7 +79,7 @@ class ParseTest(unittest.TestCase):
         return result
 
     def test_rejects_unknown_and_missing_keys(self):
-        """未知のキー (file の誤字)・欠けた必須キーは、理由と期待する形を含むエラーで拒否する。kind も未知のキー。"""
+        """未知のキー (file の誤字)・欠損した必須キーは、理由と期待する形を含むエラーで拒否する。kind も未知のキー。"""
         self.assertRejected({"file": [], "resources": [], "split": {"needed": False, "reason": ""}}, "file", "未知のキー")
         self.assertRejected({"resources": [], "split": {"needed": False, "reason": ""}}, "files", "必須")
         self.assertRejected({"files": [{"path": "a.md", "kind": "divisible"}], "resources": [], "split": {"needed": False, "reason": ""}}, "files[0].kind", "未知のキー")
@@ -135,7 +135,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual([e["key"] for e in result["errors"]], ["files[0].path", "files[1].units", "files[2].units[0]"])
 
     def test_duplicate_resources_rejected(self):
-        """同じ資源 (綴りだけ違うものを含む) を 2 度書けない。"""
+        """同じ資源 (表記だけ違うものを含む) を 2 度書けない。"""
         self.assertRejected(decl(resources=["db", "DB"]), "resources[1]", "同じ資源")
         self.assertRejected(decl(resources=["db", "gpu", "db"]), "resources[2]", "同じ資源")
 
@@ -162,11 +162,11 @@ class UpdateKindTest(unittest.TestCase):
         self.assertEqual(declaration.update_kind(go, same_files(["A", "B", "C"]), held), "resources-only", "C を足した")
         self.assertEqual(declaration.update_kind(go, same_files(["A", "C"]), held), "resources-only", "B を外して C を足した (足した資源があるので外すだけではない)")
         self.assertEqual(declaration.update_kind(go, same_files(["A", "B"]), held), "full", "持っている資源と同じ更新は資源だけを変える更新ではない")
-        self.assertEqual(declaration.update_kind(go, same_files(["B", "A"]), held), "full", "並びだけ違っても同じ")
+        self.assertEqual(declaration.update_kind(go, same_files(["B", "A"]), held), "full", "順序だけ違っても同じ")
         self.assertEqual(declaration.update_kind(go, parsed(["src/app.ts", "src/b.ts"], ["A"]), held), "full", "ファイルが違えばどちらとも判定しない")
         self.assertEqual(declaration.update_kind(go, parsed(["src/app.ts", ("package.json", [["dependencies", "react"]])], ["A"]), held), "full", "節が違っても同じ")
         self.assertEqual(declaration.update_kind(go, parsed([("package.json", [["dependencies", "zod"]]), "src/app.ts"], ["A"]), held),
-                         "resources-removed-only", "ファイルの並びは問わない")
+                         "resources-removed-only", "ファイルの順序は問わない")
 
     def test_readd_and_successive_removals(self):
         """{A, B} が開始可 → {A} → {A, B} で B を足したと判定する。{X, Y, Z} → {X, Y} → {X} の 2 回目に外すのは Y だけ。"""
@@ -188,11 +188,11 @@ class UpdateKindTest(unittest.TestCase):
         """資源の名前は大文字小文字を区別しない (正本は resources.md)。"""
         go = parsed(["a.md"], ["DB", "gpu"])
         self.assertEqual(declaration.held_resources(go, [parsed(["a.md"], ["db"])]), {"DB"})
-        self.assertEqual(declaration.update_kind(go, parsed(["a.md"], ["db", "GPU"]), {"DB", "gpu"}), "full", "綴りだけ違えば何も変わらない更新")
+        self.assertEqual(declaration.update_kind(go, parsed(["a.md"], ["db", "GPU"]), {"DB", "gpu"}), "full", "表記だけ違えば何も変わらない更新")
         self.assertEqual(declaration.resource_changes(parsed(["a.md"], ["db"]), {"DB", "gpu"}), {"added": [], "removed": ["gpu"]})
 
     def test_rewrite_after_rejection_is_not_removal(self):
-        """差し戻された宣言を書き直した更新は、資源が持っている資源より少なくても資源を外すだけの更新と判定しない (開始可が無ければ initial)。"""
+        """差し戻された宣言を修正した更新は、資源が持っている資源より少なくても資源を外すだけの更新と判定しない (開始可が無ければ initial)。"""
         rejected = parsed(["a.md"], ["A", "B"])  # 差し戻された (呼び出し元は比べる相手に渡さない)
         rewritten = parsed(["a.md"], ["A"])
         self.assertEqual(declaration.update_kind(None, rewritten, declaration.held_resources(None, [])), "initial")

@@ -89,7 +89,7 @@ class MetaAndCheckTest(FakeGhCase):
         p = meta["project"]
         self.assertEqual((p["owner"], p["number"], p["title"]), ("akm", 3, "issue-dispatch verify"))
         self.assertEqual(p["fields"]["Status"]["data_type"], "SINGLE_SELECT")
-        self.assertEqual({o["name"] for o in p["fields"]["Status"]["options"]}, set(project.STATUS_OPTIONS), "選択肢の並びは問わない")
+        self.assertEqual({o["name"] for o in p["fields"]["Status"]["options"]}, set(project.STATUS_OPTIONS), "選択肢の順序は問わない")
         self.assertEqual(p["fields"]["Agent stuck state"]["data_type"], "SINGLE_SELECT")
         self.assertTrue(p["workflows"]["Item closed"]["enabled"])
         call = self.recorded_full()[0]
@@ -238,7 +238,7 @@ class ItemsTest(FakeGhCase):
         self.assertEqual(self.body(calls[1])["variables"]["after"], "CURSOR-PAGE-1")
 
     def test_comment_pages_are_followed_per_issue(self):
-        """コメントが 1 ページに収まらない項目は、Issue ごとの続きのページを読んで全部返す。"""
+        """コメントが 1 ページに収まらない項目は、Issue ごとの残りのページを読んで全部返す。"""
         data = fixture_json("project-items-ok")
         node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
         node["content"]["comments"]["pageInfo"] = {"hasNextPage": True, "endCursor": "C1"}
@@ -298,7 +298,7 @@ class ItemsTest(FakeGhCase):
                 "errors": [{"type": "FORBIDDEN", "message": "partial"}]}
         self.responses([{"substring": "query ProjectItems", "stdout": data}, {"substring": "query IssueComments", "stdout": more}])
         result = project.items(PROJECT)
-        self.assertEqual(result["status"], "partial", "続きのページの errors も捨てないこと")
+        self.assertEqual(result["status"], "partial", "残りのページの errors も捨てないこと")
         self.assertEqual(result["problems"][0]["what"], "comments")
         self.assertIn("FORBIDDEN", result["problems"][0]["message"])
 
@@ -309,12 +309,12 @@ class ItemsTest(FakeGhCase):
         self.responses([{"substring": "query ProjectItems", "stdout": data},
                         {"substring": "query IssueComments", "stdout": {"data": {"repository": {"issue": None}}, "errors": [{"type": "NOT_FOUND", "message": "gone"}]}}])
         result = project.items(PROJECT)
-        self.assertEqual(result["status"], "partial", "続きのページの Issue が無くても例外にしないこと")
+        self.assertEqual(result["status"], "partial", "残りのページの Issue が無くても例外にしないこと")
         self.assertEqual(result["problems"][0]["what"], "comments")
         self.assertEqual(len(result["items"][0]["comments"]), 10)
 
     def test_truncated_nested_connections_are_reported(self):
-        """ラベルなどの入れ子の connection が 1 ページに収まらなければ、欠けたまま返さずに problems に入れる。"""
+        """ラベルなどの入れ子の connection が 1 ページに収まらなければ、欠損したまま返さずに problems に入れる。"""
         data = fixture_json("project-items-ok")
         node = data["data"]["repositoryOwner"]["projectV2"]["items"]["nodes"][0]
         node["content"]["labels"]["pageInfo"] = {"hasNextPage": True}

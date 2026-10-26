@@ -5,9 +5,9 @@
 呼び出し元: CLI issue-dispatch/scripts/issue_dispatch.py の `config read` と `config add-edit-check`。
 ほかのモジュールは `load()` の結果の `config` を受け取り、設定ファイルを直接読まない。
 
-`files` の規則は、`kind` が規則に書ける種類 (モジュール filekinds の `RULE_KINDS`) であることだけを確かめ、
-属性の意味はここでは確かめない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
-`resources` の属性の意味とデフォルト値もここでは確かめない (正本は resources.md。属性の適用はモジュール resources)。
+`files` の規則は、`kind` が規則に書ける種類 (モジュール filekinds の `RULE_KINDS`) であることだけを確認し、
+属性の意味はここでは確認しない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
+`resources` の属性の意味とデフォルト値もここでは確認しない (正本は resources.md。属性の適用はモジュール resources)。
 """
 
 import json
@@ -16,7 +16,7 @@ import re
 
 from issue_dispatch import filekinds
 
-# 設定ファイルの置き場 (管理ディレクトリとリポジトリのルートからの相対パス。両方で同じ)
+# 設定ファイルのパス (管理ディレクトリとリポジトリのルートからの相対パス。両方で同じ)
 CONFIG_PATH = os.path.join(".claude", "akm-claude-plugins", "issue-dispatch", "config.json")
 
 ROLES = ("manager", "repo")
@@ -44,7 +44,7 @@ INTEGER_KEYS = ("poll_minutes", "wait_minutes", "declare_deadline_minutes")
 # リポジトリの名前 `owner/repo` の形。owner と repo のどちらも、名前に使える文字 (英数字と ._-) の 1 文字以上。
 # GitHub の規則 (アカウントの種類で違う) を写すのではなく、名前として扱えないもの (空白・読めないバイト・区切りの崩れ) だけを
 # 拒む (利用者と相談して決めた)。モジュール repo も origin の URL から取り出した名前の検査に使う。モジュール record は
-# 同じ形を写している (独立性のため import しない。テストで同じ文字列であることを確かめる)
+# 同じ形を写している (独立性のため import しない。テストで同じ文字列であることを確認する)
 REPO_NAME_PATTERN = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"
 REPO_NAME_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
 _REPO_RE = REPO_NAME_RE
@@ -155,7 +155,7 @@ def _check_repositories(value, warnings):
         elif not (isinstance(path, str) and os.path.isabs(path)):
             warnings.append(_note("repositories", f"repositories の {name} の値 {path!r} は絶対パスではない。使わない"))
         elif any(k.lower() == name.lower() for k in kept):
-            # GitHub のリポジトリ名は大文字小文字を区別しないので、綴りだけ違うキーは同じリポジトリ。先に書いたものを使う
+            # GitHub のリポジトリ名は大文字小文字を区別しないので、表記だけ違うキーは同じリポジトリ。先に書いたものを使う
             warnings.append(_note("repositories", f"repositories のキー {name!r} は、大文字小文字だけ違うキーと重なる。使わない"))
         else:
             kept[name] = path
@@ -225,7 +225,7 @@ def load(root, role):
 
     返り値: {"status": "ok" | "missing" | "unreadable", "path": 設定ファイルのパス, "role": role,
              "config": デフォルト値を当てた後の設定, "warnings": [{"key", "message"}], "errors": [{"key", "message"}]}。
-    値の誤りはデフォルト値で続行して warnings に、必須のキーの欠けと読めない設定は errors に入れる。
+    値の誤りはデフォルト値で続行して warnings に、必須のキーの欠損と読めない設定は errors に入れる。
     """
     if role not in ROLES:
         raise ValueError(f"role は {ROLES} のいずれか: {role!r}")
@@ -284,7 +284,7 @@ def _interpret(status, data, path, role):
     # 個別の検査で既に警告したキーには重ねて警告しない
     if config["poll_minutes"] >= config["wait_minutes"]:
         message = (f"poll_minutes ({config['poll_minutes']}) は wait_minutes ({config['wait_minutes']}) より短くする "
-                   "(間隔が期限以上だと、待機が 1 回読むごとに期限で終わる)。両方をデフォルト値で続ける")
+                   "(間隔が期限以上だと、待機が 1 回読むごとに期限で終了する)。両方をデフォルト値で続ける")
         for key in ("poll_minutes", "wait_minutes"):
             if key not in warned:
                 warnings.append(_note(key, message))

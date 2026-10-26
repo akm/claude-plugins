@@ -1,7 +1,7 @@
 """項目の状態の導出。管理のセッションがターンのたびに、Project の項目 (project.items の結果) とコメントと Issue の出来事から、
-割り当て中か・今の割り当ての PR・正常な終わり・reopen・宣言の段階・待っているもの・持っている資源を導く (計画の R24・KTD19)。
+割り当て中か・今の割り当ての PR・正常な完了・reopen・宣言の段階・待機の理由・持っている資源を導く (計画の R24・KTD19)。
 作業のセッションの確認 (`work check`・`work held`) も同じ導出の、自分の項目についての読み出し。
-状態ごとの出どころと場面ごとの扱いの正本は issue-dispatch/skills/issue-dispatch/references/flow.md。
+状態ごとの取得元と場面ごとの扱いの正本は issue-dispatch/skills/issue-dispatch/references/flow.md。
 
 このモジュールは gh を実行しない (項目は project.items、`PR の報告` の PR の状態は issues.observe_pr を呼び出し元が読んで渡す)。
 時刻は GraphQL の ISO 8601 (UTC、`Z`) の文字列のまま比べる。
@@ -14,9 +14,9 @@ from issue_dispatch import comments, declaration, ids, resources, sessions
 
 # 宣言の段階: 判定の要る最新の宣言への最新の判定の結果で決める
 STAGES = ("undecided", "go", "returned", "waiting")
-# 今の割り当ての PR の出どころ
+# 今の割り当ての PR の取得元
 PR_SOURCES = ("report", "reference")
-# 割り当ての終わりの種類
+# 割り当ての終了の種類
 END_KINDS = ("released", "normal")
 # 問題の種類 (導出を続けられるが、知らせるもの)
 PROBLEM_KINDS = ("pr-unreadable",)
@@ -28,7 +28,7 @@ _JSON_BLOCK_RE = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
 # --- コメント -----------------------------------------------------------------------
 
 def parsed_comments(item, login):
-    """項目のコメントのうち、先頭行がこの仕組みの形で、書き手がトークンのログインのものを、時刻の順に返す。
+    """項目のコメントのうち、先頭行がこの仕組みの形で、投稿者がトークンのログインのものを、時刻の順に返す。
     要素は project.items の comments の要素に header (parse_header の結果) と text (先頭行を除いた本文) を足したもの。"""
     out = []
     for c in sorted(item.get("comments") or [], key=lambda c: c.get("created_at") or ""):
@@ -138,18 +138,18 @@ def pr_ready(pr):
     return bool(pr) and (pr["merged"] or not pr["draft"])
 
 
-# --- 終わりと reopen -----------------------------------------------------------------
+# --- 終了と reopen -----------------------------------------------------------------
 
 def _events(item, kind):
     return [e for e in item.get("events") or [] if e.get("type") == kind]
 
 
 def assignment_end(item, cs, asg, pr):
-    """割り当ての終わり (KTD19 の表の行「割り当ての終わりと reopen」): 今の番号の `解放` か、正常な終わり。
-    正常な終わりは、Issue が閉じていて進行中でない (今の割り当ての PR が、読んだ時点で ready for review かマージ済み) こと。
+    """割り当ての終了 (KTD19 の表の行「割り当ての終わりと reopen」): 今の番号の `解放` か、正常な完了。
+    正常な完了は、Issue が閉じていて進行中でない (今の割り当ての PR が、読んだ時点で ready for review かマージ済み) こと。
     Issue が開いている (reopen された) ときは、今の割り当ての最新の `ClosedEvent` があり、その close の時点で PR が ready for review か
-    マージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な終わりと読む
-    (PR の timeline は読まないので、close の時点で draft だった PR が reopen の後に ready になった場合は見分けられない。flow.md)。
+    マージ済みだった (PR がマージ済み、または close より前に作られた PR が読んだ時点で draft でない) ことで正常な完了と読む
+    (PR の timeline は読まないので、close の時点で draft だった PR が reopen の後に ready になった場合は判別できない。flow.md)。
     返り値は {"kind": "released", "at", "reason"} / {"kind": "normal", "at": 最新の ClosedEvent の時刻} / None。"""
     rel = release(cs, asg)
     if rel:
@@ -166,7 +166,7 @@ def assignment_end(item, cs, asg, pr):
 
 
 def reopened_after(item, end):
-    """終わった後の `ReopenedEvent`。無ければ None。"""
+    """終了した後の `ReopenedEvent`。無ければ None。"""
     if not end:
         return None
     later = [e for e in _events(item, "ReopenedEvent") if end.get("at") is None or (e.get("at") or "") > end["at"]]
@@ -210,7 +210,7 @@ def declarations(cs, asg):
 
 
 def results_for(cs, asg, decl_id):
-    """宣言 (コメントの ID) への判定の結果: {"go": 最新の `開始可`, "waits": `待機` の配列 (投稿の順), "returned": 最新の `依頼` (宣言の書き直し)}。
+    """宣言 (コメントの ID) への判定の結果: {"go": 最新の `開始可`, "waits": `待機` の配列 (投稿の順), "returned": 最新の `依頼` (宣言の修正)}。
     要素は {"comment_id", "at"} (`待機` は "reasons" も)。"""
     out = {"go": None, "waits": [], "returned": None}
     for c in _for_assignment(cs, asg):
@@ -222,7 +222,7 @@ def results_for(cs, asg, decl_id):
             out["go"] = entry
         elif h["kind"] == "待機":
             out["waits"].append({**entry, "reasons": h["values"]["waits"]})
-        elif h["kind"] == "依頼" and h["values"].get("request_kind") == "宣言の書き直し":
+        elif h["kind"] == "依頼" and h["values"].get("request_kind") == "宣言の修正":
             out["returned"] = entry
     return out
 
@@ -232,11 +232,11 @@ def _blocking_reasons(reasons):
 
 
 def declaration_stage(item, cs, asg, project_number):
-    """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・戻り先・自分が足した blockedBy・
+    """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・Status の復帰先・自分が足した blockedBy・
     持っている資源・読めた宣言ごとの資源 (declared_resources: 投稿の順に comment_id・at・resources・returned (差し戻されたか)・go (`開始可` があるか)。
-    判定が、宣言に無い予約の解放と更新の前に持っていた資源を、コメントを読み直さずに求めるため)。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
-    差し戻された宣言を書き直した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、
-    `待機` → waiting、`依頼` (宣言の書き直し) → returned、無ければ undecided)。"""
+    判定が、宣言に無い予約の解放と更新の前に持っていた資源を、コメントを再度読み込まずに求めるため)。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
+    差し戻された宣言を修正した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、
+    `待機` → waiting、`依頼` (宣言の修正) → returned、無ければ undecided)。"""
     go_declaration, go_id, later, judged, prev_returned, declared = None, None, [], None, False, []
     for d in declarations(cs, asg):
         res = results_for(cs, asg, d["comment_id"])
@@ -286,7 +286,7 @@ def declaration_stage(item, cs, asg, project_number):
 # --- 資源の使用 ---------------------------------------------------------------------
 
 def labels_at(item, at):
-    """ある時点 (at) に付いていたラベル: その時点までの LabeledEvent・UnlabeledEvent を時刻の順に全部読んで求める (R24 の決まり (6))。"""
+    """ある時点 (at) に付いていたラベル: その時点までの LabeledEvent・UnlabeledEvent を時刻の順に全部読んで求める (R24 の規則 (6))。"""
     labels = set()
     for e in item.get("events") or []:
         if (e.get("at") or "") > at or not e.get("label"):
@@ -299,7 +299,7 @@ def labels_at(item, at):
 
 
 def resource_labels(labels):
-    """ラベルの名前の並びから資源の名前 (`resource:<名前>` の名前。ラベルの綴りのまま、名前の順) を取る。接頭辞は大文字小文字を区別しない
+    """ラベルの名前の配列から資源の名前 (`resource:<名前>` の名前。ラベルの表記のまま、名前の順) を取る。接頭辞は大文字小文字を区別しない
     (GitHub のラベルの名前は区別しないため。issues.add_label と同じ)。"""
     n = len(LABEL_PREFIX)
     return sorted(l[n:] for l in labels if isinstance(l, str) and l[:n].casefold() == LABEL_PREFIX and len(l) > n)
@@ -312,7 +312,7 @@ def reserved_resources(item, asg, attrs_table):
 
 def resource_usage(states):
     """資源の使用 (資源の名前 → 持つ項目のキーの配列。resources.judge_* の usage): 割り当て中の項目の予約した資源と持っている資源。
-    待っている宣言が新しく要る資源は `開始可` まで持たない (held は `開始可` の宣言から導くため)。"""
+    待機している宣言が新しく要る資源は `開始可` まで持たない (held は `開始可` の宣言から導くため)。"""
     usage = {}
     for s in states:
         if not s.get("assigned"):
@@ -331,7 +331,7 @@ ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "blocked-by-remove", 
 # 1 回だけ報告するもの (記録の reported で重複を除く)
 REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
                 "pr-base-not-default", "pr-left-open")
-# 利用者に尋ねること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の問いの表
+# 利用者に質問すること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の質問の表
 QUESTION_OPTIONS = {"close-in-progress": ["stop", "reopen"], "assignee-changed": ["release", "continue"], "field-cleared": ["release", "restore"],
                     "field-changed": ["release", "restore"], "removed": ["release", "keep"], "status-changed": ["release", "restore"],
                     "third-party-edit": ["stop", "continue"], "merged-issue-open": ["close", "keep"], "pr-closed-unmerged": ["release", "keep"],
@@ -366,16 +366,16 @@ def _report(item, kind, **values):
 
 def dependency_actions(item, state, login, project_number):
     """割り当ての無い項目の `Ready` ⇄ `Blocked` の再導出 (KTD7)。範囲は担当者が自分 1 人で、割り当て中でなく、Status が Ready か Blocked の項目。
-    開いている blocker があれば `依存の待ち` → `Blocked`、すべて閉じたら `依存の解消` → `Ready` (コメントが先)。`依存の待ち` の無い `Blocked` は
-    利用者が手で付けたものなので書き換えない。コメントの後に止まった書き込み (Status の変化がコメントより後に無い) は続きを書き (continuation)、
+    開いている blocker があれば `依存の待機` → `Blocked`、すべて閉じたら `依存の解消` → `Ready` (コメントが先)。`依存の待機` の無い `Blocked` は
+    利用者が手で付けたものなので書き換えない。コメントの後で中断された書き込み (Status の変化がコメントより後に無い) は残りの書き込みを行い (continuation)、
     コメントより後に Status の変化があれば利用者の変更として報告する。返り値は (actions, reports)。"""
     status = (item.get("status") or {}).get("name")
     if state.get("assigned") or not _in_scope(item, login) or status not in STATUS_OPTIONS_FOR_DEPENDENCY:
         return [], []
     open_blockers = sorted(b["key"] for b in item.get("blocked_by") or [] if b.get("state") == "OPEN")
-    deps = [c for c in parsed_comments(item, login) if c["header"]["role"] == "manager" and c["header"]["kind"] in ("依存の待ち", "依存の解消")]
+    deps = [c for c in parsed_comments(item, login) if c["header"]["role"] == "manager" and c["header"]["kind"] in ("依存の待機", "依存の解消")]
     latest = deps[-1] if deps else None
-    waiting = latest is not None and latest["header"]["kind"] == "依存の待ち"
+    waiting = latest is not None and latest["header"]["kind"] == "依存の待機"
     changed_after = bool(latest) and bool(_status_events_after(item, latest["created_at"], project_number))
     if status == "Ready":
         if not open_blockers:
@@ -385,7 +385,7 @@ def dependency_actions(item, state, login, project_number):
                 return [], [_report(item, "status-changed", status=status, after_comment=latest["database_id"])]
             return [_action_status(item, "Blocked", continuation=True)], []
         body = "開いている blocker: " + "、".join(open_blockers)
-        return [_action_comment(item, "依存の待ち", {"blockers": open_blockers}, body), _action_status(item, "Blocked")], []
+        return [_action_comment(item, "依存の待機", {"blockers": open_blockers}, body), _action_status(item, "Blocked")], []
     # Blocked
     if waiting:
         if open_blockers:
@@ -417,7 +417,7 @@ def _rec_item(rec, key):
 
 
 def _unanswered(rec, key):
-    """項目への未回答の問い (question_id 付き)。"""
+    """項目への未回答の質問 (question_id 付き)。"""
     return [dict(q, question_id=qid) for qid, q in sorted(((rec or {}).get("questions") or {}).items())
             if ids.same_issue(q.get("item"), key) and q.get("answered_at") is None]
 
@@ -459,7 +459,7 @@ def _handover_action(item, cs, rec, own_id, lost):
 
 def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_states, lost):
     """割り当てのある項目の場面ごとの扱い (flow.md の「場面ごとの扱い」)。返り値は (actions, questions, reports)。
-    未回答の問いがある項目には手を付けない (答えを待つ間の reopen による問いの取り下げを除く)。"""
+    未回答の質問がある項目には手を付けない (回答待ちの間の reopen による質問の撤回を除く)。"""
     actions, questions, reports = [], [], []
     cs = parsed_comments(item, login)
     asg = state["assignment"]
@@ -472,7 +472,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
     if pending and item.get("state") == "OPEN":
         close_q = [q for q in pending if q["kind"] == "close-in-progress"]
         if close_q and any((e.get("at") or "") > close_q[0]["asked_at"] for e in _events(item, "ReopenedEvent")):
-            # 答えを待つ間に reopen された: 問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す (R21)
+            # 回答待ちの間に reopen された: 質問を撤回し、フィールドは空にせず、Status を導いた状態に戻す (R21)
             actions.append({"kind": "withdraw-question", "item": key, "question_id": close_q[0]["question_id"]})
             restore = "Blocked" if "Blocked" in expected_statuses(state) else "In Progress"
             if status != restore:
@@ -508,7 +508,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                 actions.append({"kind": "set-field", "item": key, "item_id": item["item_id"], "field": FIELD_TITLE, "value": intent["session_title"], "continuation": True})
     expected = expected_statuses(state)
     d = state.get("declaration") or {}
-    restore = "Blocked" if "Blocked" in expected else "In Progress"  # 続きの Status は期待する Status から 1 つに決める
+    restore = "Blocked" if "Blocked" in expected else "In Progress"  # 残りの書き込みで書く Status は、期待する Status から 1 つに決める
     status_continued = False
     if item.get("state") == "OPEN" and status not in expected and not (status == "Blocked" and d.get("manager_blocked")):
         if status not in ASSIGNED_STATUSES:
@@ -517,7 +517,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
             else:
                 actions.append(_action_status(item, restore, continuation=True))
                 status_continued = True
-    # `待機` (Issue か 小さな PR) の続き: blockedBy と Blocked
+    # `待機` (Issue か 小さな PR) の残りの書き込み: blockedBy と Blocked
     if d.get("waiting_blockers") and d.get("wait") and not d.get("manager_blocked"):
         wait_at = d["wait"]["at"]
         present = {b["key"] for b in item.get("blocked_by") or []}
@@ -535,7 +535,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                     reports.append(_report(item, "status-changed", status=status, after_comment=d["wait"]["comment_id"]))
             else:
                 actions.append(_action_status(item, restore, continuation=True))
-    # 第三者の本文の編集 (確認の対象のリポジトリだけ。確かめた時刻より後のもの)
+    # 第三者の本文の編集 (確認の対象のリポジトリだけ。確認した時刻より後のもの)
     if any(item["repo"].casefold() == r.casefold() for r in (config or {}).get("third_party_edit_check") or []):
         confirmed = ri.get("body_edit_confirmed_at") or ""
         edits = [e for e in third_party_edits(item, asg, login) if (e["edited_at"] or "") > confirmed]
@@ -561,7 +561,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
                 questions.append(_question(item, "merged-issue-open", url=pr["url"]))
             elif pr["state"] == "CLOSED":
                 questions.append(_question(item, "pr-closed-unmerged", url=pr["url"]))
-    if lost and d.get("wait") and any(r.get("kind") == "利用者の答え" for r in d["wait"]["reasons"]):
+    if lost and d.get("wait") and any(r.get("kind") == "利用者の回答" for r in d["wait"]["reasons"]):
         questions.append(_question(item, "user-answer-lost", declaration=d["judged"]["comment_id"] if d.get("judged") else None, record_lost=True))
     return actions, questions, reports
 
@@ -570,7 +570,7 @@ def assigned_scenes(item, state, rec, login, own_id, project_number, config, pr_
 
 def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
     """スナップショットの差分のうち、記録の意図 (自分の部分書き込み) と組み込みワークフローの遷移と利用者が着手を決める遷移で説明できないものを
-    報告する (KTD7)。割り当て中の項目の Status とフィールドの変化は assigned_scenes が問いにするのでここでは扱わない。"""
+    報告する (KTD7)。割り当て中の項目の Status とフィールドの変化は assigned_scenes が質問にするのでここでは扱わない。"""
     reports = []
     for diff in diffs or []:
         key = diff.get("item")
@@ -612,7 +612,7 @@ def human_changes(diffs, items_by_key, states_by_key, rec, workflows):
 # --- ターン ---------------------------------------------------------------------------
 
 def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_states, diffs, workflows, config, present_keys=None):
-    """管理のセッションのターンで、項目の状態と、行うこと (actions)・尋ねること (questions)・1 回だけ報告するもの (reports)・答えを待つ項目 (pending) を導く。
+    """管理のセッションのターンで、項目の状態と、行うこと (actions)・質問すること (questions)・1 回だけ報告するもの (reports)・回答待ちの項目 (pending) を導く。
     書き込みはしない。rec は記録 (無ければ None)。diffs は observe diff の差分 (無ければ空)。workflows は Project のワークフローの名前 → 有効か。
     present_keys は Project の一覧にある項目のキーの全部 (items を絞って渡すときに、絞り込みで外れた項目を除去と読まないため。省略時は items のキー)。"""
     lost = record_lost(rec)
@@ -634,7 +634,7 @@ def derive_turn(items, rec, login, own_id, project_number, attrs_table, pr_state
         reports += r
         pending += [{"question_id": q["question_id"], "item": item["key"], "kind": q["kind"], "asked_at": q["asked_at"]} for q in _unanswered(rec, item["key"])]
     reports += human_changes(diffs, items_by_key, states_by_key, rec, workflows)
-    # 記録の意図にある項目が一覧に無い: Project から除かれた (割り当ての解除を尋ねる)
+    # 記録の意図にある項目が一覧に無い: Project から除かれた (割り当ての解除を質問する)
     present = list(present_keys) if present_keys is not None else list(items_by_key)
     for key, ri in sorted(((rec or {}).get("items") or {}).items()):
         if ri.get("intent") and not any(ids.same_issue(key, k) for k in present) and not any(q["kind"] == "removed" for q in _unanswered(rec, key)):
@@ -658,7 +658,7 @@ def _request_done(req, cs, asg, pr_states):
     v = req["header"]["values"]
     kind = v["request_kind"]
     later = _after(cs, req["created_at"])
-    if kind == "宣言の書き直し":
+    if kind == "宣言の修正":
         return any(c["header"]["role"] == "worker" and c["header"]["kind"] == "宣言の更新" for c in later)
     if kind == "本文の追記":
         got = pr_states.get(ids.parse_pr_url(v["pr"])["url"]) or {}
@@ -703,7 +703,7 @@ def work_check(item, session_id, login, pr_states):
 
 
 def work_held(items, session_id, login, pr_states, project_number):
-    """作業のセッションが持っている Issue (`work held`。R26): 自分宛ての今の割り当てで割り当て中 (閉じて利用者の答えを待つ Issue を含む) のものを
+    """作業のセッションが持っている Issue (`work held`。R26): 自分宛ての今の割り当てで割り当て中 (閉じて利用者の回答待ちの Issue を含む) のものを
     Project の順に。要素は key・state・status・判定の要る宣言の ID (judged) と更新の種類・それへの `開始可`・`待機` の有無・
     `Blocked` が管理のセッションのものか・まだ行っていない `依頼`。"""
     out = []

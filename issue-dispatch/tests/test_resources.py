@@ -53,7 +53,7 @@ class AttributesTest(unittest.TestCase):
         self.assertEqual(resources.attributes_of(table, "staging-db"), {"name": "staging-db", "capacity": 2, "reserve": "on_assign", "when_busy": "ask", "release_undeclared": "ask"})
         self.assertEqual(resources.attributes_of(table, "gpu")["reserve"], "on_declare")
         self.assertEqual(resources.attributes_of(table, "GPU")["reserve"], "on_declare", "名前は大文字小文字を区別しない")
-        self.assertEqual(resources.attributes_of(table, "GPU")["name"], "gpu", "設定に書かれた綴りを返す")
+        self.assertEqual(resources.attributes_of(table, "GPU")["name"], "gpu", "設定に書かれた表記を返す")
 
     def test_warns_unknown_and_bad_values(self):
         table, warnings = resources.attributes({"db": {"capacity": 0, "when_busy": "maybe", "color": "red", "reserve": 3}, "x": {"capacity": "2"}})
@@ -65,12 +65,12 @@ class AttributesTest(unittest.TestCase):
 
     def test_duplicate_names_differing_in_case(self):
         table, warnings = resources.attributes({"DB": {"capacity": 2}, "db": {"capacity": 3}})
-        self.assertEqual(resources.attributes_of(table, "db")["capacity"], 2, "綴りだけ違う 2 つ目は使わない")
+        self.assertEqual(resources.attributes_of(table, "db")["capacity"], 2, "表記だけ違う 2 つ目は使わない")
         self.assertEqual([w["key"] for w in warnings], ["resources.db"])
 
 
 class HeldResourcesTest(unittest.TestCase):
-    """持っている資源 (R20 の (1)) を宣言の並びから求める。"""
+    """持っている資源 (R20 の (1)) を宣言の配列から求める。"""
 
     def test_remove_only_update_releases(self):
         """{A, B} が開始可 → {A} (B を外すだけの更新) で B を解放し、持っている資源は {A}。"""
@@ -78,7 +78,7 @@ class HeldResourcesTest(unittest.TestCase):
         self.assertEqual(resources.held_from_history(history), ["A"])
 
     def test_swap_update_waits_then_holds(self):
-        """{A, B} が開始可 → {A, C} で、B はその時点で解放し、C を待つ間の持っている資源は {A}。C が空いて開始可を書くと {A, C}。"""
+        """{A, B} が開始可 → {A, C} で、B はその時点で解放し、C が空くまで待機する間の持っている資源は {A}。C が空いて開始可を書くと {A, C}。"""
         go1 = decl(["A", "B"])
         update = decl(["A", "C"])
         self.assertEqual(resources.held_from_history([{"declaration": go1, "go": True}, {"declaration": update, "go": False}]), ["A"])
@@ -95,7 +95,7 @@ class HeldResourcesTest(unittest.TestCase):
 
     def test_case_insensitive(self):
         history = [{"declaration": decl(["DB", "gpu"]), "go": True}, {"declaration": decl(["db"]), "go": False}]
-        self.assertEqual(resources.held_from_history(history), ["DB"], "名前は大文字小文字を区別せず、開始可の宣言の綴りで返す")
+        self.assertEqual(resources.held_from_history(history), ["DB"], "名前は大文字小文字を区別せず、開始可の宣言の表記で返す")
 
 
 class AssignTest(unittest.TestCase):
@@ -115,31 +115,31 @@ class AssignTest(unittest.TestCase):
         self.assertEqual(r["result"], "assign", "項目のキーは owner/repo の大文字小文字を区別しない")
 
     def test_reserve_on_declare_is_not_reserved_at_assign(self):
-        """Covers AE51. reserve が on_declare の資源は割り当てで予約せず、空きも待たない。"""
+        """Covers AE51. reserve が on_declare の資源は割り当てで予約せず、空きも待機しない。"""
         r = resources.judge_assign(I2, ["gpu"], {"gpu": [I1]}, attrs({"gpu": {"reserve": "on_declare"}}), {})
         self.assertEqual((r["result"], r["reserve"], r["busy"]), ("assign", [], []))
 
     def test_capacity(self):
-        """capacity が 2 の資源は 2 つ目の項目まで待たせない。"""
+        """capacity が 2 の資源は 2 つ目の項目まで待機させない。"""
         a = attrs({"db": {"capacity": 2}})
         self.assertEqual(resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {})["result"], "assign")
         self.assertEqual(resources.judge_assign(I3, ["db"], {"db": [I1, I2]}, a, {})["result"], "skip")
 
     def test_when_busy_ask(self):
-        """when_busy が ask なら利用者に尋ね、答えが待つなら候補から外して、解放されるまで尋ね直さない。"""
+        """when_busy が ask なら利用者に質問し、回答が wait なら候補から外して、解放されるまで質問し直さない。"""
         a = attrs({"db": {"when_busy": "ask"}})
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {})
         self.assertEqual((r["result"], r["ask"]), ("ask", ["db"]))
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {"db": "wait"})
         self.assertEqual((r["result"], r["ask"]), ("skip", []))
         r = resources.judge_assign(I2, ["db"], {"db": [I1]}, a, {"db": "proceed"})
-        self.assertEqual((r["result"], r["reserve"]), ("assign", ["db"]), "進めると答えたら割り当てて予約する")
+        self.assertEqual((r["result"], r["reserve"]), ("assign", ["db"]), "進めると回答したら割り当てて予約する")
         r = resources.judge_assign(I2, ["db"], {}, a, {"DB": "wait"})
-        self.assertEqual(r["result"], "assign", "空いていれば答えに依らず割り当てる (答えは解放で消える前提)")
+        self.assertEqual(r["result"], "assign", "空いていれば回答に依らず割り当てる (回答は解放で消える前提)")
 
     def test_case_insensitive_names(self):
         r = resources.judge_assign(I2, ["DB"], {"db": [I1]}, attrs({"Db": {"when_busy": "ask"}}), {})
-        self.assertEqual(r["result"], "ask", "ラベル・使用・設定の綴りが違っても同じ資源")
+        self.assertEqual(r["result"], "ask", "ラベル・使用・設定の表記が違っても同じ資源")
 
 
 class DeclareTest(unittest.TestCase):
@@ -147,7 +147,7 @@ class DeclareTest(unittest.TestCase):
 
     def test_free_resources_go_and_reserve(self):
         r = resources.judge_declare(I2, ["db", "gpu"], ["db"], {"db": [I2]}, attrs(), {}, {})
-        self.assertEqual((r["result"], r["reserve"], r["wait_for"], r["ask"]), ("go", ["gpu"], [], []), "予約していないものだけ空きを確かめて予約する")
+        self.assertEqual((r["result"], r["reserve"], r["wait_for"], r["ask"]), ("go", ["gpu"], [], []), "予約していないものだけ空きを確認して予約する")
 
     def test_busy_waits(self):
         """Covers AE26, AE50. 属性がデフォルト値のとき、資源を持つ項目が 1 つあれば着手の宣言では待機を返す。どれも予約しない。"""
@@ -159,31 +159,31 @@ class DeclareTest(unittest.TestCase):
         r = resources.judge_declare(I2, ["db"], [], {"db": [I1]}, a, {}, {})
         self.assertEqual((r["result"], r["ask"]), ("ask", ["db"]))
         r = resources.judge_declare(I2, ["db"], [], {"db": [I1]}, a, {"db": "wait"}, {})
-        self.assertEqual((r["result"], r["wait_for"]), ("wait", ["db"]), "利用者が待つと答えたら wait と同じ")
+        self.assertEqual((r["result"], r["wait_for"]), ("wait", ["db"]), "利用者が待機すると回答したら wait と同じ")
         r = resources.judge_declare(I2, ["db"], [], {"db": [I1]}, a, {"db": "proceed"}, {})
         self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
 
     def test_undeclared_default_ask(self):
-        """予約したのに宣言に無い資源には「利用者に尋ねる」を返す。答えを待つ間もほかの判定が済んでいれば開始可で、予約は残す。"""
+        """予約したのに宣言に無い資源には「利用者に質問する」を返す。回答待ちの間もほかの判定が済んでいれば開始可で、予約は残す。"""
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {})
         self.assertEqual((r["result"], r["ask_undeclared"], r["release"], r["keep"]), ("go", ["db"], [], ["db"]))
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "release"})
         self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", ["db"], [], []), "解放してよい")
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "keep"})
-        self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", [], ["db"], ["db"]), "解放してはいけないなら予約を残して書き直しを頼む")
+        self.assertEqual((r["result"], r["release"], r["keep"], r["request_rewrite"]), ("go", [], ["db"], ["db"]), "解放してはいけないなら予約を残して修正を頼む")
 
     def test_undeclared_release(self):
-        """Covers AE51. release_undeclared が release なら宣言に無い予約を尋ねずに解放する。"""
+        """Covers AE51. release_undeclared が release なら宣言に無い予約を質問せずに解放する。"""
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs({"db": {"release_undeclared": "release"}}), {}, {})
         self.assertEqual((r["result"], r["release"], r["ask_undeclared"]), ("go", ["db"], []))
 
     def test_duplicate_names_reserved_once(self):
-        """宣言に同じ資源が綴りだけ違えて 2 度あっても (parse を通らない呼び出し)、1 つとして扱う。"""
+        """宣言に同じ資源が表記だけ違えて 2 度あっても (parse を通らない呼び出し)、1 つとして扱う。"""
         r = resources.judge_declare(I2, ["db", "DB"], [], {}, attrs(), {}, {})
         self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
 
     def test_wait_does_not_hold_new_resources(self):
-        """待っている宣言は新しく要る資源を持たない (どれも予約しない)。"""
+        """待機している宣言は新しく要る資源を持たない (どれも予約しない)。"""
         r = resources.judge_declare(I2, ["db", "gpu"], [], {"db": [I1]}, attrs(), {}, {})
         self.assertEqual(r["reserve"], [])
 
@@ -199,7 +199,7 @@ class DeclareTest(unittest.TestCase):
 
 
 class UpdateTest(unittest.TestCase):
-    """契機「宣言の更新」。外した資源を解放し、足した資源は着手の宣言と同じに空きを確かめる。"""
+    """契機「宣言の更新」。外した資源を解放し、足した資源は着手の宣言と同じに空きを確認する。"""
 
     def test_removed_released_and_added_checked(self):
         r = resources.judge_update(I2, "resources-only", ["A", "B"], ["A", "C"], {"A": [I2], "B": [I2], "C": [I1]}, attrs(), {})
@@ -217,7 +217,7 @@ class UpdateTest(unittest.TestCase):
             resources.judge_update(I2, "unknown", ["A"], ["A"], {}, attrs(), {})
 
     def test_readd_checks_availability(self):
-        """前に外した資源を足し直したときも、足したとして空きを確かめる。"""
+        """前に外した資源を足し直したときも、足したとして空きを確認する。"""
         r = resources.judge_update(I2, "resources-only", ["A"], ["A", "B"], {"A": [I2], "B": [I3]}, attrs(), {})
         self.assertEqual((r["result"], r["wait_for"]), ("wait", ["B"]))
 
@@ -228,16 +228,16 @@ class CloseAndReleaseTest(unittest.TestCase):
         """Issue の close・割り当ての解除: その項目が持つ資源をすべて解放する。"""
         r = resources.judge_close(I2, {"db": [I1, I2], "gpu": [I2], "x": [I3]})
         self.assertEqual(r, {"release": ["db", "gpu"]})
-        self.assertEqual(resources.judge_close(I2, {"db": [I2.upper()]}), {"release": ["db"]}, "項目の綴りが違っても解放する")
+        self.assertEqual(resources.judge_close(I2, {"db": [I2.upper()]}), {"release": ["db"]}, "項目の表記が違っても解放する")
 
     def test_release_returns_waiting_in_post_order(self):
-        """資源の解放: その資源で待っていた宣言を、投稿の順 (同じなら Project の中の順) に返す。"""
+        """資源の解放: その資源で待機していた宣言を、投稿の順 (同じなら Project の中の順) に返す。"""
         waiting = [{"item": I3, "declaration": 30, "posted_at": "2026-10-23T01:00:00Z", "position": 1, "wait_for": ["db", "gpu"]},
                    {"item": I2, "declaration": 20, "posted_at": "2026-10-23T00:00:00Z", "position": 5, "wait_for": ["DB"]},
                    {"item": I1, "declaration": 10, "posted_at": "2026-10-23T00:00:00Z", "position": 2, "wait_for": ["gpu"]},
                    {"item": f"{REPO}#4", "declaration": 40, "posted_at": "2026-10-23T00:00:00Z", "position": 3, "wait_for": ["db"]}]
         r = resources.judge_release("db", waiting)
-        self.assertEqual([w["declaration"] for w in r["rejudge"]], [40, 20, 30], "投稿の順、同じなら Project の中の順。綴りは区別しない")
+        self.assertEqual([w["declaration"] for w in r["rejudge"]], [40, 20, 30], "投稿の順、同じなら Project の中の順。表記は区別しない")
 
 
 class CliTest(unittest.TestCase):
@@ -269,7 +269,7 @@ class CliTest(unittest.TestCase):
     def test_judge(self):
         body = {"item": I2, "resources": ["db"], "usage": {"db": [I1]}, "answers": {}}
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "assign", "--body", json.dumps(body))
-        self.assertEqual((code, out["status"], out["trigger"], out["result"], out["reserve"]), (0, "ok", "assign", "assign", ["db"]), "capacity 2 なので 2 つ目まで待たせない")
+        self.assertEqual((code, out["status"], out["trigger"], out["result"], out["reserve"]), (0, "ok", "assign", "assign", ["db"]), "capacity 2 なので 2 つ目まで待機させない")
         body = {"item": I2, "declared": ["db", "gpu"], "reserved": ["db"], "usage": {"db": [I2], "gpu": [I1]}, "answers": {}, "undeclared_answers": {}}
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "declare", "--body", json.dumps(body))
         self.assertEqual((out["result"], out["wait_for"]), ("wait", ["gpu"]))
@@ -291,7 +291,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(out["errors"][0]["key"], "body")
         code, out, _ = self.cli("resources", "judge", "--dir", self.root, "--trigger", "assign", "--body", json.dumps({"item": I2, "resources": "db", "usage": {}}))
         self.assertEqual(out["status"], "error")
-        # 入れ子の中身: usage の値が文字列・資源の名前が数値・答えが文字列でない・waiting の要素の形違い
+        # 入れ子の中身: usage の値が文字列・資源の名前が数値・回答が文字列でない・waiting の要素の形違い
         for trigger, body, key in (
                 ("assign", {"item": I2, "resources": ["db"], "usage": {"db": I1}}, "body.usage.db"),
                 ("assign", {"item": I2, "resources": [1], "usage": {}}, "body.resources"),

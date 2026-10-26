@@ -1,4 +1,4 @@
-"""Issue のコメント。先頭行 (書いたセッションの種類と識別子とコメントの種類と値。R6) の生成と解析、コメントの一覧 (書き手が
+"""Issue のコメント。先頭行 (書いたセッションの種類と識別子とコメントの種類と値。R6) の生成と解析、コメントの一覧 (投稿者が
 トークンのログインと違うものを除く)、投稿 (同じ出来事への同じコメントが既にあれば投稿しない。KTD2)、小さな PR の報告と依頼の
 対応づけ。様式の正本は issue-dispatch/skills/issue-dispatch/references/issue-format.md の「コメント」。
 
@@ -15,17 +15,17 @@ PREFIX = "issue-dispatch"
 SEP = " | "
 ROLES = {"manager": "管理のセッション", "worker": "作業のセッション"}
 _ROLE_OF = {v: k for k, v in ROLES.items()}
-MANAGER_KINDS = ("割り当て", "開始可", "待機", "解放", "引き継ぎ", "停滞", "依存の待ち", "依存の解消", "依頼")
+MANAGER_KINDS = ("割り当て", "開始可", "待機", "解放", "引き継ぎ", "停滞", "依存の待機", "依存の解消", "依頼")
 WORKER_KINDS = ("着手の宣言", "宣言の更新", "小さな PR の報告", "PR の報告")
 # 宛先 (対象) と割り当ての番号を持つ種類
 ADDRESSED_KINDS = ("割り当て", "開始可", "待機", "解放", "停滞", "依頼")
-REQUEST_KINDS = ("宣言の書き直し", "本文の追記", "小さな PR")
+REQUEST_KINDS = ("宣言の修正", "本文の追記", "小さな PR")
 RELEASE_REASONS = ("解除", "close", "ID の変更", "除去")
-WAIT_KINDS = ("利用者の答え", "Issue", "小さな PR", "資源", "設定")
+WAIT_KINDS = ("利用者の回答", "Issue", "小さな PR", "資源", "設定")
 # 先頭行の値の見出し語 (値は `<見出し語> <値>` の 1 区切り)。解析は右からこの語で始まる区切りを値として取る
-VALUE_WORDS = ("対象", "割り当て", "宣言", "種類", "待つ Issue", "待つ側の宣言", "前の PR", "PR", "理由", "値", "Issue")
+VALUE_WORDS = ("対象", "割り当て", "宣言", "種類", "待機する Issue", "待機する Issue の宣言", "前の PR", "PR", "理由", "値", "Issue")
 
-# 種類ごとに持つ値 (キー) と並び。waits と blockers は配列で、1 要素 1 区切り
+# 種類ごとに持つ値 (キー) と順序。waits と blockers は配列で、1 要素 1 区切り
 _SHAPE = {
     "割り当て": ("to", "assignment"),
     "開始可": ("to", "assignment", "declaration"),
@@ -34,16 +34,16 @@ _SHAPE = {
     "停滞": ("to", "assignment", "stuck_state"),
     "依頼": ("to", "assignment", "request_kind"),  # 種類ごとの値は _REQUEST_SHAPE
     "引き継ぎ": (),
-    "依存の待ち": ("blockers",),
+    "依存の待機": ("blockers",),
     "依存の解消": (),
     "着手の宣言": (),
     "宣言の更新": (),
     "小さな PR の報告": ("waiting_issue", "waiting_declaration", "previous_pr?"),
     "PR の報告": (),
 }
-_REQUEST_SHAPE = {"宣言の書き直し": ("declaration",), "本文の追記": ("pr",), "小さな PR": ("waiting_issue", "waiting_declaration", "previous_pr?")}
-_WORD_OF = {"to": "対象", "assignment": "割り当て", "declaration": "宣言", "request_kind": "種類", "waiting_issue": "待つ Issue",
-            "waiting_declaration": "待つ側の宣言", "previous_pr": "前の PR", "pr": "PR", "release_reason": "理由", "stuck_state": "値",
+_REQUEST_SHAPE = {"宣言の修正": ("declaration",), "本文の追記": ("pr",), "小さな PR": ("waiting_issue", "waiting_declaration", "previous_pr?")}
+_WORD_OF = {"to": "対象", "assignment": "割り当て", "declaration": "宣言", "request_kind": "種類", "waiting_issue": "待機する Issue",
+            "waiting_declaration": "待機する Issue の宣言", "previous_pr": "前の PR", "pr": "PR", "release_reason": "理由", "stuck_state": "値",
             "waits": "理由", "blockers": "Issue"}
 _ID_RE = re.compile(r"^[1-9][0-9]*$")
 
@@ -80,11 +80,11 @@ def _comment_id(value, what):
 
 def _wait(item):
     if not isinstance(item, dict) or item.get("kind") not in WAIT_KINDS:
-        raise ValueError(f"待つ理由は {', '.join(WAIT_KINDS)} のどれか: {item!r}")
+        raise ValueError(f"待機する理由は {', '.join(WAIT_KINDS)} のどれか: {item!r}")
     kind = item["kind"]
     out = {"kind": kind}
     if kind == "Issue":
-        out["issue"] = _issue_ref(item.get("issue"), "待つ Issue")
+        out["issue"] = _issue_ref(item.get("issue"), "完了待ちの Issue")
     elif kind == "小さな PR":
         out["issue"] = _issue_ref(item.get("issue"), "小さな PR の依頼先の Issue")
         if item.get("pr") is not None:
@@ -132,7 +132,7 @@ def normalize_values(kind, values):
         elif key == "request_kind":
             out[key] = v
         elif key == "waiting_issue":
-            out[key] = _issue_ref(v, "待つ Issue")
+            out[key] = _issue_ref(v, "待機する Issue")
         elif key in ("previous_pr", "pr"):
             out[key] = _pr_url(v, _WORD_OF[key])
         elif key == "release_reason":
@@ -146,7 +146,7 @@ def normalize_values(kind, values):
         elif key == "waits":
             out[key] = [_wait(w) for w in v]
         elif key == "blockers":
-            out[key] = [_issue_ref(b, "待つ Issue") for b in v]
+            out[key] = [_issue_ref(b, "完了待ちの Issue") for b in v]
     return out
 
 
@@ -192,17 +192,17 @@ def format_header(role, name, session_id, kind, values=None):
         raise ValueError(f"セッション ID が無いか、区切り文字か改行を含むか、種類の語と同じ: {session_id!r}")
     normalized = normalize_values(kind, values)
     line = SEP.join([PREFIX, ROLES[role], name.strip(), session_id.strip(), kind] + _value_fields(kind, normalized))
-    # 作った先頭行を読み戻して同じ内容になることを確かめる (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで止める
+    # 作った先頭行を読み戻して同じ内容になることを確認する (往復の一致)。項目ごとの検査で漏れた形 (`|` で終わる名前など) をここで拒否する
     expected = {"role": role, "name": name.strip(), "session_id": session_id.strip(), "kind": kind, "values": normalized}
     if parse_header(line) != expected:
-        raise ValueError(f"作った先頭行を同じ内容に読み戻せない (名前や値の形を確かめる): {line!r}")
+        raise ValueError(f"作った先頭行を同じ内容に読み戻せない (名前や値の形を確認する): {line!r}")
     return line
 
 
 # --- 先頭行の解析 ----------------------------------------------------------------
 
 def _split_value(field):
-    """区切り 1 つを (見出し語, 値) にする。見出し語で始まらなければ None。長い語 (`待つ Issue`) を先に試す。"""
+    """区切り 1 つを (見出し語, 値) にする。見出し語で始まらなければ None。長い語 (`待機する Issue`) を先に試す。"""
     for word in sorted(VALUE_WORDS, key=len, reverse=True):
         if field.startswith(word + " "):
             return word, field[len(word) + 1:]
@@ -210,7 +210,7 @@ def _split_value(field):
 
 
 def _parse_wait(text):
-    for kind in ("利用者の答え", "設定"):
+    for kind in ("利用者の回答", "設定"):
         if text == kind:
             return {"kind": kind}
     if text.startswith("Issue "):
@@ -224,12 +224,12 @@ def _parse_wait(text):
         return out
     if text.startswith("資源 "):
         return {"kind": "資源", "resource": text[len("資源 "):]}
-    raise ValueError(f"待つ理由の形ではない: {text!r}")
+    raise ValueError(f"待機する理由の形ではない: {text!r}")
 
 
 def parse_wait_reason(text):
-    """`理由 ` の後の文字列 (`利用者の答え` / `Issue <参照>` / `小さな PR <参照> [PR <URL>]` / `資源 <名前>` / `設定`) を
-    待つ理由の dict にする。CLI の --reason も同じ形。形が違えば ValueError。"""
+    """`理由 ` の後の文字列 (`利用者の回答` / `Issue <参照>` / `小さな PR <参照> [PR <URL>]` / `資源 <名前>` / `設定`) を
+    待機する理由の dict にする。CLI の --reason も同じ形。形が違えば ValueError。"""
     return _wait(_parse_wait(text.strip()))
 
 
@@ -266,7 +266,7 @@ def parse_header(line):
                 raw.setdefault("waits", []).append(_parse_wait(text))
             elif word == "理由" and kind == "解放":
                 raw["release_reason"] = text
-            elif word == "Issue" and kind == "依存の待ち":
+            elif word == "Issue" and kind == "依存の待機":
                 raw.setdefault("blockers", []).append(text)
             else:
                 key = next((k for k, w in _WORD_OF.items() if w == word and k not in ("waits", "blockers", "release_reason")), None)
@@ -301,7 +301,7 @@ def token_login():
 
 
 def list_comments(issue, login=None):
-    """Issue のコメントを時刻の順に全部読む。書き手がトークンのログイン (login。None なら `gh api user`) と違うコメントは除く
+    """Issue のコメントを時刻の順に全部読む。投稿者がトークンのログイン (login。None なら `gh api user`) と違うコメントは除く
     (R6。公開リポジトリでは第三者も書けるため)。返り値: {"status": "ok", "login", "comments": [{id, database_id, url,
     created_at, author, header (parse_header の結果か None), body (先頭行を除いた本文)}], "excluded" (除いた件数), "rate_limit"}
     か失敗の説明。"""
@@ -340,7 +340,7 @@ def list_comments(issue, login=None):
     return {"status": "ok", "login": login, "comments": out, "excluded": excluded, "rate_limit": rate_limit}
 
 
-# --- 既投稿の見分けと投稿 ---------------------------------------------------------
+# --- 既投稿の判別と投稿 ---------------------------------------------------------
 
 # 意味で比べる値: Issue の参照と PR の URL は owner/repo の大文字小文字を区別しない (GitHub が区別しないため)
 _REF_KEYS = ("waiting_issue", "issue", "blockers")
@@ -358,15 +358,15 @@ def _repo_folded(text):
     return text
 
 
-# 既投稿の見分けで書き手のセッション ID も比べる種類。管理のセッションの種類は値だけで見分ける (引き継がれて ID が変わっても
-# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で見分ける。
-# 作業のセッションの種類は既投稿を確かめない (下の already_posted と post)
+# 既投稿の判別で投稿者のセッション ID も比べる種類。管理のセッションの種類は値だけで判別する (引き継がれて ID が変わっても
+# 同じ出来事を二重に書かないため。KTD2)。`引き継ぎ` は新しい管理のセッションごとに 1 つ書くので ID で判別する。
+# 作業のセッションの種類は既投稿を確認しない (下の already_posted と post)
 ID_KEYED_KINDS = ("引き継ぎ",)
 
 
 def header_key(parsed):
-    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ書き手の
-    セッション ID も比べる。値は意味で比べる: 配列 (待つもの・待つ Issue) は並びを問わず、Issue の参照と PR の URL は
+    """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ投稿者の
+    セッション ID も比べる。値は意味で比べる: 配列 (待機の理由・完了待ちの Issue) は順序を問わず、Issue の参照と PR の URL は
     owner/repo の大文字小文字を区別しない。"""
     session_id = parsed["session_id"] if parsed["kind"] in ID_KEYED_KINDS else None
     return (parsed["role"], session_id, parsed["kind"], _freeze(parsed["values"]))
@@ -385,16 +385,16 @@ def _freeze(value, key=None):
 def already_posted(parsed, own_comments):
     """同じ出来事への同じコメントが既にあればそのコメント (list_comments の要素) を、無ければ None を返す (KTD2)。
     管理のセッションの種類だけが対象。作業のセッションの種類は、投稿が自分の手順の 1 歩ごとに 1 回で、同じ出来事をもう一度書く
-    場面が gh の失敗の後のやり直しだけなので確かめない (値を持つ `小さな PR の報告` も同じ。渡されたら ValueError)。
+    場面が gh の失敗の後のやり直しだけなので確認しない (値を持つ `小さな PR の報告` も同じ。渡されたら ValueError)。
 
-    own_comments は list_comments が返した、書き手が自分のコメントの配列 (時刻の順)。種類ごとの規則:
-    `待機` は同じ宣言への最新の `待機` とだけ比べる。`依存の待ち` は最新の `依存の待ち` と比べ、間に `依存の解消` があれば
-    投稿する。`依存の解消` は最新の `依存の待ち` より後のコメントとだけ比べる。`停滞` は同じ対象・割り当て・値なら、間に
+    own_comments は list_comments が返した、投稿者が自分のコメントの配列 (時刻の順)。種類ごとの規則:
+    `待機` は同じ宣言への最新の `待機` とだけ比べる。`依存の待機` は最新の `依存の待機` と比べ、間に `依存の解消` があれば
+    投稿する。`依存の解消` は最新の `依存の待機` より後のコメントとだけ比べる。`停滞` は同じ対象・割り当て・値なら、間に
     別のコメントがあっても既投稿。ほかの種類は、先頭行の鍵 (header_key) が同じコメントがあれば既投稿。
     """
     kind = parsed["kind"]
     if kind not in MANAGER_KINDS:
-        raise ValueError(f"既投稿を確かめるのは管理のセッションの種類だけ: {kind!r}")
+        raise ValueError(f"既投稿を確認するのは管理のセッションの種類だけ: {kind!r}")
     key = header_key(parsed)
     headed = [c for c in own_comments if c.get("header")]
     if kind == "待機":
@@ -402,10 +402,10 @@ def already_posted(parsed, own_comments):
                             and c["header"]["values"].get("declaration") == parsed["values"].get("declaration")]
         latest = same_declaration[-1] if same_declaration else None
         return latest if latest and header_key(latest["header"]) == key else None
-    if kind == "依存の待ち":
+    if kind == "依存の待機":
         latest_wait, resolved_after = None, False
         for c in headed:
-            if c["header"]["kind"] == "依存の待ち":
+            if c["header"]["kind"] == "依存の待機":
                 latest_wait, resolved_after = c, False
             elif c["header"]["kind"] == "依存の解消" and latest_wait is not None:
                 resolved_after = True
@@ -415,7 +415,7 @@ def already_posted(parsed, own_comments):
     if kind == "依存の解消":
         after_latest_wait = []
         for c in headed:
-            if c["header"]["kind"] == "依存の待ち":
+            if c["header"]["kind"] == "依存の待機":
                 after_latest_wait = []
             else:
                 after_latest_wait.append(c)
@@ -430,8 +430,8 @@ def already_posted(parsed, own_comments):
 
 def post(issue, role, name, session_id, kind, values, body, login=None):
     """コメントを投稿する。先頭行は format_header で作る。管理のセッションの種類は、同じ出来事への同じコメントが既にあれば
-    投稿しない (already_posted。一覧が読めなければ投稿しない — 既投稿かを確かめられないまま投稿すると二重になりうるため)。
-    作業のセッションの種類は確かめずに投稿する (やり直しでの二重の投稿は作業のセッションのスキルが扱う)。
+    投稿しない (already_posted。一覧が読めなければ投稿しない — 既投稿かを確認できないまま投稿すると二重になりうるため)。
+    作業のセッションの種類は確認せずに投稿する (やり直しでの二重の投稿は作業のセッションのスキルが扱う)。
     返り値: {"status": "ok", "posted": bool, "database_id", "url", "header"} か失敗の説明。"""
     try:
         line = format_header(role, name, session_id, kind, values)
@@ -444,7 +444,7 @@ def post(issue, role, name, session_id, kind, values, body, login=None):
         listed = list_comments(issue, login)
         if listed["status"] != "ok":
             return listed
-        existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確かめているので None にはならない
+        existing = already_posted(parse_header(line), listed["comments"])  # format_header が往復の一致を確認しているので None にはならない
         if existing is not None:
             return {"status": "ok", "posted": False, "database_id": existing["database_id"], "url": existing["url"], "header": line}
     r = gh.run(["issue", "comment", url, "--body-file", "-"], mutation=True, stdin=f"{line}\n\n{body or ''}")
@@ -458,7 +458,7 @@ def post(issue, role, name, session_id, kind, values, body, login=None):
 # --- 報告と依頼の対応づけ ---------------------------------------------------------
 
 def match_report(request, report):
-    """`小さな PR の報告` (report) が、種類 `小さな PR` の `依頼` (request) に答えたものか。先頭行の待つ Issue・待つ側の宣言・
+    """`小さな PR の報告` (report) が、種類 `小さな PR` の `依頼` (request) に回答したものか。先頭行の待機する Issue・待機する Issue の宣言・
     前の PR (あれば) が同じなら対応する。書いたセッションの名前と ID は比べない (名前は変わりうるため)。"""
     if not request or not report or request["kind"] != "依頼" or request["values"].get("request_kind") != "小さな PR":
         return False

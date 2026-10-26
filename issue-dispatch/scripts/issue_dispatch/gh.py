@@ -2,7 +2,7 @@
 呼ばず、`run` に引数の配列を渡す。
 
 `run` は、終了コード・標準出力・標準エラー出力の末尾・タイムアウトで打ち切ったか・失敗の種類 (`failure`) を返す。
-失敗の種類は標準エラー出力と標準出力の文言から分け、再試行や再開時刻までの待ちはしない。待つかどうかと終了コード
+失敗の種類は標準エラー出力と標準出力の文言から分け、再試行や再開時刻までの待機はしない。待機するかどうかと終了コード
 (KTD6 の 8・3・4) は呼び出し側 (待機のサブコマンドなど) が決める。
 
 テストは PATH の先頭に偽の `gh` (issue-dispatch/tests/fake-gh) のディレクトリを加えて差し替える。
@@ -15,7 +15,7 @@ import time
 
 DEFAULT_TIMEOUT = 60
 STDERR_TAIL_LINES = 20
-MUTATION_INTERVAL = 1.0  # 変更系の呼び出しの後に待つ秒数 (次の変更系の呼び出しと 1 秒以上空ける。KTD14)
+MUTATION_INTERVAL = 1.0  # 変更系の呼び出しの後に待機する秒数 (次の変更系の呼び出しと 1 秒以上空ける。KTD14)
 
 # 失敗の種類。None は成功。`missing` は gh が PATH に無いか実行権限が無い (入れる・権限を直すのが直し方)
 FAILURES = ("auth", "rate_limit", "network", "timeout", "missing", "other")
@@ -75,7 +75,7 @@ def _text(value):
 def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False, stdin=None):
     """`gh` を引数の配列で実行する。
 
-    mutation が真なら、gh が終わった後に MUTATION_INTERVAL 秒待ってから返る。次の変更系の呼び出しがこのプロセスでも
+    mutation が真なら、gh が終了した後に MUTATION_INTERVAL 秒待機してから返る。次の変更系の呼び出しがこのプロセスでも
     別のプロセス (CLI はサブコマンドごとに 1 プロセス) でも、1 秒以上空く (利用者と相談して決めた)。
     返り値: {"args", "exit_code" (タイムアウトと起動できなかったときは None), "stdout", "stderr_tail", "timed_out",
     "failure", "json" (標準出力が JSON として読めればその値、読めなければ None), "json_error" (expect_json が真で、

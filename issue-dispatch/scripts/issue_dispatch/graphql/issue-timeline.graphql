@@ -1,4 +1,4 @@
-# Issue のタイムラインの出来事の続きのページ (項目の一覧で 100 件を超えたときに読む)
+# Issue のタイムラインの出来事の残りのページ (項目の一覧で 100 件を超えたときに読む)
 query IssueTimeline($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {

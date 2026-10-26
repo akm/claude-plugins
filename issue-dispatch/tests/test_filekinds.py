@@ -73,7 +73,7 @@ class PatternTest(unittest.TestCase):
 
     @unittest.skipUnless(sys.version_info >= (3, 13), "PurePath.full_match は Python 3.13 から")
     def test_same_as_full_match(self):
-        """正本の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確かめる (末尾が `/` のパターンは拡張なので除く)。"""
+        """正本の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確認する (末尾が `/` のパターンは拡張なので除く)。"""
         from pathlib import PurePosixPath
         patterns = ("*.pb.go", "**/*.pb.go", "src/*.ts", "src/**.go", "**", "dist/**", "**/x", "a/**/b", "[ab].txt",
                     "[!ab].txt", "*.md", "a?.txt", "a**b", "foo**/bar", "a/**b", "**/**/a", "a[.txt")
@@ -135,7 +135,7 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(r["unit_notation"], {"notation": "json-key", "keys": ["dependencies"]})
         self.assertEqual(r["matched"]["pattern"], "**/package.json")
         r2 = filekinds.classify("app/package.json", rules[::-1], _DEFAULT)
-        self.assertEqual(r2["unit_notation"], "json-key", "並びを逆にすれば、先に書いた広い規則の属性になること")
+        self.assertEqual(r2["unit_notation"], "json-key", "順序を逆にすれば、先に書いた広い規則の属性になること")
 
     def test_unknown_content_when_nothing_matches(self):
         r = filekinds.classify("notes/x.unknownext", [], _DEFAULT)
@@ -273,7 +273,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         out = json.loads(p.stdout)["paths"]
         inputs = ["./src/a.ts", "src//a.ts", "src/a.ts/", "/abs/a.ts", "../x/a.ts"]
-        self.assertEqual([r["path"] for r in out], inputs, "要素は入力と同じ並びで、path は書いたままの値であること")
+        self.assertEqual([r["path"] for r in out], inputs, "要素は入力と同じ順序で、path は書いたままの値であること")
         for r in out[:3]:
             with self.subTest(path=r["path"]):
                 self.assertEqual(r["normalized"], "src/a.ts", "normalized はそろえた後の値であること")

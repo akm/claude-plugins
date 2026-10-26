@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """リポジトリの設定の読み方 (issue-dispatch/scripts/issue_dispatch/repo.py) と、CLI の `repo name` のテスト。
 
-git の振る舞いは一時ディレクトリに作ったリポジトリで確かめる。`gh` は使わない。`ssh -G` は偽の ssh
+git の動作は一時ディレクトリに作ったリポジトリで確認する。`gh` は使わない。`ssh -G` は偽の ssh
 (issue-dispatch/tests/fake-ssh) のディレクトリを PATH の先頭に加えて差し替える。
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-確かめ方・「読めない」の理由・URL の比べ方の正本は issue-dispatch/skills/issue-dispatch/references/repositories.md。
+確認の方法・「読めない」の理由・URL の比べ方の正本は issue-dispatch/skills/issue-dispatch/references/repositories.md。
 """
 
 import json
@@ -177,7 +177,7 @@ class ReadRepoConfigTest(unittest.TestCase):
         self.assertEqual(r["config"]["files"], [], "設定が無いリポジトリと同じデフォルト値")
 
     def test_unreadable_reasons_in_order(self):
-        """「読めない」の理由は、決めた順に確かめて最初に当たったものを返す。"""
+        """「読めない」の理由は、決めた順に確認して最初に当たったものを返す。"""
         r = self.read({})
         self.assertEqual((r["status"], r["reason"]), ("unreadable", "not-in-repositories"))
         self.assertIn("repositories", r["fix"])
@@ -226,7 +226,7 @@ class ReadRepoConfigTest(unittest.TestCase):
         self.assertEqual(self.read({"akm/verify-a": link})["status"], "ok", "シンボリックリンクを経たルートも読む")
         variant = os.path.join(self.root, "CLONE")
         if os.path.isdir(variant) and os.path.samefile(variant, self.clone):
-            self.assertEqual(self.read({"akm/verify-a": variant})["status"], "ok", "大文字と小文字だけ違う綴りも読む")
+            self.assertEqual(self.read({"akm/verify-a": variant})["status"], "ok", "大文字と小文字だけ違う表記も読む")
 
     def test_origin_url_forms_and_alias(self):
         for url in ("https://github.com/AKM/Verify-A.git", "ssh://git@github.com/akm/verify-a", "git@ssh.github.com:akm/verify-a.git"):

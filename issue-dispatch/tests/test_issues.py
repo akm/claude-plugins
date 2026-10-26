@@ -295,14 +295,14 @@ class AddLabelTest(FakeGhCase):
         self.assertEqual([c[:2] for c in self.recorded()], [["issue", "view"]])
 
     def test_label_names_compare_case_insensitively(self):
-        """GitHub はラベルの名前を大文字小文字を区別せずに一意にするので、綴りだけ違うラベルがあれば作らずにその綴りで足す。"""
+        """GitHub はラベルの名前を大文字小文字を区別せずに一意にするので、表記だけ違うラベルがあれば作らずにその表記で足す。"""
         self.responses([self.view_entry(["bug"]), {"prefix": ["label", "list"], "stdout": [{"name": "Resource:DB"}]},
                         {"prefix": ["issue", "edit"], "stdout": ISSUE3 + "\n"}])
         result = issues.add_label(ISSUE3, "resource:db")
         self.assertEqual((result["label"], result["label_created"], result["added"]), ("Resource:DB", False, True))
         calls = self.recorded()
         self.assertEqual([c[:2] for c in calls], [["issue", "view"], ["label", "list"], ["issue", "edit"]], "label create を実行しないこと")
-        self.assertEqual(calls[2][calls[2].index("--add-label") + 1], "Resource:DB", "既にある綴りで足すこと")
+        self.assertEqual(calls[2][calls[2].index("--add-label") + 1], "Resource:DB", "既にある表記で足すこと")
 
     def test_attached_label_compares_case_insensitively(self):
         self.responses([self.view_entry(["Resource:DB"])])

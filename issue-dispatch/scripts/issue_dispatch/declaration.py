@@ -172,7 +172,7 @@ def parse(obj, rules, default_table):
             if not isinstance(r, str) or not r.strip() or any(c.isspace() for c in r):
                 errors.append({"key": f"resources[{i}]", "message": f"資源の名前は空白を含まない文字列: {r!r}"})
             elif _resource_key(r) in seen_resources:
-                # 資源の名前は大文字小文字を区別しない (正本は resources.md) ので、綴りだけ違う重複も差し戻す
+                # 資源の名前は大文字小文字を区別しない (正本は resources.md) ので、表記だけ違う重複も差し戻す
                 errors.append({"key": f"resources[{i}]", "message": f"同じ資源 {r!r} が resources[{seen_resources[_resource_key(r)]}] にもある (名前は大文字小文字を区別しない。1 つにまとめる)"})
             else:
                 seen_resources[_resource_key(r)] = i
@@ -190,13 +190,13 @@ def _file_key(f):
 
 
 def same_files(a, b):
-    """2 つの宣言のファイルと節が同じか (並びは問わない)。"""
+    """2 つの宣言のファイルと節が同じか (順序は問わない)。"""
     return {_file_key(f) for f in a["files"]} == {_file_key(f) for f in b["files"]}
 
 
 def held_resources(go_declaration, later_updates):
     """持っている資源: 最後に `開始可` を書いた宣言の resources のうち、その後のどの宣言の更新にも残っているもの (集合。
-    `開始可` の宣言の綴り)。`開始可` の宣言がまだ無ければ空。差し戻された宣言は later_updates に入れない。"""
+    `開始可` の宣言の表記)。`開始可` の宣言がまだ無ければ空。差し戻された宣言は later_updates に入れない。"""
     if go_declaration is None:
         return set()
     held = list(go_declaration["resources"])
@@ -207,7 +207,7 @@ def held_resources(go_declaration, later_updates):
 
 
 def resource_changes(new_declaration, held):
-    """新しい宣言の資源と持っている資源の差: {"added": 足した資源 (新しい宣言の綴り), "removed": 外した資源 (held の綴り)}
+    """新しい宣言の資源と持っている資源の差: {"added": 足した資源 (新しい宣言の表記), "removed": 外した資源 (held の表記)}
     (名前の順。大文字小文字は区別しない)。"""
     held_keys = {_resource_key(r) for r in held}
     new_keys = {_resource_key(r) for r in new_declaration["resources"]}
@@ -267,7 +267,7 @@ def conflictability(mine, others):
     (要素に "id" を付けられる。比べる相手は既に `開始可` になった宣言)。
 
     相手の "declaration" が None なら解析できなかった相手 ("problems" に理由) で、自動では判定できないので needs-user にする
-    (過去に受理された宣言が、今のリポジトリの設定の規則では読めないときなど。相手 1 つのためにほかの判定を止めない)。
+    (過去に受理された宣言が、今のリポジトリの設定の規則では読めないときなど。相手 1 つのためにほかの判定を中断しない)。
 
     返り値: {"result": 全体の結論 (CONFLICT_RESULTS。conflict > needs-user > none), "others": [{"id", "repo", "result",
     "paths": [{"path", "result", "reason"}] (同じリポジトリの同じパスだけ), "problems" (解析できない相手の理由。無ければ空)}]}。

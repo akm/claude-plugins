@@ -1,18 +1,18 @@
 # ファイルの種類
 
-**このファイルが、ファイルの種類と、競合の可能性の判定の規則の正本。** パスから種類と属性を決めるモジュール `issue-dispatch/scripts/issue_dispatch/filekinds.py` と、同梱のデフォルトの表 `issue-dispatch/scripts/issue_dispatch/file-kinds.json` はこれに従う。リポジトリの設定の `files` の様式と、読み込むときにそろえる表記の正本は [project-config.md](project-config.md) で、ここでは言い直さない。ほかの文書は種類と属性の名前を参照するだけで、問いや判定の規則を言い直さない。
+**このファイルが、ファイルの種類と、競合の可能性の判定の規則の正本。** パスから種類と属性を決めるモジュール `issue-dispatch/scripts/issue_dispatch/filekinds.py` と、同梱のデフォルトの表 `issue-dispatch/scripts/issue_dispatch/file-kinds.json` はこれに従う。リポジトリの設定の `files` の様式と、読み込むときにそろえる表記の正本は [project-config.md](project-config.md) で、ここでは言い直さない。ほかの文書は種類と属性の名前を参照するだけで、質問や判定の規則を言い直さない。
 
 **種類は宣言に書かず、スクリプトがパスから決める。** 作業のセッションは宣言にパスと節の名前だけを書く ([issue-format.md](issue-format.md))。
 
-## 6 段の問いと種類
+## 6 段の判定の条件と種類
 
-種類は、パスについて次の問いに上から順に答え、最初に当てはまったものにする。1 つのパスが種類の違う複数の規則に一致すれば、この表で先の種類にする (下の「照合の順」)。
+種類は、パスに次の判定の条件を上から順に当てはめ、最初に当てはまったものにする。1 つのパスが種類の違う複数の規則に一致すれば、この表で先の種類にする (下の「照合の順」)。
 
-| 段 | 問い | 当てはまれば | 競合の可能性の判定 | 競合の可能性があるときに示す扱い |
+| 段 | 判定の条件 | 当てはまれば | 競合の可能性の判定 | 競合の可能性があるときに示す扱い |
 | --- | --- | --- | --- | --- |
-| 1 | 内容を知らない (パスに一致するパターンが、リポジトリの設定にもデフォルトの表にも無い) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に尋ねる | — |
+| 1 | 内容を知らない (パスに一致するパターンが、リポジトリの設定にもデフォルトの表にも無い) | `unknown-content` | 同じパスなら、競合しうるかどうかを利用者に質問する | — |
 | 2 | ツールが生成する | `generated` | 判定しない | — |
-| 3 | 構造を知らない | `unknown-structure` | 同じパスなら競合しうる | 待つ・共通の変更を先に小さな PR にする・競合しうるまま進める、の 3 つ |
+| 3 | 構造を知らない | `unknown-structure` | 同じパスなら競合しうる | 待機する・共通の変更を先に小さな PR にする・競合しうるまま進める、の 3 つ |
 | 4 | 分割できない | `indivisible` | 節で判定する (下) | 同上 |
 | 5 | 分割すると意味が変わる可能性がある | `unstable` | 節で判定する | 同上。共通の変更を先にする小さな PR で、分けるリファクタリングも行える (意味が変わりうる点を添える) |
 | 6 | (上のどれでもない) | `divisible` | 節で判定する | 同上。共通の変更を先にする小さな PR で、分けるリファクタリングも行える |
@@ -86,7 +86,7 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 ## マージできないファイル (`mergeable`)
 
-画像など、差分でマージできないファイルは、規則に `"mergeable": false` を書く (省略は真)。そのファイルで「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて尋ねる。
+画像など、差分でマージできないファイルは、規則に `"mergeable": false` を書く (省略は真)。そのファイルで「競合しうるまま進める」を選ぼうとしたら、後で衝突を直せないことを添えて質問する。
 
 ## 共有の状態を持つファイル
 
@@ -96,11 +96,11 @@ Python 3.13 の `PurePath.full_match` と同じ規則で、`.gitignore` や `.gi
 
 表そのものの正本は `file-kinds.json` で、ここでは行を言い直さない。行は、パターンと種類と、この文書の各節の属性 (`unit_notation`・`split_reference`・`mergeable`) を持ち、`filekinds` は設定の規則と同じ規則で照合する。各行を選んだ理由は次のとおり。
 
-- **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成の印を名前に持つ Go のファイル (`**/*_generated.go` と、Kubernetes の controller-gen が生成する `**/zz_generated.*.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/npm-shrinkwrap.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
+- **`generated`** — ツールが書き、人が編集しないもの: Protocol Buffers の出力 (`**/*.pb.go`)、生成されたことを示す語 (`generated`) を名前に持つ Go のファイル (`**/*_generated.go` と、Kubernetes の controller-gen が生成する `**/zz_generated.*.go`)、パッケージマネージャのロックファイル (`**/package-lock.json`・`**/npm-shrinkwrap.json`・`**/yarn.lock`・`**/pnpm-lock.yaml`・`**/go.sum`・`**/Cargo.lock`)、縮小した JavaScript と CSS (`**/*.min.js`・`**/*.min.css`)、Terraform の状態 (`**/terraform.tfstate*`。共有の状態は上のとおり資源でも扱う)。
 - **`unknown-structure`** — 中身を読んで節を決められないもの: Excel のブック (`**/*.xlsx`)。
-- **`indivisible` で `mergeable` が偽** — 画像とフォントとバイナリの文書 (`**/*.png`・`**/*.jpg`・`**/*.jpeg`・`**/*.gif`・`**/*.svg`・`**/*.ico`・`**/*.pdf`・`**/*.woff`・`**/*.woff2`)。分けられず、差分でマージできない。SVG はテキストだが、描画ツールが全体を書き直すので画像と同じに扱う。
+- **`indivisible` で `mergeable` が偽** — 画像とフォントとバイナリの文書 (`**/*.png`・`**/*.jpg`・`**/*.jpeg`・`**/*.gif`・`**/*.svg`・`**/*.ico`・`**/*.pdf`・`**/*.woff`・`**/*.woff2`)。分けられず、差分でマージできない。SVG はテキストだが、描画ツールが全体を上書きするので画像と同じに扱う。
 - **`unstable`** — 分けると適用の順や意味が変わりうるもの: マイグレーション (`**/migrations/**`) と SQL (`**/*.sql`) は実行の順に意味があり、Protocol Buffers の定義 (`**/*.proto`) はフィールド番号の割り当てに意味がある。参照のされ方は `file`。
 - **`divisible` で節の表記があるもの** — `**/package.json` (`json-key`。`dependencies` と `devDependencies` の下を依存ごとの節にする。広い `**/*.json` より前に置く)、`**/*.json` (`json-key`)、`**/go.mod` (`go-mod-directive`。参照のされ方は `directory`)、`**/*.md` (`markdown-heading`)、`**/Makefile` (`make-target`)、`**/*.toml` (`toml-table`)、`**/*.yaml`・`**/*.yml` (`yaml-key`)、`**/Dockerfile` (`dockerfile-stage`)、`**/*.tf` (`terraform-block`。参照のされ方は `directory`)。
 - **`divisible` で節の表記の無いもの** — 自前で書くソースコード: `**/*.go` (参照のされ方は `directory`)、`**/*.ts`・`**/*.tsx`・`**/*.js`・`**/*.py`・`**/*.rb`・`**/*.css` (参照のされ方は `file`)。節の表記を決めていないので、宣言に `units` は書けない。
 
-リポジトリで扱いが違うもの (生成した `.js`・`.gitattributes` で `linguist-generated` にしたディレクトリなど) は、リポジトリの設定の `files` に書く。`generated` の行に名前で一致しない生成ファイルは、どの規則に一致しても (ビルドした `bundle.css` が `**/*.css` に、生成した Go のファイルが `**/*.go` に、など) その規則の種類 (`divisible` など) になり、利用者に尋ねない。そのリポジトリで生成されるものは、設定の `files` に `generated` の規則を書く。候補はスキル `repo-preflight` が示す。
+リポジトリで扱いが違うもの (生成した `.js`・`.gitattributes` で `linguist-generated` にしたディレクトリなど) は、リポジトリの設定の `files` に書く。`generated` の行に名前で一致しない生成ファイルは、どの規則に一致しても (ビルドした `bundle.css` が `**/*.css` に、生成した Go のファイルが `**/*.go` に、など) その規則の種類 (`divisible` など) になり、利用者に質問しない。そのリポジトリで生成されるものは、設定の `files` に `generated` の規則を書く。候補はスキル `repo-preflight` が示す。

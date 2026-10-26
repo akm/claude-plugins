@@ -2,7 +2,7 @@
 ブランチ (`origin/HEAD`) の内容のリポジトリの設定を git で読む。`origin` の URL から host と `owner/name` を取り出して、
 設定のリポジトリと合うかを比べる (作業のセッションの CLI `repo name` も同じ関数を使う。KTD9)。
 
-確かめ方・「読めない」の理由の一覧と直し方・URL の形と比べ方の正本は
+確認の方法・「読めない」の理由の一覧と直し方・URL の形と比べ方の正本は
 issue-dispatch/skills/issue-dispatch/references/repositories.md。
 
 git は読むだけで、fetch も書き込みもしない。`gh` は使わない。設定の内容の解釈は config.load_text (U2 の規則)。
@@ -17,7 +17,7 @@ from issue_dispatch import config
 GITHUB_HOST = "github.com"
 GITHUB_HOST_ALIASES = ("github.com", "ssh.github.com")  # GitHub が案内する SSH の接続先 (ポート 443) も同じ host とみなす
 
-# 「読めない」の理由。確かめる順に並べる (read_repo_config の順)
+# 「読めない」の理由。確認する順に並べる (read_repo_config の順)
 REASONS = ("not-in-repositories", "directory-missing", "not-git", "not-clone-root", "no-origin", "origin-mismatch",
            "no-origin-head", "git-failed", "config-unreadable")
 
@@ -34,7 +34,7 @@ def run_git(path, *args):
     """`git -C <path> <args>` を実行し、(終了コード, 標準出力 (末尾の改行を除く), 標準エラー出力) を返す。
 
     出力はバイト列で受け、UTF-8 として読む。読めないバイトは surrogateescape で文字列に残す (ロケールの文字コードに
-    依らず、落ちない)。設定ファイルの中身のように厳密に UTF-8 であるべきものは、呼び出し側が確かめる。
+    依らず、落ちない)。設定ファイルの中身のように厳密に UTF-8 であるべきものは、呼び出し側が確認する。
     """
     try:
         p = subprocess.run(["git", "-C", path, *args], capture_output=True, env=_clean_env())
@@ -123,7 +123,7 @@ def _unreadable(reason, message, fix=None, root_hint=None, path=None):
 
 
 def check_clone_root(path, repo):
-    """パスが、設定のリポジトリの clone のルートで、既定のブランチの参照を持つかを確かめる。
+    """パスが、設定のリポジトリの clone のルートで、既定のブランチの参照を持つかを確認する。
     問題があれば「読めない」の結果 (理由は REASONS の順で最初に当たったもの)、無ければ None。"""
     if not os.path.isdir(path):
         return _unreadable("directory-missing", f"ディレクトリ {path} が無い",

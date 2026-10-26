@@ -1,10 +1,10 @@
 """記録 (管理のセッションが持つ、GitHub から導けないもの) の読み書き。
 
-置き場は `<管理ディレクトリ>/<record_dir>/<owner>-<number>/` で、本体 `record.json` と追記専用の `actions.log` を扱う
-(`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。置き場・キー・扱いの正本は
+ディレクトリは `<管理ディレクトリ>/<record_dir>/<owner>-<number>/` で、本体 `record.json` と追記専用の `actions.log` を扱う
+(`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。ディレクトリ・キー・扱いの正本は
 issue-dispatch/skills/issue-dispatch/references/records.md。
 
-記録は蓄積データなので、壊れていれば `Corrupt` で止めて新規として扱わない (無いときだけ新規)。保存は一時ファイルに
+記録は蓄積データなので、壊れていれば `Corrupt` で中断し、新規として扱わない (無いときだけ新規)。保存は一時ファイルに
 書いて `os.replace` で置き換える (先例 pr-teeth/scripts/prteeth/store.py の `load_precious`・`_save_atomic`)。
 更新は操作の配列 (`apply`) で受け、1 つでも誤りがあれば何も適用しない。
 呼び出し元: CLI issue-dispatch/scripts/issue_dispatch.py の `record read` / `record apply` / `record log`。
@@ -23,7 +23,7 @@ MANAGER_STATES = ("active", "stopped", "ended")
 ACTION_KEYS = ("at", "kind", "target", "before", "after", "reason")
 RESEND_LIMIT = 1  # 再送は項目ごとに通算この回数まで (R24)。再送したら count_resend で数え、回数が達していれば再送しない
 
-# リポジトリの名前の形は config.REPO_NAME_PATTERN と同じ (このモジュールは config を import しないので写す。テストで一致を確かめる)
+# リポジトリの名前の形は config.REPO_NAME_PATTERN と同じ (このモジュールは config を import しないので写す。テストで一致を確認する)
 REPO_NAME_PATTERN = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"
 _ITEM_RE = re.compile(rf"^{REPO_NAME_PATTERN}#[1-9][0-9]*$")
 _REPO_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
@@ -46,7 +46,7 @@ def project_key(project):
 
 
 def record_dir(manager_root, record_dir_setting, project):
-    """記録の置き場 `<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。"""
+    """記録のディレクトリ `<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。"""
     owner, number = project_key(project).split("/")
     return os.path.join(manager_root, record_dir_setting, f"{owner}-{number}")
 
@@ -169,7 +169,7 @@ def _item(rec, item):
     })
 
 
-# 省略できるキー (null でもよい)。それ以外のキーは、無い・null を「欠けている」として差し戻す (R31)
+# 省略できるキー (null でもよい)。それ以外のキーは、無い・null を「欠損している」として差し戻す (R31)
 OPTIONAL_KEYS = {"set_manager_state": ("stop_reason",), "set_opt_in": ("answer",), "ask": ("subject",)}
 
 
@@ -312,10 +312,10 @@ def _op_set_opt_in(rec, op):
 
 def _op_ask(rec, op):
     if op["question_id"] in rec["questions"]:
-        return f"問い {op['question_id']} は既にある (答えを消さないため、同じ ID で立て直せない)"
+        return f"質問 {op['question_id']} は既にある (回答を消さないため、同じ ID で立て直せない)"
     options = op["options"]
     if not all(isinstance(o, str) and o != "" for o in options):
-        return "options の要素は空でない文字列 (答えと同じ型で照合するため)"
+        return "options の要素は空でない文字列 (回答と同じ型で照合するため)"
     if len(set(options)) != len(options):
         return "options に同じ要素が 2 つ以上ある"
     subject = op.get("subject")
@@ -328,20 +328,20 @@ def _op_ask(rec, op):
 def _op_answer(rec, op):
     q = rec["questions"].get(op["question_id"])
     if q is None:
-        return f"問い {op['question_id']} が無い"
+        return f"質問 {op['question_id']} が無い"
     if q["options"] and op["answer"] not in q["options"]:
-        return f"答え {op['answer']!r} は選択肢 {q['options']} に無い"
+        return f"回答 {op['answer']!r} は選択肢 {q['options']} に無い"
     q["answer"] = op["answer"]
     q["answered_at"] = op["at"]
 
 
 def _op_withdraw(rec, op):
-    """問いを取り下げる (答えを待つ理由が無くなった。R21 の reopen)。答えは None のまま answered_at を書くので、未回答には数えない。"""
+    """質問を撤回する (回答待ちの理由が無くなった。R21 の reopen)。回答は None のまま answered_at を書くので、未回答には数えない。"""
     q = rec["questions"].get(op["question_id"])
     if q is None:
-        return f"問い {op['question_id']} が無い"
+        return f"質問 {op['question_id']} が無い"
     if q.get("answered_at") is not None:
-        return f"問い {op['question_id']} は答えがある (取り下げられない)"
+        return f"質問 {op['question_id']} は回答がある (撤回できない)"
     q["answer"] = None
     q["answered_at"] = op["at"]
 
@@ -404,7 +404,7 @@ def apply(rec, operations):
 # ----- 読み取りの補助 -----
 
 def items_without_notified(rec):
-    """割り当ての意図があって印 notified が無い項目 (再入で合図を送り直す候補)。"""
+    """割り当ての意図があってフラグ notified が無い項目 (再入で合図を送り直す候補)。"""
     return sorted(k for k, it in rec["items"].items() if it.get("intent") and it.get("notified_at") is None)
 
 
@@ -417,7 +417,7 @@ def intent_matches(rec, item, values):
 
 
 def can_resend(rec, item):
-    """再送の回数が上限 (RESEND_LIMIT) に達していなければ真。呼ぶ順は、確かめる → 再送する → count_resend で数える。
+    """再送の回数が上限 (RESEND_LIMIT) に達していなければ真。呼ぶ順は、確認する → 再送する → count_resend で数える。
     上限が 1 なら、1 回再送した後は偽になる (通算 1 回。R24)。"""
     return rec["items"].get(item, {}).get("resend_count", 0) < RESEND_LIMIT
 

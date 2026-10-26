@@ -5,7 +5,7 @@
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-記録の置き場・キー・扱いの正本は issue-dispatch/skills/issue-dispatch/references/records.md。
+記録のディレクトリ・キー・扱いの正本は issue-dispatch/skills/issue-dispatch/references/records.md。
 """
 
 import json
@@ -56,7 +56,7 @@ class LoadSaveTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.dir, record.RECORD_FILE)), "読むだけでは作らないこと")
 
     def test_corrupt_records_stop(self):
-        """Covers AE10. 壊れた記録は Corrupt で止め、新規として扱わない。"""
+        """Covers AE10. 壊れた記録は Corrupt で中断し、新規として扱わない。"""
         cases = {
             "not json": "{",
             "top level not object": "[]",
@@ -72,7 +72,7 @@ class LoadSaveTest(unittest.TestCase):
                 self.assertIn(record.RECORD_FILE, str(cm.exception))
 
     def test_unreadable_bytes_and_broken_elements_are_corrupt(self):
-        """読めないバイト列と、要素の形の崩れも Corrupt で止める (ok として読んで後の操作で落ちない)。"""
+        """読めないバイト列と、要素の形の崩れも Corrupt で中断する (ok として読んで後の操作で落ちない)。"""
         base = {"project": PROJECT, "manager": None, "sessions": {}, "items": {}, "questions": {}}
         cases = {
             "manager is a string": dict(base, manager="x"),
@@ -102,7 +102,7 @@ class LoadSaveTest(unittest.TestCase):
             record.load(self.dir, PROJECT)
 
     def test_saved_records_reload(self):
-        """apply で作った記録は、保存して読み直せる (要素の形の検査が自分の書いたものを壊れていると見ないこと)。"""
+        """apply で作った記録は、保存して再度読み込める (要素の形の検査が自分の書いたものを壊れていると見ないこと)。"""
         rec, errors = record.apply(record.new_record(PROJECT), [
             {"op": "set_manager", "id": "m1", "name": "n", "started_at": T1},
             {"op": "set_session", "id": "s1", "name": "w", "repo": "akm/r", "worktree": "/w"},
@@ -151,7 +151,7 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(json.dumps(rec), before, "1 つでも誤りがあれば何も適用しないこと")
 
     def test_intent_and_notified(self):
-        """Covers AE9. 意図があって notified が無い項目は列挙され、同じ印を 2 度付けても時刻は最初のまま。"""
+        """Covers AE9. 意図があって notified が無い項目は列挙され、同じフラグを 2 度付けても時刻は最初のまま。"""
         self.apply({"op": "set_intent", "item": "akm/r#12", "session_id": "s1", "session_title": "worker", "status": "In Progress",
                     "assignment": 1, "at": T1})
         self.assertEqual(record.items_without_notified(self.rec), ["akm/r#12"])
@@ -165,7 +165,7 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(record.items_without_notified(self.rec), [])
         self.apply({"op": "clear_intent", "item": "akm/r#12"})
         self.assertIsNone(self.rec["items"]["akm/r#12"]["intent"])
-        self.assertIsNone(self.rec["items"]["akm/r#12"]["notified_at"], "意図を消せば印も消える")
+        self.assertIsNone(self.rec["items"]["akm/r#12"]["notified_at"], "意図を消せばフラグも消える")
 
     def test_resend_count(self):
         self.apply({"op": "set_intent", "item": "akm/r#12", "session_id": "s1", "session_title": "w", "status": "In Progress",
@@ -179,7 +179,7 @@ class ApplyTest(unittest.TestCase):
         while record.can_resend(rec, "akm/r#12"):
             resends += 1
             rec, _ = record.apply(rec, [{"op": "count_resend", "item": "akm/r#12"}])
-        self.assertEqual(resends, 0, "確かめる → 再送 → 数える の順で使っても通算 1 回を超えないこと")
+        self.assertEqual(resends, 0, "確認する → 再送 → 数える の順で使っても通算 1 回を超えないこと")
 
     def test_manager_and_exchanges(self):
         self.apply({"op": "set_manager", "id": "m1", "name": "issue-dispatch akm/3/akm", "started_at": T1})
@@ -214,7 +214,7 @@ class ApplyTest(unittest.TestCase):
     def test_reported_marks_choice_and_body_edit(self):
         self.apply({"op": "mark_reported", "item": "akm/r#5", "kind": "human_change", "at": T1},
                    {"op": "mark_reported", "item": "akm/r#5", "kind": "human_change", "at": T2})
-        self.assertEqual(self.rec["items"]["akm/r#5"]["reported"], {"human_change": T1}, "報告済みの印は最初の時刻のまま")
+        self.assertEqual(self.rec["items"]["akm/r#5"]["reported"], {"human_change": T1}, "報告済みのフラグは最初の時刻のまま")
         self.assertTrue(record.is_reported(self.rec, "akm/r#5", "human_change"))
         self.assertFalse(record.is_reported(self.rec, "akm/r#5", "not_assigned"))
         self.apply({"op": "set_conflict_choice", "item": "akm/r#5", "choice": "proceed"},
@@ -234,23 +234,23 @@ class ApplyTest(unittest.TestCase):
         self.apply({"op": "ask", "question_id": "q1", "item": "akm/r#5", "kind": "conflict", "options": ["wait", "small-pr", "proceed"], "at": T1})
         self.assertEqual([q["question_id"] for q in record.unanswered_questions(self.rec)], ["q1"])
         _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q1", "answer": "later", "at": T2}])
-        self.assertEqual(len(errors), 1, "選択肢に無い答えは受け付けない")
+        self.assertEqual(len(errors), 1, "選択肢に無い回答は受け付けない")
         self.apply({"op": "answer", "question_id": "q1", "answer": "proceed", "at": T2})
         self.assertEqual(record.unanswered_questions(self.rec), [])
         self.assertEqual(self.rec["questions"]["q1"]["answered_at"], T2)
         _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q9", "answer": "x", "at": T2}])
-        self.assertEqual(len(errors), 1, "無い問いには答えられない")
+        self.assertEqual(len(errors), 1, "無い質問には回答できない")
         _, errors = record.apply(self.rec, [{"op": "ask", "question_id": "q1", "item": "akm/r#5", "kind": "conflict", "options": ["wait"], "at": T3}])
-        self.assertEqual(len(errors), 1, "同じ ID の問いを立て直せない (答えが消えるため)")
+        self.assertEqual(len(errors), 1, "同じ ID の質問を立て直せない (回答が消えるため)")
         self.assertEqual(self.rec["questions"]["q1"]["answer"], "proceed")
 
     def test_withdraw_question(self):
-        """取り下げた問いは未回答に数えず、答えは null のまま。答えのある問いは取り下げられない。"""
+        """撤回した質問は未回答に数えず、回答は null のまま。回答のある質問は撤回できない。"""
         self.apply({"op": "ask", "question_id": "q2", "item": "akm/r#6", "kind": "close-in-progress", "options": ["stop", "reopen"], "at": T1})
         self.apply({"op": "withdraw", "question_id": "q2", "at": T2})
         self.assertEqual((record.unanswered_questions(self.rec), self.rec["questions"]["q2"]["answer"], self.rec["questions"]["q2"]["answered_at"]), ([], None, T2))
         _, errors = record.apply(self.rec, [{"op": "withdraw", "question_id": "q1", "at": T3}])
-        self.assertEqual(len(errors), 1, "答えのある問いは取り下げられない")
+        self.assertEqual(len(errors), 1, "回答のある質問は撤回できない")
 
     def test_null_and_out_of_range_values_are_rejected(self):
         """必須のキーの null・bool や 0 の assignment・null や空の answer は、例外ではなく誤りとして差し戻す。"""
@@ -272,12 +272,12 @@ class ApplyTest(unittest.TestCase):
         for answer in (None, "", 1):
             with self.subTest(answer=answer):
                 _, errors = record.apply(self.rec, [{"op": "answer", "question_id": "q1", "answer": answer, "at": T2}])
-                self.assertEqual(len(errors), 1, "答えは空でない文字列に限ること")
+                self.assertEqual(len(errors), 1, "回答は空でない文字列に限ること")
         self.apply({"op": "answer", "question_id": "q1", "answer": "free text", "at": T2})
         self.assertEqual(record.unanswered_questions(self.rec), [])
 
     def test_options_must_be_distinct_non_empty_strings(self):
-        """選択肢の要素は空でない文字列で重複しない (答えが文字列だけなので、文字列でない選択肢には答えられない)。"""
+        """選択肢の要素は空でない文字列で重複しない (回答が文字列だけなので、文字列でない選択肢には回答できない)。"""
         for options in ([1, 2], [None], [{"a": 1}], ["a", ""], ["a", "a"]):
             with self.subTest(options=options):
                 _, errors = record.apply(self.rec, [{"op": "ask", "question_id": "q1", "item": "akm/r#1", "kind": "k", "options": options, "at": T1}])
@@ -294,7 +294,7 @@ class ApplyTest(unittest.TestCase):
 class NamePatternTest(unittest.TestCase):
 
     def test_pattern_matches_config(self):
-        """record は config を import しないので、リポジトリの名前の形を写している。同じ文字列であることを確かめる。"""
+        """record は config を import しないので、リポジトリの名前の形を写している。同じ文字列であることを確認する。"""
         from issue_dispatch import config
         self.assertEqual(record.REPO_NAME_PATTERN, config.REPO_NAME_PATTERN)
         rec = record.new_record(PROJECT)

@@ -1,5 +1,5 @@
 """パスからファイルの種類と属性を決める。リポジトリの設定の `files` の規則を先に、同梱のデフォルトの表
-(file-kinds.json) を後に照合し、1 つのパスが種類の違う規則に一致すれば、6 段の問いの順で先の種類にする。
+(file-kinds.json) を後に照合し、1 つのパスが種類の違う規則に一致すれば、6 段の判定の条件の順で先の種類にする。
 
 種類と属性の意味、パターンの書き方、照合の順の正本は issue-dispatch/skills/issue-dispatch/references/file-kinds.md。
 設定の規則の様式と、読み込むときにそろえる表記の正本は同じディレクトリの project-config.md (そろえるのはモジュール config)。
@@ -13,7 +13,7 @@ import json
 import os
 import re
 
-# 6 段の問いの順 (file-kinds.md の表)。先にあるほど優先する
+# 6 段の判定の条件の順 (file-kinds.md の表)。先にあるほど優先する
 KINDS = ("unknown-content", "generated", "unknown-structure", "indivisible", "unstable", "divisible")
 # 規則に書ける種類 (`unknown-content` は、どの規則にも一致しないパスの種類なので、規則には書けない)
 RULE_KINDS = KINDS[1:]

@@ -1,4 +1,4 @@
-"""待機 (poll) のテスト。CLI を子プロセスで動かし、偽の gh (tests/fake-gh) と固定データで終わる条件・終了コード・wait.pid を確かめる。
+"""待機 (poll) のテスト。CLI を子プロセスで動かし、偽の gh (tests/fake-gh) と固定データで終了条件・終了コード・wait.pid を確認する。
 間隔と期限は分の小数で短くする。項目の合成は test_itemstate の補助を使う。"""
 
 import json
@@ -65,7 +65,7 @@ class WaiterTest(unittest.TestCase):
         return poll.Waiter(self.pid_path, M1, "wait", minutes, interval, out=Out())
 
     def test_result_line_and_pid_file(self):
-        """最初の行は pid、終わりの行は poll の結果。終わるときに wait.pid を消す。"""
+        """最初の行は pid、終了の行は poll の結果。終了するときに wait.pid を消す。"""
         calls = []
 
         def do_poll():
@@ -76,7 +76,7 @@ class WaiterTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.pid_path))
 
     def test_stop_during_poll_discards_result(self):
-        """読み取りの間に SIGTERM を受けたら、その読み取りの結果 (終わる条件) を捨てて stopped と 6 で終わる。"""
+        """読み取りの間に SIGTERM を受けたら、その読み取りの結果 (終了条件) を捨てて stopped と 6 で終了する。"""
         w = self._waiter()
 
         def poll_then_stop():
@@ -86,7 +86,7 @@ class WaiterTest(unittest.TestCase):
         self.assertEqual((code, "".join(self.out)), (6, f"pid {os.getpid()}\nstopped {os.getpid()}\n"))
 
     def test_stop_previous_reports_alive_after_grace(self):
-        """前の待機が待ち時間の後も動いていれば alive を返し、起動は続ける (wait.pid は消す)。"""
+        """前の待機が待機時間の後も動いていれば alive を返し、起動は続ける (wait.pid は消す)。"""
         import signal as _signal
         holder = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)"])
         try:
@@ -110,7 +110,7 @@ class WaiterTest(unittest.TestCase):
         calls = []
         code = self._waiter(minutes=0.003, interval=0.001).run(lambda: calls.append(1))
         self.assertEqual((code, "".join(self.out)), (124, f"pid {os.getpid()}\n"))
-        self.assertGreaterEqual(len(calls), 2, "期限切れを宣言する前にもう 1 度確かめる")
+        self.assertGreaterEqual(len(calls), 2, "期限切れを宣言する前にもう 1 度確認する")
 
     def test_failures_by_kind(self):
         """認証切れは 8、ネットワークの失敗が 3 回続けば 4 (間に成功があれば数え直す)。"""
@@ -121,10 +121,10 @@ class WaiterTest(unittest.TestCase):
             calls.append(1)
             return None if len(calls) == 2 else ("failure", "network")
         self.assertEqual(self._waiter(minutes=0.05).run(flaky), 4)
-        self.assertEqual(len(calls), 5, "成功 (2 回目) で数え直すので、4 で終わるのは 5 回目")
+        self.assertEqual(len(calls), 5, "成功 (2 回目) で数え直すので、4 で終了するのは 5 回目")
 
     def test_rate_limit_waits_until_reset_within_deadline(self):
-        """レート制限の再開が期限内なら待って続け、期限を越えるか読めなければ 3。"""
+        """レート制限の再開が期限内なら待機して続け、期限を越えるか読めなければ 3。"""
         calls = []
         original = gh.rate_limit_reset_at
         try:
@@ -142,17 +142,17 @@ class WaiterTest(unittest.TestCase):
             gh.rate_limit_reset_at = original
 
     def test_stop_previous_removes_reused_pid_without_killing(self):
-        """wait.pid の PID の開始時刻かコマンドが違えば (再利用)、そのプロセスを止めずに wait.pid だけ消す。"""
+        """wait.pid の PID の開始時刻かコマンドが違えば (再利用)、そのプロセスを停止せずに wait.pid だけ消す。"""
         sleeper = subprocess.Popen(["sleep", "30"])
         try:
             with open(self.pid_path, "w", encoding="utf-8") as f:
                 json.dump({"pid": sleeper.pid, "started_at": "not the real start", "owner": M1, "wait": "wait"}, f)
             self.assertEqual(poll.stop_previous(self.pid_path), {"removed": sleeper.pid})
             self.assertFalse(os.path.exists(self.pid_path))
-            self.assertIsNone(sleeper.poll(), "止めていない")
+            self.assertIsNone(sleeper.poll(), "停止していない")
             with open(self.pid_path, "w", encoding="utf-8") as f:
                 json.dump({"pid": sleeper.pid, "started_at": poll.process_start(sleeper.pid), "owner": M1, "wait": "wait"}, f)
-            self.assertEqual(poll.stop_previous(self.pid_path), {"removed": sleeper.pid}, "開始時刻が同じでもコマンドが待機でなければ止めない")
+            self.assertEqual(poll.stop_previous(self.pid_path), {"removed": sleeper.pid}, "開始時刻が同じでもコマンドが待機でなければ停止しない")
             self.assertIsNone(sleeper.poll())
         finally:
             sleeper.kill()
@@ -195,7 +195,7 @@ class CliBase(FakeGhCase):
 class ManagerWaitTest(CliBase):
 
     def test_wait_without_snapshot_is_5(self):
-        """スナップショットが無い (壊れている) と、書き直さずに 5 で止まる。"""
+        """スナップショットが無い (壊れている) と、上書きせずに 5 で終了する。"""
         code, out, err = self.run_cli("wait", "--dir", self.manager, *FAST)
         self.assertEqual((code, out), (5, []), err)
         os.makedirs(self.record_dir, exist_ok=True)
@@ -204,10 +204,10 @@ class ManagerWaitTest(CliBase):
         code, out, err = self.run_cli("wait", "--dir", self.manager, *FAST)
         self.assertEqual(code, 5, err)
         with open(os.path.join(self.record_dir, "snapshot.json"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "{broken", "書き直さない")
+            self.assertEqual(f.read(), "{broken", "上書きしない")
 
     def test_wait_returns_diff_kinds_and_does_not_write_snapshot(self):
-        """差分があれば種類を 1 行に書いて 0 で終わる (起動の前からの変化も最初の読み取りで返す)。スナップショットは書かない。"""
+        """差分があれば種類を 1 行に書いて 0 で終了する (起動の前からの変化も最初の読み取りで返す)。スナップショットは書かない。"""
         self.write_snapshot()
         taken = observe.load_snapshot(self.record_dir)["snapshot"]["taken_at"]
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 1)["content"].__setitem__("state", "CLOSED"))}])
@@ -241,7 +241,7 @@ class ManagerWaitTest(CliBase):
         self.assertEqual(code, 2)
 
     def test_wait_sigterm_writes_stopped_and_6(self):
-        """SIGTERM を受けると stopped と PID の行を書いて 6 で終わる。wait.pid に別の PID が書かれていれば消さない。"""
+        """SIGTERM を受けると stopped と PID の行を書いて 6 で終了する。wait.pid に別の PID が書かれていれば消さない。"""
         self.write_snapshot()
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         p = self.popen("wait", "--dir", self.manager, "--interval", "0.01", "--minutes", "1")
@@ -258,7 +258,7 @@ class ManagerWaitTest(CliBase):
         self.assertTrue(os.path.exists(pid_path), "別の PID の wait.pid は消さない")
 
     def test_new_wait_stops_previous_wait(self):
-        """起動の前に、動いている前の待機 (wait.pid の PID。開始時刻とコマンドが一致) を止める。"""
+        """起動の前に、動いている前の待機 (wait.pid の PID。開始時刻とコマンドが一致) を停止する。"""
         self.write_snapshot()
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         first = self.popen("wait", "--dir", self.manager, "--interval", "0.01", "--minutes", "1")
@@ -294,7 +294,7 @@ class WaitAssignmentTest(CliBase):
         self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", *FAST)[0], 124)
         released = mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "解除"}, t(20), 101)
         self._respond(lambda nodes: assigned_item3(nodes, [released], status="In Progress"))
-        self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", *FAST)[0], 124, "見る Issue でない項目の解放では終わらない")
+        self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", *FAST)[0], 124, "見る Issue でない項目の解放では終了しない")
 
     def test_blocked_in_review_and_pending(self):
         """--blocked は In Progress に戻ると返す。--in-review は In Progress でも返さない。--pending は戻れば返し、閉じたままなら返さない。"""
@@ -311,7 +311,7 @@ class WaitAssignmentTest(CliBase):
         self.assertEqual((code, out[1]), (0, f"resumed {A3}"))
 
     def test_stop_on_release_and_normal_end(self):
-        """見る Issue の解放で stop と理由。--in-review の正常な終わり (ready for review の後の close) で stop close。"""
+        """見る Issue の解放で stop と理由。--in-review の正常な完了 (ready for review の後の close) で stop close。"""
         released = mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "close"}, t(20), 101)
         self._respond(lambda nodes: assigned_item3(nodes, [released], status="Done", state="CLOSED"))
         code, out, _ = self.run_cli("wait-assignment", "--project", "akm/3", "--pending", A3, *FAST)
@@ -322,10 +322,10 @@ class WaitAssignmentTest(CliBase):
         code, out, _ = self.run_cli("wait-assignment", "--project", "akm/3", "--in-review", A3, *FAST)
         self.assertEqual((code, out[1]), (0, "stop close"))
         self._respond(lambda nodes: assigned_item3(nodes, [DECL1, _go(400, t(13), 500)], status="Done", state="CLOSED"))
-        self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", "--in-review", A3, *FAST)[0], 124, "進行中の Issue の close では終わらない")
+        self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", "--in-review", A3, *FAST)[0], 124, "進行中の Issue の close では終了しない")
 
     def test_request_for_body_append(self):
-        """自分宛ての `依頼` (本文の追記) で、その PR が開いていて閉じる参照に Issue が無ければ request。追記が済めば終わらない。"""
+        """自分宛ての `依頼` (本文の追記) で、その PR が開いていて閉じる参照に Issue が無ければ request。追記が済めば終了しない。"""
         req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "本文の追記", "pr": PR9}, t(31), 301)
         self._respond(lambda nodes: assigned_item3(nodes, [DECL1, _go(400, t(13), 500), req], status="In Progress"),
                       [{"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
@@ -337,7 +337,7 @@ class WaitAssignmentTest(CliBase):
         self.assertEqual(self.run_cli("wait-assignment", "--project", "akm/3", "--in-review", A3, *FAST)[0], 124)
 
     def test_prs_of_ended_items_are_not_read(self):
-        """終わった項目 (閉じていて見る Issue でない) の `PR の報告` の PR は読まない。今の割り当ての項目の PR だけを読む。"""
+        """割り当てが終了した項目 (閉じていて見る Issue でない) の `PR の報告` の PR は読まない。今の割り当ての項目の PR だけを読む。"""
         old_assign = mcomment("割り当て", {"to": W7, "assignment": 1}, t(1), 90, name="mgr", sid=M1)
         old_report = wcomment("PR の報告", None, t(2), 91, body=f"https://github.com/{A}/pull/2")
         report = wcomment("PR の報告", None, t(30), 300, body=PR9)
@@ -350,7 +350,7 @@ class WaitAssignmentTest(CliBase):
         self.assertEqual(code, 124)
         observed = [r for r in self.recorded_full() if "PrObserve" in (r.get("stdin") or "")]
         self.assertTrue(observed, "今の割り当ての項目の PR は読む")
-        self.assertFalse(any("pull/2" in (r.get("stdin") or "") for r in observed), "終わった項目の PR は読まない")
+        self.assertFalse(any("pull/2" in (r.get("stdin") or "") for r in observed), "割り当てが終了した項目の PR は読まない")
 
     def test_interval_must_be_shorter_than_minutes(self):
         code, out, err = self.run_cli("wait-assignment", "--project", "akm/3", "--interval", "1", "--minutes", "1")
@@ -367,11 +367,11 @@ class WaitDecisionTest(CliBase):
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(mutate)}])
 
     def test_go_request_wait(self):
-        """自分宛てで渡した宣言の ID の `開始可` で go、宣言の書き直しの `依頼` で request、管理のセッションが書いた Blocked で wait。"""
+        """自分宛てで渡した宣言の ID の `開始可` で go、宣言の修正の `依頼` で request、管理のセッションが書いた Blocked で wait。"""
         self._respond([DECL1, _go(400, t(13), 500)])
         code, out, _ = self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "400", *FAST)
         self.assertEqual((code, out[1]), (0, "go"))
-        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
+        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
         self._respond([DECL1, req])
         code, out, _ = self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "400", *FAST)
         self.assertEqual((code, out[1]), (0, "request"))
@@ -381,7 +381,7 @@ class WaitDecisionTest(CliBase):
         self.assertEqual((code, out[1]), (0, "wait"))
 
     def test_user_blocked_and_other_declaration_do_not_end(self):
-        """利用者が手で付けた Blocked (待機より前の変化) と、別の宣言への `開始可` では終わらない。"""
+        """利用者が手で付けた Blocked (待機より前の変化) と、別の宣言への `開始可` では終了しない。"""
         early = {"__typename": "ProjectV2ItemStatusChangedEvent", "createdAt": t(12), "status": "Blocked", "previousStatus": "In Progress", "wasAutomated": False, "project": {"number": 3}}
         self._respond([DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)], status="Blocked", events=[early])
         self.assertEqual(self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "400", *FAST)[0], 124)
@@ -398,7 +398,7 @@ class WaitDecisionTest(CliBase):
         def closed(nodes):
             assigned_item3(nodes, [DECL1, _go(400, t(13), 500), report, update], status="Done", state="CLOSED")
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(closed)}, {"substring": "query PrObserve", "stdout": pr_fixture("MERGED", merged=True)}])
-        self.assertEqual(self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "401", *FAST)[0], 124, "--review-update が無ければ正常な終わりでは終わらない")
+        self.assertEqual(self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "401", *FAST)[0], 124, "--review-update が無ければ正常な完了では終了しない")
         code, out, _ = self.run_cli("wait-decision", "--project", "akm/3", "--issue", A3, "--declaration", "401", "--review-update", *FAST)
         self.assertEqual((code, out[1]), (0, "stop close"))
 
@@ -422,7 +422,7 @@ class DocTest(unittest.TestCase):
         for key in ("`wait.pid`", "`wait-assignment`", "`wait-decision`", "`--blocked`", "`--in-review`", "`--pending`", "`--review-update`", "`pid`", "`stopped`"):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for word in poll.RESULT_WORDS:
-            self.assertTrue(f"`{word}`" in doc or f"`{word} <" in doc, f"終わりの行の語 {word} が文書に無い")
+            self.assertTrue(f"`{word}`" in doc or f"`{word} <" in doc, f"終了の行の語 {word} が文書に無い")
         for code in (0, 3, 4, 5, 6, 8, 124):
             self.assertIn(f"| {code} |", doc, f"終了コード {code} が文書に無い")
 

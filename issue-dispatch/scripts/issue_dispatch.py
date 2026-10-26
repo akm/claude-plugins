@@ -22,12 +22,12 @@
   issue add-label --issue <owner/repo#番号|URL> --label <名前> [--description <説明>]   ラベルを足す。無ければ先に作る (承認を得た後に呼ぶ)
   blocked-by add --issue <owner/repo#番号|URL> --blocker <owner/repo#番号|URL>   blockedBy に足す (失敗は理由付きで返し、再試行しない)
   pr observe --url <PR の URL>   PR の状態・参照する Issue・変えたファイルを読み、種類 (kind) を返す (読むだけ。表は issue-format.md)
-  comment list --issue <owner/repo#番号|URL>   コメントを時刻の順に全部読む (書き手がトークンのログインと違うものは除く。先頭行は解析済み)
+  comment list --issue <owner/repo#番号|URL>   コメントを時刻の順に全部読む (投稿者がトークンのログインと違うものは除く。先頭行は解析済み)
   comment post --issue <参照> --role manager|worker --name <名前> --session-id <ID> --kind <種類> [値のオプション] (--body <本文> | --body-file <ファイル|->)
       先頭行を組み立てて投稿する。同じ出来事への同じコメントが既にあれば投稿せず posted false を返す (値のオプションは issue-format.md の「コメント」)
   comment parse --line <先頭行>   先頭行を解析する (gh は実行しない。形でなければ header は null)
   declaration parse --dir <リポジトリのルート> (--body <JSON> | --body-file <ファイル|->)   宣言の JSON を検査し、パスをそろえ、種類を付けて返す
-      (リポジトリの設定の規則は --dir から読む。作業のセッションが投稿の前に確かめる)
+      (リポジトリの設定の規則は --dir から読む。作業のセッションが投稿の前に確認する)
   declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body <JSON> | --body-file <ファイル|->)
       標準入力の JSON {"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} で競合の可能性を判定する。リポジトリの設定は
       repositories の clone から既定のブランチの内容として読み、読めなければ判定しない (KTD9)
@@ -35,9 +35,9 @@
       未判定の宣言を投稿の順に判定し、judgments・actions (`開始可`・`待機`・`依頼`・Status・blockedBy の候補)・questions・signals を返す (書かない。正本は flow.md の「判定」)
   resources attributes --dir <管理ディレクトリ> [--name <資源>]   設定の resources にデフォルト値を当てた属性を返す (警告つき)
   resources judge --dir <管理ディレクトリ> --trigger assign|declare|update|close|release (--body <JSON> | --body-file <ファイル|->)
-      契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・答えは呼び出し元が渡す。gh は実行しない)
+      契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・回答は呼び出し元が渡す。gh は実行しない)
   files classify --dir <リポジトリのルート> <パス>...   パスごとの種類と属性 (リポジトリの設定の files とデフォルトの表で決める)。
-      `paths` の要素は入力と同じ並びで、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
+      `paths` の要素は入力と同じ順序で、どの要素も `path` に書いたままの入力の値を持つ。照合できた要素は `normalized`
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
 
 終了コード: JSON を出せたときは、エラーの有無によらず 0 (エラーは JSON の `errors` で伝える)。0 以外は Python 自身の失敗
@@ -86,7 +86,7 @@ def cmd_files_classify(args):
 
 
 def _record_target(args):
-    """管理ディレクトリの設定から、記録の置き場と project を決める。設定に誤りがあれば (None, None, errors)。"""
+    """管理ディレクトリの設定から、記録のディレクトリと project を決める。設定に誤りがあれば (None, None, errors)。"""
     loaded = config.load(args.dir, "manager")
     if loaded["errors"]:
         return None, None, loaded["errors"]
@@ -200,7 +200,7 @@ def cmd_project_check(args):
 
 
 def _snapshot_dir(manager_dir, parsed_project=None):
-    """管理ディレクトリの設定からスナップショットの置き場 (記録の置き場と同じ) を決める。返り値は (ディレクトリ, 設定の project, errors)。"""
+    """管理ディレクトリの設定からスナップショットのディレクトリ (記録のディレクトリと同じ) を決める。返り値は (ディレクトリ, 設定の project, errors)。"""
     loaded = config.load(manager_dir, "manager")
     project_setting = parsed_project or loaded["config"].get("project")
     if not project_setting:
@@ -253,16 +253,16 @@ def cmd_project_items(args):
             _emit({**out, "status": "error", "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
             return 0
         if _list_problems(result["problems"]):
-            # 項目の一覧そのものが欠けていれば保存しない (読めなかっただけの項目を「除かれた」と読ませないため)
+            # 項目の一覧そのものが無ければ保存しない (読めなかっただけの項目を「除かれた」と読ませないため)
             _emit({**out, "status": "error", "snapshot": None,
                    "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、スナップショットを書かない", "failure": None}]})
             return 0
-        # 1 項目の中の欠けと PR の読み取りの失敗は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ partial を付けて保存する
+        # 1 項目の中の欠損と PR の読み取りの失敗は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ partial を付けて保存する
         previous = observe.load_snapshot(directory)
         warnings = []
         if previous["status"] == "corrupt":
-            warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに書き直す"})
-        # 読むのは今のコメントに書かれた PR だけ (前のスナップショットにだけある URL は保存に残さない。差分のための読み直しは observe diff が行う)
+            warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに上書きする"})
+        # 読むのは今のコメントに書かれた PR だけ (前のスナップショットにだけある URL は保存に残さない。差分のために再度読み込むのは observe diff が行う)
         comment_prs, problems = _read_comment_prs(result["items"], login)
         out["problems"] = out["problems"] + problems
         snapshot = observe.build_snapshot(result, comment_prs, _now(), previous=previous["snapshot"])
@@ -295,11 +295,11 @@ def cmd_observe_diff(args):
         _emit({"status": "error", "diffs": [], "errors": [{"key": "login", "message": problem["message"], "failure": problem.get("failure")}]})
         return 0
     if _list_problems(result["problems"]):
-        # 項目の一覧そのものが欠けていれば差分を返さない (読めなかっただけの項目が removed として現れるため)
+        # 項目の一覧そのものが無ければ差分を返さない (読めなかっただけの項目が removed として現れるため)
         _emit({"status": "error", "snapshot_taken_at": loaded["snapshot"]["taken_at"], "diffs": [], "problems": result["problems"],
                "rate_limit": result["rate_limit"], "errors": [{"key": "partial", "message": "項目の一覧の一部が読めなかった (problems) ので、差分を返さない", "failure": None}]})
         return 0
-    # スナップショットにある PR (コメントが消えても、待っていた PR の状態の変化を見つけるため) も読む
+    # スナップショットにある PR (コメントが消えても、待機していた PR の状態の変化を見つけるため) も読む
     comment_prs, problems = _read_comment_prs(result["items"], login, extra_urls=list(loaded["snapshot"]["comment_prs"]))
     current = observe.build_snapshot(result, comment_prs, _now(), previous=loaded["snapshot"])
     all_problems = result["problems"] + problems
@@ -388,7 +388,7 @@ def _read_report_prs(items, login):
 
 
 def _items_for_state(parsed):
-    """項目の状態の導出のために項目を読む。項目の一覧そのものが欠ければ (LIST_PROBLEMS) エラー (読めなかった項目を終わったと読まないため)。"""
+    """項目の状態の導出のために項目を読む。項目の一覧そのものが無ければ (LIST_PROBLEMS) エラー (読めなかった項目を、割り当てが終了したと読まないため)。"""
     result = project.items(parsed)
     if result["status"] == "error":
         return None, {"status": "error", "errors": [{"key": "project", "message": result["message"], "failure": result.get("failure")}]}
@@ -608,7 +608,7 @@ def cmd_wait(args):
 
 
 def _worker_waiter(args, name):
-    """作業のセッションの待機の共通: Project・セッション ID・wait.pid の置き場。返り値は (parsed, session_id, Waiter) か (None, None, 終了コード)。"""
+    """作業のセッションの待機の共通: Project・セッション ID・wait.pid のパス。返り値は (parsed, session_id, Waiter) か (None, None, 終了コード)。"""
     parsed = project.parse_project(args.project)
     if parsed is None:
         return None, None, _wait_error(f"--project は owner/番号 の形 (値 {args.project!r})")
@@ -896,10 +896,10 @@ def _check_judge_body(trigger, body):
                 errors.append({"key": f"body.usage.{name}", "message": f"usage は資源の名前 → 項目 (owner/repo#番号 の文字列) の配列: {items!r}", "failure": None})
     for key in ("answers", "undeclared_answers"):
         if key in body and (not isinstance(body[key], dict) or not all(_is_name(k) and isinstance(v, str) for k, v in body[key].items())):
-            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 答え (文字列) のオブジェクト: {body[key]!r}", "failure": None})
+            errors.append({"key": f"body.{key}", "message": f"{key} は資源の名前 → 回答 (文字列) のオブジェクト: {body[key]!r}", "failure": None})
     if "waiting" in body:
         for i, w in enumerate(body["waiting"]):
-            # judge_release が読むキーをすべて確かめる (絞り込みの item・wait_for と、並べ替えの posted_at・position)
+            # judge_release が読むキーをすべて確認する (絞り込みの item・wait_for と、並べ替えの posted_at・position)
             ok = (isinstance(w, dict) and _is_name(w.get("item")) and "declaration" in w
                   and isinstance(w.get("wait_for"), list) and all(_is_name(r) for r in w["wait_for"])
                   and (w.get("posted_at") is None or isinstance(w["posted_at"], str))
@@ -974,7 +974,7 @@ def build_parser():
         p.set_defaults(func=func)
         if name == "items":
             p.add_argument("--write-snapshot", action="store_true", help="読んだ内容をスナップショットに書く (--dir が要る)")
-            p.add_argument("--dir", help="管理ディレクトリ (スナップショットの置き場は設定の record_dir)")
+            p.add_argument("--dir", help="管理ディレクトリ (スナップショットのディレクトリは設定の record_dir)")
     p_set = project_sub.add_parser("set-status", help="Status を書く (5 つ以外と Done は拒否)")
     p_set.add_argument("--project", required=True, help="owner/番号")
     p_set.add_argument("--item", required=True, help="項目の ID (project items の item_id)")
@@ -1021,7 +1021,7 @@ def build_parser():
     p_badd.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
     p_badd.add_argument("--snapshot-dir", help="管理ディレクトリ (書いた値をスナップショットに反映する)")
     p_badd.set_defaults(func=cmd_blocked_by_add)
-    p_bremove = blocked_sub.add_parser("remove", help="自分が足した blocker だけを外す (項目の状態から確かめる。承認を得た後に呼ぶ)")
+    p_bremove = blocked_sub.add_parser("remove", help="自分が足した blocker だけを外す (項目の状態から確認する。承認を得た後に呼ぶ)")
     p_bremove.add_argument("--dir", required=True, help="管理ディレクトリ")
     p_bremove.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_bremove.add_argument("--blocker", required=True, help="owner/repo#番号 か URL")
@@ -1030,7 +1030,7 @@ def build_parser():
 
     p_comment = sub.add_parser("comment", help="Issue のコメント")
     comment_sub = p_comment.add_subparsers(dest="subcommand", required=True)
-    p_clist = comment_sub.add_parser("list", help="コメントを時刻の順に全部読む (書き手が違うものは除く)")
+    p_clist = comment_sub.add_parser("list", help="コメントを時刻の順に全部読む (投稿者が違うものは除く)")
     p_clist.add_argument("--issue", required=True, help="owner/repo#番号 か URL")
     p_clist.set_defaults(func=cmd_comment_list)
     p_cparse = comment_sub.add_parser("parse", help="先頭行を解析する (gh は実行しない)")
@@ -1045,15 +1045,15 @@ def build_parser():
     p_cpost.add_argument("--to", help="対象 (作業のセッションの ID)")
     p_cpost.add_argument("--assignment", help="割り当ての番号")
     p_cpost.add_argument("--declaration", help="宣言のコメントの ID")
-    p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の答え / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
-    p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の書き直し / 本文の追記 / 小さな PR")
-    p_cpost.add_argument("--waiting-issue", help="待つ Issue (依頼 小さな PR と小さな PR の報告)")
-    p_cpost.add_argument("--waiting-declaration", help="待つ側の宣言のコメントの ID")
+    p_cpost.add_argument("--reason", action="append", help="待機の理由 (繰り返せる): 利用者の回答 / Issue <参照> / 小さな PR <参照> [PR <URL>] / 資源 <名前> / 設定")
+    p_cpost.add_argument("--request-kind", help="依頼の種類: 宣言の修正 / 本文の追記 / 小さな PR")
+    p_cpost.add_argument("--waiting-issue", help="待機する Issue (依頼 小さな PR と小さな PR の報告)")
+    p_cpost.add_argument("--waiting-declaration", help="待機する Issue の宣言のコメントの ID")
     p_cpost.add_argument("--previous-pr", help="作り直しのとき、閉じた前の PR の URL")
     p_cpost.add_argument("--pr", help="本文の追記を頼む PR の URL")
     p_cpost.add_argument("--release-reason", help="解放の理由: 解除 / close / ID の変更 / 除去")
     p_cpost.add_argument("--stuck-state", help="停滞の値 (Agent stuck state)")
-    p_cpost.add_argument("--blocker", action="append", help="依存の待ちで待つ Issue (繰り返せる)")
+    p_cpost.add_argument("--blocker", action="append", help="依存の待機の、完了待ちの Issue (blocker。繰り返せる)")
     body = p_cpost.add_mutually_exclusive_group()
     body.add_argument("--body", help="本文 (先頭行はこの CLI が足す)")
     body.add_argument("--body-file", help="本文のファイル (- なら標準入力)")
@@ -1075,7 +1075,7 @@ def build_parser():
     body.add_argument("--body", help='{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} の JSON')
     body.add_argument("--body-file", help="同じ JSON のファイル (- なら標準入力)")
     p_dconf.set_defaults(func=cmd_declaration_conflictability)
-    p_djudge = decl_sub.add_parser("judge", help="未判定の宣言を投稿の順に判定し、書き込みの候補・問い・合図を返す (書かない)")
+    p_djudge = decl_sub.add_parser("judge", help="未判定の宣言を投稿の順に判定し、書き込みの候補・質問・合図を返す (書かない)")
     p_djudge.add_argument("--dir", required=True, help="管理ディレクトリ")
     p_djudge.add_argument("--project", help="Project (owner/番号)。省略時は設定の project")
     p_djudge.add_argument("--issue", help="この項目の宣言だけ判定する (owner/repo#番号 か URL)。比べる相手はすべての項目から集める")
@@ -1108,7 +1108,7 @@ def build_parser():
     p_istate.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project と resources を読む)")
     p_istate.add_argument("--project", help="owner/番号 (省略時は設定の project)")
     p_istate.add_argument("--issue", help="1 項目だけ (owner/repo#番号)")
-    p_istate.add_argument("--diffs", help="observe diff の出力 (JSON ファイル。- なら標準入力)。人の変更の見分けに使う")
+    p_istate.add_argument("--diffs", help="observe diff の出力 (JSON ファイル。- なら標準入力)。人の変更の判別に使う")
     p_istate.set_defaults(func=cmd_item_state)
 
     p_work = sub.add_parser("work", help="作業のセッションの確認 (読むだけ)")
@@ -1123,27 +1123,27 @@ def build_parser():
     p_wheld.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wheld.set_defaults(func=cmd_work_held)
 
-    p_wait = sub.add_parser("wait", help="管理のセッションの待機: スナップショットとの差分があれば終わる (バックグラウンドで起動する)")
-    p_wait.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project・poll_minutes・wait_minutes と記録の置き場を読む)")
+    p_wait = sub.add_parser("wait", help="管理のセッションの待機: スナップショットとの差分があれば終了する (バックグラウンドで起動する)")
+    p_wait.add_argument("--dir", required=True, help="管理ディレクトリ (設定の project・poll_minutes・wait_minutes と記録のディレクトリを読む)")
     p_wait.add_argument("--project", help="owner/番号 (省略時は設定の project)")
     p_wait.add_argument("--minutes", type=float, help="期限 (分。省略時は設定の wait_minutes)")
     p_wait.add_argument("--interval", type=float, help="読む間隔 (分。省略時は設定の poll_minutes)")
     p_wait.set_defaults(func=cmd_wait)
-    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・戻り・解放・依頼で終わる")
+    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・再開・解放・依頼で終了する")
     p_wassign.add_argument("--project", required=True, help="owner/番号")
     p_wassign.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
-    p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待っている Issue (owner/repo#番号。繰り返せる)")
+    p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待機している Issue (owner/repo#番号。繰り返せる)")
     p_wassign.add_argument("--in-review", action="append", default=[], help="レビュー中の Issue (繰り返せる)")
-    p_wassign.add_argument("--pending", help="利用者の答えを待つ Issue")
+    p_wassign.add_argument("--pending", help="利用者の回答待ちの Issue")
     p_wassign.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wassign.add_argument("--minutes", type=float, required=True, help="期限 (分)")
     p_wassign.set_defaults(func=cmd_wait_assignment)
-    p_wdecision = sub.add_parser("wait-decision", help="作業のセッションの待機: 宣言への判定 (開始可・待機・依頼) で終わる")
+    p_wdecision = sub.add_parser("wait-decision", help="作業のセッションの待機: 宣言への判定 (開始可・待機・依頼) で終了する")
     p_wdecision.add_argument("--project", required=True, help="owner/番号")
     p_wdecision.add_argument("--issue", required=True, help="割り当てを受けた Issue (owner/repo#番号)")
     p_wdecision.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
-    p_wdecision.add_argument("--declaration", type=int, required=True, help="判定を待つ宣言のコメントの ID")
-    p_wdecision.add_argument("--review-update", action="store_true", help="ready for review の後の宣言の更新 (今の Issue の正常な終わりで stop)")
+    p_wdecision.add_argument("--declaration", type=int, required=True, help="判定待ちの宣言のコメントの ID")
+    p_wdecision.add_argument("--review-update", action="store_true", help="ready for review の後の宣言の更新 (今の Issue の正常な完了で stop)")
     p_wdecision.add_argument("--interval", type=float, required=True, help="読む間隔 (分)")
     p_wdecision.add_argument("--minutes", type=float, required=True, help="期限 (分)")
     p_wdecision.set_defaults(func=cmd_wait_decision)

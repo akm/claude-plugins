@@ -1,6 +1,6 @@
 """セッションの識別。セッション ID の正規化、環境変数からの自分のセッション ID の決定、管理のセッションの規約の名前の生成と
 解析、作業のセッションの一時ディレクトリのパス。gh も ListAgents も使わず、環境変数は引数の辞書で受ける (テストのため)。
-宛先の決め方と、公式文書に無い振る舞いへの依存の正本は issue-dispatch/skills/issue-dispatch/references/messaging.md。
+宛先の決め方と、公式文書に無い動作への依存の正本は issue-dispatch/skills/issue-dispatch/references/messaging.md。
 """
 
 import os
@@ -10,7 +10,7 @@ from issue_dispatch import ids
 
 NAME_PREFIX = "issue-dispatch "
 # 環境変数。CLAUDE_CODE_HOST_SESSION_ID (Desktop のセッション ID。`local_` で始まる) があればそれ、無ければ
-# CLAUDE_CODE_SESSION_ID (会話の記録の UUID)。公式文書に無い振る舞いに頼るので、読むのは own_session_id の 1 か所 (KTD10)
+# CLAUDE_CODE_SESSION_ID (会話の記録の UUID)。公式文書に無い動作に頼るので、読むのは own_session_id の 1 か所 (KTD10)
 ENV_HOST_SESSION_ID = "CLAUDE_CODE_HOST_SESSION_ID"
 ENV_SESSION_ID = "CLAUDE_CODE_SESSION_ID"
 # `local_` の有無は区別して保持する。中身の形 (UUID など) には決め打ちせず、パスの 1 区切りとして使える値 (空白と `/` を
@@ -51,7 +51,7 @@ def own_session_id(environ):
 def manager_name(owner, number=None, login=None):
     """管理のセッションの規約の名前 `issue-dispatch <owner>/<number>/<login>` を作る (KD23)。owner に設定の project
     (dict。owner と number) を渡してもよい。owner と login は小文字にそろえる (GitHub は大文字小文字を区別しないが、名前は
-    Claude Code が文字列として照合する宛先なので、設定に書かれた綴りが違っても同じ組から同じ名前を導くため)。
+    Claude Code が文字列として照合する宛先なので、設定に書かれた表記が違っても同じ組から同じ名前を導くため)。
     形が違えば ValueError。"""
     if isinstance(owner, dict):
         owner, number = owner.get("owner"), owner.get("number")
@@ -85,7 +85,7 @@ def parse_manager_name(text):
 
 def session_temp_dir(session_id, environ):
     """作業のセッションの一時ディレクトリ `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/` のパス (末尾の `/` は付けない)。
-    作業ツリーの外に置く (待機の wait.pid と、伝えた版の印のファイルの置き場。KTD6・R26)。TMPDIR は絶対パスのときだけ使う
+    作業ツリーの外に置く (待機の wait.pid と、伝えた版を記録するファイルの保存先。KTD6・R26)。TMPDIR は絶対パスのときだけ使う
     (相対パスは作業ツリーの中を指しうる)。セッション ID が読めなければ ValueError。"""
     normalized = normalize_session_id(session_id)
     if normalized is None:

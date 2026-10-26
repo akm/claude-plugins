@@ -71,7 +71,7 @@ def observed(url, state="OPEN", draft=False, merged=False, issues=(A9,), author=
 
 
 def question_table(doc, marker):
-    """文書から問いの表の範囲 (表の前置きの文 marker から、表の後の最初の空行まで) を切り出す。文書の別の表に同じ名前や選択肢があっても、問いの表だけを検査するため。
+    """文書から質問の表の範囲 (表の前置きの文 marker から、表の後の最初の空行まで) を切り出す。文書の別の表に同じ名前や選択肢があっても、質問の表だけを検査するため。
     marker が無ければ失敗させる (表の所在が変わったことを検出するため)。"""
     start = doc.index(marker)
     table_start = doc.index("\n| ", start)
@@ -80,13 +80,13 @@ def question_table(doc, marker):
 
 
 def question_row(table, kind):
-    """問いの表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確かめる (別の行の同じ並びと取り違えないため)。"""
+    """質問の表 (question_table の結果) から、種類 kind の行を取り出す。無ければ None (種類が表に無い)。選択肢は同じ行で確認する (別の行にある同じ順序の選択肢と取り違えないため)。"""
     return next((line for line in table.splitlines() if line.startswith(f"| `{kind}` |")), None)
 
 
 def question_kinds(table):
-    """問いの表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
-    種類の行は表の構造で見分ける (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
+    """質問の表 (question_table の結果) にある種類の集合。文書にだけある種類 (コードが出さない質問) を検出するため、コードの種類の集合と比べる。
+    種類の行は表の構造で判別する (見出しの行と区切りの行以外のすべて)。種類の書き方 (バッククォートの囲み) に依らないので、囲みの無い行も数える。"""
     kinds = set()
     for line in table.splitlines():
         if not line.startswith("|"):
@@ -99,12 +99,12 @@ def question_kinds(table):
 
 
 def question_options_cell(row):
-    """問いの表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
+    """質問の表の行 (question_row の結果) の選択肢の欄 (最後の欄) の文字列。文書の選択肢がコードの選択肢と一致するかを比べる (含むかではなく)。"""
     return row.strip().strip("|").split("|")[-1].strip()
 
 
 def options_text(options):
-    """コードの選択肢を、問いの表の選択肢の欄の書き方 (`a` / `b`。自由回答は「無し」) にする。"""
+    """コードの選択肢を、質問の表の選択肢の欄の書き方 (`a` / `b`。自由回答は「無し」) にする。"""
     return " / ".join(f"`{o}`" for o in options) if options else "無し"
 
 
@@ -115,7 +115,7 @@ ASSIGN2 = mcomment("割り当て", {"to": W7, "assignment": 2}, t(200), 200)
 class AssignmentTest(unittest.TestCase):
 
     def test_no_assignment_comment_means_not_assigned_even_with_field(self):
-        """コメント `割り当て` が無ければ、フィールドに ID があっても割り当て中ではない (出どころはコメント。KTD19)。"""
+        """コメント `割り当て` が無ければ、フィールドに ID があっても割り当て中ではない (取得元はコメント。KTD19)。"""
         s = itemstate.derive(make_item(), LOGIN, {}, PROJECT_NUMBER)
         self.assertIsNone(s["assignment"])
         self.assertFalse(s["assigned"])
@@ -129,7 +129,7 @@ class AssignmentTest(unittest.TestCase):
         self.assertTrue(s["assigned"])
 
     def test_release_with_current_number_ends_assignment(self):
-        """今の番号の `解放` があれば割り当ては終わり (理由と時刻を返す)。"""
+        """今の番号の `解放` があれば割り当ては終了 (理由と時刻を返す)。"""
         item = make_item(comments_=[ASSIGN1, mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "close"}, t(20), 101)], state="CLOSED")
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual(s["release"]["reason"], "close")
@@ -137,12 +137,12 @@ class AssignmentTest(unittest.TestCase):
         self.assertFalse(s["assigned"])
 
     def test_comments_by_other_authors_are_ignored(self):
-        """書き手がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない (R6)。"""
+        """投稿者がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない (R6)。"""
         item = make_item(comments_=[mcomment("割り当て", {"to": W7, "assignment": 1}, t(10), 100, author="someone")])
         self.assertIsNone(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["assignment"])
 
     def test_status_todo_does_not_end_assignment(self):
-        """Status だけの `Todo`・`Done` は終わりでも reopen でもない (KTD19)。"""
+        """Status だけの `Todo`・`Done` は終了でも reopen でもない (KTD19)。"""
         item = make_item(status="Todo", comments_=[ASSIGN1])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertTrue(s["assigned"])
@@ -192,12 +192,12 @@ class EndTest(unittest.TestCase):
         return itemstate.derive(item, LOGIN, pr_states or {}, PROJECT_NUMBER)
 
     def test_close_with_merged_pr_is_normal_end(self):
-        """進行中でない Issue (今の割り当ての PR がマージ済み) の close は正常な終わり。"""
+        """進行中でない Issue (今の割り当ての PR がマージ済み) の close は正常な完了。"""
         s = self._closed(prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)])
         self.assertEqual((s["in_progress"], s["end"], s["assigned"]), (False, {"kind": "normal", "at": t(50)}, False))
 
     def test_close_with_ready_pr_not_merged_is_normal_end(self):
-        """ready for review の後の close は、PR がマージされていなくても正常な終わり (KD9)。"""
+        """ready for review の後の close は、PR がマージされていなくても正常な完了 (KD9)。"""
         s = self._closed(prs=[ref_pr(PR9, t(25), state="OPEN", draft=False)])
         self.assertEqual(s["end"]["kind"], "normal")
 
@@ -207,38 +207,38 @@ class EndTest(unittest.TestCase):
         self.assertEqual(s["end"]["kind"], "normal")
 
     def test_close_in_progress_keeps_assignment(self):
-        """進行中 (PR が無い・draft) の Issue の close は正常な終わりではなく、割り当て中のまま (利用者の答えを待つ。R21)。"""
+        """進行中 (PR が無い・draft) の Issue の close は正常な完了ではなく、割り当て中のまま (利用者の回答待ち。R21)。"""
         for prs in ([], [ref_pr(PR9, t(25), draft=True)]):
             s = self._closed(prs=prs)
             self.assertEqual((s["in_progress"], s["end"], s["assigned"]), (True, None, True), prs)
 
     def test_close_with_previous_assignment_merged_pr_is_in_progress(self):
-        """reopen の後の割り当ての Issue を手で閉じても、前の割り当てのマージ済みの PR では正常な終わりにしない。"""
+        """reopen の後の割り当ての Issue を手で閉じても、前の割り当てのマージ済みの PR では正常な完了にしない。"""
         item = make_item(state="CLOSED", comments_=[ASSIGN2], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                          events=[{"type": "ClosedEvent", "at": t(250), "state_reason": "COMPLETED", "closer_pr": None}])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual((s["pr"], s["in_progress"], s["end"]), (None, True, None))
 
     def test_reopen_after_end_is_detected_and_reopen_while_pending_is_not(self):
-        """終わった後の `ReopenedEvent` は reopen。終わる前 (進行中の close の後) の reopen は、終わった後の reopen ではない。"""
+        """終了した後の `ReopenedEvent` は reopen。終了する前 (進行中の close の後) の reopen は、終了した後の reopen ではない。"""
         ended = make_item(state="OPEN", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                           events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(ended, LOGIN, {}, PROJECT_NUMBER)
-        self.assertEqual((s["end"]["kind"], s["reopened"]), ("normal", {"at": t(60)}), "閉じた時点で正常な終わり。reopen は終わった後")
+        self.assertEqual((s["end"]["kind"], s["reopened"]), ("normal", {"at": t(60)}), "閉じた時点で正常な完了。reopen は終了した後")
         pending = make_item(state="OPEN", status="Done", comments_=[ASSIGN1],
                             events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(pending, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual((s["end"], s["reopened"], s["assigned"]), (None, None, True))
 
     def test_reopened_issue_with_pr_created_after_close_is_not_ended(self):
-        """開いている Issue で、PR が close より後に作られたなら、その close は進行中の close (正常な終わりではない)。"""
+        """開いている Issue で、PR が close より後に作られたなら、その close は進行中の close (正常な完了ではない)。"""
         item = make_item(state="OPEN", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(70), state="OPEN", draft=False)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
         self.assertEqual((s["end"], s["reopened"], s["assigned"]), (None, None, True))
 
     def test_released_then_reopened(self):
-        """`解放` (理由 close) の後の `ReopenedEvent` も終わった後の reopen。"""
+        """`解放` (理由 close) の後の `ReopenedEvent` も終了した後の reopen。"""
         item = make_item(state="OPEN", comments_=[ASSIGN1, mcomment("解放", {"to": W7, "assignment": 1, "release_reason": "close"}, t(55), 101)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         s = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)
@@ -268,7 +268,7 @@ def stage_of(*cs, status="In Progress", events=()):
 class DeclarationStageTest(unittest.TestCase):
 
     def test_no_declaration(self):
-        """宣言のコメントが無い項目は、判定の要る宣言が無く段階も無い (何も求めず作業のセッションの宣言を待つ)。"""
+        """宣言のコメントが無い項目は、判定の要る宣言が無く段階も無い (何も求めず、作業のセッションが宣言するまで待機する)。"""
         d = stage_of()
         self.assertEqual((d["judged"], d["stage"], d["held"]), (None, None, []))
 
@@ -286,18 +286,18 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["stage"], d["go"]["comment_id"], d["held"], d["manager_blocked"]), ("go", 500, ["db"], False))
 
     def test_waiting_for_user_answer_does_not_make_blocked_managers(self):
-        """理由が `利用者の答え` だけの `待機` では Status を変えないので、Status が `Blocked` でも管理のセッションのものではない。"""
-        d = stage_of(DECL1, _wait(400, [{"kind": "利用者の答え"}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
+        """理由が `利用者の回答` だけの `待機` では Status を変えないので、Status が `Blocked` でも管理のセッションのものではない。"""
+        d = stage_of(DECL1, _wait(400, [{"kind": "利用者の回答"}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["wait"]["reasons"], d["manager_blocked"], d["return_status"], d["own_blockers"]),
-                         ("waiting", [{"kind": "利用者の答え"}], False, None, []))
+                         ("waiting", [{"kind": "利用者の回答"}], False, None, []))
 
     def test_waiting_for_issue_with_blocked_status_after_wait_is_managers(self):
-        """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。戻り先は `In Progress`、自分が足した blockedBy は待つ Issue。"""
+        """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。Status の復帰先は `In Progress`、自分が足した blockedBy は完了待ちの Issue。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["manager_blocked"], d["return_status"], d["own_blockers"], d["waiting_blockers"]), ("waiting", True, "In Progress", [A2], [A2]))
 
     def test_blocked_status_before_wait_is_users(self):
-        """`Blocked` への変化が `待機` より前なら、利用者が付けたもの (時刻で見分ける。KTD19 の基準)。"""
+        """`Blocked` への変化が `待機` より前なら、利用者が付けたもの (時刻で判別する。KTD19 の基準)。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(12))])
         self.assertEqual((d["manager_blocked"], d["return_status"]), (False, None))
 
@@ -310,7 +310,7 @@ class DeclarationStageTest(unittest.TestCase):
         """`待機` の後に `開始可` があれば作業中 (最新の判定の結果で決める)。Status が `Blocked` のままでも管理のセッションのものではない (戻し済みのはず)。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), _go(400, t(15), 501), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["manager_blocked"], d["waiting_blockers"], d["own_blockers"]), ("go", False, [], [A2]),
-                         "待っている blocker は無いが、自分が足した blocker として残る (`開始可` の後に外すため)")
+                         "待機している blocker は無いが、自分が足した blocker として残る (`開始可` の後に外すため)")
 
     def test_own_blockers_include_waits_of_previous_declarations(self):
         """自分が足した blocker は、今の割り当てのすべての `待機` から導く (ファイルを変えた更新で判定の要る宣言が変わっても残る)。"""
@@ -323,8 +323,8 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["stage"], d["wait"]["reasons"][0]["pr"], d["own_blockers"]), ("waiting", PR10, [A2]))
 
     def test_returned_declaration_and_its_rewrite(self):
-        """`依頼` (宣言の書き直し) で差し戻された宣言は段階 returned。書き直した更新は、資源を外しただけでも判定の要る宣言になる。"""
-        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
+        """`依頼` (宣言の修正) で差し戻された宣言は段階 returned。修正した更新は、資源を外しただけでも判定の要る宣言になる。"""
+        req = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
         d = stage_of(DECL1, req)
         self.assertEqual((d["stage"], d["returned"]["comment_id"]), ("returned", 500))
         rewrite = wcomment("宣言の更新", None, t(14), 401, body=decl_body(resources=()))
@@ -357,7 +357,7 @@ class DeclarationStageTest(unittest.TestCase):
         self.assertEqual((d["judged"]["error"], d["judged"]["declaration"]["files"]), (None, [{"path": "src/app.ts", "units": None, "kind": None}]))
 
     def test_declaration_paths_are_normalized_for_update_kind(self):
-        """パスの綴りだけが違う (./src/a.py) 更新は同じファイルと数え、資源を外すだけなら判定の要る宣言にならない (declaration.parse と同じ正規化)。"""
+        """パスの表記だけが違う (./src/a.py) 更新は同じファイルと数え、資源を外すだけなら判定の要る宣言にならない (declaration.parse と同じ正規化)。"""
         update = wcomment("宣言の更新", None, t(14), 401, body=decl_body(files=(("./src/a.py", None),), resources=()))
         d = stage_of(DECL1, _go(400, t(13), 500), update)
         self.assertEqual((d["judged"]["comment_id"], d["stage"], d["held"]), (400, "go", []))
@@ -384,7 +384,7 @@ class DeclaredResourcesTest(unittest.TestCase):
     def test_declared_resources_lists_parsed_declarations_in_order(self):
         """declared_resources は、今の割り当ての読めた宣言ごとの資源を投稿の順に持ち、差し戻されたか・`開始可` があるかも持つ (読めない宣言は入らない)。"""
         item = make_item(comments_=[ASSIGN1, wcomment("着手の宣言", None, t(12), 400, body=decl_body(resources=("db",))),
-                                    mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500),
+                                    mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500),
                                     wcomment("宣言の更新", None, t(14), 401, body="宣言です"),
                                     wcomment("宣言の更新", None, t(15), 402, body=decl_body(resources=("gpu",)))])
         d = itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["declaration"]
@@ -413,7 +413,7 @@ class ResourceUsageTest(unittest.TestCase):
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["reserved"], [])
 
     def test_label_prefix_is_case_insensitive(self):
-        """ラベルの名前は GitHub が大文字小文字を区別しないので、`Resource:DB` も資源 DB として予約に数える (名前はラベルの綴りのまま)。"""
+        """ラベルの名前は GitHub が大文字小文字を区別しないので、`Resource:DB` も資源 DB として予約に数える (名前はラベルの表記のまま)。"""
         item = make_item(labels=["Resource:DB"], comments_=[ASSIGN1], events=[_label_event("LabeledEvent", "Resource:DB", t(1))])
         self.assertEqual(itemstate.resource_labels(["Resource:DB", "bug", "resource:"]), ["DB"])
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER)["reserved"], ["DB"])
@@ -425,7 +425,7 @@ class ResourceUsageTest(unittest.TestCase):
         self.assertEqual(itemstate.derive(item, LOGIN, {}, PROJECT_NUMBER, attrs_table=table)["reserved"], [])
 
     def test_usage_from_states(self):
-        """資源の使用 (資源 → 持つ項目) は、割り当て中の項目の予約と持っている資源から導く。終わった項目は持たない。待っている宣言の新しい資源は持たない。"""
+        """資源の使用 (資源 → 持つ項目) は、割り当て中の項目の予約と持っている資源から導く。割り当てが終了した項目は持たない。待機している宣言の新しい資源は持たない。"""
         held_item = make_item(key=A1, labels=["resource:db"], comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], events=[_label_event("LabeledEvent", "resource:db", t(1))])
         waiting_item = make_item(key=A2, comments_=[ASSIGN1, wcomment("着手の宣言", None, t(12), 410, body=decl_body(resources=("gpu",))),
                                                      _wait(410, [{"kind": "資源", "resource": "gpu"}], t(13), 510)])
@@ -454,8 +454,8 @@ class WorkCheckTest(unittest.TestCase):
         self.assertEqual(itemstate.work_check(item2, W7, LOGIN, {})["released"]["reason"], "解除")
 
     def test_pending_requests_by_kind(self):
-        """まだ行っていない `依頼`: 宣言の書き直しは後の宣言の更新で、本文の追記は PR の閉じる参照で、小さな PR は対応する `小さな PR の報告` で行ったとする。"""
-        rewrite = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
+        """まだ行っていない `依頼`: 宣言の修正は後の宣言の更新で、本文の追記は PR の閉じる参照で、小さな PR は対応する `小さな PR の報告` で行ったとする。"""
+        rewrite = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
         append = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "本文の追記", "pr": PR9}, t(14), 501)
         small = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "小さな PR", "waiting_issue": A2, "waiting_declaration": 777}, t(15), 502)
         item = make_item(comments_=[ASSIGN1, DECL1, rewrite, append, small])
@@ -467,8 +467,8 @@ class WorkCheckTest(unittest.TestCase):
         self.assertEqual(c["pending_requests"], [])
 
     def test_request_to_other_session_or_previous_assignment_is_not_mine(self):
-        req_other = mcomment("依頼", {"to": "W-8", "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 500)
-        req_prev = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の書き直し", "declaration": 400}, t(13), 501)
+        req_other = mcomment("依頼", {"to": "W-8", "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 500)
+        req_prev = mcomment("依頼", {"to": W7, "assignment": 1, "request_kind": "宣言の修正", "declaration": 400}, t(13), 501)
         item = make_item(comments_=[ASSIGN1, req_other, req_prev, ASSIGN2])
         self.assertEqual(itemstate.work_check(item, W7, LOGIN, {})["pending_requests"], [])
 
@@ -483,7 +483,7 @@ class WorkCheckTest(unittest.TestCase):
 class WorkHeldTest(unittest.TestCase):
 
     def test_held_items_with_stage_and_blocked_owner(self):
-        """割り当て中の Issue (閉じて答えを待つものを含む) を返し、終わった Issue は返さない。宣言の段階と `Blocked` の書き手を添える。"""
+        """割り当て中の Issue (閉じて回答待ちのものを含む) を返し、割り当てが終了した Issue は返さない。宣言の段階と `Blocked` の書き込み元を添える。"""
         no_decl = make_item(key=A1, comments_=[ASSIGN1])
         waiting = make_item(key=A2, status="Blocked", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A1}], t(13), 500)],
                             events=[_status_event("Blocked", t(14))])
@@ -511,7 +511,7 @@ def _blocker(key, state="OPEN"):
 
 
 def dep_wait(blockers, at, cid):
-    return mcomment("依存の待ち", {"blockers": list(blockers)}, at, cid)
+    return mcomment("依存の待機", {"blockers": list(blockers)}, at, cid)
 
 
 def dep_clear(at, cid):
@@ -527,21 +527,21 @@ class DependencyBlockedTest(unittest.TestCase):
     """割り当ての無い項目の Ready ⇄ Blocked の再導出 (KTD7)。範囲は担当者が自分 1 人の項目で、Status が Ready か Blocked のもの。"""
 
     def test_ready_with_open_blocker_waits(self):
-        """開いている blocker があれば、`依存の待ち` を書いてから `Blocked` にする (コメントが先)。"""
+        """開いている blocker があれば、`依存の待機` を書いてから `Blocked` にする (コメントが先)。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1), _blocker(A2, "CLOSED")])
         actions, reports = dependency(item)
-        self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の待ち"), ("set-status", "Blocked")])
+        self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の待機"), ("set-status", "Blocked")])
         self.assertEqual((actions[0]["values"], reports), ({"blockers": [A1]}, []))
 
     def test_blocked_by_manager_returns_to_ready_when_blockers_close(self):
-        """管理のセッションが書いた `Blocked` (最新が `依存の待ち`) は、blocker がすべて閉じたら `依存の解消` を書いてから `Ready` に戻す。"""
+        """管理のセッションが書いた `Blocked` (最新が `依存の待機`) は、blocker がすべて閉じたら `依存の解消` を書いてから `Ready` に戻す。"""
         item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")], comments_=[dep_wait([A1], t(10), 100)],
                          events=[_status_event("Blocked", t(11), previous="Ready")])
         actions, _ = dependency(item)
         self.assertEqual([(a["kind"], a.get("comment_kind") or a.get("status")) for a in actions], [("comment", "依存の解消"), ("set-status", "Ready")])
 
     def test_blocked_by_user_is_not_rewritten(self):
-        """`依存の待ち` の無い `Blocked` (利用者が手で付けた) は、blocker が閉じていても書き換えない。"""
+        """`依存の待機` の無い `Blocked` (利用者が手で付けた) は、blocker が閉じていても書き換えない。"""
         item = make_item(status="Blocked", session_field=None, blocked_by=[_blocker(A1, "CLOSED")])
         self.assertEqual(dependency(item), ([], []))
         item = make_item(status="Blocked", session_field=None, blocked_by=[])
@@ -564,13 +564,13 @@ class DependencyBlockedTest(unittest.TestCase):
             self.assertEqual(dependency(item), ([], []), assignees)
 
     def test_interrupted_after_wait_comment_continues_to_blocked(self):
-        """`依存の待ち` を書いた後に止まった (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、続きの `Blocked` を書く。"""
+        """`依存の待機` を書いた後で中断された (Status が `Ready` のまま、その後の Status の変化が無い) 項目は、残りの書き込みとして `Blocked` を書く。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)])
         actions, reports = dependency(item)
         self.assertEqual(([(a["kind"], a["status"], a.get("continuation")) for a in actions], reports), ([("set-status", "Blocked", True)], []))
 
     def test_user_returned_to_ready_after_wait_is_reported_not_rewritten(self):
-        """`依存の待ち` → `Blocked` の後に利用者が `Ready` に戻した (Status の変化がコメントより後) 項目は、書き換えずに人の変更として報告する。"""
+        """`依存の待機` → `Blocked` の後に利用者が `Ready` に戻した (Status の変化がコメントより後) 項目は、書き換えずに人の変更として報告する。"""
         item = make_item(status="Ready", session_field=None, blocked_by=[_blocker(A1)], comments_=[dep_wait([A1], t(10), 100)],
                          events=[_status_event("Blocked", t(11), previous="Ready"), _status_event("Ready", t(12), previous="Blocked")])
         actions, reports = dependency(item)
@@ -583,7 +583,7 @@ class DependencyBlockedTest(unittest.TestCase):
         self.assertEqual([(a["kind"], a["status"], a.get("continuation")) for a in actions], [("set-status", "Ready", True)])
 
     def test_ended_assignment_counts_as_unassigned(self):
-        """割り当てが終わった (正常な終わりの後に reopen された) 項目も、割り当ての無い項目として扱う。"""
+        """割り当てが終了した (正常な完了の後に reopen された) 項目も、割り当ての無い項目として扱う。"""
         item = make_item(status="Ready", state="OPEN", blocked_by=[_blocker(A1)], comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
         actions, _ = dependency(item)
@@ -621,14 +621,14 @@ def kinds(entries):
 
 
 class AssignedScenesTest(unittest.TestCase):
-    """割り当て中の項目の場面ごとの扱い (問い・続きの書き込み・報告)。"""
+    """割り当て中の項目の場面ごとの扱い (質問・残りの書き込み・報告)。"""
 
     def test_nothing_to_do_for_item_in_expected_state(self):
         out = turn_of(make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)]))
         self.assertEqual((out["actions"], out["questions"], out["reports"], out["record_lost"]), ([], [], [], False))
 
     def test_close_in_progress_asks(self):
-        """進行中の Issue の close は、止めるか reopen して続けるかを尋ねる。答えが出るまで割り当て中のまま、ほかの書き込みはしない。"""
+        """進行中の Issue の close は、中断するか reopen して続けるかを質問する。回答が出るまで割り当て中のまま、ほかの書き込みはしない。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         out = turn_of(item)
@@ -636,7 +636,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(out["actions"], [])
 
     def test_pending_question_is_not_asked_again_and_item_is_left_alone(self):
-        """同じ項目と種類の未回答の問いがあれば尋ね直さず、その項目には手を付けない (pending に返す)。"""
+        """同じ項目と種類の未回答の質問があれば質問し直さず、その項目には手を付けない (pending に返す)。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -644,7 +644,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual((out["questions"], [p["question_id"] for p in out["pending"]]), ([], ["q1"]))
 
     def test_reopen_while_close_question_pending_withdraws_and_restores_status(self):
-        """進行中の close の答えを待つ間に reopen されたら、問いを取り下げ、フィールドは空にせず、Status を導いた状態に戻す。"""
+        """進行中の close の回答待ちの間に reopen されたら、質問を撤回し、フィールドは空にせず、Status を導いた状態に戻す。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}, {"type": "ReopenedEvent", "at": t(60)}])
         rec = rec_with(items={A9: rec_item()}, questions={"q1": {"item": A9, "kind": "close-in-progress", "options": ["stop", "reopen"], "asked_at": t(51), "answer": None, "answered_at": None}})
@@ -653,7 +653,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(kinds(out["reports"]), ["reopened-while-pending"])
 
     def test_reopen_after_end_clears_fields_and_reports(self):
-        """終わった後の reopen は、フィールドが自分の書いた値 (今の割り当ての宛先) なら空にして報告する。Status は変えない。"""
+        """終了した後の reopen は、フィールドが自分の書いた値 (今の割り当ての宛先) なら空にして報告する。Status は変えない。"""
         item = make_item(state="OPEN", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": 9}, {"type": "ReopenedEvent", "at": t(60)}])
         out = turn_of(item)
@@ -670,7 +670,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([(q["kind"], q["options"]) for q in out["questions"]], [("assignee-changed", ["release", "continue"])])
 
     def test_field_cleared_or_changed_by_user_asks(self):
-        """フィールドの値が宛先と違い、更新が `割り当て` より後なら利用者の変更として尋ねる。"""
+        """フィールドの値が宛先と違い、更新が `割り当て` より後なら利用者の変更として質問する。"""
         item = make_item(session_field="", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)])
         item["fields"]["Agent session ID"]["updated_at"] = t(30)
         self.assertEqual(kinds(turn_of(item)["questions"]), ["field-cleared"])
@@ -679,7 +679,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(kinds(turn_of(item)["questions"]), ["field-changed"])
 
     def test_field_not_written_yet_is_continued(self):
-        """`割り当て` の後にフィールドが書かれていない (更新がコメントより前) 項目は、途中で止まったとして続きを書く。"""
+        """`割り当て` の後にフィールドが書かれていない (更新がコメントより前) 項目は、途中で中断されたとして残りを書く。"""
         item = make_item(session_field=None, status="Ready", comments_=[ASSIGN1])
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("field"), a.get("value"), a.get("status")) for a in out["actions"]],
@@ -687,7 +687,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertTrue(all(a["continuation"] for a in out["actions"]))
 
     def test_status_changed_by_user_asks_release(self):
-        """割り当て中の項目の Status を手で `Todo` にされたら、reopen とせず割り当てを保ち、解除するかを尋ねる (AE8)。"""
+        """割り当て中の項目の Status を手で `Todo` にされたら、reopen とせず割り当てを保ち、解除するかを質問する (AE8)。"""
         item = make_item(status="Todo", comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], events=[_status_event("Todo", t(30))])
         out = turn_of(item)
         self.assertEqual([(q["kind"], q["options"]) for q in out["questions"]], [("status-changed", ["release", "restore"])])
@@ -697,13 +697,13 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual(turn_of(item)["questions"], [])
 
     def test_wait_continuation_adds_blocker_and_blocked(self):
-        """`待機` (Issue) を書いた後に止まった項目は、blockedBy と `Blocked` の続きを書く。"""
+        """`待機` (Issue) を書いた後で中断された項目は、残りの書き込みとして blockedBy と `Blocked` を書く。"""
         item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("blocked-by-add", A2), ("set-status", "Blocked")])
 
     def test_todo_with_wait_continues_to_blocked_once(self):
-        """Status が `Todo` のまま (書かれずに止まった) で `待機` (Issue) もある項目は、続きの Status を `Blocked` 1 つだけにする (In Progress と Blocked の 2 つを返さない)。"""
+        """Status が `Todo` のまま (書かれずに中断された) で `待機` (Issue) もある項目は、残りの書き込みの Status を `Blocked` 1 つだけにする (In Progress と Blocked の 2 つを返さない)。"""
         item = make_item(status="Todo", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500)])
         out = turn_of(item)
         self.assertEqual([(a["kind"], a.get("blocker") or a.get("status")) for a in out["actions"]], [("set-status", "Blocked"), ("blocked-by-add", A2)])
@@ -723,7 +723,7 @@ class AssignedScenesTest(unittest.TestCase):
         config = {"third_party_edit_check": [A]}
         self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item, config=config)["questions"]], [("third-party-edit", ["stop", "continue"])])
         rec = rec_with(items={A9: rec_item(confirmed=t(15))})
-        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確かめた時刻までの編集は尋ねない")
+        self.assertEqual(kinds(turn_of(item, rec=rec, config=config)["questions"]), [], "確認した時刻までの編集は質問しない")
 
     def test_pr_without_closing_reference_requests_append(self):
         """報告の PR が Issue を閉じる参照を持たなければ `依頼` (本文の追記) を書く (既に同じ依頼があれば書かない)。"""
@@ -758,7 +758,7 @@ class AssignedScenesTest(unittest.TestCase):
         out = turn_of(item, pr_states=prs)
         self.assertEqual((out["actions"], kinds(out["reports"])), ([], ["pr-base-not-default"]))
         rec = rec_with(items={A9: rec_item(reported={"pr-base-not-default": t(31)})})
-        self.assertEqual(kinds(turn_of(item, rec=rec, pr_states=prs)["reports"]), [], "報告済みの印があれば報告しない")
+        self.assertEqual(kinds(turn_of(item, rec=rec, pr_states=prs)["reports"]), [], "報告済みのフラグがあれば報告しない")
 
     def test_merged_pr_with_open_issue_and_closed_pr_ask(self):
         item = make_item(comments_=[ASSIGN1, DECL1, _go(400, t(13), 500)], prs=[ref_pr(PR9, t(25), state="MERGED", merged=True)])
@@ -767,7 +767,7 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([(q["kind"], q["options"]) for q in turn_of(item)["questions"]], [("pr-closed-unmerged", ["release", "keep"])])
 
     def test_pr_left_open_after_normal_end_is_reported(self):
-        """正常な終わり (ready for review の後の close) の後に開いたまま残る PR は 1 回報告し、判定の相手にしない。"""
+        """正常な完了 (ready for review の後の close) の後に開いたまま残る PR は 1 回報告し、判定の相手にしない。"""
         item = make_item(state="CLOSED", status="Done", comments_=[ASSIGN1], prs=[ref_pr(PR9, t(25), state="OPEN")],
                          events=[{"type": "ClosedEvent", "at": t(50), "state_reason": "COMPLETED", "closer_pr": None}])
         self.assertEqual(kinds(turn_of(item)["reports"]), ["pr-left-open"])
@@ -786,14 +786,14 @@ class AssignedScenesTest(unittest.TestCase):
         self.assertEqual([a for a in out["actions"] if a.get("comment_kind") == "引き継ぎ"], [], "自分の `引き継ぎ` が既にあれば書かない")
 
     def test_record_lost_reasks_user_answer_waits(self):
-        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の答え` を待つ宣言を尋ね直す項目として返し、報告に記録を失ったためと書く。"""
-        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の答え"}], t(13), 500)])
+        """記録を失ったとき (記録が無い・前の記録が ended) は、`利用者の回答` を理由に待機する宣言を質問し直す項目として返し、報告に記録を失ったためと書く。"""
+        item = make_item(status="In Progress", comments_=[ASSIGN1, DECL1, _wait(400, [{"kind": "利用者の回答"}], t(13), 500)])
         for rec in (None, rec_with(manager_state="ended")):
             out = turn_of(item, rec=rec)
             self.assertEqual((out["record_lost"], [(q["kind"], q.get("record_lost")) for q in out["questions"]]), (True, [("user-answer-lost", True)]))
 
     def test_removed_item_with_intent_asks(self):
-        """記録の意図にある項目が Project の一覧に無ければ、除去として解除を尋ねる。"""
+        """記録の意図にある項目が Project の一覧に無ければ、除去として解除を質問する。"""
         out = itemstate.derive_turn([], rec_with(items={A9: rec_item()}), LOGIN, M1, PROJECT_NUMBER, {}, {}, [], {}, {"third_party_edit_check": []})
         self.assertEqual([(q["kind"], q["item"], q["options"]) for q in out["questions"]], [("removed", A9, ["release", "keep"])])
 
@@ -909,7 +909,7 @@ class CliTest(FakeGhCase):
         self.assertEqual((out["items"][0]["pr"]["url"], out["items"][0]["pr"]["source"]), (PR9, "report"))
 
     def test_item_state_stops_on_list_problems(self):
-        """項目の一覧そのものが欠ければ導かない。"""
+        """項目の一覧そのものが無ければ導かない。"""
         self.responses([USER_ENTRY, {"substring": ["query ProjectItems", '"after": "CURSOR-PAGE-1"'], "stdout": "", "stderr": "gh: HTTP 502\n", "exit": 1},
                         {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-page1"}}])
         code, out, err = self.cli("item", "state", "--dir", self.manager)
@@ -996,12 +996,12 @@ class DocTest(unittest.TestCase):
             self.assertIn(key, doc, f"{key} が文書に無い")
         for name in itemstate.STAGES + itemstate.ACTION_KINDS + itemstate.REPORT_KINDS:
             self.assertIn(f"`{name}`", doc, f"{name} が文書に無い")
-        table = question_table(doc, "項目の状態の問いの種類 (`kind`) と選択肢 (`options`)")
-        self.assertEqual(question_kinds(table), set(itemstate.QUESTION_OPTIONS), "flow.md の問いの表の種類とコードの種類が一致しない")
+        table = question_table(doc, "項目の状態の質問の種類 (`kind`) と選択肢 (`options`)")
+        self.assertEqual(question_kinds(table), set(itemstate.QUESTION_OPTIONS), "flow.md の質問の表の種類とコードの種類が一致しない")
         for kind, options in itemstate.QUESTION_OPTIONS.items():
             row = question_row(table, kind)
-            self.assertIsNotNone(row, f"問いの種類 {kind} が flow.md の問いの表に無い")
-            self.assertEqual(question_options_cell(row), options_text(options), f"問いの種類 {kind} の選択肢が flow.md の問いの表の行と一致しない")
+            self.assertIsNotNone(row, f"質問の種類 {kind} が flow.md の質問の表に無い")
+            self.assertEqual(question_options_cell(row), options_text(options), f"質問の種類 {kind} の選択肢が flow.md の質問の表の行と一致しない")
 
 
 if __name__ == "__main__":

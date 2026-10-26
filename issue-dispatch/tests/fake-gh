@@ -4,7 +4,7 @@
 実際の gh の代わりに、環境変数の指示どおりに振る舞う (先例: review-triage/tests/fake-claude)。
 
 - FAKE_GH_ARGS: 受けた引数 (argv[1:]) と標準入力の中身 (stdin) と時刻と cwd を JSON の 1 行として追記するファイル
-- FAKE_GH_SLEEP: 応答の前に待つ秒数 (既定 0)
+- FAKE_GH_SLEEP: 応答の前に待機する秒数 (既定 0)
 - FAKE_GH_FIXTURES: 固定データのディレクトリ (既定はこのファイルと同じディレクトリの fixtures/gh)
 - FAKE_GH_MODE:
     ok              FAKE_GH_RESPONSES の応答の指定に従う (既定)
@@ -12,18 +12,18 @@
     not_logged_in   固定データ auth-not-logged-in を返す (終了コード 4)
     rate_limited    固定データ graphql-rate-limited を返す (終了コード 1)
     network         固定データ network-unreachable を返す (終了コード 1)
-    hang            応答せずに終わらない (呼び出し側のタイムアウトを試す)
-    exit            何も書かずに FAKE_GH_EXIT (既定 1) で終わる
+    hang            応答せずに終了しない (呼び出し側のタイムアウトを試す)
+    exit            何も書かずに FAKE_GH_EXIT (既定 1) で終了する
 - FAKE_GH_RESPONSES: 応答の指定の JSON ファイル。要素の配列で、受けた引数に最初に一致した要素を返す。要素のキー:
     prefix    引数の先頭がこの配列と同じなら一致 (例: ["issue", "view"])
     contains  この配列の要素をすべて含めば一致 (prefix と両方書けば両方)
     substring この文字列を含む引数が 1 つでもあるか、標準入力の中身に含まれれば一致 (GraphQL の操作名 "query ProjectItems" などで
-              見分ける。`gh api graphql --input -` の本文は標準入力に来る)。文字列の配列なら、すべてが一致すること。ほかの条件と両方書けば両方
+              識別する。`gh api graphql --input -` の本文は標準入力に来る)。文字列の配列なら、すべてが一致すること。ほかの条件と両方書けば両方
     stdout    標準出力に書く文字列。オブジェクトや配列なら JSON にして書く。{"fixture": "<場合>"} なら固定データの <場合>.stdout の中身
     stderr    標準エラー出力に書く文字列 (既定は空)
     exit      終了コード (既定 0)
     once      真なら 1 回だけ使い、使ったら used を真にしてファイルに書き戻す (書き込みの直後に別の値を返す場合を表す)
-  一致する要素が無ければ、標準エラー出力に引数を書いて終了コード 99 で終わる (指定の漏れを、成功した応答と取り違えないため)
+  一致する要素が無ければ、標準エラー出力に引数を書いて終了コード 99 で終了する (指定の漏れを、成功した応答と取り違えないため)
 """
 
 import json
