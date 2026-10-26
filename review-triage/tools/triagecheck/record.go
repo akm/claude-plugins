@@ -1259,7 +1259,7 @@ func recordStatusJa(s string) string {
 }
 
 // errRecordDirMissing は「明示指定したディレクトリが無い」ことを表す番兵。呼び出し側が
-// errors.Is で見分け、他の検査を続けたうえで報告に積めるようにする — 即座に返すと
+// errors.Is で判別し、他の検査を続けたうえで報告に積めるようにする — 即座に返すと
 // 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れない。
 // 権限・I/O のエラーは続行しても意味が無いので、これとは区別して返す。
 var errRecordDirMissing = errors.New(
