@@ -201,7 +201,7 @@ func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 }
 
 // ファイルがそもそも無いリポジトリ (スキル未導入) では検査は何も報告せずに通る。
-// 在り処の指定が無い (origin が空) ときだけの扱いであることは、次のテストが対にする。
+// パスの指定が無い (origin が空) ときだけの扱いであることは、次のテストが対にする。
 func TestJudgmentFlowAbsentFileSkipped(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, fs.ErrNotExist }
 	problems := judgmentFlowProblems(nil, read, "")
@@ -210,7 +210,7 @@ func TestJudgmentFlowAbsentFileSkipped(t *testing.T) {
 	}
 }
 
-// 在り処を指定したのにファイルが無いなら報告する。指定は「そこを検査せよ」という
+// パスを指定したのにファイルが無いなら報告する。指定は「そこを検査せよ」という
 // 意思表示なので、報告せずに通すと検査が無効になったことに気づけない (診断ツールの偽陰性)。
 // 報告にはどちらの指定を直せばよいか (origin) を載せる — 解決の経路が 2 つあるため。
 func TestJudgmentFlowAbsentFileReportedWhenOriginGiven(t *testing.T) {

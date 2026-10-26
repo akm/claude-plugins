@@ -98,7 +98,7 @@ func run(args []string) error {
 	// 同じ値を読むので、経路ごとに渡すと片方だけ違う案内を出す組み合わせができる。
 	summaryCommand = in.summaryCommand
 
-	// 明示した在り処の不在は、経路を問わず「指定したのに検査できない」なので
+	// 明示したパスの不在は、経路を問わず「指定したのに検査できない」なので
 	// ここでエラーにする。記録のディレクトリと判定フローの両方が無いときは 1 回の実行で両方を
 	// 報告する — 片方で即 return すると、片方を直して再実行するまで
 	// もう一方も壊れていることを知れない。
@@ -164,7 +164,7 @@ type resolvedInputs struct {
 	// judgmentFlow は検査に使う判定フローの絶対パス。指定も CLAUDE_PLUGIN_ROOT も
 	// 無ければ空 (そのとき判定フローの検査は未導入として通る)。
 	judgmentFlow string
-	// judgmentFlowOrigin は判定フローの在り処を指定したものの名前
+	// judgmentFlowOrigin は判定フローのパスを指定したものの名前
 	// (-judgment-flow / CLAUDE_PLUGIN_ROOT)。報告に使う。既定なら空。
 	judgmentFlowOrigin string
 	// embedJudgmentFlow はラッパーに埋め込む判定フローの絶対パス。明示された
@@ -223,7 +223,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	}
 	out.recordDir = absRecordDir
 
-	// 判定フローの在り処は、明示の指定 → CLAUDE_PLUGIN_ROOT → 既定 (無し) の順。
+	// 判定フローのパスは、明示の指定 → CLAUDE_PLUGIN_ROOT → 既定 (無し) の順。
 	//
 	// 「絶対パスに -current-dir を併記したらエラー」は -judgment-flow で明示された
 	// ときにだけ課す。CLAUDE_PLUGIN_ROOT から組み立てた値は常に絶対で、利用者が
@@ -312,7 +312,7 @@ func isBlankPath(s string) bool {
 	}) == ""
 }
 
-// missingPathProblems は、明示した在り処のうち実在しないものを報告の行にして返す。
+// missingPathProblems は、明示したパスのうち実在しないものを報告の行にして返す。
 // 対象は入力として読むパス (記録のディレクトリと判定フロー) で、ラッパーの出力先は
 // 含めない (これから作るものなので、無いのが普通)。
 //
@@ -354,9 +354,9 @@ var (
 	// errFlagUnusedWithInstallWrapper は、生成の経路で使われないフラグが
 	// -install-wrapper と併記されたことを表す。
 	errFlagUnusedWithInstallWrapper = errors.New("-install-wrapper と併用できません")
-	// errPathMissing は、明示した在り処 (記録のディレクトリ・判定フロー) が実在しない
+	// errPathMissing は、明示したパス (記録のディレクトリ・判定フロー) が実在しない
 	// ことを表す。どれが無いかは stderr に並べた報告の行が示す。
-	errPathMissing = errors.New("指定した在り処が存在しません")
+	errPathMissing = errors.New("指定したパスが存在しません")
 	// errEmptySummaryCommand は -summary-command に空 (空白・不可視だけを含む)
 	// が明示指定されたことを表す。
 	errEmptySummaryCommand = errors.New("空の文字列が指定されました")
@@ -414,14 +414,14 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 	return filepath.Join(base, p), true, nil
 }
 
-// resolveJudgmentFlowPath は判定フローの正本の在り処を決める。優先順は
+// resolveJudgmentFlowPath は判定フローの正本のパスを決める。優先順は
 // 明示の指定 → プラグインの展開先 → 既定 (リポジトリ内にスキルを直接置いた形)。
 //
 // 見つからなかったときに空文字を返して既定のままにするのは、判定フローが
 // 無い状態を「検査対象が無い」として通す判断が judgmentFlowProblems 側に
 // あるため。ここでエラーにすると、記録の検査まで巻き添えで落ちる。
 //
-// 2 つ目の戻り値は在り処を指定したものの名前 (origin)。-judgment-flow と
+// 2 つ目の戻り値はパスを指定したものの名前 (origin)。-judgment-flow と
 // CLAUDE_PLUGIN_ROOT のどちらも、その場所を検査せよという指定なので名前を返す。
 // 既定に落ちたときだけ空で、そのとき不在は未導入として通る。名前を返すのは、
 // 不在の報告にどちらを直せばよいかを載せるため。
