@@ -452,7 +452,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((out["judgments"][0]["result"], kinds(out["actions"])), ("request", [("comment", "依頼")]))
 
     def test_undeclared_reservation_is_handled_before_config_and_form_checks(self):
-        """宣言に無い予約の扱いは、リポジトリの設定が読めないときも、規則での形の誤りのときも行い、結果と本文に載せる (資源の使用と食い違わないため)。"""
+        """宣言に無い予約の扱いは、リポジトリの設定が読めないときも、規則での形の誤りのときも行い、結果と本文に載せる (資源の使用と矛盾しないため)。"""
         events = [{"type": "LabeledEvent", "at": t(9), "label": f"resource:{n}"} for n in ("cache", "db")]
         mine = item(A9, [ASSIGN1, decl(400, t(20), files=(("src/a.py", [["f"]]),), resources=("gpu",))], labels=["resource:cache", "resource:db"], events=events)
         out = run_judge([mine], read=reader(UNREADABLE_CONFIG), attrs=self.attrs)
