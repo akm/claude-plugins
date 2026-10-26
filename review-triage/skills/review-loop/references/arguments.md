@@ -29,14 +29,14 @@ review-loop --end [<置き場>]
 
 各キーの意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節。`--model` はワーカーの `--model` にそのまま渡す指定、`--effort` はワーカーの `--effort` で、どちらも周回の条件として `loop.yaml` に残る (語の区別は下の「モデルと effort を指す語」)。
 
-- **`--resume [<置き場>]`**: 止まった (または前のセッションが報告せずに終了した) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
+- **`--resume [<置き場>]`**: 停止した (または前のセッションが報告せずに終了した) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
 - **`--end [<置き場>]`**: 周回を終える。置き場の省略は `--resume` と同じ。
 
 設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`・`review_loop.sandbox_allow_write` (サンドボックスの中の Bash に書き込みを許す場所)・`review_loop.sandbox_allowed_domains` (同じく接続を許すドメイン)。
 
 **`--full-review` と `--base` は設定のキーを持たず、開始時の値を `loop.yaml` の `review.full_review` (真偽値)・`review.base` (ブランチ名) に書く。** どちらもブランチや周回ごとに変わる値で、前例 (`--stage` の値を `loop.stages` に書く) に合わせる。
 
-- **`--full-review`**: 収束後の全量レビューを周回の中で行う。増分の回が収束し、要否の規則 (正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) で要るときに、止まらずに全量の回を行う。すでに収束した記録で始めたときは、要否に関わらず最初の回を全量にする。どのノードで分かれるかの正本は [stops.md](stops.md) の RJ0・RJ1。
+- **`--full-review`**: 収束後の全量レビューを周回の中で行う。増分の回が収束し、要否の規則 (正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) で要るときに、停止せずに全量の回を行う。すでに収束した記録で始めたときは、要否に関わらず最初の回を全量にする。どのノードで分かれるかの正本は [stops.md](stops.md) の RJ0・RJ1。
 - **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。全量の回で `review-request` に `--base` として渡す (渡す回の正本は [round.md](round.md) の RL1 の手順 a の 4。起点の求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければ周回を始めずに人間に質問する** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で質問することになる。**そのため `origin/HEAD` の無いリポジトリでは、全量の回を行わない周回 (記録に回があり、`--full-review` を付けない周回) でも `--base` が要る** (0.14.0 では要らなかった)。
 
 **`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。周回の権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了の印の権限モードの指定をこの値と比べる。
@@ -47,7 +47,7 @@ review-loop --end [<置き場>]
 
 **`--resume --full-review` は、その起動で次に書く依頼文を全量にする。** 修正が残っていれば、それを済ませてから全量にする。**ただし、結果待ちの回 (取り込む完了の印か、印の無い依頼文の回) の依頼文の scope が `full` なら、印を書かない** — その回が全量の回なので、印を書くと、その回の採択が 0 件でも同じ HEAD の全量の回がもう 1 回続く。要否に関わらず全量にする明示の指定で、印は `loop.yaml` の実行時のキー `full_review_next` に書く (真にする所は [reentry.md](reentry.md) の「再入の手順」の 1 と [stops.md](stops.md) の RJ0・RJ1、偽に戻す所は [round.md](round.md) の RL1 の手順 a の 7 と [stops.md](stops.md) の「停止のときに書き換えるもの」。一覧は [loop-files.md](loop-files.md) の「`loop.yaml`」)。**周回の条件 `review.full_review` は変えない。** 範囲を 1 回変えるだけで、範囲は記録の回ごとに `scope` として残るので、上の「記録の回ごとの違いを読み解けなくなる」には当たらない。`--max` と同じく、次の起動には持ち越さない。
 
-**書き込みを許す場所と接続を許すドメイン (`review_loop.sandbox_allow_write`・`review_loop.sandbox_allowed_domains`) は周回の条件ではなく、`--resume` のたびに設定から再度読み込んで、`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains` に書く。** この 2 つは、ワーカーを動かすマシンごとに変わる値 (環境の値) で、周回の結果を比べるときにそろえる値ではない。開始時の値のままにすると、書き込みを許す場所が足りずに RA1 で止まった周回を、終えずに直して続けられない。再度読み込むときの値の誤りは、開始時と同じく未設定 (空の一覧) として扱い、警告を `--resume` の開始の報告に書く。**権限モードは周回の条件のままで、`--resume` では再度読み込まない。**
+**書き込みを許す場所と接続を許すドメイン (`review_loop.sandbox_allow_write`・`review_loop.sandbox_allowed_domains`) は周回の条件ではなく、`--resume` のたびに設定から再度読み込んで、`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains` に書く。** この 2 つは、ワーカーを動かすマシンごとに変わる値 (環境の値) で、周回の結果を比べるときにそろえる値ではない。開始時の値のままにすると、書き込みを許す場所が足りずに RA1 で停止した周回を、終えずに直して続けられない。再度読み込むときの値の誤りは、開始時と同じく未設定 (空の一覧) として扱い、警告を `--resume` の開始の報告に書く。**権限モードは周回の条件のままで、`--resume` では再度読み込まない。**
 
 **0.13.0 で始めた周回の `loop.yaml` には、この 2 つのキーが無い。** 無ければ空の一覧として扱う (`--resume` で再度読み込んだ後は書かれている)。権限モードは `loop.yaml` の値のまま続く。
 
@@ -83,7 +83,7 @@ review-loop --end [<置き場>]
 | `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の正本は [worker.md](worker.md) の「レビュアの実行の権限」) |
 | `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確認する (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
 | `dir` | 空でない文字列。リポジトリのルートからの相対パスとして解決する |
-| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す (`review-request` の手順 2 と同じ検査。開始時に確認しないと、共通祖先の無いブランチが条件に入り、全量の回のたびに RA3 で止まる) |
+| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す (`review-request` の手順 2 と同じ検査。開始時に確認しないと、共通祖先の無いブランチが条件に入り、全量の回のたびに RA3 で停止する) |
 
 **エラーと警告には、その値が引数と設定のどちらから来たかを書く。** 直す先が違う。
 

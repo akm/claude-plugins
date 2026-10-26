@@ -91,7 +91,7 @@ full_review_next: false
 | `wait.wait_minutes` | ◯ | `review_loop.wait_minutes` |
 | `wait.worker_wait_minutes` | ◯ | `review_loop.worker_wait_minutes` |
 | `wait.worker_stale_seconds` | ◯ | `review_loop.worker_stale_seconds` |
-| `state` | ◯ | `active` (周回が進んでいる) / `stopped` (停止ノードで止まり、人間の判断待ち) / `ended` (終了した) |
+| `state` | ◯ | `active` (周回が進んでいる) / `stopped` (停止ノードに着き、人間の判断待ち) / `ended` (終了した) |
 | `stop_reason` | ◯ | `stopped` と `ended` のとき、ノード ID (`S2`〜`S6`・`RA1`〜`RA3`) か `end` と、1 行の理由。`active` なら空文字列 |
 | `rejected` | ◯ | レビュー不成立 (RA1) と判定した回の識別子の列。再入の手順が、その回の完了の印を取り込まない。無ければ `[]` |
 | `full_review_next` | | 実行時のキー (周回の条件ではない)。`--resume --full-review` の印で、真なら次に書く依頼文を全量にする。`--resume` の開始時 ([reentry.md](reentry.md) の「再入の手順」の 1) と、判定 RJ0・RJ1 の「はい」([stops.md](stops.md)) で `true` を書き、全量の依頼文を書いたら ([round.md](round.md) の RL1 の手順 a の 7) と、どの停止でも ([stops.md](stops.md) の「停止のときに書き換えるもの」) `false` にする。無ければ偽 |
@@ -212,16 +212,16 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ワーカーのフックが拒否した呼び出し (`worker_hook_denials`) は含めない。ログから読めなければ `unknown` |
 | `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く。ワーカーのフックが拒否した呼び出しは含めない)。件数が 0 か `unknown` なら `[]` |
 | `worker_hook_denials` | | ワーカーのフック (`/tmp` を含む Bash のコマンドを実行前に拒否するもの) が拒否したと確認できた呼び出しの件数。判別の方法の正本は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」。ログから読めなければ `unknown`。起動しなかった回も `unknown`。0.18.0 以降のワーカーが書く — 0.17.0 以前のワーカーの印を、このキーが無いことでレビュー不成立にしないため、必須にしない |
-| `sandbox_blocked.count` | ◯ | サンドボックスが止めた確認 (Bash の呼び出しのうち、書き込みか接続を止められたエラーで終了したもの。sub-agent の中の呼び出しを含む) の件数。レビュー対象のコミットの行を表示しただけと確認した呼び出し (`repo_text_displayed`) は含めない。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
-| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、止められたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの正本は [worker.md](worker.md) の「サンドボックスが止めた確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
-| `repo_text_displayed.count` | | Bash の結果の本文に、サンドボックスが止めた確認を数えるときに探す文面 (`operation not permitted`) かタグ (`<sandbox_violations>`) があったが、それを含む行がどれも、レビュー対象のコミットにある行を表示したものと確認した呼び出しの件数 (sub-agent の中の呼び出しを含む)。判別の方法の正本は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」。`sandbox_blocked.count` が `unknown` なら `unknown`。起動しなかった回も `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` で、そのときはそれらの結果をすべて `sandbox_blocked` に数える。0.20.0 以降のワーカーが書く — 0.19.0 以前のワーカーの印を、このキーが無いことでレビュー不成立にしないため、必須にしない |
+| `sandbox_blocked.count` | ◯ | サンドボックスが拒否した確認 (Bash の呼び出しのうち、書き込みか接続を拒否されたエラーで終了したもの。sub-agent の中の呼び出しを含む) の件数。レビュー対象のコミットの行を表示しただけと確認した呼び出し (`repo_text_displayed`) は含めない。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
+| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、拒否されたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの正本は [worker.md](worker.md) の「サンドボックスが拒否した確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
+| `repo_text_displayed.count` | | Bash の結果の本文に、サンドボックスが拒否した確認を数えるときに探す文面 (`operation not permitted`) かタグ (`<sandbox_violations>`) があったが、それを含む行がどれも、レビュー対象のコミットにある行を表示したものと確認した呼び出しの件数 (sub-agent の中の呼び出しを含む)。判別の方法の正本は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」。`sandbox_blocked.count` が `unknown` なら `unknown`。起動しなかった回も `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` で、そのときはそれらの結果をすべて `sandbox_blocked` に数える。0.20.0 以降のワーカーが書く — 0.19.0 以前のワーカーの印を、このキーが無いことでレビュー不成立にしないため、必須にしない |
 | `repo_text_displayed.calls` | | 数えた呼び出しの列。要素の形と、1 行への直し方と切り詰める長さは `sandbox_blocked.calls` と同じで、`message` は本文のうち文面かタグを含む行。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |
 | `head_after` | | レビュアの実行が終了した後の HEAD の短縮 SHA。**起動しなかった回は省く** |
 | `tree_clean_after` | | レビュアの実行が終了した後に作業ツリーが clean か。起動しなかった回は省く |
 | `started` | ◯ | 依頼文を見つけた日時 |
 | `finished` | ◯ | 印を書く直前の日時 |
-| `exit_code` | | レビュアの実行の終了コード。起動しなかった回は省く。上限や割り込みで止めたときは止めた後の値 |
+| `exit_code` | | レビュアの実行の終了コード。起動しなかった回は省く。上限や割り込みで停止したときは停止した後の値 |
 | `error` | | `failed` のときだけ書く。通らなかった項目 (複数なら `; ` で区切る)。`ok` のときは省く |
 | `log` | | ログのファイル名。起動しなかった回は省く (ログが無いことを示す) |
 
@@ -260,9 +260,9 @@ sandbox_blocked:
 | 種類 | ファイル | 存在しないとき | 壊れているとき |
 | --- | --- | --- | --- |
 | 設定 | `config.json` の `review_loop` | キーごとの既定値 | 既定値で続行し、警告を報告に書く (失われるのは利用者が書いた数行) |
-| 状態 | `loop.yaml` | 周回が無い (開始の前提を満たす) | **止めて知らせる。新規に寄せない** — 新規として扱うと、同じブランチに終了していない周回が 2 つでき、同じ回番号の依頼文が 2 つできる |
+| 状態 | `loop.yaml` | 周回が無い (開始の前提を満たす) | **中断して知らせる。新規に寄せない** — 新規として扱うと、同じブランチに終了していない周回が 2 つでき、同じ回番号の依頼文が 2 つできる |
 | レビュアの実行が書くファイル | 結果 (レビュアの実行が作業場所に書き、ワーカーが置き場へ複写する) | ワーカーが `failed` の印を書く | ワーカーが `failed` の印を書く (`error` の書き方の正本は [worker.md](worker.md) の「回の処理」) |
-| ワーカーが書くファイル | 完了の印・`worker.yaml` | 印はまだ (待機する)。`worker.yaml` はワーカーが未起動 (起動まで待機し、期限を過ぎたら RA2) | 作業側は「レビュー不成立」(RA1) として止める |
+| ワーカーが書くファイル | 完了の印・`worker.yaml` | 印はまだ (待機する)。`worker.yaml` はワーカーが未起動 (起動まで待機し、期限を過ぎたら RA2) | 作業側は「レビュー不成立」(RA1) として停止する |
 | 作業側が書くファイル | 依頼文 | ワーカーは待機する |  ワーカーが `failed` の印を書き、レビュアの実行を起動しない |
 
 停止ノード (RA1〜RA3) の定義と報告に書くものの正本は [stops.md](stops.md)。

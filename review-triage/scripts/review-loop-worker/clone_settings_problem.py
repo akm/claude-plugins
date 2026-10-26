@@ -19,7 +19,7 @@ problems = []
 for rel in (".claude/settings.json", ".claude/settings.local.json"):
     path = os.path.join(tree, rel)
     try:
-        # シンボリックリンクなら先を読む (Claude Code もそうする)。通常のファイルでなければ読まない (/dev/zero などで止まらないように)
+        # シンボリックリンクなら先を読む (Claude Code もそうする)。通常のファイルでなければ読まない (/dev/zero などで処理が返らなくならないように)
         if not stat.S_ISREG(os.stat(path).st_mode):
             problems.append(f"{rel}: not a regular file")
             continue
