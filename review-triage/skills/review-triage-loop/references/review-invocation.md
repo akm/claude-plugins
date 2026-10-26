@@ -13,7 +13,7 @@
 
 ## 実効モデル (定義の正本)
 
-**モデルを指す語は 2 つだけ。** **指定** (`review_model` / `--model` に書かれた生の綴り。G0 でしか使わない) と、**実効モデル** (G0 で解決した後のモデル名。sub-agent への受け渡し・記録・報告のすべてがこれを使う)。「ループが決めたモデル」「継承」「呼び出し元」のような中間の語は持たない — 語が増えるたびに規則ごとに違う語を選んで食い違った (記録の 5〜19 回目)。
+**モデルを指す語は 2 つだけ。** **指定** (`review_model` / `--model` に書かれた生の綴り。G0 でしか使わない) と、**実効モデル** (G0 で解決した後のモデル名。sub-agent への受け渡し・記録・報告のすべてがこれを使う)。「ループが決めたモデル」「継承」「呼び出し元」のような中間の語は持たない — 語が増えるたびに規則ごとに違う語を選んで不統一になった (記録の 5〜19 回目)。
 
 ### G0 での解決
 
@@ -43,7 +43,7 @@
 
 ### skill を呼んだことの確認
 
-依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」。報告に無いとき・指定と食い違うときの扱い (人間に報告する) もそこが定める。
+依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」。報告に無いとき・指定と一致しないときの扱い (人間に報告する) もそこが定める。
 
 ## 記録のキーの出所 (定義の正本)
 
@@ -60,7 +60,7 @@
 
 ## `code-review` の場合
 
-sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。雛形を埋める値は、ループはスキルを呼ばないが、次のとおり [review-request スキル](../../review-request/SKILL.md) と同じ規則で決める — 識別子と出力先 (`{{output_path}}`) は手順 3・4 (別の名前を付けると `review-triage` の手順 1 が読む対象と食い違う)。識別子の成分の回・`head`・`scope_note` は手順 2 (回は記録の `runs` の数 + 1 — ループが上限のために起動時に 0 から数える回数とは別物)。モデルはこのファイルの「実効モデル」、`base` と `scope` は「範囲」が正本で、そのスキルの手順 1・2 のモデルと範囲の規則だけは使わない。
+sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。雛形を埋める値は、ループはスキルを呼ばないが、次のとおり [review-request スキル](../../review-request/SKILL.md) と同じ規則で決める — 識別子と出力先 (`{{output_path}}`) は手順 3・4 (別の名前を付けると `review-triage` の手順 1 が読む対象と一致しない)。識別子の成分の回・`head`・`scope_note` は手順 2 (回は記録の `runs` の数 + 1 — ループが上限のために起動時に 0 から数える回数とは別物)。モデルはこのファイルの「実効モデル」、`base` と `scope` は「範囲」が正本で、そのスキルの手順 1・2 のモデルと範囲の規則だけは使わない。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** ループが回ごとに勝手に切り替えない (SKILL.md の原則)。
 - `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く正本にある)。
@@ -91,7 +91,7 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 **全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点は、起点のブランチと HEAD の merge-base (共通祖先のコミット) で、求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2。**起点のブランチは、引数 `--base` があればそのブランチ、無ければ `origin/HEAD` が指すブランチで、使うのはこの全量の回だけである。** それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
 
-**これらの基点 (全量と増分) を依頼文に埋めてレビュアに渡すのは、`code-review` の経路だけである。** `ce-code-review` の経路は範囲の基点をレビュアに渡していないので ([#79](https://github.com/akm/claude-plugins/issues/79))、全量の回でも増分の回でも基点はレビュア (`ce-code-review`) が自分で決め、起点のブランチも使わない。記録の `scope` には、`ce-code-review` の経路でもループが決めた範囲を書く (実際の範囲と食い違いうることも #79 の件)。
+**これらの基点 (全量と増分) を依頼文に埋めてレビュアに渡すのは、`code-review` の経路だけである。** `ce-code-review` の経路は範囲の基点をレビュアに渡していないので ([#79](https://github.com/akm/claude-plugins/issues/79))、全量の回でも増分の回でも基点はレビュア (`ce-code-review`) が自分で決め、起点のブランチも使わない。記録の `scope` には、`ce-code-review` の経路でもループが決めた範囲を書く (実際の範囲と一致しないことがあるのも #79 の件)。
 
 **この経路 (`review-triage-loop`) は、収束後の全量レビューをループに含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、このループが担うのは最初の 1 回だけである。ループの中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回をループの中で行い、その回は上限に数えない (数えなくてもループが停止する理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 
@@ -99,4 +99,4 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 ## 起動の後に確認すること
 
-**レビューの前後で HEAD と作業ツリーが変わっていないこと。** 変わっていれば、そのレビューは報告のみで走っていない。`review-triage` に渡さず、ループを停止して報告する — 適用済みの修正を前提に採否を判断すると、判断の前提が実態と食い違う。
+**レビューの前後で HEAD と作業ツリーが変わっていないこと。** 変わっていれば、そのレビューは報告のみで走っていない。`review-triage` に渡さず、ループを停止して報告する — 適用済みの修正を前提に採否を判断すると、判断の前提が実態と一致しなくなる。

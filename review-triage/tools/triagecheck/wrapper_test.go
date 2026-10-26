@@ -70,7 +70,7 @@ func TestPluginCacheDirResolvesFromVersionedLayout(t *testing.T) {
 
 func TestPluginCacheDirRejectsUnexpectedLayout(t *testing.T) {
 	// 末尾が tools/triagecheck でない場所 (go run -C を経ずに直接 go run . した
-	// ときなど、プラグインキャッシュと無関係な場所) では、実体と食い違ったパスを
+	// ときなど、プラグインキャッシュと無関係な場所) では、実体と一致しないパスを
 	// そのまま書き出す代わりにエラーにする。
 	dir := t.TempDir()
 
@@ -334,7 +334,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 // リポジトリ相対の案内が入り、実行の仕方 (相対・絶対) に依らず同じになる。
 //
 // 生成は相対 (./bin/rtc)、検査は絶対パスで実行する。実行時の $0 から組み立てる
-// 実装だと、この 2 つで 1 行目が食い違い、生成直後のサマリが検査に落ちる
+// 実装だと、この 2 つで 1 行目が一致せず、生成直後のサマリが検査に落ちる
 // (実測)。文字列だけを見ると渡し忘れても通ってしまうので、実際に走らせる。
 func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	goBin, err := exec.LookPath("go")

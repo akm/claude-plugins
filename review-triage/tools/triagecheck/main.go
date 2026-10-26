@@ -60,7 +60,7 @@ func run(args []string) error {
 	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
 
 	// 経路どうしの衝突は、パスの規則より前に見る。-install-wrapper と
-	// -write-summary=true は「何を書き出すか」が食い違うので、エラーを出さずに片方を
+	// -write-summary=true は「何を書き出すか」が矛盾するので、エラーを出さずに片方を
 	// 無視すると「指定したのに適用されない」を作る。拒否するのは「何かを要求したとき」
 	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
 	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
@@ -263,7 +263,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	//
 	// 実行時の $0 から組み立てない — $0 は実行したときの形 (./bin/rtc、絶対パス、リンク名)
 	// そのもので、コミットされるサマリの 1 行目が実行の仕方ごとに変わり、生成直後の
-	// サマリが別の実行の仕方での検査で「食い違う」と報告される (実測)。絶対パスも
+	// サマリが別の実行の仕方での検査で「一致しない」と報告される (実測)。絶対パスも
 	// 埋め込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
 	// checkout した場所によって検査が失敗する。コミットされる値は、リポジトリ相対でなければならない。
 	//

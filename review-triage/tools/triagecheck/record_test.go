@@ -1052,7 +1052,7 @@ func TestReviewTriageRecordSummaryStale(t *testing.T) {
 	problems := reviewTriageRecordProblems(files, staleRead)
 	found := false
 	for _, p := range problems {
-		if strings.Contains(p, "feat-x.md") && strings.Contains(p, "食い違っています") {
+		if strings.Contains(p, "feat-x.md") && strings.Contains(p, "一致しません") {
 			found = true
 		}
 	}

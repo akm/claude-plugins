@@ -57,7 +57,7 @@
 
 ## `triage_summary_command` — 同梱の triagecheck に渡す
 
-**同梱の `triagecheck` は `config.json` を読まない。** 案内する再生成手段は `-summary-command` で渡し、その値がサマリの 1 行目に入ってコミットされる。**`triage_summary_command` には、`triagecheck` が案内する文字列と同じものを書く** — 食い違うと、記録を読んだ人が実在しないコマンドを案内されることになる。
+**同梱の `triagecheck` は `config.json` を読まない。** 案内する再生成手段は `-summary-command` で渡し、その値がサマリの 1 行目に入ってコミットされる。**`triage_summary_command` には、`triagecheck` が案内する文字列と同じものを書く** — 一致しないと、記録を読んだ人が実在しないコマンドを案内されることになる。
 
 `-summary-command` の既定値と、`-install-wrapper` で省略したときにツールが組み立てる値の規則は、[triagecheck の README「再生成コマンドの案内」](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md#再生成コマンドの案内--summary-command) が正本。ここでは再掲しない。
 
@@ -98,7 +98,7 @@
 
 **`review_model` は 1 つのループに 1 つの値。** 回ごとに変えることはできない。ループをまたいで変えるのは構わない (記録が回ごとに `model` を持つので後から比較できる) が、そのつど人間が指示する — ループが勝手に切り替えると、指摘の減り方がモデルの違いによるものか収束によるものかを人間が読み解けなくなる。
 
-**`review_skill` を推測しない。** どちらのスキルで走らせたかは記録の `skill` に残り、後から粒度を比較する材料になる。推測で決めると、記録が実態と食い違う。
+**`review_skill` を推測しない。** どちらのスキルで走らせたかは記録の `skill` に残り、後から粒度を比較する材料になる。推測で決めると、記録が実態と一致しなくなる。
 
 ## `fix` — 修正の既定値
 

@@ -150,7 +150,7 @@ func shellSingleQuote(s string) string {
 //
 // 値を書き出す側でここを決め打ちにせず実行位置から逆算するのは、開発中の
 // チェックアウトから -install-wrapper を実行した場合でも、実際に go run が
-// 動いた場所を正として書き出すため (決め打ちだと実体と食い違ったパスを
+// 動いた場所を正として書き出すため (決め打ちだと実体と一致しないパスを
 // 書き出しかねない)。
 func pluginCacheDir() (string, error) {
 	wd, err := os.Getwd()

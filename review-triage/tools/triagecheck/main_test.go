@@ -568,7 +568,7 @@ func TestRunWriteSummarySharesPathRules(t *testing.T) {
 	}
 }
 
-// -install-wrapper と -write-summary=true は「何を書き出すか」が食い違うので、
+// -install-wrapper と -write-summary=true は「何を書き出すか」が矛盾するので、
 // 片方を無視するのではなくエラーにする。無視すると「指定したのに適用されない」を作る —
 // 検査の経路で errCurrentDirUnused として禁じているのと同じ種類の欠陥。
 // -current-dir は併用できる (相対パスの基準として、他の経路と同じ規則で使う)。
@@ -770,7 +770,7 @@ func TestRunWriteSummaryUsesSummaryCommand(t *testing.T) {
 }
 
 // 検査の経路のエラー文も同じ値を使う。生成と検査で違う案内を出すと、
-// 「サマリを直す方法」が場所によって食い違う。
+// 「サマリを直す方法」が場所によって異なる。
 func TestRunCheckReportsSummaryCommand(t *testing.T) {
 	withRunGlobals(t)
 	recs := realTempDir(t)

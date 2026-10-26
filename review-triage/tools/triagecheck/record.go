@@ -145,7 +145,7 @@ type recordFinding struct {
 // line_check は (1) (対象の行が全量の起点から変わっていない) の結果で、同梱の道具
 // lineorigin の結果をそのまま書く。same_defect は (2) (全量の起点の内容でも同じ欠陥が
 // 成り立つ) の結果で、(1) が holds のときだけ書く。D8 が当たったかどうかは書かず、
-// (1)(2) から導く (priorDefectHit) — 導ける値を重ねて書くと、両者が食い違う記録を書けてしまう。
+// (1)(2) から導く (priorDefectHit) — 導ける値を重ねて書くと、両者が矛盾する記録を書けてしまう。
 type recordPriorDefect struct {
 	Base             string `yaml:"base"`
 	LineCheck        string `yaml:"line_check"`
@@ -340,7 +340,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 		}
 		if string(got) != want {
 			problems = append(problems, fmt.Sprintf(
-				"%s: サマリが正本 (%s) と食い違っています (`%s` で再生成する)", mdPath, yf, summaryCommand))
+				"%s: サマリが正本 (%s) と一致しません (`%s` で再生成する)", mdPath, yf, summaryCommand))
 		}
 	}
 

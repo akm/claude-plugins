@@ -12,7 +12,7 @@
 
 **依頼文には、呼ぶ skill (`/code-review` など)、その skill に渡す effort (`code-review` なら `high` のように値そのもの)、レビューを実行するモデルを、値で明記する。** 「effort を報告せよ」と書くだけでは指定にならない — 依頼文に値が無いと、レビュアが前回の記録などから自分で選び、依頼した側が知らない値で走る (実測: 記録の `level` に `xhigh` が並んでいたのを根拠に、依頼に無い `xhigh` で走った)。effort が高いほど、レビュアは不確かな指摘も報告するようになり、「報告しない条件」で落とすはずの指摘が増える。既定にしたいときも既定の値を書く (既定の正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」と「実効モデル」)。`ce-code-review` は effort もモデルも受け取らないので、その旨を書く。雛形では `{{skill}}` / `{{effort}}` / `{{model}}` がこれに当たり、[review-request スキル](../../review-request/SKILL.md) の手順 1 が値を決める。
 
-**レビュアには、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを報告に含めさせ、指定と突き合わせる。** 報告が指定と食い違っていれば — skill を呼んでいない、effort やモデルが違う、報告があるはずの経路 (`code-review`) なのに報告が無い — 記録に写す前に人間に報告する (レビュアの判断で変わった値を、依頼どおりの値として記録しないため)。`ce-code-review` のように報告が無い経路では突き合わせない。この項が定めるのは突き合わせまでで、記録の `skill` / `level` / `model` に何を書くかは定めない — 各キーの意味の正本は [record-schema.md](record-schema.md) の `runs[]` の表、ループが経路ごとに何から採るかの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「記録のキーの出所」。skill を呼ばずに差分を読んでも指摘の形は同じに見えるため、報告させないと区別できない。
+**レビュアには、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを報告に含めさせ、指定と突き合わせる。** 報告が指定と一致しなければ — skill を呼んでいない、effort やモデルが違う、報告があるはずの経路 (`code-review`) なのに報告が無い — 記録に写す前に人間に報告する (レビュアの判断で変わった値を、依頼どおりの値として記録しないため)。`ce-code-review` のように報告が無い経路では突き合わせない。この項が定めるのは突き合わせまでで、記録の `skill` / `level` / `model` に何を書くかは定めない — 各キーの意味の正本は [record-schema.md](record-schema.md) の `runs[]` の表、ループが経路ごとに何から採るかの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「記録のキーの出所」。skill を呼ばずに差分を読んでも指摘の形は同じに見えるため、報告させないと区別できない。
 
 ## 範囲の規則
 
