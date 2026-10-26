@@ -3,7 +3,7 @@
 「/tmp を含むコマンドを拒否するフック」。
 
 サンドボックスの制限を外す真偽値のキー (allowAppleEvents・filesystem.disabled・network.allowAllUnixSockets) は、
-制限する側の値 (false) を書く。--settings は利用者とブランチの設定より優先されるので、それらの設定の値は効かなくなる。
+制限する方の値 (false) を書く。--settings は利用者とブランチの設定より優先されるので、それらの設定の値は効かなくなる。
 PreToolUse のフック (review-loop-worker/deny_tmp_hook.py) は、中身をフックのコマンドに埋め込む。フックのたびにファイルを
 開かないのは、ほかの .py をワーカーが起動時に読み込むのと同じ理由 (プラグインの更新で古いバージョンのディレクトリが消えても、
 フックを実行できるように)。

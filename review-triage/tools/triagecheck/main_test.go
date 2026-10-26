@@ -27,7 +27,7 @@ func withRunGlobals(t *testing.T) {
 
 // 指定した記録のディレクトリ・判定フローが存在しないなら、run は非 0 (error) で終了する。
 // 「検査が走って合格した」と「そもそも走らなかった」を区別できるようにするための
-// 中核の挙動なので、入口 (run) の側でもテストで検証する。
+// 中核の挙動なので、入口 (run) でもテストで検証する。
 // 判定はエラーが返ること自体で行い、報告メッセージの文言には結合しない。
 // 文言で判定すると、挙動を変えない書式の変更だけで落ちる (誤検出)。
 // 報告の本文は stderr に出るので err.Error() には載らず、文言に頼ると実質
@@ -66,8 +66,8 @@ func TestRunPassesWhenJudgmentFlowUnavailable(t *testing.T) {
 	}
 }
 
-// CLAUDE_PLUGIN_ROOT が指す判定フローが無いなら報告する。プラグイン側がファイルを
-// 移動・改名したとき、利用側の CI は何も変えていないのに守りだけが外れる種類の欠陥を防ぐ。
+// CLAUDE_PLUGIN_ROOT が指す判定フローが無いなら報告する。プラグインがファイルを
+// 移動・改名したとき、利用者のリポジトリの CI は何も変えていないのに守りだけが外れる種類の欠陥を防ぐ。
 func TestRunFailsWhenPluginRootFlowMissing(t *testing.T) {
 	withRunGlobals(t)
 	cwd, err := os.Getwd()
@@ -183,7 +183,7 @@ func TestRunRejectsUnusedCurrentDir(t *testing.T) {
 	}
 }
 
-// 片方が相対でもう片方が絶対、という組み合わせは正当 (基準は相対の側に使われる)。
+// 片方が相対でもう片方が絶対、という組み合わせは正当 (基準は相対パスの方に使われる)。
 // ラッパーがまさにこの形で、-record-dir は相対・-judgment-flow は絶対を渡す。
 func TestRunAllowsCurrentDirWithMixedPaths(t *testing.T) {
 	withRunGlobals(t)
@@ -482,7 +482,7 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 // CLAUDE_PLUGIN_ROOT 由来の判定フローは -current-dir の基準を使わない。
 // 環境変数の値は利用者が -current-dir を書いたかどうかとは無関係に決まるので、
 // そこへ基準を当てると「環境変数を設定していると -current-dir が使えない」
-// (逆に相対の環境変数が、エラーにならずに解決される) ことになる。分岐の両側をテストで検証する。
+// (逆に相対の環境変数が、エラーにならずに解決される) ことになる。分岐のどちらもテストで検証する。
 func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 	base := realTempDir(t)
 	recs := filepath.Join(base, "recs")
@@ -522,8 +522,8 @@ func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 }
 
 // 値の出所を報告に反映する。CLAUDE_PLUGIN_ROOT から解決した値の誤りを、
-// 利用者が渡していない -judgment-flow の名前で叱らない。案内も、直すべき側
-// (環境変数) を向いていること — -current-dir を足しても直らないため。
+// 利用者が渡していない -judgment-flow の名前で叱らない。案内も、直すべきもの
+// (環境変数) を指していること — -current-dir を足しても直らないため。
 func TestRunReportsOriginOfBadPluginRoot(t *testing.T) {
 	withRunGlobals(t)
 	base := realTempDir(t)
@@ -749,7 +749,7 @@ func TestRunInstallWrapperAcceptsFalseWriteSummary(t *testing.T) {
 }
 
 // -summary-command で渡した文字列が、生成サマリの 1 行目にそのまま入る。
-// 埋め込みを解いた目的そのもの — 利用側の実際の再生成手段を案内させること。
+// 埋め込みを解いた目的そのもの — 利用者のリポジトリの実際の再生成手段を案内させること。
 func TestRunWriteSummaryUsesSummaryCommand(t *testing.T) {
 	withRunGlobals(t)
 	recs := realTempDir(t)
@@ -790,7 +790,7 @@ func TestRunCheckReportsSummaryCommand(t *testing.T) {
 }
 
 // 既定は特定のリポジトリの事情を含まない一般的な文言。ここに具体的な
-// Makefile のターゲット名などを埋め込むと、その名前を持たない利用側で
+// Makefile のターゲット名などを埋め込むと、その名前を持たない利用者のリポジトリで
 // 存在しないコマンドを案内することになる (Issue #36)。
 //
 // 見るのは定数であって可変の summaryCommand ではない。変数は run が書き換える
@@ -801,7 +801,7 @@ func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
 		t.Errorf("既定の案内が -write-summary を示していない: %q", defaultSummaryCommand)
 	}
 	if strings.Contains(defaultSummaryCommand, "make ") {
-		t.Errorf("既定の案内に利用側固有の呼び出し方が埋め込まれている: %q", defaultSummaryCommand)
+		t.Errorf("既定の案内に利用者のリポジトリ固有の呼び出し方が埋め込まれている: %q", defaultSummaryCommand)
 	}
 }
 

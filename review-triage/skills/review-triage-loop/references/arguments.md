@@ -1,6 +1,6 @@
 # 引数の様式
 
-**このファイルが `review-triage-loop` の引数の正本。** 設定側のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」が正本 — ここでは言い直さない。
+**このファイルが `review-triage-loop` の引数の正本。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」が正本 — ここでは言い直さない。
 
 ## 様式
 

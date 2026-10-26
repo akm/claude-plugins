@@ -38,7 +38,7 @@ var reviewTriageDir = "tmp/review-triages/"
 // 再生成の手段はリポジトリごとに違う (Makefile のターゲット・-install-wrapper で
 // 生成したラッパー・go run の直呼び) ので、特定のコマンド名を埋め込まない。
 // 既定は「このツール自身をどう呼んでいるかに依らない」一般的な言い方にして、
-// -summary-command で利用側の実際の呼び出し方を渡せるようにする
+// -summary-command で利用者のリポジトリの実際の呼び出し方を渡せるようにする
 // (-install-wrapper 経由なら、生成時にラッパー自身のリポジトリ相対パスを
 // 案内として埋め込む。値の決め方は resolveInputs)。
 //
@@ -53,7 +53,7 @@ var summaryCommand = defaultSummaryCommand
 
 // inReviewTriageDir は f が記録のディレクトリの直下にあるかを返す。
 //
-// 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧側 (listReviewTriageFiles)
+// 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧を作る関数 (listReviewTriageFiles)
 // は path.Join でパスを clean するため、ディレクトリの表記だけを整えて接頭辞で照合すると
 // "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま成功した。
 // 両辺を path.Clean に通せば、どちらの表記でも同じ判定になる。
@@ -1303,7 +1303,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 		}
 		name := e.Name()
 		// README.* は記録ではない — README.md は手書きの規範文書で、README.yaml を
-		// 記録と見なすと生成器が README.md を上書きしてしまう (検査側の除外と対称にする)。
+		// 記録と見なすと生成器が README.md を上書きしてしまう (検査での除外と対称にする)。
 		if strings.TrimSuffix(strings.TrimSuffix(name, ".md"), ".yaml") == "README" {
 			continue
 		}

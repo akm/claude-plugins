@@ -308,16 +308,16 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	}
 
 	// 経路のディレクトリ自体がシンボリックリンクでも、実体から見た記録のディレクトリを検査すること。
-	// cd -P が cd -L に変わると解決先がリンク側へ割れ、隣の囮を検査して成功する。
+	// cd -P が cd -L に変わると解決先がリンクのあるディレクトリへ割れ、隣の囮を検査して成功する。
 	// ラッパーそのものはリンクでないので、上の [ -L ] のループでは捕まらない経路。
 	//
-	// リンクは bin ディレクトリに張る。リポジトリごとリンクすると、リンク側から見た
-	// ../docs もリンクを通って実体側に戻ってしまい、囮に届かない (-L との差が出ない)。
+	// リンクは bin ディレクトリに張る。リポジトリごとリンクすると、リンクのあるディレクトリから見た
+	// ../docs もリンクを通って実体のあるディレクトリに戻ってしまい、囮に届かない (-L との差が出ない)。
 	viaBase := realTempDir(t)
 	if err := os.Symlink(filepath.Join(repo, "bin"), filepath.Join(viaBase, "bin")); err != nil {
 		t.Fatal(err)
 	}
-	// リンク側から見た ../docs/review-triages に、壊れていない囮の記録のディレクトリを作る。
+	// リンクのあるディレクトリから見た ../docs/review-triages に、壊れていない囮の記録のディレクトリを作る。
 	if err := os.MkdirAll(filepath.Join(viaBase, "docs", "review-triages"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +452,7 @@ func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
 			t.Errorf("埋め込み値が単一引用符で包まれていない (want %s):\n%s", want, got)
 		}
 	}
-	// 展開させる側は二重引用符のまま (埋め込み値と取り違えて単一にすると展開されない)。
+	// 展開させる変数は二重引用符のまま (埋め込み値と取り違えて単一にすると展開されない)。
 	for _, want := range []string{`-current-dir "$script_dir"`, `-C "$root/tools/triagecheck"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("実行時に展開する箇所が二重引用符でなくなっている (want %s):\n%s", want, got)

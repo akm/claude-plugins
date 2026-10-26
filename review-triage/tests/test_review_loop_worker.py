@@ -521,7 +521,7 @@ class WorkerTestBase(unittest.TestCase):
     def start_until_child_checks_parent(self, trigger, log):
         """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
         親の生存を確認する ps を実行するまで待機して、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
-        コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親の側に出る。"""
+        コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親として出る。"""
         for f in (trigger, log):
             if os.path.exists(f):
                 os.remove(f)
@@ -3335,7 +3335,7 @@ class TestRestartCleanup(WorkerTestBase):
     def test_stopped_even_when_stderr_broken(self):
         # 指摘 #6: stop_cwd_procs は、標準エラーへの報告 (print) が OSError で失敗しても、シグナルを送って
         # 残ったプロセスを停止する処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
-        # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave 側への書き込みが
+        # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave への書き込みが
         # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
         # 回の終了処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
         # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
