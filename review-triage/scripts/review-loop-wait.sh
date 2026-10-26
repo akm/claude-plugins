@@ -8,8 +8,8 @@
 # 同じ周期に複数が当たれば、上にあるものを返す。
 #
 #   delivered <識別子>   完了の印 delivered-<識別子>.yaml が現れた。status が ok なら依頼文と結果、
-#                        failed なら依頼文も揃ったときに返す (揃うまでは次の周期まで待つ)。
-#                        status が読めない印は揃うのを待たずに返す (読めないことは作業側の検査が扱う)
+#                        failed なら依頼文も揃ったときに返す (揃うまでは次の周期まで待機する)。
+#                        status が読めない印は、揃うまで待機せずに返す (読めないことは作業側の検査が扱う)
 #   end                  ファイル end が現れた
 #   worker <state>       新しいワーカーの worker.yaml が現れた (起動時には無かった、または pid が起動時と違う)
 #   worker <state>       worker.yaml の state が unavailable / expired / left
@@ -19,7 +19,7 @@
 #                        古いことをワーカーのプロセスが無くなった印と読む。worker.yaml が無い間は判定しない
 #
 # --await-worker を付けると、起動時の worker.yaml のワーカーはもう動いていないものとして扱い、その状態と停滞を事象にしない
-# (新しいワーカーの出現・完了の印・end だけを返す)。作業側が、終了したワーカーの起動し直しを待つときに使う。
+# (新しいワーカーの出現・完了の印・end だけを返す)。作業側が、終了したワーカーが起動し直されるまで待機するときに使う。
 #
 # 終了コード: 0 = 現れた / 124 = 期限切れ / それ以外 = 中断 (引数の誤りを含む。理由は標準エラー)。
 # 期限は起動時の date +%s に <分> を足した締切で測り、期限切れを宣言する前にもう 1 度確かめる。
@@ -100,7 +100,7 @@ check_once() {
     if [ "$worker_existed" = 0 ] || [ "$(read_key "$worker" pid)" != "$start_pid" ]; then
       echo "worker $state"; return 0
     fi
-    # 起動時のワーカーはもう動いていないものとして待っているので、その状態と停滞は見ない
+    # 起動時のワーカーはもう動いていないものとして待機しているので、その状態と停滞は見ない
     [ "$await_worker" = 1 ] && return 1
     case "$state" in
       unavailable|expired|left) echo "worker $state"; return 0 ;;

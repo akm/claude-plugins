@@ -7,7 +7,7 @@
 | ID | 種類 | 条件・内容 | 報告に書くもの |
 | --- | --- | --- | --- |
 | RG0 | 手順 | 新しい周回なら、条件を決め ([arguments.md](arguments.md)。`--base` を省いたときの `review.base` の決め方もそこが正本)、下の「開始の前提」を確かめ、下の「置き場を作る」を行う。再入 (通知・`--resume`) なら、条件を `loop.yaml` から読み、[reentry.md](reentry.md) の「再入の手順」で行き先を決める | 新しい周回のときだけ、決まった条件を周回の開始前に出す — ワーカーのモデルの指定と effort・権限モードと許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン (`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains`。空なら「無し」と書き、接続を許すホストには利用者の設定の `WebFetch(domain:…)` の許可も加わり、ワーカーが起動時に表示することを添える。正本は [worker.md](worker.md) の「ネットワーク」)・レビュースキルとそのオプション・上限・構造の関門 k・収束後の全量レビューを周回の中で行うか (`review.full_review`)・全量の起点のブランチ (`review.base` と、`--base` による指定か `origin/HEAD` による既定か。由来は `loop.yaml` に残らないので、書くのはこの開始の報告だけ)・`review-triage-fix` に渡す回数の閾値 N と段ごとの走らせ方 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ。ただしモデルは実効モデルではなくワーカーへの指定を書き、実効モデルは各回の完了の印で分かることを添える)・待機の期限と停滞の秒数・`review_loop` の設定の警告 (あれば)・周回の id と置き場の絶対パス |
-| RL1 | 手順 | 下の「1 回のレビュー」の (a) 依頼文を書く → (b) 完了の印を待つ → (c) 突き合わせる。再入の手順からは (b) か (c) に入る | いま何回目か (この起動で数えた回数) と上限、記録の回番号、識別子。収束後の全量の回なら、上限に数えないことと、この起動で行った収束後の全量の回の数 |
+| RL1 | 手順 | 下の「1 回のレビュー」の (a) 依頼文を書く → (b) 完了の印が現れるまで待機する → (c) 突き合わせる。再入の手順からは (b) か (c) に入る | いま何回目か (この起動で数えた回数) と上限、記録の回番号、識別子。収束後の全量の回なら、上限に数えないことと、この起動で行った収束後の全量の回の数 |
 
 ## 開始の前提
 
@@ -36,12 +36,12 @@
 2. **記録が読めなければ RA3。**
 3. **増分の基点が HEAD の祖先でなければ RA3。** 増分の回 (記録に回があり、`loop.yaml` の `full_review_next` が偽) なら、最後の回の `head` について `git merge-base --is-ancestor <head> HEAD` を確かめる (reset や squash で履歴から外れていると、増分の範囲が成り立たない)。全量の回 (記録に回が無いか、`full_review_next` が真) なら確かめない — 全量の基点は merge-base で、常に HEAD の祖先である。
 4. **Skill ツールで [review-request](../../review-request/SKILL.md) を呼ぶ** (回ごとに。上の「呼ぶスキル」): `review-request <review.skill> <worker.model> <review.args> --dir <置き場>` (値は `loop.yaml`。置き場はリポジトリのルートからの相対パス。`ce-code-review` は effort を受け取らないので `<review.args>` を渡さない)。**全量の回 (上の 3 と同じ区別) なら `--base <review.base>` を、`full_review_next` が真なら `--full-review` も渡す** (真にするのは `--resume --full-review` と、[stops.md](stops.md) の RJ0・RJ1 の「はい」)。増分の回に `--base` を渡さないのは、`review-request` が増分の回の `--base` を無視し、無視したことを報告に書くため (毎回の報告に意味の無い注記が出る)。**範囲と基点は `review-request` の手順 2 に従う** (全量は `--base` のブランチとの merge-base、増分は直前の回の `head`)。`review-triage-loop` の [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「範囲」(merge-base で基点を決める規則) は使わない — 依頼文を書くのは `review-request` なので、基点の規則を 2 か所に持たないため。
-5. **`review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら** (RA1 の後に同じ分のうちに書き直した)、分が変わるのを待ってからやり直す。Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-loop <周回 id>: 識別子の衝突を避けるため分が変わるまで待つ。通知を受けたら review-loop の再入の手順へ」にして、ターンを終える。再入の手順は、取り込む印も印の無い依頼文も無いので G2 に進み、L1 でここに戻る。識別子の成分に秒を足すことはしない (成分を変えると `review-request` の表の全欄を確かめ直すことになる)。
+5. **`review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら** (RA1 の後に同じ分のうちに書き直した)、分が変わるまで待機してからやり直す。Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-loop <周回 id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-loop の再入の手順へ」にして、ターンを終える。再入の手順は、取り込む印も印の無い依頼文も無いので G2 に進み、L1 でここに戻る。識別子の成分に秒を足すことはしない (成分を変えると `review-request` の表の全欄を確かめ直すことになる)。
 6. **それ以外の理由で `review-request` が依頼文を書かなかったら RA3** (報告には `review-request` が報告した理由を書く)。
 7. **書けたら、回数を数える。記録に回がある状態で全量の依頼文 (`full_review_next` が真で書いた依頼文) を書いたら、この起動で行った収束後の全量の回の数を 1 つ増やし、数えた回数は増やさない** (収束後の全量の回は上限に数えない。止まる理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。**それ以外 (増分の回と、記録に回が無いときの 1 回目の全量の回) は、この起動で数えた回数を 1 つ増やす** (J5 が見る回数。数えるのはここだけ)。**`full_review_next` が真なら偽にする** (`loop.yaml` を一時名に書いてから改名する)。依頼文の絶対パスと識別子を控える。
 8. **回 1 の最初の依頼文なら** (置き場に `worker.yaml` が無い)、ワーカーを起動するか、起動を人間に案内する ([guide-template.md](guide-template.md) の「起動の手順」)。
 
-### (b) 完了の印を待つ
+### (b) 完了の印が現れるまで待機する
 
 [reentry.md](reentry.md) の「待機」のとおり、待機スクリプトをバックグラウンドで起動して**ターンを終える**。印が現れると通知で次のターンが始まり、再入の手順で (c) に入る。
 

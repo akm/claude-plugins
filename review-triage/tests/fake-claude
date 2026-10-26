@@ -16,7 +16,7 @@
   result の行)。既定の init の行の permissionMode には、受けた `--permission-mode` の値を書く (受けていなければキーを書かない)
 - FAKE_CLAUDE_PERMISSION_MODE: 既定の init の行の permissionMode に、受けた `--permission-mode` の値の代わりに書く値
   (auto モードを使えずに別のモードで起動した回を真似る)
-- FAKE_CLAUDE_SLEEP: 結果を書く前に待つ秒数 (既定 0)
+- FAKE_CLAUDE_SLEEP: 結果を書く前に待機する秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
 - FAKE_CLAUDE_REPO: 作業側の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
 - FAKE_CLAUDE_LOOP: 周回の置き場の絶対パス (mode が write_request と write_loop_result のとき使う)

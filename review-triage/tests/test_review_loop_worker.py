@@ -54,7 +54,7 @@ _HOOK_NS = runpy.run_path(_HOOK, run_name="deny_tmp_hook")
 # サブコマンド (-C <ディレクトリ>・-c <設定> と、- で始まる引数を飛ばした最初の引数) が
 # FAKE_GIT_TOUCH_ON と同じならファイル FAKE_GIT_TOUCH を作り、
 # FAKE_GIT_RUN_ON と同じならシェルのコマンド FAKE_GIT_RUN を sh -c で実行し、
-# FAKE_GIT_SLEEP_ON と同じなら自分の PID をファイル FAKE_GIT_PIDS に書き足してから FAKE_GIT_SLEEP 秒 (既定 1000) 待ち、
+# FAKE_GIT_SLEEP_ON と同じなら自分の PID をファイル FAKE_GIT_PIDS に書き足してから FAKE_GIT_SLEEP 秒 (既定 1000) 待機し、
 # FAKE_GIT_FAIL と同じなら本物を呼ばずに失敗する
 _FAKE_GIT = """#!/usr/bin/env python3
 import json, os, subprocess, sys, time
@@ -93,7 +93,7 @@ os.execv(real, [real] + args)
 
 # 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを走らせている python) に
 # 引数をそのまま渡す。実行するスクリプトが文字列 FAKE_PY_SLEEP_MARK を含めば、
-# ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待ち、そのあとスクリプトを実行する。
+# ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待機し、そのあとスクリプトを実行する。
 # ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う。
 # 同じく文字列 FAKE_PY_PRELUDE_MARK を含めば、ファイル FAKE_PY_PRELUDE の中身をスクリプトの前に足してから実行する
 # (ワーカーの処理の途中に、別のプロセスが割り込んだのと同じ変更を起こすのに使う)。
@@ -134,9 +134,9 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 """
 
 # 偽の date (PATH の先頭の bin/ に置く)。環境変数 FAKE_DATE_TRIGGER が指すファイルを消せた 1 回だけ、本物の date の出力を書いてから
-# 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待つ (待ち始めたときに、環境変数
+# 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待機する (待機を始めたときに、環境変数
 # FAKE_DATE_STARTED が指すファイルを作る)。
-# 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待たせる (ほかの呼び出しではファイルを消さない)。
+# 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待機させる (ほかの呼び出しではファイルを消さない)。
 # コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
 if [ -n "${FAKE_DATE_TRIGGER:-}" ] && { [ -z "${FAKE_DATE_ARGS:-}" ] || [ "$*" = "$FAKE_DATE_ARGS" ]; } \\
@@ -495,7 +495,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def install_fake_date(self, trigger, started):
         """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。引数 trigger と started は、環境変数 FAKE_DATE_TRIGGER と
-        FAKE_DATE_STARTED に渡す。待つ条件と秒数は、定数 _FAKE_DATE の上のコメントのとおり。"""
+        FAKE_DATE_STARTED に渡す。待機する条件と秒数は、定数 _FAKE_DATE の上のコメントのとおり。"""
         path = os.path.join(self.bin, "date")
         with open(path, "w", encoding="utf-8") as f:
             f.write(_FAKE_DATE)
@@ -520,7 +520,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def start_until_child_checks_parent(self, trigger, log):
         """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
-        親の生存を確かめる ps を実行するまで待って、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
+        親の生存を確かめる ps を実行するまで待機して、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
         コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親の側に出る。"""
         for f in (trigger, log):
             if os.path.exists(f):
@@ -595,7 +595,7 @@ class WorkerTestBase(unittest.TestCase):
         return sorted(os.path.join(tmp, n) for n in os.listdir(tmp) if n.startswith(prefix))
 
     def spawn_sleeper(self, cwd, *args):
-        """cwd を作業ディレクトリにして、別のセッションで待ち続けるプロセスを起動する。args は起動引数に足すだけで使わない。"""
+        """cwd を作業ディレクトリにして、別のセッションで待機し続けるプロセスを起動する。args は起動引数に足すだけで使わない。"""
         p = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(1000)", *args], cwd=cwd, start_new_session=True,
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -669,7 +669,7 @@ class WorkerTestBase(unittest.TestCase):
             if v:
                 return v
             time.sleep(interval)
-        self.fail(f"{timeout} 秒待っても{what}が成り立たない")
+        self.fail(f"{timeout} 秒待機しても{what}が成り立たない")
 
     def worker_state(self):
         try:
@@ -687,7 +687,7 @@ class WorkerTestBase(unittest.TestCase):
         return _read_yaml(p)
 
     def wait_pids(self, path, count):
-        """ファイル path に PID が count 個以上書かれるのを待って、その列を返す。"""
+        """ファイル path に PID が count 個以上書かれるまで待機して、その列を返す。"""
         def ready():
             try:
                 pids = _read_pids(path)
@@ -719,7 +719,7 @@ class WorkerTestBase(unittest.TestCase):
         return sorted(n for n in os.listdir(self.tmpdir) if n.startswith("review-loop-"))
 
     def run_round(self, *extra, rid=RID):
-        """ワーカーを起動し、完了の印を待って止める。(完了の印, ワーカーの標準エラー) を返す。"""
+        """ワーカーを起動し、完了の印が現れるまで待機してから止める。(完了の印, ワーカーの標準エラー) を返す。"""
         p = self.start(*extra)
         marker = self.wait_marker(rid)
         self.wait_state("idle")
@@ -905,7 +905,7 @@ class TestHappyPath(WorkerTestBase):
         self.finish(p)
 
     def test_heartbeat_advances_during_review(self):
-        # レビュアの実行中 (偽の claude が 12 秒待つ) にも、worker.yaml の更新時刻が 5 秒おきに進む
+        # レビュアの実行中 (偽の claude が 12 秒待機する) にも、worker.yaml の更新時刻が 5 秒おきに進む
         self.env["FAKE_CLAUDE_SLEEP"] = "12"
         self.put_request()
         p = self.start()
@@ -972,7 +972,7 @@ class TestResultChecks(WorkerTestBase):
         self.put_request()
         p = self.start()
         self.wait_marker()
-        time.sleep(7)  # 探索の周期 (5 秒) を 1 回以上待つ
+        time.sleep(7)  # 探索の周期 (5 秒) の 1 回分以上待機する
         self.assertEqual(len(self.claude_calls()), 1)
         self.finish(p)
 
@@ -1518,7 +1518,7 @@ class TestWorkspace(WorkerTestBase):
         return outside
 
     def remove_workspace_at_end(self, fill):
-        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終わるのを待つ。"""
+        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終わるまで待機する。"""
         p = self.start()
         self.wait_state("idle")
         fill(self.ws_path())
@@ -2723,7 +2723,7 @@ class TestEnding(WorkerTestBase):
 
     def test_interrupt_while_idle_leaves_no_idle_sleep(self):
         # 待機中に割り込みを受けて終わったワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
-        # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、
+        # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待機する。待機に入った直後に送るので、
         # 残れば数秒はプロセスグループに残る
         p = self.start()
         self.wait_state("idle")
@@ -2786,18 +2786,18 @@ class TestEnding(WorkerTestBase):
         self.assertEqual(self.worker_state().get("pid"), p.pid)
 
     def test_interrupt_while_command_substitution_child_exits(self):
-        # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
+        # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終了まで待機する間に SIGINT を受けても終わる。bash は、
         # コマンド置換のために起動したプロセスが出力を閉じてから終わるまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
         # 終わらなければ実行しない (#105 の現象 B。
         # macOS の bash 3.2・bash 5.2・5.3 で起きる)。そのため割り込みは、コマンド置換を使わない親が受けて、子にファイルで伝える
-        # (worker.md の「終わり方」)。偽の date は、標準出力を閉じてから SIGINT を無視して待ち、SIGINT では終わらない
+        # (worker.md の「終わり方」)。偽の date は、標準出力を閉じてから SIGINT を無視して待機し、SIGINT では終わらない
         trigger = os.path.join(self.root, "date-trigger")
         started = os.path.join(self.root, "date-started")
         self.install_fake_date(trigger, started)
         p = self.start()
         self.wait_state("idle")
         open(trigger, "w").close()
-        self.wait_for(lambda: os.path.exists(started), what="偽の date が SIGINT を無視して待ち始めること")
+        self.wait_for(lambda: os.path.exists(started), what="偽の date が SIGINT を無視して待機を始めること")
         os.killpg(p.pid, signal.SIGINT)
         out, _ = p.communicate(timeout=20)
         self.assertEqual(p.returncode, 130)
@@ -2810,7 +2810,7 @@ class TestEnding(WorkerTestBase):
     def test_interrupt_right_after_child_starts(self):
         # 子が自分の PID を求めるコマンド置換 (PATH で見つかる sh を起動する) の間に親が割り込みを受けても、子は USR1 のデフォルトの
         # 動作 (終了) で終わらず、worker.yaml を left にして終わる。子は trap を最初に設定する (関数 body_main)。
-        # 偽の sh は、最初の 1 回だけ待ち始めたことをファイルに書いてから 2 秒待ち、その区間を広げる
+        # 偽の sh は、最初の 1 回だけ待機を始めたことをファイルに書いてから 2 秒待機し、その区間を広げる
         started = os.path.join(self.root, "sh-started")
         path = os.path.join(self.bin, "sh")
         with open(path, "w", encoding="utf-8") as f:
@@ -2818,7 +2818,7 @@ class TestEnding(WorkerTestBase):
         os.chmod(path, 0o755)
         self.env["FAKE_SH_STARTED"] = started
         p = self.start()
-        self.wait_for(lambda: os.path.exists(started), what="偽の sh が待ち始めること")
+        self.wait_for(lambda: os.path.exists(started), what="偽の sh が待機を始めること")
         p.send_signal(signal.SIGTERM)
         out, err = p.communicate(timeout=20)
         self.assertEqual(p.returncode, 143, err)
@@ -2829,7 +2829,7 @@ class TestEnding(WorkerTestBase):
     def test_second_interrupt_while_parent_writes_interrupt_file(self):
         # 親が割り込みを記録するファイルを書いている間に、2 回目の割り込み (Ctrl-C を続けて押したとき) がプロセスグループに届いても、
         # ファイルは書かれ、ワーカーは終わる。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
-        # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待つ
+        # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待機する
         started = os.path.join(self.root, "mv-started")
         path = os.path.join(self.bin, "mv")
         with open(path, "w", encoding="utf-8") as f:
@@ -2887,9 +2887,9 @@ class TestEnding(WorkerTestBase):
         self.finish(p)
 
     def test_sigkill_while_stopping_reviewer_after_timeout(self):
-        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に親を kill -9 で消しても、
+        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるまで待機する間に親を kill -9 で消しても、
         # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終わる (worker.md の「終わり方」)。偽の claude は
-        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
         self.put_request()
@@ -2953,9 +2953,9 @@ class TestEnding(WorkerTestBase):
 
     def test_sigkill_while_child_is_outside_wait(self):
         # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終わるまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
-        # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) を待ち続ける。
-        # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待たせ、その間に親を消す (上限を測る処理は、
-        # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待たせないように、準備の
+        # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) で待機し続ける。
+        # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待機させ、その間に親を消す (上限を測る処理は、
+        # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待機させないように、準備の
         # 途中の複製の設定の確認 (偽の python3 で遅らせる) が始まってから、偽の date のトリガーを作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 2, touch)
@@ -2967,7 +2967,7 @@ class TestEnding(WorkerTestBase):
         p = self.start()
         self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
         open(trigger, "w").close()
-        self.wait_for(lambda: os.path.exists(started), timeout=20, what="手順 9 の確認の後の log の date が待ち始めること")
+        self.wait_for(lambda: os.path.exists(started), timeout=20, what="手順 9 の確認の後の log の date が待機を始めること")
         os.kill(p.pid, signal.SIGKILL)
         p.wait(timeout=20)
         self.wait_for(lambda: os.path.exists(self.pids_file), timeout=20, what="偽の claude の起動")
@@ -3067,10 +3067,10 @@ class TestInterruptPhases(WorkerTestBase):
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_interrupt_while_stopping_reviewer_after_timeout(self):
-        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に割り込みを受けても、
+        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるまで待機する間に割り込みを受けても、
         # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の、
         # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終わり方」の、子の箇条の次の、回の終わりの処理の途中の項)。
-        # 偽の claude は TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        # 偽の claude は TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):

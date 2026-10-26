@@ -61,7 +61,7 @@ class WaitTestBase(unittest.TestCase):
             _set_mtime_ago(p, ago)
 
     def run_wait(self, minutes="1", stale=None, actions=(), timeout=30, await_worker=False):
-        """スクリプトを起動し、actions ((秒, 関数) の列) をその時刻に行い、終了を待つ。"""
+        """スクリプトを起動し、actions ((秒, 関数) の列) をその時刻に行い、終了まで待機する。"""
         args = ["bash", _SCRIPT] + (["--await-worker"] if await_worker else []) + [self.dir, RID, str(minutes)]
         if stale is not None:
             args.append(str(stale))
@@ -85,7 +85,7 @@ class WaitTestBase(unittest.TestCase):
 
 class TestDelivered(WaitTestBase):
     def test_ok_marker_with_request_and_result_returns_zero(self):
-        # 待っている間に 3 点 (印・依頼文・結果) が揃うと 0 で返る
+        # 待機している間に 3 点 (印・依頼文・結果) が揃うと 0 で返る
         rc, out, err, _ = self.run_wait(
             actions=[(1, lambda: (self.put_request(), self.put_result(), self.put_marker("ok")))]
         )
@@ -93,7 +93,7 @@ class TestDelivered(WaitTestBase):
         self.assertEqual(out, f"delivered {RID}")
 
     def test_ok_marker_without_request_does_not_return(self):
-        # status: ok の印だけで依頼文が無いときは返らない (3 点が揃うまで待つ)
+        # status: ok の印だけで依頼文が無いときは返らない (3 点が揃うまで待機する)
         self.put_result()
         self.put_marker("ok")
         rc, out, _, _ = self.run_wait(minutes="0.1")
@@ -216,7 +216,7 @@ class TestWorker(WaitTestBase):
 
 
 class TestAwaitWorker(WaitTestBase):
-    """--await-worker: 起動時のワーカーはもう動いていないものとして、新しいワーカーの出現を待つ。"""
+    """--await-worker: 起動時のワーカーはもう動いていないものとして、新しいワーカーが現れるまで待機する。"""
 
     def test_terminal_state_at_start_is_not_an_event(self):
         for state in ("expired", "left", "unavailable"):
