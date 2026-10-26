@@ -286,7 +286,7 @@ def declaration_stage(item, cs, asg, project_number):
 # --- 資源の使用 ---------------------------------------------------------------------
 
 def labels_at(item, at):
-    """ある時点 (at) に付いていたラベル: その時点までの LabeledEvent・UnlabeledEvent を時刻の順に全部読んで求める (R24 の決まり (6))。"""
+    """ある時点 (at) に付いていたラベル: その時点までの LabeledEvent・UnlabeledEvent を時刻の順に全部読んで求める (R24 の規則 (6))。"""
     labels = set()
     for e in item.get("events") or []:
         if (e.get("at") or "") > at or not e.get("label"):

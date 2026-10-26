@@ -52,7 +52,7 @@ def load_snapshot(directory):
 
 
 def save_snapshot(directory, snapshot):
-    """一時ファイル (records.md の一時名の決まり: `.` で始まり `.tmp` で終わる名前。書き込み元ごとに別) に書き、fsync してから
+    """一時ファイル (records.md の一時名の規則: `.` で始まり `.tmp` で終わる名前。書き込み元ごとに別) に書き、fsync してから
     os.replace で置き換える (record.save と同じ形)。返り値はパス。"""
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, SNAPSHOT_FILE)

@@ -28,7 +28,7 @@
 - ある時点の状態 (そのとき付いていたラベルなど) は、その時点までの出来事を時刻の順に全部読んで求める。最初や最新の出来事だけで決めない。
 - 投稿者がトークンのログインと違う先頭行のコメントは、この仕組みのコメントとして扱わない ([issue-format.md](issue-format.md) の「コメント」)。
 - 宛先と番号を持つ種類のコメント (`開始可`・`待機`・`解放`・`依頼`) は、今の割り当ての宛先と番号のものだけを使う。前の割り当てのものは使わない。
-- 同じ場面に 2 つの決まりが当たるときは、利用者の変更を上書きしないほうを選ぶ。
+- 同じ場面に 2 つの規則が当たるときは、利用者の変更を上書きしないほうを選ぶ。
 
 **決めたこと**:
 
@@ -197,7 +197,7 @@
 | `conflict` | `conflict`・`<相手の項目>:<相手の宣言の ID>` | 回答が無ければ質問し、回答まで `待機` (理由 `利用者の回答`)。`wait`: `待機` (理由 `Issue` 相手) と、相手を `blockedBy` に追加し Status を `Blocked` にする。`small-pr`: `待機` (理由 `小さな PR` 相手。相手の `小さな PR の報告` があれば PR も) と、相手のセッションへの `依頼` (小さな PR。待機する Issue がこの項目の `依頼` が相手の項目に既にあれば出さない) と `blockedBy`・`Blocked`。`proceed`: 競合しうるまま進む |
 | `needs-user` (種類 `unknown-content` の同じパス) | `unknown-content`・`<相手の項目>:<相手の宣言の ID>:<パス>` | 回答が無ければ質問し、回答まで `待機`。`conflict`: その相手を `conflict` として上の行で扱う。`none`: 競合しない。同じ相手に `conflict` のパスもあれば `conflict` の質問だけを出す |
 
-`待機` の理由 (すべて並べる決まりは [issue-format.md](issue-format.md) の「種類」) は、未回答の質問があれば `利用者の回答` を先頭に、回答済みの相手の `Issue`・`小さな PR` を続ける。結果は、未回答の質問があれば `ask`、無ければ `wait`。
+`待機` の理由 (すべて並べる規則は [issue-format.md](issue-format.md) の「種類」) は、未回答の質問があれば `利用者の回答` を先頭に、回答済みの相手の `Issue`・`小さな PR` を続ける。結果は、未回答の質問があれば `ask`、無ければ `wait`。
 
 判定の質問の種類 (`kind`) と選択肢 (`options`)。回答に従う処理はこの節が決める。
 
@@ -225,9 +225,9 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]` | 無し | `judgments`・`actions`・`questions`・`signals` (「判定」)・`record_lost`・`problems`・`rate_limit`・`warnings`・`errors`。入力は `item state` と同じで、リポジトリの設定は設定の `repositories` の clone から読む。`--issue` は、投稿の順に並べた未判定の宣言のうち、その項目の宣言まで判定する (前に投稿された宣言も判定し、後の宣言は判定しない。その項目に未判定の宣言が無ければ何も判定しない。判定の順序の決まりを守るため。比較の相手はすべての項目から集める)。`--issue` が参照の形でなければ `errors` (key `issue`。`gh` を読まない)、Project に無ければ `rejected` (key `issue`) |
+| `declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]` | 無し | `judgments`・`actions`・`questions`・`signals` (「判定」)・`record_lost`・`problems`・`rate_limit`・`warnings`・`errors`。入力は `item state` と同じで、リポジトリの設定は設定の `repositories` の clone から読む。`--issue` は、投稿の順に並べた未判定の宣言のうち、その項目の宣言まで判定する (前に投稿された宣言も判定し、後の宣言は判定しない。その項目に未判定の宣言が無ければ何も判定しない。判定の順序の規則を守るため。比較の相手はすべての項目から集める)。`--issue` が参照の形でなければ `errors` (key `issue`。`gh` を読まない)、Project に無ければ `rejected` (key `issue`) |
 | `item state --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>] [--diffs <ファイル \| ->]` | 無し | `items` (割り当てのある項目の状態。上の表)・`usage`・`actions`・`questions`・`reports`・`pending`・`record_lost` (「ターンで行うこと」)・`problems`・`rate_limit`・`warnings`・`errors`。設定の `project`・`resources` (属性)・`third_party_edit_check` と、記録 (無ければ記録を失った扱い。壊れていれば `errors` (key `record`)) と、Project のメタ情報 (ワークフローの有効・無効) を読む。`--diffs` は `observe diff` の出力 (JSON)。項目の一覧そのものが無ければ (`problems` の `what` が `items-page`・`graphql-errors`) 導かずに `errors` (key `partial`) |
-| `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (決まりの正本は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
+| `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (規則の正本は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
 | `work check --project <owner>/<番号> --issue <owner/repo#番号> [--session <ID>]` | 無し | `session`・上の表の値・`problems`・`rate_limit`・`errors`。`--session` を省けば環境変数 (`CLAUDE_CODE_HOST_SESSION_ID`、無ければ `CLAUDE_CODE_SESSION_ID`)。項目が無ければ `errors` (key `issue`) |
 | `work held --project <owner>/<番号> [--session <ID>]` | 無し | `session`・`items` (上の表)・`problems`・`rate_limit`・`errors` |
 
