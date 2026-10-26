@@ -84,7 +84,7 @@ def is_our_wait(entry):
 
 
 def stop_previous(path, grace_seconds=10.0):
-    """前の待機を停止する。`wait.pid` の PID がこの CLI の待機なら SIGTERM を送って終了するのを待機し、そうでなければ停止せずに `wait.pid` だけ消す。
+    """前の待機を停止する。`wait.pid` の PID がこの CLI の待機なら SIGTERM を送って終了するまで待機し、そうでなければ停止せずに `wait.pid` だけ消す。
     返り値: {"stopped": PID} / {"removed": PID} (再利用されていた) / {"none": True}。"""
     entry = read_pid_file(path)
     if entry is None:

@@ -125,7 +125,7 @@ class HeaderFormatParseTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             header("割り当て", {"role": "manager", "name": "m", "session_id": "M | 1"}, to="W-7", assignment=1)  # ID に区切り
         with self.assertRaises(ValueError):
-            header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "Issue"}])  # 待機する Issue が無い
+            header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "Issue"}])  # 完了待ちの Issue が無い
 
     def test_format_rejects_lines_that_do_not_round_trip(self):
         """作った先頭行を同じ内容に読み戻せない入力 (改行を含む値、`|` で終わる名前) は ValueError。"""
@@ -262,21 +262,21 @@ class AlreadyPostedTest(unittest.TestCase):
         self.assertPosted(w_user, [w_user, w_issue], False, "前と同じ理由の待機に戻ったときも、最新と違えば投稿する")
         self.assertPosted(w_user, [w_issue, w_user], True, "最新と同じなら投稿しない")
         both = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の回答"}, {"kind": "資源", "resource": "db"}])
-        self.assertPosted(w_user, [both], False, "待機するものの一部が解けて残りを書いたときも投稿する")
+        self.assertPosted(w_user, [both], False, "待機の理由の一部が解けて残りを書いたときも投稿する")
         other_decl = header("待機", to="W-7", assignment=1, declaration=2, waits=[{"kind": "利用者の回答"}])
         self.assertPosted(w_user, [w_user, other_decl], True, "別の宣言への待機は比べる相手にしない")
         pr = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "小さな PR", "issue": OTHER}])
         pr_made = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "小さな PR", "issue": OTHER, "pr": PR9}])
-        self.assertPosted(pr_made, [pr], False, "PR ができたら待機する相手が変わるので投稿する")
+        self.assertPosted(pr_made, [pr], False, "PR ができたら完了待ちの相手が変わるので投稿する")
 
     def test_values_compare_by_meaning(self):
         """繰り返す値は順序を問わず、Issue の参照と PR の URL は owner/repo の大文字小文字を区別せずに比べる。"""
         ab = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "利用者の回答"}, {"kind": "資源", "resource": "db"}])
         ba = header("待機", to="W-7", assignment=1, declaration=1, waits=[{"kind": "資源", "resource": "db"}, {"kind": "利用者の回答"}])
-        self.assertPosted(ba, [ab], True, "待機するものの順序が違っても同じ")
+        self.assertPosted(ba, [ab], True, "待機の理由の順序が違っても同じ")
         w56 = header("依存の待機", blockers=[OTHER, f"{REPO}#6"])
         w65 = header("依存の待機", blockers=[f"{REPO.upper()}#6", OTHER])
-        self.assertPosted(w65, [w56], True, "待機する Issue の順序と owner/repo の大文字小文字が違っても同じ")
+        self.assertPosted(w65, [w56], True, "完了待ちの Issue の順序と owner/repo の大文字小文字が違っても同じ")
         req = header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR9)
         upper = header("依頼", to="W-7", assignment=1, request_kind="本文の追記", pr=PR9.replace(REPO, REPO.upper()))
         self.assertPosted(upper, [req], True)
@@ -287,7 +287,7 @@ class AlreadyPostedTest(unittest.TestCase):
         wait56 = header("依存の待機", blockers=[OTHER, f"{REPO}#6"])
         done = header("依存の解消")
         self.assertPosted(wait5, [wait5], True)
-        self.assertPosted(wait56, [wait5], False, "待機する Issue が違えば投稿する")
+        self.assertPosted(wait56, [wait5], False, "完了待ちの Issue が違えば投稿する")
         self.assertPosted(wait5, [wait5, done], False, "間に依存の解消があれば投稿する")
         self.assertPosted(done, [wait5], False)
         self.assertPosted(done, [wait5, done], True)

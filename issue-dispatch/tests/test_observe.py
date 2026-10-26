@@ -181,7 +181,7 @@ class DiffTest(FakeGhCase):
         self.assertEqual(d, [{"kind": "field", "item": A3, "field": "Agent stuck state", "before": "idle-no-progress", "after": None}])
 
     def test_blocked_by_comment_pr_and_order(self):
-        """blocker の close・コメントの追加・待機している小さな PR の状態の変化を返し、処理の順 (人の変更 → close → blockedBy → コメント → PR → 項目の追加) に並ぶ。"""
+        """blocker の close・コメントの追加・マージ待ちの小さな PR の状態の変化を返し、処理の順 (人の変更 → close → blockedBy → コメント → PR → 項目の追加) に並ぶ。"""
         before = self.snapshot(comment_prs={PR9: {"state": "OPEN", "draft": False, "merged": False}})
         before["items"][A3]["blocked_by"] = {A1: "OPEN"}
         def mutate(nodes):

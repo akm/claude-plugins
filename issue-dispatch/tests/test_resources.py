@@ -78,7 +78,7 @@ class HeldResourcesTest(unittest.TestCase):
         self.assertEqual(resources.held_from_history(history), ["A"])
 
     def test_swap_update_waits_then_holds(self):
-        """{A, B} が開始可 → {A, C} で、B はその時点で解放し、C を待機する間の持っている資源は {A}。C が空いて開始可を書くと {A, C}。"""
+        """{A, B} が開始可 → {A, C} で、B はその時点で解放し、C が空くまで待機する間の持っている資源は {A}。C が空いて開始可を書くと {A, C}。"""
         go1 = decl(["A", "B"])
         update = decl(["A", "C"])
         self.assertEqual(resources.held_from_history([{"declaration": go1, "go": True}, {"declaration": update, "go": False}]), ["A"])
@@ -164,7 +164,7 @@ class DeclareTest(unittest.TestCase):
         self.assertEqual((r["result"], r["reserve"]), ("go", ["db"]))
 
     def test_undeclared_default_ask(self):
-        """予約したのに宣言に無い資源には「利用者に質問する」を返す。回答を待機する間もほかの判定が済んでいれば開始可で、予約は残す。"""
+        """予約したのに宣言に無い資源には「利用者に質問する」を返す。回答待ちの間もほかの判定が済んでいれば開始可で、予約は残す。"""
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {})
         self.assertEqual((r["result"], r["ask_undeclared"], r["release"], r["keep"]), ("go", ["db"], [], ["db"]))
         r = resources.judge_declare(I2, ["gpu"], ["db", "gpu"], {"db": [I2], "gpu": [I2]}, attrs(), {}, {"db": "release"})

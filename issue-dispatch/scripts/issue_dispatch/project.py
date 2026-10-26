@@ -19,7 +19,7 @@ STUCK_STATES = ("idle-no-progress", "deadline-passed", "session-missing", "manag
 # Status の選択肢。Todo・In Progress・Done は Project が最初から持ち、ほかの 3 つはこの仕組みが足す (色と説明は足すときの値)
 STATUS_OPTIONS = ("Todo", "Ready", "In Progress", "In review", "Blocked", "Done")
 ADDED_STATUS_OPTIONS = {"Ready": ("GREEN", "着手してよい"), "In review": ("BLUE", "PR が ready for review"),
-                        "Blocked": ("RED", "ほかの Issue か小さな PR を待機する")}
+                        "Blocked": ("RED", "ほかの Issue か小さな PR の完了まで待機する")}
 # 管理のセッションが書く Status (R2)。Done は書かない
 MANAGER_STATUSES = ("Todo", "Ready", "Blocked", "In Progress", "In review")
 REQUIRED_WORKFLOWS = ("Item closed",)

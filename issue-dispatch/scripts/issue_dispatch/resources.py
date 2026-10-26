@@ -153,7 +153,7 @@ def judge_declare(item, declared, reserved, usage, attrs_table, answers, undecla
     """契機「着手の宣言」。declared は宣言の resources、reserved は割り当てで予約した資源。answers は when_busy が ask の資源への回答、
     undeclared_answers は release_undeclared が ask の資源への回答 (名前 → release / keep)。
     返り値: {"result": "go" (`開始可` を書くときに reserve を予約する) / "wait" (`待機`。どれも予約しない) / "ask",
-    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答を待機する・残す予約), "ask_undeclared" (質問する),
+    "reserve", "wait_for", "ask", "release" (解放する宣言に無い予約), "keep" (回答待ちの予約・残す予約), "ask_undeclared" (質問する),
     "request_rewrite" (解放してはいけないので修正を頼む)}。宣言に無い予約の扱いは go / wait / ask に依らない。"""
     declared, reserved = _unique(declared), _unique(reserved)
     reserved_keys = {_key(r) for r in reserved}

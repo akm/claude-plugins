@@ -21,7 +21,7 @@
 | `deadline-passed` | 割り当てから期限 (設定 `declare_deadline_minutes`) を過ぎても、形の検査を通った着手の宣言が無い (権限の確認で停止している場合など) |
 | `session-missing` | 作業のセッションが `ListAgents` に見つからない |
 | `manager-stopped` | 管理のセッションが停止している |
-| `waiting-for-user` | 作業のセッションが `ListAgents` で状態 `waiting` のまま 2 回続けて見えた (利用者の入力か権限の承認を待機している可能性がある) |
+| `waiting-for-user` | 作業のセッションが `ListAgents` で状態 `waiting` のまま 2 回続けて見えた (利用者の入力待ちか権限の承認待ちの可能性がある) |
 
 ## Status の選択肢
 
@@ -31,7 +31,7 @@
 | `Ready` | 利用者 (管理のセッションは `Blocked` から戻すときだけ) | 利用者が「着手してよい」と決めたことを示す。割り当ての対象はこの項目だけ |
 | `In Progress` | 管理のセッション | 割り当て中 |
 | `In review` | 管理のセッション | 今の割り当ての PR の観測の種類が `in_review` (条件の正本は [issue-format.md](issue-format.md) の「PR の観測」) |
-| `Blocked` | 管理のセッション・利用者 | ほかの Issue か小さな PR を待機する |
+| `Blocked` | 管理のセッション・利用者 | ほかの Issue か小さな PR の完了まで待機する |
 | `Done` | 組み込みワークフロー (管理のセッションは書かない) | Issue が閉じた |
 
 `Todo`・`In Progress`・`Done` は Project が最初から持ち、`Ready`・`In review`・`Blocked` はこの仕組みが足す (`In Progress` の表記は Project のまま使う)。管理のセッションが書く Status は `Todo`・`Ready`・`Blocked`・`In Progress`・`In review` の 5 つに限り、`Done` は書かない (CLI の `project set-status` は、ほかの値を `gh` を実行せずに拒否する)。**Status が空の項目は無視する** — 管理のセッションは Status を書き足さない (Project によって選択肢の名前が違い、空の項目に何を書けばよいかを決められないため)。利用者が手で変えた Status は上書きせず、1 回だけ報告する。
@@ -58,7 +58,7 @@
 `project check` は、フィールド 3 つの有無と型、`Agent stuck state` の値、Status の選択肢、ワークフローを確認し、不足と作る手順の案を返す (読むだけ)。利用者の承認を得てから `project add-fields` が案を実行する。
 
 - フィールドは `gh project field-create <番号> --owner <owner> --name <名前> --data-type TEXT|SINGLE_SELECT [--single-select-options <値,…>]` で作る。
-- Status の選択肢は GraphQL の `updateProjectV2Field` (`singleSelectOptions`) で足す。**既存の選択肢を `id` 付きで含めて渡す** — 含めないと既存の値が消える (U1 で確認した)。足す選択肢の色と説明: `Ready` は GREEN「着手してよい」、`In review` は BLUE「PR が ready for review」、`Blocked` は RED「ほかの Issue か小さな PR を待機する」。既存の項目の Status の値は変わらない。
+- Status の選択肢は GraphQL の `updateProjectV2Field` (`singleSelectOptions`) で足す。**既存の選択肢を `id` 付きで含めて渡す** — 含めないと既存の値が消える (U1 で確認した)。足す選択肢の色と説明: `Ready` は GREEN「着手してよい」、`In review` は BLUE「PR が ready for review」、`Blocked` は RED「ほかの Issue か小さな PR の完了まで待機する」。既存の項目の Status の値は変わらない。
 - `Agent stuck state` の値の不足も、Status と同じく既存の値の `id` を保った `updateProjectV2Field` の案にする。
 - 既にあるフィールドの型が違うとき (`Agent stuck state` が単一選択でないなど) は作り直しが要るので、案を出さずに報告だけする。
 

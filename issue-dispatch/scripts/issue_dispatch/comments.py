@@ -84,7 +84,7 @@ def _wait(item):
     kind = item["kind"]
     out = {"kind": kind}
     if kind == "Issue":
-        out["issue"] = _issue_ref(item.get("issue"), "待機する Issue")
+        out["issue"] = _issue_ref(item.get("issue"), "完了待ちの Issue")
     elif kind == "小さな PR":
         out["issue"] = _issue_ref(item.get("issue"), "小さな PR の依頼先の Issue")
         if item.get("pr") is not None:
@@ -146,7 +146,7 @@ def normalize_values(kind, values):
         elif key == "waits":
             out[key] = [_wait(w) for w in v]
         elif key == "blockers":
-            out[key] = [_issue_ref(b, "待機する Issue") for b in v]
+            out[key] = [_issue_ref(b, "完了待ちの Issue") for b in v]
     return out
 
 
@@ -366,7 +366,7 @@ ID_KEYED_KINDS = ("引き継ぎ",)
 
 def header_key(parsed):
     """同じ出来事かを比べるための鍵。名前は比べない (変わりうる)。役割・種類・値を比べ、ID_KEYED_KINDS の種類だけ投稿者の
-    セッション ID も比べる。値は意味で比べる: 配列 (待機するもの・待機する Issue) は順序を問わず、Issue の参照と PR の URL は
+    セッション ID も比べる。値は意味で比べる: 配列 (待機の理由・完了待ちの Issue) は順序を問わず、Issue の参照と PR の URL は
     owner/repo の大文字小文字を区別しない。"""
     session_id = parsed["session_id"] if parsed["kind"] in ID_KEYED_KINDS else None
     return (parsed["role"], session_id, parsed["kind"], _freeze(parsed["values"]))

@@ -460,7 +460,7 @@ class ResourceTest(unittest.TestCase):
         self.assertEqual((j["result"], j["waits"], j["release"], j["keep"]), ("wait", [{"kind": "設定"}], ["cache"], ["db"]))
         self.assertEqual([q["kind"] for q in out["questions"]], ["release-undeclared"])
         self.assertIn("解放した資源 (宣言に無い予約・更新で外した資源): cache", out["actions"][0]["body"])
-        self.assertIn("回答を待機する予約 (宣言に無い資源。解放してよいか利用者に質問している): db", out["actions"][0]["body"])
+        self.assertIn("回答待ちの予約 (宣言に無い資源。解放してよいか利用者に質問している): db", out["actions"][0]["body"])
         out = run_judge([mine], read=reader(ok_config([{"pattern": "src/**", "kind": "unknown-structure"}])), attrs=self.attrs)
         j = out["judgments"][0]
         self.assertEqual((j["result"], j["release"], j["keep"], kinds(out["actions"])), ("request", ["cache"], ["db"], [("comment", "依頼")]))
@@ -575,7 +575,7 @@ class RecompareTest(unittest.TestCase):
 
 
 class RewriteTest(unittest.TestCase):
-    """判定を待機する宣言の修正 (計画の U15 の Approach 2)。"""
+    """判定待ちの宣言の修正 (計画の U15 の Approach 2)。"""
 
     def _rewritten(self, new_files=(("src/a.py", None),), other_go=True):
         """宣言 400 が相手 A5 (410) との競合で wait と回答でき `待機` → blockedBy A5・Blocked。`依頼` の後に修正した宣言が 401。"""
@@ -613,7 +613,7 @@ class RewriteTest(unittest.TestCase):
         self.assertEqual((out["actions"][1]["status"], out["actions"][2]["blocker"], out["actions"][2]["needs_approval"]), ("In Progress", A5, True))
 
     def test_rewrite_waiting_for_new_other_only_replaces_blocked_by(self):
-        """前の相手を待機しなくなり、別の相手を待機するなら、新しい相手を足し、前の相手は外す候補。Status は Blocked のまま。"""
+        """完了待ちの相手が前の相手から別の相手に変わるなら、新しい相手を足し、前の相手は外す候補。Status は Blocked のまま。"""
         c_go = [assign(W9, 1, t(10), 120), decl(420, t(11), files=(("src/c.py", None),), to=W9), go(420, t(12), 520, to=W9)]
         rec = rec_with(questions=question("conflict", A9, f"{A6}:420", "wait"))
         out = run_judge(self._rewritten(new_files=(("src/c.py", None),)) + [item(A6, c_go)], rec=rec)
