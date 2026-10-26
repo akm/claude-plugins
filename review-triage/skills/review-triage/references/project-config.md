@@ -79,14 +79,14 @@
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `max_rounds` | ループの上限 | 10 |
-| `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限を待たずに止めて構造の見直しを人間に問う (判定の正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
+| `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限を待たずに停止して構造の見直しを人間に問う (判定の正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
 | `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に質問する。**推測して決めない** |
 | `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
 | `review_model` | ループに指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
 
-**`max_rounds` に上限を設ける理由は、収束しないループを止めるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ種類の指摘に何度も応え続けることになる。記録の `runs` の要素数はループをまたいだ累計で、上限の数え方 (正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
+**`max_rounds` に上限を設ける理由は、収束しないループを停止させるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ種類の指摘に何度も応え続けることになる。記録の `runs` の要素数はループをまたいだ累計で、上限の数え方 (正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
 
-**`structure_rounds` は上限と別の関門で、修正が次の指摘を生んでいる形 (採択が前の回の修正の近傍に続き、減らない) を止めるためのもの。** 上限は費用の関門、こちらは構造の関門で、当たればループは人間に構造の見直しを問う (S6)。経緯は [#54](https://github.com/akm/claude-plugins/issues/54)。
+**`structure_rounds` は上限と別の関門で、修正が次の指摘を生んでいる形 (採択が前の回の修正の近傍に続き、減らない) のループを停止させるためのもの。** 上限は費用の関門、こちらは構造の関門で、当たればループは人間に構造の見直しを問う (S6)。経緯は [#54](https://github.com/akm/claude-plugins/issues/54)。
 
 ### 「未設定」の定義 (正本)
 
@@ -112,7 +112,7 @@
 | `stages.<段>.model` | sub-agent で走らせるときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
 | `stages.<段>.effort` | sub-agent で走らせるときの effort の指定 (文字列)。値は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。`subagent` が `false` なら使わない | 空 — セッションの effort を継承する agent 定義を使う (effort と定義名の対応の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「effort と定義名の対応」) |
 
-**`threshold_rounds` は記録の回番号で数える。** `max_rounds` が「この起動で回した回数」を数えるのと違い、`review-triage-fix` は記録しか見ないので、単独で走らせてもループから呼ばれても同じ回で同じ振る舞いになる。上限は収束しないループを止めるための値、閾値は人間が立案に関与し始める回を決める値で、別のものである。
+**`threshold_rounds` は記録の回番号で数える。** `max_rounds` が「この起動で回した回数」を数えるのと違い、`review-triage-fix` は記録しか見ないので、単独で走らせてもループから呼ばれても同じ回で同じ振る舞いになる。上限は収束しないループを停止させるための値、閾値は人間が立案に関与し始める回を決める値で、別のものである。
 
 `fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<段>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
 
@@ -140,7 +140,7 @@
 
 **`sandbox_allow_write` と `sandbox_allowed_domains` は、ループの条件ではなく環境の値 (ワーカーを動かすマシンごとに変わる値) で、`--resume` のたびに設定から読み直される。** 読み直しの扱いと理由 (権限モードなど、読み直さないキーとの違いを含む) の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「様式」。
 
-`review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、配列のキー `allowed_tools` / `sandbox_allow_write` / `sandbox_allowed_domains` は空の配列も未設定)。**`loop` と違い、値の誤りはループを止めない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
+`review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、配列のキー `allowed_tools` / `sandbox_allow_write` / `sandbox_allowed_domains` は空の配列も未設定)。**`loop` と違い、値の誤りはループを停止させない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
 
 ## `frozen_paths` — 直さない文書
 

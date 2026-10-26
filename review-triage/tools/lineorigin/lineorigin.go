@@ -333,7 +333,7 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 }
 
 // gitTimeout は、git の 1 回の実行に許す時間。越えたら run-error にする。git や、git が起動する
-// フィルタのプログラムが止まったときに、道具が終わらなくなるのを防ぐ。テストが短くする。
+// フィルタのプログラムが応答しなくなったときに、道具が終わらなくなるのを防ぐ。テストが短くする。
 var gitTimeout = 5 * time.Minute
 
 // runIn は、stdin を標準入力に渡して run と同じように git を実行する。
@@ -344,7 +344,7 @@ func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false", "-c", "core.fsmonitor=false"}, args...)...)
-	cmd.WaitDelay = time.Second // 期限で止めた git の子のプロセスが出力を開いたままでも、待ち続けない
+	cmd.WaitDelay = time.Second // 期限で停止させた git の子のプロセスが出力を開いたままでも、待ち続けない
 	cmd.Env = gitEnv()
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer

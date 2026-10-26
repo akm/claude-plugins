@@ -99,7 +99,7 @@ func run(args []string) error {
 	summaryCommand = in.summaryCommand
 
 	// 明示した在り処の不在は、経路を問わず「指定したのに検査できない」なので
-	// ここで止める。記録のディレクトリと判定フローの両方が無いときは 1 回の実行で両方を
+	// ここでエラーにする。記録のディレクトリと判定フローの両方が無いときは 1 回の実行で両方を
 	// 報告する — 片方で即 return すると、片方を直して再実行するまで
 	// もう一方も壊れていることを知れない。
 	if problems := missingPathProblems(in); len(problems) > 0 {

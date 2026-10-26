@@ -1100,7 +1100,7 @@ func TestGitEnvKeepsTestIsolation(t *testing.T) {
 	}
 }
 
-// 道具が git に渡す環境に、取得と問い合わせを止める変数がある。
+// 道具が git に渡す環境に、取得と問い合わせを無効にする変数がある。
 func TestGitEnvStopsFetchAndPrompt(t *testing.T) {
 	env := strings.Join(gitEnv(), "\n")
 	for _, want := range []string{"GIT_NO_LAZY_FETCH=1", "GIT_TERMINAL_PROMPT=0"} {
@@ -1468,9 +1468,9 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 	}
 }
 
-// stallingGit は、引数に word を含む呼び出しで止まり、ほかのコマンドは本物の git に渡す偽の git を
-// 書き込んだディレクトリを返す。止まるときはコマンド sleep を子のプロセスとして起動するので、期限で git (の偽物) を
-// 止めても、sleep が標準出力を開いたまま残る。
+// stallingGit は、引数に word を含む呼び出しで応答しなくなり、ほかのコマンドは本物の git に渡す偽の git を
+// 書き込んだディレクトリを返す。応答しないときはコマンド sleep を子のプロセスとして起動するので、期限で git (の偽物) を
+// 停止させても、sleep が標準出力を開いたまま残る。
 func stallingGit(t *testing.T, word string) string {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -1489,7 +1489,7 @@ func stallingGit(t *testing.T, word string) string {
 	return bin
 }
 
-// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。止めた git の子の
+// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。停止させた git の子の
 // プロセスが標準出力を開いたままでも待たない (待つと、子が終わる 30 秒後まで返らない)。
 func TestGitTimeoutIsRunError(t *testing.T) {
 	r, base := branched(t)
@@ -1499,7 +1499,7 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 	gitTimeout = 2 * time.Second
 	t.Cleanup(func() { gitTimeout = saved })
 
-	t.Run("blame で止まる", func(t *testing.T) {
+	t.Run("blame で応答しなくなる", func(t *testing.T) {
 		t.Setenv("PATH", stallingGit(t, "blame"))
 		start := time.Now()
 		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終わりませんでした")
@@ -1507,7 +1507,7 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 			t.Fatalf("期限を越えても %s 待った", d)
 		}
 	})
-	t.Run("git version で止まる", func(t *testing.T) {
+	t.Run("git version で応答しなくなる", func(t *testing.T) {
 		t.Setenv("PATH", stallingGit(t, "version"))
 		start := time.Now()
 		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git version が")

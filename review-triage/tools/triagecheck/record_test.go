@@ -1002,7 +1002,7 @@ func replaceRecordPlans(t *testing.T, plans string) string {
 	return mutated
 }
 
-// 未知のキーがあっても他の検査は続く (最初の問題で止めない)。
+// 未知のキーがあっても他の検査は続く (最初の問題で打ち切らない)。
 func TestReviewTriageRecordUnknownKeyDoesNotAbort(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML,
 		"        verdict: adopted\n",
@@ -1460,7 +1460,7 @@ func TestReviewTriageRecordLegacyRecurrencePasses(t *testing.T) {
 		{"recurrence の無い回だけ", legacyRecordYAML("")},
 		{"declined", legacyRecordYAML(legacyDeclinedYAML)},
 		{"reframed", legacyRecordYAML(reframed2)},
-		{"detected (更新される前に止まった記録)", legacyRecordYAML("      status: detected\n" + legacyEvidenceYAML(1, "P1"))},
+		{"detected (更新される前に中断した記録)", legacyRecordYAML("      status: detected\n" + legacyEvidenceYAML(1, "P1"))},
 		{"declined の回と reframed の回の両方", legacyRecordYAML(legacyDeclinedYAML, reframed3)},
 		{"same-location の根拠", legacyRecordYAML("      status: declined\n" +
 			"      evidence:\n" +
