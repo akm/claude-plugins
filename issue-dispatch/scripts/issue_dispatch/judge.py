@@ -227,7 +227,7 @@ def _question(kind, item_key, subject, decl_id, **extra):
 
 
 def _parse_mine(item, judged, rules, table):
-    """判定する宣言の JSON をコメントから読み直し、リポジトリの規則で種類を付けて検査する。返り値は (declaration, []) か (None, 誤りの文の配列)。"""
+    """判定する宣言の JSON をコメントから再度読み込み、リポジトリの規則で種類を付けて検査する。返り値は (declaration, []) か (None, 誤りの文の配列)。"""
     c = next((c for c in item.get("comments") or [] if c.get("database_id") == judged["comment_id"]), None)
     _, text = comments.split_body(c["body"]) if c else (None, None)
     obj, error = itemstate.declaration_object(text)

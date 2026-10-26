@@ -262,7 +262,7 @@ def cmd_project_items(args):
         warnings = []
         if previous["status"] == "corrupt":
             warnings.append({"key": "snapshot", "message": f"既存のスナップショット {previous['path']} が壊れている ({previous.get('message', '')}) ので、前の値を引き継がずに上書きする"})
-        # 読むのは今のコメントに書かれた PR だけ (前のスナップショットにだけある URL は保存に残さない。差分のための読み直しは observe diff が行う)
+        # 読むのは今のコメントに書かれた PR だけ (前のスナップショットにだけある URL は保存に残さない。差分のために再度読み込むのは observe diff が行う)
         comment_prs, problems = _read_comment_prs(result["items"], login)
         out["problems"] = out["problems"] + problems
         snapshot = observe.build_snapshot(result, comment_prs, _now(), previous=previous["snapshot"])

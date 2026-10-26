@@ -102,7 +102,7 @@ class LoadSaveTest(unittest.TestCase):
             record.load(self.dir, PROJECT)
 
     def test_saved_records_reload(self):
-        """apply で作った記録は、保存して読み直せる (要素の形の検査が自分の書いたものを壊れていると見ないこと)。"""
+        """apply で作った記録は、保存して再度読み込める (要素の形の検査が自分の書いたものを壊れていると見ないこと)。"""
         rec, errors = record.apply(record.new_record(PROJECT), [
             {"op": "set_manager", "id": "m1", "name": "n", "started_at": T1},
             {"op": "set_session", "id": "s1", "name": "w", "repo": "akm/r", "worktree": "/w"},

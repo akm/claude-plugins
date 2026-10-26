@@ -6,7 +6,7 @@
 
 スナップショットは、前のターンの終了時の Project の状態 (と、コメントに URL で書かれた PR の GitHub 上の状態) の写しで、GitHub から導出し直せるキャッシュ (計画の KTD5)。使うのは 2 つ: 待機が変化に気づいて管理のセッションを起こすこと (U14) と、人の変更を 1 回だけ報告すること (計画の R22)。**何を行うかはスナップショットからは決めない** — 導いた項目の状態 (U13) で決める。差分は「何が変わったか」だけを返し、意味づけ (管理のセッションが足した blocker か・どの宣言が待機するか) はしない。
 
-書き込み元は管理のセッションの再入のターンだけ。Project を読んだとき (`project items --write-snapshot`) に書き、そのターンの CLI の書き込みのたびに書いた値を反映する。待機の直前には読み直さない (読み直すと、ターンの最初の読み取りから読み直しまでの間にほかの人が起こした変化が、処理されないままスナップショットに入り、待機がその変化に気づかない)。書き込みに失敗したのに反映した値は、次の差分が食い違いとして見つけ、次のターンで直す。壊れていれば作り直す。
+書き込み元は管理のセッションの再入のターンだけ。Project を読んだとき (`project items --write-snapshot`) に書き、そのターンの CLI の書き込みのたびに書いた値を反映する。待機の直前には再度読み込まない (再度読み込むと、ターンの最初の読み取りから再度の読み込みまでの間にほかの人が起こした変化が、処理されないままスナップショットに入り、待機がその変化に気づかない)。書き込みに失敗したのに反映した値は、次の差分が食い違いとして見つけ、次のターンで直す。壊れていれば作り直す。
 
 ## `snapshot.json` の様式
 
@@ -133,8 +133,8 @@
 
 | サブコマンド | 書き込み | 返すもの |
 | --- | --- | --- |
-| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが無ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠損と読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠損の扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は読み直さず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに上書きし、`snapshot.warnings` (key `snapshot`) で知らせる |
-| `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが無ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠損と読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠損の扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を読み直す (待機していた PR の変化を見つけるため) |
+| `project items --project <owner>/<番号> --write-snapshot --dir <管理ディレクトリ>` | `snapshot.json` (GitHub には書かない) | 引数 `--write-snapshot` は `--dir` と一緒に指定する。`project items` の出力に `snapshot` (`path`・`taken_at`・`comment_prs`) を足す。項目の一覧そのものが無ければ、スナップショットを書かずに `errors` (key `partial`) で返す。1 項目の中の欠損と読めなかった PR (`problems` の `what`: `comment-pr`) は、既存のスナップショットに引き継ぐ元があれば前の値を引き継ぎ、無ければフラグ `partial` を付けて保存し、`status` は `partial`、`snapshot.skipped` と `snapshot.carried` にそれらを返す (「欠損の扱い」)。読む PR は今のコメントに書かれたものだけで、既存のスナップショットにだけある PR は再度読み込まず保存にも残さない (項目が閉じた後の PR の URL が増え続けないため)。既存のスナップショットが壊れていれば、引き継がずに上書きし、`snapshot.warnings` (key `snapshot`) で知らせる |
+| `observe diff --dir <管理ディレクトリ> --project <owner>/<番号>` | 無し | `diffs` (上の表の順)・`snapshot_taken_at`・`problems`・`rate_limit`。スナップショットが無い・壊れていれば `errors` (key `snapshot`) で、`gh` は実行しない。項目の一覧そのものが無ければ、差分を返さずに `errors` (key `partial`) と `problems` で返す。1 項目の中の欠損と読めなかった PR は、スナップショットに引き継ぐ元があれば前の値を引き継いで比べ (`carried` で返す)、無ければその種類が狂わせる値 (PR はその PR) を比べずに `skipped` で返し、`status` は `partial` (「欠損の扱い」)。スナップショットにある `comment_prs` の PR は、コメントが消えていても状態を再度読み込む (待機していた PR の変化を見つけるため) |
 | 書き込みのサブコマンドの `--snapshot-dir <管理ディレクトリ>` | `snapshot.json` | 出力に `snapshot` (`reflected`・`warnings`) を足す |
 | `wait --dir <管理ディレクトリ> [--project <owner>/<番号>] [--interval <分>] [--minutes <分>]` | `wait.pid` (記録のディレクトリ) | 「待機」の節。終了コードと標準出力の行 (JSON ではない)。スナップショットが無い・壊れていれば 5 |
 | `wait-assignment --project <owner>/<番号> [--session <ID>] [--blocked <Issue>]... [--in-review <Issue>]... [--pending <Issue>] --interval <分> --minutes <分>` | `wait.pid` (一時ディレクトリ) | 「待機」の節。`--session` を省けば環境変数 |
