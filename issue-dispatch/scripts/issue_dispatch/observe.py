@@ -22,11 +22,11 @@ ITEM_KEYS = ("item_id", "position", "state", "status", "fields", "assignees", "l
 LIST_PROBLEMS = ("items-page", "graphql-errors")
 # 差分の種類と処理の順 (observation.md の表): 人の変更 → close・reopen と項目の除去 → blockedBy → コメント → PR → 項目の追加・並び順・本文の編集
 DIFF_KINDS = ("status", "field", "assignees", "labels", "closed", "reopened", "removed", "blocked_by", "comment", "pr", "added", "position", "body_edit")
-# 1 項目の中の欠損の種類 (project items の problems の what) → その欠損が狂わせる値の差分の種類 (比べない)。対応に無い種類は項目全体を比べない。
+# 1 項目の中の欠損の種類 (project items の problems の what) → その欠損の影響を受ける値の差分の種類 (比べない)。対応に無い種類は項目全体を比べない。
 # 対応は GraphQL の connection ごとに導く値で決める (fieldValues からは fields と Status の 2 つを読む)
 PARTIAL_SKIPS = {"labels-truncated": ("labels",), "blocked_by-truncated": ("blocked_by",), "body_edits-truncated": ("body_edit",),
                  "prs-truncated": ("pr",), "fields-truncated": ("field", "status"), "comments": ("comment",), "events": ()}
-# 1 項目の中の欠損の種類 → その欠損が狂わせるスナップショットの値 (前のスナップショットから引き継ぐ値)。PARTIAL_SKIPS と同じ種類を持つ
+# 1 項目の中の欠損の種類 → その欠損の影響を受けるスナップショットの値 (前のスナップショットから引き継ぐ値)。PARTIAL_SKIPS と同じ種類を持つ
 PARTIAL_VALUES = {"labels-truncated": ("labels",), "blocked_by-truncated": ("blocked_by",), "body_edits-truncated": ("body_edited_at",),
                   "prs-truncated": ("prs",), "fields-truncated": ("fields", "status"), "comments": ("comment_ids",), "events": ()}
 # コメントの本文から PR を読む種類
@@ -81,7 +81,7 @@ def _pr_state(p):
 
 def snapshot_item(item, partial=(), previous=None, previous_taken_at=None):
     """project.items の項目 (Issue) を、スナップショットが持つ値だけにする。partial はその項目の欠損の種類 (problems の what)。
-    previous (前のスナップショットの同じ項目) があれば、欠損の種類が狂わせる値 (PARTIAL_VALUES) は前の値を引き継ぎ、`carried` (種類 →
+    previous (前のスナップショットの同じ項目) があれば、その種類の欠損の影響を受ける値 (PARTIAL_VALUES) は前の値を引き継ぎ、`carried` (種類 →
     引き継いだ値の元の taken_at) に残して `partial` には入れない。前の項目でも同じ種類が partial なら引き継ぐ元が無いので、今読んだ値のまま
     `partial` に入れる。"""
     fields = {name: {"value": v.get("text") if "text" in v else v.get("name"), "updated_at": v.get("updated_at")} for name, v in (item.get("fields") or {}).items()}
@@ -138,7 +138,7 @@ def carried(snapshot):
 
 
 def skipped(before, after):
-    """2 つのスナップショットで欠損がある項目と PR (どちらかで欠損があるもの)。項目は欠損の種類が狂わせる値だけを比べず (diff)、
+    """2 つのスナップショットで欠損がある項目と PR (どちらかで欠損があるもの)。項目はその種類の欠損の影響を受ける値だけを比べず (diff)、
     PR は比べない。返り値は {"items": {キー: 欠損の種類}, "prs": {URL: 理由}}。"""
     items = {}
     for snap in (before, after):
@@ -229,7 +229,7 @@ def _pr_view(v):
 
 def _omitted_kinds(partial):
     """項目の欠損の種類 (前後の partial の和) から、比べない差分の種類の集合を返す。対応 (PARTIAL_SKIPS) に無い種類があれば、
-    どの値が狂うか分からないので None (項目のすべての値を比べない)。"""
+    どの値が影響を受けるか分からないので None (項目のすべての値を比べない)。"""
     if any(what not in PARTIAL_SKIPS for what in partial):
         return None
     return {kind for what in partial for kind in PARTIAL_SKIPS[what]}
@@ -269,7 +269,7 @@ def _item_diffs(key, b, a):
 def diff(before, after):
     """2 つのスナップショットの違いを、処理の順 (DIFF_KINDS の順、同じ種類は今の位置の順) に並べて返す。意味づけはしない。
     要素は {"kind", "item" (コメントの URL の PR は None), ...} で、種類ごとの値は observation.md の表。
-    前後どちらかに欠損 (partial) がある項目は、その欠損の種類が狂わせる値 (PARTIAL_SKIPS) だけを比べない (欠損を変化と読まないため)。
+    前後どちらかに欠損 (partial) がある項目は、その種類の欠損の影響を受ける値 (PARTIAL_SKIPS) だけを比べない (欠損を変化と読まないため)。
     欠損と関係のない値と、項目の追加・除去・並び順は比べる。"""
     out = []
     skip = skipped(before, after)
