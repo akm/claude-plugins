@@ -6,7 +6,7 @@ Bash のコマンドの文字列がルートのディレクトリ /tmp を指す
   - review-loop-worker/build_settings_json.py が、中身をレビュアの実行に渡す --settings のフックのコマンド
     (python3 -I -c <中身>) に埋め込む。Claude Code がそのコマンドを実行すると、__name__ が "__main__" になり、下の処理が実行される
   - review-loop-worker/read_log_facts.py が、中身を __name__ を "__main__" 以外にして実行し、関数 denies と文字列 REASON を使って、
-    このフックが拒否した呼び出しを見分ける
+    このフックが拒否した呼び出しを判別する
 
 標準入力: Claude Code が渡すフックの入力 (JSON)。
 標準出力: 拒否するときだけ、拒否を表す JSON を 1 行。拒否しないときは何も出さない。

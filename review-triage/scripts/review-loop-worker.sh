@@ -475,7 +475,7 @@ REQ_STARTED=""
 REQ_STARTED_EPOCH=0
 REQ_DEADLINE=0         # 上限の時刻 (エポック秒)。依頼文を受け取った時刻に --review-timeout-minutes を足したもの
 HEAD_BEFORE=""
-REQ_BASE=""            # 依頼文の base の値 (無ければ空)。リポジトリの行を表示しただけの結果を見分けるのに使う
+REQ_BASE=""            # 依頼文の base の値 (無ければ空)。リポジトリの行を表示しただけの結果を判別するのに使う
 REQ_HEAD_FULL=""       # 依頼文の head を作業側で解決した完全な SHA
 EFFECTIVE="unknown"
 SKILL_CALLED="unknown"
@@ -1054,8 +1054,8 @@ snapshot() {
 
 # ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・ワーカーのフックが拒否した呼び出し・
 # サンドボックスが止めた確認・リポジトリの行を表示しただけの呼び出しを読んで、1 行に 1 つずつ標準出力に出す。
-# 行の並びと説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを見分けるのに、
-# 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを見分けるのに、作業側のパスと依頼文の範囲を渡す
+# 行の並びと説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを判別するのに、
+# 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを判別するのに、作業側のパスと依頼文の範囲を渡す
 read_log_facts() {
   run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook" "$CWD_REAL" "$REQ_BASE" "$REQ_HEAD_FULL"
 }
