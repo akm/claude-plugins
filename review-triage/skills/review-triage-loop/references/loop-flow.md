@@ -4,7 +4,7 @@
 
 - **図 (mermaid) が、ノードと遷移の正本。** 順序・分岐・優先はここだけが定める — 同時に成立しうる条件の優先は、図の分岐の順序として現れる。散文の「優先の規則」は持たない。
 - **決定表が、各ノードの条件 (記録のどこを見るか) と、止まったときに報告に書くものの正本。** 遷移先の列は持たない (行き先は図が正本)。
-- **散文 (このファイルの図と決定表を参照するほかの文書) はノード ID で参照し、順序・分岐・量化子を言い直さない。** このスキルの最初の試行では、手順・入口の関門・優先の規則・報告・`review-triage-fix` の終了条件がそれぞれ散文で遷移を言い直し、条件を 1 つ足すたびに他との組み合わせが抜けて、全量レビュー 6 回のうち 5 回で同じ領域に指摘が続いた (記録: `docs/review-triage/feat-review-triage-loop.yaml` の回 11〜16)。
+- **散文 (このファイルの図と決定表を参照するほかの文書) はノード ID で参照し、順序・分岐・量化子を言い直さない。** このスキルの最初の試行では、手順・入口の関門・優先の規則・報告・`review-triage-fix` の終了条件がそれぞれ散文で遷移を言い直し、条件を 1 つ足すたびに他との組み合わせが抜けて、全量レビュー 6 回のうち 5 回で同じ領域に指摘が続いた (記録: `docs/review-triage/feat-review-triage-loop.yaml` の 11〜16 回目)。
 - 図のノード ID 集合と決定表の ID 集合は 1:1。**judgment-flow.md と違い、同梱の `triagecheck` はこのファイルを検査しない** — 検査の拡張は別の課題で、それまでは人手で照合する。
 
 ## 方針
@@ -68,13 +68,13 @@ flowchart TD
   style F1 fill:#6366f12e,stroke:#4f46e5
 ```
 
-**遷移の順序と優先は図だけが定める。** 図の外で言い直さない — 言い直した散文が図と食い違った実例が記録の回 17 にある。
+**遷移の順序と優先は図だけが定める。** 図の外で言い直さない — 言い直した散文が図と食い違った実例が記録の 17 回目にある。
 
 ## 決定表 (各ノードの条件と書くものの正本)
 
 | ID | 種類 | 条件・内容 | 報告に書くもの |
 | --- | --- | --- | --- |
-| G0 | 手順 | 設定 (`config.json` の `loop`) と引数を読んでループの条件を決める。記録 (G2 で読むものと同じ) も読み、読めることを確認する (読めないときの扱いの正本は [arguments.md](arguments.md) の「値の検査」。回の有無は `--base` の扱いに使う)。決め方の正本は [arguments.md](arguments.md)、キーと既定は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」 | 決まった条件 (上限・レビュースキル・そのオプション・実効モデル。`ce-code-review` で指定が空でなければ、適用されない旨も) と、全量の起点 (起点のブランチを使う起動なら、起点のブランチ・HEAD との merge-base の SHA・ブランチの出所 (`--base` か、`origin/HEAD` による既定か)。`--base` の指定があるのに使わないときは、使わないことと理由。使う回と経路の正本は [review-invocation.md](review-invocation.md) の「範囲」) と、`review-triage-fix` に渡す回数の閾値 N (設定 `fix.threshold_rounds` と引数 `--threshold` から決めた値。決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) と、段ごとの走らせ方 (設定 `fix.stages` と引数 `--stage` から段ごとに決めた、セッション内か sub-agent か。sub-agent なら定義名と段の実効モデル。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」) をループの開始前に出す。回 N+1 以降の段 2 は立案者の選択で決まり、ここで出した走らせ方は使われない (その旨も添える) |
+| G0 | 手順 | 設定 (`config.json` の `loop`) と引数を読んでループの条件を決める。記録 (G2 で読むものと同じ) も読み、読めることを確認する (読めないときの扱いの正本は [arguments.md](arguments.md) の「値の検査」。回の有無は `--base` の扱いに使う)。決め方の正本は [arguments.md](arguments.md)、キーと既定は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」 | 決まった条件 (上限・レビュースキル・そのオプション・実効モデル。`ce-code-review` で指定が空でなければ、適用されない旨も) と、全量の起点 (起点のブランチを使う起動なら、起点のブランチ・HEAD との merge-base の SHA・ブランチの出所 (`--base` か、`origin/HEAD` による既定か)。`--base` の指定があるのに使わないときは、使わないことと理由。使う回と経路の正本は [review-invocation.md](review-invocation.md) の「範囲」) と、`review-triage-fix` に渡す回数の閾値 N (設定 `fix.threshold_rounds` と引数 `--threshold` から決めた値。決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) と、段ごとの走らせ方 (設定 `fix.stages` と引数 `--stage` から段ごとに決めた、セッション内か sub-agent か。sub-agent なら定義名と段の実効モデル。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」) をループの開始前に出す。N+1 回目以降の段 2 は立案者の選択で決まり、ここで出した走らせ方は使われない (その旨も添える) |
 | G2 | 判定 | 全回の `plans` に `status: awaiting-human` の問題があるか。記録が無ければ「無い」 | — |
 | G3 | 判定 | J2 と同じ条件。**`review-triage` を単独で走らせた直後 (採択が残り `plans` がまだ無い) はここで「ある」になり、レビューの前に F1 を通る** — 先にレビューを走らせると、`review-triage` が次の回を追記した時点で前の回の被覆の免除 (正本は [record-schema.md](../../review-triage/references/record-schema.md) の `plan_ref` の行) が解け、記録の検査が失敗する。**調査済み・未着手が残ったままループを起動し直したときも同じ** | — |
 | L1 | 手順 | レビューを起動する。経路・依頼文・範囲・モデルの正本は [review-invocation.md](review-invocation.md) | いま何回目か (この起動で数えた回数) と上限 |

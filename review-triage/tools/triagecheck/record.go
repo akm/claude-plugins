@@ -606,7 +606,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
 					add("%s: plan_ref の run %d は存在しません (回は 1〜%d)", fn, fd.PlanRef.Run, len(doc.Runs))
 				} else if !plansByRun[fd.PlanRef.Run-1][fd.PlanRef.Problem] {
-					add("%s: plan_ref の問題 %q は回 %d の plans にありません", fn, fd.PlanRef.Problem, fd.PlanRef.Run)
+					add("%s: plan_ref の問題 %q は %d 回目の plans にありません", fn, fd.PlanRef.Problem, fd.PlanRef.Run)
 				}
 			}
 		}
@@ -896,7 +896,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	}
 
 	for i, run := range doc.Runs {
-		fmt.Fprintf(&b, "\n## 回 %d: %s `%s`", i+1, recordCell(run.Date), recordCell(run.Skill))
+		fmt.Fprintf(&b, "\n## %d 回目: %s `%s`", i+1, recordCell(run.Date), recordCell(run.Skill))
 		if run.RunID != "" {
 			fmt.Fprintf(&b, " (%s)", recordCell(run.RunID))
 		}
@@ -1085,7 +1085,7 @@ func renderVerdictCell(fd recordFinding) string {
 		cell += ")"
 	}
 	if fd.PlanRef != nil {
-		cell += fmt.Sprintf(" (束ね先: 回 %d の %s)", fd.PlanRef.Run, recordCell(fd.PlanRef.Problem))
+		cell += fmt.Sprintf(" (束ね先: %d 回目の %s)", fd.PlanRef.Run, recordCell(fd.PlanRef.Problem))
 	}
 	return cell
 }
@@ -1178,7 +1178,7 @@ func renderInvestigation(inv *recordInvestigation) string {
 func renderRecurrence(b *strings.Builder, rec *recordRecurrence) {
 	fmt.Fprintf(b, "- 状態: %s\n", recordRecurrenceStatusJa(rec.Status))
 	for _, ev := range rec.Evidence {
-		fmt.Fprintf(b, "- 根拠: %s — 指摘 #%d と回 %d の %s: %s\n",
+		fmt.Fprintf(b, "- 根拠: %s — 指摘 #%d と %d 回目の %s: %s\n",
 			recordRecurrenceConditionJa(ev.Condition), ev.FindingID, ev.PriorRun,
 			recordCell(ev.Prior), recordCell(ev.Reason))
 	}

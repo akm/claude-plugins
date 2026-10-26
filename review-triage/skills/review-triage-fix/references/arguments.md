@@ -14,7 +14,7 @@ review-triage-fix [<記録 YAML のパス>] [--threshold <N>] [--stage <段>[=<�
 | `--threshold` | `threshold_rounds` | `--threshold 3` |
 | `--stage` | `stages.<段>` (`subagent` / `model` / `effort` の 3 つをまとめて) | `--stage investigate=sonnet`・`--stage plan=session`・`--stage fix=opus:high`・`--stage fix` |
 
-`--threshold <N>` は回数の閾値 N — 記録の回番号がこれを越えた回 (回 N+1 以降) で、段 1 (調査) の後に人間に立案者の選択を求める。閾値の意味と数え方の正本は [project-config.md](../../review-triage/references/project-config.md) の「`fix`」、質問の仕方の正本は [SKILL.md](../SKILL.md) の手順 4。
+`--threshold <N>` は回数の閾値 N — 記録の回番号がこれを越えた回 (N+1 回目以降) で、段 1 (調査) の後に人間に立案者の選択を求める。閾値の意味と数え方の正本は [project-config.md](../../review-triage/references/project-config.md) の「`fix`」、質問の仕方の正本は [SKILL.md](../SKILL.md) の手順 4。
 
 ### `--stage <段>[=<値>]` — 段の走らせ方
 
@@ -28,7 +28,7 @@ review-triage-fix [<記録 YAML のパス>] [--threshold <N>] [--stage <段>[=<�
 
 - **`--stage` は、その段の 3 つのキー (`subagent` / `model` / `effort`) をまとめて上書きする。** `=` 以降を省いた形は「sub-agent で、モデルと effort は未設定」を指定したことになり、設定にその段の `model` / `effort` があっても使わない。
 - **段ごとに 1 つ。** 同じ段に 2 つ以上あれば、手順を始めずにエラーとして報告する。
-- 未設定のモデル・effort をどう解決するか (実効モデル・agent 定義の名前) の正本は [stage-subagent.md](stage-subagent.md) の「走らせ方の決定」。**回 N+1 以降の段 2 (`plan`) には、引数も設定も適用されない** — その回の段 2 は立案者の選択 (SKILL.md の手順 4) で決まる。指定があっても使わず、使わなかったことを報告に書く。
+- 未設定のモデル・effort をどう解決するか (実効モデル・agent 定義の名前) の正本は [stage-subagent.md](stage-subagent.md) の「走らせ方の決定」。**N+1 回目以降の段 2 (`plan`) には、引数も設定も適用されない** — その回の段 2 は立案者の選択 (SKILL.md の手順 4) で決まる。指定があっても使わず、使わなかったことを報告に書く。
 
 ## 設定と引数の優先順位
 
