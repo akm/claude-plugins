@@ -95,7 +95,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
-	// 焼き込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
+	// 埋め込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -121,7 +121,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 	}
 	got := string(data)
 
-	// -record-dir は script_dir (ラッパーのディレクトリ) からの相対で焼き込まれる。
+	// -record-dir は script_dir (ラッパーのディレクトリ) からの相対で埋め込まれる。
 	// 生成時のカレント (プラグインの展開先) 基準ではない。
 	if !strings.Contains(got, `-record-dir '../docs/review-triages'`) {
 		t.Errorf("生成物に script_dir 基準の -record-dir が見当たらない:\n%s", got)
@@ -152,7 +152,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	}
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
-	// 焼き込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
+	// 埋め込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
 	// このテストが見るのは「明示した値が既定パスに優先すること」なので、
 	// 値が実在するかどうかは意図の外 — 実在させたうえで優先を確認する。
 	recDir := filepath.Join(base, "docs", "review-triages")
@@ -179,7 +179,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	}
 	got := string(data)
 	if !strings.Contains(got, `-judgment-flow '`+customFlow+`'`) {
-		t.Errorf("生成物に明示した -judgment-flow の焼き込みが見当たらない:\n%s", got)
+		t.Errorf("生成物に明示した -judgment-flow の埋め込みが見当たらない:\n%s", got)
 	}
 	// 明示したときは $root からの既定パスを使わない (二重に書かれない)。
 	if strings.Contains(got, `"$root/skills/review-triage/references/judgment-flow.md"`) {
@@ -194,7 +194,7 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	// bin/ はまだ存在しない。installWrapper が作る必要がある。
-	// 作られるのは出力先の親だけで、焼き込む値 (-record-dir) は実在を要求される。
+	// 作られるのは出力先の親だけで、埋め込む値 (-record-dir) は実在を要求される。
 	outPath := filepath.Join(base, "not-yet-created", "bin", "review-triage-check")
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
@@ -214,7 +214,7 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 
 // 生成したラッパーを実際に実行して、正しい記録のディレクトリを検査することを検証する。
 //
-// 文字列だけを検査していたため、-current-dir の焼き込みを壊しても全テストが
+// 文字列だけを検査していたため、-current-dir の埋め込みを壊しても全テストが
 // 通っていた。生成物の契約 (どこから実行しても同じ記録のディレクトリを見る) は、実行して
 // 初めて確認できる。
 func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
@@ -330,7 +330,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	}
 }
 
-// ラッパー経由で書き出した生成サマリの 1 行目には、生成時に焼き込んだ
+// ラッパー経由で書き出した生成サマリの 1 行目には、生成時に埋め込んだ
 // リポジトリ相対の案内が入り、実行の仕方 (相対・絶対) に依らず同じになる。
 //
 // 生成は相対 (./bin/rtc)、検査は絶対パスで実行する。実行時の $0 から組み立てる
@@ -400,7 +400,7 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	}
 }
 
-// 焼き込む案内はシェルの単一引用符で包む。%q (Go の引用) で書くと、$ を含む値
+// 埋め込む案内はシェルの単一引用符で包む。%q (Go の引用) で書くと、$ を含む値
 // (Makefile 変数など) が実行時に展開されて消える。
 func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
 	toolDir := filepath.Join(realTempDir(t), "cache", "review-triage", "0.0.1", "tools", "triagecheck")
@@ -418,11 +418,11 @@ func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := `-summary-command 'make $(TARGET) it'\''s'`; !strings.Contains(string(script), want) {
-		t.Errorf("案内が単一引用符で焼き込まれていない (want %s):\n%s", want, script)
+		t.Errorf("案内が単一引用符で埋め込まれていない (want %s):\n%s", want, script)
 	}
 }
 
-// 焼き込む値はすべて単一引用符で包む。-summary-command だけでなく plugin_cache・
+// 埋め込む値はすべて単一引用符で包む。-summary-command だけでなく plugin_cache・
 // -record-dir・明示の -judgment-flow も同じ — %q のままだと $(...) が実行時に
 // 展開され、別の記録のディレクトリを検査する。
 func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
@@ -449,10 +449,10 @@ func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
 		"-judgment-flow '" + flow + "'",
 	} {
 		if !strings.Contains(got, want) {
-			t.Errorf("焼き込み値が単一引用符で包まれていない (want %s):\n%s", want, got)
+			t.Errorf("埋め込み値が単一引用符で包まれていない (want %s):\n%s", want, got)
 		}
 	}
-	// 展開させる側は二重引用符のまま (焼き込み値と取り違えて単一にすると展開されない)。
+	// 展開させる側は二重引用符のまま (埋め込み値と取り違えて単一にすると展開されない)。
 	for _, want := range []string{`-current-dir "$script_dir"`, `-C "$root/tools/triagecheck"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("実行時に展開する箇所が二重引用符でなくなっている (want %s):\n%s", want, got)

@@ -44,7 +44,7 @@ func run(args []string) error {
 	writeSummary := fs.Bool("write-summary", false,
 		"検査せず、記録から生成サマリ (.md) を書き出す")
 	installWrapperPath := fs.String("install-wrapper", "",
-		"検査せず、-record-dir と -judgment-flow の値を焼き込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
+		"検査せず、-record-dir と -judgment-flow の値を埋め込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
 	summaryCmd := fs.String("summary-command", defaultSummaryCommand,
 		"サマリの再生成手段として案内する文字列 (エラー文と生成サマリの 1 行目に入る)。"+
 			"-install-wrapper で省略すると、-current-dir から見たラッパーの相対パスで組み立てる")
@@ -94,7 +94,7 @@ func run(args []string) error {
 	}
 
 	// 案内の文言も、経路の分岐より前に一度だけ据える。検査 (エラー文) と
-	// -write-summary (生成サマリの 1 行目) と -install-wrapper (焼き込み) が
+	// -write-summary (生成サマリの 1 行目) と -install-wrapper (埋め込み) が
 	// 同じ値を読むので、経路ごとに渡すと片方だけ違う案内を出す組み合わせができる。
 	summaryCommand = in.summaryCommand
 
@@ -167,7 +167,7 @@ type resolvedInputs struct {
 	// judgmentFlowOrigin は判定フローの在り処を指定したものの名前
 	// (-judgment-flow / CLAUDE_PLUGIN_ROOT)。報告に使う。既定なら空。
 	judgmentFlowOrigin string
-	// embedJudgmentFlow はラッパーに焼き込む判定フローの絶対パス。明示された
+	// embedJudgmentFlow はラッパーに埋め込む判定フローの絶対パス。明示された
 	// ときだけ非空。省略時はラッパーが実行時に $root から既定を解決するので、
 	// CLAUDE_PLUGIN_ROOT からは埋めない — 埋めると版のディレクトリを含む固定の
 	// パスになり、プラグインの更新でそのラッパーが壊れる。これは規則の違いでは
@@ -259,12 +259,12 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	}
 
 	// 案内する再生成コマンド。明示があればそのまま。-install-wrapper で省略されたら
-	// 「ラッパー自身をリポジトリのルートから実行する形」を組み立てて焼き込む。
+	// 「ラッパー自身をリポジトリのルートから実行する形」を組み立てて埋め込む。
 	//
 	// 実行時の $0 から組み立てない — $0 は実行したときの形 (./bin/rtc、絶対パス、リンク名)
 	// そのもので、コミットされるサマリの 1 行目が実行の仕方ごとに変わり、生成直後の
 	// サマリが別の実行の仕方での検査で「食い違う」と報告される (実測)。絶対パスも
-	// 焼き込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
+	// 埋め込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
 	// checkout した場所によって検査が失敗する。コミットされる値は、リポジトリ相対でなければならない。
 	//
 	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する —
@@ -319,7 +319,7 @@ func isBlankPath(s string) bool {
 // 判定フローは -judgment-flow だけでなく CLAUDE_PLUGIN_ROOT からも解決される。
 // どちらも「この場所を検査せよ」という指定なので、実在を要求する対象に含める
 // (解決できず既定のままのときだけ、未導入として通す)。生成の経路では
-// CLAUDE_PLUGIN_ROOT 由来の値を焼き込まないが、実在の要求は同じ規則として課す —
+// CLAUDE_PLUGIN_ROOT 由来の値を埋め込まないが、実在の要求は同じ規則として課す —
 // 経路で規則を変えると、その差が次の欠陥を生む。
 func missingPathProblems(in resolvedInputs) []string {
 	var problems []string
@@ -363,7 +363,7 @@ var (
 	// errSummaryCommandNeedsBase は、-install-wrapper で案内を組み立てるのに
 	// 基準 (-current-dir) も明示 (-summary-command) も無いことを表す。
 	errSummaryCommandNeedsBase = errors.New(
-		"-install-wrapper で焼き込む再生成コマンドの案内を組み立てられません: " +
+		"-install-wrapper で埋め込む再生成コマンドの案内を組み立てられません: " +
 			"ラッパーをリポジトリ相対で案内するには -current-dir が要ります " +
 			"(リポジトリのルートで -current-dir \"$(pwd)\" を渡すか、案内の文字列を -summary-command で渡してください)")
 )
