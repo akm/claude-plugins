@@ -9,7 +9,7 @@
 (review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で走らせる。
 実際の claude は呼ばない。依頼文は、実際の雛形 (review-triage/skills/review-triage/references/
 review-request-template.md) を埋めて作る — ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
-文字列で探して写しを作るので、雛形と食い違えばテストが失敗するようにするため。
+文字列で探して写しを作るので、雛形と一致しなければテストが失敗するようにするため。
 
 ワーカーは macOS でだけ起動する (起動時の確認で `uname -s` を見る)。CI (ubuntu) でも走るように、
 uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で Darwin を返す) も PATH の先頭に置く。
@@ -892,7 +892,7 @@ class TestHappyPath(WorkerTestBase):
         p = self.start("--allowed-tools", "Read", "--allowed-tools", "Bash(git diff:*)",
                        "--permission-mode", "default")
         marker = self.wait_marker()
-        # 偽の claude はログの init の行に受けた権限モードを書くので、実効の権限モードも default になり、食い違わない
+        # 偽の claude はログの init の行に受けた権限モードを書くので、実効の権限モードも default になり、一致する
         self.assertEqual(marker["permission_mode"], {"specified": "default", "effective": "default"})
         self.assertEqual(marker["status"], "ok", marker)
         args = self.claude_calls()[0]

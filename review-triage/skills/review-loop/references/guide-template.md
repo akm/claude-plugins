@@ -50,7 +50,7 @@
 
 - **`bash` ではなく `/bin/bash` で起動する。** `bash` と書くと、環境変数 `PATH` で先に見つかる bash (Homebrew の 5.2 など) で動く。理由の正本は [worker.md](worker.md) の「起動の仕方」の「要るもの」。
 - **ワーカーのスクリプトの絶対パス**は [SKILL.md](../SKILL.md) の「同梱のスクリプト」にある (`${CLAUDE_PLUGIN_ROOT}` が展開された絶対パス)。相対パスにしない — 人間が端末で `cd` した先で解決される。
-- **`--permission-mode` は常に付ける** (理由の正本は [arguments.md](arguments.md) の「様式」。0.13.0 の案内のコマンドでワーカーを起動したときの扱いは、[worker.md](worker.md) の「止められたときの直し方」の「権限モードの指定の食い違い」の行)。
+- **`--permission-mode` は常に付ける** (理由の正本は [arguments.md](arguments.md) の「様式」。0.13.0 の案内のコマンドでワーカーを起動したときの扱いは、[worker.md](worker.md) の「止められたときの直し方」の「権限モードの指定の不一致」の行)。
 - `--allowed-tools` は、`worker.allowed_tools` の要素ごとに 1 つ付ける。**各要素を単一引用符で囲む** — `Bash(git diff:*)` の括弧と `*` をシェルが展開しないように。要素が単一引用符を含むときは `'\''` に置き換える。列が空なら付けない (ワーカーの既定の一覧を使う)。
 - `--sandbox-allow-write` は `worker.sandbox_allow_write` の、`--sandbox-allowed-domain` は `worker.sandbox_allowed_domains` の要素ごとに 1 つ付け、`--allowed-tools` と同じく各要素を単一引用符で囲む。`~` で始まる要素も同じく囲む — `~` はシェルではなくワーカーがホームに展開するので、囲んでも意味は変わらない。列が空か、`loop.yaml` にキーが無ければ付けない。
 - 各引数の意味の正本は [worker.md](worker.md) の「起動の仕方」。

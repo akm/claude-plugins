@@ -678,7 +678,7 @@ done
 # (sandbox.excludedCommands と sandbox.network.allowUnixSockets)。レビュー対象のブランチの設定は、回ごとに複製で確かめる。
 # 利用者の設定の置き場は、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
 # 無ければ $HOME/.claude。CLAUDE_CONFIG_DIR が相対パスだと、レビュアの実行 (複製の中の cwd) からの解決先が
-# ワーカーの cwd (作業側) からの解決先と食い違い、ワーカーが実際に使われる設定を確かめられない
+# ワーカーの cwd (作業側) からの解決先と一致せず、ワーカーが実際に使われる設定を確かめられない
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   case "$CLAUDE_CONFIG_DIR" in
     /*) CONFIG_DIR="$CLAUDE_CONFIG_DIR" ;;
