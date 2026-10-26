@@ -103,7 +103,7 @@ class RunTest(FakeGhTest):
         self.assertEqual((r["json"], r["json_error"]), (None, None), "空の出力では json_error も None")
 
     def test_json_error_only_when_caller_expects_json(self):
-        """json_error は、呼び出し側が expect_json を渡したときだけ入る。引数からは推測しない。"""
+        """json_error は、呼び出し元が expect_json を渡したときだけ入る。引数からは推測しない。"""
         url = "https://github.com/o/r/issues/1#issuecomment-1\n"
         self.responses([{"prefix": ["issue", "comment"], "stdout": url},
                         {"prefix": ["api"], "stdout": "verify-a #1\n"},

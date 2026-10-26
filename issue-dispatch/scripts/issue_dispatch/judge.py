@@ -163,7 +163,7 @@ def _releasable(name, st, rec, attrs_table):
 
 def released_reservations(st, rec, attrs_table, before=None):
     """割り当てで予約した資源 (reserved) のうち、宣言に無い予約として解放したもの (名前の順)。解放は GitHub への書き込みが無い導出なので、
-    判定する側 (judge_one) と使用を導く側 (usage_for) がこの関数で同じに決める。読むのは項目の状態 (declared_resources・held) だけ。
+    判定する関数 (judge_one) と使用を導く関数 (usage_for) がこの関数で同じに決める。読むのは項目の状態 (declared_resources・held) だけ。
     条件: `開始可` の後は持っている資源 (held) に無い予約のうち、`開始可` になったどれかの宣言にあったもの (更新で外した。結果に依らず解放) と、無かったもので属性
     release_undeclared が release か質問 `release-undeclared` の回答が release のもの。`開始可` の前は今の割り当ての読めた着手の宣言 (修正を含む。before を
     渡せばそのコメントの ID の宣言より前のものだけ) のどれかに無い予約で、属性か回答が release のもの。"""

@@ -30,7 +30,7 @@ _REPO_RE = re.compile(rf"^{REPO_NAME_PATTERN}$")
 
 
 class Corrupt(Exception):
-    """記録が壊れていて読めない。「無い」(正常な新規) と区別するための型。呼び出し側は保存に進まない。"""
+    """記録が壊れていて読めない。「無い」(正常な新規) と区別するための型。呼び出し元は保存に進まない。"""
 
     def __init__(self, path, reason):
         self.path = path

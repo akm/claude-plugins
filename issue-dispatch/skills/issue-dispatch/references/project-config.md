@@ -100,4 +100,4 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py" config read --dir <ル
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/issue_dispatch.py" config add-edit-check --dir <管理ディレクトリ> --repo <owner/repo>
 ```
 
-`config read` の出力は `{"status", "path", "role", "config", "warnings", "errors"}` で、`status` は `ok` / `missing` (設定ファイルが無い) / `unreadable` (読めない)。`config` はデフォルト値を当てた後の値。`warnings` と `errors` の要素は `{"key", "message"}`。JSON を出せたときの終了コードは、`errors` の有無によらず 0。0 以外は Python 自身の失敗 (捕まえていない例外の 1・引数の誤りの 2) で、呼び出す側は停止の条件として扱う。
+`config read` の出力は `{"status", "path", "role", "config", "warnings", "errors"}` で、`status` は `ok` / `missing` (設定ファイルが無い) / `unreadable` (読めない)。`config` はデフォルト値を当てた後の値。`warnings` と `errors` の要素は `{"key", "message"}`。JSON を出せたときの終了コードは、`errors` の有無によらず 0。0 以外は Python 自身の失敗 (捕まえていない例外の 1・引数の誤りの 2) で、呼び出し元は停止の条件として扱う。

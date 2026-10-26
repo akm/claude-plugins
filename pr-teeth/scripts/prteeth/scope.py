@@ -46,7 +46,7 @@ def _bracket(pattern, start):
 
     j = pattern.find("]", i)
     if j < 0:
-        return None, start  # 閉じていない。呼び出し側がリテラル `[` として扱う。
+        return None, start  # 閉じていない。呼び出し元がリテラル `[` として扱う。
 
     body = pattern[body_start:j]
     if not body:
@@ -130,7 +130,7 @@ def classify_files(paths, repo, config):
     戻り値: {"by_file": {path: 範囲}, "counts": {範囲: 件数}, "priority": 範囲}
     priority はその PR 全体の優先度で、PR の並び順に使う（第7節）。
 
-    リポジトリ自体が未設定なら全ファイルを should_review 扱いにする（安全側）。
+    リポジトリ自体が未設定なら全ファイルを should_review 扱いにする（見落としを出さないため）。
     ignore にすると、設定し忘れたリポジトリの重要な変更を、利用者に知らせずに隠してしまう。
     """
     cfg = config or {}

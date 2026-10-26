@@ -56,12 +56,12 @@ def contents_before(tool, tool_response):
 
 
 def patch_lines(tool, tool_response, before, after):
-    """書き換えた行を、ツールの結果 (tool_response) の structuredPatch から (書き換える前の側, 書き換えた後の側) の
+    """書き換えた行を、ツールの結果 (tool_response) の structuredPatch から (書き換える前の内容, 書き換えた後の内容) の
     行番号の集合で返す。
 
     structuredPatch は Claude Code が計算した行の差分で、範囲 (hunk) ごとに oldStart・newStart (1 から数える行番号) と
     lines (先頭の 1 文字が " " は変えていない行、"-" は消した行、"+" は足した行、"\\" は末尾の改行の有無を示す記号) を持つ。
-    "-" の行を書き換える前の側、"+" の行を書き換えた後の側にする。行番号は 0 から数える (textlint の行番号と同じ数え方)。
+    "-" の行を書き換える前の内容、"+" の行を書き換えた後の内容にする。行番号は 0 から数える (textlint の行番号と同じ数え方)。
     hook の中では差分を計算しない。structuredPatch は公式の文書に載っていない (Claude Code 2.1.273 で確認した)。
 
     次のときは ValueError を送出する (hook の中の差分の計算には戻らない)。

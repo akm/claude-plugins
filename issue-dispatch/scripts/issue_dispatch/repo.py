@@ -34,7 +34,7 @@ def run_git(path, *args):
     """`git -C <path> <args>` を実行し、(終了コード, 標準出力 (末尾の改行を除く), 標準エラー出力) を返す。
 
     出力はバイト列で受け、UTF-8 として読む。読めないバイトは surrogateescape で文字列に残す (ロケールの文字コードに
-    依らず、落ちない)。設定ファイルの中身のように厳密に UTF-8 であるべきものは、呼び出し側が確認する。
+    依らず、落ちない)。設定ファイルの中身のように厳密に UTF-8 であるべきものは、呼び出し元が確認する。
     """
     try:
         p = subprocess.run(["git", "-C", path, *args], capture_output=True, env=_clean_env())

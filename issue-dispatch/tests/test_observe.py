@@ -326,7 +326,7 @@ class CliTest(FakeGhCase):
         self.assertEqual(list(out["skipped"]["prs"]), [PR9])
 
     def test_item_level_gaps_skip_only_affected_values(self):
-        """1 項目の中の欠損 (入れ子の connection の上限) は、その種類が狂わせる値だけを前のスナップショットから引き継いで比べず、ほかの値の変化と差分の保存は続ける。"""
+        """1 項目の中の欠損 (入れ子の connection の上限) は、その種類の欠損の影響を受ける値だけを前のスナップショットから引き継いで比べず、ほかの値の変化と差分の保存は続ける。"""
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": {"fixture": "project-items-ok"}}])
         self.cli("project", "items", "--project", "akm/3", "--write-snapshot", "--dir", self.manager)
         def mutate(nodes):
@@ -476,7 +476,7 @@ class CliTest(FakeGhCase):
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9, 90009)))},
                         {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
         code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
-        self.assertEqual(([d["kind"] for d in out["diffs"]], out["skipped"]["items"]), (["pr"], {A3: ["comments"]}), "前の側が partial なら比べない")
+        self.assertEqual(([d["kind"] for d in out["diffs"]], out["skipped"]["items"]), (["pr"], {A3: ["comments"]}), "前のスナップショットが partial なら比べない")
 
     def test_build_snapshot_does_not_carry_from_partial_previous(self):
         """前のスナップショットでも同じ種類が partial なら引き継がない (引き継ぐ元が無い)。"""
@@ -489,7 +489,7 @@ class CliTest(FakeGhCase):
         self.assertEqual((snap["items"][A3]["partial"], snap["items"][A3]["carried"], snap["items"][A3]["comment_ids"]), (["comments"], {}, [1, 2]))
 
     def test_unknown_partial_kind_skips_whole_item(self):
-        """対応に無い欠損の種類は、どの値が狂うか分からないので項目全体を比べない。"""
+        """対応に無い欠損の種類は、どの値が影響を受けるか分からないので項目全体を比べない。"""
         before = {"version": 1, "taken_at": "t0", "project_id": "P", "comment_prs": {},
                   "items": {A1: dict(observe.snapshot_item({"item_id": "I1", "position": 1, "state": "OPEN", "status": {"name": "Todo"}}), partial=["new-kind"])}}
         after = {"version": 1, "taken_at": "t1", "project_id": "P", "comment_prs": {},

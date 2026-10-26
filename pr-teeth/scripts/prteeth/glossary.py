@@ -70,7 +70,7 @@ def status_of(glossary, term):
 
 
 def definition_for(glossary, term, language):
-    """その言語の説明文。無ければ None（呼び出し側が生成して record する）。"""
+    """その言語の説明文。無ければ None（呼び出し元が生成して record する）。"""
     entry = get(glossary, term)
     if not entry:
         return None

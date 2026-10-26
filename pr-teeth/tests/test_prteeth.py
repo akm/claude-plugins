@@ -197,7 +197,7 @@ class TestScopeGlob(unittest.TestCase):
 
 class TestClassifyFiles(unittest.TestCase):
     def test_unconfigured_repo_is_should_review(self):
-        # 設定し忘れたリポジトリの変更を、利用者に知らせずに隠さない（安全側）。
+        # 設定し忘れたリポジトリの変更を、利用者に知らせずに隠さない（見落としを出さないため）。
         r = scope.classify_files(["a.md", "b.go"], "o/r", {"repos": {}})
         self.assertEqual(r["priority"], scope.SHOULD)
         self.assertEqual(r["counts"][scope.SHOULD], 2)
@@ -385,7 +385,7 @@ class TestStore(unittest.TestCase):
 class TestPreciousData(unittest.TestCase):
     """蓄積データの読み込み（docs/design/data-integrity.md）。
 
-    壊れているのに既定値を返すと、呼び出し側がそれを保存して元データを失わせる。
+    壊れているのに既定値を返すと、呼び出し元がそれを保存して元データを失わせる。
     「無い」（正常な初回実行）と「壊れている」を区別できることが要点。
     """
 
@@ -798,7 +798,7 @@ class TestLabelContext(unittest.TestCase):
         self.assertEqual(L["page_title"], "指定した PR")
 
     def test_unknown_language_gets_english_pick_labels(self):
-        # 未知の言語は英語にフォールバックする。文脈の上書きも英語側を使う。
+        # 未知の言語は英語にフォールバックする。文脈の上書きも英語のラベルを使う。
         self.assertEqual(labels.for_language("ko", labels.CONTEXT_PICK)["must_review"], "Focus")
 
     def test_region_tag_gets_japanese_pick_labels(self):
@@ -930,7 +930,7 @@ class TestBodies(unittest.TestCase):
         self.assertEqual(bodies.load(self.dir, "o/r", 1), "## 背景\n本文")
 
     def test_missing_body_is_none_not_an_error(self):
-        # 無いことは異常ではない（初回・掃除済み）。呼び出し側は全体を説明する。
+        # 無いことは異常ではない（初回・掃除済み）。呼び出し元は全体を説明する。
         self.assertIsNone(bodies.load(self.dir, "o/r", 999))
 
     def test_file_name_is_sanitized(self):
@@ -1236,7 +1236,7 @@ class TestRepoCache(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(path, "junk")))
 
     def test_failure_raises_repo_error(self):
-        # 1件の失敗で巡回全体を中断しない形にする（呼び出し側が握れる型）。
+        # 1件の失敗で巡回全体を中断しない形にする（呼び出し元が握れる型）。
         with self.assertRaises(repos.RepoError):
             repos.ensure(self.repos_dir, "o/r",
                          url=os.path.join(self.root, "nonexistent"))
@@ -1466,7 +1466,7 @@ class TestRender(unittest.TestCase):
     def test_page_chrome_uses_default_language(self):
         h = render.render(self._doc())
         self.assertIn('<html lang="ja"', h)
-        self.assertIn('lang="en"', h)  # PR 側は自分の言語
+        self.assertIn('lang="en"', h)  # PR の解説は自分の言語
 
     def test_escapes_html_in_content(self):
         h = render.render(self._doc({"summary": "<script>alert(1)</script>"}))
@@ -1611,8 +1611,8 @@ class TestRender(unittest.TestCase):
         doc = self._doc({"language": "en", "priority": "must_review",
                          "counts": {"must_review": 1}}, context="pick")
         h = render.render(doc)
-        self.assertIn("Focus", h)          # PR 側は英語の pick ラベル
-        self.assertIn("指定した PR", h)     # ページ側は日本語の pick ラベル
+        self.assertIn("Focus", h)          # PR の解説は英語の pick ラベル
+        self.assertIn("指定した PR", h)     # ページの共通部分は日本語の pick ラベル
 
     def test_priority_classification_is_unchanged_by_context(self):
         # 表示だけを変え、内部の値は変えない（分類・並び替えは共通）。
@@ -1751,7 +1751,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertNotIn("重点", html)
 
     def test_render_flag_overrides_payload_context(self):
-        # コマンド側が文脈を知っているので、フラグが勝つ。
+        # コマンドの引数を渡す呼び出し元が文脈を知っているので、フラグが勝つ。
         _, html = self._render("pick", payload_context="patrol")
         self.assertIn("重点", html)
 
@@ -1780,11 +1780,11 @@ class TestCliCommands(unittest.TestCase):
             {"term": t, "language": "ja", "definition": "d"} for t in terms
         ]})
         env = dict(os.environ, PR_TEETH_CONFIG_DIR=self._dir.name)
-        env.pop("PYTHONPATH", None)  # 遅延させない側に hook を継承させない
+        env.pop("PYTHONPATH", None)  # 遅延させない子プロセスに hook を継承させない
         if delay:
             # save_json を遅らせる。sitecustomize は子の起動時に自動で読まれる。
             # hook は専用ディレクトリに置く。設定ディレクトリに置くと、
-            # PYTHONPATH を渡さない側の子もこれを読む経路が生まれうる。
+            # PYTHONPATH を渡さない子プロセスもこれを読む経路が生まれうる。
             hook_dir = os.path.join(self._dir.name, "hook")
             os.makedirs(hook_dir, exist_ok=True)
             hook = os.path.join(hook_dir, "sitecustomize.py")

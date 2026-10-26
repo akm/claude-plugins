@@ -118,7 +118,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 ```
 
 戻り値の `priority`（`must_review` / `should_review` / `ignore`）と `counts` は
-**そのまま手順 7 に渡す。** 表示文言の差し替えは `render` 側で行うので、ここで
+**そのまま手順 7 に渡す。** 表示文言の差し替えは `render` で行うので、ここで
 「重点」等に読み替えない。
 
 `language` をその PR の解説言語として使う。
@@ -128,7 +128,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
 `/pr-teeth` の手順 4 と同じ。**ただし「前回からの差分」は見ない**（毎回全体が対象）。
 
 1. 作業リポジトリを用意する。**`git clone` を直接実行しない**
-   （保存先・取得量・掃除をコード側で決めるため）。
+   （保存先・取得量・掃除をコードで決めるため）。
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" repo \
@@ -153,7 +153,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" classify \
    用語集で `known` の語は裏取りも説明も省いてよい。
 
 巨大な PR は中心的な変更に絞る。無制限に解析してディスクと時間を使わない
-（clone の量と保持数は `repo` 側で抑えている）。
+（clone の量と保持数は `repo` で抑えている）。
 
 ### 6. 用語の扱い
 
@@ -304,7 +304,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 ## fork する場合
 
 配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の定義箇所**。
-fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md 側には書かない）。
+fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md には書かない）。
 
 実行時に配布元を推定する手段は採らない（`${CLAUDE_PLUGIN_ROOT}` はインストール先しか
 返さず、そこから配布元を辿る経路は非公式で、壊れると設定と用語集を見失うため）。

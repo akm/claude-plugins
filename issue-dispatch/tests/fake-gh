@@ -12,7 +12,7 @@
     not_logged_in   固定データ auth-not-logged-in を返す (終了コード 4)
     rate_limited    固定データ graphql-rate-limited を返す (終了コード 1)
     network         固定データ network-unreachable を返す (終了コード 1)
-    hang            応答せずに終了しない (呼び出し側のタイムアウトを試す)
+    hang            応答せずに終了しない (呼び出し元のタイムアウトを試す)
     exit            何も書かずに FAKE_GH_EXIT (既定 1) で終了する
 - FAKE_GH_RESPONSES: 応答の指定の JSON ファイル。要素の配列で、受けた引数に最初に一致した要素を返す。要素のキー:
     prefix    引数の先頭がこの配列と同じなら一致 (例: ["issue", "view"])

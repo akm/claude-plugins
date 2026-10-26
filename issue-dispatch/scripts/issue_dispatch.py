@@ -41,7 +41,7 @@
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
 
 終了コード: JSON を出せたときは、エラーの有無によらず 0 (エラーは JSON の `errors` で伝える)。0 以外は Python 自身の失敗
-(捕まえていない例外の 1・引数の誤りの 2) で、呼び出す側はそれを停止の条件として扱う (正本は同じ計画の R25。
+(捕まえていない例外の 1・引数の誤りの 2) で、呼び出し元はそれを停止の条件として扱う (正本は同じ計画の R25。
 1 と 2 は Python 自身が使うので、サブコマンドの専用の終了コードには使わない)。
 """
 
@@ -838,7 +838,7 @@ def cmd_declaration_conflictability(args):
         if parsed["status"] == "ok":
             others.append({"id": other.get("id"), "repo": other["repo"], "declaration": parsed["declaration"]})
         else:
-            # 相手の宣言は過去に受理されたもの。今の規則で読めなくても、判定する宣言の側は正しいので、その相手だけを
+            # 相手の宣言は過去に受理されたもの。今の規則で読めなくても、判定する宣言は正しいので、その相手だけを
             # needs-user (自動では判定できない) として残し、ほかの相手の判定は続ける
             others.append({"id": other.get("id"), "repo": other["repo"], "declaration": None, "problems": parsed["errors"]})
     if errors:

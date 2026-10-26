@@ -11,7 +11,7 @@ import html
 
 from . import labels
 
-# 範囲名 → CSS クラス。表示文言は labels 側で言語ごとに切り替える。
+# 範囲名 → CSS クラス。表示文言は labels で言語ごとに切り替える。
 _SCOPE_CLASS = {
     "must_review": "must",
     "should_review": "should",

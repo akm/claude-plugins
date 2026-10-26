@@ -12,7 +12,7 @@
 | 担当者 (assignee) | 認証しているアカウント (`gh` のトークンのログイン) 1 つだけ | 利用者 | `human-handed` が無く、担当者がトークンのログイン 1 つだけの Issue が、作業のセッションの対象になる。担当者が未設定の Issue は対象にならないので、`Ready` にする前に担当者を決める |
 | 親 Issue | sub-issue を持つ Issue | 利用者 | 親 Issue は割り当ての対象にしない (sub-issue は対象にする)。項目の一覧の `is_parent` |
 | 大きさ | 1 つの PR で閉じる大きさ | 利用者 | 作る時点で分ける規則は定めない。着手の後に分ける必要が分かったときの扱いは「分割で作る Issue」 |
-| PR との結び付き | PR の本文に Issue を閉じる記法 (`Closes #<番号>`) | 作業のセッション | マージで Issue が閉じ、`Done` と資源の解放がそれに続く (`Done` を書く組み込みワークフローの正本は [project-schema.md](project-schema.md) の「組み込みワークフロー」)。PR の側から読むのは `closingIssuesReferences` (下の「PR の観測」) |
+| PR との結び付き | PR の本文に Issue を閉じる記法 (`Closes #<番号>`) | 作業のセッション | マージで Issue が閉じ、`Done` と資源の解放がそれに続く (`Done` を書く組み込みワークフローの正本は [project-schema.md](project-schema.md) の「組み込みワークフロー」)。PR から読むのは `closingIssuesReferences` (下の「PR の観測」) |
 
 ## `blockedBy` の追加 (`blocked-by add`)
 

@@ -409,7 +409,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(self._run(self._payload())[0], SILENT)
 
     def test_normal_throttling_is_unaffected(self):
-        # 「置けない」で通知を出す側を選んでも、「既に在る」の間引きは機能したまま。
+        # 「置けない」で通知を出す方を選んでも、「既に在る」の間引きは機能したまま。
         self.assertEqual(self._run(self._payload())[0], NOTIFIED)
         self.assertEqual(self._run(self._payload())[0], SILENT)
 

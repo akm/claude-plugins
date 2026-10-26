@@ -74,7 +74,7 @@ def build_context():
 
 def main():
     try:
-        # stdin は読むが、matcher 側で発火条件を絞っているため source では分岐しない。
+        # stdin は読むが、matcher で発火条件を絞っているため source では分岐しない。
         # 不正な JSON でもセッション開始を妨げないよう握りつぶす。
         try:
             json.load(sys.stdin)
