@@ -421,7 +421,7 @@ def cmd_promote(args):
 def cmd_repo(args):
     """PR を読むための作業リポジトリを用意する（clone / fetch）。
 
-    保存先と取得量をコード側で決める。散文の指示だとリポジトリが際限なく増え、
+    保存先と取得量をコードで決める。散文の指示だとリポジトリが際限なく増え、
     取得量も実行のたびに揺れるため（第12節）。
     """
     warnings = []
@@ -471,7 +471,7 @@ def cmd_render(args):
         payload = json.load(f)
     # キー名の誤りや必須の欠落はここで拒否する。エラーにせずに空のセクションを出すことはしない。
     # ignore だけの PR を 1 行で表示する判定と並び替えも from_payload が行う。
-    # --context は入力 JSON の context より優先する（コマンド側が文脈を知っている）。
+    # --context は入力 JSON の context より優先する（コマンドの引数を渡す呼び出し元が文脈を知っている）。
     if args.context:
         payload = dict(payload, context=args.context)
     doc = document.from_payload(payload)

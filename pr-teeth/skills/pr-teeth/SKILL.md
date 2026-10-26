@@ -101,7 +101,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
 `ignore` のみの PR は軽く要約するだけでよく、clone もしない。
 
 1. 作業リポジトリを用意する。**`git clone` を直接実行しない**
-   （保存先・取得量・掃除をコード側で決めるため）。
+   （保存先・取得量・掃除をコードで決めるため）。
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" repo \
@@ -134,7 +134,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" select \
    用語集で `known` の語は裏取りも説明も省いてよい。
 
 巨大な PR は中心的な変更に絞る。無制限に解析してディスクと時間を使わない
-（clone の量と保持数は `repo` 側で抑えている）。
+（clone の量と保持数は `repo` で抑えている）。
 
 ### 5. 用語の扱い
 
@@ -276,7 +276,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
 
 **`--notified` には `body` を必ず入れる。** 次回の実行で本文の差分を出すための
 材料になる（入れないと、次回は「比較する材料が無い」状態になる）。
-`--open-prs` 側は掃除の判定にしか使わないため `body` は不要。
+`--open-prs` に渡す一覧は掃除の判定にしか使わないため `body` は不要。
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" record \
@@ -341,10 +341,10 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 
 配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の定義箇所**で、
 設定ディレクトリの場所を決める。fork して別のマーケットプレイスから配布する場合は、
-**そこ 1 箇所だけを** fork 側の配布元に書き換える。設定ディレクトリの場所が変わるため、
+**そこ 1 箇所だけを** fork した先の配布元に書き換える。設定ディレクトリの場所が変わるため、
 既存利用者には移行を案内する。
 
-SKILL.md 側に配布元は書かない（3 ファイルに散ると書き換え漏れが起き、
+SKILL.md に配布元は書かない（3 ファイルに散ると書き換え漏れが起き、
 `/pr-teeth` と `/pr-glossary` が別の設定ディレクトリを見て用語集を見失う）。
 
 実行時に配布元を推定する手段は採らない（`${CLAUDE_PLUGIN_ROOT}` はインストール先しか

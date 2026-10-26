@@ -838,7 +838,7 @@ def cmd_declaration_conflictability(args):
         if parsed["status"] == "ok":
             others.append({"id": other.get("id"), "repo": other["repo"], "declaration": parsed["declaration"]})
         else:
-            # 相手の宣言は過去に受理されたもの。今の規則で読めなくても、判定する宣言の側は正しいので、その相手だけを
+            # 相手の宣言は過去に受理されたもの。今の規則で読めなくても、判定する宣言は正しいので、その相手だけを
             # needs-user (自動では判定できない) として残し、ほかの相手の判定は続ける
             others.append({"id": other.get("id"), "repo": other["repo"], "declaration": None, "problems": parsed["errors"]})
     if errors:

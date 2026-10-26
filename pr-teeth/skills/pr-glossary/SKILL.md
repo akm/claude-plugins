@@ -81,6 +81,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" prepare
 ## fork する場合
 
 配布元は `scripts/prteeth/config.py` の `PLUGIN_SOURCE` が**唯一の定義箇所**。
-fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md 側には書かない）。
+fork するときは**そこ 1 箇所だけ**を書き換える（SKILL.md には書かない）。
 以前は各 SKILL.md にリテラルで書いており、一部だけ書き換えると設定ディレクトリが
 分かれて用語集を見失う状態だった。

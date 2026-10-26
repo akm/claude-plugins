@@ -798,7 +798,7 @@ class TestLabelContext(unittest.TestCase):
         self.assertEqual(L["page_title"], "指定した PR")
 
     def test_unknown_language_gets_english_pick_labels(self):
-        # 未知の言語は英語にフォールバックする。文脈の上書きも英語側を使う。
+        # 未知の言語は英語にフォールバックする。文脈の上書きも英語のラベルを使う。
         self.assertEqual(labels.for_language("ko", labels.CONTEXT_PICK)["must_review"], "Focus")
 
     def test_region_tag_gets_japanese_pick_labels(self):
@@ -1466,7 +1466,7 @@ class TestRender(unittest.TestCase):
     def test_page_chrome_uses_default_language(self):
         h = render.render(self._doc())
         self.assertIn('<html lang="ja"', h)
-        self.assertIn('lang="en"', h)  # PR 側は自分の言語
+        self.assertIn('lang="en"', h)  # PR の解説は自分の言語
 
     def test_escapes_html_in_content(self):
         h = render.render(self._doc({"summary": "<script>alert(1)</script>"}))
@@ -1611,8 +1611,8 @@ class TestRender(unittest.TestCase):
         doc = self._doc({"language": "en", "priority": "must_review",
                          "counts": {"must_review": 1}}, context="pick")
         h = render.render(doc)
-        self.assertIn("Focus", h)          # PR 側は英語の pick ラベル
-        self.assertIn("指定した PR", h)     # ページ側は日本語の pick ラベル
+        self.assertIn("Focus", h)          # PR の解説は英語の pick ラベル
+        self.assertIn("指定した PR", h)     # ページの共通部分は日本語の pick ラベル
 
     def test_priority_classification_is_unchanged_by_context(self):
         # 表示だけを変え、内部の値は変えない（分類・並び替えは共通）。
@@ -1751,7 +1751,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertNotIn("重点", html)
 
     def test_render_flag_overrides_payload_context(self):
-        # コマンド側が文脈を知っているので、フラグが勝つ。
+        # コマンドの引数を渡す呼び出し元が文脈を知っているので、フラグが勝つ。
         _, html = self._render("pick", payload_context="patrol")
         self.assertIn("重点", html)
 

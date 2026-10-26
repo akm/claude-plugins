@@ -280,7 +280,7 @@ def has_plan_content(tool_input):
 
 
 def _in_git_repo(cwd):
-    # timeout はプロセス側でも持つ。hooks.json の 10 秒はフック全体の上限で、
+    # timeout は git の呼び出しにも持たせる。hooks.json の 10 秒はフック全体の上限で、
     # そこで殺されると git の子プロセスが取り残されうる。ネットワーク上の
     # リポジトリや index のロック待ちで固まる経路があるため、自分で打ち切る。
     try:

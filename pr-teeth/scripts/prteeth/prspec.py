@@ -20,7 +20,7 @@ PR が出力に無いことに気づけない。
   URL のホスト部分は**照合するだけで捨てる**。取り出すのは owner / repo / number
   だけで、リンクは `document.GITHUB_HOST` から組み立てられる。つまり GitHub
   Enterprise の URL を貼っても、公開 github.com の同名リポジトリを指す。
-  GHE は `document.GITHUB_HOST` 側が未対応（設定で持つ想定のまま固定値）なので、
+  GHE は `document.GITHUB_HOST` が未対応（設定で持つ想定のまま固定値）なので、
   **ここだけホストを受け入れても対応したことにならない。** 対応する場合は
   ホストを設定に持たせ、この関数の戻り値にも載せて `gh --hostname` まで通す
   必要がある。今はその手前で loud に失敗する（`gh` が引けずエラーになる）。
