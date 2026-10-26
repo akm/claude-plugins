@@ -76,7 +76,7 @@ full_review_next: false
 | `worker.effort` | ◯ | ワーカーの effort (`review_loop.worker_effort`) |
 | `worker.permission_mode` | ◯ | `review_loop.permission_mode` |
 | `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の列は「ワーカーの既定の一覧を使う」 |
-| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。`--resume` での読み直しと、キーが無いときの扱いの正本は [arguments.md](arguments.md) の「様式」 |
+| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。`--resume` での再度の読み込みと、キーが無いときの扱いの正本は [arguments.md](arguments.md) の「様式」 |
 | `worker.sandbox_allowed_domains` | | `review_loop.sandbox_allowed_domains`。扱いは `worker.sandbox_allow_write` と同じ |
 | `worker.idle_minutes` | ◯ | `review_loop.worker_idle_minutes` |
 | `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |

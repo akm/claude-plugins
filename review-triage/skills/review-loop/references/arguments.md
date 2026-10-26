@@ -47,9 +47,9 @@ review-loop --end [<置き場>]
 
 **`--resume --full-review` は、その起動で次に書く依頼文を全量にする。** 修正が残っていれば、それを済ませてから全量にする。**ただし、結果待ちの回 (取り込む完了の印か、印の無い依頼文の回) の依頼文の scope が `full` なら、印を書かない** — その回が全量の回なので、印を書くと、その回の採択が 0 件でも同じ HEAD の全量の回がもう 1 回続く。要否に関わらず全量にする明示の指定で、印は `loop.yaml` の実行時のキー `full_review_next` に書く (真にする所は [reentry.md](reentry.md) の「再入の手順」の 1 と [stops.md](stops.md) の RJ0・RJ1、偽に戻す所は [round.md](round.md) の RL1 の手順 a の 7 と [stops.md](stops.md) の「停止のときに書き換えるもの」。一覧は [loop-files.md](loop-files.md) の「`loop.yaml`」)。**周回の条件 `review.full_review` は変えない。** 範囲を 1 回変えるだけで、範囲は記録の回ごとに `scope` として残るので、上の「記録の回ごとの違いを読み解けなくなる」には当たらない。`--max` と同じく、次の起動には持ち越さない。
 
-**書き込みを許す場所と接続を許すドメイン (`review_loop.sandbox_allow_write`・`review_loop.sandbox_allowed_domains`) は周回の条件ではなく、`--resume` のたびに設定から読み直して、`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains` に書く。** この 2 つは、ワーカーを動かすマシンごとに変わる値 (環境の値) で、周回の結果を比べるときにそろえる値ではない。開始時の値のままにすると、書き込みを許す場所が足りずに RA1 で止まった周回を、終えずに直して続けられない。読み直すときの値の誤りは、開始時と同じく未設定 (空の一覧) として扱い、警告を `--resume` の開始の報告に書く。**権限モードは周回の条件のままで、`--resume` では読み直さない。**
+**書き込みを許す場所と接続を許すドメイン (`review_loop.sandbox_allow_write`・`review_loop.sandbox_allowed_domains`) は周回の条件ではなく、`--resume` のたびに設定から再度読み込んで、`loop.yaml` の `worker.sandbox_allow_write`・`worker.sandbox_allowed_domains` に書く。** この 2 つは、ワーカーを動かすマシンごとに変わる値 (環境の値) で、周回の結果を比べるときにそろえる値ではない。開始時の値のままにすると、書き込みを許す場所が足りずに RA1 で止まった周回を、終えずに直して続けられない。再度読み込むときの値の誤りは、開始時と同じく未設定 (空の一覧) として扱い、警告を `--resume` の開始の報告に書く。**権限モードは周回の条件のままで、`--resume` では再度読み込まない。**
 
-**0.13.0 で始めた周回の `loop.yaml` には、この 2 つのキーが無い。** 無ければ空の一覧として扱う (`--resume` で読み直した後は書かれている)。権限モードは `loop.yaml` の値のまま続く。
+**0.13.0 で始めた周回の `loop.yaml` には、この 2 つのキーが無い。** 無ければ空の一覧として扱う (`--resume` で再度読み込んだ後は書かれている)。権限モードは `loop.yaml` の値のまま続く。
 
 **0.14.0 以前に始めた周回の `loop.yaml` には、`review.full_review` と `review.base` が無い。** `review.full_review` が無ければ偽とする (その周回は `--full-review` の無い条件で始めたので、条件は変わらない)。`review.base` が無ければ、`--resume` の開始時に、引数 `--base` があればその値を (値の検査は開始時の `--base` と同じ)、無ければ上の `--base` を省いたときと同じ求め方で解決したブランチ名を書く。**解決できなければ再開せず、`--resume --base <ブランチ>` で再開するよう案内する** — `review.base` はまだ条件として決まっていないので、ここで決めても「再開のたびに条件を変えない」には当たらない。
 
