@@ -37,7 +37,7 @@ review-loop --end [<置き場>]
 **`--full-review` と `--base` は設定のキーを持たず、開始時の値を `loop.yaml` の `review.full_review` (真偽値)・`review.base` (ブランチ名) に書く。** どちらもブランチや周回ごとに変わる値で、前例 (`--stage` の値を `loop.stages` に書く) に合わせる。
 
 - **`--full-review`**: 収束後の全量レビューを周回の中で行う。増分の回が収束し、要否の規則 (正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) で要るときに、止まらずに全量の回を行う。すでに収束した記録で始めたときは、要否に関わらず最初の回を全量にする。どのノードで分かれるかの正本は [stops.md](stops.md) の RJ0・RJ1。
-- **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。全量の回で `review-request` に `--base` として渡す (渡す回の正本は [round.md](round.md) の RL1 の手順 a の 4。起点の求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければ周回を始めずに人間に尋ねる** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で尋ねることになる。**そのため `origin/HEAD` の無いリポジトリでは、全量の回を行わない周回 (記録に回があり、`--full-review` を付けない周回) でも `--base` が要る** (0.14.0 では要らなかった)。
+- **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。全量の回で `review-request` に `--base` として渡す (渡す回の正本は [round.md](round.md) の RL1 の手順 a の 4。起点の求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければ周回を始めずに人間に質問する** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で質問することになる。**そのため `origin/HEAD` の無いリポジトリでは、全量の回を行わない周回 (記録に回があり、`--full-review` を付けない周回) でも `--base` が要る** (0.14.0 では要らなかった)。
 
 **`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。周回の権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了の印の権限モードの指定をこの値と比べる。
 
@@ -60,7 +60,7 @@ review-loop --end [<置き場>]
 1. 引数にあればその値
 2. 無ければ設定の値 (上の表の対応するキー。「未設定」の定義の正本は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」)
 3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の各節の表)
-4. 既定で決まらないものは**人間に尋ねる** — ワーカーのモデルの指定 (`--model`) と effort (`--effort`)、レビュースキル (`--review`)
+4. 既定で決まらないものは**人間に質問する** — ワーカーのモデルの指定 (`--model`) と effort (`--effort`)、レビュースキル (`--review`)
 
 **ワーカーのモデルと effort は推測しない。** `review-triage-loop` の「G0 での解決」(指定が未設定なら呼び出し元の 1 つ前の世代を既定にする) は使わない — このスキルではワーカーのモデルを決めるのは人間で ([SKILL.md](../SKILL.md) の前提知識)、既定を持たない。
 
@@ -70,7 +70,7 @@ review-loop --end [<置き場>]
 
 - **引数の誤りは、周回を始めずにエラーとして報告する。** 引数はその場で言い直せる。
 - **`loop`・`fix` の設定の誤りも、周回を始めずにエラーとして報告する** (`review-triage-loop` と同じ規則)。
-- **`review_loop` の設定の誤りは、そのキーを未設定として扱い (既定があれば既定、無ければ人間に尋ねる)、警告を開始の報告に書く。** 失われるのは利用者が書いた数行で、既定で続けても周回の記録は壊れない (失敗時の態度の正本は [loop-files.md](loop-files.md) の「ファイルの種類ごとの態度」)。
+- **`review_loop` の設定の誤りは、そのキーを未設定として扱い (既定があれば既定、無ければ人間に質問する)、警告を開始の報告に書く。** 失われるのは利用者が書いた数行で、既定で続けても周回の記録は壊れない (失敗時の態度の正本は [loop-files.md](loop-files.md) の「ファイルの種類ごとの態度」)。
 
 | 値 | 条件 |
 | --- | --- |
