@@ -1637,7 +1637,7 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 	for _, want := range []string{
 		"- 状態: 捉え直し済み\n",
 		"- 根拠: 同じ場所への採択 (same-location) — 指摘 #1 と 1 回目の 指摘 1: 同じ表を指す\n",
-		"- 捉え直し: 型 行ごと \\| の規則 / 軸 規則 × 行 / 根本の原因 規則が表の外に無い / 修正の単位 規則を 1 か所に書く / 出所 スキルの見立て (skill)\n",
+		"- 捉え直し: 型 行ごと \\| の規則 / 軸 規則 × 行 / 根本の原因 規則が表の外に無い / 修正の単位 規則を 1 か所に書く / 出所 スキルの見解 (skill)\n",
 	} {
 		if !strings.Contains(reframed, want) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, reframed)

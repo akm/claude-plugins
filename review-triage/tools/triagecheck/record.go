@@ -109,7 +109,7 @@ type recordRecurrenceEvidence struct {
 }
 
 // recordReframe は旧様式の reframe — 検知の後に問題の捉え方を改めた結果。
-// source は human (人間の確認から出た) / skill (スキルの見立てから出た)。
+// source は human (人間の確認から出た) / skill (スキルの見解から出た)。
 // 生成サマリの描画に使う。
 type recordReframe struct {
 	Pattern   string `yaml:"pattern"`
@@ -1220,7 +1220,7 @@ func recordReframeSourceJa(s string) string {
 	case "human":
 		return "人間の確認 (human)"
 	case "skill":
-		return "スキルの見立て (skill)"
+		return "スキルの見解 (skill)"
 	}
 	return recordCell(s)
 }
