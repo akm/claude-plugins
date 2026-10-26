@@ -46,7 +46,7 @@
 | `sessions` | 作業のセッションの ID → 下の表 |
 | `items` | 項目 (`owner/repo#番号`) → 下の表。項目が属する作業のセッションは記録に持たず、Project のフィールド `Agent session ID` から導く |
 | `opt_in_proposals` | リポジトリ (`owner/repo`) → 第三者による本文の編集の確認のオプトインの提案 (`proposed_at` 提案した時刻・`answer` 回答。未回答は null) |
-| `notices` | 項目に紐づかない「1 回だけ報告する」知らせのフラグ。知らせの名前 → 報告した時刻 |
+| `notices` | 項目に紐づかない「1 回だけ報告する」通知のフラグ。通知の名前 → 報告した時刻 |
 | `questions` | 質問の ID → 下の表 |
 
 `manager`:
@@ -112,7 +112,7 @@
 | `set_conflict_choice` | `item`・`choice` | 競合の可能性があるときに選んだ扱いを書く |
 | `mark_reported` | `item`・`kind`・`at` | 報告済みのフラグを付ける (2 度目は時刻を変えない) |
 | `set_body_edit_confirmed` | `item`・`at` | 利用者が確認した本文の編集の時刻を書く |
-| `set_notice` | `key`・`at` | 項目に紐づかない知らせの報告済みのフラグを付ける (2 度目は時刻を変えない) |
+| `set_notice` | `key`・`at` | 項目に紐づかない通知の報告済みのフラグを付ける (2 度目は時刻を変えない) |
 | `set_opt_in` | `repo`・`proposed_at`・`answer` (任意) | オプトインの提案と回答を書く |
 | `ask` | `question_id`・`item`・`kind`・`options`・`at`・`subject` (任意) | 質問を記録する (同じ ID の質問が既にあれば誤り。回答を消さないため。既にある質問は `record read` の `questions` で見る) |
 | `answer` | `question_id`・`answer`・`at` | 回答を書く (質問が無い・選択肢に無い回答は誤り) |
