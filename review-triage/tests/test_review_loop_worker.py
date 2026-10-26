@@ -191,7 +191,7 @@ def _lstat(path, *, dir_fd=None):
 _os.stat, _os.lstat = _stat, _lstat
 """
 
-# サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側とループのディレクトリがこの下にあると起動しない
+# サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、元の作業ツリーとループのディレクトリがこの下にあると起動しない
 _SANDBOX_TMP = f"/private/tmp/claude-{os.getuid()}"
 
 RID = "20260926-1400-feat-x-1-code-review-opus"
@@ -356,7 +356,7 @@ def _make_repo(repo):
 
 
 def _make_loop_dir(loop, repo):
-    """loop にループのディレクトリを作り、repo を作業側とする loop.yaml を置く。"""
+    """loop にループのディレクトリを作り、repo を元の作業ツリーとする loop.yaml を置く。"""
     os.makedirs(loop)
     with open(os.path.join(loop, "loop.yaml"), "w", encoding="utf-8") as f:
         f.write(f'id: "{LOOP_ID}"\nrepo_dir: "{repo}"\nstate: active\n')
@@ -786,11 +786,11 @@ _RESULT_LINE = {"type": "result", "subtype": "success", "is_error": False, "sess
 
 class TestHappyPath(WorkerTestBase):
     def test_stdlib_named_files_in_repo_are_not_imported(self):
-        # 作業側 (ワーカーのカレントディレクトリ) に標準ライブラリと同名のファイルがあっても、ワーカーの python3 はそれを読まない
+        # 元の作業ツリー (ワーカーのカレントディレクトリ) に標準ライブラリと同名のファイルがあっても、ワーカーの python3 はそれを読まない
         # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終了し、フラグファイルが書かれない
         for name in ("json", "re", "hashlib", "stat"):
             with open(os.path.join(self.repo, f"{name}.py"), "w", encoding="utf-8") as f:
-                f.write(f'raise SystemExit("作業側の {name}.py が読まれた")\n')
+                f.write(f'raise SystemExit("元の作業ツリーの {name}.py が読まれた")\n')
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-q", "-m", "標準ライブラリと同名のファイル")
         self.put_request()
@@ -952,7 +952,7 @@ class TestResultChecks(WorkerTestBase):
         self.assertIn("no findings key", marker["error"])
 
     def test_dirty_tree(self):
-        # 偽の claude が作業側の作業ツリーのファイルを絶対パスで書き換えると、tree_clean_after が偽で failed になる
+        # 偽の claude が元の作業ツリーのファイルを絶対パスで書き換えると、tree_clean_after が偽で failed になる
         marker = self.run_one("dirty_tree")
         self.assertEqual(marker["status"], "failed")
         self.assertIs(marker["tree_clean_after"], False)
@@ -977,7 +977,7 @@ class TestResultChecks(WorkerTestBase):
         self.finish(p)
 
     def test_loop_yaml_rewritten_during_review_is_not_a_modification(self):
-        # 作業側が再開や停止のときにレビュー中に loop.yaml を書き換えても、ループのディレクトリの変化として数えない
+        # review-loop のセッションが再開や停止のときにレビュー中に loop.yaml を書き換えても、ループのディレクトリの変化として数えない
         self.env["FAKE_CLAUDE_SLEEP"] = "4"
         self.put_request()
         p = self.start()
@@ -1247,7 +1247,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertIs(sandbox["network"]["allowAllUnixSockets"], False)
 
     def test_request_copy(self):
-        # AE1: プロンプトが指す写しには、元の出力先と元の作業ツリーのパスが無く、扱いの行が「使い捨て」。作業側の依頼文は変わらない
+        # AE1: プロンプトが指す写しには、元の出力先と元の作業ツリーのパスが無く、扱いの行が「使い捨て」。元の依頼文は変わらない
         self.put_request()
         req = self.path(f"review-request-{RID}.md")
         with open(req, "rb") as f:
@@ -1268,8 +1268,8 @@ class TestWorkspace(WorkerTestBase):
             self.assertEqual(f.read(), before)
 
     def test_branch_names_resolve_in_clone(self):
-        # AE2: 作業側が feature ブランチにいて main が別のコミットを指すとき、複製の中でもブランチ・リモート追跡ブランチ・
-        # タグが作業側と同じコミットに解決できる。作業側のブランチを取り出したままでも、複製の作成が失敗しない
+        # AE2: 元の作業ツリーが feature ブランチにいて main が別のコミットを指すとき、複製の中でもブランチ・リモート追跡ブランチ・
+        # タグが元の作業ツリーと同じコミットに解決できる。元の作業ツリーのブランチを取り出したままでも、複製の作成が失敗しない
         main = _git(self.repo, "rev-parse", "HEAD")
         _git(self.repo, "tag", "v1")
         _git(self.repo, "update-ref", "refs/remotes/origin/main", main)
@@ -1750,7 +1750,7 @@ class TestLogReading(WorkerTestBase):
             {"command": "touch /Users/x/y",
              "message": "touch: /Users/x/y: Operation not permitted"},
         ]})
-        # サンドボックスが拒否した確認は failed の条件にしない (その回を使うかは作業側が突き合わせで決める)
+        # サンドボックスが拒否した確認は failed の条件にしない (その回を使うかは review-loop のセッションが突き合わせで決める)
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_sandbox_blocked_network_and_text_elements(self):
@@ -1816,7 +1816,7 @@ class TestLogReading(WorkerTestBase):
             {"command": grep, "message": "worker.md:330:(eval):1: operation not permitted: <パス>"},
         ]})
         self.assertEqual(marker["repo_text_displayed"], {"count": 0, "calls": []})
-        # サンドボックスが拒否した確認を failed の条件にしないのは今までどおり (RA1 にするのは作業側)
+        # サンドボックスが拒否した確認を failed の条件にしないのは今までどおり (RA1 にするのは review-loop のセッション)
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_sandbox_blocked_values_are_one_line(self):
@@ -1849,7 +1849,7 @@ class TestLogReading(WorkerTestBase):
     # ---- リポジトリの行を表示しただけの結果 (worker.md の「リポジトリの行を表示しただけの結果」) ----
 
     def commit_files(self, files, message):
-        """作業側のリポジトリに、files (パス → 中身。中身が None ならそのファイルを消す) を書いてコミットし、短縮 SHA を返す。"""
+        """元のリポジトリに、files (パス → 中身。中身が None ならそのファイルを消す) を書いてコミットし、短縮 SHA を返す。"""
         for path, text in files.items():
             full = os.path.join(self.repo, path)
             if text is None:
@@ -1972,7 +1972,7 @@ class TestLogReading(WorkerTestBase):
                          f"2 {self.PY_PHRASE} 3 {self.PY_TAG} 4 {self.PY_TAG_END}"[:200])
         self.assertEqual(marker["status"], "ok", marker)
 
-        # 照合に使う行は、作業側のリポジトリに対して git を実行して 1 回だけ読む (作業場所の下では実行しない)
+        # 照合に使う行は、元のリポジトリに対して git を実行して 1 回だけ読む (作業場所の下では実行しない)
         with open(git_log, encoding="utf-8") as f:
             runs = [json.loads(line) for line in f if line.strip()]
         self.assertEqual([where for where, sub, caller in runs if sub == "grep"], [os.path.realpath(self.repo)])
@@ -2428,7 +2428,7 @@ class TestSandboxStartChecks(WorkerTestBase):
         self.start_unavailable(contains="macOS")
 
     def test_tmpdir(self):
-        # AE11: TMPDIR が無い、またはホームの下。作業側が TMPDIR の下
+        # AE11: TMPDIR が無い、またはホームの下。元の作業ツリーが TMPDIR の下
         under_home = os.path.join(self.home, "tmp")
         os.makedirs(under_home)
         link_to_home = os.path.join(self.root, "tmp-link")
@@ -2440,8 +2440,8 @@ class TestSandboxStartChecks(WorkerTestBase):
             ("TMPDIR が存在しない", os.path.join(self.root, "nowhere"), "TMPDIR がディレクトリとして存在しない"),
             ("TMPDIR がホームの下", under_home, "TMPDIR の実体がホームの下にある"),
             ("TMPDIR がホームの下を指すシンボリックリンク", link_to_home, "TMPDIR の実体がホームの下にある"),
-            ("TMPDIR が作業側の下", under_repo, "TMPDIR の実体が作業側の下にある"),
-            ("作業側が TMPDIR の下", self.root, "作業側が TMPDIR の実体の下にある"),
+            ("TMPDIR が元の作業ツリーの下", under_repo, "TMPDIR の実体が元の作業ツリーの下にある"),
+            ("元の作業ツリーが TMPDIR の下", self.root, "元の作業ツリーが TMPDIR の実体の下にある"),
         )
         for label, tmpdir, contains in cases:
             with self.subTest(label):
@@ -2453,7 +2453,7 @@ class TestSandboxStartChecks(WorkerTestBase):
                 self.start_unavailable(env=env, contains=contains)
 
     def test_sandbox_tmp(self):
-        # AE11: 作業側かループのディレクトリが、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
+        # AE11: 元の作業ツリーかループのディレクトリが、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
         if not (os.path.isdir(_SANDBOX_TMP) and os.access(_SANDBOX_TMP, os.W_OK)):
             self.skipTest(f"{_SANDBOX_TMP} が無い (macOS で Claude Code のサンドボックスを使った機材でだけ確認できる)")
         base = tempfile.mkdtemp(prefix="review-loop-worker-test-", dir=_SANDBOX_TMP)
@@ -2462,15 +2462,15 @@ class TestSandboxStartChecks(WorkerTestBase):
             loop = os.path.join(base, "loop")
             _make_loop_dir(loop, self.repo)
             self.start_unavailable(loop=loop, contains=["ループのディレクトリ", "サンドボックスの一時ディレクトリ"])
-        with self.subTest("作業側"):
+        with self.subTest("元の作業ツリー"):
             repo = os.path.join(base, "repo")
             _make_repo(repo)
             loop = os.path.join(repo, "tmp", "review-loop", LOOP_ID)
             _make_loop_dir(loop, repo)
-            self.start_unavailable(loop=loop, cwd=repo, contains=["作業側", "サンドボックスの一時ディレクトリ"])
+            self.start_unavailable(loop=loop, cwd=repo, contains=["元の作業ツリー", "サンドボックスの一時ディレクトリ"])
 
     def test_special_characters_in_paths(self):
-        # 許可と拒否の規則に書けない文字を、作業側・ループのディレクトリ・TMPDIR の実体パスに含まない
+        # 許可と拒否の規則に書けない文字を、元の作業ツリー・ループのディレクトリ・TMPDIR の実体パスに含まない
         for c in "()[]{}*?!#":
             with self.subTest(f"TMPDIR に {c}"):
                 tmpdir = os.path.join(self.root, f"tmp{c}dir")
@@ -2480,15 +2480,15 @@ class TestSandboxStartChecks(WorkerTestBase):
             loop = os.path.join(self.root, "loop#1")
             _make_loop_dir(loop, self.repo)
             self.start_unavailable(loop=loop, contains=["ループのディレクトリ", "「#」"])
-        with self.subTest("作業側に ("):
+        with self.subTest("元の作業ツリーに ("):
             repo = os.path.join(self.root, "repo (copy)")
             _make_repo(repo)
             loop = os.path.join(repo, "tmp", "review-loop", LOOP_ID)
             _make_loop_dir(loop, repo)
-            self.start_unavailable(loop=loop, cwd=repo, contains=["作業側", "「(」"])
+            self.start_unavailable(loop=loop, cwd=repo, contains=["元の作業ツリー", "「(」"])
 
     def test_sandbox_allow_write_must_not_contain_protected_places(self):
-        # AE11: --sandbox-allow-write ~ など。ホーム・作業側・ループのディレクトリと同じか、その祖先の値は受け付けない。
+        # AE11: --sandbox-allow-write ~ など。ホーム・元の作業ツリー・ループのディレクトリと同じか、その祖先の値は受け付けない。
         # 1 つ目に問題の無い値を置いて、2 つ目以降の値も確認していることを見る
         link = os.path.join(self.root, "home-link")
         os.symlink(self.home, link)
@@ -2499,7 +2499,7 @@ class TestSandboxStartChecks(WorkerTestBase):
             ("~/.. (ホームの祖先)", "~/..", "ホーム"),
             ("ホームの祖先", self.root, "ホーム"),
             ("/", "/", "ホーム"),
-            ("作業側", self.repo, "作業側"),
+            ("元の作業ツリー", self.repo, "元の作業ツリー"),
             ("ループのディレクトリ", self.loop, "ループのディレクトリ"),
             ("ループのディレクトリの祖先", os.path.join(self.repo, "tmp"), "ループのディレクトリ"),
         )
@@ -2510,14 +2510,14 @@ class TestSandboxStartChecks(WorkerTestBase):
                                        contains=["--sandbox-allow-write", contains])
 
     def test_sandbox_allow_write_must_not_be_below_repo_or_loop(self):
-        # 作業側とループのディレクトリは、その下の場所も受け付けない (作業側の .git や、git が無視する場所への書き込みを許さないため)。
+        # 元の作業ツリーとループのディレクトリは、その下の場所も受け付けない (元の作業ツリーの .git や、git が無視する場所への書き込みを許さないため)。
         # ホームの下の場所は受け付ける (Go のビルドのキャッシュなど)
         loop_outside = os.path.join(self.root, "loops", LOOP_ID)
         _make_loop_dir(loop_outside, self.repo)
         cases = (
-            ("作業側の .git", os.path.join(self.repo, ".git"), self.loop, "作業側"),
-            ("作業側の下のまだ無い場所", os.path.join(self.repo, ".venv", "cache"), self.loop, "作業側"),
-            ("作業側の外にあるループのディレクトリの下", os.path.join(loop_outside, "x"), loop_outside, "ループのディレクトリ"),
+            ("元の作業ツリーの .git", os.path.join(self.repo, ".git"), self.loop, "元の作業ツリー"),
+            ("元の作業ツリーの下のまだ無い場所", os.path.join(self.repo, ".venv", "cache"), self.loop, "元の作業ツリー"),
+            ("元の作業ツリーの外にあるループのディレクトリの下", os.path.join(loop_outside, "x"), loop_outside, "ループのディレクトリ"),
         )
         for label, value, loop, contains in cases:
             with self.subTest(label):

@@ -1,6 +1,6 @@
 #!/bin/bash
 # review-loop のワーカー。人間が端末で起動し、ループのディレクトリに現れた依頼文ごとに、TMPDIR の下に新しく作ったディレクトリ
-# (準備のディレクトリ) に複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) と依頼文の写しを作り、
+# (準備のディレクトリ) に複製 (元のリポジトリを複製して、依頼の head を取り出したもの) と依頼文の写しを作り、
 # 回の作業場所のパスに改名してから、複製の中で claude -p を走らせる。
 # 結果を確認してからループのディレクトリに複写し、作業場所を消して、完了のフラグファイルを書く。
 #
@@ -13,7 +13,7 @@
 # --model と --effort は必須で、既定を持たない (どのモデルと effort でレビューするかは人間が決める)。
 # --permission-mode の既定は auto。-- の後に受け付けるのは、--plugin-dir <ディレクトリ> と、
 # enabledPlugins だけを持つ JSON を値にした --settings の 2 つ (起動時の確認の 13)。
-# 作業側 (review-loop) と同じ作業ツリーで起動する。ループの間は作業ツリーを変えない。
+# review-loop のセッションと同じ作業ツリーで起動する。ループの間は作業ツリーを変えない。
 #
 # 終了コード: 0 = end を見て終了した / 124 = 依頼文が無いまま --idle-minutes が過ぎた /
 #             2 = 引数の誤り・起動時の確認が通らない・他のワーカーが動いている /
@@ -21,7 +21,7 @@
 #
 # 振る舞いの正本は review-triage/skills/review-loop/references/worker.md (起動時の確認・回の処理・
 # 権限の既定・ログの読み方)、ループのディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
-# プラグインの設定ファイル (config.json) は読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める。
+# プラグインの設定ファイル (config.json) は読まない — 値はすべて引数で受け、review-loop のセッションが案内のコマンドに埋める。
 # Claude Code の利用者の設定 (環境変数 CLAUDE_CONFIG_DIR があればその下、無ければ ~/.claude の settings.json) は
 # 読むが、使うのは起動時の確認と表示だけ。
 #
@@ -284,7 +284,7 @@ load_py_files() {
 }
 
 # 読み込んだ python3 のスクリプト ($1 は名前) を、$2 以降を引数にして実行する。python3 は isolated mode (-I) で起動する —
-# -c では、Python の import の探索先の先頭がカレントディレクトリになり、ワーカーのカレントディレクトリ (作業側) に json.py のような
+# -c では、Python の import の探索先の先頭がカレントディレクトリになり、ワーカーのカレントディレクトリ (元の作業ツリー) に json.py のような
 # 標準ライブラリと同名のファイルがあると、そちらが読まれるため。標準入力は /dev/null にする (どのスクリプトも標準入力を読まない)
 run_py() {
   local var="PY_SRC_$1"
@@ -476,7 +476,7 @@ REQ_STARTED_EPOCH=0
 REQ_DEADLINE=0         # 上限の時刻 (エポック秒)。依頼文を受け取った時刻に --review-timeout-minutes を足したもの
 HEAD_BEFORE=""
 REQ_BASE=""            # 依頼文の base の値 (無ければ空)。リポジトリの行を表示しただけの結果を判別するのに使う
-REQ_HEAD_FULL=""       # 依頼文の head を作業側で解決した完全な SHA
+REQ_HEAD_FULL=""       # 依頼文の head を元の作業ツリーで解決した完全な SHA
 EFFECTIVE="unknown"
 SKILL_CALLED="unknown"
 DENIAL_COUNT="unknown"
@@ -566,7 +566,7 @@ os_name=$(uname -s 2>/dev/null)
 REPO_DIR=$(read_key "$LOOP_DIR/loop.yaml" repo_dir)
 [ -n "$REPO_DIR" ] || unavailable "loop.yaml の repo_dir が読めない"
 
-# 5. 作業側と同じ作業ツリーで起動したか
+# 5. review-loop のセッションと同じ作業ツリーで起動したか
 top=$(git rev-parse --show-toplevel 2>/dev/null) || unavailable "git の作業ツリーの中で起動していない (cwd: $(pwd -P))"
 CWD_REAL=$(real_dir "$top")
 repo_real=$(real_dir "$REPO_DIR") || unavailable "loop.yaml の repo_dir が存在しない: $REPO_DIR"
@@ -590,7 +590,7 @@ command -v claude >/dev/null 2>&1 || unavailable "claude コマンドが見つ�
 PYTHON3=$(command -v python3 2>/dev/null) || unavailable "python3 が見つからない"
 [ -z "$PY_PROBLEM" ] || unavailable "$PY_PROBLEM"
 
-# 9. 作業場所を置ける一時ディレクトリがあるか。作業場所は書き込みを許す場所で、ホームと作業側は守る場所なので、重なってはいけない。
+# 9. 作業場所を置ける一時ディレクトリがあるか。作業場所は書き込みを許す場所で、ホームと元の作業ツリーは守る場所なので、重なってはいけない。
 # TMPDIR が無くても /tmp に代えない (他の利用者も書ける場所で、作業場所の名前も予測できるため)
 [ -n "${TMPDIR:-}" ] || unavailable "環境変数 TMPDIR が無い (作業場所をその下に作る。/tmp には代えない)"
 TMP_REAL=$(real_dir "$TMPDIR") || unavailable "TMPDIR がディレクトリとして存在しない: $TMPDIR"
@@ -600,24 +600,24 @@ if is_within "$TMP_REAL" "$HOME_REAL"; then
   unavailable "TMPDIR の実体がホームの下にある (TMPDIR の実体: ${TMP_REAL}、ホーム: ${HOME_REAL})。作業場所への書き込みが、ホームを守る拒否の規則に当たる"
 fi
 if is_within "$TMP_REAL" "$CWD_REAL"; then
-  unavailable "TMPDIR の実体が作業側の下にある (TMPDIR の実体: ${TMP_REAL}、作業側: ${CWD_REAL})。書き込みを許す作業場所と、守る作業側が重なる"
+  unavailable "TMPDIR の実体が元の作業ツリーの下にある (TMPDIR の実体: ${TMP_REAL}、元の作業ツリー: ${CWD_REAL})。書き込みを許す作業場所と、守る元の作業ツリーが重なる"
 fi
 if is_within "$CWD_REAL" "$TMP_REAL"; then
-  unavailable "作業側が TMPDIR の実体の下にある (作業側: ${CWD_REAL}、TMPDIR の実体: ${TMP_REAL})。書き込みを許す作業場所と、守る作業側が重なる"
+  unavailable "元の作業ツリーが TMPDIR の実体の下にある (元の作業ツリー: ${CWD_REAL}、TMPDIR の実体: ${TMP_REAL})。書き込みを許す作業場所と、守る元の作業ツリーが重なる"
 fi
 
-# 10. 作業側とループのディレクトリが、サンドボックスの一時ディレクトリの外にあるか。サンドボックスの中の Bash はそこに既定で書けるので、
+# 10. 元の作業ツリーとループのディレクトリが、サンドボックスの一時ディレクトリの外にあるか。サンドボックスの中の Bash はそこに既定で書けるので、
 # その下にあると守れない
 SANDBOX_TMP="/private/tmp/claude-$(id -u)"
 LOOP_REAL=$(real_dir "$LOOP_DIR") || unavailable "ループのディレクトリの実体パスを求められない: $LOOP_DIR"
 if is_within "$CWD_REAL" "$SANDBOX_TMP"; then
-  unavailable "作業側がサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (作業側: ${CWD_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
+  unavailable "元の作業ツリーがサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (元の作業ツリー: ${CWD_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
 fi
 if is_within "$LOOP_REAL" "$SANDBOX_TMP"; then
   unavailable "ループのディレクトリがサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (ループのディレクトリ: ${LOOP_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
 fi
 
-# 11. 作業側・ループのディレクトリ・TMPDIR の実体パスを、許可と拒否の規則に書けるか (Claude Code は、これらの文字を含むパスの規則を正しく扱えない)
+# 11. 元の作業ツリー・ループのディレクトリ・TMPDIR の実体パスを、許可と拒否の規則に書けるか (Claude Code は、これらの文字を含むパスの規則を正しく扱えない)
 check_rule_chars() {
   local label=$1 path=$2 c
   for c in '(' ')' '[' ']' '{' '}' '*' '?' '!' '#'; do
@@ -626,12 +626,12 @@ check_rule_chars() {
     esac
   done
 }
-check_rule_chars 作業側 "$CWD_REAL"
+check_rule_chars 元の作業ツリー "$CWD_REAL"
 check_rule_chars ループのディレクトリ "$LOOP_REAL"
 check_rule_chars TMPDIR "$TMP_REAL"
 
-# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・ループのディレクトリ・TMPDIR の実体) と同じでも、
-# その祖先でもなく、作業側とループのディレクトリの下の場所でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、
+# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・元の作業ツリー・ループのディレクトリ・TMPDIR の実体) と同じでも、
+# その祖先でもなく、元の作業ツリーとループのディレクトリの下の場所でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、
 # 前の回のレビュアの実行が残したプロセスが書けない場所に作るため。先頭の ~ は引数を読んだときにホームに展開してある
 for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do
   case "$v" in
@@ -678,7 +678,7 @@ done
 # (sandbox.excludedCommands と sandbox.network.allowUnixSockets)。レビュー対象のブランチの設定は、回ごとに複製で確認する。
 # 利用者の設定のパスは、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
 # 無ければ $HOME/.claude。CLAUDE_CONFIG_DIR が相対パスだと、レビュアの実行 (複製の中の cwd) からの解決先が
-# ワーカーの cwd (作業側) からの解決先と一致せず、ワーカーが実際に使われる設定を確認できない
+# ワーカーの cwd (元の作業ツリー) からの解決先と一致せず、ワーカーが実際に使われる設定を確認できない
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   case "$CLAUDE_CONFIG_DIR" in
     /*) CONFIG_DIR="$CLAUDE_CONFIG_DIR" ;;
@@ -1040,7 +1040,7 @@ check_interrupt() {
 # ---- 回の処理 (正本は worker.md の「回の処理」) ----
 
 # ループのディレクトリのファイルの一覧と更新時刻。ワーカーが回の間に書くもの (worker.yaml・その回のログ) と、
-# 作業側が再開や停止のときにレビュー中でも書き換える loop.yaml は除く。その回の結果は除かない — 結果はワーカーが
+# review-loop のセッションが再開や停止のときにレビュー中でも書き換える loop.yaml は除く。その回の結果は除かない — 結果はワーカーが
 # 比べた後に複写するので、比べる時点でループのディレクトリの結果が変わっていれば、レビュアの実行がループのディレクトリに書いたことになる
 snapshot() {
   find "$LOOP_DIR" -mindepth 1 -maxdepth 1 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
@@ -1055,7 +1055,7 @@ snapshot() {
 # ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・ワーカーのフックが拒否した呼び出し・
 # サンドボックスが拒否した確認・リポジトリの行を表示しただけの呼び出しを読んで、1 行に 1 つずつ標準出力に出す。
 # 行の順序と説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを判別するのに、
-# 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを判別するのに、作業側のパスと依頼文の範囲を渡す
+# 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを判別するのに、元の作業ツリーのパスと依頼文の範囲を渡す
 read_log_facts() {
   run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook" "$CWD_REAL" "$REQ_BASE" "$REQ_HEAD_FULL"
 }
@@ -1220,7 +1220,7 @@ clone_stage() {
   return 1
 }
 
-# 手順 6。作業側のリポジトリを準備のディレクトリの tree/ (改名の後は作業場所の tree/) に複製し、依頼の head ($1。作業側で解決した
+# 手順 6。元のリポジトリを準備のディレクトリの tree/ (改名の後は作業場所の tree/) に複製し、依頼の head ($1。元の作業ツリーで解決した
 # 完全な SHA) を detached HEAD で取り出す。
 # 段は、複製 (clone)・remote の設定の削除 (remove remote)・ブランチとリモート追跡ブランチとタグの取り込み (fetch refs)・
 # チェックアウト (checkout)・submodule の項目の検査 (submodule) の順で、どれも準備のコマンドとして起動する (関数 run_prep)。
@@ -1228,9 +1228,9 @@ clone_stage() {
 make_clone() {
   local sha=$1 subs
   clone_stage clone clone -q --shared --no-checkout -- "$CWD_REAL" tree || return 1
-  # remote の設定を消し、git push origin の push 先 (作業側のリポジトリ) を無くす
+  # remote の設定を消し、git push origin の push 先 (元のリポジトリ) を無くす
   clone_stage "remove remote" -C tree remote remove origin || return 1
-  # --no-checkout の直後の HEAD は作業側と同じブランチを指すので、そのブランチも更新できるように --update-head-ok を付ける
+  # --no-checkout の直後の HEAD は元の作業ツリーと同じブランチを指すので、そのブランチも更新できるように --update-head-ok を付ける
   clone_stage "fetch refs" -C tree -c gc.auto=0 -c maintenance.auto=false fetch -q --update-head-ok --no-tags \
     --no-recurse-submodules "$CWD_REAL" '+refs/heads/*:refs/heads/*' '+refs/remotes/*:refs/remotes/*' \
     '+refs/tags/*:refs/tags/*' || return 1
@@ -1249,7 +1249,7 @@ clone_settings_problem() {
   run_py clone_settings_problem "$1"
 }
 
-# 手順 8。作業側の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。写しの作り方 (置き換える文字列と、失敗とする条件) の
+# 手順 8。元の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。写しの作り方 (置き換える文字列と、失敗とする条件) の
 # 正本は review-loop-worker/make_request_copy.py。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
 # 読み込んだ中身を、関数 run_py と同じく python3 -I -c で実行する。
 # 通らなければ 1 を返し、上限を越えたためでなければ、完了のフラグファイルの error に書く文字列を PREP_ERROR に入れる
@@ -1412,7 +1412,7 @@ EOF
     errors+=("permission mode mismatch (expected $PERMISSION_MODE, actual $EFFECTIVE_MODE)")
   fi
 
-  # 作業側の HEAD と作業ツリー。git は作業側のリポジトリに対して実行する (複製では実行しない)
+  # 元の作業ツリーの HEAD と未コミットの変更。git は元のリポジトリに対して実行する (複製では実行しない)
   head_after=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null)
   full_after=$(git -C "$CWD_REAL" rev-parse HEAD 2>/dev/null)
   full_before=$(git -C "$CWD_REAL" rev-parse --verify -q "$HEAD_BEFORE^{commit}" 2>/dev/null)
@@ -1494,7 +1494,7 @@ run_reviewer() {
   fi
   # 作業場所の結果ファイル 1 つへの書き込みの許可。// の後にルートからのパスを続ける (Claude Code の規則で絶対パスを表す書き方)
   tools+=("Edit(/$WS/review-$CURRENT_RID.yaml)")
-  # 拒否の規則。ホーム・作業側・ループのディレクトリへの書き込みと、複製の中の Claude Code と git が後で読んで実行するものの書き換えと、
+  # 拒否の規則。ホーム・元の作業ツリー・ループのディレクトリへの書き込みと、複製の中の Claude Code と git が後で読んで実行するものの書き換えと、
   # git push を防ぐ。WebFetch・WebSearch とネットワークのコマンドは拒否しない (接続できるかはサンドボックスの接続先の一覧で決まる)
   denied=(
     'AskUserQuestion'
@@ -1588,7 +1588,7 @@ process_request() {
   # base は形を確認せずに控える (ログを読むときに確認する。無くても、形に合わなくても、回は中断しない)
   REQ_BASE=$(sed -n 's/^base:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$req" | head -n 1)
 
-  # 手順 4。作業側の HEAD と作業ツリーを確認する
+  # 手順 4。元の作業ツリーの HEAD と未コミットの変更を確認する
   if timed_out; then fail_timeout_in_preparation; return; fi
   local full_req full_head dirty
   full_req=$(git -C "$CWD_REAL" rev-parse --verify -q "$req_head^{commit}" 2>/dev/null)

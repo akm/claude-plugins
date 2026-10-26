@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""作業側の待機スクリプト (review-triage/scripts/review-loop-wait.sh) のテスト。
+"""review-loop のセッションの待機スクリプト (review-triage/scripts/review-loop-wait.sh) のテスト。
 
 標準ライブラリの unittest だけで動く。
 
@@ -145,7 +145,7 @@ class TestEnd(WaitTestBase):
         self.assertEqual(out, "end")
 
     def test_marker_is_reported_before_end(self):
-        # 同じ周期にフラグファイルと end があれば、フラグファイルを先に返す (作業側がフラグファイルを取り込めるように)
+        # 同じ周期にフラグファイルと end があれば、フラグファイルを先に返す (review-loop のセッションがフラグファイルを取り込めるように)
         self.put_request()
         self.put_marker("failed")
         _write(self.path("end"), "")

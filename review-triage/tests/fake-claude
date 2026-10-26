@@ -18,7 +18,7 @@
   (auto モードを使えずに別のモードで起動した回を真似る)
 - FAKE_CLAUDE_SLEEP: 結果を書く前に待機する秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
-- FAKE_CLAUDE_REPO: 作業側の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
+- FAKE_CLAUDE_REPO: 元の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
 - FAKE_CLAUDE_LOOP: ループのディレクトリの絶対パス (mode が write_request と write_loop_result のとき使う)
 - FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作るフラグファイルの名前の先頭
 - FAKE_CLAUDE_LINK_TARGET: mode が symlink_workspace のとき、作業場所を置き換えるシンボリックリンクの先
@@ -29,7 +29,7 @@
     no_result             結果を書かない
     empty_run_id          run_id を空で書く
     no_findings           findings の行を書かない
-    dirty_tree            結果を書き、作業側の作業ツリーの追跡中のファイル (README.md) を変える
+    dirty_tree            結果を書き、元の作業ツリーの追跡中のファイル (README.md) を変える
     write_request         結果を書き、ループのディレクトリに依頼文を 1 つ置く
     write_loop_result     結果を、写しの出力先ではなくループのディレクトリの出力先に直接書く
     git_config            結果を書き、複製の .git/config に core.fsmonitor・core.hooksPath・filter.<名前>.clean を、
