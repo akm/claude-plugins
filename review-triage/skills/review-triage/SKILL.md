@@ -27,14 +27,14 @@ description: code-review や ce-code-review が出したレビュー指摘を一
    - **上流が報告のみで走ったかを確認する** (実行前後で HEAD と作業ツリーが不変)。適用済みなら判定に進まず、その旨を報告して次から報告のみで走らせるよう案内する。
    - 指摘が見当たらなければ、レビューを先に走らせるよう案内して終了する。**勝手にレビューを走らせない。**
 2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) — 「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
-   - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録の置き場・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が検査されないまま通る)。
+   - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録のディレクトリ・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が検査されないまま通る)。
 3. **判定**: 指摘ごとに [references/judgment-flow.md](references/judgment-flow.md) の図に従って決着させる。
    - 帰結の 4 項目 (D3 で書くもの) は**全件に書く** — D1・D2 で決着した指摘にも記録の材料として残す。
    - 評価 (E1・E2) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
    - 境目が判断しづらいときは [references/gate-examples.md](references/gate-examples.md) の対になった例と突き合わせる。
-4. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。既定の置き場を使うとき、置き場が `git check-ignore` で無視されていなければ、記録を書かずに「`.gitignore` に `tmp/` を足してコミットしてから再実行する」と案内して終了する — スキルは `.gitignore` を変えない (前提と設定で明示した置き場の扱いの正本は [references/record-schema.md](references/record-schema.md) の冒頭)。無視されていれば、置き場のディレクトリが無ければ作る。
+4. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの正本は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。既定のディレクトリを使うとき、そのディレクトリが `git check-ignore` で無視されていなければ、記録を書かずに「`.gitignore` に `tmp/` を足してコミットしてから再実行する」と案内して終了する — スキルは `.gitignore` を変えない (前提と設定で明示したディレクトリの扱いの正本は [references/record-schema.md](references/record-schema.md) の冒頭)。無視されていれば、ディレクトリが無ければ作る。
 5. **サマリの再生成と検査**: [記録 README の「書いた後にすること」](references/record-schema.md#書いた後にすること) の 1 と 2 を行う (コマンドと、未設定のときの扱いの正本は [references/project-config.md](references/project-config.md))。
-6. **コミット**: 同じ節の 3 のとおり、置き場が git の追跡内 (`git check-ignore` で無視されない) のときだけコミットする — 既定の `tmp/review-triages/` は追跡外なのでコミットしない (判定の仕方・要否・分け方の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
+6. **コミット**: 同じ節の 3 のとおり、記録のディレクトリが git の追跡内 (`git check-ignore` で無視されない) のときだけコミットする — 既定の `tmp/review-triages/` は追跡外なのでコミットしない (判定の仕方・要否・分け方の正本は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
 7. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。**勝手に呼ばない** — 直すかどうかは人間が決める。
 
 ## 原則

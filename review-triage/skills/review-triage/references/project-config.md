@@ -1,6 +1,6 @@
 # プロジェクト固有の設定
 
-このスキルは、リポジトリごとに違うものを設定から読む。置き場は `.claude/akm-claude-plugins/review-triage/config.json`。
+このスキルは、リポジトリごとに違うものを設定から読む。設定ファイルのパスは `.claude/akm-claude-plugins/review-triage/config.json`。
 
 [commit-rules-guard](https://github.com/akm/claude-plugins/tree/main/commit-rules-guard) と同じ流儀で、プラグインは共通の規則を持ち、リポジトリ固有の宣言だけをこのファイルに置く。
 
@@ -46,7 +46,7 @@
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `record_dir` | 記録 (YAML と生成サマリ) の置き場 | `tmp/review-triages` — git の追跡外で、記録はコミットしない (理由は [record-schema.md](record-schema.md) の冒頭)。追跡内に置くならここで指定する |
+| `record_dir` | 記録 (YAML と生成サマリ) のディレクトリ | `tmp/review-triages` — git の追跡外で、記録はコミットしない (理由は [record-schema.md](record-schema.md) の冒頭)。追跡内に置くならここで指定する |
 | `frozen_paths` | 当時の記録として書き換えない文書のパス接頭辞 | 凍結扱いのパスは無いものとする |
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を走らせるコマンド | 検査を走らせず、**走らせていないことを報告に明記する** |
@@ -156,7 +156,7 @@
 
 同梱の `triagecheck` を使う場合、2 通りの置き方がある。
 
-- **Makefile にターゲットを 1 つ置く**（リポジトリの Makefile をそのまま検査コマンドの置き場にする）
+- **Makefile にターゲットを 1 つ置く**（リポジトリの Makefile に検査コマンドをそのまま書く）
 - **`-install-wrapper` でラッパースクリプトを生成する**（`.claude/akm-claude-plugins/review-triage/config.json` のようにリポジトリごとの設定として管理したくない・Makefile に手を入れたくない場合）
 
 どちらの置き方も、Makefile の例 (展開先の求め方・渡すフラグ) と `-install-wrapper` の使い方は [triagecheck の README](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md) が正本。ここに写すと、渡すフラグが増えたときに片方だけ古くなる。

@@ -24,11 +24,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// reviewTriageDir はトリアージの記録の置き場。この変数が唯一の定義 —
+// reviewTriageDir はトリアージの記録のディレクトリ。この変数が唯一の定義 —
 // 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が外れ、利用者はそれに気づけない。
 //
 // 既定は tmp/review-triages/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
-// 置き場が違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
+// ディレクトリが違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
 // path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
 var reviewTriageDir = "tmp/review-triages/"
 
@@ -51,10 +51,10 @@ const defaultSummaryCommand = "triagecheck -write-summary"
 
 var summaryCommand = defaultSummaryCommand
 
-// inReviewTriageDir は f が記録の置き場の直下にあるかを返す。
+// inReviewTriageDir は f が記録のディレクトリの直下にあるかを返す。
 //
 // 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧側 (listReviewTriageFiles)
-// は path.Join でパスを clean するため、置き場の表記だけを整えて接頭辞で照合すると
+// は path.Join でパスを clean するため、ディレクトリの表記だけを整えて接頭辞で照合すると
 // "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま成功した。
 // 両辺を path.Clean に通せば、どちらの表記でも同じ判定になる。
 func inReviewTriageDir(f string) bool {
@@ -78,7 +78,7 @@ type recordRun struct {
 	Findings []recordFinding `yaml:"findings"`
 	Plans    []recordPlan    `yaml:"plans"`
 	// Recurrence は旧様式のキー。同じ種類の指摘が続いていることの判断 (検知) を
-	// 記録していたが、検知は廃止したので新しい回には書かれない。置き場に残る
+	// 記録していたが、検知は廃止したので新しい回には書かれない。ディレクトリに残る
 	// 既存の記録を読み、生成サマリに従来どおり描画するために型と読み込みを残す。
 	// 検査は形 (許可キーと値の有無) だけで、中身の整合は見ない。有無をポインタで
 	// 持つのは investigation と同じ。
@@ -163,7 +163,7 @@ func priorDefectHit(pd *recordPriorDefect) bool {
 // recordPriorDefectFirstRun は、記録の中で最初に prior_defect を書いた回の添字を返す。
 // 無ければ -1。この回と、それより後の回では prior_defect を必須にする。それより前の回と、
 // 1 度も書いていない記録は、D8 の無い判定フローか、D8 の結果を verdict_reason に書く
-// 規則で判定したものと見なす — 置き場に残る過去の記録と、利用者が版を上げる前に書いた
+// 規則で判定したものと見なす — ディレクトリに残る過去の記録と、利用者が版を上げる前に書いた
 // 回を、書き換えさせずに通すため。回の date で区切らないのは、日付が、どの規則で判定
 // したかを表さないため (同じ日に両方の規則の回がありうる。版を上げる日は利用者ごとに違う)。
 func recordPriorDefectFirstRun(runs []recordRun) int {
@@ -284,7 +284,7 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"捉え直し":        {"pattern": true, "axes": true, "root_cause": true, "fix_unit": true, "source": true},
 }
 
-// reviewTriageRecordProblems は記録の置き場の YAML を検査する。
+// reviewTriageRecordProblems は記録のディレクトリの YAML を検査する。
 // README.md は対象外。検査は (1) スキーマ (未知キー・必須キー・列挙値・参照の整合)、
 // (2) サマリの鮮度 (YAML から生成した内容と *.md の一致)、(3) 孤児のサマリ。
 func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, error)) []string {
@@ -448,7 +448,7 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 			k, v := n.Content[i], n.Content[i+1]
 			if !allowed[k.Value] {
 				problems = append(problems, fmt.Sprintf(
-					"%s:%d: %sに未知のキー %q。旧いキー名の残存か置き場の誤り (上流固有の属性は attrs へ) を疑う",
+					"%s:%d: %sに未知のキー %q。旧いキー名の残存か、キーを書く位置の誤り (上流固有の属性は attrs へ) を疑う",
 					f, k.Line, kind, k.Value))
 				continue
 			}
@@ -935,7 +935,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			// 調査済み・未立案 (investigated) の注記。段 1 (調査) の結果だけがあり、修正方法と
 			// 順序をまだ持たない問題が残っている回にだけ、表の下に件数と問題 id を出す。
 			// 無い回には 1 バイトも出さず、推移の表にも列を足さない — 鮮度の検査が描画結果の
-			// 全文一致なので、無い記録の出力が変わると置き場の既存サマリがすべて古いと
+			// 全文一致なので、無い記録の出力が変わるとディレクトリの既存サマリがすべて古いと
 			// 報告される (旧様式の検知の小節と同じ形)。
 			renderInvestigatedNote(&b, run.Plans)
 			for _, pl := range run.Plans {
@@ -1258,22 +1258,22 @@ func recordStatusJa(s string) string {
 	return s
 }
 
-// errRecordDirMissing は「明示指定した置き場が無い」ことを表す番兵。呼び出し側が
+// errRecordDirMissing は「明示指定したディレクトリが無い」ことを表す番兵。呼び出し側が
 // errors.Is で見分け、他の検査を続けたうえで報告に積めるようにする — 即座に返すと
 // 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れない。
 // 権限・I/O のエラーは続行しても意味が無いので、これとは区別して返す。
 var errRecordDirMissing = errors.New(
-	"-record-dir に指定された置き場が存在しません (記録の検査が行われないまま成功するため報告する)")
+	"-record-dir に指定されたディレクトリが存在しません (記録の検査が行われないまま成功するため報告する)")
 
-// listReviewTriageFiles は記録の置き場のファイル (yaml と md) をファイルシステムから
+// listReviewTriageFiles は記録のディレクトリのファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
 // 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
 // git add 前の最初の記録が検査の対象に入らず、0 件マッチのまま検査が成功する種類の欠陥を防ぐため。
 //
-// ディレクトリが無いときの扱いは explicit で分かれる。置き場を明示的に渡すこと
+// ディレクトリが無いときの扱いは explicit で分かれる。ディレクトリを明示的に渡すこと
 // (-record-dir) は「そこを検査せよ」という意思表示なので、不在はエラーにする。
 // 未指定 (既定値) のまま不在なのはスキル未導入の正常な状態で、nil を返す。
-// 判定を分けないと、置き場を移した時点で検査が無効になり、利用者はそれに気づけない
+// 判定を分けないと、ディレクトリを移した時点で検査が無効になり、利用者はそれに気づけない
 // (judgment_flow.go の explicit と同じ理由)。
 func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 	entries, err := os.ReadDir(dir)
@@ -1311,7 +1311,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 
 // writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
 // (-write-summary の経路)。explicit は listReviewTriageFiles と同じ意味 —
-// 明示指定した置き場が無いなら、0 件生成して、エラーを出さずに成功させない。
+// 明示指定したディレクトリが無いなら、0 件生成して、エラーを出さずに成功させない。
 func writeReviewTriageSummaries(dir string, explicit bool) error {
 	files, err := listReviewTriageFiles(dir, explicit)
 	if err != nil {

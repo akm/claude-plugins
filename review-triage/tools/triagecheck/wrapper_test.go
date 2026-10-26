@@ -121,7 +121,7 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 	}
 	got := string(data)
 
-	// -record-dir は script_dir (ラッパーの置き場) からの相対で焼き込まれる。
+	// -record-dir は script_dir (ラッパーのディレクトリ) からの相対で焼き込まれる。
 	// 生成時のカレント (プラグインの展開先) 基準ではない。
 	if !strings.Contains(got, `-record-dir '../docs/review-triages'`) {
 		t.Errorf("生成物に script_dir 基準の -record-dir が見当たらない:\n%s", got)
@@ -212,10 +212,10 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 	}
 }
 
-// 生成したラッパーを実際に実行して、正しい置き場を検査することを検証する。
+// 生成したラッパーを実際に実行して、正しい記録のディレクトリを検査することを検証する。
 //
 // 文字列だけを検査していたため、-current-dir の焼き込みを壊しても全テストが
-// 通っていた。生成物の契約 (どこから実行しても同じ置き場を見る) は、実行して
+// 通っていた。生成物の契約 (どこから実行しても同じ記録のディレクトリを見る) は、実行して
 // 初めて確認できる。
 func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	goBin, err := exec.LookPath("go")
@@ -241,7 +241,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 利用者のリポジトリ。記録の置き場を実在させる。
+	// 利用者のリポジトリ。記録のディレクトリを実在させる。
 	repo := filepath.Join(base, "repo")
 	recDir := filepath.Join(repo, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
@@ -255,7 +255,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}
 
-	// 実行する場所を変えても同じ置き場を検査すること。$PWD 基準だとここで割れる。
+	// 実行する場所を変えても同じ記録のディレクトリを検査すること。$PWD 基準だとここで割れる。
 	elsewhere := realTempDir(t)
 	for _, dir := range []string{repo, elsewhere, base} {
 		cmd := exec.Command(wrapper)
@@ -267,7 +267,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		}
 	}
 
-	// 置き場に壊れた記録を置いたら、どこから実行しても検出すること
+	// 記録のディレクトリに壊れた記録を置いたら、どこから実行しても検出すること
 	// (実行はしているが対象が違う、を捕まえる)。
 	if err := os.WriteFile(filepath.Join(recDir, "bad.yaml"), []byte("broken: yes\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -281,16 +281,16 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 		}
 	}
 
-	// シンボリックリンク経由で起動しても実体の置き場を検査すること。
-	// dirname "$0" だけで基準を求めるとリンクの置き場が基準になり、その隣に
-	// 別の置き場があるとそちらを検査して成功する (実測でそうなった)。
-	// リンクの隣に紛らわしい置き場を実在させたうえで確認する。
+	// シンボリックリンク経由で起動しても実体から見た記録のディレクトリを検査すること。
+	// dirname "$0" だけで基準を求めるとリンクのあるディレクトリが基準になり、その隣に
+	// 別の記録のディレクトリがあるとそちらを検査して成功する (実測でそうなった)。
+	// リンクの隣に紛らわしい記録のディレクトリを実在させたうえで確認する。
 	linkDir := filepath.Join(realTempDir(t), "localbin")
 	if err := os.MkdirAll(linkDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// ラッパーは <置き場の親>/bin にあり -record-dir は ../docs/review-triages。
-	// リンクの親から見た同じ相対位置に、空の (壊れていない) 置き場を作る。
+	// ラッパーは <記録のディレクトリの親>/bin にあり -record-dir は ../docs/review-triages。
+	// リンクの親から見た同じ相対位置に、空の (壊れていない) 記録のディレクトリを作る。
 	decoy := filepath.Join(filepath.Dir(linkDir), "docs", "review-triages")
 	if err := os.MkdirAll(decoy, 0o755); err != nil {
 		t.Fatal(err)
@@ -303,11 +303,11 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Dir = linkDir
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("リンク経由で実行したとき、実体の置き場の壊れた記録を検出しなかった"+
+		t.Fatalf("リンク経由で実行したとき、実体から見た記録のディレクトリの壊れた記録を検出しなかった"+
 			" (隣の囮を検査している):\n%s", out)
 	}
 
-	// 経路のディレクトリ自体がシンボリックリンクでも、実体側の置き場を検査すること。
+	// 経路のディレクトリ自体がシンボリックリンクでも、実体から見た記録のディレクトリを検査すること。
 	// cd -P が cd -L に変わると解決先がリンク側へ割れ、隣の囮を検査して成功する。
 	// ラッパーそのものはリンクでないので、上の [ -L ] のループでは捕まらない経路。
 	//
@@ -317,7 +317,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	if err := os.Symlink(filepath.Join(repo, "bin"), filepath.Join(viaBase, "bin")); err != nil {
 		t.Fatal(err)
 	}
-	// リンク側から見た ../docs/review-triages に、壊れていない囮の置き場を作る。
+	// リンク側から見た ../docs/review-triages に、壊れていない囮の記録のディレクトリを作る。
 	if err := os.MkdirAll(filepath.Join(viaBase, "docs", "review-triages"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	cmd.Dir = viaBase
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(goBin)+":"+os.Getenv("PATH"))
 	if out, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("経路のディレクトリがリンクのとき、実体の置き場の壊れた記録を検出しなかった"+
+		t.Fatalf("経路のディレクトリがリンクのとき、実体から見た記録のディレクトリの壊れた記録を検出しなかった"+
 			" (cd -P が機能していない):\n%s", out)
 	}
 }
@@ -424,7 +424,7 @@ func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
 
 // 焼き込む値はすべて単一引用符で包む。-summary-command だけでなく plugin_cache・
 // -record-dir・明示の -judgment-flow も同じ — %q のままだと $(...) が実行時に
-// 展開され、別の置き場を検査する。
+// 展開され、別の記録のディレクトリを検査する。
 func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
 	base := realTempDir(t)
 	toolDir := filepath.Join(base, "cache$(echo X)", "review-triage", "0.0.1", "tools", "triagecheck")

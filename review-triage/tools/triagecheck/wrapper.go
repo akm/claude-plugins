@@ -37,13 +37,13 @@ import (
 // ラッパーはリポジトリの中に置かれるので自分の位置を知っており、推測が要らない。
 //
 // ただし「自分の位置」は実体の位置でなければならない。dirname "$0" はリンクを
-// 解決しないので、PATH 上などに張ったリンク経由で起動すると基準がリンクの置き場に
-// なり、その隣に別の置き場があるとそちらを検査して成功を返す (基準が検査対象から
+// 解決しないので、PATH 上などに張ったリンク経由で起動すると基準がリンクのあるディレクトリに
+// なり、その隣に別の記録のディレクトリがあるとそちらを検査して成功を返す (基準が検査対象から
 // 切り離される点で、絶対パスを焼き込む案を退けたのと同じ種類の問題)。リンクを辿ってから
 // 基準を求める。realpath 一発でも解けるが POSIX ではなく古い macOS に無いため、
 // bash 組み込みと readlink だけで済むループを使う。
 //
-// 置き場を絶対パスで焼き込む案は採らない。リポジトリを移動・再クローンすると
+// 記録のディレクトリを絶対パスで焼き込む案は採らない。リポジトリを移動・再クローンすると
 // 移動元を検査して成功を返し、移動先の壊れた記録を検出できない (実測)。
 //
 // PLUGIN_CACHE の解決 (最新版を選ぶ) は Makefile の例と同じロジック。ここを
@@ -55,7 +55,7 @@ set -eu -o pipefail
 
 # 基準はこのスクリプト自身の位置。$PWD は実行した場所によって変わるので使わない。
 # シンボリックリンク経由で起動されても実体の位置を採る — dirname "$0" だけでは
-# リンクの置き場が基準になり、その隣に別の置き場があるとそちらを検査してしまう。
+# リンクのあるディレクトリが基準になり、その隣に別の記録のディレクトリがあるとそちらを検査してしまう。
 script_src=$0
 while [ -L "$script_src" ]; do
   link_dir=$(cd -P "$(dirname "$script_src")" && pwd)
@@ -84,7 +84,7 @@ exec go run -C "$root/tools/triagecheck" . \
 // 分岐より前に当てる)。ここではパスを検査しない — 検査を持つと、検査の経路と
 // 別の条件で同じ規則を書き直すことになり、同じ入力に経路ごとに違う契約ができる。
 //
-// recordDir は「ラッパーの置き場 (script_dir) から見た相対パス」に変換して
+// recordDir は「ラッパーのディレクトリ (script_dir) から見た相対パス」に変換して
 // 焼き込む。絶対パスを焼き込まないのは、リポジトリを移動・再クローンすると
 // 移動元を検査して成功を返すため。
 //
@@ -98,7 +98,7 @@ exec go run -C "$root/tools/triagecheck" . \
 // 焼き込む値はすべてシェルの単一引用符で包む (shellSingleQuote)。%q (Go の引用) は
 // 使わない — bash の二重引用符とは規則が違い、`make $(TARGET)` のような値を
 // 焼き込むと実行時に $(TARGET) が展開されて消える (実測)。パスも同じで、
-// docs/$(echo x) のような置き場は別の場所を指すようになる。
+// docs/$(echo x) のようなディレクトリは別の場所を指すようになる。
 func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error {
 	pluginCache, err := pluginCacheDir()
 	if err != nil {
@@ -110,7 +110,7 @@ func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error 
 	relRecordDir, err := filepath.Rel(scriptDir, recordDir)
 	if err != nil {
 		return fmt.Errorf(
-			"%s: 記録の置き場をラッパーの位置 (%s) からの相対パスにできません: %w", recordDir, scriptDir, err)
+			"%s: 記録のディレクトリをラッパーの位置 (%s) からの相対パスにできません: %w", recordDir, scriptDir, err)
 	}
 	recordDir = filepath.ToSlash(relRecordDir)
 
@@ -126,7 +126,7 @@ func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error 
 
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("%s: 置き場の作成に失敗しました: %w", dir, err)
+			return fmt.Errorf("%s: ディレクトリの作成に失敗しました: %w", dir, err)
 		}
 	}
 	// 0o755: シェルスクリプトなので実行権限を付ける。

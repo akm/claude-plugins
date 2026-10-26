@@ -36,7 +36,7 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の「`loop`」の表。`--threshold` と `--stage` は「`fix`」の表)
 4. 既定で決まらないものは**人間に質問する** — `review_skill` (既定を持たない。理由は同じ表の下の説明) と、`review_model` で呼び出し元が既定の対応表に無いとき ([review-invocation.md](review-invocation.md) の「G0 での解決」)。ループがモデルを決めない経路では質問しない (正本は同ファイルの「G0 での解決」)
 
-**設定で決まっていれば質問しない** — リポジトリごとに決めるのが本来の置き場だからである。質問するのは、引数でも設定でも未設定 (定義は上の参照先) のときだけ。
+**設定で決まっていれば質問しない** — リポジトリごとに決めるものは、本来は設定に書くものだからである。質問するのは、引数でも設定でも未設定 (定義は上の参照先) のときだけ。
 
 ## 値の検査
 
@@ -49,7 +49,7 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 - `review_model` の値は検査しない。指定が適用されなかったときの報告の条件は [review-invocation.md](review-invocation.md) の「実効モデル」が正本。
 - `fix.threshold_rounds` (`--threshold`) は、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」の条件で検査する (条件はそちらが正本)。誤りはループを始めずにエラーとして報告する — `review-triage-fix` を呼んだ回で初めて気づくと、そこまでのレビューの実行が無駄になる。
 - `fix.stages` (`--stage`) も同じく、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 (段の名前・`<値>` の形・effort の 5 値・`subagent` の真偽値・モデルの指定が実効モデルに解決できること) で検査する。誤りはループを始めずにエラーとして報告する (例: `--stage investigate=sonnet:ultra` は effort が 5 値に無いので、ループを始めずにエラーになる)。
-- **記録** (置き場とファイル名の正本は [review-triage の record-schema.md](../../review-triage/references/record-schema.md) の「ファイルの単位」。引数や設定の値ではないが、ループを始める前に確認する入力なのでここに置く) は、経路を問わず G0 で読めることを確認する。記録が無ければ回は無いとする。記録があるのに読めない (YAML として壊れている・`runs` が無い) なら、ループを始めずにその旨を報告する ([review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 と同じ扱い) — 読めない記録を「無い」に寄せると、G2 と G3 が選択待ちと覆われていない採択を見落とし、記録に追記する回の番号も過去の回と重なる。
+- **記録** (ディレクトリとファイル名の正本は [review-triage の record-schema.md](../../review-triage/references/record-schema.md) の「ファイルの単位」。引数や設定の値ではないが、ループを始める前に確認する入力なのでここに置く) は、経路を問わず G0 で読めることを確認する。記録が無ければ回は無いとする。記録があるのに読めない (YAML として壊れている・`runs` が無い) なら、ループを始めずにその旨を報告する ([review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 と同じ扱い) — 読めない記録を「無い」に寄せると、G2 と G3 が選択待ちと覆われていない採択を見落とし、記録に追記する回の番号も過去の回と重なる。
 - **全量の起点のブランチ** (この起動で起点のブランチを使うときに限る。使う回と経路の正本は [review-invocation.md](review-invocation.md) の「範囲」) は、[review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 と同じ条件で検査する — `--base` のブランチが解決できない、`--base` が無くて `origin/HEAD` が無い、または HEAD との merge-base が求まらない (共通祖先が無い) なら、ループを始めずにその旨を報告し、起点のブランチをどれにするかを人間に質問する。
 
 **エラーには、その値が引数と設定のどちらから来たかを書く。** 直す先が違う — 引数ならその場で言い直せるが、設定なら `config.json` を直すことになる。

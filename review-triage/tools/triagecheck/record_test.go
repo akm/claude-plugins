@@ -774,7 +774,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 	}
 }
 
-// TestInReviewTriageDirNotationVariants は、置き場の表記が揺れても検査の対象が
+// TestInReviewTriageDirNotationVariants は、ディレクトリの表記が揺れても検査の対象が
 // 変わらないことを検証する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
 // "." / "./rec" / "rec//" で一覧側 (path.Join が clean する) と前置が一致せず、
 // 検査が 1 件も走らないまま成功した。
@@ -801,7 +801,7 @@ func TestInReviewTriageDirNotationVariants(t *testing.T) {
 	} {
 		reviewTriageDir = tt.dir
 		if got := inReviewTriageDir(tt.file); got != tt.want {
-			t.Errorf("置き場 %q で %q: inReviewTriageDir = %v, want %v",
+			t.Errorf("ディレクトリ %q で %q: inReviewTriageDir = %v, want %v",
 				tt.dir, tt.file, got, tt.want)
 		}
 	}
@@ -814,24 +814,24 @@ func TestListReviewTriageFilesMissingDir(t *testing.T) {
 	}
 }
 
-// 置き場を明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
-// 意思表示なので、記録 0 件として、エラーを出さずに成功を返すと、置き場を移した時点で検査が
+// ディレクトリを明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
+// 意思表示なので、記録 0 件として、エラーを出さずに成功を返すと、ディレクトリを移した時点で検査が
 // 無効になったことに気づけない (診断ツールの偽陰性)。
 func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
 	_, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"), true)
 	if err == nil {
-		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")
+		t.Fatal("明示指定したディレクトリが無いのにエラーにならなかった")
 	}
 	if !strings.Contains(err.Error(), "-record-dir") {
 		t.Fatalf("エラーにどの指定を直せばよいかが無い: %v", err)
 	}
 }
 
-// -write-summary も同じ — 明示指定した置き場が無いなら、0 件生成して
+// -write-summary も同じ — 明示指定したディレクトリが無いなら、0 件生成して
 // エラーを出さずに成功させない (生成されなかったことに気づけないため)。
 func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 	if err := writeReviewTriageSummaries(filepath.Join(t.TempDir(), "no-such"), true); err == nil {
-		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")
+		t.Fatal("明示指定したディレクトリが無いのにエラーにならなかった")
 	}
 }
 
@@ -1364,7 +1364,7 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 // --- 旧様式 (検知の項目 recurrence) の受け入れ ---
 //
 // recurrence は、同じ種類の指摘が続いていることの判断 (検知) を記録していたキー。
-// 検知は廃止したので review-triage は新しい回に書かないが、置き場に残る既存の記録は
+// 検知は廃止したので review-triage は新しい回に書かないが、ディレクトリに残る既存の記録は
 // 回ごとに持つ。triagecheck はその記録を書き換えずに検査を成功させ、生成サマリも
 // 従来どおり描画する。検査するのは形 (許可キーと値の有無) だけで、根拠が指す回や
 // 状態ごとの専用キーといった整合は見ない (README「何を検査するか」)。
@@ -1865,7 +1865,7 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 
 // summaryWithoutInvestigated は、investigated の状態を足す前に validRecordYAML から生成した
 // サマリの全文。鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
-// 1 バイトでも変わると、置き場に残る既存のサマリがすべて古いと報告される。注記は
+// 1 バイトでも変わると、ディレクトリに残る既存のサマリがすべて古いと報告される。注記は
 // investigated の問題がある回にだけ出し、推移の表には列を足さない。
 const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
 	"\n" +

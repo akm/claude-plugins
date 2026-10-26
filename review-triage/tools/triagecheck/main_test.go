@@ -25,7 +25,7 @@ func withRunGlobals(t *testing.T) {
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 }
 
-// 指定した置き場・判定フローが存在しないなら、run は非 0 (error) で終わる。
+// 指定した記録のディレクトリ・判定フローが存在しないなら、run は非 0 (error) で終わる。
 // 「検査が走って合格した」と「そもそも走らなかった」を区別できるようにするための
 // 中核の挙動なので、入口 (run) の側でもテストで検証する。
 // 判定はエラーが返ること自体で行い、報告メッセージの文言には結合しない。
@@ -202,7 +202,7 @@ func TestRunAllowsCurrentDirWithMixedPaths(t *testing.T) {
 	}
 }
 
-// 実在する置き場を相対で指定し、-current-dir で基準を渡せば検査は通る。
+// 実在する記録のディレクトリを相対で指定し、-current-dir で基準を渡せば検査は通る。
 func TestRunAcceptsRelativeRecordDirWithCurrentDir(t *testing.T) {
 	withRunGlobals(t)
 	caller := t.TempDir()
@@ -253,8 +253,8 @@ func TestRunRequiresRecordDir(t *testing.T) {
 	}
 }
 
-// 置き場と判定フローの両方が不在なら、1 回の実行で両方が報告される。
-// 置き場の不在で即 return すると判定フローの検査に到達せず、片方を直して
+// 記録のディレクトリと判定フローの両方が不在なら、1 回の実行で両方が報告される。
+// 記録のディレクトリの不在で即 return すると判定フローの検査に到達せず、片方を直して
 // 再実行するまでもう一方も壊れていることを知れない。
 func TestRunReportsBothMissingPaths(t *testing.T) {
 	withRunGlobals(t)
@@ -302,13 +302,13 @@ func captureStderr(t *testing.T, fn func()) string {
 
 // -write-summary も run 経由で explicit が渡ることを検証する。関数を直接呼ぶ
 // テストだけだと、run から検査への配線を壊しても全テストが通る (配線を false に
-// 固定するミューテーションで実測した) — そのとき「明示指定した置き場が無いのに
+// 固定するミューテーションで実測した) — そのとき「明示指定したディレクトリが無いのに
 // エラーを出さずに成功する」挙動が復活する。
 func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 	withRunGlobals(t)
 	missing := filepath.Join(t.TempDir(), "no-such")
 	if err := run([]string{"-write-summary", "-record-dir", missing}); err == nil {
-		t.Fatal("明示指定した置き場が無いのに -write-summary が成功した")
+		t.Fatal("明示指定したディレクトリが無いのに -write-summary が成功した")
 	}
 }
 
@@ -606,7 +606,7 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 	if err := os.MkdirAll(toolDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// 利用者のリポジトリ。置き場と判定フローを実在させる。
+	// 利用者のリポジトリ。記録のディレクトリと判定フローを実在させる。
 	repo := filepath.Join(base, "repo")
 	recDir := filepath.Join(repo, "docs", "rt")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
@@ -662,7 +662,7 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 					t.Fatalf("ラッパーが書き出されていない: %v", rerr)
 				}
 				got := string(script)
-				// 置き場はラッパーの位置からの相対、判定フローは利用者の基準で
+				// 記録のディレクトリはラッパーの位置からの相対、判定フローは利用者の基準で
 				// 解決した絶対パス (展開先の囮ではない)。
 				if !strings.Contains(got, `-record-dir '../docs/rt'`) {
 					t.Errorf("-record-dir が script_dir 基準の相対で焼き込まれていない:\n%s", got)
