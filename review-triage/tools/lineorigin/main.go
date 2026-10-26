@@ -130,7 +130,7 @@ func parseLines(s string) ([]lineRange, error) {
 		if isRange {
 			to, err = strconv.Atoi(b)
 			if err != nil || to < from {
-				return nil, fmt.Errorf("-lines の範囲は、終わりを始め以上にしてください: %s", s)
+				return nil, fmt.Errorf("-lines の範囲は、終点を始点以上にしてください: %s", s)
 			}
 		}
 		ranges = append(ranges, lineRange{from, to})

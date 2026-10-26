@@ -196,7 +196,7 @@ func TestCommaSeparatedLines(t *testing.T) {
 	if len(o.lines) != 3 {
 		t.Fatalf("重なる範囲の内訳が %d 行 (期待は 3 行)。出力:\n%s", len(o.lines), o.stdout)
 	}
-	// ある範囲が別の範囲を含んでも、まとめた範囲の終わりは縮まない
+	// ある範囲が別の範囲を含んでも、まとめた範囲の終点は縮まない
 	for _, lines := range []string{"1-3,2", "2,1-3"} {
 		o := r.check(base, "-file", "f.md", "-lines", lines, "-rev", "HEAD")
 		wantKind(t, o, notHolds)
@@ -222,7 +222,7 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 // -rev に HEAD より前のコミットを渡すと、作業ツリーとインデックスの内容を、HEAD ではなくそのコミットと比べる。
 // その後のコミットで指摘のファイルが変わっていれば、レビュアが共有の作業ツリーで見た、当時はコミットして
 // いなかった編集かもしれないので、確認しない。作業ツリーとインデックスの内容がそのコミットと同じなら、
-// そのコミットまでの範囲で確認する (範囲の終わりを HEAD にすると、後のコミットの内容を調べてしまう)。
+// そのコミットまでの範囲で確認する (範囲の終点を HEAD にすると、後のコミットの内容を調べてしまう)。
 func TestRevOtherThanHead(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -469,7 +469,7 @@ func TestToolDoesNotWriteIndex(t *testing.T) {
 }
 
 // 設定 core.fsmonitor に登録したプログラムを、道具の git に起動させない。起動させると、値が true のときは
-// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作り、道具が終わった後も残る。テストでは、
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作り、道具が終了した後も残る。テストでは、
 // 印のファイルを作るスクリプトを登録する (値が true の常駐のプロセスは、Linux では動かない)。
 func TestFsmonitorProgramIsNotRun(t *testing.T) {
 	r, base := branched(t)
@@ -838,7 +838,7 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 		{"check-attr が失敗する", "check-attr", "", 1, "check-attr"},
 		{"check-attr の出力が三つ組にならない", "check-attr", "f.md\\000filter\\000", 0, "git check-attr の出力を読めません"},
 		{"check-attr の出力の最後の要素が空でない", "check-attr", "f.md\\000filter\\000set\\000x", 0, "git check-attr の出力を読めません"},
-		{"config が想定していない終了コードで終わる", "config", "", 2, "config"},
+		{"config が想定していない終了コードを返す", "config", "", 2, "config"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -1170,7 +1170,7 @@ func TestRootMayBeSubdirectory(t *testing.T) {
 	wantKind(t, o, unverifiable)
 }
 
-// -root のディレクトリの名前が空白で終わっても、その名前のまま読む。空白を削ると、空白の無い名前の隣の
+// -root のディレクトリの名前の末尾が空白でも、その名前のまま読む。空白を削ると、空白の無い名前の隣の
 // ディレクトリ (ここでは同じリポジトリの複製) を読み、レビューした作業ツリーのコミットしていない行を見ずに
 // holds を返す。
 func TestRootNameEndingWithSpace(t *testing.T) {
@@ -1186,7 +1186,7 @@ func TestRootNameEndingWithSpace(t *testing.T) {
 	r.write("g.md", "g\n")
 	r.commit("branch")
 	r.git("clone", "-q", "--branch", "br", r.dir, filepath.Join(parent, "repo"))
-	// 名前が空白で終わる方にだけ、コミットしていない行を足す
+	// 名前の末尾が空白の方にだけ、コミットしていない行を足す
 	r.write("f.md", "NEW\na\nb\nc\n")
 
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
@@ -1240,7 +1240,7 @@ func TestInputErrors(t *testing.T) {
 		{"相対パスの -root", []string{"-root", ".", "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, "絶対パス"},
 		{"git のリポジトリでない -root", []string{"-root", notRepo, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, "git のリポジトリの中を指していません"},
 		{"行番号が 0", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "0", "-rev", "HEAD"}, "-lines"},
-		{"終わりが始めより前", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "3-2", "-rev", "HEAD"}, "-lines"},
+		{"終点が始点より前", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "3-2", "-rev", "HEAD"}, "-lines"},
 		{"数でない行番号", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "x", "-rev", "HEAD"}, "-lines"},
 		{"コンマの後が空", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1,", "-rev", "HEAD"}, "-lines"},
 		{"コンマの前が空", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", ",1", "-rev", "HEAD"}, "-lines"},
@@ -1489,8 +1489,8 @@ func stallingGit(t *testing.T, word string) string {
 	return bin
 }
 
-// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。停止させた git の子の
-// プロセスが標準出力を開いたままでも待たない (待つと、子が終わる 30 秒後まで返らない)。
+// git が期限までに終了しなければ、道具は待ち続けずに run-error で終了する。停止させた git の子の
+// プロセスが標準出力を開いたままでも待たない (待つと、子が終了する 30 秒後まで返らない)。
 func TestGitTimeoutIsRunError(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
@@ -1502,7 +1502,7 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 	t.Run("blame で応答しなくなる", func(t *testing.T) {
 		t.Setenv("PATH", stallingGit(t, "blame"))
 		start := time.Now()
-		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終わりませんでした")
+		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終了しませんでした")
 		if d := time.Since(start); d > 20*time.Second {
 			t.Fatalf("期限を越えても %s 待った", d)
 		}

@@ -69,7 +69,7 @@ func TestPluginCacheDirResolvesFromVersionedLayout(t *testing.T) {
 }
 
 func TestPluginCacheDirRejectsUnexpectedLayout(t *testing.T) {
-	// tools/triagecheck で終わらない場所 (go run -C を経ずに直接 go run . した
+	// 末尾が tools/triagecheck でない場所 (go run -C を経ずに直接 go run . した
 	// ときなど、プラグインキャッシュと無関係な場所) では、実体と食い違ったパスを
 	// そのまま書き出す代わりにエラーにする。
 	dir := t.TempDir()

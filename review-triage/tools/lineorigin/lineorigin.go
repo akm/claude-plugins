@@ -255,7 +255,7 @@ func parsePorcelain(out string) ([]blameLine, error) {
 		}
 	}
 	if cur != nil {
-		return nil, fmt.Errorf("git blame の出力が行 %d の途中で終わっています", cur.final)
+		return nil, fmt.Errorf("git blame の出力が行 %d の途中で途切れています", cur.final)
 	}
 	return lines, nil
 }
@@ -333,13 +333,13 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 }
 
 // gitTimeout は、git の 1 回の実行に許す時間。越えたら run-error にする。git や、git が起動する
-// フィルタのプログラムが応答しなくなったときに、道具が終わらなくなるのを防ぐ。テストが短くする。
+// フィルタのプログラムが応答しなくなったときに、道具が終了しなくなるのを防ぐ。テストが短くする。
 var gitTimeout = 5 * time.Minute
 
 // runIn は、stdin を標準入力に渡して run と同じように git を実行する。
 //
 // 設定 core.fsmonitor は打ち消す。打ち消さないと、git はそこに登録したプログラムを起動し、値が true なら
-// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作って、道具が終わった後も残る。
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作って、道具が終了した後も残る。
 func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
@@ -351,7 +351,7 @@ func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return "", -1, runf("git %s が %s 以内に終わりませんでした", strings.Join(args, " "), gitTimeout)
+		return "", -1, runf("git %s が %s 以内に終了しませんでした", strings.Join(args, " "), gitTimeout)
 	}
 	if err == nil {
 		return stdout.String(), 0, nil
@@ -378,7 +378,7 @@ func checkGitVersion(worktree bool) error {
 	cmd.Env = gitEnv()
 	out, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
-		return runf("git version が %s 以内に終わりませんでした", gitTimeout)
+		return runf("git version が %s 以内に終了しませんでした", gitTimeout)
 	}
 	if err != nil {
 		return runf("git を起動できません: %v", err)
