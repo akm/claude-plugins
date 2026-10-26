@@ -102,14 +102,14 @@ D8 の条件 (1)(2) の結果を書く。条件と、当たるかどうかの決
 | `problem_id` | ✓ | 回の中で一意な識別子 (例: `P1`) |
 | `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** (基準の正本は [grouping.md](../../review-triage-fix/references/grouping.md)) |
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
-| `approach` | △ | 何をどう直すか。書く条件は状態で決まる — **`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の答えの後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する — 段 1 (`review-triage-fix` の調査の段) の結果に立案の中身が混ざると、どの段が書いたかを記録から読めなくなる) |
+| `approach` | △ | 何をどう直すか。書く条件は状態で決まる — **`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の回答の後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する — 段 1 (`review-triage-fix` の調査の段) の結果に立案の中身が混ざると、どの段が書いたかを記録から読めなくなる) |
 | `investigation` | △ | 修正方法を決める前の調査 — 類似箇所と影響範囲 — の範囲と結果 (下記)。**無いことは「未調査」を意味する。`investigated` では必須** (無ければ検査が報告する — 調査済みの状態と矛盾するため。調べたなら `scope` を書き、まだなら `plans` に載せない)。「調査済みで波及なし」は `scope` だけを書いて表す — この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の正本は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `verification` | | 修正の後の検証のうち、観点 B (並びを読み直す) で読んだ範囲 (下記)。**任意だが、書くなら `near_edges` が要る** (無ければ検査が報告する — 書いたつもりの検証が「無い」と読まれないため)。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 7 (文書を変えたコミット) |
 | `doc_dag` | | 修正の後の `doc-dag` の確認 (下記) — 対象と、向きの無い重複・巡回の有無と対処。**任意だが、書くなら `scope` と `result` が要る**。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 9 (文書を変えた問題) |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
 | `depends_on` | | 依存する問題の `problem_id` |
-| `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空**。**1 つのコミットが複数の問題を覆ったときは、覆われた問題すべてに同じ短縮 SHA を書く** (起きる条件の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 の「人間の答えの反映」) |
+| `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空**。**1 つのコミットが複数の問題を覆ったときは、覆われた問題すべてに同じ短縮 SHA を書く** (起きる条件の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 の「人間の回答の反映」) |
 | `applied_external_url` | | リポジトリ外の反映先の URL。**`status: done-external` 専用 — 他の状態では空** |
 | `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` 専用 — 他の状態では空。`applied_external_url` が無いとき必須** |
 | `status` | ✓ | 下の表のとおり |
@@ -190,7 +190,7 @@ D8 の条件 (1)(2) の結果を書く。条件と、当たるかどうかの決
 | --- | --- | --- |
 | `investigated` | 調査済み・未立案 — `review-triage-fix` の段 1 (調査) の結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 段 2 (立案) から続ける (再開の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
 | `pending` | 未着手 — 修正方法と順序が決まっている | 段 3 (修正) から続ける (同上) |
-| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の待ちも同じ状態で表す — 選択と `options` に書くものの正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の答えは `review-triage-fix` が記録に反映する (手順 1) |
+| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の待ちも同じ状態で表す — 選択と `options` に書くものの正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |
 

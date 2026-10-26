@@ -1650,7 +1650,7 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 // review-triage-fix の段 1 (調査) の結果 (原因・束ね・調査) は、修正方法 (approach) と
 // 順序 (order) をまだ持たない問題として plans[].status: investigated で記録に置く。
 // approach と order を書く条件は状態ごとに決まる — pending / done / done-external では
-// approach が必須 (order は任意)、awaiting-human では任意 (人間の答えの後に書く)、
+// approach が必須 (order は任意)、awaiting-human では任意 (人間の回答の後に書く)、
 // investigated では書かない (書いてあれば報告する)。被覆の規則 (採択は plans か
 // plan_ref で覆う) は状態を問わない。
 

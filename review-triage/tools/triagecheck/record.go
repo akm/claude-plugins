@@ -203,7 +203,7 @@ type recordPlan struct {
 	FindingIDs []int  `yaml:"finding_ids"`
 	// Approach (修正方法) と Order (順序) は review-triage-fix の段 2 (立案) が書く。
 	// 書く条件は status ごとに決まる — pending / done / done-external では approach が
-	// 必須、awaiting-human では任意 (人間の答えの後に書く)、investigated (段 1 の
+	// 必須、awaiting-human では任意 (人間の回答の後に書く)、investigated (段 1 の
 	// 結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
 	Approach string `yaml:"approach"`
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
@@ -657,7 +657,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
 			// status ごとに決まる (スキーマ表の approach の行) — 修正に進む状態
 			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
-			// では任意 (人間が立案する待ちは approach を持たず、人間の答えの後に書く)、
+			// では任意 (人間が立案する待ちは approach を持たず、人間の回答の後に書く)、
 			// investigated では逆に書いてあれば報告する。
 			approachRequired := func() {
 				if pl.Approach == "" {
