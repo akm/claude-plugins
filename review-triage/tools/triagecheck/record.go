@@ -657,7 +657,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
 			// status ごとに決まる (スキーマ表の approach の行) — 修正に進む状態
 			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
-			// では任意 (人間が立案する待ちは approach を持たず、人間の回答の後に書く)、
+			// では任意 (人間の立案待ちは approach を持たず、人間の回答の後に書く)、
 			// investigated では逆に書いてあれば報告する。
 			approachRequired := func() {
 				if pl.Approach == "" {
@@ -1113,7 +1113,7 @@ func renderPlanCells(pl recordPlan) []string {
 	case pl.AppliedExternalURL != "":
 		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
-	// 修正方法の欄。investigated (と人間が立案する待ちの awaiting-human) は approach を
+	// 修正方法の欄。investigated (と人間の立案待ちの awaiting-human) は approach を
 	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す — 空のセルは書き忘れと
 	// 区別できない。approach を持つ状態の行は変わらない。
 	approach := "—"

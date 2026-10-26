@@ -1740,7 +1740,7 @@ func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 
 // approach の必須は状態ごとに決まる。pending / done / done-external では従来どおり
 // 無ければ報告し、awaiting-human では options があれば approach が無くても通る
-// (人間が立案する待ち — 立案者 C — は approach を持たない)。
+// (人間の立案待ち — 立案者 C — は approach を持たない)。
 func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 	// approach の行を消した validRecordYAML。sha と status は各ケースが差し替える。
 	noApproach := strings.Replace(validRecordYAML, "        approach: 数え直して単位を書く\n", "", 1)
@@ -1783,7 +1783,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 		}
 		files, read := recordFiles(t, mutated)
 		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
-			t.Fatalf("approach の無い awaiting-human (人間が立案する待ち) で問題が出た: %v", problems)
+			t.Fatalf("approach の無い awaiting-human (人間の立案待ち) で問題が出た: %v", problems)
 		}
 	})
 

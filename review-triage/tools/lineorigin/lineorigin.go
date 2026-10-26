@@ -344,7 +344,7 @@ func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false", "-c", "core.fsmonitor=false"}, args...)...)
-	cmd.WaitDelay = time.Second // 期限で停止させた git の子のプロセスが出力を開いたままでも、待ち続けない
+	cmd.WaitDelay = time.Second // 期限で停止させた git の子のプロセスが出力を開いたままでも、待機し続けない
 	cmd.Env = gitEnv()
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
@@ -431,7 +431,7 @@ func gitEnv() []string {
 		// 部分クローンで欠けたオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
 		// 取得できないと git は失敗し、道具は run-error になる
 		"GIT_NO_LAZY_FETCH=1",
-		// 認証などで利用者に入力を求めて待たない
+		// 認証などで利用者の入力待ちにならない
 		"GIT_TERMINAL_PROMPT=0",
 	)
 	return append(env, extraGitEnv...)

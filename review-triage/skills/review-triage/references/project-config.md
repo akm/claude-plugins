@@ -79,7 +79,7 @@
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `max_rounds` | ループの上限 | 10 |
-| `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限を待たずに停止して構造の見直しを人間に問う (判定の正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
+| `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限に達する前に停止して構造の見直しを人間に問う (判定の正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
 | `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に質問する。**推測して決めない** |
 | `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
 | `review_model` | ループに指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
@@ -125,9 +125,9 @@
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `dir` | ループのディレクトリの親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
-| `wait_minutes` | 完了のフラグファイルを待つ上限 (分) | 60 |
-| `worker_wait_minutes` | ワーカーの起動を待つ上限 (分)。1 回目の最初の待機と、`--resume` でワーカーが動いていないときに使う | 15 |
-| `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
+| `wait_minutes` | 完了のフラグファイルが書かれるまで待機する上限 (分) | 60 |
+| `worker_wait_minutes` | ワーカーの起動まで待機する上限 (分)。1 回目の最初の待機と、`--resume` でワーカーが動いていないときに使う | 15 |
+| `worker_idle_minutes` | 依頼文が書かれるまでワーカーが待機する上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
 | `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
 | `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
 | `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に質問する。**推測して決めない** |

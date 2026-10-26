@@ -172,7 +172,7 @@ D8 の条件 (1)(2) の結果を書く。条件と、当たるかどうかの決
 
 ```yaml
       - problem_id: P2
-        cause: 待ちを予算に数える条件を、正本の式と別に 4 箇所に書いた
+        cause: 待機を予算に数える条件を、正本の式と別に 4 箇所に書いた
         finding_ids: [3]
         approach: 残り時間の式を正本にし、他は参照にする
         doc_dag:
@@ -190,7 +190,7 @@ D8 の条件 (1)(2) の結果を書く。条件と、当たるかどうかの決
 | --- | --- | --- |
 | `investigated` | 調査済み・未立案 — `review-triage-fix` の段 1 (調査) の結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 段 2 (立案) から続ける (再開の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
 | `pending` | 未着手 — 修正方法と順序が決まっている | 段 3 (修正) から続ける (同上) |
-| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の待ちも同じ状態で表す — 選択と `options` に書くものの正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
+| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の立案待ちも同じ状態で表す — 選択と `options` に書くものの正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする — 回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |
 

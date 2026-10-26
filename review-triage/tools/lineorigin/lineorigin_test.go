@@ -1489,8 +1489,8 @@ func stallingGit(t *testing.T, word string) string {
 	return bin
 }
 
-// git が期限までに終了しなければ、道具は待ち続けずに run-error で終了する。停止させた git の子の
-// プロセスが標準出力を開いたままでも待たない (待つと、子が終了する 30 秒後まで返らない)。
+// git が期限までに終了しなければ、道具は待機し続けずに run-error で終了する。停止させた git の子の
+// プロセスが標準出力を開いたままでも待機しない (待機すると、子が終了する 30 秒後まで返らない)。
 func TestGitTimeoutIsRunError(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
@@ -1504,7 +1504,7 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 		start := time.Now()
 		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終了しませんでした")
 		if d := time.Since(start); d > 20*time.Second {
-			t.Fatalf("期限を越えても %s 待った", d)
+			t.Fatalf("期限を越えても %s 待機した", d)
 		}
 	})
 	t.Run("git version で応答しなくなる", func(t *testing.T) {
@@ -1512,7 +1512,7 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 		start := time.Now()
 		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git version が")
 		if d := time.Since(start); d > 20*time.Second {
-			t.Fatalf("期限を越えても %s 待った", d)
+			t.Fatalf("期限を越えても %s 待機した", d)
 		}
 	})
 }
