@@ -1,6 +1,6 @@
 # レビューの起動
 
-**このファイルが `review-triage-loop` からレビューを起動する経路の正本。** 依頼文の中身 (検証の前払い・報告しない条件・出力様式) は [review-request.md](../../review-triage/references/review-request.md) が正本 — ここでは言い直さず、経路ごとの違いだけを定める。
+**このファイルが `review-triage-loop` からレビューを起動する経路の正本。** 依頼文の中身 (報告前の検証・報告しない条件・出力様式) は [review-request.md](../../review-triage/references/review-request.md) が正本 — ここでは言い直さず、経路ごとの違いだけを定める。
 
 ## なぜ経路がスキルごとに違うか
 

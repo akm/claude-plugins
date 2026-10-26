@@ -36,7 +36,7 @@
 - skill: `{{skill}}` / effort: `{{effort}}` / モデル: `{{model}}` — **この値で呼ぶ。** 自分で別の値を選ばない。effort が空なら、その skill は effort を受け取らない (`ce-code-review` など) ということで、値を補わない。`ce-code-review` はモデルの指定も適用されない — その場合のモデルは記録に残す名前であって、渡そうとしない。
 - **報告に、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを含める。** 受け取る側はこの報告を上の指定と突き合わせる。
 
-## 検証の前払い (すべての指摘に必須)
+## 報告前の検証 (すべての指摘に必須)
 
 - evidence には次のいずれかを含める。どちらも含められない指摘は confidence を low にする。
   - 実行した確認 — コマンドと出力の要点、またはプローブ・ミューテーションの手順と結果
@@ -83,7 +83,7 @@ findings:
     file: path/to/file.md
     line: 12
     summary: "1〜2 文の要旨"
-    evidence: "検証の前払いの節のとおり"
+    evidence: "報告前の検証の節のとおり"
     attrs:
       severity: P2
       confidence: high
@@ -98,7 +98,7 @@ residual: []
 | `findings[].id` | 1 からの連番 |
 | `findings[].file` / `line` | 指摘の位置。`line` は不明なら省略 |
 | `findings[].summary` | 1〜2 文の要旨 |
-| `findings[].evidence` | 「検証の前払い」の節のとおり |
+| `findings[].evidence` | 「報告前の検証」の節のとおり |
 | `findings[].attrs` | レビューが付けた属性 (`severity` / `confidence` など) をそのまま。無い属性を補完しない |
 | `residual` | 「報告しない条件」に当たるが残す 1 行メモの列。無ければ `[]` |
 
