@@ -1588,14 +1588,14 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 		"          reason: \"隣の行 | に当て忘れた\"\n"))
 	for _, want := range []string{
 		"\n### 検知\n\n- 状態: 検知済み・未処理\n",
-		"- 根拠: 修正由来の指摘 (fix-derived) — 指摘 #1 と 1 回目の P1 \\| 別: 隣の行 \\| に当て忘れた\n",
+		"- 根拠: 修正由来の指摘 (fix-derived) — 指摘 #1 と回 1 の P1 \\| 別: 隣の行 \\| に当て忘れた\n",
 	} {
 		if !strings.Contains(detected, want) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, detected)
 		}
 	}
 	// 小節の位置: 2 回目の節の中で、指摘の表の後、修正計画の前。
-	run2 := detected[strings.Index(detected, "\n## 2 回目:"):]
+	run2 := detected[strings.Index(detected, "\n## 回 2:"):]
 	recIdx := strings.Index(run2, "\n### 検知\n")
 	if recIdx < 0 {
 		t.Fatalf("2 回目の節に検知の小節が無い:\n%s", detected)
@@ -1636,8 +1636,8 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 		"        source: skill\n"))
 	for _, want := range []string{
 		"- 状態: 捉え直し済み\n",
-		"- 根拠: 同じ場所への採択 (same-location) — 指摘 #1 と 1 回目の 指摘 1: 同じ表を指す\n",
-		"- 捉え直し: 型 行ごと \\| の規則 / 軸 規則 × 行 / 根本の原因 規則が表の外に無い / 修正の単位 規則を 1 か所に書く / 出所 スキルの見解 (skill)\n",
+		"- 根拠: 同じ場所への採択 (same-location) — 指摘 #1 と回 1 の 指摘 1: 同じ表を指す\n",
+		"- 捉え直し: 型 行ごと \\| の規則 / 軸 規則 × 行 / 根本の原因 規則が表の外に無い / 修正の単位 規則を 1 か所に書く / 出所 スキルの見立て (skill)\n",
 	} {
 		if !strings.Contains(reframed, want) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, reframed)
@@ -1879,7 +1879,7 @@ const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。正
 	"| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" +
 	"| 1 | 2026-08-30 | `code-review` | `sonnet-5` | full | 3 | 1 | 1 | 1 |\n" +
 	"\n" +
-	"## 1 回目: 2026-08-30 `code-review`\n" +
+	"## 回 1: 2026-08-30 `code-review`\n" +
 	"\n" +
 	"- HEAD `abc1234` / model `sonnet-5` / scope full / level medium\n" +
 	"\n" +
@@ -1959,8 +1959,8 @@ func TestReviewTriageSummaryInvestigated(t *testing.T) {
 	// 複数回の記録では、investigated の問題がある回にだけ出る。
 	multi := replaceRecordPlans(t, investigatedPlansYAML) + legacyRunYAML(2, "")
 	summary := render(t, multi)
-	run1 := summary[strings.Index(summary, "\n## 1 回目:"):strings.Index(summary, "\n## 2 回目:")]
-	run2 := summary[strings.Index(summary, "\n## 2 回目:"):]
+	run1 := summary[strings.Index(summary, "\n## 回 1:"):strings.Index(summary, "\n## 回 2:")]
+	run2 := summary[strings.Index(summary, "\n## 回 2:"):]
 	if !strings.Contains(run1, "- **"+note) {
 		t.Fatalf("investigated の問題がある 1 回目に注記が無い:\n%s", summary)
 	}
