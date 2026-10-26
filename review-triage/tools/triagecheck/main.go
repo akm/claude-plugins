@@ -392,7 +392,7 @@ func resolveBaseDir(currentDir string) (string, error) {
 }
 
 // resolvePath は p を絶対パスにして返す。絶対ならそのまま、相対なら base を基準にする。
-// 2 つ目の戻り値は base を実際に使ったか (呼び出し側が「-current-dir が一度も
+// 2 つ目の戻り値は base を実際に使ったか (呼び出し元が「-current-dir が一度も
 // 使われなかった」ことを検出するために使う)。
 //
 // base が空 (= -current-dir が無い) のに相対を渡されたらエラーにする。ここで
@@ -426,7 +426,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 // 既定に落ちたときだけ空で、そのとき不在は未導入として通る。名前を返すのは、
 // 不在の報告にどちらを直せばよいかを載せるため。
 //
-// 指定の有無は値ではなく specified (呼び出し側が flag.Visit で読んだ意思表示) で
+// 指定の有無は値ではなく specified (呼び出し元が flag.Visit で読んだ意思表示) で
 // 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」として
 // 扱われ、検査が走らないまま成功する (-record-dir で避けたはずの種類の欠陥と同じ)。
 func resolveJudgmentFlowPath(value string, specified bool) (flowPath, origin string) {

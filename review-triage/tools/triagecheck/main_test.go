@@ -132,7 +132,7 @@ func TestResolveBaseDir(t *testing.T) {
 
 // resolvePath は絶対ならそのまま、相対なら基準と組み合わせる。基準が無いまま
 // 相対を渡されたら推測せずエラー。2 つ目の戻り値は基準を実際に使ったかで、
-// 呼び出し側が「-current-dir が一度も使われなかった」ことを検出するのに使う。
+// 呼び出し元が「-current-dir が一度も使われなかった」ことを検出するのに使う。
 func TestResolvePath(t *testing.T) {
 	base := "/base"
 	t.Run("絶対はそのまま (基準は使わない)", func(t *testing.T) {
