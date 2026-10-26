@@ -17,7 +17,7 @@ Bash のコマンドの文字列がルートのディレクトリ /tmp を指す
 import json, re, sys
 
 # ルートのディレクトリ /tmp を指すパス。/tmp の前がパスの一部になる文字 (英数字・. ~ $ } / -) なら当てない
-# (./tmp・~/tmp・$TMPDIR/tmp・${D}/tmp・/private/tmp など)。/tmp の後が名前の続きになる文字 (英数字・. -) でも当てない (/tmpfile など)
+# (./tmp・~/tmp・$TMPDIR/tmp・${D}/tmp・/private/tmp など)。/tmp の後に、名前の一部として続く文字 (英数字・. -) があるときも当てない (/tmpfile など)
 TMP_PATH = re.compile(r"(?<![\w.~$}/-])/tmp(?![\w.-])")
 
 REASON = ("このコマンドは実行していない: レビューのワーカーは、/tmp を含む Bash のコマンドを実行前に拒否する"

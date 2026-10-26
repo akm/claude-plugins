@@ -2092,7 +2092,7 @@ class TestWorkerHook(WorkerTestBase):
         "cd '/tmp' && ls",
         "python3 -c \"open('/tmp/x', 'w')\"",
     ]
-    # 拒否しないコマンド。/tmp の前か後が、パスや名前の続きになる文字のもの
+    # 拒否しないコマンド。/tmp の前か後に、パスや名前の一部として続く文字があるもの
     ALLOWED = [
         "mkdir -p ./tmp/a && echo x > ./tmp/a/b",
         "mkdir -p tmp && cat > tmp/probe_test.go <<'EOF'\nEOF",
