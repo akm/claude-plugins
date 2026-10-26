@@ -29,7 +29,7 @@ review-loop --end [<置き場>]
 
 各キーの意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節。`--model` はワーカーの `--model` にそのまま渡す指定、`--effort` はワーカーの `--effort` で、どちらも周回の条件として `loop.yaml` に残る (語の区別は下の「モデルと effort を指す語」)。
 
-- **`--resume [<置き場>]`**: 止まった (または前のセッションが報告せずに終わった) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
+- **`--resume [<置き場>]`**: 止まった (または前のセッションが報告せずに終了した) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
 - **`--end [<置き場>]`**: 周回を終える。置き場の省略は `--resume` と同じ。
 
 設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`・`review_loop.sandbox_allow_write` (サンドボックスの中の Bash に書き込みを許す場所)・`review_loop.sandbox_allowed_domains` (同じく接続を許すドメイン)。

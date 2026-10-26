@@ -1,6 +1,6 @@
 """レビュアの実行のログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・
 ワーカーのフックが拒否した呼び出し・サンドボックスが止めた確認・リポジトリの行を表示しただけの呼び出しを読む
-(回の終わりの処理の 2)。読み方の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
+(回の終了処理の 2)。読み方の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
 
 引数: 1 つ目はログのパス。読めなければ、空のログとして扱う。2 つ目はワーカーのフックのファイル
 (review-loop-worker/deny_tmp_hook.py) の中身で、__name__ を "__main__" 以外にして実行し、関数 denies と文字列 REASON を使う。
@@ -163,7 +163,7 @@ def shows_repo_line(line, repo_lines):
 
 
 def blocked_message(body, skip=frozenset()):
-    """本文のうち、文面を含む行と、タグの行から閉じるタグの行 (無ければ本文の終わり) までの行を、空白で繋ぐ。
+    """本文のうち、文面を含む行と、タグの行から閉じるタグの行 (無ければ本文の末尾) までの行を、空白で繋ぐ。
     接続を止められたときは、止められたホストがタグの次の行にあるため、タグの中の行も含める。
     skip にある番号の行 (リポジトリの行を表示したと確認した行) は含めず、タグの行でもタグの中の行を含め始めない。
     ただし、その行が閉じるタグを含めば、そこでタグの中の行を終える (開きタグと閉じタグを同じ行に書いた文書の行を表示したとき)。"""
@@ -272,7 +272,7 @@ if isinstance(result, dict):
     repo_read = False
     for r in results:
         name_cmd = uses.get(r.get("tool_use_id"))
-        # is_error は見ない — 出力を | tail に渡したコマンドや、; echo で終わるコマンドは、止められても成功で終わる (実測)
+        # is_error は見ない — 出力を | tail に渡したコマンドや、末尾が ; echo のコマンドは、止められても成功で終了する (実測)
         if not name_cmd or name_cmd[0] != "Bash":
             continue
         body = body_text(r.get("content"))

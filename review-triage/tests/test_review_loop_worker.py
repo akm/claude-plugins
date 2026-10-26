@@ -15,7 +15,7 @@ review-request-template.md) を埋めて作る — ワーカーは雛形の行 (
 uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で Darwin を返す) も PATH の先頭に置く。
 ワーカーの環境変数 HOME と TMPDIR は、テストの一時ディレクトリの中の別々のディレクトリにする
 (利用者の設定 ~/.claude/settings.json を読まないように、また作業場所の条件を満たすように)。
-ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終わりに消す。
+ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終了時に消す。
 
 振る舞いの正本は review-triage/skills/review-loop/references/worker.md、
 置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
@@ -137,7 +137,7 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 # 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待機する (待機を始めたときに、環境変数
 # FAKE_DATE_STARTED が指すファイルを作る)。
 # 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待機させる (ほかの呼び出しではファイルを消さない)。
-# コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
+# コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終了する前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
 if [ -n "${FAKE_DATE_TRIGGER:-}" ] && { [ -z "${FAKE_DATE_ARGS:-}" ] || [ "$*" = "$FAKE_DATE_ARGS" ]; } \\
   && rm "$FAKE_DATE_TRIGGER" 2>/dev/null; then
@@ -543,7 +543,7 @@ class WorkerTestBase(unittest.TestCase):
         return p
 
     def delay_git(self, sub):
-        """偽の git を置き、サブコマンド sub を終わらせないようにする (PID は self.git_pids_file に書かれる)。"""
+        """偽の git を置き、サブコマンド sub を終了させないようにする (PID は self.git_pids_file に書かれる)。"""
         self.install_fake_git()
         self.env["FAKE_GIT_SLEEP_ON"] = sub
         self.env["FAKE_GIT_SLEEP"] = "1000"
@@ -582,7 +582,7 @@ class WorkerTestBase(unittest.TestCase):
         return _workspace_path(self.tmpdir, self.loop)
 
     def interrupt_paths(self):
-        """この周回の割り込みを記録するファイルのパスと、それを書くときの一時名 (worker.md の「終わり方」) の組。"""
+        """この周回の割り込みを記録するファイルのパスと、それを書くときの一時名 (worker.md の「終了の仕方」) の組。"""
         tmp, name = os.path.split(self.ws_path())
         key = name[len("review-loop-"):]
         return (os.path.join(tmp, f"review-loop-interrupt-{key}"),
@@ -604,7 +604,7 @@ class WorkerTestBase(unittest.TestCase):
         return p
 
     def write_dead_worker_yaml(self, workspace):
-        """kill -9 で消えたレビュー中のワーカーが残した形の worker.yaml を書く (pid は終わったプロセスのもの)。"""
+        """kill -9 で消えたレビュー中のワーカーが残した形の worker.yaml を書く (pid は終了したプロセスのもの)。"""
         dead = subprocess.Popen(["true"])
         dead.wait()
         with open(self.path("worker.yaml"), "w", encoding="utf-8") as f:
@@ -637,7 +637,7 @@ class WorkerTestBase(unittest.TestCase):
         return p
 
     def start_unavailable(self, *extra, contains, cwd=None, env=None, loop=None):
-        """起動時の確認が通らず、worker.yaml が unavailable と理由 (contains を含む) で書かれ、終了コード 2 で終わることを確認する。"""
+        """起動時の確認が通らず、worker.yaml が unavailable と理由 (contains を含む) で書かれ、終了コード 2 で終了することを確認する。"""
         loop = loop or self.loop
         yaml_path = os.path.join(loop, "worker.yaml")
         if os.path.exists(yaml_path):
@@ -787,7 +787,7 @@ _RESULT_LINE = {"type": "result", "subtype": "success", "is_error": False, "sess
 class TestHappyPath(WorkerTestBase):
     def test_stdlib_named_files_in_repo_are_not_imported(self):
         # 作業側 (ワーカーのカレントディレクトリ) に標準ライブラリと同名のファイルがあっても、ワーカーの python3 はそれを読まない
-        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終わり、印が書かれない
+        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終了し、印が書かれない
         for name in ("json", "re", "hashlib", "stat"):
             with open(os.path.join(self.repo, f"{name}.py"), "w", encoding="utf-8") as f:
                 f.write(f'raise SystemExit("作業側の {name}.py が読まれた")\n')
@@ -1449,7 +1449,7 @@ class TestWorkspace(WorkerTestBase):
                 self.assertEqual(self.workspaces(), [])
 
     def test_end_during_preparation(self):
-        # 準備の途中 (複製の作成中) に置き場に end が現れた回は、failed・loop dir modified の印を書いてから、end を見て終わる
+        # 準備の途中 (複製の作成中) に置き場に end が現れた回は、failed・loop dir modified の印を書いてから、end を見て終了する
         self.install_fake_git()
         self.env["FAKE_GIT_TOUCH_ON"] = "clone"
         self.env["FAKE_GIT_TOUCH"] = self.path("end")
@@ -1489,7 +1489,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertFalse(os.path.lexists(ws))
 
     def test_leftover_process_is_stopped(self):
-        # 正常に終わったレビュアの実行が、別のプロセスグループで cwd が複製の中の子を残しても、回の後にその子は残らない
+        # 正常に終了したレビュアの実行が、別のプロセスグループで cwd が複製の中の子を残しても、回の後にその子は残らない
         self.env["FAKE_CLAUDE_MODE"] = "leave_child"
         self.put_request()
         marker, _ = self.run_round()
@@ -1518,7 +1518,7 @@ class TestWorkspace(WorkerTestBase):
         return outside
 
     def remove_workspace_at_end(self, fill):
-        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終わるまで待機する。"""
+        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終了するまで待機する。"""
         p = self.start()
         self.wait_state("idle")
         fill(self.ws_path())
@@ -1791,7 +1791,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_sandbox_blocked_counts_successful_results(self):
         # is_error が偽の Bash の結果も、文面があれば数える。通し確認 (2026-09-28) で、出力を | tail に渡したコマンドと
-        # ; echo で終わるコマンドは、止められても成功で終わった。文面を含む文書を grep しただけの結果も、その行が
+        # 末尾が ; echo のコマンドは、止められても成功で終了した。文面を含む文書を grep しただけの結果も、その行が
         # レビュー対象のコミットに無ければ数える (見落として記録に入れるより、止めて人間が報告を読む方を選ぶ)
         go = "cd tree/tools && go test ./... 2>&1 | tail -30"
         cat = "cat > /tmp/t_test.go <<'EOF'\npackage main\nEOF\necho skip"
@@ -2243,7 +2243,7 @@ class TestStartChecks(WorkerTestBase):
 
     def test_leftover_interrupt_file_is_removed(self):
         # 起動時の確認の 16: 前の起動が残した割り込みを記録するファイルと一時名 (親が kill -9 で消えると残ることがある) は消す。
-        # 残すと、子が起動してすぐに割り込みを受けたものとして終わる。シンボリックリンクはリンクだけを消し、リンクの先は残す
+        # 残すと、子が起動してすぐに割り込みを受けたものとして終了する。シンボリックリンクはリンクだけを消し、リンクの先は残す
         path, tmp = self.interrupt_paths()
         target = os.path.join(self.root, "outside-interrupt")
         with open(target, "w", encoding="utf-8") as f:
@@ -2254,7 +2254,7 @@ class TestStartChecks(WorkerTestBase):
         p = self.start()
         self.wait_state("idle")
         time.sleep(2)
-        self.assertIsNone(p.poll(), "残っていた割り込みを記録するファイルで、ワーカーが終わった")
+        self.assertIsNone(p.poll(), "残っていた割り込みを記録するファイルで、ワーカーが終了した")
         self.assertEqual(self.worker_state()["state"], "idle")
         self.assertFalse(os.path.lexists(path))
         self.assertFalse(os.path.lexists(tmp))
@@ -2274,7 +2274,7 @@ class TestStartChecks(WorkerTestBase):
 
 
 class TestParentAvoidsCommandSubstitution(unittest.TestCase):
-    """trap を設定した後の親 (worker.md の「終わり方」) は、コマンド置換を使わない。bash は、コマンド置換を処理している間に
+    """trap を設定した後の親 (worker.md の「終了の仕方」) は、コマンド置換を使わない。bash は、コマンド置換を処理している間に
     受けたシグナルの trap を実行しないことがあるため (#105)。後から親の部分や、親が呼ぶ関数に $(...) を足すと、割り込みが
     失われうる。"""
 
@@ -2722,7 +2722,7 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=3, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_idle_leaves_no_idle_sleep(self):
-        # 待機中に割り込みを受けて終わったワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
+        # 待機中に割り込みを受けて終了したワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
         # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待機する。待機に入った直後に送るので、
         # 残れば数秒はプロセスグループに残る
         p = self.start()
@@ -2731,13 +2731,13 @@ class TestEnding(WorkerTestBase):
         p.wait(timeout=20)
         self.assertEqual(p.returncode, 143)
         self.wait_for(lambda: not _group_alive(p.pid), timeout=1.5,
-                      what="ワーカーが終わった後に、プロセスグループが空になる")
+                      what="ワーカーが終了した後に、プロセスグループが空になる")
         p.communicate(timeout=5)
 
     def test_group_signal_while_child_checks_parent(self):
         # 子が親の生存を確認する ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まる。子は、
-        # ps がシグナルで止まったときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終わる)
-        # ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
+        # ps がシグナルで止まったときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終了する)
+        # ではなく、割り込みとして worker.yaml を left にして終了する。偽の ps (関数 install_fake_ps) で、
         # 親の生存の確認 (ps -o stat= -p <PID>) を 3 秒遅らせる
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
@@ -2754,13 +2754,13 @@ class TestEnding(WorkerTestBase):
     def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
         # 子が親の生存を確認する ps がシグナルで止まっても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
         # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確認する — 親が無いと判定すると、
-        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終わる) で子が終わる。偽の ps は自分に TERM を送って終わる
+        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終了する) で子が終了する。偽の ps は自分に TERM を送って終了する
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
         self.install_fake_ps(trigger, log, 'kill -TERM "$$"')
         p = self.start_until_child_checks_parent(trigger, log)
         time.sleep(1)
-        self.assertIsNone(p.poll(), "ps が止まった後に、ワーカーが終わった")
+        self.assertIsNone(p.poll(), "ps が止まった後に、ワーカーが終了した")
         with open(self.path("end"), "w", encoding="utf-8") as f:
             f.write("人間が置いた\n")
         out, err = p.communicate(timeout=20)
@@ -2769,8 +2769,8 @@ class TestEnding(WorkerTestBase):
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_sigkill_after_parent_records_interrupt(self):
-        # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終わる
-        # (worker.yaml を left にしない。worker.md の「終わり方」の kill -9 の箇条)。偽の ps で、子が親の生存を確認する ps を
+        # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終了する
+        # (worker.yaml を left にしない。worker.md の「終了の仕方」の kill -9 の箇条)。偽の ps で、子が親の生存を確認する ps を
         # 3 秒遅らせ、その間に親だけに TERM を送ってファイルを書かせてから、親を消す
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
@@ -2786,11 +2786,11 @@ class TestEnding(WorkerTestBase):
         self.assertEqual(self.worker_state().get("pid"), p.pid)
 
     def test_interrupt_while_command_substitution_child_exits(self):
-        # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終了まで待機する間に SIGINT を受けても終わる。bash は、
-        # コマンド置換のために起動したプロセスが出力を閉じてから終わるまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
-        # 終わらなければ実行しない (#105 の現象 B。
+        # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終了まで待機する間に SIGINT を受けても終了する。bash は、
+        # コマンド置換のために起動したプロセスが出力を閉じてから終了するまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
+        # 終了しなければ実行しない (#105 の現象 B。
         # macOS の bash 3.2・bash 5.2・5.3 で起きる)。そのため割り込みは、コマンド置換を使わない親が受けて、子にファイルで伝える
-        # (worker.md の「終わり方」)。偽の date は、標準出力を閉じてから SIGINT を無視して待機し、SIGINT では終わらない
+        # (worker.md の「終了の仕方」)。偽の date は、標準出力を閉じてから SIGINT を無視して待機し、SIGINT では終了しない
         trigger = os.path.join(self.root, "date-trigger")
         started = os.path.join(self.root, "date-started")
         self.install_fake_date(trigger, started)
@@ -2809,7 +2809,7 @@ class TestEnding(WorkerTestBase):
 
     def test_interrupt_right_after_child_starts(self):
         # 子が自分の PID を求めるコマンド置換 (PATH で見つかる sh を起動する) の間に親が割り込みを受けても、子は USR1 のデフォルトの
-        # 動作 (終了) で終わらず、worker.yaml を left にして終わる。子は trap を最初に設定する (関数 body_main)。
+        # 動作 (終了) で終了せず、worker.yaml を left にして終了する。子は trap を最初に設定する (関数 body_main)。
         # 偽の sh は、最初の 1 回だけ待機を始めたことをファイルに書いてから 2 秒待機し、その区間を広げる
         started = os.path.join(self.root, "sh-started")
         path = os.path.join(self.bin, "sh")
@@ -2828,7 +2828,7 @@ class TestEnding(WorkerTestBase):
 
     def test_second_interrupt_while_parent_writes_interrupt_file(self):
         # 親が割り込みを記録するファイルを書いている間に、2 回目の割り込み (Ctrl-C を続けて押したとき) がプロセスグループに届いても、
-        # ファイルは書かれ、ワーカーは終わる。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
+        # ファイルは書かれ、ワーカーは終了する。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
         # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待機する
         started = os.path.join(self.root, "mv-started")
         path = os.path.join(self.bin, "mv")
@@ -2850,7 +2850,7 @@ class TestEnding(WorkerTestBase):
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_interrupt_file_rewritten_when_write_fails(self):
-        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き込みをやり直し、ワーカーは終わる。書けなかったことは
+        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き込みをやり直し、ワーカーは終了する。書けなかったことは
         # 1 度だけ標準エラーに知らせる (関数 write_interrupt_file)。偽の mv は、ファイルへの最初の改名だけを失敗させる
         failed = os.path.join(self.root, "mv-failed")
         path = os.path.join(self.bin, "mv")
@@ -2873,7 +2873,7 @@ class TestEnding(WorkerTestBase):
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_timeout(self):
-        # AE15: 終わらない偽の claude を上限で止め、子プロセスも残さない
+        # AE15: 終了しない偽の claude を上限で止め、子プロセスも残さない
         self.env["FAKE_CLAUDE_MODE"] = "hang"
         self.put_request()
         p = self.start("--review-timeout-minutes", "0.05")
@@ -2887,9 +2887,9 @@ class TestEnding(WorkerTestBase):
         self.finish(p)
 
     def test_sigkill_while_stopping_reviewer_after_timeout(self):
-        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるまで待機する間に親を kill -9 で消しても、
-        # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終わる (worker.md の「終わり方」)。偽の claude は
-        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
+        # 上限を越えた回は、回の終了処理をレビュアの実行を止めるところから始める。止まるまで待機する間に親を kill -9 で消しても、
+        # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終了する (worker.md の「終了の仕方」)。偽の claude は
+        # TERM を受けても終了せず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
         self.put_request()
@@ -2936,7 +2936,7 @@ class TestEnding(WorkerTestBase):
 
     def test_sigkill_during_review_leaves_no_worker_processes(self):
         # レビュー中にワーカーを SIGKILL で消すと、ワーカーのプロセスグループ (子と、更新時刻を進める処理と、上限を測る処理) は
-        # 10 秒以内に空になる。子は、上限を測る処理が送る USR1 で親が消えたことに気づき、後始末をせずに終わる (worker.yaml も
+        # 10 秒以内に空になる。子は、上限を測る処理が送る USR1 で親が消えたことに気づき、後始末をせずに終了する (worker.yaml も
         # 印も書かない)。レビュアの実行は専用のプロセスグループなので残る (trap が動かないので止められない)
         self.env["FAKE_CLAUDE_MODE"] = "hang"
         self.put_request()
@@ -2952,7 +2952,7 @@ class TestEnding(WorkerTestBase):
         self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")))
 
     def test_sigkill_while_child_is_outside_wait(self):
-        # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終わるまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
+        # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終了するまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
         # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) で待機し続ける。
         # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待機させ、その間に親を消す (上限を測る処理は、
         # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待機させないように、準備の
@@ -2980,7 +2980,7 @@ class TestEnding(WorkerTestBase):
 
     def test_sigkill_stops_heartbeat(self):
         # AE17: ワーカーを SIGKILL で消すと、10 秒以内に worker.yaml の更新時刻が止まる。待機中の子は、依頼文を探す周期ごとに
-        # 親が消えたことに気づき、後始末をせずに終わる (worker.yaml を left にしない)
+        # 親が消えたことに気づき、後始末をせずに終了する (worker.yaml を left にしない)
         p = self.start()
         self.wait_state("idle")
         os.kill(p.pid, signal.SIGKILL)
@@ -2995,7 +2995,7 @@ class TestEnding(WorkerTestBase):
 
 
 class TestTimeoutDuringPreparation(WorkerTestBase):
-    """上限は、依頼文を受け取ってからレビュアの実行が終わるまでを測る (worker.md の「回の処理」)。
+    """上限は、依頼文を受け取ってからレビュアの実行が終了するまでを測る (worker.md の「回の処理」)。
     準備 (作業場所・複製・複製の設定・写し) の途中で越えた回は、レビュアの実行を起動しない (計画の AE8)。"""
 
     def assert_timeout_without_run(self, p):
@@ -3012,7 +3012,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
         return marker
 
     def test_timeout_while_cloning(self):
-        # 複製の作成 (偽の git の clone) が終わらないと、上限で偽の git のプロセスグループを止め、failed・timeout の印を書く
+        # 複製の作成 (偽の git の clone) が終了しないと、上限で偽の git のプロセスグループを止め、failed・timeout の印を書く
         self.delay_git("clone")
         self.put_request()
         p = self.start("--review-timeout-minutes", "0.05")
@@ -3032,14 +3032,14 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
 
 
 class TestInterruptPhases(WorkerTestBase):
-    """割り込みを受けた時点ごとの扱い (worker.md の「終わり方」。計画の AE9)。レビュアの実行中の扱いは
+    """割り込みを受けた時点ごとの扱い (worker.md の「終了の仕方」。計画の AE9)。レビュアの実行中の扱いは
     TestEnding.test_interrupt_while_reviewing で確認する。シグナルは、端末の Ctrl-C と同じくワーカーのプロセスグループに送る。"""
 
     SIGNALS = ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129))
 
     def test_interrupt_during_preparation(self):
-        # 準備の途中 (偽の git の clone が終わらない間) に割り込みを受けると、準備のプロセスグループを止め、準備のディレクトリと
-        # 作業場所を消し、印を書かずに left で終わる。起動し直したワーカーが、印の無い同じ依頼文を処理する
+        # 準備の途中 (偽の git の clone が終了しない間) に割り込みを受けると、準備のプロセスグループを止め、準備のディレクトリと
+        # 作業場所を消し、印を書かずに left で終了する。起動し直したワーカーが、印の無い同じ依頼文を処理する
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
                 self.reset_loop()
@@ -3067,10 +3067,10 @@ class TestInterruptPhases(WorkerTestBase):
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_interrupt_while_stopping_reviewer_after_timeout(self):
-        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるまで待機する間に割り込みを受けても、
-        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の、
-        # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終わり方」の、子の箇条の次の、回の終わりの処理の途中の項)。
-        # 偽の claude は TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
+        # 上限を越えた回は、回の終了処理をレビュアの実行を止めるところから始める。止まるまで待機する間に割り込みを受けても、
+        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終了する (関数 on_signal の、
+        # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終了の仕方」の、子の箇条の次の、回の終了処理の途中の項)。
+        # 偽の claude は TERM を受けても終了せず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
@@ -3097,7 +3097,7 @@ class TestInterruptPhases(WorkerTestBase):
     def test_group_signal_while_child_runs_foreground_command(self):
         # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM か HUP
         # (端末を閉じたとき) が届くと、そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
-        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の
+        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、印を書かずに left で終了する (worker.md の「終了の仕方」の
         # 子の箇条)。偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 30, touch)
@@ -3127,8 +3127,8 @@ class TestInterruptPhases(WorkerTestBase):
                 self.assertEqual(self.claude_calls(), [])
 
     def test_interrupt_during_finish(self):
-        # 回の終わりの処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
-        # 書き終えてから left で終わる。割り込みは回の終わりの処理が起動したコマンド (遅らせた複写) にも届くが、それで止まらない
+        # 回の終了処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
+        # 書き終えてから left で終了する。割り込みは回の終了処理が起動したコマンド (遅らせた複写) にも届くが、それで止まらない
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("after the rename", 3, touch)
         for sig, code in self.SIGNALS:
@@ -3154,7 +3154,7 @@ class TestInterruptPhases(WorkerTestBase):
 
 
 class TestRestartCleanup(WorkerTestBase):
-    """起動し直したときの掃除 (worker.md の「起動時の確認」の 2 と「終わり方」の kill -9。計画の AE10)。"""
+    """起動し直したときの掃除 (worker.md の「起動時の確認」の 2 と「終了の仕方」の kill -9。計画の AE10)。"""
 
     def kill9(self, p):
         os.kill(p.pid, signal.SIGKILL)
@@ -3196,7 +3196,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assert_cleaned_before_pickup(err)
 
     def test_sigkill_while_preparing_then_restart(self):
-        # 準備の途中 (偽の git の clone が終わらない間) にワーカーを SIGKILL で消すと、準備のディレクトリと、その中を cwd にした
+        # 準備の途中 (偽の git の clone が終了しない間) にワーカーを SIGKILL で消すと、準備のディレクトリと、その中を cwd にした
         # 偽の git が残る。起動し直すと、それを止めて準備のディレクトリを消してから、同じ依頼文を処理する
         self.delay_git("clone")
         self.put_request()
@@ -3307,7 +3307,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assertTrue(os.path.exists(keep))
 
     def test_end_removes_workspace(self):
-        # end を見て終わるとき、周回の作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
+        # end を見て終了するとき、周回の作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
         target = os.path.join(self.root, "link-target")
         os.makedirs(target)
         keep = os.path.join(target, "keep.txt")
@@ -3337,10 +3337,10 @@ class TestRestartCleanup(WorkerTestBase):
         # 残ったプロセスを止める処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
         # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave 側への書き込みが
         # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
-        # 回の終わりの処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
+        # 回の終了処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
         # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
         # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが止まることを確認する
-        # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終わって
+        # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終了して
         # os.kill に届かないので、このプロセスは止まらずに残る)。
         ws = self.ws_path()
         touch = os.path.join(self.root, "stop-started")
@@ -3361,7 +3361,7 @@ class TestRestartCleanup(WorkerTestBase):
         os.makedirs(os.path.join(ws, "tree"), exist_ok=True)
         inside = self.spawn_sleeper(os.path.join(ws, "tree"))
 
-        # stop_cwd_procs の呼び出し (回の終わりの処理の 1) が始まった (sleep に入った) ら、
+        # stop_cwd_procs の呼び出し (回の終了処理の 1) が始まった (sleep に入った) ら、
         # 端末を閉じたのと同じ状態にする。以降、その python3 のスクリプトの標準エラーへの書き込みは OSError になる
         self.wait_for(lambda: os.path.exists(touch), what="stop_cwd_procs の呼び出しの開始")
         os.close(master)

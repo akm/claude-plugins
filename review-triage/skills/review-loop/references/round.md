@@ -16,12 +16,12 @@
 1. **作業ツリーが clean である** (`git status --porcelain` が空)。満たさなければ、変更をコミットするか退避してから起動し直すよう案内する。
 2. **周回の置き場の親 (`review_loop.dir`) が git に無視されている** (`git check-ignore -q <dir>`)。満たさなければ、`.gitignore` に足してコミットしてから起動し直すよう案内する (スキルは `.gitignore` を変えない)。
 3. **記録 YAML が読める** (置き場は設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)。無ければ新規として扱う。あるのに読めなければ、読めない理由を報告する。
-4. **同じブランチに `ended` でない周回が無い。** `find <review_loop.dir> -mindepth 2 -maxdepth 2 -name loop.yaml` で探し (zsh の glob は一致が無いと失敗するので使わない)、`branch` が現在のブランチで `state` が `ended` でないものがあれば、その置き場を添えて `--resume` か `--end` を案内する。**読めない `loop.yaml` があれば、止めて知らせる** — 新規に寄せると、同じブランチに終わっていない周回が 2 つでき、同じ記録の同じ回番号の依頼文が 2 つできる。
+4. **同じブランチに `ended` でない周回が無い。** `find <review_loop.dir> -mindepth 2 -maxdepth 2 -name loop.yaml` で探し (zsh の glob は一致が無いと失敗するので使わない)、`branch` が現在のブランチで `state` が `ended` でないものがあれば、その置き場を添えて `--resume` か `--end` を案内する。**読めない `loop.yaml` があれば、止めて知らせる** — 新規に寄せると、同じブランチに終了していない周回が 2 つでき、同じ記録の同じ回番号の依頼文が 2 つできる。
 
 ## 置き場を作る
 
 1. **周回 id を決める**: `<YYYYMMDD>-<hhmm>-<ブランチ名>`。ブランチ名の整え方は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 3 の表の「ブランチ名」の行と同じ。
-2. **置き場 `<review_loop.dir>/<周回 id>/` を作る。** 既にあれば (同じ分に 2 度始めた) 作らずに報告して終わる。
+2. **置き場 `<review_loop.dir>/<周回 id>/` を作る。** 既にあれば (同じ分に 2 度始めた) 作らずに報告して終了する。
 3. **`loop.yaml` を書く** (様式の正本は [loop-files.md](loop-files.md) の「`loop.yaml`」)。`repo_dir` は作業ツリーのルートの実体パス、`state` は `active`。一時名 `.loop.yaml.tmp` に書いてから `mv` で改名する。
 
 ## 呼ぶスキル
