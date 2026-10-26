@@ -431,7 +431,7 @@ func gitEnv() []string {
 		// 部分クローンで欠けたオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
 		// 取得できないと git は失敗し、道具は run-error になる
 		"GIT_NO_LAZY_FETCH=1",
-		// 認証などで利用者に尋ねて待たない
+		// 認証などで利用者に入力を求めて待たない
 		"GIT_TERMINAL_PROMPT=0",
 	)
 	return append(env, extraGitEnv...)
@@ -595,7 +595,7 @@ func (g gitRunner) hasUncommittedChange(top, rev, kind, file string) (bool, erro
 // 誤った holds にはならない。
 func (g gitRunner) convertingAttribute(file string) (string, error) {
 	// オプション -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
-	// filter だけを尋ねると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
+	// filter だけを問い合わせると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
 	out, _, err := g.run("check-attr", "-a", "-z", "--", file)
 	if err != nil {
 		return "", asRun(err)

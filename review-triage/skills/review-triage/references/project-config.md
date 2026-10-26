@@ -51,7 +51,7 @@
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を走らせるコマンド | 検査を走らせず、**走らせていないことを報告に明記する** |
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが正本として残る |
-| `loop` | `review-triage-loop` の既定値 (下記) | 周回の既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に尋ねる |
+| `loop` | `review-triage-loop` の既定値 (下記) | 周回の既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に質問する |
 | `fix` | `review-triage-fix` の既定値 (下記) | 修正の既定値を持たない。`review-triage-fix` はキーごとの既定 (下の「`fix`」の表) に従う |
 | `review_loop` | `review-loop` (レビューを端末のワーカーに任せる周回) の既定値 (下記) | キーごとの既定 (下の「`review_loop`」の表) に従う |
 
@@ -80,7 +80,7 @@
 | --- | --- | --- |
 | `max_rounds` | 周回の上限 | 10 |
 | `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限を待たずに止めて構造の見直しを人間に問う (判定の正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
-| `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
+| `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に質問する。**推測して決めない** |
 | `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
 | `review_model` | 周回に指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
 
@@ -90,7 +90,7 @@
 
 ### 「未設定」の定義 (正本)
 
-**`loop` のキーが「未設定」とは、キーが無いか、文字列のキー (`review_skill` / `review_args` / `review_model`) の値が空文字列であることを指す。** 未設定のキーは既定に従い、既定が決まらないキー (`review_skill` はいつでも、`review_model` は呼び出し元が対応表に無いとき。ただし周回がモデルを決めない経路は除く — 正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) は人間に尋ねる。JSON の様式が `""` を置いているのは、キーの存在を示すためであって、空のモデル名や空の引数を指定する意味ではない。
+**`loop` のキーが「未設定」とは、キーが無いか、文字列のキー (`review_skill` / `review_args` / `review_model`) の値が空文字列であることを指す。** 未設定のキーは既定に従い、既定が決まらないキー (`review_skill` はいつでも、`review_model` は呼び出し元が対応表に無いとき。ただし周回がモデルを決めない経路は除く — 正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) は人間に質問する。JSON の様式が `""` を置いているのは、キーの存在を示すためであって、空のモデル名や空の引数を指定する意味ではない。
 
 **`max_rounds` と `structure_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-loop` の値の検査 ([arguments.md](../../review-triage-loop/references/arguments.md)) がエラーにする。
 
@@ -106,7 +106,7 @@
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `threshold_rounds` | 回数の閾値 N。記録の回番号 (`runs` の要素数) が N を越えた回 (回 N+1 以降) では、`review-triage-fix` が段 1 (調査) の後に人間に立案者を尋ねる (尋ね方と選択肢の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) | 5 |
+| `threshold_rounds` | 回数の閾値 N。記録の回番号 (`runs` の要素数) が N を越えた回 (回 N+1 以降) では、`review-triage-fix` が段 1 (調査) の後に人間に立案者の選択を求める (質問の仕方と選択肢の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) | 5 |
 | `stages` | 段ごとの走らせ方。キーは段の名前 — `investigate` (段 1 = 調査)・`plan` (段 2 = 立案)・`fix` (段 3 = 修正)。段の中身と手順の対応の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭 | 3 段ともセッション内 (下の各キーの既定) |
 | `stages.<段>.subagent` | その段を sub-agent で走らせるか (真偽値) | `false` — セッション内で走らせる |
 | `stages.<段>.model` | sub-agent で走らせるときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
@@ -116,7 +116,7 @@
 
 `fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<段>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
 
-**`stages` の設定は、回 N+1 以降の段 2 (`plan`) には適用されない。** その回の段 2 は `review-triage-fix` が人間に尋ねた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。段 1 (`investigate`) と段 3 (`fix`) の設定は回の番号に関わらず適用される。段の走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
+**`stages` の設定は、回 N+1 以降の段 2 (`plan`) には適用されない。** その回の段 2 は `review-triage-fix` が人間に求めた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。段 1 (`investigate`) と段 3 (`fix`) の設定は回の番号に関わらず適用される。段の走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
 
 ## `review_loop` — ワーカーに任せる周回の既定値
 
@@ -130,7 +130,7 @@
 | `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
 | `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
 | `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
-| `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に尋ねる。**推測して決めない** |
+| `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に質問する。**推測して決めない** |
 | `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | `auto` (デフォルトにする理由と、ワーカーが受け付けない値の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
 | `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。ワーカーの `--allowed-tools` に要素ごとに埋める | ワーカーの既定の一覧 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
 | `sandbox_allow_write` | サンドボックス (Claude Code が Bash のコマンドの書き込みと接続を制限する機能) の中の Bash に書き込みを許す場所の一覧 (文字列の配列)。テストがホームの下のキャッシュ (Go のビルドのキャッシュ `~/Library/Caches/go-build` など) に書くときに足す (実測と理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「サンドボックス」)。各要素は絶対パスか `~` で始まるパスで、先頭の `~` はワーカーがホームに展開する。ワーカーの `--sandbox-allow-write` に要素ごとに埋める。環境の値 (下記) | 空 — 書き込みを許すのは、ワーカーが回ごとに作る一時ディレクトリ (回の作業場所) だけ (許せる場所の条件の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動時の確認」の 12) |

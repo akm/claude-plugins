@@ -14,7 +14,7 @@ review-triage-fix [<記録 YAML のパス>] [--threshold <N>] [--stage <段>[=<�
 | `--threshold` | `threshold_rounds` | `--threshold 3` |
 | `--stage` | `stages.<段>` (`subagent` / `model` / `effort` の 3 つをまとめて) | `--stage investigate=sonnet`・`--stage plan=session`・`--stage fix=opus:high`・`--stage fix` |
 
-`--threshold <N>` は回数の閾値 N — 記録の回番号がこれを越えた回 (回 N+1 以降) で、段 1 (調査) の後に人間に立案者を尋ねる。閾値の意味と数え方の正本は [project-config.md](../../review-triage/references/project-config.md) の「`fix`」、尋ね方の正本は [SKILL.md](../SKILL.md) の手順 4。
+`--threshold <N>` は回数の閾値 N — 記録の回番号がこれを越えた回 (回 N+1 以降) で、段 1 (調査) の後に人間に立案者の選択を求める。閾値の意味と数え方の正本は [project-config.md](../../review-triage/references/project-config.md) の「`fix`」、質問の仕方の正本は [SKILL.md](../SKILL.md) の手順 4。
 
 ### `--stage <段>[=<値>]` — 段の走らせ方
 
@@ -40,7 +40,7 @@ review-triage-fix [<記録 YAML のパス>] [--threshold <N>] [--stage <段>[=<�
 2. 無ければ設定の `fix` の値 (「未設定」の定義の正本は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」)
 3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の「`fix`」の表)
 
-**閾値も段の走らせ方も既定で決まるので、人間に尋ねることはない。** 尋ねるのは閾値の値でも走らせ方でもなく、閾値を越えた回の立案者 (正本は [SKILL.md](../SKILL.md) の手順 4) である。
+**閾値も段の走らせ方も既定で決まるので、人間に質問することはない。** 質問するのは閾値の値でも走らせ方でもなく、閾値を越えた回の立案者 (正本は [SKILL.md](../SKILL.md) の手順 4) である。
 
 ## 値の検査
 

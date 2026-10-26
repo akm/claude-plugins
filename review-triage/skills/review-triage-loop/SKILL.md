@@ -21,7 +21,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 **周回の順序・分岐・優先・止まる条件は [references/loop-flow.md](references/loop-flow.md) が正本。** このファイルでは言い直さない — 以下、ノード ID (G0・G2・G3・L1・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6) はそこを指す。
 
 1. **設定と引数を読む** (G0): `.claude/akm-claude-plugins/review-triage/config.json` の `loop` を読み、引数で上書きする (キーと既定値の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」。引数の様式は [references/arguments.md](references/arguments.md))。
-   - **`review_skill` が引数でも設定でも未設定なら、人間に尋ねる** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
+   - **`review_skill` が引数でも設定でも未設定なら、人間に質問する** (「未設定」の定義の正本は [project-config.md](../review-triage/references/project-config.md))。推測して決めない。
    - **全量の起点のブランチ (`--base`) も周回の条件で、G0 で決める** (扱いの正本は [references/arguments.md](references/arguments.md) の「様式」にある `--base` の段落)。
    - **記録 (手順 2 で読むもの) も、経路を問わず G0 で読み、読めることを確かめる** (読めないときの扱いの正本は [references/arguments.md](references/arguments.md) の「値の検査」)。回の有無は `--base` の扱いに使う。
    - **構造の関門 k (`--structure-rounds`、設定は `loop.structure_rounds`) は周回の条件で、J9 が使う** (意味・既定・値の検査の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」と [references/arguments.md](references/arguments.md))。
