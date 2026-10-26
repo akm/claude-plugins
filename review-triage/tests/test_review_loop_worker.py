@@ -5,20 +5,20 @@
 
   python3 -m unittest discover -s review-triage/tests
 
-一時ディレクトリに git のリポジトリと周回の置き場を作り、claude の名前で偽のコマンド
+一時ディレクトリに git のリポジトリとループのディレクトリを作り、claude の名前で偽のコマンド
 (review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で走らせる。
 実際の claude は呼ばない。依頼文は、実際の雛形 (review-triage/skills/review-triage/references/
 review-request-template.md) を埋めて作る — ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
-文字列で探して写しを作るので、雛形と食い違えばテストが失敗するようにするため。
+文字列で探して写しを作るので、雛形と一致しなければテストが失敗するようにするため。
 
 ワーカーは macOS でだけ起動する (起動時の確認で `uname -s` を見る)。CI (ubuntu) でも走るように、
 uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で Darwin を返す) も PATH の先頭に置く。
 ワーカーの環境変数 HOME と TMPDIR は、テストの一時ディレクトリの中の別々のディレクトリにする
 (利用者の設定 ~/.claude/settings.json を読まないように、また作業場所の条件を満たすように)。
-ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終わりに消す。
+ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終了時に消す。
 
 振る舞いの正本は review-triage/skills/review-loop/references/worker.md、
-置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
+ループのディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
 """
 
 import hashlib
@@ -54,7 +54,7 @@ _HOOK_NS = runpy.run_path(_HOOK, run_name="deny_tmp_hook")
 # サブコマンド (-C <ディレクトリ>・-c <設定> と、- で始まる引数を飛ばした最初の引数) が
 # FAKE_GIT_TOUCH_ON と同じならファイル FAKE_GIT_TOUCH を作り、
 # FAKE_GIT_RUN_ON と同じならシェルのコマンド FAKE_GIT_RUN を sh -c で実行し、
-# FAKE_GIT_SLEEP_ON と同じなら自分の PID をファイル FAKE_GIT_PIDS に書き足してから FAKE_GIT_SLEEP 秒 (既定 1000) 待ち、
+# FAKE_GIT_SLEEP_ON と同じなら自分の PID をファイル FAKE_GIT_PIDS に書き足してから FAKE_GIT_SLEEP 秒 (既定 1000) 待機し、
 # FAKE_GIT_FAIL と同じなら本物を呼ばずに失敗する
 _FAKE_GIT = """#!/usr/bin/env python3
 import json, os, subprocess, sys, time
@@ -93,7 +93,7 @@ os.execv(real, [real] + args)
 
 # 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを走らせている python) に
 # 引数をそのまま渡す。実行するスクリプトが文字列 FAKE_PY_SLEEP_MARK を含めば、
-# ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待ち、そのあとスクリプトを実行する。
+# ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待機し、そのあとスクリプトを実行する。
 # ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う。
 # 同じく文字列 FAKE_PY_PRELUDE_MARK を含めば、ファイル FAKE_PY_PRELUDE の中身をスクリプトの前に足してから実行する
 # (ワーカーの処理の途中に、別のプロセスが割り込んだのと同じ変更を起こすのに使う)。
@@ -134,10 +134,10 @@ exec "$FAKE_PY_REAL" $opt -c "$script" "$@"
 """
 
 # 偽の date (PATH の先頭の bin/ に置く)。環境変数 FAKE_DATE_TRIGGER が指すファイルを消せた 1 回だけ、本物の date の出力を書いてから
-# 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待つ (待ち始めたときに、環境変数
+# 標準出力を閉じ、SIGINT を無視して環境変数 FAKE_DATE_HOLD が示す秒数 (無ければ 2 秒) 待機する (待機を始めたときに、環境変数
 # FAKE_DATE_STARTED が指すファイルを作る)。
-# 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待たせる (ほかの呼び出しではファイルを消さない)。
-# コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終わる前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
+# 環境変数 FAKE_DATE_ARGS があれば、引数の全体がそれと一致する呼び出しだけを待機させる (ほかの呼び出しではファイルを消さない)。
+# コマンド置換 $(date ...) のために起動した date が「出力を閉じた後、終了する前」にいる間を作る (#105 の現象 B)。それ以外は本物の date を実行する
 _FAKE_DATE = """#!/bin/sh
 if [ -n "${FAKE_DATE_TRIGGER:-}" ] && { [ -z "${FAKE_DATE_ARGS:-}" ] || [ "$*" = "$FAKE_DATE_ARGS" ]; } \\
   && rm "$FAKE_DATE_TRIGGER" 2>/dev/null; then
@@ -153,7 +153,7 @@ exec "$FAKE_DATE_REAL" "$@"
 
 # make_removable の途中で、前の回のレビュアの実行が残したプロセスがディレクトリをシンボリックリンクに置き換えたのと同じ変更を
 # 起こす前置き (偽の python3 の FAKE_PY_PRELUDE)。名前が victim のパスを、シンボリックリンクを辿らずに stat した直後
-# (関数 make_removable がディレクトリであることを確かめた直後で、chmod より前) に 1 度だけ、そのディレクトリを victim.moved に移し、
+# (関数 make_removable がディレクトリであることを確認した直後で、chmod より前) に 1 度だけ、そのディレクトリを victim.moved に移し、
 # victim を FAKE_PY_SWAP_TARGET へのシンボリックリンクにして、ファイル FAKE_PY_SWAP_DONE を作る
 _SWAP_PRELUDE = """
 import os as _os
@@ -191,7 +191,7 @@ def _lstat(path, *, dir_fd=None):
 _os.stat, _os.lstat = _stat, _lstat
 """
 
-# サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側と周回の置き場がこの下にあると起動しない
+# サンドボックスの中の Bash が既定で書き込める一時ディレクトリ。ワーカーは、作業側とループのディレクトリがこの下にあると起動しない
 _SANDBOX_TMP = f"/private/tmp/claude-{os.getuid()}"
 
 RID = "20260926-1400-feat-x-1-code-review-opus"
@@ -316,7 +316,7 @@ def _read_pids(path):
 
 
 def _workspace_path(tmpdir, loop):
-    """ワーカーが周回の置き場 loop のために TMPDIR (tmpdir) の下に作る作業場所のパス (worker.md の「回の処理」の手順 5)。"""
+    """ワーカーがループのディレクトリ loop のために TMPDIR (tmpdir) の下に作る作業場所のパス (worker.md の「回の処理」の手順 5)。"""
     loop_real = os.path.realpath(loop)
     digest = hashlib.sha256(loop_real.encode("utf-8")).hexdigest()[:8]
     return os.path.join(os.path.realpath(tmpdir), f"review-loop-{os.path.basename(loop_real)}-{digest}")
@@ -356,7 +356,7 @@ def _make_repo(repo):
 
 
 def _make_loop_dir(loop, repo):
-    """loop に周回の置き場を作り、repo を作業側とする loop.yaml を置く。"""
+    """loop にループのディレクトリを作り、repo を作業側とする loop.yaml を置く。"""
     os.makedirs(loop)
     with open(os.path.join(loop, "loop.yaml"), "w", encoding="utf-8") as f:
         f.write(f'id: "{LOOP_ID}"\nrepo_dir: "{repo}"\nstate: active\n')
@@ -472,7 +472,7 @@ class WorkerTestBase(unittest.TestCase):
         os.rename(tmp, self.path(f"review-request-{rid}.md"))
 
     def reset_loop(self):
-        """subTest の間で、置き場を loop.yaml だけに戻し、偽の claude の記録を消す。"""
+        """subTest の間で、ループのディレクトリを loop.yaml だけに戻し、偽の claude の記録を消す。"""
         for n in os.listdir(self.loop):
             if n == "loop.yaml":
                 continue
@@ -495,7 +495,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def install_fake_date(self, trigger, started):
         """PATH の先頭の bin/ に偽の date (_FAKE_DATE) を置く。引数 trigger と started は、環境変数 FAKE_DATE_TRIGGER と
-        FAKE_DATE_STARTED に渡す。待つ条件と秒数は、定数 _FAKE_DATE の上のコメントのとおり。"""
+        FAKE_DATE_STARTED に渡す。待機する条件と秒数は、定数 _FAKE_DATE の上のコメントのとおり。"""
         path = os.path.join(self.bin, "date")
         with open(path, "w", encoding="utf-8") as f:
             f.write(_FAKE_DATE)
@@ -505,7 +505,7 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_DATE_STARTED"] = started
 
     def install_fake_ps(self, trigger, log, action):
-        """PATH の先頭の bin/ に偽のコマンド ps を置く。ファイル trigger がある間、プロセスの状態を尋ねる呼び出し (ps -o stat= -p <PID>。
+        """PATH の先頭の bin/ に偽のコマンド ps を置く。ファイル trigger がある間、プロセスの状態を問い合わせる呼び出し (ps -o stat= -p <PID>。
         ワーカーの関数 pid_alive) では、呼んだプロセスとその親の PID をファイル log に書いてから、シェルのコマンド action を実行する。
         それ以外の呼び出しと、action の後は、本物の ps を実行する。"""
         path = os.path.join(self.bin, "ps")
@@ -520,7 +520,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def start_until_child_checks_parent(self, trigger, log):
         """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
-        親の生存を確かめる ps を実行するまで待って、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
+        親の生存を確認する ps を実行するまで待機して、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
         コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親の側に出る。"""
         for f in (trigger, log):
             if os.path.exists(f):
@@ -539,11 +539,11 @@ class WorkerTestBase(unittest.TestCase):
             except OSError:
                 return False
         open(trigger, "w").close()
-        self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+        self.wait_for(child_in_ps, what="子が親の生存を確認する ps を実行すること")
         return p
 
     def delay_git(self, sub):
-        """偽の git を置き、サブコマンド sub を終わらせないようにする (PID は self.git_pids_file に書かれる)。"""
+        """偽の git を置き、サブコマンド sub を終了させないようにする (PID は self.git_pids_file に書かれる)。"""
         self.install_fake_git()
         self.env["FAKE_GIT_SLEEP_ON"] = sub
         self.env["FAKE_GIT_SLEEP"] = "1000"
@@ -578,24 +578,24 @@ class WorkerTestBase(unittest.TestCase):
         self.env["FAKE_PY_PRELUDE"] = path
 
     def ws_path(self):
-        """この周回の作業場所のパス。"""
+        """このループの作業場所のパス。"""
         return _workspace_path(self.tmpdir, self.loop)
 
     def interrupt_paths(self):
-        """この周回の割り込みを記録するファイルのパスと、それを書くときの一時名 (worker.md の「終わり方」) の組。"""
+        """このループの割り込みを記録するファイルのパスと、それを書くときの一時名 (worker.md の「終了の仕方」) の組。"""
         tmp, name = os.path.split(self.ws_path())
         key = name[len("review-loop-"):]
         return (os.path.join(tmp, f"review-loop-interrupt-{key}"),
                 os.path.join(tmp, f".review-loop-interrupt-{key}.tmp"))
 
     def prep_dirs(self):
-        """TMPDIR の下に残っている、この周回の準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの列。"""
+        """TMPDIR の下に残っている、このループの準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの列。"""
         prefix = "review-loop-prep-" + os.path.basename(self.ws_path())[len("review-loop-"):] + "."
         tmp = os.path.realpath(self.tmpdir)
         return sorted(os.path.join(tmp, n) for n in os.listdir(tmp) if n.startswith(prefix))
 
     def spawn_sleeper(self, cwd, *args):
-        """cwd を作業ディレクトリにして、別のセッションで待ち続けるプロセスを起動する。args は起動引数に足すだけで使わない。"""
+        """cwd を作業ディレクトリにして、別のセッションで待機し続けるプロセスを起動する。args は起動引数に足すだけで使わない。"""
         p = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(1000)", *args], cwd=cwd, start_new_session=True,
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -604,7 +604,7 @@ class WorkerTestBase(unittest.TestCase):
         return p
 
     def write_dead_worker_yaml(self, workspace):
-        """kill -9 で消えたレビュー中のワーカーが残した形の worker.yaml を書く (pid は終わったプロセスのもの)。"""
+        """kill -9 で消えたレビュー中のワーカーが残した形の worker.yaml を書く (pid は終了したプロセスのもの)。"""
         dead = subprocess.Popen(["true"])
         dead.wait()
         with open(self.path("worker.yaml"), "w", encoding="utf-8") as f:
@@ -619,7 +619,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def write_user_settings(self, content, config_dir=None):
         """利用者の設定 settings.json を書く。config_dir を省略すると HOME/.claude、指定するとそのディレクトリの直下
-        (環境変数 CLAUDE_CONFIG_DIR を指定したときの置き場)。content が文字列ならそのまま書く。"""
+        (環境変数 CLAUDE_CONFIG_DIR を指定したときのループのディレクトリ)。content が文字列ならそのまま書く。"""
         d = config_dir if config_dir is not None else os.path.join(self.home, ".claude")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "settings.json"), "w", encoding="utf-8") as f:
@@ -637,7 +637,7 @@ class WorkerTestBase(unittest.TestCase):
         return p
 
     def start_unavailable(self, *extra, contains, cwd=None, env=None, loop=None):
-        """起動時の確認が通らず、worker.yaml が unavailable と理由 (contains を含む) で書かれ、終了コード 2 で終わることを確かめる。"""
+        """起動時の確認が通らず、worker.yaml が unavailable と理由 (contains を含む) で書かれ、終了コード 2 で終了することを確認する。"""
         loop = loop or self.loop
         yaml_path = os.path.join(loop, "worker.yaml")
         if os.path.exists(yaml_path):
@@ -653,7 +653,7 @@ class WorkerTestBase(unittest.TestCase):
         return state
 
     def start_idle(self, *extra, cwd=None, env=None, loop=None):
-        """起動時の確認が通り、worker.yaml が idle で書かれることを確かめ、止めて (標準出力, worker.yaml の中身) を返す。"""
+        """起動時の確認が通り、worker.yaml が idle で書かれることを確認し、停止して (標準出力, worker.yaml の中身) を返す。"""
         p = self.start(*extra, cwd=cwd, env=env, loop=loop)
         state = self.wait_for(
             lambda: self.worker_state().get("pid") == p.pid and self.worker_state(),
@@ -669,7 +669,7 @@ class WorkerTestBase(unittest.TestCase):
             if v:
                 return v
             time.sleep(interval)
-        self.fail(f"{timeout} 秒待っても{what}が成り立たない")
+        self.fail(f"{timeout} 秒待機しても{what}が成り立たない")
 
     def worker_state(self):
         try:
@@ -683,11 +683,11 @@ class WorkerTestBase(unittest.TestCase):
 
     def wait_marker(self, rid=RID, timeout=25):
         p = self.path(f"delivered-{rid}.yaml")
-        self.wait_for(lambda: os.path.exists(p), timeout=timeout, what=f"完了の印 {rid}")
+        self.wait_for(lambda: os.path.exists(p), timeout=timeout, what=f"完了のフラグファイル {rid}")
         return _read_yaml(p)
 
     def wait_pids(self, path, count):
-        """ファイル path に PID が count 個以上書かれるのを待って、その列を返す。"""
+        """ファイル path に PID が count 個以上書かれるまで待機して、その列を返す。"""
         def ready():
             try:
                 pids = _read_pids(path)
@@ -719,7 +719,7 @@ class WorkerTestBase(unittest.TestCase):
         return sorted(n for n in os.listdir(self.tmpdir) if n.startswith("review-loop-"))
 
     def run_round(self, *extra, rid=RID):
-        """ワーカーを起動し、完了の印を待って止める。(完了の印, ワーカーの標準エラー) を返す。"""
+        """ワーカーを起動し、完了のフラグファイルが現れるまで待機してから停止する。(完了のフラグファイル, ワーカーの標準エラー) を返す。"""
         p = self.start(*extra)
         marker = self.wait_marker(rid)
         self.wait_state("idle")
@@ -747,7 +747,7 @@ def _option_values(args, name):
 
 
 def _assert_not_run_values(test, marker):
-    """レビュアの実行を起動しなかった回の印も、ワーカーの版と、値が unknown のログから読む項目を持つこと (KTD15)。"""
+    """レビュアの実行を起動しなかった回のフラグファイルも、ワーカーの版と、値が unknown のログから読む項目を持つこと (KTD15)。"""
     test.assertEqual(marker["worker_version"], _plugin_version())
     test.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "unknown"})
     test.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
@@ -787,7 +787,7 @@ _RESULT_LINE = {"type": "result", "subtype": "success", "is_error": False, "sess
 class TestHappyPath(WorkerTestBase):
     def test_stdlib_named_files_in_repo_are_not_imported(self):
         # 作業側 (ワーカーのカレントディレクトリ) に標準ライブラリと同名のファイルがあっても、ワーカーの python3 はそれを読まない
-        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終わり、印が書かれない
+        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終了し、フラグファイルが書かれない
         for name in ("json", "re", "hashlib", "stat"):
             with open(os.path.join(self.repo, f"{name}.py"), "w", encoding="utf-8") as f:
                 f.write(f'raise SystemExit("作業側の {name}.py が読まれた")\n')
@@ -799,7 +799,7 @@ class TestHappyPath(WorkerTestBase):
         self.assertNotIn("が読まれた", err)
 
     def test_one_round(self):
-        # AE1: idle → reviewing (識別子入り) → idle と遷移し、ok の印とログが残る
+        # AE1: idle → reviewing (識別子入り) → idle と遷移し、ok のフラグファイルとログが残る
         self.env["FAKE_CLAUDE_SLEEP"] = "2"
         p = self.start()
         idle = self.wait_state("idle")
@@ -868,7 +868,7 @@ class TestHappyPath(WorkerTestBase):
         p = self.start()
         self.wait_marker(RID)
         self.wait_marker(RID2)
-        # 作業場所のパスは周回の間変わらず、写しの名前が識別子で変わる
+        # 作業場所のパスはループの間変わらず、写しの名前が識別子で変わる
         prompts = [c[1] for c in self.claude_calls()]
         ws = os.path.dirname(self.claude_records()[0]["cwd"])
         self.assertEqual(prompts, [
@@ -887,12 +887,12 @@ class TestHappyPath(WorkerTestBase):
         self.finish(p)
 
     def test_allowed_tools_replace_default(self):
-        # 権限モードを指定すれば既定 (auto) に代わる。0.13.0 で始めた周回は default を指定して続ける
+        # 権限モードを指定すれば既定 (auto) に代わる。0.13.0 で始めたループは default を指定して続ける
         self.put_request()
         p = self.start("--allowed-tools", "Read", "--allowed-tools", "Bash(git diff:*)",
                        "--permission-mode", "default")
         marker = self.wait_marker()
-        # 偽の claude はログの init の行に受けた権限モードを書くので、実効の権限モードも default になり、食い違わない
+        # 偽の claude はログの init の行に受けた権限モードを書くので、実効の権限モードも default になり、一致する
         self.assertEqual(marker["permission_mode"], {"specified": "default", "effective": "default"})
         self.assertEqual(marker["status"], "ok", marker)
         args = self.claude_calls()[0]
@@ -905,7 +905,7 @@ class TestHappyPath(WorkerTestBase):
         self.finish(p)
 
     def test_heartbeat_advances_during_review(self):
-        # レビュアの実行中 (偽の claude が 12 秒待つ) にも、worker.yaml の更新時刻が 5 秒おきに進む
+        # レビュアの実行中 (偽の claude が 12 秒待機する) にも、worker.yaml の更新時刻が 5 秒おきに進む
         self.env["FAKE_CLAUDE_SLEEP"] = "12"
         self.put_request()
         p = self.start()
@@ -932,7 +932,7 @@ class TestResultChecks(WorkerTestBase):
         return marker
 
     def test_empty_run_id(self):
-        # AE5。failed の回でも、結果が通常のファイルなら置き場に複写する (人間が RA1 の報告から読めるように)
+        # AE5。failed の回でも、結果が通常のファイルならループのディレクトリに複写する (人間が RA1 の報告から読めるように)
         marker = self.run_one("empty_run_id")
         self.assertEqual(marker["status"], "failed")
         self.assertIn("run_id mismatch", marker["error"])
@@ -959,7 +959,7 @@ class TestResultChecks(WorkerTestBase):
         self.assertIn("tree not clean (README.md)", marker["error"])
 
     def test_loop_dir_modified(self):
-        # レビュアの実行が置き場に依頼文を置くと failed にし、その依頼文をレビュアの実行に回さない
+        # レビュアの実行がループのディレクトリに依頼文を置くと failed にし、その依頼文をレビュアの実行に回さない
         marker = self.run_one("write_request")
         bogus = "29990101-0000-x-9-code-review-opus"
         self.assertEqual(marker["status"], "failed")
@@ -972,12 +972,12 @@ class TestResultChecks(WorkerTestBase):
         self.put_request()
         p = self.start()
         self.wait_marker()
-        time.sleep(7)  # 探索の周期 (5 秒) を 1 回以上待つ
+        time.sleep(7)  # 探索の周期 (5 秒) の 1 回分以上待機する
         self.assertEqual(len(self.claude_calls()), 1)
         self.finish(p)
 
     def test_loop_yaml_rewritten_during_review_is_not_a_modification(self):
-        # 作業側が再開や停止のときにレビュー中に loop.yaml を書き換えても、置き場の変化として数えない
+        # 作業側が再開や停止のときにレビュー中に loop.yaml を書き換えても、ループのディレクトリの変化として数えない
         self.env["FAKE_CLAUDE_SLEEP"] = "4"
         self.put_request()
         p = self.start()
@@ -992,7 +992,7 @@ class TestResultChecks(WorkerTestBase):
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_head_mismatch_does_not_run_reviewer(self):
-        # AE8: 依頼文の head と HEAD が違うと、偽の claude を呼ばずに failed の印を書く
+        # AE8: 依頼文の head と HEAD が違うと、偽の claude を呼ばずに failed のフラグファイルを書く
         old = self.head()
         with open(os.path.join(self.repo, "a.txt"), "w", encoding="utf-8") as f:
             f.write("a\n")
@@ -1039,7 +1039,7 @@ class TestWorkspace(WorkerTestBase):
     (worker.md の「回の処理」の手順 5〜10 と「レビュアの実行の権限」)。"""
 
     def assert_not_run(self, marker):
-        """レビュアの実行を起動しなかった回の印で、偽の claude が呼ばれず、作業場所が残っていないこと。"""
+        """レビュアの実行を起動しなかった回のフラグファイルで、偽の claude が呼ばれず、作業場所が残っていないこと。"""
         self.assertEqual(marker["status"], "failed", marker)
         self.assertEqual(self.claude_calls(), [])
         for key in ("head_after", "tree_clean_after", "exit_code", "log"):
@@ -1049,13 +1049,13 @@ class TestWorkspace(WorkerTestBase):
 
     def test_reviewer_runs_in_clone(self):
         # AE1: cwd は作業場所の tree/ で、依頼の head を detached で取り出し、remote が無い。
-        # 結果は印より先に置き場に現れ、回の後に作業場所は残らない
+        # 結果はフラグファイルより先にループのディレクトリに現れ、回の後に作業場所は残らない
         self.put_request()
         full = _git(self.repo, "rev-parse", "HEAD")
         p = self.start()
         marker_path = self.path(f"delivered-{RID}.yaml")
-        self.wait_for(lambda: os.path.exists(marker_path), what="完了の印")
-        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "印が現れた時点で結果が置き場に無い")
+        self.wait_for(lambda: os.path.exists(marker_path), what="完了のフラグファイル")
+        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "フラグファイルが現れた時点で結果がループのディレクトリに無い")
         self.wait_state("idle")
         self.finish(p)
         marker = _read_yaml(marker_path)
@@ -1121,7 +1121,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_workspace_path_taken_before_rename(self):
         # 前の回のレビュアの実行が残したプロセスが、準備の間に作業場所のパスを作り直した (偽の git の checkout の途中に作る) とき、
-        # シンボリックリンクと空でないディレクトリなら、リンクの先を変えずに改名が失敗し、レビュアの実行を起動せずに failed の印を書く。
+        # シンボリックリンクと空でないディレクトリなら、リンクの先を変えずに改名が失敗し、レビュアの実行を起動せずに failed のフラグファイルを書く。
         # 空のディレクトリなら改名で置き換わり、その回は通る
         ws = self.ws_path()
         victim = os.path.join(self.root, "victim")
@@ -1174,7 +1174,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(args[args.index("--setting-sources") + 1], "user,project")
         self.assertEqual(args.count("--settings"), 1)
         # フックのコマンドは、PATH で見つけた python3 の絶対パスと、起動時に読み込んだフックの中身 (ワーカーはコマンド置換で
-        # 読むので、末尾の改行は除かれる) を、それぞれシェルの引用符で囲んだもの。フックの振る舞いは TestWorkerHook で確かめる
+        # 読むので、末尾の改行は除かれる) を、それぞれシェルの引用符で囲んだもの。フックの振る舞いは TestWorkerHook で確認する
         with open(_HOOK, encoding="utf-8") as f:
             hook_source = f.read().rstrip("\n")
         python3 = shutil.which("python3", path=self.env["PATH"])
@@ -1226,7 +1226,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertIs(settings[0]["autoMemoryEnabled"], False)
 
     def test_sandbox_boolean_keys_are_overridden_not_checked(self):
-        # 利用者の設定とブランチの設定で、サンドボックスの制限を外す真偽値のキーが true でも、回は止めない。
+        # 利用者の設定とブランチの設定で、サンドボックスの制限を外す真偽値のキーが true でも、回は中断しない。
         # --settings はそれらの設定より優先されるので、ワーカーは false を渡して値を上書きする
         # (worker.md の「サンドボックス」)
         loose = {"sandbox": {"allowAppleEvents": True, "filesystem": {"disabled": True},
@@ -1290,13 +1290,13 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(rec["branch"], "")
 
     def test_request_copy_cannot_be_made(self):
-        # AE6: 扱いの行が無い (0.13.0 の依頼文)・2 つある・出力先が置き場を指さない・作業ツリーのパスが無い依頼文では、
-        # レビュアの実行を起動せずに failed の印を書き、作業場所を残さない
+        # AE6: 扱いの行が無い (0.13.0 の依頼文)・2 つある・出力先がループのディレクトリを指さない・作業ツリーのパスが無い依頼文では、
+        # レビュアの実行を起動せずに failed のフラグファイルを書き、作業場所を残さない
         line = "- 作業ツリーの扱い: 共有\n"
         cases = (
             ("扱いの行が無い", lambda t: t.replace(line, ""), "handling lines: 0"),
             ("扱いの行が 2 つ", lambda t: t.replace(line, line + line), "handling lines: 2"),
-            ("出力先が置き場を指さない",
+            ("出力先がループのディレクトリを指さない",
              lambda t: t.replace(self.path(f"review-{RID}.yaml"), os.path.join(self.root, f"review-{RID}.yaml")),
              "output path does not point to the loop dir"),
             ("作業ツリーのパスが無い", lambda t: t.replace(f"`{self.repo}`", "`/nowhere`"), "worktree path not found"),
@@ -1315,7 +1315,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_clone_stage_failure(self):
         # AE7: 複製の作成の段 (複製・remote の設定の削除・取り込み・チェックアウト) のどれかが失敗すると、
-        # レビュアの実行を起動せずに failed の印を書き、error に失敗した段を書く。作業場所は残らない
+        # レビュアの実行を起動せずに failed のフラグファイルを書き、error に失敗した段を書く。作業場所は残らない
         self.install_fake_git()
         for sub, stage in (("clone", "clone"), ("remote", "remove remote"), ("fetch", "fetch refs"),
                            ("checkout", "checkout")):
@@ -1342,7 +1342,7 @@ class TestWorkspace(WorkerTestBase):
     def test_clone_settings(self):
         # AE16: 複製の .claude/settings.json か .claude/settings.local.json に、空でない sandbox.excludedCommands か
         # sandbox.network.allowUnixSockets があるか、sandbox.network.allowLocalBinding が偽でないか、JSON として読めなければ、
-        # レビュアの実行を起動せずに failed の印を書く
+        # レビュアの実行を起動せずに failed のフラグファイルを書く
         sockets = json.dumps({"sandbox": {"network": {"allowUnixSockets": ["/var/run/docker.sock"]}}})
         binding = json.dumps({"sandbox": {"network": {"allowLocalBinding": True}}})
         cases = (
@@ -1379,8 +1379,8 @@ class TestWorkspace(WorkerTestBase):
                 _git(self.repo, "commit", "-q", "-m", f"remove {rel}")
 
     def test_clone_settings_without_excluded_commands(self):
-        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets、偽の sandbox.network.allowLocalBinding は止めない。
-        # 検査しないキー (sandbox.enableWeakerNetworkIsolation) も止めない
+        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets、偽の sandbox.network.allowLocalBinding では、回を中断しない。
+        # 検査しないキー (sandbox.enableWeakerNetworkIsolation) でも、回を中断しない
         path = os.path.join(self.repo, ".claude", "settings.json")
         os.makedirs(os.path.dirname(path))
         with open(path, "w", encoding="utf-8") as f:
@@ -1408,7 +1408,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(self.workspaces(), [])
 
     def test_reviewer_writes_loop_result_directly(self):
-        # AE13: レビュアの実行が置き場の出力先に直接書くと、置き場が変わったとして failed
+        # AE13: レビュアの実行がループのディレクトリの出力先に直接書くと、ループのディレクトリが変わったとして failed
         self.env["FAKE_CLAUDE_MODE"] = "write_loop_result"
         self.put_request()
         marker, _ = self.run_round()
@@ -1416,7 +1416,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertIn(f"loop dir modified (review-{RID}.yaml)", marker["error"])
 
     def test_result_copy_failure(self):
-        # AE15: 置き場の結果の一時名の場所にディレクトリがあると複写が失敗し、failed の印の error に複写の失敗を書く。ok の印は書かない
+        # AE15: ループのディレクトリの結果の一時名の場所にディレクトリがあると複写が失敗し、failed のフラグファイルの error に複写の失敗を書く。ok のフラグファイルは書かない
         os.makedirs(self.path(f".review-{RID}.yaml.tmp"))
         self.put_request()
         marker, _ = self.run_round()
@@ -1427,7 +1427,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_result_file_conditions(self):
         # 結果がシンボリックリンク・FIFO・ディレクトリのとき、実体が作業場所の外にあるとき、大きさが上限を越えるときに、
-        # 止まらずに failed の印を書き、結果を置き場に複写しない
+        # 停止せずに failed のフラグファイルを書き、結果をループのディレクトリに複写しない
         outside = os.path.join(self.root, "outside-result.yaml")
         self.env["FAKE_CLAUDE_OUTSIDE"] = outside
         cases = (
@@ -1449,7 +1449,7 @@ class TestWorkspace(WorkerTestBase):
                 self.assertEqual(self.workspaces(), [])
 
     def test_end_during_preparation(self):
-        # 準備の途中 (複製の作成中) に置き場に end が現れた回は、failed・loop dir modified の印を書いてから、end を見て終わる
+        # 準備の途中 (複製の作成中) にループのディレクトリに end が現れた回は、failed・loop dir modified のフラグファイルを書いてから、end を見て終了する
         self.install_fake_git()
         self.env["FAKE_GIT_TOUCH_ON"] = "clone"
         self.env["FAKE_GIT_TOUCH"] = self.path("end")
@@ -1489,7 +1489,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertFalse(os.path.lexists(ws))
 
     def test_leftover_process_is_stopped(self):
-        # 正常に終わったレビュアの実行が、別のプロセスグループで cwd が複製の中の子を残しても、回の後にその子は残らない
+        # 正常に終了したレビュアの実行が、別のプロセスグループで cwd が複製の中の子を残しても、回の後にその子は残らない
         self.env["FAKE_CLAUDE_MODE"] = "leave_child"
         self.put_request()
         marker, _ = self.run_round()
@@ -1499,7 +1499,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(self.workspaces(), [])
 
     def test_readonly_directory(self):
-        # 作業場所の中に読み取り専用のディレクトリがあっても、回の後に作業場所は残らない。印の exit_code は偽の claude の終了コードのまま
+        # 作業場所の中に読み取り専用のディレクトリがあっても、回の後に作業場所は残らない。フラグファイルの exit_code は偽の claude の終了コードのまま
         self.env["FAKE_CLAUDE_MODE"] = "readonly_dir"
         self.env["FAKE_CLAUDE_EXIT"] = "5"
         self.put_request()
@@ -1518,7 +1518,7 @@ class TestWorkspace(WorkerTestBase):
         return outside
 
     def remove_workspace_at_end(self, fill):
-        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終わるのを待つ。"""
+        """ワーカーを idle にし、関数 fill で作業場所の中身を作ってから end を置いて、ワーカーが作業場所を消して終了するまで待機する。"""
         p = self.start()
         self.wait_state("idle")
         fill(self.ws_path())
@@ -1545,10 +1545,10 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(os.listdir(outside), ["keep.txt"])
 
     def test_removal_does_not_follow_symlink_swapped_in(self):
-        # 作業場所の中のディレクトリを、確かめてから chmod するまでの間にシンボリックリンクに置き換えられても (前の回のレビュアの実行が
+        # 作業場所の中のディレクトリを、確認してから chmod するまでの間にシンボリックリンクに置き換えられても (前の回のレビュアの実行が
         # 残したプロセスの書き込みを、偽の python3 の前置きで起こす)、リンクの先の権限を変えない
         if os.chmod not in os.supports_follow_symlinks:
-            self.skipTest("この OS には lchmod が無い (chmod でシンボリックリンクを辿らない方法を、macOS でだけ確かめられる)")
+            self.skipTest("この OS には lchmod が無い (chmod でシンボリックリンクを辿らない方法を、macOS でだけ確認できる)")
         outside = self.make_outside_readonly_dir()
         done = os.path.join(self.root, "swap-done")
         self.prelude_python("add_owner_rwx", _SWAP_PRELUDE)
@@ -1585,8 +1585,8 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual(marker["skill_called"], "unknown")
 
     def test_no_result_line_is_unknown(self):
-        # result の行が無い (実行が最後まで行かなかった) ログでは、拒否の件数も、サンドボックスが止めた件数も unknown。
-        # 止められた呼び出しがあっても、件数が unknown なら calls は空
+        # result の行が無い (実行が最後まで行かなかった) ログでは、拒否の件数も、サンドボックスが拒否した件数も unknown。
+        # 拒否された呼び出しがあっても、件数が unknown なら calls は空
         marker = self.run_with_stream([
             {"type": "system", "subtype": "init", "model": "claude-opus-5"},
             _tool_use("toolu_1", "Bash", {"command": "touch /Users/x/y"}),
@@ -1628,7 +1628,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_worker_hook_denials_need_all_conditions(self):
         # 3 つの条件 (ツールが Bash でコマンドがフックの規則に当たる・tool_result の本文がフックの理由の文面と一致する) の
-        # どれかを満たさない拒否は、ワーカーのフックによるものと確かめられないので、permission_denials に数える
+        # どれかを満たさない拒否は、ワーカーのフックによるものと確認できないので、permission_denials に数える
         reason = _HOOK_NS["REASON"]
         tmp = "cat > /tmp/x.go"
         marker = self.run_with_stream([
@@ -1686,14 +1686,14 @@ class TestLogReading(WorkerTestBase):
 
     def test_permission_mode_mismatch(self):
         # AE4: 偽の claude が init の行の permissionMode に default を書く (auto モードを使えなかった) と、指定 (既定の auto) と
-        # 違うので failed。error に期待したモードと実際のモードを書き、印の permission_mode に指定と実効を書く
+        # 違うので failed。error に期待したモードと実際のモードを書き、フラグファイルの permission_mode に指定と実効を書く
         self.env["FAKE_CLAUDE_PERMISSION_MODE"] = "default"
         self.put_request()
         marker, _ = self.run_round()
         self.assertEqual(marker["status"], "failed", marker)
         self.assertEqual(marker["error"], "permission mode mismatch (expected auto, actual default)")
         self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "default"})
-        # failed の回でも、結果が通常のファイルなら置き場に複写する
+        # failed の回でも、結果が通常のファイルならループのディレクトリに複写する
         self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")))
 
     def test_permission_mode_without_init_line_is_unknown(self):
@@ -1707,7 +1707,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_permission_mode_ignores_subagent_init_line(self):
         # sub-agent の init の行 (parent_tool_use_id がある) は使わない。最上位の init の行より前に置いて、
-        # parent_tool_use_id を見ずに最初の init の行を読む誤りも検出できるようにする
+        # parent_tool_use_id を見ずに最初の init の行を読む実装のミスも検出できるようにする
         marker = self.run_with_stream([
             _init("auto", parent="toolu_agent"),
             _init("default"),
@@ -1729,11 +1729,11 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "default"})
         self.assertEqual(marker["status"], "failed", marker)
 
-    # ---- サンドボックスが止めた確認 (worker.md の「サンドボックスが止めた確認の数え方」) ----
+    # ---- サンドボックスが拒否した確認 (worker.md の「サンドボックスが拒否した確認の数え方」) ----
 
     def test_sandbox_blocked_top_level_and_subagent(self):
         # AE5: 最上位の Bash の結果 (本文の文面は小文字) と、sub-agent の中の Bash の結果 (大文字で始まる) の 2 件を数え、
-        # それぞれのコマンドと、本文のうち文面を含む行を印に書く。本文の形は実測したもの
+        # それぞれのコマンドと、本文のうち文面を含む行をフラグファイルに書く。本文の形は実測したもの
         marker = self.run_with_stream([
             _init("auto"),
             _tool_use("toolu_top", "Bash", {"command": "touch /Users/x/probe.txt", "description": "プローブを置く"}),
@@ -1750,11 +1750,11 @@ class TestLogReading(WorkerTestBase):
             {"command": "touch /Users/x/y",
              "message": "touch: /Users/x/y: Operation not permitted"},
         ]})
-        # サンドボックスが止めた確認は failed の条件にしない (その回を使うかは作業側が突き合わせで決める)
+        # サンドボックスが拒否した確認は failed の条件にしない (その回を使うかは作業側が突き合わせで決める)
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_sandbox_blocked_network_and_text_elements(self):
-        # 接続を止められた結果 (本文に <sandbox_violations> のタグ) も数え、message にタグの中の行 (止められたホスト) を書く。
+        # 接続を拒否された結果 (本文に <sandbox_violations> のタグ) も数え、message にタグの中の行 (拒否されたホスト) を書く。
         # 本文が text の要素の列の形の結果も数える
         marker = self.run_with_stream([
             _init("auto"),
@@ -1791,8 +1791,8 @@ class TestLogReading(WorkerTestBase):
 
     def test_sandbox_blocked_counts_successful_results(self):
         # is_error が偽の Bash の結果も、文面があれば数える。通し確認 (2026-09-28) で、出力を | tail に渡したコマンドと
-        # ; echo で終わるコマンドは、止められても成功で終わった。文面を含む文書を grep しただけの結果も、その行が
-        # レビュー対象のコミットに無ければ数える (見落として記録に入れるより、止めて人間が報告を読む方を選ぶ)
+        # 末尾が ; echo のコマンドは、拒否されても成功で終了した。文面を含む文書を grep しただけの結果も、その行が
+        # レビュー対象のコミットに無ければ数える (見落として記録に入れるより、RA1 で停止して人間が報告を読む方を選ぶ)
         go = "cd tree/tools && go test ./... 2>&1 | tail -30"
         cat = "cat > /tmp/t_test.go <<'EOF'\npackage main\nEOF\necho skip"
         grep = "grep -rn 'operation not permitted' ."
@@ -1816,13 +1816,13 @@ class TestLogReading(WorkerTestBase):
             {"command": grep, "message": "worker.md:330:(eval):1: operation not permitted: <パス>"},
         ]})
         self.assertEqual(marker["repo_text_displayed"], {"count": 0, "calls": []})
-        # サンドボックスが止めた確認を failed の条件にしないのは今までどおり (RA1 にするのは作業側)
+        # サンドボックスが拒否した確認を failed の条件にしないのは今までどおり (RA1 にするのは作業側)
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_sandbox_blocked_values_are_one_line(self):
         # 改行・タブ・引用符・バックスラッシュ・制御文字・行の区切りの文字・対になっていないサロゲート (JSON の \ud800 の
         # エスケープから入る、2 つ組で 1 文字を表す符号の片方) を含むコマンドと本文も、
-        # 印の YAML を壊さずに 1 行で書く (_read_yaml は二重引用符の文字列を JSON として読むので、エスケープの誤りも例外になる)。
+        # フラグファイルの YAML を壊さずに 1 行で書く (_read_yaml は二重引用符の文字列を JSON として読むので、エスケープの誤りも例外になる)。
         # コマンドと文面は先頭 200 文字で切る
         tricky = ("cat <<'EOF' > ~/probe.txt\n\"quoted\" and \\backslash\\\tTab\x01\x7f\x85\u2028\ud800 日本語\nEOF\n")
         long_command = "echo " + "x" * 300 + " > ~/long.txt"
@@ -1862,7 +1862,7 @@ class TestLogReading(WorkerTestBase):
         _git(self.repo, "commit", "-q", "-m", message)
         return self.head()
 
-    # 照合に使う行。#86 の周回で、表示しただけで数えられた行 (ワーカーの実装・テスト・文書) と同じ形にする
+    # 照合に使う行。#86 のループで、表示しただけで数えられた行 (ワーカーの実装・テスト・文書) と同じ形にする
     PY_PHRASE = 'PHRASE = "operation not permitted"   # ファイルの書き込みを止められたときの文面 (大文字と小文字を区別しない)'
     PY_TAG = 'TAG = "<sandbox_violations>"         # 接続を止められたときに本文に付くタグ'
     PY_TAG_END = 'TAG_END = "</sandbox_violations>"'
@@ -1871,10 +1871,10 @@ class TestLogReading(WorkerTestBase):
     DOC_NET = '      message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"'
     OLD_LINE = '旧い説明: サンドボックスの中から起動すると `sandbox-exec: sandbox_apply: Operation not permitted` で止まる。'
     MID_LINE = '途中のコミットにだけある行: Operation not permitted の例'
-    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 の周回の回 1 で、git log で表示しただけで数えられた形)
+    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 のループの 1 回目で、git log で表示しただけで数えられた形)
     MID_SUBJECT = 'mid: operation not permitted の例を足す'
     MID_BODY = 'ワーカーは、本文に文面 operation not permitted かタグ <sandbox_violations> があれば数える。'
-    # 開きタグと閉じタグを同じ行に書いた文書の行 (worker.md の「サンドボックスが止めた確認の数え方」の 3 にある形)
+    # 開きタグと閉じタグを同じ行に書いた文書の行 (worker.md の「サンドボックスが拒否した確認の数え方」の 3 にある形)
     BOTH_TAGS = '文面を含む行は、`<sandbox_violations>` の行から `</sandbox_violations>` の行までの行。'
 
     def make_review_range(self):
@@ -1898,10 +1898,10 @@ class TestLogReading(WorkerTestBase):
 
     def test_repo_text_displayed_is_not_counted(self):
         # #86: レビュアが差分や文書を表示しただけで、本文に文面とタグが現れた。文面かタグを含む行がどれも、
-        # レビュー対象のコミット (base と base..head の各コミット) の行を表示したものなら、サンドボックスが止めた確認に数えず、
+        # レビュー対象のコミット (base と base..head の各コミット) の行を表示したものなら、サンドボックスが拒否した確認に数えず、
         # repo_text_displayed に数える。表示の形は、行そのもの (sed)・差分の + と - と文脈の行 (git diff・git log -p)・
         # 行番号とタブ (cat -n)・grep -n のファイル名と行番号 (git grep -n のコミットの名前つきを含む)・1 つのファイルを
-        # grep -n したときの行番号・hunk の見出し。#86 の周回で照合できずに数えられた形 (コミットメッセージ・git blame・
+        # grep -n したときの行番号・hunk の見出し。#86 のループで照合できずに数えられた形 (コミットメッセージ・git blame・
         # git log --oneline・-n 無しの grep と git grep) も含める
         base = self.make_review_range()
         head_full = _git(self.repo, "rev-parse", "HEAD")
@@ -1910,7 +1910,7 @@ class TestLogReading(WorkerTestBase):
         self.env["FAKE_GIT_LOG"] = git_log
         diff_body = "\n".join([
             "diff --git a/worker/read_log_facts.py b/worker/read_log_facts.py",
-            # git は見出しの後ろに、hunk の前にある行の先頭を 80 バイトまで付ける (#86 の周回で実際に現れた形)
+            # git は見出しの後ろに、hunk の前にある行の先頭を 80 バイトまで付ける (#86 のループで実際に現れた形)
             '@@ -2,6 +2,7 @@ PHRASE = "operation not permitted"   # ファイルの書き込みを止めら',
             " " + self.PY_TAG,
             " " + self.PY_TAG_END,
@@ -1967,7 +1967,7 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual(marker["repo_text_displayed"]["count"], len(calls))
         self.assertEqual([c["command"] for c in marker["repo_text_displayed"]["calls"]], [c for c, _ in calls])
         # message には、文面かタグを含む行と、タグの行から閉じるタグの行までを書く。1 行への直し方と切り詰める長さも、
-        # サンドボックスが止めた確認と同じ (タブは空白にする)
+        # サンドボックスが拒否した確認と同じ (タブは空白にする)
         self.assertEqual(marker["repo_text_displayed"]["calls"][1]["message"],
                          f"2 {self.PY_PHRASE} 3 {self.PY_TAG} 4 {self.PY_TAG_END}"[:200])
         self.assertEqual(marker["status"], "ok", marker)
@@ -1978,9 +1978,9 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual([where for where, sub, caller in runs if sub == "grep"], [os.path.realpath(self.repo)])
 
     def test_repo_text_mixed_and_excluded_lines(self):
-        # 表示したものと確かめられない行が 1 行でもあれば、今までどおりサンドボックスが止めた確認に数え、
-        # message には表示したものと確かめた行を除いて書く (表示したタグの行からは、タグの中の行を含め始めない)。
-        # 文面だけの行とタグだけの行は照合に使わない — 接続を止められたときの本物の本文にはタグだけの行がある。
+        # 表示したものと確認できない行が 1 行でもあれば、今までどおりサンドボックスが拒否した確認に数え、
+        # message には表示したものと確認した行を除いて書く (表示したタグの行からは、タグの中の行を含め始めない)。
+        # 文面だけの行とタグだけの行は照合に使わない — 接続を拒否されたときの本物の本文にはタグだけの行がある。
         # レビュー対象の範囲の外 (別のブランチ) にしか無い行も照合に使わない
         _git(self.repo, "switch", "-q", "-c", "other")
         self.commit_files({"other.md": "別のブランチにだけある行: operation not permitted\n"}, "other")
@@ -1992,7 +1992,7 @@ class TestLogReading(WorkerTestBase):
         mixed = (f"{self.PY_TAG}\n{self.PY_TAG_END}\n{self.DOC_OPEN}\n"
                  "touch: /Users/x/y: Operation not permitted")
         # 本物のタグのブロックの中に、開きタグと閉じタグを同じ行に書いた文書の行を表示した行があっても、そこでタグの中の行を終え、
-        # 後ろの無関係な出力を message に含めない (#86 の周回の回 3 の指摘)
+        # 後ろの無関係な出力を message に含めない (#86 のループの 3 回目の指摘)
         net_with_doc = ("Exit code 56\n<sandbox_violations>\n"
                         "deny network-outbound a.example:443 (host is not on the allow list)\n"
                         f"{self.BOTH_TAGS}\n後続の無関係な出力")
@@ -2027,8 +2027,8 @@ class TestLogReading(WorkerTestBase):
 
     def test_repo_lines_unreadable(self):
         # 依頼文に base の行が無い・base が形に合わない (- で始まる)・コミットに解決できない・git grep が失敗したときは、
-        # リポジトリの行を読めなかったものとして、文面かタグを含む結果をすべてサンドボックスが止めた確認に数え、
-        # repo_text_displayed の件数を unknown にする。どれも回は止めない (status は ok)
+        # リポジトリの行を読めなかったものとして、文面かタグを含む結果をすべてサンドボックスが拒否した確認に数え、
+        # repo_text_displayed の件数を unknown にする。どれも回は中断しない (status は ok)
         base = self.make_review_range()
         body = f"     2\t{self.PY_PHRASE}"
         self.put_stream([
@@ -2079,9 +2079,9 @@ class TestLogReading(WorkerTestBase):
 
 class TestWorkerHook(WorkerTestBase):
     """ワーカーがレビュアの実行に渡す PreToolUse のフック (worker.md の「/tmp を含むコマンドを拒否するフック」)。
-    ワーカーが --settings に埋め込んだコマンドを、Claude Code と同じくシェルで実行して確かめる。"""
+    ワーカーが --settings に埋め込んだコマンドを、Claude Code と同じくシェルで実行して確認する。"""
 
-    # 拒否するコマンド。先頭の 3 つは goose-ut の周回で、サンドボックスが /tmp への書き込みを止めたもの (#80)
+    # 拒否するコマンド。先頭の 3 つは goose-ut のループで、サンドボックスが /tmp への書き込みを拒否したもの (#80)
     DENIED = [
         "cat > /tmp/x.go 2>/dev/null <<'EOF'\nEOF\nmkdir -p \"$TMPDIR/rx\" && cat > \"$TMPDIR/rx/main.go\" <<'EOF'\nEOF",
         "cat > /tmp/x.go 2>/dev/null; mkdir -p ./tmp/markerprobe && cat > ./tmp/markerprobe/main_test.go <<'EOF'\nEOF",
@@ -2092,7 +2092,7 @@ class TestWorkerHook(WorkerTestBase):
         "cd '/tmp' && ls",
         "python3 -c \"open('/tmp/x', 'w')\"",
     ]
-    # 拒否しないコマンド。/tmp の前か後が、パスや名前の続きになる文字のもの
+    # 拒否しないコマンド。/tmp の前か後に、パスや名前の一部として続く文字があるもの
     ALLOWED = [
         "mkdir -p ./tmp/a && echo x > ./tmp/a/b",
         "mkdir -p tmp && cat > tmp/probe_test.go <<'EOF'\nEOF",
@@ -2243,7 +2243,7 @@ class TestStartChecks(WorkerTestBase):
 
     def test_leftover_interrupt_file_is_removed(self):
         # 起動時の確認の 16: 前の起動が残した割り込みを記録するファイルと一時名 (親が kill -9 で消えると残ることがある) は消す。
-        # 残すと、子が起動してすぐに割り込みを受けたものとして終わる。シンボリックリンクはリンクだけを消し、リンクの先は残す
+        # 残すと、子が起動してすぐに割り込みを受けたものとして終了する。シンボリックリンクはリンクだけを消し、リンクの先は残す
         path, tmp = self.interrupt_paths()
         target = os.path.join(self.root, "outside-interrupt")
         with open(target, "w", encoding="utf-8") as f:
@@ -2254,7 +2254,7 @@ class TestStartChecks(WorkerTestBase):
         p = self.start()
         self.wait_state("idle")
         time.sleep(2)
-        self.assertIsNone(p.poll(), "残っていた割り込みを記録するファイルで、ワーカーが終わった")
+        self.assertIsNone(p.poll(), "残っていた割り込みを記録するファイルで、ワーカーが終了した")
         self.assertEqual(self.worker_state()["state"], "idle")
         self.assertFalse(os.path.lexists(path))
         self.assertFalse(os.path.lexists(tmp))
@@ -2263,7 +2263,7 @@ class TestStartChecks(WorkerTestBase):
         self.assertEqual(code, 143)
 
     def test_interrupt_file_path_occupied(self):
-        # 起動時の確認の 16: 割り込みを記録するファイルのパスか一時名に、消せないもの (ディレクトリ) があれば止める。
+        # 起動時の確認の 16: 割り込みを記録するファイルのパスか一時名に、消せないもの (ディレクトリ) があれば停止する。
         # 親が書けず、子に割り込みを伝えられないため
         for i in range(2):
             occupied = self.interrupt_paths()[i]
@@ -2274,7 +2274,7 @@ class TestStartChecks(WorkerTestBase):
 
 
 class TestParentAvoidsCommandSubstitution(unittest.TestCase):
-    """trap を設定した後の親 (worker.md の「終わり方」) は、コマンド置換を使わない。bash は、コマンド置換を処理している間に
+    """trap を設定した後の親 (worker.md の「終了の仕方」) は、コマンド置換を使わない。bash は、コマンド置換を処理している間に
     受けたシグナルの trap を実行しないことがあるため (#105)。後から親の部分や、親が呼ぶ関数に $(...) を足すと、割り込みが
     失われうる。"""
 
@@ -2380,12 +2380,12 @@ class TestWorkerYamlOnStart(WorkerTestBase):
 
 class TestPythonScriptsLoadedAtStart(WorkerTestBase):
     """ワーカーは、python3 で実行するファイル (ディレクトリ review-triage/scripts/review-loop-worker/ の .py) の中身を
-    起動時に読み込み、読み込んだ中身を実行する (worker.md の「要るもの」)。周回の間に別のセッションがプラグインを更新して、
+    起動時に読み込み、読み込んだ中身を実行する (worker.md の「要るもの」)。ループの間に別のセッションがプラグインを更新して、
     古いバージョンのディレクトリの中身が消えても、ワーカーが動き続けるようにするため。"""
 
     def test_keeps_running_after_python_dir_moved(self):
         # プラグインのスクリプトとファイルを一時ディレクトリに写してワーカーを起動し、1 回を処理させた後に .py のディレクトリを
-        # 別名に移す。次の依頼文も、ファイルを開かずに処理を終え、ok の印を書く
+        # 別名に移す。次の依頼文も、ファイルを開かずに処理を終え、ok のフラグファイルを書く
         copy = os.path.join(self.root, "plugin", "review-triage")
         shutil.copytree(os.path.join(_HERE, "..", "scripts"), os.path.join(copy, "scripts"),
                         ignore=shutil.ignore_patterns("__pycache__"))
@@ -2453,15 +2453,15 @@ class TestSandboxStartChecks(WorkerTestBase):
                 self.start_unavailable(env=env, contains=contains)
 
     def test_sandbox_tmp(self):
-        # AE11: 作業側か周回の置き場が、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
+        # AE11: 作業側かループのディレクトリが、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
         if not (os.path.isdir(_SANDBOX_TMP) and os.access(_SANDBOX_TMP, os.W_OK)):
-            self.skipTest(f"{_SANDBOX_TMP} が無い (macOS で Claude Code のサンドボックスを使った機材でだけ確かめられる)")
+            self.skipTest(f"{_SANDBOX_TMP} が無い (macOS で Claude Code のサンドボックスを使った機材でだけ確認できる)")
         base = tempfile.mkdtemp(prefix="review-loop-worker-test-", dir=_SANDBOX_TMP)
         self.addCleanup(shutil.rmtree, base, True)
-        with self.subTest("周回の置き場"):
+        with self.subTest("ループのディレクトリ"):
             loop = os.path.join(base, "loop")
             _make_loop_dir(loop, self.repo)
-            self.start_unavailable(loop=loop, contains=["周回の置き場", "サンドボックスの一時ディレクトリ"])
+            self.start_unavailable(loop=loop, contains=["ループのディレクトリ", "サンドボックスの一時ディレクトリ"])
         with self.subTest("作業側"):
             repo = os.path.join(base, "repo")
             _make_repo(repo)
@@ -2470,16 +2470,16 @@ class TestSandboxStartChecks(WorkerTestBase):
             self.start_unavailable(loop=loop, cwd=repo, contains=["作業側", "サンドボックスの一時ディレクトリ"])
 
     def test_special_characters_in_paths(self):
-        # 許可と拒否の規則に書けない文字を、作業側・周回の置き場・TMPDIR の実体パスに含まない
+        # 許可と拒否の規則に書けない文字を、作業側・ループのディレクトリ・TMPDIR の実体パスに含まない
         for c in "()[]{}*?!#":
             with self.subTest(f"TMPDIR に {c}"):
                 tmpdir = os.path.join(self.root, f"tmp{c}dir")
                 os.makedirs(tmpdir)
                 self.start_unavailable(env=dict(self.env, TMPDIR=tmpdir), contains=["TMPDIR", f"「{c}」"])
-        with self.subTest("周回の置き場に #"):
+        with self.subTest("ループのディレクトリに #"):
             loop = os.path.join(self.root, "loop#1")
             _make_loop_dir(loop, self.repo)
-            self.start_unavailable(loop=loop, contains=["周回の置き場", "「#」"])
+            self.start_unavailable(loop=loop, contains=["ループのディレクトリ", "「#」"])
         with self.subTest("作業側に ("):
             repo = os.path.join(self.root, "repo (copy)")
             _make_repo(repo)
@@ -2488,8 +2488,8 @@ class TestSandboxStartChecks(WorkerTestBase):
             self.start_unavailable(loop=loop, cwd=repo, contains=["作業側", "「(」"])
 
     def test_sandbox_allow_write_must_not_contain_protected_places(self):
-        # AE11: --sandbox-allow-write ~ など。ホーム・作業側・周回の置き場と同じか、その祖先の値は受け付けない。
-        # 1 つ目に問題の無い値を置いて、2 つ目以降の値も確かめていることを見る
+        # AE11: --sandbox-allow-write ~ など。ホーム・作業側・ループのディレクトリと同じか、その祖先の値は受け付けない。
+        # 1 つ目に問題の無い値を置いて、2 つ目以降の値も確認していることを見る
         link = os.path.join(self.root, "home-link")
         os.symlink(self.home, link)
         cases = (
@@ -2500,8 +2500,8 @@ class TestSandboxStartChecks(WorkerTestBase):
             ("ホームの祖先", self.root, "ホーム"),
             ("/", "/", "ホーム"),
             ("作業側", self.repo, "作業側"),
-            ("周回の置き場", self.loop, "周回の置き場"),
-            ("周回の置き場の祖先", os.path.join(self.repo, "tmp"), "周回の置き場"),
+            ("ループのディレクトリ", self.loop, "ループのディレクトリ"),
+            ("ループのディレクトリの祖先", os.path.join(self.repo, "tmp"), "ループのディレクトリ"),
         )
         for label, value, contains in cases:
             with self.subTest(label):
@@ -2510,14 +2510,14 @@ class TestSandboxStartChecks(WorkerTestBase):
                                        contains=["--sandbox-allow-write", contains])
 
     def test_sandbox_allow_write_must_not_be_below_repo_or_loop(self):
-        # 作業側と周回の置き場は、その下の場所も受け付けない (作業側の .git や、git が無視する場所への書き込みを許さないため)。
+        # 作業側とループのディレクトリは、その下の場所も受け付けない (作業側の .git や、git が無視する場所への書き込みを許さないため)。
         # ホームの下の場所は受け付ける (Go のビルドのキャッシュなど)
         loop_outside = os.path.join(self.root, "loops", LOOP_ID)
         _make_loop_dir(loop_outside, self.repo)
         cases = (
             ("作業側の .git", os.path.join(self.repo, ".git"), self.loop, "作業側"),
             ("作業側の下のまだ無い場所", os.path.join(self.repo, ".venv", "cache"), self.loop, "作業側"),
-            ("作業側の外にある周回の置き場の下", os.path.join(loop_outside, "x"), loop_outside, "周回の置き場"),
+            ("作業側の外にあるループのディレクトリの下", os.path.join(loop_outside, "x"), loop_outside, "ループのディレクトリ"),
         )
         for label, value, loop, contains in cases:
             with self.subTest(label):
@@ -2587,7 +2587,7 @@ class TestSandboxStartChecks(WorkerTestBase):
         self.start_idle("--", "--plugin-dir", plugin, "--settings", settings)
 
     def test_user_settings_excluded_commands(self):
-        # AE11: 利用者の設定に sandbox.excludedCommands がある。JSON として読めない設定も、検査できないので止める
+        # AE11: 利用者の設定に sandbox.excludedCommands がある。JSON として読めない設定も、検査できないので停止する
         cases = (
             ("sandbox.excludedCommands がある", {"sandbox": {"excludedCommands": ["docker"]}},
              "sandbox.excludedCommands"),
@@ -2614,8 +2614,8 @@ class TestSandboxStartChecks(WorkerTestBase):
                 self.start_unavailable(contains=["利用者の設定", *contains])
 
     def test_user_settings_without_excluded_commands(self):
-        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets は止めない。
-        # 利用者の設定の sandbox.network.allowLocalBinding は、真でも止めない (止めるのはレビュー対象のブランチの設定だけ)
+        # 空の sandbox.excludedCommands と sandbox.network.allowUnixSockets は停止しない。
+        # 利用者の設定の sandbox.network.allowLocalBinding は、真でも停止しない (停止するのはレビュー対象のブランチの設定だけ)
         cases = (
             ("excludedCommands が空", {"sandbox": {"enabled": True, "excludedCommands": []}}),
             ("allowUnixSockets が空", {"sandbox": {"network": {"allowUnixSockets": [], "allowLocalBinding": True}}}),
@@ -2656,14 +2656,14 @@ class TestSandboxStartChecks(WorkerTestBase):
 
     def test_claude_config_dir_must_be_absolute(self):
         # CLAUDE_CONFIG_DIR が相対パスだと、Claude Code 本体はレビュアの実行の cwd (複製) から解決するので、
-        # ワーカーは同じファイルを確かめられず起動しない
+        # ワーカーは同じファイルを確認できず起動しない
         env = dict(self.env, CLAUDE_CONFIG_DIR="relative/config-dir")
         self.start_unavailable(env=env, contains=["CLAUDE_CONFIG_DIR", "絶対パス"])
 
 
 class TestNetworkNotice(WorkerTestBase):
     """起動時の表示 (worker.md の「起動時の確認」の 15): 利用者の設定の WebFetch(domain:…) の許可は、
-    サンドボックスの接続を許すホストに加わるので、それを表示する。止めはしない。"""
+    サンドボックスの接続を許すホストに加わるので、それを表示する。停止はしない。"""
 
     def test_all_hosts(self):
         # AE17
@@ -2722,8 +2722,8 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=3, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_idle_leaves_no_idle_sleep(self):
-        # 待機中に割り込みを受けて終わったワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
-        # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待つ。待機に入った直後に送るので、
+        # 待機中に割り込みを受けて終了したワーカーは、待機のコマンド sleep (最大でワーカーの変数 POLL_SECONDS の秒数) を残さない。
+        # 残すと、sleep が標準出力と標準エラーを開いたまま残り、端末やテストはそれが閉じるまで待機する。待機に入った直後に送るので、
         # 残れば数秒はプロセスグループに残る
         p = self.start()
         self.wait_state("idle")
@@ -2731,14 +2731,14 @@ class TestEnding(WorkerTestBase):
         p.wait(timeout=20)
         self.assertEqual(p.returncode, 143)
         self.wait_for(lambda: not _group_alive(p.pid), timeout=1.5,
-                      what="ワーカーが終わった後に、プロセスグループが空になる")
+                      what="ワーカーが終了した後に、プロセスグループが空になる")
         p.communicate(timeout=5)
 
     def test_group_signal_while_child_checks_parent(self):
-        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まる。子は、
-        # ps がシグナルで止まったときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終わる)
-        # ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
-        # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせる
+        # 子が親の生存を確認する ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も停止する。子は、
+        # ps がシグナルで停止したときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終了する)
+        # ではなく、割り込みとして worker.yaml を left にして終了する。偽の ps (関数 install_fake_ps) で、
+        # 親の生存の確認 (ps -o stat= -p <PID>) を 3 秒遅らせる
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
         self.install_fake_ps(trigger, log, "sleep 3")
@@ -2752,15 +2752,15 @@ class TestEnding(WorkerTestBase):
                 self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
-        # 子が親の生存を確かめる ps がシグナルで止まっても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
-        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確かめる — 親が無いと判定すると、
-        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終わる) で子が終わる。偽の ps は自分に TERM を送って終わる
+        # 子が親の生存を確認する ps がシグナルで停止しても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
+        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確認する — 親が無いと判定すると、
+        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終了する) で子が終了する。偽の ps は自分に TERM を送って終了する
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
         self.install_fake_ps(trigger, log, 'kill -TERM "$$"')
         p = self.start_until_child_checks_parent(trigger, log)
         time.sleep(1)
-        self.assertIsNone(p.poll(), "ps が止まった後に、ワーカーが終わった")
+        self.assertIsNone(p.poll(), "ps が停止した後に、ワーカーが終了した")
         with open(self.path("end"), "w", encoding="utf-8") as f:
             f.write("人間が置いた\n")
         out, err = p.communicate(timeout=20)
@@ -2769,8 +2769,8 @@ class TestEnding(WorkerTestBase):
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_sigkill_after_parent_records_interrupt(self):
-        # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終わる
-        # (worker.yaml を left にしない。worker.md の「終わり方」の kill -9 の箇条)。偽の ps で、子が親の生存を確かめる ps を
+        # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終了する
+        # (worker.yaml を left にしない。worker.md の「終了の仕方」の kill -9 の箇条)。偽の ps で、子が親の生存を確認する ps を
         # 3 秒遅らせ、その間に親だけに TERM を送ってファイルを書かせてから、親を消す
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
@@ -2786,18 +2786,18 @@ class TestEnding(WorkerTestBase):
         self.assertEqual(self.worker_state().get("pid"), p.pid)
 
     def test_interrupt_while_command_substitution_child_exits(self):
-        # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終わりを待つ間に SIGINT を受けても終わる。bash は、
-        # コマンド置換のために起動したプロセスが出力を閉じてから終わるまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
-        # 終わらなければ実行しない (#105 の現象 B。
+        # 待機中のワーカーが、コマンド置換 $(date ...) のために起動した date の終了まで待機する間に SIGINT を受けても終了する。bash は、
+        # コマンド置換のために起動したプロセスが出力を閉じてから終了するまでの間に受けた SIGINT の trap を、そのプロセスが SIGINT で
+        # 終了しなければ実行しない (#105 の現象 B。
         # macOS の bash 3.2・bash 5.2・5.3 で起きる)。そのため割り込みは、コマンド置換を使わない親が受けて、子にファイルで伝える
-        # (worker.md の「終わり方」)。偽の date は、標準出力を閉じてから SIGINT を無視して待ち、SIGINT では終わらない
+        # (worker.md の「終了の仕方」)。偽の date は、標準出力を閉じてから SIGINT を無視して待機し、SIGINT では終了しない
         trigger = os.path.join(self.root, "date-trigger")
         started = os.path.join(self.root, "date-started")
         self.install_fake_date(trigger, started)
         p = self.start()
         self.wait_state("idle")
         open(trigger, "w").close()
-        self.wait_for(lambda: os.path.exists(started), what="偽の date が SIGINT を無視して待ち始めること")
+        self.wait_for(lambda: os.path.exists(started), what="偽の date が SIGINT を無視して待機を始めること")
         os.killpg(p.pid, signal.SIGINT)
         out, _ = p.communicate(timeout=20)
         self.assertEqual(p.returncode, 130)
@@ -2809,8 +2809,8 @@ class TestEnding(WorkerTestBase):
 
     def test_interrupt_right_after_child_starts(self):
         # 子が自分の PID を求めるコマンド置換 (PATH で見つかる sh を起動する) の間に親が割り込みを受けても、子は USR1 のデフォルトの
-        # 動作 (終了) で終わらず、worker.yaml を left にして終わる。子は trap を最初に設定する (関数 body_main)。
-        # 偽の sh は、最初の 1 回だけ待ち始めたことをファイルに書いてから 2 秒待ち、その区間を広げる
+        # 動作 (終了) で終了せず、worker.yaml を left にして終了する。子は trap を最初に設定する (関数 body_main)。
+        # 偽の sh は、最初の 1 回だけ待機を始めたことをファイルに書いてから 2 秒待機し、その区間を広げる
         started = os.path.join(self.root, "sh-started")
         path = os.path.join(self.bin, "sh")
         with open(path, "w", encoding="utf-8") as f:
@@ -2818,7 +2818,7 @@ class TestEnding(WorkerTestBase):
         os.chmod(path, 0o755)
         self.env["FAKE_SH_STARTED"] = started
         p = self.start()
-        self.wait_for(lambda: os.path.exists(started), what="偽の sh が待ち始めること")
+        self.wait_for(lambda: os.path.exists(started), what="偽の sh が待機を始めること")
         p.send_signal(signal.SIGTERM)
         out, err = p.communicate(timeout=20)
         self.assertEqual(p.returncode, 143, err)
@@ -2828,8 +2828,8 @@ class TestEnding(WorkerTestBase):
 
     def test_second_interrupt_while_parent_writes_interrupt_file(self):
         # 親が割り込みを記録するファイルを書いている間に、2 回目の割り込み (Ctrl-C を続けて押したとき) がプロセスグループに届いても、
-        # ファイルは書かれ、ワーカーは終わる。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
-        # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待つ
+        # ファイルは書かれ、ワーカーは終了する。親は、INT・TERM・HUP を無視するサブシェルで書く (関数 write_interrupt_file)。
+        # 偽のコマンド mv は、ファイルへの改名を始めたことをファイル started に書いてから 2 秒待機する
         started = os.path.join(self.root, "mv-started")
         path = os.path.join(self.bin, "mv")
         with open(path, "w", encoding="utf-8") as f:
@@ -2846,11 +2846,11 @@ class TestEnding(WorkerTestBase):
         out, err = p.communicate(timeout=20)
         self.assertEqual(p.returncode, 130, err)
         self.assertEqual(self.worker_state()["state"], "left", err)
-        self.assertNotIn("書き直す", err)
+        self.assertNotIn("書き込みをやり直す", err)
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_interrupt_file_rewritten_when_write_fails(self):
-        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き直し、ワーカーは終わる。書けなかったことは
+        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き込みをやり直し、ワーカーは終了する。書けなかったことは
         # 1 度だけ標準エラーに知らせる (関数 write_interrupt_file)。偽の mv は、ファイルへの最初の改名だけを失敗させる
         failed = os.path.join(self.root, "mv-failed")
         path = os.path.join(self.bin, "mv")
@@ -2869,11 +2869,11 @@ class TestEnding(WorkerTestBase):
         self.assertTrue(os.path.exists(failed), "偽の mv が改名を失敗させていない")
         self.assertEqual(p.returncode, 143, err)
         self.assertEqual(self.worker_state()["state"], "left", err)
-        self.assertEqual(err.count("書き直す"), 1, err)
+        self.assertEqual(err.count("書き込みをやり直す"), 1, err)
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_timeout(self):
-        # AE15: 終わらない偽の claude を上限で止め、子プロセスも残さない
+        # AE15: 終了しない偽の claude を上限で停止し、子プロセスも残さない
         self.env["FAKE_CLAUDE_MODE"] = "hang"
         self.put_request()
         p = self.start("--review-timeout-minutes", "0.05")
@@ -2887,9 +2887,9 @@ class TestEnding(WorkerTestBase):
         self.finish(p)
 
     def test_sigkill_while_stopping_reviewer_after_timeout(self):
-        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に親を kill -9 で消しても、
-        # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終わる (worker.md の「終わり方」)。偽の claude は
-        # TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        # 上限を越えた回は、回の終了処理をレビュアの実行を停止するところから始める。停止するまで待機する間に親を kill -9 で消しても、
+        # 子はその回のフラグファイル (failed・timeout) を書き終えてから、後始末をせずに終了する (worker.md の「終了の仕方」)。偽の claude は
+        # TERM を受けても終了せず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
         self.put_request()
@@ -2903,7 +2903,7 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_reviewing(self):
-        # AE16: 割り込みを受けたら、レビュアの実行とその子を止めて failed の印と left を書く。作業場所は残らない
+        # AE16: 割り込みを受けたら、レビュアの実行とその子を停止して failed のフラグファイルと left を書く。作業場所は残らない
         for sig, code in ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129)):
             with self.subTest(sig=sig.name):
                 for n in os.listdir(self.loop):
@@ -2936,8 +2936,8 @@ class TestEnding(WorkerTestBase):
 
     def test_sigkill_during_review_leaves_no_worker_processes(self):
         # レビュー中にワーカーを SIGKILL で消すと、ワーカーのプロセスグループ (子と、更新時刻を進める処理と、上限を測る処理) は
-        # 10 秒以内に空になる。子は、上限を測る処理が送る USR1 で親が消えたことに気づき、後始末をせずに終わる (worker.yaml も
-        # 印も書かない)。レビュアの実行は専用のプロセスグループなので残る (trap が動かないので止められない)
+        # 10 秒以内に空になる。子は、上限を測る処理が送る USR1 で親が消えたことに気づき、後始末をせずに終了する (worker.yaml も
+        # フラグファイルも書かない)。レビュアの実行は専用のプロセスグループなので残る (trap が動かないので停止できない)
         self.env["FAKE_CLAUDE_MODE"] = "hang"
         self.put_request()
         p = self.start()
@@ -2952,10 +2952,10 @@ class TestEnding(WorkerTestBase):
         self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")))
 
     def test_sigkill_while_child_is_outside_wait(self):
-        # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終わるまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
-        # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) を待ち続ける。
-        # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待たせ、その間に親を消す (上限を測る処理は、
-        # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待たせないように、準備の
+        # 回の処理の間に親が kill -9 で消えると、上限を測る処理は、子が終了するまで 1 秒おきに USR1 を送る (関数 start_watchdog)。
+        # 1 度だけだと、子が wait の外にいる間に届いた USR1 は trap で消え、子は次の wait (レビュアの実行) で待機し続ける。
+        # 偽のコマンド date で、手順 9 の確認の後の関数 log の date (+%H:%M:%S) を 8 秒待機させ、その間に親を消す (上限を測る処理は、
+        # ワーカーの変数 POLL_SECONDS の秒数のうちに親が消えたことに気づく)。手順 9 より前の log で待機させないように、準備の
         # 途中の複製の設定の確認 (偽の python3 で遅らせる) が始まってから、偽の date のトリガーを作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 2, touch)
@@ -2967,7 +2967,7 @@ class TestEnding(WorkerTestBase):
         p = self.start()
         self.wait_for(lambda: os.path.exists(touch), what="複製の設定の確認の開始")
         open(trigger, "w").close()
-        self.wait_for(lambda: os.path.exists(started), timeout=20, what="手順 9 の確認の後の log の date が待ち始めること")
+        self.wait_for(lambda: os.path.exists(started), timeout=20, what="手順 9 の確認の後の log の date が待機を始めること")
         os.kill(p.pid, signal.SIGKILL)
         p.wait(timeout=20)
         self.wait_for(lambda: os.path.exists(self.pids_file), timeout=20, what="偽の claude の起動")
@@ -2979,8 +2979,8 @@ class TestEnding(WorkerTestBase):
         self.assertFalse(os.path.exists(self.path(f"delivered-{RID}.yaml")))
 
     def test_sigkill_stops_heartbeat(self):
-        # AE17: ワーカーを SIGKILL で消すと、10 秒以内に worker.yaml の更新時刻が止まる。待機中の子は、依頼文を探す周期ごとに
-        # 親が消えたことに気づき、後始末をせずに終わる (worker.yaml を left にしない)
+        # AE17: ワーカーを SIGKILL で消すと、10 秒以内に worker.yaml の更新時刻が進まなくなる。待機中の子は、依頼文を探す周期ごとに
+        # 親が消えたことに気づき、後始末をせずに終了する (worker.yaml を left にしない)
         p = self.start()
         self.wait_state("idle")
         os.kill(p.pid, signal.SIGKILL)
@@ -2995,7 +2995,7 @@ class TestEnding(WorkerTestBase):
 
 
 class TestTimeoutDuringPreparation(WorkerTestBase):
-    """上限は、依頼文を受け取ってからレビュアの実行が終わるまでを測る (worker.md の「回の処理」)。
+    """上限は、依頼文を受け取ってからレビュアの実行が終了するまでを測る (worker.md の「回の処理」)。
     準備 (作業場所・複製・複製の設定・写し) の途中で越えた回は、レビュアの実行を起動しない (計画の AE8)。"""
 
     def assert_timeout_without_run(self, p):
@@ -3012,7 +3012,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
         return marker
 
     def test_timeout_while_cloning(self):
-        # 複製の作成 (偽の git の clone) が終わらないと、上限で偽の git のプロセスグループを止め、failed・timeout の印を書く
+        # 複製の作成 (偽の git の clone) が終了しないと、上限で偽の git のプロセスグループを停止し、failed・timeout のフラグファイルを書く
         self.delay_git("clone")
         self.put_request()
         p = self.start("--review-timeout-minutes", "0.05")
@@ -3022,7 +3022,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
 
     def test_timeout_just_before_request_copy(self):
         # 複製の設定の確認 (手順 7) を遅らせて、写しの作成 (手順 8) の直前に上限を越えさせる。
-        # 準備の段の合間に越えても、次の段の前かレビュアの実行を起動する前に確かめるので、偽の claude は呼ばれない
+        # 準備の段の合間に越えても、次の段の前かレビュアの実行を起動する前に確認するので、偽の claude は呼ばれない
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 5, touch)
         self.put_request()
@@ -3032,14 +3032,14 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
 
 
 class TestInterruptPhases(WorkerTestBase):
-    """割り込みを受けた時点ごとの扱い (worker.md の「終わり方」。計画の AE9)。レビュアの実行中の扱いは
-    TestEnding.test_interrupt_while_reviewing で確かめる。シグナルは、端末の Ctrl-C と同じくワーカーのプロセスグループに送る。"""
+    """割り込みを受けた時点ごとの扱い (worker.md の「終了の仕方」。計画の AE9)。レビュアの実行中の扱いは
+    TestEnding.test_interrupt_while_reviewing で確認する。シグナルは、端末の Ctrl-C と同じくワーカーのプロセスグループに送る。"""
 
     SIGNALS = ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129))
 
     def test_interrupt_during_preparation(self):
-        # 準備の途中 (偽の git の clone が終わらない間) に割り込みを受けると、準備のプロセスグループを止め、準備のディレクトリと
-        # 作業場所を消し、印を書かずに left で終わる。起動し直したワーカーが、印の無い同じ依頼文を処理する
+        # 準備の途中 (偽の git の clone が終了しない間) に割り込みを受けると、準備のプロセスグループを停止し、準備のディレクトリと
+        # 作業場所を消し、フラグファイルを書かずに left で終了する。起動し直したワーカーが、フラグファイルの無い同じ依頼文を処理する
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
                 self.reset_loop()
@@ -3067,10 +3067,10 @@ class TestInterruptPhases(WorkerTestBase):
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_interrupt_while_stopping_reviewer_after_timeout(self):
-        # 上限を越えた回は、回の終わりの処理をレビュアの実行を止めるところから始める。止まるのを待つ間に割り込みを受けても、
-        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終わる (関数 on_signal の、
-        # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終わり方」の、子の箇条の次の、回の終わりの処理の途中の項)。
-        # 偽の claude は TERM を受けても終わらず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待たせる
+        # 上限を越えた回は、回の終了処理をレビュアの実行を停止するところから始める。停止するまで待機する間に割り込みを受けても、
+        # その回のフラグファイルを、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終了する (関数 on_signal の、
+        # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終了の仕方」の、子の箇条の次の、回の終了処理の途中の項)。
+        # 偽の claude は TERM を受けても終了せず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
@@ -3085,7 +3085,7 @@ class TestInterruptPhases(WorkerTestBase):
                 os.killpg(p.pid, sig)
                 _, err = p.communicate(timeout=30)
                 self.assertEqual(p.returncode, code, err)
-                self.assertTrue(os.path.exists(self.path(f"delivered-{RID}.yaml")), "その回の印が書かれていない")
+                self.assertTrue(os.path.exists(self.path(f"delivered-{RID}.yaml")), "その回のフラグファイルが書かれていない")
                 marker = _read_yaml(self.path(f"delivered-{RID}.yaml"))
                 self.assertEqual(marker["status"], "failed", err)
                 self.assertEqual(marker["error"], "timeout", err)
@@ -3096,8 +3096,8 @@ class TestInterruptPhases(WorkerTestBase):
 
     def test_group_signal_while_child_runs_foreground_command(self):
         # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM か HUP
-        # (端末を閉じたとき) が届くと、そのコマンドも止まる。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
-        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、印を書かずに left で終わる (worker.md の「終わり方」の
+        # (端末を閉じたとき) が届くと、そのコマンドも停止する。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
+        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、フラグファイルを書かずに left で終了する (worker.md の「終了の仕方」の
         # 子の箇条)。偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 30, touch)
@@ -3127,8 +3127,8 @@ class TestInterruptPhases(WorkerTestBase):
                 self.assertEqual(self.claude_calls(), [])
 
     def test_interrupt_during_finish(self):
-        # 回の終わりの処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
-        # 書き終えてから left で終わる。割り込みは回の終わりの処理が起動したコマンド (遅らせた複写) にも届くが、それで止まらない
+        # 回の終了処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回のフラグファイルを、割り込みを受けなかったときと同じに
+        # 書き終えてから left で終了する。割り込みは回の終了処理が起動したコマンド (遅らせた複写) にも届くが、それで停止しない
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("after the rename", 3, touch)
         for sig, code in self.SIGNALS:
@@ -3154,14 +3154,14 @@ class TestInterruptPhases(WorkerTestBase):
 
 
 class TestRestartCleanup(WorkerTestBase):
-    """起動し直したときの掃除 (worker.md の「起動時の確認」の 2 と「終わり方」の kill -9。計画の AE10)。"""
+    """起動し直したときの掃除 (worker.md の「起動時の確認」の 2 と「終了の仕方」の kill -9。計画の AE10)。"""
 
     def kill9(self, p):
         os.kill(p.pid, signal.SIGKILL)
         p.communicate(timeout=30)
 
     def assert_cleaned_before_pickup(self, err):
-        """起動し直したワーカーの出力で、前の作業場所に残ったプロセスを止めたことが、依頼文を見つけたことより先にある。"""
+        """起動し直したワーカーの出力で、前の作業場所に残ったプロセスを停止したことが、依頼文を見つけたことより先にある。"""
         stopped = err.find("SIGTERM を送る")
         picked = err.find("依頼文を見つけた")
         self.assertNotEqual(stopped, -1, err)
@@ -3170,7 +3170,7 @@ class TestRestartCleanup(WorkerTestBase):
 
     def test_sigkill_while_reviewing_then_restart(self):
         # レビュアの実行中にワーカーを SIGKILL で消すと、偽の claude と、その子と、別のプロセスグループで動く子が残る。
-        # 同じコマンドで起動し直すと、それらを止めて前の作業場所を消してから、同じ依頼文を処理する。新しいログに前の実行の行は混ざらない
+        # 同じコマンドで起動し直すと、それらを停止して前の作業場所を消してから、同じ依頼文を処理する。新しいログに前の実行の行は混ざらない
         self.env["FAKE_CLAUDE_MODE"] = "hang_leave_child"
         self.put_request()
         p = self.start()
@@ -3196,8 +3196,8 @@ class TestRestartCleanup(WorkerTestBase):
         self.assert_cleaned_before_pickup(err)
 
     def test_sigkill_while_preparing_then_restart(self):
-        # 準備の途中 (偽の git の clone が終わらない間) にワーカーを SIGKILL で消すと、準備のディレクトリと、その中を cwd にした
-        # 偽の git が残る。起動し直すと、それを止めて準備のディレクトリを消してから、同じ依頼文を処理する
+        # 準備の途中 (偽の git の clone が終了しない間) にワーカーを SIGKILL で消すと、準備のディレクトリと、その中を cwd にした
+        # 偽の git が残る。起動し直すと、それを停止して準備のディレクトリを消してから、同じ依頼文を処理する
         self.delay_git("clone")
         self.put_request()
         p = self.start()
@@ -3219,7 +3219,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assert_cleaned_before_pickup(err)
 
     def test_processes_outside_workspace_are_not_stopped(self):
-        # 作業場所の外を cwd にしているプロセスは、起動引数に作業場所のパスがあっても止めない。中を cwd にしているものは止める
+        # 作業場所の外を cwd にしているプロセスは、起動引数に作業場所のパスがあっても停止しない。中を cwd にしているものは停止する
         ws = self.ws_path()
         os.makedirs(os.path.join(ws, "tree"))
         inside = self.spawn_sleeper(os.path.join(ws, "tree"))
@@ -3231,7 +3231,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assertFalse(os.path.lexists(ws))
 
     def test_cleanup_even_when_unavailable(self):
-        # 置き場に end がある状態や、ほかの確認で unavailable になる起動でも、残ったプロセスと作業場所を片付けてから止まる。
+        # ループのディレクトリに end がある状態や、ほかの確認で unavailable になる起動でも、残ったプロセスと作業場所を片付けてから停止する。
         # worker.yaml が無ければ (作業場所のパスが記録されていなければ)、決まったパスを片付ける
         cases = (
             ("end がある", True, {}, "end"),
@@ -3258,7 +3258,7 @@ class TestRestartCleanup(WorkerTestBase):
 
     def test_cleanup_only_workspace_shaped_directories(self):
         # worker.yaml の workspace が、作業場所の名前の形に合わないディレクトリや、シンボリックリンクを指すときは、
-        # 中を cwd にしているプロセスを止めず、何も消さない
+        # 中を cwd にしているプロセスを停止せず、何も消さない
         victim = os.path.join(self.root, "victim")
         os.makedirs(victim)
         keep = os.path.join(victim, "keep.txt")
@@ -3276,8 +3276,8 @@ class TestRestartCleanup(WorkerTestBase):
                 self.assertTrue(os.path.islink(ws))
 
     def test_prep_dirs_are_found_by_name(self):
-        # worker.yaml が無くても (準備のディレクトリのパスは記録しない)、TMPDIR の実体の下の、この周回の準備のディレクトリの名前の形
-        # (review-loop-prep-<周回 id>-<ハッシュ>.<6 文字>) に合うディレクトリは、中を cwd にしているプロセスを止めてから消す。
+        # worker.yaml が無くても (準備のディレクトリのパスは記録しない)、TMPDIR の実体の下の、このループの準備のディレクトリの名前の形
+        # (review-loop-prep-<ループ id>-<ハッシュ>.<6 文字>) に合うディレクトリは、中を cwd にしているプロセスを停止してから消す。
         # 名前の形に合わないものと、シンボリックリンクは片付けない
         key = os.path.basename(self.ws_path())[len("review-loop-"):]
         tmp = os.path.realpath(self.tmpdir)
@@ -3307,7 +3307,7 @@ class TestRestartCleanup(WorkerTestBase):
         self.assertTrue(os.path.exists(keep))
 
     def test_end_removes_workspace(self):
-        # end を見て終わるとき、周回の作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
+        # end を見て終了するとき、ループの作業場所が残っていれば消す。シンボリックリンクなら、リンクだけを消してリンクの先は消さない
         target = os.path.join(self.root, "link-target")
         os.makedirs(target)
         keep = os.path.join(target, "keep.txt")
@@ -3334,14 +3334,14 @@ class TestRestartCleanup(WorkerTestBase):
 
     def test_stopped_even_when_stderr_broken(self):
         # 指摘 #6: stop_cwd_procs は、標準エラーへの報告 (print) が OSError で失敗しても、シグナルを送って
-        # 残ったプロセスを止める処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
+        # 残ったプロセスを停止する処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
         # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave 側への書き込みが
         # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
-        # 回の終わりの処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
+        # 回の終了処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
         # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
-        # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが止まることを確かめる
-        # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終わって
-        # os.kill に届かないので、このプロセスは止まらずに残る)。
+        # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが停止することを確認する
+        # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終了して
+        # os.kill に届かないので、このプロセスは停止せずに残る)。
         ws = self.ws_path()
         touch = os.path.join(self.root, "stop-started")
         self.delay_python("の中を cwd にしているプロセスが残っているので", 2, touch)
@@ -3361,7 +3361,7 @@ class TestRestartCleanup(WorkerTestBase):
         os.makedirs(os.path.join(ws, "tree"), exist_ok=True)
         inside = self.spawn_sleeper(os.path.join(ws, "tree"))
 
-        # stop_cwd_procs の呼び出し (回の終わりの処理の 1) が始まった (sleep に入った) ら、
+        # stop_cwd_procs の呼び出し (回の終了処理の 1) が始まった (sleep に入った) ら、
         # 端末を閉じたのと同じ状態にする。以降、その python3 のスクリプトの標準エラーへの書き込みは OSError になる
         self.wait_for(lambda: os.path.exists(touch), what="stop_cwd_procs の呼び出しの開始")
         os.close(master)

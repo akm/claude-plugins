@@ -9,18 +9,18 @@
   FAKE_CLAUDE_REVS の各名前を `git rev-parse` で解決した SHA (解決できなければ null)・
   受けた `--settings` の値を JSON として読んだものの列・プロンプトが指す依頼文 (写し) の中身
 - FAKE_CLAUDE_REVS: 記録で解決する名前を空白で区切って並べたもの (既定 main)
-- FAKE_CLAUDE_PIDS: 終わらないプロセスの PID を書くファイル。テストの後片付け (メソッド tearDown) が、書かれた PID に
+- FAKE_CLAUDE_PIDS: 終了しないプロセスの PID を書くファイル。テストの後片付け (メソッド tearDown) が、書かれた PID に
   KILL を送る。mode ごとに書く PID は、hang_ignore_term は自分、hang は自分と子、hang_leave_child は自分と子 2 つ、
   leave_child は残した子だけ
 - FAKE_CLAUDE_STREAM: 標準出力に書く stream-json の中身を持つファイル。無ければ既定の 3 行 (init の行・Skill の呼び出し・
   result の行)。既定の init の行の permissionMode には、受けた `--permission-mode` の値を書く (受けていなければキーを書かない)
 - FAKE_CLAUDE_PERMISSION_MODE: 既定の init の行の permissionMode に、受けた `--permission-mode` の値の代わりに書く値
   (auto モードを使えずに別のモードで起動した回を真似る)
-- FAKE_CLAUDE_SLEEP: 結果を書く前に待つ秒数 (既定 0)
+- FAKE_CLAUDE_SLEEP: 結果を書く前に待機する秒数 (既定 0)
 - FAKE_CLAUDE_EXIT: 終了コード (既定 0)
 - FAKE_CLAUDE_REPO: 作業側の作業ツリーの絶対パス (mode が dirty_tree のとき使う)
-- FAKE_CLAUDE_LOOP: 周回の置き場の絶対パス (mode が write_request と write_loop_result のとき使う)
-- FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作る印のファイルの名前の先頭
+- FAKE_CLAUDE_LOOP: ループのディレクトリの絶対パス (mode が write_request と write_loop_result のとき使う)
+- FAKE_CLAUDE_GIT_MARK: mode が git_config のとき、git が実行するコマンドが作るフラグファイルの名前の先頭
 - FAKE_CLAUDE_LINK_TARGET: mode が symlink_workspace のとき、作業場所を置き換えるシンボリックリンクの先
 - FAKE_CLAUDE_OUTSIDE: mode が result_symlink_outside のとき、結果のシンボリックリンクの先 (作業場所の外のファイル)
 - FAKE_CLAUDE_TERM_RECEIVED: mode が hang_ignore_term のとき、SIGTERM を受けたら作るファイル
@@ -30,23 +30,23 @@
     empty_run_id          run_id を空で書く
     no_findings           findings の行を書かない
     dirty_tree            結果を書き、作業側の作業ツリーの追跡中のファイル (README.md) を変える
-    write_request         結果を書き、周回の置き場に依頼文を 1 つ置く
-    write_loop_result     結果を、写しの出力先ではなく周回の置き場の出力先に直接書く
+    write_request         結果を書き、ループのディレクトリに依頼文を 1 つ置く
+    write_loop_result     結果を、写しの出力先ではなくループのディレクトリの出力先に直接書く
     git_config            結果を書き、複製の .git/config に core.fsmonitor・core.hooksPath・filter.<名前>.clean を、
-                          .git/hooks/ に post-checkout を置く (どれも、git が実行すると印のファイルを作る)
+                          .git/hooks/ に post-checkout を置く (どれも、git が実行するとフラグファイルを作る)
     symlink_workspace     作業場所を別の名前に移し、元の名前を FAKE_CLAUDE_LINK_TARGET へのシンボリックリンクにしてから、
                           写しの出力先に結果を書く (結果はリンクの先に書かれる)
-    leave_child           結果を書き、別のプロセスグループ (新しいセッション) で cwd が複製の中の子を残して終わる
+    leave_child           結果を書き、別のプロセスグループ (新しいセッション) で cwd が複製の中の子を残して終了する
     readonly_dir          結果を書き、複製の中に読み取り専用のディレクトリを作る
     result_symlink        結果を、複製の中のファイルへのシンボリックリンクにする
     result_symlink_outside 結果を、FAKE_CLAUDE_OUTSIDE (作業場所の外のファイル) へのシンボリックリンクにする
     result_fifo           結果を FIFO にする
     result_dir            結果をディレクトリにする
     result_large          結果を、ワーカーの上限 (1 MiB) を越える大きさで書く
-    hang                  子プロセスを起動して終わらない
-    hang_ignore_term      SIGTERM を受けても終わらず (受けたら FAKE_CLAUDE_TERM_RECEIVED を作る)、SIGKILL まで終わらない
+    hang                  子プロセスを起動して終了しない
+    hang_ignore_term      SIGTERM を受けても終了せず (受けたら FAKE_CLAUDE_TERM_RECEIVED を作る)、SIGKILL まで終了しない
     hang_leave_child      子プロセスを 2 つ (同じプロセスグループのものと、別のプロセスグループ (新しいセッション) のもの。
-                          どちらも cwd は複製) 起動し、0.2 秒おきに標準出力に {"type": "fake_tick"} の行を書いて終わらない
+                          どちらも cwd は複製) 起動し、0.2 秒おきに標準出力に {"type": "fake_tick"} の行を書いて終了しない
 
 プロンプトの「依頼文 <パス> のとおりに」から依頼文 (ワーカーが作業場所に作った写し) を見つけ、
 その「出力先: `<パス>`」の行から結果の書き先を読む。
@@ -63,7 +63,7 @@ import time
 
 def git(*args):
     """cwd で git を実行し、成功すれば標準出力 (前後の空白を除く) を、失敗すれば None を返す。
-    テストが PATH に置く偽の git が、ワーカーの実行した git と見分けられるように、環境変数 FAKE_GIT_CALLER を fake-claude にする。"""
+    テストが PATH に置く偽の git が、ワーカーの実行した git と識別できるように、環境変数 FAKE_GIT_CALLER を fake-claude にする。"""
     r = subprocess.run(["git", *args], capture_output=True, text=True,
                        env=dict(os.environ, FAKE_GIT_CALLER="fake-claude"))
     return r.stdout.strip() if r.returncode == 0 else None

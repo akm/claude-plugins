@@ -1,5 +1,5 @@
 """起動時の確認の 14。利用者の設定ファイル (settings.json) が、コマンドをサンドボックスの外で実行させず、
-Unix ソケットへの接続を許さないかを確かめる。
+Unix ソケットへの接続を許さないかを確認する。
 
 ファイルが JSON として読めないか、空でない sandbox.excludedCommands か sandbox.network.allowUnixSockets を持てば、
 起動しない理由とする。ファイルが無ければ何もしない。

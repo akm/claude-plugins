@@ -1,6 +1,6 @@
 """レビュアの実行のログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・
-ワーカーのフックが拒否した呼び出し・サンドボックスが止めた確認・リポジトリの行を表示しただけの呼び出しを読む
-(回の終わりの処理の 2)。読み方の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
+ワーカーのフックが拒否した呼び出し・サンドボックスが拒否した確認・リポジトリの行を表示しただけの呼び出しを読む
+(回の終了処理の 2)。読み方の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
 
 引数: 1 つ目はログのパス。読めなければ、空のログとして扱う。2 つ目はワーカーのフックのファイル
 (review-loop-worker/deny_tmp_hook.py) の中身で、__name__ を "__main__" 以外にして実行し、関数 denies と文字列 REASON を使う。
@@ -10,12 +10,12 @@
 標準出力: 次の行。値はどれも 1 行 (改行を含まない)。読めない値は unknown にする。
   1 行目: 実効モデルの名前 / 2 行目: skill_called / 3 行目: 拒否の件数 (ワーカーのフックが拒否したものを除く) /
   4 行目: 拒否されたツールの名前の列 (JSON。ワーカーのフックが拒否したものを除く) / 5 行目: 実効の権限モード /
-  6 行目: ワーカーのフックが拒否した件数 / 7 行目: サンドボックスが止めた件数 (リポジトリの行を表示しただけのものを除く) /
-  8 行目: リポジトリの行を表示しただけと確かめた件数 /
-  9 行目から: 止められた呼び出しごとに、コマンドと文面の 2 行。続けて、リポジトリの行を表示しただけの呼び出しごとに、
+  6 行目: ワーカーのフックが拒否した件数 / 7 行目: サンドボックスが拒否した件数 (リポジトリの行を表示しただけのものを除く) /
+  8 行目: リポジトリの行を表示しただけと確認した件数 /
+  9 行目から: 拒否された呼び出しごとに、コマンドと文面の 2 行。続けて、リポジトリの行を表示しただけの呼び出しごとに、
   同じくコマンドと文面の 2 行 (どれも先頭 200 文字まで)。
-  サンドボックスが止めた件数が unknown なら、8 行目も unknown にし、9 行目からの行は出さない。
-  レビュー対象のコミットの行を読めなければ、文面かタグを含む結果はすべてサンドボックスが止めた確認に数え、8 行目を unknown にする。
+  サンドボックスが拒否した件数が unknown なら、8 行目も unknown にし、9 行目からの行は出さない。
+  レビュー対象のコミットの行を読めなければ、文面かタグを含む結果はすべてサンドボックスが拒否した確認に数え、8 行目を unknown にする。
 終了コード: 0。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 read_log_facts。
@@ -24,21 +24,21 @@
 
 import json, re, subprocess, sys
 
-# 印の YAML に書く値を 1 行に直すときに空白にする文字: 改行とタブを含む制御文字・行と段落の区切りの文字・
+# フラグファイルの YAML に書く値を 1 行に直すときに空白にする文字: 改行とタブを含む制御文字・行と段落の区切りの文字・
 # 対になっていないサロゲート (JSON の \ud800 のように、2 つ組で 1 文字を表す符号の片方だけをエスケープで書いたもの)・
 # 文字として使わない符号 (U+FFFE と U+FFFF)。どれも YAML の文字列にそのまま書けないか、書くと行が分かれるか、
 # ワーカーがこの出力を行ごとに読むのを乱す
 NOT_ONE_LINE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff\ufffe\uffff]")
 LIMIT = 200
-PHRASE = "operation not permitted"   # ファイルの書き込みを止められたときの文面 (大文字と小文字を区別しない)
-TAG = "<sandbox_violations>"         # 接続を止められたときに本文に付くタグ
+PHRASE = "operation not permitted"   # ファイルの書き込みを拒否されたときの文面 (大文字と小文字を区別しない)
+TAG = "<sandbox_violations>"         # 接続を拒否されたときに本文に付くタグ
 TAG_END = "</sandbox_violations>"
 
 # 依頼文の base として受け付ける値。0.14.0 以前の review-request はブランチ名 (main など) を、それより後は短縮 SHA を書く。
 # - で始まる値は git のオプションとして読まれるので受け付けない
 BASE_NAME = re.compile(r"[0-9A-Za-z._/][0-9A-Za-z._/-]*")
 FULL_SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
-# 表示のコマンドが行の前に付けるもの。リポジトリの行を表示しただけかを確かめるときに、1 つだけ除いて比べる
+# 表示のコマンドが行の前に付けるもの。リポジトリの行を表示しただけかを確認するときに、1 つだけ除いて比べる
 DIFF_MARK = ("+", "-")                  # 差分の追加と削除の行 (文脈の行の空白は、前後の空白を除くときに消える)
 LINE_NUMBER = re.compile(r"\s*\d+\t")    # cat -n と nl の行番号とタブ
 # grep -n の「<ファイル>:<行番号>:」と、前後の行の「<ファイル>-<行番号>-」の後半。ファイル名が同じ形を含むこともあるので、
@@ -47,7 +47,7 @@ GREP_NUMBER = re.compile(r"(?=(:\d+:|-\d+-))")
 # grep -n で 1 つのファイルだけを検索したときに行の先頭に付く「<行番号>:」と、前後の行の「<行番号>-」
 GREP_LINE_NUMBER = re.compile(r"\d+[:-]")
 # git blame の「<SHA> (<作者> <日時> <行番号>) 」。-s (「<SHA> <行番号>) 」)・-f (SHA の後にファイル名)・-n・-e・
-# -b (SHA の代わりに空白) の形も、行番号に続く「) 」までとして除く。SHA の前の ^ は、範囲の始まりのコミットの印
+# -b (SHA の代わりに空白) の形も、行番号に続く「) 」までとして除く。SHA の前の ^ は、範囲の始まりのコミットを示す記号
 BLAME_PREFIX = re.compile(r"[\^0-9a-f ]{8,}[^)]*?\d+\) ")
 # git log --oneline の「<短縮 SHA> 」
 ONELINE_PREFIX = re.compile(r"[0-9a-f]{7,64} ")
@@ -75,7 +75,7 @@ def body_text(content):
 
 
 def by_worker_hook(denial, results_by_id):
-    """拒否 (result の行の permission_denials の要素) が、ワーカーのフックによるものと確かめられるか。
+    """拒否 (result の行の permission_denials の要素) が、ワーカーのフックによるものと確認できるか。
     ツールが Bash で、コマンドがフックの規則に当たり、その呼び出しの tool_result の本文がフックの返す理由の文面と一致すること。
     どれも Claude Code が書く行なので、レビュアには書けない"""
     if not isinstance(denial, dict) or denial.get("tool_name") != "Bash":
@@ -95,7 +95,7 @@ def marked(line):
 
 def read_repo_lines(repo, base, head):
     """レビュー対象のコミット (base と、base..head の各コミット) で追跡されているファイルの行と、それらのコミットのコミットメッセージの
-    行のうち、文面かタグを含むものを、前後の空白を除いた文字列の集合にして返す。文面だけの行とタグだけの行は含めない — 止められたときの
+    行のうち、文面かタグを含むものを、前後の空白を除いた文字列の集合にして返す。文面だけの行とタグだけの行は含めない — 拒否されたときの
     本物の行と同じになりうるため。読めなければ (base か head の値が形に合わない・git が失敗した) None を返す。"""
     if not BASE_NAME.fullmatch(base) or not FULL_SHA.fullmatch(head):
         return None
@@ -163,9 +163,9 @@ def shows_repo_line(line, repo_lines):
 
 
 def blocked_message(body, skip=frozenset()):
-    """本文のうち、文面を含む行と、タグの行から閉じるタグの行 (無ければ本文の終わり) までの行を、空白で繋ぐ。
-    接続を止められたときは、止められたホストがタグの次の行にあるため、タグの中の行も含める。
-    skip にある番号の行 (リポジトリの行を表示したと確かめた行) は含めず、タグの行でもタグの中の行を含め始めない。
+    """本文のうち、文面を含む行と、タグの行から閉じるタグの行 (無ければ本文の末尾) までの行を、空白で繋ぐ。
+    接続を拒否されたときは、拒否されたホストがタグの次の行にあるため、タグの中の行も含める。
+    skip にある番号の行 (リポジトリの行を表示したと確認した行) は含めず、タグの行でもタグの中の行を含め始めない。
     ただし、その行が閉じるタグを含めば、そこでタグの中の行を終える (開きタグと閉じタグを同じ行に書いた文書の行を表示したとき)。"""
     out = []
     in_tag = False
@@ -206,7 +206,7 @@ for line in f:
     if not isinstance(o, dict):
         continue
     t = o.get("type")
-    # サンドボックスが止めた確認を数えるための対応は、sub-agent の行 (parent_tool_use_id がある) からも作る
+    # サンドボックスが拒否した確認を数えるための対応は、sub-agent の行 (parent_tool_use_id がある) からも作る
     if t in ("assistant", "user"):
         msg = o.get("message")
         content = msg.get("content") if isinstance(msg, dict) else None
@@ -272,7 +272,7 @@ if isinstance(result, dict):
     repo_read = False
     for r in results:
         name_cmd = uses.get(r.get("tool_use_id"))
-        # is_error は見ない — 出力を | tail に渡したコマンドや、; echo で終わるコマンドは、止められても成功で終わる (実測)
+        # is_error は見ない — 出力を | tail に渡したコマンドや、末尾が ; echo のコマンドは、拒否されても成功で終了する (実測)
         if not name_cmd or name_cmd[0] != "Bash":
             continue
         body = body_text(r.get("content"))

@@ -1,13 +1,13 @@
-"""ディレクトリ (作業場所か準備のディレクトリ) の中を cwd にしているプロセスを止める (回の終わりの処理の 1 と、起動時の確認の 2)。
+"""ディレクトリ (作業場所か準備のディレクトリ) の中を cwd にしているプロセスを停止する (回の終了処理の 1 と、起動時の確認の 2)。
 
 TERM を送り、猶予の秒数のうちに消えなければ KILL を送る。プロセスグループでは見つけられない (Bash のコマンドは
 レビュアの実行とは別のプロセスグループで動く) ので、cwd で見つける。cwd は、/proc があれば /proc/<PID>/cwd から
 (Linux。CI のテストが通る経路)、無ければコマンド lsof で (macOS) 読む。
 
 引数: 1 つ目はディレクトリの実体パス。2 つ目は TERM を送ってから KILL を送るまでの猶予の秒数。3 つ目は出力に書くディレクトリの呼び名。
-標準エラー: シグナルを送ったプロセスと、列挙できなかったことか止められなかったことを書く。標準エラーに書けなくても
-  (ワーカーを動かしていた端末を閉じたときなど)、シグナルを送って止める処理は続ける。
-終了コード: 止めるものが無いか、すべて止まれば 0。列挙できないか止められなければ 1。
+標準エラー: シグナルを送ったプロセスと、列挙できなかったことか停止できなかったことを書く。標準エラーに書けなくても
+  (ワーカーを動かしていた端末を閉じたときなど)、シグナルを送って停止する処理は続ける。
+終了コード: 停止するものが無いか、すべて停止すれば 0。列挙できないか停止できなければ 1。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 stop_cwd_procs。
 語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
@@ -20,7 +20,7 @@ me = os.getpid()
 
 
 def note(msg):
-    """標準エラーへの報告。書けなくても (端末を閉じた後の OSError など) 無視して、止める処理は続ける。"""
+    """標準エラーへの報告。書けなくても (端末を閉じた後の OSError など) 無視して、停止する処理は続ける。"""
     try:
         print(msg, file=sys.stderr, flush=True)
     except OSError:
@@ -82,6 +82,6 @@ except RuntimeError as e:
     note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスを列挙できない: {e}")
     sys.exit(1)
 if pids:
-    note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが止まらない "
+    note(f"review-loop-worker: {label} {workspace} の中を cwd にしているプロセスが停止しない "
          f"(PID: {' '.join(str(p) for p in sorted(pids))})")
     sys.exit(1)

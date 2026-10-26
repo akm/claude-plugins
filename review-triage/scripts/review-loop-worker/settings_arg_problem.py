@@ -1,4 +1,4 @@
-"""起動時の確認の 13。追加の引数 (-- の後) の --settings の値が、enabledPlugins だけを持つ JSON かを確かめる。
+"""起動時の確認の 13。追加の引数 (-- の後) の --settings の値が、enabledPlugins だけを持つ JSON かを確認する。
 
 値が JSON として読めて、トップレベルのキーが enabledPlugins だけで、その値がプラグイン名から真偽値への対応であれば受け付ける。
 

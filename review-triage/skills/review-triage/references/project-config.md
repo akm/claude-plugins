@@ -120,12 +120,12 @@
 
 ## `review_loop` — ワーカーに任せる周回の既定値
 
-[review-loop](../../review-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** (引数の様式と、値の誤りの扱いの正本は [review-loop の arguments.md](../../review-loop/references/arguments.md))。周回の条件のうち上限・レビュースキル・モデルなどは `loop`、`review-triage-fix` に渡す値は `fix` から読み、ここには周回の置き場とワーカーに固有の値だけを置く。
+[review-loop](../../review-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** (引数の様式と、値の誤りの扱いの正本は [review-loop の arguments.md](../../review-loop/references/arguments.md))。周回の条件のうち上限・レビュースキル・モデルなどは `loop`、`review-triage-fix` に渡す値は `fix` から読み、ここにはループのディレクトリとワーカーに固有の値だけを置く。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `dir` | 周回の置き場の親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
-| `wait_minutes` | 完了の印を待つ上限 (分) | 60 |
+| `dir` | ループのディレクトリの親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
+| `wait_minutes` | 完了のフラグファイルを待つ上限 (分) | 60 |
 | `worker_wait_minutes` | ワーカーの起動を待つ上限 (分)。回 1 の最初の待機と、`--resume` でワーカーが動いていないときに使う | 15 |
 | `worker_idle_minutes` | ワーカーが依頼文を待つ上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
 | `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
