@@ -470,7 +470,7 @@ func TestToolDoesNotWriteIndex(t *testing.T) {
 
 // 設定 core.fsmonitor に登録したプログラムを、道具の git に起動させない。起動させると、値が true のときは
 // 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作り、道具が終了した後も残る。テストでは、
-// 印のファイルを作るスクリプトを登録する (値が true の常駐のプロセスは、Linux では動かない)。
+// 起動したことを示すフラグファイルを作るスクリプトを登録する (値が true の常駐のプロセスは、Linux では動かない)。
 func TestFsmonitorProgramIsNotRun(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
@@ -490,7 +490,7 @@ func TestFsmonitorProgramIsNotRun(t *testing.T) {
 	}
 }
 
-// skip-worktree (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) を
+// skip-worktree (インデックスの項目に付けるフラグで、付いたファイルの作業ツリーの変更を git が見ないようにする) を
 // 付けたファイルの編集は、インデックスに記録した更新時刻などには現れないが、コミットしていない変更として扱う。
 func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	r, base := branched(t)
@@ -1266,7 +1266,7 @@ func TestInputErrors(t *testing.T) {
 	}
 }
 
-// wantError は、結果を出さずに、標準エラー出力の最初の行が印で始まり、終了コードが code であることを確認する。
+// wantError は、結果を出さずに、標準エラー出力の最初の行が接頭辞で始まり、終了コードが code であることを確認する。
 func wantError(t *testing.T, o output, code int, label, want string) {
 	t.Helper()
 	if o.code != code {
@@ -1282,8 +1282,8 @@ func wantError(t *testing.T, o output, code int, label, want string) {
 	wantContains(t, o.stderr, want)
 }
 
-// ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が印で始まり、
-// 終了コードで種類が分かれる。フラグの誤りでパッケージ flag が使い方を書き出すと、最初の行が印にならない。
+// ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が接頭辞で始まり、
+// 終了コードで種類が分かれる。フラグの誤りでパッケージ flag が使い方を書き出すと、最初の行が接頭辞で始まらない。
 func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
 	r, _ := branched(t)
 	r.write("g.md", "branch\n")
