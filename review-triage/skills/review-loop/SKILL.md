@@ -47,7 +47,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 2. **開始の前提を確認する** ([round.md](references/round.md) の「開始の前提」)。
 3. **ループのディレクトリと `loop.yaml` を作る** ([round.md](references/round.md) の「ループのディレクトリを作る」)。
 4. **決まった条件を報告する** (書くものは [round.md](references/round.md) の決定表の RG0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
-5. **ループを回す**: G2 から [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図に従う。L1 に来たら RL1 ([round.md](references/round.md))。回 1 の最初の依頼文を書いたら、ワーカーを起動するか起動を案内し ([guide-template.md](references/guide-template.md) の「起動の手順」)、待機を起動して**ターンを終える** ([reentry.md](references/reentry.md) の「待機」)。
+5. **ループを回す**: G2 から [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図に従う。L1 に来たら RL1 ([round.md](references/round.md))。1 回目の最初の依頼文を書いたら、ワーカーを起動するか起動を案内し ([guide-template.md](references/guide-template.md) の「起動の手順」)、待機を起動して**ターンを終える** ([reentry.md](references/reentry.md) の「待機」)。
 
 ### 再入 (待機の通知・`--resume`)
 

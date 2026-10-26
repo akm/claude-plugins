@@ -1871,7 +1871,7 @@ class TestLogReading(WorkerTestBase):
     DOC_NET = '      message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"'
     OLD_LINE = '旧い説明: サンドボックスの中から起動すると `sandbox-exec: sandbox_apply: Operation not permitted` で止まる。'
     MID_LINE = '途中のコミットにだけある行: Operation not permitted の例'
-    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 のループの回 1 で、git log で表示しただけで数えられた形)
+    # 間のコミットのメッセージ。件名と本文の両方が文面を含む (#86 のループの 1 回目で、git log で表示しただけで数えられた形)
     MID_SUBJECT = 'mid: operation not permitted の例を足す'
     MID_BODY = 'ワーカーは、本文に文面 operation not permitted かタグ <sandbox_violations> があれば数える。'
     # 開きタグと閉じタグを同じ行に書いた文書の行 (worker.md の「サンドボックスが拒否した確認の数え方」の 3 にある形)
@@ -1992,7 +1992,7 @@ class TestLogReading(WorkerTestBase):
         mixed = (f"{self.PY_TAG}\n{self.PY_TAG_END}\n{self.DOC_OPEN}\n"
                  "touch: /Users/x/y: Operation not permitted")
         # 本物のタグのブロックの中に、開きタグと閉じタグを同じ行に書いた文書の行を表示した行があっても、そこでタグの中の行を終え、
-        # 後ろの無関係な出力を message に含めない (#86 のループの回 3 の指摘)
+        # 後ろの無関係な出力を message に含めない (#86 のループの 3 回目の指摘)
         net_with_doc = ("Exit code 56\n<sandbox_violations>\n"
                         "deny network-outbound a.example:443 (host is not on the allow list)\n"
                         f"{self.BOTH_TAGS}\n後続の無関係な出力")
