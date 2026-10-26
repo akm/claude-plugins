@@ -43,7 +43,7 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
 
 class RepoError(Exception):
-    """取得に失敗した。1件の失敗で巡回全体を中断しないため、呼び出し側で握る。"""
+    """取得に失敗した。1件の失敗で巡回全体を中断しないため、呼び出し元で握る。"""
 
 
 def _run(args, cwd=None, timeout=None):

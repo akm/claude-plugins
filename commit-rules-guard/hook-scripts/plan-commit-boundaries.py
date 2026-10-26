@@ -205,7 +205,7 @@ def sweep(state_dir, max_age_days=MAX_MARKER_AGE_DAYS, now=None):
     姉妹モジュール pr-teeth の repos.py / bodies.py が同じ「溜まり続けるキャッシュ」に
     上限を持っているのに揃える。
 
-    掃除の失敗はフックの判断に影響させない（呼び出し側で握る）。ここで例外を
+    掃除の失敗はフックの判断に影響させない（呼び出し元で握る）。ここで例外を
     上げると、掃除できない環境で通知そのものが停止してしまう。
     """
     import time

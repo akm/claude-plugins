@@ -130,7 +130,7 @@ def cmd_select(args):
 def _attach_body_diffs(targets, paths, warnings):
     """更新された PR に本文の差分を添える。
 
-    呼び出し側が state ロックを保持している前提。本文の読み込みは state の読み込みと
+    呼び出し元が state ロックを保持している前提。本文の読み込みは state の読み込みと
     同じ臨界区間に入れる（対応しない組み合わせを読まないため）。
 
     判断はここで済ませ、モデルには結果だけ渡す（2つの本文を渡して「どこが変わったか
@@ -692,7 +692,7 @@ def main(argv=None):
         sys.stdout.write("\n")
         return 1
     except repos.RepoError as e:
-        # 取得の失敗。1件で巡回全体を中断しないよう、呼び出し側は注記して続行する。
+        # 取得の失敗。1件で巡回全体を中断しないよう、呼び出し元は注記して続行する。
         json.dump({
             "error": str(e),
             "hint": "この PR は取得できません。注記して他の PR の解説を続けてください。",

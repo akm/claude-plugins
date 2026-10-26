@@ -107,7 +107,7 @@ def git(repo, *args):
     try:
         return subprocess.run(base + list(args), capture_output=True, text=True)
     except OSError:
-        # git が PATH に無い等でも本体を停止させない（呼び出し側は returncode!=0 で扱う）。
+        # git が PATH に無い等でも本体を停止させない（呼び出し元は returncode!=0 で扱う）。
         return _GitFail()
 
 

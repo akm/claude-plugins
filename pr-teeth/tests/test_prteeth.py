@@ -385,7 +385,7 @@ class TestStore(unittest.TestCase):
 class TestPreciousData(unittest.TestCase):
     """蓄積データの読み込み（docs/design/data-integrity.md）。
 
-    壊れているのに既定値を返すと、呼び出し側がそれを保存して元データを失わせる。
+    壊れているのに既定値を返すと、呼び出し元がそれを保存して元データを失わせる。
     「無い」（正常な初回実行）と「壊れている」を区別できることが要点。
     """
 
@@ -930,7 +930,7 @@ class TestBodies(unittest.TestCase):
         self.assertEqual(bodies.load(self.dir, "o/r", 1), "## 背景\n本文")
 
     def test_missing_body_is_none_not_an_error(self):
-        # 無いことは異常ではない（初回・掃除済み）。呼び出し側は全体を説明する。
+        # 無いことは異常ではない（初回・掃除済み）。呼び出し元は全体を説明する。
         self.assertIsNone(bodies.load(self.dir, "o/r", 999))
 
     def test_file_name_is_sanitized(self):
@@ -1236,7 +1236,7 @@ class TestRepoCache(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(path, "junk")))
 
     def test_failure_raises_repo_error(self):
-        # 1件の失敗で巡回全体を中断しない形にする（呼び出し側が握れる型）。
+        # 1件の失敗で巡回全体を中断しない形にする（呼び出し元が握れる型）。
         with self.assertRaises(repos.RepoError):
             repos.ensure(self.repos_dir, "o/r",
                          url=os.path.join(self.root, "nonexistent"))

@@ -46,7 +46,7 @@ def _bracket(pattern, start):
 
     j = pattern.find("]", i)
     if j < 0:
-        return None, start  # 閉じていない。呼び出し側がリテラル `[` として扱う。
+        return None, start  # 閉じていない。呼び出し元がリテラル `[` として扱う。
 
     body = pattern[body_start:j]
     if not body:

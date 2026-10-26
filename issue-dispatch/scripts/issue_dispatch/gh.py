@@ -3,7 +3,7 @@
 
 `run` は、終了コード・標準出力・標準エラー出力の末尾・タイムアウトで打ち切ったか・失敗の種類 (`failure`) を返す。
 失敗の種類は標準エラー出力と標準出力の文言から分け、再試行や再開時刻までの待機はしない。待機するかどうかと終了コード
-(KTD6 の 8・3・4) は呼び出し側 (待機のサブコマンドなど) が決める。
+(KTD6 の 8・3・4) は呼び出し元 (待機のサブコマンドなど) が決める。
 
 テストは PATH の先頭に偽の `gh` (issue-dispatch/tests/fake-gh) のディレクトリを加えて差し替える。
 """
@@ -82,7 +82,7 @@ def run(args, timeout=DEFAULT_TIMEOUT, mutation=False, expect_json=False, stdin=
     標準出力が空でないのに JSON として読めなかったときの理由。それ以外は None)}
 
     stdin は、標準入力に渡す文字列 (`gh api graphql --input -` の本文など)。None なら標準入力は渡さない (/dev/null)。
-    expect_json は、呼び出し側が標準出力に JSON を期待するときに真を渡す (`gh api` や `--json` で JSON を受け取る
+    expect_json は、呼び出し元が標準出力に JSON を期待するときに真を渡す (`gh api` や `--json` で JSON を受け取る
     呼び出し)。引数から推測しない。`--jq` や `--template` で文字列を取り出す呼び出しや、URL や文章を出すコマンド
     (`gh issue comment` など) では渡さない (利用者と相談して決めた)。
 

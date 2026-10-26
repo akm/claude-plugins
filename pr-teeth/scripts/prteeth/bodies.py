@@ -94,7 +94,7 @@ def save(bodies_dir, repo, number, body):
 def load(bodies_dir, repo, number):
     """保存済みの本文を返す。無ければ None。
 
-    無いことは異常ではない（初回・掃除済み・保存に失敗した回）。呼び出し側は
+    無いことは異常ではない（初回・掃除済み・保存に失敗した回）。呼び出し元は
     「前回の本文が無い」として全体を説明する。
     """
     path = path_for(bodies_dir, repo, number)
@@ -121,7 +121,7 @@ def diff(previous, current, max_lines=MAX_DIFF_LINES, max_bytes=None):
     """本文の差分を unified diff で返す。変化が無ければ空文字。
 
     previous が None（保存が無い）の場合も空文字を返す。「前回の本文が無い」と
-    「本文が変わっていない」は呼び出し側で区別する（has_previous を見る）。
+    「本文が変わっていない」は呼び出し元で区別する（has_previous を見る）。
 
     差分の判断はここで完結させる。モデルに2つの本文を渡して「どこが変わったか
     考えさせる」と、実行のたびに揺れるうえ見落としも起きる。

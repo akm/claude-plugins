@@ -78,7 +78,7 @@ def setup(out=sys.stdout):
       - ディレクトリが無い: 取得して名前を変える。名前を変える前に、同時に実行した別の setup がディレクトリを
         作り終えていたら (改名が失敗し、ディレクトリに textlint がある)、入ったものとして扱う。
     一時的な名前のディレクトリは、成否に関わらず最後に消す。textlint のディレクトリの名前に変わらなかったディレクトリを残しても、
-    次の setup は使わないため。ファイル操作の失敗 (OSError) は TextlintError にして呼び出し側に返す。
+    次の setup は使わないため。ファイル操作の失敗 (OSError) は TextlintError にして呼び出し元に返す。
     """
     try:
         return _setup(out)
@@ -150,7 +150,7 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
     """textlint の設定を workdir に作り、(設定のパス, 規則が 1 つ以上あるか) を返す。
 
     規則が 1 つも無いときに textlint を実行すると、JSON ではなく案内の文を出すので、
-    呼び出し側は規則が無ければ textlint を実行しない。
+    呼び出し元は規則が無ければ textlint を実行しない。
 
     fix_only が True のときは、規則を自動修正してよい避ける語の辞書だけにする (リポジトリの規則集と、
     検出だけする避ける語は入れない)。自動修正で文脈によって言い換えが変わる語を書き換えないため。
