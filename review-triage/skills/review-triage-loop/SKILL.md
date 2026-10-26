@@ -28,7 +28,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
    - **回数の閾値 N (`--threshold`、設定は `fix.threshold_rounds`) はループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味・決め方・検査の正本は [review-triage-fix の arguments.md](../review-triage-fix/references/arguments.md))。
    - **段 (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の走らせ方 (`--stage`、設定は `fix.stages`) も同じくループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせた段の検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。ループは段の sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
    - 決まった条件をループの開始前に報告する (書くものは決定表の G0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
-2. **入口の関門** (G2・G3): 記録 YAML を読み (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)、図の順に判定する。各ノードの条件・行き先・停止するときの報告は、図と決定表が正本。
+2. **入口の関門** (G2・G3): 記録 YAML を読み (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)、図の順に判定する。各ノードの条件・遷移先・停止するときの報告は、図と決定表が正本。
 3. **ループ** (L1 → S2〜S6): 図に従って回す。各ノードで行うことと見る場所は決定表のとおり。**各回の冒頭で、いま何回目かと上限を報告する** (L1)。
 4. **報告** (S2〜S6): 停止した理由と、ループで何が起きたかを出す。全体の形は [references/reporting.md](references/reporting.md)、停止した理由ごとに足すものは決定表の S2〜S6 が正本。**採択件数の回ごとの推移を必ず出す** — 収束に向かっていたのか、減らないまま停止したのかは、件数の推移にしか現れない。
 
