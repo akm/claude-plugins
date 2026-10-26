@@ -44,7 +44,7 @@ def _git_status(cwd):
 def build_context(lines):
     staged, unstaged, untracked = [], [], []
     for line in lines:
-        # porcelain v1: XY<space>path。X=index側, Y=worktree側。
+        # porcelain v1: XY<space>path。X はインデックス、Y は作業ツリーの状態。
         status, path = line[:2], line[3:]
         if status == "??":
             untracked.append(path)

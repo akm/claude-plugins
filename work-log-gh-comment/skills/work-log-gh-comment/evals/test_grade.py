@@ -178,7 +178,7 @@ class TestTokensAbsent(unittest.TestCase):
         """貼られたかどうかは、貼られたものの中身で決まる。
 
         説明を添えても、貼った値は貼られている。周囲を見る形にすると
-        窓の広さが新しい調整の対象になり、動かすたびに、それまで正しく判定できていた側で誤判定が起きる。
+        窓の広さが新しい調整の対象になり、動かすたびに、それまで正しく判定できていた記録で誤判定が起きる。
         """
         leak = "ENROLLMENT_TOKEN=lappds_enr_****"
         for body in (leak,
@@ -297,9 +297,9 @@ class TestEval5Coverage(unittest.TestCase):
                 self.assertEqual(labels, e["assertions"])
 
     def test_出力を全部マスクした記録は満点を取れない(self):
-        """README が eval-5 の題材と宣言する「全部隠す」側。
+        """README が eval-5 の題材と宣言する「全部隠す」記録。
 
-        非機密の値さえ残っていれば通る状態だと、片側しか測れていない。
+        非機密の値さえ残っていれば通る状態だと、一方しか測れていない。
         """
         body = ("<details><summary> $ ./register-site.sh </summary>\n\n"
                 "```\n$ ./register-site.sh\n(以降の出力はすべてマスク)\n```\n\n"

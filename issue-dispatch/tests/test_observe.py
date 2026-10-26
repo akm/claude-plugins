@@ -476,7 +476,7 @@ class CliTest(FakeGhCase):
         self.responses([USER_ENTRY, {"substring": "query ProjectItems", "stdout": items_data(lambda nodes: node_of(nodes, 3)["content"]["comments"]["nodes"].append(pr_report_comment(PR9, 90009)))},
                         {"substring": "query PrObserve", "stdout": pr_fixture("OPEN")}])
         code, out, err = self.cli("observe", "diff", "--dir", self.manager, "--project", "akm/3")
-        self.assertEqual(([d["kind"] for d in out["diffs"]], out["skipped"]["items"]), (["pr"], {A3: ["comments"]}), "前の側が partial なら比べない")
+        self.assertEqual(([d["kind"] for d in out["diffs"]], out["skipped"]["items"]), (["pr"], {A3: ["comments"]}), "前のスナップショットが partial なら比べない")
 
     def test_build_snapshot_does_not_carry_from_partial_previous(self):
         """前のスナップショットでも同じ種類が partial なら引き継がない (引き継ぐ元が無い)。"""
