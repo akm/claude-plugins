@@ -1438,7 +1438,7 @@ func TestGitVersionBoundary(t *testing.T) {
 	})
 }
 
-// 部分クローンで欠けたオブジェクトを、道具がネットワークから取得してリポジトリに書き込まない。
+// 部分クローンで手元に無いオブジェクトを、道具がネットワークから取得してリポジトリに書き込まない。
 // 環境変数 GIT_NO_LAZY_FETCH は git 2.44 からなので、それより前の git では飛ばす。
 func TestPartialCloneDoesNotFetch(t *testing.T) {
 	out, err := exec.Command("git", "version").Output()
@@ -1456,12 +1456,12 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 	missing := func() string { return clone.git("rev-list", "--objects", "--all", "--missing=print") }
 	before := missing()
 	if !strings.Contains(before, "?") {
-		t.Fatal("部分クローンに欠けたオブジェクトが無く、確認できない")
+		t.Fatal("部分クローンで手元に無いオブジェクトが 1 つも無く、確認できない")
 	}
 
 	o := clone.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
 	if after := missing(); after != before {
-		t.Fatalf("道具が欠けたオブジェクトを取得した。前:\n%s\n後:\n%s", before, after)
+		t.Fatalf("道具が手元に無かったオブジェクトを取得した。前:\n%s\n後:\n%s", before, after)
 	}
 	if o.kind == holds {
 		t.Fatalf("起点の内容を読めないのに holds を返した: %s", o.stdout)
