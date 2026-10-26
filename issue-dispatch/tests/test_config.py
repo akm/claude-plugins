@@ -5,7 +5,7 @@
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-一時ディレクトリを管理ディレクトリとリポジトリのルートに見立て、そこに設定ファイルを作って読み込みの結果
+一時ディレクトリを管理ディレクトリとリポジトリのルートとして使い、そこに設定ファイルを作って読み込みの結果
 (デフォルト値の適用・警告・エラー・`files` のパターンの表記) を確認する。
 キーと未設定のときの扱いの正本は issue-dispatch/skills/issue-dispatch/references/project-config.md。
 """
