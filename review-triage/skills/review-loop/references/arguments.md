@@ -74,7 +74,7 @@ review-loop --end [<置き場>]
 
 | 値 | 条件 |
 | --- | --- |
-| ワーカーのモデルの指定 | 空でない文字列。綴りは検査しない (`claude --model` が解釈する) |
+| ワーカーのモデルの指定 | 空でない文字列。表記は検査しない (`claude --model` が解釈する) |
 | ワーカーの effort | `low` / `medium` / `high` / `xhigh` / `max` のいずれか |
 | `review_skill`・`review_args`・`max_rounds`・`structure_rounds` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
 | `threshold_rounds`・`stages` | [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 |
@@ -93,7 +93,7 @@ review-loop --end [<置き場>]
 
 | 語 | 何か | 決めるもの | 残る場所 |
 | --- | --- | --- | --- |
-| ワーカーのモデルの指定 | `claude -p --model` に渡す綴り (`opus` のような別名か、版を含む名前) | 人間 (`--model` か `loop.review_model`) | `loop.yaml` の `worker.model`・`worker.yaml` の `model`・依頼文の `model` と識別子・完了の印の `model.specified`・記録の `notes` の `worker_model` |
+| ワーカーのモデルの指定 | `claude -p --model` に渡す値 (`opus` のような別名か、版を含む名前) | 人間 (`--model` か `loop.review_model`) | `loop.yaml` の `worker.model`・`worker.yaml` の `model`・依頼文の `model` と識別子・完了の印の `model.specified`・記録の `notes` の `worker_model` |
 | 実効モデル | レビュアの実行が実際に動いたモデルの名前 (モデル ID から `claude-` を除いた記録の表記) | ワーカーがログから読む | 完了の印の `model.effective`・記録の `model` と `notes` の `(実効: …)` |
 | ワーカーの effort | `claude -p --effort` に渡す、レビュアの実行 (セッション) の effort | 人間 (`--effort` か `review_loop.worker_effort`) | `loop.yaml` の `worker.effort`・`worker.yaml` の `effort`・完了の印の `effort`・記録の `notes` の `worker_effort` |
 | レビュースキルの effort | レビュースキル (`code-review`) に渡す effort | `--review-args` か `loop.review_args` (無ければ既定。正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」) | 依頼文の `effort`・結果と記録の `level` |
