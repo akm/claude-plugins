@@ -619,7 +619,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def write_user_settings(self, content, config_dir=None):
         """利用者の設定 settings.json を書く。config_dir を省略すると HOME/.claude、指定するとそのディレクトリの直下
-        (環境変数 CLAUDE_CONFIG_DIR を指定したときのループのディレクトリ)。content が文字列ならそのまま書く。"""
+        (環境変数 CLAUDE_CONFIG_DIR を指定したときの設定ファイルのディレクトリ)。content が文字列ならそのまま書く。"""
         d = config_dir if config_dir is not None else os.path.join(self.home, ".claude")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "settings.json"), "w", encoding="utf-8") as f:
