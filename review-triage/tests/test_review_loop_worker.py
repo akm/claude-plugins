@@ -683,7 +683,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def wait_marker(self, rid=RID, timeout=25):
         p = self.path(f"delivered-{rid}.yaml")
-        self.wait_for(lambda: os.path.exists(p), timeout=timeout, what=f"完了の印 {rid}")
+        self.wait_for(lambda: os.path.exists(p), timeout=timeout, what=f"完了のフラグファイル {rid}")
         return _read_yaml(p)
 
     def wait_pids(self, path, count):
@@ -719,7 +719,7 @@ class WorkerTestBase(unittest.TestCase):
         return sorted(n for n in os.listdir(self.tmpdir) if n.startswith("review-loop-"))
 
     def run_round(self, *extra, rid=RID):
-        """ワーカーを起動し、完了の印が現れるまで待機してから停止する。(完了の印, ワーカーの標準エラー) を返す。"""
+        """ワーカーを起動し、完了のフラグファイルが現れるまで待機してから停止する。(完了のフラグファイル, ワーカーの標準エラー) を返す。"""
         p = self.start(*extra)
         marker = self.wait_marker(rid)
         self.wait_state("idle")
@@ -747,7 +747,7 @@ def _option_values(args, name):
 
 
 def _assert_not_run_values(test, marker):
-    """レビュアの実行を起動しなかった回の印も、ワーカーの版と、値が unknown のログから読む項目を持つこと (KTD15)。"""
+    """レビュアの実行を起動しなかった回のフラグファイルも、ワーカーの版と、値が unknown のログから読む項目を持つこと (KTD15)。"""
     test.assertEqual(marker["worker_version"], _plugin_version())
     test.assertEqual(marker["permission_mode"], {"specified": "auto", "effective": "unknown"})
     test.assertEqual(marker["sandbox_blocked"], {"count": "unknown", "calls": []})
@@ -787,7 +787,7 @@ _RESULT_LINE = {"type": "result", "subtype": "success", "is_error": False, "sess
 class TestHappyPath(WorkerTestBase):
     def test_stdlib_named_files_in_repo_are_not_imported(self):
         # 作業側 (ワーカーのカレントディレクトリ) に標準ライブラリと同名のファイルがあっても、ワーカーの python3 はそれを読まない
-        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終了し、印が書かれない
+        # (python3 を isolated mode (-I) で起動する)。読まれると import した時点で終了し、フラグファイルが書かれない
         for name in ("json", "re", "hashlib", "stat"):
             with open(os.path.join(self.repo, f"{name}.py"), "w", encoding="utf-8") as f:
                 f.write(f'raise SystemExit("作業側の {name}.py が読まれた")\n')
@@ -799,7 +799,7 @@ class TestHappyPath(WorkerTestBase):
         self.assertNotIn("が読まれた", err)
 
     def test_one_round(self):
-        # AE1: idle → reviewing (識別子入り) → idle と遷移し、ok の印とログが残る
+        # AE1: idle → reviewing (識別子入り) → idle と遷移し、ok のフラグファイルとログが残る
         self.env["FAKE_CLAUDE_SLEEP"] = "2"
         p = self.start()
         idle = self.wait_state("idle")
@@ -992,7 +992,7 @@ class TestResultChecks(WorkerTestBase):
         self.assertEqual(marker["status"], "ok", marker)
 
     def test_head_mismatch_does_not_run_reviewer(self):
-        # AE8: 依頼文の head と HEAD が違うと、偽の claude を呼ばずに failed の印を書く
+        # AE8: 依頼文の head と HEAD が違うと、偽の claude を呼ばずに failed のフラグファイルを書く
         old = self.head()
         with open(os.path.join(self.repo, "a.txt"), "w", encoding="utf-8") as f:
             f.write("a\n")
@@ -1039,7 +1039,7 @@ class TestWorkspace(WorkerTestBase):
     (worker.md の「回の処理」の手順 5〜10 と「レビュアの実行の権限」)。"""
 
     def assert_not_run(self, marker):
-        """レビュアの実行を起動しなかった回の印で、偽の claude が呼ばれず、作業場所が残っていないこと。"""
+        """レビュアの実行を起動しなかった回のフラグファイルで、偽の claude が呼ばれず、作業場所が残っていないこと。"""
         self.assertEqual(marker["status"], "failed", marker)
         self.assertEqual(self.claude_calls(), [])
         for key in ("head_after", "tree_clean_after", "exit_code", "log"):
@@ -1049,13 +1049,13 @@ class TestWorkspace(WorkerTestBase):
 
     def test_reviewer_runs_in_clone(self):
         # AE1: cwd は作業場所の tree/ で、依頼の head を detached で取り出し、remote が無い。
-        # 結果は印より先に周回のディレクトリに現れ、回の後に作業場所は残らない
+        # 結果はフラグファイルより先に周回のディレクトリに現れ、回の後に作業場所は残らない
         self.put_request()
         full = _git(self.repo, "rev-parse", "HEAD")
         p = self.start()
         marker_path = self.path(f"delivered-{RID}.yaml")
-        self.wait_for(lambda: os.path.exists(marker_path), what="完了の印")
-        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "印が現れた時点で結果が周回のディレクトリに無い")
+        self.wait_for(lambda: os.path.exists(marker_path), what="完了のフラグファイル")
+        self.assertTrue(os.path.isfile(self.path(f"review-{RID}.yaml")), "フラグファイルが現れた時点で結果が周回のディレクトリに無い")
         self.wait_state("idle")
         self.finish(p)
         marker = _read_yaml(marker_path)
@@ -1121,7 +1121,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_workspace_path_taken_before_rename(self):
         # 前の回のレビュアの実行が残したプロセスが、準備の間に作業場所のパスを作り直した (偽の git の checkout の途中に作る) とき、
-        # シンボリックリンクと空でないディレクトリなら、リンクの先を変えずに改名が失敗し、レビュアの実行を起動せずに failed の印を書く。
+        # シンボリックリンクと空でないディレクトリなら、リンクの先を変えずに改名が失敗し、レビュアの実行を起動せずに failed のフラグファイルを書く。
         # 空のディレクトリなら改名で置き換わり、その回は通る
         ws = self.ws_path()
         victim = os.path.join(self.root, "victim")
@@ -1291,7 +1291,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_request_copy_cannot_be_made(self):
         # AE6: 扱いの行が無い (0.13.0 の依頼文)・2 つある・出力先が周回のディレクトリを指さない・作業ツリーのパスが無い依頼文では、
-        # レビュアの実行を起動せずに failed の印を書き、作業場所を残さない
+        # レビュアの実行を起動せずに failed のフラグファイルを書き、作業場所を残さない
         line = "- 作業ツリーの扱い: 共有\n"
         cases = (
             ("扱いの行が無い", lambda t: t.replace(line, ""), "handling lines: 0"),
@@ -1315,7 +1315,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_clone_stage_failure(self):
         # AE7: 複製の作成の段 (複製・remote の設定の削除・取り込み・チェックアウト) のどれかが失敗すると、
-        # レビュアの実行を起動せずに failed の印を書き、error に失敗した段を書く。作業場所は残らない
+        # レビュアの実行を起動せずに failed のフラグファイルを書き、error に失敗した段を書く。作業場所は残らない
         self.install_fake_git()
         for sub, stage in (("clone", "clone"), ("remote", "remove remote"), ("fetch", "fetch refs"),
                            ("checkout", "checkout")):
@@ -1342,7 +1342,7 @@ class TestWorkspace(WorkerTestBase):
     def test_clone_settings(self):
         # AE16: 複製の .claude/settings.json か .claude/settings.local.json に、空でない sandbox.excludedCommands か
         # sandbox.network.allowUnixSockets があるか、sandbox.network.allowLocalBinding が偽でないか、JSON として読めなければ、
-        # レビュアの実行を起動せずに failed の印を書く
+        # レビュアの実行を起動せずに failed のフラグファイルを書く
         sockets = json.dumps({"sandbox": {"network": {"allowUnixSockets": ["/var/run/docker.sock"]}}})
         binding = json.dumps({"sandbox": {"network": {"allowLocalBinding": True}}})
         cases = (
@@ -1416,7 +1416,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertIn(f"loop dir modified (review-{RID}.yaml)", marker["error"])
 
     def test_result_copy_failure(self):
-        # AE15: 周回のディレクトリの結果の一時名の場所にディレクトリがあると複写が失敗し、failed の印の error に複写の失敗を書く。ok の印は書かない
+        # AE15: 周回のディレクトリの結果の一時名の場所にディレクトリがあると複写が失敗し、failed のフラグファイルの error に複写の失敗を書く。ok のフラグファイルは書かない
         os.makedirs(self.path(f".review-{RID}.yaml.tmp"))
         self.put_request()
         marker, _ = self.run_round()
@@ -1427,7 +1427,7 @@ class TestWorkspace(WorkerTestBase):
 
     def test_result_file_conditions(self):
         # 結果がシンボリックリンク・FIFO・ディレクトリのとき、実体が作業場所の外にあるとき、大きさが上限を越えるときに、
-        # 停止せずに failed の印を書き、結果を周回のディレクトリに複写しない
+        # 停止せずに failed のフラグファイルを書き、結果を周回のディレクトリに複写しない
         outside = os.path.join(self.root, "outside-result.yaml")
         self.env["FAKE_CLAUDE_OUTSIDE"] = outside
         cases = (
@@ -1449,7 +1449,7 @@ class TestWorkspace(WorkerTestBase):
                 self.assertEqual(self.workspaces(), [])
 
     def test_end_during_preparation(self):
-        # 準備の途中 (複製の作成中) に周回のディレクトリに end が現れた回は、failed・loop dir modified の印を書いてから、end を見て終了する
+        # 準備の途中 (複製の作成中) に周回のディレクトリに end が現れた回は、failed・loop dir modified のフラグファイルを書いてから、end を見て終了する
         self.install_fake_git()
         self.env["FAKE_GIT_TOUCH_ON"] = "clone"
         self.env["FAKE_GIT_TOUCH"] = self.path("end")
@@ -1499,7 +1499,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(self.workspaces(), [])
 
     def test_readonly_directory(self):
-        # 作業場所の中に読み取り専用のディレクトリがあっても、回の後に作業場所は残らない。印の exit_code は偽の claude の終了コードのまま
+        # 作業場所の中に読み取り専用のディレクトリがあっても、回の後に作業場所は残らない。フラグファイルの exit_code は偽の claude の終了コードのまま
         self.env["FAKE_CLAUDE_MODE"] = "readonly_dir"
         self.env["FAKE_CLAUDE_EXIT"] = "5"
         self.put_request()
@@ -1686,7 +1686,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_permission_mode_mismatch(self):
         # AE4: 偽の claude が init の行の permissionMode に default を書く (auto モードを使えなかった) と、指定 (既定の auto) と
-        # 違うので failed。error に期待したモードと実際のモードを書き、印の permission_mode に指定と実効を書く
+        # 違うので failed。error に期待したモードと実際のモードを書き、フラグファイルの permission_mode に指定と実効を書く
         self.env["FAKE_CLAUDE_PERMISSION_MODE"] = "default"
         self.put_request()
         marker, _ = self.run_round()
@@ -1733,7 +1733,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_sandbox_blocked_top_level_and_subagent(self):
         # AE5: 最上位の Bash の結果 (本文の文面は小文字) と、sub-agent の中の Bash の結果 (大文字で始まる) の 2 件を数え、
-        # それぞれのコマンドと、本文のうち文面を含む行を印に書く。本文の形は実測したもの
+        # それぞれのコマンドと、本文のうち文面を含む行をフラグファイルに書く。本文の形は実測したもの
         marker = self.run_with_stream([
             _init("auto"),
             _tool_use("toolu_top", "Bash", {"command": "touch /Users/x/probe.txt", "description": "プローブを置く"}),
@@ -1822,7 +1822,7 @@ class TestLogReading(WorkerTestBase):
     def test_sandbox_blocked_values_are_one_line(self):
         # 改行・タブ・引用符・バックスラッシュ・制御文字・行の区切りの文字・対になっていないサロゲート (JSON の \ud800 の
         # エスケープから入る、2 つ組で 1 文字を表す符号の片方) を含むコマンドと本文も、
-        # 印の YAML を壊さずに 1 行で書く (_read_yaml は二重引用符の文字列を JSON として読むので、エスケープの誤りも例外になる)。
+        # フラグファイルの YAML を壊さずに 1 行で書く (_read_yaml は二重引用符の文字列を JSON として読むので、エスケープの誤りも例外になる)。
         # コマンドと文面は先頭 200 文字で切る
         tricky = ("cat <<'EOF' > ~/probe.txt\n\"quoted\" and \\backslash\\\tTab\x01\x7f\x85\u2028\ud800 日本語\nEOF\n")
         long_command = "echo " + "x" * 300 + " > ~/long.txt"
@@ -2385,7 +2385,7 @@ class TestPythonScriptsLoadedAtStart(WorkerTestBase):
 
     def test_keeps_running_after_python_dir_moved(self):
         # プラグインのスクリプトとファイルを一時ディレクトリに写してワーカーを起動し、1 回を処理させた後に .py のディレクトリを
-        # 別名に移す。次の依頼文も、ファイルを開かずに処理を終え、ok の印を書く
+        # 別名に移す。次の依頼文も、ファイルを開かずに処理を終え、ok のフラグファイルを書く
         copy = os.path.join(self.root, "plugin", "review-triage")
         shutil.copytree(os.path.join(_HERE, "..", "scripts"), os.path.join(copy, "scripts"),
                         ignore=shutil.ignore_patterns("__pycache__"))
@@ -2888,7 +2888,7 @@ class TestEnding(WorkerTestBase):
 
     def test_sigkill_while_stopping_reviewer_after_timeout(self):
         # 上限を越えた回は、回の終了処理をレビュアの実行を停止するところから始める。停止するまで待機する間に親を kill -9 で消しても、
-        # 子はその回の印 (failed・timeout) を書き終えてから、後始末をせずに終了する (worker.md の「終了の仕方」)。偽の claude は
+        # 子はその回のフラグファイル (failed・timeout) を書き終えてから、後始末をせずに終了する (worker.md の「終了の仕方」)。偽の claude は
         # TERM を受けても終了せず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
         self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
@@ -2903,7 +2903,7 @@ class TestEnding(WorkerTestBase):
         self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
 
     def test_interrupt_while_reviewing(self):
-        # AE16: 割り込みを受けたら、レビュアの実行とその子を停止して failed の印と left を書く。作業場所は残らない
+        # AE16: 割り込みを受けたら、レビュアの実行とその子を停止して failed のフラグファイルと left を書く。作業場所は残らない
         for sig, code in ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129)):
             with self.subTest(sig=sig.name):
                 for n in os.listdir(self.loop):
@@ -2937,7 +2937,7 @@ class TestEnding(WorkerTestBase):
     def test_sigkill_during_review_leaves_no_worker_processes(self):
         # レビュー中にワーカーを SIGKILL で消すと、ワーカーのプロセスグループ (子と、更新時刻を進める処理と、上限を測る処理) は
         # 10 秒以内に空になる。子は、上限を測る処理が送る USR1 で親が消えたことに気づき、後始末をせずに終了する (worker.yaml も
-        # 印も書かない)。レビュアの実行は専用のプロセスグループなので残る (trap が動かないので停止できない)
+        # フラグファイルも書かない)。レビュアの実行は専用のプロセスグループなので残る (trap が動かないので停止できない)
         self.env["FAKE_CLAUDE_MODE"] = "hang"
         self.put_request()
         p = self.start()
@@ -3012,7 +3012,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
         return marker
 
     def test_timeout_while_cloning(self):
-        # 複製の作成 (偽の git の clone) が終了しないと、上限で偽の git のプロセスグループを停止し、failed・timeout の印を書く
+        # 複製の作成 (偽の git の clone) が終了しないと、上限で偽の git のプロセスグループを停止し、failed・timeout のフラグファイルを書く
         self.delay_git("clone")
         self.put_request()
         p = self.start("--review-timeout-minutes", "0.05")
@@ -3039,7 +3039,7 @@ class TestInterruptPhases(WorkerTestBase):
 
     def test_interrupt_during_preparation(self):
         # 準備の途中 (偽の git の clone が終了しない間) に割り込みを受けると、準備のプロセスグループを停止し、準備のディレクトリと
-        # 作業場所を消し、印を書かずに left で終了する。起動し直したワーカーが、印の無い同じ依頼文を処理する
+        # 作業場所を消し、フラグファイルを書かずに left で終了する。起動し直したワーカーが、フラグファイルの無い同じ依頼文を処理する
         for sig, code in self.SIGNALS:
             with self.subTest(sig=sig.name):
                 self.reset_loop()
@@ -3068,7 +3068,7 @@ class TestInterruptPhases(WorkerTestBase):
 
     def test_interrupt_while_stopping_reviewer_after_timeout(self):
         # 上限を越えた回は、回の終了処理をレビュアの実行を停止するところから始める。停止するまで待機する間に割り込みを受けても、
-        # その回の印を、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終了する (関数 on_signal の、
+        # その回のフラグファイルを、割り込みを受けなかったときと同じ failed・timeout で書き終えてから、left で終了する (関数 on_signal の、
         # ワーカーの変数 PHASE が finish のときの分岐。worker.md の「終了の仕方」の、子の箇条の次の、回の終了処理の途中の項)。
         # 偽の claude は TERM を受けても終了せず、ワーカーが KILL を送るまで (ワーカーの変数 STOP_GRACE_SECONDS の秒数) 待機させる
         received = os.path.join(self.root, "term-received")
@@ -3085,7 +3085,7 @@ class TestInterruptPhases(WorkerTestBase):
                 os.killpg(p.pid, sig)
                 _, err = p.communicate(timeout=30)
                 self.assertEqual(p.returncode, code, err)
-                self.assertTrue(os.path.exists(self.path(f"delivered-{RID}.yaml")), "その回の印が書かれていない")
+                self.assertTrue(os.path.exists(self.path(f"delivered-{RID}.yaml")), "その回のフラグファイルが書かれていない")
                 marker = _read_yaml(self.path(f"delivered-{RID}.yaml"))
                 self.assertEqual(marker["status"], "failed", err)
                 self.assertEqual(marker["error"], "timeout", err)
@@ -3097,7 +3097,7 @@ class TestInterruptPhases(WorkerTestBase):
     def test_group_signal_while_child_runs_foreground_command(self):
         # 準備の途中、子がフォアグラウンドのコマンド (複製の設定の確認の python3) を実行している間に、プロセスグループに TERM か HUP
         # (端末を閉じたとき) が届くと、そのコマンドも停止する。親が割り込みを記録するファイルを書くより先に、子がその失敗を準備の失敗
-        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、印を書かずに left で終了する (worker.md の「終了の仕方」の
+        # として扱っても、子が自分で受けたシグナルを割り込みとして扱うので、フラグファイルを書かずに left で終了する (worker.md の「終了の仕方」の
         # 子の箇条)。偽の mv で、親がファイルを改名するのを 3 秒遅らせ、子が先に失敗の経路に入る順序を作る
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 30, touch)
@@ -3127,7 +3127,7 @@ class TestInterruptPhases(WorkerTestBase):
                 self.assertEqual(self.claude_calls(), [])
 
     def test_interrupt_during_finish(self):
-        # 回の終了処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回の印を、割り込みを受けなかったときと同じに
+        # 回の終了処理の途中 (結果の複写を遅らせる) に割り込みを受けると、その回のフラグファイルを、割り込みを受けなかったときと同じに
         # 書き終えてから left で終了する。割り込みは回の終了処理が起動したコマンド (遅らせた複写) にも届くが、それで停止しない
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("after the rename", 3, touch)

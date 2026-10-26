@@ -2,7 +2,7 @@
 # review-loop のワーカー。人間が端末で起動し、周回のディレクトリに現れた依頼文ごとに、TMPDIR の下に新しく作ったディレクトリ
 # (準備のディレクトリ) に複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) と依頼文の写しを作り、
 # 回の作業場所のパスに改名してから、複製の中で claude -p を走らせる。
-# 結果を確認してから周回のディレクトリに複写し、作業場所を消して、完了の印を書く。
+# 結果を確認してから周回のディレクトリに複写し、作業場所を消して、完了のフラグファイルを書く。
 #
 # 使い方:
 #   review-loop-worker.sh <周回のディレクトリの絶対パス> --model <指定> --effort <値>
@@ -209,12 +209,12 @@ last_line() {
   printf '%s\n' "$1" | sed '/^[[:space:]]*$/d' | tail -n 1
 }
 
-# 複数行の文字列 ($1) の空でない行を、"; " で繋いで 1 行にする (完了の印の error の区切り)
+# 複数行の文字列 ($1) の空でない行を、"; " で繋いで 1 行にする (完了のフラグファイルの error の区切り)
 join_lines() {
   printf '%s\n' "$1" | sed '/^$/d' | awk 'NR > 1 { printf "; " } { printf "%s", $0 }'
 }
 
-# 改行区切りの列 (標準入力) を、", " で繋いだ 1 行にする (完了の印の error に並べる一覧)
+# 改行区切りの列 (標準入力) を、", " で繋いだ 1 行にする (完了のフラグファイルの error に並べる一覧)
 comma_join() {
   tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g'
 }
@@ -484,14 +484,14 @@ DENIAL_TOOLS="[]"
 EFFECTIVE_MODE="unknown"  # ログから読んだ実効の権限モード
 HOOK_DENIAL_COUNT="unknown"  # ログから数えた、ワーカーのフックが拒否した呼び出しの件数 (DENIAL_COUNT には含めない)
 SANDBOX_COUNT="unknown"   # ログから数えた、サンドボックスが拒否した確認の件数 (リポジトリの行を表示しただけのものを除く)
-SANDBOX_CALLS=""          # 完了の印の sandbox_blocked.calls の要素 (YAML の行)。空なら calls は []
+SANDBOX_CALLS=""          # 完了のフラグファイルの sandbox_blocked.calls の要素 (YAML の行)。空なら calls は []
 SHOWN_COUNT="unknown"     # ログから数えた、リポジトリの行を表示しただけと確認した呼び出しの件数
-SHOWN_CALLS=""            # 完了の印の repo_text_displayed.calls の要素 (YAML の行)。空なら calls は []
-MARKER_LINE=""         # 最後に書いた完了の印の、この起動で応じた回の一覧に出す行
+SHOWN_CALLS=""            # 完了のフラグファイルの repo_text_displayed.calls の要素 (YAML の行)。空なら calls は []
+MARKER_LINE=""         # 最後に書いた完了のフラグファイルの、この起動で応じた回の一覧に出す行
 PREP_DIR=""            # 回の準備のディレクトリのパス (手順 5 で作り、手順 8 の後に作業場所のパスに改名する)
 PREP_OUT=""            # 準備のコマンドの標準出力と標準エラーを書くファイル (準備のディレクトリの中。改名の前に消す)
 PREP_TIMEOUT=0         # 準備のコマンドを、上限を越えたために停止したか起動しなかったら 1
-PREP_ERROR=""          # 準備の段が通らなかったときに、完了の印の error に書く文字列
+PREP_ERROR=""          # 準備の段が通らなかったときに、完了のフラグファイルの error に書く文字列
 
 # worker.yaml を書く。キー workspace には、reviewing のときだけ回の作業場所のパスを書く (起動し直したワーカーが片付けるのに使う)
 write_worker_yaml() {
@@ -952,12 +952,12 @@ leave() {
 
 # 割り込み (INT / TERM / HUP) を受けたときの子の処理。$1 はシグナルの名前、$2 は終了コード。子が割り込みを記録するファイルか、
 # 自分で受けたシグナルの名前 (変数 SELF_SIG) を見つけたときに呼ぶ (関数 check_interrupt)。受けた時点 (PHASE) で扱いが違う。
-#   prep   (準備の途中): 準備のコマンドのプロセスグループを停止し、準備のディレクトリと作業場所を消す。印は書かない —
+#   prep   (準備の途中): 準備のコマンドのプロセスグループを停止し、準備のディレクトリと作業場所を消す。フラグファイルは書かない —
 #          レビュアの実行を起動していないので、起動し直したワーカーが同じ依頼文を初めから処理する
-#   review (レビュアの実行中): レビュアの実行を停止し、回の終了処理を行って、failed・interrupted の印を書く
+#   review (レビュアの実行中): レビュアの実行を停止し、回の終了処理を行って、failed・interrupted のフラグファイルを書く
 #   finish (回の終了処理の途中。上限を越えてレビュアの実行を停止している間に見つけたとき): 何もせずに戻る。割り込みを記録する
-#          ファイルも SELF_SIG も残るので、その回の印を書き終えてから、もう一度見つけて終了する (関数 process_request)。
-#          印の無い回と、消し残した作業場所を作らないため
+#          ファイルも SELF_SIG も残るので、その回のフラグファイルを書き終えてから、もう一度見つけて終了する (関数 process_request)。
+#          フラグファイルの無い回と、消し残した作業場所を作らないため
 # finish のほかは、そのあと worker.yaml を left にして終了する
 INTERRUPT_NOTED=0
 on_signal() {
@@ -965,7 +965,7 @@ on_signal() {
   if [ "$PHASE" = finish ]; then
     if [ "$INTERRUPT_NOTED" = 0 ]; then
       INTERRUPT_NOTED=1
-      log "割り込み ($sig) を受けた。この回の印を書き終えてから終了する"
+      log "割り込み ($sig) を受けた。この回のフラグファイルを書き終えてから終了する"
     fi
     return 0
   fi
@@ -980,7 +980,7 @@ on_signal() {
         PREP_PID=""
       fi
       discard_round_dirs
-      log "準備の途中だったので、印を書かずに終了する。起動し直したワーカーが、同じ依頼文を初めから処理する: $CURRENT_RID"
+      log "準備の途中だったので、フラグファイルを書かずに終了する。起動し直したワーカーが、同じ依頼文を初めから処理する: $CURRENT_RID"
       ;;
     review)
       stop_watchdog
@@ -997,15 +997,15 @@ on_signal() {
 
 # 親が割り込みを記録したか (worker.md の「終了の仕方」) と、親が動いているかを確認する。どの時点で呼ぶかの正本は worker.md の
 # 「終了の仕方」の子の箇条。割り込みを記録するファイルか、子が自分で受けた TERM・HUP の名前 (SELF_SIG) があれば、関数 on_signal で扱う。
-# 親が動いていなければ (kill -9)、ファイルや SELF_SIG があっても、後始末をせずに終了する (worker.yaml も印も書かない。起動し直した
-# ワーカーが片付ける。回の終了処理の途中なら、その回の印を書き終えてから終了する)。親の確認に使う ps がプロセスグループに届いた TERM・HUP で停止したときは、親が動いていないとは判定しない
+# 親が動いていなければ (kill -9)、ファイルや SELF_SIG があっても、後始末をせずに終了する (worker.yaml もフラグファイルも書かない。起動し直した
+# ワーカーが片付ける。回の終了処理の途中なら、その回のフラグファイルを書き終えてから終了する)。親の確認に使う ps がプロセスグループに届いた TERM・HUP で停止したときは、親が動いていないとは判定しない
 # (関数 pid_alive)。割り込みかどうかを主にファイルで確認するのは、bash がコマンド置換を処理している間に受けたシグナルの trap を
 # 実行しないことがあるため。親は子が終了するまで 1 秒おきに USR1 を送るので、子が USR1 を受け損ねても、次の USR1 で wait から戻る
 check_interrupt() {
   local sig="" code=""
   [ "$FINISHING" = 0 ] || return 0
   if ! worker_alive; then
-    # 回の終了処理の途中 (上限を越えてレビュアの実行を停止している間) は、その回の印を書き終えてから終了する。関数 process_request が
+    # 回の終了処理の途中 (上限を越えてレビュアの実行を停止している間) は、その回のフラグファイルを書き終えてから終了する。関数 process_request が
     # 回の後に呼ぶ check_interrupt で、ここに戻る
     [ "$PHASE" != finish ] || return 0
     FINISHING=1
@@ -1060,7 +1060,7 @@ read_log_facts() {
   run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook" "$CWD_REAL" "$REQ_BASE" "$REQ_HEAD_FULL"
 }
 
-# 完了の印を書き、この起動で応じた回の一覧に出す行を MARKER_LINE に入れる。ran=1 はレビュアの実行を起動した回。
+# 完了のフラグファイルを書き、この起動で応じた回の一覧に出す行を MARKER_LINE に入れる。ran=1 はレビュアの実行を起動した回。
 # 一覧への追加 (関数 note_served) は呼び出し元が行う — 回の終了処理はサブシェルで行うので、ここで変数を変えても戻らないため
 write_marker() {
   local status=$1 error=$2 ran=$3 head_after=${4:-} clean_after=${5:-} exit_code=${6:-}
@@ -1112,7 +1112,7 @@ write_marker() {
   local line="$CURRENT_RID  $status  model: $MODEL (実効: $EFFECTIVE)  effort: $EFFORT  所要: $(( elapsed / 60 ))分$(( elapsed % 60 ))秒"
   [ "$status" = failed ] && line="$line  error: $error"
   MARKER_LINE=$(printf '%s' "$line" | tr '\n' ' ')
-  log "完了の印を書いた: $CURRENT_RID ($status${error:+: $error})"
+  log "完了のフラグファイルを書いた: $CURRENT_RID ($status${error:+: $error})"
 }
 
 # この起動で応じた回の一覧に 1 行 ($1) を足し、応じた回の数を 1 つ増やす
@@ -1128,7 +1128,7 @@ note_served() {
 # 残っていれば、リンクだけを消す (リンクの先は消さない)。準備のディレクトリは mktemp -d で作る — 前の回のサンドボックスが
 # 書き込みを許したのは作業場所のパスで、新しい名前のディレクトリには書けない。
 # 作業場所は、手順 8 の後に準備のディレクトリを作業場所のパスに改名して作る (関数 rename_prep_dir)。
-# 作れなければ、完了の印の error に書く文字列を PREP_ERROR に入れて 1 を返す
+# 作れなければ、完了のフラグファイルの error に書く文字列を PREP_ERROR に入れて 1 を返す
 prepare_workspace() {
   local out
   if [ -e "$WS" ] && [ ! -L "$WS" ]; then
@@ -1161,7 +1161,7 @@ rename_dir() {
 # レビュアの実行が残したプロセスが、手順 5 で消した後に作り直したもの)、シンボリックリンクを辿らずに失敗する —
 # rename(2) は、移す先が空でないディレクトリなら ENOTEMPTY で、ディレクトリでないもの (シンボリックリンクを含む) なら
 # ENOTDIR で失敗し、空のディレクトリなら置き換える。mv は移す先がディレクトリへのシンボリックリンクなら、その先の中に移すので使わない。
-# 改名できなければ、完了の印の error に書く文字列を PREP_ERROR に入れて 1 を返す
+# 改名できなければ、完了のフラグファイルの error に書く文字列を PREP_ERROR に入れて 1 を返す
 rename_prep_dir() {
   local out
   if out=$(rename_dir "$PREP_DIR" "$WS"); then
@@ -1172,7 +1172,7 @@ rename_prep_dir() {
   return 1
 }
 
-# 手順 6 の段の失敗を、完了の印の error に書く文字列にする。$1 は段の名前、$2 は git の出力
+# 手順 6 の段の失敗を、完了のフラグファイルの error に書く文字列にする。$1 は段の名前、$2 は git の出力
 clone_failed() {
   local detail
   detail=$(last_line "$2")
@@ -1211,7 +1211,7 @@ run_prep() {
 }
 
 # 手順 6 の段を 1 つ行う。$1 は段の名前、残りは git の引数。通らなければ 1 を返し、上限を越えたためでなければ、
-# 完了の印の error に書く文字列を PREP_ERROR に入れる
+# 完了のフラグファイルの error に書く文字列を PREP_ERROR に入れる
 clone_stage() {
   local stage=$1
   shift
@@ -1252,7 +1252,7 @@ clone_settings_problem() {
 # 手順 8。作業側の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。写しの作り方 (置き換える文字列と、失敗とする条件) の
 # 正本は review-loop-worker/make_request_copy.py。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
 # 読み込んだ中身を、関数 run_py と同じく python3 -I -c で実行する。
-# 通らなければ 1 を返し、上限を越えたためでなければ、完了の印の error に書く文字列を PREP_ERROR に入れる
+# 通らなければ 1 を返し、上限を越えたためでなければ、完了のフラグファイルの error に書く文字列を PREP_ERROR に入れる
 make_request_copy() {
   local out
   run_prep "request copy" python3 -I -c "$PY_SRC_make_request_copy" "$1" "$2" "$CURRENT_RID" "$LOOP_REAL" "$CWD_REAL" "$WS" "$CLONE" \
@@ -1280,9 +1280,9 @@ copy_result() {
 
 # ---- 回の処理の流れ (手順 2〜10) ----
 
-# レビュアの実行を起動しなかった回の印 (依頼文・HEAD・作業ツリーの確認か、作業場所を作れない)。上限の計測を停止してから書く。
+# レビュアの実行を起動しなかった回のフラグファイル (依頼文・HEAD・作業ツリーの確認か、作業場所を作れない)。上限の計測を停止してから書く。
 # ログから読む項目 (実効モデル・実効の権限モード・サンドボックスが拒否した件数など) は、関数 process_request が回の初めに入れた
-# unknown のまま書く。書く前に割り込みを確認する — 準備の途中に受けた割り込みなら、印を書かずに終了する (関数 on_signal)
+# unknown のまま書く。書く前に割り込みを確認する — 準備の途中に受けた割り込みなら、フラグファイルを書かずに終了する (関数 on_signal)
 fail_without_run() {
   check_interrupt
   stop_watchdog
@@ -1294,14 +1294,14 @@ fail_without_run() {
 }
 
 # 準備 (手順 5〜8 と、その後の改名) が通らなかった回。準備のディレクトリと作業場所があれば、回の終了処理の 1 と 5 の手順で
-# 片付けてから、レビュアの実行を起動せずに failed の印を書く
+# 片付けてから、レビュアの実行を起動せずに failed のフラグファイルを書く
 fail_prepared() {
   discard_round_dirs
   PREP_DIR=""
   fail_without_run "$1"
 }
 
-# 準備の途中で上限を越えた回。レビュアの実行を起動せずに、failed・timeout の印を書く
+# 準備の途中で上限を越えた回。レビュアの実行を起動せずに、failed・timeout のフラグファイルを書く
 fail_timeout_in_preparation() {
   log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、レビュアの実行を起動しない"
   fail_prepared timeout
@@ -1316,8 +1316,8 @@ fail_preparation_stage() {
   fi
 }
 
-# 手順 10。レビュアの実行が終了した (または停止した) 後の処理と印。how は done / timeout / interrupted。
-# 順序は、残ったプロセスを停止する → ログを読む → 確認する → 結果を複写する → 作業場所を消す → 印を書く。
+# 手順 10。レビュアの実行が終了した (または停止した) 後の処理とフラグファイル。how は done / timeout / interrupted。
+# 順序は、残ったプロセスを停止する → ログを読む → 確認する → 結果を複写する → 作業場所を消す → フラグファイルを書く。
 # 関数 run_finish がサブシェルで呼ぶ。この起動で応じた回の一覧の行 (1 行目) と、この起動の間は処理しない依頼文の識別子
 # (2 行目以降) を標準出力に出して、呼び出し元に返す
 REVIEWER_RC=""
@@ -1335,7 +1335,7 @@ finish_round() {
   stop_cwd_procs "$WS"
 
   # 2. ログを読む。行の順序は review-loop-worker/read_log_facts.py の先頭のコメントのとおり。9 行目からは、
-  # 呼び出しごとのコマンドと文面の 2 行で、先頭から SANDBOX_COUNT 件を完了の印の sandbox_blocked.calls の要素の YAML に、
+  # 呼び出しごとのコマンドと文面の 2 行で、先頭から SANDBOX_COUNT 件を完了のフラグファイルの sandbox_blocked.calls の要素の YAML に、
   # 残りを repo_text_displayed.calls の要素の YAML にする (値は yaml_str で二重引用符の文字列にする)
   facts=$(read_log_facts "$LOOP_DIR/$CURRENT_RID.log")
   SANDBOX_CALLS=""
@@ -1434,17 +1434,17 @@ EOF
   fi
 
   # 4. 結果を複写する。failed の回でも、結果のファイルの条件を満たせば複写する (RA1 の報告から人間が結果を読めるように)。
-  # ok の印は、周回のディレクトリの出力先に結果が通常のファイルとして在ることを copy_result が確認した後にだけ書ける
+  # ok のフラグファイルは、周回のディレクトリの出力先に結果が通常のファイルとして在ることを copy_result が確認した後にだけ書ける
   if [ "$copyable" = 1 ]; then
     if ! problem=$(copy_result "$ws_result" "$dest"); then
       errors+=("result copy failed (${problem:-理由が分からない})")
     fi
   fi
 
-  # 5. 作業場所を消す。消せなくても印の status は変えない (次の回の手順 5 か、次の起動の掃除で消す)
+  # 5. 作業場所を消す。消せなくてもフラグファイルの status は変えない (次の回の手順 5 か、次の起動の掃除で消す)
   remove_workspace "$WS"
 
-  # 6. 印を書く
+  # 6. フラグファイルを書く
   if [ ${#errors[@]} -eq 0 ]; then
     write_marker ok "" 1 "$head_after" "$clean_after" "$REVIEWER_RC"
   else
@@ -1459,14 +1459,14 @@ EOF
 # 手順 10 (回の終了処理) を行う。how は done / timeout / interrupted。
 # 端末の Ctrl-C のようにワーカーのプロセスグループ全体に届く割り込みで、回の終了処理が起動したコマンド (結果の複写や
 # 作業場所の削除) が停止しないように、INT・TERM・HUP を無視するサブシェルで行う (無視はコマンドに引き継がれる)。
-# 子は、サブシェルの終了まで待機する間は割り込みを記録するファイルを確認せず、印を書き終えてから確認する (関数 process_request)。
+# 子は、サブシェルの終了まで待機する間は割り込みを記録するファイルを確認せず、フラグファイルを書き終えてから確認する (関数 process_request)。
 # サブシェルで変えた変数は戻らないので、この起動で応じた回の一覧の行と、処理しない依頼文の識別子を標準出力で受け取る
 run_finish() {
   local how=$1 out line first=1
   PHASE=finish
   out=$(trap '' INT TERM HUP; finish_round "$how")
   if [ -z "$out" ]; then
-    log "回の終了処理が、印を書いたことを知らせずに終了した: $CURRENT_RID"
+    log "回の終了処理が、フラグファイルを書いたことを知らせずに終了した: $CURRENT_RID"
     return 0
   fi
   while IFS= read -r line; do
@@ -1551,7 +1551,7 @@ process_request() {
   REQ_DEADLINE=$(( REQ_STARTED_EPOCH + REVIEW_TIMEOUT_SECONDS ))
   REQ_BASE=""
   REQ_HEAD_FULL=""
-  # ログから読む項目。レビュアの実行を起動しなかった回の印には、この unknown のまま書く
+  # ログから読む項目。レビュアの実行を起動しなかった回のフラグファイルには、この unknown のまま書く
   EFFECTIVE="unknown"
   SKILL_CALLED="unknown"
   DENIAL_COUNT="unknown"
@@ -1632,14 +1632,14 @@ process_request() {
   if timed_out; then fail_timeout_in_preparation; return; fi
   log "レビュアの実行を起動する: claude -p --model $MODEL --effort $EFFORT --permission-mode $PERMISSION_MODE (cwd: ${CLONE}、上限 $REVIEW_TIMEOUT_MINUTES 分)"
   run_reviewer "$WS/$copy_name" "$logf"
-  # 印を書き終えた。回の終了処理の途中に受けた割り込みは、ここで見つけて終了する
+  # フラグファイルを書き終えた。回の終了処理の途中に受けた割り込みは、ここで見つけて終了する
   CURRENT_RID=""
   PHASE=""
   check_interrupt
   write_worker_yaml idle ""
 }
 
-# 印の無い依頼文のうち、識別子の順で最初の 1 つ
+# フラグファイルの無い依頼文のうち、識別子の順で最初の 1 つ
 next_request() {
   find "$LOOP_DIR" -mindepth 1 -maxdepth 1 -type f -name 'review-request-*.md' 2>/dev/null \
     | sed -e 's|.*/review-request-||' -e 's|\.md$||' | LC_ALL=C sort | while IFS= read -r id; do
@@ -1705,7 +1705,7 @@ body_main() {
       trap '' INT TERM HUP
       cleanup
       write_worker_yaml expired ""
-      log "印の無い依頼文が無いまま $IDLE_MINUTES 分が過ぎたので終了する。周回は終了していない — 同じコマンドで起動し直せる"
+      log "フラグファイルの無い依頼文が無いまま $IDLE_MINUTES 分が過ぎたので終了する。周回は終了していない — 同じコマンドで起動し直せる"
       print_served
       exit 124
     fi

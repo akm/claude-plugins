@@ -85,7 +85,7 @@ class WaitTestBase(unittest.TestCase):
 
 class TestDelivered(WaitTestBase):
     def test_ok_marker_with_request_and_result_returns_zero(self):
-        # 待機している間に 3 点 (印・依頼文・結果) が揃うと 0 で返る
+        # 待機している間に 3 点 (フラグファイル・依頼文・結果) が揃うと 0 で返る
         rc, out, err, _ = self.run_wait(
             actions=[(1, lambda: (self.put_request(), self.put_result(), self.put_marker("ok")))]
         )
@@ -93,7 +93,7 @@ class TestDelivered(WaitTestBase):
         self.assertEqual(out, f"delivered {RID}")
 
     def test_ok_marker_without_request_does_not_return(self):
-        # status: ok の印だけで依頼文が無いときは返らない (3 点が揃うまで待機する)
+        # status: ok のフラグファイルだけで依頼文が無いときは返らない (3 点が揃うまで待機する)
         self.put_result()
         self.put_marker("ok")
         rc, out, _, _ = self.run_wait(minutes="0.1")
@@ -107,7 +107,7 @@ class TestDelivered(WaitTestBase):
         self.assertEqual(rc, 124)
 
     def test_failed_marker_needs_only_request(self):
-        # status: failed の印は結果が無くても、依頼文があれば 0 で返る (2 点一致)
+        # status: failed のフラグファイルは結果が無くても、依頼文があれば 0 で返る (2 点一致)
         self.put_request()
         self.put_marker("failed")
         rc, out, err, elapsed = self.run_wait()
@@ -116,7 +116,7 @@ class TestDelivered(WaitTestBase):
         self.assertLess(elapsed, 3)
 
     def test_temporary_name_is_ignored_until_renamed(self):
-        # 一時名 (. で始まる名前) の印には反応せず、改名すると返る
+        # 一時名 (. で始まる名前) のフラグファイルには反応せず、改名すると返る
         self.put_request()
         self.put_result()
         tmp = self.path(f".delivered-{RID}.yaml.tmp")
@@ -145,7 +145,7 @@ class TestEnd(WaitTestBase):
         self.assertEqual(out, "end")
 
     def test_marker_is_reported_before_end(self):
-        # 同じ周期に印と end があれば、印を先に返す (作業側が印を取り込めるように)
+        # 同じ周期にフラグファイルと end があれば、フラグファイルを先に返す (作業側がフラグファイルを取り込めるように)
         self.put_request()
         self.put_marker("failed")
         _write(self.path("end"), "")
