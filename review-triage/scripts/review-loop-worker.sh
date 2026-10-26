@@ -1054,7 +1054,7 @@ snapshot() {
 
 # ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・ワーカーのフックが拒否した呼び出し・
 # サンドボックスが止めた確認・リポジトリの行を表示しただけの呼び出しを読んで、1 行に 1 つずつ標準出力に出す。
-# 行の並びと説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを判別するのに、
+# 行の順序と説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを判別するのに、
 # 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを判別するのに、作業側のパスと依頼文の範囲を渡す
 read_log_facts() {
   run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook" "$CWD_REAL" "$REQ_BASE" "$REQ_HEAD_FULL"
@@ -1334,7 +1334,7 @@ finish_round() {
   # レビュアの実行の終了コード (REVIEWER_RC) は変えない
   stop_cwd_procs "$WS"
 
-  # 2. ログを読む。行の並びは review-loop-worker/read_log_facts.py の先頭のコメントのとおり。9 行目からは、
+  # 2. ログを読む。行の順序は review-loop-worker/read_log_facts.py の先頭のコメントのとおり。9 行目からは、
   # 呼び出しごとのコマンドと文面の 2 行で、先頭から SANDBOX_COUNT 件を完了の印の sandbox_blocked.calls の要素の YAML に、
   # 残りを repo_text_displayed.calls の要素の YAML にする (値は yaml_str で二重引用符の文字列にする)
   facts=$(read_log_facts "$LOOP_DIR/$CURRENT_RID.log")
