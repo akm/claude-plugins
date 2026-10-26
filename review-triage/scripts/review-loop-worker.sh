@@ -1723,7 +1723,7 @@ body_main() {
 # 無いことを確かめる
 
 # 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを覚えて、割り込みを記録するファイルに書く。
-# 子への USR1 と、書けなかったときの書き直しは、関数 supervise_body が行う
+# 子への USR1 と、書けなかったときの書き込みのやり直しは、関数 supervise_body が行う
 relay_interrupt() {
   [ -z "$RELAY_SIG" ] || return 0
   RELAY_SIG=$1
@@ -1741,14 +1741,14 @@ write_interrupt_file() {
     && return 0
   if [ -z "$RELAY_WARNED" ]; then
     RELAY_WARNED=1
-    echo "review-loop-worker: 割り込みを記録するファイル $INTERRUPT_FILE を書けない。子 (PID $BODY_PID) が終わるまで、1 秒おきに書き直す。" >&2
+    echo "review-loop-worker: 割り込みを記録するファイル $INTERRUPT_FILE を書けない。子 (PID $BODY_PID) が終わるまで、1 秒おきに書き込みをやり直す。" >&2
     echo "  止まらなければ kill -KILL $WORKER_PID を送る (子は親が無いことに気づいて、後始末をせずに終わる)" >&2
   fi
   return 1
 }
 
 # 子を起動し、終わるまで待機する。割り込みを受けていれば、子が終わるまで 1 秒おきに子へ USR1 を送る (子が USR1 を受け損ねても、
-# 次の USR1 で wait から戻るように)。送る前に、割り込みを記録するファイルが無ければ (書けなかったとき) 書き直す。子が終わったら
+# 次の USR1 で wait から戻るように)。送る前に、割り込みを記録するファイルが無ければ (書けなかったとき) 書き込みをやり直す。子が終わったら
 # 割り込みを記録するファイルを消し、割り込みを受けていればそのシグナルの終了コードで、受けていなければ子の終了コードで終わる
 supervise_body() {
   local rc=""

@@ -2846,11 +2846,11 @@ class TestEnding(WorkerTestBase):
         out, err = p.communicate(timeout=20)
         self.assertEqual(p.returncode, 130, err)
         self.assertEqual(self.worker_state()["state"], "left", err)
-        self.assertNotIn("書き直す", err)
+        self.assertNotIn("書き込みをやり直す", err)
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_interrupt_file_rewritten_when_write_fails(self):
-        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き直し、ワーカーは終わる。書けなかったことは
+        # 親が割り込みを記録するファイルを書けなかったときは、子へ USR1 を送る前に書き込みをやり直し、ワーカーは終わる。書けなかったことは
         # 1 度だけ標準エラーに知らせる (関数 write_interrupt_file)。偽の mv は、ファイルへの最初の改名だけを失敗させる
         failed = os.path.join(self.root, "mv-failed")
         path = os.path.join(self.bin, "mv")
@@ -2869,7 +2869,7 @@ class TestEnding(WorkerTestBase):
         self.assertTrue(os.path.exists(failed), "偽の mv が改名を失敗させていない")
         self.assertEqual(p.returncode, 143, err)
         self.assertEqual(self.worker_state()["state"], "left", err)
-        self.assertEqual(err.count("書き直す"), 1, err)
+        self.assertEqual(err.count("書き込みをやり直す"), 1, err)
         self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_timeout(self):
