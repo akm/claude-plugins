@@ -81,9 +81,9 @@ review-loop --end [<置き場>]
 | `wait_minutes`・`worker_wait_minutes`・`worker_idle_minutes`・`review_timeout_minutes` | 正の数 (小数を許す) |
 | `worker_stale_seconds` | 10 以上の整数 (ワーカーは 5 秒おきに更新時刻を進めるので、それより短いと動いているワーカーを停滞と読む) |
 | `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の正本は [worker.md](worker.md) の「レビュアの実行の権限」) |
-| `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確かめる (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
+| `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確認する (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
 | `dir` | 空でない文字列。リポジトリのルートからの相対パスとして解決する |
-| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す (`review-request` の手順 2 と同じ検査。開始時に確かめないと、共通祖先の無いブランチが条件に入り、全量の回のたびに RA3 で止まる) |
+| `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す (`review-request` の手順 2 と同じ検査。開始時に確認しないと、共通祖先の無いブランチが条件に入り、全量の回のたびに RA3 で止まる) |
 
 **エラーと警告には、その値が引数と設定のどちらから来たかを書く。** 直す先が違う。
 
@@ -98,4 +98,4 @@ review-loop --end [<置き場>]
 | ワーカーの effort | `claude -p --effort` に渡す、レビュアの実行 (セッション) の effort | 人間 (`--effort` か `review_loop.worker_effort`) | `loop.yaml` の `worker.effort`・`worker.yaml` の `effort`・完了の印の `effort`・記録の `notes` の `worker_effort` |
 | レビュースキルの effort | レビュースキル (`code-review`) に渡す effort | `--review-args` か `loop.review_args` (無ければ既定。正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」) | 依頼文の `effort`・結果と記録の `level` |
 
-**ワーカーの effort は実行時の値を確かめられない** — `claude -p` のログに effort は記録されないので、残るのはワーカーに渡した値である。
+**ワーカーの effort は実行時の値を確認できない** — `claude -p` のログに effort は記録されないので、残るのはワーカーに渡した値である。

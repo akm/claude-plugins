@@ -1,5 +1,5 @@
 """回の処理の手順 7。複製の .claude/settings.json と .claude/settings.local.json に、コマンドをサンドボックスの外で実行させる設定と、
-Unix ソケットへの接続を許す設定と、localhost の bind と接続を許す設定が無いかを確かめる。
+Unix ソケットへの接続を許す設定と、localhost の bind と接続を許す設定が無いかを確認する。
 
 どちらかのファイルが JSON として読めないか、空でない sandbox.excludedCommands か sandbox.network.allowUnixSockets を持つか、
 sandbox.network.allowLocalBinding が偽でない値 (真偽値でない値を含む) を持てば、そのファイルと理由を出す。無いファイルは飛ばす。

@@ -153,7 +153,7 @@ exec "$FAKE_DATE_REAL" "$@"
 
 # make_removable の途中で、前の回のレビュアの実行が残したプロセスがディレクトリをシンボリックリンクに置き換えたのと同じ変更を
 # 起こす前置き (偽の python3 の FAKE_PY_PRELUDE)。名前が victim のパスを、シンボリックリンクを辿らずに stat した直後
-# (関数 make_removable がディレクトリであることを確かめた直後で、chmod より前) に 1 度だけ、そのディレクトリを victim.moved に移し、
+# (関数 make_removable がディレクトリであることを確認した直後で、chmod より前) に 1 度だけ、そのディレクトリを victim.moved に移し、
 # victim を FAKE_PY_SWAP_TARGET へのシンボリックリンクにして、ファイル FAKE_PY_SWAP_DONE を作る
 _SWAP_PRELUDE = """
 import os as _os
@@ -520,7 +520,7 @@ class WorkerTestBase(unittest.TestCase):
 
     def start_until_child_checks_parent(self, trigger, log):
         """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
-        親の生存を確かめる ps を実行するまで待機して、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
+        親の生存を確認する ps を実行するまで待機して、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
         コマンド置換の中の ps は、子が起動したサブシェルから呼ばれるので、子の PID は、ps を呼んだプロセスの親の側に出る。"""
         for f in (trigger, log):
             if os.path.exists(f):
@@ -539,7 +539,7 @@ class WorkerTestBase(unittest.TestCase):
             except OSError:
                 return False
         open(trigger, "w").close()
-        self.wait_for(child_in_ps, what="子が親の生存を確かめる ps を実行すること")
+        self.wait_for(child_in_ps, what="子が親の生存を確認する ps を実行すること")
         return p
 
     def delay_git(self, sub):
@@ -637,7 +637,7 @@ class WorkerTestBase(unittest.TestCase):
         return p
 
     def start_unavailable(self, *extra, contains, cwd=None, env=None, loop=None):
-        """起動時の確認が通らず、worker.yaml が unavailable と理由 (contains を含む) で書かれ、終了コード 2 で終わることを確かめる。"""
+        """起動時の確認が通らず、worker.yaml が unavailable と理由 (contains を含む) で書かれ、終了コード 2 で終わることを確認する。"""
         loop = loop or self.loop
         yaml_path = os.path.join(loop, "worker.yaml")
         if os.path.exists(yaml_path):
@@ -653,7 +653,7 @@ class WorkerTestBase(unittest.TestCase):
         return state
 
     def start_idle(self, *extra, cwd=None, env=None, loop=None):
-        """起動時の確認が通り、worker.yaml が idle で書かれることを確かめ、止めて (標準出力, worker.yaml の中身) を返す。"""
+        """起動時の確認が通り、worker.yaml が idle で書かれることを確認し、止めて (標準出力, worker.yaml の中身) を返す。"""
         p = self.start(*extra, cwd=cwd, env=env, loop=loop)
         state = self.wait_for(
             lambda: self.worker_state().get("pid") == p.pid and self.worker_state(),
@@ -1174,7 +1174,7 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(args[args.index("--setting-sources") + 1], "user,project")
         self.assertEqual(args.count("--settings"), 1)
         # フックのコマンドは、PATH で見つけた python3 の絶対パスと、起動時に読み込んだフックの中身 (ワーカーはコマンド置換で
-        # 読むので、末尾の改行は除かれる) を、それぞれシェルの引用符で囲んだもの。フックの振る舞いは TestWorkerHook で確かめる
+        # 読むので、末尾の改行は除かれる) を、それぞれシェルの引用符で囲んだもの。フックの振る舞いは TestWorkerHook で確認する
         with open(_HOOK, encoding="utf-8") as f:
             hook_source = f.read().rstrip("\n")
         python3 = shutil.which("python3", path=self.env["PATH"])
@@ -1545,10 +1545,10 @@ class TestWorkspace(WorkerTestBase):
         self.assertEqual(os.listdir(outside), ["keep.txt"])
 
     def test_removal_does_not_follow_symlink_swapped_in(self):
-        # 作業場所の中のディレクトリを、確かめてから chmod するまでの間にシンボリックリンクに置き換えられても (前の回のレビュアの実行が
+        # 作業場所の中のディレクトリを、確認してから chmod するまでの間にシンボリックリンクに置き換えられても (前の回のレビュアの実行が
         # 残したプロセスの書き込みを、偽の python3 の前置きで起こす)、リンクの先の権限を変えない
         if os.chmod not in os.supports_follow_symlinks:
-            self.skipTest("この OS には lchmod が無い (chmod でシンボリックリンクを辿らない方法を、macOS でだけ確かめられる)")
+            self.skipTest("この OS には lchmod が無い (chmod でシンボリックリンクを辿らない方法を、macOS でだけ確認できる)")
         outside = self.make_outside_readonly_dir()
         done = os.path.join(self.root, "swap-done")
         self.prelude_python("add_owner_rwx", _SWAP_PRELUDE)
@@ -1628,7 +1628,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_worker_hook_denials_need_all_conditions(self):
         # 3 つの条件 (ツールが Bash でコマンドがフックの規則に当たる・tool_result の本文がフックの理由の文面と一致する) の
-        # どれかを満たさない拒否は、ワーカーのフックによるものと確かめられないので、permission_denials に数える
+        # どれかを満たさない拒否は、ワーカーのフックによるものと確認できないので、permission_denials に数える
         reason = _HOOK_NS["REASON"]
         tmp = "cat > /tmp/x.go"
         marker = self.run_with_stream([
@@ -1978,8 +1978,8 @@ class TestLogReading(WorkerTestBase):
         self.assertEqual([where for where, sub, caller in runs if sub == "grep"], [os.path.realpath(self.repo)])
 
     def test_repo_text_mixed_and_excluded_lines(self):
-        # 表示したものと確かめられない行が 1 行でもあれば、今までどおりサンドボックスが止めた確認に数え、
-        # message には表示したものと確かめた行を除いて書く (表示したタグの行からは、タグの中の行を含め始めない)。
+        # 表示したものと確認できない行が 1 行でもあれば、今までどおりサンドボックスが止めた確認に数え、
+        # message には表示したものと確認した行を除いて書く (表示したタグの行からは、タグの中の行を含め始めない)。
         # 文面だけの行とタグだけの行は照合に使わない — 接続を止められたときの本物の本文にはタグだけの行がある。
         # レビュー対象の範囲の外 (別のブランチ) にしか無い行も照合に使わない
         _git(self.repo, "switch", "-q", "-c", "other")
@@ -2079,7 +2079,7 @@ class TestLogReading(WorkerTestBase):
 
 class TestWorkerHook(WorkerTestBase):
     """ワーカーがレビュアの実行に渡す PreToolUse のフック (worker.md の「/tmp を含むコマンドを拒否するフック」)。
-    ワーカーが --settings に埋め込んだコマンドを、Claude Code と同じくシェルで実行して確かめる。"""
+    ワーカーが --settings に埋め込んだコマンドを、Claude Code と同じくシェルで実行して確認する。"""
 
     # 拒否するコマンド。先頭の 3 つは goose-ut の周回で、サンドボックスが /tmp への書き込みを止めたもの (#80)
     DENIED = [
@@ -2455,7 +2455,7 @@ class TestSandboxStartChecks(WorkerTestBase):
     def test_sandbox_tmp(self):
         # AE11: 作業側か周回の置き場が、サンドボックスの一時ディレクトリ (/private/tmp/claude-<利用者の番号>) の下
         if not (os.path.isdir(_SANDBOX_TMP) and os.access(_SANDBOX_TMP, os.W_OK)):
-            self.skipTest(f"{_SANDBOX_TMP} が無い (macOS で Claude Code のサンドボックスを使った機材でだけ確かめられる)")
+            self.skipTest(f"{_SANDBOX_TMP} が無い (macOS で Claude Code のサンドボックスを使った機材でだけ確認できる)")
         base = tempfile.mkdtemp(prefix="review-loop-worker-test-", dir=_SANDBOX_TMP)
         self.addCleanup(shutil.rmtree, base, True)
         with self.subTest("周回の置き場"):
@@ -2489,7 +2489,7 @@ class TestSandboxStartChecks(WorkerTestBase):
 
     def test_sandbox_allow_write_must_not_contain_protected_places(self):
         # AE11: --sandbox-allow-write ~ など。ホーム・作業側・周回の置き場と同じか、その祖先の値は受け付けない。
-        # 1 つ目に問題の無い値を置いて、2 つ目以降の値も確かめていることを見る
+        # 1 つ目に問題の無い値を置いて、2 つ目以降の値も確認していることを見る
         link = os.path.join(self.root, "home-link")
         os.symlink(self.home, link)
         cases = (
@@ -2656,7 +2656,7 @@ class TestSandboxStartChecks(WorkerTestBase):
 
     def test_claude_config_dir_must_be_absolute(self):
         # CLAUDE_CONFIG_DIR が相対パスだと、Claude Code 本体はレビュアの実行の cwd (複製) から解決するので、
-        # ワーカーは同じファイルを確かめられず起動しない
+        # ワーカーは同じファイルを確認できず起動しない
         env = dict(self.env, CLAUDE_CONFIG_DIR="relative/config-dir")
         self.start_unavailable(env=env, contains=["CLAUDE_CONFIG_DIR", "絶対パス"])
 
@@ -2735,10 +2735,10 @@ class TestEnding(WorkerTestBase):
         p.communicate(timeout=5)
 
     def test_group_signal_while_child_checks_parent(self):
-        # 子が親の生存を確かめる ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まる。子は、
+        # 子が親の生存を確認する ps (関数 check_interrupt) の実行中に、プロセスグループに TERM か HUP が届くと、ps も止まる。子は、
         # ps がシグナルで止まったときは親が無いと判定しない (関数 pid_alive) ので、kill -9 のときの経路 (後始末をせずに終わる)
         # ではなく、割り込みとして worker.yaml を left にして終わる。偽の ps (関数 install_fake_ps) で、
-        # 親の生存の確かめ (ps -o stat= -p <PID>) を 3 秒遅らせる
+        # 親の生存の確認 (ps -o stat= -p <PID>) を 3 秒遅らせる
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
         self.install_fake_ps(trigger, log, "sleep 3")
@@ -2752,8 +2752,8 @@ class TestEnding(WorkerTestBase):
                 self.assertIn("この起動で応じた回: 0 回", out)
 
     def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
-        # 子が親の生存を確かめる ps がシグナルで止まっても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
-        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確かめる — 親が無いと判定すると、
+        # 子が親の生存を確認する ps がシグナルで止まっても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
+        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確認する — 親が無いと判定すると、
         # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終わる) で子が終わる。偽の ps は自分に TERM を送って終わる
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
@@ -2770,7 +2770,7 @@ class TestEnding(WorkerTestBase):
 
     def test_sigkill_after_parent_records_interrupt(self):
         # 親が割り込みを記録するファイルを書いた後、子がそれを読む前に親を kill -9 で消すと、子は後始末をせずに終わる
-        # (worker.yaml を left にしない。worker.md の「終わり方」の kill -9 の箇条)。偽の ps で、子が親の生存を確かめる ps を
+        # (worker.yaml を left にしない。worker.md の「終わり方」の kill -9 の箇条)。偽の ps で、子が親の生存を確認する ps を
         # 3 秒遅らせ、その間に親だけに TERM を送ってファイルを書かせてから、親を消す
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
@@ -3022,7 +3022,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
 
     def test_timeout_just_before_request_copy(self):
         # 複製の設定の確認 (手順 7) を遅らせて、写しの作成 (手順 8) の直前に上限を越えさせる。
-        # 準備の段の合間に越えても、次の段の前かレビュアの実行を起動する前に確かめるので、偽の claude は呼ばれない
+        # 準備の段の合間に越えても、次の段の前かレビュアの実行を起動する前に確認するので、偽の claude は呼ばれない
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 5, touch)
         self.put_request()
@@ -3033,7 +3033,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
 
 class TestInterruptPhases(WorkerTestBase):
     """割り込みを受けた時点ごとの扱い (worker.md の「終わり方」。計画の AE9)。レビュアの実行中の扱いは
-    TestEnding.test_interrupt_while_reviewing で確かめる。シグナルは、端末の Ctrl-C と同じくワーカーのプロセスグループに送る。"""
+    TestEnding.test_interrupt_while_reviewing で確認する。シグナルは、端末の Ctrl-C と同じくワーカーのプロセスグループに送る。"""
 
     SIGNALS = ((signal.SIGINT, 130), (signal.SIGTERM, 143), (signal.SIGHUP, 129))
 
@@ -3339,7 +3339,7 @@ class TestRestartCleanup(WorkerTestBase):
         # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
         # 回の終わりの処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
         # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
-        # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが止まることを確かめる
+        # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが止まることを確認する
         # (直さない場合、print が RuntimeError 以外の OSError を送出し、python3 がそこで終わって
         # os.kill に届かないので、このプロセスは止まらずに残る)。
         ws = self.ws_path()

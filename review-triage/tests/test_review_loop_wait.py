@@ -6,7 +6,7 @@
   python3 -m unittest discover -s review-triage/tests
 
 一時ディレクトリを周回の置き場として使い、スクリプトを subprocess で起動して、
-ファイルを置いたときに返る終了コードと標準出力の 1 行を確かめる。
+ファイルを置いたときに返る終了コードと標準出力の 1 行を確認する。
 ファイルの様式と事象の正本は review-triage/skills/review-loop/references/loop-files.md。
 """
 
@@ -264,7 +264,7 @@ class TestDeadline(WaitTestBase):
         self.assertLess(elapsed, 9)
 
     def test_file_placed_just_before_deadline_returns_zero(self):
-        # 期限切れを宣言する前にもう 1 度確かめるので、締切の直前に置いたものは 0 で返る
+        # 期限切れを宣言する前にもう 1 度確認するので、締切の直前に置いたものは 0 で返る
         rc, out, err, _ = self.run_wait(
             minutes="0.1", actions=[(5.5, lambda: _write(self.path("end"), ""))]
         )

@@ -2,7 +2,7 @@
 # review-loop のワーカー。人間が端末で起動し、周回の置き場に現れた依頼文ごとに、TMPDIR の下に新しく作ったディレクトリ
 # (準備のディレクトリ) に複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) と依頼文の写しを作り、
 # 回の作業場所のパスに改名してから、複製の中で claude -p を走らせる。
-# 結果を確かめてから置き場に複写し、作業場所を消して、完了の印を書く。
+# 結果を確認してから置き場に複写し、作業場所を消して、完了の印を書く。
 #
 # 使い方:
 #   review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --effort <値>
@@ -25,20 +25,20 @@
 # Claude Code の利用者の設定 (環境変数 CLAUDE_CONFIG_DIR があればその下、無ければ ~/.claude の settings.json) は
 # 読むが、使うのは起動時の確認と表示だけ。
 #
-# macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確かめたため)。
+# macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確認したため)。
 # bash は macOS の /bin/bash (3.2) で動くように書き、1 行目でそれを指定する — 環境変数 PATH で先に見つかる bash (Homebrew の 5.2
 # など) を使わないため。bash 5.2 は、保留中の trap をコマンド置換 $(...) の中身の構文解析の途中で実行することがあり、そのとき trap の
 # 文字列は構文の誤りになって実行されない (#105)。テストは CI (ubuntu) でも偽の uname で走らせるので、
 # GNU の stat と Linux の /proc でも動くようにしておく。python3 が要る (claude -p と準備のコマンドを専用のプロセスグループで
 # 起動する・ログ (stream-json) を読む・プラグインの版を読む・--settings の値と利用者の設定と複製の設定を JSON として検査する・
-# --settings の JSON を組み立てる・依頼文の写しを作る・準備のディレクトリを作業場所のパスに改名する・結果を確かめて複写する・
+# --settings の JSON を組み立てる・依頼文の写しを作る・準備のディレクトリを作業場所のパスに改名する・結果を確認して複写する・
 # 作業場所の中を cwd にしているプロセスを見つける・作業場所の中のディレクトリに権限を足す・パスの実体を求めるのに使う)。
 # python3 の処理はこのファイルに書かず、処理ごとのファイル (.py) にして、このスクリプトの実体と同じディレクトリの下の
 # ディレクトリ review-triage/scripts/review-loop-worker/ に置く。ファイル名は、そのファイルを python3 で実行する関数の名前に
 # 合わせる (setpgid_exec.py だけは、関数 run_prep と run_reviewer が共に使う)。各ファイルの説明の正本は、そのファイルの
 # 先頭のコメント。ワーカーは起動時にすべてのファイルの中身を変数に読み込み、実行するときは読み込んだ中身を python3 -I -c に
 # 渡す (実行中にプラグインが更新されて、ディレクトリの中身が消えても動き続けるため。関数 load_py_files)。
-# 読み込めたかは、起動時の確認の 8 で確かめる。
+# 読み込めたかは、起動時の確認の 8 で確認する。
 #
 # 構成: ワーカーは 2 つのプロセスで動く。人間が起動したプロセス (親。worker.yaml の pid) は、起動時の確認を済ませて、
 # 回の処理を行うバックグラウンドのサブシェル (子) を起動したあとは、子が終わるまで待機するだけで、コマンド置換を使わない。
@@ -296,7 +296,7 @@ run_py() {
 # 読み込めなければ、それらを行わずに、起動時の確認の 8 で止まる
 load_py_files
 
-# ---- 起動時の確認に使う道具 (python3 を使う。read_worker_version のほかは、起動時の確認の 8 で python3 とそのスクリプトを確かめた後に呼ぶ) ----
+# ---- 起動時の確認に使う道具 (python3 を使う。read_worker_version のほかは、起動時の確認の 8 で python3 とそのスクリプトを確認した後に呼ぶ) ----
 
 # ワーカーのバージョンを標準出力に出す。$1 はこのスクリプトのパス。説明の正本は review-loop-worker/read_worker_version.py
 read_worker_version() {
@@ -348,7 +348,7 @@ make_removable() {
 }
 
 # 作業場所 ($1。実体パス) を消す (回の終わりの処理の 5)。準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。
-# 省略すると「作業場所」)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確かめてから、
+# 省略すると「作業場所」)。パスがシンボリックリンクでなく、実体が作ったときと同じであることを確認してから、
 # 中のディレクトリに権限を足して rm -rf で消す。git は使わない。消さなかったか消せなければ、パスと理由を標準エラーに出して 1 を返す
 remove_workspace() {
   local ws=$1 label=${2:-作業場所} why
@@ -358,7 +358,7 @@ remove_workspace() {
   fi
   [ -e "$ws" ] || return 0
   if ! why=$(make_removable "$ws"); then
-    log "$label $ws を消さない: ${why:-確かめられない}。次の回の作業場所を作るときか、次の起動で消す"
+    log "$label $ws を消さない: ${why:-確認できない}。次の回の作業場所を作るときか、次の起動で消す"
     return 1
   fi
   rm -rf "$ws" 2>/dev/null
@@ -456,7 +456,7 @@ PREP_PID=""            # 準備のコマンド (専用のプロセスグルー�
 WAITED_RC=""           # 関数 wait_once・wait_child・stop_group が受け取った、子プロセスの終了コード
 FINISHING=0
 BODY_PID=""            # 子 (回の処理を行うバックグラウンドのサブシェル) の PID。親は起動したときに、子は自分で求める (関数 body_main)
-INTERRUPT_FILE=""      # 割り込みを記録するファイル (起動時の確認の 16 で決める)。親が書き、子が確かめる
+INTERRUPT_FILE=""      # 割り込みを記録するファイル (起動時の確認の 16 で決める)。親が書き、子が確認する
 INTERRUPT_TMP=""       # 割り込みを記録するファイルを書くときの一時名
 RELAY_SIG=""           # 親が最初に受けた割り込みのシグナルの名前 (関数 relay_interrupt)
 RELAY_CODE=""          # 親が最初に受けた割り込みの終了コード
@@ -485,7 +485,7 @@ EFFECTIVE_MODE="unknown"  # ログから読んだ実効の権限モード
 HOOK_DENIAL_COUNT="unknown"  # ログから数えた、ワーカーのフックが拒否した呼び出しの件数 (DENIAL_COUNT には含めない)
 SANDBOX_COUNT="unknown"   # ログから数えた、サンドボックスが止めた確認の件数 (リポジトリの行を表示しただけのものを除く)
 SANDBOX_CALLS=""          # 完了の印の sandbox_blocked.calls の要素 (YAML の行)。空なら calls は []
-SHOWN_COUNT="unknown"     # ログから数えた、リポジトリの行を表示しただけと確かめた呼び出しの件数
+SHOWN_COUNT="unknown"     # ログから数えた、リポジトリの行を表示しただけと確認した呼び出しの件数
 SHOWN_CALLS=""            # 完了の印の repo_text_displayed.calls の要素 (YAML の行)。空なら calls は []
 MARKER_LINE=""         # 最後に書いた完了の印の、この起動で応じた回の一覧に出す行
 PREP_DIR=""            # 回の準備のディレクトリのパス (手順 5 で作り、手順 8 の後に作業場所のパスに改名する)
@@ -559,7 +559,7 @@ startup_cleanup
 
 # 3. macOS で動いているか
 os_name=$(uname -s 2>/dev/null)
-[ "$os_name" = Darwin ] || unavailable "macOS で動いていない (uname -s: ${os_name:-読めない})。サンドボックスの振る舞いを macOS でだけ確かめたので、ほかの OS では起動しない"
+[ "$os_name" = Darwin ] || unavailable "macOS で動いていない (uname -s: ${os_name:-読めない})。サンドボックスの振る舞いを macOS でだけ確認したので、ほかの OS では起動しない"
 
 # 4. loop.yaml があり、repo_dir が読めるか
 [ -f "$LOOP_DIR/loop.yaml" ] || unavailable "loop.yaml が無い"
@@ -594,7 +594,7 @@ PYTHON3=$(command -v python3 2>/dev/null) || unavailable "python3 が見つか�
 # TMPDIR が無くても /tmp に代えない (他の利用者も書ける場所で、作業場所の名前も予測できるため)
 [ -n "${TMPDIR:-}" ] || unavailable "環境変数 TMPDIR が無い (作業場所をその下に作る。/tmp には代えない)"
 TMP_REAL=$(real_dir "$TMPDIR") || unavailable "TMPDIR がディレクトリとして存在しない: $TMPDIR"
-[ -n "${HOME:-}" ] || unavailable "環境変数 HOME が無い (TMPDIR がホームの外にあるかを確かめられない)"
+[ -n "${HOME:-}" ] || unavailable "環境変数 HOME が無い (TMPDIR がホームの外にあるかを確認できない)"
 HOME_REAL=$(real_dir "$HOME") || unavailable "ホームがディレクトリとして存在しない: $HOME"
 if is_within "$TMP_REAL" "$HOME_REAL"; then
   unavailable "TMPDIR の実体がホームの下にある (TMPDIR の実体: ${TMP_REAL}、ホーム: ${HOME_REAL})。作業場所への書き込みが、ホームを守る拒否の規則に当たる"
@@ -675,14 +675,14 @@ while [ "$i" -lt ${#EXTRA_ARGS[@]} ]; do
 done
 
 # 14. 利用者の設定が、コマンドをサンドボックスの外で実行させず、Unix ソケットへの接続を許さないか
-# (sandbox.excludedCommands と sandbox.network.allowUnixSockets)。レビュー対象のブランチの設定は、回ごとに複製で確かめる。
+# (sandbox.excludedCommands と sandbox.network.allowUnixSockets)。レビュー対象のブランチの設定は、回ごとに複製で確認する。
 # 利用者の設定の置き場は、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
 # 無ければ $HOME/.claude。CLAUDE_CONFIG_DIR が相対パスだと、レビュアの実行 (複製の中の cwd) からの解決先が
-# ワーカーの cwd (作業側) からの解決先と一致せず、ワーカーが実際に使われる設定を確かめられない
+# ワーカーの cwd (作業側) からの解決先と一致せず、ワーカーが実際に使われる設定を確認できない
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   case "$CLAUDE_CONFIG_DIR" in
     /*) CONFIG_DIR="$CLAUDE_CONFIG_DIR" ;;
-    *) unavailable "環境変数 CLAUDE_CONFIG_DIR が相対パス ($CLAUDE_CONFIG_DIR)。レビュアの実行はこれを自分の cwd (複製) から解決するので、ワーカーが同じファイルを確かめられない。絶対パスにしてから起動し直す" ;;
+    *) unavailable "環境変数 CLAUDE_CONFIG_DIR が相対パス ($CLAUDE_CONFIG_DIR)。レビュアの実行はこれを自分の cwd (複製) から解決するので、ワーカーが同じファイルを確認できない。絶対パスにしてから起動し直す" ;;
   esac
 else
   CONFIG_DIR="$HOME/.claude"
@@ -709,7 +709,7 @@ REVIEW_TIMEOUT_SECONDS=$(minutes_to_seconds "$REVIEW_TIMEOUT_MINUTES")
 
 # 回の作業場所 (worker.md の「回の処理」の手順 5)。周回の間は同じパスを使い回し、回ごとに作り直す。
 # 名前は、周回 id (置き場のディレクトリ名) と、周回の置き場の実体パスから作るハッシュ。TMP_REAL は実体パスなので、
-# 作業場所のパスもそのまま実体パスになる (シンボリックリンクに置き換えられていないかを、このパスと比べて確かめる)。
+# 作業場所のパスもそのまま実体パスになる (シンボリックリンクに置き換えられていないかを、このパスと比べて確認する)。
 # 準備のディレクトリの名前は review-loop-prep-<WS_KEY>.<mktemp が決める 6 文字> で、作業場所のパスの文字列で始まらない
 # (サンドボックスが書き込みの許可をパスの接頭辞で判定しても、作業場所への許可が準備のディレクトリに及ばないように)
 ws_hash=$(workspace_hash "$LOOP_REAL") && [ -n "$ws_hash" ] || unavailable "作業場所の名前に付けるハッシュを求められない"
@@ -743,7 +743,7 @@ SETTINGS_JSON=$(build_settings_json "${settings_args[@]}") && [ -n "$SETTINGS_JS
 # プロセス $1 が動いているか。終わったのに、起動したプロセスが回収していない (ゾンビの) プロセスは動いていないとみなす。
 # コマンド ps がシグナルで止まったとき (終了コードが 128 を越える。プロセスグループに届いた TERM・HUP など) は、分からないので
 # 動いているとみなす — 動いていないとみなすと、親が動いているのに、子が kill -9 のときの経路 (関数 check_interrupt) で後始末を
-# せずに終わる。本当に動いていなければ、次に確かめたときに分かる
+# せずに終わる。本当に動いていなければ、次に確認したときに分かる
 pid_alive() {
   local st rc
   st=$(ps -o stat= -p "$1" 2>/dev/null)
@@ -778,7 +778,7 @@ start_heartbeat() {
 # バックグラウンドの処理 (PID $1。更新時刻を進める処理か上限を測る処理) に TERM を送り、プロセスが残っている間だけ終了まで待機する。
 # 残っていなければ組み込みコマンド wait で待機しない (正本は worker.md の「終わり方」)。これらの処理は親と子と同じプロセスグループで動くので、
 # プロセスグループに届いた HUP ではすぐに (trap が無い)、TERM では自分の trap で、子と同時に終わる (INT は、バックグラウンドの
-# コマンドなので無視する)。bash 5 (Linux の 5.2 で確かめた) は、trap を設定したシグナルで wait を途中で抜けるとき、その wait の中で
+# コマンドなので無視する)。bash 5 (Linux の 5.2 で確認した) は、trap を設定したシグナルで wait を途中で抜けるとき、その wait の中で
 # 回収した子プロセスの終わりを記録しないことがあるので、準備のコマンドやレビュアの実行の終了まで待機する wait が、同時に終わったこれらの処理を
 # 回収したまま抜けることがある。終わりを記録しなかった子プロセスを wait すると、ほかの子プロセスがすべて終わるまで戻らない — まだ止めていない
 # 準備のコマンドやレビュアの実行が残っていれば、ワーカーが終わらない
@@ -796,9 +796,9 @@ stop_heartbeat() {
 }
 
 # 上限の時刻 ($1。エポック秒) を過ぎたら、子に USR1 を送る。USR1 は、子が待機している wait を途中で戻すための通知で、
-# 上限を越えたかどうかは子が時計で確かめる (関数 timed_out)。過ぎた後は、止められるまで 1 秒おきに送る — 1 度だけだと、
+# 上限を越えたかどうかは子が時計で確認する (関数 timed_out)。過ぎた後は、止められるまで 1 秒おきに送る — 1 度だけだと、
 # 子が wait を始める直前に届いた USR1 は wait を戻さず、その wait に上限が掛からない。
-# 周期ごとに子が動いているかを確かめ、動いていなければ (kill -9 で trap が動かなかった場合も) 自分も終わる —
+# 周期ごとに子が動いているかを確認し、動いていなければ (kill -9 で trap が動かなかった場合も) 自分も終わる —
 # 消えた子の PID が別のプロセスに再利用されていると、USR1 (デフォルトの動作は終了) がそのプロセスを止めてしまうため。
 # 親が動いていなければ (kill -9)、上限の時刻を見ずに、子が終わるまで 1 秒おきに USR1 を送る (1 度だけでは足りない理由は、上の
 # 上限の USR1 と同じ)。子は wait から戻ったときに親が消えたことに気づき、後始末をせずに終わる (関数 check_interrupt)
@@ -835,7 +835,7 @@ stop_watchdog() {
   fi
 }
 
-# 上限を越えたか (依頼文を受け取った時刻から --review-timeout-minutes が過ぎたか)。時計で確かめる — USR1 は wait を戻すための
+# 上限を越えたか (依頼文を受け取った時刻から --review-timeout-minutes が過ぎたか)。時計で確認する — USR1 は wait を戻すための
 # 通知で、前の回の上限を測る処理が止まる間際に送ったものが遅れて届くこともあるので、越えたことの根拠にしない
 timed_out() {
   [ "$(date +%s)" -ge "$REQ_DEADLINE" ]
@@ -854,9 +854,9 @@ idle_sleep() {
 }
 
 # 子プロセス $1 の終了まで 1 度待機する。終わっていれば終了コードを WAITED_RC に入れて 0 を返す。trap (割り込みや USR1) を実行したために
-# wait が途中で終了し、子がまだ在れば 1 を返す (呼び出し元が上限を確かめてから待機し直す)。wait が途中で戻った直後に子が終わった場合も、
+# wait が途中で終了し、子がまだ在れば 1 を返す (呼び出し元が上限を確認してから待機し直す)。wait が途中で戻った直後に子が終わった場合も、
 # 子の終了コードを受け取り直す (受け取り済みの子に対して wait で待機すると 127 が返るので、そのときは最初の値のままにする)。
-# wait から戻るたびに、割り込みの記録と親が動いているかを確かめる (関数 check_interrupt)。割り込みなら、ここから終わることがある
+# wait から戻るたびに、割り込みの記録と親が動いているかを確認する (関数 check_interrupt)。割り込みなら、ここから終わることがある
 wait_once() {
   local rc
   wait "$1"
@@ -995,11 +995,11 @@ on_signal() {
   leave "$code"
 }
 
-# 親が割り込みを記録したか (worker.md の「終わり方」) と、親が動いているかを確かめる。どの時点で呼ぶかの正本は worker.md の
+# 親が割り込みを記録したか (worker.md の「終わり方」) と、親が動いているかを確認する。どの時点で呼ぶかの正本は worker.md の
 # 「終わり方」の子の箇条。割り込みを記録するファイルか、子が自分で受けた TERM・HUP の名前 (SELF_SIG) があれば、関数 on_signal で扱う。
 # 親が動いていなければ (kill -9)、ファイルや SELF_SIG があっても、後始末をせずに終わる (worker.yaml も印も書かない。起動し直した
 # ワーカーが片付ける。回の終わりの処理の途中なら、その回の印を書き終えてから終わる)。親の確認に使う ps がプロセスグループに届いた TERM・HUP で止まったときは、親が動いていないとは判定しない
-# (関数 pid_alive)。割り込みかどうかを主にファイルで確かめるのは、bash がコマンド置換を処理している間に受けたシグナルの trap を
+# (関数 pid_alive)。割り込みかどうかを主にファイルで確認するのは、bash がコマンド置換を処理している間に受けたシグナルの trap を
 # 実行しないことがあるため。親は子が終わるまで 1 秒おきに USR1 を送るので、子が USR1 を受け損ねても、次の USR1 で wait から戻る
 check_interrupt() {
   local sig="" code=""
@@ -1014,7 +1014,7 @@ check_interrupt() {
   fi
   if [ -f "$INTERRUPT_FILE" ]; then
     read -r sig code <"$INTERRUPT_FILE"
-    # 終了コードの形はシェルの case 文で確かめる — grep のような外部コマンドは、プロセスグループに届いた TERM・HUP で止まりうるため
+    # 終了コードの形はシェルの case 文で確認する — grep のような外部コマンドは、プロセスグループに届いた TERM・HUP で止まりうるため
     case "$sig:$code" in
       :*|*:|*:*[!0-9]*) sig="" ;;
     esac
@@ -1244,7 +1244,7 @@ make_clone() {
   return 0
 }
 
-# 手順 7。複製 ($1) の設定を確かめる。説明の正本は review-loop-worker/clone_settings_problem.py
+# 手順 7。複製 ($1) の設定を確認する。説明の正本は review-loop-worker/clone_settings_problem.py
 clone_settings_problem() {
   run_py clone_settings_problem "$1"
 }
@@ -1266,7 +1266,7 @@ make_request_copy() {
   return 1
 }
 
-# 作業場所の結果 ($1) を確かめる (「回の処理」の表の「結果のファイル」)。大きさの上限は RESULT_MAX_BYTES。
+# 作業場所の結果 ($1) を確認する (「回の処理」の表の「結果のファイル」)。大きさの上限は RESULT_MAX_BYTES。
 # 説明の正本は review-loop-worker/result_file_problem.py
 result_file_problem() {
   run_py result_file_problem "$1" "$WS" "$RESULT_MAX_BYTES"
@@ -1282,7 +1282,7 @@ copy_result() {
 
 # レビュアの実行を起動しなかった回の印 (依頼文・HEAD・作業ツリーの確認か、作業場所を作れない)。上限の計測を止めてから書く。
 # ログから読む項目 (実効モデル・実効の権限モード・サンドボックスが止めた件数など) は、関数 process_request が回の初めに入れた
-# unknown のまま書く。書く前に割り込みを確かめる — 準備の途中に受けた割り込みなら、印を書かずに終わる (関数 on_signal)
+# unknown のまま書く。書く前に割り込みを確認する — 準備の途中に受けた割り込みなら、印を書かずに終わる (関数 on_signal)
 fail_without_run() {
   check_interrupt
   stop_watchdog
@@ -1317,7 +1317,7 @@ fail_preparation_stage() {
 }
 
 # 手順 10。レビュアの実行が終わった (または止めた) 後の処理と印。how は done / timeout / interrupted。
-# 順序は、残ったプロセスを止める → ログを読む → 確かめる → 結果を複写する → 作業場所を消す → 印を書く。
+# 順序は、残ったプロセスを止める → ログを読む → 確認する → 結果を複写する → 作業場所を消す → 印を書く。
 # 関数 run_finish がサブシェルで呼ぶ。この起動で応じた回の一覧の行 (1 行目) と、この起動の間は処理しない依頼文の識別子
 # (2 行目以降) を標準出力に出して、呼び出し元に返す
 REVIEWER_RC=""
@@ -1379,7 +1379,7 @@ EOF
   [ -n "$SANDBOX_COUNT" ] || SANDBOX_COUNT=unknown
   [ -n "$SHOWN_COUNT" ] || SHOWN_COUNT=unknown
 
-  # 3. 確かめる。上限と割り込みで止めた回は、結果の 4 項目 (ある・ファイル・形・run_id) を確かめない。
+  # 3. 確認する。上限と割り込みで止めた回は、結果の 4 項目 (ある・ファイル・形・run_id) を確認しない。
   # 作業場所は回ごとに作り直すので、作業場所にある結果は、この回のレビュアの実行が書いたものである
   case "$how" in
     timeout) errors+=("timeout") ;;
@@ -1406,7 +1406,7 @@ EOF
     errors+=("no result")
   fi
 
-  # 実効の権限モード。上限と割り込みで止めた回も確かめる。ログから読めなければ (unknown) 問わない —
+  # 実効の権限モード。上限と割り込みで止めた回も確認する。ログから読めなければ (unknown) 問わない —
   # 手動のモードに戻った回は、拒否された呼び出しとして別に現れる
   if [ "$EFFECTIVE_MODE" != unknown ] && [ "$EFFECTIVE_MODE" != "$PERMISSION_MODE" ]; then
     errors+=("permission mode mismatch (expected $PERMISSION_MODE, actual $EFFECTIVE_MODE)")
@@ -1434,7 +1434,7 @@ EOF
   fi
 
   # 4. 結果を複写する。failed の回でも、結果のファイルの条件を満たせば複写する (RA1 の報告から人間が結果を読めるように)。
-  # ok の印は、置き場の出力先に結果が通常のファイルとして在ることを copy_result が確かめた後にだけ書ける
+  # ok の印は、置き場の出力先に結果が通常のファイルとして在ることを copy_result が確認した後にだけ書ける
   if [ "$copyable" = 1 ]; then
     if ! problem=$(copy_result "$ws_result" "$dest"); then
       errors+=("result copy failed (${problem:-理由が分からない})")
@@ -1459,7 +1459,7 @@ EOF
 # 手順 10 (回の終わりの処理) を行う。how は done / timeout / interrupted。
 # 端末の Ctrl-C のようにワーカーのプロセスグループ全体に届く割り込みで、回の終わりの処理が起動したコマンド (結果の複写や
 # 作業場所の削除) が止まらないように、INT・TERM・HUP を無視するサブシェルで行う (無視はコマンドに引き継がれる)。
-# 子は、サブシェルの終了まで待機する間は割り込みを記録するファイルを確かめず、印を書き終えてから確かめる (関数 process_request)。
+# 子は、サブシェルの終了まで待機する間は割り込みを記録するファイルを確認せず、印を書き終えてから確認する (関数 process_request)。
 # サブシェルで変えた変数は戻らないので、この起動で応じた回の一覧の行と、処理しない依頼文の識別子を標準出力で受け取る
 run_finish() {
   local how=$1 out line first=1
@@ -1579,16 +1579,16 @@ process_request() {
   local logf="$LOOP_DIR/$CURRENT_RID.log"
   HEAD_BEFORE=$(git -C "$CWD_REAL" rev-parse --short HEAD 2>/dev/null)
 
-  # 手順 3。依頼文を確かめる
+  # 手順 3。依頼文を確認する
   if grep -q '{{' "$req"; then fail_without_run "request malformed (unfilled placeholder)"; return; fi
   if ! grep -q '^## 出力様式' "$req"; then fail_without_run "request malformed (no output format section)"; return; fi
   local req_head
   req_head=$(sed -n 's/^head:[[:space:]]*"\([0-9a-f][0-9a-f]*\)"[[:space:]]*$/\1/p' "$req" | head -n 1)
   if [ -z "$req_head" ]; then fail_without_run "request malformed (no head line)"; return; fi
-  # base は形を確かめずに控える (ログを読むときに確かめる。無くても、形に合わなくても、回は止めない)
+  # base は形を確認せずに控える (ログを読むときに確認する。無くても、形に合わなくても、回は止めない)
   REQ_BASE=$(sed -n 's/^base:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$req" | head -n 1)
 
-  # 手順 4。作業側の HEAD と作業ツリーを確かめる
+  # 手順 4。作業側の HEAD と作業ツリーを確認する
   if timed_out; then fail_timeout_in_preparation; return; fi
   local full_req full_head dirty
   full_req=$(git -C "$CWD_REAL" rev-parse --verify -q "$req_head^{commit}" 2>/dev/null)
@@ -1600,8 +1600,8 @@ process_request() {
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | comma_join)
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
-  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各段の前に確かめる
-  # (手順 6 の各段と手順 8 では、関数 run_prep が起動する前と待機する間に確かめる)。手順 6〜8 は準備のディレクトリの中で行う
+  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各段の前に確認する
+  # (手順 6 の各段と手順 8 では、関数 run_prep が起動する前と待機する間に確認する)。手順 6〜8 は準備のディレクトリの中で行う
   local problem
   if timed_out; then fail_timeout_in_preparation; return; fi
   if ! prepare_workspace; then
@@ -1660,7 +1660,7 @@ body_main() {
   # SIGINT は無視する (端末の Ctrl-C は親だけが受ける)。子は ( ) & で起動したバックグラウンドのサブシェルなので、無視した状態で
   # 始まるが、bash の版や起動の仕方によっては無視にならない (bash 5.2 は、INT の trap を設定した親が関数を & で起動すると、
   # 子の SIGINT をデフォルトの動作にする) ので、ここで明示する。
-  # 親が送る USR1 は、待機している wait を途中で戻すためだけに使い、割り込みかどうかは割り込みを記録するファイルで確かめる
+  # 親が送る USR1 は、待機している wait を途中で戻すためだけに使い、割り込みかどうかは割り込みを記録するファイルで確認する
   # (関数 check_interrupt)。プロセスグループに届いた TERM・HUP は、wait を戻すほかに、受けたシグナルの名前を SELF_SIG に書く —
   # 子がフォアグラウンドで実行しているコマンドも同じシグナルで止まり、親がファイルを書くより先に、子がその失敗を準備の失敗として
   # 扱うことがあるため (SELF_SIG に名前があれば、関数 check_interrupt が割り込みにする)。TERM と HUP は無視にしない — 無視は子が起動する
@@ -1720,7 +1720,7 @@ body_main() {
 # 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt・write_interrupt_file・supervise_body)。bash は、
 # コマンド置換を処理している間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。
 # テスト review-triage/tests/test_review_loop_worker.py が、親の trap を設定した後の行から呼ぶ関数をたどり、その本文にコマンド置換が
-# 無いことを確かめる
+# 無いことを確認する
 
 # 割り込みを受けたときの親の処理。最初に受けた 1 回だけ、シグナルの名前と終了コードを覚えて、割り込みを記録するファイルに書く。
 # 子への USR1 と、書けなかったときの書き込みのやり直しは、関数 supervise_body が行う
