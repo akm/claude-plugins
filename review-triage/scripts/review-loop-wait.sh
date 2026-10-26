@@ -46,7 +46,7 @@ rid=$2
 minutes=$3
 stale_seconds=${4:-30}
 
-[ -d "$dir" ] || { echo "ループのディレクトリがディレクトリとして存在しない: $dir" >&2; exit 2; }
+[ -d "$dir" ] || { echo "ループのディレクトリが無いか、ディレクトリではない: $dir" >&2; exit 2; }
 [ -n "$rid" ] || { echo "識別子が空" >&2; exit 2; }
 echo "$minutes" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { echo "分は 0 以上の数で指定する: $minutes" >&2; exit 2; }
 echo "$stale_seconds" | grep -Eq '^[0-9]+$' || { echo "停滞の秒数は 0 以上の整数で指定する: $stale_seconds" >&2; exit 2; }

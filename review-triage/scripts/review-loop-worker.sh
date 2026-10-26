@@ -136,7 +136,7 @@ case "$LOOP_DIR" in
   /*) ;;
   *) die_usage "ループのディレクトリは絶対パスで指定する: $LOOP_DIR" ;;
 esac
-[ -d "$LOOP_DIR" ] || die_usage "ループのディレクトリがディレクトリとして存在しない: $LOOP_DIR"
+[ -d "$LOOP_DIR" ] || die_usage "ループのディレクトリが無いか、ディレクトリではない: $LOOP_DIR"
 [ -n "$MODEL" ] || die_usage "--model は必須 (どのモデルでレビューするかは人間が決める)"
 case "$EFFORT" in
   low|medium|high|xhigh|max) ;;
