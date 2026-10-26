@@ -121,7 +121,7 @@ func TestReviewTriageRecordDocDagPasses(t *testing.T) {
 	}
 }
 
-// verification (読み直した範囲) を持つ計画は正しい記録として通る。
+// verification (再確認した範囲) を持つ計画は正しい記録として通る。
 func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
 		"order: 1\n        verification:\n          near_edges:\n            - docs/foo.md 11-14 (表の全行)\n            - docs/foo.md 7-30 (節「表の節」。変更行 25 のリンク先)\n", 1)
@@ -193,7 +193,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
 			"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n", "plan_ref に値がありません"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
-		// 修正の検証 (verification) は任意だが、書くなら near_edges (読み直した範囲) が要り、要素は空にできない。
+		// 修正の検証 (verification) は任意だが、書くなら near_edges (再確認した範囲) が要り、要素は空にできない。
 		{"verification に near_edges が無い", "order: 1\n",
 			"order: 1\n        verification:\n          note: 読んだ\n", "verification.near_edges"},
 		{"verification の near_edges に空の要素", "order: 1\n",

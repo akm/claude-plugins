@@ -138,7 +138,7 @@
 
 ワーカーのスクリプトはこの設定を読まず、`review-loop` が値を人間に案内する起動コマンドに埋める (理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」)。
 
-**`sandbox_allow_write` と `sandbox_allowed_domains` は、ループの条件ではなく環境の値 (ワーカーを動かすマシンごとに変わる値) で、`--resume` のたびに設定から読み直される。** 読み直しの扱いと理由 (権限モードなど、読み直さないキーとの違いを含む) の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「様式」。
+**`sandbox_allow_write` と `sandbox_allowed_domains` は、ループの条件ではなく環境の値 (ワーカーを動かすマシンごとに変わる値) で、`--resume` のたびに設定から再度読み込まれる。** 再度の読み込みの扱いと理由 (権限モードなど、再度読み込まないキーとの違いを含む) の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「様式」。
 
 `review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、配列のキー `allowed_tools` / `sandbox_allow_write` / `sandbox_allowed_domains` は空の配列も未設定)。**`loop` と違い、値の誤りはループを停止させない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
 

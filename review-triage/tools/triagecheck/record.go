@@ -212,7 +212,7 @@ type recordPlan struct {
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の正本は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
-	// Verification は修正の後の検証のうち、観点 B (並びを読み直す) で読んだ範囲。任意だが、
+	// Verification は修正の後の検証のうち、観点 B (並びを再確認する) で読んだ範囲。任意だが、
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
 	Verification *recordVerification `yaml:"verification"`
@@ -248,7 +248,7 @@ type recordDocDag struct {
 	Result string `yaml:"result"`
 }
 
-// recordVerification は plans[].verification — 観点 B で読み直した範囲 (near_edges)。
+// recordVerification は plans[].verification — 観点 B で再確認した範囲 (near_edges)。
 type recordVerification struct {
 	NearEdges []string `yaml:"near_edges"`
 }
@@ -748,11 +748,11 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: doc_dag.result がありません (向きの無い重複・巡回の有無と対処)", pn)
 				}
 			}
-			// 検証 (verification) は任意だが、書くなら読み直した範囲 (near_edges) が要る。
+			// 検証 (verification) は任意だが、書くなら再確認した範囲 (near_edges) が要る。
 			// 範囲の無い検証は、読んだつもりの記録と読んでいない記録を区別できない。
 			if ver := pl.Verification; ver != nil {
 				if len(ver.NearEdges) == 0 {
-					add("%s: verification.near_edges がありません (観点 B で読み直した範囲。nearedges の出力から写す)", pn)
+					add("%s: verification.near_edges がありません (観点 B で再確認した範囲。nearedges の出力から写す)", pn)
 				}
 				for i, v := range ver.NearEdges {
 					if strings.TrimSpace(v) == "" {

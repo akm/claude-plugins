@@ -34,7 +34,7 @@
 
 ## 同梱の道具 (nearedges)
 
-Markdown の修正の差分から、コミット前に読み直す範囲 — 同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 (近くの辺) — を列挙します。`review-triage-fix` の段 3 が観点 B (並びを読み直す) に使い、読んだ範囲を記録の `plans[].verification.near_edges` に残します。`-hints` で差分の種類に応じた観点 (B・C・F) も提示します。使い方は [tools/nearedges/README.md](tools/nearedges/README.md)。**Go が必要です** (triagecheck と同じく `go run` で都度実行)。
+Markdown の修正の差分から、コミット前に再確認する範囲 — 同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 (近くの辺) — を列挙します。`review-triage-fix` の段 3 が観点 B (並びを再確認する) に使い、読んだ範囲を記録の `plans[].verification.near_edges` に残します。`-hints` で差分の種類に応じた観点 (B・C・F) も提示します。使い方は [tools/nearedges/README.md](tools/nearedges/README.md)。**Go が必要です** (triagecheck と同じく `go run` で都度実行)。
 
 ## 同梱の道具 (lineorigin)
 
@@ -93,7 +93,7 @@ Markdown の修正の差分から、コミット前に読み直す範囲 — 同
 
 `fix` は `review-triage-fix` の既定 — 回数の閾値 N (`threshold_rounds`) と、段 (調査 / 立案 / 修正) ごとに sub-agent で走らせるか・その model と effort (`stages`) — で、無くても既定 (閾値 5、どの段もセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
 
-`review_loop` は `review-loop` の既定 — ループのディレクトリ・待機の期限・ワーカーの effort と権限 (権限モード・許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン) — で、無くても既定で動きます (ワーカーの effort とモデルが決まらなければ質問します。モデルは `loop.review_model` を共用します)。書き込みを許す場所と接続を許すドメインは `--resume` のたびに設定から読み直すので、サンドボックスの拒否で停止したループは、終えずに設定を直して続けられます。各キーの意味は同ファイルの「`review_loop`」を参照してください。
+`review_loop` は `review-loop` の既定 — ループのディレクトリ・待機の期限・ワーカーの effort と権限 (権限モード・許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン) — で、無くても既定で動きます (ワーカーの effort とモデルが決まらなければ質問します。モデルは `loop.review_model` を共用します)。書き込みを許す場所と接続を許すドメインは `--resume` のたびに設定から再度読み込むので、サンドボックスの拒否で停止したループは、終えずに設定を直して続けられます。各キーの意味は同ファイルの「`review_loop`」を参照してください。
 
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 

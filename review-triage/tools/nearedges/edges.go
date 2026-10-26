@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// edge は読み直す範囲 1 つ (近くの辺)。File はリポジトリのルートからの相対パス。
+// edge は再確認する範囲 1 つ (近くの辺)。File はリポジトリのルートからの相対パス。
 type edge struct {
 	File    string
 	Kind    string // table / list / section / link / paragraph / heading
@@ -23,7 +23,7 @@ type edge struct {
 
 var linkPattern = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 
-// nearEdges は変更行ごとに読み直す範囲を求め、同じ範囲はまとめて返す。
+// nearEdges は変更行ごとに再確認する範囲を求め、同じ範囲はまとめて返す。
 // 表のセルならその表の全行、箇条書きの項目なら同じ箇条書き全体と親、段落なら節全体、
 // 変更行のリンクならその参照先の節。
 func nearEdges(root string, changes map[string][]change) ([]edge, error) {
@@ -147,10 +147,10 @@ func render(root string, edges []edge, withContent bool) string {
 	}
 	sort.Strings(files)
 	if len(edges) == 0 {
-		b.WriteString("読み直す範囲はありません (Markdown の変更が無い)\n")
+		b.WriteString("再確認する範囲はありません (Markdown の変更が無い)\n")
 		return b.String()
 	}
-	b.WriteString("# 修正の近くの辺 (読み直す範囲)\n\n")
+	b.WriteString("# 修正の近くの辺 (再確認する範囲)\n\n")
 	for _, f := range files {
 		fmt.Fprintf(&b, "## %s\n\n", f)
 		for _, e := range byFile[f] {

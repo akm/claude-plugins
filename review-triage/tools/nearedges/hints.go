@@ -23,13 +23,13 @@ func hints(changes map[string][]change, edges []edge) []string {
 	for _, e := range edges {
 		switch e.Kind {
 		case "table":
-			add(fmt.Sprintf("観点 B: 表のセルを変えた (%s %d〜%d 行目) — その表の全行を同じ基準で読み直す (第 1 列の条件・他の列の理由・行どうしの重なりと網羅)", e.File, e.Start, e.End))
+			add(fmt.Sprintf("観点 B: 表のセルを変えた (%s %d〜%d 行目) — その表の全行を同じ基準で再確認する (第 1 列の条件・他の列の理由・行どうしの重なりと網羅)", e.File, e.Start, e.End))
 		case "list":
-			add(fmt.Sprintf("観点 B: 箇条書きを変えた (%s %d〜%d 行目) — 同じ箇条書きの全項目と、それを導入する親を読み直す", e.File, e.Start, e.End))
+			add(fmt.Sprintf("観点 B: 箇条書きを変えた (%s %d〜%d 行目) — 同じ箇条書きの全項目と、それを導入する親を再確認する", e.File, e.Start, e.End))
 		case "section":
-			add(fmt.Sprintf("観点 B: 段落を変えた (%s %d〜%d 行目) — 同じ節の全文を読み直す (冒頭の包括文と離れた文との矛盾)", e.File, e.Start, e.End))
+			add(fmt.Sprintf("観点 B: 段落を変えた (%s %d〜%d 行目) — 同じ節の全文を再確認する (冒頭の包括文と離れた文との矛盾)", e.File, e.Start, e.End))
 		case "link":
-			add(fmt.Sprintf("観点 B: 変更行が参照する先 (%s %s) を読み直す — 参照先が主張の所在か、参照先の側が古びていないか", e.File, e.Heading))
+			add(fmt.Sprintf("観点 B: 変更行が参照する先 (%s %s) を再確認する — 参照先が主張の所在か、参照先の側が古びていないか", e.File, e.Heading))
 		}
 	}
 	for f, cs := range changes {
@@ -46,7 +46,7 @@ func hints(changes map[string][]change, edges []edge) []string {
 				add(fmt.Sprintf("観点 C: 変更行に数がある「%s」(%s %d 行目) — 何を 1 と数えるかと範囲を先に決め、数を 1 増減しても主張が変わらないなら数を書かない", m, f, c.Line))
 			}
 			if strings.Contains(c.Text, "正本は") && !strings.Contains(c.Text, "](") {
-				add(fmt.Sprintf("観点 B: 変更行に「正本は」があるがリンクが無い (%s %d 行目) — 正本の側を読み直し、参照をリンクにする", f, c.Line))
+				add(fmt.Sprintf("観点 B: 変更行に「正本は」があるがリンクが無い (%s %d 行目) — 正本の側を再確認し、参照をリンクにする", f, c.Line))
 			}
 		}
 	}
