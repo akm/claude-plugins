@@ -642,7 +642,7 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 		{"全パスが絶対でも案内の組み立てに -current-dir を使う", []string{"-install-wrapper", out, "-record-dir", recDir, "-current-dir", repo, "-judgment-flow", flow}, nil, ""},
 		{"全パスが絶対で基準も案内も無い", []string{"-install-wrapper", out, "-record-dir", recDir}, errSummaryCommandNeedsBase, ""},
 		{"-record-dir が不在", []string{"-install-wrapper", out, "-record-dir", filepath.Join(repo, "no-such"), "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
-		{"-judgment-flow が不在 (綴りの誤り)", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", filepath.Join(repo, "floww.md"), "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
+		{"-judgment-flow が不在 (誤記)", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", filepath.Join(repo, "floww.md"), "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
 		{"-judgment-flow が空に展開された変数", []string{"-install-wrapper", out, "-record-dir", recDir, "-judgment-flow", "/skills/review-triage/references/judgment-flow.md", "-summary-command", "bin/rtc -write-summary"}, errPathMissing, ""},
 		{"相対を -current-dir で解決して生成", []string{"-current-dir", repo, "-install-wrapper", "bin/rtc", "-record-dir", "docs/rt", "-judgment-flow", "flow.md"}, nil, ""},
 	}

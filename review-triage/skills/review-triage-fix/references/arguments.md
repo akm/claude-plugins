@@ -49,7 +49,7 @@ review-triage-fix [<記録 YAML のパス>] [--threshold <N>] [--stage <段>[=<�
 - `threshold_rounds` は 1 以上の整数。0 以下や整数でない値は、手順を始めずにエラーとして報告する。
 - `--stage` の `<段>` は `investigate` / `plan` / `fix` のいずれか。
 - `--stage` の `<値>` は `session` か `<model>[:<effort>]` (`<model>` は空でない)。
-- effort (`--stage` の `:<effort>`、設定の `stages.<段>.effort`) は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。それ以外 (例: `--stage investigate=sonnet:ultra`) は、手順を始めずにエラーとして報告する。**検査するのは綴りだけ** — 実効モデルがその effort に対応しているかは検出できない (限界の正本は [stage-subagent.md](stage-subagent.md) の「effort と定義名の対応」)。
+- effort (`--stage` の `:<effort>`、設定の `stages.<段>.effort`) は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。それ以外 (例: `--stage investigate=sonnet:ultra`) は、手順を始めずにエラーとして報告する。**検査するのは表記だけ** — 実効モデルがその effort に対応しているかは検出できない (限界の正本は [stage-subagent.md](stage-subagent.md) の「effort と定義名の対応」)。
 - 設定の `stages.<段>.subagent` は真偽値 (JSON の `true` / `false`)。文字列や空は未設定と読まず、エラーとして報告する。
 - モデルの指定 (`--stage` の `<model>`、設定の `stages.<段>.model`) は、実効モデルに解決できること。解決の規則と、解決できないときに中断する規則の正本は [stage-subagent.md](stage-subagent.md) の「実効モデルの解決」。**解決も手順を始める前に 3 段分行う** — 段 3 の指定が解決できないことに段 1・2 を走らせた後で気づくと、その実行が無駄になる。
 - `subagent` が `false` に決まった段 (引数 `session` を含む) の `model` / `effort` は採る値ではないので検査しない。
