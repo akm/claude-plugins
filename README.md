@@ -172,7 +172,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
     ├── skills/review-request/     # レビューの依頼文の生成
     ├── skills/review-triage/      # SKILL.md と references/
     ├── skills/review-triage-fix/
-    ├── skills/review-triage-loop/  # レビューから修正までの周回
+    ├── skills/review-triage-loop/  # レビューから修正までのループ
     ├── skills/review-loop/        # レビューを端末のワーカーに任せるループ
     ├── scripts/                   # ワーカー (python3 で実行するファイルを置く review-loop-worker/ を含む) と、作業側の待機スクリプト
     ├── tests/                     # python3 -m unittest discover -s review-triage/tests

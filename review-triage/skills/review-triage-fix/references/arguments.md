@@ -60,4 +60,4 @@ review-triage-fix [<記録 YAML のパス>] [--threshold <N>] [--stage <段>[=<�
 
 ## `review-triage-loop` から呼ばれるとき
 
-`review-triage-loop` は `--threshold` と `--stage` を周回の条件として使わず、`review-triage-fix` にそのまま渡す (正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md))。周回から呼ばれても単独で走らせても、値の決定と検査はこのファイルの規則で行う。
+`review-triage-loop` は `--threshold` と `--stage` をループの条件として使わず、`review-triage-fix` にそのまま渡す (正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md))。ループから呼ばれても単独で走らせても、値の決定と検査はこのファイルの規則で行う。

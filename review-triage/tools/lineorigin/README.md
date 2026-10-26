@@ -133,4 +133,4 @@ git の振る舞いのうち、結果を変えるものと、リポジトリへ�
   | `-worktree` で、sparse-checkout から除いたファイルや、作業ツリーから消したファイル | `input-error:` | ファイルが作業ツリーに無い |
   | `-rev` で、sparse-checkout から除いたファイル | `unverifiable` (コミットしていない変更がある) | ファイルが作業ツリーに無いだけ |
   | `-worktree` で指摘のファイルの親のディレクトリを、または (方式によらず) `-root` の親のディレクトリを、権限などでたどれない | `input-error:` (作業ツリーにファイルが無い・`-root` が存在するディレクトリではない) | ファイルやディレクトリはあるが、たどれない |
-- **全量の起点は、渡されたものを使う。** 起点の決め方 (レビュー結果の `base`・周回が決めたブランチ・参照 `origin/HEAD`) の正本は [premise-check.md](../../skills/review-triage/references/premise-check.md) の「全量の起点」で、道具は決めない。
+- **全量の起点は、渡されたものを使う。** 起点の決め方 (レビュー結果の `base`・ループが決めたブランチ・参照 `origin/HEAD`) の正本は [premise-check.md](../../skills/review-triage/references/premise-check.md) の「全量の起点」で、道具は決めない。

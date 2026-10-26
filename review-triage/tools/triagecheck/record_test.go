@@ -134,7 +134,7 @@ func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	}
 }
 
-// origin: residual (周回中に residual を自己採択した指摘) は正しい記録として通る。
+// origin: residual (ループ中に residual を自己採択した指摘) は正しい記録として通る。
 func TestReviewTriageRecordOriginResidualPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n",
 		"        verdict: adopted\n        origin: residual\n", 1)
@@ -210,8 +210,8 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"order: 1\n        doc_dag:\n          scope: docs/foo.md\n          result: 重複なし\n          figure: tmp/x.html\n", "figure"},
 		{"doc_dag の値が無い (null)", "order: 1\n", "order: 1\n        doc_dag:\n", "doc_dag に値がありません"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
-		// 指摘の出所 (origin) は review / residual の列挙。周回中に residual を自己採択した指摘を区別する
-		// (record-schema.md「周回中に記録の外で直さない」)。
+		// 指摘の出所 (origin) は review / residual の列挙。ループ中に residual を自己採択した指摘を区別する
+		// (record-schema.md「ループ中に記録の外で直さない」)。
 		{"origin の列挙値違反", "        verdict: adopted\n", "        verdict: adopted\n        origin: upstream\n", "origin"},
 		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
 		{"date が空", "- date: \"2026-08-30\"\n", "- date: \"\"\n", "date"},

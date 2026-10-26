@@ -592,8 +592,8 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			if fd.VerdictReason == "" {
 				add("%s: verdict_reason がありません (判定の経路をノード ID で書く)", fn)
 			}
-			// 指摘の出所。省略時は上流のレビュー (review)。residual は周回中に自己採択したもの
-			// (record-schema.md「周回中に記録の外で直さない」)。
+			// 指摘の出所。省略時は上流のレビュー (review)。residual はループ中に自己採択したもの
+			// (record-schema.md「ループ中に記録の外で直さない」)。
 			switch fd.Origin {
 			case "", "review", "residual":
 			default:
@@ -1054,7 +1054,7 @@ func renderFindingCells(fd recordFinding) []string {
 	}
 	summary := recordCell(fd.Summary)
 	if fd.Origin == "residual" {
-		// 上流の residual を周回中に自己採択した指摘。上流の指摘と区別して読めるようにする。
+		// 上流の residual をループ中に自己採択した指摘。上流の指摘と区別して読めるようにする。
 		summary = "(residual の自己採択) " + summary
 	}
 	return []string{

@@ -100,7 +100,7 @@ D8 の条件 (1)(2) と、確認できないときの行き先は [judgment-flow
 **全量の起点は、ブランチの作り始めのコミットで、次の順で決める。**
 
 1. レビュー結果の `scope` が `full` なら、その `base` をそのまま使う。`review-request` が、起点のブランチと HEAD の merge-base (共通祖先のコミット) として求めたものである (正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。
-2. 周回の中で呼ばれ、周回が起点のブランチを決めていれば、そのブランチと HEAD の merge-base (`review-triage-loop` は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 で決めたブランチ、`review-loop` は `loop.yaml` の `review.base`)。
+2. ループの中で呼ばれ、ループが起点のブランチを決めていれば、そのブランチと HEAD の merge-base (`review-triage-loop` は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 で決めたブランチ、`review-loop` は `loop.yaml` の `review.base`)。
 3. それ以外は、`origin/HEAD` が指すブランチ (`review-request` が引数 `--base` の無いときに使うものと同じ) と HEAD の merge-base。
 
 全量の起点が、レビューした内容のコミット (作業ツリーの内容なら HEAD) と同じとき (このブランチにコミットが無い。既定ブランチの先端でレビューした、など) は、ブランチより前からある欠陥と、このブランチで入った欠陥を区別できないので、(1) を確認できないとする。
