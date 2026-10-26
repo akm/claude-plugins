@@ -1483,7 +1483,7 @@ func TestReviewTriageRecordLegacyRecurrencePasses(t *testing.T) {
 
 // 検知の整合 (根拠が直前の回を指すか、回 1 に無いか、比べた回の状態と prior の形が
 // 合うか、状態ごとの専用キー、status の列挙) はもう検査しない。以前は報告していた
-// 各ケースで問題が 0 件になることを確かめる。
+// 各ケースで問題が 0 件になることを確認する。
 func TestReviewTriageRecordLegacyRecurrenceNotCrossChecked(t *testing.T) {
 	reframed2 := "      status: reframed\n" + legacyEvidenceYAML(1, "P1") + legacyReframeYAML
 	cases := []struct {
@@ -1666,7 +1666,7 @@ const investigatedPlansYAML = `    plans:
 `
 
 // approach と order の無い investigated は問題にならない。採択 (指摘 1) を覆うのも
-// この問題なので、被覆の検査が状態を問わず通ることも同時に確かめる。
+// この問題なので、被覆の検査が状態を問わず通ることも同時に確認する。
 func TestReviewTriageRecordInvestigatedPasses(t *testing.T) {
 	files, read := recordFiles(t, replaceRecordPlans(t, investigatedPlansYAML))
 	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -1982,7 +1982,7 @@ func TestRenderPlanCellsInvestigated(t *testing.T) {
 }
 
 // priorDefectRecordYAML は prior_defect (D8 の結果) を書いた記録。validRecordYAML の
-// 根拠を確かめた指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって H7 で保留にした
+// 根拠を確認した指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって H7 で保留にした
 // 指摘 (id 4) を足す。
 func priorDefectRecordYAML(t *testing.T) string {
 	t.Helper()
@@ -2152,7 +2152,7 @@ func TestReviewTriageRecordPriorDefectViolations(t *testing.T) {
 	}
 }
 
-// (2) を確かめられなかったときも D8 は当たる (judgment-flow.md の D8 の行)。当たったときに
+// (2) を確認できなかったときも D8 は当たる (judgment-flow.md の D8 の行)。当たったときに
 // 保留でない記録を、(2) の値ごとに報告するかを検証する。
 func TestReviewTriageRecordPriorDefectHitRequiresHeld(t *testing.T) {
 	cases := []struct {
@@ -2193,7 +2193,7 @@ func TestRenderVerdictCellPriorDefect(t *testing.T) {
 		{"(1) が成り立たなければ (2) を出さない",
 			&recordPriorDefect{Base: "1111111", LineCheck: "not-holds", LineReason: "r"},
 			"**保留** — H7 (D8: 当たらない。(1) not-holds)"},
-		{"(2) を確かめられなければ当たる",
+		{"(2) を確認できなければ当たる",
 			&recordPriorDefect{Base: "1111111", LineCheck: "holds", LineReason: "r", SameDefect: "unverifiable", SameDefectReason: "r"},
 			"**保留** — H7 (D8: 当たる。(1) holds、(2) unverifiable)"},
 		{"(2) が成り立たなければ当たらない",

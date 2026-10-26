@@ -155,7 +155,7 @@ type recordPriorDefect struct {
 }
 
 // priorDefectHit は D8 が当たったかを (1)(2) の結果から導く。(1) が成り立ち、(2) が
-// 成り立つか確かめられないときに当たる (judgment-flow.md の D8 の行)。
+// 成り立つか確認できないときに当たる (judgment-flow.md の D8 の行)。
 func priorDefectHit(pd *recordPriorDefect) bool {
 	return pd.LineCheck == "holds" && (pd.SameDefect == "holds" || pd.SameDefect == "unverifiable")
 }
@@ -739,7 +739,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				}
 			}
 			// doc-dag の確認 (doc_dag) は任意だが、書くなら対象 (scope) と結果 (result) が要る。
-			// 片方だけの記録は、何を確かめて何が分かったかを残さない。
+			// 片方だけの記録は、何を確認して何が分かったかを残さない。
 			if dd := pl.DocDag; dd != nil {
 				if strings.TrimSpace(dd.Scope) == "" {
 					add("%s: doc_dag.scope がありません (doc-dag に渡した対象の文書群)", pn)
@@ -943,7 +943,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 					fmt.Fprintf(&b, "\n- **%s は選択待ち (人間が選ぶ)**: %s\n", recordCell(pl.ProblemID), recordCell(pl.Options))
 				}
 			}
-			// リポジトリ外への反映は、コミットを辿っても内容を確かめられない。
+			// リポジトリ外への反映は、コミットを辿っても内容を確認できない。
 			// 反映を確認した方法 (notes) を表の外に出して、後から追えるようにする。
 			for _, pl := range run.Plans {
 				if pl.Status == "done-external" && pl.Notes != "" {
@@ -973,7 +973,7 @@ func recordRow(cells []string) string {
 }
 
 // recordPriorDefectProblems は指摘 1 件の prior_defect (D8 の結果) を検査する。
-// 書く条件は D8 に進んだかで決まる — 判定フローでは、D4 で根拠を確かめた指摘
+// 書く条件は D8 に進んだかで決まる — 判定フローでは、D4 で根拠を確認した指摘
 // (premise_check.result が verified) だけが D8 に進む。required が偽の回
 // (recordPriorDefectFirstRun の回より前の回) では、無くても報告しない。
 func recordPriorDefectProblems(required bool, fd recordFinding) []string {
@@ -985,7 +985,7 @@ func recordPriorDefectProblems(required bool, fd recordFinding) []string {
 	pd := fd.PriorDefect
 	if pd == nil {
 		if verified && required {
-			add("prior_defect がありません (D4 で根拠を確かめた指摘は D8 で判定するので、D8 の結果を書く。この記録では、この回かそれより前の回で prior_defect を書いている)")
+			add("prior_defect がありません (D4 で根拠を確認した指摘は D8 で判定するので、D8 の結果を書く。この記録では、この回かそれより前の回で prior_defect を書いている)")
 		}
 		return problems
 	}
@@ -1012,7 +1012,7 @@ func recordPriorDefectProblems(required bool, fd recordFinding) []string {
 		switch pd.SameDefect {
 		case "holds", "not-holds", "unverifiable":
 		case "":
-			add("prior_defect.same_defect がありません (line_check が holds なら (2) を確かめる)")
+			add("prior_defect.same_defect がありません (line_check が holds なら (2) を確認する)")
 		default:
 			add("prior_defect.same_defect は holds / not-holds / unverifiable のいずれか: %q", pd.SameDefect)
 		}
@@ -1020,7 +1020,7 @@ func recordPriorDefectProblems(required bool, fd recordFinding) []string {
 			add("prior_defect.same_defect_reason がありません ((2) の根拠。全量の起点の内容の該当箇所)")
 		}
 	case lineValid:
-		// (1) が成り立たないか確かめられなければ D8 は当たらないと決まり、(2) は確かめない。
+		// (1) が成り立たないか確認できなければ D8 は当たらないと決まり、(2) は確認しない。
 		// line_check が列挙外のときは、(2) を書くべきかが決まらないので報告しない。
 		if pd.SameDefect != "" || pd.SameDefectReason != "" {
 			add("prior_defect.same_defect と same_defect_reason は、line_check が holds のときだけ書く (line_check %q)", pd.LineCheck)

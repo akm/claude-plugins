@@ -221,8 +221,8 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 
 // -rev に HEAD より前のコミットを渡すと、作業ツリーとインデックスの内容を、HEAD ではなくそのコミットと比べる。
 // その後のコミットで指摘のファイルが変わっていれば、レビュアが共有の作業ツリーで見た、当時はコミットして
-// いなかった編集かもしれないので、確かめない。作業ツリーとインデックスの内容がそのコミットと同じなら、
-// そのコミットまでの範囲で確かめる (範囲の終わりを HEAD にすると、後のコミットの内容を調べてしまう)。
+// いなかった編集かもしれないので、確認しない。作業ツリーとインデックスの内容がそのコミットと同じなら、
+// そのコミットまでの範囲で確認する (範囲の終わりを HEAD にすると、後のコミットの内容を調べてしまう)。
 func TestRevOtherThanHead(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -420,8 +420,8 @@ func TestUncommittedChangeInFileIsUnverifiableWithRev(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
-// -rev のときにコミットしていない変更を確かめられなければ、変更が無いとして git blame で行を調べに進まず、
-// run-error にする。調べに進むと、確かめられなかった編集の行が、起点にあったまま (誤った holds) と報告される。
+// -rev のときにコミットしていない変更を確認できなければ、変更が無いとして git blame で行を調べに進まず、
+// run-error にする。調べに進むと、確認できなかった編集の行が、起点にあったまま (誤った holds) と報告される。
 func TestUncommittedChangeCheckFailureIsRunError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root では権限を外しても読めてしまう")
@@ -429,7 +429,7 @@ func TestUncommittedChangeCheckFailureIsRunError(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
 	r.commit("branch")
-	// 1 行目を書き換え (コミットしない)、確かめるコマンド git hash-object --path が読めないように権限を外す
+	// 1 行目を書き換え (コミットしない)、確認するコマンド git hash-object --path が読めないように権限を外す
 	r.write("f.md", "A\nb\nc\n")
 	p := filepath.Join(r.dir, "f.md")
 	if err := os.Chmod(p, 0); err != nil {
@@ -502,7 +502,7 @@ func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
-// 追跡中のシンボリックリンクは、方式によらず確かめない。git はリンクの文字列を 1 行のブロブとして
+// 追跡中のシンボリックリンクは、方式によらず確認しない。git はリンクの文字列を 1 行のブロブとして
 // 記録し、git blame もそれを見るが、レビュアはリンクの先の内容を読むので、行番号が対応しない
 // (リンクの先をブランチが書き換えても、リンクの文字列は起点のまま)。
 func TestTrackedSymlinkIsUnverifiable(t *testing.T) {
@@ -672,8 +672,8 @@ func TestWorktreeContent(t *testing.T) {
 }
 
 // -worktree で、clean フィルタが設定されたファイルは、作業ツリーの行番号と git blame が見る
-// フィルタの後の行番号がずれうるので、確かめずに unverifiable にする。確かめると、書き換えた行が
-// 別の (起点のままの) 行に当たり、誤った holds になる。属性の書き方ごとに確かめる。
+// フィルタの後の行番号がずれうるので、確認せずに unverifiable にする。確認すると、書き換えた行が
+// 別の (起点のままの) 行に当たり、誤った holds になる。属性の書き方ごとに確認する。
 func TestWorktreeCleanFilterAttributes(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -681,17 +681,17 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 		driver     string // 設定する clean フィルタのドライバの名前 (空なら設定しない)
 		want       string
 	}{
-		{"-filter はフィルタを外すので確かめる", "f.md -filter\n", "", notHolds},
-		{"!filter は属性を無しに戻すので確かめる", "*.md filter=strip\nf.md !filter\n", "strip", notHolds},
-		{"filter=strip は確かめない", "f.md filter=strip\n", "strip", unverifiable},
-		{"ドライバの名前が unspecified でも確かめない", "f.md filter=unspecified\n", "unspecified", unverifiable},
-		{"ドライバの名前が unset でも確かめない", "f.md filter=unset\n", "unset", unverifiable},
-		{"名前が unset のドライバがあると -filter も確かめない", "f.md -filter\n", "unset", unverifiable},
-		{"値の無い filter は確かめない", "f.md filter\n", "", unverifiable},
-		{"設定の無いドライバの名前でも確かめない", "f.md filter=nodriver\n", "", unverifiable},
-		{"filter が 2 つ目の属性でも確かめない", "f.md diff=x filter=strip\n", "strip", unverifiable},
-		{"filter が 3 つ目の属性でも確かめない", "f.md -text -diff filter=strip\n", "strip", unverifiable},
-		{"filter ではない属性の値が filter でも確かめる", "f.md diff=filter\n", "", notHolds},
+		{"-filter はフィルタを外すので確認する", "f.md -filter\n", "", notHolds},
+		{"!filter は属性を無しに戻すので確認する", "*.md filter=strip\nf.md !filter\n", "strip", notHolds},
+		{"filter=strip は確認しない", "f.md filter=strip\n", "strip", unverifiable},
+		{"ドライバの名前が unspecified でも確認しない", "f.md filter=unspecified\n", "unspecified", unverifiable},
+		{"ドライバの名前が unset でも確認しない", "f.md filter=unset\n", "unset", unverifiable},
+		{"名前が unset のドライバがあると -filter も確認しない", "f.md -filter\n", "unset", unverifiable},
+		{"値の無い filter は確認しない", "f.md filter\n", "", unverifiable},
+		{"設定の無いドライバの名前でも確認しない", "f.md filter=nodriver\n", "", unverifiable},
+		{"filter が 2 つ目の属性でも確認しない", "f.md diff=x filter=strip\n", "strip", unverifiable},
+		{"filter が 3 つ目の属性でも確認しない", "f.md -text -diff filter=strip\n", "strip", unverifiable},
+		{"filter ではない属性の値が filter でも確認する", "f.md diff=filter\n", "", notHolds},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -727,30 +727,30 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 	}
 }
 
-// 属性 ident が設定されたファイルは、方式によらず確かめずに unverifiable にする。git はコマンド
+// 属性 ident が設定されたファイルは、方式によらず確認せずに unverifiable にする。git はコマンド
 // git hash-object --path でも git blame --contents でも、比べる前に「$Id: … $」の中を「$Id$」へ戻すので、
-// 確かめると、作業ツリーでその中を書き換えた行が、起点にあったまま (誤った holds) と報告される。
-// 属性の書き方ごとに確かめる。-filter (フィルタを外す書き方) と一緒に付けた場合も、書く順と行の分け方を
-// 変えて確かめる。関数 convertingAttribute は、filter の値が unset でドライバの設定が無いときに、戻らずに
+// 確認すると、作業ツリーでその中を書き換えた行が、起点にあったまま (誤った holds) と報告される。
+// 属性の書き方ごとに確認する。-filter (フィルタを外す書き方) と一緒に付けた場合も、書く順と行の分け方を
+// 変えて確認する。関数 convertingAttribute は、filter の値が unset でドライバの設定が無いときに、戻らずに
 // 後の属性を調べ続けるので、同じファイルに付けた ident を順序によらず見落とさない。
 func TestIdentAttributeIsUnverifiable(t *testing.T) {
 	cases := []struct {
 		name       string
 		attributes string
-		want       string // 確かめないときに理由に含む語 (空なら確かめる)
+		want       string // 確認しないときに理由に含む語 (空なら確認する)
 	}{
-		{"ident は確かめない", "f.md ident\n", "ident"},
-		{"値のある ident も確かめない", "f.md ident=x\n", "ident"},
-		{"ident が 2 つ目の属性でも確かめない", "f.md -text ident\n", "ident"},
+		{"ident は確認しない", "f.md ident\n", "ident"},
+		{"値のある ident も確認しない", "f.md ident=x\n", "ident"},
+		{"ident が 2 つ目の属性でも確認しない", "f.md -text ident\n", "ident"},
 		{"filter と ident が両方あれば clean フィルタの理由にする", "f.md ident filter=nodriver\n", "clean フィルタ"},
-		{"-filter の後の ident も確かめない", "f.md -filter ident\n", "ident"},
-		{"-filter の前の ident も確かめない", "f.md ident -filter\n", "ident"},
-		{"-filter の行の後の行の ident も確かめない", "f.md -filter\nf.md ident\n", "ident"},
-		{"-filter の行の前の行の ident も確かめない", "f.md ident\nf.md -filter\n", "ident"},
-		{"-ident は展開を外すので確かめる", "f.md -ident\n", ""},
-		{"!ident は属性を無しに戻すので確かめる", "*.md ident\nf.md !ident\n", ""},
-		{"ident ではない属性の値が ident でも確かめる", "f.md diff=ident\n", ""},
-		{"属性が無ければ確かめる", "", ""},
+		{"-filter の後の ident も確認しない", "f.md -filter ident\n", "ident"},
+		{"-filter の前の ident も確認しない", "f.md ident -filter\n", "ident"},
+		{"-filter の行の後の行の ident も確認しない", "f.md -filter\nf.md ident\n", "ident"},
+		{"-filter の行の前の行の ident も確認しない", "f.md ident\nf.md -filter\n", "ident"},
+		{"-ident は展開を外すので確認する", "f.md -ident\n", ""},
+		{"!ident は属性を無しに戻すので確認する", "*.md ident\nf.md !ident\n", ""},
+		{"ident ではない属性の値が ident でも確認する", "f.md diff=ident\n", ""},
+		{"属性が無ければ確認する", "", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -786,7 +786,7 @@ func TestIdentAttributeIsUnverifiable(t *testing.T) {
 	}
 }
 
-// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter (属性 filter を外す書き方) と区別できないので確かめない。
+// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter (属性 filter を外す書き方) と区別できないので確認しない。
 func TestUnsetDriverWithProcessOnly(t *testing.T) {
 	r := newRepo(t)
 	r.git("config", "filter.unset.process", "nonexistent-filter-process")
@@ -848,8 +848,8 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 	}
 }
 
-// clean フィルタのあるファイルは、確かめる前に unverifiable を返すので、道具はフィルタのプログラムを
-// 実行しない。-rev のときにコミットしていない変更を確かめるコマンド git hash-object --path がプログラムを
+// clean フィルタのあるファイルは、確認する前に unverifiable を返すので、道具はフィルタのプログラムを
+// 実行しない。-rev のときにコミットしていない変更を確認するコマンド git hash-object --path がプログラムを
 // 実行すると、プログラムがリポジトリに書きうる。
 func TestCleanFilterProgramIsNotRun(t *testing.T) {
 	r := newRepo(t)
@@ -960,7 +960,7 @@ func TestLineFromHistoryForkedBeforeBaseIsUnverifiable(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "m.md", "-lines", "2", "-rev", "HEAD"), notHolds)
 }
 
-// 成り立たない行と確かめられない行が混ざる範囲は、成り立たない行を優先して not-holds になる。
+// 成り立たない行と確認できない行が混ざる範囲は、成り立たない行を優先して not-holds になる。
 func TestNotHoldsTakesPrecedenceOverUnverifiable(t *testing.T) {
 	r := newRepo(t)
 	r.write("m.md", "m1\nm2\n")
@@ -981,7 +981,7 @@ func TestNotHoldsTakesPrecedenceOverUnverifiable(t *testing.T) {
 }
 
 // 無関係な履歴をマージして入った行は、そのルートのコミットの行として報告され、成り立たない。
-// 起点にある同じパスのファイル (g.md) の行を、無関係な履歴の内容で置き換えて確かめる。
+// 起点にある同じパスのファイル (g.md) の行を、無関係な履歴の内容で置き換えて確認する。
 func TestLineFromUnrelatedHistoryDoesNotHold(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -1266,7 +1266,7 @@ func TestInputErrors(t *testing.T) {
 	}
 }
 
-// wantError は、結果を出さずに、標準エラー出力の最初の行が印で始まり、終了コードが code であることを確かめる。
+// wantError は、結果を出さずに、標準エラー出力の最初の行が印で始まり、終了コードが code であることを確認する。
 func wantError(t *testing.T, o output, code int, label, want string) {
 	t.Helper()
 	if o.code != code {
@@ -1376,7 +1376,7 @@ func TestGitNotFoundIsRunError(t *testing.T) {
 }
 
 // fakeGit は、コマンド git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
-// git を書き込んだディレクトリを返す。環境変数 PATH の先頭に置いて、版の確認を確かめるのに使う。
+// git を書き込んだディレクトリを返す。環境変数 PATH の先頭に置いて、版の確認をテストするのに使う。
 func fakeGit(t *testing.T, versionLine string) string {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -1456,7 +1456,7 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 	missing := func() string { return clone.git("rev-list", "--objects", "--all", "--missing=print") }
 	before := missing()
 	if !strings.Contains(before, "?") {
-		t.Fatal("部分クローンに欠けたオブジェクトが無く、確かめられない")
+		t.Fatal("部分クローンに欠けたオブジェクトが無く、確認できない")
 	}
 
 	o := clone.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")

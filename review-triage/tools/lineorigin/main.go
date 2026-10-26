@@ -1,7 +1,7 @@
 // lineorigin は、レビューの指摘の対象の行が、全量の起点 (ブランチの作り始めのコミット) から、
-// レビューした内容まで変わっていないかを確かめる。review-triage の判定ノード D8 の条件 (1)。
+// レビューした内容まで変わっていないかを確認する。review-triage の判定ノード D8 の条件 (1)。
 //
-// 結果は「成り立つ」(holds)・「成り立たない」(not-holds)・「確かめられない」(unverifiable) の 3 つで、
+// 結果は「成り立つ」(holds)・「成り立たない」(not-holds)・「確認できない」(unverifiable) の 3 つで、
 // 理由と行ごとの内訳を添えて標準出力に書く。結果を出せないときは標準出力に何も書かず、
 // 標準エラー出力の最初の行に印を付けて書く。入力の誤り (フラグの不足・解決できない版・
 // レビューした内容に無いファイルや行) は input-error:、道具を実行できないこと (git を起動できない・
@@ -30,7 +30,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// run はフラグを読んで確かめ、結果を stdout に書く。戻り値は終了コード
+// run はフラグを読んで確認し、結果を stdout に書く。戻り値は終了コード
 // (0: 結果を出した、2: 入力の誤り、3: 道具を実行できない)。
 func run(args []string, stdout, stderr io.Writer) int {
 	opts, err := parseFlags(args)

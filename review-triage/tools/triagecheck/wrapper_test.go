@@ -45,7 +45,7 @@ func withWorkingDir(t *testing.T, dir string, fn func()) {
 func TestPluginCacheDirResolvesFromVersionedLayout(t *testing.T) {
 	// 実際のプラグインキャッシュの配置 (.../review-triage/<版>/tools/triagecheck)
 	// を模した一時ディレクトリを作り、そこから実行したときに版ディレクトリの
-	// 1 つ上 (.../review-triage) が返ることを確かめる。
+	// 1 つ上 (.../review-triage) が返ることを確認する。
 	base := realTempDir(t)
 	pluginRoot := filepath.Join(base, "cache", "akm-claude-plugins", "review-triage")
 	versionDir := filepath.Join(pluginRoot, "0.1.0", "tools", "triagecheck")
@@ -154,7 +154,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 
 	// 焼き込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
 	// このテストが見るのは「明示した値が既定パスに優先すること」なので、
-	// 値が実在するかどうかは意図の外 — 実在させたうえで優先を確かめる。
+	// 値が実在するかどうかは意図の外 — 実在させたうえで優先を確認する。
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -216,11 +216,11 @@ func TestInstallWrapperCreatesParentDirectory(t *testing.T) {
 //
 // 文字列だけを検査していたため、-current-dir の焼き込みを壊しても全テストが
 // 通っていた。生成物の契約 (どこから実行しても同じ置き場を見る) は、実行して
-// 初めて確かめられる。
+// 初めて確認できる。
 func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skip("go が PATH に無いので実行は確かめられない")
+		t.Skip("go が PATH に無いので実行は確認できない")
 	}
 	toolDir, err := os.Getwd()
 	if err != nil {
@@ -284,7 +284,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 	// シンボリックリンク経由で起動しても実体の置き場を検査すること。
 	// dirname "$0" だけで基準を求めるとリンクの置き場が基準になり、その隣に
 	// 別の置き場があるとそちらを検査して成功する (実測でそうなった)。
-	// リンクの隣に紛らわしい置き場を実在させたうえで確かめる。
+	// リンクの隣に紛らわしい置き場を実在させたうえで確認する。
 	linkDir := filepath.Join(realTempDir(t), "localbin")
 	if err := os.MkdirAll(linkDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -339,7 +339,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skip("go が PATH に無いので実行は確かめられない")
+		t.Skip("go が PATH に無いので実行は確認できない")
 	}
 	toolDir, err := os.Getwd()
 	if err != nil {
