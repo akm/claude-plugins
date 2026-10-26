@@ -597,7 +597,7 @@ func TestRunInstallWrapperRejectsUnusedFlags(t *testing.T) {
 // 前の 1 か所 (resolveInputs) にあり、生成の経路は解決済みの絶対パスを埋め込むだけ。
 //
 // 以前は生成の経路がパスの解決より前で分岐して戻っていたため、検査の経路の規則が
-// 1 つも届かず、同じ規則を wrapper.go に別の条件で書き直しては、その差を
+// 1 つも届かず、同じ規則を wrapper.go に別の条件で実装し直しては、その差を
 // レビューに指摘されることを回を重ねて繰り返した (相対の -judgment-flow が
 // 展開先を暗黙の基準に解決され、版のディレクトリを含む固定パスが埋め込まれる、など)。
 func TestRunInstallWrapperSharesPathRules(t *testing.T) {
