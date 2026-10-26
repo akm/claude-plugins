@@ -1707,7 +1707,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_permission_mode_ignores_subagent_init_line(self):
         # sub-agent の init の行 (parent_tool_use_id がある) は使わない。最上位の init の行より前に置いて、
-        # parent_tool_use_id を見ずに最初の init の行を読む誤りも検出できるようにする
+        # parent_tool_use_id を見ずに最初の init の行を読む実装のミスも検出できるようにする
         marker = self.run_with_stream([
             _init("auto", parent="toolu_agent"),
             _init("default"),

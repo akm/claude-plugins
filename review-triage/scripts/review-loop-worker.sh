@@ -25,7 +25,7 @@
 # Claude Code の利用者の設定 (環境変数 CLAUDE_CONFIG_DIR があればその下、無ければ ~/.claude の settings.json) は
 # 読むが、使うのは起動時の確認と表示だけ。
 #
-# macOS でだけ動かす (起動時の確認の 3。サンドボックスの振る舞いを macOS でだけ確認したため)。
+# macOS でだけ動かす (起動時の確認の 3。サンドボックスの動作を macOS でだけ確認したため)。
 # bash は macOS の /bin/bash (3.2) で動くように書き、1 行目でそれを指定する — 環境変数 PATH で先に見つかる bash (Homebrew の 5.2
 # など) を使わないため。bash 5.2 は、保留中の trap をコマンド置換 $(...) の中身の構文解析の途中で実行することがあり、そのとき trap の
 # 文字列は構文の誤りになって実行されない (#105)。テストは CI (ubuntu) でも偽の uname で走らせるので、
@@ -559,7 +559,7 @@ startup_cleanup
 
 # 3. macOS で動いているか
 os_name=$(uname -s 2>/dev/null)
-[ "$os_name" = Darwin ] || unavailable "macOS で動いていない (uname -s: ${os_name:-読めない})。サンドボックスの振る舞いを macOS でだけ確認したので、ほかの OS では起動しない"
+[ "$os_name" = Darwin ] || unavailable "macOS で動いていない (uname -s: ${os_name:-読めない})。サンドボックスの動作を macOS でだけ確認したので、ほかの OS では起動しない"
 
 # 4. loop.yaml があり、repo_dir が読めるか
 [ -f "$LOOP_DIR/loop.yaml" ] || unavailable "loop.yaml が無い"
