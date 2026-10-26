@@ -3,7 +3,7 @@
 //
 // 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
 // 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・決め打ちの値の
-// 誤りが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
+// ミスが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
 // 誤って失敗する」誤検出を生んだ。数えるものを書かせないことで、この類を発生源から消す。
 // スキーマの意味の正本は skills/review-triage/references/record-schema.md。
 package main
@@ -417,7 +417,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 
 // recordNullSilentKeys は、値を省いて null にすると他のどの検査でも失敗しない
 // 構造キー。キーの有無をポインタの nil で見る plan_ref / investigation は、
-// 「キーを書いて値を省いた」(書きかけ・インデントの誤り) が「キーが無い」と
+// 「キーを書いて値を省いた」(書きかけ・インデントのミス) が「キーが無い」と
 // 同一になり、書き込み元は書いたつもりのまま記録上は無い扱いになる (実測:
 // investigation: だけの記録が検査 0 件でサマリにも出なかった)。
 // 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
@@ -448,7 +448,7 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 			k, v := n.Content[i], n.Content[i+1]
 			if !allowed[k.Value] {
 				problems = append(problems, fmt.Sprintf(
-					"%s:%d: %sに未知のキー %q。旧いキー名の残存か、キーを書く位置の誤り (上流固有の属性は attrs へ) を疑う",
+					"%s:%d: %sに未知のキー %q。旧いキー名の残存か、キーを書く位置のミス (上流固有の属性は attrs へ) を疑う",
 					f, k.Line, kind, k.Value))
 				continue
 			}
