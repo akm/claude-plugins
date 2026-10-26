@@ -11,7 +11,7 @@ import (
 
 // change は unified diff から読んだ変更 1 つ。Line は変更後 (post-image) の行番号。
 // 追加・変更した行は Text にその行の文を持つ。削除だけの変更は、削除の直後の位置を
-// Line に持ち Deleted が真になる (読み直す範囲を決めるのに位置だけが要る)。
+// Line に持ち Deleted が真になる (再確認する範囲を決めるのに位置だけが要る)。
 type change struct {
 	Line    int
 	Text    string

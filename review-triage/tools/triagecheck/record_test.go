@@ -121,7 +121,7 @@ func TestReviewTriageRecordDocDagPasses(t *testing.T) {
 	}
 }
 
-// verification (読み直した範囲) を持つ計画は正しい記録として通る。
+// verification (再確認した範囲) を持つ計画は正しい記録として通る。
 func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
 		"order: 1\n        verification:\n          near_edges:\n            - docs/foo.md 11-14 (表の全行)\n            - docs/foo.md 7-30 (節「表の節」。変更行 25 のリンク先)\n", 1)
@@ -134,7 +134,7 @@ func TestReviewTriageRecordVerificationPasses(t *testing.T) {
 	}
 }
 
-// origin: residual (周回中に residual を自己採択した指摘) は正しい記録として通る。
+// origin: residual (ループ中に residual を自己採択した指摘) は正しい記録として通る。
 func TestReviewTriageRecordOriginResidualPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "        verdict: adopted\n",
 		"        verdict: adopted\n        origin: residual\n", 1)
@@ -193,7 +193,7 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 		{"plan_ref の値が無い (null)", "        verdict_reason: ゲート 0 件で採択 (A2)\n",
 			"        verdict_reason: ゲート 0 件で採択 (A2)\n        plan_ref:\n", "plan_ref に値がありません"},
 		{"depends_on の自己参照", "order: 1\n", "order: 1\n        depends_on: [P1]\n", "自己参照"},
-		// 修正の検証 (verification) は任意だが、書くなら near_edges (読み直した範囲) が要り、要素は空にできない。
+		// 修正の検証 (verification) は任意だが、書くなら near_edges (再確認した範囲) が要り、要素は空にできない。
 		{"verification に near_edges が無い", "order: 1\n",
 			"order: 1\n        verification:\n          note: 読んだ\n", "verification.near_edges"},
 		{"verification の near_edges に空の要素", "order: 1\n",
@@ -210,8 +210,8 @@ func TestReviewTriageRecordSchemaViolations(t *testing.T) {
 			"order: 1\n        doc_dag:\n          scope: docs/foo.md\n          result: 重複なし\n          figure: tmp/x.html\n", "figure"},
 		{"doc_dag の値が無い (null)", "order: 1\n", "order: 1\n        doc_dag:\n", "doc_dag に値がありません"},
 		{"未知のキー", "        verdict: adopted\n", "        verdict: adopted\n        severity: P1\n", "severity"},
-		// 指摘の出所 (origin) は review / residual の列挙。周回中に residual を自己採択した指摘を区別する
-		// (record-schema.md「周回中に記録の外で直さない」)。
+		// 指摘の出所 (origin) は review / residual の列挙。ループ中に residual を自己採択した指摘を区別する
+		// (record-schema.md「ループ中に記録の外で直さない」)。
 		{"origin の列挙値違反", "        verdict: adopted\n", "        verdict: adopted\n        origin: upstream\n", "origin"},
 		{"実行の直下の未知のキー", "    head: abc1234\n", "    head: abc1234\n    foo: 1\n", "foo"},
 		{"date が空", "- date: \"2026-08-30\"\n", "- date: \"\"\n", "date"},
@@ -774,7 +774,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 	}
 }
 
-// TestInReviewTriageDirNotationVariants は、置き場の表記が揺れても検査の対象が
+// TestInReviewTriageDirNotationVariants は、ディレクトリの表記が揺れても検査の対象が
 // 変わらないことを検証する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
 // "." / "./rec" / "rec//" で一覧側 (path.Join が clean する) と前置が一致せず、
 // 検査が 1 件も走らないまま成功した。
@@ -801,7 +801,7 @@ func TestInReviewTriageDirNotationVariants(t *testing.T) {
 	} {
 		reviewTriageDir = tt.dir
 		if got := inReviewTriageDir(tt.file); got != tt.want {
-			t.Errorf("置き場 %q で %q: inReviewTriageDir = %v, want %v",
+			t.Errorf("ディレクトリ %q で %q: inReviewTriageDir = %v, want %v",
 				tt.dir, tt.file, got, tt.want)
 		}
 	}
@@ -814,24 +814,24 @@ func TestListReviewTriageFilesMissingDir(t *testing.T) {
 	}
 }
 
-// 置き場を明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
-// 意思表示なので、記録 0 件として、エラーを出さずに成功を返すと、置き場を移した時点で検査が
+// ディレクトリを明示指定したのに無いならエラーにする。指定は「そこを検査せよ」という
+// 意思表示なので、記録 0 件として、エラーを出さずに成功を返すと、ディレクトリを移した時点で検査が
 // 無効になったことに気づけない (診断ツールの偽陰性)。
 func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
 	_, err := listReviewTriageFiles(filepath.Join(t.TempDir(), "no-such"), true)
 	if err == nil {
-		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")
+		t.Fatal("明示指定したディレクトリが無いのにエラーにならなかった")
 	}
 	if !strings.Contains(err.Error(), "-record-dir") {
 		t.Fatalf("エラーにどの指定を直せばよいかが無い: %v", err)
 	}
 }
 
-// -write-summary も同じ — 明示指定した置き場が無いなら、0 件生成して
+// -write-summary も同じ — 明示指定したディレクトリが無いなら、0 件生成して
 // エラーを出さずに成功させない (生成されなかったことに気づけないため)。
 func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 	if err := writeReviewTriageSummaries(filepath.Join(t.TempDir(), "no-such"), true); err == nil {
-		t.Fatal("明示指定した置き場が無いのにエラーにならなかった")
+		t.Fatal("明示指定したディレクトリが無いのにエラーにならなかった")
 	}
 }
 
@@ -1002,7 +1002,7 @@ func replaceRecordPlans(t *testing.T, plans string) string {
 	return mutated
 }
 
-// 未知のキーがあっても他の検査は続く (最初の問題で止めない)。
+// 未知のキーがあっても他の検査は続く (最初の問題で打ち切らない)。
 func TestReviewTriageRecordUnknownKeyDoesNotAbort(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML,
 		"        verdict: adopted\n",
@@ -1052,7 +1052,7 @@ func TestReviewTriageRecordSummaryStale(t *testing.T) {
 	problems := reviewTriageRecordProblems(files, staleRead)
 	found := false
 	for _, p := range problems {
-		if strings.Contains(p, "feat-x.md") && strings.Contains(p, "食い違っています") {
+		if strings.Contains(p, "feat-x.md") && strings.Contains(p, "一致しません") {
 			found = true
 		}
 	}
@@ -1364,13 +1364,13 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 // --- 旧様式 (検知の項目 recurrence) の受け入れ ---
 //
 // recurrence は、同じ種類の指摘が続いていることの判断 (検知) を記録していたキー。
-// 検知は廃止したので review-triage は新しい回に書かないが、置き場に残る既存の記録は
+// 検知は廃止したので review-triage は新しい回に書かないが、ディレクトリに残る既存の記録は
 // 回ごとに持つ。triagecheck はその記録を書き換えずに検査を成功させ、生成サマリも
 // 従来どおり描画する。検査するのは形 (許可キーと値の有無) だけで、根拠が指す回や
 // 状態ごとの専用キーといった整合は見ない (README「何を検査するか」)。
 
-// legacyRecordYAML は旧様式の記録の fixture。validRecordYAML (回 1) の後ろに引数の
-// 数だけ回を足し、回 i+2 の直下に recurrences[i] を置く (空文字列なら書かない)。
+// legacyRecordYAML は旧様式の記録の fixture。validRecordYAML (1 回目) の後ろに引数の
+// 数だけ回を足し、i+2 回目の直下に recurrences[i] を置く (空文字列なら書かない)。
 // 足す回は採択 (指摘 1) と、それを覆う plans (P1) を持つ。最後の回でなくなっても
 // 被覆の検査に掛からないようにするため。
 func legacyRecordYAML(recurrences ...string) string {
@@ -1434,7 +1434,7 @@ func legacyEvidenceYAML(priorRun int, prior string) string {
 }
 
 // legacyDeclinedYAML は status declined (繰り返しではないと判断した) の旧様式の
-// recurrence。回 2 に置く形 (根拠は回 1 の P1 を指す)。
+// recurrence。2 回目に置く形 (根拠は 1 回目の P1 を指す)。
 var legacyDeclinedYAML = "      status: declined\n" + legacyEvidenceYAML(1, "P1") +
 	"      declined_reason: 回 1 の指摘は元から残っていた欠陥で、修正由来ではない\n"
 
@@ -1460,7 +1460,7 @@ func TestReviewTriageRecordLegacyRecurrencePasses(t *testing.T) {
 		{"recurrence の無い回だけ", legacyRecordYAML("")},
 		{"declined", legacyRecordYAML(legacyDeclinedYAML)},
 		{"reframed", legacyRecordYAML(reframed2)},
-		{"detected (更新される前に止まった記録)", legacyRecordYAML("      status: detected\n" + legacyEvidenceYAML(1, "P1"))},
+		{"detected (更新される前に中断した記録)", legacyRecordYAML("      status: detected\n" + legacyEvidenceYAML(1, "P1"))},
 		{"declined の回と reframed の回の両方", legacyRecordYAML(legacyDeclinedYAML, reframed3)},
 		{"same-location の根拠", legacyRecordYAML("      status: declined\n" +
 			"      evidence:\n" +
@@ -1481,18 +1481,18 @@ func TestReviewTriageRecordLegacyRecurrencePasses(t *testing.T) {
 	}
 }
 
-// 検知の整合 (根拠が直前の回を指すか、回 1 に無いか、比べた回の状態と prior の形が
+// 検知の整合 (根拠が直前の回を指すか、1 回目に無いか、比べた回の状態と prior の形が
 // 合うか、状態ごとの専用キー、status の列挙) はもう検査しない。以前は報告していた
-// 各ケースで問題が 0 件になることを確かめる。
+// 各ケースで問題が 0 件になることを確認する。
 func TestReviewTriageRecordLegacyRecurrenceNotCrossChecked(t *testing.T) {
 	reframed2 := "      status: reframed\n" + legacyEvidenceYAML(1, "P1") + legacyReframeYAML
 	cases := []struct {
 		name    string
 		yamlSrc string
 	}{
-		{"回 1 に recurrence がある",
+		{"1 回目に recurrence がある",
 			validRecordYAML + "    recurrence:\n      status: detected\n" + legacyEvidenceYAML(1, "P1")},
-		{"prior_run が直前の回でない (回 3 の根拠が回 1 を指す)",
+		{"prior_run が直前の回でない (3 回目の根拠が 1 回目を指す)",
 			legacyRecordYAML(reframed2, "      status: detected\n"+legacyEvidenceYAML(1, "P1"))},
 		{"比べた回が reframed なのに prior が問題 id",
 			legacyRecordYAML(reframed2, "      status: detected\n"+legacyEvidenceYAML(2, "P1"))},
@@ -1594,11 +1594,11 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, detected)
 		}
 	}
-	// 小節の位置: 回 2 の節の中で、指摘の表の後、修正計画の前。
+	// 小節の位置: 2 回目の節の中で、指摘の表の後、修正計画の前。
 	run2 := detected[strings.Index(detected, "\n## 回 2:"):]
 	recIdx := strings.Index(run2, "\n### 検知\n")
 	if recIdx < 0 {
-		t.Fatalf("回 2 の節に検知の小節が無い:\n%s", detected)
+		t.Fatalf("2 回目の節に検知の小節が無い:\n%s", detected)
 	}
 	if recIdx < strings.Index(run2, "| 1 | `docs/foo.md:12`") {
 		t.Fatalf("検知の小節が指摘の表より前に出ている:\n%s", detected)
@@ -1650,7 +1650,7 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 // review-triage-fix の段 1 (調査) の結果 (原因・束ね・調査) は、修正方法 (approach) と
 // 順序 (order) をまだ持たない問題として plans[].status: investigated で記録に置く。
 // approach と order を書く条件は状態ごとに決まる — pending / done / done-external では
-// approach が必須 (order は任意)、awaiting-human では任意 (人間の答えの後に書く)、
+// approach が必須 (order は任意)、awaiting-human では任意 (人間の回答の後に書く)、
 // investigated では書かない (書いてあれば報告する)。被覆の規則 (採択は plans か
 // plan_ref で覆う) は状態を問わない。
 
@@ -1666,7 +1666,7 @@ const investigatedPlansYAML = `    plans:
 `
 
 // approach と order の無い investigated は問題にならない。採択 (指摘 1) を覆うのも
-// この問題なので、被覆の検査が状態を問わず通ることも同時に確かめる。
+// この問題なので、被覆の検査が状態を問わず通ることも同時に確認する。
 func TestReviewTriageRecordInvestigatedPasses(t *testing.T) {
 	files, read := recordFiles(t, replaceRecordPlans(t, investigatedPlansYAML))
 	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
@@ -1740,7 +1740,7 @@ func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 
 // approach の必須は状態ごとに決まる。pending / done / done-external では従来どおり
 // 無ければ報告し、awaiting-human では options があれば approach が無くても通る
-// (人間が立案する待ち — 立案者 C — は approach を持たない)。
+// (人間の立案待ち — 立案者 C — は approach を持たない)。
 func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 	// approach の行を消した validRecordYAML。sha と status は各ケースが差し替える。
 	noApproach := strings.Replace(validRecordYAML, "        approach: 数え直して単位を書く\n", "", 1)
@@ -1783,7 +1783,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 		}
 		files, read := recordFiles(t, mutated)
 		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
-			t.Fatalf("approach の無い awaiting-human (人間が立案する待ち) で問題が出た: %v", problems)
+			t.Fatalf("approach の無い awaiting-human (人間の立案待ち) で問題が出た: %v", problems)
 		}
 	})
 
@@ -1801,7 +1801,7 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 }
 
 // 列挙に無い状態は従来どおり報告し、文言の列挙に investigated が入る (状態を足したのに
-// 案内の列挙が古いままだと、書き手は正しい値を知る手段が無い)。
+// 案内の列挙が古いままだと、書き込み元は正しい値を知る手段が無い)。
 func TestReviewTriageRecordUnknownStatusListsInvestigated(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "status: pending", "status: investigating", 1)
 	if mutated == validRecordYAML {
@@ -1865,7 +1865,7 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 
 // summaryWithoutInvestigated は、investigated の状態を足す前に validRecordYAML から生成した
 // サマリの全文。鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
-// 1 バイトでも変わると、置き場に残る既存のサマリがすべて古いと報告される。注記は
+// 1 バイトでも変わると、ディレクトリに残る既存のサマリがすべて古いと報告される。注記は
 // investigated の問題がある回にだけ出し、推移の表には列を足さない。
 const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
 	"\n" +
@@ -1962,10 +1962,10 @@ func TestReviewTriageSummaryInvestigated(t *testing.T) {
 	run1 := summary[strings.Index(summary, "\n## 回 1:"):strings.Index(summary, "\n## 回 2:")]
 	run2 := summary[strings.Index(summary, "\n## 回 2:"):]
 	if !strings.Contains(run1, "- **"+note) {
-		t.Fatalf("investigated の問題がある回 1 に注記が無い:\n%s", summary)
+		t.Fatalf("investigated の問題がある 1 回目に注記が無い:\n%s", summary)
 	}
 	if strings.Contains(run2, note) {
-		t.Fatalf("investigated の問題が無い回 2 に注記が出ている:\n%s", summary)
+		t.Fatalf("investigated の問題が無い 2 回目に注記が出ている:\n%s", summary)
 	}
 }
 
@@ -1982,7 +1982,7 @@ func TestRenderPlanCellsInvestigated(t *testing.T) {
 }
 
 // priorDefectRecordYAML は prior_defect (D8 の結果) を書いた記録。validRecordYAML の
-// 根拠を確かめた指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって H7 で保留にした
+// 根拠を確認した指摘 (id 1 と 3) に D8 の結果を書き、D8 が当たって H7 で保留にした
 // 指摘 (id 4) を足す。
 func priorDefectRecordYAML(t *testing.T) string {
 	t.Helper()
@@ -2152,7 +2152,7 @@ func TestReviewTriageRecordPriorDefectViolations(t *testing.T) {
 	}
 }
 
-// (2) を確かめられなかったときも D8 は当たる (judgment-flow.md の D8 の行)。当たったときに
+// (2) を確認できなかったときも D8 は当たる (judgment-flow.md の D8 の行)。当たったときに
 // 保留でない記録を、(2) の値ごとに報告するかを検証する。
 func TestReviewTriageRecordPriorDefectHitRequiresHeld(t *testing.T) {
 	cases := []struct {
@@ -2193,7 +2193,7 @@ func TestRenderVerdictCellPriorDefect(t *testing.T) {
 		{"(1) が成り立たなければ (2) を出さない",
 			&recordPriorDefect{Base: "1111111", LineCheck: "not-holds", LineReason: "r"},
 			"**保留** — H7 (D8: 当たらない。(1) not-holds)"},
-		{"(2) を確かめられなければ当たる",
+		{"(2) を確認できなければ当たる",
 			&recordPriorDefect{Base: "1111111", LineCheck: "holds", LineReason: "r", SameDefect: "unverifiable", SameDefectReason: "r"},
 			"**保留** — H7 (D8: 当たる。(1) holds、(2) unverifiable)"},
 		{"(2) が成り立たなければ当たらない",

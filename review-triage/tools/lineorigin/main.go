@@ -1,12 +1,12 @@
 // lineorigin は、レビューの指摘の対象の行が、全量の起点 (ブランチの作り始めのコミット) から、
-// レビューした内容まで変わっていないかを確かめる。review-triage の判定ノード D8 の条件 (1)。
+// レビューした内容まで変わっていないかを確認する。review-triage の判定ノード D8 の条件 (1)。
 //
-// 結果は「成り立つ」(holds)・「成り立たない」(not-holds)・「確かめられない」(unverifiable) の 3 つで、
+// 結果は「成り立つ」(holds)・「成り立たない」(not-holds)・「確認できない」(unverifiable) の 3 つで、
 // 理由と行ごとの内訳を添えて標準出力に書く。結果を出せないときは標準出力に何も書かず、
-// 標準エラー出力の最初の行に印を付けて書く。入力の誤り (フラグの不足・解決できない版・
+// 標準エラー出力の最初の行に接頭辞を付けて書く。入力の誤り (フラグの不足・解決できない版・
 // レビューした内容に無いファイルや行) は input-error:、道具を実行できないこと (git を起動できない・
 // git が古い・git の出力を読めない) は run-error:。コマンド go run で実行すると終了コードは 1 になるので、
-// 終了コード (2 と 3) ではなく印で見分ける。
+// 終了コード (2 と 3) ではなく接頭辞で判別する。
 //
 // 使い方 (-root はレビューした作業ツリーのルートか、その中のディレクトリの絶対パス。値は単一引用符で囲む):
 //
@@ -30,7 +30,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// run はフラグを読んで確かめ、結果を stdout に書く。戻り値は終了コード
+// run はフラグを読んで確認し、結果を stdout に書く。戻り値は終了コード
 // (0: 結果を出した、2: 入力の誤り、3: 道具を実行できない)。
 func run(args []string, stdout, stderr io.Writer) int {
 	opts, err := parseFlags(args)
@@ -56,7 +56,7 @@ type options struct {
 
 func parseFlags(args []string) (options, error) {
 	fs := flag.NewFlagSet("lineorigin", flag.ContinueOnError)
-	// パッケージ flag は誤りのときに使い方を書き出すが、標準エラー出力の最初の行を印にするため捨てる
+	// パッケージ flag は誤りのときに使い方を書き出すが、標準エラー出力の最初の行を接頭辞で始めるため捨てる
 	// (フラグの一覧は、ファイル review-triage/tools/lineorigin/README.md の「使い方」)
 	fs.SetOutput(io.Discard)
 	root := fs.String("root", "", "リポジトリのルートか、その中のディレクトリの絶対パス (必須)")
@@ -130,7 +130,7 @@ func parseLines(s string) ([]lineRange, error) {
 		if isRange {
 			to, err = strconv.Atoi(b)
 			if err != nil || to < from {
-				return nil, fmt.Errorf("-lines の範囲は、終わりを始め以上にしてください: %s", s)
+				return nil, fmt.Errorf("-lines の範囲は、終点を始点以上にしてください: %s", s)
 			}
 		}
 		ranges = append(ranges, lineRange{from, to})

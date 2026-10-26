@@ -36,7 +36,7 @@ func main() {
 func run(args []string) error {
 	fs := flag.NewFlagSet("triagecheck", flag.ContinueOnError)
 	recordDir := fs.String("record-dir", "",
-		"トリアージ記録 (*.yaml) の置き場 (必須)。相対パスなら -current-dir も要る")
+		"トリアージ記録 (*.yaml) のディレクトリ (必須)。相対パスなら -current-dir も要る")
 	currentDir := fs.String("current-dir", "",
 		"相対パスを解決する基準のディレクトリ。絶対パスで、実在すること")
 	flowPath := fs.String("judgment-flow", "",
@@ -44,7 +44,7 @@ func run(args []string) error {
 	writeSummary := fs.Bool("write-summary", false,
 		"検査せず、記録から生成サマリ (.md) を書き出す")
 	installWrapperPath := fs.String("install-wrapper", "",
-		"検査せず、-record-dir と -judgment-flow の値を焼き込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
+		"検査せず、-record-dir と -judgment-flow の値を埋め込んだ呼び出し用のラッパースクリプトを指定パスに書き出す")
 	summaryCmd := fs.String("summary-command", defaultSummaryCommand,
 		"サマリの再生成手段として案内する文字列 (エラー文と生成サマリの 1 行目に入る)。"+
 			"-install-wrapper で省略すると、-current-dir から見たラッパーの相対パスで組み立てる")
@@ -60,7 +60,7 @@ func run(args []string) error {
 	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
 
 	// 経路どうしの衝突は、パスの規則より前に見る。-install-wrapper と
-	// -write-summary=true は「何を書き出すか」が食い違うので、エラーを出さずに片方を
+	// -write-summary=true は「何を書き出すか」が矛盾するので、エラーを出さずに片方を
 	// 無視すると「指定したのに適用されない」を作る。拒否するのは「何かを要求したとき」
 	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
 	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
@@ -94,12 +94,12 @@ func run(args []string) error {
 	}
 
 	// 案内の文言も、経路の分岐より前に一度だけ据える。検査 (エラー文) と
-	// -write-summary (生成サマリの 1 行目) と -install-wrapper (焼き込み) が
+	// -write-summary (生成サマリの 1 行目) と -install-wrapper (埋め込み) が
 	// 同じ値を読むので、経路ごとに渡すと片方だけ違う案内を出す組み合わせができる。
 	summaryCommand = in.summaryCommand
 
-	// 明示した在り処の不在は、経路を問わず「指定したのに検査できない」なので
-	// ここで止める。置き場と判定フローの両方が無いときは 1 回の実行で両方を
+	// 明示したパスの不在は、経路を問わず「指定したのに検査できない」なので
+	// ここでエラーにする。記録のディレクトリと判定フローの両方が無いときは 1 回の実行で両方を
 	// 報告する — 片方で即 return すると、片方を直して再実行するまで
 	// もう一方も壊れていることを知れない。
 	if problems := missingPathProblems(in); len(problems) > 0 {
@@ -164,10 +164,10 @@ type resolvedInputs struct {
 	// judgmentFlow は検査に使う判定フローの絶対パス。指定も CLAUDE_PLUGIN_ROOT も
 	// 無ければ空 (そのとき判定フローの検査は未導入として通る)。
 	judgmentFlow string
-	// judgmentFlowOrigin は判定フローの在り処を指定したものの名前
+	// judgmentFlowOrigin は判定フローのパスを指定したものの名前
 	// (-judgment-flow / CLAUDE_PLUGIN_ROOT)。報告に使う。既定なら空。
 	judgmentFlowOrigin string
-	// embedJudgmentFlow はラッパーに焼き込む判定フローの絶対パス。明示された
+	// embedJudgmentFlow はラッパーに埋め込む判定フローの絶対パス。明示された
 	// ときだけ非空。省略時はラッパーが実行時に $root から既定を解決するので、
 	// CLAUDE_PLUGIN_ROOT からは埋めない — 埋めると版のディレクトリを含む固定の
 	// パスになり、プラグインの更新でそのラッパーが壊れる。これは規則の違いでは
@@ -223,7 +223,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	}
 	out.recordDir = absRecordDir
 
-	// 判定フローの在り処は、明示の指定 → CLAUDE_PLUGIN_ROOT → 既定 (無し) の順。
+	// 判定フローのパスは、明示の指定 → CLAUDE_PLUGIN_ROOT → 既定 (無し) の順。
 	//
 	// 「絶対パスに -current-dir を併記したらエラー」は -judgment-flow で明示された
 	// ときにだけ課す。CLAUDE_PLUGIN_ROOT から組み立てた値は常に絶対で、利用者が
@@ -259,12 +259,12 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	}
 
 	// 案内する再生成コマンド。明示があればそのまま。-install-wrapper で省略されたら
-	// 「ラッパー自身をリポジトリのルートから実行する形」を組み立てて焼き込む。
+	// 「ラッパー自身をリポジトリのルートから実行する形」を組み立てて埋め込む。
 	//
 	// 実行時の $0 から組み立てない — $0 は実行したときの形 (./bin/rtc、絶対パス、リンク名)
 	// そのもので、コミットされるサマリの 1 行目が実行の仕方ごとに変わり、生成直後の
-	// サマリが別の実行の仕方での検査で「食い違う」と報告される (実測)。絶対パスも
-	// 焼き込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
+	// サマリが別の実行の仕方での検査で「一致しない」と報告される (実測)。絶対パスも
+	// 埋め込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
 	// checkout した場所によって検査が失敗する。コミットされる値は、リポジトリ相対でなければならない。
 	//
 	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する —
@@ -312,15 +312,15 @@ func isBlankPath(s string) bool {
 	}) == ""
 }
 
-// missingPathProblems は、明示した在り処のうち実在しないものを報告の行にして返す。
-// 対象は入力として読むパス (記録の置き場と判定フロー) で、ラッパーの出力先は
+// missingPathProblems は、明示したパスのうち実在しないものを報告の行にして返す。
+// 対象は入力として読むパス (記録のディレクトリと判定フロー) で、ラッパーの出力先は
 // 含めない (これから作るものなので、無いのが普通)。
 //
 // 判定フローは -judgment-flow だけでなく CLAUDE_PLUGIN_ROOT からも解決される。
 // どちらも「この場所を検査せよ」という指定なので、実在を要求する対象に含める
 // (解決できず既定のままのときだけ、未導入として通す)。生成の経路では
-// CLAUDE_PLUGIN_ROOT 由来の値を焼き込まないが、実在の要求は同じ規則として課す —
-// 経路で規則を変えると、その差が次の欠陥の置き場になる。
+// CLAUDE_PLUGIN_ROOT 由来の値を埋め込まないが、実在の要求は同じ規則として課す —
+// 経路で規則を変えると、その差が次の欠陥を生む。
 func missingPathProblems(in resolvedInputs) []string {
 	var problems []string
 	if _, err := os.Stat(in.recordDir); errors.Is(err, fs.ErrNotExist) {
@@ -347,23 +347,23 @@ var errCurrentDirUnused = errors.New(
 // 同じ語が含まれていると、検査が失われたことに気づけない。
 var (
 	// errRecordDirRequired は -record-dir が省略されたことを表す。
-	errRecordDirRequired = errors.New("-record-dir は必須です (検査する記録の置き場を指定する)")
+	errRecordDirRequired = errors.New("-record-dir は必須です (検査する記録のディレクトリを指定する)")
 	// errEmptyPath は、パスを取るフラグに空文字が明示指定されたことを表す。
 	// どのフラグかは包んだ文言が示す。
 	errEmptyPath = errors.New("空のパスが指定されました")
 	// errFlagUnusedWithInstallWrapper は、生成の経路で使われないフラグが
 	// -install-wrapper と併記されたことを表す。
 	errFlagUnusedWithInstallWrapper = errors.New("-install-wrapper と併用できません")
-	// errPathMissing は、明示した在り処 (記録の置き場・判定フロー) が実在しない
+	// errPathMissing は、明示したパス (記録のディレクトリ・判定フロー) が実在しない
 	// ことを表す。どれが無いかは stderr に並べた報告の行が示す。
-	errPathMissing = errors.New("指定した在り処が存在しません")
+	errPathMissing = errors.New("指定したパスが存在しません")
 	// errEmptySummaryCommand は -summary-command に空 (空白・不可視だけを含む)
 	// が明示指定されたことを表す。
 	errEmptySummaryCommand = errors.New("空の文字列が指定されました")
 	// errSummaryCommandNeedsBase は、-install-wrapper で案内を組み立てるのに
 	// 基準 (-current-dir) も明示 (-summary-command) も無いことを表す。
 	errSummaryCommandNeedsBase = errors.New(
-		"-install-wrapper で焼き込む再生成コマンドの案内を組み立てられません: " +
+		"-install-wrapper で埋め込む再生成コマンドの案内を組み立てられません: " +
 			"ラッパーをリポジトリ相対で案内するには -current-dir が要ります " +
 			"(リポジトリのルートで -current-dir \"$(pwd)\" を渡すか、案内の文字列を -summary-command で渡してください)")
 )
@@ -414,14 +414,14 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 	return filepath.Join(base, p), true, nil
 }
 
-// resolveJudgmentFlowPath は判定フローの正本の在り処を決める。優先順は
+// resolveJudgmentFlowPath は判定フローの正本のパスを決める。優先順は
 // 明示の指定 → プラグインの展開先 → 既定 (リポジトリ内にスキルを直接置いた形)。
 //
 // 見つからなかったときに空文字を返して既定のままにするのは、判定フローが
 // 無い状態を「検査対象が無い」として通す判断が judgmentFlowProblems 側に
 // あるため。ここでエラーにすると、記録の検査まで巻き添えで落ちる。
 //
-// 2 つ目の戻り値は在り処を指定したものの名前 (origin)。-judgment-flow と
+// 2 つ目の戻り値はパスを指定したものの名前 (origin)。-judgment-flow と
 // CLAUDE_PLUGIN_ROOT のどちらも、その場所を検査せよという指定なので名前を返す。
 // 既定に落ちたときだけ空で、そのとき不在は未導入として通る。名前を返すのは、
 // 不在の報告にどちらを直せばよいかを載せるため。

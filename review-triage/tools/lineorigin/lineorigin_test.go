@@ -196,7 +196,7 @@ func TestCommaSeparatedLines(t *testing.T) {
 	if len(o.lines) != 3 {
 		t.Fatalf("重なる範囲の内訳が %d 行 (期待は 3 行)。出力:\n%s", len(o.lines), o.stdout)
 	}
-	// ある範囲が別の範囲を含んでも、まとめた範囲の終わりは縮まない
+	// ある範囲が別の範囲を含んでも、まとめた範囲の終点は縮まない
 	for _, lines := range []string{"1-3,2", "2,1-3"} {
 		o := r.check(base, "-file", "f.md", "-lines", lines, "-rev", "HEAD")
 		wantKind(t, o, notHolds)
@@ -221,8 +221,8 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 
 // -rev に HEAD より前のコミットを渡すと、作業ツリーとインデックスの内容を、HEAD ではなくそのコミットと比べる。
 // その後のコミットで指摘のファイルが変わっていれば、レビュアが共有の作業ツリーで見た、当時はコミットして
-// いなかった編集かもしれないので、確かめない。作業ツリーとインデックスの内容がそのコミットと同じなら、
-// そのコミットまでの範囲で確かめる (範囲の終わりを HEAD にすると、後のコミットの内容を調べてしまう)。
+// いなかった編集かもしれないので、確認しない。作業ツリーとインデックスの内容がそのコミットと同じなら、
+// そのコミットまでの範囲で確認する (範囲の終点を HEAD にすると、後のコミットの内容を調べてしまう)。
 func TestRevOtherThanHead(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -260,7 +260,7 @@ func TestAnnotatedTagsResolveToCommits(t *testing.T) {
 }
 
 // ファイルの中で並べ替えた行は、差分が残ったと見なした行だけが成り立ち、消して足したと見なした行は
-// 成り立たない。末尾の 2 行を先頭へ動かすと、最も長く共通する並び (a・b・c) が 1 つに決まるので、
+// 成り立たない。末尾の 2 行を先頭へ動かすと、最長共通部分列 (a・b・c) が 1 つに決まるので、
 // 残ったと見なす行が差分の作り方によらない。動かす 2 行は、コマンド git blame の移動の検出 (オプション -M) が移動と
 // 見なす長さ (英数字 20 文字) を越えるので、道具が移動の検出を使うと 1〜2 行目も成り立ってしまう。
 func TestReorderedLinesFollowDiff(t *testing.T) {
@@ -420,8 +420,8 @@ func TestUncommittedChangeInFileIsUnverifiableWithRev(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
-// -rev のときにコミットしていない変更を確かめられなければ、変更が無いとして git blame で行を調べに進まず、
-// run-error にする。調べに進むと、確かめられなかった編集の行が、起点にあったまま (誤った holds) と報告される。
+// -rev のときにコミットしていない変更を確認できなければ、変更が無いとして git blame で行を調べに進まず、
+// run-error にする。調べに進むと、確認できなかった編集の行が、起点にあったまま (誤った holds) と報告される。
 func TestUncommittedChangeCheckFailureIsRunError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root では権限を外しても読めてしまう")
@@ -429,7 +429,7 @@ func TestUncommittedChangeCheckFailureIsRunError(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
 	r.commit("branch")
-	// 1 行目を書き換え (コミットしない)、確かめるコマンド git hash-object --path が読めないように権限を外す
+	// 1 行目を書き換え (コミットしない)、確認するコマンド git hash-object --path が読めないように権限を外す
 	r.write("f.md", "A\nb\nc\n")
 	p := filepath.Join(r.dir, "f.md")
 	if err := os.Chmod(p, 0); err != nil {
@@ -469,8 +469,8 @@ func TestToolDoesNotWriteIndex(t *testing.T) {
 }
 
 // 設定 core.fsmonitor に登録したプログラムを、道具の git に起動させない。起動させると、値が true のときは
-// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作り、道具が終わった後も残る。テストでは、
-// 印のファイルを作るスクリプトを登録する (値が true の常駐のプロセスは、Linux では動かない)。
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作り、道具が終了した後も残る。テストでは、
+// 起動したことを示すフラグファイルを作るスクリプトを登録する (値が true の常駐のプロセスは、Linux では動かない)。
 func TestFsmonitorProgramIsNotRun(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
@@ -490,7 +490,7 @@ func TestFsmonitorProgramIsNotRun(t *testing.T) {
 	}
 }
 
-// skip-worktree (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) を
+// skip-worktree (インデックスの項目に付けるフラグで、付いたファイルの作業ツリーの変更を git が見ないようにする) を
 // 付けたファイルの編集は、インデックスに記録した更新時刻などには現れないが、コミットしていない変更として扱う。
 func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	r, base := branched(t)
@@ -502,7 +502,7 @@ func TestSkipWorktreeEditIsUncommittedChange(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
 }
 
-// 追跡中のシンボリックリンクは、方式によらず確かめない。git はリンクの文字列を 1 行のブロブとして
+// 追跡中のシンボリックリンクは、方式によらず確認しない。git はリンクの文字列を 1 行のブロブとして
 // 記録し、git blame もそれを見るが、レビュアはリンクの先の内容を読むので、行番号が対応しない
 // (リンクの先をブランチが書き換えても、リンクの文字列は起点のまま)。
 func TestTrackedSymlinkIsUnverifiable(t *testing.T) {
@@ -672,8 +672,8 @@ func TestWorktreeContent(t *testing.T) {
 }
 
 // -worktree で、clean フィルタが設定されたファイルは、作業ツリーの行番号と git blame が見る
-// フィルタの後の行番号がずれうるので、確かめずに unverifiable にする。確かめると、書き換えた行が
-// 別の (起点のままの) 行に当たり、誤った holds になる。属性の書き方ごとに確かめる。
+// フィルタの後の行番号がずれうるので、確認せずに unverifiable にする。確認すると、書き換えた行が
+// 別の (起点のままの) 行に当たり、誤った holds になる。属性の書き方ごとに確認する。
 func TestWorktreeCleanFilterAttributes(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -681,17 +681,17 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 		driver     string // 設定する clean フィルタのドライバの名前 (空なら設定しない)
 		want       string
 	}{
-		{"-filter はフィルタを外すので確かめる", "f.md -filter\n", "", notHolds},
-		{"!filter は属性を無しに戻すので確かめる", "*.md filter=strip\nf.md !filter\n", "strip", notHolds},
-		{"filter=strip は確かめない", "f.md filter=strip\n", "strip", unverifiable},
-		{"ドライバの名前が unspecified でも確かめない", "f.md filter=unspecified\n", "unspecified", unverifiable},
-		{"ドライバの名前が unset でも確かめない", "f.md filter=unset\n", "unset", unverifiable},
-		{"名前が unset のドライバがあると -filter も確かめない", "f.md -filter\n", "unset", unverifiable},
-		{"値の無い filter は確かめない", "f.md filter\n", "", unverifiable},
-		{"設定の無いドライバの名前でも確かめない", "f.md filter=nodriver\n", "", unverifiable},
-		{"filter が 2 つ目の属性でも確かめない", "f.md diff=x filter=strip\n", "strip", unverifiable},
-		{"filter が 3 つ目の属性でも確かめない", "f.md -text -diff filter=strip\n", "strip", unverifiable},
-		{"filter ではない属性の値が filter でも確かめる", "f.md diff=filter\n", "", notHolds},
+		{"-filter はフィルタを外すので確認する", "f.md -filter\n", "", notHolds},
+		{"!filter は属性を無しに戻すので確認する", "*.md filter=strip\nf.md !filter\n", "strip", notHolds},
+		{"filter=strip は確認しない", "f.md filter=strip\n", "strip", unverifiable},
+		{"ドライバの名前が unspecified でも確認しない", "f.md filter=unspecified\n", "unspecified", unverifiable},
+		{"ドライバの名前が unset でも確認しない", "f.md filter=unset\n", "unset", unverifiable},
+		{"名前が unset のドライバがあると -filter も確認しない", "f.md -filter\n", "unset", unverifiable},
+		{"値の無い filter は確認しない", "f.md filter\n", "", unverifiable},
+		{"設定の無いドライバの名前でも確認しない", "f.md filter=nodriver\n", "", unverifiable},
+		{"filter が 2 つ目の属性でも確認しない", "f.md diff=x filter=strip\n", "strip", unverifiable},
+		{"filter が 3 つ目の属性でも確認しない", "f.md -text -diff filter=strip\n", "strip", unverifiable},
+		{"filter ではない属性の値が filter でも確認する", "f.md diff=filter\n", "", notHolds},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -727,30 +727,30 @@ func TestWorktreeCleanFilterAttributes(t *testing.T) {
 	}
 }
 
-// 属性 ident が設定されたファイルは、方式によらず確かめずに unverifiable にする。git はコマンド
+// 属性 ident が設定されたファイルは、方式によらず確認せずに unverifiable にする。git はコマンド
 // git hash-object --path でも git blame --contents でも、比べる前に「$Id: … $」の中を「$Id$」へ戻すので、
-// 確かめると、作業ツリーでその中を書き換えた行が、起点にあったまま (誤った holds) と報告される。
-// 属性の書き方ごとに確かめる。-filter (フィルタを外す書き方) と一緒に付けた場合も、書く順と行の分け方を
-// 変えて確かめる。関数 convertingAttribute は、filter の値が unset でドライバの設定が無いときに、戻らずに
+// 確認すると、作業ツリーでその中を書き換えた行が、起点にあったまま (誤った holds) と報告される。
+// 属性の書き方ごとに確認する。-filter (フィルタを外す書き方) と一緒に付けた場合も、書く順と行の分け方を
+// 変えて確認する。関数 convertingAttribute は、filter の値が unset でドライバの設定が無いときに、戻らずに
 // 後の属性を調べ続けるので、同じファイルに付けた ident を順序によらず見落とさない。
 func TestIdentAttributeIsUnverifiable(t *testing.T) {
 	cases := []struct {
 		name       string
 		attributes string
-		want       string // 確かめないときに理由に含む語 (空なら確かめる)
+		want       string // 確認しないときに理由に含む語 (空なら確認する)
 	}{
-		{"ident は確かめない", "f.md ident\n", "ident"},
-		{"値のある ident も確かめない", "f.md ident=x\n", "ident"},
-		{"ident が 2 つ目の属性でも確かめない", "f.md -text ident\n", "ident"},
+		{"ident は確認しない", "f.md ident\n", "ident"},
+		{"値のある ident も確認しない", "f.md ident=x\n", "ident"},
+		{"ident が 2 つ目の属性でも確認しない", "f.md -text ident\n", "ident"},
 		{"filter と ident が両方あれば clean フィルタの理由にする", "f.md ident filter=nodriver\n", "clean フィルタ"},
-		{"-filter の後の ident も確かめない", "f.md -filter ident\n", "ident"},
-		{"-filter の前の ident も確かめない", "f.md ident -filter\n", "ident"},
-		{"-filter の行の後の行の ident も確かめない", "f.md -filter\nf.md ident\n", "ident"},
-		{"-filter の行の前の行の ident も確かめない", "f.md ident\nf.md -filter\n", "ident"},
-		{"-ident は展開を外すので確かめる", "f.md -ident\n", ""},
-		{"!ident は属性を無しに戻すので確かめる", "*.md ident\nf.md !ident\n", ""},
-		{"ident ではない属性の値が ident でも確かめる", "f.md diff=ident\n", ""},
-		{"属性が無ければ確かめる", "", ""},
+		{"-filter の後の ident も確認しない", "f.md -filter ident\n", "ident"},
+		{"-filter の前の ident も確認しない", "f.md ident -filter\n", "ident"},
+		{"-filter の行の後の行の ident も確認しない", "f.md -filter\nf.md ident\n", "ident"},
+		{"-filter の行の前の行の ident も確認しない", "f.md ident\nf.md -filter\n", "ident"},
+		{"-ident は展開を外すので確認する", "f.md -ident\n", ""},
+		{"!ident は属性を無しに戻すので確認する", "*.md ident\nf.md !ident\n", ""},
+		{"ident ではない属性の値が ident でも確認する", "f.md diff=ident\n", ""},
+		{"属性が無ければ確認する", "", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -786,7 +786,7 @@ func TestIdentAttributeIsUnverifiable(t *testing.T) {
 	}
 }
 
-// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter (属性 filter を外す書き方) と区別できないので確かめない。
+// 名前が unset のドライバを、設定 filter.unset.process だけで登録しても、-filter (属性 filter を外す書き方) と区別できないので確認しない。
 func TestUnsetDriverWithProcessOnly(t *testing.T) {
 	r := newRepo(t)
 	r.git("config", "filter.unset.process", "nonexistent-filter-process")
@@ -838,7 +838,7 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 		{"check-attr が失敗する", "check-attr", "", 1, "check-attr"},
 		{"check-attr の出力が三つ組にならない", "check-attr", "f.md\\000filter\\000", 0, "git check-attr の出力を読めません"},
 		{"check-attr の出力の最後の要素が空でない", "check-attr", "f.md\\000filter\\000set\\000x", 0, "git check-attr の出力を読めません"},
-		{"config が想定していない終了コードで終わる", "config", "", 2, "config"},
+		{"config が想定していない終了コードを返す", "config", "", 2, "config"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -848,8 +848,8 @@ func TestCleanFilterCheckFailuresAreRunErrors(t *testing.T) {
 	}
 }
 
-// clean フィルタのあるファイルは、確かめる前に unverifiable を返すので、道具はフィルタのプログラムを
-// 実行しない。-rev のときにコミットしていない変更を確かめるコマンド git hash-object --path がプログラムを
+// clean フィルタのあるファイルは、確認する前に unverifiable を返すので、道具はフィルタのプログラムを
+// 実行しない。-rev のときにコミットしていない変更を確認するコマンド git hash-object --path がプログラムを
 // 実行すると、プログラムがリポジトリに書きうる。
 func TestCleanFilterProgramIsNotRun(t *testing.T) {
 	r := newRepo(t)
@@ -960,7 +960,7 @@ func TestLineFromHistoryForkedBeforeBaseIsUnverifiable(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "m.md", "-lines", "2", "-rev", "HEAD"), notHolds)
 }
 
-// 成り立たない行と確かめられない行が混ざる範囲は、成り立たない行を優先して not-holds になる。
+// 成り立たない行と確認できない行が混ざる範囲は、成り立たない行を優先して not-holds になる。
 func TestNotHoldsTakesPrecedenceOverUnverifiable(t *testing.T) {
 	r := newRepo(t)
 	r.write("m.md", "m1\nm2\n")
@@ -981,7 +981,7 @@ func TestNotHoldsTakesPrecedenceOverUnverifiable(t *testing.T) {
 }
 
 // 無関係な履歴をマージして入った行は、そのルートのコミットの行として報告され、成り立たない。
-// 起点にある同じパスのファイル (g.md) の行を、無関係な履歴の内容で置き換えて確かめる。
+// 起点にある同じパスのファイル (g.md) の行を、無関係な履歴の内容で置き換えて確認する。
 func TestLineFromUnrelatedHistoryDoesNotHold(t *testing.T) {
 	r, base := branched(t)
 	r.write("f.md", "a\nb\nC\n")
@@ -1100,7 +1100,7 @@ func TestGitEnvKeepsTestIsolation(t *testing.T) {
 	}
 }
 
-// 道具が git に渡す環境に、取得と問い合わせを止める変数がある。
+// 道具が git に渡す環境に、取得と問い合わせを無効にする変数がある。
 func TestGitEnvStopsFetchAndPrompt(t *testing.T) {
 	env := strings.Join(gitEnv(), "\n")
 	for _, want := range []string{"GIT_NO_LAZY_FETCH=1", "GIT_TERMINAL_PROMPT=0"} {
@@ -1170,7 +1170,7 @@ func TestRootMayBeSubdirectory(t *testing.T) {
 	wantKind(t, o, unverifiable)
 }
 
-// -root のディレクトリの名前が空白で終わっても、その名前のまま読む。空白を削ると、空白の無い名前の隣の
+// -root のディレクトリの名前の末尾が空白でも、その名前のまま読む。空白を削ると、空白の無い名前の隣の
 // ディレクトリ (ここでは同じリポジトリの複製) を読み、レビューした作業ツリーのコミットしていない行を見ずに
 // holds を返す。
 func TestRootNameEndingWithSpace(t *testing.T) {
@@ -1186,7 +1186,7 @@ func TestRootNameEndingWithSpace(t *testing.T) {
 	r.write("g.md", "g\n")
 	r.commit("branch")
 	r.git("clone", "-q", "--branch", "br", r.dir, filepath.Join(parent, "repo"))
-	// 名前が空白で終わる方にだけ、コミットしていない行を足す
+	// 名前の末尾が空白の方にだけ、コミットしていない行を足す
 	r.write("f.md", "NEW\na\nb\nc\n")
 
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), unverifiable)
@@ -1240,7 +1240,7 @@ func TestInputErrors(t *testing.T) {
 		{"相対パスの -root", []string{"-root", ".", "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, "絶対パス"},
 		{"git のリポジトリでない -root", []string{"-root", notRepo, "-base", base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"}, "git のリポジトリの中を指していません"},
 		{"行番号が 0", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "0", "-rev", "HEAD"}, "-lines"},
-		{"終わりが始めより前", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "3-2", "-rev", "HEAD"}, "-lines"},
+		{"終点が始点より前", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "3-2", "-rev", "HEAD"}, "-lines"},
 		{"数でない行番号", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "x", "-rev", "HEAD"}, "-lines"},
 		{"コンマの後が空", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", "1,", "-rev", "HEAD"}, "-lines"},
 		{"コンマの前が空", []string{"-root", r.dir, "-base", base, "-file", "f.md", "-lines", ",1", "-rev", "HEAD"}, "-lines"},
@@ -1266,7 +1266,7 @@ func TestInputErrors(t *testing.T) {
 	}
 }
 
-// wantError は、結果を出さずに、標準エラー出力の最初の行が印で始まり、終了コードが code であることを確かめる。
+// wantError は、結果を出さずに、標準エラー出力の最初の行が接頭辞で始まり、終了コードが code であることを確認する。
 func wantError(t *testing.T, o output, code int, label, want string) {
 	t.Helper()
 	if o.code != code {
@@ -1282,8 +1282,8 @@ func wantError(t *testing.T, o output, code int, label, want string) {
 	wantContains(t, o.stderr, want)
 }
 
-// ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が印で始まり、
-// 終了コードで種類が分かれる。フラグの誤りでパッケージ flag が使い方を書き出すと、最初の行が印にならない。
+// ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が接頭辞で始まり、
+// 終了コードで種類が分かれる。フラグの誤りでパッケージ flag が使い方を書き出すと、最初の行が接頭辞で始まらない。
 func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
 	r, _ := branched(t)
 	r.write("g.md", "branch\n")
@@ -1376,7 +1376,7 @@ func TestGitNotFoundIsRunError(t *testing.T) {
 }
 
 // fakeGit は、コマンド git version の出力だけを versionLine に偽り、ほかのコマンドは本物の git に渡す
-// git を書き込んだディレクトリを返す。環境変数 PATH の先頭に置いて、版の確認を確かめるのに使う。
+// git を書き込んだディレクトリを返す。環境変数 PATH の先頭に置いて、版の確認をテストするのに使う。
 func fakeGit(t *testing.T, versionLine string) string {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -1438,7 +1438,7 @@ func TestGitVersionBoundary(t *testing.T) {
 	})
 }
 
-// 部分クローンで欠けたオブジェクトを、道具がネットワークから取得してリポジトリに書き込まない。
+// 部分クローンで手元に無いオブジェクトを、道具がネットワークから取得してリポジトリに書き込まない。
 // 環境変数 GIT_NO_LAZY_FETCH は git 2.44 からなので、それより前の git では飛ばす。
 func TestPartialCloneDoesNotFetch(t *testing.T) {
 	out, err := exec.Command("git", "version").Output()
@@ -1456,21 +1456,21 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 	missing := func() string { return clone.git("rev-list", "--objects", "--all", "--missing=print") }
 	before := missing()
 	if !strings.Contains(before, "?") {
-		t.Fatal("部分クローンに欠けたオブジェクトが無く、確かめられない")
+		t.Fatal("部分クローンで手元に無いオブジェクトが 1 つも無く、確認できない")
 	}
 
 	o := clone.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
 	if after := missing(); after != before {
-		t.Fatalf("道具が欠けたオブジェクトを取得した。前:\n%s\n後:\n%s", before, after)
+		t.Fatalf("道具が手元に無かったオブジェクトを取得した。前:\n%s\n後:\n%s", before, after)
 	}
 	if o.kind == holds {
 		t.Fatalf("起点の内容を読めないのに holds を返した: %s", o.stdout)
 	}
 }
 
-// stallingGit は、引数に word を含む呼び出しで止まり、ほかのコマンドは本物の git に渡す偽の git を
-// 書き込んだディレクトリを返す。止まるときはコマンド sleep を子のプロセスとして起動するので、期限で git (の偽物) を
-// 止めても、sleep が標準出力を開いたまま残る。
+// stallingGit は、引数に word を含む呼び出しで応答しなくなり、ほかのコマンドは本物の git に渡す偽の git を
+// 書き込んだディレクトリを返す。応答しないときはコマンド sleep を子のプロセスとして起動するので、期限で git (の偽物) を
+// 停止させても、sleep が標準出力を開いたまま残る。
 func stallingGit(t *testing.T, word string) string {
 	t.Helper()
 	real, err := exec.LookPath("git")
@@ -1489,8 +1489,8 @@ func stallingGit(t *testing.T, word string) string {
 	return bin
 }
 
-// git が期限までに終わらなければ、道具は待ち続けずに run-error で終わる。止めた git の子の
-// プロセスが標準出力を開いたままでも待たない (待つと、子が終わる 30 秒後まで返らない)。
+// git が期限までに終了しなければ、道具は待機し続けずに run-error で終了する。停止させた git の子の
+// プロセスが標準出力を開いたままでも待機しない (待機すると、子が終了する 30 秒後まで返らない)。
 func TestGitTimeoutIsRunError(t *testing.T) {
 	r, base := branched(t)
 	r.write("g.md", "branch\n")
@@ -1499,20 +1499,20 @@ func TestGitTimeoutIsRunError(t *testing.T) {
 	gitTimeout = 2 * time.Second
 	t.Cleanup(func() { gitTimeout = saved })
 
-	t.Run("blame で止まる", func(t *testing.T) {
+	t.Run("blame で応答しなくなる", func(t *testing.T) {
 		t.Setenv("PATH", stallingGit(t, "blame"))
 		start := time.Now()
-		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終わりませんでした")
+		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "以内に終了しませんでした")
 		if d := time.Since(start); d > 20*time.Second {
-			t.Fatalf("期限を越えても %s 待った", d)
+			t.Fatalf("期限を越えても %s 待機した", d)
 		}
 	})
-	t.Run("git version で止まる", func(t *testing.T) {
+	t.Run("git version で応答しなくなる", func(t *testing.T) {
 		t.Setenv("PATH", stallingGit(t, "version"))
 		start := time.Now()
 		wantError(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), 3, "run-error:", "git version が")
 		if d := time.Since(start); d > 20*time.Second {
-			t.Fatalf("期限を越えても %s 待った", d)
+			t.Fatalf("期限を越えても %s 待機した", d)
 		}
 	})
 }

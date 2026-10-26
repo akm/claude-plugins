@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// 結果の 3 つの値。D8 の条件 (1) が成り立つ・成り立たない・確かめられない。
+// 結果の 3 つの値。D8 の条件 (1) が成り立つ・成り立たない・確認できない。
 const (
 	holds        = "holds"
 	notHolds     = "not-holds"
@@ -34,7 +34,7 @@ type lineResult struct {
 	note string
 }
 
-// check は、opts の行が全量の起点からレビューした内容まで変わっていないかを確かめる。
+// check は、opts の行が全量の起点からレビューした内容まで変わっていないかを確認する。
 // 入力の誤り (解決できない版・レビューした内容に無いファイルや行) は error で返し、結果にしない。
 func check(opts options) (result, error) {
 	if err := checkGitVersion(opts.worktree); err != nil {
@@ -101,7 +101,7 @@ func check(opts options) (result, error) {
 
 	// 次の 3 つは、レビュアが読む内容とコマンド git blame が見る内容が違いうる。シンボリックリンクと clean
 	// フィルタは行番号が対応せず、属性 ident は行の中の書き換えを、比べる前の変換で戻す。どれも書き換えた行が
-	// 起点のままと報告されうる (誤った holds) ので、方式によらず確かめない。
+	// 起点のままと報告されうる (誤った holds) ので、方式によらず確認しない。
 	// git はシンボリックリンクのリンクの文字列を 1 行のブロブとして記録し、git blame もそれを見るが、
 	// レビュアはリンクの先の内容を読む
 	if targetEntry == entrySymlink {
@@ -111,7 +111,7 @@ func check(opts options) (result, error) {
 	// git blame もフィルタの後の内容 (コミットの内容と、オプション --contents で渡した内容) を見る。フィルタが
 	// 行を増やしたり消したりすると、行番号がずれる。属性 ident は、記録するときに「$Id: … $」を「$Id$」へ戻し、
 	// コマンド git hash-object --path と git blame --contents も同じ変換を当ててから比べるので、「$Id: … $」の
-	// 中の書き換えが見えない。-rev では、コミットしていない変更の確認より前に確かめる (その確認が実行する
+	// 中の書き換えが見えない。-rev では、コミットしていない変更の確認より前に、属性 filter と ident を調べる (その確認が実行する
 	// git hash-object --path が、フィルタのプログラムを実行しないように)
 	attr, err := g.convertingAttribute(opts.file)
 	if err != nil {
@@ -121,7 +121,7 @@ func check(opts options) (result, error) {
 	case "filter":
 		return result{kind: unverifiable, reason: "指摘のファイルに clean フィルタ (属性 filter) が設定されていて、作業ツリーの内容 (フィルタの前) と、git blame が見るフィルタの後の内容の行番号がずれうる"}, nil
 	case "ident":
-		return result{kind: unverifiable, reason: "指摘のファイルに属性 ident が設定されていて、git は「$Id: … $」の中を「$Id$」へ戻してから内容を比べるので、レビュアが読んだその中の書き換えを確かめられない"}, nil
+		return result{kind: unverifiable, reason: "指摘のファイルに属性 ident が設定されていて、git は「$Id: … $」の中を「$Id$」へ戻してから内容を比べるので、レビュアが読んだその中の書き換えを確認できない"}, nil
 	}
 
 	if !opts.worktree {
@@ -146,7 +146,7 @@ func check(opts options) (result, error) {
 }
 
 // classify は blame の結果を行ごとに分類し、全体の結果を決める。
-// 成り立たない行が 1 つでもあれば成り立たない、無くて確かめられない行があれば確かめられない。
+// 成り立たない行が 1 つでもあれば成り立たない、無くて確認できない行があれば確認できない。
 func classify(base, file string, blamed []blameLine) result {
 	res := result{kind: holds}
 	for _, b := range blamed {
@@ -255,7 +255,7 @@ func parsePorcelain(out string) ([]blameLine, error) {
 		}
 	}
 	if cur != nil {
-		return nil, fmt.Errorf("git blame の出力が行 %d の途中で終わっています", cur.final)
+		return nil, fmt.Errorf("git blame の出力が行 %d の途中で途切れています", cur.final)
 	}
 	return lines, nil
 }
@@ -287,7 +287,7 @@ type gitRunner struct{ root string }
 // toplevel は -root からリポジトリのルートを求める。入力の誤りにするのは、-root が存在する
 // ディレクトリでないときと、-root から上のどこにも .git が無いときだけ。.git があるのに git が
 // リポジトリとして読めない (権限・所有者など) ときは、渡し方では直せないので run-error にする。
-// git は .git を読めないときも「not a git repository」と言うので、.git の有無は道具が確かめる。
+// git は .git を読めないときも「not a git repository」と言うので、.git の有無は道具が確認する。
 func toplevel(dir string) (string, error) {
 	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
 		return "", inputf("-root が存在するディレクトリではありません: %s", dir)
@@ -333,25 +333,25 @@ func (g gitRunner) run(args ...string) (string, int, error) {
 }
 
 // gitTimeout は、git の 1 回の実行に許す時間。越えたら run-error にする。git や、git が起動する
-// フィルタのプログラムが止まったときに、道具が終わらなくなるのを防ぐ。テストが短くする。
+// フィルタのプログラムが応答しなくなったときに、道具が終了しなくなるのを防ぐ。テストが短くする。
 var gitTimeout = 5 * time.Minute
 
 // runIn は、stdin を標準入力に渡して run と同じように git を実行する。
 //
 // 設定 core.fsmonitor は打ち消す。打ち消さないと、git はそこに登録したプログラムを起動し、値が true なら
-// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作って、道具が終わった後も残る。
+// 常駐のプロセス git fsmonitor--daemon が .git の下にファイルを作って、道具が終了した後も残る。
 func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.root, "-c", "core.quotePath=false", "-c", "core.fsmonitor=false"}, args...)...)
-	cmd.WaitDelay = time.Second // 期限で止めた git の子のプロセスが出力を開いたままでも、待ち続けない
+	cmd.WaitDelay = time.Second // 期限で停止させた git の子のプロセスが出力を開いたままでも、待機し続けない
 	cmd.Env = gitEnv()
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return "", -1, runf("git %s が %s 以内に終わりませんでした", strings.Join(args, " "), gitTimeout)
+		return "", -1, runf("git %s が %s 以内に終了しませんでした", strings.Join(args, " "), gitTimeout)
 	}
 	if err == nil {
 		return stdout.String(), 0, nil
@@ -365,7 +365,7 @@ func (g gitRunner) runIn(stdin io.Reader, args ...string) (string, int, error) {
 
 var gitVersionRe = regexp.MustCompile(`^git version ([0-9]+)\.([0-9]+)`)
 
-// checkGitVersion は、git を起動できることと、道具が要る版であることを確かめる。要るのは 2.30 以降
+// checkGitVersion は、git を起動できることと、道具が要る版であることを確認する。要るのは 2.30 以降
 // (関数 commit が使うコマンド git rev-parse --end-of-options が 2.30.0 から) で、フラグ -worktree では
 // 2.41 以降 (関数 blame がコマンド git blame にオプション --contents と範囲 <起点>..<コミット> を一緒に
 // 渡す形を、git は 2.41.0 から受け付ける)。古い git では、正しい版を渡しても解決できないか、git blame が
@@ -378,7 +378,7 @@ func checkGitVersion(worktree bool) error {
 	cmd.Env = gitEnv()
 	out, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
-		return runf("git version が %s 以内に終わりませんでした", gitTimeout)
+		return runf("git version が %s 以内に終了しませんでした", gitTimeout)
 	}
 	if err != nil {
 		return runf("git を起動できません: %v", err)
@@ -428,10 +428,10 @@ func gitEnv() []string {
 		"GIT_LITERAL_PATHSPECS=1",
 		// コマンド git replace の置き換えを見ない。見ると、blame が置き換えた後の履歴で、行を最後に変えたコミットを求める
 		"GIT_NO_REPLACE_OBJECTS=1",
-		// 部分クローンで欠けたオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
+		// 部分クローンで手元に無いオブジェクトを、ネットワークから取得してリポジトリに書き込まない (git 2.44 以降)。
 		// 取得できないと git は失敗し、道具は run-error になる
 		"GIT_NO_LAZY_FETCH=1",
-		// 認証などで利用者に尋ねて待たない
+		// 認証などで利用者の入力待ちにならない
 		"GIT_TERMINAL_PROMPT=0",
 	)
 	return append(env, extraGitEnv...)
@@ -516,7 +516,7 @@ func (g gitRunner) entry(commit, file string) (string, error) {
 // コマンド git diff は使わない。インデックスに記録した更新時刻などが作業ツリーのファイルと合わないと、
 // 環境変数 GIT_OPTIONAL_LOCKS=0 を立ててもそれを更新してインデックスを書き換えるため。代わりに、rev・インデックス・
 // 作業ツリーの内容のハッシュを比べる。インデックスに記録した更新時刻などに頼らないので、skip-worktree や
-// assume-unchanged (インデックスの項目に付ける印で、付いたファイルの作業ツリーの変更を git が見ないようにする) が
+// assume-unchanged (インデックスの項目に付けるフラグで、付いたファイルの作業ツリーの変更を git が見ないようにする) が
 // 付いたファイルの編集も、変更として扱う。
 //
 // kind は、コミット rev の file の項目の種類 (関数 entry の値)。インデックスか作業ツリーの種類がそれと違えば
@@ -591,11 +591,11 @@ func (g gitRunner) hasUncommittedChange(top, rev, kind, file string) (bool, erro
 // filter も「あり」とする。
 // 属性 ident (ファイルの中の「$Id$」を、取り出すときにブロブの SHA を入れた「$Id: … $」に展開し、記録する
 // ときに「$Id$」へ戻す仕組み) は、unset 以外の値なら「あり」とする (git が展開するのは値が set のときだけ)。
-// 「あり」なら呼び出し元は確かめずに unverifiable を返すので、迷う場合を「あり」として扱っても、
+// 「あり」なら呼び出し元は確認せずに unverifiable を返すので、迷う場合を「あり」として扱っても、
 // 誤った holds にはならない。
 func (g gitRunner) convertingAttribute(file string) (string, error) {
 	// オプション -a は、値のある属性 (unset を含む) だけを出し、属性が無い (unspecified) ものは出さない。
-	// filter だけを尋ねると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
+	// filter だけを問い合わせると、属性が無いことと、名前が unspecified のドライバを同じ出力で返す
 	out, _, err := g.run("check-attr", "-a", "-z", "--", file)
 	if err != nil {
 		return "", asRun(err)

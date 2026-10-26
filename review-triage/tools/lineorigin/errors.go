@@ -6,9 +6,9 @@ import (
 	"io"
 )
 
-// 結果を出せないときのエラーは 2 種類で、標準エラー出力の最初の行に付ける印で見分ける。
+// 結果を出せないときのエラーは 2 種類で、標準エラー出力の最初の行に付ける接頭辞で判別する。
 // 終了コードでも分けるが、コマンド go run で実行すると、道具の終了コードが 0 でなければ go run は
-// 1 を返すので、終了コードでは見分けられない。
+// 1 を返すので、終了コードでは判別できない。
 const (
 	inputErrorLabel = "input-error:"
 	runErrorLabel   = "run-error:"
@@ -41,7 +41,7 @@ func asRun(err error) error {
 	return runf("%v", err)
 }
 
-// report は err を印を付けて w に書き、終了コードを返す。どちらの種類でもないエラーは
+// report は err に接頭辞を付けて w に書き、終了コードを返す。どちらの種類でもないエラーは
 // 道具が想定していない失敗なので、道具を実行できないことにする。
 func report(w io.Writer, err error) int {
 	var ie *inputError

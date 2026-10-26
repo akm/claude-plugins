@@ -51,8 +51,8 @@ var judgmentFlowDecorations = map[string]bool{
 // ファイルの実在で決める — 追跡前の判定フローが検査の対象に入らず、0 件マッチのまま
 // 検査が成功する種類の欠陥 (B1 と同じ) を防ぐ。
 //
-// ファイルが無いときの扱いは origin で分かれる。origin は在り処を指定したものの
-// 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。在り処を指定する
+// ファイルが無いときの扱いは origin で分かれる。origin はパスを指定したものの
+// 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。パスを指定する
 // ことは「そこを検査せよ」という意思表示なので、不在は問題として報告する。指定が
 // 無いまま不在なのはスキル未導入の正常な状態で、何もしない。1 つの入口に 2 つの
 // 意味を担わせると、プラグイン側がファイルを移動・改名した時点で利用側の検査が
@@ -151,7 +151,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 }
 
 // sortedMapKeys はマップのキーを昇順で返す。出力の順序を入力の反復順に
-// 依存させないため (問題の並びが実行ごとに変わると差分が読めない)。
+// 依存させないため (問題の順序が実行ごとに変わると差分が読めない)。
 func sortedMapKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {

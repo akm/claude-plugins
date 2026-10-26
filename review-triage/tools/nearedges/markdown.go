@@ -76,7 +76,7 @@ func parseMarkdown(raw []string) *document {
 		}
 		d.tables = append(d.tables, block{Kind: "table", Start: start, End: i - 1})
 	}
-	// 箇条書き: 項目の行から始まり、項目・字下げされた続きの行・(次が項目か続きなら) 空行、で続く範囲。
+	// 箇条書き: 項目の行から始まり、項目・字下げされた継続行・(次が項目か継続行なら) 空行、で続く範囲。
 	for i := 1; i <= n; {
 		if d.inCode(i) || !listItemLine.MatchString(d.lines[i]) {
 			i++
@@ -88,12 +88,12 @@ func parseMarkdown(raw []string) *document {
 			l := d.lines[j]
 			switch {
 			case d.inCode(j):
-				j = n // フェンスは箇条書きの続きではない
+				j = n // フェンスは箇条書きの継続行ではない
 			case listItemLine.MatchString(l), isIndentedContinuation(l):
 				end = j
 				continue
 			case strings.TrimSpace(l) == "":
-				// 空行は、次の非空行が項目か続きなら箇条書きの中。
+				// 空行は、次の非空行が項目か継続行なら箇条書きの中。
 				k := j + 1
 				for k <= n && strings.TrimSpace(d.lines[k]) == "" {
 					k++
