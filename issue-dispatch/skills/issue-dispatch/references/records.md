@@ -144,5 +144,5 @@ GitHub への書き込み (割り当て・Status・フィールド・コメン�
 
 次のものは GitHub から導けるので記録に持たず、ターンのたびに導く (導く単位は項目の状態の文書 [flow.md](flow.md))。
 
-- 宣言 (Issue のコメント)、資源の使用 (ラベルと宣言)、自分が足した `blockedBy`、待機している小さな PR、Status の戻り先
+- 宣言 (Issue のコメント)、資源の使用 (ラベルと宣言)、自分が足した `blockedBy`、待機している小さな PR、Status の復帰先
 - Issue の URL・タイトル・本文、項目が属する作業のセッション (フィールド `Agent session ID`)

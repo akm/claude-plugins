@@ -35,8 +35,8 @@
 - マージされずに閉じた PR は、draft でなければ ready for review と読む (読んだ時点の `state`・`merged`・`draft` で判定するため)。
 - 今の割り当ての PR の候補が複数あるとき (閉じる参照の PR が今の割り当ての後に複数) は、作成が最新のものを使う。
 - 開いている Issue の正常な完了の判定は、close の時点で PR が draft だった後に ready になった場合を判別できない (PR の timeline を読まないため)。判別が要ると分かったら、`pr observe` に PR の出来事を足す。
-- `開始可` を書くとき (待機が解けて判定し直した後) は、Status を戻り先に戻してから合図を送り (計画の R20)、その `待機` のために足した blockedBy (`own_blockers`) は利用者の承認を得てから `blocked-by remove` で外す (閉じた blocker が残っても判定には影響しないので、承認を待機する間も作業は進む)。
-- 管理のセッションが書いた `Blocked` は、判定の要る最新の宣言への `待機` のうち、理由に `Issue` か `小さな PR` を含み、最新の `開始可` より後の最初のものがあり、Status が `Blocked` で、`Blocked` への Status の変化の時刻がその `待機` 以後のもの。変化が `待機` より前なら利用者が付けたもの (`manager_blocked` は偽)。戻り先 (`return_status`) は `In Progress`。
+- `開始可` を書くとき (待機が解けて判定し直した後) は、Status を復帰先 (`return_status`) に戻してから合図を送り (計画の R20)、その `待機` のために足した blockedBy (`own_blockers`) は利用者の承認を得てから `blocked-by remove` で外す (閉じた blocker が残っても判定には影響しないので、承認を待機する間も作業は進む)。
+- 管理のセッションが書いた `Blocked` は、判定の要る最新の宣言への `待機` のうち、理由に `Issue` か `小さな PR` を含み、最新の `開始可` より後の最初のものがあり、Status が `Blocked` で、`Blocked` への Status の変化の時刻がその `待機` 以後のもの。変化が `待機` より前なら利用者が付けたもの (`manager_blocked` は偽)。Status の復帰先 (`return_status`) は `In Progress`。
 - JSON のコードブロックが読めない宣言と、形が誤っている宣言 (検査は [issue-format.md](issue-format.md) の「宣言」の `declaration parse` と同じ。種類は付けない) も、判定の要る宣言にする (`declaration` は null で `error` に理由。管理のセッションが差し戻す)。
 
 ## 宣言の段階

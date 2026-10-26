@@ -1129,7 +1129,7 @@ def build_parser():
     p_wait.add_argument("--minutes", type=float, help="期限 (分。省略時は設定の wait_minutes)")
     p_wait.add_argument("--interval", type=float, help="読む間隔 (分。省略時は設定の poll_minutes)")
     p_wait.set_defaults(func=cmd_wait)
-    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・戻り・解放・依頼で終了する")
+    p_wassign = sub.add_parser("wait-assignment", help="作業のセッションの待機: 割り当て・再開・解放・依頼で終了する")
     p_wassign.add_argument("--project", required=True, help="owner/番号")
     p_wassign.add_argument("--session", help="自分のセッション ID (省略時は環境変数)")
     p_wassign.add_argument("--blocked", action="append", default=[], help="Blocked で待機している Issue (owner/repo#番号。繰り返せる)")

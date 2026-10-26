@@ -232,7 +232,7 @@ def _blocking_reasons(reasons):
 
 
 def declaration_stage(item, cs, asg, project_number):
-    """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・戻り先・自分が足した blockedBy・
+    """今の割り当ての判定の要る最新の宣言 (R20) と、その段階・判定の結果・管理のセッションが書いた `Blocked` か・Status の復帰先・自分が足した blockedBy・
     持っている資源・読めた宣言ごとの資源 (declared_resources: 投稿の順に comment_id・at・resources・returned (差し戻されたか)・go (`開始可` があるか)。
     判定が、宣言に無い予約の解放と更新の前に持っていた資源を、コメントを再度読み込まずに求めるため)。判定の要る宣言は、着手の宣言と宣言の更新のうち、`開始可` の後の資源を外すだけの更新 (resources-removed-only) を除いたもの。
     差し戻された宣言を修正した更新は、資源を外しただけでも判定の要る宣言。段階は、その宣言への最新の判定の結果 (`開始可` → go、

@@ -292,7 +292,7 @@ class DeclarationStageTest(unittest.TestCase):
                          ("waiting", [{"kind": "利用者の回答"}], False, None, []))
 
     def test_waiting_for_issue_with_blocked_status_after_wait_is_managers(self):
-        """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。戻り先は `In Progress`、自分が足した blockedBy は待機する Issue。"""
+        """理由に `Issue` を含む `待機` の後に `Blocked` になった Status は管理のセッションのもの。Status の復帰先は `In Progress`、自分が足した blockedBy は待機する Issue。"""
         d = stage_of(DECL1, _wait(400, [{"kind": "Issue", "issue": A2}], t(13), 500), status="Blocked", events=[_status_event("Blocked", t(14))])
         self.assertEqual((d["stage"], d["manager_blocked"], d["return_status"], d["own_blockers"], d["waiting_blockers"]), ("waiting", True, "In Progress", [A2], [A2]))
 
