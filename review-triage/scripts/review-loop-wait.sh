@@ -2,9 +2,9 @@
 # review-loop の作業側がバックグラウンドで走らせる待機スクリプト。
 #
 # 使い方:
-#   review-loop-wait.sh [--await-worker] <周回の置き場> <識別子> <分> [<停滞の秒数>]
+#   review-loop-wait.sh [--await-worker] <周回のディレクトリ> <識別子> <分> [<停滞の秒数>]
 #
-# 周回の置き場を 5 秒おきに見て、次のどれかが現れたら標準出力に 1 行を書いて終了コード 0 で終了する。
+# 周回のディレクトリを 5 秒おきに見て、次のどれかが現れたら標準出力に 1 行を書いて終了コード 0 で終了する。
 # 同じ周期に複数が当たれば、上にあるものを返す。
 #
 #   delivered <識別子>   完了の印 delivered-<識別子>.yaml が現れた。status が ok なら依頼文と結果、
@@ -24,14 +24,14 @@
 # 終了コード: 0 = 現れた / 124 = 期限切れ / それ以外 = 中断 (引数の誤りを含む。理由は標準エラー)。
 # 期限は起動時の date +%s に <分> を足した締切で測り、期限切れを宣言する前にもう 1 度確認する。
 # 一時名 (. で始まる名前) のファイルは見ない — 書き込み元は一時名に書いてから改名する。
-# 置き場の各ファイルの様式の正本は review-triage/skills/review-loop/references/loop-files.md。
+# 周回のディレクトリの各ファイルの様式の正本は review-triage/skills/review-loop/references/loop-files.md。
 #
 # macOS の /bin/bash (3.2) と Linux の bash、GNU と BSD の stat で動かす。
 
 set -u
 
 usage() {
-  echo "使い方: review-loop-wait.sh [--await-worker] <周回の置き場> <識別子> <分> [<停滞の秒数>]" >&2
+  echo "使い方: review-loop-wait.sh [--await-worker] <周回のディレクトリ> <識別子> <分> [<停滞の秒数>]" >&2
   exit 2
 }
 
@@ -46,7 +46,7 @@ rid=$2
 minutes=$3
 stale_seconds=${4:-30}
 
-[ -d "$dir" ] || { echo "周回の置き場がディレクトリとして存在しない: $dir" >&2; exit 2; }
+[ -d "$dir" ] || { echo "周回のディレクトリがディレクトリとして存在しない: $dir" >&2; exit 2; }
 [ -n "$rid" ] || { echo "識別子が空" >&2; exit 2; }
 echo "$minutes" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { echo "分は 0 以上の数で指定する: $minutes" >&2; exit 2; }
 echo "$stale_seconds" | grep -Eq '^[0-9]+$' || { echo "停滞の秒数は 0 以上の整数で指定する: $stale_seconds" >&2; exit 2; }

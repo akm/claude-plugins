@@ -38,14 +38,14 @@
 - ワーカーを停止するときは、その端末で Ctrl-C を押します (レビュー中の回は、失敗として完了の印が書かれます。レビューを始める前の準備 (複製を作るなど) の途中なら印は書かれず、起動し直したワーカーがその回を初めからやり直します)。
 ````
 
-雛形の箇条書きは、ワーカーの振る舞いのうち人間が知っておくことを、人間向けに言い直したもの。正本は [worker.md](worker.md) の「起動の仕方」の「要るもの」(macOS でだけ動くこと・端末のコマンド `claude` の認証)・「回の処理」(複製の中でレビューすることと、作業ツリーを変えるとレビュー不成立になること)・「終了の仕方」(周回の置き場にファイル `end` が現れたときと、Ctrl-C で停止したときの扱い) にある。**ワーカーの振る舞いを変えて、箇条書きに書いた事実が変わるときは、正本を直してから雛形を直す。**
+雛形の箇条書きは、ワーカーの振る舞いのうち人間が知っておくことを、人間向けに言い直したもの。正本は [worker.md](worker.md) の「起動の仕方」の「要るもの」(macOS でだけ動くこと・端末のコマンド `claude` の認証)・「回の処理」(複製の中でレビューすることと、作業ツリーを変えるとレビュー不成立になること)・「終了の仕方」(周回のディレクトリにファイル `end` が現れたときと、Ctrl-C で停止したときの扱い) にある。**ワーカーの振る舞いを変えて、箇条書きに書いた事実が変わるときは、正本を直してから雛形を直す。**
 
 ## 起動コマンドの組み立て
 
 `{{worker_command}}` は、`loop.yaml` の値で次の順に 1 行で組み立てる。
 
 ```
-/bin/bash "<ワーカーのスクリプトの絶対パス>" "<置き場の絶対パス>" --model "<worker.model>" --effort <worker.effort> --permission-mode <worker.permission_mode> [--allowed-tools '<ツール>']... [--sandbox-allow-write '<パス>']... [--sandbox-allowed-domain '<ドメイン>']... --idle-minutes <worker.idle_minutes> --review-timeout-minutes <worker.review_timeout_minutes>
+/bin/bash "<ワーカーのスクリプトの絶対パス>" "<周回のディレクトリの絶対パス>" --model "<worker.model>" --effort <worker.effort> --permission-mode <worker.permission_mode> [--allowed-tools '<ツール>']... [--sandbox-allow-write '<パス>']... [--sandbox-allowed-domain '<ドメイン>']... --idle-minutes <worker.idle_minutes> --review-timeout-minutes <worker.review_timeout_minutes>
 ```
 
 - **`bash` ではなく `/bin/bash` で起動する。** `bash` と書くと、環境変数 `PATH` で先に見つかる bash (Homebrew の 5.2 など) で動く。理由の正本は [worker.md](worker.md) の「起動の仕方」の「要るもの」。

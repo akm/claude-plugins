@@ -1,11 +1,11 @@
 #!/bin/bash
-# review-loop のワーカー。人間が端末で起動し、周回の置き場に現れた依頼文ごとに、TMPDIR の下に新しく作ったディレクトリ
+# review-loop のワーカー。人間が端末で起動し、周回のディレクトリに現れた依頼文ごとに、TMPDIR の下に新しく作ったディレクトリ
 # (準備のディレクトリ) に複製 (作業側のリポジトリを複製して、依頼の head を取り出したもの) と依頼文の写しを作り、
 # 回の作業場所のパスに改名してから、複製の中で claude -p を走らせる。
-# 結果を確認してから置き場に複写し、作業場所を消して、完了の印を書く。
+# 結果を確認してから周回のディレクトリに複写し、作業場所を消して、完了の印を書く。
 #
 # 使い方:
-#   review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --effort <値>
+#   review-loop-worker.sh <周回のディレクトリの絶対パス> --model <指定> --effort <値>
 #       [--permission-mode <値>] [--allowed-tools <ツール>]...
 #       [--sandbox-allow-write <パス>]... [--sandbox-allowed-domain <ドメイン>]...
 #       [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>...]
@@ -20,7 +20,7 @@
 #             128 + シグナル番号 = 割り込み (INT / TERM / HUP)
 #
 # 振る舞いの正本は review-triage/skills/review-loop/references/worker.md (起動時の確認・回の処理・
-# 権限の既定・ログの読み方)、置き場のファイルの様式の正本は同じディレクトリの loop-files.md。
+# 権限の既定・ログの読み方)、周回のディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
 # プラグインの設定ファイル (config.json) は読まない — 値はすべて引数で受け、作業側が案内のコマンドに埋める。
 # Claude Code の利用者の設定 (環境変数 CLAUDE_CONFIG_DIR があればその下、無ければ ~/.claude の settings.json) は
 # 読むが、使うのは起動時の確認と表示だけ。
@@ -55,7 +55,7 @@ WORKER_PID=$$
 POLL_SECONDS=5              # 依頼文を探す周期と、worker.yaml の更新時刻を進める周期
 OTHER_WORKER_FRESH_SECONDS=30  # 起動時の確認で、他のワーカーが動いていると判定する更新時刻の新しさ
 STOP_GRACE_SECONDS=5        # レビュアの実行や作業場所に残ったプロセスを TERM で停止してから KILL を送るまでの猶予
-RESULT_MAX_BYTES=1048576    # 置き場に複写する結果の大きさの上限 (1 MiB)。正本は worker.md の「回の処理」の手順 10
+RESULT_MAX_BYTES=1048576    # 周回のディレクトリに複写する結果の大きさの上限 (1 MiB)。正本は worker.md の「回の処理」の手順 10
 
 # レビュアの実行に許すツールの既定の一覧 (--allowed-tools を 1 回でも指定すれば置き換わる)。
 # 正本は worker.md の「レビュアの実行の権限」
@@ -79,7 +79,7 @@ DEFAULT_ALLOWED_TOOLS=(
 
 usage() {
   cat >&2 <<'USAGE'
-使い方: review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --effort <値>
+使い方: review-loop-worker.sh <周回のディレクトリの絶対パス> --model <指定> --effort <値>
     [--permission-mode <値>] [--allowed-tools <ツール>]...
     [--sandbox-allow-write <パス>]... [--sandbox-allowed-domain <ドメイン>]...
     [--idle-minutes <分>] [--review-timeout-minutes <分>] [-- <claude に渡す追加の引数>...]
@@ -134,9 +134,9 @@ done
 
 case "$LOOP_DIR" in
   /*) ;;
-  *) die_usage "周回の置き場は絶対パスで指定する: $LOOP_DIR" ;;
+  *) die_usage "周回のディレクトリは絶対パスで指定する: $LOOP_DIR" ;;
 esac
-[ -d "$LOOP_DIR" ] || die_usage "周回の置き場がディレクトリとして存在しない: $LOOP_DIR"
+[ -d "$LOOP_DIR" ] || die_usage "周回のディレクトリがディレクトリとして存在しない: $LOOP_DIR"
 [ -n "$MODEL" ] || die_usage "--model は必須 (どのモデルでレビューするかは人間が決める)"
 case "$EFFORT" in
   low|medium|high|xhigh|max) ;;
@@ -369,7 +369,7 @@ remove_workspace() {
   return 0
 }
 
-# ディレクトリ $1 の下に残っている準備のディレクトリ (名前が review-loop-prep-<$2>.<6 文字>。$2 は、周回 id と、周回の置き場の
+# ディレクトリ $1 の下に残っている準備のディレクトリ (名前が review-loop-prep-<$2>.<6 文字>。$2 は、周回 id と、周回のディレクトリの
 # 実体パスのハッシュを - で繋いだもの) を片付ける (起動時の確認の 2 と、回の処理の手順 5・割り込み)。準備のディレクトリは
 # worker.yaml に記録しないので、名前の形で見つける。シンボリックリンクでないディレクトリだけを、中を cwd にしているプロセスを
 # 停止してから消す (作業場所と同じ手順)。それ以外のものは、パスを標準エラーに出して残す
@@ -388,7 +388,7 @@ discard_prep_dirs() {
 
 # 起動時の確認の 2 (掃除)。前の起動が残した作業場所と準備のディレクトリの中を cwd にしているプロセスを停止し、それらを消す。
 # 作業場所として片付けるのは、前の worker.yaml のキー workspace に記録されたパス (無いか空なら、TMPDIR の実体の下の決まったパス)
-# だけで、パスの名前が作業場所の名前の形 (review-loop-<周回 id>-<周回の置き場の実体パスのハッシュ>) に合い、シンボリックリンクでない
+# だけで、パスの名前が作業場所の名前の形 (review-loop-<周回 id>-<周回のディレクトリの実体パスのハッシュ>) に合い、シンボリックリンクでない
 # ディレクトリのときだけ、停止して消す — worker.yaml に書かれた値だけを根拠に、ワーカーが作ったのではないディレクトリの中の
 # プロセスを停止したり、ディレクトリを消したりしないため。準備のディレクトリは worker.yaml に記録しないので、作業場所と同じディレクトリの
 # 下から名前の形で見つける (関数 discard_prep_dirs)。プロセスは cwd で見つける (プロセスグループでは見つけられず、名前 (claude) は
@@ -447,7 +447,7 @@ START_HEAD=""
 STARTED=""
 ROUNDS_SERVED=0
 SERVED_LINES=()
-IGNORED_REQUESTS=" "   # レビュアの実行の間に置き場に現れた依頼文 (この起動の間は処理しない)
+IGNORED_REQUESTS=" "   # レビュアの実行の間に周回のディレクトリに現れた依頼文 (この起動の間は処理しない)
 HEARTBEAT_PID=""
 WATCHDOG_PID=""
 SLEEP_PID=""
@@ -463,7 +463,7 @@ RELAY_CODE=""          # 親が最初に受けた割り込みの終了コード
 RELAY_WARNED=""        # 割り込みを記録するファイルを書けなかったことを、標準エラーに知らせたか (関数 write_interrupt_file)
 SELF_SIG=""            # 子が自分で最初に受けた TERM・HUP の名前 (プロセスグループに届いたもの。関数 body_main の trap が書く)
 WS=""                  # 回の作業場所のパス (起動時の確認が通った後に決める)
-WS_KEY=""              # 作業場所と準備のディレクトリの名前に共通する部分 (<周回 id>-<周回の置き場の実体パスのハッシュ>)
+WS_KEY=""              # 作業場所と準備のディレクトリの名前に共通する部分 (<周回 id>-<周回のディレクトリの実体パスのハッシュ>)
 # 回のどの部分を行っているか。割り込みを受けたときの扱いを決める (関数 on_signal)。
 #   "" = 依頼文を探している / prep = 準備 (手順 2〜8 と、準備のディレクトリの改名) / review = レビュアの実行 (手順 9) /
 #   finish = 回の終了処理 (手順 10)
@@ -546,7 +546,7 @@ if [ -f "$LOOP_DIR/worker.yaml" ]; then
     idle|reviewing)
       if [ -n "$other_mtime" ] && [ $(( $(date +%s) - other_mtime )) -le "$OTHER_WORKER_FRESH_SECONDS" ] \
         && echo "$other_pid" | grep -Eq '^[0-9]+$' && kill -0 "$other_pid" 2>/dev/null; then
-        echo "review-loop-worker: この置き場では別のワーカーが動いている (PID ${other_pid}、状態 $other_state)。" >&2
+        echo "review-loop-worker: このディレクトリでは別のワーカーが動いている (PID ${other_pid}、状態 $other_state)。" >&2
         echo "  そのワーカーの端末で Ctrl-C を押すか、kill -TERM $other_pid で停止してから起動し直す。" >&2
         exit 2
       fi ;;
@@ -606,18 +606,18 @@ if is_within "$CWD_REAL" "$TMP_REAL"; then
   unavailable "作業側が TMPDIR の実体の下にある (作業側: ${CWD_REAL}、TMPDIR の実体: ${TMP_REAL})。書き込みを許す作業場所と、守る作業側が重なる"
 fi
 
-# 10. 作業側と周回の置き場が、サンドボックスの一時ディレクトリの外にあるか。サンドボックスの中の Bash はそこに既定で書けるので、
+# 10. 作業側と周回のディレクトリが、サンドボックスの一時ディレクトリの外にあるか。サンドボックスの中の Bash はそこに既定で書けるので、
 # その下にあると守れない
 SANDBOX_TMP="/private/tmp/claude-$(id -u)"
-LOOP_REAL=$(real_dir "$LOOP_DIR") || unavailable "周回の置き場の実体パスを求められない: $LOOP_DIR"
+LOOP_REAL=$(real_dir "$LOOP_DIR") || unavailable "周回のディレクトリの実体パスを求められない: $LOOP_DIR"
 if is_within "$CWD_REAL" "$SANDBOX_TMP"; then
   unavailable "作業側がサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (作業側: ${CWD_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
 fi
 if is_within "$LOOP_REAL" "$SANDBOX_TMP"; then
-  unavailable "周回の置き場がサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (周回の置き場: ${LOOP_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
+  unavailable "周回のディレクトリがサンドボックスの一時ディレクトリ ${SANDBOX_TMP} の下にある (周回のディレクトリ: ${LOOP_REAL})。サンドボックスの中の Bash が既定で書ける場所なので、守れない"
 fi
 
-# 11. 作業側・周回の置き場・TMPDIR の実体パスを、許可と拒否の規則に書けるか (Claude Code は、これらの文字を含むパスの規則を正しく扱えない)
+# 11. 作業側・周回のディレクトリ・TMPDIR の実体パスを、許可と拒否の規則に書けるか (Claude Code は、これらの文字を含むパスの規則を正しく扱えない)
 check_rule_chars() {
   local label=$1 path=$2 c
   for c in '(' ')' '[' ']' '{' '}' '*' '?' '!' '#'; do
@@ -627,11 +627,11 @@ check_rule_chars() {
   done
 }
 check_rule_chars 作業側 "$CWD_REAL"
-check_rule_chars 周回の置き場 "$LOOP_REAL"
+check_rule_chars 周回のディレクトリ "$LOOP_REAL"
 check_rule_chars TMPDIR "$TMP_REAL"
 
-# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・周回の置き場・TMPDIR の実体) と同じでも、
-# その祖先でもなく、作業側と周回の置き場の下の場所でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、
+# 12. 書き込みを許す場所 (--sandbox-allow-write) が、守る場所 (ホーム・作業側・周回のディレクトリ・TMPDIR の実体) と同じでも、
+# その祖先でもなく、作業側と周回のディレクトリの下の場所でもないか。TMPDIR の実体を守るのは、準備のディレクトリ (回の処理の手順 5) を、
 # 前の回のレビュアの実行が残したプロセスが書けない場所に作るため。先頭の ~ は引数を読んだときにホームに展開してある
 for v in ${SANDBOX_ALLOW_WRITE[@]+"${SANDBOX_ALLOW_WRITE[@]}"}; do
   case "$v" in
@@ -676,7 +676,7 @@ done
 
 # 14. 利用者の設定が、コマンドをサンドボックスの外で実行させず、Unix ソケットへの接続を許さないか
 # (sandbox.excludedCommands と sandbox.network.allowUnixSockets)。レビュー対象のブランチの設定は、回ごとに複製で確認する。
-# 利用者の設定の置き場は、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
+# 利用者の設定のパスは、Claude Code 本体と同じ決め方にする: 環境変数 CLAUDE_CONFIG_DIR があればその下、
 # 無ければ $HOME/.claude。CLAUDE_CONFIG_DIR が相対パスだと、レビュアの実行 (複製の中の cwd) からの解決先が
 # ワーカーの cwd (作業側) からの解決先と一致せず、ワーカーが実際に使われる設定を確認できない
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
@@ -708,7 +708,7 @@ IDLE_SECONDS=$(minutes_to_seconds "$IDLE_MINUTES")
 REVIEW_TIMEOUT_SECONDS=$(minutes_to_seconds "$REVIEW_TIMEOUT_MINUTES")
 
 # 回の作業場所 (worker.md の「回の処理」の手順 5)。周回の間は同じパスを使い回し、回ごとに作り直す。
-# 名前は、周回 id (置き場のディレクトリ名) と、周回の置き場の実体パスから作るハッシュ。TMP_REAL は実体パスなので、
+# 名前は、周回 id (周回のディレクトリの名前) と、周回のディレクトリの実体パスから作るハッシュ。TMP_REAL は実体パスなので、
 # 作業場所のパスもそのまま実体パスになる (シンボリックリンクに置き換えられていないかを、このパスと比べて確認する)。
 # 準備のディレクトリの名前は review-loop-prep-<WS_KEY>.<mktemp が決める 6 文字> で、作業場所のパスの文字列で始まらない
 # (サンドボックスが書き込みの許可をパスの接頭辞で判定しても、作業場所への許可が準備のディレクトリに及ばないように)
@@ -1039,9 +1039,9 @@ check_interrupt() {
 
 # ---- 回の処理 (正本は worker.md の「回の処理」) ----
 
-# 置き場のファイルの一覧と更新時刻。ワーカーが回の間に書くもの (worker.yaml・その回のログ) と、
+# 周回のディレクトリのファイルの一覧と更新時刻。ワーカーが回の間に書くもの (worker.yaml・その回のログ) と、
 # 作業側が再開や停止のときにレビュー中でも書き換える loop.yaml は除く。その回の結果は除かない — 結果はワーカーが
-# 比べた後に複写するので、比べる時点で置き場の結果が変わっていれば、レビュアの実行が置き場に書いたことになる
+# 比べた後に複写するので、比べる時点で周回のディレクトリの結果が変わっていれば、レビュアの実行が周回のディレクトリに書いたことになる
 snapshot() {
   find "$LOOP_DIR" -mindepth 1 -maxdepth 1 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
     n=${p##*/}
@@ -1272,7 +1272,7 @@ result_file_problem() {
   run_py result_file_problem "$1" "$WS" "$RESULT_MAX_BYTES"
 }
 
-# 手順 10 の 4。作業場所の結果 ($1) を、置き場の出力先 ($2) に複写する。大きさの上限は RESULT_MAX_BYTES。
+# 手順 10 の 4。作業場所の結果 ($1) を、周回のディレクトリの出力先 ($2) に複写する。大きさの上限は RESULT_MAX_BYTES。
 # 説明の正本は review-loop-worker/copy_result.py
 copy_result() {
   run_py copy_result "$1" "$2" "$RESULT_MAX_BYTES"
@@ -1420,7 +1420,7 @@ EOF
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | comma_join)
   if [ -z "$dirty" ]; then clean_after=true; else clean_after=false; errors+=("tree not clean ($dirty)"); fi
 
-  # 置き場。依頼文を受け取ったときに控えた一覧と比べる (結果の複写より前に比べる)
+  # 周回のディレクトリ。依頼文を受け取ったときに控えた一覧と比べる (結果の複写より前に比べる)
   after=$(snapshot)
   changed=$( { echo "$SNAPSHOT_BEFORE"; echo "$after"; } | sed '/^$/d' | LC_ALL=C sort | uniq -u | sed 's/ [^ ]*$//' | LC_ALL=C sort -u | comma_join)
   if [ -n "$changed" ]; then
@@ -1434,7 +1434,7 @@ EOF
   fi
 
   # 4. 結果を複写する。failed の回でも、結果のファイルの条件を満たせば複写する (RA1 の報告から人間が結果を読めるように)。
-  # ok の印は、置き場の出力先に結果が通常のファイルとして在ることを copy_result が確認した後にだけ書ける
+  # ok の印は、周回のディレクトリの出力先に結果が通常のファイルとして在ることを copy_result が確認した後にだけ書ける
   if [ "$copyable" = 1 ]; then
     if ! problem=$(copy_result "$ws_result" "$dest"); then
       errors+=("result copy failed (${problem:-理由が分からない})")
@@ -1494,7 +1494,7 @@ run_reviewer() {
   fi
   # 作業場所の結果ファイル 1 つへの書き込みの許可。// の後にルートからのパスを続ける (Claude Code の規則で絶対パスを表す書き方)
   tools+=("Edit(/$WS/review-$CURRENT_RID.yaml)")
-  # 拒否の規則。ホーム・作業側・周回の置き場への書き込みと、複製の中の Claude Code と git が後で読んで実行するものの書き換えと、
+  # 拒否の規則。ホーム・作業側・周回のディレクトリへの書き込みと、複製の中の Claude Code と git が後で読んで実行するものの書き換えと、
   # git push を防ぐ。WebFetch・WebSearch とネットワークのコマンドは拒否しない (接続できるかはサンドボックスの接続先の一覧で決まる)
   denied=(
     'AskUserQuestion'
@@ -1567,7 +1567,7 @@ process_request() {
   PREP_ERROR=""
   PREP_DIR=""
   PREP_OUT=""
-  # 手順 2。上限の計測を始め、worker.yaml を reviewing にして識別子と作業場所のパスを書き、置き場のファイルの一覧と更新時刻を
+  # 手順 2。上限の計測を始め、worker.yaml を reviewing にして識別子と作業場所のパスを書き、周回のディレクトリのファイルの一覧と更新時刻を
   # 控える (回の終了処理で比べる。準備の途中に現れた end も検出するため、ここで控える)
   start_watchdog "$REQ_DEADLINE"
   write_worker_yaml reviewing "$CURRENT_RID"
@@ -1677,7 +1677,7 @@ body_main() {
 
   write_worker_yaml idle ""
   start_heartbeat
-  log "ワーカーを起動した: 版 $WORKER_VERSION / 置き場 $LOOP_DIR / モデル $MODEL / effort $EFFORT / 権限モード $PERMISSION_MODE"
+  log "ワーカーを起動した: 版 $WORKER_VERSION / 周回のディレクトリ $LOOP_DIR / モデル $MODEL / effort $EFFORT / 権限モード $PERMISSION_MODE"
 
   idle_since=$(date +%s)
   while :; do

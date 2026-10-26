@@ -8,8 +8,8 @@
 review-loop [--model <指定>] [--effort <値>] [--review <スキル名>] [--review-args "<引数>"]
             [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <段>[=<値>]]...
             [--wait-minutes <分>] [--worker-wait-minutes <分>] [--full-review] [--base <ブランチ>]
-review-loop --resume [<置き場>] [--max <回数>] [--full-review] [--base <ブランチ>]
-review-loop --end [<置き場>]
+review-loop --resume [<周回のディレクトリ>] [--max <回数>] [--full-review] [--base <ブランチ>]
+review-loop --end [<周回のディレクトリ>]
 ```
 
 | 引数 | 対応する設定のキー | 例 |
@@ -29,10 +29,10 @@ review-loop --end [<置き場>]
 
 各キーの意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節。`--model` はワーカーの `--model` にそのまま渡す指定、`--effort` はワーカーの `--effort` で、どちらも周回の条件として `loop.yaml` に残る (語の区別は下の「モデルと effort を指す語」)。
 
-- **`--resume [<置き場>]`**: 停止した (または前のセッションが報告せずに終了した) 周回を続ける。置き場は周回の置き場のパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
-- **`--end [<置き場>]`**: 周回を終える。置き場の省略は `--resume` と同じ。
+- **`--resume [<周回のディレクトリ>]`**: 停止した (または前のセッションが報告せずに終了した) 周回を続ける。値は周回のディレクトリのパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でない周回 (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
+- **`--end [<周回のディレクトリ>]`**: 周回を終える。周回のディレクトリの省略は `--resume` と同じ。
 
-設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回の置き場の親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`・`review_loop.sandbox_allow_write` (サンドボックスの中の Bash に書き込みを許す場所)・`review_loop.sandbox_allowed_domains` (同じく接続を許すドメイン)。
+設定だけで決めるもの (引数を持たない): `review_loop.dir` (周回のディレクトリの親)・`review_loop.worker_idle_minutes`・`review_loop.worker_stale_seconds`・`review_loop.review_timeout_minutes`・`review_loop.permission_mode`・`review_loop.allowed_tools`・`review_loop.sandbox_allow_write` (サンドボックスの中の Bash に書き込みを許す場所)・`review_loop.sandbox_allowed_domains` (同じく接続を許すドメイン)。
 
 **`--full-review` と `--base` は設定のキーを持たず、開始時の値を `loop.yaml` の `review.full_review` (真偽値)・`review.base` (ブランチ名) に書く。** どちらもブランチや周回ごとに変わる値で、前例 (`--stage` の値を `loop.stages` に書く) に合わせる。
 
