@@ -1228,7 +1228,7 @@ clone_stage() {
 make_clone() {
   local sha=$1 subs
   clone_stage clone clone -q --shared --no-checkout -- "$CWD_REAL" tree || return 1
-  # remote の設定を消し、git push origin の行き先 (作業側のリポジトリ) を無くす
+  # remote の設定を消し、git push origin の push 先 (作業側のリポジトリ) を無くす
   clone_stage "remove remote" -C tree remote remove origin || return 1
   # --no-checkout の直後の HEAD は作業側と同じブランチを指すので、そのブランチも更新できるように --update-head-ok を付ける
   clone_stage "fetch refs" -C tree -c gc.auto=0 -c maintenance.auto=false fetch -q --update-head-ok --no-tags \

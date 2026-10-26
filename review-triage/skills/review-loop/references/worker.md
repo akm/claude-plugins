@@ -135,7 +135,7 @@ review-loop-worker.sh <周回の置き場の絶対パス> --model <指定> --eff
 6. **複製を作る**: 作業側のリポジトリを `git clone --shared --no-checkout` で準備のディレクトリの `tree/` (改名の後は作業場所の `tree/`) に複製し、remote の設定を消し、作業側のブランチ・リモート追跡ブランチ・タグ (`refs/heads/*`・`refs/remotes/*`・`refs/tags/*`) を取り込んでから、依頼の `head` (作業側で解決した完全な SHA) を detached HEAD (ブランチではなくコミットを直接指す状態) でチェックアウトする。
    - `git worktree` で作らないのは、その管理情報が作業側のリポジトリの中 (多くはホームの下) に置かれ、サンドボックスの中の git の書き込み (インデックスの更新など) が止まるため (実測)。`--shared` の複製は git のオブジェクトを作業側と共有するので、増えるのは作業ツリーを展開した分だけ。
    - ブランチ・リモート追跡ブランチ・タグを取り込むのは、全量の回 (scope が `full` で、ブランチの全体をレビューする回) の `base` が、ブランチ名 (0.14.0 以前の `review-request` が埋めた `main` など) でも、派生元のブランチとの merge-base の SHA でも、複製の中で作業側と同じコミットに解決できるようにするため。
-   - remote の設定を消すのは、`git push origin` の行き先 (作業側のリポジトリ) を無くすため。
+   - remote の設定を消すのは、`git push origin` の push 先 (作業側のリポジトリ) を無くすため。
    - 複製に submodule の項目 (モード 160000) があれば、複製の作成の失敗とする。Git LFS・partial clone・shallow clone のリポジトリもサポートしない (複製の作成かチェックアウトが失敗すれば、同じく複製の作成の失敗になる)。
    - git が追跡しないファイル (依存のディレクトリ・`.env`・`.claude/settings.local.json` など) は複製に無い。そのため確認が失敗することがあり、その回はレビュアの報告か RA1 で分かる。
 7. **複製の設定を確かめる**: 複製の `.claude/settings.json` と `.claude/settings.local.json` のどちらかに、空でない `sandbox.excludedCommands` か `sandbox.network.allowUnixSockets` があるか、`sandbox.network.allowLocalBinding` が偽でない値 (真偽値でない値を含む) を持つか、JSON として読めなければ通らない。`excludedCommands` と `allowUnixSockets` で回を止める理由は起動時の確認の 14 と同じ。`allowLocalBinding` で回を止める理由は、下の「このワーカーが検出しないもの」の、利用者の設定の `allowLocalBinding` の項目。
