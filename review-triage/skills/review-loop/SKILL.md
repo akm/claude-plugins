@@ -76,7 +76,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 - **このスキルは判断も修正もしない。** `review-request`・`review-triage`・`review-triage-fix` を、回ごとに Skill ツールで呼ぶだけ ([round.md](references/round.md) の「呼ぶスキル」)。
 - **待機を起動したターンでは、それ以外のツールを呼ばない。** 通知で次のターンが始まる (理由の正本は [reentry.md](references/reentry.md) の「待機」)。
 - **周回が条件を勝手に変えない。** 条件は `loop.yaml` にある (再開のときの規則の正本は [arguments.md](references/arguments.md) の「様式」)。
-- **置き場のファイルは、書く側だけが書く** ([loop-files.md](references/loop-files.md) の「ファイルの一覧」)。作業側はワーカーのファイル (`worker.yaml`・完了の印・ログ) にも、レビュアの実行の結果にも書き込まない。
+- **置き場のファイルは、それぞれの書き込み元だけが書く** ([loop-files.md](references/loop-files.md) の「ファイルの一覧」)。作業側はワーカーのファイル (`worker.yaml`・完了の印・ログ) にも、レビュアの実行の結果にも書き込まない。
 - **置き場を消さない。** 後で経路どうしの収束を比べる材料になる。
 - **人間に返した状態を越えて進まない。** 選択待ち (S2) と停止 (RA1〜RA3) は、人間の判断を求めて止まった結果である。
 
