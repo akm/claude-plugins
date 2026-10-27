@@ -557,10 +557,10 @@ reason = "日本語の「周回」はコースや軌道を回ること。処理�
 decided_in = "https://github.com/akm/claude-plugins/issues/87"
 
 [[terms]]
-pattern = "/(?<![一-龯々])回 (?:\\d|N)/"
+pattern = "/(?<![一-龯々\\d])(?<![\\dN] )回 (?:\\d|N)/"
 verdict = "avoid"
 replacements = ["1 回目", "N+1 回目以降"]
-reason = "英語 (Round 1) の語順で、名詞の後に番号を置いている。日本語では「1 回目」「N+1 回目以降」と書く"
+reason = "英語 (Round 1) の語順で、名詞の後に番号を置いている。日本語では「1 回目」「N+1 回目以降」と書く。前が漢字の「今回 1 つ」「前回 2 件」と、数の後に置いた「回」(「1 回 3 件まで」「第 1 回 2026 年」) は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/87"
 
 # ---- 許容する語 ----
