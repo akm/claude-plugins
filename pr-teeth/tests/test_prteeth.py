@@ -90,7 +90,7 @@ class TestLanguageResolution(unittest.TestCase):
         self.assertEqual(config.resolve_language("o/r", cfg, cli_lang="fr"), "fr")
 
     def test_scheduled_run_uses_files_only(self):
-        # 第14節: 無人実行では cli_lang が無く、2〜4段だけで決まる。
+        # 第14節: 無人実行では cli_lang が無く、2〜4 番目だけで決まる。
         cfg = {"language": "en", "repos": {"o/r": {"language": "ko"}}}
         self.assertEqual(config.resolve_language("o/r", cfg, None), "ko")
 
@@ -663,7 +663,7 @@ class TestAuth(unittest.TestCase):
     """トークンの探索順序（第6節）。
 
     `gh auth token` を実際に呼ぶと実行環境の認証状態に左右されるため、
-    その段だけ差し替えて順序を検証する。
+    その候補だけ差し替えて順序を検証する。
     """
 
     def setUp(self):
