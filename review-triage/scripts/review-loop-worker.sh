@@ -491,7 +491,7 @@ MARKER_LINE=""         # 最後に書いた完了のフラグファイルの、�
 PREP_DIR=""            # 回の準備のディレクトリのパス (手順 5 で作り、手順 8 の後に作業場所のパスに改名する)
 PREP_OUT=""            # 準備のコマンドの標準出力と標準エラーを書くファイル (準備のディレクトリの中。改名の前に消す)
 PREP_TIMEOUT=0         # 準備のコマンドを、上限を越えたために停止したか起動しなかったら 1
-PREP_ERROR=""          # 準備の段が通らなかったときに、完了のフラグファイルの error に書く文字列
+PREP_ERROR=""          # 準備の処理が通らなかったときに、完了のフラグファイルの error に書く文字列
 
 # worker.yaml を書く。キー workspace には、reviewing のときだけ回の作業場所のパスを書く (起動し直したワーカーが片付けるのに使う)
 write_worker_yaml() {
@@ -1172,14 +1172,14 @@ rename_prep_dir() {
   return 1
 }
 
-# 手順 6 の段の失敗を、完了のフラグファイルの error に書く文字列にする。$1 は段の名前、$2 は git の出力
+# 手順 6 の処理の失敗を、完了のフラグファイルの error に書く文字列にする。$1 は処理の名前、$2 は git の出力
 clone_failed() {
   local detail
   detail=$(last_line "$2")
   echo "clone failed ($1${detail:+: $detail})"
 }
 
-# 準備のコマンド ($2 以降) を、準備のディレクトリを cwd にして、専用のプロセスグループでバックグラウンドに起動して、終了まで待機する ($1 は出力に書く段の名前)。
+# 準備のコマンド ($2 以降) を、準備のディレクトリを cwd にして、専用のプロセスグループでバックグラウンドに起動して、終了まで待機する ($1 は出力に書く処理の名前)。
 # 標準出力と標準エラーは PREP_OUT に書く。レビュアの実行と同じ起動の仕方にするのは、上限を越えたときと割り込みを受けたときに、
 # プロセスグループごと停止されるようにするため (フォアグラウンドで待機すると、bash は trap をコマンドが終了するまで遅らせる)。
 # 起動する前か待機する間に上限を越えたら、プロセスグループを停止し、PREP_TIMEOUT を 1 にして 1 を返す。そうでなければコマンドの終了コードを返す
@@ -1187,7 +1187,7 @@ run_prep() {
   local stage=$1
   shift
   if timed_out; then
-    log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、準備の段 ($stage) を始めない"
+    log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、準備の処理 ($stage) を始めない"
     PREP_TIMEOUT=1
     return 1
   fi
@@ -1199,7 +1199,7 @@ run_prep() {
   PREP_PID=$!
   until wait_once "$PREP_PID"; do
     if timed_out; then
-      log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、準備の段 ($stage) のプロセスグループを停止する"
+      log "上限 ($REVIEW_TIMEOUT_MINUTES 分) を越えたので、準備の処理 ($stage) のプロセスグループを停止する"
       stop_group "$PREP_PID"
       PREP_PID=""
       PREP_TIMEOUT=1
@@ -1210,7 +1210,7 @@ run_prep() {
   return "$WAITED_RC"
 }
 
-# 手順 6 の段を 1 つ行う。$1 は段の名前、残りは git の引数。通らなければ 1 を返し、上限を越えたためでなければ、
+# 手順 6 の処理を 1 つ行う。$1 は処理の名前、残りは git の引数。通らなければ 1 を返し、上限を越えたためでなければ、
 # 完了のフラグファイルの error に書く文字列を PREP_ERROR に入れる
 clone_stage() {
   local stage=$1
@@ -1222,7 +1222,7 @@ clone_stage() {
 
 # 手順 6。元のリポジトリを準備のディレクトリの tree/ (改名の後は作業場所の tree/) に複製し、依頼の head ($1。元の作業ツリーで解決した
 # 完全な SHA) を detached HEAD で取り出す。
-# 段は、複製 (clone)・remote の設定の削除 (remove remote)・ブランチとリモート追跡ブランチとタグの取り込み (fetch refs)・
+# 処理は、複製 (clone)・remote の設定の削除 (remove remote)・ブランチとリモート追跡ブランチとタグの取り込み (fetch refs)・
 # チェックアウト (checkout)・submodule の項目の検査 (submodule) の順で、どれも準備のコマンドとして起動する (関数 run_prep)。
 # 通らなければ 1 を返す (理由は関数 clone_stage のとおり PREP_TIMEOUT か PREP_ERROR に入る)
 make_clone() {
@@ -1307,7 +1307,7 @@ fail_timeout_in_preparation() {
   fail_prepared timeout
 }
 
-# 手順 6 か 8 が通らなかった回。上限を越えたためなら timeout を、そうでなければ段の失敗 (PREP_ERROR。無ければ $1) を error に書く
+# 手順 6 か 8 が通らなかった回。上限を越えたためなら timeout を、そうでなければ処理の失敗 (PREP_ERROR。無ければ $1) を error に書く
 fail_preparation_stage() {
   if [ "$PREP_TIMEOUT" = 1 ]; then
     fail_timeout_in_preparation
@@ -1600,8 +1600,8 @@ process_request() {
   dirty=$(git -C "$CWD_REAL" status --porcelain 2>/dev/null | cut -c4- | comma_join)
   if [ -n "$dirty" ]; then fail_without_run "tree not clean ($dirty)"; return; fi
 
-  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各段の前に確認する
-  # (手順 6 の各段と手順 8 では、関数 run_prep が起動する前と待機する間に確認する)。手順 6〜8 は準備のディレクトリの中で行う
+  # 手順 5〜8。準備のどれかが通らなければ、レビュアの実行を起動しない。上限を越えたかは、各処理の前に確認する
+  # (手順 6 の各処理と手順 8 では、関数 run_prep が起動する前と待機する間に確認する)。手順 6〜8 は準備のディレクトリの中で行う
   local problem
   if timed_out; then fail_timeout_in_preparation; return; fi
   if ! prepare_workspace; then
@@ -1627,7 +1627,7 @@ process_request() {
   if ! rename_prep_dir; then fail_prepared "$PREP_ERROR"; return; fi
 
   # 手順 9。準備の途中に割り込みを受けていれば、レビュアの実行を起動せずに終了する (関数 on_signal)。
-  # 準備の段の合間に上限を越えていれば、レビュアの実行を起動しない
+  # 準備の処理の合間に上限を越えていれば、レビュアの実行を起動しない
   check_interrupt
   if timed_out; then fail_timeout_in_preparation; return; fi
   log "レビュアの実行を起動する: claude -p --model $MODEL --effort $EFFORT --permission-mode $PERMISSION_MODE (cwd: ${CLONE}、上限 $REVIEW_TIMEOUT_MINUTES 分)"

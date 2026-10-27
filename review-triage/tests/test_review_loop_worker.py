@@ -1314,8 +1314,8 @@ class TestWorkspace(WorkerTestBase):
                 self.assertIn(contains, marker["error"])
 
     def test_clone_stage_failure(self):
-        # AE7: 複製の作成の段 (複製・remote の設定の削除・取り込み・チェックアウト) のどれかが失敗すると、
-        # レビュアの実行を起動せずに failed のフラグファイルを書き、error に失敗した段を書く。作業場所は残らない
+        # AE7: 複製の作成の処理 (複製・remote の設定の削除・取り込み・チェックアウト) のどれかが失敗すると、
+        # レビュアの実行を起動せずに failed のフラグファイルを書き、error に失敗した処理を書く。作業場所は残らない
         self.install_fake_git()
         for sub, stage in (("clone", "clone"), ("remote", "remove remote"), ("fetch", "fetch refs"),
                            ("checkout", "checkout")):
@@ -3022,7 +3022,7 @@ class TestTimeoutDuringPreparation(WorkerTestBase):
 
     def test_timeout_just_before_request_copy(self):
         # 複製の設定の確認 (手順 7) を遅らせて、写しの作成 (手順 8) の直前に上限を越えさせる。
-        # 準備の段の合間に越えても、次の段の前かレビュアの実行を起動する前に確認するので、偽の claude は呼ばれない
+        # 準備の処理の合間に越えても、次の処理の前かレビュアの実行を起動する前に確認するので、偽の claude は呼ばれない
         touch = os.path.join(self.root, "delay-started")
         self.delay_python("settings.local.json", 5, touch)
         self.put_request()
