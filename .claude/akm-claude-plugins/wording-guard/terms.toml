@@ -563,6 +563,20 @@ replacements = ["1 回目", "N+1 回目以降"]
 reason = "英語 (Round 1) の語順で、名詞の後に番号を置いている。日本語では「1 回目」「N+1 回目以降」と書く。前が漢字の「今回 1 つ」「前回 2 件」と、数の後に置いた「回」(「1 回 3 件まで」「第 1 回 2026 年」) は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/87"
 
+[[terms]]
+pattern = "/(?<![一-龯々\\d])(?<![\\dN] )段 ?(?:\\d|N)/"
+verdict = "avoid"
+replacements = ["調査フェーズ", "立案フェーズ", "修正フェーズ"]
+reason = "英語 (Stage 1) の語順で、数の後に付けて数える語 (助数詞) の「段」の後に番号を置いている。review-triage-fix の手順の区分は、番号ではなく名前で「調査フェーズ」「立案フェーズ」「修正フェーズ」と書く。前が漢字の形と、数の後に置いた「段」(「2 段で解く」) は対象にしない"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+
+[[terms]]
+pattern = "/(?:調査|立案|修正)の段(?![階落])/"
+verdict = "avoid"
+replacements = ["調査フェーズ", "立案フェーズ", "修正フェーズ"]
+reason = "「段」は数える語 (助数詞) で、手順の区分の名前としては日本語として不自然。review-triage-fix の手順の区分は「調査フェーズ」「立案フェーズ」「修正フェーズ」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+
 # ---- 許容する語 ----
 
 [[terms]]
