@@ -122,7 +122,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 ### 雛形
 
 ````markdown
-# review-triage-fix のフェーズの依頼: {{stage_name}}フェーズ — {{branch}} の回 {{round}}
+# review-triage-fix のフェーズの依頼: {{stage_name}}フェーズ — {{branch}} の {{round}} 回目
 
 この依頼文は、スキル `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) が、フェーズを sub-agent で走らせるために書いたものである。受け取った sub-agent はこの依頼文と「読む文書」だけを読んで、指示されたフェーズを 1 つ実行し、結果を記録 YAML に書き、「報告の様式」のとおり報告する。依頼文の作り方と呼び出し元の検証の正本は `review-triage-fix` の `references/stage-subagent.md` — 受け取った sub-agent が読む必要は無い。
 
