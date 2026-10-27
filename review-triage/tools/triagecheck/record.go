@@ -216,7 +216,7 @@ type recordPlan struct {
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
 	Verification *recordVerification `yaml:"verification"`
-	// DocDag は修正の後の doc-dag の確認 (対象と、向きの無い重複・巡回の有無と対処)。任意だが、
+	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが正本か決まっていない重複・参照の循環の有無と対処)。任意だが、
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
 	DocDag    *recordDocDag `yaml:"doc_dag"`
 	Options   string        `yaml:"options"`
@@ -745,7 +745,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: doc_dag.scope がありません (doc-dag に渡した対象の文書群)", pn)
 				}
 				if strings.TrimSpace(dd.Result) == "" {
-					add("%s: doc_dag.result がありません (向きの無い重複・巡回の有無と対処)", pn)
+					add("%s: doc_dag.result がありません (どちらが正本か決まっていない重複・参照の循環の有無と対処)", pn)
 				}
 			}
 			// 検証 (verification) は任意だが、書くなら再確認した範囲 (near_edges) が要る。
