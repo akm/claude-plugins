@@ -777,7 +777,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 // TestInReviewTriageDirNotationVariants は、ディレクトリの表記が揺れても検査の対象が
 // 変わらないことを検証する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
 // "." / "./rec" / "rec//" で一覧を作る関数 (path.Join が clean する) と前置が一致せず、
-// 検査が 1 件も走らないまま成功した。
+// 検査が 1 件も実行されないまま成功した。
 func TestInReviewTriageDirNotationVariants(t *testing.T) {
 	saved := reviewTriageDir
 	t.Cleanup(func() { reviewTriageDir = saved })

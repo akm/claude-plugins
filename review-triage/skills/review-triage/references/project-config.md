@@ -49,7 +49,7 @@
 | `record_dir` | 記録 (YAML と生成サマリ) のディレクトリ | `tmp/review-triages` — git の追跡外で、記録はコミットしない (理由は [record-schema.md](record-schema.md) の冒頭)。追跡内に置くならここで指定する |
 | `frozen_paths` | 当時の記録として書き換えない文書のパス接頭辞 | 凍結扱いのパスは無いものとする |
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
-| `triage_check_command` | 記録のスキーマ検査を走らせるコマンド | 検査を走らせず、**走らせていないことを報告に明記する** |
+| `triage_check_command` | 記録のスキーマ検査を実行するコマンド | 検査を実行せず、**実行していないことを報告に明記する** |
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが正本として残る |
 | `loop` | `review-triage-loop` の既定値 (下記) | ループの既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に質問する |
 | `fix` | `review-triage-fix` の既定値 (下記) | 修正の既定値を持たない。`review-triage-fix` はキーごとの既定 (下の「`fix`」の表) に従う |
@@ -98,7 +98,7 @@
 
 **`review_model` は 1 つのループに 1 つの値。** 回ごとに変えることはできない。ループをまたいで変えるのは構わない (記録が回ごとに `model` を持つので後から比較できる) が、そのつど人間が指示する — ループが勝手に切り替えると、指摘の減り方がモデルの違いによるものか収束によるものかを人間が読み解けなくなる。
 
-**`review_skill` を推測しない。** どちらのスキルで走らせたかは記録の `skill` に残り、後から粒度を比較する材料になる。推測で決めると、記録が実態と一致しなくなる。
+**`review_skill` を推測しない。** どちらのスキルで実行したかは記録の `skill` に残り、後から粒度を比較する材料になる。推測で決めると、記録が実態と一致しなくなる。
 
 ## `fix` — 修正の既定値
 
@@ -107,16 +107,16 @@
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `threshold_rounds` | 回数の閾値 N。記録の回番号 (`runs` の要素数) が N を越えた回 (N+1 回目以降) では、`review-triage-fix` が調査フェーズの後に人間に立案者の選択を求める (質問の仕方と選択肢の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) | 5 |
-| `stages` | フェーズごとの走らせ方。キーはフェーズの名前 — `investigate` (調査フェーズ)・`plan` (立案フェーズ)・`fix` (修正フェーズ)。フェーズの中身と手順の対応の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭 | 3 つのフェーズともセッション内 (下の各キーの既定) |
-| `stages.<フェーズ>.subagent` | そのフェーズを sub-agent で走らせるか (真偽値) | `false` — セッション内で走らせる |
-| `stages.<フェーズ>.model` | sub-agent で走らせるときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
-| `stages.<フェーズ>.effort` | sub-agent で走らせるときの effort の指定 (文字列)。値は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。`subagent` が `false` なら使わない | 空 — セッションの effort を継承する agent 定義を使う (effort と定義名の対応の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「effort と定義名の対応」) |
+| `stages` | フェーズごとの実行方法。キーはフェーズの名前 — `investigate` (調査フェーズ)・`plan` (立案フェーズ)・`fix` (修正フェーズ)。フェーズの中身と手順の対応の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭 | 3 つのフェーズともセッション内 (下の各キーの既定) |
+| `stages.<フェーズ>.subagent` | そのフェーズを sub-agent で実行するか (真偽値) | `false` — セッション内で実行する |
+| `stages.<フェーズ>.model` | sub-agent で実行するときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
+| `stages.<フェーズ>.effort` | sub-agent で実行するときの effort の指定 (文字列)。値は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。`subagent` が `false` なら使わない | 空 — セッションの effort を継承する agent 定義を使う (effort と定義名の対応の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「effort と定義名の対応」) |
 
-**`threshold_rounds` は記録の回番号で数える。** `max_rounds` が「この起動で回した回数」を数えるのと違い、`review-triage-fix` は記録しか見ないので、単独で走らせてもループから呼ばれても同じ回で同じ振る舞いになる。上限は収束しないループを停止させるための値、閾値は人間が立案に関与し始める回を決める値で、別のものである。
+**`threshold_rounds` は記録の回番号で数える。** `max_rounds` が「この起動で回した回数」を数えるのと違い、`review-triage-fix` は記録しか見ないので、単独で実行してもループから呼ばれても同じ回で同じ振る舞いになる。上限は収束しないループを停止させるための値、閾値は人間が立案に関与し始める回を決める値で、別のものである。
 
 `fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<フェーズ>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
 
-**`stages` の設定は、N+1 回目以降の立案フェーズ (`plan`) には適用されない。** その回の立案フェーズは `review-triage-fix` が人間に求めた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。調査フェーズ (`investigate`) と修正フェーズ (`fix`) の設定は回の番号に関わらず適用される。フェーズの走らせ方を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「走らせ方の決定」。
+**`stages` の設定は、N+1 回目以降の立案フェーズ (`plan`) には適用されない。** その回の立案フェーズは `review-triage-fix` が人間に求めた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。調査フェーズ (`investigate`) と修正フェーズ (`fix`) の設定は回の番号に関わらず適用される。フェーズの実行方法を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実行方法の決定」。
 
 ## `review_loop` — ワーカーに任せるループの既定値
 
@@ -152,7 +152,7 @@
 
 ## 検査コマンドを設定しないとどうなるか
 
-記録のスキーマ検査 (`triage_check_command`) は、必須キーの欠落・列挙値の誤り・参照の不整合を捕まえる。**走らせなければ、壊れた記録がそのまま残る。**
+記録のスキーマ検査 (`triage_check_command`) は、必須キーの欠落・列挙値の誤り・参照の不整合を捕まえる。**実行しなければ、壊れた記録がそのまま残る。**
 
 同梱の `triagecheck` を使う場合、2 通りの置き方がある。
 
@@ -161,4 +161,4 @@
 
 どちらの置き方も、Makefile の例 (展開先の求め方・渡すフラグ) と `-install-wrapper` の使い方は [triagecheck の README](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md) が正本。ここに写すと、渡すフラグが増えたときに片方だけ古くなる。
 
-**検査を走らせなかった回は、報告にそう書く。** 「検査で問題が出なかった」と「検査を走らせていない」は別の事実で、混同すると次の読者が通ったものと誤解する。
+**検査を実行しなかった回は、報告にそう書く。** 「検査で問題が出なかった」と「検査を実行していない」は別の事実で、混同すると次の読者が通ったものと誤解する。

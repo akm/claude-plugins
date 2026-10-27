@@ -15,7 +15,7 @@ import (
 
 // TestMain は、利用者の git の設定 (グローバル・システム) がテストの結果を変えないように、
 // 環境変数 HOME を一時ディレクトリに替え、システムの設定を読ませない。GIT_ で始まる環境変数を先に
-// 取り除くのは、環境変数 GIT_DIR などが設定されたまま走らせると、テストの git が一時ディレクトリではなく
+// 取り除くのは、環境変数 GIT_DIR などが設定されたまま実行すると、テストの git が一時ディレクトリではなく
 // その変数が指すリポジトリにコミットやブランチを作るため。
 func TestMain(m *testing.M) {
 	for _, kv := range os.Environ() {
@@ -1282,7 +1282,7 @@ func wantError(t *testing.T, o output, code int, label, want string) {
 	wantContains(t, o.stderr, want)
 }
 
-// ビルドした実行ファイルを、別のプロセスとして走らせても、標準エラー出力の最初の行が接頭辞で始まり、
+// ビルドした実行ファイルを、別のプロセスとして実行しても、標準エラー出力の最初の行が接頭辞で始まり、
 // 終了コードで種類が分かれる。フラグの誤りでパッケージ flag が使い方を書き出すと、最初の行が接頭辞で始まらない。
 func TestExecutableReportsLabelOnFirstLine(t *testing.T) {
 	r, _ := branched(t)

@@ -6,15 +6,15 @@
 
 | スキル | 説明 |
 | --- | --- |
-| `review-request` | 別セッションで走らせる上流レビューの依頼文を、雛形から埋めてディレクトリ (既定は `tmp/`。`--dir` で変えられる) に書き出す。結果の出力先を依頼文に埋め込み、新しいセッションにはそのパス 1 つを渡す。`--full-review` を付けると、記録に回があっても全量の依頼文を作る。全量の起点は、`--base` で指定した派生元のブランチ (省略時は `origin/HEAD` が指すブランチ) と HEAD の merge-base (引数が無くても、`main` ではなくこの起点になる) |
+| `review-request` | 別セッションで実行する上流レビューの依頼文を、雛形から埋めてディレクトリ (既定は `tmp/`。`--dir` で変えられる) に書き出す。結果の出力先を依頼文に埋め込み、新しいセッションにはそのパス 1 つを渡す。`--full-review` を付けると、記録に回があっても全量の依頼文を作る。全量の起点は、`--base` で指定した派生元のブランチ (省略時は `origin/HEAD` が指すブランチ) と HEAD の merge-base (引数が無くても、`main` ではなくこの起点になる) |
 | `review-triage` | 指摘を判定し、記録に残す。**修正はしない** (判断までが範囲) |
-| `review-triage-fix` | 採択した指摘を原因で束ね、調査 → 立案 → 修正 の 3 つのフェーズで問題単位で直す。記録の回番号が回数の閾値 N を越えた回では、調査の後に人間が立案者 (セッションのモデル / 指定モデルの sub-agent / 人間自身) を選ぶ。フェーズごとに sub-agent で走らせられる |
+| `review-triage-fix` | 採択した指摘を原因で束ね、調査 → 立案 → 修正 の 3 つのフェーズで問題単位で直す。記録の回番号が回数の閾値 N を越えた回では、調査の後に人間が立案者 (セッションのモデル / 指定モデルの sub-agent / 人間自身) を選ぶ。フェーズごとに sub-agent で実行できる |
 | `review-triage-loop` | レビューの起動から上の 2 つまでを 1 回として、終了条件に当たるまで繰り返す。**判断も修正もせず、2 つを呼ぶだけ**。記録に回が無いときの最初の回 (全量の回) の起点のブランチを `--base` で指定できる (省くと `origin/HEAD` が指すブランチ。レビュースキルが `code-review` のときだけ適用される) |
 | `review-loop` | `review-triage-loop` と同じループを、レビューだけを端末のワーカー (下記) に任せて回す。ワーカーのモデルと effort を人間が選べる。`--full-review` を付けると、収束の後に要れば全量の回をループの中で行い (上限に数えない)、`--base` で全量の起点のブランチを指定できる (省くと `origin/HEAD` が指すブランチになり、`origin/HEAD` が無いリポジトリでは全量の回を行わないループでも `--base` が要る)。停止したループは `--resume` で続け (`--resume --full-review` なら次の回を全量にする)、`--end` で終える |
 
 `code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは記録 (YAML) だけで行います。**
 
-`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。`review-loop` は、レビューを同じセッションの sub-agent ではなく、人間が決めたモデルと effort の別のプロセスで走らせたいときに使います (詳細は [SKILL.md](skills/review-loop/SKILL.md))。
+`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。`review-loop` は、レビューを同じセッションの sub-agent ではなく、人間が決めたモデルと effort の別のプロセスで実行したいときに使います (詳細は [SKILL.md](skills/review-loop/SKILL.md))。
 
 ## なぜ記録を残すか
 
@@ -42,7 +42,7 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 
 ## 同梱のワーカー (review-loop-worker)
 
-`review-loop` のレビューを行うスクリプト `scripts/review-loop-worker.sh` です。**端末で 1 回起動**すると、ループのディレクトリ (review-loop のセッションとの受け渡しに使うディレクトリ) に依頼文が現れるたびに `claude -p` を指定のモデルと effort で走らせ、結果を確認してから完了のフラグファイルを書き、次の依頼文が書かれるまで待機します。起動コマンドは `review-loop` が案内します。Claude Desktop app で Terminal パネルのツールが使えるときは、`review-loop` がモデル・effort・コマンドを示して承認を求め、承認すると端末のタブで起動します。
+`review-loop` のレビューを行うスクリプト `scripts/review-loop-worker.sh` です。**端末で 1 回起動**すると、ループのディレクトリ (review-loop のセッションとの受け渡しに使うディレクトリ) に依頼文が現れるたびに `claude -p` を指定のモデルと effort で実行し、結果を確認してから完了のフラグファイルを書き、次の依頼文が書かれるまで待機します。起動コマンドは `review-loop` が案内します。Claude Desktop app で Terminal パネルのツールが使えるときは、`review-loop` がモデル・effort・コマンドを示して承認を求め、承認すると端末のタブで起動します。
 
 - **macOS でだけ動きます。** ほかの OS では、起動時の確認で停止します。
 - **review-loop のセッションと同じ作業ツリーで起動します。** 別の worktree やクローンで起動すると、起動時の確認で停止します。
@@ -53,7 +53,7 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 - **`/tmp` を含む Bash のコマンドは、ワーカーが PreToolUse のフック (ツールを実行する前に呼ばれるフック) で実行前に拒否し、一時ファイルを作業ツリーの複製の中に作るようレビュアに伝えます。** `/tmp` への書き込みはサンドボックスが拒否し、その回がレビュー不成立になるためです。このフックが拒否した呼び出しは、レビュー不成立の条件に数えません。
 - **サンドボックスに拒否されたときの文面 (`operation not permitted` など) を含むファイルを、レビュアが `git diff` や `cat` で表示しただけの結果は、その行がレビュー対象のコミットにあると確認できれば、拒否された確認に数えません。** 数えると、そうしたファイルを変えたブランチでは、確認が 1 件も拒否されていなくても回がレビュー不成立になるためです。
 - **ネットワークは、利用者の設定ファイル `settings.json` (環境変数 `CLAUDE_CONFIG_DIR` があればその下、無ければ `~/.claude` の下) の `WebFetch(domain:…)` の許可に従います。** その許可はサンドボックスの中の Bash が接続できるドメインに加わり、ワーカーは起動時に、加わるドメインを表示します。`WebFetch(domain:*)` を許していれば、レビュアの実行の Bash は外のすべてのホストに接続できます (表示はしますが、拒否しません)。ほかに接続を許すドメインは、設定 `review_loop.sandbox_allowed_domains` に足します。
-- 引数・起動時の確認・使い捨ての作業ツリーの作り方・権限の正本は [worker.md](skills/review-loop/references/worker.md) です。テストは `claude` の代わりに偽のコマンドを置いて走らせます (`python3 -m unittest discover -s review-triage/tests`)。
+- 引数・起動時の確認・使い捨ての作業ツリーの作り方・権限の正本は [worker.md](skills/review-loop/references/worker.md) です。テストは `claude` の代わりに偽のコマンドを置いて実行します (`python3 -m unittest discover -s review-triage/tests`)。
 
 ## プロジェクト固有の設定
 
@@ -91,7 +91,7 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 
 `loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
-`fix` は `review-triage-fix` の既定 — 回数の閾値 N (`threshold_rounds`) と、フェーズ (調査 / 立案 / 修正) ごとに sub-agent で走らせるか・その model と effort (`stages`) — で、無くても既定 (閾値 5、どのフェーズもセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
+`fix` は `review-triage-fix` の既定 — 回数の閾値 N (`threshold_rounds`) と、フェーズ (調査 / 立案 / 修正) ごとに sub-agent で実行するか・その model と effort (`stages`) — で、無くても既定 (閾値 5、どのフェーズもセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
 
 `review_loop` は `review-loop` の既定 — ループのディレクトリ・待機の期限・ワーカーの effort と権限 (権限モード・許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン) — で、無くても既定で動きます (ワーカーの effort とモデルが決まらなければ質問します。モデルは `loop.review_model` を共用します)。書き込みを許す場所と接続を許すドメインは `--resume` のたびに設定から再度読み込むので、サンドボックスの拒否で停止したループは、終えずに設定を直して続けられます。各キーの意味は同ファイルの「`review_loop`」を参照してください。
 
@@ -101,7 +101,7 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 
 ## 同梱の agent 定義
 
-`agents/` に、`review-triage-fix` がフェーズを sub-agent で走らせるときに使う汎用の agent 定義を 6 つ同梱しています — `fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max`。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どのフェーズを行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (走らせ方・依頼文・検証の正本は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
+`agents/` に、`review-triage-fix` がフェーズを sub-agent で実行するときに使う汎用の agent 定義を 6 つ同梱しています — `fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max`。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どのフェーズを行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (実行方法・依頼文・検証の正本は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
 
 ## 併用すると役に立つプラグイン
 
@@ -125,4 +125,4 @@ claude plugin install review-triage@akm-claude-plugins
 
 レビューを端末のワーカーに任せてループを回すときは、「レビューをワーカーに任せて回して」(`review-loop`) と依頼します。ワーカーを起動すると (承認して `review-loop` に端末のタブで起動させるか、案内されたコマンドを自分で端末で実行します)、ループが停止するまでレビュー・トリアージ・修正が続きます。
 
-別セッションでレビューを走らせるときは、先に「レビューの依頼文を作って」(`review-request`) で依頼文を `tmp/` (既定のディレクトリ) に書き出し、新しいセッションにそのパスを渡します。結果が返ったら「レビューの指摘を選り分けて」のように依頼すると `review-triage` が起動します。同じセッションで走らせたレビューの指摘も対象にできます。**勝手にレビューを走らせることはありません。**
+別セッションでレビューを実行するときは、先に「レビューの依頼文を作って」(`review-request`) で依頼文を `tmp/` (既定のディレクトリ) に書き出し、新しいセッションにそのパスを渡します。結果が返ったら「レビューの指摘を選り分けて」のように依頼すると `review-triage` が起動します。同じセッションで実行したレビューの指摘も対象にできます。**勝手にレビューを実行することはありません。**

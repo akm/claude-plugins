@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# review-loop のセッションがバックグラウンドで走らせる待機スクリプト。
+# review-loop のセッションがバックグラウンドで実行する待機スクリプト。
 #
 # 使い方:
 #   review-loop-wait.sh [--await-worker] <ループのディレクトリ> <識別子> <分> [<停滞の秒数>]

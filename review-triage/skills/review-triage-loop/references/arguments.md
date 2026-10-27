@@ -21,7 +21,7 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 
 **`--threshold <N>` はループの条件ではなく、`review-triage-fix` にそのまま渡す。** 回数の閾値 N (記録の回番号がこれを越えた回で、`review-triage-fix` が調査の後に人間に立案者の選択を求める) の意味・決め方・検査の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」で、ループはこの値で分岐しない。ループが行うのは 2 つだけ — 開始前の報告 (決定表 G0) に書くために同じ規則で値を決めて検査すること (下の「値の検査」) と、`review-triage-fix` を呼ぶ (F1) たびにその値を渡すこと。
 
-**`--stage <フェーズ>[=<値>]` も同じ扱いで、`review-triage-fix` にそのまま渡す。** フェーズ (`investigate` = 調査 / `plan` = 立案 / `fix` = 修正) をセッション内で走らせるか sub-agent で走らせるか、sub-agent ならそのモデルと effort の指定で、様式・優先順位・値の検査の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「`--stage`」、走らせ方の決定 (定義名・実効モデル) の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md)。ループが行うのは `--threshold` と同じ 2 つ — 開始前の報告 (G0) に書くために同じ規則でフェーズごとの走らせ方を決めて検査すること、`review-triage-fix` を呼ぶ (F1) たびにそのまま渡すこと。**`--model` はレビューのモデル、`--stage` の `<model>` はフェーズの sub-agent のモデルで、別のものである。**
+**`--stage <フェーズ>[=<値>]` も同じ扱いで、`review-triage-fix` にそのまま渡す。** フェーズ (`investigate` = 調査 / `plan` = 立案 / `fix` = 修正) をセッション内で実行するか sub-agent で実行するか、sub-agent ならそのモデルと effort の指定で、様式・優先順位・値の検査の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「`--stage`」、実行方法の決定 (定義名・実効モデル) の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md)。ループが行うのは `--threshold` と同じ 2 つ — 開始前の報告 (G0) に書くために同じ規則でフェーズごとの実行方法を決めて検査すること、`review-triage-fix` を呼ぶ (F1) たびにそのまま渡すこと。**`--model` はレビューのモデル、`--stage` の `<model>` はフェーズの sub-agent のモデルで、別のものである。**
 
 **`--base <ブランチ>` は、全量の回の起点を求める派生元のブランチ** (別の作業ブランチから派生したブランチなら、その作業ブランチ)。**設定のキーを持たない** — ブランチごとに変わる値なので、`review-request` と `review-loop` の `--base` と同じく設定には置かない。**どの回・どの経路で起点のブランチを使い、省いたときにどのブランチになるかの正本は [review-invocation.md](review-invocation.md) の「範囲」。** G0 は、下の「値の検査」で読む記録の回の有無と経路から、この起動で起点のブランチを使うかを決める。使うなら起点のブランチを決め、同じ「値の検査」のとおり検査する。使わないのに指定があれば、無視する。
 
@@ -54,4 +54,4 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 
 **エラーには、その値が引数と設定のどちらから来たかを書く。** 直す先が違う — 引数ならその場で言い直せるが、設定なら `config.json` を直すことになる。
 
-**エラーはループを始める前に報告する。** 1 回目を走らせてから値の誤りに気づくと、レビューの実行が無駄になる。
+**エラーはループを始める前に報告する。** 1 回目を実行してから値の誤りに気づくと、レビューの実行が無駄になる。
