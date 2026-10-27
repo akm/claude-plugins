@@ -335,7 +335,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 //
 // 生成は相対 (./bin/rtc)、検査は絶対パスで実行する。実行時の $0 から組み立てる
 // 実装だと、この 2 つで 1 行目が一致せず、生成直後のサマリが検査に落ちる
-// (実測)。文字列だけを見ると渡し忘れても通ってしまうので、実際に走らせる。
+// (実測)。文字列だけを見ると渡し忘れても通ってしまうので、実際に実行する。
 func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	goBin, err := exec.LookPath("go")
 	if err != nil {

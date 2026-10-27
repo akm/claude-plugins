@@ -1038,7 +1038,7 @@ class TestBodies(unittest.TestCase):
 
     def test_prune_does_not_delete_in_flight_temp_files(self):
         # store の原子的書き込みは一時ファイル + os.replace。ここで消すと、
-        # 並走する保存が replace に失敗する（#22 で入れた保証が崩れる）。
+        # 同時に行われている保存が replace に失敗する（#22 で入れた保証が崩れる）。
         bodies.save(self.dir, "o/r", 1, "alive")
         tmp = os.path.join(self.dir, ".tmp-abc123.txt")
         with open(tmp, "w", encoding="utf-8") as f:
@@ -1812,7 +1812,7 @@ class TestCliCommands(unittest.TestCase):
 
         slow = self._record_in_subprocess(["alpha"], delay=0.6)
         # 先行プロセスが「読み終えたが、まだ保存していない」窓に後続を入れる。
-        # ここで待機せずに起こすと両者が順に走ってしまい、競合を再現できない。
+        # ここで待機せずに起こすと両者が順に実行されてしまい、競合を再現できない。
         time.sleep(0.2)
         fast = self._record_in_subprocess(["beta"])
         self.assertEqual(slow.wait(), 0)
@@ -1955,7 +1955,7 @@ class TestCliCommands(unittest.TestCase):
     def test_record_holds_the_state_lock_while_writing_bodies(self):
         # state の記録と本文は対で意味を持つ（記録に対応する本文が次回の差分の
         # 基準）。本文の保存がロックの外にあると、state を書き終えてから本文を
-        # 書くまでの間に、並走した実行の掃除が入りうる（#4）。
+        # 書くまでの間に、同時に行われた別の実行の掃除が入りうる（#4）。
         #
         # 競合そのものは実行のたびに再現するとは限らないため、ここでは
         # 「本文を書いている間ロックを保持しているか」という不変条件を直接見る。

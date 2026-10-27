@@ -6,12 +6,12 @@
   python3 -m unittest discover -s review-triage/tests
 
 一時ディレクトリに git のリポジトリとループのディレクトリを作り、claude の名前で偽のコマンド
-(review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で走らせる。
+(review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で実行する。
 実際の claude は呼ばない。依頼文は、実際の雛形 (review-triage/skills/review-triage/references/
 review-request-template.md) を埋めて作る — ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
 文字列で探して写しを作るので、雛形と一致しなければテストが失敗するようにするため。
 
-ワーカーは macOS でだけ起動する (起動時の確認で `uname -s` を見る)。CI (ubuntu) でも走るように、
+ワーカーは macOS でだけ起動する (起動時の確認で `uname -s` を見る)。CI (ubuntu) でも実行できるように、
 uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で Darwin を返す) も PATH の先頭に置く。
 ワーカーの環境変数 HOME と TMPDIR は、テストの一時ディレクトリの中の別々のディレクトリにする
 (利用者の設定 ~/.claude/settings.json を読まないように、また作業場所の条件を満たすように)。
@@ -91,7 +91,7 @@ real = os.environ["FAKE_GIT_REAL"]
 os.execv(real, [real] + args)
 """
 
-# 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを走らせている python) に
+# 偽の python3。テストが PATH の先頭の bin/ に python3 の名前で書き、FAKE_PY_REAL (このテストを実行している python) に
 # 引数をそのまま渡す。実行するスクリプトが文字列 FAKE_PY_SLEEP_MARK を含めば、
 # ファイル FAKE_PY_TOUCH を作ってから FAKE_PY_SLEEP 秒 (既定 1000) 待機し、そのあとスクリプトを実行する。
 # ワーカーが python3 で行う処理のうち 1 つだけを遅らせて、上限を越える時点や割り込みを送る時点を決めるのに使う。
@@ -376,7 +376,7 @@ class WorkerTestBase(unittest.TestCase):
         os.symlink(os.path.realpath(_FAKE), os.path.join(self.bin, "claude"))
         os.symlink(os.path.realpath(_FAKE_UNAME), os.path.join(self.bin, "uname"))
         # HOME を差し替えると、asdf のような版の管理ツールの python3 は (HOME の下の設定を探すので) 起動しなくなる。
-        # ワーカーと偽の claude が使う python3 は、このテストを走らせている python の実行ファイルにする
+        # ワーカーと偽の claude が使う python3 は、このテストを実行している python の実行ファイルにする
         os.symlink(sys.executable, os.path.join(self.bin, "python3"))
         # ワーカーの HOME と TMPDIR は、リポジトリとは別の、互いに重ならない場所にする
         self.home = os.path.join(root, "home")
@@ -2367,7 +2367,7 @@ class TestWorkerYamlOnStart(WorkerTestBase):
     def test_empty_arrays_under_set_u(self):
         # -- 以降・--sandbox-allow-write・--sandbox-allowed-domain・--allowed-tools をどれも付けない (配列がどれも空の) 起動で、
         # 1 回の処理を終えられる。macOS の /bin/bash (3.2) は set -u のもとで空の配列の展開をエラーにすることがあるので、
-        # /bin/bash があればそれで走らせる
+        # /bin/bash があればそれで実行する
         shell = "/bin/bash" if os.path.exists("/bin/bash") else "bash"
         self.put_request()
         p = self.start(shell=shell)
@@ -2414,7 +2414,7 @@ class TestPythonScriptsLoadedAtStart(WorkerTestBase):
 
 
 class TestSandboxStartChecks(WorkerTestBase):
-    """起動時の確認のうち、レビュアの実行をサンドボックスで走らせるための項目 (worker.md の「起動時の確認」の 3 と 9〜14)。"""
+    """起動時の確認のうち、レビュアの実行をサンドボックスで行うための項目 (worker.md の「起動時の確認」の 3 と 9〜14)。"""
 
     def test_not_macos(self):
         # AE11: uname -s が Linux
@@ -3336,7 +3336,7 @@ class TestRestartCleanup(WorkerTestBase):
         # 指摘 #6: stop_cwd_procs は、標準エラーへの報告 (print) が OSError で失敗しても、シグナルを送って
         # 残ったプロセスを停止する処理を続けなければならない。ワーカーを動かしていた端末を閉じると、その後の
         # 標準エラーへの書き込みは OSError (EIO) になる (pty の master を閉じると、slave への書き込みが
-        # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で走らせ、
+        # そうなる)。ワーカー全体を pty (stdin・stdout・stderr を同じ pty の slave にする) の上で実行し、
         # 回の終了処理が stop_cwd_procs を呼ぶ直前 (偽の python3 の delay_python で、その python3 のスクリプトの
         # 実行そのものを遅らせて捕まえる) で master を閉じ、それから回を最後まで進めさせる。
         # 標準エラーに書けない状態でも、作業場所の中に残したプロセスが停止することを確認する

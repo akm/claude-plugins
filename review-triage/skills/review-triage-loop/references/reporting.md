@@ -5,9 +5,9 @@
 ## 必ず出すもの
 
 1. **停止した理由** — どの停止ノード (S2〜S6) で停止したか (正本は [loop-flow.md](loop-flow.md))。
-2. **回った回数と上限** — 「3 回 / 上限 5 回」の形。この起動でレビューを 1 回も走らせずに停止した (回した回数が 0) ときは「0 回 / 上限 5 回」と書き、推移は出さない。
+2. **回った回数と上限** — 「3 回 / 上限 5 回」の形。この起動でレビューを 1 回も実行せずに停止した (回した回数が 0) ときは「0 回 / 上限 5 回」と書き、推移は出さない。
 3. **採択件数の回ごとの推移** — 下記。
-4. **ループの条件** — レビュースキル・そのオプション・実効モデル (定義の正本は [review-invocation.md](review-invocation.md) の「実効モデル」)・全量の起点のブランチ (ループが決めていれば)、および `review-triage-fix` に渡した回数の閾値 N (引数 `--threshold`、設定 `fix.threshold_rounds`。意味と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) とフェーズ (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭) ごとの走らせ方 (引数 `--stage`、設定 `fix.stages`。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md))。手順 1 (決定表 G0) で報告したものと同じ値。**各回で実際にどう走らせたかは、各回の `review-triage-fix` の報告 (手順 8) が持つ** — N+1 回目以降の立案フェーズは立案者の選択で決まるので、条件として出した走らせ方と回ごとの実態は一致しないことがある。
+4. **ループの条件** — レビュースキル・そのオプション・実効モデル (定義の正本は [review-invocation.md](review-invocation.md) の「実効モデル」)・全量の起点のブランチ (ループが決めていれば)、および `review-triage-fix` に渡した回数の閾値 N (引数 `--threshold`、設定 `fix.threshold_rounds`。意味と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) とフェーズ (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭) ごとの実行方法 (引数 `--stage`、設定 `fix.stages`。決め方の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md))。手順 1 (決定表 G0) で報告したものと同じ値。**各回で実際にどう実行したかは、各回の `review-triage-fix` の報告 (手順 8) が持つ** — N+1 回目以降の立案フェーズは立案者の選択で決まるので、条件として出した実行方法と回ごとの実態は一致しないことがある。
 5. **残っているもの** — 調査済み (`status: investigated`) と未着手 (`status: pending`) の問題があれば、その回と識別子。**停止した理由を問わず出す** — ループの後に残ったものは次のループか人間が引き継ぐので、報告に無いと引き継ぎ先が知る手段が無い。
 6. **次に回すときの条件の推奨** — 推移から導いた、次のループのレビューのモデルと effort の推奨と、その理由。目安 (どの回にどの粒度のモデルが向くか) の正本は [record-schema.md の「生成サマリの読み方」](../../review-triage/references/record-schema.md#生成サマリの読み方)。**ループは条件を変えない** (原則) — 推奨を出すだけで、変えるかどうかは人間が次の起動で決める。停止した理由を問わず出す ([#58](https://github.com/akm/claude-plugins/issues/58))。
 
@@ -39,5 +39,5 @@
 
 ## 書かないもの
 
-- **ループの内部の進み方のうち、フェーズの走らせ方以外のもの** — レビューの sub-agent をいつ立てたか、JSON をどう写したかなどは、読者が次に何をするかに関係しない。**フェーズの走らせ方 (どのフェーズをセッション内か sub-agent か、sub-agent ならその定義名・effort・実効モデル) は例外で、書く** — ループの報告には条件 (上の 4) として 1 度、各回の実態は `review-triage-fix` の各回の報告 (手順 8) に含める。走らせ方は記録に残らないので、報告に無いと、その回の計画や修正をどのモデルがどの effort で行ったかを後から読めない。
+- **ループの内部の進み方のうち、フェーズの実行方法以外のもの** — レビューの sub-agent をいつ立てたか、JSON をどう写したかなどは、読者が次に何をするかに関係しない。**フェーズの実行方法 (どのフェーズをセッション内か sub-agent か、sub-agent ならその定義名・effort・実効モデル) は例外で、書く** — ループの報告には条件 (上の 4) として 1 度、各回の実態は `review-triage-fix` の各回の報告 (手順 8) に含める。実行方法は記録に残らないので、報告に無いと、その回の計画や修正をどのモデルがどの effort で行ったかを後から読めない。
 - **各回の判定の詳細** — `review-triage` が回ごとに報告済みで、記録にも残っている。ループの報告で繰り返さない。

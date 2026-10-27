@@ -1,13 +1,13 @@
 ---
 name: review-loop
-description: レビューを端末のワーカー (依頼文ごとに claude -p を人間が決めたモデルと effort で走らせるスクリプト。起動は人間が承認する) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。受け渡しはループのディレクトリのファイルだけで、完了のフラグファイルが現れるまでバックグラウンドで待機する。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base) を指定でき、--resume で停止したループを続け (--resume --full-review なら次の回を全量にする)、--end でループを終える。
+description: レビューを端末のワーカー (依頼文ごとに claude -p を人間が決めたモデルと effort で実行するスクリプト。起動は人間が承認する) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。受け渡しはループのディレクトリのファイルだけで、完了のフラグファイルが現れるまでバックグラウンドで待機する。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base) を指定でき、--resume で停止したループを続け (--resume --full-review なら次の回を全量にする)、--end でループを終える。
 ---
 
 # review-loop: レビューを端末のワーカーに任せるループ
 
-レビューは、端末で起動するワーカー (スクリプト `review-triage/scripts/review-loop-worker.sh`) が行う。ワーカーは依頼文ごとに `claude -p` を、人間が決めたモデルと effort で走らせる。ワーカーは、人間の承認を得てこのセッションが端末のタブで起動するか、人間が端末で起動する。**このセッションは、依頼文を書き、完了のフラグファイルが現れるまで待機し、[review-triage](../review-triage/SKILL.md) と [review-triage-fix](../review-triage-fix/SKILL.md) を呼ぶ。** 成果物はループの結果の報告で、判断は `review-triage`、修正は `review-triage-fix` が持つ。
+レビューは、端末で起動するワーカー (スクリプト `review-triage/scripts/review-loop-worker.sh`) が行う。ワーカーは依頼文ごとに `claude -p` を、人間が決めたモデルと effort で実行する。ワーカーは、人間の承認を得てこのセッションが端末のタブで起動するか、人間が端末で起動する。**このセッションは、依頼文を書き、完了のフラグファイルが現れるまで待機し、[review-triage](../review-triage/SKILL.md) と [review-triage-fix](../review-triage-fix/SKILL.md) を呼ぶ。** 成果物はループの結果の報告で、判断は `review-triage`、修正は `review-triage-fix` が持つ。
 
-同じセッションの sub-agent でレビューするループ ([review-triage-loop](../review-triage-loop/SKILL.md)) との違いは、レビューを走らせるモデルとセッションの effort を人間が選べることと、レビュアが回ごとに新しいプロセスになること。どちらの経路で回したかは記録の `notes` の 1 行に残り、後から収束を比べられる。
+同じセッションの sub-agent でレビューするループ ([review-triage-loop](../review-triage-loop/SKILL.md)) との違いは、レビューを実行するモデルとセッションの effort を人間が選べることと、レビュアが回ごとに新しいプロセスになること。どちらの経路で回したかは記録の `notes` の 1 行に残り、後から収束を比べられる。
 
 ## 正本の宣言
 

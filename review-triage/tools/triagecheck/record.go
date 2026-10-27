@@ -55,7 +55,7 @@ var summaryCommand = defaultSummaryCommand
 //
 // 文字列の接頭辞ではなくディレクトリどうしを比較する。一覧を作る関数 (listReviewTriageFiles)
 // は path.Join でパスを clean するため、ディレクトリの表記だけを整えて接頭辞で照合すると
-// "." や "./rec" や "rec//" で一致せず、検査が 1 件も走らないまま成功した。
+// "." や "./rec" や "rec//" で一致せず、検査が 1 件も実行されないまま成功した。
 // 両辺を path.Clean に通せば、どちらの表記でも同じ判定になる。
 func inReviewTriageDir(f string) bool {
 	return path.Dir(f) == path.Clean(reviewTriageDir)

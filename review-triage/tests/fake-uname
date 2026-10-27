@@ -1,7 +1,7 @@
 #!/bin/sh
 # ワーカーのテストで、PATH の先頭に uname の名前で置く偽のコマンド。
 #
-# ワーカーは起動時の確認で `uname -s` が Darwin (macOS) であることを確認する。CI は ubuntu で走るので、
+# ワーカーは起動時の確認で `uname -s` が Darwin (macOS) であることを確認する。CI は ubuntu で実行されるので、
 # 本物の uname のままだと、すべてのテストでワーカーがその確認で停止する。
 #
 # - `uname -s` には、環境変数 FAKE_UNAME_S の値を返す。無ければ Darwin を返す。

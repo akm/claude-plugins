@@ -1,6 +1,6 @@
 # レビューの依頼の様式
 
-**このファイルが、上流レビューを別セッションで走らせて結果をファイルで受け取るときの、依頼の運用 (依頼文の作り方・範囲の規則・各節の理由・受け渡し様式) の正本。** レビュアに読ませる依頼文そのものの正本は [review-request-template.md](review-request-template.md) (雛形) で、[review-request](../../review-request/SKILL.md) スキルがそれを埋めて書き出す。トリアージでの読み方は [SKILL.md](../SKILL.md) の手順 1。ループ (`review-triage-loop`) がセッション内の sub-agent にレビューを渡す経路は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) が正本で、依頼文の文面は同じ雛形から取る。
+**このファイルが、上流レビューを別セッションで実行して結果をファイルで受け取るときの、依頼の運用 (依頼文の作り方・範囲の規則・各節の理由・受け渡し様式) の正本。** レビュアに読ませる依頼文そのものの正本は [review-request-template.md](review-request-template.md) (雛形) で、[review-request](../../review-request/SKILL.md) スキルがそれを埋めて書き出す。トリアージでの読み方は [SKILL.md](../SKILL.md) の手順 1。ループ (`review-triage-loop`) がセッション内の sub-agent にレビューを渡す経路は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) が正本で、依頼文の文面は同じ雛形から取る。
 
 ## 依頼文はファイルに書き出し、パスだけを渡す
 
@@ -10,7 +10,7 @@
 
 ## 呼ぶ skill・effort・モデル — 値で明記し、報告させる
 
-**依頼文には、呼ぶ skill (`/code-review` など)、その skill に渡す effort (`code-review` なら `high` のように値そのもの)、レビューを実行するモデルを、値で明記する。** 「effort を報告せよ」と書くだけでは指定にならない — 依頼文に値が無いと、レビュアが前回の記録などから自分で選び、依頼元が知らない値で走る (実測: 記録の `level` に `xhigh` が並んでいたのを根拠に、依頼に無い `xhigh` で走った)。effort が高いほど、レビュアは不確かな指摘も報告するようになり、「報告しない条件」で落とすはずの指摘が増える。既定にしたいときも既定の値を書く (既定の正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」と「実効モデル」)。`ce-code-review` は effort もモデルも受け取らないので、その旨を書く。雛形では `{{skill}}` / `{{effort}}` / `{{model}}` がこれに当たり、[review-request スキル](../../review-request/SKILL.md) の手順 1 が値を決める。
+**依頼文には、呼ぶ skill (`/code-review` など)、その skill に渡す effort (`code-review` なら `high` のように値そのもの)、レビューを実行するモデルを、値で明記する。** 「effort を報告せよ」と書くだけでは指定にならない — 依頼文に値が無いと、レビュアが前回の記録などから自分で選び、依頼元が知らない値で実行される (実測: 記録の `level` に `xhigh` が並んでいたのを根拠に、依頼に無い `xhigh` で実行された)。effort が高いほど、レビュアは不確かな指摘も報告するようになり、「報告しない条件」で落とすはずの指摘が増える。既定にしたいときも既定の値を書く (既定の正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」と「実効モデル」)。`ce-code-review` は effort もモデルも受け取らないので、その旨を書く。雛形では `{{skill}}` / `{{effort}}` / `{{model}}` がこれに当たり、[review-request スキル](../../review-request/SKILL.md) の手順 1 が値を決める。
 
 **レビュアには、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを報告に含めさせ、指定と突き合わせる。** 報告が指定と一致しなければ — skill を呼んでいない、effort やモデルが違う、報告があるはずの経路 (`code-review`) なのに報告が無い — 記録に写す前に人間に報告する (レビュアの判断で変わった値を、依頼どおりの値として記録しないため)。`ce-code-review` のように報告が無い経路では突き合わせない。この項が定めるのは突き合わせまでで、記録の `skill` / `level` / `model` に何を書くかは定めない — 各キーの意味の正本は [record-schema.md](record-schema.md) の `runs[]` の表、ループが経路ごとに何から採るかの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「記録のキーの出所」。skill を呼ばずに差分を読んでも指摘の形は同じに見えるため、報告させないと区別できない。
 

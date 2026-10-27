@@ -1,6 +1,6 @@
 ---
 name: review-triage-loop
-description: レビュー・トリアージ・修正の 3 つを上限回数まで繰り返し、収束したか停止したかを人間に返す。各回で review-triage と review-triage-fix を呼び、終了条件に当たったら理由を添えて停止する。「レビューから修正までを回して」「収束するまで繰り返して」「review-triage-loop を実行して」のような依頼で使う。引数で上限・レビュースキル・そのオプション・モデル・全量の起点にする派生元のブランチ (--base)・回数の閾値とフェーズの走らせ方 (どちらも review-triage-fix に渡す) を指定でき、省略時は設定の既定に従う。
+description: レビュー・トリアージ・修正の 3 つを上限回数まで繰り返し、収束したか停止したかを人間に返す。各回で review-triage と review-triage-fix を呼び、終了条件に当たったら理由を添えて停止する。「レビューから修正までを回して」「収束するまで繰り返して」「review-triage-loop を実行して」のような依頼で使う。引数で上限・レビュースキル・そのオプション・モデル・全量の起点にする派生元のブランチ (--base)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す) を指定でき、省略時は設定の既定に従う。
 ---
 
 # review-triage-loop: レビューから修正までのループ
@@ -14,7 +14,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
 - **ループは必ず停止する。** 上限に達したら、採択が残っていても停止する (上限を設ける理由の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」)。
 - **修正が次の指摘を生んでいる形でも停止する。** 採択が前の回の修正の近傍に続き、件数が減らないときは、上限に達する前に停止して構造の見直しを人間に問う (J9 → S6。判定の正本は [references/loop-flow.md](references/loop-flow.md))。局所修正を重ねても近傍の指摘が続くループは、上限まで回しても収束しない ([#54](https://github.com/akm/claude-plugins/issues/54))。
 - **選択待ちは、既存のスキルが人間の判断を求めて中断した結果である。** ループがそれを越えて進むと、判断を求めた意味が消える。上限はそれとは別で、収束しないループを停止させるためにこのスキルが持つ関門である。
-- **モデルはループごとに選べる (指定が適用される経路に限る — 経路ごとに指定がどう使われるかの正本は [references/review-invocation.md](references/review-invocation.md) の「G0 での解決」)。** 1 つのループはどの回も同じモデルで走らせる (設定と引数はループ全体に 1 つの値を持つ) が、ループをまたげば変えてよい — 記録は回ごとに `model` を持つので、後から粒度の違いを比較できる。使い分けの目安 (実害系の検出と、収束を確認する回で向くモデルが違う) は [record-schema.md](../review-triage/references/record-schema.md) の「生成サマリの読み方」が正本。**ループの途中で勝手に切り替えない** — 切り替えるなら、いったん停止して人間が次のループの条件として指示する。目安に従って使い分ける手順は、まず 1 つのループを停止するまで回し、停止した後に `--model` を変えて次のループを起動する (例: 採択が減ってきた後のループだけ、別のモデルで回す)。指定が適用されない経路では、この手順を踏んでも実効モデルは変わらない。
+- **モデルはループごとに選べる (指定が適用される経路に限る — 経路ごとに指定がどう使われるかの正本は [references/review-invocation.md](references/review-invocation.md) の「G0 での解決」)。** 1 つのループはどの回も同じモデルで実行する (設定と引数はループ全体に 1 つの値を持つ) が、ループをまたげば変えてよい — 記録は回ごとに `model` を持つので、後から粒度の違いを比較できる。使い分けの目安 (実害系の検出と、収束を確認する回で向くモデルが違う) は [record-schema.md](../review-triage/references/record-schema.md) の「生成サマリの読み方」が正本。**ループの途中で勝手に切り替えない** — 切り替えるなら、いったん停止して人間が次のループの条件として指示する。目安に従って使い分ける手順は、まず 1 つのループを停止するまで回し、停止した後に `--model` を変えて次のループを起動する (例: 採択が減ってきた後のループだけ、別のモデルで回す)。指定が適用されない経路では、この手順を踏んでも実効モデルは変わらない。
 
 ## 手順
 
@@ -26,7 +26,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
    - **記録 (手順 2 で読むもの) も、経路を問わず G0 で読み、読めることを確認する** (読めないときの扱いの正本は [references/arguments.md](references/arguments.md) の「値の検査」)。回の有無は `--base` の扱いに使う。
    - **構造の関門 k (`--structure-rounds`、設定は `loop.structure_rounds`) はループの条件で、J9 が使う** (意味・既定・値の検査の正本は [project-config.md](../review-triage/references/project-config.md) の「`loop`」と [references/arguments.md](references/arguments.md))。
    - **回数の閾値 N (`--threshold`、設定は `fix.threshold_rounds`) はループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味・決め方・検査の正本は [review-triage-fix の arguments.md](../review-triage-fix/references/arguments.md))。
-   - **フェーズ (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の走らせ方 (`--stage`、設定は `fix.stages`) も同じくループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。走らせ方の決定と、sub-agent で走らせたフェーズの検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。ループはフェーズの sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
+   - **フェーズ (`review-triage-fix` の手順を区切った区分。定義の正本は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の実行方法 (`--stage`、設定は `fix.stages`) も同じくループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。実行方法の決定と、sub-agent で実行したフェーズの検証の正本は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。ループはフェーズの sub-agent を自分で立てない — 立てるのも検証するのも `review-triage-fix` である。
    - 決まった条件をループの開始前に報告する (書くものは決定表の G0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
 2. **入口の関門** (G2・G3): 記録 YAML を読み (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)、図の順に判定する。各ノードの条件・遷移先・停止するときの報告は、図と決定表が正本。
 3. **ループ** (L1 → S2〜S6): 図に従って回す。各ノードで行うことと見る場所は決定表のとおり。**各回の冒頭で、いま何回目かと上限を報告する** (L1)。
