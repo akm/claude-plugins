@@ -1931,6 +1931,7 @@ func TestReviewTriageSummaryInvestigated(t *testing.T) {
 	for _, want := range []string{
 		"| P1 | 数えずに書いた | #1 | — | — | 調査済み | — |",
 		"\n- **" + note + " が 1 件: P1** — ",
+		"`review-triage-fix` が立案フェーズから続ける\n",
 	} {
 		if !strings.Contains(one, want) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, one)

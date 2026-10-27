@@ -1149,7 +1149,7 @@ func renderInvestigatedNote(b *strings.Builder, plans []recordPlan) {
 	if len(ids) == 0 {
 		return
 	}
-	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案 (段 2) から続ける\n",
+	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案フェーズから続ける\n",
 		len(ids), strings.Join(ids, ", "))
 }
 
