@@ -292,7 +292,7 @@ def cmd_record(args):
     warnings.extend(skipped)
 
     now = _now()
-    # 読み込みから保存までをロックで囲む。ここを開けると、同時に走った実行の
+    # 読み込みから保存までをロックで囲む。ここを開けると、同時に行われた実行の
     # どちらか一方の記録が丸ごと失われる（#13）。
     with store.locked(paths["glossary"]):
         g = _load_glossary(paths)

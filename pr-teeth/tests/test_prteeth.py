@@ -1812,7 +1812,7 @@ class TestCliCommands(unittest.TestCase):
 
         slow = self._record_in_subprocess(["alpha"], delay=0.6)
         # 先行プロセスが「読み終えたが、まだ保存していない」窓に後続を入れる。
-        # ここで待機せずに起こすと両者が順に走ってしまい、競合を再現できない。
+        # ここで待機せずに起こすと両者が順に実行されてしまい、競合を再現できない。
         time.sleep(0.2)
         fast = self._record_in_subprocess(["beta"])
         self.assertEqual(slow.wait(), 0)
