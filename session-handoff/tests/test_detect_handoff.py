@@ -46,7 +46,7 @@ def _gh_result(stdout="", returncode=0):
 
 
 def _run_main(payload):
-    """main() を標準入力つきで走らせ、(終了コード, 標準出力) を返す。"""
+    """main() を標準入力つきで実行し、(終了コード, 標準出力) を返す。"""
     stdin = io.StringIO(payload if isinstance(payload, str) else json.dumps(payload))
     stdout = io.StringIO()
     with mock.patch.object(sys, "stdin", stdin), mock.patch.object(sys, "stdout", stdout):
