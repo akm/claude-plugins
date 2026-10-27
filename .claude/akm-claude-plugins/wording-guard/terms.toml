@@ -584,6 +584,13 @@ replacements = ["実行する", "実行される"]
 reason = "プログラムや処理を主語にして、人や物の移動を表す動詞を使っている (「job が走る」)。人やスキルが主語の「走らせる」も、動いているのはプログラムなので同じ比喩。主語が人やスキルなら「実行する」、プログラムや処理が主語なら「実行される」と書く。「走らせ方」は「実行方法」と書く。「走査」は対象にしない"
 decided_in = "https://github.com/akm/claude-plugins/issues/87"
 
+[[terms]]
+pattern = "/[並併]走/"
+verdict = "avoid"
+replacements = ["同時に行われる", "重なる"]
+reason = "「走る」と同じく、プログラムや処理の実行を人や物の移動に喩えている。複数の実行が同時に行われることは「同時に行われる」「(実行が) 重なる」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+
 # ---- 許容する語 ----
 
 [[terms]]
