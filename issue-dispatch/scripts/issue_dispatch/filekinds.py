@@ -1,5 +1,5 @@
 """パスからファイルの種類と属性を決める。リポジトリの設定の `files` の規則を先に、同梱のデフォルトの表
-(file-kinds.json) を後に照合し、1 つのパスが種類の違う規則に一致すれば、6 段の判定の条件の順で先の種類にする。
+(file-kinds.json) を後に照合し、1 つのパスが種類の違う規則に一致すれば、6 つの判定の条件の順で先の種類にする。
 
 種類と属性の意味、パターンの書き方、照合の順の正本は issue-dispatch/skills/issue-dispatch/references/file-kinds.md。
 設定の規則の様式と、読み込むときにそろえる表記の正本は同じディレクトリの project-config.md (そろえるのはモジュール config)。
@@ -13,7 +13,7 @@ import json
 import os
 import re
 
-# 6 段の判定の条件の順 (file-kinds.md の表)。先にあるほど優先する
+# 6 つの判定の条件の順 (file-kinds.md の表)。先にあるほど優先する
 KINDS = ("unknown-content", "generated", "unknown-structure", "indivisible", "unstable", "divisible")
 # 規則に書ける種類 (`unknown-content` は、どの規則にも一致しないパスの種類なので、規則には書けない)
 RULE_KINDS = KINDS[1:]
@@ -122,7 +122,7 @@ def _attributes(rule):
 
 
 def _pick(path, rules, source):
-    """規則の配列の中で path に一致するものから、6 段の順で先の種類の規則を 1 つ選ぶ。無ければ None。
+    """規則の配列の中で path に一致するものから、判定の条件の順で先の種類の規則を 1 つ選ぶ。無ければ None。
     同じ種類なら先に書いた規則 (`<` で比べるので、後の規則は置き換えない。file-kinds.md の「照合の順」の 3)。"""
     best = None
     for rule in rules:
@@ -141,7 +141,7 @@ def classify(path, rules, default_table):
     """パスの種類と属性を決める。
 
     rules はリポジトリの設定の `files` (config がそろえた後の規則の配列)、default_table はデフォルトの表。
-    設定の規則に一致すればその中で、無ければデフォルトの表の中で、6 段の順で先の種類を選ぶ。
+    設定の規則に一致すればその中で、無ければデフォルトの表の中で、判定の条件の順で先の種類を選ぶ。
     どちらにも一致しなければ `unknown-content` (属性は無し、`matched` は None)。
     返り値: {"kind", "unit_notation", "split_reference", "mergeable", "matched": {"source": "config" | "default", "pattern"} | None}
     """
