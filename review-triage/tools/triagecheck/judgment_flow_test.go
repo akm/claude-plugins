@@ -112,7 +112,7 @@ func TestJudgmentFlowStyleOnlyNodeIsNotSatisfied(t *testing.T) {
 }
 
 // タブ区切りの装飾行 (style<TAB>A2 …) も装飾として除外される — 区切りを
-// 半角スペース 1 種と仮定すると、実ノードの無い ID が図側に混入する。
+// 半角スペース 1 種と仮定すると、実ノードの無い ID が図の ID に混入する。
 func TestJudgmentFlowTabSeparatedDecoration(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture, "  A2[\"A2: 採択\"]\n", "", 1)
 	content = strings.Replace(content, "  D1 -- 当たる --> A2\n", "", 1)

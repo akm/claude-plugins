@@ -12,7 +12,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 ## 前提知識
 
 - **上流のレビューは報告のみで走らせる。** 指摘を見つけるたびに直すと、先に直した修正が後の判断の前提を変える (`code-review` は `--fix` 無し、`ce-code-review` は `mode:agent`)。
-- **別セッションでレビューを走らせて結果をファイルで受け取る場合、依頼文と受け渡し様式の正本は [references/review-request.md](references/review-request.md)。** 検証の前払い (evidence の必須化) と報告しない条件を依頼文に入れるほど、判定のコストが下がる。
+- **別セッションでレビューを走らせて結果をファイルで受け取る場合、依頼文と受け渡し様式の正本は [references/review-request.md](references/review-request.md)。** 報告前の検証 (evidence の必須化) と報告しない条件を依頼文に入れるほど、判定のコストが下がる。
 - **レビューの範囲 (全量か増分か) は、範囲の規則に従って決める** (正本は [references/review-request.md](references/review-request.md) の「範囲の規則」)。どのモデル・範囲で走らせたかは記録の `model` / `scope` に必ず残し、粒度の違いを後から比較できるようにする。モデルの使い分けの運用ガイドは [記録 README の収束の目安](references/record-schema.md#生成サマリの読み方)。
 - **却下ゲートは仮説である** ([references/rejection-gates.md](references/rejection-gates.md))。記録を取り、どのゲートが機能しているかを後から確認する。
 - **規範文書に実測値を書かない。** 件数・比率などの実測は記録 ([スキーマ](references/record-schema.md)) だけが持ち、必要なときにそこから数える。
@@ -42,7 +42,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 - **このスキルは修正しない。** 判断までが範囲。修正まで持たせると、判断が甘くても修正が進む。
 - **記録を省かない。** 却下は「対処しなかった欠陥」を作る操作で、誤った却下を検証する経路は記録しかない (理由の正本は [記録 README](references/record-schema.md))。
 - **sub-agent の結果は鵜呑みにせず、検証してから反映する。** 仕様・設計との照合を sub-agent に依頼する仕方は [references/premise-check.md](references/premise-check.md)。
-- **対抗ペルソナは保留にだけ使う。** 保留になった指摘に限り、「対処すべきでない」と主張する側を立てて突き合わせてよい。全件に回すとコストが高く、もっともらしい反論で正しい指摘を却下する危険がある。
+- **対抗ペルソナは保留にだけ使う。** 保留になった指摘に限り、「対処すべきでない」と主張する役を立てて突き合わせてよい。全件に回すとコストが高く、もっともらしい反論で正しい指摘を却下する危険がある。
 - **判定は実行のたびに揺れうる。** 記録に判断の材料 (帰結・評価の結果・決着ノード) を残すので、後から読めば同じ判定になるかを人間が確認できる。
 
 ## このスキルが検出しないもの

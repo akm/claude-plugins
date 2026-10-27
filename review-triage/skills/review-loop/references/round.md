@@ -26,7 +26,7 @@
 
 ## 呼ぶスキル
 
-**このスキルが呼ぶ 3 つのスキル — RL1 の手順 a の `review-request`・L2 の `review-triage`・F1 の `review-triage-fix` — は、回ごとに Skill ツールで呼ぶ。** 前の回で読んだ手順を、このスキルが自分で実行しない — 依頼文の識別子の組み立てと雛形の埋め方、記録への回の追記・residual を自己採択にするかの判断・生成サマリの再生成と検査、修正と記録の更新は、それぞれのスキルが行う。このスキルが代わりに行うと、そのスキルの手順で確認しないまま結果がファイルと記録に入る (通し確認で、指摘が 0 件の回に作業側が `review-triage` を、2 回目以降の依頼文で `review-request` を代わりに行った)。
+**このスキルが呼ぶ 3 つのスキル — RL1 の手順 a の `review-request`・L2 の `review-triage`・F1 の `review-triage-fix` — は、回ごとに Skill ツールで呼ぶ。** 前の回で読んだ手順を、このスキルが自分で実行しない — 依頼文の識別子の組み立てと雛形の埋め方、記録への回の追記・residual を自己採択にするかの判断・生成サマリの再生成と検査、修正と記録の更新は、それぞれのスキルが行う。このスキルが代わりに行うと、そのスキルの手順で確認しないまま結果がファイルと記録に入る (通し確認で、指摘が 0 件の回に review-loop のセッションが `review-triage` を、2 回目以降の依頼文で `review-request` を代わりに行った)。
 
 ## 1 回のレビュー (RL1)
 
@@ -53,7 +53,7 @@
 2. **ワーカーのバージョン**: フラグファイルの `worker_version` が 0.14.0 以降 (`.` で区切った数を、先頭から数として比べる)。キーが無いか 0.14.0 より古ければ RA1 (報告に書く項目の正本は [stops.md](stops.md) の「RA1 の報告の、原因ごとの項目」の表の「ワーカーのバージョン」の行)。`unknown` なら停止しない (このキーを書くのは 0.14.0 以降のワーカーだけ。レビュアの実行を起動しなかった回は 4 で停止する)。**3 の必須キーより先に見る** — 0.13.0 のワーカーのフラグファイルは 0.14.0 で足したキーを持たないので、必須キーを先に見ると、ワーカーが古いことではなくキーが足りないことを報告してしまう。
 3. **フラグファイルの様式**: 必須キー ([loop-files.md](loop-files.md) の「`delivered-<識別子>.yaml`」の表) があり、`status` が `ok` か `failed`。
 4. **`status` が `ok`**: `failed` なら RA1。
-5. **HEAD と作業ツリー**: フラグファイルの `head_before` と `head_after` が依頼文の `head` と同じコミットを指し、`tree_clean_after` が `true`。**作業側でも** `git rev-parse --short HEAD` が依頼文の `head` と同じで、`git status --porcelain` が空であることを確認する (フラグファイルを信じるだけにしない)。
+5. **HEAD と作業ツリー**: フラグファイルの `head_before` と `head_after` が依頼文の `head` と同じコミットを指し、`tree_clean_after` が `true`。**元の作業ツリーでも** `git rev-parse --short HEAD` が依頼文の `head` と同じで、`git status --porcelain` が空であることを確認する (フラグファイルを信じるだけにしない)。
 6. **effort とモデル**: フラグファイルの `effort` が `loop.yaml` の `worker.effort` と、`model.specified` が `worker.model` と等しい (人間が案内と違う値でワーカーを起動していない)。`model.effective` が `unknown` でなければ、実効モデルの名前が指定に一致する — 比べ方は [stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」と同じで、名前 (`opus-5` のような版を含む表記) から版を除いた部分が指定の別名 (`opus`) と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。`unknown` なら比べない (記録の `notes` に「不明」と残る)。
 7. **skill を呼んだ**: `skill_called` が `false` なら RA1 — skill を呼ばずに読んだ結果を、依頼どおりの結果として記録しない (規則の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」)。`unknown` なら停止しない (`notes` に「不明」と残る)。
 8. **拒否されたツールの呼び出しが無い**: `permission_denials.count` が 1 以上なら RA1 — 調べられなかった範囲の指摘が無い結果を、採択 0 の収束として記録に入れないため。ワーカーのフックが拒否した呼び出し (フラグファイルの `worker_hook_denials`) は、この件数に含まれない (判別の方法と、RA1 にしない理由の正本は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」)。報告に書くもの (原因ごとの項目と直し方) の正本は [stops.md](stops.md) の RA1 の行。`unknown` なら停止しない (`notes` に「不明」と残る)。

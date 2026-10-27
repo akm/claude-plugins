@@ -64,7 +64,7 @@ func run(args []string) error {
 	// 無視すると「指定したのに適用されない」を作る。拒否するのは「何かを要求したとき」
 	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
 	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
-	// 値を見ずに「指定された」と報告するので、値の側も見る。
+	// 値を見ずに「指定された」と報告するので、値も見る。
 	if explicit["install-wrapper"] && explicit["write-summary"] && *writeSummary {
 		return fmt.Errorf("-write-summary は %w (生成の経路では使われません)", errFlagUnusedWithInstallWrapper)
 	}
@@ -186,7 +186,7 @@ type resolvedInputs struct {
 //  1. 空・空白・不可視の値は拒否する (isBlankPath)。空の明示はパスとして意味を持たず、
 //     通すと「指定したのに検査されない」になる。
 //  2. 相対パスは -current-dir を基準に解決する (無ければ resolvePath がエラー)。
-//     基準は推測しない — go run -C で起動されるためカレントはツール側を指し、
+//     基準は推測しない — go run -C で起動されるためカレントはツールのディレクトリを指し、
 //     呼び出し元のカレントはプロセスの中から知りようがない。
 //  3. -current-dir を渡したのに一度も基準として使われなければエラー。エラーにしないと
 //     「基準を渡したつもり」のまま別の解決結果を受け取る。
@@ -392,7 +392,7 @@ func resolveBaseDir(currentDir string) (string, error) {
 }
 
 // resolvePath は p を絶対パスにして返す。絶対ならそのまま、相対なら base を基準にする。
-// 2 つ目の戻り値は base を実際に使ったか (呼び出し側が「-current-dir が一度も
+// 2 つ目の戻り値は base を実際に使ったか (呼び出し元が「-current-dir が一度も
 // 使われなかった」ことを検出するために使う)。
 //
 // base が空 (= -current-dir が無い) のに相対を渡されたらエラーにする。ここで
@@ -403,7 +403,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 	}
 	if base == "" {
 		// CLAUDE_PLUGIN_ROOT は -current-dir の基準を使わないので、そちらを案内しても
-		// 直らない。直すべきは環境変数の側だと言う。
+		// 直らない。直すべきは環境変数だと案内する。
 		if flagName == "CLAUDE_PLUGIN_ROOT" {
 			return "", false, fmt.Errorf(
 				"%s が相対パスです。絶対パスを設定してください: %s", flagName, p)
@@ -418,7 +418,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 // 明示の指定 → プラグインの展開先 → 既定 (リポジトリ内にスキルを直接置いた形)。
 //
 // 見つからなかったときに空文字を返して既定のままにするのは、判定フローが
-// 無い状態を「検査対象が無い」として通す判断が judgmentFlowProblems 側に
+// 無い状態を「検査対象が無い」として通す判断が judgmentFlowProblems に
 // あるため。ここでエラーにすると、記録の検査まで巻き添えで落ちる。
 //
 // 2 つ目の戻り値はパスを指定したものの名前 (origin)。-judgment-flow と
@@ -426,7 +426,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 // 既定に落ちたときだけ空で、そのとき不在は未導入として通る。名前を返すのは、
 // 不在の報告にどちらを直せばよいかを載せるため。
 //
-// 指定の有無は値ではなく specified (呼び出し側が flag.Visit で読んだ意思表示) で
+// 指定の有無は値ではなく specified (呼び出し元が flag.Visit で読んだ意思表示) で
 // 判定する。値が空かどうかで見ると、-judgment-flow "" の明示指定が「指定なし」として
 // 扱われ、検査が走らないまま成功する (-record-dir で避けたはずの種類の欠陥と同じ)。
 func resolveJudgmentFlowPath(value string, specified bool) (flowPath, origin string) {

@@ -1,6 +1,6 @@
 # 段を sub-agent で走らせる
 
-**このファイルが、`review-triage-fix` の段 (調査 / 立案 / 修正。定義と手順との対応の正本は [SKILL.md](../SKILL.md) の「手順」の冒頭) を sub-agent で走らせるときの、走らせ方の決定・依頼文・呼び出し側の検証の正本。** 段の中身の規範 (調査の 2 方向・束ねる基準・順序・検証の観点 A〜F・機械検査の関門・1 問題 1 コミット) は [SKILL.md](../SKILL.md) の手順と references/ 配下の各文書が正本で、ここでは言い直さない — sub-agent で走らせても、その段の規範は変わらない。設定と引数の様式・優先順位・値の検査は [arguments.md](arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」が正本。effort ごとの agent 定義 (`review-triage/agents/` の 6 ファイル) の中身は各定義が正本。
+**このファイルが、`review-triage-fix` の段 (調査 / 立案 / 修正。定義と手順との対応の正本は [SKILL.md](../SKILL.md) の「手順」の冒頭) を sub-agent で走らせるときの、走らせ方の決定・依頼文・呼び出し元の検証の正本。** 段の中身の規範 (調査の 2 方向・束ねる基準・順序・検証の観点 A〜F・機械検査の関門・1 問題 1 コミット) は [SKILL.md](../SKILL.md) の手順と references/ 配下の各文書が正本で、ここでは言い直さない — sub-agent で走らせても、その段の規範は変わらない。設定と引数の様式・優先順位・値の検査は [arguments.md](arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」が正本。effort ごとの agent 定義 (`review-triage/agents/` の 6 ファイル) の中身は各定義が正本。
 
 ## なぜ段ごとに sub-agent に出せるか
 
@@ -14,13 +14,13 @@
 
 | 段 | 名前 (設定・引数) | sub-agent に含める手順 (番号の正本は [SKILL.md](../SKILL.md) の「手順」の直下にある段と手順の対応) | 段の規範 (references/) | 進める状態 |
 | --- | --- | --- | --- | --- |
-| 段 1 (調査) | `investigate` | 段 1 の手順のうち、**末尾の「立案者の選択」は含めない** — 人間に問うのはセッション側 | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
+| 段 1 (調査) | `investigate` | 段 1 の手順のうち、**末尾の「立案者の選択」は含めない** — 人間に問うのは呼び出し元のセッション | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
 | 段 2 (立案) | `plan` | 段 2 の手順 | [ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
-| 段 3 (修正) | `fix` | 段 3 の手順のうち、**報告と `doc-dag` の確認は含めない** — セッション側で行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
+| 段 3 (修正) | `fix` | 段 3 の手順のうち、**報告と `doc-dag` の確認は含めない** — 呼び出し元のセッションで行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
 
 全段に共通して読ませる文書: [SKILL.md](../SKILL.md) (該当の手順と「原則」)、[record-schema.md](../../review-triage/references/record-schema.md) (記録の様式・状態・コミット節)、[project-config.md](../../review-triage/references/project-config.md) (設定のキーの意味)。
 
-手順 1 (入力を読む・対象の解決・人間の回答の反映) はどの段にも含めず、セッション側で行う。
+手順 1 (入力を読む・対象の解決・人間の回答の反映) はどの段にも含めず、呼び出し元のセッションで行う。
 
 ## 走らせ方の決定
 
@@ -59,16 +59,16 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | 名前 (`claude-opus-5` のような、版を含む表記) | その名前のうち版を除いた部分が列挙にあれば、その別名 |
 | 上のいずれにも解決できない | **中断して報告する** (指定と、それが引数と設定のどちらから来たかを添える)。推測で別名を選ばない |
 
-**sub-agent には実効モデルを `model` として必ず明示して渡す。** [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 より後の規則」と同じ理由 — 省略すると agent 定義・環境変数・親のモデルの順で解決され、呼び出し側が知らないモデルで走りうる。指定が未設定でも省略しない。
+**sub-agent には実効モデルを `model` として必ず明示して渡す。** [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 より後の規則」と同じ理由 — 省略すると agent 定義・環境変数・親のモデルの順で解決され、呼び出し元が知らないモデルで走りうる。指定が未設定でも省略しない。
 
 ## 起動の形
 
 - **Agent ツール**で、`subagent_type` に定義名、`model` に実効モデル、`prompt` に依頼文 (下の雛形を埋めたもの) を渡す。
 - **`run_in_background: false` を明示して渡す。** 省略すると background で走り、結果が返るまで待機せずに次に進んでしまう。結果が返り、検証が通るまで次の段に進まない。
-- **段は逐次で、同時に走らせる sub-agent は 1 つ。** 記録 YAML を複数の sub-agent が同時に書くと、後から書いた側が先の結果を消す。
-- **`isolation` は渡さない。** 段は呼び出し側と同じ作業ツリーで走る — 段 3 のコミットと記録の更新が呼び出し側の HEAD に載る必要があり、agent 定義が `isolation` を持たないのも同じ理由。
+- **段は逐次で、同時に走らせる sub-agent は 1 つ。** 記録 YAML を複数の sub-agent が同時に書くと、後から書いた sub-agent が先の結果を消す。
+- **`isolation` は渡さない。** 段は呼び出し元と同じ作業ツリーで走る — 段 3 のコミットと記録の更新が呼び出し元の HEAD に載る必要があり、agent 定義が `isolation` を持たないのも同じ理由。
 - **停止した sub-agent を再開しない** (追加の指示を送らない)。途中で中断した段は、記録の状態から新しい段の実行として始める — 再開に必要な情報は記録にあり、停止した sub-agent の文脈には無い (SKILL.md の前提知識「段のあいだの受け渡しは記録 YAML だけ」)。
-- **sub-agent を起動する前に記録の写しを取らない。** 記録はブランチ単位で短命で、壊れれば呼び出し側の検証が検出し、人間が直す。記録のディレクトリを git の追跡内にしている利用者は git で戻せる。写しは記録のディレクトリにファイルを増やし、検査の対象の扱いを決める必要を生むので、費用に見合わない。
+- **sub-agent を起動する前に記録の写しを取らない。** 記録はブランチ単位で短命で、壊れれば呼び出し元の検証が検出し、人間が直す。記録のディレクトリを git の追跡内にしている利用者は git で戻せる。写しは記録のディレクトリにファイルを増やし、検査の対象の扱いを決める必要を生むので、費用に見合わない。
 
 ## 依頼文
 
@@ -84,7 +84,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | `{{repo_dir}}` / `{{branch}}` | `git rev-parse --show-toplevel` / 現在のブランチ名 |
 | `{{round}}` | 対象の回の番号 (記録の `runs` の要素数) |
 | `{{targets}}` | 手順 1 で解決した対象 — 段 1: 覆われていない採択の回と `id`。段 2: `status: investigated` の問題の回と `problem_id`。段 3: `status: pending` の問題の回と `problem_id` |
-| `{{consider_design_change}}` | 設計・仕様変更を含めて検討するか (`true` / `false`)。N+1 回目以降の段 2 なら `true`、それ以外 (段 1・3 と、N 回目までの段 2) は `false`。**N+1 回目以降かどうかを sub-agent に計算させない** — N の決め方は呼び出し側にしか無い |
+| `{{consider_design_change}}` | 設計・仕様変更を含めて検討するか (`true` / `false`)。N+1 回目以降の段 2 なら `true`、それ以外 (段 1・3 と、N 回目までの段 2) は `false`。**N+1 回目以降かどうかを sub-agent に計算させない** — N の決め方は呼び出し元にしか無い |
 | `{{skill_md_path}}` / `{{record_schema_path}}` / `{{project_config_path}}` / `{{stage_references}}` | 読ませる文書の絶対パス (「段と手順・文書の対応」)。**プラグインの展開先の絶対パスで書く** — 依頼文を書くセッションは自分のスキルの配置先 (この SKILL.md を読んだディレクトリ) を知っている。相対パスは sub-agent の作業ディレクトリ (リポジトリ) から解決できない |
 | `{{agent_name}}` | 定義名 (「effort と定義名の対応」)。sub-agent は自分の定義名を知らないので、報告に写させるために書く |
 | `{{stage_prohibitions}}` | 下の「段ごとの禁止事項」の該当する段の項目 |
@@ -108,9 +108,9 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 段 1・段 2:
 
 - 記録 YAML と生成サマリ以外のファイルを作らない・変えない・消さない。
-- コミットしない。**記録のコミットも含む** — 記録のディレクトリが git の追跡内でも、コミットは呼び出し側が検証の後に行う。
+- コミットしない。**記録のコミットも含む** — 記録のディレクトリが git の追跡内でも、コミットは呼び出し元が検証の後に行う。
 - 段 1 は `approach` と `order` を書かない (`investigated` の条件の正本は record-schema.md の `plans[]` の表)。段 2 は記録の外のファイルを変えない。
-- 段 1 は手順 4 の末尾の「立案者の選択」を行わない — 回の番号と回数の閾値 N を比べず、人間に質問せず、問題を `status: awaiting-human` にしない。段 1 の結果はすべて `status: investigated` で返す (立案者の選択はセッション側が行う)。**束ね方や直し方に人間の判断が要ると思ったときも選択待ちにせず**、`investigated` で返す。**調べた事実は記録の `investigation` に書き、判断が要るという見解は報告に書く** (見解の記載先は下の「報告の様式」の「できなかったこと」。様式に項目を足さない) — 次の段に渡るのは記録だけで (SKILL.md の前提知識)、記録に見解を書く欄は無い (様式の正本は [record-schema.md](../../review-triage/references/record-schema.md) の調査の表)。**段 2 は記録の事実から判断する。** 見解は、報告を読む呼び出し側と人間のためのものである。
+- 段 1 は手順 4 の末尾の「立案者の選択」を行わない — 回の番号と回数の閾値 N を比べず、人間に質問せず、問題を `status: awaiting-human` にしない。段 1 の結果はすべて `status: investigated` で返す (立案者の選択は呼び出し元のセッションが行う)。**束ね方や直し方に人間の判断が要ると思ったときも選択待ちにせず**、`investigated` で返す。**調べた事実は記録の `investigation` に書き、判断が要るという見解は報告に書く** (見解の記載先は下の「報告の様式」の「できなかったこと」。様式に項目を足さない) — 次の段に渡るのは記録だけで (SKILL.md の前提知識)、記録に見解を書く欄は無い (様式の正本は [record-schema.md](../../review-triage/references/record-schema.md) の調査の表)。**段 2 は記録の事実から判断する。** 見解は、報告を読む呼び出し元と人間のためのものである。
 
 段 3:
 
@@ -124,7 +124,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 ````markdown
 # review-triage-fix の段の依頼: 段 {{stage_no}} ({{stage_name}}) — {{branch}} の回 {{round}}
 
-この依頼文は、スキル `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) が、段を sub-agent で走らせるために書いたものである。受け取った側はこの依頼文と「読む文書」だけを読んで、指示された段を 1 つ実行し、結果を記録 YAML に書き、「報告の様式」のとおり報告する。依頼文の作り方と呼び出し側の検証の正本は `review-triage-fix` の `references/stage-subagent.md` — 受け取った側が読む必要は無い。
+この依頼文は、スキル `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) が、段を sub-agent で走らせるために書いたものである。受け取った sub-agent はこの依頼文と「読む文書」だけを読んで、指示された段を 1 つ実行し、結果を記録 YAML に書き、「報告の様式」のとおり報告する。依頼文の作り方と呼び出し元の検証の正本は `review-triage-fix` の `references/stage-subagent.md` — 受け取った sub-agent が読む必要は無い。
 
 ## 値 — この値で動く。自分で別の値を選ばない
 
@@ -164,7 +164,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - HEAD と作業ツリー: (段の前後の HEAD の短縮 SHA。記録のディレクトリの外に変更が無いこと。段 3 は未コミットの変更が無いこと)
 ````
 
-## 呼び出し側の検証 (段が返ったら必ず)
+## 呼び出し元の検証 (段が返ったら必ず)
 
 **sub-agent の報告は要約であって、判定の材料は記録 YAML と git の状態である。結果は検証してから反映する** ([premise-check.md](../../review-triage/references/premise-check.md) と同じ原則 — 上流の結果を追認せず、自分で確認する)。
 
@@ -174,7 +174,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 1. **報告が様式のとおりか** — 項目の不足・様式に無い項目・「不明」の項目。
 2. **記録 YAML を再度読み込み、設定の `triage_check_command` を走らせる** (未設定なら走らせていないことを報告に書く — [project-config.md](../../review-triage/references/project-config.md))。
-3. **モデルの突き合わせ** — 報告の「動いているモデル」が実効モデルの指すモデルと同じか。別名は版を含まないので、申告の名前のうち版を除いた部分と比べる。**一致しなければ人間に報告する** ([review-request.md](../../review-triage/references/review-request.md) の「値で明記し、報告させる」の規則と同じ — sub-agent の側で変わった値を、依頼どおりの値として報告しないため)。
+3. **モデルの突き合わせ** — 報告の「動いているモデル」が実効モデルの指すモデルと同じか。別名は版を含まないので、申告の名前のうち版を除いた部分と比べる。**一致しなければ人間に報告する** ([review-request.md](../../review-triage/references/review-request.md) の「値で明記し、報告させる」の規則と同じ — sub-agent で変わった値を、依頼どおりの値として報告しないため)。
 4. **effort** — 報告には、使った定義名から導いた effort を書く (「effort と定義名の対応」を逆に引く)。
 
 段ごとに確認すること:
@@ -183,9 +183,9 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | --- | --- | --- |
 | 段 1 | `{{targets}}` の採択がすべて `plans` (`status: investigated`) か `plan_ref` で覆われた。`investigated` に `investigation` がある (検査が報告する)。`investigated` に `approach`・`order` が無い (検査が報告する) | HEAD が段の前と同じ。`git status --porcelain` の差分が記録のディレクトリ (`record_dir`) 配下だけ |
 | 段 2 | `{{targets}}` の `investigated` がすべて `pending` か `awaiting-human` に進んだ。`awaiting-human` に `options` がある (検査が報告する)。`investigated` のまま残った問題があれば、理由が報告の「できなかったこと」にある | 同上 |
-| 段 3 | `{{targets}}` の `pending` が `done` (`sha`) か `done-external` に進んだ。**`done` の各 `sha` が HEAD の履歴にある** (`git merge-base --is-ancestor <sha> HEAD`)。`pending` のまま残った問題があれば、理由が報告にある (区切りでの中断は失敗ではない — 次の再開が段 3 から続ける) | **作業ツリーに未コミットの変更が無い** (`git status --porcelain` が空)。**最終 HEAD で設定の `gates` を 1 度走らせる** — sub-agent がコミットごとに通したと報告していても、呼び出し側は最終状態を自分で確認する。`gates` が未設定なら、走らせていないことを報告に書く |
+| 段 3 | `{{targets}}` の `pending` が `done` (`sha`) か `done-external` に進んだ。**`done` の各 `sha` が HEAD の履歴にある** (`git merge-base --is-ancestor <sha> HEAD`)。`pending` のまま残った問題があれば、理由が報告にある (区切りでの中断は失敗ではない — 次の再開が段 3 から続ける) | **作業ツリーに未コミットの変更が無い** (`git status --porcelain` が空)。**最終 HEAD で設定の `gates` を 1 度走らせる** — sub-agent がコミットごとに通したと報告していても、呼び出し元は最終状態を自分で確認する。`gates` が未設定なら、走らせていないことを報告に書く |
 
-検証が通ったら次の段に進む (段 1 の後は、手順 4 の末尾の「立案者の選択」をセッション側で行ってから)。
+検証が通ったら次の段に進む (段 1 の後は、手順 4 の末尾の「立案者の選択」を呼び出し元のセッションで行ってから)。
 
 ## 失敗時
 
@@ -197,12 +197,12 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - 報告が様式に合わない、動いているモデルが実効モデルと一致しない
 - 段 3 の `done` の `sha` が HEAD の履歴に無い、最終 HEAD で `gates` が失敗した
 
-**再試行しない理由**: 同じ依頼文で走らせても同じ結果になりやすく、壊れた記録の上に 2 度目の結果が重なる。**セッション内に切り替えない理由**: 走らせ方は手順 1 で決めて報告するもので、失敗を契機に呼び出し側が変えると、報告した走らせ方と実態が一致しなくなる。壊れた記録は人間が直す (記録のディレクトリが git の追跡内なら git で戻せる)。
+**再試行しない理由**: 同じ依頼文で走らせても同じ結果になりやすく、壊れた記録の上に 2 度目の結果が重なる。**セッション内に切り替えない理由**: 走らせ方は手順 1 で決めて報告するもので、失敗を契機に呼び出し元が変えると、報告した走らせ方と実態が一致しなくなる。壊れた記録は人間が直す (記録のディレクトリが git の追跡内なら git で戻せる)。
 
 ## 記録のディレクトリが git の追跡内のとき
 
-- **段 1・2 の後**: 検証が通ったら、**呼び出し側が**記録とサマリをコミットする (分け方の正本は [record-schema.md](../../review-triage/references/record-schema.md#コミット) のコミット節)。sub-agent はコミットしない (禁止事項)。
-- **段 3**: 現行の手順 7 どおり、区切りで sub-agent が記録とサマリをコミットする。呼び出し側は未コミットの変更が無いことを確認する (上の表)。
+- **段 1・2 の後**: 検証が通ったら、**呼び出し元が**記録とサマリをコミットする (分け方の正本は [record-schema.md](../../review-triage/references/record-schema.md#コミット) のコミット節)。sub-agent はコミットしない (禁止事項)。
+- **段 3**: 現行の手順 7 どおり、区切りで sub-agent が記録とサマリをコミットする。呼び出し元は未コミットの変更が無いことを確認する (上の表)。
 - 追跡外 (既定のディレクトリ) では、どの段でも記録のコミットは無い。
 
 ## 段の実行情報は報告に書き、記録には残さない

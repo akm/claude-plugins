@@ -671,13 +671,13 @@ func TestReviewTriageSummaryRenderBranches(t *testing.T) {
 		"developer → operator", // audience の上書きの表示
 		"| 対象外 |",              // premise stages none のセル (summary の語との誤一致を避けて列で照合)
 		"| P1 | c1 | #2 | a1 | — | 未着手 | — |",               // order 無しの行全体 (他列の — との誤一致を避ける)
-		"| P2 | c2 | #2 | a2 | 2 (P1 の後) | 済 | `abc9999` |", // depends_on と sha 真側の行全体
+		"| P2 | c2 | #2 | a2 | 2 (P1 の後) | 済 | `abc9999` |", // depends_on と sha が真の場合の行全体
 	} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("%q がサマリに無い:\n%s", want, summary)
 		}
 	}
-	// 偽側: audience_initial == audience の指摘 (id 3) には上書きの矢印を出さない。
+	// 偽の場合: audience_initial == audience の指摘 (id 3) には上書きの矢印を出さない。
 	if strings.Count(summary, "→") != 1 {
 		t.Fatalf("上書きの矢印は 1 箇所 (id 1) だけのはず:\n%s", summary)
 	}
@@ -776,7 +776,7 @@ func TestListReviewTriageFiles(t *testing.T) {
 
 // TestInReviewTriageDirNotationVariants は、ディレクトリの表記が揺れても検査の対象が
 // 変わらないことを検証する。生の文字列に "/" を足して HasPrefix で照合していた頃は、
-// "." / "./rec" / "rec//" で一覧側 (path.Join が clean する) と前置が一致せず、
+// "." / "./rec" / "rec//" で一覧を作る関数 (path.Join が clean する) と前置が一致せず、
 // 検査が 1 件も走らないまま成功した。
 func TestInReviewTriageDirNotationVariants(t *testing.T) {
 	saved := reviewTriageDir
@@ -1099,11 +1099,11 @@ func TestReviewTriageSummaryCounts(t *testing.T) {
 	if strings.Contains(summary, "選択待ち") {
 		t.Fatalf("pending だけの記録に選択待ちの表示が出ている:\n%s", summary)
 	}
-	// gates_fired の結合表示 (真側)。
+	// gates_fired の結合表示 (真の場合)。
 	if !strings.Contains(summary, "developer-domain") {
 		t.Fatalf("gates_fired の表示が無い:\n%s", summary)
 	}
-	// run_id 空の見出しに括弧を付けない・depends_on 空の順序セルに接尾辞を付けない (偽側)。
+	// run_id 空の見出しに括弧を付けない・depends_on 空の順序セルに接尾辞を付けない (偽の場合)。
 	if !strings.Contains(summary, "`code-review`\n") {
 		t.Fatalf("run_id 空の見出しに余計な表示が付いている:\n%s", summary)
 	}
@@ -1243,7 +1243,7 @@ func TestReviewTriageRecordUnknownStatusReportsOnce(t *testing.T) {
 
 // 修正計画の表の最終列は SHA と URL の 2 つの型を取るので、見出しは「証拠」で
 // なければならない。見出しを SHA に戻すと、done-external の行の URL を SHA として
-// 読ませることになる (セルを埋める側だけ直して見出しに追随しなかった種類の欠陥)。
+// 読ませることになる (セルを埋める処理だけ直して見出しに追随しなかった種類の欠陥)。
 func TestReviewTriageSummaryPlanEvidenceHeader(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML,
 		"        sha: \"\"\n        status: pending\n",
