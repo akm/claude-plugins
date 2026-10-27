@@ -392,7 +392,7 @@ class TestHookBehavior(unittest.TestCase):
         self.assertEqual(codes, [NOTIFIED, NOTIFIED, NOTIFIED])
 
     def test_old_markers_are_swept_on_notify(self):
-        # 通知した回に掃除が走る。古いセッションの記録を残し続けない。
+        # 通知した回に掃除が実行される。古いセッションの記録を残し続けない。
         state = os.path.join(self.state, "commit-rules-guard")
         os.makedirs(state, exist_ok=True)
         stale = os.path.join(state, "ancient.seen")
