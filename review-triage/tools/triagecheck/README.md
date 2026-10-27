@@ -245,6 +245,7 @@ bin/review-triage-check -write-summary   # 生成サマリを書き出す
 | review-triage の版 | 変えた書式 |
 | --- | --- |
 | 0.24.0 | 回の見出し「## 回 N: …」→「## N 回目: …」、束ね先「(束ね先: 回 N の …)」→「(束ね先: N 回目の …)」、検知の根拠の行「指摘 #M と回 N の …」→「指摘 #M と N 回目の …」、捉え直しの出所「スキルの見立て (skill)」→「スキルの見解 (skill)」([#87](https://github.com/akm/claude-plugins/issues/87)) |
+| 0.25.0 | 調査済み・未立案の注記の末尾「`review-triage-fix` が立案 (段 2) から続ける」→「`review-triage-fix` が立案フェーズから続ける」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 
 ## テスト
 

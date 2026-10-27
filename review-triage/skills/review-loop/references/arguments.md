@@ -6,7 +6,7 @@
 
 ```
 review-loop [--model <指定>] [--effort <値>] [--review <スキル名>] [--review-args "<引数>"]
-            [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <段>[=<値>]]...
+            [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <フェーズ>[=<値>]]...
             [--wait-minutes <分>] [--worker-wait-minutes <分>] [--full-review] [--base <ブランチ>]
 review-loop --resume [<ループのディレクトリ>] [--max <回数>] [--full-review] [--base <ブランチ>]
 review-loop --end [<ループのディレクトリ>]
@@ -21,7 +21,7 @@ review-loop --end [<ループのディレクトリ>]
 | `--max` | `loop.max_rounds` | `--max 3` |
 | `--structure-rounds` | `loop.structure_rounds` | `--structure-rounds 0` |
 | `--threshold` | `fix.threshold_rounds` | `--threshold 3` |
-| `--stage` | `fix.stages.<段>` | `--stage investigate=sonnet:high` |
+| `--stage` | `fix.stages.<フェーズ>` | `--stage investigate=sonnet:high` |
 | `--wait-minutes` | `review_loop.wait_minutes` | `--wait-minutes 5` |
 | `--worker-wait-minutes` | `review_loop.worker_wait_minutes` | `--worker-wait-minutes 5` |
 | `--full-review` | 無し (`loop.yaml` の `review.full_review` に書く) | `--full-review` |

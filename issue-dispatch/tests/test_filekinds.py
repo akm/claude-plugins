@@ -121,10 +121,10 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(r2["matched"]["source"], "default")
 
     def test_earlier_stage_wins_when_two_rules_match(self):
-        """種類の違う 2 つの規則に一致すれば、6 段の順で先の種類。"""
+        """種類の違う 2 つの規則に一致すれば、判定の条件の順で先の種類。"""
         rules = [{"pattern": "gen/**", "kind": "divisible"}, {"pattern": "**/*.go", "kind": "generated"}]
         r = filekinds.classify("gen/a.go", rules, _DEFAULT)
-        self.assertEqual(r["kind"], "generated", "規則の並び順ではなく段の順で決めること")
+        self.assertEqual(r["kind"], "generated", "規則の並び順ではなく判定の条件の順で決めること")
         self.assertEqual(r["matched"]["pattern"], "**/*.go")
 
     def test_first_rule_wins_among_the_same_kind(self):
@@ -212,7 +212,7 @@ class DefaultTableTest(unittest.TestCase):
                          "`**/*.json` より前の `**/package.json` の属性になること")
         self.assertEqual(filekinds.classify("config/app.json", [], _DEFAULT)["unit_notation"], "json-key")
         self.assertEqual(filekinds.classify("a/npm-shrinkwrap.json", [], _DEFAULT)["kind"], "generated",
-                         "`**/*.json` より段の順で先の generated になること")
+                         "`**/*.json` より判定の条件の順で先の generated になること")
         self.assertEqual(filekinds.classify("cmd/main.go", [], _DEFAULT)["split_reference"], "directory")
         self.assertEqual(filekinds.classify("src/app.ts", [], _DEFAULT)["split_reference"], "file")
 

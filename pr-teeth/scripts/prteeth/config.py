@@ -64,7 +64,7 @@ def resolve_language(repo, config, cli_lang=None):
     3. config.toml の language（ユーザー既定）
     4. 組み込み既定 "ja"
 
-    無人実行では cli_lang が None になり、2〜4 段だけで解決する（第14節）。
+    無人実行では cli_lang が None になり、2〜4 番目だけで解決する（第14節）。
     """
     if cli_lang and str(cli_lang).strip():
         return str(cli_lang).strip()

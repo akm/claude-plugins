@@ -201,9 +201,9 @@ type recordPlan struct {
 	ProblemID  string `yaml:"problem_id"`
 	Cause      string `yaml:"cause"`
 	FindingIDs []int  `yaml:"finding_ids"`
-	// Approach (修正方法) と Order (順序) は review-triage-fix の段 2 (立案) が書く。
+	// Approach (修正方法) と Order (順序) は review-triage-fix の立案フェーズが書く。
 	// 書く条件は status ごとに決まる — pending / done / done-external では approach が
-	// 必須、awaiting-human では任意 (人間の回答の後に書く)、investigated (段 1 の
+	// 必須、awaiting-human では任意 (人間の回答の後に書く)、investigated (調査フェーズの
 	// 結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
 	Approach string `yaml:"approach"`
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
@@ -674,13 +674,13 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 			switch pl.Status {
 			case "investigated":
-				// 段 1 (調査) の結果だけを持つ状態。修正方法と順序は段 2 (立案) が書いて
-				// pending / awaiting-human に進める。ここに書いてあると、段 2 が書いたのか
-				// 段 1 が段 2 の中身まで書いたのかを記録から読めなくなるので、書いてあれば報告する。
+				// 調査フェーズの結果だけを持つ状態。修正方法と順序は立案フェーズが書いて
+				// pending / awaiting-human に進める。ここに書いてあると、立案フェーズが書いたのか
+				// 調査フェーズが立案フェーズの中身まで書いたのかを記録から読めなくなるので、書いてあれば報告する。
 				noSHAYet()
 				// 調査 (investigation) は他の状態では任意だが、この状態では必須。
 				// 無いことは「未調査」を意味する (スキーマ表) ので、調査済みの状態と矛盾する。
-				// 通してしまうと、段 2 が未調査の問題に立案し、同じ原因の別の現れが残る。
+				// 通してしまうと、立案フェーズが未調査の問題に立案し、同じ原因の別の現れが残る。
 				// 中身 (scope) の検査は下の inv != nil の検査に委ねる。
 				if pl.Investigation == nil {
 					add("%s: 調査済み (investigated) には investigation (調べた範囲と結果) が必須。"+
@@ -936,7 +936,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			for _, pl := range run.Plans {
 				b.WriteString(recordRow(renderPlanCells(pl)))
 			}
-			// 調査済み・未立案 (investigated) の注記。段 1 (調査) の結果だけがあり、修正方法と
+			// 調査済み・未立案 (investigated) の注記。調査フェーズの結果だけがあり、修正方法と
 			// 順序をまだ持たない問題が残っている回にだけ、表の下に件数と問題 id を出す。
 			// 無い回には 1 バイトも出さず、推移の表にも列を足さない — 鮮度の検査が描画結果の
 			// 全文一致なので、無い記録の出力が変わるとディレクトリの既存サマリがすべて古いと
@@ -1149,7 +1149,7 @@ func renderInvestigatedNote(b *strings.Builder, plans []recordPlan) {
 	if len(ids) == 0 {
 		return
 	}
-	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案 (段 2) から続ける\n",
+	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案フェーズから続ける\n",
 		len(ids), strings.Join(ids, ", "))
 }
 

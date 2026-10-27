@@ -283,7 +283,7 @@ class RepoConfigTest(ConfigTestBase):
                 self.assertEqual(bool(config.REPO_NAME_RE.match(name)), ok)
 
     def test_file_rule_kind_must_be_a_rule_kind(self):
-        """`kind` は規則に書ける種類 (file-kinds.md の段 2〜6)。`unknown-content` と知らない値は警告して外す。"""
+        """`kind` は規則に書ける種類 (file-kinds.md の表の 2〜6 番目)。`unknown-content` と知らない値は警告して外す。"""
         _write_config(self.root, {"files": [
             {"pattern": "a/**", "kind": "unknown-content"},
             {"pattern": "b/**", "kind": "sectioned"},
