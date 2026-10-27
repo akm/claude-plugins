@@ -14,6 +14,6 @@
 
 言い換えを決めた語と、使い続けると決めた語は、ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` に例として記録している (様式の正本はファイル [wording-guard/skills/wording-guard/references/terms.md](wording-guard/skills/wording-guard/references/terms.md))。
 
-例外: トリアージ記録 (現行のディレクトリ `tmp/review-triages/` と、過去にコミットした `docs/review-triage/`) は、レビュー指摘を逐語で引用するため書き換えない。
+例外: トリアージ記録 (現行のディレクトリ `tmp/review-triages/` と、過去にコミットした `docs/review-triage/`) は、レビュー指摘を逐語で引用するため書き換えない。`docs/review-triage/` のサマリ (`*.md`) も、triagecheck が生成するサマリの書式が変わった後に再生成せず、生成した当時の書式のまま残す。そのため、このディレクトリは triagecheck で検査しない (設定 `.claude/akm-claude-plugins/review-triage/config.json` の `record_dir` は `tmp/review-triages`)。
 
 経緯は [#35](https://github.com/akm/claude-plugins/issues/35) と [#89](https://github.com/akm/claude-plugins/issues/89) を参照。

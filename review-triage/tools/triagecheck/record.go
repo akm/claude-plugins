@@ -216,7 +216,7 @@ type recordPlan struct {
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
 	Verification *recordVerification `yaml:"verification"`
-	// DocDag は修正の後の doc-dag の確認 (対象と、向きの無い重複・巡回の有無と対処)。任意だが、
+	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが正本か決まっていない重複・参照の循環の有無と対処)。任意だが、
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
 	DocDag    *recordDocDag `yaml:"doc_dag"`
 	Options   string        `yaml:"options"`
@@ -745,7 +745,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: doc_dag.scope がありません (doc-dag に渡した対象の文書群)", pn)
 				}
 				if strings.TrimSpace(dd.Result) == "" {
-					add("%s: doc_dag.result がありません (向きの無い重複・巡回の有無と対処)", pn)
+					add("%s: doc_dag.result がありません (どちらが正本か決まっていない重複・参照の循環の有無と対処)", pn)
 				}
 			}
 			// 検証 (verification) は任意だが、書くなら再確認した範囲 (near_edges) が要る。
@@ -896,10 +896,11 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	}
 
 	for i, run := range doc.Runs {
-		// サマリに出す文言は、語の言い換え (#135) でも変えない。鮮度の検査は描画結果の
-		// 全文一致なので、文言を変えるとディレクトリに残る既存のサマリがすべて古いと報告される。
-		// 束ね先・根拠の行・出所の文言も同じ。
-		fmt.Fprintf(&b, "\n## 回 %d: %s `%s`", i+1, recordCell(run.Date), recordCell(run.Skill))
+		// 鮮度の検査は描画結果の全文一致なので、サマリに出す文言を変えると、ディレクトリに残る
+		// 既存のサマリがすべて古いと報告される。0.24.0 で回の書き方を「N 回目」に変えたときは、
+		// 再生成が要ることを README の「生成サマリの書式の変更」に書いた。束ね先・根拠の行・
+		// 出所の文言も同じ。
+		fmt.Fprintf(&b, "\n## %d 回目: %s `%s`", i+1, recordCell(run.Date), recordCell(run.Skill))
 		if run.RunID != "" {
 			fmt.Fprintf(&b, " (%s)", recordCell(run.RunID))
 		}
@@ -1088,8 +1089,8 @@ func renderVerdictCell(fd recordFinding) string {
 		cell += ")"
 	}
 	if fd.PlanRef != nil {
-		// 文言はサマリに出るので変えない (理由は renderReviewTriageSummaryDoc の回の見出しのコメント)
-		cell += fmt.Sprintf(" (束ね先: 回 %d の %s)", fd.PlanRef.Run, recordCell(fd.PlanRef.Problem))
+		// 文言はサマリに出る (変えたときの扱いは renderReviewTriageSummaryDoc の回の見出しのコメント)
+		cell += fmt.Sprintf(" (束ね先: %d 回目の %s)", fd.PlanRef.Run, recordCell(fd.PlanRef.Problem))
 	}
 	return cell
 }
@@ -1182,8 +1183,8 @@ func renderInvestigation(inv *recordInvestigation) string {
 func renderRecurrence(b *strings.Builder, rec *recordRecurrence) {
 	fmt.Fprintf(b, "- 状態: %s\n", recordRecurrenceStatusJa(rec.Status))
 	for _, ev := range rec.Evidence {
-		// 文言はサマリに出るので変えない (理由は renderReviewTriageSummaryDoc の回の見出しのコメント)
-		fmt.Fprintf(b, "- 根拠: %s — 指摘 #%d と回 %d の %s: %s\n",
+		// 文言はサマリに出る (変えたときの扱いは renderReviewTriageSummaryDoc の回の見出しのコメント)
+		fmt.Fprintf(b, "- 根拠: %s — 指摘 #%d と %d 回目の %s: %s\n",
 			recordRecurrenceConditionJa(ev.Condition), ev.FindingID, ev.PriorRun,
 			recordCell(ev.Prior), recordCell(ev.Reason))
 	}
@@ -1225,8 +1226,8 @@ func recordReframeSourceJa(s string) string {
 	case "human":
 		return "人間の確認 (human)"
 	case "skill":
-		// 文言はサマリに出るので変えない (理由は renderReviewTriageSummaryDoc の回の見出しのコメント)
-		return "スキルの見立て (skill)"
+		// 文言はサマリに出る (変えたときの扱いは renderReviewTriageSummaryDoc の回の見出しのコメント)
+		return "スキルの見解 (skill)"
 	}
 	return recordCell(s)
 }
