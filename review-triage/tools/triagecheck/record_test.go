@@ -1647,14 +1647,14 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 
 // --- 調査済み・未立案 (investigated) の状態 ---
 //
-// review-triage-fix の段 1 (調査) の結果 (原因・束ね・調査) は、修正方法 (approach) と
+// review-triage-fix の調査フェーズの結果 (原因・束ね・調査) は、修正方法 (approach) と
 // 順序 (order) をまだ持たない問題として plans[].status: investigated で記録に置く。
 // approach と order を書く条件は状態ごとに決まる — pending / done / done-external では
 // approach が必須 (order は任意)、awaiting-human では任意 (人間の回答の後に書く)、
 // investigated では書かない (書いてあれば報告する)。被覆の規則 (採択は plans か
 // plan_ref で覆う) は状態を問わない。
 
-// investigatedPlansYAML は段 1 の結果だけを持つ問題 (approach と order が無い) の
+// investigatedPlansYAML は調査フェーズの結果だけを持つ問題 (approach と order が無い) の
 // plans 節。validRecordYAML の plans 節と差し替えて使う。
 const investigatedPlansYAML = `    plans:
       - problem_id: P1
@@ -1674,9 +1674,9 @@ func TestReviewTriageRecordInvestigatedPasses(t *testing.T) {
 	}
 }
 
-// investigated に後の段が書くキーがあれば報告する。approach / order は段 2 (立案) の
-// 中身で、段 1 の結果に混ざると、段 2 が書いたのか段 1 が越境したのかを記録から
-// 読めなくなる。sha は段 3 (修正) の結果で、done-external 専用のキー
+// investigated に後のフェーズが書くキーがあれば報告する。approach / order は立案フェーズの
+// 中身で、調査フェーズの結果に混ざると、立案フェーズが書いたのか調査フェーズが越境したのかを記録から
+// 読めなくなる。sha は修正フェーズの結果で、done-external 専用のキー
 // (applied_external_url / notes) も同じく修正を終えた状態にしか無い — 調査だけの
 // 問題に残っていると、サマリが調査済みの行に sha を並べて、直したように見える。
 func TestReviewTriageRecordInvestigatedRejectsLaterStageKeys(t *testing.T) {
@@ -1716,8 +1716,8 @@ func TestReviewTriageRecordInvestigatedRejectsLaterStageKeys(t *testing.T) {
 
 // investigated に investigation (調べた範囲と結果) が無ければ報告する。investigation が
 // 無いことは「未調査」を意味する (record-schema.md の plans[] の表) ので、調査済みの
-// 状態と矛盾する — 段 1 が調査を飛ばして原因と束ねだけを書いた記録が検査を通ると、
-// 段 2 が未調査の問題に立案し、同じ原因の別の現れが残る。
+// 状態と矛盾する — 調査フェーズが調査を飛ばして原因と束ねだけを書いた記録が検査を通ると、
+// 立案フェーズが未調査の問題に立案し、同じ原因の別の現れが残る。
 func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 	plans := strings.Replace(investigatedPlansYAML,
 		"        investigation:\n          scope: grep -rn '分母' . と docs/foo.md の同じ表の全行\n", "", 1)

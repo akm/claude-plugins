@@ -1,6 +1,6 @@
 # nearedges
 
-Markdown の修正の差分から、**近くの辺** — 変更した箇所と同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 — を列挙する。`review-triage-fix` の段 3 (修正) でコミットの前に再確認する範囲を、人の判断ではなく差分から決めるための道具 ([verification.md](../../skills/review-triage-fix/references/verification.md) の観点 B)。
+Markdown の修正の差分から、**近くの辺** — 変更した箇所と同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 — を列挙する。`review-triage-fix` の修正フェーズでコミットの前に再確認する範囲を、人の判断ではなく差分から決めるための道具 ([verification.md](../../skills/review-triage-fix/references/verification.md) の観点 B)。
 
 **なぜ要るか。** 修正の波及先のうち、別のファイル・別の節にあって同じ語を共有するもの (遠くの辺) は grep で辿れる。同じ表の他の行・同じ行の他の列・同じ段落の次の文は同じ語を共有しないので目で読むしかなく (近くの辺)、読む範囲を人が決めると省かれる。省かれた回は次のレビューの採択として現れる ([#56](https://github.com/akm/claude-plugins/issues/56))。
 
