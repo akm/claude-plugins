@@ -556,6 +556,13 @@ replacements = ["ループ"]
 reason = "日本語の「周回」はコースや軌道を回ること。処理の繰り返しの全体 (開始から停止まで) は「ループ」、その中の 1 回分は「1 回」と書く (スキル名 review-loop・ファイル loop.yaml とそろう)"
 decided_in = "https://github.com/akm/claude-plugins/issues/87"
 
+[[terms]]
+pattern = "/(?<![一-龯々])回 (?:\\d|N)/"
+verdict = "avoid"
+replacements = ["1 回目", "N+1 回目以降"]
+reason = "英語 (Round 1) の語順で、名詞の後に番号を置いている。日本語では「1 回目」「N+1 回目以降」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+
 # ---- 許容する語 ----
 
 [[terms]]
