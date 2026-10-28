@@ -12,7 +12,7 @@
 
 網羅的な避ける表現の一覧は作らない。列挙を検査の範囲にすると、一覧に無いものが検査されないまま残る。例として一覧を作ることは許容する。そのときは、一覧が例であって範囲ではないことを一覧に書く。一覧に無い表現も、この 3 原則に照らして判断する。
 
-言い換えを決めた語と、使い続けると決めた語は、ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` に例として記録している (様式の正本はファイル [wording-guard/skills/wording-guard/references/terms.md](wording-guard/skills/wording-guard/references/terms.md))。
+言い換えを決めた語と、使い続けると決めた語は、ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` に例として記録している (様式の SSOT はファイル [wording-guard/skills/wording-guard/references/terms.md](wording-guard/skills/wording-guard/references/terms.md))。
 
 例外: トリアージ記録 (現行のディレクトリ `tmp/review-triages/` と、過去にコミットした `docs/review-triage/`) は、レビュー指摘を逐語で引用するため書き換えない。`docs/review-triage/` のサマリ (`*.md`) も、triagecheck が生成するサマリの書式が変わった後に再生成せず、生成した当時の書式のまま残す。そのため、このディレクトリは triagecheck で検査しない (設定 `.claude/akm-claude-plugins/review-triage/config.json` の `record_dir` は `tmp/review-triages`)。
 

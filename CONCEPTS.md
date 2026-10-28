@@ -86,42 +86,42 @@ LLM が手順書に従ってその場で組み立てる構造化データ。
 ### フェーズ
 `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) の手順を、結果を記録 YAML に書いて区切った 3 つの区分 — 調査フェーズ (原因を書いて束ね、類似箇所と影響範囲を調べる)・立案フェーズ (修正方法と順序を決める)・修正フェーズ (直して検証し、コミットする)。境目で結果が記録に残るので、そこで中断・再開でき、フェーズごとに sub-agent で実行できる。
 
-各フェーズが行うこと・手順番号との対応・設定と引数での名前 (`investigate` / `plan` / `fix`) の正本は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の「手順」の冒頭で、ここでは言い直さない。
+各フェーズが行うこと・手順番号との対応・設定と引数での名前 (`investigate` / `plan` / `fix`) の SSOT は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の「手順」の冒頭で、ここでは言い直さない。
 
 ### 回数の閾値
 レビューと修正のループで、人間が立案に関与し始める回を決める、記録 (review-triage の記録 YAML) の回番号 N。N 回目までは通常どおり直し、N+1 回目以降は毎回、調査の後に人間が[立案者を選ぶ](#立案者の選択)。
 
-既定値・設定と引数のキー・数え方 (記録の回番号で数える) と、ループの上限との違いの正本は `review-triage` の [project-config.md](review-triage/skills/review-triage/references/project-config.md) の「`fix`」で、ここでは言い直さない。
+既定値・設定と引数のキー・数え方 (記録の回番号で数える) と、ループの上限との違いの SSOT は `review-triage` の [project-config.md](review-triage/skills/review-triage/references/project-config.md) の「`fix`」で、ここでは言い直さない。
 
 ### 立案者の選択
-[回数の閾値](#回数の閾値) N を越えた各回で、[立案フェーズ](#フェーズ) を誰が行うかを人間が選ぶこと。選択肢 (セッションのモデル / 指定モデルの sub-agent / 人間自身)・質問の仕方・設定で既定を持たない理由の正本は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の手順 4 で、ここでは言い直さない。
+[回数の閾値](#回数の閾値) N を越えた各回で、[立案フェーズ](#フェーズ) を誰が行うかを人間が選ぶこと。選択肢 (セッションのモデル / 指定モデルの sub-agent / 人間自身)・質問の仕方・設定で既定を持たない理由の SSOT は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の手順 4 で、ここでは言い直さない。
 
 同じ種類の指摘が続いているかをスキルが判断する仕組みと、指摘の繰り返しを図にして人間と確認する作業を置き換えるもの — どちらも人間に読まれなくなっていて、判断の結果が何も駆動していなかった。
 
 ### ループのディレクトリ
 `review-loop` (レビューを端末の[ワーカー](#ワーカー)に任せて、レビューと修正のループを回すスキル) の 1 つのループが、review-loop のセッションとワーカーの受け渡しに使うディレクトリ。ループごとに 1 つ作り、ループの条件と状態・依頼文・レビューの結果・[完了のフラグファイル](#完了のフラグファイル)・ワーカーの状態を、ファイルとして置く。2 つのプロセスはメッセージを送り合わず、このディレクトリの中のファイルだけで受け渡す。ループを終えても消さない。
 
-各ファイルの書き込み元・様式・失敗時の態度の正本は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) で、ここでは言い直さない。
+各ファイルの書き込み元・様式・失敗時の態度の SSOT は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) で、ここでは言い直さない。
 
 ### ワーカー
 人間が端末で起動し、[ループのディレクトリ](#ループのディレクトリ)に現れた依頼文ごとに、[使い捨ての作業ツリー](#使い捨ての作業ツリー)の中で `claude -p` を、人間が決めたモデルと effort で実行するプロセス (スクリプト `review-triage/scripts/review-loop-worker.sh`)。結果を確認してから[完了のフラグファイル](#完了のフラグファイル)を書き、次の依頼文が現れるまで待機する。レビュアの実行 (`claude -p` の 1 回) 以外の判断をすべてスクリプトで行う。
 
-起動時の確認・回の処理・権限の既定・終了の仕方の正本は `review-loop` の [worker.md](review-triage/skills/review-loop/references/worker.md) で、ここでは言い直さない。
+起動時の確認・回の処理・権限の既定・終了の仕方の SSOT は `review-loop` の [worker.md](review-triage/skills/review-loop/references/worker.md) で、ここでは言い直さない。
 
 ### 使い捨ての作業ツリー
 [ワーカー](#ワーカー)が依頼文ごとに一時ディレクトリに作る、元のリポジトリ (`review-loop` を実行するセッションが使うリポジトリ) の複製。依頼文の `head` (レビュー対象のコミット) を取り出してあり、レビュアの実行はこの中で動く。確認のための変更 (テストの実行や、コードを一時的に書き換えて検査が失敗するかを見ることなど) はこの中でだけ許し、回の終了時に複製ごと消すので、変更は元の作業ツリーに残らない。名前に「作業ツリー」とあるが、`git worktree` ではなく `git clone` で作る。ワーカーの文書では「複製」と呼ぶ。
 
-作り方・その中でのレビュアの実行の権限・消し方の正本は `review-loop` の [worker.md](review-triage/skills/review-loop/references/worker.md) の「回の処理」と「レビュアの実行の権限」で、ここでは言い直さない。
+作り方・その中でのレビュアの実行の権限・消し方の SSOT は `review-loop` の [worker.md](review-triage/skills/review-loop/references/worker.md) の「回の処理」と「レビュアの実行の権限」で、ここでは言い直さない。
 
 ### 完了のフラグファイル
 [ワーカー](#ワーカー)が依頼文 1 つを終えたことを、review-loop のセッションに知らせるファイル。その回を使えるか (`ok` / `failed`)、ワーカーに渡したモデルと effort、ログから読んだ実効モデルを持つ。review-loop のセッションはこのファイルが現れるまで待機し、このファイルと結果を依頼文と突き合わせてから記録に取り込む。
 
-様式の正本は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) の「`delivered-<識別子>.yaml`」、突き合わせの順序の正本は [round.md](review-triage/skills/review-loop/references/round.md) で、ここでは言い直さない。
+様式の SSOT は `review-loop` の [loop-files.md](review-triage/skills/review-loop/references/loop-files.md) の「`delivered-<識別子>.yaml`」、突き合わせの順序の SSOT は [round.md](review-triage/skills/review-loop/references/round.md) で、ここでは言い直さない。
 
 ### 再入の手順
 review-loop のセッションが、[完了のフラグファイル](#完了のフラグファイル)が現れるまで待機するバックグラウンドの処理の通知を受けたときと、人間が `--resume` でループを続けるときに入る、1 つの入口。会話の文脈に依存せず、ループのディレクトリのファイルと記録と通知の説明文だけから、次に何をするかを決める。入口を 1 つにしてあるので、compact (会話の自動要約) の後や、セッションを開き直した後でも同じ手順に戻れ、同じ回を 2 度取り込まない。
 
-手順の正本は `review-loop` の [reentry.md](review-triage/skills/review-loop/references/reentry.md) で、ここでは言い直さない。
+手順の SSOT は `review-loop` の [reentry.md](review-triage/skills/review-loop/references/reentry.md) で、ここでは言い直さない。
 
 ## 文書
 
