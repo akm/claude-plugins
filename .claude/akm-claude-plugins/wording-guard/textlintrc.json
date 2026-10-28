@@ -1,7 +1,7 @@
 {
   "filters": {
     "allowlist": {
-      "allow": ["/「[^」\\n]*」/"]
+      "allow": ["/「[^」\\n]*」/", "/\\|\\s*—\\s*(?=\\|)/"]
     }
   },
   "rules": {
@@ -9,7 +9,7 @@
       "literal-verb-translation": { "severity": "warning" },
       "vague-evaluative-ending": { "severity": "warning" },
       "calqued-metaphor": { "severity": "warning" },
-      "sentence-connection": false,
+      "sentence-connection": { "severity": "warning" },
       "foreign-field-term": false,
       "physical-verb-for-abstract": false,
       "nominalized-kango": false,
