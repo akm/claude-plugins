@@ -5,7 +5,7 @@ description: mermaid の図を含む HTML をプロジェクト内の tmp/ に�
 
 # mermaid-preview: mermaid 図の HTML プレビュー
 
-mermaid の図を人間に見せるための HTML を生成して開く。**この文書が、mermaid を HTML で表示する方法の検証済み知見の正本** — 他のスキル・文書はここを参照し、再掲しない。
+mermaid の図を人間に見せるための HTML を生成して開く。**この文書が、mermaid を HTML で表示する方法の検証済み知見の SSOT (single source of truth。ある事実を定めている唯一の記述)** — 他のスキル・文書はここを参照し、再掲しない。
 
 ## 検証済みの制約
 
