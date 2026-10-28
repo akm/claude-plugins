@@ -1,4 +1,4 @@
-// judgment_flow.go は review-triage の判定フローの正本 (judgment-flow.md) について、
+// judgment_flow.go は review-triage の判定フローの SSOT (judgment-flow.md) について、
 // mermaid の図のノード ID 集合と決定表の ID 集合が 1:1 で一致するかを検査する
 // (judgment-flow)。
 //
@@ -16,10 +16,10 @@ import (
 	"strings"
 )
 
-// judgmentFlowPath は判定フローの正本。ファイルが存在しないときは検査を
+// judgmentFlowPath は判定フローの SSOT。ファイルが存在しないときは検査を
 // 何もしない (対象は git 追跡でなくファイルの実在で決める)。
 //
-// スキルがプラグインとして配られると、この正本はリポジトリの外 (プラグインの
+// スキルがプラグインとして配られると、この SSOT はリポジトリの外 (プラグインの
 // 展開先) に置かれ、パスは環境ごとに違う。main が CLAUDE_PLUGIN_ROOT または
 // -judgment-flow から解決して設定する。既定はリポジトリ内にスキルを直接置く
 // 形 (プラグイン化前の配置) で、そのときだけこの値がそのまま使われる。

@@ -1,11 +1,11 @@
 // record.go はレビュー指摘のトリアージ記録 (既定は tmp/review-triages/*.yaml) の
 // スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
 //
-// 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
+// 記録の SSOT は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
 // 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・決め打ちの値の
 // ミスが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
 // 誤って失敗する」誤検出を生んだ。数えるものを書かせないことで、この類を発生源から消す。
-// スキーマの意味の正本は skills/review-triage/references/record-schema.md。
+// スキーマの意味の SSOT は skills/review-triage/references/record-schema.md。
 package main
 
 import (
@@ -61,7 +61,7 @@ func inReviewTriageDir(f string) bool {
 	return path.Dir(f) == path.Clean(reviewTriageDir)
 }
 
-// --- スキーマ (意味の正本は skills/review-triage/references/record-schema.md) ---
+// --- スキーマ (意味の SSOT は skills/review-triage/references/record-schema.md) ---
 
 type recordDoc struct {
 	Runs []recordRun `yaml:"runs"`
@@ -210,13 +210,13 @@ type recordPlan struct {
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
 	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
-	// 調査の手順の正本は review-triage-fix の references/investigation.md。
+	// 調査の手順の SSOT は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
 	// Verification は修正の後の検証のうち、観点 B (周りの記述を再確認する) で読んだ範囲。任意だが、
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
 	Verification *recordVerification `yaml:"verification"`
-	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが正本か決まっていない重複・参照の循環の有無と対処)。任意だが、
+	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが SSOT か決まっていない重複・参照の循環の有無と対処)。任意だが、
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
 	DocDag    *recordDocDag `yaml:"doc_dag"`
 	Options   string        `yaml:"options"`

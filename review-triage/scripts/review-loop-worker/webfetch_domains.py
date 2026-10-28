@@ -6,7 +6,7 @@
 終了コード: 0。14 の後にファイルを読めなくなったときなどは、Python の例外で 0 以外になる (呼び出し元は終了コードを見ない)。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 webfetch_domains。
-語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
+語の意味と振る舞いの SSOT は、ファイル review-triage/skills/review-loop/references/worker.md。
 """
 
 import json, re, sys

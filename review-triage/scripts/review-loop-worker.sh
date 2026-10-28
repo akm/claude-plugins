@@ -19,8 +19,8 @@
 #             2 = 引数の誤り・起動時の確認が通らない・他のワーカーが動いている /
 #             128 + シグナル番号 = 割り込み (INT / TERM / HUP)
 #
-# 振る舞いの正本は review-triage/skills/review-loop/references/worker.md (起動時の確認・回の処理・
-# 権限の既定・ログの読み方)、ループのディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
+# 振る舞いの SSOT は review-triage/skills/review-loop/references/worker.md (起動時の確認・回の処理・
+# 権限の既定・ログの読み方)、ループのディレクトリのファイルの様式の SSOT は同じディレクトリの loop-files.md。
 # プラグインの設定ファイル (config.json) は読まない — 値はすべて引数で受け、review-loop のセッションが案内のコマンドに埋める。
 # Claude Code の利用者の設定 (環境変数 CLAUDE_CONFIG_DIR があればその下、無ければ ~/.claude の settings.json) は
 # 読むが、使うのは起動時の確認と表示だけ。
@@ -35,7 +35,7 @@
 # 作業場所の中を cwd にしているプロセスを見つける・作業場所の中のディレクトリに権限を足す・パスの実体を求めるのに使う)。
 # python3 の処理はこのファイルに書かず、処理ごとのファイル (.py) にして、このスクリプトの実体と同じディレクトリの下の
 # ディレクトリ review-triage/scripts/review-loop-worker/ に置く。ファイル名は、そのファイルを python3 で実行する関数の名前に
-# 合わせる (setpgid_exec.py だけは、関数 run_prep と run_reviewer が共に使う)。各ファイルの説明の正本は、そのファイルの
+# 合わせる (setpgid_exec.py だけは、関数 run_prep と run_reviewer が共に使う)。各ファイルの説明の SSOT は、そのファイルの
 # 先頭のコメント。ワーカーは起動時にすべてのファイルの中身を変数に読み込み、実行するときは読み込んだ中身を python3 -I -c に
 # 渡す (実行中にプラグインが更新されて、ディレクトリの中身が消えても動き続けるため。関数 load_py_files)。
 # 読み込めたかは、起動時の確認の 8 で確認する。
@@ -43,7 +43,7 @@
 # 構成: ワーカーは 2 つのプロセスで動く。人間が起動したプロセス (親。worker.yaml の pid) は、起動時の確認を済ませて、
 # 回の処理を行うバックグラウンドのサブシェル (子) を起動したあとは、子が終了するまで待機するだけで、コマンド置換を使わない。
 # 割り込み (INT / TERM / HUP) は親が受け、割り込みを記録するファイルで子に伝える (関数 relay_interrupt と check_interrupt)。
-# bash は、コマンド置換を処理している間に受けたシグナルの trap を実行しないことがあるため。振る舞いと理由の正本は worker.md の「終了の仕方」。
+# bash は、コマンド置換を処理している間に受けたシグナルの trap を実行しないことがあるため。振る舞いと理由の SSOT は worker.md の「終了の仕方」。
 #
 # 不変条件: 作業場所のパスの下では git を実行しない。複製に対する git は、準備のディレクトリの中で、作業場所のパスに
 # 改名する前にだけ実行する (作業場所のパスはループの間使い回すので、前の回のレビュアの実行が残したプロセスも書ける。
@@ -55,10 +55,10 @@ WORKER_PID=$$
 POLL_SECONDS=5              # 依頼文を探す周期と、worker.yaml の更新時刻を進める周期
 OTHER_WORKER_FRESH_SECONDS=30  # 起動時の確認で、他のワーカーが動いていると判定する更新時刻の新しさ
 STOP_GRACE_SECONDS=5        # レビュアの実行や作業場所に残ったプロセスを TERM で停止してから KILL を送るまでの猶予
-RESULT_MAX_BYTES=1048576    # ループのディレクトリに複写する結果の大きさの上限 (1 MiB)。正本は worker.md の「回の処理」の手順 10
+RESULT_MAX_BYTES=1048576    # ループのディレクトリに複写する結果の大きさの上限 (1 MiB)。SSOT は worker.md の「回の処理」の手順 10
 
 # レビュアの実行に許すツールの既定の一覧 (--allowed-tools を 1 回でも指定すれば置き換わる)。
-# 正本は worker.md の「レビュアの実行の権限」
+# SSOT は worker.md の「レビュアの実行の権限」
 DEFAULT_ALLOWED_TOOLS=(
   'Bash(git diff:*)'
   'Bash(git log:*)'
@@ -298,37 +298,37 @@ load_py_files
 
 # ---- 起動時の確認に使う道具 (python3 を使う。read_worker_version のほかは、起動時の確認の 8 で python3 とそのスクリプトを確認した後に呼ぶ) ----
 
-# ワーカーのバージョンを標準出力に出す。$1 はこのスクリプトのパス。説明の正本は review-loop-worker/read_worker_version.py
+# ワーカーのバージョンを標準出力に出す。$1 はこのスクリプトのパス。説明の SSOT は review-loop-worker/read_worker_version.py
 read_worker_version() {
   run_py read_worker_version "$1"
 }
 
-# 起動時の確認の 12 (書き込みを許す場所の検査)。説明の正本は review-loop-worker/allow_write_problem.py
+# 起動時の確認の 12 (書き込みを許す場所の検査)。説明の SSOT は review-loop-worker/allow_write_problem.py
 allow_write_problem() {
   run_py allow_write_problem "$@"
 }
 
-# 起動時の確認の 13 (追加の引数の --settings の値の検査)。説明の正本は review-loop-worker/settings_arg_problem.py
+# 起動時の確認の 13 (追加の引数の --settings の値の検査)。説明の SSOT は review-loop-worker/settings_arg_problem.py
 settings_arg_problem() {
   run_py settings_arg_problem "$1"
 }
 
-# 起動時の確認の 14 (利用者の設定の検査)。説明の正本は review-loop-worker/user_settings_problem.py
+# 起動時の確認の 14 (利用者の設定の検査)。説明の SSOT は review-loop-worker/user_settings_problem.py
 user_settings_problem() {
   run_py user_settings_problem "$1"
 }
 
-# 起動時の確認の 15 (接続を許すホストに加わるドメインの表示)。説明の正本は review-loop-worker/webfetch_domains.py
+# 起動時の確認の 15 (接続を許すホストに加わるドメインの表示)。説明の SSOT は review-loop-worker/webfetch_domains.py
 webfetch_domains() {
   run_py webfetch_domains "$1"
 }
 
-# 作業場所の名前に付けるハッシュ。説明の正本は review-loop-worker/workspace_hash.py
+# 作業場所の名前に付けるハッシュ。説明の SSOT は review-loop-worker/workspace_hash.py
 workspace_hash() {
   run_py workspace_hash "$1"
 }
 
-# レビュアの実行に渡す --settings の JSON を組み立てて標準出力に出す。説明の正本は review-loop-worker/build_settings_json.py
+# レビュアの実行に渡す --settings の JSON を組み立てて標準出力に出す。説明の SSOT は review-loop-worker/build_settings_json.py
 build_settings_json() {
   run_py build_settings_json "$@"
 }
@@ -337,12 +337,12 @@ build_settings_json() {
 
 # 作業場所 ($1。実体パス) の中を cwd にしているプロセスを停止する。準備のディレクトリにも使う ($2 は出力に書くディレクトリの呼び名。
 # 省略すると「作業場所」)。TERM を送ってから KILL を送るまでの猶予は STOP_GRACE_SECONDS 秒。
-# 説明の正本は review-loop-worker/stop_cwd_procs.py
+# 説明の SSOT は review-loop-worker/stop_cwd_procs.py
 stop_cwd_procs() {
   run_py stop_cwd_procs "$1" "$STOP_GRACE_SECONDS" "${2:-作業場所}"
 }
 
-# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の権限を足す。説明の正本は review-loop-worker/make_removable.py
+# 作業場所 ($1) を rm -rf で消せるように、その中のディレクトリに所有者の権限を足す。説明の SSOT は review-loop-worker/make_removable.py
 make_removable() {
   run_py make_removable "$1"
 }
@@ -523,7 +523,7 @@ unavailable() {
   exit 2
 }
 
-# ---- 起動時の確認 (正本は worker.md の「起動時の確認」の表。番号は表の「順」) ----
+# ---- 起動時の確認 (SSOT は worker.md の「起動時の確認」の表。番号は表の「順」) ----
 
 STARTED=$(now_iso)
 
@@ -776,7 +776,7 @@ start_heartbeat() {
 }
 
 # バックグラウンドの処理 (PID $1。更新時刻を進める処理か上限を測る処理) に TERM を送り、プロセスが残っている間だけ終了まで待機する。
-# 残っていなければ組み込みコマンド wait で待機しない (正本は worker.md の「終了の仕方」)。これらの処理は親と子と同じプロセスグループで動くので、
+# 残っていなければ組み込みコマンド wait で待機しない (SSOT は worker.md の「終了の仕方」)。これらの処理は親と子と同じプロセスグループで動くので、
 # プロセスグループに届いた HUP ではすぐに (trap が無い)、TERM では自分の trap で、子と同時に終了する (INT は、バックグラウンドの
 # コマンドなので無視する)。bash 5 (Linux の 5.2 で確認した) は、trap を設定したシグナルで wait を途中で抜けるとき、その wait の中で
 # 回収した子プロセスの終了を記録しないことがあるので、準備のコマンドやレビュアの実行の終了まで待機する wait が、同時に終了したこれらの処理を
@@ -904,7 +904,7 @@ stop_group() {
   wait_child "$pgid"
 }
 
-# ---- 終了の仕方 (正本は worker.md の「終了の仕方」) ----
+# ---- 終了の仕方 (SSOT は worker.md の「終了の仕方」) ----
 
 cleanup() {
   stop_watchdog
@@ -995,7 +995,7 @@ on_signal() {
   leave "$code"
 }
 
-# 親が割り込みを記録したか (worker.md の「終了の仕方」) と、親が動いているかを確認する。どの時点で呼ぶかの正本は worker.md の
+# 親が割り込みを記録したか (worker.md の「終了の仕方」) と、親が動いているかを確認する。どの時点で呼ぶかの SSOT は worker.md の
 # 「終了の仕方」の子の箇条。割り込みを記録するファイルか、子が自分で受けた TERM・HUP の名前 (SELF_SIG) があれば、関数 on_signal で扱う。
 # 親が動いていなければ (kill -9)、ファイルや SELF_SIG があっても、後始末をせずに終了する (worker.yaml もフラグファイルも書かない。起動し直した
 # ワーカーが片付ける。回の終了処理の途中なら、その回のフラグファイルを書き終えてから終了する)。親の確認に使う ps がプロセスグループに届いた TERM・HUP で停止したときは、親が動いていないとは判定しない
@@ -1037,7 +1037,7 @@ check_interrupt() {
   on_signal "$sig" "$code"
 }
 
-# ---- 回の処理 (正本は worker.md の「回の処理」) ----
+# ---- 回の処理 (SSOT は worker.md の「回の処理」) ----
 
 # ループのディレクトリのファイルの一覧と更新時刻。ワーカーが回の間に書くもの (worker.yaml・その回のログ) と、
 # review-loop のセッションが再開や停止のときにレビュー中でも書き換える loop.yaml は除く。その回の結果は除かない — 結果はワーカーが
@@ -1054,7 +1054,7 @@ snapshot() {
 
 # ログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・ワーカーのフックが拒否した呼び出し・
 # サンドボックスが拒否した確認・リポジトリの行を表示しただけの呼び出しを読んで、1 行に 1 つずつ標準出力に出す。
-# 行の順序と説明の正本は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを判別するのに、
+# 行の順序と説明の SSOT は review-loop-worker/read_log_facts.py。ワーカーのフックが拒否した呼び出しを判別するのに、
 # 起動時に読み込んだフックの中身を渡す。リポジトリの行を表示しただけの呼び出しを判別するのに、元の作業ツリーのパスと依頼文の範囲を渡す
 read_log_facts() {
   run_py read_log_facts "$1" "$PY_SRC_deny_tmp_hook" "$CWD_REAL" "$REQ_BASE" "$REQ_HEAD_FULL"
@@ -1121,7 +1121,7 @@ note_served() {
   ROUNDS_SERVED=$(( ROUNDS_SERVED + 1 ))
 }
 
-# ---- 回の作業場所・複製・写し・結果の複写に使う道具 (正本は worker.md の「回の処理」の手順 5〜10) ----
+# ---- 回の作業場所・複製・写し・結果の複写に使う道具 (SSOT は worker.md の「回の処理」の手順 5〜10) ----
 
 # 手順 5。前の回の作業場所と準備のディレクトリが残っていれば、残ったプロセスを停止して消してから、準備のディレクトリを新しく作り、
 # そのパスを PREP_DIR に、準備のコマンドの出力を書くファイルのパスを PREP_OUT に入れる。作業場所のパスにシンボリックリンクが
@@ -1152,7 +1152,7 @@ prepare_workspace() {
   return 0
 }
 
-# ディレクトリ $1 を $2 に改名する (rename(2) をそのまま呼ぶ)。説明の正本は review-loop-worker/rename_dir.py
+# ディレクトリ $1 を $2 に改名する (rename(2) をそのまま呼ぶ)。説明の SSOT は review-loop-worker/rename_dir.py
 rename_dir() {
   run_py rename_dir "$1" "$2"
 }
@@ -1244,13 +1244,13 @@ make_clone() {
   return 0
 }
 
-# 手順 7。複製 ($1) の設定を確認する。説明の正本は review-loop-worker/clone_settings_problem.py
+# 手順 7。複製 ($1) の設定を確認する。説明の SSOT は review-loop-worker/clone_settings_problem.py
 clone_settings_problem() {
   run_py clone_settings_problem "$1"
 }
 
 # 手順 8。元の依頼文 ($1) の写しを、準備のディレクトリの $2 に作る。写しの作り方 (置き換える文字列と、失敗とする条件) の
-# 正本は review-loop-worker/make_request_copy.py。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
+# SSOT は review-loop-worker/make_request_copy.py。写しを作る python3 は準備のコマンドとして起動する (関数 run_prep)。
 # 読み込んだ中身を、関数 run_py と同じく python3 -I -c で実行する。
 # 通らなければ 1 を返し、上限を越えたためでなければ、完了のフラグファイルの error に書く文字列を PREP_ERROR に入れる
 make_request_copy() {
@@ -1267,13 +1267,13 @@ make_request_copy() {
 }
 
 # 作業場所の結果 ($1) を確認する (「回の処理」の表の「結果のファイル」)。大きさの上限は RESULT_MAX_BYTES。
-# 説明の正本は review-loop-worker/result_file_problem.py
+# 説明の SSOT は review-loop-worker/result_file_problem.py
 result_file_problem() {
   run_py result_file_problem "$1" "$WS" "$RESULT_MAX_BYTES"
 }
 
 # 手順 10 の 4。作業場所の結果 ($1) を、ループのディレクトリの出力先 ($2) に複写する。大きさの上限は RESULT_MAX_BYTES。
-# 説明の正本は review-loop-worker/copy_result.py
+# 説明の SSOT は review-loop-worker/copy_result.py
 copy_result() {
   run_py copy_result "$1" "$2" "$RESULT_MAX_BYTES"
 }
@@ -1482,7 +1482,7 @@ EOF
 }
 
 # 手順 9。レビュアの実行を、複製を cwd にして、専用のプロセスグループでバックグラウンドに起動して、終了まで待機する。
-# 引数の中身と理由の正本は worker.md の「レビュアの実行」と「レビュアの実行の権限」
+# 引数の中身と理由の SSOT は worker.md の「レビュアの実行」と「レビュアの実行の権限」
 run_reviewer() {
   local copy=$1 logf=$2
   local prompt="依頼文 $copy のとおりに作業し、結果を依頼文が指す出力先に書く。"
@@ -1650,7 +1650,7 @@ next_request() {
     done
 }
 
-# ---- 子 (回の処理を行うプロセス。正本は worker.md の「終了の仕方」) ----
+# ---- 子 (回の処理を行うプロセス。SSOT は worker.md の「終了の仕方」) ----
 
 # 子の本体。worker.yaml を idle で書き、更新時刻を進める処理を始め、依頼文を探して回の処理を行う。親 (関数 supervise_body) が
 # バックグラウンドのサブシェルとして起動する
@@ -1715,7 +1715,7 @@ body_main() {
   done
 }
 
-# ---- 親 (シグナルを受け取るプロセス。正本は worker.md の「終了の仕方」) ----
+# ---- 親 (シグナルを受け取るプロセス。SSOT は worker.md の「終了の仕方」) ----
 #
 # 親は、下で trap を設定した後、コマンド置換を使わない (関数 relay_interrupt・write_interrupt_file・supervise_body)。bash は、
 # コマンド置換を処理している間に受けたシグナルの trap を実行しないことがあるため (経緯は https://github.com/akm/claude-plugins/issues/105)。

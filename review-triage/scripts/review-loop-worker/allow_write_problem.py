@@ -9,7 +9,7 @@
 終了コード: 受け付けない値があれば 1、無ければ 0。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 allow_write_problem。
-語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
+語の意味と振る舞いの SSOT は、ファイル review-triage/skills/review-loop/references/worker.md。
 """
 
 import os, sys

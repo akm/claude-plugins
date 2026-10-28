@@ -111,7 +111,7 @@ func TestReviewTriageRecordValidPasses(t *testing.T) {
 // doc_dag (修正の後の doc-dag の確認) を持つ計画は正しい記録として通る。
 func TestReviewTriageRecordDocDagPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
-		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: どちらが正本か決まっていない重複なし。参照の循環なし\n", 1)
+		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: どちらが SSOT か決まっていない重複なし。参照の循環なし\n", 1)
 	if mutated == validRecordYAML {
 		t.Fatal("フィクスチャの置換が適用されていない")
 	}

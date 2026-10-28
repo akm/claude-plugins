@@ -6,7 +6,7 @@
 標準出力と終了コード: このプロセスがコマンドに置き換わる (exec) ので、コマンドのもの。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 run_prep と run_reviewer。
-語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
+語の意味と振る舞いの SSOT は、ファイル review-triage/skills/review-loop/references/worker.md。
 """
 
 import os, sys
