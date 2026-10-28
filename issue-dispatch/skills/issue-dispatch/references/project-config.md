@@ -71,7 +71,7 @@ issue-dispatch は、管理ディレクトリ (管理のセッションが動く
 
 ## `files` の規則の書き方
 
-要素は `pattern` と `kind` が必須で、`unit_notation`・`split_reference`・`mergeable` は省略できる。**`kind` と省略できる属性の意味と、パターンの照合の規則の SSOT は [file-kinds.md](file-kinds.md)** — この文書は様式と、読み込むときにそろえる表記だけを定める。
+要素は `pattern` と `kind` が必須で、`unit_notation`・`split_reference`・`mergeable` は省略できる。**`kind` と省略できる属性の意味と、パターンの照合の規則の SSOT は [file-kinds.md](file-kinds.md)。** この文書は様式と、読み込むときにそろえる表記だけを定める。
 
 | キー | 必須 | 内容 |
 | --- | --- | --- |
