@@ -14,6 +14,8 @@
 
 言い換えを決めた語と、使い続けると決めた語は、ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` に例として記録している (様式の [SSOT](CONCEPTS.md#ssot) はファイル [wording-guard/skills/wording-guard/references/terms.md](wording-guard/skills/wording-guard/references/terms.md))。
 
+文中で前の文に理由や補足を続けるダッシュ「—」は使わず、文を分けるか、括弧・読点で書く。見出しの区切り・箇条書きの項目名と説明の区切り・表の空欄のダッシュは使い続ける (経緯は [#87](https://github.com/akm/claude-plugins/issues/87))。
+
 例外: トリアージ記録 (現行のディレクトリ `tmp/review-triages/` と、過去にコミットした `docs/review-triage/`) は、レビュー指摘を逐語で引用するため書き換えない。`docs/review-triage/` のサマリ (`*.md`) も、triagecheck が生成するサマリの書式が変わった後に再生成せず、生成した当時の書式のまま残す。そのため、このディレクトリは triagecheck で検査しない (設定 `.claude/akm-claude-plugins/review-triage/config.json` の `record_dir` は `tmp/review-triages`)。
 
 経緯は [#35](https://github.com/akm/claude-plugins/issues/35) と [#89](https://github.com/akm/claude-plugins/issues/89) を参照。
