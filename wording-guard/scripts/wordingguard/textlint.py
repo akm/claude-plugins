@@ -279,6 +279,24 @@ def _finding(message, source, to_index=None):
     }
 
 
+def display_message(message):
+    """検出の message を、表示する 1 つの文字列にする。
+
+    message は 1 行目が本文で、2 行目以降が補足 (規則 prh では用語ファイルの理由、規則集では「解説: URL」など)。
+    補足は、本文を 1 つの文として区切ってから続ける。本文の末尾が句点ならそのまま続け、英語の文末の記号なら空白を挟み、
+    それ以外 (規則 prh の「X => Y」など) は句点を足す。コマンド check の出力と hook の通知は、どちらもこの形で表示する。
+    """
+    head, _, detail = message.partition("\n")
+    detail = detail.strip()
+    if not detail:
+        return head
+    if head.endswith(("。", "！", "？")):
+        return head + detail
+    if head.endswith((".", "!", "?")):
+        return f"{head} {detail}"
+    return f"{head}。{detail}"
+
+
 def check_files(root, cfg, term_list, paths):
     """ファイルを検査し、{パス: 検出のリスト} を返す。"""
     if not paths:

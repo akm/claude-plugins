@@ -144,10 +144,8 @@ def _markdown_files(root, cfg, paths):
 
 def _print_findings(label, findings):
     for f in findings:
-        head, _, detail = f["message"].partition("\n")
         matched = f"「{f['matched']}」 " if f["matched"] else ""
-        detail = f" — {detail.strip()}" if detail.strip() else ""
-        print(f"{label}:{f['line']}:{f['column']} {f['severity']} {matched}{head}{detail} [{f['rule']}]")
+        print(f"{label}:{f['line']}:{f['column']} {f['severity']} {matched}{textlint.display_message(f['message'])} [{f['rule']}]")
 
 
 def cmd_check(args):
