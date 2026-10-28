@@ -1,6 +1,6 @@
 # 記録
 
-**このファイルが、記録 (管理のセッションが手元に持つファイル群) のディレクトリ・様式・扱いの正本。** モジュール `issue-dispatch/scripts/issue_dispatch/record.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `record read` / `record apply` / `record log` はこれに従う。ほかの文書はキーの名前を参照するだけで、様式と扱いを言い直さない。
+**このファイルが、記録 (管理のセッションが手元に持つファイル群) のディレクトリ・様式・扱いの SSOT。** モジュール `issue-dispatch/scripts/issue_dispatch/record.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `record read` / `record apply` / `record log` はこれに従う。ほかの文書はキーの名前を参照するだけで、様式と扱いを言い直さない。
 
 **記録には、GitHub から導けないものだけを書く。** 導けるもの (下の「記録が持たないもの」) はターンのたびに GitHub から導く。記録と GitHub が矛盾する場面と、記録を失ったときに作り直す別の手順を無くすため。
 
@@ -8,7 +8,7 @@
 
 `<管理ディレクトリ>/<record_dir>/<owner>-<number>/`。`record_dir` は管理ディレクトリの設定のキー (デフォルト値はキーの表 [project-config.md](project-config.md) が持つ)。`<owner>-<number>` は設定の `project` から作る。ディレクトリを Project ごとに分けるのは、設定の `project` を後で別の Project に書き換えたときに、前の Project の記録と混ざらないようにするため。このディレクトリは git が無視する (設定は追跡し、記録は追跡しない)。
 
-| ファイル | 書き込み元 | 内容 | 様式の正本 |
+| ファイル | 書き込み元 | 内容 | 様式の SSOT |
 | --- | --- | --- | --- |
 | `record.json` | 管理のセッション (CLI の `record apply`) | 本体。下の「`record.json`」 | この文書 |
 | `actions.log` | 管理のセッション (CLI の `record log`) | GitHub への書き込みの追記専用のログ。下の「`actions.log`」 | この文書 |
@@ -23,7 +23,7 @@
 
 ## 種類ごとの扱い
 
-データは「壊れていたときに何が失われるか」で種類を分け、読めない・壊れているときの振る舞いを種類ごとに決める (考え方の正本は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md`)。
+データは「壊れていたときに何が失われるか」で種類を分け、読めない・壊れているときの振る舞いを種類ごとに決める (考え方の SSOT は `docs/solutions/architecture-patterns/fail-soft-by-data-class.md`)。
 
 | 種類 | ファイル | 失われるもの | 読めない・壊れているとき |
 | --- | --- | --- | --- |
@@ -73,7 +73,7 @@
 | キー | 内容 |
 | --- | --- |
 | `intent` | 割り当ての書き込みの意図 (`session_id`・`session_title`・`status` に書く予定の値、`assignment` 割り当ての番号、`at` 決めた時刻)。無ければ null。Project の値が意図と一致すれば自分の書き込みと判定する (再入のときに、途中まで書いた割り当てを継続するため。R24) |
-| `notified_at` | 合図 `assigned` を送ったことを示すフラグ (時刻)。意図があってフラグが無い項目は、再入で合図を送り直す候補。同じフラグを 2 度付けても最初の時刻のまま。いつ付くかの正本は [flow.md](flow.md) |
+| `notified_at` | 合図 `assigned` を送ったことを示すフラグ (時刻)。意図があってフラグが無い項目は、再入で合図を送り直す候補。同じフラグを 2 度付けても最初の時刻のまま。いつ付くかの SSOT は [flow.md](flow.md) |
 | `resend_count` | 合図の再送の回数。再送は項目ごとに通算 1 回で、1 回再送した後は再送しない (R24)。再送の前に回数を確認し、再送したら数える |
 | `conflict_choice` | 競合の可能性があるときに選んだ扱い。判定 ([flow.md](flow.md) の「判定」) は書かず、質問 `conflict` の回答 (相手ごと) で代える。消すかは U21 で決める |
 | `reported` | 報告済みのフラグ。報告の種類 (人の変更・割り当てない理由など) → 最初に報告した時刻 |
@@ -87,7 +87,7 @@
 | `options` | 選択肢の配列。要素は空でない文字列で、重複しない (回答は選択肢と同じ文字列で照合する)。空なら自由回答 |
 | `asked_at` | 質問した時刻 |
 | `answer` / `answered_at` | 回答と回答した時刻。未回答はどちらも null。撤回した質問 (`withdraw`) は `answer` が null で `answered_at` がある |
-| `subject` | 質問の対象 (任意。無ければ null)。同じ項目・種類でも対象が違えば別の質問。判定の質問が使う: 資源の名前、相手の宣言 (`<相手の項目>:<相手の宣言の ID>`)、パス付き (`<相手の項目>:<相手の宣言の ID>:<パス>`)。形の正本は [flow.md](flow.md) の「判定」 |
+| `subject` | 質問の対象 (任意。無ければ null)。同じ項目・種類でも対象が違えば別の質問。判定の質問が使う: 資源の名前、相手の宣言 (`<相手の項目>:<相手の宣言の ID>`)、パス付き (`<相手の項目>:<相手の宣言の ID>:<パス>`)。形の SSOT は [flow.md](flow.md) の「判定」 |
 
 質問の種類 (`kind`) と選択肢 (`options`) の一覧は、質問を導く文書 [flow.md](flow.md) が持つ (項目の状態の質問は「ターンで行うこと」の質問の表、判定の質問は「判定」の質問の表)。回答に従う処理も同じ文書が決める (項目の状態の質問は U16・U21 で決める)。記録は種類の一覧を持たず、`answer` は質問に書かれた `options` と照合する。
 

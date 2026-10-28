@@ -7,7 +7,7 @@
 
 一時ディレクトリを管理ディレクトリとリポジトリのルートとして使い、そこに設定ファイルを作って読み込みの結果
 (デフォルト値の適用・警告・エラー・`files` のパターンの表記) を確認する。
-キーと未設定のときの扱いの正本は issue-dispatch/skills/issue-dispatch/references/project-config.md。
+キーと未設定のときの扱いの SSOT は issue-dispatch/skills/issue-dispatch/references/project-config.md。
 """
 
 import json
@@ -182,7 +182,7 @@ class ManagerConfigTest(ConfigTestBase):
         result = config.load(self.root, "manager")
         c = result["config"]
         self.assertEqual(c["repositories"], {"akm/a": "/Users/x/a"})
-        self.assertEqual(c["resources"], {"dev-port": {"capacity": 2}}, "属性の中身は確認しない (resources.md の正本は U11)")
+        self.assertEqual(c["resources"], {"dev-port": {"capacity": 2}}, "属性の中身は確認しない (resources.md の SSOT は U11)")
         self.assertEqual(len(_warnings_about(result, "repositories")), 2)
         self.assertEqual(len(_warnings_about(result, "resources")), 1)
 
@@ -394,7 +394,7 @@ class CliTest(ConfigTestBase):
         self.assertEqual(_read_json(path)["third_party_edit_check"], ["akm/a"])
 
     def test_argument_error_exits_2(self):
-        """引数の誤りは argparse の終了コード 2 (停止の条件の正本は R25)。"""
+        """引数の誤りは argparse の終了コード 2 (停止の条件の SSOT は R25)。"""
         p = self._run("config", "read", "--dir", self.root, "--role", "other")
         self.assertEqual(p.returncode, 2)
 

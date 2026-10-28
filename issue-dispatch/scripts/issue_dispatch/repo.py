@@ -2,7 +2,7 @@
 ブランチ (`origin/HEAD`) の内容のリポジトリの設定を git で読む。`origin` の URL から host と `owner/name` を取り出して、
 設定のリポジトリと合うかを比べる (作業のセッションの CLI `repo name` も同じ関数を使う。KTD9)。
 
-確認の方法・「読めない」の理由の一覧と直し方・URL の形と比べ方の正本は
+確認の方法・「読めない」の理由の一覧と直し方・URL の形と比べ方の SSOT は
 issue-dispatch/skills/issue-dispatch/references/repositories.md。
 
 git は読むだけで、fetch も書き込みもしない。`gh` は使わない。設定の内容の解釈は config.load_text (U2 の規則)。

@@ -1,6 +1,6 @@
 # Issue の様式
 
-このファイルが、この仕組み (issue-dispatch) が扱う Issue と PR の様式の正本。管理のセッションと作業のセッションが Issue のどこを読み、どこに何を書くかをここで決める。Project のフィールドと Status の様式は [project-schema.md](project-schema.md)、リポジトリの設定は [project-config.md](project-config.md) が正本で、ここには写さない。宣言 (作業のセッションが変える予定のファイルを書くコメント) の本文の様式は「宣言」の節。
+このファイルが、この仕組み (issue-dispatch) が扱う Issue と PR の様式の SSOT。管理のセッションと作業のセッションが Issue のどこを読み、どこに何を書くかをここで決める。Project のフィールドと Status の様式は [project-schema.md](project-schema.md)、リポジトリの設定は [project-config.md](project-config.md) が SSOT で、ここには写さない。宣言 (作業のセッションが変える予定のファイルを書くコメント) の本文の様式は「宣言」の節。
 
 ## Issue が持つもの
 
@@ -12,7 +12,7 @@
 | 担当者 (assignee) | 認証しているアカウント (`gh` のトークンのログイン) 1 つだけ | 利用者 | `human-handed` が無く、担当者がトークンのログイン 1 つだけの Issue が、作業のセッションの対象になる。担当者が未設定の Issue は対象にならないので、`Ready` にする前に担当者を決める |
 | 親 Issue | sub-issue を持つ Issue | 利用者 | 親 Issue は割り当ての対象にしない (sub-issue は対象にする)。項目の一覧の `is_parent` |
 | 大きさ | 1 つの PR で閉じる大きさ | 利用者 | 作る時点で分ける規則は定めない。着手の後に分ける必要が分かったときの扱いは「分割で作る Issue」 |
-| PR との結び付き | PR の本文に Issue を閉じる記法 (`Closes #<番号>`) | 作業のセッション | マージで Issue が閉じ、`Done` と資源の解放がそれに続く (`Done` を書く組み込みワークフローの正本は [project-schema.md](project-schema.md) の「組み込みワークフロー」)。PR から読むのは `closingIssuesReferences` (下の「PR の観測」) |
+| PR との結び付き | PR の本文に Issue を閉じる記法 (`Closes #<番号>`) | 作業のセッション | マージで Issue が閉じ、`Done` と資源の解放がそれに続く (`Done` を書く組み込みワークフローの SSOT は [project-schema.md](project-schema.md) の「組み込みワークフロー」)。PR から読むのは `closingIssuesReferences` (下の「PR の観測」) |
 
 ## `blockedBy` の追加 (`blocked-by add`)
 
@@ -100,7 +100,7 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 | `割り当て` | 管理のセッション | `対象`・`割り当て` | 割り当てた経緯 |
 | `開始可` | 管理のセッション | `対象`・`割り当て`・`宣言` | 宣言に競合の可能性が無いという判定の結果 |
 | `待機` | 管理のセッション | `対象`・`割り当て`・`宣言`・`理由` (待機の理由の数だけ繰り返す) | 待機する理由。`理由` の値は `利用者の回答` / `Issue <参照>` / `小さな PR <依頼先の Issue の参照>` (PR ができていれば続けて ` PR <URL>`) / `資源 <名前>` / `設定`。その宣言のその時点の待機の理由をすべて並べる (最新の `待機` で、ほかの待機も分かるようにするため) |
-| `解放` | 管理のセッション | `対象`・`割り当て`・`理由` | 解放の理由。値は `解除` (フィールドを空にして `Todo`) / `close` (フィールドを跡として残す) / `ID の変更` (Status だけ `Todo`) / `除去` (項目が Project から除かれた)。理由で、後に書くものを分ける (正本は計画の KTD19) |
+| `解放` | 管理のセッション | `対象`・`割り当て`・`理由` | 解放の理由。値は `解除` (フィールドを空にして `Todo`) / `close` (フィールドを跡として残す) / `ID の変更` (Status だけ `Todo`) / `除去` (項目が Project から除かれた)。理由で、後に書くものを分ける (SSOT は計画の KTD19) |
 | `引き継ぎ` | 管理のセッション | 無し | 前の管理のセッションの作業中の項目を引き継いだ経緯 (本文に前の管理のセッションの名前と ID と理由) |
 | `停滞` | 管理のセッション | `対象`・`割り当て`・`値` | `Agent stuck state` に値を書いた経緯 |
 | `依存の待機` | 管理のセッション | `Issue` (完了待ちの Issue の数だけ) | 割り当ての無い項目を、開いている blocker があるので `Blocked` にした経緯。宛先と割り当ての番号は持たない (割り当てが無いため) |
@@ -143,8 +143,8 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 | --- | --- | --- | --- |
 | `files` | ✓ | 配列 | 変える予定のファイル。0 件でもよい |
 | `files[].path` | ✓ | 文字列 | リポジトリのルートからの相対パス。`./a`・`a//b`・`a/../a/b` は同じパスにそろえる。絶対パスと、ルートの外を指すパス (`../x`。そろえると `../x` になる `src/../../x` も)・ルートそのものは差し戻す。同じパスを 2 度書けない |
-| `files[].units` | | 文字列の配列の配列 | そのファイルのうち変える予定の節。節の書き方 (階層ごとの名前の配列。名前は正規化しない) と、書ける種類 (節の表記 `unit_notation` がある種類) の正本は [file-kinds.md](file-kinds.md) の「節で判定する」と「節の表記」で、ここでは言い直さない。省けばファイル全体を変える予定。空の配列は書けない (節を 1 つも変えない宣言は無いので、全体なら省く) |
-| `resources` | ✓ | 文字列の配列 | 使う資源の名前 (ラベル `resource:<名前>` の `<名前>`)。空白を含まない。名前は大文字小文字を区別しない (正本は [resources.md](resources.md)) ので、同じ資源を表記だけ違えて 2 度書けない |
+| `files[].units` | | 文字列の配列の配列 | そのファイルのうち変える予定の節。節の書き方 (階層ごとの名前の配列。名前は正規化しない) と、書ける種類 (節の表記 `unit_notation` がある種類) の SSOT は [file-kinds.md](file-kinds.md) の「節で判定する」と「節の表記」で、ここでは言い直さない。省けばファイル全体を変える予定。空の配列は書けない (節を 1 つも変えない宣言は無いので、全体なら省く) |
+| `resources` | ✓ | 文字列の配列 | 使う資源の名前 (ラベル `resource:<名前>` の `<名前>`)。空白を含まない。名前は大文字小文字を区別しない (SSOT は [resources.md](resources.md)) ので、同じ資源を表記だけ違えて 2 度書けない |
 | `split` | ✓ | オブジェクト | 分ける必要 |
 | `split.needed` | ✓ | 真偽値 | 分ける必要があるか |
 | `split.reason` | ✓ | 文字列 | 理由。`needed` が偽なら空でよい |
@@ -181,7 +181,7 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 
 ### 競合の可能性
 
-2 つの宣言 (判定する宣言と、既に `開始可` になった宣言) の、同じリポジトリの同じパスごとに判定する (計画の R5。種類ごとの規則と節の比べ方の正本は [file-kinds.md](file-kinds.md))。別のリポジトリの同じパスは競合しない (リポジトリ名の大文字小文字は区別しない)。
+2 つの宣言 (判定する宣言と、既に `開始可` になった宣言) の、同じリポジトリの同じパスごとに判定する (計画の R5。種類ごとの規則と節の比べ方の SSOT は [file-kinds.md](file-kinds.md))。別のリポジトリの同じパスは競合しない (リポジトリ名の大文字小文字は区別しない)。
 
 | 結果 | 意味 |
 | --- | --- |
@@ -207,6 +207,6 @@ issue-dispatch | <管理のセッション | 作業のセッション> | <セッ
 | `comment post --issue <参照> --role manager\|worker --name <名前> --session-id <ID> --kind <種類> [--to] [--assignment] [--declaration] [--reason <値>]... [--request-kind] [--waiting-issue] [--waiting-declaration] [--previous-pr] [--pr] [--release-reason] [--stuck-state] [--blocker <参照>]... (--body \| --body-file)` | `gh issue comment` (管理のセッションの種類で既投稿なら無し) | `posted`・`database_id`・`url`・`header` (組み立てた先頭行)。値のオプションは見出し語の表の順 |
 | `comment parse --line <先頭行>` | 無し | `header` (解析結果か null) |
 | `declaration parse --dir <リポジトリのルート> (--body <JSON> \| --body-file <ファイル \| ->)` | 無し | `declaration` (そろえたパスと種類付き。誤りがあれば null)・`count`・`config_status`。リポジトリの設定の規則は `--dir` から読む |
-| `declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body \| --body-file)` | 無し | 本文は `{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]}`。`result` (全体)・`others` (相手ごと・パスごとの結果と理由)・`declaration`・`repo_config` (設定の読み取りの結果)。リポジトリの設定は `repositories` の clone から既定のブランチの内容として読み (正本は [repositories.md](repositories.md))、読めなければ判定せず `errors` (key `repo-config`) で理由と直し方を返す。`others` の宣言が解析できなければ、その相手は `needs-user` (`problems` に理由) |
+| `declaration conflictability --dir <管理ディレクトリ> --repo <owner/name> (--body \| --body-file)` | 無し | 本文は `{"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]}`。`result` (全体)・`others` (相手ごと・パスごとの結果と理由)・`declaration`・`repo_config` (設定の読み取りの結果)。リポジトリの設定は `repositories` の clone から既定のブランチの内容として読み (SSOT は [repositories.md](repositories.md))、読めなければ判定せず `errors` (key `repo-config`) で理由と直し方を返す。`others` の宣言が解析できなければ、その相手は `needs-user` (`problems` に理由) |
 
 `<参照>` は `owner/repo#番号` か Issue の URL。どのサブコマンドも JSON を出せれば終了コード 0 で、失敗は `status: error` と `errors` (`key`・`message`・`failure`) で伝える。参照や URL の形が読めないときは `gh` を実行せずに返す。

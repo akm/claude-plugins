@@ -1,6 +1,6 @@
 # 観測 (スナップショットと差分)
 
-このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の正本。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
+このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の SSOT。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
 
 ## 目的
 
@@ -63,7 +63,7 @@
 
 読めなかった PR は `comment_prs` の値そのものが欠損なので、引き継げなければ比べない。`partial` のある項目と PR は `skipped` (`items`: キー → 欠損の種類、`prs`: URL → 理由) で、引き継いだ項目と PR は `carried` (`items`: キー → 種類 → 元の `taken_at`、`prs`: URL → 元の `taken_at`) で知らせる。
 
-| 欠損の種類 (`partial`。名前と意味の正本は [project-schema.md](project-schema.md) の CLI の表の `problems`) | 引き継ぐ値 (項目のキー) | 比べない差分の種類 |
+| 欠損の種類 (`partial`。名前と意味の SSOT は [project-schema.md](project-schema.md) の CLI の表の `problems`) | 引き継ぐ値 (項目のキー) | 比べない差分の種類 |
 | --- | --- | --- |
 | `labels-truncated` | `labels` | `labels` |
 | `blocked_by-truncated` | `blocked_by` | `blocked_by` |

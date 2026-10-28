@@ -1,6 +1,6 @@
 # Project の様式
 
-**このファイルが、Project (GitHub Projects) の様式の正本。** モジュール `issue-dispatch/scripts/issue_dispatch/project.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `project check` / `project items` / `project set-status` / `project add-fields` はこれに従う。ほかの文書はフィールドと Status の名前を参照するだけで、意味と作り方を言い直さない。
+**このファイルが、Project (GitHub Projects) の様式の SSOT。** モジュール `issue-dispatch/scripts/issue_dispatch/project.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `project check` / `project items` / `project set-status` / `project add-fields` はこれに従う。ほかの文書はフィールドと Status の名前を参照するだけで、意味と作り方を言い直さない。
 
 1 つの Project に、複数のリポジトリ (別の owner も) の Issue を入れる。Project には Issue だけを入れ、PR は入れない。
 
@@ -9,7 +9,7 @@
 | 名前 | 型 | 書き込み元 | 意味 |
 | --- | --- | --- | --- |
 | `Status` | 単一選択 (Project が最初から持つ) | 管理のセッション・利用者・組み込みワークフロー | 下の「Status の選択肢」 |
-| `Agent session ID` | テキスト | 管理のセッション | 割り当ての正本。割り当てた作業のセッションの ID。排他のフラグで、コメント `割り当て` より先に書く |
+| `Agent session ID` | テキスト | 管理のセッション | 割り当ての SSOT。割り当てた作業のセッションの ID。排他のフラグで、コメント `割り当て` より先に書く |
 | `Agent session title` | テキスト | 管理のセッション | 人が読む写し (作業のセッションの名前)。管理のセッションが ID に合わせる |
 | `Agent stuck state` | 単一選択 | 管理のセッション | 停止しているときだけ値が入り、空なら正常 (下の表)。利用者が空にしたときは上書きせず 1 回だけ報告する |
 
@@ -30,7 +30,7 @@
 | `Todo` | 利用者・組み込みワークフロー・管理のセッション (割り当ての解除と、マージされずに閉じた PR の Issue を戻すときだけ) | 未着手。割り当てない |
 | `Ready` | 利用者 (管理のセッションは `Blocked` から戻すときだけ) | 利用者が「着手してよい」と決めたことを示す。割り当ての対象はこの項目だけ |
 | `In Progress` | 管理のセッション | 割り当て中 |
-| `In review` | 管理のセッション | 今の割り当ての PR の観測の種類が `in_review` (条件の正本は [issue-format.md](issue-format.md) の「PR の観測」) |
+| `In review` | 管理のセッション | 今の割り当ての PR の観測の種類が `in_review` (条件の SSOT は [issue-format.md](issue-format.md) の「PR の観測」) |
 | `Blocked` | 管理のセッション・利用者 | ほかの Issue か小さな PR の完了まで待機する |
 | `Done` | 組み込みワークフロー (管理のセッションは書かない) | Issue が閉じた |
 

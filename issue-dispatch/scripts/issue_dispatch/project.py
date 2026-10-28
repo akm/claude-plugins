@@ -1,5 +1,5 @@
 """Project (GitHub Projects) の読み書き。項目の一覧 (`items`)・フィールドと選択肢とワークフローの検査 (`check`)・
-不足の作成 (`add_fields`)・Status とフィールドの書き込み。様式の正本は
+不足の作成 (`add_fields`)・Status とフィールドの書き込み。様式の SSOT は
 issue-dispatch/skills/issue-dispatch/references/project-schema.md。
 
 GraphQL は同じディレクトリの graphql/*.graphql を `gh api graphql` で実行する (操作名で偽の gh が識別する)。

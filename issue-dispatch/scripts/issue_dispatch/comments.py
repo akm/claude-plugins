@@ -1,6 +1,6 @@
 """Issue のコメント。先頭行 (書いたセッションの種類と識別子とコメントの種類と値。R6) の生成と解析、コメントの一覧 (投稿者が
 トークンのログインと違うものを除く)、投稿 (同じ出来事への同じコメントが既にあれば投稿しない。KTD2)、小さな PR の報告と依頼の
-対応づけ。様式の正本は issue-dispatch/skills/issue-dispatch/references/issue-format.md の「コメント」。
+対応づけ。様式の SSOT は issue-dispatch/skills/issue-dispatch/references/issue-format.md の「コメント」。
 
 読むのは GraphQL (graphql/issue-comments.graphql。実行は project.graphql) と `gh api user`、書くのは `gh issue comment <URL>
 --body-file -` (本文を標準入力で渡す。gh.run の mutation=True)。

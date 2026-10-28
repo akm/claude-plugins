@@ -1,5 +1,5 @@
 """Issue と PR の読み書き。`blockedBy` の追加 (`add_blocked_by`)・分割で作る Issue の作成 (`create_issue`)・ラベルの追加
-(`add_label`。リポジトリに無ければ作る)・PR の観測 (`observe_pr`)。様式の正本は
+(`add_label`。リポジトリに無ければ作る)・PR の観測 (`observe_pr`)。様式の SSOT は
 issue-dispatch/skills/issue-dispatch/references/issue-format.md。
 
 読むのは `gh issue list` / `gh issue view` / `gh label list` / `gh api user` と GraphQL (graphql/pr-observe.graphql。実行は

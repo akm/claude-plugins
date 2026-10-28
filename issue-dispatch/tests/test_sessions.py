@@ -3,7 +3,7 @@
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-様式の正本は issue-dispatch/skills/issue-dispatch/references/messaging.md。
+様式の SSOT は issue-dispatch/skills/issue-dispatch/references/messaging.md。
 """
 
 import os

@@ -5,7 +5,7 @@ pr-observe-*) で動く。偽の gh の用意は test_project.FakeGhCase と同�
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-様式の正本は issue-dispatch/skills/issue-dispatch/references/observation.md。
+様式の SSOT は issue-dispatch/skills/issue-dispatch/references/observation.md。
 """
 
 import copy

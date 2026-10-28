@@ -1,4 +1,4 @@
-"""宣言の判定 (計画の U15。正本は flow.md の「判定」)。
+"""宣言の判定 (計画の U15。SSOT は flow.md の「判定」)。
 
 項目の状態 (itemstate) が導いた「判定の要る宣言」を、投稿の順 (同じなら Project の中の順) に 1 件ずつ判定し、`開始可`・`待機`・`依頼`
 の書き込みの候補 (actions)・利用者に質問すること (questions)・作業のセッションに送る合図 (signals) を返す。gh は実行せず、書き込みもしない。
@@ -11,7 +11,7 @@ from . import comments, declaration, filekinds, ids, itemstate, resources
 
 RESULTS = ("go", "wait", "ask", "request")
 SIGNAL_KINDS = ("go", "wait", "request")
-# 判定の質問 (種類 → 選択肢)。種類の名前と選択肢の正本は flow.md の「判定」の質問の表
+# 判定の質問 (種類 → 選択肢)。種類の名前と選択肢の SSOT は flow.md の「判定」の質問の表
 QUESTION_OPTIONS = {"conflict": ["wait", "small-pr", "proceed"], "unknown-content": ["conflict", "none"], "resource-busy": ["wait", "proceed"],
                     "release-undeclared": ["release", "keep"], "small-pr-closed": ["wait-issue", "redo", "proceed"]}
 QUESTION_KINDS = tuple(QUESTION_OPTIONS)

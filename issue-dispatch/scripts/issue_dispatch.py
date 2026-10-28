@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """issue-dispatch の CLI の入口。サブコマンドごとにパッケージ issue_dispatch のモジュールの関数を実行する。入出力は JSON。
 
-サブコマンドの一覧の正本は、計画 docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md の KTD14。
+サブコマンドの一覧の SSOT は、計画 docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md の KTD14。
 この版にあるサブコマンド:
   config read --dir <ルート> --role manager|repo   設定を読み、デフォルト値を当てた後の設定と警告・エラーを返す
   config add-edit-check --dir <ルート> --repo <owner/repo>   管理ディレクトリの設定の third_party_edit_check に足す
@@ -32,7 +32,7 @@
       標準入力の JSON {"declaration": <宣言>, "others": [{"id", "repo", "declaration"}]} で競合の可能性を判定する。リポジトリの設定は
       repositories の clone から既定のブランチの内容として読み、読めなければ判定しない (KTD9)
   declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]
-      未判定の宣言を投稿の順に判定し、judgments・actions (`開始可`・`待機`・`依頼`・Status・blockedBy の候補)・questions・signals を返す (書かない。正本は flow.md の「判定」)
+      未判定の宣言を投稿の順に判定し、judgments・actions (`開始可`・`待機`・`依頼`・Status・blockedBy の候補)・questions・signals を返す (書かない。SSOT は flow.md の「判定」)
   resources attributes --dir <管理ディレクトリ> [--name <資源>]   設定の resources にデフォルト値を当てた属性を返す (警告つき)
   resources judge --dir <管理ディレクトリ> --trigger assign|declare|update|close|release (--body <JSON> | --body-file <ファイル|->)
       契機ごとの資源の判断。本文のキーは resources.md の契機の表 (使用・資源・回答は呼び出し元が渡す。gh は実行しない)
@@ -41,7 +41,7 @@
       (そろえた後のパス) と種類・属性・`matched` を持ち、差し戻した要素は `error` (理由) だけを持つ
 
 終了コード: JSON を出せたときは、エラーの有無によらず 0 (エラーは JSON の `errors` で伝える)。0 以外は Python 自身の失敗
-(捕まえていない例外の 1・引数の誤りの 2) で、呼び出し元はそれを停止の条件として扱う (正本は同じ計画の R25。
+(捕まえていない例外の 1・引数の誤りの 2) で、呼び出し元はそれを停止の条件として扱う (SSOT は同じ計画の R25。
 1 と 2 は Python 自身が使うので、サブコマンドの専用の終了コードには使わない)。
 """
 

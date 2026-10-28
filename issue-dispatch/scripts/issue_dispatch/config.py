@@ -1,13 +1,13 @@
 """設定の読み込み。管理ディレクトリとリポジトリの設定ファイルを読み、未設定のキーにデフォルト値を当て、
 値の誤りを警告し、`files` のパターンの表記をそろえる。承認を得た後に `third_party_edit_check` へリポジトリを足す。
 
-キーと未設定のときの扱いの正本は issue-dispatch/skills/issue-dispatch/references/project-config.md。
+キーと未設定のときの扱いの SSOT は issue-dispatch/skills/issue-dispatch/references/project-config.md。
 呼び出し元: CLI issue-dispatch/scripts/issue_dispatch.py の `config read` と `config add-edit-check`。
 ほかのモジュールは `load()` の結果の `config` を受け取り、設定ファイルを直接読まない。
 
 `files` の規則は、`kind` が規則に書ける種類 (モジュール filekinds の `RULE_KINDS`) であることだけを確認し、
-属性の意味はここでは確認しない (正本は file-kinds.md。種類の決定はモジュール filekinds)。
-`resources` の属性の意味とデフォルト値もここでは確認しない (正本は resources.md。属性の適用はモジュール resources)。
+属性の意味はここでは確認しない (SSOT は file-kinds.md。種類の決定はモジュール filekinds)。
+`resources` の属性の意味とデフォルト値もここでは確認しない (SSOT は resources.md。属性の適用はモジュール resources)。
 """
 
 import json

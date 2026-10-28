@@ -5,7 +5,7 @@
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-種類と属性・パターンの書き方・照合の順の正本は issue-dispatch/skills/issue-dispatch/references/file-kinds.md。
+種類と属性・パターンの書き方・照合の順の SSOT は issue-dispatch/skills/issue-dispatch/references/file-kinds.md。
 """
 
 import ast
@@ -73,7 +73,7 @@ class PatternTest(unittest.TestCase):
 
     @unittest.skipUnless(sys.version_info >= (3, 13), "PurePath.full_match は Python 3.13 から")
     def test_same_as_full_match(self):
-        """正本の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確認する (末尾が `/` のパターンは拡張なので除く)。"""
+        """SSOT の「Python 3.13 の `PurePath.full_match` と同じ規則」を、同じ組で確認する (末尾が `/` のパターンは拡張なので除く)。"""
         from pathlib import PurePosixPath
         patterns = ("*.pb.go", "**/*.pb.go", "src/*.ts", "src/**.go", "**", "dist/**", "**/x", "a/**/b", "[ab].txt",
                     "[!ab].txt", "*.md", "a?.txt", "a**b", "foo**/bar", "a/**b", "**/**/a", "a[.txt")
