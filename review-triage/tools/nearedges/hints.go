@@ -15,6 +15,11 @@ var universalWords = []string{
 
 var countPattern = regexp.MustCompile(`\d+\s*(?:つ|件|箇所|か所|回|行|個|種|通り)`)
 
+// SSOT (ある事実を定めている唯一の記述) を指して参照する書き方。リンクが無ければ、検証の観点 B の
+// 手がかりにする。このリポジトリの書き方は「SSOT は」。「正本は」は、ほかのリポジトリの文書が
+// 同じ意味で書く形なので見続ける。
+var referenceWords = []string{"SSOT は", "正本は"}
+
 // hints は変更行と近くの辺から、コミット前に当てる検証の観点 (verification.md の A〜F) を
 // 差分の種類に応じて提示する。
 func hints(changes map[string][]change, edges []edge) []string {
@@ -45,8 +50,10 @@ func hints(changes map[string][]change, edges []edge) []string {
 			if m := countPattern.FindString(c.Text); m != "" {
 				add(fmt.Sprintf("観点 C: 変更行に数がある「%s」(%s %d 行目) — 何を 1 と数えるかと範囲を先に決め、数を 1 増減しても主張が変わらないなら数を書かない", m, f, c.Line))
 			}
-			if strings.Contains(c.Text, "正本は") && !strings.Contains(c.Text, "](") {
-				add(fmt.Sprintf("観点 B: 変更行に「正本は」があるがリンクが無い (%s %d 行目) — 正本を再確認し、参照をリンクにする", f, c.Line))
+			for _, w := range referenceWords {
+				if strings.Contains(c.Text, w) && !strings.Contains(c.Text, "](") {
+					add(fmt.Sprintf("観点 B: 変更行に「%s」があるがリンクが無い (%s %d 行目) — 正本を再確認し、参照をリンクにする", w, f, c.Line))
+				}
 			}
 		}
 	}
