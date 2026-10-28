@@ -12,7 +12,7 @@
 
 ## 2 つの原則
 
-記録は 2 つの原則に従い、**この順で優先します。** 原則の正本は [SKILL.md](skills/work-log-gh-comment/SKILL.md) の「2 つの原則」、機密の扱いの正本は [references/sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) です。ここは紹介として要点だけを書きます。
+記録は 2 つの原則に従い、**この順で優先します。** 原則の SSOT (single source of truth。ある事実を定めている唯一の記述) は [SKILL.md](skills/work-log-gh-comment/SKILL.md) の「2 つの原則」、機密の扱いの SSOT は [references/sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) です。ここは紹介として要点だけを書きます。
 
 1. **機密は貼らない。** Issue と PR のコメントは全世界から読め、編集しても履歴が残り、回収できません。
 2. **それ以外は省略も要約もしない。** 出力のどの部分が後で役に立つかは、記録する時点では分かりません。
@@ -23,7 +23,7 @@
 
 ## 何が保証されるか
 
-前の 2 つは [SKILL.md](skills/work-log-gh-comment/SKILL.md) の「記録するもの」、後の 2 つは [sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) の「どう伏せるか」が正本です。
+前の 2 つは [SKILL.md](skills/work-log-gh-comment/SKILL.md) の「記録するもの」、後の 2 つは [sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) の「どう伏せるか」が SSOT です。
 
 - **失敗したコマンドと、人間に代行を依頼したコマンドを省かない。** 試行錯誤の経路そのものが、次に同じ作業をする人への情報になります。
 - **出力の中の不一致を、解釈で均さない。** 「サマリは `3 errors` なのに `ERROR` 行が 2 行しかない」「終了コードは 0 なのに本文は失敗している」— こうした矛盾は、要約すると消えます。
@@ -36,7 +36,7 @@
 
 ## 同梱の評価 (evals)
 
-`skills/work-log-gh-comment/evals/` に、スキルを変更したときに効果を測るための一式が入っています。構成と回し方の正本は [evals/README.md](skills/work-log-gh-comment/evals/README.md) です。
+`skills/work-log-gh-comment/evals/` に、スキルを変更したときに効果を測るための一式が入っています。構成と回し方の SSOT は [evals/README.md](skills/work-log-gh-comment/evals/README.md) です。
 
 - `evals.json` — 6 つのテストケース。Alert の使い分けと機密の扱いが分かれるように選んであります
 - `fixtures/` — テストで実行するスクリプト (外部サービスにはアクセスしません)
@@ -53,7 +53,7 @@ python3 と make だけで動きます。
 
 ## 文中の例について
 
-[format.md](skills/work-log-gh-comment/references/format.md) と [sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) の例は、lappds という配信基盤の実際の作業記録から採っています (断りの正本は [format.md](skills/work-log-gh-comment/references/format.md) の冒頭)。**コマンドやリソース名はその題材のものなので、形と使い分けだけを読んでください。**
+[format.md](skills/work-log-gh-comment/references/format.md) と [sensitive-data.md](skills/work-log-gh-comment/references/sensitive-data.md) の例は、lappds という配信基盤の実際の作業記録から採っています (断りの SSOT は [format.md](skills/work-log-gh-comment/references/format.md) の冒頭)。**コマンドやリソース名はその題材のものなので、形と使い分けだけを読んでください。**
 
 抽象的な例に置き換えていないのは、実際の出力にしか現れない不一致こそが、この書式の扱う対象だからです。
 
