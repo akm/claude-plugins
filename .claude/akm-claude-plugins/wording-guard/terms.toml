@@ -591,6 +591,13 @@ replacements = ["同時に行われる", "重なる"]
 reason = "「走る」と同じく、プログラムや処理の実行を人や物の移動に喩えている。複数の実行が同時に行われることは「同時に行われる」「(実行が) 重なる」と書く"
 decided_in = "https://github.com/akm/claude-plugins/issues/87"
 
+[[terms]]
+pattern = "正本"
+verdict = "avoid"
+replacements = ["SSOT"]
+reason = "法律の語の流用で、法律では原本と同じ効力を持つ写しを指し、ここで指したい元の記述とはずれる。ある事実を定めている唯一の記述は SSOT (single source of truth。定義は CONCEPTS.md) と書く。doc-dag が調べる文書に現れる参照の形として引くときは、かぎ括弧で「正本は X」と書く"
+decided_in = "https://github.com/akm/claude-plugins/issues/87"
+
 # ---- 許容する語 ----
 
 [[terms]]
