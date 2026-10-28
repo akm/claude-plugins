@@ -15,7 +15,7 @@ PreToolUse だけでは「コミットしようとした瞬間」にしか介入
 複数の動機が絡み合い、コミットされるべき変更が後続の変更に上書きされて失われます。これは事後には
 取り返せないため、他の 3 つのフックで事前に意識づけします。
 
-想起させるルールそのものの正本は同梱の [rules/commit-rules.md](rules/commit-rules.md) です (利用者の `~/.claude/rules/commit-rules.md` があればそちらを優先します。探索順は「設定」の節)。この README はフックの振る舞いを説明するもので、ルールの内容はそこから引いています。
+想起させるルールそのものの SSOT (single source of truth。ある事実を定めている唯一の記述) は同梱の [rules/commit-rules.md](rules/commit-rules.md) です (利用者の `~/.claude/rules/commit-rules.md` があればそちらを優先します。探索順は「設定」の節)。この README はフックの振る舞いを説明するもので、ルールの内容はそこから引いています。
 
 ## 事前の意識づけ (SessionStart / UserPromptSubmit)
 
