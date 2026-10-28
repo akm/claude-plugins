@@ -52,7 +52,7 @@ func hints(changes map[string][]change, edges []edge) []string {
 			}
 			for _, w := range referenceWords {
 				if strings.Contains(c.Text, w) && !strings.Contains(c.Text, "](") {
-					add(fmt.Sprintf("観点 B: 変更行に「%s」があるがリンクが無い (%s %d 行目) — 正本を再確認し、参照をリンクにする", w, f, c.Line))
+					add(fmt.Sprintf("観点 B: 変更行に「%s」があるがリンクが無い (%s %d 行目) — SSOT を再確認し、参照をリンクにする", w, f, c.Line))
 				}
 			}
 		}
