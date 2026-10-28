@@ -53,7 +53,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_teeth.py" promote \
 
 用語集が壊れていて読めない場合、コマンドは**保存せずエラーで終了する**（上書きを避けるため）。
 その場合は `hint` の内容をユーザーに伝え、退避か修復を仰ぐ。勝手に削除・再作成しない
-(規則の正本は [data-integrity.md](../../docs/design/data-integrity.md) の「蓄積データ — 壊れているなら変更しない」)。
+(規則の SSOT は [data-integrity.md](../../docs/design/data-integrity.md) の「蓄積データ — 壊れているなら変更しない」)。SSOT は single source of truth の略で、ある事実を定めている唯一の記述を指す。
 
 ### 定義を編集する
 
