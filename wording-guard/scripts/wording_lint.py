@@ -102,7 +102,7 @@ def _textlint_context(args):
 def _git_markdown_files(root, directory):
     """ディレクトリの下の Markdown のうち、git が追跡しているものと、無視されていない未追跡のものを集める。
 
-    .git の中と、git に無視されたパス (node_modules など) は除く — 依存パッケージの文書まで検査したり
+    .git の中と、git に無視されたパス (node_modules など) は除く。依存パッケージの文書まで検査したり
     書き換えたりしないため。
     """
     rel = os.path.relpath(os.path.realpath(directory), os.path.realpath(root))
@@ -124,7 +124,7 @@ def _markdown_files(root, cfg, paths):
 
     (検査するファイル, 書き換えない過去の記録として除いたファイル) を返す。
     ディレクトリからは、git に無視されていない Markdown だけを集める。明示的に指定したファイルが
-    Markdown でなければ、存在しないパスと同じく誤りにする — 知らせずに除くと「検査したもの 0 個」で
+    Markdown でなければ、存在しないパスと同じく誤りにする。知らせずに除くと「検査したもの 0 個」で
     成功に見えるため。
     """
     files, skipped = [], []

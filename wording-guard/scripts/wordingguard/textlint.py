@@ -154,7 +154,7 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
 
     fix_only が True のときは、規則を自動修正してよい避ける語の辞書だけにする (リポジトリの規則集と、
     検出だけする避ける語は入れない)。自動修正で文脈によって言い換えが変わる語を書き換えないため。
-    リポジトリの設定のうち、規則 (rules) 以外 (検出から除く範囲の filters など) はそのまま使う —
+    リポジトリの設定のうち、規則 (rules) 以外 (検出から除く範囲の filters など) はそのまま使う。
     check で検出しない範囲 (引用など) を、fix が書き換えないようにするため。
     """
     base, base_dir, where = {}, root, "設定"
