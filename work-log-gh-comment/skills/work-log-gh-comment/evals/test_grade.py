@@ -665,7 +665,7 @@ class TestPastedOutputLines(unittest.TestCase):
         省略) と、逐語一致の勘定を同じ軸に揃える。
 
         現行のフィクスチャに重複行は無いので、架空の正解を差し込んで
-        検証する — 重複が現れてから気づくのでは遅い。
+        検証する。重複が現れてから気づくのでは遅い。
         """
         grade._fixture_cache["dup-probe.sh"] = [
             "start", "same line", "same line", "end"]
@@ -730,7 +730,7 @@ class TestAlertKinds(unittest.TestCase):
         """CHECKS[2] は「内容に応じて選ばれているか」を見る。
 
         eval-2 は読み取りのみの調査なので、format.md:101 のとおり TIP は
-        合わない。種類の数では測れない — format.md:56 は 1 コメントに
+        合わない。種類の数では測れない。format.md:56 は 1 コメントに
         1〜2 個を目安と定めており、NOTE 1 個は指針どおりの正しい記録。
         """
         _, fn = grade.CHECKS[2][4]
