@@ -273,7 +273,7 @@ def classify(entries, config=None):
             "生成物（" + ", ".join(generated[:3])
             + ("…" if len(generated) > 3 else "")
             + "）と手書きの変更が同時にステージされています。"
-            "『手書きと自動生成は別の動機』— 分けてコミットするか確認してください。"
+            "『手書きと自動生成は別の動機』なので、分けてコミットするか確認してください。"
         )
 
     has_docs = any(re.search(r"(^|/)docs?/", p) or p.lower().endswith((".md", ".rst")) for p in paths)
