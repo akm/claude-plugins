@@ -1,6 +1,6 @@
 """レビュアの実行のログ (stream-json) から、実効モデル・skill の呼び出し・拒否された呼び出し・実効の権限モード・
 ワーカーのフックが拒否した呼び出し・サンドボックスが拒否した確認・リポジトリの行を表示しただけの呼び出しを読む
-(回の終了処理の 2)。読み方の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
+(回の終了処理の 2)。読み方の SSOT は、ファイル review-triage/skills/review-loop/references/worker.md の「ログの読み方」。
 
 引数: 1 つ目はログのパス。読めなければ、空のログとして扱う。2 つ目はワーカーのフックのファイル
 (review-loop-worker/deny_tmp_hook.py) の中身で、__name__ を "__main__" 以外にして実行し、関数 denies と文字列 REASON を使う。
@@ -19,7 +19,7 @@
 終了コード: 0。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 read_log_facts。
-語の意味と振る舞いの正本も、同じ worker.md。
+語の意味と振る舞いの SSOT も、同じ worker.md。
 """
 
 import json, re, subprocess, sys

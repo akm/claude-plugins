@@ -1,6 +1,6 @@
 # triagecheck
 
-トリアージ記録 (YAML) のスキーマと、判定フローの正本を検査する。生成サマリ (`.md`) の書き出しも行う。
+トリアージ記録 (YAML) のスキーマと、判定フローの SSOT を検査する。生成サマリ (`.md`) の書き出しも行う。
 
 lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査を切り出したもの。**検査の中身は変えていない** — 変えたのは対象のパスの決め方だけ。
 
@@ -8,10 +8,10 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 | 検査 | 内容 |
 | --- | --- |
-| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (正本は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「前からある欠陥」) と、D8 が当たる記録の `verdict` が `held` であること。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
+| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「前からある欠陥」) と、D8 が当たる記録の `verdict` が `held` であること。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
-**記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定のディレクトリ `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して終了し、`.gitignore` は変えない — 正本は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。
+**記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定のディレクトリ `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して終了し、`.gitignore` は変えない — SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。
 
 ## 前提
 
@@ -35,7 +35,7 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 | --- | --- | --- |
 | `-record-dir` | ✓ | 記録のディレクトリ。末尾のスラッシュは補う |
 | `-current-dir` | △ | 相対パスを解決する基準。**相対パスを渡すとき必須** |
-| `-judgment-flow` | | 判定フローの正本のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
+| `-judgment-flow` | | 判定フローの SSOT のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
 | `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す。**対象はディレクトリの全記録** (1 ファイルだけを指定する手段は無い) |
 | `-install-wrapper` | | 検査せず、呼び出し用のラッパースクリプトを書き出す。相対パスなら `-current-dir` も要る |
 | `-summary-command` | | サマリの再生成手段として案内する文字列。既定は `triagecheck -write-summary` (`-install-wrapper` では `-current-dir` から見たラッパーの相対パス) |
@@ -48,18 +48,18 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 
 ### 再生成コマンドの案内 (-summary-command)
 
-**この節が、案内の値 (既定・`-install-wrapper` での組み立て・空の扱い) の規則の正本。** 他の文書 (スキルの project-config.md など) はここを参照し、規則を再掲しない。
+**この節が、案内の値 (既定・`-install-wrapper` での組み立て・空の扱い) の規則の SSOT。** 他の文書 (スキルの project-config.md など) はここを参照し、規則を再掲しない。
 
 **サマリの再生成手段はリポジトリごとに違う** (Makefile のターゲット・`-install-wrapper` で生成したラッパー・`go run` の直呼び) ため、このツールは特定のコマンド名を持たない。`-summary-command` に渡した文字列が次の 2 か所へ入る。
 
-- サマリが無い / 正本と一致しないときのエラー文 (「`<値>` で再生成する」)
+- サマリが無い / SSOT と一致しないときのエラー文 (「`<値>` で再生成する」)
 - 生成サマリ (`.md`) の 1 行目のコメント
 
 省略すると `triagecheck -write-summary` になる。**空文字や空白だけの指定はエラー** (再生成の手段を空欄で案内することになるため)。
 
-**`-install-wrapper` で生成したラッパーには、この値を埋め込む。** `-summary-command` を渡せばその文字列を、省略すれば `-current-dir` から見たラッパー自身の相対パス (`bin/review-triage-check -write-summary` など) を案内として埋め込む。**省略するなら `-current-dir` が要る** (無いとエラー)。実行時の呼び出し方 (`$0`) や絶対パスから組み立てないのは、この値がコミットされるため — 呼び出し方やマシンで 1 行目が変わると、同じコミットが検査する場所によって「正本と一致しない」と報告される。
+**`-install-wrapper` で生成したラッパーには、この値を埋め込む。** `-summary-command` を渡せばその文字列を、省略すれば `-current-dir` から見たラッパー自身の相対パス (`bin/review-triage-check -write-summary` など) を案内として埋め込む。**省略するなら `-current-dir` が要る** (無いとエラー)。実行時の呼び出し方 (`$0`) や絶対パスから組み立てないのは、この値がコミットされるため — 呼び出し方やマシンで 1 行目が変わると、同じコミットが検査する場所によって「SSOT と一致しない」と報告される。
 
-**この値は生成サマリの 1 行目としてコミットされる。** 変えると既存サマリが鮮度検査で「正本と一致しない」と報告されるので、`-write-summary` で再生成して吸収する。
+**この値は生成サマリの 1 行目としてコミットされる。** 変えると既存サマリが鮮度検査で「SSOT と一致しない」と報告されるので、`-write-summary` で再生成して吸収する。
 
 ### パスの渡し方
 
@@ -240,12 +240,13 @@ bin/review-triage-check -write-summary   # 生成サマリを書き出す
 
 ## 生成サマリの書式の変更
 
-**鮮度の検査は、記録 YAML から描き直したサマリとの全文一致で行う。** そのため、サマリの書式が変わった版に更新すると、更新の前に生成したサマリは、すべて「正本と一致しない」と報告される。記録のディレクトリを git で追跡しているリポジトリでは、更新した後に `-write-summary` (`-summary-command` で案内している再生成の手段) で再生成してコミットする。
+**鮮度の検査は、記録 YAML から描き直したサマリとの全文一致で行う。** そのため、サマリの書式が変わった版に更新すると、更新の前に生成したサマリは、すべて「SSOT と一致しない」と報告される。記録のディレクトリを git で追跡しているリポジトリでは、更新した後に `-write-summary` (`-summary-command` で案内している再生成の手段) で再生成してコミットする。
 
 | review-triage の版 | 変えた書式 |
 | --- | --- |
 | 0.24.0 | 回の見出し「## 回 N: …」→「## N 回目: …」、束ね先「(束ね先: 回 N の …)」→「(束ね先: N 回目の …)」、検知の根拠の行「指摘 #M と回 N の …」→「指摘 #M と N 回目の …」、捉え直しの出所「スキルの見立て (skill)」→「スキルの見解 (skill)」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.25.0 | 調査済み・未立案の注記の末尾「`review-triage-fix` が立案 (段 2) から続ける」→「`review-triage-fix` が立案フェーズから続ける」([#87](https://github.com/akm/claude-plugins/issues/87)) |
+| 0.26.0 | 冒頭のコメント「正本は <YAML> — …」→「SSOT は <YAML> — …」、本文の 1 行目「正本は [<YAML>](<YAML>)。…」→「SSOT は [<YAML>](<YAML>)。…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 
 ## テスト
 

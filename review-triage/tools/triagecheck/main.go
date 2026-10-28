@@ -1,4 +1,4 @@
-// triagecheck は review-triage の記録 (YAML) と判定フローの正本を検査する。
+// triagecheck は review-triage の記録 (YAML) と判定フローの SSOT を検査する。
 //
 // lappds の tools/doccheck から、review-triage に関わる 2 つの検査
 // (review-triage-record / judgment-flow) を切り出したもの。検査の中身は
@@ -40,7 +40,7 @@ func run(args []string) error {
 	currentDir := fs.String("current-dir", "",
 		"相対パスを解決する基準のディレクトリ。絶対パスで、実在すること")
 	flowPath := fs.String("judgment-flow", "",
-		"判定フローの正本 (judgment-flow.md) のパス。省略時は CLAUDE_PLUGIN_ROOT から解決する")
+		"判定フローの SSOT (judgment-flow.md) のパス。省略時は CLAUDE_PLUGIN_ROOT から解決する")
 	writeSummary := fs.Bool("write-summary", false,
 		"検査せず、記録から生成サマリ (.md) を書き出す")
 	installWrapperPath := fs.String("install-wrapper", "",
@@ -329,7 +329,7 @@ func missingPathProblems(in resolvedInputs) []string {
 	if in.judgmentFlow != "" {
 		if _, err := os.Stat(in.judgmentFlow); errors.Is(err, fs.ErrNotExist) {
 			problems = append(problems, fmt.Sprintf(
-				"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま成功するため報告する)",
+				"%s: %s が指す判定フローの SSOT が存在しません (検査が行われないまま成功するため報告する)",
 				in.judgmentFlow, in.judgmentFlowOrigin))
 		}
 	}
@@ -414,7 +414,7 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 	return filepath.Join(base, p), true, nil
 }
 
-// resolveJudgmentFlowPath は判定フローの正本のパスを決める。優先順は
+// resolveJudgmentFlowPath は判定フローの SSOT のパスを決める。優先順は
 // 明示の指定 → プラグインの展開先 → 既定 (リポジトリ内にスキルを直接置いた形)。
 //
 // 見つからなかったときに空文字を返して既定のままにするのは、判定フローが

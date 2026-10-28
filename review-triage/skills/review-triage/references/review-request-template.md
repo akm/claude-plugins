@@ -1,6 +1,6 @@
 # レビューの依頼: {{repo}} の {{branch}} ({{scope}})
 
-このファイルは review-triage プラグインの `review-request` スキルが生成した依頼文である。レビュアはこの依頼文だけを読んで作業し、結果を「出力様式」のとおり `{{output_path}}` に書き出す。依頼文の作り方と各節の理由の正本は review-triage スキルの `references/review-request.md` — レビュアが読む必要は無い。
+このファイルは review-triage プラグインの `review-request` スキルが生成した依頼文である。レビュアはこの依頼文だけを読んで作業し、結果を「出力様式」のとおり `{{output_path}}` に書き出す。依頼文の作り方と各節の理由の SSOT は review-triage スキルの `references/review-request.md` — レビュアが読む必要は無い。
 
 ## 対象
 

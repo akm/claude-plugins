@@ -1,11 +1,11 @@
 // record.go はレビュー指摘のトリアージ記録 (既定は tmp/review-triages/*.yaml) の
 // スキーマと、生成サマリ (*.md) の鮮度を検査する (review-triage-record)。
 //
-// 記録の正本は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
+// 記録の SSOT は YAML で、件数の集計・累計は人が書かず、サマリ生成が計算する。
 // 1 回目の試行 (claude/review-triage-skill-bf7714) では手書きの累計・決め打ちの値の
 // ミスが指摘の約 3 分の 1 を占め、書かせて検算する検査は「正しい訂正手順が
 // 誤って失敗する」誤検出を生んだ。数えるものを書かせないことで、この類を発生源から消す。
-// スキーマの意味の正本は skills/review-triage/references/record-schema.md。
+// スキーマの意味の SSOT は skills/review-triage/references/record-schema.md。
 package main
 
 import (
@@ -61,7 +61,7 @@ func inReviewTriageDir(f string) bool {
 	return path.Dir(f) == path.Clean(reviewTriageDir)
 }
 
-// --- スキーマ (意味の正本は skills/review-triage/references/record-schema.md) ---
+// --- スキーマ (意味の SSOT は skills/review-triage/references/record-schema.md) ---
 
 type recordDoc struct {
 	Runs []recordRun `yaml:"runs"`
@@ -210,13 +210,13 @@ type recordPlan struct {
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
 	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
-	// 調査の手順の正本は review-triage-fix の references/investigation.md。
+	// 調査の手順の SSOT は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
 	// Verification は修正の後の検証のうち、観点 B (周りの記述を再確認する) で読んだ範囲。任意だが、
 	// 書くなら near_edges が要る (無いと「書いたつもりの検証」が無い扱いになる)。
 	// 範囲は同梱の道具 nearedges の出力から写す (record-schema.md「検証」)。
 	Verification *recordVerification `yaml:"verification"`
-	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが正本か決まっていない重複・参照の循環の有無と対処)。任意だが、
+	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが SSOT か決まっていない重複・参照の循環の有無と対処)。任意だが、
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
 	DocDag    *recordDocDag `yaml:"doc_dag"`
 	Options   string        `yaml:"options"`
@@ -340,7 +340,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 		}
 		if string(got) != want {
 			problems = append(problems, fmt.Sprintf(
-				"%s: サマリが正本 (%s) と一致しません (`%s` で再生成する)", mdPath, yf, summaryCommand))
+				"%s: サマリが SSOT (%s) と一致しません (`%s` で再生成する)", mdPath, yf, summaryCommand))
 		}
 	}
 
@@ -348,7 +348,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 	for _, md := range mds {
 		if !stemSet[strings.TrimSuffix(md, ".md")] {
 			problems = append(problems, fmt.Sprintf(
-				"%s: 対応する YAML (正本) がありません。記録の正本は <ブランチ名>.yaml で、サマリはその生成物", md))
+				"%s: 対応する YAML (SSOT) がありません。記録の SSOT は <ブランチ名>.yaml で、サマリはその生成物", md))
 		}
 	}
 	return problems
@@ -745,7 +745,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: doc_dag.scope がありません (doc-dag に渡した対象の文書群)", pn)
 				}
 				if strings.TrimSpace(dd.Result) == "" {
-					add("%s: doc_dag.result がありません (どちらが正本か決まっていない重複・参照の循環の有無と対処)", pn)
+					add("%s: doc_dag.result がありません (どちらが SSOT か決まっていない重複・参照の循環の有無と対処)", pn)
 				}
 			}
 			// 検証 (verification) は任意だが、書くなら再確認した範囲 (near_edges) が要る。
@@ -868,9 +868,9 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	base := path.Base(yamlPath)
 	stem := strings.TrimSuffix(base, ".yaml")
 	var b strings.Builder
-	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。正本は %s — `%s` で再生成する。 -->\n\n", base, summaryCommand)
+	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。SSOT は %s — `%s` で再生成する。 -->\n\n", base, summaryCommand)
 	fmt.Fprintf(&b, "# %s のトリアージ記録\n\n", stem)
-	fmt.Fprintf(&b, "正本は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
+	fmt.Fprintf(&b, "SSOT は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
 
 	b.WriteString("## 推移\n\n")
 	b.WriteString("| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n")
@@ -1340,7 +1340,7 @@ func writeReviewTriageSummaries(dir string, explicit bool) error {
 		if err := os.WriteFile(mdPath, []byte(summary), 0o644); err != nil {
 			return err
 		}
-		fmt.Printf("生成: %s (正本: %s)\n", mdPath, f)
+		fmt.Printf("生成: %s (SSOT: %s)\n", mdPath, f)
 	}
 	return nil
 }

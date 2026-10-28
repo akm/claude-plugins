@@ -1,6 +1,6 @@
 """レビュアの実行の PreToolUse のフック (ツールを実行する前に Claude Code が呼ぶフック)。
 Bash のコマンドの文字列がルートのディレクトリ /tmp を指すパスを含めば、そのコマンドを実行する前に拒否する。
-説明の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「/tmp を含むコマンドを拒否するフック」。
+説明の SSOT は、ファイル review-triage/skills/review-loop/references/worker.md の「/tmp を含むコマンドを拒否するフック」。
 
 ワーカーはこのファイルを、ほかの .py と同じく起動時に読み込み、2 か所で使う。
   - review-loop-worker/build_settings_json.py が、中身をレビュアの実行に渡す --settings のフックのコマンド

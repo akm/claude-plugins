@@ -111,7 +111,7 @@ func TestReviewTriageRecordValidPasses(t *testing.T) {
 // doc_dag (修正の後の doc-dag の確認) を持つ計画は正しい記録として通る。
 func TestReviewTriageRecordDocDagPasses(t *testing.T) {
 	mutated := strings.Replace(validRecordYAML, "order: 1\n",
-		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: どちらが正本か決まっていない重複なし。参照の循環なし\n", 1)
+		"order: 1\n        doc_dag:\n          scope: docs/foo.md と、それが参照する docs/bar.md\n          result: どちらが SSOT か決まっていない重複なし。参照の循環なし\n", 1)
 	if mutated == validRecordYAML {
 		t.Fatal("フィクスチャの置換が適用されていない")
 	}
@@ -1355,7 +1355,7 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	first, _, _ := strings.Cut(summary, "\n")
-	want := "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `" + defaultSummaryCommand + "` で再生成する。 -->"
+	want := "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml — `" + defaultSummaryCommand + "` で再生成する。 -->"
 	if first != want {
 		t.Errorf("1 行目が既定の形ではない:\n got: %s\nwant: %s", first, want)
 	}
@@ -1867,11 +1867,11 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 // 鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
 // 1 バイトでも変わると、ディレクトリに残る既存のサマリがすべて古いと報告される。注記は
 // investigated の問題がある回にだけ出し、推移の表には列を足さない。
-const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
+const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
 	"\n" +
 	"# feat-x のトリアージ記録\n" +
 	"\n" +
-	"正本は [feat-x.yaml](feat-x.yaml)。読み方と収束の目安は [README](README.md)。\n" +
+	"SSOT は [feat-x.yaml](feat-x.yaml)。読み方と収束の目安は [README](README.md)。\n" +
 	"\n" +
 	"## 推移\n" +
 	"\n" +

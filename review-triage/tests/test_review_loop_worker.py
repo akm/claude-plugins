@@ -17,8 +17,8 @@ uname の名前で偽のコマンド (review-triage/tests/fake-uname。既定で
 (利用者の設定 ~/.claude/settings.json を読まないように、また作業場所の条件を満たすように)。
 ワーカーは回ごとに TMPDIR の下に準備のディレクトリを作って複製と写しを作り、作業場所のパスに改名して、回の終了時に消す。
 
-振る舞いの正本は review-triage/skills/review-loop/references/worker.md、
-ループのディレクトリのファイルの様式の正本は同じディレクトリの loop-files.md。
+振る舞いの SSOT は review-triage/skills/review-loop/references/worker.md、
+ループのディレクトリのファイルの様式の SSOT は同じディレクトリの loop-files.md。
 """
 
 import hashlib

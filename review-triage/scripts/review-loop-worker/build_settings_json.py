@@ -1,5 +1,5 @@
 """レビュアの実行に渡す --settings の JSON を組み立てる。
-中身の正本は、ファイル review-triage/skills/review-loop/references/worker.md の「サンドボックス」と
+中身の SSOT は、ファイル review-triage/skills/review-loop/references/worker.md の「サンドボックス」と
 「/tmp を含むコマンドを拒否するフック」。
 
 サンドボックスの制限を外す真偽値のキー (allowAppleEvents・filesystem.disabled・network.allowAllUnixSockets) は、
@@ -16,7 +16,7 @@ enabledPlugins だけであることを確認する。
 終了コード: 組み立てられれば 0。合成の後の確認で一致しなければ、理由を標準エラーに出して 1。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 build_settings_json。
-語の意味と振る舞いの正本も、同じ worker.md。
+語の意味と振る舞いの SSOT も、同じ worker.md。
 """
 
 import json, shlex, sys

@@ -15,7 +15,7 @@ Markdown の修正の差分から、**近くの辺** — 変更した箇所と�
 
 削除だけの変更は、削除の直後の位置を変更行として扱う。同じ範囲は 1 つにまとめ、その範囲を読む理由になった変更行を添える。
 
-**`-hints` を付けると、差分の種類に応じて当てる検証の観点も提示する** (観点の定義の正本は [verification.md](../../skills/review-triage-fix/references/verification.md))。
+**`-hints` を付けると、差分の種類に応じて当てる検証の観点も提示する** (観点の定義の SSOT は [verification.md](../../skills/review-triage-fix/references/verification.md))。
 
 | 差分に現れるもの | 提示する観点 |
 | --- | --- |
@@ -49,7 +49,7 @@ git show <sha> --format= -- '*.md' | go run -C <プラグインの展開先>/too
 | `-hints` | | 差分の種類に応じた観点 (B・C・F) も提示する |
 | `-no-content` | | 範囲の本文を出さず、位置だけを出す |
 
-出力は Markdown で、ファイルごとに範囲 (種類・行・見出し・変更行・理由) と、その本文を行番号つきで並べる (1 範囲 200 行で打ち切る)。**読んだ範囲は記録の `plans[].verification.near_edges` に書く** (様式の正本は [record-schema.md](../../skills/review-triage/references/record-schema.md))。
+出力は Markdown で、ファイルごとに範囲 (種類・行・見出し・変更行・理由) と、その本文を行番号つきで並べる (1 範囲 200 行で打ち切る)。**読んだ範囲は記録の `plans[].verification.near_edges` に書く** (様式の SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md))。
 
 ## 限界
 

@@ -14,7 +14,7 @@
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 make_request_copy が、準備のコマンドとして
 (関数 run_prep で、準備のディレクトリを cwd にして) 起動する。
-語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
+語の意味と振る舞いの SSOT は、ファイル review-triage/skills/review-loop/references/worker.md。
 """
 
 import os, re, sys

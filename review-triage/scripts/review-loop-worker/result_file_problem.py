@@ -8,7 +8,7 @@
 終了コード: 受け付けるなら 0、受け付けないなら 1。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 result_file_problem。
-語の意味と振る舞いの正本も、同じ worker.md。
+語の意味と振る舞いの SSOT も、同じ worker.md。
 """
 
 import os, stat, sys

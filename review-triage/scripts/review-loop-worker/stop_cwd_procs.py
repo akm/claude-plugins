@@ -10,7 +10,7 @@ TERM を送り、猶予の秒数のうちに消えなければ KILL を送る。
 終了コード: 停止するものが無いか、すべて停止すれば 0。列挙できないか停止できなければ 1。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 stop_cwd_procs。
-語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
+語の意味と振る舞いの SSOT は、ファイル review-triage/skills/review-loop/references/worker.md。
 """
 
 import os, signal, subprocess, sys, time

@@ -9,18 +9,18 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 
 同じセッションの sub-agent でレビューするループ ([review-triage-loop](../review-triage-loop/SKILL.md)) との違いは、レビューを実行するモデルとセッションの effort を人間が選べることと、レビュアが回ごとに新しいプロセスになること。どちらの経路で回したかは記録の `notes` の 1 行に残り、後から収束を比べられる。
 
-## 正本の宣言
+## SSOT の宣言
 
-**ループの順序・分岐・停止の条件・報告は、`review-triage-loop` の [loop-flow.md](../review-triage-loop/references/loop-flow.md) と [reporting.md](../review-triage-loop/references/reporting.md) が正本。** このスキルは `review-triage-loop` を呼ばず、同じ図に従って自分で `review-triage` と `review-triage-fix` を呼ぶ。差し替えるのは G0 と L1、G3 の「無い」の先と J2 の「無い」の先 (収束後の全量の回に進むかの判定を挟む) で、停止ノードを 3 つ足す。散文で遷移を言い直さない。
+**ループの順序・分岐・停止の条件・報告は、`review-triage-loop` の [loop-flow.md](../review-triage-loop/references/loop-flow.md) と [reporting.md](../review-triage-loop/references/reporting.md) が SSOT (single source of truth。ある事実を定めている唯一の記述)。** このスキルは `review-triage-loop` を呼ばず、同じ図に従って自分で `review-triage` と `review-triage-fix` を呼ぶ。差し替えるのは G0 と L1、G3 の「無い」の先と J2 の「無い」の先 (収束後の全量の回に進むかの判定を挟む) で、停止ノードを 3 つ足す。散文で遷移を言い直さない。
 
-| 流用元 | 使うもの | 使わないもの (このスキルの正本) |
+| 流用元 | 使うもの | 使わないもの (このスキルの SSOT) |
 | --- | --- | --- |
 | [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RG0、L1 → RL1 ([round.md](references/round.md))。G3 の「無い」の先 (RJ0) と J2 の「無い」の先 (RJ1)、追加の停止 RA1〜RA3 と、差し替えた部分の図 ([stops.md](references/stops.md)) |
 | [reporting.md](../review-triage-loop/references/reporting.md) | 必ず出すもの 6 項目 (停止した理由に RA1〜RA3 を含める) | このループで足す項目 ([stops.md](references/stops.md) の「停止の報告に足すもの」) |
 | [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表 (読み替え方は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)・「effort の既定」 | 「G0 での解決」(ワーカーのモデルは人間が決める)・「範囲」(基点は `review-request` の規則。[round.md](references/round.md) の RL1 の手順 a) |
 | [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |
 
-ループのディレクトリのファイルの様式の正本は [loop-files.md](references/loop-files.md)、ワーカーの振る舞いの正本は [worker.md](references/worker.md)。
+ループのディレクトリのファイルの様式の SSOT は [loop-files.md](references/loop-files.md)、ワーカーの振る舞いの SSOT は [worker.md](references/worker.md)。
 
 ## 同梱のスクリプト
 
@@ -31,11 +31,11 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 
 ## 前提知識
 
-- **ループは必ず停止する。** 停止の条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RA1〜RA3 を足したもの。収束後の全量の回 (`--full-review`) は上限に数えないが、それでも停止する (理由の正本は [review-request.md](../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
-- **停止と終了は別。** 停止 (S2〜S6・RA1〜RA3) は人間の判断待ちの状態で、判断の後に `--resume` で続けられる (停止のときに書き換えるものとワーカーの扱いの正本は [stops.md](references/stops.md) の「停止のときに書き換えるもの」)。ループを終えるのは人間が `--end` を打ったときだけ。
-- **ワーカーのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ質問する。ワーカーを起動するかどうかも人間が決める。端末のツール (Claude Desktop app の Terminal パネルでコマンドを実行するツール) が使えれば、このスキルは人間の承認を得てから端末のタブで起動し、使えなければ起動コマンドを案内する (手順の正本は [guide-template.md](references/guide-template.md) の「起動の手順」)。
+- **ループは必ず停止する。** 停止の条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RA1〜RA3 を足したもの。収束後の全量の回 (`--full-review`) は上限に数えないが、それでも停止する (理由の SSOT は [review-request.md](../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
+- **停止と終了は別。** 停止 (S2〜S6・RA1〜RA3) は人間の判断待ちの状態で、判断の後に `--resume` で続けられる (停止のときに書き換えるものとワーカーの扱いの SSOT は [stops.md](references/stops.md) の「停止のときに書き換えるもの」)。ループを終えるのは人間が `--end` を打ったときだけ。
+- **ワーカーのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ質問する。ワーカーを起動するかどうかも人間が決める。端末のツール (Claude Desktop app の Terminal パネルでコマンドを実行するツール) が使えれば、このスキルは人間の承認を得てから端末のタブで起動し、使えなければ起動コマンドを案内する (手順の SSOT は [guide-template.md](references/guide-template.md) の「起動の手順」)。
 - **受け渡しはループのディレクトリのファイルだけ。** セッション間のメッセージは使わない。
-- **同時に動くのは、review-loop のセッションかレビュアの実行 (ワーカーが起動する `claude -p` の 1 回) のどちらか一方。** レビュアの実行は元の作業ツリーでは動かない。ワーカーは依頼文ごとに一時ディレクトリ (回の作業場所。以下「作業場所」) を作り、その中の使い捨ての作業ツリー (元のリポジトリの複製) でレビュアの実行を行い、回の終了時に作業場所を消す。ただしワーカーは、依頼文を受け取ったときと、レビュアの実行が終了した後に、元の作業ツリーの HEAD と未コミットの変更が依頼文のとおりかを確認し、違えばその回を `failed` にする。そのため、レビューの間は review-loop のセッションも人間も作業ツリーを変えない。作業場所と複製の作り方と消し方、この確認の正本は [worker.md](references/worker.md) の「回の処理」。
+- **同時に動くのは、review-loop のセッションかレビュアの実行 (ワーカーが起動する `claude -p` の 1 回) のどちらか一方。** レビュアの実行は元の作業ツリーでは動かない。ワーカーは依頼文ごとに一時ディレクトリ (回の作業場所。以下「作業場所」) を作り、その中の使い捨ての作業ツリー (元のリポジトリの複製) でレビュアの実行を行い、回の終了時に作業場所を消す。ただしワーカーは、依頼文を受け取ったときと、レビュアの実行が終了した後に、元の作業ツリーの HEAD と未コミットの変更が依頼文のとおりかを確認し、違えばその回を `failed` にする。そのため、レビューの間は review-loop のセッションも人間も作業ツリーを変えない。作業場所と複製の作り方と消し方、この確認の SSOT は [worker.md](references/worker.md) の「回の処理」。
 - **ループの間に履歴を書き換えない** (reset・rebase・squash)。増分の基点 (直前の回の `head`) が履歴から外れると、依頼文を書けずに停止する (RA3)。
 - **待機の通知は人間の入力ではない。** 通知を人間の回答 (S2 の回答など) として扱わない。
 
@@ -69,20 +69,20 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
    - **捨てる**: そのまま 3 に進む。ワーカーは、レビュー中ならその回を終えて (ループのディレクトリに `end` が現れたので `failed` のフラグファイルを書いて) から、まだ依頼文を受け取っていなければすぐに、一覧を出力して終了する。
 3. **`end` を書く** (理由を 1 行。一時名から改名する)。`end` が既にあれば (人間が直接置いた) 書かない。
 4. **`loop.yaml` を `state: ended`・`stop_reason: "end: <理由>"` にする。** 人間が `end` を直接置いていたときの理由は「end を外部で置かれた」。
-5. **報告する**: ループの id とループのディレクトリ、ワーカーが一覧を出力して終了すること (ワーカーが動いていなければ、次に起動しても `end` があるので起動時の確認で停止すること。停止するまでに行う後始末の正本は [worker.md](references/worker.md) の「起動時の確認」の 2)、ループのディレクトリは消さずに残すこと。
+5. **報告する**: ループの id とループのディレクトリ、ワーカーが一覧を出力して終了すること (ワーカーが動いていなければ、次に起動しても `end` があるので起動時の確認で停止すること。停止するまでに行う後始末の SSOT は [worker.md](references/worker.md) の「起動時の確認」の 2)、ループのディレクトリは消さずに残すこと。
 
 ## 原則
 
 - **このスキルは判断も修正もしない。** `review-request`・`review-triage`・`review-triage-fix` を、回ごとに Skill ツールで呼ぶだけ ([round.md](references/round.md) の「呼ぶスキル」)。
-- **待機を起動したターンでは、それ以外のツールを呼ばない。** 通知で次のターンが始まる (理由の正本は [reentry.md](references/reentry.md) の「待機」)。
-- **ループが条件を勝手に変えない。** 条件は `loop.yaml` にある (再開のときの規則の正本は [arguments.md](references/arguments.md) の「様式」)。
+- **待機を起動したターンでは、それ以外のツールを呼ばない。** 通知で次のターンが始まる (理由の SSOT は [reentry.md](references/reentry.md) の「待機」)。
+- **ループが条件を勝手に変えない。** 条件は `loop.yaml` にある (再開のときの規則の SSOT は [arguments.md](references/arguments.md) の「様式」)。
 - **ループのディレクトリのファイルは、それぞれの書き込み元だけが書く** ([loop-files.md](references/loop-files.md) の「ファイルの一覧」)。review-loop のセッションはワーカーのファイル (`worker.yaml`・完了のフラグファイル・ログ) にも、レビュアの実行の結果にも書き込まない。
 - **ループのディレクトリを消さない。** 後で経路どうしの収束を比べる材料になる。
 - **人間に返した状態を越えて進まない。** 選択待ち (S2) と停止 (RA1〜RA3) は、人間の判断を求めて停止した結果である。
 
 ## このスキルが検出しないもの
 
-- **レビュアの実行の中身が正しいか** — 確認しない。何を確認するかの正本は [worker.md](references/worker.md) の「このワーカーが検出しないもの」。
-- **レビュアの実行が、複製と作業場所の外に残したもののうち、ワーカーが検出しないもの** — サンドボックスの一時ディレクトリ (`/private/tmp/claude-<利用者の番号>`) への書き込み・ホームと元の作業ツリーの外へのツールによる書き込み・利用者の設定が接続を許すホストへの送信など。一覧の正本は [worker.md](references/worker.md) の「このワーカーが検出しないもの」。
+- **レビュアの実行の中身が正しいか** — 確認しない。何を確認するかの SSOT は [worker.md](references/worker.md) の「このワーカーが検出しないもの」。
+- **レビュアの実行が、複製と作業場所の外に残したもののうち、ワーカーが検出しないもの** — サンドボックスの一時ディレクトリ (`/private/tmp/claude-<利用者の番号>`) への書き込み・ホームと元の作業ツリーの外へのツールによる書き込み・利用者の設定が接続を許すホストへの送信など。一覧の SSOT は [worker.md](references/worker.md) の「このワーカーが検出しないもの」。
 - **ワーカーの effort が実際に適用されたか** — `claude -p` のログに effort は記録されないので、ワーカーに渡した値を記録に残すだけ。
 - **収束したことが「欠陥が無い」ことを意味するか** — 意味しない。そのレビュースキル・そのモデル・その effort・その範囲で指摘が出なかったということである。

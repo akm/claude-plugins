@@ -50,7 +50,7 @@
 | `frozen_paths` | 当時の記録として書き換えない文書のパス接頭辞 | 凍結扱いのパスは無いものとする |
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を実行するコマンド | 検査を実行せず、**実行していないことを報告に明記する** |
-| `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが正本として残る |
+| `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが SSOT として残る |
 | `loop` | `review-triage-loop` の既定値 (下記) | ループの既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に質問する |
 | `fix` | `review-triage-fix` の既定値 (下記) | 修正の既定値を持たない。`review-triage-fix` はキーごとの既定 (下の「`fix`」の表) に従う |
 | `review_loop` | `review-loop` (レビューを端末のワーカーに任せるループ) の既定値 (下記) | キーごとの既定 (下の「`review_loop`」の表) に従う |
@@ -59,7 +59,7 @@
 
 **同梱の `triagecheck` は `config.json` を読まない。** 案内する再生成手段は `-summary-command` で渡し、その値がサマリの 1 行目に入ってコミットされる。**`triage_summary_command` には、`triagecheck` が案内する文字列と同じものを書く** — 一致しないと、記録を読んだ人が実在しないコマンドを案内されることになる。
 
-`-summary-command` の既定値と、`-install-wrapper` で省略したときにツールが組み立てる値の規則は、[triagecheck の README「再生成コマンドの案内」](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md#再生成コマンドの案内--summary-command) が正本。ここでは再掲しない。
+`-summary-command` の既定値と、`-install-wrapper` で省略したときにツールが組み立てる値の規則は、[triagecheck の README「再生成コマンドの案内」](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md#再生成コマンドの案内--summary-command) が SSOT。ここでは再掲しない。
 
 ## `gates` — なぜ関門の一覧が要るか
 
@@ -79,18 +79,18 @@
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `max_rounds` | ループの上限 | 10 |
-| `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限に達する前に停止して構造の見直しを人間に問う (判定の正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
+| `structure_rounds` | 構造の関門 k。直近 k 回で、採択が前の回の修正の近傍に続き、件数が減らなければ、上限に達する前に停止して構造の見直しを人間に問う (判定の SSOT は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の J9) | 3。`0` で判定しない |
 | `review_skill` | 起動するレビュースキル (`code-review` / `ce-code-review`) | 引数にも無ければ人間に質問する。**推測して決めない** |
-| `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
-| `review_model` | ループに指定するモデル。経路によって実際に使われるかが違う (実効モデルの正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
+| `review_args` | レビュースキルに渡す引数 (`code-review` の effort など) | 既定の effort を渡す (SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」の節) |
+| `review_model` | ループに指定するモデル。経路によって実際に使われるかが違う (実効モデルの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」の節) | 経路で決まる (SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) |
 
-**`max_rounds` に上限を設ける理由は、収束しないループを停止させるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ種類の指摘に何度も応え続けることになる。記録の `runs` の要素数はループをまたいだ累計で、上限の数え方 (正本は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
+**`max_rounds` に上限を設ける理由は、収束しないループを停止させるため。** 回数が多いこと自体が「収束していない」という情報で、放置すると同じ種類の指摘に何度も応え続けることになる。記録の `runs` の要素数はループをまたいだ累計で、上限の数え方 (SSOT は [review-triage-loop の loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表 J5) とは別である — 過去に何回まで伸びたかを後から見るときに使う。上限に達したときの扱いは `review-triage-loop` の手順が定める。
 
 **`structure_rounds` は上限と別の関門で、修正が次の指摘を生んでいる形 (採択が前の回の修正の近傍に続き、減らない) のループを停止させるためのもの。** 上限は費用の関門、こちらは構造の関門で、当たればループは人間に構造の見直しを問う (S6)。経緯は [#54](https://github.com/akm/claude-plugins/issues/54)。
 
-### 「未設定」の定義 (正本)
+### 「未設定」の定義 (SSOT)
 
-**`loop` のキーが「未設定」とは、キーが無いか、文字列のキー (`review_skill` / `review_args` / `review_model`) の値が空文字列であることを指す。** 未設定のキーは既定に従い、既定が決まらないキー (`review_skill` はいつでも、`review_model` は呼び出し元が対応表に無いとき。ただしループがモデルを決めない経路は除く — 正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) は人間に質問する。JSON の様式が `""` を置いているのは、キーの存在を示すためであって、空のモデル名や空の引数を指定する意味ではない。
+**`loop` のキーが「未設定」とは、キーが無いか、文字列のキー (`review_skill` / `review_args` / `review_model`) の値が空文字列であることを指す。** 未設定のキーは既定に従い、既定が決まらないキー (`review_skill` はいつでも、`review_model` は呼び出し元が対応表に無いとき。ただしループがモデルを決めない経路は除く — SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「G0 での解決」) は人間に質問する。JSON の様式が `""` を置いているのは、キーの存在を示すためであって、空のモデル名や空の引数を指定する意味ではない。
 
 **`max_rounds` と `structure_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-loop` の値の検査 ([arguments.md](../../review-triage-loop/references/arguments.md)) がエラーにする。
 
@@ -102,45 +102,45 @@
 
 ## `fix` — 修正の既定値
 
-[review-triage-fix](../../review-triage-fix/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) も、`review-triage-fix` に渡す値を決めるために同じ既定を読む。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き (引数の様式と決め方の正本は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md))。
+[review-triage-fix](../../review-triage-fix/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) も、`review-triage-fix` に渡す値を決めるために同じ既定を読む。**引数で指定された値が設定より優先する** — 設定はリポジトリごとの既定で、引数はその回だけの上書き (引数の様式と決め方の SSOT は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md))。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
-| `threshold_rounds` | 回数の閾値 N。記録の回番号 (`runs` の要素数) が N を越えた回 (N+1 回目以降) では、`review-triage-fix` が調査フェーズの後に人間に立案者の選択を求める (質問の仕方と選択肢の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) | 5 |
-| `stages` | フェーズごとの実行方法。キーはフェーズの名前 — `investigate` (調査フェーズ)・`plan` (立案フェーズ)・`fix` (修正フェーズ)。フェーズの中身と手順の対応の正本は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭 | 3 つのフェーズともセッション内 (下の各キーの既定) |
+| `threshold_rounds` | 回数の閾値 N。記録の回番号 (`runs` の要素数) が N を越えた回 (N+1 回目以降) では、`review-triage-fix` が調査フェーズの後に人間に立案者の選択を求める (質問の仕方と選択肢の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4) | 5 |
+| `stages` | フェーズごとの実行方法。キーはフェーズの名前 — `investigate` (調査フェーズ)・`plan` (立案フェーズ)・`fix` (修正フェーズ)。フェーズの中身と手順の対応の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の「手順」の冒頭 | 3 つのフェーズともセッション内 (下の各キーの既定) |
 | `stages.<フェーズ>.subagent` | そのフェーズを sub-agent で実行するか (真偽値) | `false` — セッション内で実行する |
-| `stages.<フェーズ>.model` | sub-agent で実行するときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
-| `stages.<フェーズ>.effort` | sub-agent で実行するときの effort の指定 (文字列)。値は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。`subagent` が `false` なら使わない | 空 — セッションの effort を継承する agent 定義を使う (effort と定義名の対応の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「effort と定義名の対応」) |
+| `stages.<フェーズ>.model` | sub-agent で実行するときのモデルの指定 (文字列)。`subagent` が `false` なら使わない | 空 — 実効モデルは呼び出し元 (このセッションが動いているモデル) になる (指定から実効モデルへの解決の SSOT は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実効モデルの解決」) |
+| `stages.<フェーズ>.effort` | sub-agent で実行するときの effort の指定 (文字列)。値は `low` / `medium` / `high` / `xhigh` / `max` のいずれか。`subagent` が `false` なら使わない | 空 — セッションの effort を継承する agent 定義を使う (effort と定義名の対応の SSOT は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「effort と定義名の対応」) |
 
 **`threshold_rounds` は記録の回番号で数える。** `max_rounds` が「この起動で回した回数」を数えるのと違い、`review-triage-fix` は記録しか見ないので、単独で実行してもループから呼ばれても同じ回で同じ振る舞いになる。上限は収束しないループを停止させるための値、閾値は人間が立案に関与し始める回を決める値で、別のものである。
 
 `fix` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`fix` 自体が無いか、キーが無ければ既定。`stages` の文字列のキー `model` / `effort` は空文字列も未設定)。**`threshold_rounds` は整数で、空文字列を未設定とは読まない** — 空や整数でない値は `review-triage-fix` の値の検査 ([review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md)) がエラーにする (`max_rounds` と同じ扱い)。**`stages.<フェーズ>.subagent` も同じく真偽値で、空文字列や文字列の `"true"` を未設定とは読まない** — 同じ検査がエラーにする。
 
-**`stages` の設定は、N+1 回目以降の立案フェーズ (`plan`) には適用されない。** その回の立案フェーズは `review-triage-fix` が人間に求めた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。調査フェーズ (`investigate`) と修正フェーズ (`fix`) の設定は回の番号に関わらず適用される。フェーズの実行方法を設定と引数から決める規則の正本は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実行方法の決定」。
+**`stages` の設定は、N+1 回目以降の立案フェーズ (`plan`) には適用されない。** その回の立案フェーズは `review-triage-fix` が人間に求めた立案者の選択 (手順 4) で決まり、`stages.plan` は使わない。調査フェーズ (`investigate`) と修正フェーズ (`fix`) の設定は回の番号に関わらず適用される。フェーズの実行方法を設定と引数から決める規則の SSOT は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md) の「実行方法の決定」。
 
 ## `review_loop` — ワーカーに任せるループの既定値
 
-[review-loop](../../review-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** (引数の様式と、値の誤りの扱いの正本は [review-loop の arguments.md](../../review-loop/references/arguments.md))。ループの条件のうち上限・レビュースキル・モデルなどは `loop`、`review-triage-fix` に渡す値は `fix` から読み、ここにはループのディレクトリとワーカーに固有の値だけを置く。
+[review-loop](../../review-loop/SKILL.md) が読む。**引数で指定された値が設定より優先する** (引数の様式と、値の誤りの扱いの SSOT は [review-loop の arguments.md](../../review-loop/references/arguments.md))。ループの条件のうち上限・レビュースキル・モデルなどは `loop`、`review-triage-fix` に渡す値は `fix` から読み、ここにはループのディレクトリとワーカーに固有の値だけを置く。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
 | `dir` | ループのディレクトリの親ディレクトリ (リポジトリのルートからの相対パス)。git に無視されていること | `tmp/review-loop` |
 | `wait_minutes` | 完了のフラグファイルが書かれるまで待機する上限 (分) | 60 |
 | `worker_wait_minutes` | ワーカーの起動まで待機する上限 (分)。1 回目の最初の待機と、`--resume` でワーカーが動いていないときに使う | 15 |
-| `worker_idle_minutes` | 依頼文が書かれるまでワーカーが待機する上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
+| `worker_idle_minutes` | 依頼文が書かれるまでワーカーが待機する上限 (分)。ワーカーの `--idle-minutes` に埋める | ワーカーの既定 (SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」) |
 | `worker_stale_seconds` | ワーカーの `worker.yaml` の更新時刻がこれより古ければ、ワーカーのプロセスが無くなったと読む (秒) | 30 |
 | `review_timeout_minutes` | レビュアの実行 1 回の上限 (分)。ワーカーの `--review-timeout-minutes` に埋める | ワーカーの既定 (同上) |
 | `worker_effort` | ワーカーに求める effort (`low` / `medium` / `high` / `xhigh` / `max`) | 引数にも無ければ人間に質問する。**推測して決めない** |
-| `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | `auto` (デフォルトにする理由と、ワーカーが受け付けない値の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
-| `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。ワーカーの `--allowed-tools` に要素ごとに埋める | ワーカーの既定の一覧 (正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
-| `sandbox_allow_write` | サンドボックス (Claude Code が Bash のコマンドの書き込みと接続を制限する機能) の中の Bash に書き込みを許す場所の一覧 (文字列の配列)。テストがホームの下のキャッシュ (Go のビルドのキャッシュ `~/Library/Caches/go-build` など) に書くときに足す (実測と理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「サンドボックス」)。各要素は絶対パスか `~` で始まるパスで、先頭の `~` はワーカーがホームに展開する。ワーカーの `--sandbox-allow-write` に要素ごとに埋める。環境の値 (下記) | 空 — 書き込みを許すのは、ワーカーが回ごとに作る一時ディレクトリ (回の作業場所) だけ (許せる場所の条件の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動時の確認」の 12) |
-| `sandbox_allowed_domains` | サンドボックスの中の Bash に接続を許すドメインの一覧 (文字列の配列)。ワーカーの `--sandbox-allowed-domain` に要素ごとに埋める。環境の値 (下記) | 空 — 接続を許すのは、利用者の設定の `WebFetch(domain:…)` の許可から加わるドメインだけ (加わり方の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「ネットワーク」) |
+| `permission_mode` | レビュアの実行の権限モード。ワーカーの `--permission-mode` に埋める | `auto` (デフォルトにする理由と、ワーカーが受け付けない値の SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
+| `allowed_tools` | レビュアの実行に許すツールの一覧 (文字列の配列)。ワーカーの `--allowed-tools` に要素ごとに埋める | ワーカーの既定の一覧 (SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「レビュアの実行の権限」) |
+| `sandbox_allow_write` | サンドボックス (Claude Code が Bash のコマンドの書き込みと接続を制限する機能) の中の Bash に書き込みを許す場所の一覧 (文字列の配列)。テストがホームの下のキャッシュ (Go のビルドのキャッシュ `~/Library/Caches/go-build` など) に書くときに足す (実測と理由の SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「サンドボックス」)。各要素は絶対パスか `~` で始まるパスで、先頭の `~` はワーカーがホームに展開する。ワーカーの `--sandbox-allow-write` に要素ごとに埋める。環境の値 (下記) | 空 — 書き込みを許すのは、ワーカーが回ごとに作る一時ディレクトリ (回の作業場所) だけ (許せる場所の条件の SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動時の確認」の 12) |
+| `sandbox_allowed_domains` | サンドボックスの中の Bash に接続を許すドメインの一覧 (文字列の配列)。ワーカーの `--sandbox-allowed-domain` に要素ごとに埋める。環境の値 (下記) | 空 — 接続を許すのは、利用者の設定の `WebFetch(domain:…)` の許可から加わるドメインだけ (加わり方の SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「ネットワーク」) |
 
-ワーカーのスクリプトはこの設定を読まず、`review-loop` が値を人間に案内する起動コマンドに埋める (理由の正本は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」)。
+ワーカーのスクリプトはこの設定を読まず、`review-loop` が値を人間に案内する起動コマンドに埋める (理由の SSOT は [review-loop の worker.md](../../review-loop/references/worker.md) の「起動の仕方」)。
 
-**`sandbox_allow_write` と `sandbox_allowed_domains` は、ループの条件ではなく環境の値 (ワーカーを動かすマシンごとに変わる値) で、`--resume` のたびに設定から再度読み込まれる。** 再度の読み込みの扱いと理由 (権限モードなど、再度読み込まないキーとの違いを含む) の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「様式」。
+**`sandbox_allow_write` と `sandbox_allowed_domains` は、ループの条件ではなく環境の値 (ワーカーを動かすマシンごとに変わる値) で、`--resume` のたびに設定から再度読み込まれる。** 再度の読み込みの扱いと理由 (権限モードなど、再度読み込まないキーとの違いを含む) の SSOT は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「様式」。
 
-`review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、配列のキー `allowed_tools` / `sandbox_allow_write` / `sandbox_allowed_domains` は空の配列も未設定)。**`loop` と違い、値の誤りはループを停止させない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の正本は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
+`review_loop` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`review_loop` 自体が無いか、キーが無ければ既定。文字列のキー `dir` / `worker_effort` / `permission_mode` は空文字列も未設定、配列のキー `allowed_tools` / `sandbox_allow_write` / `sandbox_allowed_domains` は空の配列も未設定)。**`loop` と違い、値の誤りはループを停止させない** — そのキーを未設定として扱い、警告を開始の報告に書く (理由の SSOT は [review-loop の arguments.md](../../review-loop/references/arguments.md) の「値の検査」)。
 
 ## `frozen_paths` — 直さない文書
 
@@ -159,6 +159,6 @@
 - **Makefile にターゲットを 1 つ置く**（リポジトリの Makefile に検査コマンドをそのまま書く）
 - **`-install-wrapper` でラッパースクリプトを生成する**（`.claude/akm-claude-plugins/review-triage/config.json` のようにリポジトリごとの設定として管理したくない・Makefile に手を入れたくない場合）
 
-どちらの置き方も、Makefile の例 (展開先の求め方・渡すフラグ) と `-install-wrapper` の使い方は [triagecheck の README](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md) が正本。ここに写すと、渡すフラグが増えたときに片方だけ古くなる。
+どちらの置き方も、Makefile の例 (展開先の求め方・渡すフラグ) と `-install-wrapper` の使い方は [triagecheck の README](https://github.com/akm/claude-plugins/blob/main/review-triage/tools/triagecheck/README.md) が SSOT。ここに写すと、渡すフラグが増えたときに片方だけ古くなる。
 
 **検査を実行しなかった回は、報告にそう書く。** 「検査で問題が出なかった」と「検査を実行していない」は別の事実で、混同すると次の読者が通ったものと誤解する。

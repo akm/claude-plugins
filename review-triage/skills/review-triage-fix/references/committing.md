@@ -1,6 +1,6 @@
 # 問題単位でコミットする
 
-**このファイルが、修正のコミットの粒度・メッセージ・関門の正本。** 記録 (YAML・サマリ) のコミットの分け方は [記録 README のコミット節](../../review-triage/references/record-schema.md#コミット) が正本。
+**このファイルが、修正のコミットの粒度・メッセージ・関門の SSOT。** 記録 (YAML・サマリ) のコミットの分け方は [記録 README のコミット節](../../review-triage/references/record-schema.md#コミット) が SSOT。
 
 ## 1 問題 1 コミット
 
@@ -32,12 +32,12 @@
 通すのは、設定の `gates` が挙げるもののうち**変更の種類に対応するもの**と、記録を変更したなら `triage_check_command` ([project-config.md](../../review-triage/references/project-config.md))。
 
 - **CI に任せない。** CI が対象外にしている領域 (設定ファイル・スキル定義など) は珍しくなく、そこはローカルの関門でしか検査されない。**どの領域が CI の対象外かは、リポジトリごとに違う。**
-- **`gates` が未設定なら、関門を通していないことを報告に書く。** 通したふりをしない (未設定時の扱いの正本は [project-config.md](../../review-triage/references/project-config.md))。
+- **`gates` が未設定なら、関門を通していないことを報告に書く。** 通したふりをしない (未設定時の扱いの SSOT は [project-config.md](../../review-triage/references/project-config.md))。
 - **検査が失敗したままコミットしない。** 分割のために一時的に失敗する状態になる場合は、その旨をコミットメッセージに書き、次のコミットで合格に戻す。途中で中断したときに失敗するコミットが残るので、**失敗する状態にする前に、合格に戻すところまで続けられるかを確認する**。
 - 機械検査と別に、[verification.md](verification.md) の観点のうちコミット前にかかるもの (B・D・E) を確認する。**観点 B の読む範囲は、同梱の道具 [nearedges](../../../tools/nearedges/README.md) に差分 (`git diff --cached -- '*.md'`) を渡して列挙させ、その出力を読んでから、読んだ範囲を記録の `plans[].verification.near_edges` に書く。** 差分に Markdown が無ければ道具は「再確認する範囲はありません」と出すので、`verification` は書かなくてよい。
 
 ## コミット後に記録へ書く
 
-**コミットしたら、記録 YAML の該当の問題を `status: done`・`sha` に更新しておく。** 途中で中断したとき、どこまで進んだかが記録に残る。記録とサマリのコミットは区切りで行う (分け方の正本は [記録 README のコミット節](../../review-triage/references/record-schema.md#コミット))。
+**コミットしたら、記録 YAML の該当の問題を `status: done`・`sha` に更新しておく。** 途中で中断したとき、どこまで進んだかが記録に残る。記録とサマリのコミットは区切りで行う (分け方の SSOT は [記録 README のコミット節](../../review-triage/references/record-schema.md#コミット))。
 
-**リポジトリ外の成果物への反映はコミットが立たない。** その問題は `status: done-external` にする。**対象の範囲と、何を書くかの正本は [記録 README のリポジトリ外への反映](../../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない (規則を写すと、正本が変わったときに片方だけ古くなる)。
+**リポジトリ外の成果物への反映はコミットが立たない。** その問題は `status: done-external` にする。**対象の範囲と、何を書くかの SSOT は [記録 README のリポジトリ外への反映](../../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない (規則を写すと、SSOT が変わったときに片方だけ古くなる)。

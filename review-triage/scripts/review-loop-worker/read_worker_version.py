@@ -9,7 +9,7 @@
 終了コード: 読めれば 0。ファイルを読めないか、キー version の値が空でない文字列でなければ、理由を標準エラーに出して 1。
 
 呼び出し元: ファイル review-triage/scripts/review-loop-worker.sh の関数 read_worker_version。
-語の意味と振る舞いの正本は、ファイル review-triage/skills/review-loop/references/worker.md。
+語の意味と振る舞いの SSOT は、ファイル review-triage/skills/review-loop/references/worker.md。
 """
 
 import json, os, sys
