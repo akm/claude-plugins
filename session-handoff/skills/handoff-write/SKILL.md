@@ -12,7 +12,7 @@ description: いまのセッションの作業を別のセッションへ引き�
 ## 前提知識
 
 - **compact (会話の自動要約) との違いは、引き継ぎ文を書くセッションが「次に何をするか」を知っていること。** 会話全体を均等に縮めるのではなく、次の作業に要ることを選んで書く。何を選ぶかの SSOT (single source of truth。ある事実を定めている唯一の記述) は [references/what-to-carry.md](references/what-to-carry.md)。
-- **節の構成の SSOT は雛形 [references/template.md](references/template.md)。** 節を足したり消したりしない — 引き継ぎ文を読むセッションは節の名前を手がかりに読む。
+- **節の構成の SSOT は雛形 [references/template.md](references/template.md)。** 節を足したり消したりしない。引き継ぎ文を読むセッションは節の名前を手がかりに読む。
 - **雛形の 1 行目の `<!-- session-handoff v1 -->` は、引き継ぎ文を読むセッションとフックが引き継ぎ文を識別するマーク。** 必ず本文の 1 行目に置き、前に何も書かない。
 
 ## 引数
@@ -40,7 +40,7 @@ description: いまのセッションの作業を別のセッションへ引き�
    gh api repos/<owner/repo>/issues/<番号> --jq '.pull_request != null'
    ```
 
-   `true` なら PR、`false` なら Issue。**終了コードで判別しない** — `gh issue view <番号> --json ...` は PR の番号でも終了コード 0 を返す。
+   `true` なら PR、`false` なら Issue。**終了コードで判別しない。** `gh issue view <番号> --json ...` は PR の番号でも終了コード 0 を返す。
 
 2. **リポジトリの状態を採る。**
 
