@@ -228,6 +228,29 @@ func TestHintsFromChangedLines(t *testing.T) {
 	}
 }
 
+// SSOT を指す書き方 (「SSOT は」と、ほかのリポジトリの文書が書く「正本は」) にリンクが無ければ、
+// 観点 B の手がかりを出す。リンクがあれば出さない。
+func TestHintsReferenceWithoutLink(t *testing.T) {
+	d := "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1,0 +1,3 @@\n" +
+		"+様式の SSOT は terms.md。\n+様式の正本は terms.md。\n+様式の SSOT は [terms.md](terms.md)。\n"
+	changes, err := parseUnifiedDiff(strings.NewReader(d))
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(hints(changes, nil), "\n")
+	for _, want := range []string{
+		"観点 B: 変更行に「SSOT は」があるがリンクが無い (docs/a.md 1 行目) — SSOT を再確認し、参照をリンクにする",
+		"観点 B: 変更行に「正本は」があるがリンクが無い (docs/a.md 2 行目) — SSOT を再確認し、参照をリンクにする",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("%q が提示されない: %s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "3 行目") {
+		t.Errorf("リンクのある行 (3 行目) に手がかりが出ている: %s", joined)
+	}
+}
+
 func TestRenderIsReadable(t *testing.T) {
 	root := writeFixture(t)
 	changes, err := parseUnifiedDiff(strings.NewReader(unifiedDiff))

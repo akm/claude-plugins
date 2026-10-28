@@ -1,7 +1,7 @@
 """資源 (ラベル `resource:<名前>` と宣言の `resources` で表す、同時に使える数が限られるもの)。属性の読み込み (`attributes`。
 設定に無い資源と属性はデフォルト値)、持っている資源の求め方 (`held_from_history`。R20 の (1))、契機ごとの判断
 (`judge_assign`・`judge_declare`・`judge_update`・`judge_close`・`judge_release`。属性と、U13 が求めた資源の使用と、記録にある
-利用者の回答を引数で受ける)。属性の表と契機の表の正本は issue-dispatch/skills/issue-dispatch/references/resources.md。gh は使わない。
+利用者の回答を引数で受ける)。属性の表と契機の表の SSOT は issue-dispatch/skills/issue-dispatch/references/resources.md。gh は使わない。
 
 資源の名前は大文字小文字を区別せずに比べる (ラベルの名前を GitHub が区別しないため)。返す名前は、呼び出し元が渡した表記
 (宣言・ラベル・設定) のまま。

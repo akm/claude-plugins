@@ -5,7 +5,7 @@
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-記録のディレクトリ・キー・扱いの正本は issue-dispatch/skills/issue-dispatch/references/records.md。
+記録のディレクトリ・キー・扱いの SSOT は issue-dispatch/skills/issue-dispatch/references/records.md。
 """
 
 import json

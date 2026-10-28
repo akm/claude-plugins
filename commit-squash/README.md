@@ -13,17 +13,17 @@
 ## 特徴
 
 - **`git rebase -i` を使わず、起点から積み直す。** 順序の入れ替えで衝突が起きず、最終ツリーのハッシュ比較で「中身が 1 バイトも変わっていない」ことを機械的に証明できます (理由は同梱の [why-not-rebase.md](skills/commit-squash/references/why-not-rebase.md))。
-- **push 済みのコミットは変更しない。** 判定の軸はこれだけで、1 つでも該当すればその場で中断します (正本は同梱の [history-rewriting.md](skills/commit-squash/references/history-rewriting.md))。
+- **push 済みのコミットは変更しない。** 判定の軸はこれだけで、1 つでも該当すればその場で中断します (SSOT は同梱の [history-rewriting.md](skills/commit-squash/references/history-rewriting.md))。SSOT は single source of truth の略で、ある事実を定めている唯一の記述を指します。
 - **`git reset --hard` を使わない。** ブランチの付け替えは `--keep` で行うため、未コミットの作業を消しません (同上)。
 
 ## 前提
 
-確認の手順の正本は同梱の [SKILL.md](skills/commit-squash/SKILL.md) の「前提の確認」、中断する条件の正本は [history-rewriting.md](skills/commit-squash/references/history-rewriting.md) の「中断すべきとき」です。
+確認の手順の SSOT は同梱の [SKILL.md](skills/commit-squash/SKILL.md) の「前提の確認」、中断する条件の SSOT は [history-rewriting.md](skills/commit-squash/references/history-rewriting.md) の「中断すべきとき」です。
 
 - **まとめる範囲がすべて未 push であること。** push 済みのコミットが含まれる場合、スキルは実行せずに報告して終了します。
 - **作業ツリーがクリーンであること。**
 
-バックアップブランチはスキルが自動で作りますが、**削除は行いません** (人間に依頼します)。まとめ方に問題が見つかったときに復元に使う唯一のブランチだからです (正本は [SKILL.md](skills/commit-squash/SKILL.md) の手順 10)。
+バックアップブランチはスキルが自動で作りますが、**削除は行いません** (人間に依頼します)。まとめ方に問題が見つかったときに復元に使う唯一のブランチだからです (SSOT は [SKILL.md](skills/commit-squash/SKILL.md) の手順 10)。
 
 ## commit-rules-guard との関係
 

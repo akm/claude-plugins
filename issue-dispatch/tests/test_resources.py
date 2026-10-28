@@ -4,7 +4,7 @@ gh は使わない。判定のテストは resources.md の契機の表の行ご
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-様式と規則の正本は issue-dispatch/skills/issue-dispatch/references/resources.md。
+様式と規則の SSOT は issue-dispatch/skills/issue-dispatch/references/resources.md。
 """
 
 import json

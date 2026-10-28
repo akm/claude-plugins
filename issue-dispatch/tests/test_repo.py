@@ -6,7 +6,7 @@ git の動作は一時ディレクトリに作ったリポジトリで確認す�
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-確認の方法・「読めない」の理由・URL の比べ方の正本は issue-dispatch/skills/issue-dispatch/references/repositories.md。
+確認の方法・「読めない」の理由・URL の比べ方の SSOT は issue-dispatch/skills/issue-dispatch/references/repositories.md。
 """
 
 import json

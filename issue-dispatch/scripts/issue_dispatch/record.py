@@ -1,7 +1,7 @@
 """記録 (管理のセッションが持つ、GitHub から導けないもの) の読み書き。
 
 ディレクトリは `<管理ディレクトリ>/<record_dir>/<owner>-<number>/` で、本体 `record.json` と追記専用の `actions.log` を扱う
-(`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。ディレクトリ・キー・扱いの正本は
+(`snapshot.json` と `wait.pid` は別の単位 (観測と待機) が書く)。ディレクトリ・キー・扱いの SSOT は
 issue-dispatch/skills/issue-dispatch/references/records.md。
 
 記録は蓄積データなので、壊れていれば `Corrupt` で中断し、新規として扱わない (無いときだけ新規)。保存は一時ファイルに

@@ -1,7 +1,7 @@
 """観測のうちスナップショットと差分。`snapshot.json` (ポーリングの基準になる Project の状態の写し) の読み書き、項目の読み取り
 からの作成 (`build_snapshot`)、コメントに URL で書かれた PR の収集 (`pr_urls_in_comments`)、書いた値の反映 (`reflect`)、
 スナップショットと今の内容の差分 (`diff`。何が変わったかだけを処理の順に返し、意味づけはしない)。
-様式・差分の種類と処理の順の正本は issue-dispatch/skills/issue-dispatch/references/observation.md。保存先の正本は records.md。
+様式・差分の種類と処理の順の SSOT は issue-dispatch/skills/issue-dispatch/references/observation.md。保存先の SSOT は records.md。
 
 このモジュールは gh を実行しない (項目の読み取りは project.items、PR の状態は issues.pr_state を呼び出し元が行う)。
 """

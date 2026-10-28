@@ -188,7 +188,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 
 各プラグインのテストは、上の「構成」の節で各ディレクトリに添えたコマンドで実行します。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
 
-対象はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけ、ファイル `.github/test-targets.txt` に書いた期待の一覧と比べます。差があれば失敗にするので、テストが対象から外れても、一覧に無いテストが増えても気づけます。見つけ方・比べ方と各 job の失敗の条件の正本はワークフローのコメントで、以下はその要約です。
+対象はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけ、ファイル `.github/test-targets.txt` に書いた期待の一覧と比べます。差があれば失敗にするので、テストが対象から外れても、一覧に無いテストが増えても気づけます。見つけ方・比べ方と各 job の失敗の条件の [SSOT](CONCEPTS.md#ssot) はワークフローのコメントで、以下はその要約です。
 
 - ファイル `test_*.py` を含むディレクトリごとにコマンド `python3 -m unittest discover -s <ディレクトリ>` を実行する (Python は 3.11。pr-teeth が前提とする下限に合わせている)
 - ファイル `go.mod` を含むディレクトリごとに `go test ./...` を実行する (Go は各モジュールの `go.mod` が宣言するバージョン)

@@ -1,7 +1,7 @@
 {
   "name": "review-triage",
   "description": "レビュー指摘を採択 / 保留 / 却下に選り分け、採択したものを原因で束ねて直し、レビューから修正までを上限回数まで回す (レビューは sub-agent か端末のワーカーで実行する) skill 5 つと、レビューを行うワーカーのスクリプト、修正フェーズを sub-agent で実行する agent 定義、記録を検査する Go ツール",
-  "version": "0.25.1",
+  "version": "0.25.2",
   "author": {
     "name": "akm"
   },

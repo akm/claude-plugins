@@ -1,6 +1,6 @@
 """セッションの識別。セッション ID の正規化、環境変数からの自分のセッション ID の決定、管理のセッションの規約の名前の生成と
 解析、作業のセッションの一時ディレクトリのパス。gh も ListAgents も使わず、環境変数は引数の辞書で受ける (テストのため)。
-宛先の決め方と、公式文書に無い動作への依存の正本は issue-dispatch/skills/issue-dispatch/references/messaging.md。
+宛先の決め方と、公式文書に無い動作への依存の SSOT は issue-dispatch/skills/issue-dispatch/references/messaging.md。
 """
 
 import os

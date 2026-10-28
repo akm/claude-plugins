@@ -1,7 +1,7 @@
 """項目の状態の導出。管理のセッションがターンのたびに、Project の項目 (project.items の結果) とコメントと Issue の出来事から、
 割り当て中か・今の割り当ての PR・正常な完了・reopen・宣言の段階・待機の理由・持っている資源を導く (計画の R24・KTD19)。
 作業のセッションの確認 (`work check`・`work held`) も同じ導出の、自分の項目についての読み出し。
-状態ごとの取得元と場面ごとの扱いの正本は issue-dispatch/skills/issue-dispatch/references/flow.md。
+状態ごとの取得元と場面ごとの扱いの SSOT は issue-dispatch/skills/issue-dispatch/references/flow.md。
 
 このモジュールは gh を実行しない (項目は project.items、`PR の報告` の PR の状態は issues.observe_pr を呼び出し元が読んで渡す)。
 時刻は GraphQL の ISO 8601 (UTC、`Z`) の文字列のまま比べる。
@@ -331,7 +331,7 @@ ACTION_KINDS = ("comment", "set-status", "blocked-by-add", "blocked-by-remove", 
 # 1 回だけ報告するもの (記録の reported で重複を除く)
 REPORT_KINDS = ("status-changed", "field-changed", "blocked-by-added", "blocked-by-removed", "reopened", "reopened-while-pending",
                 "pr-base-not-default", "pr-left-open")
-# 利用者に質問すること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の正本は flow.md の「ターンで行うこと」の質問の表
+# 利用者に質問すること (種類 → 選択肢。空なら自由回答)。種類の名前と選択肢の SSOT は flow.md の「ターンで行うこと」の質問の表
 QUESTION_OPTIONS = {"close-in-progress": ["stop", "reopen"], "assignee-changed": ["release", "continue"], "field-cleared": ["release", "restore"],
                     "field-changed": ["release", "restore"], "removed": ["release", "keep"], "status-changed": ["release", "restore"],
                     "third-party-edit": ["stop", "continue"], "merged-issue-open": ["close", "keep"], "pr-closed-unmerged": ["release", "keep"],

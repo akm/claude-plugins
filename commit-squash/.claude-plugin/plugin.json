@@ -1,7 +1,7 @@
 {
   "name": "commit-squash",
   "description": "未 push のコミットを、同じ関心事のものどうしでまとめて数を減らす skill (rebase を使わず起点から積み直す)",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": {
     "name": "akm"
   },

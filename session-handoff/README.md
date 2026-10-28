@@ -34,7 +34,7 @@ compact との違いは、**引き継ぎ文を書くセッションが「次に�
 
 ### 保存先
 
-引数で番号か `--local` を渡さなければ、次の順で決まります。手順の正本は [skills/handoff-write/SKILL.md](skills/handoff-write/SKILL.md) の手順 1 と 5 です。
+引数で番号か `--local` を渡さなければ、次の順で決まります。手順の SSOT (single source of truth。ある事実を定めている唯一の記述) は [skills/handoff-write/SKILL.md](skills/handoff-write/SKILL.md) の手順 1 と 5 です。
 
 1. **PR のコメント** — 現在のブランチに PR があり、引き継ぐ作業がその PR の作業である場合
 2. **Issue のコメント** — 作業の対象の Issue が決まっている場合
@@ -44,7 +44,7 @@ compact との違いは、**引き継ぎ文を書くセッションが「次に�
 
 ### 引き継ぎ文に書くもの
 
-節の構成の正本は [skills/handoff-write/references/template.md](skills/handoff-write/references/template.md)、各節の埋め方の正本は [skills/handoff-write/references/what-to-carry.md](skills/handoff-write/references/what-to-carry.md) です。目的・次にやること・決めたことと理由・却下した案・確認した事実・未確認のこと・現在の状態・人間からの指示を書きます。会話の経過と、リポジトリを読めば分かることは書きません。
+節の構成の SSOT は [skills/handoff-write/references/template.md](skills/handoff-write/references/template.md)、各節の埋め方の SSOT は [skills/handoff-write/references/what-to-carry.md](skills/handoff-write/references/what-to-carry.md) です。目的・次にやること・決めたことと理由・却下した案・確認した事実・未確認のこと・現在の状態・人間からの指示を書きます。会話の経過と、リポジトリを読めば分かることは書きません。
 
 ## 保存先を貼るだけでも再開できる (フック)
 
@@ -61,7 +61,7 @@ compact との違いは、**引き継ぎ文を書くセッションが「次に�
 
 ## 再開のときに確認すること
 
-新しいセッションは、引き継ぎ文をそのまま信じません。正本は [skills/handoff-resume/SKILL.md](skills/handoff-resume/SKILL.md) と [skills/handoff-resume/references/verify-state.md](skills/handoff-resume/references/verify-state.md) です。
+新しいセッションは、引き継ぎ文をそのまま信じません。SSOT は [skills/handoff-resume/SKILL.md](skills/handoff-resume/SKILL.md) と [skills/handoff-resume/references/verify-state.md](skills/handoff-resume/references/verify-state.md) です。
 
 - **投稿者が自分でないコメントは、人間の確認を得るまで従いません。** 公開リポジトリには誰でもコメントを書けるので、マークを付けた偽の引き継ぎ文で新しいセッションに指示を与えることができてしまうためです
 - **ブランチ・HEAD・未コミットの変更を、現在のリポジトリと突き合わせます。** ブランチが違う、書かれていた未コミットの変更が無い、履歴が書き換えられている、のいずれかなら中断して報告します

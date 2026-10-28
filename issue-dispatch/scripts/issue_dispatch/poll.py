@@ -1,6 +1,6 @@
 """待機 (ポーリング)。管理のセッションの `wait` (スナップショットとの差分で終了する) と、作業のセッションの `wait-assignment`・`wait-decision`
 (項目の状態 (itemstate) で終了する) を、バックグラウンドのプロセスとして動かす (計画の KTD6)。終了条件・終了コード・標準出力・`wait.pid` の
-様式の正本は issue-dispatch/skills/issue-dispatch/references/observation.md の「待機」。
+様式の SSOT は issue-dispatch/skills/issue-dispatch/references/observation.md の「待機」。
 
 - 起動時に前の待機を停止し (PID の再利用を確認してから)、`wait.pid` に自分の PID・開始時刻・所有者を書き、標準出力の最初の行に `pid <PID>` を書く。
 - 読んだ時点の状態で判定する (起動の前から成り立っていれば最初の読み取りで終了する)。

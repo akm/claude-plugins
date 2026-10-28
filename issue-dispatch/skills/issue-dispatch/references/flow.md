@@ -1,6 +1,6 @@
 # 処理の流れ (項目の状態)
 
-このファイルが、この仕組み (issue-dispatch) の、管理のセッションがターンのたびに導く**項目の状態**の正本 (計画の R24・KTD19)。状態ごとの取得元 (GitHub のどこから導くか) と判断の基準、場面ごとの扱い、`item state` と作業のセッションの確認 (`work check`・`work held`) が返す値をここに書く。宣言の判定の節は U15 で、割り当ての節は U16 で、状態遷移の図と決定表は U21 で足す。モジュール `issue-dispatch/scripts/issue_dispatch/itemstate.py` が導出を実装し、`gh` は実行しない (項目は `project items`、`PR の報告` の PR の状態は `pr observe` と同じ関数で、呼び出し元が読んで渡す)。
+このファイルが、この仕組み (issue-dispatch) の、管理のセッションがターンのたびに導く**項目の状態**の SSOT (single source of truth。ある事実を定めている唯一の記述) (計画の R24・KTD19)。状態ごとの取得元 (GitHub のどこから導くか) と判断の基準、場面ごとの扱い、`item state` と作業のセッションの確認 (`work check`・`work held`) が返す値をここに書く。宣言の判定の節は U15 で、割り当ての節は U16 で、状態遷移の図と決定表は U21 で足す。モジュール `issue-dispatch/scripts/issue_dispatch/itemstate.py` が導出を実装し、`gh` は実行しない (項目は `project items`、`PR の報告` の PR の状態は `pr observe` と同じ関数で、呼び出し元が読んで渡す)。
 
 ターンで行うこと (書き込みの候補・質問すること・報告) の導き方は「ターンで行うこと」の節。`item state` は書き込まず、管理のセッション (U21・U23 のスキル) が既存のサブコマンドで実行する。
 
@@ -16,7 +16,7 @@
 | 待機の理由 (`waiting_blockers`)・管理のセッションが書いた `Blocked` (`manager_blocked`) | 判定の要る最新の宣言への、最新の `開始可` より後の `待機` の理由と相手。管理のセッションが書いた `Blocked` かは、理由に `Issue` か `小さな PR` を含む最初の `待機` と、`Blocked` への Status の変化の時刻で判別する (下の基準) | 管理 (`待機` → 理由が `Issue` か `小さな PR` のときだけ `blockedBy` → `Blocked` → 合図。資源・設定・利用者の回答の理由では Status を変えない) |
 | 自分が足した `blockedBy` (`own_blockers`) | 今の割り当てのすべての `待機` (前の宣言へのものも、`開始可` の前のものも含む) の理由の `Issue` と `小さな PR` の依頼先の Issue。`blocked-by remove` が外してよい blocker と、人が足した blockedBy の判別に使う | 管理 (`待機` → `blockedBy`) |
 | 今の割り当ての PR (`pr`) | 今の割り当て (`割り当て` より後) の最新の `PR の報告` の本文の URL の PR (作者がトークンのログインと違えば無いものとする)。無ければ、Issue を閉じる参照の PR (`closedByPullRequestsReferences`) のうち、作者がトークンのログインで、作成が `割り当て` より後のもの (複数なら作成が最新)。この行が「今の割り当ての PR」の唯一の取得元。`PR の報告` の PR が読めなければ、PR は無しとして `problems` (`what` が `pr-unreadable`) で知らせ、閉じる参照の PR には戻らない (読めるようになれば報告の PR を使うため) | 作業 (`PR の報告` → 合図 `review`) |
-| 資源の使用 (`reserved`・`held`) | 予約 = コメント `割り当て` の時点で付いていたラベル `resource:<名前>` (接頭辞は大文字小文字を区別しない。GitHub のラベルの名前が区別しないため) のうち、属性 `reserve` が `on_assign` のもの。持っている資源 (定義の正本は [issue-format.md](issue-format.md) の「更新の種類」。差し戻された宣言は数えない)。空いていない資源がある宣言は、`開始可` まで何も持たない | 利用者 (ラベル)・作業 (宣言)・管理 (`開始可`) |
+| 資源の使用 (`reserved`・`held`) | 予約 = コメント `割り当て` の時点で付いていたラベル `resource:<名前>` (接頭辞は大文字小文字を区別しない。GitHub のラベルの名前が区別しないため) のうち、属性 `reserve` が `on_assign` のもの。持っている資源 (定義の SSOT は [issue-format.md](issue-format.md) の「更新の種類」。差し戻された宣言は数えない)。空いていない資源がある宣言は、`開始可` まで何も持たない | 利用者 (ラベル)・作業 (宣言)・管理 (`開始可`) |
 | 小さな PR | `待機` の理由の `小さな PR` と依頼先の Issue (と、報告の後は PR の URL) | 管理 (依頼・`待機`)・作業 (報告) |
 | 割り当ての無い項目の `Blocked` | 最新の `依存の待機` があり、その後に `依存の解消` が無い (管理のセッションが書いたもの)。無ければ利用者が手で付けたもの | 管理 (コメント → Status) |
 | 担当者の変化 | Issue の担当者 (範囲は担当者がトークンのログイン 1 人の項目) と、記録の未回答の質問 | 利用者。割り当て中なら、回答が出るまで作業中の項目のまま |
@@ -175,7 +175,7 @@
 
 ## 判定
 
-宣言の判定 (計画の R20・KTD9・KTD14・AE32・AE54)。モジュール `issue-dispatch/scripts/issue_dispatch/judge.py` (関数 `judge.judge`) と CLI の `declaration judge` がこれに従う。競合の可能性の規則は [issue-format.md](issue-format.md) の「競合の可能性」、資源の判断は [resources.md](resources.md) の契機の表、リポジトリの設定の読み方は [repositories.md](repositories.md) が正本で、ここでは言い直さない。
+宣言の判定 (計画の R20・KTD9・KTD14・AE32・AE54)。モジュール `issue-dispatch/scripts/issue_dispatch/judge.py` (関数 `judge.judge`) と CLI の `declaration judge` がこれに従う。競合の可能性の規則は [issue-format.md](issue-format.md) の「競合の可能性」、資源の判断は [resources.md](resources.md) の契機の表、リポジトリの設定の読み方は [repositories.md](repositories.md) が SSOT で、ここでは言い直さない。
 
 **判定の順序と比較の相手**: 未判定の宣言 (判定の要る最新の宣言で、段階が `undecided` のもの) を、投稿の順 (同じなら Project の中の順) に 1 件ずつ判定する。比較の相手は、その時点で `開始可` になっている宣言 (項目ごとに最新の `開始可` の宣言) だけで、未判定の宣言どうしは比較しない。同じ実行で先に `開始可` にした宣言は後の宣言の相手になり、予約した資源は後の宣言には空いていない。相手の項目の PR が ready for review の後なら、PR が変更したファイルのうち相手の宣言に無いものも、節なしのファイルとして相手に加える (「PR が変えたファイルとの照合」と同じ取得元)。比較の規則 (同じリポジトリの同じパスごと。別のリポジトリは競合しない) は [issue-format.md](issue-format.md) の「競合の可能性」。
 
@@ -227,7 +227,7 @@
 | --- | --- | --- |
 | `declaration judge --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>]` | 無し | `judgments`・`actions`・`questions`・`signals` (「判定」)・`record_lost`・`problems`・`rate_limit`・`warnings`・`errors`。入力は `item state` と同じで、リポジトリの設定は設定の `repositories` の clone から読む。`--issue` は、投稿の順に並べた未判定の宣言のうち、その項目の宣言まで判定する (前に投稿された宣言も判定し、後の宣言は判定しない。その項目に未判定の宣言が無ければ何も判定しない。判定の順序の規則を守るため。比較の相手はすべての項目から集める)。`--issue` が参照の形でなければ `errors` (key `issue`。`gh` を読まない)、Project に無ければ `rejected` (key `issue`) |
 | `item state --dir <管理ディレクトリ> [--project <owner>/<番号>] [--issue <owner/repo#番号>] [--diffs <ファイル \| ->]` | 無し | `items` (割り当てのある項目の状態。上の表)・`usage`・`actions`・`questions`・`reports`・`pending`・`record_lost` (「ターンで行うこと」)・`problems`・`rate_limit`・`warnings`・`errors`。設定の `project`・`resources` (属性)・`third_party_edit_check` と、記録 (無ければ記録を失った扱い。壊れていれば `errors` (key `record`)) と、Project のメタ情報 (ワークフローの有効・無効) を読む。`--diffs` は `observe diff` の出力 (JSON)。項目の一覧そのものが無ければ (`problems` の `what` が `items-page`・`graphql-errors`) 導かずに `errors` (key `partial`) |
-| `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (規則の正本は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
+| `blocked-by remove --dir <管理ディレクトリ> --issue <owner/repo#番号> --blocker <owner/repo#番号> [--snapshot-dir <管理ディレクトリ>]` | `blockedBy` | 項目の状態の `own_blockers` にある blocker だけを外す (規則の SSOT は [issue-format.md](issue-format.md) の「`blockedBy` の削除」)。それ以外は `rejected` (`own_blockers` を返す)。承認を得た後に呼ぶ。外したら `--snapshot-dir` のスナップショットに反映する ([observation.md](observation.md)) |
 | `work check --project <owner>/<番号> --issue <owner/repo#番号> [--session <ID>]` | 無し | `session`・上の表の値・`problems`・`rate_limit`・`errors`。`--session` を省けば環境変数 (`CLAUDE_CODE_HOST_SESSION_ID`、無ければ `CLAUDE_CODE_SESSION_ID`)。項目が無ければ `errors` (key `issue`) |
 | `work held --project <owner>/<番号> [--session <ID>]` | 無し | `session`・`items` (上の表)・`problems`・`rate_limit`・`errors` |
 

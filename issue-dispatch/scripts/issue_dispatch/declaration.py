@@ -1,6 +1,6 @@
 """宣言 (作業のセッションが変える予定のファイルと節と資源を書く JSON)。形の検査とパスの正規化 (`parse`)、更新の種類の判定
 (`held_resources`・`update_kind`・`resource_changes`。R20)、競合の可能性の判定 (`conflictability`。R5)、PR が変えたファイルと
-宣言の照合 (`pr_files_check`。R21)。様式と判定の規則の正本は issue-dispatch/skills/issue-dispatch/references/issue-format.md の
+宣言の照合 (`pr_files_check`。R21)。様式と判定の規則の SSOT は issue-dispatch/skills/issue-dispatch/references/issue-format.md の
 「宣言」。種類は filekinds がパスから決める (宣言に `kind` は書けない。KTD9)。gh は使わない。
 
 形の検査は必須キーと未知のキーで行う (docs/solutions/design-patterns/typed-contract-for-agent-input.md)。パスはリポジトリの
@@ -25,7 +25,7 @@ _NO_UNITS_KINDS = ("generated", "unknown-content", "unknown-structure")
 
 
 def _resource_key(name):
-    # 資源の名前は大文字小文字を区別しない (ラベルの名前を GitHub が区別しないため。正本は resources.md)
+    # 資源の名前は大文字小文字を区別しない (ラベルの名前を GitHub が区別しないため。SSOT は resources.md)
     return name.strip().casefold()
 
 
@@ -172,7 +172,7 @@ def parse(obj, rules, default_table):
             if not isinstance(r, str) or not r.strip() or any(c.isspace() for c in r):
                 errors.append({"key": f"resources[{i}]", "message": f"資源の名前は空白を含まない文字列: {r!r}"})
             elif _resource_key(r) in seen_resources:
-                # 資源の名前は大文字小文字を区別しない (正本は resources.md) ので、表記だけ違う重複も差し戻す
+                # 資源の名前は大文字小文字を区別しない (SSOT は resources.md) ので、表記だけ違う重複も差し戻す
                 errors.append({"key": f"resources[{i}]", "message": f"同じ資源 {r!r} が resources[{seen_resources[_resource_key(r)]}] にもある (名前は大文字小文字を区別しない。1 つにまとめる)"})
             else:
                 seen_resources[_resource_key(r)] = i

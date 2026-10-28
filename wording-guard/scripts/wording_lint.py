@@ -8,7 +8,7 @@
   fix     自動修正してよい避ける語 (autofix = true) だけを、ファイルに適用する
 
 check と fix は、設定キー textlint があるリポジトリでだけ実行できる。振る舞いと終了コードの意味の
-正本はファイル `wording-guard/skills/wording-guard/references/textlint.md` (終了コードは「コマンド」の表)。
+SSOT はファイル `wording-guard/skills/wording-guard/references/textlint.md` (終了コードは「コマンド」の表)。
 ここでは言い直さない。
 """
 

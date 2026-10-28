@@ -1,8 +1,8 @@
 """パスからファイルの種類と属性を決める。リポジトリの設定の `files` の規則を先に、同梱のデフォルトの表
 (file-kinds.json) を後に照合し、1 つのパスが種類の違う規則に一致すれば、6 つの判定の条件の順で先の種類にする。
 
-種類と属性の意味、パターンの書き方、照合の順の正本は issue-dispatch/skills/issue-dispatch/references/file-kinds.md。
-設定の規則の様式と、読み込むときにそろえる表記の正本は同じディレクトリの project-config.md (そろえるのはモジュール config)。
+種類と属性の意味、パターンの書き方、照合の順の SSOT は issue-dispatch/skills/issue-dispatch/references/file-kinds.md。
+設定の規則の様式と、読み込むときにそろえる表記の SSOT は同じディレクトリの project-config.md (そろえるのはモジュール config)。
 
 このモジュールは `issue_dispatch` のほかのモジュールを import しない (種類の決定を GitHub の操作や記録から切り離し、
 単独でテストできるようにするため。KD22)。設定ファイルも読まず、そろえた後の規則を引数で受ける。

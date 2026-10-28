@@ -4,7 +4,7 @@
 
   python3 -m unittest discover -s issue-dispatch/tests
 
-様式の正本は issue-dispatch/skills/issue-dispatch/references/issue-format.md の「宣言」。
+様式の SSOT は issue-dispatch/skills/issue-dispatch/references/issue-format.md の「宣言」。
 """
 
 import json
@@ -185,7 +185,7 @@ class UpdateKindTest(unittest.TestCase):
         self.assertEqual(declaration.resource_changes(parsed(["a.md"], ["X"]), held2), {"added": [], "removed": ["Y"]}, "2 回目は Y だけを外したと数える")
 
     def test_resource_names_ignore_case(self):
-        """資源の名前は大文字小文字を区別しない (正本は resources.md)。"""
+        """資源の名前は大文字小文字を区別しない (SSOT は resources.md)。"""
         go = parsed(["a.md"], ["DB", "gpu"])
         self.assertEqual(declaration.held_resources(go, [parsed(["a.md"], ["db"])]), {"DB"})
         self.assertEqual(declaration.update_kind(go, parsed(["a.md"], ["db", "GPU"]), {"DB", "gpu"}), "full", "表記だけ違えば何も変わらない更新")

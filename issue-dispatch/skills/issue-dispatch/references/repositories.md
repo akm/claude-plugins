@@ -1,6 +1,6 @@
 # リポジトリの設定の読み方
 
-**このファイルが、リポジトリの設定の読み方の正本。** 管理のセッションは、管理ディレクトリの設定 `repositories` ([project-config.md](project-config.md)) に書かれた clone のパスから、既定のブランチの内容のリポジトリの設定を git で読む。モジュール `issue-dispatch/scripts/issue_dispatch/repo.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `repo name` はこれに従う。ほかの文書は「読めない」の理由の名前を参照するだけで、確認の方法を言い直さない。
+**このファイルが、リポジトリの設定の読み方の SSOT (single source of truth。ある事実を定めている唯一の記述)。** 管理のセッションは、管理ディレクトリの設定 `repositories` ([project-config.md](project-config.md)) に書かれた clone のパスから、既定のブランチの内容のリポジトリの設定を git で読む。モジュール `issue-dispatch/scripts/issue_dispatch/repo.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `repo name` はこれに従う。ほかの文書は「読めない」の理由の名前を参照するだけで、確認の方法を言い直さない。
 
 管理のセッションがローカルの clone を読むのは、管理ディレクトリで動いていてリポジトリの中にいないが、作業のセッションと同じマシンで動くため。読むのは、作業のセッションの worktree ではなく、worktree を作った元の clone のパス (worktree は Issue ごとに作られて消え、作業中のブランチの変更が見えるため)。ファイルをそのまま読まずに git で既定のブランチの内容を読むのは、checkout しているブランチや編集中の内容に左右されないため。最後に fetch した時点の内容になる。
 
