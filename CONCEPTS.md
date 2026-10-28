@@ -128,4 +128,4 @@ review-loop のセッションが、[完了のフラグファイル](#完了の�
 ### SSOT
 single source of truth の略。ある事実 (規則・様式・値・手順) を定めている唯一の記述。ほかの文書やコードは、その事実を書き写さずに SSOT を参照する。文書では「X の SSOT は Y」(X を定めているのは Y) と書く。
 
-生成物では、生成元を SSOT と呼ぶ (triagecheck のサマリの SSOT は記録 YAML)。生成物が SSOT と一致しなければ、SSOT から生成し直す。`doc-dag` は、同じ事実が 2 か所に書かれた重複を、片方を SSOT にし、もう片方をそこへの参照にして解消する (依存の向きは「参照元 → SSOT」)。
+生成物では、生成元を SSOT と呼ぶ (triagecheck のサマリの SSOT は記録 YAML)。生成物が SSOT と一致しなければ、SSOT から生成し直す。`doc-dag` は、同じ事実が 2 か所に書かれた重複を、片方を SSOT にし、もう片方をそこへの参照にして解消する。依存の向きと解消の手の SSOT は doc-dag の [SKILL.md](doc-dag/skills/doc-dag/SKILL.md) で、ここでは言い直さない。
