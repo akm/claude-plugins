@@ -1355,7 +1355,7 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	first, _, _ := strings.Cut(summary, "\n")
-	want := "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `" + defaultSummaryCommand + "` で再生成する。 -->"
+	want := "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml — `" + defaultSummaryCommand + "` で再生成する。 -->"
 	if first != want {
 		t.Errorf("1 行目が既定の形ではない:\n got: %s\nwant: %s", first, want)
 	}
@@ -1867,11 +1867,11 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 // 鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
 // 1 バイトでも変わると、ディレクトリに残る既存のサマリがすべて古いと報告される。注記は
 // investigated の問題がある回にだけ出し、推移の表には列を足さない。
-const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。正本は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
+const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
 	"\n" +
 	"# feat-x のトリアージ記録\n" +
 	"\n" +
-	"正本は [feat-x.yaml](feat-x.yaml)。読み方と収束の目安は [README](README.md)。\n" +
+	"SSOT は [feat-x.yaml](feat-x.yaml)。読み方と収束の目安は [README](README.md)。\n" +
 	"\n" +
 	"## 推移\n" +
 	"\n" +

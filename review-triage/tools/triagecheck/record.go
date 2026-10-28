@@ -340,7 +340,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 		}
 		if string(got) != want {
 			problems = append(problems, fmt.Sprintf(
-				"%s: サマリが正本 (%s) と一致しません (`%s` で再生成する)", mdPath, yf, summaryCommand))
+				"%s: サマリが SSOT (%s) と一致しません (`%s` で再生成する)", mdPath, yf, summaryCommand))
 		}
 	}
 
@@ -348,7 +348,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 	for _, md := range mds {
 		if !stemSet[strings.TrimSuffix(md, ".md")] {
 			problems = append(problems, fmt.Sprintf(
-				"%s: 対応する YAML (正本) がありません。記録の正本は <ブランチ名>.yaml で、サマリはその生成物", md))
+				"%s: 対応する YAML (SSOT) がありません。記録の SSOT は <ブランチ名>.yaml で、サマリはその生成物", md))
 		}
 	}
 	return problems
@@ -745,7 +745,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: doc_dag.scope がありません (doc-dag に渡した対象の文書群)", pn)
 				}
 				if strings.TrimSpace(dd.Result) == "" {
-					add("%s: doc_dag.result がありません (どちらが正本か決まっていない重複・参照の循環の有無と対処)", pn)
+					add("%s: doc_dag.result がありません (どちらが SSOT か決まっていない重複・参照の循環の有無と対処)", pn)
 				}
 			}
 			// 検証 (verification) は任意だが、書くなら再確認した範囲 (near_edges) が要る。
@@ -868,9 +868,9 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	base := path.Base(yamlPath)
 	stem := strings.TrimSuffix(base, ".yaml")
 	var b strings.Builder
-	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。正本は %s — `%s` で再生成する。 -->\n\n", base, summaryCommand)
+	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。SSOT は %s — `%s` で再生成する。 -->\n\n", base, summaryCommand)
 	fmt.Fprintf(&b, "# %s のトリアージ記録\n\n", stem)
-	fmt.Fprintf(&b, "正本は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
+	fmt.Fprintf(&b, "SSOT は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
 
 	b.WriteString("## 推移\n\n")
 	b.WriteString("| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n")
@@ -1340,7 +1340,7 @@ func writeReviewTriageSummaries(dir string, explicit bool) error {
 		if err := os.WriteFile(mdPath, []byte(summary), 0o644); err != nil {
 			return err
 		}
-		fmt.Printf("生成: %s (正本: %s)\n", mdPath, f)
+		fmt.Printf("生成: %s (SSOT: %s)\n", mdPath, f)
 	}
 	return nil
 }

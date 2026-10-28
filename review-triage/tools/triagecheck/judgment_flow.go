@@ -68,7 +68,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 		if errors.Is(err, fs.ErrNotExist) {
 			if origin != "" {
 				return []string{fmt.Sprintf(
-					"%s: %s が指す判定フローの正本が存在しません (検査が行われないまま成功するため報告する)",
+					"%s: %s が指す判定フローの SSOT が存在しません (検査が行われないまま成功するため報告する)",
 					judgmentFlowPath, origin)}
 			}
 			return nil
@@ -121,7 +121,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 	}
 
 	if !hasMermaid {
-		problems = append(problems, fmt.Sprintf("%s: mermaid の図が見つかりません (図がノードと遷移の正本)", judgmentFlowPath))
+		problems = append(problems, fmt.Sprintf("%s: mermaid の図が見つかりません (図がノードと遷移の SSOT)", judgmentFlowPath))
 	}
 	if len(tableIDs) == 0 {
 		problems = append(problems, fmt.Sprintf("%s: 決定表 (先頭セルが ID の行) が見つかりません", judgmentFlowPath))
