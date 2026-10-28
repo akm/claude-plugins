@@ -10,7 +10,7 @@
 
 ## 何を解決するか
 
-考え方と手順の正本は同梱のファイル [wording-guard/skills/wording-guard/SKILL.md](skills/wording-guard/SKILL.md) です。ここは要点だけを書きます。
+考え方と手順の SSOT (single source of truth。ある事実を定めている唯一の記述) は同梱のファイル [wording-guard/skills/wording-guard/SKILL.md](skills/wording-guard/SKILL.md) です。ここは要点だけを書きます。
 
 語を 1 つ指摘されて直しても、**同じ原則に反する別の語が残ります。** あるレビューコメントの下書きでは、プログラムやデータを主語にして人や物の動きを表す動詞が、人間が 3 回指摘するまで別の語で残り続けました (3 往復の記録はファイル [wording-guard/skills/wording-guard/references/kind-expansion.md](skills/wording-guard/references/kind-expansion.md) にあります)。
 
@@ -98,7 +98,7 @@ claude plugin install wording-guard@akm-claude-plugins
 
 ## このプラグインがしないこと
 
-正本は同梱の [SKILL.md](skills/wording-guard/SKILL.md) の「このスキルがしないこと」です。ここは要約です。
+SSOT は同梱の [SKILL.md](skills/wording-guard/SKILL.md) の「このスキルがしないこと」です。ここは要約です。
 
 - **文章の内容のレビュー** — 主張の正しさ・構成・過不足は別の関心事です。
 - **一覧の網羅の保証** — 原則に照らした判断なので、読みの深さに依存します。見つけた分を直し、走査の回数と各回の結果を報告します。

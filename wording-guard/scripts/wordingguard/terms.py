@@ -1,6 +1,6 @@
 """用語ファイル (TOML) を読み、様式を検査して、textlint の辞書と許容の一覧に変換する。
 
-用語ファイルの様式と意味の正本はファイル `wording-guard/skills/wording-guard/references/terms.md`。
+用語ファイルの様式と意味の SSOT はファイル `wording-guard/skills/wording-guard/references/terms.md`。
 用語ファイルは「決めたことの記録」であって、検査の範囲ではない。
 
 textlint への変換先:

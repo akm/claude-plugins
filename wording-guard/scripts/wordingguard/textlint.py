@@ -10,7 +10,7 @@ textlint と規則集は、プラグインに同梱した `wording-guard/textlin
   2. 用語ファイルから生成した prh の辞書と許容の一覧 (wordingguard.terms)
   3. 引用ブロックを検出から除くフィルタ (wording-guard が引用を書き換えないため)
 
-振る舞いの正本はファイル `wording-guard/skills/wording-guard/references/textlint.md`。
+振る舞いの SSOT はファイル `wording-guard/skills/wording-guard/references/textlint.md`。
 """
 
 import bisect
@@ -176,7 +176,7 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
             dictionaries.append(path)
     if dictionaries or "prh" in rules:
         prh = _option(rules.get("prh"), "規則 prh", where)
-        # 用語ファイルの避ける語は error にする (正本は textlint.md の「何を検出するか」)。規則 prh に error 以外の重大度を
+        # 用語ファイルの避ける語は error にする (SSOT は textlint.md の「何を検出するか」)。規則 prh に error 以外の重大度を
         # 書くと、避ける語も失敗にならなくなるので誤りにする。利用者に知らせずに上書きすると、設定に書いた値が使われないことに気づけない
         if "severity" in prh and prh["severity"] != "error":
             raise config.ConfigError(f"{where} の規則 prh の severity が {prh['severity']!r}。用語ファイルの避ける語は "

@@ -2,7 +2,7 @@
 
 **textlint (文章を規則で検査するツール) で、用語ファイルの避ける語と、規則集 (textlint の規則をまとめたパッケージ) が出す不自然な表現の候補を検出する。** 使うのは、設定キー `textlint` を書いたリポジトリだけ (ファイル [wording-guard/skills/wording-guard/references/project-config.md](project-config.md))。
 
-textlint は語の一覧と文の形で照合する道具なので、**検出したものは着手点であって、範囲ではない。** 検出されなかった表現も、SKILL.md の手順 2 で読んだ原則に照らして判断する (用語ファイルを範囲として扱わない理由の正本は [terms.md](terms.md) の「用語ファイルは例であって、範囲ではない」)。
+textlint は語の一覧と文の形で照合する道具なので、**検出したものは着手点であって、範囲ではない。** 検出されなかった表現も、SKILL.md の手順 2 で読んだ原則に照らして判断する (用語ファイルを範囲として扱わない理由の SSOT は [terms.md](terms.md) の「用語ファイルは例であって、範囲ではない」)。
 
 ## 何を検出するか
 
@@ -11,7 +11,7 @@ textlint は語の一覧と文の形で照合する道具なので、**検出し
 | 避ける語 | 用語ファイル ([terms.md](terms.md)) を、規則 textlint-rule-prh (語のパターンと置き換え先を照合する規則。以下 prh) の辞書に変換したもの。リポジトリの textlint の設定に書いた prh の辞書の語も含む | error (失敗にする) |
 | 不自然な表現の候補 | リポジトリの textlint の設定 (設定キー `textlint.config`) で有効にした規則集 | 設定で決める。warning (失敗にしない) を推奨。指定しなければ textlint のデフォルト値の error になる |
 
-**重大度 (error / warning) は、検出の種類ではない。** 検出の種類は規則の名前で判別する — 規則 `prh` の検出が避ける語、それ以外が規則集の検出。重大度は失敗にするかどうかだけを決め、`check` と hook は、種類に関わらず error の検出があれば失敗にする。この表とこの段落が、検出の種類と重大度の関係の正本。
+**重大度 (error / warning) は、検出の種類ではない。** 検出の種類は規則の名前で判別する — 規則 `prh` の検出が避ける語、それ以外が規則集の検出。重大度は失敗にするかどうかだけを決め、`check` と hook は、種類に関わらず error の検出があれば失敗にする。この表とこの段落が、検出の種類と重大度の関係の SSOT。
 
 **次のものは検出しない。**
 
@@ -70,7 +70,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py check --stdin --filename i
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
 ```
 
-終了コードの意味の正本はこの表で、どのサブコマンドも同じ意味で返す (`terms` が返すのは 0・2・3 だけ)。
+終了コードの意味の SSOT はこの表で、どのサブコマンドも同じ意味で返す (`terms` が返すのは 0・2・3 だけ)。
 
 | 終了コード | 意味 |
 | --- | --- |
@@ -93,7 +93,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/wording_lint.py fix docs/
   - Claude Code は、差分の計算が時間切れになると `structuredPatch` を空にする。空なのに書き換える前と後の内容が違うときは、検査できなかったこととして知らせる (hook の中で差分を計算し直さない)
   - Write で新しいファイルを作ったとき (`originalFile` が null で、`type` が `create`) は、書いた内容の全体を検査する
   - 書き込みを保留したとき (`staged` が true。ファイルは変わっていない) は、何もしない
-- error の検出があれば、Claude に直すよう求める (`decision: block`)。規則 `prh` の検出 (避ける語) は言い換えの候補から選んで直すよう、それ以外の規則の検出は規則の message に従って直すよう案内する (判別の方法の正本は[「何を検出するか」](#何を検出するか))。warning だけなら、判断の材料として渡す (`additionalContext`)
+- error の検出があれば、Claude に直すよう求める (`decision: block`)。規則 `prh` の検出 (避ける語) は言い換えの候補から選んで直すよう、それ以外の規則の検出は規則の message に従って直すよう案内する (判別の方法の SSOT は[「何を検出するか」](#何を検出するか))。warning だけなら、判断の材料として渡す (`additionalContext`)
 - hook を有効にしたリポジトリで、設定・用語ファイルの誤り、textlint が入っていない、または書き換える前と後の内容か書き換えた行が分からない (`tool_response` に `originalFile` か `structuredPatch` が無い、既存のファイルなのに `originalFile` が null である、書き換えた後のファイルを読めない、`structuredPatch` が空なのに前後の内容が違う、または `structuredPatch` の行の内容がファイルの内容と一致しない) ときは、検査を省略せずに、Claude と利用者の両方に知らせる
 - 設定キー `textlint.hook` が `true` でないリポジトリ、Markdown 以外のファイル、設定キー `frozen_paths` の下のファイル、git リポジトリの外のファイルでは何もしない。**プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動く** ので、設定で有効にしたリポジトリでだけ検査する。`textlint.hook` は設定の型を検査する前に見るので、有効にしていないリポジトリでは、設定の誤りがあっても何もしない。設定ファイルが JSON として読めないときは、有効かを決められないので誤りとして知らせる
 - Python 3.11 以降が必要 (用語ファイルを標準ライブラリ `tomllib` で読むため)

@@ -1,7 +1,7 @@
 """wording-guard の設定ファイルを読む。
 
 設定ファイルの配置先は、リポジトリのルートからの相対パス
-`.claude/akm-claude-plugins/wording-guard/config.json`。各キーの意味の正本は
+`.claude/akm-claude-plugins/wording-guard/config.json`。各キーの意味の SSOT は
 ファイル `wording-guard/skills/wording-guard/references/project-config.md`。
 
 ここで型を検査するのは、このパッケージが使うキー (`terms_paths`・`frozen_paths`・`textlint`) だけ。

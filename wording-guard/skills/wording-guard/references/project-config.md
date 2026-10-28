@@ -56,11 +56,11 @@
 
 原則に照らした判断は、走査のたびにやり直される。人間が一度決めた言い換えも、記録が無ければ次に書く人やエージェントに届かず、同じ語が再び書かれる。逆に、使い続けると決めた語は、記録が無ければ走査のたびに候補に挙げ直される。
 
-**用語ファイルは決めたことの記録であって、範囲ではない。** 様式・意味・複数のファイルの扱いの正本はファイル [wording-guard/skills/wording-guard/references/terms.md](terms.md)。
+**用語ファイルは決めたことの記録であって、範囲ではない。** 様式・意味・複数のファイルの扱いの SSOT はファイル [wording-guard/skills/wording-guard/references/terms.md](terms.md)。
 
 ## `textlint` — なぜ設定で有効にするか
 
-textlint は Node のパッケージを取得して使うので、セットアップが要る。プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くので、キーを書いたリポジトリでだけ検査する。振る舞い・セットアップ・コマンドの正本はファイル [wording-guard/skills/wording-guard/references/textlint.md](textlint.md)。
+textlint は Node のパッケージを取得して使うので、セットアップが要る。プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くので、キーを書いたリポジトリでだけ検査する。振る舞い・セットアップ・コマンドの SSOT はファイル [wording-guard/skills/wording-guard/references/textlint.md](textlint.md)。
 
 ## 未設定でも中断しない
 

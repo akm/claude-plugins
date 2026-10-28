@@ -1,7 +1,7 @@
 """PostToolUse の hook (ツールの実行の直後に動く処理) の本体。
 
 Edit / Write で Markdown に書き足した文章を textlint で検査し、結果を Claude に返す。
-振る舞いの正本はファイル `wording-guard/skills/wording-guard/references/textlint.md` の「hook」。
+振る舞いの SSOT はファイル `wording-guard/skills/wording-guard/references/textlint.md` の「hook」。
 
   - 検査するのは、設定キー textlint.hook を true にしたリポジトリの Markdown だけ。それ以外は何もしない
     (プラグインの hook は、プラグインを有効にしたすべてのリポジトリで動くため)。textlint.hook は設定の型を
