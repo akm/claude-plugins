@@ -1,6 +1,6 @@
 # Project の様式
 
-**このファイルが、Project (GitHub Projects) の様式の SSOT。** モジュール `issue-dispatch/scripts/issue_dispatch/project.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `project check` / `project items` / `project set-status` / `project add-fields` はこれに従う。ほかの文書はフィールドと Status の名前を参照するだけで、意味と作り方を言い直さない。
+**このファイルが、Project (GitHub Projects) の様式の SSOT (single source of truth。ある事実を定めている唯一の記述)。** モジュール `issue-dispatch/scripts/issue_dispatch/project.py` と、CLI `issue-dispatch/scripts/issue_dispatch.py` のサブコマンド `project check` / `project items` / `project set-status` / `project add-fields` はこれに従う。ほかの文書はフィールドと Status の名前を参照するだけで、意味と作り方を言い直さない。
 
 1 つの Project に、複数のリポジトリ (別の owner も) の Issue を入れる。Project には Issue だけを入れ、PR は入れない。
 

@@ -1,6 +1,6 @@
 # ファイルの種類
 
-**このファイルが、ファイルの種類と、競合の可能性の判定の規則の SSOT。** パスから種類と属性を決めるモジュール `issue-dispatch/scripts/issue_dispatch/filekinds.py` と、同梱のデフォルトの表 `issue-dispatch/scripts/issue_dispatch/file-kinds.json` はこれに従う。リポジトリの設定の `files` の様式と、読み込むときにそろえる表記の SSOT は [project-config.md](project-config.md) で、ここでは言い直さない。ほかの文書は種類と属性の名前を参照するだけで、質問や判定の規則を言い直さない。
+**このファイルが、ファイルの種類と、競合の可能性の判定の規則の SSOT (single source of truth。ある事実を定めている唯一の記述)。** パスから種類と属性を決めるモジュール `issue-dispatch/scripts/issue_dispatch/filekinds.py` と、同梱のデフォルトの表 `issue-dispatch/scripts/issue_dispatch/file-kinds.json` はこれに従う。リポジトリの設定の `files` の様式と、読み込むときにそろえる表記の SSOT は [project-config.md](project-config.md) で、ここでは言い直さない。ほかの文書は種類と属性の名前を参照するだけで、質問や判定の規則を言い直さない。
 
 **種類は宣言に書かず、スクリプトがパスから決める。** 作業のセッションは宣言にパスと節の名前だけを書く ([issue-format.md](issue-format.md))。
 

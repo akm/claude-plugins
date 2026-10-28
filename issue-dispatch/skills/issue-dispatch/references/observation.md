@@ -1,6 +1,6 @@
 # 観測 (スナップショットと差分)
 
-このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の SSOT。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
+このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の SSOT (single source of truth。ある事実を定めている唯一の記述)。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
 
 ## 目的
 

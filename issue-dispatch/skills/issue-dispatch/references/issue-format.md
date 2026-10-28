@@ -1,6 +1,6 @@
 # Issue の様式
 
-このファイルが、この仕組み (issue-dispatch) が扱う Issue と PR の様式の SSOT。管理のセッションと作業のセッションが Issue のどこを読み、どこに何を書くかをここで決める。Project のフィールドと Status の様式は [project-schema.md](project-schema.md)、リポジトリの設定は [project-config.md](project-config.md) が SSOT で、ここには写さない。宣言 (作業のセッションが変える予定のファイルを書くコメント) の本文の様式は「宣言」の節。
+このファイルが、この仕組み (issue-dispatch) が扱う Issue と PR の様式の SSOT (single source of truth。ある事実を定めている唯一の記述)。管理のセッションと作業のセッションが Issue のどこを読み、どこに何を書くかをここで決める。Project のフィールドと Status の様式は [project-schema.md](project-schema.md)、リポジトリの設定は [project-config.md](project-config.md) が SSOT で、ここには写さない。宣言 (作業のセッションが変える予定のファイルを書くコメント) の本文の様式は「宣言」の節。
 
 ## Issue が持つもの
 

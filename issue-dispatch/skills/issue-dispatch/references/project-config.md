@@ -1,6 +1,6 @@
 # 設定
 
-issue-dispatch は、管理ディレクトリ (管理のセッションが動くディレクトリ) とリポジトリの、同じ相対パス `.claude/akm-claude-plugins/issue-dispatch/config.json` を読む。ファイル名は同じで、キーで役割が分かれる。**この文書が、設定のキーと「未設定」のときの扱いの SSOT。** 読み込みはモジュール `scripts/issue_dispatch/config.py` が行い、CLI の `config read` で読める (入出力は JSON)。
+issue-dispatch は、管理ディレクトリ (管理のセッションが動くディレクトリ) とリポジトリの、同じ相対パス `.claude/akm-claude-plugins/issue-dispatch/config.json` を読む。ファイル名は同じで、キーで役割が分かれる。**この文書が、設定のキーと「未設定」のときの扱いの SSOT (single source of truth。ある事実を定めている唯一の記述)。** 読み込みはモジュール `scripts/issue_dispatch/config.py` が行い、CLI の `config read` で読める (入出力は JSON)。
 
 [review-triage](https://github.com/akm/claude-plugins/tree/main/review-triage) と同じ流儀で、プラグインは共通の規則を持ち、リポジトリ固有の宣言だけをこのファイルに書く。
 

@@ -1,6 +1,6 @@
 # 資源の扱い
 
-このファイルが、この仕組み (issue-dispatch) の資源の扱いの SSOT。資源は、同時に使える数が限られるもの (検証用の DB・GPU など) で、Issue のラベル `resource:<名前>` (SSOT は [issue-format.md](issue-format.md) の「Issue が持つもの」) と宣言の `resources` (同じ文書の「宣言」) で表す。資源の種類で変わりうる判断はすべて属性にし、属性は管理ディレクトリの設定の `resources` に資源の名前ごとに書く (設定のキーの SSOT は [project-config.md](project-config.md))。設定に無い資源と、書かれていない属性はデフォルト値で扱い、デフォルト値は資源の種類を区別しないときの扱い。新しい種類のために判断を変えるときは、属性の表に行を足し、契機の表の「読む属性」を直す (計画の KTD8)。モジュール `issue-dispatch/scripts/issue_dispatch/resources.py` が、属性の適用と契機ごとの判断を実装する (`gh` は使わない)。
+このファイルが、この仕組み (issue-dispatch) の資源の扱いの SSOT (single source of truth。ある事実を定めている唯一の記述)。資源は、同時に使える数が限られるもの (検証用の DB・GPU など) で、Issue のラベル `resource:<名前>` (SSOT は [issue-format.md](issue-format.md) の「Issue が持つもの」) と宣言の `resources` (同じ文書の「宣言」) で表す。資源の種類で変わりうる判断はすべて属性にし、属性は管理ディレクトリの設定の `resources` に資源の名前ごとに書く (設定のキーの SSOT は [project-config.md](project-config.md))。設定に無い資源と、書かれていない属性はデフォルト値で扱い、デフォルト値は資源の種類を区別しないときの扱い。新しい種類のために判断を変えるときは、属性の表に行を足し、契機の表の「読む属性」を直す (計画の KTD8)。モジュール `issue-dispatch/scripts/issue_dispatch/resources.py` が、属性の適用と契機ごとの判断を実装する (`gh` は使わない)。
 
 **資源の名前は大文字小文字を区別しない** (ラベルの名前を GitHub が区別しないため)。設定の `resources` のキー・ラベル・宣言の `resources`・使用の表の名前を同じ規則で比べ、返す名前は渡された表記のまま。設定で表記だけ違う 2 つ目以降の資源は警告して使わない。
 

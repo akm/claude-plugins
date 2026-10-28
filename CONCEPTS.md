@@ -86,7 +86,7 @@ LLM が手順書に従ってその場で組み立てる構造化データ。
 ### フェーズ
 `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) の手順を、結果を記録 YAML に書いて区切った 3 つの区分 — 調査フェーズ (原因を書いて束ね、類似箇所と影響範囲を調べる)・立案フェーズ (修正方法と順序を決める)・修正フェーズ (直して検証し、コミットする)。境目で結果が記録に残るので、そこで中断・再開でき、フェーズごとに sub-agent で実行できる。
 
-各フェーズが行うこと・手順番号との対応・設定と引数での名前 (`investigate` / `plan` / `fix`) の SSOT は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の「手順」の冒頭で、ここでは言い直さない。
+各フェーズが行うこと・手順番号との対応・設定と引数での名前 (`investigate` / `plan` / `fix`) の [SSOT](#ssot) は `review-triage-fix` の [SKILL.md](review-triage/skills/review-triage-fix/SKILL.md) の「手順」の冒頭で、ここでは言い直さない。
 
 ### 回数の閾値
 レビューと修正のループで、人間が立案に関与し始める回を決める、記録 (review-triage の記録 YAML) の回番号 N。N 回目までは通常どおり直し、N+1 回目以降は毎回、調査の後に人間が[立案者を選ぶ](#立案者の選択)。

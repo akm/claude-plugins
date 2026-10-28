@@ -1,6 +1,6 @@
 # 処理の流れ (項目の状態)
 
-このファイルが、この仕組み (issue-dispatch) の、管理のセッションがターンのたびに導く**項目の状態**の SSOT (計画の R24・KTD19)。状態ごとの取得元 (GitHub のどこから導くか) と判断の基準、場面ごとの扱い、`item state` と作業のセッションの確認 (`work check`・`work held`) が返す値をここに書く。宣言の判定の節は U15 で、割り当ての節は U16 で、状態遷移の図と決定表は U21 で足す。モジュール `issue-dispatch/scripts/issue_dispatch/itemstate.py` が導出を実装し、`gh` は実行しない (項目は `project items`、`PR の報告` の PR の状態は `pr observe` と同じ関数で、呼び出し元が読んで渡す)。
+このファイルが、この仕組み (issue-dispatch) の、管理のセッションがターンのたびに導く**項目の状態**の SSOT (single source of truth。ある事実を定めている唯一の記述) (計画の R24・KTD19)。状態ごとの取得元 (GitHub のどこから導くか) と判断の基準、場面ごとの扱い、`item state` と作業のセッションの確認 (`work check`・`work held`) が返す値をここに書く。宣言の判定の節は U15 で、割り当ての節は U16 で、状態遷移の図と決定表は U21 で足す。モジュール `issue-dispatch/scripts/issue_dispatch/itemstate.py` が導出を実装し、`gh` は実行しない (項目は `project items`、`PR の報告` の PR の状態は `pr observe` と同じ関数で、呼び出し元が読んで渡す)。
 
 ターンで行うこと (書き込みの候補・質問すること・報告) の導き方は「ターンで行うこと」の節。`item state` は書き込まず、管理のセッション (U21・U23 のスキル) が既存のサブコマンドで実行する。
 
