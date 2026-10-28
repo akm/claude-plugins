@@ -1,6 +1,6 @@
 # triagecheck
 
-トリアージ記録 (YAML) のスキーマと、判定フローの正本を検査する。生成サマリ (`.md`) の書き出しも行う。
+トリアージ記録 (YAML) のスキーマと、判定フローの SSOT を検査する。生成サマリ (`.md`) の書き出しも行う。
 
 lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査を切り出したもの。**検査の中身は変えていない** — 変えたのは対象のパスの決め方だけ。
 
@@ -8,10 +8,10 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 | 検査 | 内容 |
 | --- | --- |
-| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (正本は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「前からある欠陥」) と、D8 が当たる記録の `verdict` が `held` であること。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
+| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「前からある欠陥」) と、D8 が当たる記録の `verdict` が `held` であること。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
-**記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定のディレクトリ `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して終了し、`.gitignore` は変えない — 正本は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。
+**記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。既定のディレクトリ `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して終了し、`.gitignore` は変えない — SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。
 
 ## 前提
 
@@ -35,7 +35,7 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 | --- | --- | --- |
 | `-record-dir` | ✓ | 記録のディレクトリ。末尾のスラッシュは補う |
 | `-current-dir` | △ | 相対パスを解決する基準。**相対パスを渡すとき必須** |
-| `-judgment-flow` | | 判定フローの正本のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
+| `-judgment-flow` | | 判定フローの SSOT のパス。省略時は `CLAUDE_PLUGIN_ROOT` から解決 |
 | `-write-summary` | | 検査せず、記録から生成サマリ (`.md`) を書き出す。**対象はディレクトリの全記録** (1 ファイルだけを指定する手段は無い) |
 | `-install-wrapper` | | 検査せず、呼び出し用のラッパースクリプトを書き出す。相対パスなら `-current-dir` も要る |
 | `-summary-command` | | サマリの再生成手段として案内する文字列。既定は `triagecheck -write-summary` (`-install-wrapper` では `-current-dir` から見たラッパーの相対パス) |
@@ -48,11 +48,11 @@ go run -C <プラグインの展開先>/tools/triagecheck . \
 
 ### 再生成コマンドの案内 (-summary-command)
 
-**この節が、案内の値 (既定・`-install-wrapper` での組み立て・空の扱い) の規則の正本。** 他の文書 (スキルの project-config.md など) はここを参照し、規則を再掲しない。
+**この節が、案内の値 (既定・`-install-wrapper` での組み立て・空の扱い) の規則の SSOT。** 他の文書 (スキルの project-config.md など) はここを参照し、規則を再掲しない。
 
 **サマリの再生成手段はリポジトリごとに違う** (Makefile のターゲット・`-install-wrapper` で生成したラッパー・`go run` の直呼び) ため、このツールは特定のコマンド名を持たない。`-summary-command` に渡した文字列が次の 2 か所へ入る。
 
-- サマリが無い / 正本と一致しないときのエラー文 (「`<値>` で再生成する」)
+- サマリが無い / SSOT と一致しないときのエラー文 (「`<値>` で再生成する」)
 - 生成サマリ (`.md`) の 1 行目のコメント
 
 省略すると `triagecheck -write-summary` になる。**空文字や空白だけの指定はエラー** (再生成の手段を空欄で案内することになるため)。

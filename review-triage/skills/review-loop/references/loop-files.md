@@ -1,8 +1,8 @@
 # ループのディレクトリのファイル
 
-**このファイルが、ループのディレクトリ (`<review_loop.dir>/<ループ id>/`。review-loop のセッションとワーカーが受け渡しに使うディレクトリ) の中のファイルの契約の正本。** [SKILL.md](../SKILL.md) (review-loop のセッションの手順)・ワーカーのスクリプト `review-triage/scripts/review-loop-worker.sh`・待機スクリプト `review-triage/scripts/review-loop-wait.sh` はこれに従う。ほかの文書はファイルの名前と役割を参照するだけで、キーや態度を言い直さない。
+**このファイルが、ループのディレクトリ (`<review_loop.dir>/<ループ id>/`。review-loop のセッションとワーカーが受け渡しに使うディレクトリ) の中のファイルの契約の SSOT。** [SKILL.md](../SKILL.md) (review-loop のセッションの手順)・ワーカーのスクリプト `review-triage/scripts/review-loop-worker.sh`・待機スクリプト `review-triage/scripts/review-loop-wait.sh` はこれに従う。ほかの文書はファイルの名前と役割を参照するだけで、キーや態度を言い直さない。
 
-**2 つのプロセスの受け渡しは、このディレクトリの中のファイルだけで行う。** review-loop のセッションとワーカーは互いのプロセスを知らず、メッセージも送らない。ループのディレクトリは git に無視されている (review-loop のセッションが開始時に確認する) ので、ファイルはコミットされない。ワーカーがレビュアの実行のために回ごとに作る一時ディレクトリ (回の作業場所) はループのディレクトリの外にあり、受け渡しには使わない (作業場所の正本は [worker.md](worker.md) の「回の処理」)。
+**2 つのプロセスの受け渡しは、このディレクトリの中のファイルだけで行う。** review-loop のセッションとワーカーは互いのプロセスを知らず、メッセージも送らない。ループのディレクトリは git に無視されている (review-loop のセッションが開始時に確認する) ので、ファイルはコミットされない。ワーカーがレビュアの実行のために回ごとに作る一時ディレクトリ (回の作業場所) はループのディレクトリの外にあり、受け渡しには使わない (作業場所の SSOT は [worker.md](worker.md) の「回の処理」)。
 
 ## ファイルの一覧
 
@@ -13,12 +13,12 @@
 | `loop.yaml` | review-loop のセッション | ループの開始時と、停止・再開・終了のたび | 下の「`loop.yaml`」 |
 | `review-request-<識別子>.md` (依頼文) | review-loop のセッション (`review-request --dir`) | 回ごと (RL1 の手順 a) | 雛形 [review-request-template.md](../../review-triage/references/review-request-template.md) |
 | `review-<識別子>.yaml` (結果) | ワーカー (レビュアの実行が作業場所に書いた結果を、確認してから複写する) | レビュアの実行が終了した後、完了のフラグファイルより前 | 雛形の「出力様式」の節 |
-| `<識別子>.log` (ログ) | ワーカー (レビュアの実行の標準出力と標準エラーをそのまま) | レビュアの実行の間 | `claude -p --output-format stream-json --verbose` の出力。読み方の正本は [worker.md](worker.md) の「ログの読み方」 |
+| `<識別子>.log` (ログ) | ワーカー (レビュアの実行の標準出力と標準エラーをそのまま) | レビュアの実行の間 | `claude -p --output-format stream-json --verbose` の出力。読み方の SSOT は [worker.md](worker.md) の「ログの読み方」 |
 | `delivered-<識別子>.yaml` (完了のフラグファイル) | ワーカー | 回の終了処理 (結果の複写と作業場所の削除) の後、またはレビュアの実行を起動せずに失敗と決めた後 | 下の「`delivered-<識別子>.yaml`」 |
 | `worker.yaml` | ワーカー | 起動時と、状態が変わるたび。動いている間は 5 秒おきに更新時刻だけを進める | 下の「`worker.yaml`」 |
 | `end` | review-loop のセッション (`--end`) か人間 | ループを終えるとき | 理由を 1 行。中身は読まない |
 
-**識別子は `review-request` が付けるもの (成分の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 3) をそのまま使い、依頼文・結果・ログ・完了のフラグファイルの名前は識別子から導出する。** どのファイルも、識別子から導出できるファイル名をキーとして持たない — 持つと、名前と中身が一致しないときにどちらを信じるかを決める規則が要る。
+**識別子は `review-request` が付けるもの (成分の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 3) をそのまま使い、依頼文・結果・ログ・完了のフラグファイルの名前は識別子から導出する。** どのファイルも、識別子から導出できるファイル名をキーとして持たない — 持つと、名前と中身が一致しないときにどちらを信じるかを決める規則が要る。
 
 ## 一時名と改名
 
@@ -30,7 +30,7 @@
 
 ## `loop.yaml`
 
-review-loop のセッションがループの条件と状態を書く。`--resume` はこのファイルからループの条件を復元する (再開のときに何を変えてよいかの正本は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃え、値の意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節にある — 下の表は対応する設定のキーだけを書く。設定のキーを持たない条件 (`loop.stages`・`review.full_review`・`review.base`) は、引数の値を書き、意味の正本は [arguments.md](arguments.md)。
+review-loop のセッションがループの条件と状態を書く。`--resume` はこのファイルからループの条件を復元する (再開のときに何を変えてよいかの SSOT は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃え、値の意味の SSOT は [project-config.md](../../review-triage/references/project-config.md) の各節にある — 下の表は対応する設定のキーだけを書く。設定のキーを持たない条件 (`loop.stages`・`review.full_review`・`review.base`) は、引数の値を書き、意味の SSOT は [arguments.md](arguments.md)。
 
 ```yaml
 id: "20260926-1400-feat-review-loop-63"
@@ -76,14 +76,14 @@ full_review_next: false
 | `worker.effort` | ◯ | ワーカーの effort (`review_loop.worker_effort`) |
 | `worker.permission_mode` | ◯ | `review_loop.permission_mode` |
 | `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の列は「ワーカーの既定の一覧を使う」 |
-| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。`--resume` での再度の読み込みと、キーが無いときの扱いの正本は [arguments.md](arguments.md) の「様式」 |
+| `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。`--resume` での再度の読み込みと、キーが無いときの扱いの SSOT は [arguments.md](arguments.md) の「様式」 |
 | `worker.sandbox_allowed_domains` | | `review_loop.sandbox_allowed_domains`。扱いは `worker.sandbox_allow_write` と同じ |
 | `worker.idle_minutes` | ◯ | `review_loop.worker_idle_minutes` |
 | `worker.review_timeout_minutes` | ◯ | `review_loop.review_timeout_minutes` |
 | `review.skill` | ◯ | `loop.review_skill` |
 | `review.args` | ◯ | `loop.review_args` (空文字列なら既定) |
-| `review.full_review` | | 引数 `--full-review` を付けて始めたか (真偽値)。0.14.0 以前に始めたループには無い (無いときの扱いの正本は [arguments.md](arguments.md) の「様式」) |
-| `review.base` | | 全量の起点を求める派生元のブランチ名 (引数 `--base`。省けば開始時に解決した `origin/HEAD` が指すブランチ)。0.14.0 以前に始めたループには無い (無いときの扱いの正本は [arguments.md](arguments.md) の「様式」) |
+| `review.full_review` | | 引数 `--full-review` を付けて始めたか (真偽値)。0.14.0 以前に始めたループには無い (無いときの扱いの SSOT は [arguments.md](arguments.md) の「様式」) |
+| `review.base` | | 全量の起点を求める派生元のブランチ名 (引数 `--base`。省けば開始時に解決した `origin/HEAD` が指すブランチ)。0.14.0 以前に始めたループには無い (無いときの扱いの SSOT は [arguments.md](arguments.md) の「様式」) |
 | `loop.max_rounds` | ◯ | `loop.max_rounds` |
 | `loop.structure_rounds` | ◯ | `loop.structure_rounds` |
 | `loop.threshold` | ◯ | `fix.threshold_rounds` |
@@ -96,7 +96,7 @@ full_review_next: false
 | `rejected` | ◯ | レビュー不成立 (RA1) と判定した回の識別子の列。再入の手順が、その回の完了のフラグファイルを取り込まない。無ければ `[]` |
 | `full_review_next` | | 実行時のキー (ループの条件ではない)。`--resume --full-review` のフラグで、真なら次に書く依頼文を全量にする。`--resume` の開始時 ([reentry.md](reentry.md) の「再入の手順」の 1) と、判定 RJ0・RJ1 の「はい」([stops.md](stops.md)) で `true` を書き、全量の依頼文を書いたら ([round.md](round.md) の RL1 の手順 a の 7) と、どの停止でも ([stops.md](stops.md) の「停止のときに書き換えるもの」) `false` にする。無ければ偽 |
 
-各値の決め方は [arguments.md](arguments.md) が正本。ワーカーが読むのは `repo_dir` だけで、トップレベルの `repo_dir: "<パス>"` の 1 行として読む (値を 1 行に書く)。
+各値の決め方は [arguments.md](arguments.md) が SSOT。ワーカーが読むのは `repo_dir` だけで、トップレベルの `repo_dir: "<パス>"` の 1 行として読む (値を 1 行に書く)。
 
 ## `worker.yaml`
 
@@ -124,8 +124,8 @@ rounds_served: 0
 | --- | --- | --- |
 | `state` | ◯ | 下の「状態」の 5 つのいずれか |
 | `current_request` | ◯ | `reviewing` のとき処理中の識別子。それ以外は空文字列 |
-| `workspace` | ◯ | `reviewing` のとき、その回の作業場所 (ワーカーが環境変数 `TMPDIR` の下に用意する一時ディレクトリ) のパス。それ以外は空文字列。起動し直したワーカーが、`kill -9` などで消えた前の起動の作業場所を片付けるのに使う (正本は [worker.md](worker.md) の「起動時の確認」の 2)。準備のディレクトリ (複製と写しを作ってから作業場所のパスに改名するディレクトリ) のパスは書かない — 起動し直したワーカーは、名前の形で見つける |
-| `pid` | ◯ | ワーカーのプロセス ID。人間が起動したプロセス (割り込みを受け取るプロセス) のもので、回の処理を行う子のプロセスのものではない (正本は [worker.md](worker.md) の「終了の仕方」) |
+| `workspace` | ◯ | `reviewing` のとき、その回の作業場所 (ワーカーが環境変数 `TMPDIR` の下に用意する一時ディレクトリ) のパス。それ以外は空文字列。起動し直したワーカーが、`kill -9` などで消えた前の起動の作業場所を片付けるのに使う (SSOT は [worker.md](worker.md) の「起動時の確認」の 2)。準備のディレクトリ (複製と写しを作ってから作業場所のパスに改名するディレクトリ) のパスは書かない — 起動し直したワーカーは、名前の形で見つける |
+| `pid` | ◯ | ワーカーのプロセス ID。人間が起動したプロセス (割り込みを受け取るプロセス) のもので、回の処理を行う子のプロセスのものではない (SSOT は [worker.md](worker.md) の「終了の仕方」) |
 | `worker_version` | ◯ | ワーカーのバージョン。スクリプトの実体の位置から、プラグインのファイル `review-triage/.claude-plugin/plugin.json` を読んで決める。読めなければ `unknown` |
 | `model` | ◯ | ワーカーに渡したモデルの指定 (`--model` の値) |
 | `effort` | ◯ | ワーカーに渡した effort (`--effort` の値) |
@@ -157,15 +157,15 @@ stateDiagram-v2
   left --> [*]
 ```
 
-`unavailable` / `expired` / `left` になったワーカーは、更新時刻を進めるのをやめて終了する。起動時の確認で「他のワーカーが動いている」と判定したときは、`worker.yaml` に触れずに終了する (判定の条件の正本は [worker.md](worker.md) の「起動時の確認」)。
+`unavailable` / `expired` / `left` になったワーカーは、更新時刻を進めるのをやめて終了する。起動時の確認で「他のワーカーが動いている」と判定したときは、`worker.yaml` に触れずに終了する (判定の条件の SSOT は [worker.md](worker.md) の「起動時の確認」)。
 
-**`reviewing` から `left` になっても、完了のフラグファイルがあるとは限らない。** 準備の途中 (レビュアの実行を起動する前) に割り込みを受けた回は、フラグファイルを書かずに終了する。その依頼文はフラグファイルの無いまま残り、起動し直したワーカーがもう一度処理する (割り込みの扱いの正本は [worker.md](worker.md) の「終了の仕方」)。
+**`reviewing` から `left` になっても、完了のフラグファイルがあるとは限らない。** 準備の途中 (レビュアの実行を起動する前) に割り込みを受けた回は、フラグファイルを書かずに終了する。その依頼文はフラグファイルの無いまま残り、起動し直したワーカーがもう一度処理する (割り込みの扱いの SSOT は [worker.md](worker.md) の「終了の仕方」)。
 
 ## `delivered-<識別子>.yaml`
 
-ワーカーが回ごとに書く完了のフラグファイル。**フラグファイルが現れたことが「ワーカーがこの回を終えた」ことを表し、`status` がその回を使えるかを表す。** 突き合わせ (review-loop のセッションがフラグファイルと結果を依頼文と比べること) の順序の正本は [round.md](round.md) の RL1 の手順 c。
+ワーカーが回ごとに書く完了のフラグファイル。**フラグファイルが現れたことが「ワーカーがこの回を終えた」ことを表し、`status` がその回を使えるかを表す。** 突き合わせ (review-loop のセッションがフラグファイルと結果を依頼文と比べること) の順序の SSOT は [round.md](round.md) の RL1 の手順 c。
 
-**`status` が `ok` のフラグファイルがあれば、ループのディレクトリに結果が通常のファイルとして在る** (ワーカーがこれを守る手順の正本は [worker.md](worker.md) の「回の処理」の手順 10)。待機スクリプト `review-loop-wait.sh` は `ok` のフラグファイルを見ても、依頼文と結果が揃うまで返さないので、結果が無いまま `ok` のフラグファイルが現れると期限まで待機し続ける。`failed` のフラグファイルでは、結果が在るとは限らない (複写できた結果は `failed` の回でもループのディレクトリにある)。
+**`status` が `ok` のフラグファイルがあれば、ループのディレクトリに結果が通常のファイルとして在る** (ワーカーがこれを守る手順の SSOT は [worker.md](worker.md) の「回の処理」の手順 10)。待機スクリプト `review-loop-wait.sh` は `ok` のフラグファイルを見ても、依頼文と結果が揃うまで返さないので、結果が無いまま `ok` のフラグファイルが現れると期限まで待機し続ける。`failed` のフラグファイルでは、結果が在るとは限らない (複写できた結果は `failed` の回でもループのディレクトリにある)。
 
 ```yaml
 id: "20260926-1400-feat-review-loop-63-1-code-review-opus"
@@ -211,10 +211,10 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `skill_called` | ◯ | レビュアの実行が Skill ツールを呼んだか。`true` / `false`、ログから読めなければ `unknown` |
 | `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ワーカーのフックが拒否した呼び出し (`worker_hook_denials`) は含めない。ログから読めなければ `unknown` |
 | `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く。ワーカーのフックが拒否した呼び出しは含めない)。件数が 0 か `unknown` なら `[]` |
-| `worker_hook_denials` | | ワーカーのフック (`/tmp` を含む Bash のコマンドを実行前に拒否するもの) が拒否したと確認できた呼び出しの件数。判別の方法の正本は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」。ログから読めなければ `unknown`。起動しなかった回も `unknown`。0.18.0 以降のワーカーが書く — 0.17.0 以前のワーカーのフラグファイルを、このキーが無いことでレビュー不成立にしないため、必須にしない |
+| `worker_hook_denials` | | ワーカーのフック (`/tmp` を含む Bash のコマンドを実行前に拒否するもの) が拒否したと確認できた呼び出しの件数。判別の方法の SSOT は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」。ログから読めなければ `unknown`。起動しなかった回も `unknown`。0.18.0 以降のワーカーが書く — 0.17.0 以前のワーカーのフラグファイルを、このキーが無いことでレビュー不成立にしないため、必須にしない |
 | `sandbox_blocked.count` | ◯ | サンドボックスが拒否した確認 (Bash の呼び出しのうち、書き込みか接続を拒否されたエラーで終了したもの。sub-agent の中の呼び出しを含む) の件数。レビュー対象のコミットの行を表示しただけと確認した呼び出し (`repo_text_displayed`) は含めない。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
-| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、拒否されたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの正本は [worker.md](worker.md) の「サンドボックスが拒否した確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
-| `repo_text_displayed.count` | | Bash の結果の本文に、サンドボックスが拒否した確認を数えるときに探す文面 (`operation not permitted`) かタグ (`<sandbox_violations>`) があったが、それを含む行がどれも、レビュー対象のコミットにある行を表示したものと確認した呼び出しの件数 (sub-agent の中の呼び出しを含む)。判別の方法の正本は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」。`sandbox_blocked.count` が `unknown` なら `unknown`。起動しなかった回も `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` で、そのときはそれらの結果をすべて `sandbox_blocked` に数える。0.20.0 以降のワーカーが書く — 0.19.0 以前のワーカーのフラグファイルを、このキーが無いことでレビュー不成立にしないため、必須にしない |
+| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、拒否されたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの SSOT は [worker.md](worker.md) の「サンドボックスが拒否した確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
+| `repo_text_displayed.count` | | Bash の結果の本文に、サンドボックスが拒否した確認を数えるときに探す文面 (`operation not permitted`) かタグ (`<sandbox_violations>`) があったが、それを含む行がどれも、レビュー対象のコミットにある行を表示したものと確認した呼び出しの件数 (sub-agent の中の呼び出しを含む)。判別の方法の SSOT は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」。`sandbox_blocked.count` が `unknown` なら `unknown`。起動しなかった回も `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` で、そのときはそれらの結果をすべて `sandbox_blocked` に数える。0.20.0 以降のワーカーが書く — 0.19.0 以前のワーカーのフラグファイルを、このキーが無いことでレビュー不成立にしないため、必須にしない |
 | `repo_text_displayed.calls` | | 数えた呼び出しの列。要素の形と、1 行への直し方と切り詰める長さは `sandbox_blocked.calls` と同じで、`message` は本文のうち文面かタグを含む行。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |
 | `head_after` | | レビュアの実行が終了した後の HEAD の短縮 SHA。**起動しなかった回は省く** |
@@ -237,7 +237,7 @@ sandbox_blocked:
       message: "<sandbox_violations> deny network-outbound example.com:443 (host is not on the allow list)"
 ```
 
-`error` に書く項目の一覧と、それぞれの確認の方法の正本は [worker.md](worker.md) の「回の処理」。ログから読む項目の読み方の正本は同じファイルの「ログの読み方」。
+`error` に書く項目の一覧と、それぞれの確認の方法の SSOT は [worker.md](worker.md) の「回の処理」。ログから読む項目の読み方の SSOT は同じファイルの「ログの読み方」。
 
 ## 読むプロセスの検査
 
@@ -245,10 +245,10 @@ sandbox_blocked:
 
 | ファイル | 読むプロセス | 確認すること |
 | --- | --- | --- |
-| 設定 (`config.json` の `review_loop`) | review-loop のセッション | 値の型と範囲 (条件の正本は [arguments.md](arguments.md) の「値の検査」) |
+| 設定 (`config.json` の `review_loop`) | review-loop のセッション | 値の型と範囲 (条件の SSOT は [arguments.md](arguments.md) の「値の検査」) |
 | `loop.yaml` | review-loop のセッション・ワーカー | YAML として読め、必須キーがあり、`state` が 3 つのいずれか。ワーカーは `repo_dir` の行があること |
 | 依頼文 | ワーカー | 埋め残しの `{{` が無い。「出力様式」の節 (`## 出力様式` の行) がある。`head: "<SHA>"` の行がある |
-| 結果 | ワーカー (作業場所の結果)・review-loop のセッション (ループのディレクトリの結果) | ファイルがある。`findings:` の行 (review-loop のセッションは YAML の `findings` キー) がある。`run_id` が識別子と一致する。ワーカーは、ループのディレクトリへ複写する前にファイルの種類・配置先・大きさも確認する (正本は [worker.md](worker.md) の「回の処理」) |
+| 結果 | ワーカー (作業場所の結果)・review-loop のセッション (ループのディレクトリの結果) | ファイルがある。`findings:` の行 (review-loop のセッションは YAML の `findings` キー) がある。`run_id` が識別子と一致する。ワーカーは、ループのディレクトリへ複写する前にファイルの種類・配置先・大きさも確認する (SSOT は [worker.md](worker.md) の「回の処理」) |
 | 完了のフラグファイル | review-loop のセッション | YAML として読め、必須キーがあり、`id` が識別子と一致し、`status` が 2 つのいずれか |
 | `worker.yaml` | review-loop のセッション・ワーカー | YAML として読め、必須キーがあり、`state` が 5 つのいずれか |
 | `end` | review-loop のセッション・ワーカー | 有無だけ |
@@ -261,8 +261,8 @@ sandbox_blocked:
 | --- | --- | --- | --- |
 | 設定 | `config.json` の `review_loop` | キーごとの既定値 | 既定値で続行し、警告を報告に書く (失われるのは利用者が書いた数行) |
 | 状態 | `loop.yaml` | ループが無い (開始の前提を満たす) | **中断して知らせる。新規に寄せない** — 新規として扱うと、同じブランチに終了していないループが 2 つでき、同じ回番号の依頼文が 2 つできる |
-| レビュアの実行が書くファイル | 結果 (レビュアの実行が作業場所に書き、ワーカーがループのディレクトリへ複写する) | ワーカーが `failed` のフラグファイルを書く | ワーカーが `failed` のフラグファイルを書く (`error` の書き方の正本は [worker.md](worker.md) の「回の処理」) |
+| レビュアの実行が書くファイル | 結果 (レビュアの実行が作業場所に書き、ワーカーがループのディレクトリへ複写する) | ワーカーが `failed` のフラグファイルを書く | ワーカーが `failed` のフラグファイルを書く (`error` の書き方の SSOT は [worker.md](worker.md) の「回の処理」) |
 | ワーカーが書くファイル | 完了のフラグファイル・`worker.yaml` | フラグファイルはまだ (待機する)。`worker.yaml` はワーカーが未起動 (起動まで待機し、期限を過ぎたら RA2) | review-loop のセッションは「レビュー不成立」(RA1) として停止する |
 | review-loop のセッションが書くファイル | 依頼文 | ワーカーは待機する |  ワーカーが `failed` のフラグファイルを書き、レビュアの実行を起動しない |
 
-停止ノード (RA1〜RA3) の定義と報告に書くものの正本は [stops.md](stops.md)。
+停止ノード (RA1〜RA3) の定義と報告に書くものの SSOT は [stops.md](stops.md)。

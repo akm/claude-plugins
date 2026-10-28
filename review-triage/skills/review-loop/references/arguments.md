@@ -1,6 +1,6 @@
 # 引数の様式
 
-**このファイルが `review-loop` の引数と、ループの条件の決め方の正本。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」「`fix`」「`review_loop`」が正本 — ここでは言い直さない。
+**このファイルが `review-loop` の引数と、ループの条件の決め方の SSOT。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」「`fix`」「`review_loop`」が SSOT — ここでは言い直さない。
 
 ## 様式
 
@@ -27,7 +27,7 @@ review-loop --end [<ループのディレクトリ>]
 | `--full-review` | 無し (`loop.yaml` の `review.full_review` に書く) | `--full-review` |
 | `--base` | 無し (`loop.yaml` の `review.base` に書く) | `--base feat/a` |
 
-各キーの意味の正本は [project-config.md](../../review-triage/references/project-config.md) の各節。`--model` はワーカーの `--model` にそのまま渡す指定、`--effort` はワーカーの `--effort` で、どちらもループの条件として `loop.yaml` に残る (語の区別は下の「モデルと effort を指す語」)。
+各キーの意味の SSOT は [project-config.md](../../review-triage/references/project-config.md) の各節。`--model` はワーカーの `--model` にそのまま渡す指定、`--effort` はワーカーの `--effort` で、どちらもループの条件として `loop.yaml` に残る (語の区別は下の「モデルと effort を指す語」)。
 
 - **`--resume [<ループのディレクトリ>]`**: 停止した (または前のセッションが報告せずに終了した) ループを続ける。値はループのディレクトリのパス (絶対パスか、リポジトリのルートからの相対パス)。省けば、現在のブランチの `ended` でないループ (複数あれば id の新しいもの。探し方は [round.md](round.md) の「開始の前提」の 4 と同じ)。
 - **`--end [<ループのディレクトリ>]`**: ループを終える。ループのディレクトリの省略は `--resume` と同じ。
@@ -36,12 +36,12 @@ review-loop --end [<ループのディレクトリ>]
 
 **`--full-review` と `--base` は設定のキーを持たず、開始時の値を `loop.yaml` の `review.full_review` (真偽値)・`review.base` (ブランチ名) に書く。** どちらもブランチやループごとに変わる値で、前例 (`--stage` の値を `loop.stages` に書く) に合わせる。
 
-- **`--full-review`**: 収束後の全量レビューをループの中で行う。増分の回が収束し、要否の規則 (正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) で要るときに、停止せずに全量の回を行う。すでに収束した記録で始めたときは、要否に関わらず最初の回を全量にする。どのノードで分かれるかの正本は [stops.md](stops.md) の RJ0・RJ1。
-- **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。全量の回で `review-request` に `--base` として渡す (渡す回の正本は [round.md](round.md) の RL1 の手順 a の 4。起点の求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければループを始めずに人間に質問する** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で質問することになる。**そのため `origin/HEAD` の無いリポジトリでは、全量の回を行わないループ (記録に回があり、`--full-review` を付けないループ) でも `--base` が要る** (0.14.0 では要らなかった)。
+- **`--full-review`**: 収束後の全量レビューをループの中で行う。増分の回が収束し、要否の規則 (SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) で要るときに、停止せずに全量の回を行う。すでに収束した記録で始めたときは、要否に関わらず最初の回を全量にする。どのノードで分かれるかの SSOT は [stops.md](stops.md) の RJ0・RJ1。
+- **`--base <ブランチ>`**: 全量の起点を求める派生元のブランチ。全量の回で `review-request` に `--base` として渡す (渡す回の SSOT は [round.md](round.md) の RL1 の手順 a の 4。起点の求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を `review-request` の手順 2 と同じ求め方で解決して書き、解決できなければループを始めずに人間に質問する** — 空のまま書いて毎回 `review-request` の既定に任せると、開始の報告にブランチ名が出ず、`origin/HEAD` が無ければ回の途中で質問することになる。**そのため `origin/HEAD` の無いリポジトリでは、全量の回を行わないループ (記録に回があり、`--full-review` を付けないループ) でも `--base` が要る** (0.14.0 では要らなかった)。
 
-**`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の正本は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。ループの権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了のフラグファイルの権限モードの指定をこの値と比べる。
+**`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。ループの権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない — 案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了のフラグファイルの権限モードの指定をこの値と比べる。
 
-**`--threshold` と `--stage` はループの条件ではなく、`review-triage-fix` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落 — ループは開始前の報告に書くために同じ規則で値を決めて検査し、`review-triage-fix` を呼ぶ (F1) たびに渡す。
+**`--threshold` と `--stage` はループの条件ではなく、`review-triage-fix` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落 — ループは開始前の報告に書くために同じ規則で値を決めて検査し、`review-triage-fix` を呼ぶ (F1) たびに渡す。
 
 **`--resume` で受け付けるのは `--max` と `--full-review` だけ。** 例外は `--base` で、`loop.yaml` に `review.base` が無いとき (下の「0.14.0 以前に始めたループ」) だけ受け付ける。ほかの引数と、`review.base` があるときの `--base` は、引数の誤りとして再開せずにエラーにする。ほかの条件は `loop.yaml` から復元する — 再開のたびに条件が変わると、記録の回ごとの違いが条件の違いによるものか収束によるものかを読み解けなくなる。条件を変えたいときは、`--end` で終えてから新しいループを始める。`--max` は起動ごとの上限 (J5 は起動ごとに 0 から数える) なので、再開のたびに決めてよい。省略時は `loop.yaml` の `loop.max_rounds`。
 
@@ -55,10 +55,10 @@ review-loop --end [<ループのディレクトリ>]
 
 ## 設定と引数の優先順位
 
-決定の順に見る (`review-triage-loop` と同じ規則。正本は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「設定と引数の優先順位」)。
+決定の順に見る (`review-triage-loop` と同じ規則。SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「設定と引数の優先順位」)。
 
 1. 引数にあればその値
-2. 無ければ設定の値 (上の表の対応するキー。「未設定」の定義の正本は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」)
+2. 無ければ設定の値 (上の表の対応するキー。「未設定」の定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」)
 3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の各節の表)
 4. 既定で決まらないものは**人間に質問する** — ワーカーのモデルの指定 (`--model`) と effort (`--effort`)、レビュースキル (`--review`)
 
@@ -70,7 +70,7 @@ review-loop --end [<ループのディレクトリ>]
 
 - **引数の誤りは、ループを始めずにエラーとして報告する。** 引数はその場で言い直せる。
 - **`loop`・`fix` の設定の誤りも、ループを始めずにエラーとして報告する** (`review-triage-loop` と同じ規則)。
-- **`review_loop` の設定の誤りは、そのキーを未設定として扱い (既定があれば既定、無ければ人間に質問する)、警告を開始の報告に書く。** 失われるのは利用者が書いた数行で、既定で続けてもループの記録は壊れない (失敗時の態度の正本は [loop-files.md](loop-files.md) の「ファイルの種類ごとの態度」)。
+- **`review_loop` の設定の誤りは、そのキーを未設定として扱い (既定があれば既定、無ければ人間に質問する)、警告を開始の報告に書く。** 失われるのは利用者が書いた数行で、既定で続けてもループの記録は壊れない (失敗時の態度の SSOT は [loop-files.md](loop-files.md) の「ファイルの種類ごとの態度」)。
 
 | 値 | 条件 |
 | --- | --- |
@@ -80,8 +80,8 @@ review-loop --end [<ループのディレクトリ>]
 | `threshold_rounds`・`stages` | [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 |
 | `wait_minutes`・`worker_wait_minutes`・`worker_idle_minutes`・`review_timeout_minutes` | 正の数 (小数を許す) |
 | `worker_stale_seconds` | 10 以上の整数 (ワーカーは 5 秒おきに更新時刻を進めるので、それより短いと動いているワーカーを停滞と読む) |
-| `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の正本は [worker.md](worker.md) の「レビュアの実行の権限」) |
-| `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確認する (正本は [worker.md](worker.md) の「起動時の確認」の 12) |
+| `permission_mode` | `bypassPermissions` でない (ワーカーが受け付けない。理由の SSOT は [worker.md](worker.md) の「レビュアの実行の権限」) |
+| `allowed_tools`・`sandbox_allow_write`・`sandbox_allowed_domains` | 文字列の配列。`sandbox_allow_write` の各値が書き込みを許せる場所かは、ワーカーが起動時に確認する (SSOT は [worker.md](worker.md) の「起動時の確認」の 12) |
 | `dir` | 空でない文字列。リポジトリのルートからの相対パスとして解決する |
 | `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す (`review-request` の手順 2 と同じ検査。開始時に確認しないと、共通祖先の無いブランチが条件に入り、全量の回のたびに RA3 で停止する) |
 
@@ -89,13 +89,13 @@ review-loop --end [<ループのディレクトリ>]
 
 ## モデルと effort を指す語
 
-このループには、モデルとそれぞれ別の effort が 2 つずつ現れる。**語を混ぜない。** モデルの語 (指定・実効モデル) の定義の正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」で、このスキルもその 2 語だけを使う。
+このループには、モデルとそれぞれ別の effort が 2 つずつ現れる。**語を混ぜない。** モデルの語 (指定・実効モデル) の定義の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「実効モデル」で、このスキルもその 2 語だけを使う。
 
 | 語 | 何か | 決めるもの | 残る場所 |
 | --- | --- | --- | --- |
 | ワーカーのモデルの指定 | `claude -p --model` に渡す値 (`opus` のような別名か、版を含む名前) | 人間 (`--model` か `loop.review_model`) | `loop.yaml` の `worker.model`・`worker.yaml` の `model`・依頼文の `model` と識別子・完了のフラグファイルの `model.specified`・記録の `notes` の `worker_model` |
 | 実効モデル | レビュアの実行が実際に動いたモデルの名前 (モデル ID から `claude-` を除いた記録の表記) | ワーカーがログから読む | 完了のフラグファイルの `model.effective`・記録の `model` と `notes` の `(実効: …)` |
 | ワーカーの effort | `claude -p --effort` に渡す、レビュアの実行 (セッション) の effort | 人間 (`--effort` か `review_loop.worker_effort`) | `loop.yaml` の `worker.effort`・`worker.yaml` の `effort`・完了のフラグファイルの `effort`・記録の `notes` の `worker_effort` |
-| レビュースキルの effort | レビュースキル (`code-review`) に渡す effort | `--review-args` か `loop.review_args` (無ければ既定。正本は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」) | 依頼文の `effort`・結果と記録の `level` |
+| レビュースキルの effort | レビュースキル (`code-review`) に渡す effort | `--review-args` か `loop.review_args` (無ければ既定。SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」) | 依頼文の `effort`・結果と記録の `level` |
 
 **ワーカーの effort は実行時の値を確認できない** — `claude -p` のログに effort は記録されないので、残るのはワーカーに渡した値である。

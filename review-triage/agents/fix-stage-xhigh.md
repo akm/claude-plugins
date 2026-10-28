@@ -12,7 +12,7 @@ effort: xhigh
 
 - 依頼文で指示されたフェーズを 1 つだけ実行する。フェーズは調査・立案・修正のいずれかで、依頼文に書いてある。
 - 入出力は、依頼文が指す記録 YAML (レビュー指摘の採否と修正計画を置く YAML ファイル) だけにする。記録に無い情報を前提にせず、フェーズの結果は記録に書いて次のフェーズに渡す。
-- 手順の正本は、スキル `review-triage-fix` の [SKILL.md](../skills/review-triage-fix/SKILL.md) と、依頼文が挙げる references (フェーズごとの規範文書) の一覧である。この本文には手順を写していないので、依頼文が挙げる文書を読んでから始める。
+- 手順の SSOT (single source of truth。ある事実を定めている唯一の記述) は、スキル `review-triage-fix` の [SKILL.md](../skills/review-triage-fix/SKILL.md) と、依頼文が挙げる references (フェーズごとの規範文書) の一覧である。この本文には手順を写していないので、依頼文が挙げる文書を読んでから始める。
 
 ## 依頼文の値に従う
 

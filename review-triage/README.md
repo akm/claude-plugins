@@ -18,7 +18,7 @@
 
 ## なぜ記録を残すか
 
-理由の正本は [record-schema.md](skills/review-triage/references/record-schema.md) の冒頭と「ファイルの単位」です。ここは紹介として要点だけを書きます。
+理由の SSOT (single source of truth。ある事実を定めている唯一の記述) は [record-schema.md](skills/review-triage/references/record-schema.md) の冒頭と「ファイルの単位」です。ここは紹介として要点だけを書きます。
 
 **却下は「対処しなかった欠陥」を作る操作で、誤った却下は気づかれないまま残ります。** 採択は修正と再レビューで検証されますが、**却下を検証する経路は記録しかありません。** 指摘を減らすほど成功に見えるので、誤った却下は成果に計上されてしまいます。
 
@@ -28,7 +28,7 @@
 
 記録のスキーマと、判定フローの図・決定表の一致を機械的に検査します。**Go が必要です。**
 
-バイナリは配らず `go run` で都度実行します (理由の正本は [tools/triagecheck/README.md](tools/triagecheck/README.md) の「前提」)。`go install` したバイナリを使う運用にすると、プラグインを更新してもバイナリが古いまま残り、**新しいスキーマを検査しないまま処理を続けます。**
+バイナリは配らず `go run` で都度実行します (理由の SSOT は [tools/triagecheck/README.md](tools/triagecheck/README.md) の「前提」)。`go install` したバイナリを使う運用にすると、プラグインを更新してもバイナリが古いまま残り、**新しいスキーマを検査しないまま処理を続けます。**
 
 詳しい呼び出し方 (Makefile に置く例、および呼び出し用のラッパースクリプトを生成する `-install-wrapper`) は [tools/triagecheck/README.md](tools/triagecheck/README.md) を参照してください。
 
@@ -53,11 +53,11 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 - **`/tmp` を含む Bash のコマンドは、ワーカーが PreToolUse のフック (ツールを実行する前に呼ばれるフック) で実行前に拒否し、一時ファイルを作業ツリーの複製の中に作るようレビュアに伝えます。** `/tmp` への書き込みはサンドボックスが拒否し、その回がレビュー不成立になるためです。このフックが拒否した呼び出しは、レビュー不成立の条件に数えません。
 - **サンドボックスに拒否されたときの文面 (`operation not permitted` など) を含むファイルを、レビュアが `git diff` や `cat` で表示しただけの結果は、その行がレビュー対象のコミットにあると確認できれば、拒否された確認に数えません。** 数えると、そうしたファイルを変えたブランチでは、確認が 1 件も拒否されていなくても回がレビュー不成立になるためです。
 - **ネットワークは、利用者の設定ファイル `settings.json` (環境変数 `CLAUDE_CONFIG_DIR` があればその下、無ければ `~/.claude` の下) の `WebFetch(domain:…)` の許可に従います。** その許可はサンドボックスの中の Bash が接続できるドメインに加わり、ワーカーは起動時に、加わるドメインを表示します。`WebFetch(domain:*)` を許していれば、レビュアの実行の Bash は外のすべてのホストに接続できます (表示はしますが、拒否しません)。ほかに接続を許すドメインは、設定 `review_loop.sandbox_allowed_domains` に足します。
-- 引数・起動時の確認・使い捨ての作業ツリーの作り方・権限の正本は [worker.md](skills/review-loop/references/worker.md) です。テストは `claude` の代わりに偽のコマンドを置いて実行します (`python3 -m unittest discover -s review-triage/tests`)。
+- 引数・起動時の確認・使い捨ての作業ツリーの作り方・権限の SSOT は [worker.md](skills/review-loop/references/worker.md) です。テストは `claude` の代わりに偽のコマンドを置いて実行します (`python3 -m unittest discover -s review-triage/tests`)。
 
 ## プロジェクト固有の設定
 
-`.claude/akm-claude-plugins/review-triage/config.json` に置きます。様式と各キーの意味の正本は [project-config.md](skills/review-triage/references/project-config.md) で、以下はその例です。
+`.claude/akm-claude-plugins/review-triage/config.json` に置きます。様式と各キーの意味の SSOT は [project-config.md](skills/review-triage/references/project-config.md) で、以下はその例です。
 
 ```json
 {
@@ -97,18 +97,18 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
-別に、指摘の分類と被害者を宣言する `.claude/review-triage.yaml` が要ります。`review-triage --gen-config` が雛形を生成します (様式の正本は [config-schema.md](skills/review-triage/references/config-schema.md))。
+別に、指摘の分類と被害者を宣言する `.claude/review-triage.yaml` が要ります。`review-triage --gen-config` が雛形を生成します (様式の SSOT は [config-schema.md](skills/review-triage/references/config-schema.md))。
 
 ## 同梱の agent 定義
 
-`agents/` に、`review-triage-fix` がフェーズを sub-agent で実行するときに使う汎用の agent 定義を 6 つ同梱しています — `fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max`。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どのフェーズを行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (実行方法・依頼文・検証の正本は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
+`agents/` に、`review-triage-fix` がフェーズを sub-agent で実行するときに使う汎用の agent 定義を 6 つ同梱しています — `fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max`。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どのフェーズを行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (実行方法・依頼文・検証の SSOT は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
 
 ## 併用すると役に立つプラグイン
 
 いずれも**別プラグインで、無くても動きます** (該当の手順を飛ばし、飛ばしたことを報告します)。
 
 - [mermaid-preview](../mermaid-preview/README.md) — 保留の判断を提示するときに使います。無ければ Markdown の表と箇条書きで続けます
-- [doc-dag](../doc-dag/README.md) — 同じ記述が複数の箇所にあるとき片方を正本にしてもう片方を参照に変える修正と、修正で文書を変更した後に重複が再び生じていないかの確認に使います
+- [doc-dag](../doc-dag/README.md) — 同じ記述が複数の箇所にあるとき片方を SSOT にしてもう片方を参照に変える修正と、修正で文書を変更した後に重複が再び生じていないかの確認に使います
 
 ## 文中の例について
 

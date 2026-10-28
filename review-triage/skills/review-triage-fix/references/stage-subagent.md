@@ -1,6 +1,6 @@
 # フェーズを sub-agent で実行する
 
-**このファイルが、`review-triage-fix` のフェーズ (調査 / 立案 / 修正。定義と手順との対応の正本は [SKILL.md](../SKILL.md) の「手順」の冒頭) を sub-agent で実行するときの、実行方法の決定・依頼文・呼び出し元の検証の正本。** フェーズの中身の規範 (調査の 2 方向・束ねる基準・順序・検証の観点 A〜F・機械検査の関門・1 問題 1 コミット) は [SKILL.md](../SKILL.md) の手順と references/ 配下の各文書が正本で、ここでは言い直さない — sub-agent で実行しても、そのフェーズの規範は変わらない。設定と引数の様式・優先順位・値の検査は [arguments.md](arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」が正本。effort ごとの agent 定義 (`review-triage/agents/` の 6 ファイル) の中身は各定義が正本。
+**このファイルが、`review-triage-fix` のフェーズ (調査 / 立案 / 修正。定義と手順との対応の SSOT は [SKILL.md](../SKILL.md) の「手順」の冒頭) を sub-agent で実行するときの、実行方法の決定・依頼文・呼び出し元の検証の SSOT。** フェーズの中身の規範 (調査の 2 方向・束ねる基準・順序・検証の観点 A〜F・機械検査の関門・1 問題 1 コミット) は [SKILL.md](../SKILL.md) の手順と references/ 配下の各文書が SSOT で、ここでは言い直さない — sub-agent で実行しても、そのフェーズの規範は変わらない。設定と引数の様式・優先順位・値の検査は [arguments.md](arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」が SSOT。effort ごとの agent 定義 (`review-triage/agents/` の 6 ファイル) の中身は各定義が SSOT。
 
 ## なぜフェーズごとに sub-agent に出せるか
 
@@ -12,7 +12,7 @@
 
 ## フェーズと手順・文書の対応
 
-| フェーズ | 名前 (設定・引数) | sub-agent に含める手順 (番号の正本は [SKILL.md](../SKILL.md) の「手順」の直下にあるフェーズと手順の対応) | フェーズの規範 (references/) | 進める状態 |
+| フェーズ | 名前 (設定・引数) | sub-agent に含める手順 (番号の SSOT は [SKILL.md](../SKILL.md) の「手順」の直下にあるフェーズと手順の対応) | フェーズの規範 (references/) | 進める状態 |
 | --- | --- | --- | --- | --- |
 | 調査フェーズ | `investigate` | 調査フェーズの手順のうち、**末尾の「立案者の選択」は含めない** — 人間に問うのは呼び出し元のセッション | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
 | 立案フェーズ | `plan` | 立案フェーズの手順 | [ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
@@ -24,7 +24,7 @@
 
 ## 実行方法の決定
 
-フェーズごとに「セッション内か sub-agent か」を決め、sub-agent なら定義名と実効モデルを決める。値の優先順位 (引数 > 設定 > 既定) と値の検査の正本は [arguments.md](arguments.md) — ここは決定の結果を求める規則だけを持つ。
+フェーズごとに「セッション内か sub-agent か」を決め、sub-agent なら定義名と実効モデルを決める。値の優先順位 (引数 > 設定 > 既定) と値の検査の SSOT は [arguments.md](arguments.md) — ここは決定の結果を求める規則だけを持つ。
 
 1. **セッション内か sub-agent か**: 引数 `--stage <フェーズ>` があれば、値が `session` ならセッション内、それ以外は sub-agent。無ければ設定 `fix.stages.<フェーズ>.subagent` (`true` なら sub-agent)。どちらにも無ければセッション内。
 2. **定義名** (sub-agent のとき): effort の指定から下の「effort と定義名の対応」で決める。
@@ -33,7 +33,7 @@
 
 **決定は手順 1 で 3 つのフェーズについてまとめて行い、報告 (手順 8) に書く。** フェーズの直前に決めると、後のフェーズの設定や引数の誤りに前のフェーズを実行した後で気づく。
 
-### effort と定義名の対応 (正本)
+### effort と定義名の対応 (SSOT)
 
 | effort の指定 | 定義名 (Agent ツールの `subagent_type` に渡す値) |
 | --- | --- |
@@ -91,7 +91,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 ### 運ばないもの
 
-- **指摘や計画の中身の言い直し。** 記録が正本で、sub-agent は記録から読む。依頼文に写すと、写し間違いがフェーズの前提になる。
+- **指摘や計画の中身の言い直し。** 記録が SSOT で、sub-agent は記録から読む。依頼文に写すと、写し間違いがフェーズの前提になる。
 - **回数の閾値 N、対象の回が N+1 以上かどうか、立案者の選択の回答。** フェーズが受け取るのは「設計・仕様変更を含めて検討するか」の真偽だけ。
 
 ### フェーズごとの禁止事項
@@ -109,14 +109,14 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 - 記録 YAML と生成サマリ以外のファイルを作らない・変えない・消さない。
 - コミットしない。**記録のコミットも含む** — 記録のディレクトリが git の追跡内でも、コミットは呼び出し元が検証の後に行う。
-- 調査フェーズは `approach` と `order` を書かない (`investigated` の条件の正本は record-schema.md の `plans[]` の表)。立案フェーズは記録の外のファイルを変えない。
-- 調査フェーズは手順 4 の末尾の「立案者の選択」を行わない — 回の番号と回数の閾値 N を比べず、人間に質問せず、問題を `status: awaiting-human` にしない。調査フェーズの結果はすべて `status: investigated` で返す (立案者の選択は呼び出し元のセッションが行う)。**束ね方や直し方に人間の判断が要ると思ったときも選択待ちにせず**、`investigated` で返す。**調べた事実は記録の `investigation` に書き、判断が要るという見解は報告に書く** (見解の記載先は下の「報告の様式」の「できなかったこと」。様式に項目を足さない) — 次のフェーズに渡るのは記録だけで (SKILL.md の前提知識)、記録に見解を書く欄は無い (様式の正本は [record-schema.md](../../review-triage/references/record-schema.md) の調査の表)。**立案フェーズは記録の事実から判断する。** 見解は、報告を読む呼び出し元と人間のためのものである。
+- 調査フェーズは `approach` と `order` を書かない (`investigated` の条件の SSOT は record-schema.md の `plans[]` の表)。立案フェーズは記録の外のファイルを変えない。
+- 調査フェーズは手順 4 の末尾の「立案者の選択」を行わない — 回の番号と回数の閾値 N を比べず、人間に質問せず、問題を `status: awaiting-human` にしない。調査フェーズの結果はすべて `status: investigated` で返す (立案者の選択は呼び出し元のセッションが行う)。**束ね方や直し方に人間の判断が要ると思ったときも選択待ちにせず**、`investigated` で返す。**調べた事実は記録の `investigation` に書き、判断が要るという見解は報告に書く** (見解の記載先は下の「報告の様式」の「できなかったこと」。様式に項目を足さない) — 次のフェーズに渡るのは記録だけで (SKILL.md の前提知識)、記録に見解を書く欄は無い (様式の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の調査の表)。**立案フェーズは記録の事実から判断する。** 見解は、報告を読む呼び出し元と人間のためのものである。
 
 修正フェーズ:
 
 - 対象 (`{{targets}}`) 以外の問題を直さない。
-- 1 問題 1 コミット。各コミットの前に、設定の `gates` の関門と観点 A〜F を通す (正本は committing.md・verification.md)。
-- コミットしたら記録の該当の問題を `status: done`・`sha` に更新する。区切り (全問題の完了、または中断) で、記録のディレクトリが git の追跡内なら記録とサマリをコミットする (分け方の正本は record-schema.md のコミット節)。**未コミットの変更を残して返らない。**
+- 1 問題 1 コミット。各コミットの前に、設定の `gates` の関門と観点 A〜F を通す (SSOT は committing.md・verification.md)。
+- コミットしたら記録の該当の問題を `status: done`・`sha` に更新する。区切り (全問題の完了、または中断) で、記録のディレクトリが git の追跡内なら記録とサマリをコミットする (分け方の SSOT は record-schema.md のコミット節)。**未コミットの変更を残して返らない。**
 - 手順 8 (報告) と手順 9 (`doc-dag`) を行わない。
 
 ### 雛形
@@ -124,7 +124,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 ````markdown
 # review-triage-fix のフェーズの依頼: {{stage_name}}フェーズ — {{branch}} の {{round}} 回目
 
-この依頼文は、スキル `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) が、フェーズを sub-agent で実行するために書いたものである。受け取った sub-agent はこの依頼文と「読む文書」だけを読んで、指示されたフェーズを 1 つ実行し、結果を記録 YAML に書き、「報告の様式」のとおり報告する。依頼文の作り方と呼び出し元の検証の正本は `review-triage-fix` の `references/stage-subagent.md` — 受け取った sub-agent が読む必要は無い。
+この依頼文は、スキル `review-triage-fix` (採択したレビュー指摘を原因で束ねて直すスキル) が、フェーズを sub-agent で実行するために書いたものである。受け取った sub-agent はこの依頼文と「読む文書」だけを読んで、指示されたフェーズを 1 つ実行し、結果を記録 YAML に書き、「報告の様式」のとおり報告する。依頼文の作り方と呼び出し元の検証の SSOT は `review-triage-fix` の `references/stage-subagent.md` — 受け取った sub-agent が読む必要は無い。
 
 ## 値 — この値で動く。自分で別の値を選ばない
 
@@ -132,7 +132,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - 記録 YAML: `{{record_path}}`
 - 設定ファイル: `{{config_path}}` — `record_dir`・`gates`・`triage_check_command`・`triage_summary_command` はここから読む
 - リポジトリ: `{{repo_dir}}` / ブランチ: `{{branch}}`
-- 対象の回: {{round}} (記録の `runs` の要素数)。新しく書く `plans` は、その採択が属する回に置く (別の回の採択を同じ原因で束ねるときは、束ね先の問題に `plan_ref` を書く — 規則の正本は record-schema.md の `finding_ids` と `plan_ref` の行)。
+- 対象の回: {{round}} (記録の `runs` の要素数)。新しく書く `plans` は、その採択が属する回に置く (別の回の採択を同じ原因で束ねるときは、束ね先の問題に `plan_ref` を書く — 規則の SSOT は record-schema.md の `finding_ids` と `plan_ref` の行)。
 - 対象: {{targets}}
 - 設計・仕様変更を含めて検討する: {{consider_design_change}} — この値をそのまま使う。回の番号から自分で判断しない。
 - 定義名: `{{agent_name}}` — 報告にこの値をそのまま写す。
@@ -144,7 +144,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - `{{project_config_path}}` — 設定のキーの意味
 - フェーズの規範: {{stage_references}}
 
-指摘と計画の中身は記録 YAML が正本で、この依頼文には写していない。記録から読む。
+指摘と計画の中身は記録 YAML が SSOT で、この依頼文には写していない。記録から読む。
 
 ## 禁止事項
 
@@ -201,7 +201,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 ## 記録のディレクトリが git の追跡内のとき
 
-- **調査フェーズ・立案フェーズの後**: 検証が通ったら、**呼び出し元が**記録とサマリをコミットする (分け方の正本は [record-schema.md](../../review-triage/references/record-schema.md#コミット) のコミット節)。sub-agent はコミットしない (禁止事項)。
+- **調査フェーズ・立案フェーズの後**: 検証が通ったら、**呼び出し元が**記録とサマリをコミットする (分け方の SSOT は [record-schema.md](../../review-triage/references/record-schema.md#コミット) のコミット節)。sub-agent はコミットしない (禁止事項)。
 - **修正フェーズ**: 現行の手順 7 どおり、区切りで sub-agent が記録とサマリをコミットする。呼び出し元は未コミットの変更が無いことを確認する (上の表)。
 - 追跡外 (既定のディレクトリ) では、どのフェーズでも記録のコミットは無い。
 

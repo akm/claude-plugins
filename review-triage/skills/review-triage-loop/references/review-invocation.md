@@ -1,6 +1,6 @@
 # レビューの起動
 
-**このファイルが `review-triage-loop` からレビューを起動する経路の正本。** 依頼文の中身 (報告前の検証・報告しない条件・出力様式) は [review-request.md](../../review-triage/references/review-request.md) が正本 — ここでは言い直さず、経路ごとの違いだけを定める。
+**このファイルが `review-triage-loop` からレビューを起動する経路の SSOT。** 依頼文の中身 (報告前の検証・報告しない条件・出力様式) は [review-request.md](../../review-triage/references/review-request.md) が SSOT — ここでは言い直さず、経路ごとの違いだけを定める。
 
 ## なぜ経路がスキルごとに違うか
 
@@ -11,7 +11,7 @@
 
 **独立した文脈で実行するのは、レビュアとトリアージを分けるため。** 同じ文脈で実行すると、指摘を出したセッションがそのまま採否を判断することになる。
 
-## 実効モデル (定義の正本)
+## 実効モデル (定義の SSOT)
 
 **モデルを指す語は 2 つだけ。** **指定** (`review_model` / `--model` に書かれた生の表記。G0 でしか使わない) と、**実効モデル** (G0 で解決した後のモデル名。sub-agent への受け渡し・記録・報告のすべてがこれを使う)。「ループが決めたモデル」「継承」「呼び出し元」のような中間の語は持たない — 語が増えるたびに規則ごとに違う語を選んで不統一になった (記録の 5〜19 回目)。
 
@@ -21,10 +21,10 @@
 
 | 経路 | 実効モデル (名前) |
 | --- | --- |
-| `code-review` | 指定があれば、それを名前に解決したもの — `opus` のような別名は対応する名前に、`inherit` は呼び出し元 (このセッションが動いているモデル) の名前に。指定が未設定 (定義の正本は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」) なら既定 — 呼び出し元の 1 つ前の世代の同じ位置のモデル (下の対応表。表に無ければ推測せず人間に質問する) |
+| `code-review` | 指定があれば、それを名前に解決したもの — `opus` のような別名は対応する名前に、`inherit` は呼び出し元 (このセッションが動いているモデル) の名前に。指定が未設定 (定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」) なら既定 — 呼び出し元の 1 つ前の世代の同じ位置のモデル (下の対応表。表に無ければ推測せず人間に質問する) |
 | `ce-code-review` | 呼び出し元の名前。**指定は適用されない** — sub-agent に包まないので渡す先が無く、`ce-code-review` は主要な 3 つのペルソナに呼び出し元のモデルを継承させ、残りは mid-tier を使う。**指定が空でなければ「指定 X はこの経路では適用されない」と報告する** — 比較ではなく経路で決めるので、表記と名前の違いで誤報は出ない |
 
-既定の対応表 (正本。表に無い組み合わせは人間に質問する):
+既定の対応表 (SSOT。表に無い組み合わせは人間に質問する):
 
 | 呼び出し元 | 既定 |
 | --- | --- |
@@ -43,11 +43,11 @@
 
 ### skill を呼んだことの確認
 
-依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の正本は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」。報告に無いとき・指定と一致しないときの扱い (人間に報告する) もそこが定める。
+依頼文に skill・effort・モデルを値で明記する義務と、報告させる義務の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」。報告に無いとき・指定と一致しないときの扱い (人間に報告する) もそこが定める。
 
-## 記録のキーの出所 (定義の正本)
+## 記録のキーの出所 (定義の SSOT)
 
-**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表だけが定める。** キーの意味の正本は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここはループがその値をどこから採るかを定める。
+**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表だけが定める。** キーの意味の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここはループがその値をどこから採るかを定める。
 
 | 記録のキー | `code-review` | `ce-code-review` |
 | --- | --- | --- |
@@ -60,10 +60,10 @@
 
 ## `code-review` の場合
 
-sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の正本は [review-request.md](../../review-triage/references/review-request.md))。雛形を埋める値は、ループはスキルを呼ばないが、次のとおり [review-request スキル](../../review-request/SKILL.md) と同じ規則で決める — 識別子と出力先 (`{{output_path}}`) は手順 3・4 (別の名前を付けると `review-triage` の手順 1 が読む対象と一致しない)。識別子の成分の回・`head`・`scope_note` は手順 2 (回は記録の `runs` の数 + 1 — ループが上限のために起動時に 0 から数える回数とは別物)。モデルはこのファイルの「実効モデル」、`base` と `scope` は「範囲」が正本で、そのスキルの手順 1・2 のモデルと範囲の規則だけは使わない。
+sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の SSOT は [review-request.md](../../review-triage/references/review-request.md))。雛形を埋める値は、ループはスキルを呼ばないが、次のとおり [review-request スキル](../../review-request/SKILL.md) と同じ規則で決める — 識別子と出力先 (`{{output_path}}`) は手順 3・4 (別の名前を付けると `review-triage` の手順 1 が読む対象と一致しない)。識別子の成分の回・`head`・`scope_note` は手順 2 (回は記録の `runs` の数 + 1 — ループが上限のために起動時に 0 から数える回数とは別物)。モデルはこのファイルの「実効モデル」、`base` と `scope` は「範囲」が SSOT で、そのスキルの手順 1・2 のモデルと範囲の規則だけは使わない。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** ループが回ごとに勝手に切り替えない (SKILL.md の原則)。
-- `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く正本にある)。
+- `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く SSOT にある)。
 - 出力は雛形の「出力様式」の YAML で書き出させる。**地の文で返させない** — `review-triage` の手順 1 がファイル経由で読む形である。
 
 ## `ce-code-review` の場合
@@ -89,11 +89,11 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 ## 範囲
 
-**全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点は、起点のブランチと HEAD の merge-base (共通祖先のコミット) で、求め方の正本は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2。**起点のブランチは、引数 `--base` があればそのブランチ、無ければ `origin/HEAD` が指すブランチで、使うのはこの全量の回だけである。** それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
+**全量にするのは、記録に回が 1 件も無いときだけ。** 全量の基点は、起点のブランチと HEAD の merge-base (共通祖先のコミット) で、求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2。**起点のブランチは、引数 `--base` があればそのブランチ、無ければ `origin/HEAD` が指すブランチで、使うのはこの全量の回だけである。** それ以外はすべて増分で、基点は記録の最後の回の `head` から読む。規則の理由は [review-request.md](../../review-triage/references/review-request.md) の「範囲の規則」にある — 全量を繰り返すと指摘が際限なく出続ける。
 
 **これらの基点 (全量と増分) を依頼文に埋めてレビュアに渡すのは、`code-review` の経路だけである。** `ce-code-review` の経路は範囲の基点をレビュアに渡していないので ([#79](https://github.com/akm/claude-plugins/issues/79))、全量の回でも増分の回でも基点はレビュア (`ce-code-review`) が自分で決め、起点のブランチも使わない。記録の `scope` には、`ce-code-review` の経路でもループが決めた範囲を書く (実際の範囲と一致しないことがあるのも #79 の件)。
 
-**この経路 (`review-triage-loop`) は、収束後の全量レビューをループに含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、このループが担うのは最初の 1 回だけである。ループの中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回をループの中で行い、その回は上限に数えない (数えなくてもループが停止する理由の正本は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
+**この経路 (`review-triage-loop`) は、収束後の全量レビューをループに含めない。** [review-request.md](../../review-triage/references/review-request.md) の範囲の規則が求める 2 種類の `full` (最初の 1 回と、収束後の全量レビュー) のうち、このループが担うのは最初の 1 回だけである。ループの中で行う手段を持つのは `review-loop` で、引数 `--full-review` を付けると収束後の全量の回をループの中で行い、その回は上限に数えない (数えなくてもループが停止する理由の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。
 
 **「ループの 1 回目」と「記録の 1 回目」を同一視しない。** 既に回のある記録に対して loop を起動すれば、そのループの 1 回目は記録の 2 回目以降にあたる。ループの中だけで数えると、2 度目以降の全量レビューを実行することになり、この行が引く規則に反する。
 

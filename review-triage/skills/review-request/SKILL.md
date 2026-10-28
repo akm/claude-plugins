@@ -7,7 +7,7 @@ description: 別セッションで実行する上流レビュー (code-review �
 
 別セッションで実行する上流レビューの依頼文を、雛形 ([review-request-template.md](../review-triage/references/review-request-template.md)) を埋めてファイルに書き出す。**成果物は依頼文のファイル 1 つで、レビューは実行しない。** 実行するのは人間で、新しいセッションに依頼文のパスを渡す。結果を受け取って判定するのは [review-triage](../review-triage/SKILL.md)。
 
-依頼の運用 (なぜファイルに書き出すか・範囲の規則・各節の理由) の正本は [review-request.md](../review-triage/references/review-request.md) — ここでは言い直さない。
+依頼の運用 (なぜファイルに書き出すか・範囲の規則・各節の理由) の SSOT (single source of truth。ある事実を定めている唯一の記述) は [review-request.md](../review-triage/references/review-request.md) — ここでは言い直さない。
 
 ## 引数
 
@@ -21,7 +21,7 @@ review-request [<スキル名>] [<モデル名>] [<effort>] [--dir <ディレク
 | `<モデル名>` | レビューを実行するモデル | 手順 1 |
 | `<effort>` | レビュースキルに渡す effort | 手順 1 |
 | `--dir <ディレクトリ>` | 依頼文と結果のディレクトリ。相対パスはリポジトリのルート (`git rev-parse --show-toplevel`) を基準に解決する。作業ツリーの外は受け付けない (git に無視されていることを確認できないため) | `tmp/` |
-| `--full-review` | 記録に回があっても、範囲を全量 (scope `full`) にする。要否に関わらず全量にする明示の指定 (要否の規則の正本は [review-request.md](../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) | 範囲は手順 2 のとおり (記録に回が無ければ全量、あれば増分) |
+| `--full-review` | 記録に回があっても、範囲を全量 (scope `full`) にする。要否に関わらず全量にする明示の指定 (要否の規則の SSOT は [review-request.md](../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) | 範囲は手順 2 のとおり (記録に回が無ければ全量、あれば増分) |
 | `--base <ブランチ>` | 全量の起点を求める派生元のブランチ (別の作業ブランチから派生したブランチなら、その作業ブランチ)。増分の回では使わない | `origin/HEAD` が指すブランチ (手順 2) |
 
 位置引数はこの順で読む。`--dir`・`--full-review`・`--base` は位置引数の前後どちらに置いてもよい。`--full-review` と `--base` は設定のキーを持たない — どちらもブランチやループごとに変わる値である。ループのディレクトリに依頼文を書くスキル (`review-loop`) が、`--dir` を毎回、`--base` と `--full-review` を全量の回に使う。
@@ -34,14 +34,14 @@ review-request [<スキル名>] [<モデル名>] [<effort>] [--dir <ディレク
 
 ## 手順
 
-1. **引数と設定を読む**: 引数はスキル名・モデル名・effort とディレクトリ (様式は上の「引数」)。**スキル名の省略時は `code-review`。モデル名は、引数に無ければ設定 (`.claude/akm-claude-plugins/review-triage/config.json`) の `loop.review_model` を使い、それも未設定なら人間に質問する。effort は、引数に無ければ設定の `loop.review_args`、それも未設定なら既定 (正本は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「effort の既定」)。`ce-code-review` のように effort を受け取らない skill では空にする** (設定のキーの正本は [project-config.md](../review-triage/references/project-config.md))。あわせて設定の `record_dir` を読む (未設定なら既定の `tmp/review-triages/`)。
+1. **引数と設定を読む**: 引数はスキル名・モデル名・effort とディレクトリ (様式は上の「引数」)。**スキル名の省略時は `code-review`。モデル名は、引数に無ければ設定 (`.claude/akm-claude-plugins/review-triage/config.json`) の `loop.review_model` を使い、それも未設定なら人間に質問する。effort は、引数に無ければ設定の `loop.review_args`、それも未設定なら既定 (SSOT は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「effort の既定」)。`ce-code-review` のように effort を受け取らない skill では空にする** (設定のキーの SSOT は [project-config.md](../review-triage/references/project-config.md))。あわせて設定の `record_dir` を読む (未設定なら既定の `tmp/review-triages/`)。
 2. **回と範囲を決める**: 現在のブランチの記録 (`<record_dir>/<ブランチ名>.yaml`。ブランチ名の `/` は `-` に置き換える) を読み、`runs` の数 + 1 を回とする (記録が無ければ 1)。**記録があるのに読めない (YAML として壊れている・`runs` が無い) なら、生成せずにその旨を報告して終了する** — 「読めない」を「無い」に寄せると回の番号が 1 から振り直され、過去の回と同じ番号の依頼文ができる。
    - **記録に回が無いか、引数 `--full-review` があれば、scope は `full`。** `base` は、起点のブランチと HEAD の merge-base (共通祖先のコミット) の短縮 SHA (`git merge-base <ブランチ> HEAD` の結果を `git rev-parse --short` で縮めたもの)。起点のブランチは、引数 `--base` があればそれ、無ければ `origin/HEAD` が指すブランチ (`git symbolic-ref --short refs/remotes/origin/HEAD` の結果。`origin/main` のような形のまま使う)。起点を分岐元の `main` に決め打ちしないのは、別の作業ブランチから派生したブランチで、派生元のコミットまで範囲に入るため。**`--base` のブランチが解決できない (`git rev-parse --verify --quiet "<ブランチ>^{commit}"` が失敗する)、`--base` が無くて `origin/HEAD` が無い、または merge-base が求まらない (共通祖先が無い) なら、生成せずにその旨を報告し、起点のブランチをどれにするかを人間に質問する** — 起点を推測すると、範囲が広すぎるか狭すぎる依頼文ができ、どちらもレビューの結果からは気づけない。
      - 補足は、記録に回が無く `--full-review` も無ければ「ブランチの全量 (起点: `<ブランチ>` との merge-base)」。`--full-review` があれば「ブランチの全量 (`--full-review` による指定。起点: `<ブランチ>` との merge-base)。増分の外を報告しない規則はこの回には当てはまらない」。書き分けるのは、記録に回がある状態の全量の回で、レビュアが前の回の依頼文にあった増分の規則をこの回に当てはめないようにするため。
    - **それ以外 (記録に回があり、`--full-review` が無い) なら、scope は `incremental`、`base` は直前の回の `head`。** `--base` は使わない (あっても無視し、報告にその旨を書く)。補足は「前回の HEAD `<sha>` からの増分。増分の外は、増分が壊した場合のみ報告する」。
-   - **ディレクトリ (`--dir`。省略時は `tmp/`) が `git check-ignore -q <ディレクトリ>` で無視されていなければ生成せず、「`.gitignore` にディレクトリ (既定なら `tmp/`) を足してコミットしてから再実行する」と案内して終了する** — スキルは `.gitignore` を変えない。依頼文と結果は設定の `record_dir` に関わらずこのディレクトリに置くので、記録のディレクトリと違って「既定のディレクトリを使うとき」に限らず常に確認する (前提の正本は [record-schema.md](../review-triage/references/record-schema.md) の冒頭)。`git check-ignore` は存在しないパスでも判定できるので、ディレクトリを作る前に確認する。
-   - `head` は現在の HEAD の短縮 SHA。**作業ツリーが clean でなければ生成せず、その旨を報告する** — 依頼文は作業ツリーの扱いを「共有」(依頼元と同じ作業ツリーでレビューする) で書くので、レビュアは HEAD と作業ツリーが不変であることを確認して報告する。汚れたまま渡すと、その確認が成り立たない。ループ (`review-loop`) で「使い捨て」に書き換えた依頼文でも、依頼元の作業ツリーは確認する (確認するのはワーカーで、正本は [review-loop の worker.md](../review-loop/references/worker.md) の「回の処理」の手順 4)。
-3. **識別子と出力先を決める**: 識別子は `<YYYYMMDD>-<hhmm>-<ブランチ名>-<回>-<スキル名>-<モデル名>`。依頼文は `<ディレクトリ>/review-request-<識別子>.md`、レビュー結果の出力先は `<ディレクトリ>/review-<識別子>.yaml` (ディレクトリの既定は `tmp/`)。成分ごとの扱いは下の表が正本で、**成分を足す・外す・変えるときは、その行の全欄を確認する** — 欄を 1 つ書き残すと、その扱いが無いことは次のレビューまで気づかれない (実測: 成分を変えるたびに、外した成分の役割・足した成分の整え方・参照先の規則、と別の欄で 3 回続いた)。識別子はファイル名に使うので、整え方はファイル名に使える形にするためのもの。識別子の衝突 (同じ名前の依頼文か結果が既にある状態) は 1 つずつやり直せるので、厳密な一意性は求めない。
+   - **ディレクトリ (`--dir`。省略時は `tmp/`) が `git check-ignore -q <ディレクトリ>` で無視されていなければ生成せず、「`.gitignore` にディレクトリ (既定なら `tmp/`) を足してコミットしてから再実行する」と案内して終了する** — スキルは `.gitignore` を変えない。依頼文と結果は設定の `record_dir` に関わらずこのディレクトリに置くので、記録のディレクトリと違って「既定のディレクトリを使うとき」に限らず常に確認する (前提の SSOT は [record-schema.md](../review-triage/references/record-schema.md) の冒頭)。`git check-ignore` は存在しないパスでも判定できるので、ディレクトリを作る前に確認する。
+   - `head` は現在の HEAD の短縮 SHA。**作業ツリーが clean でなければ生成せず、その旨を報告する** — 依頼文は作業ツリーの扱いを「共有」(依頼元と同じ作業ツリーでレビューする) で書くので、レビュアは HEAD と作業ツリーが不変であることを確認して報告する。汚れたまま渡すと、その確認が成り立たない。ループ (`review-loop`) で「使い捨て」に書き換えた依頼文でも、依頼元の作業ツリーは確認する (確認するのはワーカーで、SSOT は [review-loop の worker.md](../review-loop/references/worker.md) の「回の処理」の手順 4)。
+3. **識別子と出力先を決める**: 識別子は `<YYYYMMDD>-<hhmm>-<ブランチ名>-<回>-<スキル名>-<モデル名>`。依頼文は `<ディレクトリ>/review-request-<識別子>.md`、レビュー結果の出力先は `<ディレクトリ>/review-<識別子>.yaml` (ディレクトリの既定は `tmp/`)。成分ごとの扱いは下の表が SSOT で、**成分を足す・外す・変えるときは、その行の全欄を確認する** — 欄を 1 つ書き残すと、その扱いが無いことは次のレビューまで気づかれない (実測: 成分を変えるたびに、外した成分の役割・足した成分の整え方・参照先の規則、と別の欄で 3 回続いた)。識別子はファイル名に使うので、整え方はファイル名に使える形にするためのもの。識別子の衝突 (同じ名前の依頼文か結果が既にある状態) は 1 つずつやり直せるので、厳密な一意性は求めない。
 
    | 成分 | 出所 | 整え方 | 欠損時の扱い | なぜ入れるか |
    | --- | --- | --- | --- | --- |
@@ -53,7 +53,7 @@ review-request [<スキル名>] [<モデル名>] [<effort>] [--dir <ディレク
    - **どちらかが既に存在すれば上書きせず、その旨を報告して終了する。** 同じ識別子で作り直したいときは人間が消す。
 4. **雛形を埋めて書き出す**: 雛形の `{{…}}` を次で埋める — `repo` (`git remote get-url origin`)・`repo_dir` (`git rev-parse --show-toplevel`)・`branch` (現在のブランチ名)・`base` / `head` / `scope` / `scope_note` (手順 2)・`skill` / `model` / `effort` (手順 1)・`date` (生成日 `YYYY-MM-DD`)・`run_id` (手順 3 の識別子)・`output_path` (手順 3 の出力先を `repo_dir` 起点の絶対パスにしたもの)。ディレクトリが無ければ作る (無視されていることは手順 2 で確認済み)。
    - **出力先は絶対パスで埋める。** 相対パスはレビュアの cwd (作業ディレクトリ) で解決され、別の場所に書かれた実測がある。
-   - **雛形の「対象」の節にある作業ツリーの扱いの行 (`- 作業ツリーの扱い: 共有`) は書き換えず、値「共有」のまま書く** — 「使い捨て」への書き換えはループ (`review-loop`) のワーカーが行う (正本は [review-loop の worker.md](../review-loop/references/worker.md) の「回の処理」の手順 8)。
+   - **雛形の「対象」の節にある作業ツリーの扱いの行 (`- 作業ツリーの扱い: 共有`) は書き換えず、値「共有」のまま書く** — 「使い捨て」への書き換えはループ (`review-loop`) のワーカーが行う (SSOT は [review-loop の worker.md](../review-loop/references/worker.md) の「回の処理」の手順 8)。
    - **依頼文は、同じディレクトリの一時名 `.review-request-<識別子>.md.tmp` に書き、埋め残した `{{…}}` が無いことを確認してから、`mv` で `review-request-<識別子>.md` に改名する。** ディレクトリを定期的に確認するプロセス (`review-loop` のワーカー) は一時名 (`.` で始まる名前) を読まないので、書きかけの依頼文を処理しない。
 5. **報告する**: 依頼文のパスと出力先のパス、埋めた値 (対象・範囲・スキル名・モデル名・effort) を出す。**scope が `full` なら、起点のブランチ名と merge-base の SHA、ブランチの出所 (`--base` か、`origin/HEAD` による既定か)、`--full-review` の有無も出す** — 起点を推測しない規則を、人間が報告で確認できるようにするため。**新しいセッションへ渡すのは依頼文のパス 1 つ**であること、結果が返ったら `review-triage` に出力先のパスを渡すことを案内する。
 
@@ -66,4 +66,4 @@ review-request [<スキル名>] [<モデル名>] [<effort>] [--dir <ディレク
 ## このスキルがしないこと
 
 - **レビュー結果の様式の検査** — 受け取るスキル (`review-triage` の手順 1) が担う。
-- **依頼文の文面の設計** — 雛形が正本。文面を変えたいときは雛形を直す。
+- **依頼文の文面の設計** — 雛形が SSOT。文面を変えたいときは雛形を直す。
