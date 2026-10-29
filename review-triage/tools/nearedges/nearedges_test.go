@@ -239,8 +239,8 @@ func TestHintsReferenceWithoutLink(t *testing.T) {
 	}
 	joined := strings.Join(hints(changes, nil), "\n")
 	for _, want := range []string{
-		"観点 B: 変更行に「SSOT は」があるがリンクが無い (docs/a.md 1 行目) — SSOT を再確認し、参照をリンクにする",
-		"観点 B: 変更行に「正本は」があるがリンクが無い (docs/a.md 2 行目) — SSOT を再確認し、参照をリンクにする",
+		"観点 B: 変更行に「SSOT は」があるがリンクが無い (docs/a.md 1 行目)。SSOT を再確認し、参照をリンクにする",
+		"観点 B: 変更行に「正本は」があるがリンクが無い (docs/a.md 2 行目)。SSOT を再確認し、参照をリンクにする",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("%q が提示されない: %s", want, joined)
