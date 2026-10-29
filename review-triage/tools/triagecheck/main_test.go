@@ -15,7 +15,7 @@ import (
 //
 // あわせて、run が読む環境変数 CLAUDE_PLUGIN_ROOT をここでクリアする。run を呼ぶ
 // テストは必ずこの関数を最初に呼ぶので、環境に依存しない状態をこの 1 か所で作れる
-// (経路ごとに書くと、書き忘れたテストだけが環境依存になる — 実測で、この変数が
+// (経路ごとに書くと、書き忘れたテストだけが環境依存になる。実測で、この変数が
 // 設定された環境で 1 つだけ落ち、3 つが別の理由で失敗していた)。環境変数を
 // 意図的に使うテストは、この関数の後で t.Setenv して上書きする。
 func withRunGlobals(t *testing.T) {
@@ -264,7 +264,7 @@ func TestRunReportsBothMissingPaths(t *testing.T) {
 
 	// 報告の本文は stderr に出るので、そこを捕まえて「両方が載ったか」を対象の
 	// パスで見る。件数の文言 (「2 件」) で判定すると、挙動を変えない書式の変更で
-	// 落ちる — 何を報告したかではなく、どう書いたかを検査することになる。
+	// 落ちる。何を報告したかではなく、どう書いたかを検査することになるため。
 	stderr := captureStderr(t, func() {
 		if err := run([]string{"-record-dir", recDir, "-judgment-flow", flow}); err == nil {
 			t.Error("両方が不在なのに成功した")
@@ -302,7 +302,7 @@ func captureStderr(t *testing.T, fn func()) string {
 
 // -write-summary も run 経由で explicit が渡ることを検証する。関数を直接呼ぶ
 // テストだけだと、run から検査への配線を壊しても全テストが通る (配線を false に
-// 固定するミューテーションで実測した) — そのとき「明示指定したディレクトリが無いのに
+// 固定するミューテーションで実測した)。そのとき「明示指定したディレクトリが無いのに
 // エラーを出さずに成功する」挙動が復活する。
 func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 	withRunGlobals(t)
@@ -315,7 +315,7 @@ func TestRunWriteSummaryFailsOnMissingExplicitRecordDir(t *testing.T) {
 // 空のパス (空文字・空白だけ・不可視のフォーマット文字だけの値) を明示指定したら、
 // どの経路でもその場で拒否する。通すと -judgment-flow "" は「指定なし」として扱われ
 // 検査が実行されないまま成功し、空白や不可視の値は展開先を基準にした無関係なパスに
-// なる — どちらも「指定したのに検査されない」種類の欠陥そのもの。
+// なる。どちらも「指定したのに検査されない」種類の欠陥そのものである。
 //
 // 規則は経路の分岐より前の 1 か所 (resolveInputs) にあるので、表は
 // 経路 × フラグ × 入力 で回す。経路ごとに別のテストを書くと、規則を経路ごとに
@@ -394,8 +394,8 @@ func TestRunEmptyInstallWrapperDoesNotFallThroughToCheck(t *testing.T) {
 	if err := os.MkdirAll(recs, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// 生成サマリの対象になる記録を 1 つ置く。中身は検査を通す必要が無い —
-	// 見るのは .md が作られるかどうかだけ。
+	// 生成サマリの対象になる記録を 1 つ置く。中身は検査を通す必要が無い。
+	// 見るのは .md が作られるかどうかだけである。
 	if err := os.WriteFile(filepath.Join(recs, "rec.yaml"), []byte("runs: []\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,7 @@ func TestRunEmptyInstallWrapperDoesNotFallThroughToCheck(t *testing.T) {
 }
 
 // -judgment-flow を省略したときだけ、ラッパーは $root からの既定パスを使う。
-// 「既定を使う」は省略で表す — 明示した空は他の経路と同じく拒否される
+// 「既定を使う」は省略で表す。明示した空は他の経路と同じく拒否される
 // (TestRunRejectsEmptyExplicitPaths)。空文字を「既定」の意味に使うと、
 // 空のパスの規則に生成の経路だけの例外ができ、規則を足すたびに例外の処理が要る。
 func TestRunInstallWrapperOmittedJudgmentFlowUsesDefault(t *testing.T) {
@@ -523,7 +523,7 @@ func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 
 // 値の出所を報告に反映する。CLAUDE_PLUGIN_ROOT から解決した値の誤りを、
 // 利用者が渡していない -judgment-flow の名前で叱らない。案内も、直すべきもの
-// (環境変数) を指していること — -current-dir を足しても直らないため。
+// (環境変数) を指していることを検証する。-current-dir を足しても直らないため。
 func TestRunReportsOriginOfBadPluginRoot(t *testing.T) {
 	withRunGlobals(t)
 	base := realTempDir(t)
@@ -569,8 +569,8 @@ func TestRunWriteSummarySharesPathRules(t *testing.T) {
 }
 
 // -install-wrapper と -write-summary=true は「何を書き出すか」が矛盾するので、
-// 片方を無視するのではなくエラーにする。無視すると「指定したのに適用されない」を作る —
-// 検査の経路で errCurrentDirUnused として禁じているのと同じ種類の欠陥。
+// 片方を無視するのではなくエラーにする。無視すると「指定したのに適用されない」を作る。
+// これは検査の経路で errCurrentDirUnused として禁じているのと同じ種類の欠陥である。
 // -current-dir は併用できる (相対パスの基準として、他の経路と同じ規則で使う)。
 func TestRunInstallWrapperRejectsUnusedFlags(t *testing.T) {
 	recs := filepath.Join(realTempDir(t), "docs", "rt")
@@ -749,7 +749,7 @@ func TestRunInstallWrapperAcceptsFalseWriteSummary(t *testing.T) {
 }
 
 // -summary-command で渡した文字列が、生成サマリの 1 行目にそのまま入る。
-// 埋め込みを解いた目的そのもの — 利用者のリポジトリの実際の再生成手段を案内させること。
+// 埋め込みを解いた目的 (利用者のリポジトリの実際の再生成手段を案内させること) そのものを検証する。
 func TestRunWriteSummaryUsesSummaryCommand(t *testing.T) {
 	withRunGlobals(t)
 	recs := realTempDir(t)

@@ -154,7 +154,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 
 	// 埋め込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
 	// このテストが見るのは「明示した値が既定パスに優先すること」なので、
-	// 値が実在するかどうかは意図の外 — 実在させたうえで優先を確認する。
+	// 値が実在するかどうかは意図の外なので、実在させたうえで優先を確認する。
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -423,8 +423,8 @@ func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
 }
 
 // 埋め込む値はすべて単一引用符で包む。-summary-command だけでなく plugin_cache・
-// -record-dir・明示の -judgment-flow も同じ — %q のままだと $(...) が実行時に
-// 展開され、別の記録のディレクトリを検査する。
+// -record-dir・明示の -judgment-flow も同じである。%q のままだと $(...) が実行時に
+// 展開され、別の記録のディレクトリを検査するため。
 func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
 	base := realTempDir(t)
 	toolDir := filepath.Join(base, "cache$(echo X)", "review-triage", "0.0.1", "tools", "triagecheck")

@@ -24,8 +24,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// reviewTriageDir はトリアージの記録のディレクトリ。この変数が唯一の定義 —
-// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が外れ、利用者はそれに気づけない。
+// reviewTriageDir はトリアージの記録のディレクトリ。この変数が唯一の定義である。
+// 別のリテラルを増やすと、移設のとき片方だけ更新されて検査が外れ、利用者はそれに気づけないため。
 //
 // 既定は tmp/review-triages/ (git の追跡外) で、-record-dir で上書きできる (リポジトリごとに
 // ディレクトリが違うため)。表記の揺れ (".", "./rec", "rec//") は inReviewTriageDir が
@@ -86,7 +86,7 @@ type recordRun struct {
 	Notes      string            `yaml:"notes"`
 }
 
-// recordRecurrence は runs[].recurrence (旧様式) — 検知の状態 (status) と根拠
+// recordRecurrence は runs[].recurrence (旧様式) を表す。中身は検知の状態 (status) と根拠
 // (evidence)、繰り返しではないと判断した理由 (declined_reason)、問題の捉え方を
 // 改めた結果 (reframe)。生成サマリの描画に使う。
 type recordRecurrence struct {
@@ -108,7 +108,7 @@ type recordRecurrenceEvidence struct {
 	Reason    string `yaml:"reason"`
 }
 
-// recordReframe は旧様式の reframe — 検知の後に問題の捉え方を改めた結果。
+// recordReframe は旧様式の reframe (検知の後に問題の捉え方を改めた結果)。
 // source は human (人間の確認から出た) / skill (スキルの見解から出た)。
 // 生成サマリの描画に使う。
 type recordReframe struct {
@@ -141,11 +141,11 @@ type recordFinding struct {
 	Attrs       map[string]any     `yaml:"attrs"`
 }
 
-// recordPriorDefect は findings[].prior_defect — D8 の条件 (1)(2) の結果。
+// recordPriorDefect は findings[].prior_defect を表し、D8 の条件 (1)(2) の結果を持つ。
 // line_check は (1) (対象の行が全量の起点から変わっていない) の結果で、同梱の道具
 // lineorigin の結果をそのまま書く。same_defect は (2) (全量の起点の内容でも同じ欠陥が
 // 成り立つ) の結果で、(1) が holds のときだけ書く。D8 が当たったかどうかは書かず、
-// (1)(2) から導く (priorDefectHit) — 導ける値を重ねて書くと、両者が矛盾する記録を書けてしまう。
+// (1)(2) から導く (priorDefectHit)。導ける値を重ねて書くと、両者が矛盾する記録を書けてしまうため。
 type recordPriorDefect struct {
 	Base             string `yaml:"base"`
 	LineCheck        string `yaml:"line_check"`
@@ -163,7 +163,7 @@ func priorDefectHit(pd *recordPriorDefect) bool {
 // recordPriorDefectFirstRun は、記録の中で最初に prior_defect を書いた回の添字を返す。
 // 無ければ -1。この回と、それより後の回では prior_defect を必須にする。それより前の回と、
 // 1 度も書いていない記録は、D8 の無い判定フローか、D8 の結果を verdict_reason に書く
-// 規則で判定したものと見なす — ディレクトリに残る過去の記録と、利用者が版を上げる前に書いた
+// 規則で判定したものと見なす。ディレクトリに残る過去の記録と、利用者が版を上げる前に書いた
 // 回を、書き換えさせずに通すため。回の date で区切らないのは、日付が、どの規則で判定
 // したかを表さないため (同じ日に両方の規則の回がありうる。版を上げる日は利用者ごとに違う)。
 func recordPriorDefectFirstRun(runs []recordRun) int {
@@ -202,13 +202,13 @@ type recordPlan struct {
 	Cause      string `yaml:"cause"`
 	FindingIDs []int  `yaml:"finding_ids"`
 	// Approach (修正方法) と Order (順序) は review-triage-fix の立案フェーズが書く。
-	// 書く条件は status ごとに決まる — pending / done / done-external では approach が
+	// 書く条件は status ごとに決まる。pending / done / done-external では approach が
 	// 必須、awaiting-human では任意 (人間の回答の後に書く)、investigated (調査フェーズの
 	// 結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
 	Approach string `yaml:"approach"`
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
-	// 値で表す — この 2 つを記録上で区別するため、ポインタで有無を持つ。
+	// 値で表す。この 2 つを記録上で区別するため、ポインタで有無を持つ。
 	// status: investigated (調査済み) では必須で、無ければ検査が報告する。
 	// 調査の手順の SSOT は review-triage-fix の references/investigation.md。
 	Investigation *recordInvestigation `yaml:"investigation"`
@@ -230,25 +230,25 @@ type recordPlan struct {
 	// 対象 (ローカルの外部ツール設定など) で同じ行き詰まりが起きるため、
 	// 「URL か notes のどちらか」を必須にする。
 	//
-	// URL は sha ほど強い証拠にならない — sha はリポジトリがある限り不変だが、
-	// PR 本文の URL は現在の本文を返すので、後から修正の前後を判別できない。
+	// URL は sha ほど強い証拠にならない。sha はリポジトリがある限り不変だが、
+	// PR 本文の URL は現在の本文を返すので、後から修正の前後を判別できないため。
 	// applied_external_url は「反映先を指すもの」であって「反映内容を固定するもの」
 	// ではない。だから notes には反映を確認した方法を書く。
 	AppliedExternalURL string `yaml:"applied_external_url"`
 	Notes              string `yaml:"notes"`
 }
 
-// recordInvestigation は plans[].investigation — 直す前の調査の範囲と結果。
+// recordInvestigation は plans[].investigation (直す前の調査の範囲と結果)。
 // scope は調べた範囲 (実行したコマンドと目で読んだ対象)、included は同じ原因の
 // 別の現れとして問題に含めた箇所、excluded は見つけたが含めなかった箇所と理由。
 // included / excluded が両方空なら「調べたが波及先は無かった」。
-// recordDocDag は plans[].doc_dag — 修正の後の doc-dag の確認の対象と結果。
+// recordDocDag は plans[].doc_dag (修正の後の doc-dag の確認の対象と結果)。
 type recordDocDag struct {
 	Scope  string `yaml:"scope"`
 	Result string `yaml:"result"`
 }
 
-// recordVerification は plans[].verification — 観点 B で再確認した範囲 (near_edges)。
+// recordVerification は plans[].verification を表し、観点 B で再確認した範囲 (near_edges) を持つ。
 type recordVerification struct {
 	NearEdges []string `yaml:"near_edges"`
 }
@@ -259,7 +259,7 @@ type recordInvestigation struct {
 	Excluded []string `yaml:"excluded"`
 }
 
-// recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する — 旧いキー名の
+// recordAllowedKeys は階層ごとに許すキー。未知のキーは報告する。旧いキー名の
 // 残存が「エラーなしで空」として扱われる種類の欠陥を避けるため。attrs だけは任意のキーを許す
 // (上流固有の属性のパススルー)。
 var recordAllowedKeys = map[string]map[string]bool{
@@ -357,9 +357,9 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 // recordLineCommentProblems は行内コメント (LineComment) を持つノードを検出する。
 // YAML の素のスカラーは半角スペースに続く # 以降をコメントとして落とすため、
 // 引用符の無い値に # を書くと値が警告なく切り詰められる (実測で cause が「PR」だけに
-// なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る —
-// 生テキストの正規表現で字句規則を再現する方式は、キーの形・空白・ブロックスカラー・
-// 値全体のコメントと境界のたびに検出漏れが生じた (字句の形を列挙する検査は、列挙に無い形が現れるたびに検出漏れを繰り返す。既知の種類の欠陥である)。
+// なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る。
+// 生テキストの正規表現で字句規則を再現する方式では、キーの形・空白・ブロックスカラー・
+// 値全体のコメントと境界のたびに検出漏れが生じたため (字句の形を列挙する検査は、列挙に無い形が現れるたびに検出漏れを繰り返す。既知の種類の欠陥である)。
 // ブロックスカラーの本文の # は内容でありコメントにならないので、構造的に区別される。
 // 行頭コメント (HeadComment) は値を壊さないため対象にしない。
 func recordLineCommentProblems(f string, root *yaml.Node) []string {
@@ -368,7 +368,7 @@ func recordLineCommentProblems(f string, root *yaml.Node) []string {
 	walk = func(n *yaml.Node) {
 		if n.LineComment != "" {
 			problems = append(problems, fmt.Sprintf(
-				"%s:%d: 行内コメント (%q) は使えません — YAML は ' #' 以降をコメントとして落とし、値が警告なく切り詰められる。値に # を含めるときは引用符で囲む",
+				"%s:%d: 行内コメント (%q) は使えません。YAML は ' #' 以降をコメントとして落とし、値が警告なく切り詰められる。値に # を含めるときは引用符で囲む",
 				f, n.Line, n.LineComment))
 		}
 		for _, c := range n.Content {
@@ -394,7 +394,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 	var extra yaml.Node
 	if err := dec.Decode(&extra); err == nil {
 		return []string{fmt.Sprintf(
-			"%s: --- 区切りの 2 つ目のドキュメントがあります — 記録は単一ドキュメントで、2 つ目以降は読まれず消える", f)}, nil
+			"%s: --- 区切りの 2 つ目のドキュメントがあります。記録は単一ドキュメントで、2 つ目以降は読まれず消える", f)}, nil
 	} else if !errors.Is(err, io.EOF) {
 		return []string{fmt.Sprintf("%s: 2 つ目のドキュメントの解析に失敗しました: %v", f, err)}, nil
 	}
@@ -420,9 +420,9 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 「キーを書いて値を省いた」(書きかけ・インデントのミス) が「キーが無い」と
 // 同一になり、書き込み元は書いたつもりのまま記録上は無い扱いになる (実測:
 // investigation: だけの記録が検査 0 件でサマリにも出なかった)。
-// 旧様式の recurrence も同じ — null は「無い」と同一になり、書きかけの項目が消える。
+// 旧様式の recurrence も同じで、null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
-// ここに含めない — 重ねると 1 つの書き忘れが複数の問題になる。
+// ここに含めない。重ねると 1 つの書き忘れが複数の問題になるため。
 var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
@@ -642,8 +642,8 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// スキーマ表が「done-external のときだけ書く」と定める排他で、書かせる
 			// だけで検査しないと、done でコミット済みなのに外部 URL が残る記録が
 			// エラーにならずに通る (sha の排他は前から検査されていた)。列挙外の status では
-			// 呼ばない — default が列挙違反を報告するので、そこへ重ねると 1 つの
-			// 誤字が 2 つの問題になる。
+			// 呼ばない。default が列挙違反を報告するので、そこへ重ねると 1 つの
+			// 誤字が 2 つの問題になるため。
 			externalOnly := func() {
 				for _, kv := range []struct{ key, val string }{
 					{"applied_external_url", pl.AppliedExternalURL}, {"notes", pl.Notes},
@@ -655,7 +655,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				}
 			}
 			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
-			// status ごとに決まる (スキーマ表の approach の行) — 修正に進む状態
+			// status ごとに決まる (スキーマ表の approach の行)。修正に進む状態
 			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
 			// では任意 (人間の立案待ちは approach を持たず、人間の回答の後に書く)、
 			// investigated では逆に書いてあれば報告する。
@@ -665,7 +665,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				}
 			}
 			// noSHAYet はまだ修正していない状態 (investigated / pending / awaiting-human) の
-			// 共通の検査 — done-external 専用のキーが無く、sha も無いこと。
+			// 共通の検査で、done-external 専用のキーが無く、sha も無いことを確認する。
 			noSHAYet := func() {
 				externalOnly()
 				if pl.SHA != "" {
@@ -684,7 +684,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				// 中身 (scope) の検査は下の inv != nil の検査に委ねる。
 				if pl.Investigation == nil {
 					add("%s: 調査済み (investigated) には investigation (調べた範囲と結果) が必須。"+
-						"無いものは未調査で、状態と矛盾する — 調べたなら scope を書き、まだなら plans に載せない", pn)
+						"無いものは未調査で、状態と矛盾する。調べたなら scope を書き、まだなら plans に載せない", pn)
 				}
 				if pl.Approach != "" {
 					add("%s: 調査済み (investigated) では approach を書かない。修正方法を決めたのなら status: pending にする", pn)
@@ -725,7 +725,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
 			if inv := pl.Investigation; inv != nil {
 				if strings.TrimSpace(inv.Scope) == "" {
-					add("%s: investigation.scope がありません (調べた範囲 — 実行したコマンドと目で読んだ対象)。範囲を書かない調査は未調査と区別できない", pn)
+					add("%s: investigation.scope がありません (調べた範囲。実行したコマンドと目で読んだ対象)。範囲を書かない調査は未調査と区別できない", pn)
 				}
 				for _, kv := range []struct {
 					key  string
@@ -773,7 +773,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 		// 被覆: 採択は自回の plans か plan_ref で覆われる。覆われない採択は、
 		// 対処しないまま、誰にも知らされずに消える。
 		//
-		// 免除するのは「plans がまだ無い最後の回」だけ — fix 前の状態を指す。
+		// 免除するのは「plans がまだ無い最後の回」だけで、これは fix 前の状態を指す。
 		// 後続の回が追記された時点でその回はもう fix 前ではないので、免除を解く。
 		// 全回で len(run.Plans) > 0 を条件にしていた頃は、plans を書かないまま
 		// 次の回に進んだ過去の回の採択が、検査からも review-triage-fix (最後の回の
@@ -797,7 +797,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 		}
 		for _, cycle := range recordDependsOnCycles(run.Plans) {
-			add("%s: depends_on が循環しています (%s)。順序が定まらない — 同じ原因の 1 問題に束ねるべきものを分けていないかを疑う",
+			add("%s: depends_on が循環しています (%s)。順序が定まらない。同じ原因の 1 問題に束ねるべきものを分けていないかを疑う",
 				rn, strings.Join(cycle, " → "))
 		}
 	}
@@ -855,7 +855,7 @@ func recordDependsOnCycles(plans []recordPlan) [][]string {
 // --- サマリの生成 ---
 
 // renderReviewTriageSummary は記録 YAML から人が読むサマリ (Markdown) を生成する。
-// 件数はすべてここで計算する — 人が書いた集計をどこからも読まない。
+// 件数はすべてここで計算し、人が書いた集計をどこからも読まない。
 func renderReviewTriageSummary(yamlPath string, data []byte) (string, error) {
 	var doc recordDoc
 	if err := yaml.Unmarshal(data, &doc); err != nil {
@@ -868,7 +868,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	base := path.Base(yamlPath)
 	stem := strings.TrimSuffix(base, ".yaml")
 	var b strings.Builder
-	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。SSOT は %s — `%s` で再生成する。 -->\n\n", base, summaryCommand)
+	fmt.Fprintf(&b, "<!-- 生成物。手で編集しない。SSOT は %s。`%s` で再生成する。 -->\n\n", base, summaryCommand)
 	fmt.Fprintf(&b, "# %s のトリアージ記録\n\n", stem)
 	fmt.Fprintf(&b, "SSOT は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
 
@@ -887,8 +887,8 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 				rejected++
 			}
 		}
-		// 自由文字列の欄 (skill・model など) は recordCell で無害化する — 縦棒が
-		// 入ると桁がずれ、偽の数字が集計値の手前に並ぶ (列挙で守られない欄は検査も
+		// 自由文字列の欄 (skill・model など) は recordCell で無害化する。縦棒が
+		// 入ると桁がずれ、偽の数字が集計値の手前に並ぶため (列挙で守られない欄は検査も
 		// 捕まえない)。
 		fmt.Fprintf(&b, "| %d | %s | `%s` | `%s` | %s | %d | %d | %d | %d |\n",
 			i+1, recordCell(run.Date), recordCell(run.Skill), recordCell(run.Model),
@@ -928,8 +928,8 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 
 		if len(run.Plans) > 0 {
 			b.WriteString("\n### 修正計画\n\n")
-			// 最終列の見出しは「証拠」— コミットの SHA とリポジトリ外の反映先の URL の
-			// 2 つの型を取る (renderPlanCells の証拠の欄)。見出しを SHA のままにすると、
+			// 最終列の見出しは「証拠」にする。最終列は、コミットの SHA とリポジトリ外の反映先の
+			// URL の 2 つの型を取るため (renderPlanCells の証拠の欄)。見出しを SHA のままにすると、
 			// done-external の行に出る URL を SHA として読ませることになる。
 			b.WriteString("| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |\n")
 			b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
@@ -938,9 +938,9 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			}
 			// 調査済み・未立案 (investigated) の注記。調査フェーズの結果だけがあり、修正方法と
 			// 順序をまだ持たない問題が残っている回にだけ、表の下に件数と問題 id を出す。
-			// 無い回には 1 バイトも出さず、推移の表にも列を足さない — 鮮度の検査が描画結果の
+			// 無い回には 1 バイトも出さず、推移の表にも列を足さない。鮮度の検査が描画結果の
 			// 全文一致なので、無い記録の出力が変わるとディレクトリの既存サマリがすべて古いと
-			// 報告される (旧様式の検知の小節と同じ形)。
+			// 報告されるため (旧様式の検知の小節と同じ形)。
 			renderInvestigatedNote(&b, run.Plans)
 			for _, pl := range run.Plans {
 				if pl.Status == "awaiting-human" {
@@ -956,7 +956,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			}
 			// 直す前の調査の範囲と結果。次のレビューで同じ種類の指摘が来たとき、前回の
 			// 調査漏れ (範囲の外だった) か新規かを判別する材料なので表の外に出す。
-			// 無い問題は出さない — 無いことが「未調査」の表現。
+			// 無い問題は出さない。無いことが「未調査」を表すため。
 			for _, pl := range run.Plans {
 				if pl.Investigation != nil {
 					fmt.Fprintf(&b, "\n- **%s の調査**: %s\n", recordCell(pl.ProblemID), renderInvestigation(pl.Investigation))
@@ -977,7 +977,7 @@ func recordRow(cells []string) string {
 }
 
 // recordPriorDefectProblems は指摘 1 件の prior_defect (D8 の結果) を検査する。
-// 書く条件は D8 に進んだかで決まる — 判定フローでは、D4 で根拠を確認した指摘
+// 書く条件は D8 に進んだかで決まる。判定フローでは、D4 で根拠を確認した指摘
 // (premise_check.result が verified) だけが D8 に進む。required が偽の回
 // (recordPriorDefectFirstRun の回より前の回) では、無くても報告しない。
 func recordPriorDefectProblems(required bool, fd recordFinding) []string {
@@ -1074,7 +1074,7 @@ func renderFindingCells(fd recordFinding) []string {
 }
 
 // renderVerdictCell は判定セル (判定 — 経路。D8 の結果と束ね先があれば添える) を返す。
-// D8 の結果は prior_defect を書いた指摘にだけ添える — 過去の記録の生成サマリを変えないため。
+// D8 の結果は prior_defect を書いた指摘にだけ添える。過去の記録の生成サマリを変えないため。
 func renderVerdictCell(fd recordFinding) string {
 	cell := recordVerdictJa(fd.Verdict) + " — " + recordCell(fd.VerdictReason)
 	if pd := fd.PriorDefect; pd != nil {
@@ -1119,8 +1119,8 @@ func renderPlanCells(pl recordPlan) []string {
 		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
 	// 修正方法の欄。investigated (と人間の立案待ちの awaiting-human) は approach を
-	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す — 空のセルは書き忘れと
-	// 区別できない。approach を持つ状態の行は変わらない。
+	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す。空のセルは書き忘れと
+	// 区別できないため。approach を持つ状態の行は変わらない。
 	approach := "—"
 	if pl.Approach != "" {
 		approach = recordCell(pl.Approach)
@@ -1138,7 +1138,7 @@ func renderPlanCells(pl recordPlan) []string {
 
 // renderInvestigatedNote は調査済み・未立案 (status investigated) の問題の件数と id を
 // 修正計画の表の下に 1 行で出す。該当する問題が無ければ何も書かない。件数はここで
-// 数える — 人が書いた集計をどこからも読まない (推移の表と同じ)。
+// 数え、人が書いた集計をどこからも読まない (推移の表と同じ)。
 func renderInvestigatedNote(b *strings.Builder, plans []recordPlan) {
 	var ids []string
 	for _, pl := range plans {
@@ -1149,13 +1149,13 @@ func renderInvestigatedNote(b *strings.Builder, plans []recordPlan) {
 	if len(ids) == 0 {
 		return
 	}
-	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案フェーズから続ける\n",
+	fmt.Fprintf(b, "\n- **調査済み・未立案 (investigated) が %d 件: %s。** 修正方法と順序をまだ持たない。`review-triage-fix` が立案フェーズから続ける\n",
 		len(ids), strings.Join(ids, ", "))
 }
 
 // renderInvestigation は調査の範囲と結果を 1 行にする。included / excluded が
-// 両方空なら「波及先なし」と明示する — 範囲だけ出すと、調べて無かったのか
-// 結果を書き忘れたのかが読めない。
+// 両方空なら「波及先なし」と明示する。範囲だけ出すと、調べて無かったのか
+// 結果を書き忘れたのかが読めないため。
 func renderInvestigation(inv *recordInvestigation) string {
 	s := "範囲: " + recordCell(inv.Scope)
 	if len(inv.Included) == 0 && len(inv.Excluded) == 0 {
@@ -1178,8 +1178,8 @@ func renderInvestigation(inv *recordInvestigation) string {
 }
 
 // renderRecurrence は旧様式の検知の項目 (状態・根拠・判断した理由・reframe) を
-// 箇条書きで出す。自由文字列はすべて recordCell を通す — 表の外でも、縦棒や改行が
-// 入ると次の行の構造を壊す。
+// 箇条書きで出す。自由文字列はすべて recordCell を通す。表の外でも、縦棒や改行が
+// 入ると次の行の構造を壊すため。
 func renderRecurrence(b *strings.Builder, rec *recordRecurrence) {
 	fmt.Fprintf(b, "- 状態: %s\n", recordRecurrenceStatusJa(rec.Status))
 	for _, ev := range rec.Evidence {
@@ -1210,7 +1210,7 @@ func recordRecurrenceStatusJa(s string) string {
 	return recordCell(s)
 }
 
-// 列挙値は英語の識別子を括弧で添える — 記録 YAML と突き合わせて読むため。
+// 列挙値は英語の識別子を括弧で添える。記録 YAML と突き合わせて読むため。
 func recordRecurrenceConditionJa(s string) string {
 	switch s {
 	case "fix-derived":
@@ -1266,15 +1266,15 @@ func recordStatusJa(s string) string {
 }
 
 // errRecordDirMissing は「明示指定したディレクトリが無い」ことを表す番兵。呼び出し元が
-// errors.Is で判別し、他の検査を続けたうえで報告に積めるようにする — 即座に返すと
-// 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れない。
+// errors.Is で判別し、他の検査を続けたうえで報告に積めるようにする。即座に返すと
+// 判定フローの検査に到達せず、片方を直して再実行するまでもう一方の不在を知れないため。
 // 権限・I/O のエラーは続行しても意味が無いので、これとは区別して返す。
 var errRecordDirMissing = errors.New(
 	"-record-dir に指定されたディレクトリが存在しません (記録の検査が行われないまま成功するため報告する)")
 
 // listReviewTriageFiles は記録のディレクトリのファイル (yaml と md) をファイルシステムから
 // 列挙する。doccheck の他の検査は git 追跡ファイルを対象にするが、記録は
-// 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる —
+// 「これから追跡される」ファイルなので、追跡前でも検査・生成の対象に入れる。
 // git add 前の最初の記録が検査の対象に入らず、0 件マッチのまま検査が成功する種類の欠陥を防ぐため。
 //
 // ディレクトリが無いときの扱いは explicit で分かれる。ディレクトリを明示的に渡すこと
@@ -1303,8 +1303,8 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 			continue
 		}
 		name := e.Name()
-		// README.* は記録ではない — README.md は手書きの規範文書で、README.yaml を
-		// 記録と見なすと生成器が README.md を上書きしてしまう (検査での除外と対称にする)。
+		// README.* は記録ではない。README.md は手書きの規範文書で、README.yaml を
+		// 記録と見なすと生成器が README.md を上書きしてしまうため (検査での除外と対称にする)。
 		if strings.TrimSuffix(strings.TrimSuffix(name, ".md"), ".yaml") == "README" {
 			continue
 		}
@@ -1317,7 +1317,7 @@ func listReviewTriageFiles(dir string, explicit bool) ([]string, error) {
 }
 
 // writeReviewTriageSummaries は記録 YAML すべてについてサマリを再生成する
-// (-write-summary の経路)。explicit は listReviewTriageFiles と同じ意味 —
+// (-write-summary の経路)。explicit は listReviewTriageFiles と同じ意味を持つ。
 // 明示指定したディレクトリが無いなら、0 件生成して、エラーを出さずに成功させない。
 func writeReviewTriageSummaries(dir string, explicit bool) error {
 	files, err := listReviewTriageFiles(dir, explicit)
