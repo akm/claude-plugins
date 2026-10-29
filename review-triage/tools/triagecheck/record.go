@@ -41,7 +41,7 @@ const defaultSummaryCommand = "triagecheck -write-summary"
 //
 // 再生成の手段はリポジトリごとに違う (Makefile のターゲット・-install-wrapper で
 // 生成したラッパー・go run の直呼び) ので、特定のコマンド名を埋め込まない。
-// 既定は「このツール自身をどう呼んでいるかに依らない」一般的な言い方にして、
+// デフォルト値は「このツール自身をどう呼んでいるかに依らない」一般的な言い方にして、
 // -summary-command で利用者のリポジトリの実際の呼び出し方を渡せるようにする
 // (-install-wrapper 経由なら、生成時にラッパー自身のリポジトリ相対パスを
 // 案内として埋め込む。値の決め方は resolveInputs)。

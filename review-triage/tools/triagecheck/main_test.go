@@ -440,7 +440,7 @@ func TestRunInstallWrapperOmittedJudgmentFlowUsesDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(script), `-judgment-flow "$root/skills/review-triage/references/judgment-flow.md"`) {
-		t.Fatalf("既定の判定フローのパスが埋め込まれていない:\n%s", script)
+		t.Fatalf("デフォルトの判定フローのパスが埋め込まれていない:\n%s", script)
 	}
 }
 
