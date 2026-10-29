@@ -32,6 +32,10 @@ import (
 // path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
 var reviewTriageDir = "tmp/review-triages/"
 
+// defaultSummaryCommand は summaryCommand の既定値。定数に分けるのは、テストが既定を
+// 検査するとき、run が書き換えた後の変数ではなく定数を読めるようにするためである。
+const defaultSummaryCommand = "triagecheck -write-summary"
+
 // summaryCommand はサマリの再生成手段を利用者へ案内するときに使う文字列。
 // エラーの文言と、生成サマリの 1 行目に埋まる。
 //
@@ -44,11 +48,6 @@ var reviewTriageDir = "tmp/review-triages/"
 //
 // この値は生成サマリの 1 行目としてコミットされるため、変えると既存サマリの
 // 鮮度検査に差分が出る。再生成で吸収する。
-//
-// 既定値は定数に分ける。テストが既定を検査するとき、run が書き換えた後の
-// 変数ではなく定数を読めるようにするため。
-const defaultSummaryCommand = "triagecheck -write-summary"
-
 var summaryCommand = defaultSummaryCommand
 
 // inReviewTriageDir は f が記録のディレクトリの直下にあるかを返す。
@@ -238,10 +237,6 @@ type recordPlan struct {
 	Notes              string `yaml:"notes"`
 }
 
-// recordInvestigation は plans[].investigation (直す前の調査の範囲と結果)。
-// scope は調べた範囲 (実行したコマンドと目で読んだ対象)、included は同じ原因の
-// 別の現れとして問題に含めた箇所、excluded は見つけたが含めなかった箇所と理由。
-// included / excluded が両方空なら「調べたが波及先は無かった」。
 // recordDocDag は plans[].doc_dag (修正の後の doc-dag の確認の対象と結果)。
 type recordDocDag struct {
 	Scope  string `yaml:"scope"`
@@ -253,6 +248,10 @@ type recordVerification struct {
 	NearEdges []string `yaml:"near_edges"`
 }
 
+// recordInvestigation は plans[].investigation (直す前の調査の範囲と結果)。
+// scope は調べた範囲 (実行したコマンドと目で読んだ対象)、included は同じ原因の
+// 別の現れとして問題に含めた箇所、excluded は見つけたが含めなかった箇所と理由。
+// included / excluded が両方空なら「調べたが波及先は無かった」。
 type recordInvestigation struct {
 	Scope    string   `yaml:"scope"`
 	Included []string `yaml:"included"`
