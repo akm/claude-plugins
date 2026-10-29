@@ -43,7 +43,7 @@ execution: code
 | --- | --- | --- |
 | Q1 | **停止をもう 1 つ足す。** #151 では review-rally だけの停止を 3 つ (レビュー不成立・起動できないか値が違う・拒否された) としたが、`review-loop` の RA3 に当たる「依頼文を作れない (作業ツリーが clean でない・記録が読めない・増分の基点が HEAD の祖先でない)」が抜けていた | 足す (RR4) |
 | Q2 | **依頼文と結果のディレクトリ。** 2026-10-29 の試験で次が分かった。(1) レビューのセッションは、自分の worktree の外へ Write すると PreToolUse の hook に拒否される。メインの作業ツリーは読める。(2) メインのセッション (worktree で動いていない) は、レビューの worktree へ Write でき、`git -C <worktree> checkout --detach` も実行できる。(3) アプリは worktree をメインの作業ツリーの `.claude/worktrees/` の下に置くが、既存の worktree を再利用することがあり、パスは `branch_name` から決まらない | 依頼文と結果を、レビューの worktree の `tmp/review-rally/<ループの id>/` に置く。メインのセッションは `review-request --dir` にこのパスを渡し、結果は読むだけにする。`--dir` に渡せるのは、レビューの worktree のディレクトリ `.claude/worktrees/` が git に無視されているからである。このリポジトリで無視しているのは `.gitignore` ではなく `.git/info/exclude` なので、無視されていないリポジトリでは `review-request` が依頼文を書かずに RR4 で停止する。そのときは、`.gitignore` に `.claude/worktrees/` を足すよう案内する。レビューの worktree のパスは、起動の後に `get_session` の `cwd` から取る。メインのセッションが worktree で動いているときは、初版では対象外にする (レビューの worktree がメインの作業ツリーの外になり、`--dir` に渡せず、書き込みも拒否されるおそれがある。この場合は試験していない)。起動の前にこれを確認し、当たれば RR2 で停止する |
-| Q3 | **依頼文の「作業ツリーの扱い」の値。** 雛形の値は「共有」(読み取り専用。確認のための変更は revert する) と「使い捨て」(複製の中でだけ変えてよい) の 2 つ | 「共有」のまま書き換えない。レビューの worktree は回をまたいで使い続けるので、レビュアが変更を残すと、次の回に HEAD に合わせる操作 (`checkout --detach`) が失敗するか、変更が次の回に残る。「共有」なら、回の後に作業ツリーが clean であることを確認すれば足りる。#151 の本文の「依頼文の作業ツリーの扱いを書き換える手順が要る」は、これに合わせて直した |
+| Q3 | **依頼文の「作業ツリーの扱い」の値。** 雛形の値は「共有」(読み取り専用。確認のための変更は revert する) と「使い捨て」(複製の中でだけ変えてよい) の 2 つ | 「共有」のまま書き換えない。レビューの worktree は回をまたいで使い続けるので、レビュアが変更を残すと、次の回に HEAD に合わせる操作 (`checkout --detach`) が失敗するか、変更が次の回に残る。「共有」なら、回の後に作業ツリーが clean であることを確認すれば足りる。依頼文の「対象」の作業ツリーには、`review-request` が既定ではメインのセッションの作業ツリーを埋める。レビューの worktree を指すようにするには、`review-request` に、対象の作業ツリーを指定する引数 (名前は U3a で決める。例: `--target-dir`) を足して渡す (2026-10-29 の PR #152 のレビューの指摘を受けて利用者が決めた。依頼文を書くのを `review-request` だけに保つため)。#151 の本文の「依頼文の作業ツリーの扱いを書き換える手順が要る」は、これに合わせて直した |
 | Q4 | **設定のキー。** `review-loop` は設定 `review_loop` を持つ | 新しいキーを足さず、`loop` のキー (`review_skill`・`review_args`・`review_model`・`max_rounds`・`structure_rounds`) と `fix` のキーを使う。引数で上書きできるのは `--model`・`--effort`・レビュースキルとそのオプション・`--max`・`--structure-rounds`・`--threshold`・`--stage`。設定のキーを持たない引数として `--base` (記録に回が無いときの最初の全量の回の起点にする派生元のブランチ。`review-request` に渡す) も受け付ける。レビューのセッションのモデルは、引数 `--model`、無ければ `loop.review_model`、それも無ければ人間に質問する。effort は引数 `--effort` で指定し、無ければ人間に質問する (推測しない)。権限モードは指定せず、メインのセッションのものを引き継がせる (権限モードが同じなら、メッセージが承認待ちにならない)。状態のファイルのディレクトリは `tmp/review-rally/` に決め打ちする |
 | Q5 | **ループの状態を残すファイル。** 初版は `--resume` を持たないが、会話が長くなって compact (会話の要約) されると、レビューのセッションの id・worktree のパス・回数が失われうる | メインのセッションの `tmp/review-rally/<ループの id>/rally.yaml` に、ループの条件・レビューのセッションの id・worktree のパス・この起動で数えた回数・結果待ちの依頼文の識別子と、その依頼を送った時刻 (記録の `notes` の `review_minutes` の起点) を書く。書き込み元はメインのセッションだけ |
 | Q6 | **D5 で移す節。** ファイル `review-triage/skills/review-loop/references/round.md` のうち、ワーカーに依らない節 | 次の 3 つを、ファイル `review-triage/skills/review-triage-loop/references/review-invocation.md` の新しい節「別のプロセスでレビューした結果の取り込み」へ移す。(1) 節「呼ぶスキル」(回ごとに Skill ツールで呼ぶ規則)、(2) 節「L2 で `review-triage` に渡すもの」のうち、記録の `scope` を結果ファイルの値から採る規則・`run_id` を結果ファイルからそのまま写させる規則・`review-triage` が返った後に `run_id` を写したかの確認、(3) 節「1 回のレビュー (RL1)」の手順 (c) の 11 (結果ファイルの `run_id`・`scope`・`base` の照合)。ワーカーのフラグファイルに関わる部分 (手順 (c) の 1〜10)、記録の `model` の採り方、`notes` の書式は移さない |
@@ -63,7 +63,7 @@ execution: code
 
 ## 1 回の流れ (L1 の差し替え)
 
-1. **依頼文を書く**: RR4 の条件を確認し、Skill ツールで `review-request` を呼び出す (`--dir` はレビューの worktree の中。Q2)。
+1. **依頼文を書く**: RR4 の条件を確認し、Skill ツールで `review-request` を呼び出す (`--dir` はレビューの worktree の中。Q2。対象の作業ツリーを指定する引数にはレビューの worktree を渡す。Q3)。
 2. **レビューの worktree を合わせる**: `git -C <worktree> status --porcelain` が空であることを確認してから、`git -C <worktree> checkout --detach <HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。
 3. **会話を消す**: 2 回目以降は、ツール `clear_session` を実行する (D1)。
 4. **依頼する**: `SendMessage` で、依頼文のパスと、完了の通知の様式 (下記) を送る。会話を消した後なので、毎回すべてを書く。ターンを終える。
@@ -103,6 +103,13 @@ review-rally: <ループの id> / review_session: <セッション id> / model: 
 
 - **確認の方法**: 起動の前の確認 (メインのセッションが worktree で動いていないこと)、起動の引数 (`model`・`effort`・`use_worktree: true`・`context: "fresh"`・`name`。権限モードは指定しない)、起動の直後の `get_session` の確認 (モデル・effort・worktree のパス) を、文書の上で辿る。
 - **作るファイル**: `review-triage/skills/review-rally/references/session.md` (起動の引数・最初の指示文・`get_session` での確認・`rally.yaml` の様式 (Q5))。
+
+### U3a. `review-request` に、依頼文の対象の作業ツリーを指定する引数を足す (Q3)
+
+U4 がこの引数を使うので、U4 より前に行う。
+
+- **確認の方法**: 引数がある場合と無い場合のそれぞれで、依頼文の「対象」の作業ツリーと、`review-request` が確認する作業ツリー (範囲・HEAD・clean) を文書の上で辿る。`review-request` が確認するのは、引数があってもメインのセッションの作業ツリーのままにする。指定した作業ツリーの HEAD と clean は、`review-rally` が「1 回の流れ」の手順 2 と手順 6 で確認する (依頼文を書く時点では、まだ HEAD に合わせていないため)。
+- **変えるファイル**: `review-triage/skills/review-request/SKILL.md` (引数の表・手順 4 の `repo_dir` の埋め方)。雛形は `{{repo_dir}}` を埋める値が変わるだけなので変えない。版は minor を上げる (引数を足すため)。
 
 ### U4. 1 回のレビュー (L1 の差し替え。D1・Q1〜Q3・RR1・RR3・RR4)
 
