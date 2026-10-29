@@ -14,8 +14,8 @@
 
 **依存が無ければ、影響範囲の広い問題から。** 広い方を先に直すと、狭い方の修正がその上に乗る。逆にすると狭い方をやり直すことがある。広さは調査の結果 (記録の `plans[].investigation`) から読む。
 
-**依存は非循環にする。** 循環したら順序が定まらない — 同じ原因の 1 問題に束ねるべきものを分けていないかを疑う。自己参照と循環は `triagecheck` の `review-triage-record` 検査が検出する。
+**依存は非循環にする。** 循環したら順序が定まらない。同じ原因の 1 問題に束ねるべきものを分けていないかを疑う。自己参照と循環は `triagecheck` の `review-triage-record` 検査が検出する。
 
 ## 順序を決めたら理由を書く
 
-**なぜその順なのかを 1 文で、記録の `plans[].approach` に書く。** `notes` は使わない — `status: done-external` 専用の欄で、他の状態で書くと記録の検査が弾く (様式の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `plans[]` の表)。「SSOT が先」だけでは、後から読んだときに何が SSOT か分からない。
+**なぜその順なのかを 1 文で、記録の `plans[].approach` に書く。** `notes` は使わない。`status: done-external` 専用の欄で、他の状態で書くと記録の検査が弾く (様式の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `plans[]` の表)。「SSOT が先」だけでは、後から読んだときに何が SSOT か分からない。
