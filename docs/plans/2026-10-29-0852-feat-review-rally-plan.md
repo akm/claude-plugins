@@ -110,13 +110,13 @@ review-rally: <ループの id> / review_session: <セッション id> / model: 
 
 U4 がこの引数を使うので、U4 より前に行う。
 
-- **確認の方法**: 引数がある場合と無い場合のそれぞれで、依頼文の「対象」の作業ツリーと、`review-request` が確認する作業ツリー (範囲・HEAD・clean) を文書の上で辿る。`review-request` が確認するのは、引数があってもメインのセッションの作業ツリーのままにする。指定した作業ツリーの HEAD と clean は、`review-rally` が「1 回の流れ」の手順 1 (依頼文を書く前) と手順 6 で確認する。`review-request` の確認と分けるのは、レビューの worktree を HEAD に合わせて確認するのが `review-rally` の手順であるため。
+- **確認の方法**: 引数がある場合と無い場合のそれぞれで、依頼文の「対象」の作業ツリーと、`review-request` が確認する作業ツリー (範囲・HEAD・clean) を文書の上で辿る。`review-request` が確認するのは、引数があってもメインのセッションの作業ツリーのままにする。指定した作業ツリーの HEAD と clean は、`review-rally` が「1 回の流れ」の手順 1 (依頼文を書く前) と手順 6 で確認する。`review-request` に確認を足さないのは、`review-request` が確認するのは依頼元 (メインの作業ツリー) の状態で、対象の作業ツリーを HEAD に合わせるのは `review-rally` の手順 1 だからである。`review-request` に足すと、`review-rally` 以外の使い方でも、対象の作業ツリーを先に HEAD に合わせておく前提が要る。
 - **変えるファイル**: `review-triage/skills/review-request/SKILL.md` (引数の表・手順 4 の `repo_dir` の埋め方)。雛形は `{{repo_dir}}` を埋める値が変わるだけなので変えない。版は minor を上げる (引数を足すため)。
 
 ### U4. 1 回のレビュー (L1 の差し替え。D1・Q1〜Q3・RR1〜RR4)
 
 - **確認の方法**: 上の「1 回の流れ」の各手順で、通る場合と各停止に入る場合を文書の上で辿る。手順 5 の終了の通知だけで始まったターンの扱いは、文書を書く前に、試験用のセッションで通知が届く時機と `get_session` の値の更新のされ方を試し、その結果から手順 5 の 2 つの要件を満たす規則を決める。
-- **作るファイル**: `review-triage/skills/review-rally/references/round.md` (依頼文・worktree を合わせる・会話を消す・依頼のメッセージの文面・通知の受け方・突き合わせ・L2 に渡すもの・`notes` の書式)。
+- **作るファイル**: `review-triage/skills/review-rally/references/round.md` (worktree を合わせる・依頼文・会話を消す・依頼のメッセージの文面・通知の受け方・突き合わせ・L2 に渡すもの・`notes` の書式)。
 - **変えるファイル**: `review-triage/skills/review-triage-loop/references/review-invocation.md`。U1 で書いた、経路を `review-loop` だけとする箇所 (冒頭の宣言・節「記録のキーの出所」の太字の宣言・節「別のプロセスでレビューした結果の取り込み」の冒頭) に `review-rally` を足す。足さないと、`review-rally` の記録の `scope` を表の値から採る読み方ができてしまう。
 
 ### U5. 停止と片付け (D4)
