@@ -8,7 +8,7 @@
 一時ディレクトリに git のリポジトリとループのディレクトリを作り、claude の名前で偽のコマンド
 (review-triage/tests/fake-claude) を PATH の先頭に置いて、スクリプトを subprocess で実行する。
 実際の claude は呼ばない。依頼文は、実際の雛形 (review-triage/skills/review-triage/references/
-review-request-template.md) を埋めて作る — ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
+review-request-template.md) を埋めて作る。ワーカーは雛形の行 (出力先・作業ツリー・作業ツリーの扱い) を
 文字列で探して写しを作るので、雛形と一致しなければテストが失敗するようにするため。
 
 ワーカーは macOS でだけ起動する (起動時の確認で `uname -s` を見る)。CI (ubuntu) でも実行できるように、
@@ -1980,7 +1980,7 @@ class TestLogReading(WorkerTestBase):
     def test_repo_text_mixed_and_excluded_lines(self):
         # 表示したものと確認できない行が 1 行でもあれば、今までどおりサンドボックスが拒否した確認に数え、
         # message には表示したものと確認した行を除いて書く (表示したタグの行からは、タグの中の行を含め始めない)。
-        # 文面だけの行とタグだけの行は照合に使わない — 接続を拒否されたときの本物の本文にはタグだけの行がある。
+        # 文面だけの行とタグだけの行は照合に使わない。接続を拒否されたときの本物の本文にはタグだけの行があるため。
         # レビュー対象の範囲の外 (別のブランチ) にしか無い行も照合に使わない
         _git(self.repo, "switch", "-q", "-c", "other")
         self.commit_files({"other.md": "別のブランチにだけある行: operation not permitted\n"}, "other")
@@ -2753,7 +2753,7 @@ class TestEnding(WorkerTestBase):
 
     def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
         # 子が親の生存を確認する ps がシグナルで停止しても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
-        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確認する — 親が無いと判定すると、
+        # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確認する。親が無いと判定すると、
         # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終了する) で子が終了する。偽の ps は自分に TERM を送って終了する
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
