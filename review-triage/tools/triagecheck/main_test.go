@@ -16,7 +16,7 @@ import (
 // あわせて、run が読む環境変数 CLAUDE_PLUGIN_ROOT をここでクリアする。run を呼ぶ
 // テストは必ずこの関数を最初に呼ぶので、環境に依存しない状態をこの 1 か所で作れる
 // (経路ごとに書くと、書き忘れたテストだけが環境依存になる。実測で、この変数が
-// 設定された環境で 1 つだけ落ち、3 つが別の理由で失敗していた)。環境変数を
+// 設定された環境で 1 つが失敗し、ほかの 3 つは別の理由で失敗していた)。環境変数を
 // 意図的に使うテストは、この関数の後で t.Setenv して上書きする。
 func withRunGlobals(t *testing.T) {
 	t.Helper()
@@ -29,7 +29,7 @@ func withRunGlobals(t *testing.T) {
 // 「検査が実行されて合格した」と「そもそも実行されなかった」を区別できるようにするための
 // 中核の挙動なので、入口 (run) でもテストで検証する。
 // 判定はエラーが返ること自体で行い、報告メッセージの文言には結合しない。
-// 文言で判定すると、挙動を変えない書式の変更だけで落ちる (誤検出)。
+// 文言で判定すると、挙動を変えない書式の変更だけで失敗する (誤検出)。
 // 報告の本文は stderr に出るので err.Error() には載らず、文言に頼ると実質
 // 「書式が変わっていないこと」を検査するテストになる。
 func TestRunFailsOnMissingExplicitPaths(t *testing.T) {
@@ -62,7 +62,7 @@ func TestRunPassesWhenJudgmentFlowUnavailable(t *testing.T) {
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 
 	if err := run([]string{"-record-dir", recs}); err != nil {
-		t.Fatalf("判定フローが無い状態で落ちた: %v", err)
+		t.Fatalf("判定フローが無い状態でエラーになった: %v", err)
 	}
 }
 
@@ -198,7 +198,7 @@ func TestRunAllowsCurrentDirWithMixedPaths(t *testing.T) {
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 
 	if err := run([]string{"-record-dir", "recs", "-current-dir", caller, "-judgment-flow", flow}); err != nil {
-		t.Fatalf("相対と絶対の組み合わせで落ちた: %v", err)
+		t.Fatalf("相対と絶対の組み合わせでエラーになった: %v", err)
 	}
 }
 
@@ -212,7 +212,7 @@ func TestRunAcceptsRelativeRecordDirWithCurrentDir(t *testing.T) {
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 
 	if err := run([]string{"-record-dir", "recs", "-current-dir", caller}); err != nil {
-		t.Fatalf("基準を渡した相対指定で落ちた: %v", err)
+		t.Fatalf("基準を渡した相対指定でエラーになった: %v", err)
 	}
 }
 
@@ -264,7 +264,7 @@ func TestRunReportsBothMissingPaths(t *testing.T) {
 
 	// 報告の本文は stderr に出るので、そこを捕まえて「両方が載ったか」を対象の
 	// パスで見る。件数の文言 (「2 件」) で判定すると、挙動を変えない書式の変更で
-	// 落ちる。何を報告したかではなく、どう書いたかを検査することになるため。
+	// 失敗する。何を報告したかではなく、どう書いたかを検査することになるため。
 	stderr := captureStderr(t, func() {
 		if err := run([]string{"-record-dir", recDir, "-judgment-flow", flow}); err == nil {
 			t.Error("両方が不在なのに成功した")
@@ -470,7 +470,7 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 			t.Fatalf("got (%q, %q), want (%q, %q)", p, origin, want, "CLAUDE_PLUGIN_ROOT")
 		}
 	})
-	t.Run("どちらも無ければデフォルトに落ちる", func(t *testing.T) {
+	t.Run("どちらも無ければデフォルトのパス (空文字列) を返す", func(t *testing.T) {
 		t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 		p, origin := resolveJudgmentFlowPath("", false)
 		if p != "" || origin != "" {
@@ -516,7 +516,7 @@ func TestRunPluginRootFlowIgnoresCurrentDir(t *testing.T) {
 		// -record-dir が相対なので -current-dir は使われる。判定フローは絶対で
 		// 解決されるため、両者が同居しても問題にならない。
 		if err := run([]string{"-record-dir", "recs", "-current-dir", base}); err != nil {
-			t.Fatalf("絶対の CLAUDE_PLUGIN_ROOT と -current-dir の同居で落ちた: %v", err)
+			t.Fatalf("絶対の CLAUDE_PLUGIN_ROOT と -current-dir の同居でエラーになった: %v", err)
 		}
 	})
 }
@@ -795,7 +795,7 @@ func TestRunCheckReportsSummaryCommand(t *testing.T) {
 //
 // 見るのは定数であって可変の summaryCommand ではない。変数は run が書き換える
 // ので、先行するテストが残した値をデフォルトと取り違えて、デフォルトの回帰を検出できない
-// (または偽陽性で落ちる) ことがある。
+// (または偽陽性で失敗する) ことがある。
 func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
 	if !strings.Contains(defaultSummaryCommand, "-write-summary") {
 		t.Errorf("デフォルトの案内が -write-summary を示していない: %q", defaultSummaryCommand)
