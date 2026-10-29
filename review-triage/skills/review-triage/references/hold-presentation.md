@@ -1,6 +1,6 @@
 # 保留の提示
 
-**このファイルが、保留 (H1〜H7) をどう人間に示すかの SSOT。** 保留になる条件は [judgment-flow.md](judgment-flow.md) — ここでは言い直さない。
+**このファイルが、保留 (H1〜H7) をどう人間に示すかの SSOT。** 保留になる条件は [judgment-flow.md](judgment-flow.md)。ここでは言い直さない。
 
 ## Markdown が SSOT
 
