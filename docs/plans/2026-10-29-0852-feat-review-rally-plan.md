@@ -114,7 +114,7 @@ review-rally: <ループの id> / review_session: <セッション id> / model: 
 U4 がこの引数を使うので、U4 より前に行う。
 
 - **確認の方法**: 引数がある場合と無い場合のそれぞれで、依頼文の「対象」の作業ツリーと、`review-request` が確認する作業ツリー (範囲・HEAD・clean) を文書の上で辿る。`review-request` が確認するのは、引数があってもメインのセッションの作業ツリーのままにする。指定した作業ツリーの HEAD と clean は、`review-rally` が「1 回の流れ」の手順 1 (依頼文を書く前) と手順 6 で確認する。`review-request` に確認を足さないのは、`review-request` が確認するのは依頼元 (メインの作業ツリー) の状態で、対象の作業ツリーを HEAD に合わせるのは `review-rally` の手順 1 だからである。`review-request` に足すと、`review-rally` 以外の使い方でも、対象の作業ツリーを先に HEAD に合わせておく前提が要る。
-- **変えるファイル**: `review-triage/skills/review-request/SKILL.md` (引数の表・手順 4 の `repo_dir` の埋め方)。雛形は `{{repo_dir}}` を埋める値が変わるだけなので変えない。版は minor を上げる (引数を足すため)。
+- **変えるファイル**: `review-triage/skills/review-request/SKILL.md` (引数の表・手順 4 の `repo_dir` の埋め方・節「引数」の末尾の、`--dir` を毎回使うループを `review-loop` だけと書く文に `review-rally` を足す)。雛形は `{{repo_dir}}` を埋める値が変わるだけなので変えない。版は minor を上げる (引数を足すため)。
 
 ### U4. 1 回のレビュー (L1 の差し替え。D1・Q1〜Q3・RR1〜RR4)
 
