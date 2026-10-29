@@ -42,7 +42,7 @@ execution: code
 | ID | 点 | 決めたこと |
 | --- | --- | --- |
 | Q1 | **停止をもう 1 つ足す。** #151 では review-rally だけの停止を 3 つ (レビュー不成立・起動できないか値が違う・拒否された) としたが、`review-loop` の RA3 に当たる「依頼文を作れない (作業ツリーが clean でない・記録が読めない・増分の基点が HEAD の祖先でない)」が抜けていた | 足す (RR4) |
-| Q2 | **依頼文と結果のディレクトリ。** 2026-10-29 の試験で次が分かった。(1) レビューのセッションは、自分の worktree の外へ Write すると PreToolUse の hook に拒否される。メインの作業ツリーは読める。(2) メインのセッション (worktree で動いていない) は、レビューの worktree へ Write でき、`git -C <worktree> checkout --detach` も実行できる。(3) アプリは worktree をメインの作業ツリーの `.claude/worktrees/` の下に置くが、既存の worktree を再利用することがあり、パスは `branch_name` から決まらない | 依頼文と結果を、レビューの worktree の `tmp/review-rally/<ループの id>/` に置く。メインのセッションは `review-request --dir` にこのパスを渡し、結果は読むだけにする。この形は、次の 2 つの無視を前提にする。(i) メインの作業ツリーから見て、`.claude/worktrees/` が git に無視されている。このリポジトリで無視しているのは `.gitignore` ではなく `.git/info/exclude` である。無視されていないリポジトリでは、メインの作業ツリーに `?? .claude/` が出て clean でなくなるので、`review-request` が依頼文を書かずに RR4 で停止する。そのときは、`.gitignore` に `.claude/worktrees/` を足すよう案内する。(ii) レビューの worktree の中から見て、`--dir` のディレクトリ (`tmp/` の下) が無視されている。`review-request` が確認するのはメインの作業ツリーから見た無視だけなので、(i) だけが成り立つリポジトリでは、依頼文を書いた時点でレビューの worktree に `?? tmp/` が出る。そのため、「1 回の流れ」の手順 1 で `review-request` を呼び出す前に確認する。レビューの worktree のパスは、起動の後に `get_session` の `cwd` から取る。メインのセッションが worktree で動いているときは、初版では対象外にする (レビューの worktree がメインの作業ツリーの外になり、`--dir` に渡せず、書き込みも拒否されるおそれがある。この場合は試験していない)。起動の前にこれを確認し、当たれば RR2 で停止する |
+| Q2 | **依頼文と結果のディレクトリ。** 2026-10-29 の試験で次が分かった。(1) レビューのセッションは、自分の worktree の外へ Write すると PreToolUse の hook に拒否される。メインの作業ツリーは読める。(2) メインのセッション (worktree で動いていない) は、レビューの worktree へ Write でき、`git -C <worktree> checkout --detach` も実行できる。(3) アプリは worktree をメインの作業ツリーの `.claude/worktrees/` の下に置くが、既存の worktree を再利用することがあり、パスは `branch_name` から決まらない | 依頼文と結果を、レビューの worktree の `tmp/review-rally/<ループの id>/` に置く。メインのセッションは `review-request --dir` にこのパスを渡し、結果は読むだけにする。この形は、次の 2 つの無視を前提にする。(i) メインの作業ツリーから見て、`.claude/worktrees/` が git に無視されている。このリポジトリで無視しているのは `.gitignore` ではなく `.git/info/exclude` である。無視されていないリポジトリでは、メインの作業ツリーに `?? .claude/` が出て clean でなくなるので、`review-request` が依頼文を書かずに RR4 で停止する。そのときは、`.gitignore` に `.claude/worktrees/` を足すよう案内する。(ii) レビューの worktree の中から見て、`--dir` のディレクトリ (`tmp/` の下) が無視されている。`review-request` が確認するのはメインの作業ツリーから見た無視だけなので、(i) だけが成り立つリポジトリでは、依頼文を書いた時点でレビューの worktree に `?? tmp/` が出る。そのため、「1 回の流れ」の手順 2 で `review-request` を呼び出す前に確認する。レビューの worktree のパスは、起動の後に `get_session` の `cwd` から取る。メインのセッションが worktree で動いているときは、初版では対象外にする (レビューの worktree がメインの作業ツリーの外になり、`--dir` に渡せず、書き込みも拒否されるおそれがある。この場合は試験していない)。起動の前にこれを確認し、当たれば RR2 で停止する |
 | Q3 | **依頼文の「作業ツリーの扱い」の値。** 雛形の値は「共有」(読み取り専用。確認のための変更は revert する) と「使い捨て」(複製の中でだけ変えてよい) の 2 つ | 「共有」のまま書き換えない。レビューの worktree は回をまたいで使い続けるので、レビュアが変更を残すと、次の回に HEAD に合わせる操作 (`checkout --detach`) が失敗するか、変更が次の回に残る。「共有」なら、回の後に作業ツリーが clean であることを確認すれば足りる。依頼文の「対象」の作業ツリーには、`review-request` が既定ではメインのセッションの作業ツリーを埋める。レビューの worktree を指すようにするには、`review-request` に、対象の作業ツリーを指定する引数 (名前は U3a で決める。例: `--target-dir`) を足して渡す (2026-10-29 の PR #152 のレビューの指摘を受けて利用者が決めた。依頼文を書くのを `review-request` だけに保つため)。#151 の本文の「依頼文の作業ツリーの扱いを書き換える手順が要る」は、これに合わせて直した |
 | Q4 | **設定のキー。** `review-loop` は設定 `review_loop` を持つ | 新しいキーを足さず、`loop` のキー (`review_skill`・`review_args`・`review_model`・`max_rounds`・`structure_rounds`) と `fix` のキーを使う。引数で上書きできるのは `--model`・`--effort`・レビュースキルとそのオプション・`--max`・`--structure-rounds`・`--threshold`・`--stage`。設定のキーを持たない引数として `--base` (記録に回が無いときの最初の全量の回の起点にする派生元のブランチ。`review-request` に渡す) も受け付ける。レビューのセッションのモデルは、引数 `--model`、無ければ `loop.review_model`、それも無ければ人間に質問する。effort は引数 `--effort` で指定し、無ければ人間に質問する (推測しない)。権限モードは指定せず、メインのセッションのものを引き継がせる (権限モードが同じなら、メッセージが承認待ちにならない)。状態のファイルのディレクトリは `tmp/review-rally/` に決め打ちする |
 | Q5 | **ループの状態を残すファイル。** 初版は `--resume` を持たないが、会話が長くなって compact (会話の要約) されると、レビューのセッションの id・worktree のパス・回数が失われうる | メインのセッションの `tmp/review-rally/<ループの id>/rally.yaml` に、ループの条件・レビューのセッションの id・worktree のパス・この起動で数えた回数・結果待ちの依頼文の識別子と、その依頼を送った時刻 (記録の `notes` の `review_minutes` の起点) を書く。書き込み元はメインのセッションだけ |
@@ -55,7 +55,7 @@ execution: code
 | ID | 停止 | 条件 |
 | --- | --- | --- |
 | RR1 | レビュー不成立 | レビューのセッションが失敗を通知した・完了を通知せずにターンを終えた (下の「1 回の流れ」の手順 5 の照合で決める)・結果ファイルが読めないか `run_id`・`scope`・`base` が依頼文と違う・レビューの worktree の HEAD が変わったか clean でない・メインのリポジトリのブランチや HEAD がレビューの間に変わった・`review-triage` が結果の様式を差し戻した |
-| RR2 | レビューのセッションを使えない | メインのセッションが worktree で動いている (Q2)・`start_session` が失敗した・`get_session` のモデルか effort が指定と違う・レビューの worktree が clean でないか、HEAD に合わせられない (下の「1 回の流れ」の手順 2) |
+| RR2 | レビューのセッションを使えない | メインのセッションが worktree で動いている (Q2)・`start_session` が失敗した・`get_session` のモデルか effort が指定と違う・レビューの worktree が clean でないか、HEAD に合わせられない (下の「1 回の流れ」の手順 1) |
 | RR3 | 拒否された | `SendMessage` が届かなかった (承認待ちのまま期限が切れた、など)・`clear_session` を拒否された |
 | RR4 | 依頼文を作れない (Q1) | 作業ツリーが clean でない・レビューの worktree の中から見て `--dir` のディレクトリが無視されていない (Q2 の (ii))・記録が読めない・増分の基点が HEAD の祖先でない・`review-request` が依頼文を書かなかった |
 
@@ -63,8 +63,8 @@ execution: code
 
 ## 1 回の流れ (L1 の差し替え)
 
-1. **依頼文を書く**: RR4 の条件を確認し (レビューの worktree の中から見た無視は `git -C <worktree> check-ignore -q <--dir のパス>` で確認する。無視されていなければ、`.gitignore` に `tmp/` を足すよう案内する)、Skill ツールで `review-request` を呼び出す (`--dir` はレビューの worktree の中。Q2。対象の作業ツリーを指定する引数にはレビューの worktree を渡す。Q3)。
-2. **レビューの worktree を合わせる**: `git -C <worktree> status --porcelain` が空であることを確認してから、`git -C <worktree> checkout --detach <HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。
+1. **レビューの worktree を合わせる**: `git -C <worktree> status --porcelain` が空であることを確認してから、`git -C <worktree> checkout --detach <HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。依頼文を書く前に合わせるのは、手順 2 のレビューの worktree の中から見た無視の確認を、レビューする HEAD の `.gitignore` で行うため。
+2. **依頼文を書く**: RR4 の条件を確認し (レビューの worktree の中から見た無視は `git -C <worktree> check-ignore -q <--dir のパス>` で確認する。無視されていなければ、`.gitignore` に `tmp/` を足すよう案内する)、Skill ツールで `review-request` を呼び出す (`--dir` はレビューの worktree の中。Q2。対象の作業ツリーを指定する引数にはレビューの worktree を渡す。Q3)。
 3. **会話を消す**: 2 回目以降は、ツール `clear_session` を実行する (D1)。
 4. **依頼する**: `SendMessage` で、依頼文のパスと、完了の通知の様式 (下記) を送る。会話を消した後なので、毎回すべてを書く。ターンを終える。
 5. **通知を受ける**: レビューのセッションからのメッセージ (`from` がレビューのセッションの id) で、次のターンが始まる。人間のメッセージやほかのセッションのメッセージで始まったターンは、通知として扱わない。レビューのセッションのターンの終了の通知 (`<side-sessions-event>`) だけで始まったターンでは、その通知がどの依頼に対するものかが分からない (前の回のターンの終了の通知が、次の回の依頼を送った後に届くことがありうる)。そのため、`get_session` でレビューのセッションが動いているか (`isRunning`) と最後の活動の時刻 (`lastActivityAt`) を確認する。動いておらず、最後の活動の時刻が `rally.yaml` の依頼を送った時刻より後で、結果待ちの識別子の完了のメッセージも無ければ RR1。それ以外 (動いている、または最後の活動が依頼を送る前) は、前の回の通知か、レビューのセッションがまだ依頼の処理を始めていないとみなし、そのままターンを終えて待機を続ける。
@@ -108,7 +108,7 @@ review-rally: <ループの id> / review_session: <セッション id> / model: 
 
 U4 がこの引数を使うので、U4 より前に行う。
 
-- **確認の方法**: 引数がある場合と無い場合のそれぞれで、依頼文の「対象」の作業ツリーと、`review-request` が確認する作業ツリー (範囲・HEAD・clean) を文書の上で辿る。`review-request` が確認するのは、引数があってもメインのセッションの作業ツリーのままにする。指定した作業ツリーの HEAD と clean は、`review-rally` が「1 回の流れ」の手順 2 と手順 6 で確認する (依頼文を書く時点では、まだ HEAD に合わせていないため)。
+- **確認の方法**: 引数がある場合と無い場合のそれぞれで、依頼文の「対象」の作業ツリーと、`review-request` が確認する作業ツリー (範囲・HEAD・clean) を文書の上で辿る。`review-request` が確認するのは、引数があってもメインのセッションの作業ツリーのままにする。指定した作業ツリーの HEAD と clean は、`review-rally` が「1 回の流れ」の手順 1 (依頼文を書く前) と手順 6 で確認する。`review-request` の確認と分けるのは、レビューの worktree を HEAD に合わせて確認するのが `review-rally` の手順であるため。
 - **変えるファイル**: `review-triage/skills/review-request/SKILL.md` (引数の表・手順 4 の `repo_dir` の埋め方)。雛形は `{{repo_dir}}` を埋める値が変わるだけなので変えない。版は minor を上げる (引数を足すため)。
 
 ### U4. 1 回のレビュー (L1 の差し替え。D1・Q1〜Q3・RR1〜RR4)
