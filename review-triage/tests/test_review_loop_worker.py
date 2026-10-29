@@ -2754,7 +2754,7 @@ class TestEnding(WorkerTestBase):
     def test_parent_check_stopped_by_signal_is_not_parent_gone(self):
         # 子が親の生存を確認する ps がシグナルで停止しても、子は親が無いとは判定せず、動き続ける (関数 pid_alive)。割り込みを
         # 記録するファイルも、子が自分で受けたシグナルの名前 (変数 SELF_SIG) も無い状態で確認する。親が無いと判定すると、
-        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終了する) で子が終了する。偽の ps は自分に TERM を送って終了する
+        # 親が動いているのに、kill -9 のときの経路 (後始末をせずに終了する) で子が終了するため。偽の ps は自分に TERM を送って終了する
         trigger = os.path.join(self.root, "ps-trigger")
         log = os.path.join(self.root, "ps-callers")
         self.install_fake_ps(trigger, log, 'kill -TERM "$$"')
