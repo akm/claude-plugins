@@ -138,6 +138,19 @@ U4 がこの引数を使うので、U4 より前に行う。
 - 小さな変更のあるブランチで `review-rally` を起動し、少なくとも 2 回のレビュー (2 回目は会話を消した後) と、収束 (S3) か停止までを通す。
 - 確認すること: Q2 のディレクトリで依頼文と結果を書けるか (`.claude/worktrees/` を無視しているのがどのファイルか)、レビューの worktree を HEAD に合わせられるか、記録の `notes` の行、片付けの後にセッションと worktree が残っていないか、アーカイブで worktree とブランチがどう片付けられるか (U5 の決め方に使う)。
 
+## 実装で決めたこと (2026-10-29)
+
+U2〜U6 と U3a を実装する中で決めたことと、上の計画と違う点。実装の SSOT は、ディレクトリ `review-triage/skills/review-rally/` の文書と、ファイル `review-triage/skills/review-request/SKILL.md`。
+
+| 点 | 決めたこと |
+| --- | --- |
+| PR の分け方 | U3a と U2〜U6 を同じ PR にした (利用者が決めた)。U3a を先に分ける予定だったが、U3a のコミットが 2 つだけだったため |
+| U3a の雛形 | 雛形 (ファイル `review-triage/skills/review-triage/references/review-request-template.md`) の「共有」の説明を 1 文変えた。「対象」の作業ツリーを「依頼元が作業している作業ツリーそのもの」としていて、`--target-dir` を使うと事実と合わなくなるため。引数の名前は `--target-dir` にした |
+| U3a の経路の列挙 | `review-request` の SKILL.md の、`--dir` を毎回使うループを挙げる文への `review-rally` の追加は、U3a のコミットではなく `review-rally` を足すコミットで行った。U3a の時点では `review-rally` が無いため |
+| 手順 2 の確認 (U4) | `tmp/review-rally/` と `.claude/worktrees/` がメインの作業ツリーから見て無視されていることを、何かを書く前の開始の前提で確認することにした。一時リポジトリで 6 通りの組み合わせを試し、2 つが無視されていればメインの作業ツリーもレビューの worktree も clean のままになると分かったため。開始の前提が満たされないときは、停止 (RR2・RR4) ではなく、ループを始めずに報告する。そのため、RR2 の「メインのセッションが worktree で動いている」も開始の前提に移した (SSOT はファイル `review-triage/skills/review-rally/references/session.md` の「開始の前提」) |
+| 手順 5 の規則 (U4) | 試験用のセッションで、`isRunning` は依頼を送るとすぐに真になりターンが終了すると偽になること、`lastActivityAt` はツールの呼び出しを始めるたびと `clear_session` で進み、1 つの長いツールの実行の間は進まないことを確認した。その値と依頼を送った時刻を比べる規則と、30 分ごとの待機の通知で、2 つの要件を満たす (SSOT はファイル `review-triage/skills/review-rally/references/round.md` の「再入の手順」) |
+| 片付け (U5) | 案内だけにし、review-rally は片付けない (利用者が決めた)。再利用された worktree では、セッションをアーカイブせずに元の HEAD に戻す手順を案内する。元の HEAD は、起動の直後に worktree の reflog から控える |
+
 ## 後に回すもの
 
 - `--resume`・`--end`・`--full-review` (D4)。
