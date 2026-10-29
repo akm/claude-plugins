@@ -1,6 +1,6 @@
 # review-triage
 
-レビュー指摘を**一件ずつ吟味して採択 / 保留 / 却下に選り分け**、採択したものを**原因で束ねて直す** skill 5 つと、レビューを行うワーカーのスクリプト、記録を検査する Go ツールを配布するプラグインです。
+レビュー指摘を**一件ずつ吟味して採択 / 保留 / 却下に選り分け**、採択したものを**原因で束ねて直す** skill 6 つと、レビューを行うワーカーのスクリプト、記録を検査する Go ツールを配布するプラグインです。
 
 ## 収録スキル
 
@@ -11,10 +11,11 @@
 | `review-triage-fix` | 採択した指摘を原因で束ね、調査 → 立案 → 修正 の 3 つのフェーズで問題単位で直す。記録の回番号が回数の閾値 N を越えた回では、調査の後に人間が立案者 (セッションのモデル / 指定モデルの sub-agent / 人間自身) を選ぶ。フェーズごとに sub-agent で実行できる |
 | `review-triage-loop` | レビューの起動から上の 2 つまでを 1 回として、終了条件に当たるまで繰り返す。**判断も修正もせず、2 つを呼ぶだけ**。記録に回が無いときの最初の回 (全量の回) の起点のブランチを `--base` で指定できる (省くと `origin/HEAD` が指すブランチ。レビュースキルが `code-review` のときだけ適用される) |
 | `review-loop` | `review-triage-loop` と同じループを、レビューだけを端末のワーカー (下記) に任せて回す。ワーカーのモデルと effort を人間が選べる。`--full-review` を付けると、収束の後に要れば全量の回をループの中で行い (上限に数えない)、`--base` で全量の起点のブランチを指定できる (省くと `origin/HEAD` が指すブランチになり、`origin/HEAD` が無いリポジトリでは全量の回を行わないループでも `--base` が要る)。停止したループは `--resume` で続け (`--resume --full-review` なら次の回を全量にする)、`--end` で終える |
+| `review-rally` | `review-triage-loop` と同じループを、レビューだけを、このセッションから起動した別の Claude Code のセッション (専用の worktree で動く) に任せて回す。依頼と完了の通知はセッション間のメッセージで行い、2 回目以降は依頼の前にそのセッションの会話を消す。人間はレビューのセッションを開いて見守れる。モデルと effort は、起動元のセッション以下から人間が選ぶ。Claude のデスクトップアプリで、worktree ではないメインの作業ツリーで動くセッションから使う。停止したら新しいループを始める (`--resume` を持たない) |
 
 `code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは記録 (YAML) だけで行います。**
 
-`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。`review-loop` は、レビューを同じセッションの sub-agent ではなく、人間が決めたモデルと effort の別のプロセスで実行したいときに使います (詳細は [SKILL.md](skills/review-loop/SKILL.md))。
+`review-triage` と `review-triage-fix` は、それぞれ単独でも使えます。`review-triage-loop` は、レビューから修正までを人間が毎回指示する代わりに、上限回数まで自動で回したいときに使います (詳細は [SKILL.md](skills/review-triage-loop/SKILL.md))。`review-loop` は、レビューを同じセッションの sub-agent ではなく、人間が決めたモデルと effort の別のプロセスで実行したいときに使います (詳細は [SKILL.md](skills/review-loop/SKILL.md))。`review-rally` は、レビューを対話のセッションで実行し、人間がその様子を見守りたいときに使います (詳細は [SKILL.md](skills/review-rally/SKILL.md))。
 
 ## なぜ記録を残すか
 
