@@ -153,7 +153,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
 	// 埋め込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
-	// このテストが見るのは「明示した値がデフォルトのパスに優先すること」なので、
+	// このテストが見るのは「明示した値がデフォルトのパスに優先すること」である。
 	// 値が実在するかどうかは意図の外なので、実在させたうえで優先を確認する。
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
