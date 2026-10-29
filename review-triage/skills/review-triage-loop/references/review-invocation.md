@@ -47,7 +47,7 @@
 
 ## 記録のキーの出所 (定義の SSOT)
 
-**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表だけが定める。** キーの意味の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここはループがその値をどこから採るかを定める。ただし、レビューを別のプロセスに任せる経路 (`review-loop`) では、この表の値の一部を替える。どれをどう替えるかは、末尾の節「別のプロセスでレビューした結果の取り込み」の「`review-triage` に渡すもの」が定める。
+**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表だけが定める。** キーの意味の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここはループがその値をどこから採るかを定める。ただし、レビューを別のプロセスに任せる経路 (`review-loop`) では、この表の値の一部を替える。どれをどう替えるかは、末尾の節「別のプロセスでレビューした結果の取り込み」の「`review-triage` に渡すもの」が定める。そこで定めずに、それぞれのスキルの文書に委ねるもの (`model` の採り方) もある。
 
 | 記録のキー | `code-review` | `ce-code-review` |
 | --- | --- | --- |
