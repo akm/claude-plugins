@@ -412,9 +412,9 @@ func TestRunEmptyInstallWrapperDoesNotFallThroughToCheck(t *testing.T) {
 	}
 }
 
-// -judgment-flow を省略したときだけ、ラッパーは $root からの既定パスを使う。
-// 「既定を使う」は省略で表す。明示した空は他の経路と同じく拒否される
-// (TestRunRejectsEmptyExplicitPaths)。空文字を「既定」の意味に使うと、
+// -judgment-flow を省略したときだけ、ラッパーは $root からのデフォルトのパスを使う。
+// 「デフォルトを使う」は省略で表す。明示した空は他の経路と同じく拒否される
+// (TestRunRejectsEmptyExplicitPaths)。空文字を「デフォルト」の意味に使うと、
 // 空のパスの規則に生成の経路だけの例外ができ、規則を足すたびに例外の処理が要る。
 func TestRunInstallWrapperOmittedJudgmentFlowUsesDefault(t *testing.T) {
 	withRunGlobals(t)

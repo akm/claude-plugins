@@ -32,7 +32,7 @@ import (
 // path.Dir どうしの比較で吸収するので、この値の末尾のスラッシュの有無は問わない。
 var reviewTriageDir = "tmp/review-triages/"
 
-// defaultSummaryCommand は summaryCommand の既定値。定数に分けるのは、テストが既定を
+// defaultSummaryCommand は summaryCommand のデフォルト値。定数に分けるのは、テストがデフォルト値を
 // 検査するとき、run が書き換えた後の変数ではなく定数を読めるようにするためである。
 const defaultSummaryCommand = "triagecheck -write-summary"
 
