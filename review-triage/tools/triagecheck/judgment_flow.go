@@ -21,7 +21,7 @@ import (
 //
 // スキルがプラグインとして配られると、この SSOT はリポジトリの外 (プラグインの
 // 展開先) に置かれ、パスは環境ごとに違う。main が CLAUDE_PLUGIN_ROOT または
-// -judgment-flow から解決して設定する。既定はリポジトリ内にスキルを直接置く
+// -judgment-flow から解決して設定する。デフォルトはリポジトリ内にスキルを直接置く
 // 形 (プラグイン化前の配置) で、そのときだけこの値がそのまま使われる。
 var judgmentFlowPath = ".claude/skills/review-triage/references/judgment-flow.md"
 

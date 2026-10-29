@@ -1341,9 +1341,9 @@ func TestReviewTriageRecordIgnoresOtherFiles(t *testing.T) {
 	}
 }
 
-// 生成サマリの 1 行目は、既定のまま生成すると既定の案内を含む決まった形になる。
+// 生成サマリの 1 行目は、デフォルトのまま生成するとデフォルトの案内を含む決まった形になる。
 // 1 行目はコミットされる値なので、組み立て方の変更をここで捕まえる。可変の
-// summaryCommand ではなく定数と突き合わせる (run が書き換えた後の値を既定と
+// summaryCommand ではなく定数と突き合わせる (run が書き換えた後の値をデフォルトと
 // 取り違えないため)。
 func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 	saved := summaryCommand
@@ -1357,7 +1357,7 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 	first, _, _ := strings.Cut(summary, "\n")
 	want := "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml。`" + defaultSummaryCommand + "` で再生成する。 -->"
 	if first != want {
-		t.Errorf("1 行目が既定の形ではない:\n got: %s\nwant: %s", first, want)
+		t.Errorf("1 行目がデフォルトの形ではない:\n got: %s\nwant: %s", first, want)
 	}
 }
 

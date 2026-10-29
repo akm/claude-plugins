@@ -138,9 +138,9 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 	if !strings.Contains(got, wantCache) {
 		t.Errorf("生成物に想定した plugin_cache が見当たらない (want substring %q):\n%s", wantCache, got)
 	}
-	// -judgment-flow を明示しなかったときは、$root からの既定パスを使う。
+	// -judgment-flow を明示しなかったときは、$root からのデフォルトのパスを使う。
 	if !strings.Contains(got, `-judgment-flow "$root/skills/review-triage/references/judgment-flow.md"`) {
-		t.Errorf("生成物に -judgment-flow の既定値が見当たらない:\n%s", got)
+		t.Errorf("生成物に -judgment-flow のデフォルト値が見当たらない:\n%s", got)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
 	// 埋め込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
-	// このテストが見るのは「明示した値が既定パスに優先すること」なので、
+	// このテストが見るのは「明示した値がデフォルトのパスに優先すること」なので、
 	// 値が実在するかどうかは意図の外なので、実在させたうえで優先を確認する。
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
@@ -181,9 +181,9 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	if !strings.Contains(got, `-judgment-flow '`+customFlow+`'`) {
 		t.Errorf("生成物に明示した -judgment-flow の埋め込みが見当たらない:\n%s", got)
 	}
-	// 明示したときは $root からの既定パスを使わない (二重に書かれない)。
+	// 明示したときは $root からのデフォルトのパスを使わない (二重に書かれない)。
 	if strings.Contains(got, `"$root/skills/review-triage/references/judgment-flow.md"`) {
-		t.Errorf("明示指定があるのに既定パスも書かれている:\n%s", got)
+		t.Errorf("明示指定があるのにデフォルトのパスも書かれている:\n%s", got)
 	}
 }
 
@@ -368,7 +368,7 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	wrapper := filepath.Join(repo, "bin", "rtc")
 
 	t.Chdir(filepath.Join(version, "tools", "triagecheck"))
-	// run が決める既定 (リポジトリ相対) と同じ値を渡す。
+	// run が決めるデフォルト (リポジトリ相対) と同じ値を渡す。
 	if err := installWrapper(wrapper, recDir, "", "bin/rtc -write-summary"); err != nil {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}

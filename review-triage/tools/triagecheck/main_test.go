@@ -237,7 +237,7 @@ func TestRunRejectsRelativeRecordDirWithoutCurrentDir(t *testing.T) {
 	}
 }
 
-// -record-dir は必須。省略を許すと「既定の場所を検査したことにする」ため。
+// -record-dir は必須。省略を許すと「デフォルトの場所を検査したことにする」ため。
 func TestRunRequiresRecordDir(t *testing.T) {
 	withRunGlobals(t)
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
@@ -470,7 +470,7 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 			t.Fatalf("got (%q, %q), want (%q, %q)", p, origin, want, "CLAUDE_PLUGIN_ROOT")
 		}
 	})
-	t.Run("どちらも無ければ既定に落ちる", func(t *testing.T) {
+	t.Run("どちらも無ければデフォルトに落ちる", func(t *testing.T) {
 		t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 		p, origin := resolveJudgmentFlowPath("", false)
 		if p != "" || origin != "" {
@@ -688,7 +688,7 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 		})
 	}
 
-	// CLAUDE_PLUGIN_ROOT からの判定フローは埋め込まない (既定は実行時に $root から
+	// CLAUDE_PLUGIN_ROOT からの判定フローは埋め込まない (デフォルトは実行時に $root から
 	// 解決する) が、実在の要求は他の経路と同じく課す。
 	t.Run("CLAUDE_PLUGIN_ROOT は埋め込まないが実在は要求する", func(t *testing.T) {
 		withRunGlobals(t)
@@ -720,7 +720,7 @@ func TestRunInstallWrapperSharesPathRules(t *testing.T) {
 			t.Fatal(rerr)
 		}
 		if !strings.Contains(string(script), `-judgment-flow "$root/skills/review-triage/references/judgment-flow.md"`) {
-			t.Fatalf("環境変数の値が埋め込まれ、既定の $root が使われていない:\n%s", script)
+			t.Fatalf("環境変数の値が埋め込まれ、デフォルトの $root が使われていない:\n%s", script)
 		}
 	})
 }
@@ -789,19 +789,19 @@ func TestRunCheckReportsSummaryCommand(t *testing.T) {
 	}
 }
 
-// 既定は特定のリポジトリの事情を含まない一般的な文言。ここに具体的な
+// デフォルトは特定のリポジトリの事情を含まない一般的な文言。ここに具体的な
 // Makefile のターゲット名などを埋め込むと、その名前を持たない利用者のリポジトリで
 // 存在しないコマンドを案内することになる (Issue #36)。
 //
 // 見るのは定数であって可変の summaryCommand ではない。変数は run が書き換える
-// ので、先行するテストが残した値を既定と取り違えて、既定の回帰を検出できない
+// ので、先行するテストが残した値をデフォルトと取り違えて、デフォルトの回帰を検出できない
 // (または偽陽性で落ちる) ことがある。
 func TestSummaryCommandDefaultIsGeneric(t *testing.T) {
 	if !strings.Contains(defaultSummaryCommand, "-write-summary") {
-		t.Errorf("既定の案内が -write-summary を示していない: %q", defaultSummaryCommand)
+		t.Errorf("デフォルトの案内が -write-summary を示していない: %q", defaultSummaryCommand)
 	}
 	if strings.Contains(defaultSummaryCommand, "make ") {
-		t.Errorf("既定の案内に利用者のリポジトリ固有の呼び出し方が埋め込まれている: %q", defaultSummaryCommand)
+		t.Errorf("デフォルトの案内に利用者のリポジトリ固有の呼び出し方が埋め込まれている: %q", defaultSummaryCommand)
 	}
 }
 

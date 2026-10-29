@@ -18,7 +18,7 @@ import (
 // wrapperTemplate はラッパースクリプトの雛形。%s は順に
 // (1) PLUGIN_CACHE の値, (2) -record-dir に埋め込む値 (script_dir からの相対),
 // (3) -summary-command に埋め込む値, (4) -judgment-flow の行 (明示が無ければ
-// $root からの既定) が入る。(1)〜(3) と明示の (4) は生成時に決まった値なので、
+// $root からのデフォルト) が入る。(1)〜(3) と明示の (4) は生成時に決まった値なので、
 // installWrapper がシェルの単一引用符で包んでから差し込む。
 //
 // テンプレート内の二重引用符は「実行時に展開させる」箇所だけに使う。
@@ -89,7 +89,7 @@ exec go run -C "$root/tools/triagecheck" . \
 // 移動元を検査して成功を返すため。
 //
 // judgmentFlow が非空なら絶対パスのまま埋め込み、空なら -judgment-flow は付けず、
-// プラグイン展開先の既定パス (skills/review-triage/references/judgment-flow.md) を
+// プラグイン展開先のデフォルトのパス (skills/review-triage/references/judgment-flow.md) を
 // 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
 // resolveInputs が拒否する。
 //
