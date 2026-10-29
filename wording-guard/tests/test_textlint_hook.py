@@ -478,6 +478,44 @@ class TestExcerpt(unittest.TestCase):
         self.assertEqual(hook._excerpt(text, {"start": None}), "")
 
 
+class TestDisplayMessage(unittest.TestCase):
+    def test_adds_period_after_prh_head(self):
+        self.assertEqual(textlint.display_message(KIKU["message"]), "効く => 適用される。何がどう働くかを書く",
+                         "規則 prh の「X => Y」の後に句点を足して補足を続けていない")
+
+    def test_keeps_japanese_sentence_end(self):
+        self.assertEqual(textlint.display_message("冗長な表現です。\n解説: https://example.com/"),
+                         "冗長な表現です。解説: https://example.com/", "末尾が句点の本文に句点を重ねている")
+
+    def test_puts_space_after_english_sentence_end(self):
+        self.assertEqual(textlint.display_message("Redundant expression.\nSee: https://example.com/"),
+                         "Redundant expression. See: https://example.com/", "英語の文末の後に空白を挟んでいない")
+
+    def test_without_detail(self):
+        self.assertEqual(textlint.display_message("冗長な表現です"), "冗長な表現です", "補足が無いのに文字を足している")
+        self.assertEqual(textlint.display_message("冗長な表現です\n  \n"), "冗長な表現です", "空白だけの補足を補足として扱っている")
+
+    def test_joins_multiline_detail_into_one_line(self):
+        message = ("助詞 \"は\" がみつかりました。\n\n次の助詞が連続しています。\n\n- \"は\"\n- \"は\"\n\n"
+                   "同じ助詞を連続して使わないように検討してください。\n")
+        self.assertEqual(textlint.display_message(message),
+                         "助詞 \"は\" がみつかりました。次の助詞が連続しています。 - \"は\" - \"は\" "
+                         "同じ助詞を連続して使わないように検討してください。",
+                         "補足の改行を残している (hook の通知で別の検出の項目に見える)")
+
+    def test_ignores_spaces_around_head(self):
+        self.assertEqual(textlint.display_message("冗長な表現です。 \n解説: x"), "冗長な表現です。解説: x",
+                         "本文の末尾の空白のせいで句点を重ねている")
+
+    def test_empty_head_returns_detail(self):
+        self.assertEqual(textlint.display_message("\n解説: x"), "解説: x", "本文が空なのに句点から始めている")
+
+    def test_hook_uses_same_form(self):
+        line = hook._format([("ここで効く。", KIKU)]).splitlines()[0]
+        self.assertEqual(line, "- 「効く」 効く => 適用される。何がどう働くかを書く [prh]",
+                         "hook の通知が、コマンド check と同じ形で補足を続けていない")
+
+
 class TestIntroduced(unittest.TestCase):
     def test_only_new_findings(self):
         self.assertEqual(hook.introduced([KIKU], [KIKU, KATA]), [KATA])

@@ -182,13 +182,14 @@ def _excerpt(text, finding):
 
 
 def _format(items):
+    # tomllib を使うモジュールは、Python の版を確認してから読み込む (handle が確認した後にだけ呼ばれる)
+    from . import textlint
+
     shown = items[:MAX_ITEMS]
     lines = []
     for text, f in shown:
-        head, _, detail = f["message"].partition("\n")
         matched = f"「{f['matched']}」 " if f["matched"] else ""
-        lines.append(f"- {matched}{head}" + (f" — {detail.strip()}" if detail.strip() else "")
-                     + f" [{f['rule']}]")
+        lines.append(f"- {matched}{textlint.display_message(f['message'])} [{f['rule']}]")
         excerpt = _excerpt(text, f)
         if excerpt:
             lines.append(f"  該当箇所: {excerpt}")

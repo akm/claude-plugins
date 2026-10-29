@@ -154,7 +154,7 @@ def compose(root, cfg, term_list, workdir, fix_only=False):
 
     fix_only が True のときは、規則を自動修正してよい避ける語の辞書だけにする (リポジトリの規則集と、
     検出だけする避ける語は入れない)。自動修正で文脈によって言い換えが変わる語を書き換えないため。
-    リポジトリの設定のうち、規則 (rules) 以外 (検出から除く範囲の filters など) はそのまま使う —
+    リポジトリの設定のうち、規則 (rules) 以外 (検出から除く範囲の filters など) はそのまま使う。
     check で検出しない範囲 (引用など) を、fix が書き換えないようにするため。
     """
     base, base_dir, where = {}, root, "設定"
@@ -277,6 +277,28 @@ def _finding(message, source, to_index=None):
         "end": end,
         "matched": matched,
     }
+
+
+def display_message(message):
+    """検出の message を、表示する 1 つの文字列にする。
+
+    message は 1 行目が本文で、2 行目以降が補足 (規則 prh では用語ファイルの理由、規則集では「解説: URL」など)。
+    補足は、本文を 1 つの文として区切ってから続ける。本文の末尾が句点ならそのまま続け、英語の文末の記号なら空白を挟み、
+    それ以外 (規則 prh の「X => Y」など) は句点を足す。コマンド check の出力と hook の通知は、どちらもこの形で表示する。
+    本文と補足の改行と連続する空白は 1 つの空白にまとめ、1 行で表示する。補足が複数行の規則 (no-doubled-joshi など) の
+    行が、hook の通知で別の検出の箇条書きの項目に見えないようにするため。本文が空なら補足だけを返す。
+    """
+    head, _, detail = message.partition("\n")
+    head, detail = " ".join(head.split()), " ".join(detail.split())
+    if not detail:
+        return head
+    if not head:
+        return detail
+    if head.endswith(("。", "！", "？")):
+        return head + detail
+    if head.endswith((".", "!", "?")):
+        return f"{head} {detail}"
+    return f"{head}。{detail}"
 
 
 def check_files(root, cfg, term_list, paths):

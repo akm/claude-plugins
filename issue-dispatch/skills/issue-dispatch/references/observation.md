@@ -1,10 +1,10 @@
 # 観測 (スナップショットと差分)
 
-このファイルが、この仕組み (issue-dispatch) の観測 — スナップショット (`snapshot.json`)・差分・待機 — の SSOT (single source of truth。ある事実を定めている唯一の記述)。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
+このファイルが、この仕組み (issue-dispatch) の観測 (スナップショット `snapshot.json`・差分・待機) の SSOT (single source of truth。ある事実を定めている唯一の記述)。待機 (`wait.pid` の様式・終了条件・終了コード・標準出力) は「待機」の節。ディレクトリ (`<管理ディレクトリ>/<record_dir>/<owner>-<number>/`) と種類ごとの扱いは [records.md](records.md)。モジュール `issue-dispatch/scripts/issue_dispatch/observe.py` が読み書き・作成・反映・差分を実装し、`gh` は実行しない (項目の読み取りは `project items`、PR の状態は `issues.pr_state`)。待機はモジュール `issue-dispatch/scripts/issue_dispatch/poll.py` が実装する。
 
 ## 目的
 
-スナップショットは、前のターンの終了時の Project の状態 (と、コメントに URL で書かれた PR の GitHub 上の状態) の写しで、GitHub から導出し直せるキャッシュ (計画の KTD5)。使うのは 2 つ: 待機が変化に気づいて管理のセッションを起こすこと (U14) と、人の変更を 1 回だけ報告すること (計画の R22)。**何を行うかはスナップショットからは決めない** — 導いた項目の状態 (U13) で決める。差分は「何が変わったか」だけを返し、意味づけ (管理のセッションが足した blocker か・どの宣言が待機するか) はしない。
+スナップショットは、前のターンの終了時の Project の状態 (と、コメントに URL で書かれた PR の GitHub 上の状態) の写しで、GitHub から導出し直せるキャッシュ (計画の KTD5)。使うのは 2 つ: 待機が変化に気づいて管理のセッションを起こすこと (U14) と、人の変更を 1 回だけ報告すること (計画の R22)。**何を行うかはスナップショットからは決めない。** 導いた項目の状態 (U13) で決める。差分は「何が変わったか」だけを返し、意味づけ (管理のセッションが足した blocker か・どの宣言が待機するか) はしない。
 
 書き込み元は管理のセッションの再入のターンだけ。Project を読んだとき (`project items --write-snapshot`) に書き、そのターンの CLI の書き込みのたびに書いた値を反映する。待機の直前には再度読み込まない (再度読み込むと、ターンの最初の読み取りから再度の読み込みまでの間にほかの人が起こした変化が、処理されないままスナップショットに入り、待機がその変化に気づかない)。書き込みに失敗したのに反映した値は、次の差分が不一致として見つけ、次のターンで直す。壊れていれば作り直す。
 

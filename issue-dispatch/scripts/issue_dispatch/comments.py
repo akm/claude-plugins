@@ -430,7 +430,7 @@ def already_posted(parsed, own_comments):
 
 def post(issue, role, name, session_id, kind, values, body, login=None):
     """コメントを投稿する。先頭行は format_header で作る。管理のセッションの種類は、同じ出来事への同じコメントが既にあれば
-    投稿しない (already_posted。一覧が読めなければ投稿しない — 既投稿かを確認できないまま投稿すると二重になりうるため)。
+    投稿しない (already_posted。一覧が読めなければ投稿しない。既投稿かを確認できないまま投稿すると二重になりうるため)。
     作業のセッションの種類は確認せずに投稿する (やり直しでの二重の投稿は作業のセッションのスキルが扱う)。
     返り値: {"status": "ok", "posted": bool, "database_id", "url", "header"} か失敗の説明。"""
     try:
