@@ -21,7 +21,7 @@
 
 | 経路 | 実効モデル (名前) |
 | --- | --- |
-| `code-review` | 指定があれば、それを名前に解決したもの。`opus` のような別名は対応する名前に、`inherit` は呼び出し元 (このセッションが動いているモデル) の名前に。指定が未設定 (定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」) なら、既定である呼び出し元の 1 つ前の世代の同じ位置のモデル (下の対応表。表に無ければ推測せず人間に質問する) |
+| `code-review` | 指定があれば、それを名前に解決したもの。`opus` のような別名は対応する名前に、`inherit` は呼び出し元 (このセッションが動いているモデル) の名前に。指定が未設定 (定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」) なら、呼び出し元の 1 つ前の世代の同じ位置のモデル (既定。下の対応表。表に無ければ推測せず人間に質問する) |
 | `ce-code-review` | 呼び出し元の名前。**指定は適用されない。** sub-agent に包まないので渡す先が無く、`ce-code-review` は主要な 3 つのペルソナに呼び出し元のモデルを継承させ、残りは mid-tier を使う。**指定が空でなければ「指定 X はこの経路では適用されない」と報告する。** 比較ではなく経路で決めるので、表記と名前の違いで誤報は出ない |
 
 既定の対応表 (SSOT。表に無い組み合わせは人間に質問する):
@@ -60,7 +60,7 @@
 
 ## `code-review` の場合
 
-sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の SSOT は [review-request.md](../../review-triage/references/review-request.md))。雛形を埋める値は、ループはスキルを呼ばないが、次のとおり [review-request スキル](../../review-request/SKILL.md) と同じ規則で決める。識別子と出力先 (`{{output_path}}`) は手順 3・4 (別の名前を付けると `review-triage` の手順 1 が読む対象と一致しない)。識別子の成分の回・`head`・`scope_note` は手順 2 (回は記録の `runs` の数 + 1 で、ループが上限のために起動時に 0 から数える回数とは別物)。モデルはこのファイルの「実効モデル」、`base` と `scope` は「範囲」が SSOT で、そのスキルの手順 1・2 のモデルと範囲の規則だけは使わない。
+sub-agent を立て、[review-request-template.md](../../review-triage/references/review-request-template.md) を埋めた依頼文を渡す (運用の SSOT は [review-request.md](../../review-triage/references/review-request.md))。雛形を埋める値は、ループはスキルを呼ばないが、次のとおり [review-request スキル](../../review-request/SKILL.md) と同じ規則で決める。識別子と出力先 (`{{output_path}}`) は手順 3・4 で決める (別の名前を付けると `review-triage` の手順 1 が読む対象と一致しない)。識別子の成分の回・`head`・`scope_note` は手順 2 で決める (回は記録の `runs` の数 + 1 で、ループが上限のために起動時に 0 から数える回数とは別物)。モデルはこのファイルの「実効モデル」、`base` と `scope` は「範囲」が SSOT で、そのスキルの手順 1・2 のモデルと範囲の規則だけは使わない。
 
 - **`model` には実効モデル (上の定義) を必ず明示して渡す。** ループが回ごとに勝手に切り替えない (SKILL.md の原則)。
 - `review_args` (無ければ既定の effort。上の定義) と実効モデルは、依頼文に**値で**書いて渡し、skill を呼んだことと実際の effort・モデルを報告させる (上の定義。値で書く理由もそこが引く SSOT にある)。
