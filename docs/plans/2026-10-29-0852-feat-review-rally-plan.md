@@ -21,7 +21,7 @@ execution: code
 
 - **目的**: レビューを、メインのセッションから起動した別のセッションに任せて、レビューから修正までを収束するまで繰り返す。人間の操作は、ループの起動と、停止した後の判断だけにする。
 - **手段**: スキル `review-rally` を足す。ループの流れは、ファイル `review-triage/skills/review-triage-loop/references/loop-flow.md` の図に従い、G0 (条件を読む) と L1 (レビューを起動する) を差し替えて、停止を足す。依頼と完了の通知は、ツール `SendMessage` で行う。
-- **変えるのは手順書 (Markdown) と `plugin.json` の版、README だけ。** スクリプトとツール `triagecheck` は変えない。
+- **変えるのは手順書 (Markdown) と、ファイル `review-triage/.claude-plugin/plugin.json` の版、ファイル `review-triage/README.md` だけ。** スクリプトとツール `triagecheck` は変えない。
 - **実装を中断して人間に返す条件**:
   - 通し確認 (U7) で、レビューのセッションが結果のファイルを書けない、またはメインのセッションがレビューの worktree を HEAD に合わせられない。
   - スクリプトを足さないと実現できない手順が見つかった。
