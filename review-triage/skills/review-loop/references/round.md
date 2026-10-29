@@ -26,7 +26,7 @@
 
 ## 呼ぶスキル
 
-**このスキルが呼ぶ 3 つのスキル — RL1 の手順 a の `review-request`・L2 の `review-triage`・F1 の `review-triage-fix` — は、回ごとに Skill ツールで呼ぶ。** 前の回で読んだ手順を、このスキルが自分で実行しない — 依頼文の識別子の組み立てと雛形の埋め方、記録への回の追記・residual を自己採択にするかの判断・生成サマリの再生成と検査、修正と記録の更新は、それぞれのスキルが行う。このスキルが代わりに行うと、そのスキルの手順で確認しないまま結果がファイルと記録に入る (通し確認で、指摘が 0 件の回に review-loop のセッションが `review-triage` を、2 回目以降の依頼文で `review-request` を代わりに行った)。
+**このスキルが呼ぶ 3 つのスキル (RL1 の手順 a の `review-request`・L2 の `review-triage`・F1 の `review-triage-fix`) は、回ごとに Skill ツールで呼ぶ。** 規則と理由の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「呼ぶスキル」。
 
 ## 1 回のレビュー (RL1)
 
@@ -59,21 +59,17 @@
 8. **拒否されたツールの呼び出しが無い**: `permission_denials.count` が 1 以上なら RA1 — 調べられなかった範囲の指摘が無い結果を、採択 0 の収束として記録に入れないため。ワーカーのフックが拒否した呼び出し (フラグファイルの `worker_hook_denials`) は、この件数に含まれない (判別の方法と、RA1 にしない理由の SSOT は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」)。報告に書くもの (原因ごとの項目と直し方) の SSOT は [stops.md](stops.md) の RA1 の行。`unknown` なら停止しない (`notes` に「不明」と残る)。
 9. **権限モードの指定**: フラグファイルの `permission_mode.specified` が `loop.yaml` の `worker.permission_mode` と等しい (人間が案内と違う権限モードでワーカーを起動していない)。`unknown` なら停止しない (`notes` に「不明」と残る)。実効の権限モード (`permission_mode.effective`) が指定と違う回は、ワーカーが `failed` にするので 4 で停止する (SSOT は [worker.md](worker.md) の「ログの読み方」)。
 10. **サンドボックスが拒否した確認が無い**: `sandbox_blocked.count` が 1 以上なら RA1 — 理由は 8 と同じ。8 とは別に確認する (サンドボックスが拒否した確認が `permission_denials` に数えられないことと、件数が `unknown` になる条件の SSOT は [worker.md](worker.md) の「ログの読み方」)。レビュー対象のコミットの行を表示しただけと確認した呼び出し (フラグファイルの `repo_text_displayed`) は、この件数に含まれない (判別の方法と、数えない理由の SSOT は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」)。報告に書くもの (拒否されたコマンドとパスかホスト、直し方) の SSOT は [stops.md](stops.md) の RA1 の行。`unknown` なら停止しない — そのときは `permission_denials` も `unknown` になっていて、`notes` に「不明」と残る。
-11. **結果**: 結果ファイル (`<ループのディレクトリ>/review-<識別子>.yaml`) が YAML として読め、`findings` キーがあり、`run_id` が識別子と一致し、`scope` と `base` が依頼文の値と一致する。**`scope` と `base` を比べるのは、記録の `scope` を結果の値から採るため** (下の「L2 で `review-triage` に渡すもの」)。レビュアが全量の回を `incremental` と書いたまま記録に入ると、記録に全量の回が無いことになり、要否が毎回「要る」になって、上限に数えない全量の回が繰り返される。
+11. **結果**: 結果ファイル (`<ループのディレクトリ>/review-<識別子>.yaml`) を照合する。照合することと理由の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」で、通らなければ RA1。
 
 すべて通れば L2 に進む。
 
 ## L2 で `review-triage` に渡すもの
 
-L2 でも、回ごとに Skill ツールで `review-triage` を呼ぶ (指摘が 0 件の回も。規則の SSOT は上の「呼ぶスキル」)。
+L2 で `review-triage` に渡すもの (記録のキーの出所の読み替え方・`run_id` の写し方) と、`review-triage` が返った後に確認することの SSOT は、[review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「`review-triage` に渡すもの」。そこで「その経路のレビュー不成立」と書くものは、このスキルでは RA1。このスキルの値は次のとおり。
 
-`review-triage` を呼ぶときは、結果ファイルのパスと、次の値を渡す。
-
-- **記録のキー (`model` / `skill` / `level` / `scope`) の値の出所は、[review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「記録のキーの出所」の、そのレビュースキル (`code-review` か `ce-code-review`) の列のとおり。ただし「sub-agent の報告」を「完了のフラグファイル」と読み替え、`scope` は結果 YAML の `scope` の値 (依頼文に `review-request` が埋めた値) を使う。** 出所の表の「ループが決めた範囲」を同じファイルの「範囲」の節で読むと、全量は記録に回が無いときだけなので、収束後の全量の回が `incremental` として記録される。 このループは新しい経路ではないので、出所の表を増やさない (表を複数の文書に持つと、同じ場所への採択が続いた実測がある)。`model` はフラグファイルの `model.effective` で、`unknown` なら `loop.yaml` の `worker.model` (記録の `model` は空にできない)。
-- **記録の `notes` に書く 1 行** (下の「`notes` の固定書式」)。
-- **`run_id` は結果 YAML の値をそのまま写すこと** (規則の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「出力様式」の節)。
-
-**`review-triage` が結果の様式を差し戻したら RA1。** `review-triage` が返ったら、**記録の末尾の回の `run_id` が識別子と一致することを確認し、一致しなければ RA1** (報告に「`review-triage` が `run_id` を写さなかった」と書く)。一致しないまま進むと、再入の手順が同じ結果を 2 度取り込む。
+- **「レビュアの実行を確認した材料」は、完了のフラグファイル。**
+- **記録の `model` は、フラグファイルの `model.effective`。** `unknown` なら `loop.yaml` の `worker.model` (記録の `model` は空にできない)。
+- **記録の `notes` に書く 1 行は、下の「`notes` の固定書式」。**
 
 ## `notes` の固定書式
 
