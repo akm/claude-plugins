@@ -495,6 +495,21 @@ class TestDisplayMessage(unittest.TestCase):
         self.assertEqual(textlint.display_message("冗長な表現です"), "冗長な表現です", "補足が無いのに文字を足している")
         self.assertEqual(textlint.display_message("冗長な表現です\n  \n"), "冗長な表現です", "空白だけの補足を補足として扱っている")
 
+    def test_joins_multiline_detail_into_one_line(self):
+        message = ("助詞 \"は\" がみつかりました。\n\n次の助詞が連続しています。\n\n- \"は\"\n- \"は\"\n\n"
+                   "同じ助詞を連続して使わないように検討してください。\n")
+        self.assertEqual(textlint.display_message(message),
+                         "助詞 \"は\" がみつかりました。次の助詞が連続しています。 - \"は\" - \"は\" "
+                         "同じ助詞を連続して使わないように検討してください。",
+                         "補足の改行を残している (hook の通知で別の検出の項目に見える)")
+
+    def test_ignores_spaces_around_head(self):
+        self.assertEqual(textlint.display_message("冗長な表現です。 \n解説: x"), "冗長な表現です。解説: x",
+                         "本文の末尾の空白のせいで句点を重ねている")
+
+    def test_empty_head_returns_detail(self):
+        self.assertEqual(textlint.display_message("\n解説: x"), "解説: x", "本文が空なのに句点から始めている")
+
     def test_hook_uses_same_form(self):
         line = hook._format([("ここで効く。", KIKU)]).splitlines()[0]
         self.assertEqual(line, "- 「効く」 効く => 適用される。何がどう働くかを書く [prh]",

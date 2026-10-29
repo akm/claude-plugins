@@ -285,11 +285,15 @@ def display_message(message):
     message は 1 行目が本文で、2 行目以降が補足 (規則 prh では用語ファイルの理由、規則集では「解説: URL」など)。
     補足は、本文を 1 つの文として区切ってから続ける。本文の末尾が句点ならそのまま続け、英語の文末の記号なら空白を挟み、
     それ以外 (規則 prh の「X => Y」など) は句点を足す。コマンド check の出力と hook の通知は、どちらもこの形で表示する。
+    本文と補足の改行と連続する空白は 1 つの空白にまとめ、1 行で表示する。補足が複数行の規則 (no-doubled-joshi など) の
+    行が、hook の通知で別の検出の箇条書きの項目に見えないようにするため。本文が空なら補足だけを返す。
     """
     head, _, detail = message.partition("\n")
-    detail = detail.strip()
+    head, detail = " ".join(head.split()), " ".join(detail.split())
     if not detail:
         return head
+    if not head:
+        return detail
     if head.endswith(("。", "！", "？")):
         return head + detail
     if head.endswith((".", "!", "?")):
