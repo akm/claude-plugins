@@ -91,7 +91,7 @@ review-rally: <ループの id> / review_session: <セッション id> / model: 
 
 - **確認の方法**: 移した後に `review-loop` の手順を文書の上で辿り、参照がすべて解けることと、振る舞いが変わらないことを確認する。`doc-dag` で、参照に循環が無く、同じ事実の複製が増えていないことを確認する。
 - **変えるファイル**: `review-triage/skills/review-triage-loop/references/review-invocation.md` (節を足す)、`review-triage/skills/review-loop/references/round.md` (移した節を参照に置き換える)、`review-triage/skills/review-loop/SKILL.md` (流用元の表)。
-- **書き方**: 移した部分は、`round.md` では新しい節への参照に置き換える。レビュー不成立の停止の名前は経路ごとに違う (`review-loop` は RA1、`review-rally` は RR1) ので、新しい節では「その経路のレビュー不成立の停止」と書き、各スキルの文書で対応を書く。
+- **書き方**: 移した部分は、`round.md` では新しい節への参照に置き換える。レビュー不成立の停止の名前は経路ごとに違う (`review-loop` は RA1、`review-rally` は RR1) ので、新しい節では「その経路のレビュー不成立」と書き、各スキルの文書で対応を書く。
 - **PR**: この単位だけで 1 つの PR にし、マージしてから U2 以降のブランチを作る。版は patch を上げる。
 
 ### U2. スキルの SKILL.md と条件の決め方 (G0 の差し替え。Q4)
