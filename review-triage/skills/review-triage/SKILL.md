@@ -5,9 +5,9 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 
 # review-triage: レビュー指摘の採否の判断
 
-レビュー指摘を一件ずつ吟味し、未対処時の帰結を自分で構成してから採否を決める。**成果物は判定済みの記録であって、修正ではない** — 採択した指摘を直すのは後段の [review-triage-fix](../review-triage-fix/SKILL.md)。呼ぶかどうかは人間が決める。
+レビュー指摘を一件ずつ吟味し、未対処時の帰結を自分で構成してから採否を決める。**成果物は判定済みの記録であって、修正ではない。** 採択した指摘を直すのは後段の [review-triage-fix](../review-triage-fix/SKILL.md)。呼ぶかどうかは人間が決める。
 
-**判定の順序・分岐・各ノードの条件は [references/judgment-flow.md](references/judgment-flow.md) が SSOT (single source of truth。ある事実を定めている唯一の記述)。** このファイルでは言い直さない — 以下、ノード ID (D1〜D8・E1・E2・A / H / R) はそこを指す。
+**判定の順序・分岐・各ノードの条件は [references/judgment-flow.md](references/judgment-flow.md) が SSOT (single source of truth。ある事実を定めている唯一の記述)。** このファイルでは言い直さない。以下、ノード ID (D1〜D8・E1・E2・A / H / R) はそこを指す。
 
 ## 前提知識
 
@@ -21,21 +21,21 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 
 **手順 1 より前に `--gen-config` を処理する。** 指定されていれば、指摘の有無に関わらず雛形を生成して終了する (生成の内容と既存があるときの振る舞いは [references/config-schema.md](references/config-schema.md))。設定がまだ無い利用者は、レビューを実行する前にこれを実行するので、手順 1 の「指摘が無ければ終了」より先に置かないと到達できない。
 
-1. **入力の確認**: 入力の経路は 2 つ — 同じセッションの文脈から受け取るか、**別セッションのレビュー結果を YAML ファイルで受け取る** (依頼の運用と様式の SSOT は [references/review-request.md](references/review-request.md)。依頼文は [review-request](../review-request/SKILL.md) スキルが生成する)。どのスキルかは記録の `skill` に残す。
-   - ファイル経由の場合、読むのは**依頼文に埋め込んだ出力先の 1 ファイル** (`tmp/review-<識別子>.yaml`)。`head` が現在の HEAD と一致することを確認してから判定に進む。`residual` の列は指摘として数えず、目を通して気になるものだけ記録の `notes` に写す。**直したい residual は `notes` ではなく、自己採択の指摘 (`origin: residual`) として `findings` に足し、他の指摘と同じ判定を通す** (様式と理由の SSOT は [references/record-schema.md](references/record-schema.md) の「ループ中に記録の外で直さない」)。トップレベルの `attrs` も同じ扱い — 記録に写す場所は無いので、残す価値があるものだけ `notes` に写す。
-   - **出力先には過去の回のファイルが残る。** 識別子で名前が区別できる (成分の SSOT は [review-request](../review-request/SKILL.md) の手順 3) が、それでも `head` が現在の HEAD と一致するものだけを対象にし、一致するものが無ければ指摘が無い場合と同じ扱いにする — 古い結果を現在の HEAD への指摘として判定すると、既に直した箇所を再び却下・採択することになる。
+1. **入力の確認**: 入力の経路は 2 つで、同じセッションの文脈から受け取るか、**別セッションのレビュー結果を YAML ファイルで受け取る** (依頼の運用と様式の SSOT は [references/review-request.md](references/review-request.md)。依頼文は [review-request](../review-request/SKILL.md) スキルが生成する)。どのスキルかは記録の `skill` に残す。
+   - ファイル経由の場合、読むのは**依頼文に埋め込んだ出力先の 1 ファイル** (`tmp/review-<識別子>.yaml`)。`head` が現在の HEAD と一致することを確認してから判定に進む。`residual` の列は指摘として数えず、目を通して気になるものだけ記録の `notes` に写す。**直したい residual は `notes` ではなく、自己採択の指摘 (`origin: residual`) として `findings` に足し、他の指摘と同じ判定を通す** (様式と理由の SSOT は [references/record-schema.md](references/record-schema.md) の「ループ中に記録の外で直さない」)。トップレベルの `attrs` も同じ扱いで、記録に写す場所は無いので、残す価値があるものだけ `notes` に写す。
+   - **出力先には過去の回のファイルが残る。** 識別子で名前が区別できる (成分の SSOT は [review-request](../review-request/SKILL.md) の手順 3) が、それでも `head` が現在の HEAD と一致するものだけを対象にし、一致するものが無ければ指摘が無い場合と同じ扱いにする。古い結果を現在の HEAD への指摘として判定すると、既に直した箇所を再び却下・採択することになる。
    - **上流が報告のみで実行されたかを確認する** (実行前後で HEAD と作業ツリーが不変)。適用済みなら判定に進まず、その旨を報告して次から報告のみで実行するよう案内する。
    - 指摘が見当たらなければ、レビューを先に実行するよう案内して終了する。**勝手にレビューを実行しない。**
-2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) — 「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
+2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) で、「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
    - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録のディレクトリ・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が検査されないまま通る)。
 3. **判定**: 指摘ごとに [references/judgment-flow.md](references/judgment-flow.md) の図に従って決着させる。
-   - 帰結の 4 項目 (D3 で書くもの) は**全件に書く** — D1・D2 で決着した指摘にも記録の材料として残す。
+   - 帰結の 4 項目 (D3 で書くもの) は**全件に書く。** D1・D2 で決着した指摘にも記録の材料として残す。
    - 評価 (E1・E2) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
    - 境目が判断しづらいときは [references/gate-examples.md](references/gate-examples.md) の対になった例と突き合わせる。
-4. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの SSOT は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。既定のディレクトリを使うとき、そのディレクトリが `git check-ignore` で無視されていなければ、記録を書かずに「`.gitignore` に `tmp/` を足してコミットしてから再実行する」と案内して終了する — スキルは `.gitignore` を変えない (前提と設定で明示したディレクトリの扱いの SSOT は [references/record-schema.md](references/record-schema.md) の冒頭)。無視されていれば、ディレクトリが無ければ作る。
+4. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの SSOT は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書く。`verdict_reason` には決着ノードの ID を書く。既定のディレクトリを使うとき、そのディレクトリが `git check-ignore` で無視されていなければ、記録を書かずに「`.gitignore` に `tmp/` を足してコミットしてから再実行する」と案内して終了する。スキルは `.gitignore` を変えない (前提と設定で明示したディレクトリの扱いの SSOT は [references/record-schema.md](references/record-schema.md) の冒頭)。無視されていれば、ディレクトリが無ければ作る。
 5. **サマリの再生成と検査**: [記録 README の「書いた後にすること」](references/record-schema.md#書いた後にすること) の 1 と 2 を行う (コマンドと、未設定のときの扱いの SSOT は [references/project-config.md](references/project-config.md))。
-6. **コミット**: 同じ節の 3 のとおり、記録のディレクトリが git の追跡内 (`git check-ignore` で無視されない) のときだけコミットする — 既定の `tmp/review-triages/` は追跡外なのでコミットしない (判定の仕方・要否・分け方の SSOT は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
-7. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。**勝手に呼ばない** — 直すかどうかは人間が決める。
+6. **コミット**: 同じ節の 3 のとおり、記録のディレクトリが git の追跡内 (`git check-ignore` で無視されない) のときだけコミットする。既定の `tmp/review-triages/` は追跡外なのでコミットしない (判定の仕方・要否・分け方の SSOT は [記録 README のコミット節](references/record-schema.md#コミット))。**修正はコミットしない** (判断までが範囲)。
+7. **報告**: 全件数・採択・保留・却下と、決着ノード別の内訳 (生成サマリの推移の表と同じ値) を出す。保留があれば [references/hold-presentation.md](references/hold-presentation.md) の形で提示する。採択があれば [review-triage-fix](../review-triage-fix/SKILL.md) を案内する。**勝手に呼ばない。** 直すかどうかは人間が決める。
 
 ## 原則
 

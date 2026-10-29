@@ -27,7 +27,7 @@
 
 ## コミット前に通すもの
 
-各コミットの前に関門を通す。**まとめて最後に通さない** — どのコミットで壊れたかが分からなくなる。
+各コミットの前に関門を通す。**まとめて最後に通さない。** どのコミットで壊れたかが分からなくなる。
 
 通すのは、設定の `gates` が挙げるもののうち**変更の種類に対応するもの**と、記録を変更したなら `triage_check_command` ([project-config.md](../../review-triage/references/project-config.md))。
 
@@ -40,4 +40,4 @@
 
 **コミットしたら、記録 YAML の該当の問題を `status: done`・`sha` に更新しておく。** 途中で中断したとき、どこまで進んだかが記録に残る。記録とサマリのコミットは区切りで行う (分け方の SSOT は [記録 README のコミット節](../../review-triage/references/record-schema.md#コミット))。
 
-**リポジトリ外の成果物への反映はコミットが立たない。** その問題は `status: done-external` にする。**対象の範囲と、何を書くかの SSOT は [記録 README のリポジトリ外への反映](../../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)** — ここには写さない (規則を写すと、SSOT が変わったときに片方だけ古くなる)。
+**リポジトリ外の成果物への反映はコミットが立たない。** その問題は `status: done-external` にする。**対象の範囲と、何を書くかの SSOT は [記録 README のリポジトリ外への反映](../../review-triage/references/record-schema.md#リポジトリ外への反映-done-external)。** ここには写さない (規則を写すと、SSOT が変わったときに片方だけ古くなる)。
