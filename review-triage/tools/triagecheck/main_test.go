@@ -470,7 +470,7 @@ func TestResolveJudgmentFlowPath(t *testing.T) {
 			t.Fatalf("got (%q, %q), want (%q, %q)", p, origin, want, "CLAUDE_PLUGIN_ROOT")
 		}
 	})
-	t.Run("どちらも無ければデフォルトのパス (空文字列) を返す", func(t *testing.T) {
+	t.Run("どちらも無ければパスにも名前にも空を返す", func(t *testing.T) {
 		t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 		p, origin := resolveJudgmentFlowPath("", false)
 		if p != "" || origin != "" {
