@@ -34,7 +34,7 @@
 
 ## 同梱の道具 (nearedges)
 
-Markdown の修正の差分から、コミット前に再確認する範囲 — 同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 (近くの辺) — を列挙します。`review-triage-fix` の修正フェーズが観点 B (周りの記述を再確認する) に使い、読んだ範囲を記録の `plans[].verification.near_edges` に残します。`-hints` で差分の種類に応じた観点 (B・C・F) も提示します。使い方は [tools/nearedges/README.md](tools/nearedges/README.md)。**Go が必要です** (triagecheck と同じく `go run` で都度実行)。
+Markdown の修正の差分から、コミット前に再確認する範囲を列挙します。範囲は、同じ表の全行・同じ箇条書きとその親・同じ節の全文・変更行が参照する先 (近くの辺) です。`review-triage-fix` の修正フェーズが観点 B (周りの記述を再確認する) に使い、読んだ範囲を記録の `plans[].verification.near_edges` に残します。`-hints` で差分の種類に応じた観点 (B・C・F) も提示します。使い方は [tools/nearedges/README.md](tools/nearedges/README.md)。**Go が必要です** (triagecheck と同じく `go run` で都度実行)。
 
 ## 同梱の道具 (lineorigin)
 
@@ -91,9 +91,9 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 
 `loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
-`fix` は `review-triage-fix` の既定 — 回数の閾値 N (`threshold_rounds`) と、フェーズ (調査 / 立案 / 修正) ごとに sub-agent で実行するか・その model と effort (`stages`) — で、無くても既定 (閾値 5、どのフェーズもセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
+`fix` は `review-triage-fix` の既定で、無くても既定 (閾値 5、どのフェーズもセッション内) で動きます。既定の中身は、回数の閾値 N (`threshold_rounds`) と、フェーズ (調査 / 立案 / 修正) ごとに sub-agent で実行するか・その model と effort (`stages`) です。各キーの意味は同ファイルの「`fix`」を参照してください。
 
-`review_loop` は `review-loop` の既定 — ループのディレクトリ・待機の期限・ワーカーの effort と権限 (権限モード・許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン) — で、無くても既定で動きます (ワーカーの effort とモデルが決まらなければ質問します。モデルは `loop.review_model` を共用します)。書き込みを許す場所と接続を許すドメインは `--resume` のたびに設定から再度読み込むので、サンドボックスの拒否で停止したループは、終えずに設定を直して続けられます。各キーの意味は同ファイルの「`review_loop`」を参照してください。
+`review_loop` は `review-loop` の既定で、無くても既定で動きます (ワーカーの effort とモデルが決まらなければ質問します。モデルは `loop.review_model` を共用します)。既定の中身は、ループのディレクトリ・待機の期限・ワーカーの effort と権限 (権限モード・許可の一覧・サンドボックスで書き込みを許す場所と接続を許すドメイン) です。書き込みを許す場所と接続を許すドメインは `--resume` のたびに設定から再度読み込むので、サンドボックスの拒否で停止したループは、終えずに設定を直して続けられます。各キーの意味は同ファイルの「`review_loop`」を参照してください。
 
 **`gates` (関門の一覧) がとくに重要です。** 却下の免除条項は「この欠陥を検出する関門が無い」ことを条件にするため、そのリポジトリにどんな関門があるかを知らないと判定できません。未設定のときの扱いと理由は [project-config.md](skills/review-triage/references/project-config.md) の「`gates` — なぜ関門の一覧が要るか」を参照してください。
 
@@ -101,7 +101,7 @@ Markdown の修正の差分から、コミット前に再確認する範囲 — 
 
 ## 同梱の agent 定義
 
-`agents/` に、`review-triage-fix` がフェーズを sub-agent で実行するときに使う汎用の agent 定義を 6 つ同梱しています — `fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max`。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どのフェーズを行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (実行方法・依頼文・検証の SSOT は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
+`agents/` に、`review-triage-fix` がフェーズを sub-agent で実行するときに使う汎用の agent 定義を 6 つ同梱しています。`fix-stage` (effort をセッションから継承) と `fix-stage-low` / `fix-stage-medium` / `fix-stage-high` / `fix-stage-xhigh` / `fix-stage-max` です。参照名は `review-triage:fix-stage-high` の形です。Claude Code は sub-agent の effort を agent 定義の frontmatter でしか受けず、呼び出し時に上書きできないため、effort ごとに定義を分けています。定義の違いは effort だけで、どのフェーズを行うかは `review-triage-fix` が依頼文で指示し、model は呼び出し時に渡します (実行方法・依頼文・検証の SSOT は [stage-subagent.md](skills/review-triage-fix/references/stage-subagent.md))。**`review-triage-fix` の依頼文を伴わない用途では使いません。**
 
 ## 併用すると役に立つプラグイン
 
