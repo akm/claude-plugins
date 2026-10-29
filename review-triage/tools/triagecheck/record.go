@@ -354,7 +354,7 @@ func reviewTriageRecordProblems(files []string, readFile func(string) ([]byte, e
 }
 
 // recordLineCommentProblems は行内コメント (LineComment) を持つノードを検出する。
-// YAML の素のスカラーは半角スペースに続く # 以降をコメントとして落とすため、
+// YAML の素のスカラーは半角スペースに続く # 以降をコメントとして取り除くため、
 // 引用符の無い値に # を書くと値が警告なく切り詰められる (実測で cause が「PR」だけに
 // なった)。切り詰められた分はパーサが LineComment として保持するので、そこを見る。
 // 生テキストの正規表現で字句規則を再現する方式では、キーの形・空白・ブロックスカラー・
@@ -367,7 +367,7 @@ func recordLineCommentProblems(f string, root *yaml.Node) []string {
 	walk = func(n *yaml.Node) {
 		if n.LineComment != "" {
 			problems = append(problems, fmt.Sprintf(
-				"%s:%d: 行内コメント (%q) は使えません。YAML は ' #' 以降をコメントとして落とし、値が警告なく切り詰められる。値に # を含めるときは引用符で囲む",
+				"%s:%d: 行内コメント (%q) は使えません。YAML は ' #' 以降をコメントとして取り除き、値が警告なく切り詰められる。値に # を含めるときは引用符で囲む",
 				f, n.Line, n.LineComment))
 		}
 		for _, c := range n.Content {
