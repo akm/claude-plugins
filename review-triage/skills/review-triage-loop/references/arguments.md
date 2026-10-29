@@ -34,7 +34,7 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 1. 引数にあればその値
 2. 無ければ設定の `loop` の値 (「未設定」の定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」。上の段落のとおり、`--threshold` と `--stage` だけは設定の `fix` を見る)
 3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の「`loop`」の表。`--threshold` と `--stage` は「`fix`」の表)
-4. 既定で決まらないものは**人間に質問する**。質問するのは、`review_skill` (既定を持たない。理由は同じ表の下の説明) と、`review_model` で呼び出し元が既定の対応表に無いとき ([review-invocation.md](review-invocation.md) の「G0 での解決」) である。ループがモデルを決めない経路では質問しない (SSOT は同ファイルの「G0 での解決」)
+4. 既定で決まらないものは**人間に質問する**。質問するのは、`review_skill` (既定を持たない。理由は同じ表の下の説明) を決めるときと、`review_model` で呼び出し元が既定の対応表に無いとき ([review-invocation.md](review-invocation.md) の「G0 での解決」) である。ループがモデルを決めない経路では質問しない (SSOT は同ファイルの「G0 での解決」)
 
 **設定で決まっていれば質問しない。** リポジトリごとに決めるものは、本来は設定に書くものだからである。質問するのは、引数でも設定でも未設定 (定義は上の参照先) のときだけ。
 
