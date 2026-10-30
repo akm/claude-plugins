@@ -11,13 +11,13 @@
 | # | 確認すること | 確認の仕方 | 満たさないときの直し方 |
 | --- | --- | --- | --- |
 | 1 | メインのセッションが worktree で動いていない | `git rev-parse --path-format=absolute --git-dir` と `git rev-parse --path-format=absolute --git-common-dir` が同じ | メインの作業ツリー (`git rev-parse --git-common-dir` の親) で動くセッションから起動し直す。worktree で動くセッションは、ほかの worktree への書き込みと git の操作を拒否されるので、レビューの worktree を HEAD に合わせられない |
-| 2 | メインの作業ツリーから見て、`tmp/review-rally/` が git に無視されている | `git check-ignore -q tmp/review-rally/<ループの id>/rally.yaml` | ファイル `.gitignore` に `tmp/` を足し、現在のブランチにコミットしてから起動し直す。レビューの worktree は現在のブランチの HEAD に合わせるので、コミットすればレビューの worktree でも無視される |
+| 2 | メインの作業ツリーから見て、`tmp/review-rally/` が git に無視されている | `git check-ignore -q tmp/review-rally/x/rally.yaml` | ファイル `.gitignore` に `tmp/` を足し、現在のブランチにコミットしてから起動し直す。レビューの worktree は現在のブランチの HEAD に合わせるので、コミットすればレビューの worktree でも無視される |
 | 3 | メインの作業ツリーから見て、`.claude/worktrees/` が git に無視されている | `git check-ignore -q .claude/worktrees/review-rally` | ファイル `.gitignore` に `.claude/worktrees/` を足し、現在のブランチにコミットしてから起動し直す。無視されていないと、レビューの worktree ができた時点で、メインの作業ツリーに `?? .claude/` (`.claude/` の下に追跡するファイルがあれば `?? .claude/worktrees/`) が出て clean でなくなる |
 | 4 | メインの作業ツリーが clean である | `git status --porcelain` が空 | 出ている変更をコミットするか退避してから起動し直す。出ているのが `?? tmp/` か `?? .claude/` か `?? .claude/worktrees/` なら、2 か 3 の直し方に当たる (2・3 の確認が先に失敗しているはずなので、直し方は 2・3 の行に書いたものだけでよい) |
 | 5 | 記録が読める | 記録 YAML (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`) が無いか、YAML として読める | 無ければ新規として扱う。あるのに読めなければ、読めない理由を報告する |
 | 6 | 全量の起点のブランチが決まる | [arguments.md](arguments.md) の `--base` の段落と「値の検査」 | `--base` で、使えるブランチを指定する |
 
-- 2 と 3 は、`git check-ignore` が存在しないパスでも判定できることを使う。2・3 の無視の出所 (`.gitignore`・`.git/info/exclude`・利用者の設定 `core.excludesFile`) は問わない。`.git/info/exclude` と `core.excludesFile` は、メインの作業ツリーとレビューの worktree で共通だからである。
+- 2 と 3 は、`git check-ignore` が存在しないパスでも判定できることを使う。2 のパスにループの id を使わないのは、ループの id を決めるのがこの確認の後 (下の「ループのディレクトリを作る」の 1) だからである。2・3 の無視の出所 (`.gitignore`・`.git/info/exclude`・利用者の設定 `core.excludesFile`) は問わない。`.git/info/exclude` と `core.excludesFile` は、メインの作業ツリーとレビューの worktree で共通だからである。
 - 2〜4 の組み合わせと、メインの作業ツリー・レビューの worktree に出るものは、2026-10-29 に一時リポジトリで確認した (`tmp/` と `.claude/worktrees/` のどちらを無視するか・`.claude/` の下に追跡するファイルがあるかの 6 通り)。2 と 3 がともに満たされれば、メインの作業ツリーもレビューの worktree も clean のままになる。
 
 ## ループのディレクトリを作る
