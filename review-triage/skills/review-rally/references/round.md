@@ -33,13 +33,13 @@
    - それ以外の理由で書かなかったら RR4 (報告には `review-request` が報告した理由を書く)。
    - 書けたら、`rally.yaml` の `rounds` を 1 つ増やす (J5 が見る回数。数えるのはここだけ)。
 3. **会話を消す。** レビューのセッションに前の回の依頼を送っていれば (この起動で 2 回目以降の依頼なら)、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。1 回目は消さない (最初の指示文のターンしか無い)。
-4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` (そのセッションのターンが始まった) か `queued` (前のターンの後に始まる) でなければ RR3。**送る直前に**、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) と、現在のブランチの reflog の件数 (`git reflog show --format=%h refs/heads/<現在のブランチ> | wc -l`) を取る (手順 6 の 4 で比べる)。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`)・reflog の件数 (`branch_reflog`) を書く。手順 6 は完了のメッセージで始まった後のターンで行うので、会話が compact されても比べられるよう、ファイルに残す。
+4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` (そのセッションのターンが始まった) か `queued` (前のターンの後に始まる) でなければ RR3。**送る直前に**、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) と、その時点の UNIX 時刻 (`date +%s`) を取る (手順 6 の 4 で比べる)。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`)・UNIX 時刻 (`reflog_since`) を書く。手順 6 は完了のメッセージで始まった後のターンで行うので、会話が compact されても比べられるよう、ファイルに残す。
 5. **待機を起動して、ターンを終える** (下の「待機」)。完了のメッセージが届くと次のターンが始まり、再入の手順から手順 6 に入る。
 6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1 (報告に書くものの SSOT は [stops.md](stops.md) の決定表の RR1 の行)。
    1. 結果のファイル (依頼のディレクトリの `review-<識別子>.yaml`) を照合する。照合することと理由の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
    2. レビューの worktree の HEAD が依頼文の `head` と同じコミットで、`git -C <レビューの worktree> status --porcelain` が空である。
    3. メインの作業ツリーの HEAD が依頼文の `head` と同じコミットで、`git status --porcelain` が空である。
-   4. レビューの間に、メインのリポジトリのブランチが動いていない。ブランチの一覧と現在のブランチの reflog の件数 (取り方は手順 4) が、`rally.yaml` の `waiting.refs`・`waiting.branch_reflog` と同じである。件数も比べるのは、ブランチを動かしてから元のコミットに戻すと、一覧は同じになるが reflog の件数が増えるためである。レビュアのテストが、メインのリポジトリのブランチを書き換えた実例があるため。
+   4. レビューの間に、メインのリポジトリのブランチが動いていない。ブランチの一覧 (取り方は手順 4) が `rally.yaml` の `waiting.refs` と同じで、現在のブランチの reflog に `waiting.reflog_since` より後の項目が無い (`git reflog show --date=unix --format=%gd refs/heads/<現在のブランチ>` が出す `<ブランチ>@{<UNIX 時刻>}` の時刻が、どれも `reflog_since` 以下である)。reflog も見るのは、ブランチを動かしてから元のコミットに戻すと、一覧は同じになるが reflog に項目が増えるためである。項目の数ではなく時刻で比べるのは、git が期限 (設定 `gc.reflogExpire`) より古い項目を消し、ブランチが動かなくても数が減ることがあるためである。レビュアのテストが、メインのリポジトリのブランチを書き換えた実例があるため。
 
    すべて通れば L2 に進む。
 
