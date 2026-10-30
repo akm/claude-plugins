@@ -106,6 +106,10 @@ waiting:
   run_id: "20261029-0905-feat-foo-1-code-review-claude-opus-5-5"
   sent_at: "2026-10-29T00:05:12Z"
   timer_fires: 0
+  refs:
+    - "feat/foo 1a2b3c4"
+    - "main 5d6e7f8"
+  branch_reflog: 12
 ```
 
 | キー | 内容 |
@@ -116,4 +120,4 @@ waiting:
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
 | `session` | 起動したレビューのセッション。`model`・`effort`・`permission_mode` は `get_session` で確認した実際の値。`branch` は `get_session` の `branch`。`reused` と `original_head` は上の「起動」の 3 |
 | `rounds` | この起動で数えた回数 (J5 が見る。数える場所は [round.md](round.md) の手順 2) |
-| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで。記録の `notes` の `review_minutes` と、再入の手順の時刻の比較の起点)、`timer_fires` は待機の通知を受けた回数 ([round.md](round.md) の「待機」)。結果待ちが無ければ `run_id` を空にする |
+| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで。記録の `notes` の `review_minutes` と、再入の手順の時刻の比較の起点)、`timer_fires` は待機の通知を受けた回数 ([round.md](round.md) の「待機」)、`refs` はメインのリポジトリのブランチの一覧 (1 つのブランチが 1 要素)、`branch_reflog` は現在のブランチの reflog の件数 (`refs` と `branch_reflog` は、依頼を送る直前に取ったもの。取り方と比べ方は [round.md](round.md) の手順 4 と手順 6 の 4)。結果待ちが無ければ `run_id` を空にする |
