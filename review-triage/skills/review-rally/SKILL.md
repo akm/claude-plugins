@@ -24,7 +24,7 @@ description: レビューを、このセッションから起動した別の Cla
 
 ## 前提知識
 
-- **ループは必ず停止する。** 停止の条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RR1〜RR4 を足したもの。停止したら、レビューのセッションと worktree を片付けて終える。**初版は、停止したループを続ける手段 (`--resume`) を持たない。** 続けるときは新しいループを始める。記録は回をまたいで続くので、推移は失われない。
+- **ループは必ず停止する。** 停止の条件は `review-triage-loop` と同じ (上限・収束・選択待ち・進まない・構造の見直し) に、RR1〜RR4 を足したもの。停止したら、レビューのセッションと worktree を片付けずに、片付けの案内を報告に書いて終える (片付けるかどうかは人間が決める。[stops.md](references/stops.md) の「停止のときに行うこと」)。**初版は、停止したループを続ける手段 (`--resume`) を持たない。** 続けるときは新しいループを始める。記録は回をまたいで続くので、推移は失われない。
 - **メインのセッションは、worktree ではなくメインの作業ツリーで動かす。** レビューの worktree はメインの作業ツリーの下 (`.claude/worktrees/`) に置かれ、依頼文と結果はその中に書く ([round.md](references/round.md) の「ファイルのディレクトリ」)。メインのセッションが worktree で動いていると、ほかの worktree への書き込みと git の操作を拒否される。
 - **レビューのセッションのモデルと effort は人間が決める。** このスキルは推測せず、決まらなければ質問する。アプリは起動元より上のモデルと effort を選べず、上を指定しても誤りにせずに無視するので、起動の直後に実際の値を確認し、指定と違えば停止する (RR2。[session.md](references/session.md))。
 - **依頼と完了の通知はセッション間のメッセージで行う。** 依頼文と結果はファイルで、メッセージで渡すのはそのパスと完了の 1 行だけ。依頼文を会話に貼らない理由の SSOT は [review-request.md](../review-triage/references/review-request.md) の「依頼文はファイルに書き出し、パスだけを渡す」。
@@ -53,7 +53,7 @@ description: レビューを、このセッションから起動した別の Cla
 
 ### 停止
 
-図に従って停止ノード (S2〜S6・RR1〜RR4) に到達したら、[stops.md](references/stops.md) の「停止のときに行うこと」のとおり、依頼文と結果を複製し、`rally.yaml` を書き換え、片付けをしてから報告する。報告の形は [reporting.md](../review-triage-loop/references/reporting.md)、停止ノードごとに足すものは [loop-flow.md](../review-triage-loop/references/loop-flow.md) の決定表 (S2〜S6) と [stops.md](references/stops.md) の決定表 (RR1〜RR4)、このループで足すものは [stops.md](references/stops.md) の「停止の報告に足すもの」。
+図に従って停止ノード (S2〜S6・RR1〜RR4) に到達したら、[stops.md](references/stops.md) の「停止のときに行うこと」のとおり、依頼文と結果を複製し、`rally.yaml` を書き換え、片付けの案内を書いて報告する。報告の形は [reporting.md](../review-triage-loop/references/reporting.md)、停止ノードごとに足すものは [loop-flow.md](../review-triage-loop/references/loop-flow.md) の決定表 (S2〜S6) と [stops.md](references/stops.md) の決定表 (RR1〜RR4)、このループで足すものは [stops.md](references/stops.md) の「停止の報告に足すもの」。
 
 ## 原則
 
