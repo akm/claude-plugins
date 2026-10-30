@@ -48,7 +48,7 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 
 | 値 | 条件 |
 | --- | --- |
-| レビューのセッションのモデルの指定 | 空でない文字列。表記は検査しない (`start_session` が解釈し、起動の後に実際の値と比べる。比べ方の SSOT は [session.md](session.md) の「起動」) |
+| レビューのセッションのモデルの指定 | 空でない文字列。表記は検査しない (`start_session` が解釈し、起動の後に実際の値と比べる。比べ方の SSOT は [session.md](session.md) の「起動」)。effort と違い、開始の前にメインのセッションのモデルと比べない。モデルには、どちらが上かを決める手段が無いためである (指定は別名 `opus` でも版を含む名前でもよく、このスキルはモデルの上下の表を持たない)。指定がメインのセッションより上かどうかは、起動の後に実際の値と比べて初めて分かる (違えば RR2) |
 | レビューのセッションの effort | `low` / `medium` / `high` / `xhigh` / `max` のいずれかで、メインのセッションの effort (`get_session` の `self` の `effort`) 以下。上なら、ループを始めずに、メインのセッションの effort を上げるか、指定を下げるよう案内する (上の値は `start_session` に無視されるので、起動してから RR2 で停止させずに、開始の前に誤りとして報告する) |
 | `review_skill`・`review_args`・`max_rounds`・`structure_rounds` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
 | `threshold_rounds`・`stages` | [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 |
