@@ -724,7 +724,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
 			if inv := pl.Investigation; inv != nil {
 				if strings.TrimSpace(inv.Scope) == "" {
-					add("%s: investigation.scope がありません (調べた範囲。実行したコマンドと目で読んだ対象)。範囲を書かない調査は未調査と区別できない", pn)
+					add("%s: investigation.scope がありません (調べた範囲。実行したコマンドと目で読んだ対象を書く)。範囲を書かない調査は未調査と区別できない", pn)
 				}
 				for _, kv := range []struct {
 					key  string
