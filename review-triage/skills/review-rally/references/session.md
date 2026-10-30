@@ -55,7 +55,7 @@
    - `worktreePath` が無いか、メインの作業ツリーの `.claude/worktrees/` の下にない。
    - `permissionMode` がメインのセッション (`get_session` の `self`) と違う。
 
-3. **レビューの worktree の起動前の状態を控える。** アプリは、以前から残っている worktree を再利用して、新しいブランチに切り替えることがある (#151 の試しで 2 回起きた)。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。片付けの案内で、元に戻す手順を組み立てるために使う ([stops.md](stops.md) の「片付けの案内」)。
+3. **レビューの worktree の起動前の状態を控える。** アプリは、以前から残っている worktree を再利用して、新しいブランチに切り替えることがある (#151 の試しで 2 回起きた)。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。`<元の HEAD>` は、元の HEAD が detached HEAD なら SHA、ブランチを指していたならそのブランチ名である (git が reflog にそう書く)。片付けの案内で、元に戻す手順を組み立てるために使う ([stops.md](stops.md) の「片付けの案内」)。
 
 4. **`rally.yaml` の `session` を書く** (様式は下の「`rally.yaml`」)。
 
