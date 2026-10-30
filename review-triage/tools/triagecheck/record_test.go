@@ -1241,7 +1241,7 @@ func TestReviewTriageRecordUnknownStatusReportsOnce(t *testing.T) {
 	}
 }
 
-// 修正計画の表の最終列は SHA と URL の 2 つの型を取るので、見出しは「証拠」で
+// 修正計画の表の最終列は SHA だけでなく URL も取るので、見出しは「証拠」で
 // なければならない。見出しを SHA に戻すと、done-external の行の URL を SHA として
 // 読ませることになる (セルを埋める処理だけ直して見出しに追随しなかった種類の欠陥)。
 func TestReviewTriageSummaryPlanEvidenceHeader(t *testing.T) {
