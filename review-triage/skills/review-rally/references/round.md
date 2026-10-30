@@ -22,7 +22,7 @@
 
 ### 手順
 
-1. **レビューの worktree を HEAD に合わせる。** `git -C <レビューの worktree> status --porcelain` が空であることを確認してから、`git -C <レビューの worktree> checkout --detach <メインの作業ツリーの HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。続けて、`git -C <レビューの worktree> check-ignore -q tmp/review-rally/<ループの id>/x` で、レビューの worktree の中から見て依頼のディレクトリが無視されていることを確認する。**パスは、レビューの worktree のルートからの相対パスで渡す。** 手順 2 の `--dir` と同じメインの作業ツリーからの相対パス (`.claude/worktrees/<名前>/…`) を渡すと、`.claude/worktrees/` を無視する規則 (開始の前提の 3) に当たって、`tmp/` の規則と関係なく無視と判定され、絶対パスを渡すと git がリポジトリの外のパスとして誤りにする。無視されていなければ RR4 (開始の前提の 2 が満たされていれば起きないが、レビューの worktree だけに適用される無視の規則があれば起きうる)。**依頼文を書く前に合わせるのは、無視の確認を、レビューする HEAD の `.gitignore` で行うため。**
+1. **レビューの worktree を HEAD に合わせる。** `git -C <レビューの worktree> status --porcelain` が空であることを確認してから、`git -C <レビューの worktree> checkout --detach <メインの作業ツリーの HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。続けて、`git -C <レビューの worktree> check-ignore -q tmp/review-rally/<ループの id>/x` で、レビューの worktree の中から見て依頼のディレクトリが無視されていることを確認する。**パスは、レビューの worktree のルートからの相対パスで渡す。** 手順 2 の `--dir` と同じメインの作業ツリーからの相対パス (`.claude/worktrees/<名前>/…`) を渡すと、`.claude/worktrees/` を無視する規則 (開始の前提の 3) に当たって、`tmp/` の規則と関係なく無視と判定される。レビューの worktree の外を指す絶対パス (メインの作業ツリーの `tmp/` など) を渡すと、git は誤りにする (終了コード 128)。無視されていなければ RR4 (開始の前提の 2 が満たされていれば起きないが、レビューの worktree だけに適用される無視の規則があれば起きうる)。**依頼文を書く前に合わせるのは、無視の確認を、レビューする HEAD の `.gitignore` で行うため。**
 2. **依頼文を書く。** 次をすべて確認してから、Skill ツールで [review-request](../../review-request/SKILL.md) を呼び出す (回ごとに。規則の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「呼ぶスキル」)。当たれば RR4 で、当たったものをすべて一度に報告する。
    - メインの作業ツリーが clean である (`git status --porcelain` が空)。開始の前提の 2・3 を満たしたので、`review-rally` 自身が書くファイルはここに出ない。
    - 記録が読める。
