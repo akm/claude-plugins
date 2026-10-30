@@ -95,7 +95,7 @@ def marked(line):
 
 def read_repo_lines(repo, base, head):
     """レビュー対象のコミット (base と、base..head の各コミット) で追跡されているファイルの行と、それらのコミットのコミットメッセージの
-    行のうち、文面かタグを含むものを、前後の空白を除いた文字列の集合にして返す。文面だけの行とタグだけの行は含めない — 拒否されたときの
+    行のうち、文面かタグを含むものを、前後の空白を除いた文字列の集合にして返す。文面だけの行とタグだけの行は含めない。拒否されたときの
     本物の行と同じになりうるため。読めなければ (base か head の値が形に合わない・git が失敗した) None を返す。"""
     if not BASE_NAME.fullmatch(base) or not FULL_SHA.fullmatch(head):
         return None
@@ -272,7 +272,7 @@ if isinstance(result, dict):
     repo_read = False
     for r in results:
         name_cmd = uses.get(r.get("tool_use_id"))
-        # is_error は見ない — 出力を | tail に渡したコマンドや、末尾が ; echo のコマンドは、拒否されても成功で終了する (実測)
+        # is_error は見ない。出力を | tail に渡したコマンドや、末尾が ; echo のコマンドは、拒否されても成功で終了するため (実測)
         if not name_cmd or name_cmd[0] != "Bash":
             continue
         body = body_text(r.get("content"))

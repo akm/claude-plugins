@@ -80,7 +80,7 @@ func TestJudgmentFlowDuplicateTableRow(t *testing.T) {
 }
 
 // mermaid のコメント行 (%%) に書いた ID と、色コード (大文字 16 進) は
-// ノード ID として数えない — 正規表現の反例 (verification.md の観点 F)。
+// ノード ID として数えない。正規表現の反例として検証する (verification.md の観点 F)。
 func TestJudgmentFlowIgnoresCommentsAndColors(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture,
 		"flowchart TD\n",
@@ -94,8 +94,8 @@ func TestJudgmentFlowIgnoresCommentsAndColors(t *testing.T) {
 	}
 }
 
-// ノードを消して style 行を消し忘れた編集ミスを検査が捕まえる —
-// style / class などの行は ID の出所にしない。
+// ノードを消して style 行を消し忘れた編集ミスを検査が捕まえる。
+// style / class などの行は ID の出所にしないため。
 func TestJudgmentFlowStyleOnlyNodeIsNotSatisfied(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture, "  A2[\"A2: 採択\"]\n", "", 1)
 	content = strings.Replace(content, "  D1 -- 当たる --> A2\n", "", 1)
@@ -111,8 +111,8 @@ func TestJudgmentFlowStyleOnlyNodeIsNotSatisfied(t *testing.T) {
 	}
 }
 
-// タブ区切りの装飾行 (style<TAB>A2 …) も装飾として除外される — 区切りを
-// 半角スペース 1 種と仮定すると、実ノードの無い ID が図の ID に混入する。
+// タブ区切りの装飾行 (style<TAB>A2 …) も装飾として除外される。区切りを
+// 半角スペース 1 種と仮定すると、実ノードの無い ID が図の ID に混入するため。
 func TestJudgmentFlowTabSeparatedDecoration(t *testing.T) {
 	content := strings.Replace(judgmentFlowFixture, "  A2[\"A2: 採択\"]\n", "", 1)
 	content = strings.Replace(content, "  D1 -- 当たる --> A2\n", "", 1)
@@ -191,8 +191,8 @@ func TestJudgmentFlowMissingTable(t *testing.T) {
 	}
 }
 
-// git 追跡に依らず、ファイルが読めれば検査する — 追跡前の判定フローが
-// 検査の対象に入らず、0 件マッチのまま検査が成功する種類の欠陥 (B1 と同じ) を防ぐ。
+// git 追跡に依らず、ファイルが読めれば検査する。追跡前の判定フローが
+// 検査の対象に入らず、0 件マッチのまま検査が成功する種類の欠陥 (B1 と同じ) を防ぐため。
 func TestJudgmentFlowChecksUntrackedFile(t *testing.T) {
 	problems := judgmentFlowProblems(nil, judgmentFlowRead("# 図も表も無い\n"), "")
 	if len(problems) == 0 {
@@ -212,7 +212,7 @@ func TestJudgmentFlowAbsentFileSkipped(t *testing.T) {
 
 // パスを指定したのにファイルが無いなら報告する。指定は「そこを検査せよ」という
 // 意思表示なので、報告せずに通すと検査が無効になったことに気づけない (診断ツールの偽陰性)。
-// 報告にはどちらの指定を直せばよいか (origin) を載せる — 解決の経路が 2 つあるため。
+// 報告にはどちらの指定を直せばよいか (origin) を載せる。解決の経路が 2 つあるため。
 func TestJudgmentFlowAbsentFileReportedWhenOriginGiven(t *testing.T) {
 	read := func(_ string) ([]byte, error) { return nil, fs.ErrNotExist }
 	for _, origin := range []string{"-judgment-flow", "CLAUDE_PLUGIN_ROOT"} {

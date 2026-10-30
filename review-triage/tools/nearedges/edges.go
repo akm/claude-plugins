@@ -80,17 +80,17 @@ func nearEdges(root string, changes map[string][]change) ([]edge, error) {
 			switch {
 			case d.tableAt(n) != nil:
 				t := d.tableAt(n)
-				add(edge{File: f, Kind: "table", Start: t.Start, End: t.End, Reason: "表のセルを変えた — その表の全行"}, n)
+				add(edge{File: f, Kind: "table", Start: t.Start, End: t.End, Reason: "表のセルを変えた (再確認するのはその表の全行)"}, n)
 			case d.listAt(n) != nil:
 				l := d.listAt(n)
-				e := edge{File: f, Kind: "list", Start: l.Start, End: l.End, Reason: "箇条書きの項目を変えた — 同じ箇条書き全体と、その親"}
+				e := edge{File: f, Kind: "list", Start: l.Start, End: l.End, Reason: "箇条書きの項目を変えた (再確認するのは同じ箇条書き全体と、その親)"}
 				if p := d.blockBefore(l.Start); p != nil {
 					e.Parent = &edge{File: f, Kind: p.Kind, Start: p.Start, End: p.End, Heading: p.Heading}
 				}
 				add(e, n)
 			default:
 				s := d.sectionAt(n)
-				add(edge{File: f, Kind: "section", Start: s.Start, End: s.End, Heading: s.Heading, Reason: "段落を変えた — 同じ節の全文"}, n)
+				add(edge{File: f, Kind: "section", Start: s.Start, End: s.End, Heading: s.Heading, Reason: "段落を変えた (再確認するのは同じ節の全文)"}, n)
 			}
 			for _, m := range linkPattern.FindAllStringSubmatch(c.Text, -1) {
 				target := m[1]

@@ -59,7 +59,7 @@ const validRecordYAML = `runs:
         consequence:
           condition: disk full のとき
           who: developer
-          what: テストが落ちる
+          what: テストが失敗する
           detectability: 気づく
         premise_check:
           stages: A
@@ -497,8 +497,8 @@ func TestRenderFindingCells(t *testing.T) {
 	}
 }
 
-// セルに入る自由文字列は残らず recordCell を通る — loc (file)・depends_on の
-// 結合・sha・選択待ち行の problem_id (D3 の取りこぼし 4 箇所)。
+// セルに入る自由文字列は残らず recordCell を通る。検証するのは loc (file)・depends_on の
+// 結合・sha・選択待ち行の problem_id の 4 箇所 (D3 の取りこぼし) である。
 func TestRenderCellsEscapeAllFreeStrings(t *testing.T) {
 	fd := recordFinding{
 		ID: 1, File: "docs/a|b.md", Line: 3, Summary: "s", Category: "test", Audience: "developer",
@@ -827,7 +827,7 @@ func TestListReviewTriageFilesMissingDirExplicit(t *testing.T) {
 	}
 }
 
-// -write-summary も同じ — 明示指定したディレクトリが無いなら、0 件生成して
+// -write-summary も同じで、明示指定したディレクトリが無いなら、0 件生成して
 // エラーを出さずに成功させない (生成されなかったことに気づけないため)。
 func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 	if err := writeReviewTriageSummaries(filepath.Join(t.TempDir(), "no-such"), true); err == nil {
@@ -835,7 +835,7 @@ func TestWriteReviewTriageSummariesMissingDirExplicit(t *testing.T) {
 	}
 }
 
-// ディレクトリが「無い」以外の読み取りエラー (ENOTDIR など) は握りつぶさず返す —
+// ディレクトリが「無い」以外の読み取りエラー (ENOTDIR など) は握りつぶさず返し、
 // 権限や I/O のエラーを「記録 0 件」= 成功として扱わせない。
 func TestListReviewTriageFilesErrorReported(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "not-a-dir")
@@ -1241,7 +1241,7 @@ func TestReviewTriageRecordUnknownStatusReportsOnce(t *testing.T) {
 	}
 }
 
-// 修正計画の表の最終列は SHA と URL の 2 つの型を取るので、見出しは「証拠」で
+// 修正計画の表の最終列は SHA だけでなく URL も取るので、見出しは「証拠」で
 // なければならない。見出しを SHA に戻すと、done-external の行の URL を SHA として
 // 読ませることになる (セルを埋める処理だけ直して見出しに追随しなかった種類の欠陥)。
 func TestReviewTriageSummaryPlanEvidenceHeader(t *testing.T) {
@@ -1341,9 +1341,9 @@ func TestReviewTriageRecordIgnoresOtherFiles(t *testing.T) {
 	}
 }
 
-// 生成サマリの 1 行目は、既定のまま生成すると既定の案内を含む決まった形になる。
+// 生成サマリの 1 行目は、デフォルトのまま生成するとデフォルトの案内を含む決まった形になる。
 // 1 行目はコミットされる値なので、組み立て方の変更をここで捕まえる。可変の
-// summaryCommand ではなく定数と突き合わせる (run が書き換えた後の値を既定と
+// summaryCommand ではなく定数と突き合わせる (run が書き換えた後の値をデフォルトと
 // 取り違えないため)。
 func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 	saved := summaryCommand
@@ -1355,9 +1355,9 @@ func TestReviewTriageSummaryFirstLineUsesDefaultCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	first, _, _ := strings.Cut(summary, "\n")
-	want := "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml — `" + defaultSummaryCommand + "` で再生成する。 -->"
+	want := "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml。`" + defaultSummaryCommand + "` で再生成する。 -->"
 	if first != want {
-		t.Errorf("1 行目が既定の形ではない:\n got: %s\nwant: %s", first, want)
+		t.Errorf("1 行目がデフォルトの形ではない:\n got: %s\nwant: %s", first, want)
 	}
 }
 
@@ -1649,7 +1649,7 @@ func TestReviewTriageSummaryLegacyRecurrence(t *testing.T) {
 //
 // review-triage-fix の調査フェーズの結果 (原因・束ね・調査) は、修正方法 (approach) と
 // 順序 (order) をまだ持たない問題として plans[].status: investigated で記録に置く。
-// approach と order を書く条件は状態ごとに決まる — pending / done / done-external では
+// approach と order を書く条件は状態ごとに決まる。pending / done / done-external では
 // approach が必須 (order は任意)、awaiting-human では任意 (人間の回答の後に書く)、
 // investigated では書かない (書いてあれば報告する)。被覆の規則 (採択は plans か
 // plan_ref で覆う) は状態を問わない。
@@ -1677,7 +1677,7 @@ func TestReviewTriageRecordInvestigatedPasses(t *testing.T) {
 // investigated に後のフェーズが書くキーがあれば報告する。approach / order は立案フェーズの
 // 中身で、調査フェーズの結果に混ざると、立案フェーズが書いたのか調査フェーズが越境したのかを記録から
 // 読めなくなる。sha は修正フェーズの結果で、done-external 専用のキー
-// (applied_external_url / notes) も同じく修正を終えた状態にしか無い — 調査だけの
+// (applied_external_url / notes) も同じく修正を終えた状態にしか無い。調査だけの
 // 問題に残っていると、サマリが調査済みの行に sha を並べて、直したように見える。
 func TestReviewTriageRecordInvestigatedRejectsLaterStageKeys(t *testing.T) {
 	cases := []struct {
@@ -1716,7 +1716,7 @@ func TestReviewTriageRecordInvestigatedRejectsLaterStageKeys(t *testing.T) {
 
 // investigated に investigation (調べた範囲と結果) が無ければ報告する。investigation が
 // 無いことは「未調査」を意味する (record-schema.md の plans[] の表) ので、調査済みの
-// 状態と矛盾する — 調査フェーズが調査を飛ばして原因と束ねだけを書いた記録が検査を通ると、
+// 状態と矛盾する。調査フェーズが調査を飛ばして原因と束ねだけを書いた記録が検査を通ると、
 // 立案フェーズが未調査の問題に立案し、同じ原因の別の現れが残る。
 func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 	plans := strings.Replace(investigatedPlansYAML,
@@ -1739,8 +1739,8 @@ func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 }
 
 // approach の必須は状態ごとに決まる。pending / done / done-external では従来どおり
-// 無ければ報告し、awaiting-human では options があれば approach が無くても通る
-// (人間の立案待ち — 立案者 C — は approach を持たない)。
+// 無ければ報告し、awaiting-human では options があれば approach が無くても通る。
+// 人間の立案待ち (立案者 C) は approach を持たないため。
 func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 	// approach の行を消した validRecordYAML。sha と status は各ケースが差し替える。
 	noApproach := strings.Replace(validRecordYAML, "        approach: 数え直して単位を書く\n", "", 1)
@@ -1867,7 +1867,7 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 // 鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
 // 1 バイトでも変わると、ディレクトリに残る既存のサマリがすべて古いと報告される。注記は
 // investigated の問題がある回にだけ出し、推移の表には列を足さない。
-const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml — `triagecheck -write-summary` で再生成する。 -->\n" +
+const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSOT は feat-x.yaml。`triagecheck -write-summary` で再生成する。 -->\n" +
 	"\n" +
 	"# feat-x のトリアージ記録\n" +
 	"\n" +
@@ -1887,7 +1887,7 @@ const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSO
 	"| --- | --- | --- | --- | --- | --- | --- |\n" +
 	"| 1 | `docs/foo.md:10` 数の食い違い | doc-other / developer | 検算するとき / 分母を誤る / 気づかない | A: verified | — | **採択** — ゲート 0 件で採択 (A2) |\n" +
 	"| 2 | `internal/bar.go` 仕様違反の主張 | production / operator | 運用中 / 配信が止まる / 気づかない | A+B: unverifiable | — | **保留** — 根拠を確かめられず保留 (H3) |\n" +
-	"| 3 | `tools/baz_test.go` 一時ファイルの削除が雑 | test / developer | disk full のとき / テストが落ちる / 気づく | A: verified | developer-domain | **却下** — 開発者の領域で却下 (R3) |\n" +
+	"| 3 | `tools/baz_test.go` 一時ファイルの削除が雑 | test / developer | disk full のとき / テストが失敗する / 気づく | A: verified | developer-domain | **却下** — 開発者の領域で却下 (R3) |\n" +
 	"\n" +
 	"### 修正計画\n" +
 	"\n" +
@@ -1930,7 +1930,7 @@ func TestReviewTriageSummaryInvestigated(t *testing.T) {
 	one := render(t, replaceRecordPlans(t, investigatedPlansYAML))
 	for _, want := range []string{
 		"| P1 | 数えずに書いた | #1 | — | — | 調査済み | — |",
-		"\n- **" + note + " が 1 件: P1** — ",
+		"\n- **" + note + " が 1 件: P1。** ",
 		"`review-triage-fix` が立案フェーズから続ける\n",
 	} {
 		if !strings.Contains(one, want) {
@@ -1950,7 +1950,7 @@ func TestReviewTriageSummaryInvestigated(t *testing.T) {
 	two := render(t, replaceRecordPlans(t, investigatedPlansYAML+
 		"      - problem_id: P2\n        cause: c2\n        finding_ids: [1]\n        status: investigated\n"+
 		"      - problem_id: P3\n        cause: c3\n        finding_ids: [1]\n        approach: a3\n        sha: \"\"\n        status: pending\n"))
-	if !strings.Contains(two, "\n- **"+note+" が 2 件: P1, P2** — ") {
+	if !strings.Contains(two, "\n- **"+note+" が 2 件: P1, P2。** ") {
 		t.Fatalf("2 件の注記が出ていない:\n%s", two)
 	}
 	if strings.Count(two, "- **"+note) != 1 {

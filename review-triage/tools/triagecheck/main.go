@@ -2,7 +2,7 @@
 //
 // lappds の tools/doccheck から、review-triage に関わる 2 つの検査
 // (review-triage-record / judgment-flow) を切り出したもの。検査の中身は
-// 変えていない — 変えたのは、対象のパスをリポジトリごとに決められるように
+// 変えていない。変えたのは、対象のパスをリポジトリごとに決められるように
 // した点だけ。
 //
 // 使い方 (-record-dir は必須。相対パスを渡すなら -current-dir も要る。
@@ -52,9 +52,9 @@ func run(args []string) error {
 		return err
 	}
 
-	// 明示的に渡されたフラグを集める。既定値との一致では判定しない — 利用者が
-	// 既定と同じ値を明示的に渡すことがあり、そのとき「指定していない」と誤って
-	// 扱うと、不在を報告すべき経路が報告されないまま通る。flag.Visit は実際に指定された
+	// 明示的に渡されたフラグを集める。デフォルト値との一致では判定しない。利用者が
+	// デフォルト値と同じ値を明示的に渡すことがあり、そのとき「指定していない」と誤って
+	// 扱うと、不在を報告すべき経路が報告されないまま通るため。flag.Visit は実際に指定された
 	// フラグだけを回すので、意思表示の有無をそのまま読める。
 	explicit := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
@@ -62,15 +62,15 @@ func run(args []string) error {
 	// 経路どうしの衝突は、パスの規則より前に見る。-install-wrapper と
 	// -write-summary=true は「何を書き出すか」が矛盾するので、エラーを出さずに片方を
 	// 無視すると「指定したのに適用されない」を作る。拒否するのは「何かを要求したとき」
-	// だけ — -write-summary=false は「生成サマリは要らない」= -install-wrapper の
-	// 既定の挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
+	// だけ。-write-summary=false は「生成サマリは要らない」= -install-wrapper の
+	// デフォルトの挙動そのものを頼んでいるだけで、拒否する理由が無い。flag.Visit は
 	// 値を見ずに「指定された」と報告するので、値も見る。
 	if explicit["install-wrapper"] && explicit["write-summary"] && *writeSummary {
 		return fmt.Errorf("-write-summary は %w (生成の経路では使われません)", errFlagUnusedWithInstallWrapper)
 	}
 
-	// 空白だけの -summary-command は拒否する — 通すと「再生成する手段は空欄です」と
-	// 案内することになり、指定しないより悪い。値そのものの決定は、パスの規則と
+	// 空白だけの -summary-command は拒否する。通すと「再生成する手段は空欄です」と
+	// 案内することになり、指定しないより悪いため。値そのものの決定は、パスの規則と
 	// 一緒に resolveInputs で行う (案内はパスの形をした値なので、同じ規則に乗せる)。
 	if explicit["summary-command"] && isBlankPath(*summaryCmd) {
 		return fmt.Errorf("-summary-command に%w", errEmptySummaryCommand)
@@ -100,8 +100,8 @@ func run(args []string) error {
 
 	// 明示したパスの不在は、経路を問わず「指定したのに検査できない」なので
 	// ここでエラーにする。記録のディレクトリと判定フローの両方が無いときは 1 回の実行で両方を
-	// 報告する — 片方で即 return すると、片方を直して再実行するまで
-	// もう一方も壊れていることを知れない。
+	// 報告する。片方で即 return すると、片方を直して再実行するまで
+	// もう一方も壊れていることを知れないため。
 	if problems := missingPathProblems(in); len(problems) > 0 {
 		for _, p := range problems {
 			fmt.Fprintln(os.Stderr, "  - "+p)
@@ -152,7 +152,7 @@ type pathInputs struct {
 	currentDir     string
 	judgmentFlow   string
 	installWrapper string
-	// summaryCommand は -summary-command の生の値 (既定値を含む)。明示されたかは
+	// summaryCommand は -summary-command の生の値 (デフォルト値を含む)。明示されたかは
 	// explicit で見る。
 	summaryCommand string
 	explicit       map[string]bool
@@ -165,19 +165,19 @@ type resolvedInputs struct {
 	// 無ければ空 (そのとき判定フローの検査は未導入として通る)。
 	judgmentFlow string
 	// judgmentFlowOrigin は判定フローのパスを指定したものの名前
-	// (-judgment-flow / CLAUDE_PLUGIN_ROOT)。報告に使う。既定なら空。
+	// (-judgment-flow / CLAUDE_PLUGIN_ROOT)。報告に使う。デフォルトなら空。
 	judgmentFlowOrigin string
 	// embedJudgmentFlow はラッパーに埋め込む判定フローの絶対パス。明示された
-	// ときだけ非空。省略時はラッパーが実行時に $root から既定を解決するので、
-	// CLAUDE_PLUGIN_ROOT からは埋めない — 埋めると版のディレクトリを含む固定の
-	// パスになり、プラグインの更新でそのラッパーが壊れる。これは規則の違いでは
-	// なく「省略時の既定」の違いで、規則 (明示した値の扱い) は他の経路と同じ。
+	// ときだけ非空。省略時はラッパーが実行時に $root からデフォルトを解決するので、
+	// CLAUDE_PLUGIN_ROOT からは埋めない。埋めると版のディレクトリを含む固定の
+	// パスになり、プラグインの更新でそのラッパーが壊れるため。これは規則の違いでは
+	// なく「省略時のデフォルト」の違いで、規則 (明示した値の扱い) は他の経路と同じ。
 	embedJudgmentFlow string
 	// installWrapper はラッパーの出力先の絶対パス。明示されたときだけ非空。
 	installWrapper string
 	// summaryCommand は案内する再生成コマンド。明示されればその値、-install-wrapper
 	// で省略されれば -current-dir から見たラッパーの相対パスで組み立てた値、
-	// それ以外は既定値。
+	// それ以外はデフォルト値。
 	summaryCommand string
 }
 
@@ -186,15 +186,15 @@ type resolvedInputs struct {
 //  1. 空・空白・不可視の値は拒否する (isBlankPath)。空の明示はパスとして意味を持たず、
 //     通すと「指定したのに検査されない」になる。
 //  2. 相対パスは -current-dir を基準に解決する (無ければ resolvePath がエラー)。
-//     基準は推測しない — go run -C で起動されるためカレントはツールのディレクトリを指し、
-//     呼び出し元のカレントはプロセスの中から知りようがない。
+//     基準は推測しない。go run -C で起動されるためカレントはツールのディレクトリを指し、
+//     呼び出し元のカレントはプロセスの中から知りようがないからである。
 //  3. -current-dir を渡したのに一度も基準として使われなければエラー。エラーにしないと
 //     「基準を渡したつもり」のまま別の解決結果を受け取る。
 //
 // 実在の要求は missingPathProblems が担う (全件をまとめて報告するため)。
 //
-// -record-dir は必須で既定値を持たせない。既定が相対パスだと「基準の無い相対」を
-// 許すことになり、上の規則が崩れる。省略を許して既定の場所を検査したことにする
+// -record-dir は必須でデフォルト値を持たせない。デフォルトが相対パスだと「基準の無い相対」を
+// 許すことになり、上の規則が崩れる。省略を許してデフォルトの場所を検査したことにする
 // より、どこを検査するのかを必ず言わせる。空文字は省略と区別できないので、
 // 空のパスではなく必須の検査として拒否される。
 func resolveInputs(in pathInputs) (resolvedInputs, error) {
@@ -223,7 +223,7 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	}
 	out.recordDir = absRecordDir
 
-	// 判定フローのパスは、明示の指定 → CLAUDE_PLUGIN_ROOT → 既定 (無し) の順。
+	// 判定フローのパスは、明示の指定 → CLAUDE_PLUGIN_ROOT → デフォルト (無し) の順。
 	//
 	// 「絶対パスに -current-dir を併記したらエラー」は -judgment-flow で明示された
 	// ときにだけ課す。CLAUDE_PLUGIN_ROOT から組み立てた値は常に絶対で、利用者が
@@ -261,14 +261,14 @@ func resolveInputs(in pathInputs) (resolvedInputs, error) {
 	// 案内する再生成コマンド。明示があればそのまま。-install-wrapper で省略されたら
 	// 「ラッパー自身をリポジトリのルートから実行する形」を組み立てて埋め込む。
 	//
-	// 実行時の $0 から組み立てない — $0 は実行したときの形 (./bin/rtc、絶対パス、リンク名)
+	// 実行時の $0 から組み立てない。$0 は実行したときの形 (./bin/rtc、絶対パス、リンク名)
 	// そのもので、コミットされるサマリの 1 行目が実行の仕方ごとに変わり、生成直後の
-	// サマリが別の実行の仕方での検査で「一致しない」と報告される (実測)。絶対パスも
-	// 埋め込まない — 別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
-	// checkout した場所によって検査が失敗する。コミットされる値は、リポジトリ相対でなければならない。
+	// サマリが別の実行の仕方での検査で「一致しない」と報告されるからである (実測)。絶対パスも
+	// 埋め込まない。別のマシン (CI) は別のパスに checkout するので、同じコミットでも、
+	// checkout した場所によって検査が失敗するため。コミットされる値は、リポジトリ相対でなければならない。
 	//
-	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する —
-	// -record-dir と同じ規則で、案内というパスの形をした値にも同じ規則を当てる。
+	// 相対にする基準は -current-dir。基準が無ければ推測せずに要求する。
+	// -record-dir と同じ規則を、案内というパスの形をした値にも当てる。
 	// ラッパーの basename だけで案内する案は「PATH に居るはず」という推測になる
 	// ので採らない。
 	switch {
@@ -318,9 +318,9 @@ func isBlankPath(s string) bool {
 //
 // 判定フローは -judgment-flow だけでなく CLAUDE_PLUGIN_ROOT からも解決される。
 // どちらも「この場所を検査せよ」という指定なので、実在を要求する対象に含める
-// (解決できず既定のままのときだけ、未導入として通す)。生成の経路では
-// CLAUDE_PLUGIN_ROOT 由来の値を埋め込まないが、実在の要求は同じ規則として課す —
-// 経路で規則を変えると、その差が次の欠陥を生む。
+// (解決できずデフォルトのままのときだけ、未導入として通す)。生成の経路では
+// CLAUDE_PLUGIN_ROOT 由来の値を埋め込まないが、実在の要求は同じ規則として課す。
+// 経路で規則を変えると、その差が次の欠陥を生むため。
 func missingPathProblems(in resolvedInputs) []string {
 	var problems []string
 	if _, err := os.Stat(in.recordDir); errors.Is(err, fs.ErrNotExist) {
@@ -343,7 +343,7 @@ var errCurrentDirUnused = errors.New(
 
 // 次の 3 つは、テストがエラーの種類を文言の部分一致ではなく errors.Is で
 // 識別できるようにするための番兵。文言で見ると、挙動を変えないメッセージの
-// 書き換えでテストが落ちる一方、別の検査が代わりに立てたエラーの文言に
+// 書き換えでテストが失敗する一方、別の検査が代わりに立てたエラーの文言に
 // 同じ語が含まれていると、検査が失われたことに気づけない。
 var (
 	// errRecordDirRequired は -record-dir が省略されたことを表す。
@@ -371,9 +371,9 @@ var (
 // resolveBaseDir は -current-dir の値を検証して返す。指定が無ければ空を返す
 // (そのとき相対パスは resolvePath がエラーにする)。
 //
-// 基準そのものが相対だと「基準の基準」が要り、元の問題に戻る。実在も要求する —
+// 基準そのものが相対だと「基準の基準」が要り、元の問題に戻る。実在も要求する。
 // 存在しないディレクトリを基準にすると、そこからの相対も存在しないので、
-// 「指定したのに検査できない」を作る。
+// 「指定したのに検査できない」を作るため。
 func resolveBaseDir(currentDir string) (string, error) {
 	if currentDir == "" {
 		return "", nil
@@ -415,15 +415,17 @@ func resolvePath(p, base, flagName string) (string, bool, error) {
 }
 
 // resolveJudgmentFlowPath は判定フローの SSOT のパスを決める。優先順は
-// 明示の指定 → プラグインの展開先 → 既定 (リポジトリ内にスキルを直接置いた形)。
+// 明示の指定 → プラグインの展開先 → デフォルト (リポジトリ内にスキルを直接置いた形)。
 //
-// 見つからなかったときに空文字を返して既定のままにするのは、判定フローが
+// 見つからなかったときに空文字を返してデフォルトのままにするのは、判定フローが
 // 無い状態を「検査対象が無い」として通す判断が judgmentFlowProblems に
-// あるため。ここでエラーにすると、記録の検査まで巻き添えで落ちる。
+// あるため。ここでエラーにすると、記録の検査も行われずに triagecheck がエラーで終了する。
 //
 // 2 つ目の戻り値はパスを指定したものの名前 (origin)。-judgment-flow と
 // CLAUDE_PLUGIN_ROOT のどちらも、その場所を検査せよという指定なので名前を返す。
-// 既定に落ちたときだけ空で、そのとき不在は未導入として通る。名前を返すのは、
+// specified が false で CLAUDE_PLUGIN_ROOT も空のときは、パスにも名前にも空を返す。
+// このとき判定フローの検査はデフォルトのパスを読み、ファイルが無くても未導入として
+// 通過する (judgmentFlowProblems は名前が空なら不在を報告しない)。名前を返すのは、
 // 不在の報告にどちらを直せばよいかを載せるため。
 //
 // 指定の有無は値ではなく specified (呼び出し元が flag.Visit で読んだ意思表示) で

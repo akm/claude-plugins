@@ -18,18 +18,18 @@ import (
 // wrapperTemplate はラッパースクリプトの雛形。%s は順に
 // (1) PLUGIN_CACHE の値, (2) -record-dir に埋め込む値 (script_dir からの相対),
 // (3) -summary-command に埋め込む値, (4) -judgment-flow の行 (明示が無ければ
-// $root からの既定) が入る。(1)〜(3) と明示の (4) は生成時に決まった値なので、
+// $root からのデフォルト) が入る。(1)〜(3) と明示の (4) は生成時に決まった値なので、
 // installWrapper がシェルの単一引用符で包んでから差し込む。
 //
-// テンプレート内の二重引用符は「実行時に展開させる」箇所だけに使う —
+// テンプレート内の二重引用符は「実行時に展開させる」箇所だけに使う。
 // "$script_dir"・"$root/..." がそれで、埋め込む値には使わない。二重引用符の中では
 // $(...)・バックティック・$VAR が展開されるので、値にそれらを含むパスが実行時に
 // 別のパスに変わる。埋め込む値と展開させる変数を、引用符の種類で判別できる
 // ようにしておく。
 //
-// -summary-command は生成時に決めた値を埋め込む。実行時の $0 から組み立てない —
+// -summary-command は生成時に決めた値を埋め込む。実行時の $0 から組み立てない。
 // $0 は実行したときの形そのものなので、コミットされるサマリの 1 行目が実行の仕方ごとに
-// 変わる。値の決め方 (リポジトリ相対) は resolveInputs のコメントを参照。
+// 変わるため。値の決め方 (リポジトリ相対) は resolveInputs のコメントを参照。
 //
 // 基準には $PWD ではなく script_dir (ラッパー自身の実体の位置) を使う。$PWD は
 // シェルが更新する慣習にすぎず、非シェルの親 (CI ランナー・cron・make -C) が
@@ -54,8 +54,8 @@ const wrapperTemplate = `#!/usr/bin/env bash
 set -eu -o pipefail
 
 # 基準はこのスクリプト自身の位置。$PWD は実行した場所によって変わるので使わない。
-# シンボリックリンク経由で起動されても実体の位置を採る — dirname "$0" だけでは
-# リンクのあるディレクトリが基準になり、その隣に別の記録のディレクトリがあるとそちらを検査してしまう。
+# シンボリックリンク経由で起動されても実体の位置を採る。dirname "$0" だけでは
+# リンクのあるディレクトリが基準になり、その隣に別の記録のディレクトリがあるとそちらを検査してしまうため。
 script_src=$0
 while [ -L "$script_src" ]; do
   link_dir=$(cd -P "$(dirname "$script_src")" && pwd)
@@ -81,23 +81,23 @@ exec go run -C "$root/tools/triagecheck" . \
 // installWrapper はラッパースクリプトを path に書き出す。
 //
 // 3 つの引数はすべて解決済みの絶対パス (規則は run の resolveInputs が経路の
-// 分岐より前に当てる)。ここではパスを検査しない — 検査を持つと、検査の経路と
-// 別の条件で同じ規則を実装し直すことになり、同じ入力に経路ごとに違う契約ができる。
+// 分岐より前に当てる)。ここではパスを検査しない。検査を持つと、検査の経路と
+// 別の条件で同じ規則を実装し直すことになり、同じ入力に経路ごとに違う契約ができるため。
 //
 // recordDir は「ラッパーのディレクトリ (script_dir) から見た相対パス」に変換して
 // 埋め込む。絶対パスを埋め込まないのは、リポジトリを移動・再クローンすると
 // 移動元を検査して成功を返すため。
 //
 // judgmentFlow が非空なら絶対パスのまま埋め込み、空なら -judgment-flow は付けず、
-// プラグイン展開先の既定パス (skills/review-triage/references/judgment-flow.md) を
+// プラグイン展開先のデフォルトのパス (skills/review-triage/references/judgment-flow.md) を
 // 実行時に $root から解決させる。空になるのは省略したときだけで、明示した空は
 // resolveInputs が拒否する。
 //
 // summaryCommand は決定済みの案内 (resolveInputs が決める)。ここでは値を作らない。
 //
 // 埋め込む値はすべてシェルの単一引用符で包む (shellSingleQuote)。%q (Go の引用) は
-// 使わない — bash の二重引用符とは規則が違い、`make $(TARGET)` のような値を
-// 埋め込むと実行時に $(TARGET) が展開されて消える (実測)。パスも同じで、
+// 使わない。bash の二重引用符とは規則が違い、`make $(TARGET)` のような値を
+// 埋め込むと実行時に $(TARGET) が展開されて消えるため (実測)。パスも同じで、
 // docs/$(echo x) のようなディレクトリは別の場所を指すようになる。
 func installWrapper(path, recordDir, judgmentFlow, summaryCommand string) error {
 	pluginCache, err := pluginCacheDir()
@@ -145,8 +145,8 @@ func shellSingleQuote(s string) string {
 }
 
 // pluginCacheDir はこのプロセス自身の実行位置 (go run -C <展開先>/tools/triagecheck)
-// から、プラグインキャッシュのルート (.../review-triage/ — 版のディレクトリの
-// 1 つ上) を逆算する。
+// から、プラグインキャッシュのルート (版のディレクトリの 1 つ上の .../review-triage/)
+// を逆算する。
 //
 // 値を書き出すときにここを決め打ちにせず実行位置から逆算するのは、開発中の
 // チェックアウトから -install-wrapper を実行した場合でも、実際に go run が

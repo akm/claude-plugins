@@ -4,7 +4,7 @@
 //
 // 図は「ノードと遷移」だけ、表は「各ノードの条件と書くもの」だけを持ち、同じ事実を
 // 二度語らない。残るずれ方は ID 集合の不一致だけなので、そこを機械で照合する。
-// 生成はしない — 照合のみ。
+// 生成はせず、照合だけを行う。
 package main
 
 import (
@@ -21,7 +21,7 @@ import (
 //
 // スキルがプラグインとして配られると、この SSOT はリポジトリの外 (プラグインの
 // 展開先) に置かれ、パスは環境ごとに違う。main が CLAUDE_PLUGIN_ROOT または
-// -judgment-flow から解決して設定する。既定はリポジトリ内にスキルを直接置く
+// -judgment-flow から解決して設定する。デフォルトはリポジトリ内にスキルを直接置く
 // 形 (プラグイン化前の配置) で、そのときだけこの値がそのまま使われる。
 var judgmentFlowPath = ".claude/skills/review-triage/references/judgment-flow.md"
 
@@ -48,8 +48,8 @@ var judgmentFlowDecorations = map[string]bool{
 }
 
 // judgmentFlowProblems は図と表の ID 集合を照合する。対象は git 追跡でなく
-// ファイルの実在で決める — 追跡前の判定フローが検査の対象に入らず、0 件マッチのまま
-// 検査が成功する種類の欠陥 (B1 と同じ) を防ぐ。
+// ファイルの実在で決める。追跡前の判定フローが検査の対象に入らず、0 件マッチのまま
+// 検査が成功する種類の欠陥 (B1 と同じ) を防ぐため。
 //
 // ファイルが無いときの扱いは origin で分かれる。origin はパスを指定したものの
 // 名前 (-judgment-flow / CLAUDE_PLUGIN_ROOT) で、空なら指定が無い。パスを指定する
@@ -60,7 +60,7 @@ var judgmentFlowDecorations = map[string]bool{
 // (rejection-gates.md の「診断ツールの偽陰性」)。
 //
 // origin を真偽値でなく名前にするのは、報告を読む人が直す先を特定できるようにする
-// ため — 解決の経路が 2 つあるので、どちらを直せばよいかが分からないと調べ直しになる。
+// ためである。解決の経路が 2 つあるので、どちらを直せばよいかが分からないと調べ直しになる。
 // files は他の検査とシグネチャを揃えるための引数で、使わない。
 func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), origin string) []string {
 	data, err := readFile(judgmentFlowPath)
@@ -98,7 +98,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 			if strings.HasPrefix(trimmed, "%%") {
 				continue
 			}
-			// 装飾の行も ID の出所にしない — ノードを消して style 行を消し忘れた
+			// 装飾の行も ID の出所にしない。ノードを消して style 行を消し忘れた
 			// 編集ミスを、ID 照合が「図にある」と誤認しないため。先頭トークンは
 			// strings.Fields で取り出す (タブ区切りも区切りとして扱う)。
 			if fields := strings.Fields(trimmed); len(fields) > 0 && judgmentFlowDecorations[fields[0]] {
@@ -112,7 +112,7 @@ func judgmentFlowProblems(_ []string, readFile func(string) ([]byte, error), ori
 			continue
 		}
 		if m := judgmentFlowTableRowRe.FindStringSubmatch(line); m != nil {
-			// 直後が区切り行なら、この行は見出し — 本体行として数えない。
+			// 直後が区切り行なら、この行は見出しなので、本体行として数えない。
 			if i+1 < len(lines) && judgmentFlowSeparatorRe.MatchString(lines[i+1]) {
 				continue
 			}

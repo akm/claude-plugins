@@ -138,9 +138,9 @@ func TestInstallWrapperWritesExecutableScript(t *testing.T) {
 	if !strings.Contains(got, wantCache) {
 		t.Errorf("生成物に想定した plugin_cache が見当たらない (want substring %q):\n%s", wantCache, got)
 	}
-	// -judgment-flow を明示しなかったときは、$root からの既定パスを使う。
+	// -judgment-flow を明示しなかったときは、$root からのデフォルトのパスを使う。
 	if !strings.Contains(got, `-judgment-flow "$root/skills/review-triage/references/judgment-flow.md"`) {
-		t.Errorf("生成物に -judgment-flow の既定値が見当たらない:\n%s", got)
+		t.Errorf("生成物に -judgment-flow のデフォルト値が見当たらない:\n%s", got)
 	}
 }
 
@@ -153,8 +153,8 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	outPath := filepath.Join(base, "bin", "review-triage-check")
 
 	// 埋め込む値は実在していること (installWrapper が生成の時点で実在を要求する)。
-	// このテストが見るのは「明示した値が既定パスに優先すること」なので、
-	// 値が実在するかどうかは意図の外 — 実在させたうえで優先を確認する。
+	// このテストが見るのは「明示した値がデフォルトのパスに優先すること」である。
+	// 値が実在するかどうかは意図の外なので、実在させたうえで優先を確認する。
 	recDir := filepath.Join(base, "docs", "review-triages")
 	if err := os.MkdirAll(recDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -181,9 +181,9 @@ func TestInstallWrapperEmbedsExplicitJudgmentFlow(t *testing.T) {
 	if !strings.Contains(got, `-judgment-flow '`+customFlow+`'`) {
 		t.Errorf("生成物に明示した -judgment-flow の埋め込みが見当たらない:\n%s", got)
 	}
-	// 明示したときは $root からの既定パスを使わない (二重に書かれない)。
+	// 明示したときは $root からのデフォルトのパスを使わない (二重に書かれない)。
 	if strings.Contains(got, `"$root/skills/review-triage/references/judgment-flow.md"`) {
-		t.Errorf("明示指定があるのに既定パスも書かれている:\n%s", got)
+		t.Errorf("明示指定があるのにデフォルトのパスも書かれている:\n%s", got)
 	}
 }
 
@@ -334,7 +334,7 @@ func TestInstallWrapperGeneratesRunnableScript(t *testing.T) {
 // リポジトリ相対の案内が入り、実行の仕方 (相対・絶対) に依らず同じになる。
 //
 // 生成は相対 (./bin/rtc)、検査は絶対パスで実行する。実行時の $0 から組み立てる
-// 実装だと、この 2 つで 1 行目が一致せず、生成直後のサマリが検査に落ちる
+// 実装だと、この 2 つで 1 行目が一致せず、生成直後のサマリが検査で「一致しない」と報告される
 // (実測)。文字列だけを見ると渡し忘れても通ってしまうので、実際に実行する。
 func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	goBin, err := exec.LookPath("go")
@@ -368,7 +368,7 @@ func TestInstallWrapperSummaryCommandPointsAtWrapper(t *testing.T) {
 	wrapper := filepath.Join(repo, "bin", "rtc")
 
 	t.Chdir(filepath.Join(version, "tools", "triagecheck"))
-	// run が決める既定 (リポジトリ相対) と同じ値を渡す。
+	// run が決めるデフォルト (リポジトリ相対) と同じ値を渡す。
 	if err := installWrapper(wrapper, recDir, "", "bin/rtc -write-summary"); err != nil {
 		t.Fatalf("ラッパーの生成に失敗: %v", err)
 	}
@@ -423,8 +423,8 @@ func TestInstallWrapperQuotesSummaryCommandForShell(t *testing.T) {
 }
 
 // 埋め込む値はすべて単一引用符で包む。-summary-command だけでなく plugin_cache・
-// -record-dir・明示の -judgment-flow も同じ — %q のままだと $(...) が実行時に
-// 展開され、別の記録のディレクトリを検査する。
+// -record-dir・明示の -judgment-flow も同じである。%q のままだと $(...) が実行時に
+// 展開され、別の記録のディレクトリを検査するため。
 func TestInstallWrapperQuotesAllBakedValuesForShell(t *testing.T) {
 	base := realTempDir(t)
 	toolDir := filepath.Join(base, "cache$(echo X)", "review-triage", "0.0.1", "tools", "triagecheck")
