@@ -31,12 +31,8 @@ description: レビューを、このセッションから起動した別の Cla
 
 ### 開始 (`/review-rally`)
 
-1. 条件を決める (RRG0。[arguments.md](references/arguments.md))。
-2. 開始の前提を確認する ([session.md](references/session.md) の「開始の前提」)。
-3. ループのディレクトリと `rally.yaml` を作る ([session.md](references/session.md) の「ループのディレクトリを作る」)。
-4. レビューのセッションを起動し、実際の値を確認する ([session.md](references/session.md) の「起動」)。
-5. 決まった条件を報告する ([round.md](references/round.md) の決定表の RRG0)。
-6. G2 から [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図に従う。L1 に来たら RRL1 ([round.md](references/round.md))。
+1. RRG0 を行う ([round.md](references/round.md) の決定表)。
+2. G2 から [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図に従う。L1 に来たら RRL1 ([round.md](references/round.md))。
 
 ### 再入
 
