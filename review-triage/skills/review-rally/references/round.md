@@ -37,7 +37,7 @@
 3. **会話を消す。** この起動で 2 回目以降の依頼なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。1 回目は消さない。
 4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`) を書く。
 5. **待機を起動して、ターンを終える** (下の「待機」)。
-6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1 (報告に書くものは [stops.md](stops.md) の決定表の RR1 の行)。
+6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
    1. 結果のファイル (依頼のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
    2. レビューの worktree の HEAD が依頼文の `head` と同じコミットで、`git -C <レビューの worktree> status --porcelain` が空である。
    3. メインの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (`git symbolic-ref -q --short HEAD` の出力。detached HEAD なら何も出ない) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
