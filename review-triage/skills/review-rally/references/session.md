@@ -114,7 +114,7 @@ waiting:
 | キー | 内容 |
 | --- | --- |
 | `loop_id`・`branch`・`repo_dir` | ループの id・現在のブランチ・メインの作業ツリーのルートの実体パス |
-| `state` | `active` (回している) か `stopped` (停止した)。停止したループは続けない ([SKILL.md](../SKILL.md) の前提知識) |
+| `state` | `active` (回している) か `stopped` (停止した)。停止したループは続けない |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
 | `session` | 起動したレビューのセッション。`model`・`effort`・`permission_mode` は `get_session` で確認した実際の値。`branch` は `get_session` の `branch`。`reused` と `original_head` は上の「起動」の 3 |
