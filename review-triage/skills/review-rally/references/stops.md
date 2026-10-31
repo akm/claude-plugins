@@ -1,10 +1,10 @@
 # 差し替えた部分の流れと、追加の停止
 
-**このファイルが、`review-rally` が `review-triage-loop` のループから差し替えた部分のノードと遷移 (図) と、追加の停止ノード RR1〜RR4 の条件と報告 (決定表)、どの停止でも行うこと (複製・`rally.yaml` の書き換え・片付けの案内) の SSOT。** 差し替えないノードとその遷移は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の図が SSOT で、ここでは言い直さない。規律は `loop-flow.md` の冒頭と同じで、図が遷移の SSOT、決定表が条件と報告の SSOT、散文はノード ID で参照する。
+**このファイルが、`review-rally` が差し替えた部分の図と、追加の停止ノード RR1〜RR4 の決定表、どの停止でも行うことの SSOT。** 差し替えないノードとその遷移は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の図が SSOT。
 
-- 図の ID 集合 (RRG0・RRL1・RR1・RR2・RR3・RR4) と決定表の ID 集合は 1:1。RRG0 と RRL1 の決定表は [round.md](round.md)、RR1〜RR4 の決定表はこのファイルにある。**同梱の `triagecheck` はこのファイルを検査しない。** 人手で照合する。
-- 図の `IN` はループに入る起点 (スキルの起動・人間のメッセージ以外で始まったターン) を示す記号で、ノード ID ではない (決定表の行を持たない)。
-- 図の G2・L2・J2 は `loop-flow.md` のノードで、そこから先は `loop-flow.md` の図に従う (J5 を経て L1 に戻ったら、L1 の代わりに RRL1 に入る)。
+- 図の ID 集合 (RRG0・RRL1・RR1・RR2・RR3・RR4) と決定表の ID 集合は 1:1。RRG0 と RRL1 の決定表は [round.md](round.md) にある。同梱の `triagecheck` はこのファイルを検査しないので、人手で照合する。
+- 図の `IN` はループに入る起点 (スキルの起動・人間のメッセージ以外で始まったターン) を示す記号で、ノード ID ではない。
+- 図の G2・L2・J2 は `loop-flow.md` のノードで、そこから先は `loop-flow.md` の図に従う (L1 に戻ったら、L1 の代わりに RRL1 に入る)。
 
 ## 図
 
@@ -43,7 +43,7 @@ flowchart TD
   style RR4 fill:#dc26262e,stroke:#b91c1c
 ```
 
-**再入 (人間のメッセージ以外で始まったターン) の中身 (どのターンをどの依頼の通知とみなすか・何もせずに終えるのはどんなときか) の SSOT は [round.md](round.md) の「再入の手順」。** 開始の前提が満たされないときは、ループを始めずに報告する ([session.md](session.md) の「開始の前提」)。停止ではないので、図に含めない。
+再入の中身の SSOT は [round.md](round.md) の「再入の手順」。開始の前提が満たされないときは、停止ではないので図に含めない ([session.md](session.md) の「開始の前提」)。
 
 ## 決定表 (RR1〜RR4)
 
@@ -58,21 +58,21 @@ flowchart TD
 
 **どの停止ノード ([loop-flow.md](../../review-triage-loop/references/loop-flow.md) の S2〜S6 と、上の RR1〜RR4) でも、次の順に行ってから報告する。**
 
-1. **依頼文と結果を複製する。** レビューの worktree の依頼のディレクトリ (`tmp/review-rally/<ループの id>/`) に依頼文か結果が 1 つでもあれば、そのディレクトリの全体 (前の回のものを含む) を、メインのセッションのループのディレクトリに複製する。依頼文も結果も無ければ (1 回目の依頼文を書く前の停止)、複製しない。片付けでレビューの worktree を消すと、停止の原因を結果のファイルで調べられなくなるためである。
+1. **依頼文と結果を複製する。** レビューの worktree の依頼のディレクトリに依頼文か結果が 1 つでもあれば、そのディレクトリの全体を、ループのディレクトリに複製する。レビューの worktree を片付けた後も、停止の原因を調べられるようにするため。
 2. **`rally.yaml` を `state: stopped`・`stop_reason: "<ID>: <1 行の理由>"` にする。**
-3. **片付けはしない。案内だけを報告に書く** (下の「片付けの案内」)。レビューのセッションのアーカイブは既定で worktree も片付け、アプリが再利用した worktree には以前の作業のファイルが残っていることがある。どれも元に戻せないので、行うかどうかと、いつ行うかは人間が決める (2026-10-29 に利用者が決めた)。
+3. **片付けはしない。案内だけを報告に書く** (下の「片付けの案内」)。片付けは元に戻せないので、行うかどうかは人間が決める。
 
 ## 片付けの案内
 
 停止の報告に、`rally.yaml` の `session` から組み立てた次の手順を、人間が実行できる形で書く。
 
 - **新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
-- **再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。依頼のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`。1 で複製してある)、worktree を元の HEAD に戻し (`session.original_head` はブランチ名か SHA のどちらか。`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すればブランチ名なので `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば SHA なので `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。レビューのセッションは、待機したまま残す。
-- **ループのディレクトリ (メインの作業ツリーの `tmp/review-rally/<ループの id>/`) と記録は消さない。** 後で経路どうしの収束を比べる材料になる。
+- **再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。依頼のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
+- **ループのディレクトリと記録は消さない。** ほかの経路と収束を比べる材料になる。
 
 ## 停止の報告に足すもの
 
-**停止の報告の全体は [reporting.md](../../review-triage-loop/references/reporting.md) の「必ず出すもの」の 6 項目で、S2〜S6 ごとに足すものは [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表の「報告に書くもの」。** 1 の「停止した理由」には RR1〜RR4 も入る。このループでは、どの停止 (S2〜S6・RR1〜RR4) でも次を足す。
+報告の全体は [reporting.md](../../review-triage-loop/references/reporting.md) の「必ず出すもの」で、S2〜S6 ごとに足すものは [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表。このループでは、どの停止 (S2〜S6・RR1〜RR4) でも次を足す。
 
 | 項目 | 書くもの |
 | --- | --- |
@@ -81,5 +81,5 @@ flowchart TD
 | 複製 | 上の「停止のときに行うこと」の 1 で複製したか、複製先の絶対パス |
 | 片付け | 上の「片付けの案内」 |
 | 回数 | この起動で回した回数と上限 (reporting.md の 2) |
-| 次にできる操作 | 新しいループを始めること (初版は `--resume` を持たない。記録は続くので、推移は失われない)。S2 なら、回答の渡し先 (`review-triage-fix` を単独で起動して回答する。SSOT は loop-flow.md の S2 の行) |
-| S3 のとき | 収束後の全量レビューの要否 (規則の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) と、行い方。このループは収束後の全量の回をループに含めないので、`review-request --full-review --base <loop.base>` で依頼文を作り、別のセッションで実行する手段を案内する。**`--base` を必ず付けるよう書く。** 付けないと起点が `origin/HEAD` になり (省いたときの既定。SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)、範囲が広がる。行うかどうかは人間が決める |
+| 次にできる操作 | 新しいループを始めること (このスキルは `--resume` を持たない)。S2 なら、回答の渡し先 (`review-triage-fix` を単独で起動して回答する。SSOT は loop-flow.md の S2 の行) |
+| S3 のとき | 収束後の全量レビューの要否 (規則の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」) と、`review-request --full-review --base <loop.base>` で依頼文を作り、別のセッションで実行する手段。`--base` を付けないと起点が `origin/HEAD` になって範囲が広がるので、必ず付けるよう書く。行うかどうかは人間が決める |
