@@ -265,4 +265,4 @@ sandbox_blocked:
 | ワーカーが書くファイル | 完了のフラグファイル・`worker.yaml` | フラグファイルはまだ (待機する)。`worker.yaml` はワーカーが未起動 (起動まで待機し、期限を過ぎたら RA2) | review-loop のセッションは「レビュー不成立」(RA1) として停止する |
 | review-loop のセッションが書くファイル | 依頼文 | ワーカーは待機する |  ワーカーが `failed` のフラグファイルを書き、レビュアの実行を起動しない |
 
-停止ノード (RA1〜RA3) の定義と報告に書くものの SSOT は [stops.md](stops.md)。
+停止ノード (RA1〜RA3) の名前と報告に書くものの SSOT は [stops.md](stops.md)。

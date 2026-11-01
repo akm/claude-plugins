@@ -53,7 +53,7 @@ review-loop <ループ id> <記録の回番号> 回目 (<識別子>) [この起�
 
 ## 事象ごとの扱い
 
-待機スクリプトの終了コードと標準出力の 1 行 (事象の定義の SSOT はスクリプト `review-triage/scripts/review-loop-wait.sh` の冒頭のコメント) で分ける。停止ノードの定義と報告に書くものの SSOT は [stops.md](stops.md)。
+待機スクリプトの終了コードと標準出力の 1 行 (事象の定義の SSOT はスクリプト `review-triage/scripts/review-loop-wait.sh` の冒頭のコメント) で分ける。停止ノードの名前と報告に書くものの SSOT は [stops.md](stops.md)。
 
 | 終了コード | 標準出力 | 扱い |
 | --- | --- | --- |

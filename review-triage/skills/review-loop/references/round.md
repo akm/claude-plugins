@@ -1,6 +1,6 @@
 # ループの開始と 1 回のレビュー (RG0・RL1)
 
-**このファイルが、`review-loop` が `review-triage-loop` の G0 と L1 を差し替えるノード RG0・RL1 の条件と手順の SSOT。** ノードと遷移の SSOT は [stops.md](stops.md) の図で、差し替えないノード (G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6) は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) が SSOT。ここでは言い直さない。
+**このファイルが、`review-loop` が `review-triage-loop` の G0 と L1 を差し替えるノード RG0・RL1 の条件と手順の SSOT。** 差し替えないノード (G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6) は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) が SSOT で、ここでは言い直さない。
 
 ## 決定表
 
