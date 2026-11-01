@@ -33,9 +33,9 @@
    呼び出しは `review-request <loop.review_skill> <loop.model> <loop.review_args> --dir <依頼のディレクトリの相対パス> --target-dir <レビューの worktree の絶対パス>` (値は `rally.yaml`。`ce-code-review` には `<loop.review_args>` を渡さない)。記録に回が無いか、`rally.yaml` の `next_full` が真なら全量の回で、`--base <loop.base>` も渡す。記録に回がある状態の全量の回では、`--full-review` も渡す。
    - `review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら、Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-rally <ループの id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-rally の再入の手順へ」にして、ターンを終える。
    - それ以外の理由で書かなかったら RR4。
-   - 書けたら、`next_full` を偽にする。記録に回がある状態の全量の回でなければ、`rounds` を 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
+   - 書けたら、`next_full` を偽にする。
 3. **会話を消す。** `rally.yaml` の `requests` が 1 以上なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。
-4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。送ったら、`rally.yaml` の `requests` を 1 つ増やし、`waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・ブランチの一覧 (`refs`) を書く。
+4. **依頼する。** 送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取り、`rally.yaml` の `waiting` に、識別子・送る時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・ブランチの一覧 (`refs`) を書く。続けて、ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送ったら、`requests` を 1 つ増やす。記録に回がある状態の全量の回でなければ、`rounds` も 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
 5. **待機を起動して、ターンを終える** (下の「待機」)。
 6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
    1. 結果のファイル (依頼のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。

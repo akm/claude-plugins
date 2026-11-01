@@ -42,15 +42,13 @@
 
    **`permission_mode` は渡さない。** メインのセッションの権限モードが引き継がれ、メッセージが承認待ちにならない。
 
-2. **ツール `get_session` で、起動したセッションの値を確認する。** 次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
+2. **ツール `get_session` で起動したセッションの値を読み、`rally.yaml` の `session` に書いてから確認する。** 次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
    - `model` が指定と違う。指定が別名 (`opus` など) なら、`model` から `claude-` と版を除いた部分が別名と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。
    - `effort` が指定と違う。
    - `worktreePath` が無いか、メインの作業ツリーの `.claude/worktrees/` の下にない。
    - `permissionMode` がメインのセッション (`get_session` の `self`) と違う。
 
 3. **レビューの worktree が再利用されたかを控える。** アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) で使う。
-
-4. **`rally.yaml` の `session` を書く。**
 
 ### 最初の指示文
 
