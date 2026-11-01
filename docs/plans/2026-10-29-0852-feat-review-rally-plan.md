@@ -150,11 +150,16 @@ U2〜U6 と U3a を実装する中で決めたことと、上の計画と違う�
 | 手順 2 の確認 (U4) | `tmp/review-rally/` と `.claude/worktrees/` がメインの作業ツリーから見て無視されていることを、何かを書く前の開始の前提で確認することにした。一時リポジトリで 6 通りの組み合わせを試し、2 つが無視されていればメインの作業ツリーもレビューの worktree も clean のままになると分かったため。開始の前提が満たされないときは、停止 (RR2・RR4) ではなく、ループを始めずに報告する。そのため、RR2 の「メインのセッションが worktree で動いている」も開始の前提に移した (SSOT はファイル `review-triage/skills/review-rally/references/session.md` の「開始の前提」) |
 | 手順 5 の規則 (U4) | 試験用のセッションで、`isRunning` は依頼を送るとすぐに真になりターンが終了すると偽になること、`lastActivityAt` はツールの呼び出しを始めるたびと `clear_session` で進み、1 つの長いツールの実行の間は進まないことを確認した。その値と依頼を送った時刻を比べる規則と、30 分ごとの待機の通知で、2 つの要件を満たす (SSOT はファイル `review-triage/skills/review-rally/references/round.md` の「再入の手順」) |
 | 片付け (U5) | 案内だけにし、review-rally は片付けない (利用者が決めた)。再利用された worktree では、セッションをアーカイブせずに元の HEAD に戻す手順を案内する。元の HEAD は、起動の直後に worktree の reflog から控える |
-| 全量の依頼 (2026-11-01) | D4 で後に回した `--full-review` を、2 つの引数として足した (利用者が決めた)。`--full-first` は 1 回目の依頼文を全量にし、`--full-review` は収束した後に、要れば全量の回を行う。SSOT は `review-triage/skills/review-rally/references/arguments.md` と、`references/stops.md` の RRJ1 |
+
+## 計画の後に決めたこと (2026-11-01)
+
+| 点 | 決めたこと |
+| --- | --- |
+| 全量の依頼 | D4 で後に回した `--full-review` を、2 つの引数として足した (利用者が決めた)。`--full-first` は 1 回目の依頼文を全量にし、`--full-review` は収束した後に、要れば全量の回を行う。SSOT は `review-triage/skills/review-rally/references/arguments.md` と、`references/stops.md` の RRJ1 |
 
 ## 後に回すもの
 
-- `--resume`・`--end` (D4)。`--full-review` は、上の「実装で決めたこと」の「全量の依頼」で足した。
+- `--resume`・`--end` (D4)。`--full-review` は、上の「計画の後に決めたこと」の「全量の依頼」で足した。
 - レビューのセッションの自己申告による「レビュースキルを Skill ツールで呼び出したか」「拒否されたツールの呼び出しの件数」の記録 (D6)。
 - 経路ごとの収束の比べ方。記録がたまってから決める。
 
