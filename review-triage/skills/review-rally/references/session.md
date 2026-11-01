@@ -107,7 +107,7 @@ waiting:
 | `state` | `active` (回している) か `stopped` (停止した) |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
-| `session` | 起動したレビューのセッション。`model`・`effort`・`permission_mode`・`branch` は `get_session` の値。`reused` と `original_head` は上の「起動」の 3 |
+| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode`・`branch` は `get_session` の値。`reused` と `original_head` は上の「起動」の 3 |
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 2) |
