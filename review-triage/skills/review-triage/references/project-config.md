@@ -74,7 +74,7 @@
 
 ## `loop` — ループの既定値
 
-[review-triage-loop](../../review-triage-loop/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) も同じ既定を読む (ワーカーのモデルの指定には `review_model` を共用する)。**引数で指定された値が設定より優先する。** 設定はリポジトリごとの既定で、引数はその回だけの上書き。
+[review-triage-loop](../../review-triage-loop/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) と [review-rally](../../review-rally/SKILL.md) も同じ既定を読む (review-loop はワーカーの、review-rally はレビューのセッションのモデルの指定に `review_model` を共用する)。**引数で指定された値が設定より優先する。** 設定はリポジトリごとの既定で、引数はその回だけの上書き。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
@@ -102,7 +102,7 @@
 
 ## `fix` — 修正の既定値
 
-[review-triage-fix](../../review-triage-fix/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) も、`review-triage-fix` に渡す値を決めるために同じ既定を読む。**引数で指定された値が設定より優先する。** 設定はリポジトリごとの既定で、引数はその回だけの上書き (引数の様式と決め方の SSOT は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md))。
+[review-triage-fix](../../review-triage-fix/SKILL.md) が読む。[review-loop](../../review-loop/SKILL.md) と [review-rally](../../review-rally/SKILL.md) も、`review-triage-fix` に渡す値を決めるために同じ既定を読む。**引数で指定された値が設定より優先する。** 設定はリポジトリごとの既定で、引数はその回だけの上書き (引数の様式と決め方の SSOT は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md))。
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |

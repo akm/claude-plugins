@@ -1,6 +1,6 @@
 # レビューの起動
 
-**このファイルが `review-triage-loop` からレビューを起動する経路の SSOT。** 依頼文の中身 (報告前の検証・報告しない条件・出力様式) は [review-request.md](../../review-triage/references/review-request.md) が SSOT。ここでは言い直さず、経路ごとの違いだけを定める。レビューを別のプロセスに任せるループ (`review-loop`) が結果を取り込むときの共通の規則も、末尾の節「別のプロセスでレビューした結果の取り込み」が SSOT。
+**このファイルが `review-triage-loop` からレビューを起動する経路の SSOT。** 依頼文の中身 (報告前の検証・報告しない条件・出力様式) は [review-request.md](../../review-triage/references/review-request.md) が SSOT。ここでは言い直さず、経路ごとの違いだけを定める。レビューを別のプロセスに任せるループ (`review-loop`・`review-rally`) が結果を取り込むときの共通の規則も、末尾の節「別のプロセスでレビューした結果の取り込み」が SSOT。
 
 ## なぜ経路がスキルごとに違うか
 
@@ -47,7 +47,7 @@
 
 ## 記録のキーの出所 (定義の SSOT)
 
-**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表が定める。ただし、レビューを別のプロセスに任せる経路 (`review-loop`) では、この表の値の一部を替える。** キーの意味の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここはループがその値をどこから採るかを定める。どれをどう替えるかは、末尾の節「別のプロセスでレビューした結果の取り込み」の「`review-triage` に渡すもの」が定める。そこで定めずに、それぞれのスキルの文書に委ねるもの (`model` の採り方) もある。
+**記録の `model` / `skill` / `level` / `scope` を何から採るかは、経路ごとにこの表が定める。ただし、レビューを別のプロセスに任せる経路 (`review-loop`・`review-rally`) では、この表の値の一部を替える。** キーの意味の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `runs[]` の表で、ここはループがその値をどこから採るかを定める。どれをどう替えるかは、末尾の節「別のプロセスでレビューした結果の取り込み」の「`review-triage` に渡すもの」が定める。そこで定めずに、それぞれのスキルの文書に委ねるもの (`model` の採り方) もある。
 
 | 記録のキー | `code-review` | `ce-code-review` |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 ## 別のプロセスでレビューした結果の取り込み
 
-**この節が、レビューを別のプロセスに任せるループ (`review-loop`) が、`review-request` で依頼文を作り、レビューの結果のファイルを受け取って取り込むときの、共通の規則の SSOT。** レビュアの実行を確認する材料 (`review-loop` では完了のフラグファイル) と、規則に反したときに停止するノード (以下「その経路のレビュー不成立」。`review-loop` では RA1) は、経路ごとに違うので、それぞれのスキルの文書が定める。この経路 (`review-triage-loop`) は `review-request` を呼ばず、結果を sub-agent から受け取るので、この節を使わない。
+**この節が、レビューを別のプロセスに任せるループ (`review-loop`・`review-rally`) が、`review-request` で依頼文を作り、レビューの結果のファイルを受け取って取り込むときの、共通の規則の SSOT。** レビュアの実行を確認する材料 (`review-loop` では完了のフラグファイル) と、規則に反したときに停止するノード (以下「その経路のレビュー不成立」。`review-loop` では RA1) は、経路ごとに違うので、それぞれのスキルの文書が定める。この経路 (`review-triage-loop`) は `review-request` を呼ばず、結果を sub-agent から受け取るので、この節を使わない。
 
 ### 呼ぶスキル
 
