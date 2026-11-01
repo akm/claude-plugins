@@ -15,7 +15,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 
 | 流用元 | 使うもの | 使わないもの (このスキルの SSOT) |
 | --- | --- | --- |
-| [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RG0、L1 → RL1 ([round.md](references/round.md))。G3 の「無い」の先 (RJ0) と J2 の「無い」の先 (RJ1)、追加の停止 RA1〜RA3 と、差し替えた部分の図 ([stops.md](references/stops.md)) |
+| [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RG0、L1 → RL1 ([round.md](references/round.md))。G3 の「無い」の先 (RJ0) と J2 の「無い」の先 (RJ1)、追加の停止 RA1〜RA3 ([stops.md](references/stops.md)) |
 | [reporting.md](../review-triage-loop/references/reporting.md) | 必ず出すもの 6 項目 (停止した理由に RA1〜RA3 を含める) | このループで足す項目 ([stops.md](references/stops.md) の「停止の報告に足すもの」) |
 | [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表 (読み替え方は同じファイルの「別のプロセスでレビューした結果の取り込み」、このスキルでの値は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)・「effort の既定」・「別のプロセスでレビューした結果の取り込み」(呼ぶスキル・結果のファイルの照合・`review-triage` に渡すもの) | 「G0 での解決」(ワーカーのモデルは人間が決める)・「範囲」(基点は `review-request` の規則。[round.md](references/round.md) の RL1 の手順 a) |
 | [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |
@@ -59,7 +59,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 
 ### 停止
 
-図に従って停止ノード (S2〜S6・RA1〜RA3) に到達したら、[stops.md](references/stops.md) の「停止のときに書き換えるもの」のとおり `loop.yaml` を書き換えてから報告する。報告の形は [reporting.md](../review-triage-loop/references/reporting.md)、停止ノードごとに足すものは [loop-flow.md](../review-triage-loop/references/loop-flow.md) の決定表 (S2〜S6) と [stops.md](references/stops.md) の決定表 (RA1〜RA3)、このループで足すものは [stops.md](references/stops.md) の「停止の報告に足すもの」。
+停止ノード (S2〜S6・RA1〜RA3) に到達したら、[stops.md](references/stops.md) の「停止のときに書き換えるもの」のとおり `loop.yaml` を書き換えてから報告する。報告の形は [reporting.md](../review-triage-loop/references/reporting.md)、停止ノードごとに足すものは [loop-flow.md](../review-triage-loop/references/loop-flow.md) の決定表 (S2〜S6) と [stops.md](references/stops.md) の決定表 (RA1〜RA3)、このループで足すものは [stops.md](references/stops.md) の「停止の報告に足すもの」。
 
 ### 終了 (`--end`)
 

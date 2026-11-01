@@ -53,14 +53,14 @@ review-loop <ループ id> <記録の回番号> 回目 (<識別子>) [この起�
 
 ## 事象ごとの扱い
 
-待機スクリプトの終了コードと標準出力の 1 行 (事象の定義の SSOT はスクリプト `review-triage/scripts/review-loop-wait.sh` の冒頭のコメント) で分ける。停止ノードの定義と報告に書くものの SSOT は [stops.md](stops.md)。
+待機スクリプトの終了コードと標準出力の 1 行 (事象の定義の SSOT はスクリプト `review-triage/scripts/review-loop-wait.sh` の冒頭のコメント) で分ける。停止ノードの名前と報告に書くものの SSOT は [stops.md](stops.md)。
 
 | 終了コード | 標準出力 | 扱い |
 | --- | --- | --- |
 | 0 | `delivered <識別子>` | 再入の手順の 4 に進む |
 | 0 | `end` | ループの終了として扱う (人間が `end` を直接置いた)。[SKILL.md](../SKILL.md) の「終了」の手順 3 |
 | 0 | `worker idle` / `worker reviewing` | ワーカーが起動した (出現した)。`wait.wait_minutes` で待機し直す。数える回数は変えない |
-| 0 | `worker unavailable` | RA2。報告に `worker.yaml` の `error` (起動時の確認で通らなかった項目) を書く |
+| 0 | `worker unavailable` | RA2 |
 | 0 | `worker expired` / `worker left` / `worker stale` | RA2。**`worker stale` のとき、レビュアの実行 (`claude -p`) が残って動いていることがあるが、判定を覆さない。** ワーカーが `kill -9` などで消えても、専用のプロセスグループで動くレビュアの実行は残る。完了のフラグファイルを書くワーカーが動いていないので、待機してもフラグファイルは現れない。プロセスを調べて待機し直したり、手順に無い方法で待機したりしない |
 | 0 | `worker invalid` | RA1 (ワーカーが書くファイルが読めない) |
 | 124 | — | 下の「期限切れと中断」 |
