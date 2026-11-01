@@ -44,6 +44,6 @@ execution: docs
 - U4: `references/stops.md`
 - U5: 確認。残った文が、手順・様式・決定表か、基準に当たる理由のどれかであることを、文ごとに確認する。doc-dag で参照が切れていないこと、wording-guard を通すこと、review-rally で全量をレビューする。
 
-## 決まっていないこと
+## 計画の後に決めたこと
 
-- 作業するブランチ。このブランチで行い #151 の PR に含めるか、今の review-rally を PR にしてマージしてから、Issue を立てて別のブランチで行うか。
+- 作業するブランチ。このブランチ `feat/review-request-target-dir-151` で行い、#151 の PR に含める (2026-10-31 に利用者が決めた)。
