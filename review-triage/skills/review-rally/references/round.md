@@ -122,5 +122,5 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
 review-rally: <ループの id> / review_session: <session.id> / model: <loop.model> (実効: <session.model>) / effort: <loop.effort> (実効: <session.effort>) / permission_mode: <session.permission_mode> / review_minutes: <分>
 ```
 
-- `review_minutes` は、`waiting.sent_at` から完了のメッセージで始まったターンまでの分 (小数第 1 位まで)。
+- `review_minutes` は、`waiting.sent_at` から、手順 6 に入ったターンまでの分 (小数第 1 位まで)。
 - 記録のスキーマは変えない。ほかの経路の回と収束を比べるときは、この行の有無で経路を分ける。
