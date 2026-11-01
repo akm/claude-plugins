@@ -19,7 +19,7 @@
 
 1. **ループの id を決める**: `<YYYYMMDD>-<hhmm>-<ブランチ名>`。ブランチ名の整え方は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 3 の表の「ブランチ名」の行と同じ。
 2. **ループのディレクトリ `tmp/review-rally/<ループの id>/` を、メインの作業ツリーに作る。** 既にあれば作らずに報告して終了する。
-3. **`rally.yaml` を書く** (様式は下の「`rally.yaml`」)。`next_full` には `loop.full_first` の値を書く。`rounds` と `requests` は 0、`waiting` は `run_id`・`sent_at` を空、`timer_fires` を 0、`refs` を空の配列にする (下の例は 1 回目の依頼を送った後の状態)。`session` は空にしておき、起動の後に書く。
+3. **`rally.yaml` を書く** (様式は下の「`rally.yaml`」)。`next_full` には `loop.full_first` の値を書く。`rounds` と `requests` は 0、`waiting` は `run_id`・`sent_at` を空、`refs` を空の配列にする (下の例は 1 回目の依頼を送った後の状態)。`session` は空にしておき、起動の後に書く。
 
 ## 起動
 
@@ -98,7 +98,6 @@ next_full: false
 waiting:
   run_id: "20261029-0905-feat-foo-1-code-review-claude-opus-5-5"
   sent_at: "2026-10-29T00:05:12Z"
-  timer_fires: 0
   refs:
     - "feat/foo 1a2b3c4"
     - "main 5d6e7f8"
@@ -114,4 +113,4 @@ waiting:
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 2) |
-| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`timer_fires` は待機の通知を受けた回数、`refs` は依頼を送る直前のメインのリポジトリのブランチの一覧 (1 つのブランチが 1 要素)。結果待ちが無ければ `run_id` を空にする |
+| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`refs` は依頼を送る直前のメインのリポジトリのブランチの一覧 (1 つのブランチが 1 要素)。結果待ちが無ければ `run_id` を空にする |
