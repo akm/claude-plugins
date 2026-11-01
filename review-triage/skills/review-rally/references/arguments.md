@@ -7,7 +7,7 @@
 ```
 review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--review-args "<引数>"]
              [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <フェーズ>[=<値>]]...
-             [--base <ブランチ>]
+             [--base <ブランチ>] [--full-first] [--full-review]
 ```
 
 | 引数 | 対応する設定のキー | 例 |
@@ -21,10 +21,14 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 | `--threshold` | `fix.threshold_rounds` | `--threshold 3` |
 | `--stage` | `fix.stages.<フェーズ>` | `--stage investigate=sonnet:high` |
 | `--base` | 無し (`rally.yaml` の `loop.base` に書く) | `--base feat/a` |
+| `--full-first` | 無し (`rally.yaml` の `loop.full_first` に書く) | `--full-first` |
+| `--full-review` | 無し (`rally.yaml` の `loop.full_review` に書く) | `--full-review` |
 
 - **`--model`** と **`--effort`** は、レビューのセッションを起動するときに `start_session` の `model` と `effort` に渡す。
 - **`--threshold` と `--stage` は、`review-triage-fix` にそのまま渡す。** 扱いの SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落。開始前の報告に書くために、同じ規則で値を決めて検査する。
-- **`--base <ブランチ>`** は、全量の起点を求める派生元のブランチ。記録に回が無いときの最初の全量の回で、`review-request` に `--base` として渡す (起点の求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を、`review-request` の手順 2 と同じ求め方で解決して書く。解決できなければ、ループを始めずに人間に質問する。** 空のまま書くと、開始の報告にブランチ名が出ないためである。
+- **`--base <ブランチ>`** は、全量の起点を求める派生元のブランチ。全量の回 ([round.md](round.md) の手順 2) で、`review-request` に `--base` として渡す (起点の求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を、`review-request` の手順 2 と同じ求め方で解決して書く。解決できなければ、ループを始めずに人間に質問する。** 空のまま書くと、開始の報告にブランチ名が出ないためである。
+- **`--full-first`** は、この起動の 1 回目の依頼文を、収束後の全量レビューの要否を問わずに全量にする。記録に回が無ければ、付けなくても 1 回目は全量になる。
+- **`--full-review`** は、収束した後に、収束後の全量レビューが要れば、停止せずに全量の回を行う ([stops.md](stops.md) の RRJ1)。
 
 ## 設定と引数の優先順位
 

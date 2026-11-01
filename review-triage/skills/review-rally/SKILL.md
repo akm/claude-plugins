@@ -1,6 +1,6 @@
 ---
 name: review-rally
-description: レビューを、このセッションから起動した別の Claude Code のセッション (レビューのセッション。専用の worktree で動く) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。依頼と完了の通知はセッション間のメッセージで行い、2 回目以降は依頼の前にレビューのセッションの会話を消す。「レビューを別のセッションに任せて回して」「セッションを起動してレビューから修正までを回して」「review-rally を実行して」のような依頼で使う。引数でレビューのセッションのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・全量の起点にする派生元のブランチ (--base)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す) を指定できる。Claude のデスクトップアプリで、worktree ではないメインの作業ツリーで動くセッションから使う。
+description: レビューを、このセッションから起動した別の Claude Code のセッション (レビューのセッション。専用の worktree で動く) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。依頼と完了の通知はセッション間のメッセージで行い、2 回目以降は依頼の前にレビューのセッションの会話を消す。「レビューを別のセッションに任せて回して」「セッションを起動してレビューから修正までを回して」「review-rally を実行して」のような依頼で使う。引数でレビューのセッションのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・全量の起点にする派生元のブランチ (--base)・1 回目を全量にするか (--full-first)・収束の後に全量の回を行うか (--full-review)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す) を指定できる。Claude のデスクトップアプリで、worktree ではないメインの作業ツリーで動くセッションから使う。
 ---
 
 # review-rally: レビューを別のセッションに任せるループ
@@ -22,7 +22,7 @@ description: レビューを、このセッションから起動した別の Cla
 
 | 流用元 | 使うもの | 使わないもの (このスキルの SSOT) |
 | --- | --- | --- |
-| [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RRG0、L1 → RRL1 ([round.md](references/round.md))。追加の停止 RR1〜RR4 と、差し替えた部分の図 ([stops.md](references/stops.md)) |
+| [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RRG0、L1 → RRL1 ([round.md](references/round.md))。J2 の「無い」と S3 の間に RRJ1。追加の停止 RR1〜RR4 と、差し替えた部分の図 ([stops.md](references/stops.md)) |
 | [reporting.md](../review-triage-loop/references/reporting.md) | 必ず出すもの 6 項目 (停止した理由に RR1〜RR4 を含める) | このループで足す項目 ([stops.md](references/stops.md) の「停止の報告に足すもの」) |
 | [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表・「effort の既定」・「別のプロセスでレビューした結果の取り込み」(呼ぶスキル・結果のファイルの照合・`review-triage` に渡すもの) | 「G0 での解決」(レビューのセッションのモデルは人間が決める)・「範囲」(基点は `review-request` の規則) |
 | [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |

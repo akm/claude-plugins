@@ -6,8 +6,8 @@
 
 | ID | 種類 | 条件・内容 | 報告に書くもの |
 | --- | --- | --- | --- |
-| RRG0 | 手順 | 新しいループなら、次の順に行う。(1) 条件を決める ([arguments.md](arguments.md))。(2) 開始の前提を確認する ([session.md](session.md) の「開始の前提」)。(3) ループのディレクトリと `rally.yaml` を作る ([session.md](session.md) の「ループのディレクトリを作る」)。(4) レビューのセッションを起動し、実際の値を確認する ([session.md](session.md) の「起動」)。再入なら、下の「再入の手順」 | 新しいループのときだけ、決まった条件をループの開始前に出す。書くのは、レビューのセッションのモデルの指定と実効モデル・effort (指定と `get_session` の値)・権限モード、レビュースキルとそのオプション、上限、構造の関門 k、全量の起点のブランチ (`loop.base` と、`--base` による指定か `origin/HEAD` による既定か)、`review-triage-fix` に渡す回数の閾値 N とフェーズごとの実行方法 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ)、ループの id とループのディレクトリの絶対パス、レビューのセッション (名前・id・worktree のパス。再利用された worktree なら、そのことと元の HEAD) |
-| RRL1 | 手順 | 下の「1 回のレビュー」の手順 1〜5。手順 5 で待機を起動してターンを終え、再入の手順から手順 6 に入る。手順 2 で識別子の衝突の待機を起動したときは、再入の手順から手順 1 に入る | いま何回目か (この起動で数えた回数) と上限、記録の回番号、識別子 |
+| RRG0 | 手順 | 新しいループなら、次の順に行う。(1) 条件を決める ([arguments.md](arguments.md))。(2) 開始の前提を確認する ([session.md](session.md) の「開始の前提」)。(3) ループのディレクトリと `rally.yaml` を作る ([session.md](session.md) の「ループのディレクトリを作る」)。(4) レビューのセッションを起動し、実際の値を確認する ([session.md](session.md) の「起動」)。再入なら、下の「再入の手順」 | 新しいループのときだけ、決まった条件をループの開始前に出す。書くのは、レビューのセッションのモデルの指定と実効モデル・effort (指定と `get_session` の値)・権限モード、レビュースキルとそのオプション、上限、構造の関門 k、全量の起点のブランチ (`loop.base` と、`--base` による指定か `origin/HEAD` による既定か)、`review-triage-fix` に渡す回数の閾値 N とフェーズごとの実行方法 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ)、`--full-first` と `--full-review` の有無、ループの id とループのディレクトリの絶対パス、レビューのセッション (名前・id・worktree のパス。再利用された worktree なら、そのことと元の HEAD) |
+| RRL1 | 手順 | 下の「1 回のレビュー」の手順 1〜5。手順 5 で待機を起動してターンを終え、再入の手順から手順 6 に入る。手順 2 で識別子の衝突の待機を起動したときは、再入の手順から手順 1 に入る | いま何回目か (この起動で数えた回数) と上限、記録の回番号、範囲 (全量か増分か)、識別子 |
 
 ## ファイルのディレクトリ
 
@@ -28,12 +28,12 @@
 2. **依頼文を書く。** 次をすべて確認してから、Skill ツールで [review-request](../../review-request/SKILL.md) を呼び出す。当たれば RR4 で、当たったものをすべて一度に報告する。
    - メインの作業ツリーが clean である (`git status --porcelain` が空)。
    - 記録が読める。
-   - 増分の回 (記録に回がある) なら、最後の回の `head` が HEAD の祖先である (`git merge-base --is-ancestor <head> HEAD`)。
+   - 増分の回 (記録に回があり、`next_full` が偽) なら、最後の回の `head` が HEAD の祖先である (`git merge-base --is-ancestor <head> HEAD`)。
 
-   呼び出しは `review-request <loop.review_skill> <loop.model> <loop.review_args> --dir <依頼のディレクトリの相対パス> --target-dir <レビューの worktree の絶対パス>` (値は `rally.yaml`。`ce-code-review` には `<loop.review_args>` を渡さない)。記録に回が無ければ (全量の回)、`--base <loop.base>` も渡す。
+   呼び出しは `review-request <loop.review_skill> <loop.model> <loop.review_args> --dir <依頼のディレクトリの相対パス> --target-dir <レビューの worktree の絶対パス>` (値は `rally.yaml`。`ce-code-review` には `<loop.review_args>` を渡さない)。記録に回が無いか、`rally.yaml` の `next_full` が真なら全量の回で、`--base <loop.base>` も渡す。記録に回がある状態の全量の回では、`--full-review` も渡す。
    - `review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら、Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-rally <ループの id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-rally の再入の手順へ」にして、ターンを終える。
    - それ以外の理由で書かなかったら RR4 (報告には `review-request` が報告した理由を書く)。
-   - 書けたら、`rally.yaml` の `rounds` を 1 つ増やす (J5 が見る回数。数えるのはここだけ)。
+   - 書けたら、`next_full` を偽にする。記録に回がある状態の全量の回でなければ、`rounds` を 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
 3. **会話を消す。** この起動で 2 回目以降の依頼なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。1 回目は消さない。
 4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`) を書く。
 5. **待機を起動して、ターンを終える** (下の「待機」)。
