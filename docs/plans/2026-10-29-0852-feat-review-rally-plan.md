@@ -155,11 +155,11 @@ U2〜U6 と U3a を実装する中で決めたことと、上の計画と違う�
 
 | 点 | 決めたこと |
 | --- | --- |
-| 全量の依頼 | D4 で後に回した `--full-review` を、2 つの引数として足した (利用者が決めた)。`--full-first` は 1 回目の依頼文を全量にし、`--full-review` は収束した後に、要れば全量の回を行う。SSOT は `review-triage/skills/review-rally/references/arguments.md` と、`references/stops.md` の RRJ1 |
+| 全量の依頼 | D4 で後に回した、全量で依頼する手段を足した。引数は 2 つで、分け方と名前は利用者が決めた。`--full-first` は 1 回目の依頼文を全量にし、`--full-review` は収束した後に、要れば全量の回を行う。SSOT は `review-triage/skills/review-rally/references/arguments.md` と、`references/stops.md` の RRJ1 |
 
 ## 後に回すもの
 
-- `--resume`・`--end` (D4)。`--full-review` は、上の「計画の後に決めたこと」の「全量の依頼」で足した。
+- `--resume`・`--end` (D4)。全量で依頼する手段は、上の「計画の後に決めたこと」の「全量の依頼」で足した。
 - レビューのセッションの自己申告による「レビュースキルを Skill ツールで呼び出したか」「拒否されたツールの呼び出しの件数」の記録 (D6)。
 - 経路ごとの収束の比べ方。記録がたまってから決める。
 
