@@ -32,7 +32,7 @@
 
    呼び出しは `review-request <loop.review_skill> <loop.model> <loop.review_args> --dir <依頼のディレクトリの相対パス> --target-dir <レビューの worktree の絶対パス>` (値は `rally.yaml`。`ce-code-review` には `<loop.review_args>` を渡さない)。記録に回が無いか、`rally.yaml` の `next_full` が真なら全量の回で、`--base <loop.base>` も渡す。記録に回がある状態の全量の回では、`--full-review` も渡す。
    - `review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら、Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-rally <ループの id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-rally の再入の手順へ」にして、ターンを終える。
-   - それ以外の理由で書かなかったら RR4 (報告には `review-request` が報告した理由を書く)。
+   - それ以外の理由で書かなかったら RR4。
    - 書けたら、`next_full` を偽にする。記録に回がある状態の全量の回でなければ、`rounds` を 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
 3. **会話を消す。** `rally.yaml` の `requests` が 1 以上なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。
 4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。送ったら、`rally.yaml` の `requests` を 1 つ増やし、`waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`) を書く。
@@ -90,7 +90,7 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
    | --- | --- |
    | レビューのセッション (`from` が `session.id`) のメッセージで、1 行目が `review-rally <ループの id> <識別子>: done <パス>` | 識別子が `waiting.run_id` と違うか、記録に同じ `run_id` の回があれば、何もせずに終える。同じなら手順 6 (突き合わせ) に進む |
    | 同じく、1 行目が `review-rally <ループの id> <識別子>: failed <理由>` | 識別子が `waiting.run_id` と同じなら RR1。違えば何もせずに終える |
-   | 同じく、1 行目がどちらの形でもない | RR1 (報告にメッセージの 1 行目を引く) |
+   | 同じく、1 行目がどちらの形でもない | RR1 |
    | ターンの終了の通知だけ | 下の「完了のメッセージが無いまま来たターン」 |
    | 待機の通知 (`description` が `review-rally <ループの id> (<識別子>)` で始まる) | 識別子が `waiting.run_id` と違えば何もせずに終える。同じなら、`waiting.timer_fires` を 1 増やしてから、下の「完了のメッセージが無いまま来たターン」 |
    | ほかのセッションのメッセージ | 通知として扱わない。ループを進めない |
@@ -102,7 +102,7 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
 | `isRunning` | `lastActivityAt` | 扱い |
 | --- | --- | --- |
 | `true` | 今から 60 分以内 | レビュー中。待機の通知で入ったなら、待機を起動し直す。ターンの終了の通知で入ったなら、何もせずに終える |
-| `true` | 今から 60 分より前 | RR1 (応答なし)。報告に、承認待ちなどでレビューのセッションのターンが進んでいないおそれがあることを書く |
+| `true` | 今から 60 分より前 | RR1 (応答なし) |
 | `false` | `waiting.sent_at` より前 | 依頼を受けたターンがまだ始まっていない。待機の通知で入ったなら RR3 (依頼が処理されない)。ターンの終了の通知で入ったなら、何もせずに終える |
 | `false` | `waiting.sent_at` より後 | 依頼を受けたターンが、完了のメッセージを送らずに終了した。依頼のディレクトリに結果のファイル (`review-<識別子>.yaml`) があれば手順 6 に進む。無ければ RR1 |
 
