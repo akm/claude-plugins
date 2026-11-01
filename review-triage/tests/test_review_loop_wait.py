@@ -61,7 +61,7 @@ class WaitTestBase(unittest.TestCase):
             _set_mtime_ago(p, ago)
 
     def run_wait(self, minutes="1", stale=None, actions=(), timeout=30, await_worker=False):
-        """スクリプトを起動し、actions ((秒, 関数) の列) をその時刻に行い、終了まで待機する。"""
+        """スクリプトを起動し、actions ((秒, 関数) の配列) をその時刻に行い、終了まで待機する。"""
         args = ["bash", _SCRIPT] + (["--await-worker"] if await_worker else []) + [self.dir, RID, str(minutes)]
         if stale is not None:
             args.append(str(stale))

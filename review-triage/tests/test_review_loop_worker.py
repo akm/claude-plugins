@@ -222,10 +222,10 @@ def _yaml_scalar(value):
 
 
 def _read_yaml(path):
-    """ワーカーが書く YAML を読む。読めるのは、ブロック形式の対応の入れ子・対応を要素に持つブロック形式の列
-    (`- <キー>: <値>` の行で要素が始まるもの)・スカラー・JSON 形式の列。二重引用符の文字列は JSON の文字列として読むので、
+    """ワーカーが書く YAML を読む。読めるのは、ブロック形式の対応の入れ子・対応を要素に持つブロック形式の配列
+    (`- <キー>: <値>` の行で要素が始まるもの)・スカラー・JSON 形式の配列。二重引用符の文字列は JSON の文字列として読むので、
     エスケープが正しくなければ (制御文字がそのまま入っているなど) 例外になる。字下げが揃わない行も例外にする。"""
-    rows = []  # (字下げ, キー, 値)。キーが None の行は列の要素の始まり
+    rows = []  # (字下げ, キー, 値)。キーが None の行は配列の要素の始まり
     with open(path, encoding="utf-8") as f:
         for raw in f:
             line = raw.rstrip("\n")
@@ -236,7 +236,7 @@ def _read_yaml(path):
                 raise ValueError(f"読めない行: {line!r}")
             indent = len(m.group(1))
             if m.group(2):
-                # 列の要素の始まり。要素の対応のキーは「- 」の後ろの桁にあるものとして読む
+                # 配列の要素の始まり。要素の対応のキーは「- 」の後ろの桁にあるものとして読む
                 rows.append((indent, None, None))
                 indent += 2
             rows.append((indent, m.group(3), m.group(4)))
@@ -589,7 +589,7 @@ class WorkerTestBase(unittest.TestCase):
                 os.path.join(tmp, f".review-loop-interrupt-{key}.tmp"))
 
     def prep_dirs(self):
-        """TMPDIR の下に残っている、このループの準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの列。"""
+        """TMPDIR の下に残っている、このループの準備のディレクトリ (worker.md の「回の処理」の手順 5) のパスの配列。"""
         prefix = "review-loop-prep-" + os.path.basename(self.ws_path())[len("review-loop-"):] + "."
         tmp = os.path.realpath(self.tmpdir)
         return sorted(os.path.join(tmp, n) for n in os.listdir(tmp) if n.startswith(prefix))
@@ -687,7 +687,7 @@ class WorkerTestBase(unittest.TestCase):
         return _read_yaml(p)
 
     def wait_pids(self, path, count):
-        """ファイル path に PID が count 個以上書かれるまで待機して、その列を返す。"""
+        """ファイル path に PID が count 個以上書かれるまで待機して、書かれた PID の配列を返す。"""
         def ready():
             try:
                 pids = _read_pids(path)
@@ -708,14 +708,14 @@ class WorkerTestBase(unittest.TestCase):
             return [json.loads(line) for line in f if line.strip()]
 
     def claude_records(self):
-        """偽の claude が起動されたときの様子 (cwd・複製の中の git の結果・--settings・写しの中身) の列。"""
+        """偽の claude が起動されたときの様子 (cwd・複製の中の git の結果・--settings・写しの中身) の配列。"""
         if not os.path.exists(self.record_file):
             return []
         with open(self.record_file, encoding="utf-8") as f:
             return [json.loads(line) for line in f if line.strip()]
 
     def workspaces(self):
-        """TMPDIR の下に残っている作業場所と準備のディレクトリ (どちらも名前が review-loop- で始まる) の名前の列。"""
+        """TMPDIR の下に残っている作業場所と準備のディレクトリ (どちらも名前が review-loop- で始まる) の名前の配列。"""
         return sorted(n for n in os.listdir(self.tmpdir) if n.startswith("review-loop-"))
 
     def run_round(self, *extra, rid=RID):
@@ -773,7 +773,7 @@ def _tool_use(tid, name, tool_input, parent=None):
 
 
 def _tool_result(tid, content, is_error, parent=None):
-    """ツールの結果 (type が user の行の message.content の tool_result)。content は文字列か text の要素の列。"""
+    """ツールの結果 (type が user の行の message.content の tool_result)。content は文字列か text の要素の配列。"""
     return {"type": "user", "parent_tool_use_id": parent, "session_id": "s",
             "message": {"role": "user",
                         "content": [{"type": "tool_result", "tool_use_id": tid, "content": content,
@@ -1755,7 +1755,7 @@ class TestLogReading(WorkerTestBase):
 
     def test_sandbox_blocked_network_and_text_elements(self):
         # 接続を拒否された結果 (本文に <sandbox_violations> のタグ) も数え、message にタグの中の行 (拒否されたホスト) を書く。
-        # 本文が text の要素の列の形の結果も数える
+        # 本文が text の要素の配列の形の結果も数える
         marker = self.run_with_stream([
             _init("auto"),
             _tool_use("toolu_net", "Bash", {"command": "curl -sS https://example.com/"}),

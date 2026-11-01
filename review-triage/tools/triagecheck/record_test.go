@@ -2045,7 +2045,7 @@ func TestReviewTriageRecordPriorDefectPasses(t *testing.T) {
 // verdict_reason に書く規則で判定したものと見なし、無くても報告しない。回の date には
 // よらない (どの回も validRecordYAML と同じ date)。
 func TestReviewTriageRecordPriorDefectRequiredFromFirstRun(t *testing.T) {
-	// 2 つ目の回として足すときは、先頭の "runs:" を外して回の列だけにする。
+	// 2 つ目の回として足すときは、先頭の "runs:" を外して回の配列だけにする。
 	asLaterRun := func(src string) string { return strings.TrimPrefix(src, "runs:\n") }
 	// D8 の結果を書いた回のうち、id 1 の prior_defect だけを書き忘れた回。
 	forgotID1 := func(t *testing.T) string {
