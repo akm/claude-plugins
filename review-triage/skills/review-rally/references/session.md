@@ -19,7 +19,7 @@
 
 1. **ループの id を決める**: `<YYYYMMDD>-<hhmm>-<ブランチ名>`。ブランチ名の整え方は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 3 の表の「ブランチ名」の行と同じ。
 2. **ループのディレクトリ `tmp/review-rally/<ループの id>/` を、メインの作業ツリーに作る。** 既にあれば作らずに報告して終了する。
-3. **`rally.yaml` を書く** (様式は下の「`rally.yaml`」)。`next_full` には `loop.full_first` の値を書く。`session` は空にしておき、起動の後に書く。
+3. **`rally.yaml` を書く** (様式は下の「`rally.yaml`」)。`next_full` には `loop.full_first` の値を書く。`rounds` と `requests` は 0、`waiting` は `run_id`・`sent_at` を空、`timer_fires` を 0、`refs` を空の配列にする (下の例は 1 回目の依頼を送った後の状態)。`session` は空にしておき、起動の後に書く。
 
 ## 起動
 
