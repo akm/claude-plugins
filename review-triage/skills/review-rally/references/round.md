@@ -34,8 +34,8 @@
    - `review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら、Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-rally <ループの id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-rally の再入の手順へ」にして、ターンを終える。
    - それ以外の理由で書かなかったら RR4 (報告には `review-request` が報告した理由を書く)。
    - 書けたら、`next_full` を偽にする。記録に回がある状態の全量の回でなければ、`rounds` を 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
-3. **会話を消す。** この起動で 2 回目以降の依頼なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。1 回目は消さない。
-4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`) を書く。
+3. **会話を消す。** `rally.yaml` の `requests` が 1 以上なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。
+4. **依頼する。** ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送る直前に、メインのリポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。送ったら、`rally.yaml` の `requests` を 1 つ増やし、`waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・`timer_fires: 0`・ブランチの一覧 (`refs`) を書く。
 5. **待機を起動して、ターンを終える** (下の「待機」)。
 6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
    1. 結果のファイル (依頼のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
@@ -47,7 +47,7 @@
 
 ### 依頼のメッセージ
 
-**会話を消した後に送るので、レビューの規則をすべて書く。**
+**会話を消した後に送るので、レビューの規則をすべて書く。** `<回>` は記録の回番号 (記録の `runs` の数 + 1)。
 
 ```
 review-rally <ループの id>: <回> 回目のレビューの依頼 (識別子 <識別子>)

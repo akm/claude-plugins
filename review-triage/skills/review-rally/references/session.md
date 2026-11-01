@@ -93,6 +93,7 @@ session:
   reused: false
   original_head: ""
 rounds: 1
+requests: 1
 next_full: false
 waiting:
   run_id: "20261029-0905-feat-foo-1-code-review-claude-opus-5-5"
@@ -111,5 +112,6 @@ waiting:
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
 | `session` | 起動したレビューのセッション。`model`・`effort`・`permission_mode`・`branch` は `get_session` の値。`reused` と `original_head` は上の「起動」の 3 |
 | `rounds` | この起動で数えた回数 (J5 が見る) |
+| `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 2) |
 | `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`timer_fires` は待機の通知を受けた回数、`refs` は依頼を送る直前のメインのリポジトリのブランチの一覧 (1 つのブランチが 1 要素)。結果待ちが無ければ `run_id` を空にする |
