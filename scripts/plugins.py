@@ -184,8 +184,8 @@ _VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 # (issue-dispatch は配布していないので import しない)。scheme は KTD4 が挙げる 4 つに限る
 _SCP_RE = re.compile(r"^(?:[^@/:]+@)?(?P<host>[^:/]+):(?P<path>[^/].*)$")
 _URL_RE = re.compile(r"^(?:ssh|https|git)://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.+)$")
-# scheme のある URL の userinfo の部分 (関数 hide_credentials が *** にする)
-_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^@/]+@")
+# scheme のある URL の、scheme:// から最後の @ までの部分 (関数 hide_credentials が *** にする)
+_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://).+@")
 # <所有者>/<リポジトリ> の形。どちらも、名前に使える文字 (英数字と ._-) の 1 文字以上
 _REPO_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
@@ -350,6 +350,9 @@ def hide_credentials(url):
 
     URL に認証情報 (https://<ユーザー>:<トークン>@github.com/... など) を埋め込んだ利用者のトークンを、標準エラー出力に
     出さないため。scp 形式 (git@github.com:...) のユーザー名は秘密ではないので変えない。ほかの形の値はそのまま返す。
+    userinfo は、最初の @ や / までではなく、URL の中の最後の @ までとみなす。パスワードに @ や / を符号化せずに書いた
+    誤った形の URL でも、パスワードを出さないため。パスに @ を含む URL ではホストとパスの一部も伏せるが、
+    表示が分かりにくくなるだけで、認証情報は出ない。
     """
     return _USERINFO_RE.sub(r"\1***@", url)
 

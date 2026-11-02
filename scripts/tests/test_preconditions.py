@@ -253,6 +253,9 @@ class SourceUrlTest(unittest.TestCase):
     def test_hide_credentials(self):
         plugins = load_plugins()
         for url, shown in (("https://user:token@github.com/a/b.git", "https://***@github.com/a/b.git"),
+                           # パスワードに @ や / を符号化せずに書いた、誤った形の URL
+                           ("https://user:p@ss@github.com/a/b.git", "https://***@github.com/a/b.git"),
+                           ("https://user:ab/cd@github.com/a/b.git", "https://***@github.com/a/b.git"),
                            ("ssh://git@github.com:22/a/b.git", "ssh://***@github.com:22/a/b.git"),
                            ("https://github.com/a/b.git", "https://github.com/a/b.git"),
                            ("git@github.com:a/b.git", "git@github.com:a/b.git"),
