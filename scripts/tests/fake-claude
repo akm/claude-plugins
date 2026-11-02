@@ -21,7 +21,8 @@
 状態のファイルのキー (無いキーは空として扱う):
 
 - marketplaces: 登録したマーケットプレイスの配列。要素は `plugin marketplace list --json` の要素の形
-  (name・source と、source が github なら repo、git なら url)。installLocation が無ければ足して出力する
+  (name・source と、source が github なら repo、git なら url。ref を付けて登録したものは ref も。本物の claude は、github と
+  git の取得元の path を出力しない)。installLocation が無ければ足して出力する
 - clone: マーケットプレイスの名前 → (プラグインの名前 → 版)。マーケットプレイスの clone にある版
 - published: マーケットプレイスの名前 → (プラグインの名前 → 版)。配布元にある版
 - installed: インストール済みのプラグインの配列。要素のキーは id・scope・version と、enabled (省略時は真)・

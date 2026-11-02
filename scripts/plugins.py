@@ -32,8 +32,8 @@ Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
   4. マーケットプレイスが登録されている (claude plugin marketplace list --json)。登録されていなければ、登録するコマンドを
      表示する。登録は利用者の環境に設定を足す操作なので、このスクリプトでは行わない
   5. 登録したマーケットプレイスの取得元が配布元の main である。akm/claude-plugins の形で登録したものも、URL の形で登録した
-     ものも受け付ける。ref (ブランチやタグ) を付けて登録したものは ref が main のときだけ、path を付けて登録したものは path が
-     空のときだけ受け付ける
+     ものも受け付ける。ref (ブランチやタグ) を付けて登録したものは ref が main のときだけ受け付ける。path (リポジトリの中の
+     marketplace.json のパス) は、claude plugin marketplace list --json が github と git の取得元では出力しないので、検査できない
   6. remote origin の URL (git config --get remote.origin.url の値) が配布元を指す
   7. git fetch で origin の main を取得できる。失敗したときは、手元にある古い origin/main を使わない
   8. 取得した直後の origin/main の SHA にある marketplace.json の、マーケットプレイスの名前と配布元が、作業ツリーのものと同じ。
@@ -556,14 +556,12 @@ def check_registration(local):
         if source_key(url) != expected:
             shown = hide_credentials(value)
             raise PluginsError(f"マーケットプレイス {name} の取得元 ({shown}) が、配布元 ({format_source(expected)}) でない", fix)
-        # ref と path は、取得する内容を変える。配布元の main を取得するのは、ref が無いか main で、path が無いか空のときだけ
+        # ref は取得する内容を変える。配布元の main を取得するのは、ref が無いか main のときだけ。
+        # path (リポジトリの中の marketplace.json のパス) も取得する内容を変えるが、list --json は github と git の取得元では
+        # path を出力しないので、ここでは検査できない
         ref = m.get("ref")
         if ref not in (None, "main"):
             raise PluginsError(f"マーケットプレイス {name} を ref {ref!r} を付けて登録している。取得元が配布元の main でない", fix)
-        path = m.get("path")
-        if path not in (None, ""):
-            raise PluginsError(f"マーケットプレイス {name} を path {path!r} を付けて登録している。"
-                               "配布元のマーケットプレイスは、リポジトリのルートにある", fix)
 
 
 def check_origin(root, local):

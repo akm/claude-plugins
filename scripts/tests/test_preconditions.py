@@ -198,20 +198,14 @@ class RegistrationTest(ScriptTestCase):
                 self.write_state({"marketplaces": [entry]})
                 self.assert_stopped_without_change(self.run_script("status"), "取得元")
 
-    def test_registration_ref_and_path(self):
-        accepted = [{"name": MP, "source": "github", "repo": "akm/claude-plugins", "ref": "main"},
-                    {"name": MP, "source": "github", "repo": "akm/claude-plugins", "path": ""}]
-        for entry in accepted:
+    def test_registration_ref(self):
+        self.write_state({"marketplaces": [{"name": MP, "source": "github", "repo": "akm/claude-plugins", "ref": "main"}]})
+        self.assertEqual(self.latest(self.prepare()), PUBLISHED, "ref が main の登録は受け付けること")
+        for entry in ({"name": MP, "source": "github", "repo": "akm/claude-plugins", "ref": "dev"},
+                      {"name": MP, "source": "git", "url": "https://github.com/akm/claude-plugins.git", "ref": "v1.0.0"}):
             with self.subTest(entry=entry):
                 self.write_state({"marketplaces": [entry]})
-                self.assertEqual(self.latest(self.prepare()), PUBLISHED, "ref が main か path が空の登録は受け付けること")
-        rejected = [({"name": MP, "source": "github", "repo": "akm/claude-plugins", "ref": "dev"}, "ref"),
-                    ({"name": MP, "source": "git", "url": "https://github.com/akm/claude-plugins.git", "ref": "v1.0.0"}, "ref"),
-                    ({"name": MP, "source": "github", "repo": "akm/claude-plugins", "path": "sub"}, "path")]
-        for entry, fragment in rejected:
-            with self.subTest(entry=entry):
-                self.write_state({"marketplaces": [entry]})
-                self.assert_stopped_without_change(self.run_script("status"), fragment)
+                self.assert_stopped_without_change(self.run_script("status"), "ref")
 
     def test_credentials_in_registered_url_are_hidden(self):
         self.write_state({"marketplaces": [{"name": MP, "source": "git",
