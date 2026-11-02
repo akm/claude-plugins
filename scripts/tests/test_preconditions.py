@@ -12,6 +12,9 @@
 - 別のプロセスで、コピーしたスクリプトをモジュールとして読み込み、関数 prepare に引数で値を渡して呼ぶ (読み取った結果を見るテスト)
 
 外部のコマンドを実行しない関数 (名前の解析・URL の正規化・版の解析・出力の検査) は、このプロセスで引数を渡して呼ぶ。
+
+このファイルの R・KD・KTD の番号は、計画のファイル docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の
+Requirements (R)・Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
 """
 
 import importlib.util

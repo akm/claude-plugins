@@ -11,6 +11,9 @@
 Ctrl-C は、偽の claude が親のプロセス (スクリプト) に SIGINT を送って起こす。
 
 ファイル scripts/tests/test_makefile.py が、クラス InstallTestCase を使う。
+
+このファイルの R・KD・KTD の番号は、計画のファイル docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の
+Requirements (R)・Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
 """
 
 import json

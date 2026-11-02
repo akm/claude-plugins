@@ -15,6 +15,9 @@
 指定したときだけ、その値をこのオプションで渡す。対象は marketplace.json の順に扱い、渡した順にはしない。同じ名前を 2 回
 渡してもエラーにしない。最新の版は、origin/main にある <source.path>/.claude-plugin/plugin.json の version。
 
+このファイルの R・KD・KTD の番号は、計画のファイル docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の Requirements (R)・
+Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
+
 語:
   配布元      プラグインを配布する GitHub のリポジトリ (ホスト・所有者・リポジトリの組。ファイル CONCEPTS.md の語)。
               作業ツリーの marketplace.json の、各プラグインの source.url から決める

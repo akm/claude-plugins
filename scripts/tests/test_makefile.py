@@ -8,6 +8,9 @@
 Makefile とスクリプト scripts/plugins.py を作業用のリポジトリにコピーし、make をプロセスとして実行する。本物の claude は
 実行せず、GitHub に接続しない (共通の準備はファイル scripts/tests/plugintest.py)。make は、ファイル
 scripts/tests/test_status.py と scripts/tests/test_install.py のテストと同じ偽の claude と一時的なリポジトリで動かす。
+
+このファイルの R・KD・KTD の番号は、計画のファイル docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の
+Requirements (R)・Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
 """
 
 import os

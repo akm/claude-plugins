@@ -10,6 +10,9 @@
 偽の claude の記録を見る。claude plugin list --json の出力の形の誤りも、状況の表示を通したプロセスの単位で確認する。
 
 ファイル scripts/tests/test_makefile.py が、クラス StatusTestCase と関数 parse_status を使う。
+
+このファイルの R・KD・KTD の番号は、計画のファイル docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の
+Requirements (R)・Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
 """
 
 import json
