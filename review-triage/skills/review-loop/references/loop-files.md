@@ -75,7 +75,7 @@ full_review_next: false
 | `worker.model` | ◯ | ワーカーのモデルの指定 (`loop.review_model`) |
 | `worker.effort` | ◯ | ワーカーの effort (`review_loop.worker_effort`) |
 | `worker.permission_mode` | ◯ | `review_loop.permission_mode` |
-| `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の列は「ワーカーの既定の一覧を使う」 |
+| `worker.allowed_tools` | ◯ | `review_loop.allowed_tools`。空の配列は「ワーカーの既定の一覧を使う」 |
 | `worker.sandbox_allow_write` | | `review_loop.sandbox_allow_write`。`--resume` での再度の読み込みと、キーが無いときの扱いの SSOT は [arguments.md](arguments.md) の「様式」 |
 | `worker.sandbox_allowed_domains` | | `review_loop.sandbox_allowed_domains`。扱いは `worker.sandbox_allow_write` と同じ |
 | `worker.idle_minutes` | ◯ | `review_loop.worker_idle_minutes` |
@@ -87,13 +87,13 @@ full_review_next: false
 | `loop.max_rounds` | ◯ | `loop.max_rounds` |
 | `loop.structure_rounds` | ◯ | `loop.structure_rounds` |
 | `loop.threshold` | ◯ | `fix.threshold_rounds` |
-| `loop.stages` | ◯ | 引数 `--stage` の値の列 (引数で指定したものだけ。設定 `fix.stages` は `review-triage-fix` が自分で読む)。無ければ `[]` |
+| `loop.stages` | ◯ | 引数 `--stage` の値の配列 (引数で指定したものだけ。設定 `fix.stages` は `review-triage-fix` が自分で読む)。無ければ `[]` |
 | `wait.wait_minutes` | ◯ | `review_loop.wait_minutes` |
 | `wait.worker_wait_minutes` | ◯ | `review_loop.worker_wait_minutes` |
 | `wait.worker_stale_seconds` | ◯ | `review_loop.worker_stale_seconds` |
 | `state` | ◯ | `active` (ループが進んでいる) / `stopped` (停止ノードに着き、人間の判断待ち) / `ended` (終了した) |
 | `stop_reason` | ◯ | `stopped` と `ended` のとき、ノード ID (`S2`〜`S6`・`RA1`〜`RA3`) か `end` と、1 行の理由。`active` なら空文字列 |
-| `rejected` | ◯ | レビュー不成立 (RA1) と判定した回の識別子の列。再入の手順が、その回の完了のフラグファイルを取り込まない。無ければ `[]` |
+| `rejected` | ◯ | レビュー不成立 (RA1) と判定した回の識別子の配列。再入の手順が、その回の完了のフラグファイルを取り込まない。無ければ `[]` |
 | `full_review_next` | | 実行時のキー (ループの条件ではない)。`--resume --full-review` のフラグで、真なら次に書く依頼文を全量にする。`--resume` の開始時 ([reentry.md](reentry.md) の「再入の手順」の 1) と、判定 RJ0・RJ1 の「はい」([stops.md](stops.md)) で `true` を書き、全量の依頼文を書いたら ([round.md](round.md) の RL1 の手順 a の 7) と、どの停止でも ([stops.md](stops.md) の「停止のときに書き換えるもの」) `false` にする。無ければ偽 |
 
 各値の決め方は [arguments.md](arguments.md) が SSOT。ワーカーが読むのは `repo_dir` だけで、トップレベルの `repo_dir: "<パス>"` の 1 行として読む (値を 1 行に書く)。
@@ -130,8 +130,8 @@ rounds_served: 0
 | `model` | ◯ | ワーカーに渡したモデルの指定 (`--model` の値) |
 | `effort` | ◯ | ワーカーに渡した effort (`--effort` の値) |
 | `permission_mode` | ◯ | レビュアの実行に渡す権限モード |
-| `sandbox_allow_write` | ◯ | サンドボックスの中の Bash に、作業場所のほかに書き込みを許す場所の列 (`--sandbox-allow-write` の値を指定の順に。先頭の `~` はホームに展開したもの)。指定が無ければ `[]` |
-| `sandbox_allowed_domains` | ◯ | サンドボックスの中の Bash に接続を許すホストの列 (`--sandbox-allowed-domain` の値を指定の順に)。指定が無ければ `[]`。利用者の設定の `WebFetch(domain:…)` の許可から加わるものは含まない |
+| `sandbox_allow_write` | ◯ | サンドボックスの中の Bash に、作業場所のほかに書き込みを許す場所の配列 (`--sandbox-allow-write` の値を指定の順に。先頭の `~` はホームに展開したもの)。指定が無ければ `[]` |
+| `sandbox_allowed_domains` | ◯ | サンドボックスの中の Bash に接続を許すホストの配列 (`--sandbox-allowed-domain` の値を指定の順に)。指定が無ければ `[]`。利用者の設定の `WebFetch(domain:…)` の許可から加わるものは含まない |
 | `cwd` | ◯ | ワーカーを起動した作業ツリーのルートの実体パス |
 | `head` | ◯ | ワーカーを起動したときの HEAD の短縮 SHA |
 | `started` | ◯ | ワーカーを起動した日時 |
@@ -210,12 +210,12 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `permission_mode.effective` | ◯ | ログから読んだ実効の権限モード。指定と違えば `status` は `failed`。読めなければ `unknown` (それだけでは `failed` にしない)。起動しなかった回も `unknown` |
 | `skill_called` | ◯ | レビュアの実行が Skill ツールを呼んだか。`true` / `false`、ログから読めなければ `unknown` |
 | `permission_denials.count` | ◯ | 許可されずに拒否されたツールの呼び出しの件数。ワーカーのフックが拒否した呼び出し (`worker_hook_denials`) は含めない。ログから読めなければ `unknown` |
-| `permission_denials.tools` | ◯ | 拒否されたツールの名前の列 (重複を除く。ワーカーのフックが拒否した呼び出しは含めない)。件数が 0 か `unknown` なら `[]` |
+| `permission_denials.tools` | ◯ | 拒否されたツールの名前の配列 (重複を除く。ワーカーのフックが拒否した呼び出しは含めない)。件数が 0 か `unknown` なら `[]` |
 | `worker_hook_denials` | | ワーカーのフック (`/tmp` を含む Bash のコマンドを実行前に拒否するもの) が拒否したと確認できた呼び出しの件数。判別の方法の SSOT は [worker.md](worker.md) の「`/tmp` を含むコマンドを拒否するフック」。ログから読めなければ `unknown`。起動しなかった回も `unknown`。0.18.0 以降のワーカーが書く。0.17.0 以前のワーカーのフラグファイルを、このキーが無いことでレビュー不成立にしないため、必須にしない |
 | `sandbox_blocked.count` | ◯ | サンドボックスが拒否した確認 (Bash の呼び出しのうち、書き込みか接続を拒否されたエラーで終了したもの。sub-agent の中の呼び出しを含む) の件数。レビュー対象のコミットの行を表示しただけと確認した呼び出し (`repo_text_displayed`) は含めない。ログから数えられなければ `unknown`。起動しなかった回も `unknown` |
-| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、拒否されたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの SSOT は [worker.md](worker.md) の「サンドボックスが拒否した確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
+| `sandbox_blocked.calls` | ◯ | 数えた呼び出しの配列。各要素は `command` (Bash に渡したコマンド) と `message` (結果の本文のうち、拒否されたパスかホストを含む部分) の 2 つのキーを持ち、どちらも文字列 (1 行への直し方と、切り詰める長さの SSOT は [worker.md](worker.md) の「サンドボックスが拒否した確認の数え方」の 3)。件数が 0 か `unknown` なら `[]` |
 | `repo_text_displayed.count` | | Bash の結果の本文に、サンドボックスが拒否した確認を数えるときに探す文面 (`operation not permitted`) かタグ (`<sandbox_violations>`) があったが、それを含む行がどれも、レビュー対象のコミットにある行を表示したものと確認した呼び出しの件数 (sub-agent の中の呼び出しを含む)。判別の方法の SSOT は [worker.md](worker.md) の「リポジトリの行を表示しただけの結果」。`sandbox_blocked.count` が `unknown` なら `unknown`。起動しなかった回も `unknown`。文面かタグを含む結果があったのに、レビュー対象のコミットの行を読めなかったときも `unknown` で、そのときはそれらの結果をすべて `sandbox_blocked` に数える。0.20.0 以降のワーカーが書く。0.19.0 以前のワーカーのフラグファイルを、このキーが無いことでレビュー不成立にしないため、必須にしない |
-| `repo_text_displayed.calls` | | 数えた呼び出しの列。要素の形と、1 行への直し方と切り詰める長さは `sandbox_blocked.calls` と同じで、`message` は本文のうち文面かタグを含む行。件数が 0 か `unknown` なら `[]` |
+| `repo_text_displayed.calls` | | 数えた呼び出しの配列。要素の形と、1 行への直し方と切り詰める長さは `sandbox_blocked.calls` と同じで、`message` は本文のうち文面かタグを含む行。件数が 0 か `unknown` なら `[]` |
 | `head_before` | ◯ | 依頼文を見つけたときの HEAD の短縮 SHA |
 | `head_after` | | レビュアの実行が終了した後の HEAD の短縮 SHA。**起動しなかった回は省く** |
 | `tree_clean_after` | | レビュアの実行が終了した後に作業ツリーが clean か。起動しなかった回は省く |
@@ -225,7 +225,7 @@ log: "20260926-1400-feat-review-loop-63-1-code-review-opus.log"
 | `error` | | `failed` のときだけ書く。通らなかった項目 (複数なら `; ` で区切る)。`ok` のときは省く |
 | `log` | | ログのファイル名。起動しなかった回は省く (ログが無いことを示す) |
 
-`sandbox_blocked.calls` と `repo_text_displayed.calls` が空でないときは、要素ごとに `- ` で始まる行から書く (YAML のブロック形式の列)。
+`sandbox_blocked.calls` と `repo_text_displayed.calls` が空でないときは、要素ごとに `- ` で始まる行から書く (YAML のブロック形式の配列)。
 
 ```yaml
 sandbox_blocked:

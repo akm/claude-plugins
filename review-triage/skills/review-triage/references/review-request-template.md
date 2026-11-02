@@ -100,7 +100,7 @@ residual: []
 | `findings[].summary` | 1〜2 文の要旨 |
 | `findings[].evidence` | 「報告前の検証」の節のとおり |
 | `findings[].attrs` | レビューが付けた属性 (`severity` / `confidence` など) をそのまま。無い属性を補完しない |
-| `residual` | 「報告しない条件」に当たるが残す 1 行メモの列。無ければ `[]` |
+| `residual` | 「報告しない条件」に当たるが残す 1 行メモの配列。無ければ `[]` |
 
 注意:
 

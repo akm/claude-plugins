@@ -31,7 +31,7 @@ var (
 	fenceLine    = regexp.MustCompile("^\\s*(```|~~~)")
 )
 
-// parseMarkdown は行の列から構造を読む。末尾の空行 (ファイル末尾の改行による空要素) は落とす。
+// parseMarkdown は行のスライスから構造を読む。末尾の空行 (ファイル末尾の改行による空要素) は落とす。
 // コードフェンスの中の行は見出し・表・箇条書きとして読まない。
 func parseMarkdown(raw []string) *document {
 	lines := append([]string{}, raw...)

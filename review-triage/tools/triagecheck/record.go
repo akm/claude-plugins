@@ -970,7 +970,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	return b.String()
 }
 
-// recordRow はセルの列から表の 1 行を組み立てる。
+// recordRow はセルのスライスから表の 1 行を組み立てる。
 func recordRow(cells []string) string {
 	return "| " + strings.Join(cells, " | ") + " |\n"
 }
@@ -1094,7 +1094,7 @@ func renderVerdictCell(fd recordFinding) string {
 	return cell
 }
 
-// renderPlanCells は修正計画 1 件の表のセル列を返す。
+// renderPlanCells は修正計画 1 件の表のセルのスライスを返す。
 func renderPlanCells(pl recordPlan) []string {
 	var ids []string
 	for _, id := range pl.FindingIDs {
