@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""scripts/ のスクリプトのテストで、PATH の先頭に claude の名前で置く偽のコマンド。
+
+本物の claude の代わりに、状態のファイルを読み書きして振る舞う (先例: issue-dispatch/tests/fake-gh・review-triage/tests/fake-claude)。
+受け付けるのは次の形の引数だけで、それ以外は標準エラー出力に引数を書いて終了コード 99 で終える。
+本物の claude は知らない語をプロンプトとして受け取ることがあるので、受け付ける形を決めておき、指定の漏れを成功と取り違えないようにする。
+
+  --fake-claude-identity                                        定数 IDENTITY の文字列を出力する (偽物であることの確認に使う)
+  plugin list --json                                            インストール済みのプラグインを出力する
+  plugin marketplace list --json                                登録したマーケットプレイスを出力する
+  plugin marketplace update <マーケットプレイス>                配布元の版を clone に反映する
+  plugin install <プラグイン>@<マーケットプレイス> --scope user --json
+                                                                clone の版を user スコープにインストール済みにする
+
+環境変数:
+
+- FAKE_CLAUDE_STATE: 状態のファイル (JSON)。--fake-claude-identity のほかは、無ければ終了コード 98 で終える
+- FAKE_CLAUDE_RECORD: 受けた引数 (args) と cwd を、呼び出しごとに JSON の 1 行として追記するファイル。引数を調べる前に書く
+- CLAUDE_CONFIG_DIR: 出力するパス (展開先と clone の場所) の基準。無ければ $HOME/.claude。パスを出力するだけで、ファイルは作らない
+
+状態のファイルのキー (無いキーは空として扱う):
+
+- marketplaces: 登録したマーケットプレイスの配列。要素は `plugin marketplace list --json` の要素の形
+  (name・source と、source が github なら repo、git なら url)。installLocation が無ければ足して出力する
+- clone: マーケットプレイスの名前 → (プラグインの名前 → 版)。マーケットプレイスの clone にある版
+- published: マーケットプレイスの名前 → (プラグインの名前 → 版)。配布元にある版
+- installed: インストール済みのプラグインの配列。要素のキーは id・scope・version と、enabled (省略時は真)・
+  projectPath (project / local スコープのとき)。`plugin list --json` は、本物と同じキー (固定データ
+  scripts/tests/fixtures/plugin-list.json の要素のキー) を持つ要素にして出力する
+- faults: 失敗などの指定の配列。要素を先頭から見て、引数の先頭が prefix と同じ要素ごとに、skip が 1 以上なら 1 減らして
+  ファイルに書き戻し、次の要素へ進む。skip が 0 なら action を行い、ほかの要素は見ない。要素のキー:
+    prefix   引数の先頭と比べる配列
+    action   fail       状態を変えずに、終了コード 1 で終える
+             no_change  状態を変えずに、終了コード 0 で終える (成功を返して版を変えない)
+             sigint     状態を変えずに、親のプロセスに SIGINT (Ctrl-C と同じシグナル) を送る。親が終了させるまで待機し、
+                        定数 SIGINT_WAIT の秒数がたっても終了させられなければ、終了コード 130 で終える
+    stdout   標準出力に書く文字列 (省略時は空)。no_change で `plugin list --json` の出力を差し替えるのにも使う
+    stderr   標準エラー出力に書く文字列 (省略時は、fail のときだけ決まった文を書く)
+    skip     一致した呼び出しのうち、先頭からこの数だけは action を行わずに通す (省略時は 0)
+
+`plugin install` と `plugin marketplace update` が成功したときの標準出力は、本物の形に合わせていない。
+テストするスクリプトは、状態を変えるコマンドの出力を解析しないため。
+"""
+
+import json
+import os
+import signal
+import sys
+import time
+
+# 偽物であることの確認に使う文字列。ファイル scripts/tests/plugintest.py の定数 FAKE_CLAUDE_IDENTITY と同じにする
+IDENTITY = "fake-claude for akm/claude-plugins scripts/tests"
+# action が sigint のときに、親が終了させるのを待機する上限 (秒)
+SIGINT_WAIT = 10
+# plugin list --json の installedAt と lastUpdated に入れる時刻
+TIMESTAMP = "2026-11-02T00:00:00.000Z"
+
+
+def respond(stdout="", stderr="", code=0):
+    sys.stdout.write(stdout)
+    sys.stdout.flush()
+    sys.stderr.write(stderr)
+    sys.stderr.flush()
+    sys.exit(code)
+
+
+def record(args):
+    path = os.environ.get("FAKE_CLAUDE_RECORD")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"args": args, "cwd": os.getcwd()}, ensure_ascii=False) + "\n")
+
+
+def config_dir():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def parse(args):
+    """受け付ける形なら (コマンドの名前, 引数) を、そうでなければ None を返す。"""
+    if args == ["--fake-claude-identity"]:
+        return ("identity", None)
+    if args == ["plugin", "list", "--json"]:
+        return ("list", None)
+    if args == ["plugin", "marketplace", "list", "--json"]:
+        return ("marketplace_list", None)
+    if len(args) == 4 and args[:3] == ["plugin", "marketplace", "update"]:
+        return ("marketplace_update", args[3])
+    if len(args) == 6 and args[:2] == ["plugin", "install"] and args[3:] == ["--scope", "user", "--json"] and "@" in args[2]:
+        return ("install", args[2])
+    return None
+
+
+def load_state(path):
+    with open(path, encoding="utf-8") as f:
+        state = json.load(f)
+    for key, empty in (("marketplaces", []), ("clone", {}), ("published", {}), ("installed", []), ("faults", [])):
+        state.setdefault(key, empty)
+    return state
+
+
+def save_state(path, state):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def find_fault(args, state, path):
+    """引数に当たる指定を返す。skip で通した指定は、skip を 1 減らしてファイルに書き戻す。"""
+    for fault in state["faults"]:
+        prefix = list(fault.get("prefix", []))
+        if not prefix or args[:len(prefix)] != prefix:
+            continue
+        if int(fault.get("skip", 0)) > 0:
+            fault["skip"] = int(fault["skip"]) - 1
+            save_state(path, state)
+            continue
+        return fault
+    return None
+
+
+def apply_fault(fault, args):
+    action = fault.get("action")
+    stdout = fault.get("stdout", "")
+    stderr = fault.get("stderr")
+    if action == "fail":
+        respond(stdout, f"fake-claude: 状態のファイルの指定で失敗する: {args!r}\n" if stderr is None else stderr, 1)
+    if action == "no_change":
+        respond(stdout, stderr or "", 0)
+    if action == "sigint":
+        sys.stdout.write(stdout)
+        sys.stdout.flush()
+        sys.stderr.write(stderr or "")
+        sys.stderr.flush()
+        os.kill(os.getppid(), signal.SIGINT)
+        # 本物の Ctrl-C では、親と子が同時にシグナルを受ける。親が子の実行中にシグナルを受けるよう、親が終了させるまで待機する
+        deadline = time.monotonic() + SIGINT_WAIT
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+        respond("", "", 130)
+    respond("", f"fake-claude: faults の知らない action {action!r}\n", 98)
+
+
+def list_element(entry):
+    """状態のファイルの installed の要素を、`plugin list --json` の要素の形にする。"""
+    name, _, marketplace = entry["id"].partition("@")
+    element = {
+        "id": entry["id"],
+        "version": entry["version"],
+        "scope": entry["scope"],
+        "enabled": entry.get("enabled", True),
+        "installPath": os.path.join(config_dir(), "plugins", "cache", marketplace, name, entry["version"]),
+        "installedAt": TIMESTAMP,
+        "lastUpdated": TIMESTAMP,
+    }
+    if entry["scope"] != "user":
+        element["projectPath"] = entry["projectPath"]
+    element["projectEnabled"] = entry.get("projectEnabled", False)
+    return element
+
+
+def marketplace_element(entry):
+    element = dict(entry)
+    element.setdefault("installLocation", os.path.join(config_dir(), "plugins", "marketplaces", entry["name"]))
+    return element
+
+
+def registered(state, name):
+    return any(m.get("name") == name for m in state["marketplaces"])
+
+
+def main():
+    args = sys.argv[1:]
+    record(args)
+    parsed = parse(args)
+    if parsed is None:
+        respond("", f"fake-claude: 知らない引数 {args!r}\n", 99)
+    command, operand = parsed
+    if command == "identity":
+        respond(IDENTITY + "\n")
+
+    path = os.environ.get("FAKE_CLAUDE_STATE")
+    if not path:
+        respond("", "fake-claude: 環境変数 FAKE_CLAUDE_STATE が無い\n", 98)
+    try:
+        state = load_state(path)
+    except (OSError, ValueError) as e:
+        respond("", f"fake-claude: 状態のファイル {path} を読めない: {e}\n", 98)
+
+    fault = find_fault(args, state, path)
+    if fault is not None:
+        apply_fault(fault, args)
+
+    if command == "list":
+        respond(json.dumps([list_element(e) for e in state["installed"]], ensure_ascii=False, indent=2) + "\n")
+    if command == "marketplace_list":
+        respond(json.dumps([marketplace_element(m) for m in state["marketplaces"]], ensure_ascii=False, indent=2) + "\n")
+    if command == "marketplace_update":
+        if not registered(state, operand):
+            respond("", f"fake-claude: マーケットプレイス {operand} は登録されていない\n", 1)
+        state["clone"][operand] = dict(state["published"].get(operand, {}))
+        save_state(path, state)
+        respond(f"fake-claude: マーケットプレイス {operand} を更新した\n")
+    if command == "install":
+        name, _, marketplace = operand.partition("@")
+        if not registered(state, marketplace):
+            respond("", f"fake-claude: マーケットプレイス {marketplace} は登録されていない\n", 1)
+        version = state["clone"].get(marketplace, {}).get(name)
+        if version is None:
+            respond("", f"fake-claude: プラグイン {name} はマーケットプレイス {marketplace} の clone に無い\n", 1)
+        installed = [e for e in state["installed"] if not (e["id"] == operand and e["scope"] == "user")]
+        installed.append({"id": operand, "scope": "user", "version": version, "enabled": True})
+        state["installed"] = installed
+        save_state(path, state)
+        respond(json.dumps({"id": operand, "scope": "user", "version": version}, ensure_ascii=False) + "\n")
+
+
+if __name__ == "__main__":
+    main()

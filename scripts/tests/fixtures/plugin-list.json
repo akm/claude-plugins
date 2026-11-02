@@ -1,0 +1,43 @@
+[
+  {
+    "id": "commit-rules-guard@akm-claude-plugins",
+    "version": "0.3.0",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/example/.claude/plugins/cache/akm-claude-plugins/commit-rules-guard/0.3.0",
+    "installedAt": "2026-07-27T00:29:38.184Z",
+    "lastUpdated": "2026-07-27T00:29:38.184Z",
+    "projectPath": "/Users/example/other-project",
+    "projectEnabled": false
+  },
+  {
+    "id": "commit-rules-guard@akm-claude-plugins",
+    "version": "0.4.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/example/.claude/plugins/cache/akm-claude-plugins/commit-rules-guard/0.4.0",
+    "installedAt": "2026-08-31T22:36:34.250Z",
+    "lastUpdated": "2026-08-31T22:36:34.250Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "discord@claude-plugins-official",
+    "version": "0.0.4",
+    "scope": "user",
+    "enabled": false,
+    "installPath": "/Users/example/.claude/plugins/cache/claude-plugins-official/discord/0.0.4",
+    "installedAt": "2026-03-22T12:20:02.434Z",
+    "lastUpdated": "2026-03-24T08:02:49.937Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "skill-creator@claude-plugins-official",
+    "version": "a7ba5b93db0c",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/example/.claude/plugins/cache/claude-plugins-official/skill-creator/a7ba5b93db0c",
+    "installedAt": "2026-03-15T02:19:28.587Z",
+    "lastUpdated": "2026-10-31T03:11:48.782Z",
+    "projectEnabled": false
+  }
+]
