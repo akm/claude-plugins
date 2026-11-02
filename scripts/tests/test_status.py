@@ -211,6 +211,27 @@ class AutoUpdateNoteTest(StatusTestCase):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, note, "プラグインの行より後ろに、自動更新を確認する方法を表示すること")
 
+    def test_note_matches_readme(self):
+        """案内の公式ドキュメントの URL と /plugin の画面の項目の名前が、README.md の手順にもあること。
+
+        README.md の節「マーケットプレイスの自動更新を有効にする」は、利用者向けに同じ URL と項目の名前を書いている。
+        片方だけを直したときに、ここで検出する。
+        """
+        r = self.run_status()
+        self.assert_shown(r)
+        note = r.stdout.rstrip("\n").splitlines()
+        urls = re.findall(r"https://\S+", note[-1])
+        items = re.findall(r"「([^」]+)」", r.stdout) + re.findall(r"([A-Za-z]+) タブ", r.stdout)
+        self.assertTrue(urls and items, f"案内から URL と項目の名前を取り出せること: {r.stdout}")
+        with open(os.path.join(plugintest.REPO_ROOT, "README.md"), encoding="utf-8") as f:
+            readme = f.read()
+        for fragment in urls + items:
+            with self.subTest(fragment=fragment):
+                # README.md の長い語や長い URL の一部として一致しないように、前後が英数字・- でないことも見る
+                found = re.search(r"(?<![A-Za-z0-9-])" + re.escape(fragment) + r"(?![A-Za-z0-9-])", readme)
+                self.assertTrue(found,
+                                f"状況の表示の案内と README.md で、URL と項目の名前を同じにすること (README.md に無い: {fragment})")
+
     def test_note_uses_marketplace_name_from_marketplace_json(self):
         renamed = plugintest.marketplace_json(NAMES)
         renamed["name"] = "renamed-marketplace"
