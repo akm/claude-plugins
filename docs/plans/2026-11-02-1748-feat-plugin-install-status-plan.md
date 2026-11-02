@@ -38,7 +38,7 @@ execution: code
   - ほかのプラグインのディレクトリ・`.claude-plugin/marketplace.json`・`.github/workflows/test.yml`・ディレクトリ `.claude/` を変えなければ実装できない。
 - **進め方**: 単位ごとに、テストを先に書く。テストは偽の claude と手元の一時的なリポジトリで動かし、本物の `claude` を実行せず、GitHub に接続しない (KTD12・KTD13)。本物の `claude` での確認は、すべての単位の後に、利用者の許可を得てから行う (Verification Contract の通し確認)。
 - **後始末の担当**: コミットは動機ごとに分ける (規範は利用者のコミットルール)。PR の作成と、Issue #168 へのコメントは、利用者の指示を受けてから行う。
-- **Product Contract の保全**: 要件の出所は Issue #168 と 2026-11-02 の会話。Issue の本文に無く、会話で決めたものは KD3・KD6〜KD8・KD11・KD13〜KD16・KD18〜KD22。KD4 (更新のターゲットを作らない) は、2026-11-02 に Issue の本文にも反映した。
+- **Product Contract の保全**: 要件の出所は Issue #168 と 2026-11-02 の会話。Issue の本文に無く、会話で決めたものは KD3・KD6〜KD8・KD11・KD13〜KD16・KD18〜KD25。KD4 (更新のターゲットを作らない) は、2026-11-02 に Issue の本文にも反映した。
 
 ---
 
@@ -78,6 +78,9 @@ execution: code
 - KD20. **入れるものが 1 つも無いときは、マーケットプレイスの定義も取得し直さない** (session-settled: user-approved。退けた案: 入れるものが無くても取得し直す。理由: 入れるものが無いのに、手元の clone を変えるだけになる)。Governs R13。
 - KD21. **URL の形で登録したマーケットプレイスも、取得元が配布元なら受け付ける** (session-settled: user-approved。退けた案: `akm/claude-plugins` の形の登録だけを受け付ける。理由: README の節「user レベルでインストールする」が、`https://….git` や `git@…` の形の登録を案内している)。Governs R5。
 - KD22. **自動更新が有効かは判定せず、確認する方法と公式ドキュメントの URL を、状況の表示の最後に示す** (session-settled: user-directed。退けた案: 自動更新が有効かを示さない。理由: 自動更新の設定は 3 か所 (設定ファイルの `extraKnownMarketplaces`・Claude Code が内部に持つファイル・管理者の設定) にあり、`claude` の CLI の出力からは判定できないが、更新を自動更新に任せる以上、利用者が確認できる必要がある)。Governs R21。
+- KD23. **状況の表示の最後に、user スコープの「版が古いもの」「インストールされていないもの」「無効なもの」の名前をまとめて示す** (session-settled: user-approved。退けた案: プラグインごとの行だけを示す。理由: 対象のプラグインが多いと、どれが古いかを一目で読み取りにくい。2026-11-02 の実装の後に決めた)。Governs R22。
+- KD24. **インストールの最初に、user スコープにインストール済みで扱わないものを示し、中止したときの「処理しなかったもの」は、当てはまるものが無くても「なし」と示す** (session-settled: user-approved。退けた案: どちらも示さない。理由: インストールのターゲットが古いものを更新しないことと、処理しなかったものが無いことが、出力から分かる。2026-11-02 の実装の後に決めた)。Governs R15, R23。
+- KD25. **インストールが失敗して中止した後に記録を読み込み、処理中だったプラグインが user スコープに入っていれば、版が最新でなくても再起動の案内を出す** (session-settled: user-approved。退けた案: インストールしたものと「版が変わったか分からない」ものがあるときだけ出す。理由: 手元の状態が変わっていて、再起動が要る。2026-11-02 の実装の後に決めた)。Governs R18。
 
 ### Requirements
 
@@ -101,21 +104,23 @@ execution: code
 - R10. 有効か無効かは、user スコープの分だけ表示する。
 - R11. user スコープにインストールされていないプラグインは、インストールされていないことが分かるように表示する。
 - R12. 状況の表示は、インストール済みのプラグインもマーケットプレイスの clone も変えない。古いものがあっても終了コード 0 で終える。
+- R22. 状況の表示で、user スコープの「版が古いもの」「インストールされていないもの」「無効なもの」の名前を、それぞれ 1 行にまとめて示す。当てはまるものが無いときは「なし」と示す。
 - R21. 状況の表示の最後に、次を示す。古いプラグインはマーケットプレイス akm-claude-plugins の自動更新で更新されること。自動更新が有効かは、Claude Code のセッションで `/plugin` を開き、Marketplaces タブで akm-claude-plugins を選ぶと確認でき、そこで有効と無効を切り替えられること。すぐに更新したいときは、同じ画面で「Update marketplace」を選べること。公式ドキュメントの URL (https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace)。
 
 **インストール**
 
 - R13. マーケットプレイスの定義を取得し直してから、user スコープにインストールされていないプラグインを、user スコープにインストールする。user スコープにインストール済みのプラグインは、古くても扱わない。入れるものが 1 つも無いときは、マーケットプレイスの定義も取得し直さず、何も変えずに終了コード 0 で終える。
+- R23. インストールの最初に、対象のうち user スコープにインストール済みで扱わないものの名前を示す。
 
 **失敗と中止**
 
-- R15. `claude` コマンドが失敗したら、その時点で中止し、残りのプラグインは処理しない。失敗したプラグイン (マーケットプレイスの定義の取得し直しが失敗したときはマーケットプレイス) と、エラーの内容を標準エラー出力に表示し、終了コード 0 以外で終える。インストールが失敗したときは、インストールの記録を再度読み込み、そのプラグインの実際の版 (入っていなければ、入っていないこと) を示す。処理しなかったプラグインの名前も示す。
+- R15. `claude` コマンドが失敗したら、その時点で中止し、残りのプラグインは処理しない。失敗したプラグイン (マーケットプレイスの定義の取得し直しが失敗したときはマーケットプレイス) と、エラーの内容を標準エラー出力に表示し、終了コード 0 以外で終える。インストールが失敗したときは、インストールの記録を再度読み込み、そのプラグインの実際の版 (入っていなければ、入っていないこと) を示す。処理しなかったプラグインの名前も示す。当てはまるものが無いときは「なし」と示す。
 - R16. `claude` コマンドが成功を返しても、インストールの後の user スコープの版が最新の版と同じでなければ、R15 と同じく中止する。
 - R17. Ctrl-C で中断したときも、中止として扱う。ただし、それ以上コマンドを実行せず、処理中だったプラグインを「版が変わったか分からない」と示し、`make plugins-status` で確認するよう案内する。処理しなかったプラグインの名前も示す。
 
 **実行の後の案内**
 
-- R18. 新しくインストールしたプラグインがあれば、実行の最後に次を表示する。中止・中断したときも、それまでにインストールしたものか、版が変わったか分からないものがあれば表示する。どちらも実行はしない。
+- R18. 新しくインストールしたプラグインがあれば、実行の最後に次を表示する。中止・中断したときも、それまでにインストールしたものか、版が変わったか分からないものか、再度読み込んだ結果 user スコープに入っていた処理中のもの (版が最新でなくても) があれば表示する。どちらも実行はしない。
   - Claude Code の再起動が要ること。再起動するまで、実行中のセッションには反映されない
   - インストールしたものに wording-guard があれば、textlint を入れるコマンド `python3 <展開先>/scripts/wording_lint.py setup`。展開先は、インストールの後に再度読み込んだ実際のパス
 
@@ -382,7 +387,7 @@ flowchart TB
 ### U3. 状況の表示 (読み取りの操作)
 
 - **Goal:** インストール済みの版と最新の版を照合して状況を表示する。Makefile とターゲット `plugins-status` を作る。
-- **Requirements:** R9〜R12・R21。KD5・KD6・KD15・KD18・KD22。KTD7・KTD11。
+- **Requirements:** R9〜R12・R21・R22。KD5・KD6・KD15・KD18・KD22・KD23。KTD7・KTD11。
 - **Dependencies:** U2。
 - **Files:** 作る: `Makefile`・`scripts/tests/test_status.py`・`scripts/tests/test_makefile.py`。変える: `scripts/plugins.py`。
 - **Approach:**
@@ -412,7 +417,7 @@ flowchart TB
 ### U4. インストール (変える操作の共通部分を含む)
 
 - **Goal:** user スコープに無いプラグインをインストールする。中止と中断の扱いと案内を含め、ターゲット `plugins-install` を足す。
-- **Requirements:** R13・R15〜R18。KD11・KD12・KD14・KD16・KD17・KD19・KD20。KTD7〜KTD9・KTD11。
+- **Requirements:** R13・R15〜R18・R23。KD11・KD12・KD14・KD16・KD17・KD19・KD20・KD24・KD25。KTD7〜KTD9・KTD11。
 - **Dependencies:** U3。
 - **Files:** 作る: `scripts/tests/test_install.py`。変える: `scripts/plugins.py`・`Makefile`・`scripts/tests/test_makefile.py`。
 - **Approach:**
@@ -458,7 +463,7 @@ flowchart TB
 
 | 検査 | コマンド / 手段 | 対象の単位 | 証明するもの |
 | --- | --- | --- | --- |
-| 単体テスト | `python3 -m unittest discover -s scripts/tests` (偽の claude と一時的なリポジトリ。本物の `claude` を実行せず、GitHub に接続しない) | U1〜U4 | R1〜R13・R15〜R19・R21 |
+| 単体テスト | `python3 -m unittest discover -s scripts/tests` (偽の claude と一時的なリポジトリ。本物の `claude` を実行せず、GitHub に接続しない) | U1〜U4 | R1〜R13・R15〜R19・R21〜R23 |
 | CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (PR を開いたときと、PR への push で実行される。ブランチへの push だけでは実行されない) | U1 | `.github/test-targets.txt` と実際の対象が一致する |
 | 変えないものの差分 | `git diff --stat main -- commit-rules-guard pr-teeth doc-dag mermaid-preview commit-squash review-triage work-log-gh-comment wording-guard session-handoff issue-dispatch .claude-plugin .github/workflows .claude` | U1〜U4・U6 | 差分が無い (利用者に判断を求める条件) |
 | 表現 | 変えた Markdown と、Python の日本語のコメント・docstring・テストのメッセージを、スキル `wording-guard` (Markdown 以外は `wording_lint.py check --stdin`) と目視で検査する | U1〜U4・U6 | 避ける語が無い。日本語の文中で、理由や補足を続けるダッシュを使っていない |
@@ -479,7 +484,7 @@ flowchart TB
 ## Definition of Done
 
 - U1〜U4・U6 がすべて完了し、Verification Contract の全項目が成功している。通し確認で利用者が行わないと決めた手順があれば、その手順と理由が PR の本文にある。
-- R1〜R13・R15〜R19・R21 のそれぞれが、単体テストか通し確認のどれかで確認されている。R20 (README) は、U6 の確認 (表現の検査・リンクと節の名前の実在・docstring の内容) で確認されている。
+- R1〜R13・R15〜R19・R21〜R23 のそれぞれが、単体テストか通し確認のどれかで確認されている。R20 (README) は、U6 の確認 (表現の検査・リンクと節の名前の実在・docstring の内容) で確認されている。
 - ほかのプラグインのディレクトリ・`.claude-plugin/marketplace.json`・`.github/workflows/`・`.claude/` に差分が無い。
 - 単位ごとに、動機でコミットが分かれている。`.github/test-targets.txt` の 1 行は最初のテストのコミットに入っている。計画のコミットは実装と分かれている。
 - 実装が計画と合わなかったところは、計画の R と KTD が実装に合わせて直され、直した理由が PR の本文にある。Open Questions への回答が、KTD7 か PR の本文に書かれている。
