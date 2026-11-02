@@ -26,8 +26,8 @@ MAKEFILE_REL = "Makefile"
 MAKE_ENV_VARS = ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL", "MAKEFILES", "PLUGINS")
 
 
-class MakefileStatusTest(test_status.StatusTestCase):
-    """ターゲット plugins-status と変数 PLUGINS (KTD11)。"""
+class MakeMixin:
+    """Makefile を作業用のリポジトリにコピーし、make を実行する。plugintest.PluginTestCase を継承したクラスと一緒に継承する。"""
 
     def setUp(self):
         super().setUp()
@@ -44,6 +44,10 @@ class MakefileStatusTest(test_status.StatusTestCase):
         run_env.update(env or {})
         return subprocess.run(["make", *args], env=run_env, cwd=cwd or self.other, stdin=subprocess.DEVNULL,
                               capture_output=True, text=True, timeout=plugintest.TIMEOUT)
+
+
+class MakefileStatusTest(MakeMixin, test_status.StatusTestCase):
+    """ターゲット plugins-status と変数 PLUGINS (KTD11)。"""
 
     def shown_names(self, r):
         self.assertEqual(r.returncode, 0, f"make が終了コード 0 で終了すること: {r.stderr}")
