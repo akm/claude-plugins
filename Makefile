@@ -12,9 +12,11 @@
 # make の関数は空白で語を分けるので、パスを abspath で絶対パスにしない。make と make -C では Makefile の場所が
 # 相対パス (./) になり、レシピは make の作業ディレクトリで実行されるので、リポジトリのパスに空白があっても動く。
 # 空白を含むパスの Makefile を -f で指定したときだけは、make がそのパスを語に分けるので、スクリプトを見つけられない。
-# そのときは、別の手段で探さずに、理由と直し方を示して終了する
+# そのときは、別の手段で探さずに、理由と直し方を示して終了する。
+# スクリプトの有無は、パスを単一引用符で囲んだシェルの test -f で確認する。make の $(wildcard) はパスの [ ] などを
+# グロブのパターンとして扱うので、そのパターンに一致する別のパスがあると、スクリプトがあっても無いと判定するため
 PLUGINS_SCRIPT := $(dir $(lastword $(MAKEFILE_LIST)))scripts/plugins.py
-ifeq ($(wildcard $(PLUGINS_SCRIPT)),)
+ifeq ($(shell test -f '$(subst ','\'',$(PLUGINS_SCRIPT))' && echo found),)
 $(error この Makefile の場所から scripts/plugins.py を見つけられない。空白を含むパスの Makefile を make -f で指定すると、make がパスを空白で分けるため起きる。リポジトリのルートで make を実行するか、make -C <リポジトリのルート> を使う)
 endif
 

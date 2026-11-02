@@ -82,6 +82,15 @@ class MakefileStatusTest(MakeMixin, test_status.StatusTestCase):
                                  "リポジトリのパスに空白があっても、make と make -C で状況を表示すること")
         self.assert_only_reads()
 
+    def test_makefile_path_with_glob_characters_given_by_f(self):
+        # make の $(wildcard) は proj[1] を proj1 などに一致するパターンとして扱う。一致する別のディレクトリを作っておく
+        bracketed = os.path.join(self.root, "proj[1]", "repo")
+        shutil.copytree(self.work, bracketed, symlinks=True)
+        os.makedirs(os.path.join(self.root, "proj1", "repo"))
+        r = self.run_make("-f", os.path.join(bracketed, MAKEFILE_REL), "plugins-status")
+        self.assertEqual(self.shown_names(r), test_status.NAMES,
+                         "パスに [ ] があり、そのパターンに一致する別のディレクトリがあっても、make -f で状況を表示すること")
+
     def test_makefile_path_with_space_given_by_f_fails_with_reason(self):
         spaced = self.copy_work_to_path_with_space()
         r = self.run_make("-f", os.path.join(spaced, MAKEFILE_REL), "plugins-status")
