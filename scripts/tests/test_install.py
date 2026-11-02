@@ -244,6 +244,8 @@ class AbortTest(InstallTestCase):
         self.assertIn(STATUS_HINT, r.stderr)
         self.assertIn("処理しなかったもの: pr-teeth", lines)
         self.assertIn(RESTART, r.stderr, "版が変わったか分からないものがあれば、再起動の案内を表示すること (R18)")
+        self.assertIn(CONFIRM_GUIDE, r.stderr,
+                      "再度読み込めず、インストールされたか分からないときは、確認の進め方を示すこと")
 
     def test_failed_install_found_latest_after_reread(self):
         reread = [list_element("wording-guard", "0.28.0", self.install_path("wording-guard", "0.28.0")),
@@ -259,6 +261,18 @@ class AbortTest(InstallTestCase):
         self.assertIn("処理しなかったもの: pr-teeth", lines)
         self.assertNotIn(CONFIRM_GUIDE, r.stderr,
                          "再度読み込んでインストールされていると分かったときは、確認の進め方を示さないこと")
+
+    def test_failed_install_found_old_version_after_reread(self):
+        reread = [list_element("wording-guard", "0.28.0", self.install_path("wording-guard", "0.28.0")),
+                  list_element("doc-dag", "0.1.0", self.install_path("doc-dag", "0.1.0"))]
+        self.set_state(faults=[{"prefix": install_args("doc-dag"), "action": "fail"},
+                               {"prefix": LIST, "skip": 2, "action": "no_change", "stdout": json.dumps(reread)}])
+        r = self.run_install()
+        self.assert_aborted(r)
+        self.assertIn("処理中だったもの: doc-dag は、user スコープの版が 0.1.0 で、最新の版 0.2.0 と違う (再度読み込んだ結果)",
+                      r.stderr.splitlines(), "再度読み込んで古い版で入っていたものは、最新の版と違うと示すこと")
+        self.assertNotIn(CONFIRM_GUIDE, r.stderr,
+                         "再度読み込んで古い版でインストールされていると分かったときも、確認の進め方を示さないこと")
 
     def test_install_output_not_utf8_shows_no_confirm_guide(self):
         self.set_state(faults=[{"prefix": install_args("doc-dag"), "action": "bad_utf8"}])
