@@ -39,6 +39,20 @@
   11. claude plugin list --json の出力が、必要なキーを持つ。キーを検査するのは、このマーケットプレイスのプラグインの要素だけ。
       対象のプラグインのインストール済みの版が X.Y.Z の形である
 
+状況の表示 (サブコマンド status)。前提の検査と読み取りの後、標準出力に次を表示する。
+  - 対象のプラグインごとに、最新の版と、スコープ (user・project・local) ごとのインストール済みの版と、最新の版と比べた結果
+    (同じ・古い・新しい)。project / local スコープの行には、プロジェクトのパスを添える
+  - user スコープの行には、有効か無効か (user スコープの設定の値)。project / local スコープの行には示さない。
+    claude plugin list --json の enabled は、スコープごとの値ではなく、コマンドを実行したディレクトリで有効かを表すため
+  - user スコープにインストールされていないプラグインは、user スコープの行に、インストールされていないことを示す
+  - user スコープの版が古いもの・user スコープにインストールされていないもの・user スコープで無効なものの名前のまとめ
+  - 最後に、古いプラグインはマーケットプレイスの自動更新で更新されること、自動更新が有効かを確認して切り替える方法
+    (Claude Code のセッションの /plugin の Marketplaces タブ)、すぐに更新する方法 (同じ画面の「Update marketplace」) と、
+    公式ドキュメントの URL。自動更新が有効かは判定しない。設定が 3 か所 (設定ファイルの extraKnownMarketplaces・
+    Claude Code が内部に持つファイル・管理者の設定) にあり、claude の CLI の出力からは判定できないため
+状況の表示は、インストール済みのプラグインもマーケットプレイスの clone も変えない (claude は plugin marketplace list と
+plugin list だけを実行する)。古いものがあっても、終了コード 0 で終了する。
+
 URL は、scp 形式 (git@github.com:<所有者>/<リポジトリ>.git)・ssh://・https://・git:// を受け付ける。末尾の .git と / を
 除き、大文字と小文字を区別せずに、ホスト・所有者・リポジトリを比べる。SSH の設定の Host の別名は解決しないので、別名で書いた
 URL は配布元と判定しない。
@@ -68,6 +82,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
 
 PROG = "plugins.py"
 # リポジトリのルート。このファイルの実体があるディレクトリ scripts/ の親ディレクトリ。cwd からは決めない (KTD3)
@@ -90,6 +105,18 @@ SCOPES = ("user", "project", "local")
 NOTHING_CHANGED = "何も変えていない"
 CLI_SHAPE_FIX = ("Claude Code の版が上がって、出力の形が変わった可能性がある。claude の出力を見て、"
                  "scripts/plugins.py の読み方を直す")
+
+# 状況の表示で、最新の版と比べた結果 (関数 compare_versions の値) を示す語
+COMPARISON_LABELS = {"same": "同じ", "older": "古い", "newer": "新しい"}
+# 状況の表示の最後に示す、自動更新の案内 (R21)。公式ドキュメントの URL と、/plugin の画面の項目の名前は、ここだけに書く。
+# URL や画面の項目の名前が変わったら、ここを直す。{marketplace} には、marketplace.json から読んだマーケットプレイスの名前が入る
+AUTO_UPDATE_NOTE = (
+    "古いプラグインは、マーケットプレイス {marketplace} の自動更新で更新される。\n"
+    "自動更新が有効かは、Claude Code のセッションで /plugin を開き、Marketplaces タブで {marketplace} を選ぶと確認できる。"
+    "同じ画面で、有効と無効を切り替えられる。\n"
+    "すぐに更新したいときは、同じ画面で「Update marketplace」を選ぶ。\n"
+    "公式ドキュメント: https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace"
+)
 
 # 実行先のリポジトリを変える git の環境変数。git rev-parse --local-env-vars の出力 (git 2.50.1)。
 # git のフックの中から実行されると、GIT_DIR などが別のリポジトリを指していることがあるので、git を実行する前に消す。
@@ -598,11 +625,86 @@ def prepare(root, names):
     return {"marketplace": local["name"], "source": format_source(local["source"]), "sha": sha, "plugins": targets}
 
 
+# ---- 状況の表示 ----
+
+def display_width(text):
+    """端末での表示の幅を返す。全角の文字 (East Asian Width が W か F) を 2、ほかを 1 と数える。"""
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
+
+
+def pad(text, width):
+    """text の後ろに空白を足して、表示の幅を width にそろえる。"""
+    return text + " " * max(width - display_width(text), 0)
+
+
+def scope_rows(plugin):
+    """対象のプラグイン plugin の、スコープごとの行の元にする (スコープ, インストール済みの要素) の配列を返す。
+
+    user スコープを先にし、project / local スコープを後に並べる (同じスコープの中は claude plugin list --json の出力の順)。
+    user スコープにインストールされていなければ、先頭を ("user", None) にする。
+    """
+    entries = sorted(plugin["installed"], key=lambda e: SCOPES.index(e["scope"]))
+    rows = [(e["scope"], e) for e in entries]
+    if not any(e["scope"] == "user" for e in entries):
+        rows.insert(0, ("user", None))
+    return rows
+
+
+def status_lines(snapshot):
+    """関数 prepare の結果 snapshot から、状況の表示の行の配列を作る (R9〜R11・R21)。"""
+    marketplace = snapshot["marketplace"]
+    plugins = snapshot["plugins"]
+    rows = {p["name"]: scope_rows(p) for p in plugins}
+    entries = [e for p in plugins for _, e in rows[p["name"]] if e is not None]
+    name_width = max([display_width(p["name"]) for p in plugins] + [0])
+    scope_width = max(display_width(s) for s in SCOPES)
+    version_width = max([display_width(e["version"]) for e in entries] + [0])
+    label_width = max(display_width(label) for label in COMPARISON_LABELS.values())
+
+    lines = [
+        f"マーケットプレイス {marketplace} のプラグインのインストール状況",
+        f"最新の版は、origin/main (コミット {snapshot['sha'][:12]}) にある plugin.json の版。",
+        "各スコープの行には、インストール済みの版と、最新の版と比べた結果 (同じ・古い・新しい) を示す。",
+        "user スコープの行には有効か無効か (user スコープの設定の値) を、project / local スコープの行にはプロジェクトのパスを示す。",
+        "",
+    ]
+    older, missing, disabled = [], [], []
+    for p in plugins:
+        lines.append(f"{pad(p['name'], name_width)}  最新の版 {p['latest']}")
+        for scope, e in rows[p["name"]]:
+            head = "  " + pad(scope, scope_width) + "  "
+            if e is None:
+                lines.append(head + "インストールされていない")
+                missing.append(p["name"])
+                continue
+            comparison = compare_versions(e["version"], p["latest"])
+            if scope == "user":
+                note = "有効" if e["enabled"] else "無効"
+                if comparison == "older" and p["name"] not in older:
+                    older.append(p["name"])
+                if not e["enabled"] and p["name"] not in disabled:
+                    disabled.append(p["name"])
+            else:
+                note = e["projectPath"]
+            lines.append(head + pad(e["version"], version_width) + "  "
+                         + pad(COMPARISON_LABELS[comparison], label_width) + "  " + note)
+
+    lines.append("")
+    for label, names in (("user スコープの版が最新の版より古いもの", older),
+                         ("user スコープにインストールされていないもの", missing),
+                         ("user スコープで無効なもの", disabled)):
+        lines.append(f"{label}: {', '.join(names) if names else 'なし'}")
+    lines.append("")
+    lines.extend(AUTO_UPDATE_NOTE.format(marketplace=marketplace).splitlines())
+    return lines
+
+
 # ---- サブコマンド ----
 
 def cmd_status(snapshot):
-    raise NotImplementedError("サブコマンド status の表示は、まだ実装していない "
-                              "(計画 docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の U3 で足す)")
+    """状況を標準出力に表示する。何も変えず、古いものがあっても終了コード 0 で終了する (R12・KD18)。"""
+    print("\n".join(status_lines(snapshot)))
+    return EXIT_OK
 
 
 def cmd_install(snapshot):
