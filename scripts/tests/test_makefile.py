@@ -99,6 +99,16 @@ class MakefileStatusTest(MakeMixin, test_status.StatusTestCase):
         self.assertIn("make -C", r.stderr, "直し方として make -C を示すこと")
         self.assertEqual(self.read_record(), [], "claude を実行しないこと")
 
+    def test_makefile_without_script_fails_with_reason(self):
+        alone = os.path.join(self.root, "alone")
+        os.makedirs(alone)
+        shutil.copy(os.path.join(self.work, MAKEFILE_REL), alone)
+        r = self.run_make("-f", os.path.join(alone, MAKEFILE_REL), "plugins-status")
+        self.assertNotEqual(r.returncode, 0, "Makefile だけを別のディレクトリにコピーしたときは、終了コード 0 以外で終了すること")
+        self.assertIn("リポジトリのルートの Makefile", r.stderr,
+                      f"空白の無いパスでも、リポジトリのルートの Makefile を使うよう示すこと: {r.stderr}")
+        self.assertEqual(self.read_record(), [], "claude を実行しないこと")
+
     def test_plugins_variable_limits_targets(self):
         cases = [("PLUGINS=wording-guard,doc-dag", ["doc-dag", "wording-guard"]),
                  ("PLUGINS=", test_status.NAMES)]
