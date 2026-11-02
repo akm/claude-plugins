@@ -83,7 +83,7 @@ class MakefileStatusTest(MakeMixin, test_status.StatusTestCase):
         r = self.run_make("-C", self.work, "plugins-status", "PLUGINS=no-such")
         self.assertNotEqual(r.returncode, 0, "載っていない名前を指定したら、make が終了コード 0 以外で終了すること")
         self.assertIn("no-such", r.stderr)
-        self.assertIn(test_status.NOTHING_CHANGED, r.stderr)
+        self.assertIn(plugintest.NOTHING_CHANGED, r.stderr)
         self.assert_only_reads()
 
 

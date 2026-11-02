@@ -9,6 +9,8 @@
 - git のテストのために、配布元の代わりの bare リポジトリと、作業用のリポジトリを作る (メソッド make_repos)。
   作業用のリポジトリの remote.origin.url は GitHub の URL にし、git の設定 insteadOf で取得先を bare リポジトリに向ける。
   環境変数 GIT_ALLOW_PROTOCOL を file にするので、GitHub に接続しようとすれば git が失敗する
+- 作業用のリポジトリにコピーしたスクリプト scripts/plugins.py を実行するメソッド (run_script) と、その結果を検査する
+  メソッド (assert_stopped_without_change など)。期待値はスクリプトの定数を import せずに、このファイルの定数で書く
 
   python3 -m unittest discover -s scripts/tests
 """
@@ -38,6 +40,18 @@ SOURCE_URL = "https://github.com/akm/claude-plugins"
 ORIGIN_URL = SOURCE_URL + ".git"
 # テストが実行するコマンド (偽の claude・git) の待機の上限 (秒)
 TIMEOUT = 60
+
+# テストするスクリプトの、リポジトリのルートからの相対パス
+SCRIPT_REL = os.path.join("scripts", "plugins.py")
+# 偽の claude の状態の marketplaces。このリポジトリのマーケットプレイスと、ほかのマーケットプレイスを 1 つ登録した状態
+REGISTERED = [{"name": MARKETPLACE, "source": "github", "repo": MARKETPLACE_REPO},
+              {"name": "claude-plugins-official", "source": "github", "repo": "anthropics/claude-plugins-official"}]
+# 状態を変えない claude のコマンド。前提の検査・読み取り・状況の表示では、これだけを実行してよい
+READ_COMMANDS = (["plugin", "list", "--json"], ["plugin", "marketplace", "list", "--json"])
+# 何も変えていないことを示す語。前提の検査でエラーになったときのエラーの文と、インストールするものが無いときの表示に書かれる
+NOTHING_CHANGED = "何も変えていない"
+# project スコープの要素の projectPath に使う、ほかのプロジェクトのパス
+OTHER_PROJECT = "/Users/example/other-project"
 
 
 class FakeClaudeCheckError(AssertionError):
@@ -109,6 +123,11 @@ def git(path, *args, env=None, check=True):
 
 def dump_json(value):
     return json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+
+
+def without(d, key):
+    """辞書 d から、キー key を除いた新しい辞書を返す (キーが足りない要素を作るときに使う)。"""
+    return {k: v for k, v in d.items() if k != key}
 
 
 def marketplace_json(names):
@@ -213,13 +232,14 @@ class PluginTestCase(unittest.TestCase):
         self.env = env
         self.write_state({})
         check_fake_claude(self.env)
-        if os.path.exists(self.record_path):
-            os.remove(self.record_path)
+        self.reset_record()
 
     # ---- 偽の claude ----
 
     def write_state(self, state):
         """偽の claude の状態のファイルを書く。state に無いキーは空にする (キーの意味は fake-claude の docstring)。"""
+        # キーと空の値は、ファイル scripts/tests/fake-claude の関数 load_state の一覧と同じにする。
+        # fake-claude は別のプロセスで動くので、import で共有しない
         full = {"marketplaces": [], "clone": {}, "published": {}, "installed": [], "faults": []}
         full.update(state)
         with open(self.state_path, "w", encoding="utf-8") as f:
@@ -229,6 +249,13 @@ class PluginTestCase(unittest.TestCase):
         with open(self.state_path, encoding="utf-8") as f:
             return json.load(f)
 
+    def installed(self, name, scope, version, enabled=True, project_path=None):
+        """偽の claude の状態の installed の要素を、このリポジトリのマーケットプレイスのプラグイン name について作る。"""
+        entry = {"id": f"{name}@{MARKETPLACE}", "scope": scope, "version": version, "enabled": enabled}
+        if project_path is not None:
+            entry["projectPath"] = project_path
+        return entry
+
     def read_record(self):
         """偽の claude の記録を、呼び出しの順に {"args": [...], "cwd": ...} の配列で返す。"""
         if not os.path.exists(self.record_path):
@@ -236,10 +263,44 @@ class PluginTestCase(unittest.TestCase):
         with open(self.record_path, encoding="utf-8") as f:
             return [json.loads(line) for line in f if line.strip()]
 
+    def reset_record(self):
+        """偽の claude の記録を消す (1 つのテストで何度か実行するときに、前の実行の記録を残さないため)。"""
+        if os.path.exists(self.record_path):
+            os.remove(self.record_path)
+
+    def assert_only_reads(self):
+        """偽の claude の記録が、状態を変えないコマンド (READ_COMMANDS) だけであること。"""
+        for entry in self.read_record():
+            self.assertIn(entry["args"], READ_COMMANDS, "状態を変えないコマンドだけを実行すること")
+
     def run_claude(self, *args, cwd=None):
         """self.env で claude を実行する。cwd を省略したときは self.root で実行する。"""
         return subprocess.run(["claude", *args], env=self.env, cwd=cwd or self.root, stdin=subprocess.DEVNULL,
                               capture_output=True, text=True, timeout=TIMEOUT)
+
+    # ---- スクリプト scripts/plugins.py ----
+
+    def run_script(self, *args, cwd=None):
+        """作業用のリポジトリにコピーしたスクリプトを、self.env で実行する。cwd を省略したときは self.root で実行する。
+
+        スクリプトは、メソッド make_repos と copy_into_work で作業用のリポジトリにコピーしておく。SIGINT の扱いは
+        デフォルトに戻してから実行する (関数 default_sigint)。シェルのバックグラウンドのジョブなどでテストを実行すると、
+        SIGINT を無視する設定を受け継ぎ、偽の claude が送る SIGINT をスクリプトが受け取らないため。
+        """
+        return subprocess.run([sys.executable, os.path.join(self.work, SCRIPT_REL), *args], env=self.env,
+                              cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                              timeout=TIMEOUT, preexec_fn=default_sigint)
+
+    def assert_stopped_without_change(self, r, *fragments):
+        """終了コード 3 で終了し、何も変えていないことと fragments が標準エラー出力にあり、状態を変えないコマンドだけを実行したこと。
+
+        サブクラスは、このメソッドを呼んでから、それぞれの検査を足す。
+        """
+        self.assertEqual(r.returncode, 3, f"終了コード 3 で終了すること: {r.stderr}")
+        self.assertIn(NOTHING_CHANGED, r.stderr, "何も変えていないことをエラーの文に書くこと")
+        for fragment in fragments:
+            self.assertIn(fragment, r.stderr)
+        self.assert_only_reads()
 
     # ---- git のリポジトリ ----
 
@@ -250,6 +311,10 @@ class PluginTestCase(unittest.TestCase):
         """
         self.source_tree, self.source = make_source(self.root, plugins)
         self.work = make_work(self.root, self.source, origin_url)
+
+    def origin_main_sha(self):
+        """配布元の代わりの bare リポジトリの main の SHA を返す。"""
+        return git(self.source, "rev-parse", "main", env=self.env).stdout.strip()
 
     def publish_version(self, name, version):
         """配布元にプラグイン name の新しい版 version をコミットし、偽の claude の状態の配布元の版も version にする。"""

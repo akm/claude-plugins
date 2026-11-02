@@ -28,14 +28,8 @@ sys.path.insert(0, _HERE)
 import plugintest  # noqa: E402
 
 MP = plugintest.MARKETPLACE
-SCRIPT_REL = os.path.join("scripts", "plugins.py")
 SCP_URL = "git@github.com:akm/claude-plugins.git"
-REGISTERED = [{"name": MP, "source": "github", "repo": plugintest.MARKETPLACE_REPO},
-              {"name": "claude-plugins-official", "source": "github", "repo": "anthropics/claude-plugins-official"}]
 PUBLISHED = [("doc-dag", "0.2.0"), ("pr-teeth", "0.5.1"), ("wording-guard", "0.28.0")]
-# 前提の検査と読み取りで実行してよい claude のコマンド (どちらも状態を変えない)
-READ_COMMANDS = (["plugin", "list", "--json"], ["plugin", "marketplace", "list", "--json"])
-NOTHING_CHANGED = "何も変えていない"
 
 # 作業用のリポジトリにコピーしたスクリプトを、別のプロセスでモジュールとして読み込み、関数 prepare を呼び出して、結果を JSON で出力する
 DRIVER = """\
@@ -54,7 +48,7 @@ def load_plugins():
     """このリポジトリのスクリプト scripts/plugins.py を、モジュールとして読み込む (外部のコマンドを実行しない関数のテストに使う)。"""
     global _module
     if _module is None:
-        spec = importlib.util.spec_from_file_location("plugins", os.path.join(plugintest.REPO_ROOT, SCRIPT_REL))
+        spec = importlib.util.spec_from_file_location("plugins", os.path.join(plugintest.REPO_ROOT, plugintest.SCRIPT_REL))
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         _module = module
@@ -78,17 +72,8 @@ class ScriptTestCase(plugintest.PluginTestCase):
     def setUp(self):
         super().setUp()
         self.make_repos(PUBLISHED, origin_url=SCP_URL)
-        self.copy_into_work([SCRIPT_REL])
-        self.write_state({"marketplaces": REGISTERED})
-
-    def run_script(self, *args, cwd=None):
-        """作業用のリポジトリにコピーしたスクリプトを、self.env で実行する。cwd を省略したときは self.root で実行する。
-
-        SIGINT の扱いはデフォルトに戻してから実行する (関数 plugintest.default_sigint)。
-        """
-        return subprocess.run([sys.executable, os.path.join(self.work, SCRIPT_REL), *args], env=self.env,
-                              cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                              timeout=plugintest.TIMEOUT, preexec_fn=plugintest.default_sigint)
+        self.copy_into_work([plugintest.SCRIPT_REL])
+        self.write_state({"marketplaces": plugintest.REGISTERED})
 
     def prepare(self, names=None, cwd=None, env=None):
         """作業用のリポジトリにコピーしたスクリプトの関数 prepare を別のプロセスで呼び、読み取った結果を返す。
@@ -108,21 +93,10 @@ class ScriptTestCase(plugintest.PluginTestCase):
     def latest(self, snapshot):
         return [(p["name"], p["latest"]) for p in snapshot["plugins"]]
 
-    def origin_main_sha(self):
-        return plugintest.git(self.source, "rev-parse", "main", env=self.env).stdout.strip()
-
-    def assert_only_reads(self):
-        for entry in self.read_record():
-            self.assertIn(entry["args"], READ_COMMANDS, "前提の検査と読み取りでは、状態を変えないコマンドだけを実行すること")
-
     def assert_stopped_without_change(self, r, *fragments):
-        """終了コード 3 で終了し、何も変えていないことと fragments が標準エラー出力にあり、変える操作を実行していないこと。"""
-        self.assertEqual(r.returncode, 3, f"終了コード 3 で終了すること: {r.stderr}")
-        self.assertIn(NOTHING_CHANGED, r.stderr, "何も変えていないことをエラーの文に書くこと")
+        """メソッド plugintest.PluginTestCase.assert_stopped_without_change の検査に加えて、標準エラー出力がプログラム名で始まること。"""
+        super().assert_stopped_without_change(r, *fragments)
         self.assertTrue(r.stderr.startswith("plugins.py: "), "エラーの文の前にプログラム名を付けること")
-        for fragment in fragments:
-            self.assertIn(fragment, r.stderr)
-        self.assert_only_reads()
 
     def write_work(self, rel, content):
         plugintest.write_files(self.work, {rel: content})
@@ -202,10 +176,10 @@ class RegistrationTest(ScriptTestCase):
     """マーケットプレイスの登録と取得元の検査 (R4・R5・KD9・KD13・KD21)。"""
 
     def test_unregistered_marketplace_shows_add_command(self):
-        self.write_state({"marketplaces": REGISTERED[1:]})
+        self.write_state({"marketplaces": plugintest.REGISTERED[1:]})
         r = self.run_script("status")
         self.assert_stopped_without_change(r, "claude plugin marketplace add akm/claude-plugins")
-        self.assertEqual(self.read_state()["marketplaces"], REGISTERED[1:], "マーケットプレイスを登録しないこと")
+        self.assertEqual(self.read_state()["marketplaces"], plugintest.REGISTERED[1:], "マーケットプレイスを登録しないこと")
 
     def test_url_registrations_are_accepted(self):
         for url in ("https://github.com/akm/claude-plugins.git", "git@github.com:akm/claude-plugins.git"):
@@ -225,7 +199,7 @@ class RegistrationTest(ScriptTestCase):
         for fault, fragment in (({"action": "fail", "stderr": "marketplace list broke\n"}, "marketplace list broke"),
                                 ({"action": "no_change", "stdout": "{}"}, "配列でない")):
             with self.subTest(fault=fault):
-                self.write_state({"marketplaces": REGISTERED,
+                self.write_state({"marketplaces": plugintest.REGISTERED,
                                   "faults": [dict(fault, prefix=["plugin", "marketplace", "list"])]})
                 self.assert_stopped_without_change(self.run_script("status"), fragment)
 
@@ -357,7 +331,7 @@ class PluginListTest(ScriptTestCase):
     """claude plugin list --json の検査と読み取り (KTD7 の 1 つ目の箇条)。"""
 
     def test_installed_are_grouped_by_target(self):
-        self.write_state({"marketplaces": REGISTERED, "installed": [
+        self.write_state({"marketplaces": plugintest.REGISTERED, "installed": [
             {"id": f"doc-dag@{MP}", "scope": "project", "version": "0.1.0", "projectPath": "/Users/example/other-project"},
             {"id": f"doc-dag@{MP}", "scope": "user", "version": "0.2.0", "enabled": False},
             {"id": f"wording-guard@{MP}", "scope": "local", "version": "0.29.0", "projectPath": "/Users/example/p"},
@@ -384,7 +358,7 @@ class PluginListTest(ScriptTestCase):
         ]
         for state, fragment in cases:
             with self.subTest(fragment=fragment):
-                self.write_state(dict(state, marketplaces=REGISTERED))
+                self.write_state(dict(state, marketplaces=plugintest.REGISTERED))
                 self.assert_stopped_without_change(self.run_script("status"), fragment)
 
 
@@ -413,13 +387,13 @@ class PluginListParseTest(unittest.TestCase):
             "JSON でない": "not json",
             "配列でない": json.dumps({"id": "x"}),
             "id が無い要素": json.dumps([{"scope": "user"}]),
-            "version が無い": json.dumps([{k: v for k, v in self.USER.items() if k != "version"}]),
-            "scope が無い": json.dumps([{k: v for k, v in self.USER.items() if k != "scope"}]),
-            "installPath が無い": json.dumps([{k: v for k, v in self.USER.items() if k != "installPath"}]),
-            "user の enabled が無い": json.dumps([{k: v for k, v in self.USER.items() if k != "enabled"}]),
+            "version が無い": json.dumps([plugintest.without(self.USER, "version")]),
+            "scope が無い": json.dumps([plugintest.without(self.USER, "scope")]),
+            "installPath が無い": json.dumps([plugintest.without(self.USER, "installPath")]),
+            "user の enabled が無い": json.dumps([plugintest.without(self.USER, "enabled")]),
             "user の enabled が真偽値でない": json.dumps([dict(self.USER, enabled="true")]),
-            "project の projectPath が無い": json.dumps([{k: v for k, v in self.PROJECT.items() if k != "projectPath"}]),
-            "local の projectPath が無い": json.dumps([dict({k: v for k, v in self.PROJECT.items() if k != "projectPath"}, scope="local")]),
+            "project の projectPath が無い": json.dumps([plugintest.without(self.PROJECT, "projectPath")]),
+            "local の projectPath が無い": json.dumps([dict(plugintest.without(self.PROJECT, "projectPath"), scope="local")]),
             "知らないスコープ": json.dumps([dict(self.USER, scope="managed")]),
         }
         for label, text in cases.items():
@@ -480,12 +454,12 @@ class RootAndEnvironmentTest(ScriptTestCase):
         self.assertNotEqual(record[0]["cwd"], record[1]["cwd"], "実行のたびに一時ディレクトリを作ること")
 
     def test_ctrl_c_during_preconditions(self):
-        self.write_state({"marketplaces": REGISTERED,
+        self.write_state({"marketplaces": plugintest.REGISTERED,
                           "faults": [{"prefix": ["plugin", "marketplace", "list"], "action": "sigint"}]})
         r = self.run_script("status")
         self.assertEqual(r.returncode, 130, f"Ctrl-C で中断したときは終了コード 130 で終了すること: {r.stderr}")
         self.assertIn("中断", r.stderr)
-        self.assertIn(NOTHING_CHANGED, r.stderr)
+        self.assertIn(plugintest.NOTHING_CHANGED, r.stderr)
         self.assert_only_reads()
 
 

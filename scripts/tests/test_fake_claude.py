@@ -26,7 +26,8 @@ import plugintest  # noqa: E402
 MP = plugintest.MARKETPLACE
 WG = f"wording-guard@{MP}"
 DD = f"doc-dag@{MP}"
-REGISTERED = [{"name": MP, "source": "github", "repo": plugintest.MARKETPLACE_REPO}]
+# 偽の claude の状態の marketplaces。このリポジトリのマーケットプレイスだけを登録した状態 (plugintest.REGISTERED とは別のもの)
+REGISTERED_OWN_ONLY = [{"name": MP, "source": "github", "repo": plugintest.MARKETPLACE_REPO}]
 
 
 def _write_script(path, body):
@@ -141,7 +142,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
                 self.assertEqual(set(element), expected[element["scope"]], "要素のキーが固定データの要素のキーと同じであること")
 
     def test_marketplace_list_returns_registered(self):
-        self.write_state({"marketplaces": REGISTERED + [{"name": "other", "source": "git", "url": "https://example.com/other.git"}]})
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY + [{"name": "other", "source": "git", "url": "https://example.com/other.git"}]})
         r = self.run_claude("plugin", "marketplace", "list", "--json")
         self.assertEqual(r.returncode, 0, r.stderr)
         listed = json.loads(r.stdout)
@@ -155,7 +156,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
 
     def test_marketplace_update_then_install(self):
         project = {"id": WG, "scope": "project", "version": "0.2.5", "projectPath": "/Users/example/other-project"}
-        self.write_state({"marketplaces": REGISTERED,
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY,
                           "clone": {MP: {"wording-guard": "0.2.7"}},
                           "published": {MP: {"wording-guard": "0.2.8"}},
                           "installed": [project]})
@@ -175,7 +176,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
                          "パスを返すだけで、ファイルを作らないこと")
 
     def test_update_and_install_fail_for_unknown_names(self):
-        self.write_state({"marketplaces": REGISTERED, "clone": {MP: {"wording-guard": "0.2.8"}}})
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY, "clone": {MP: {"wording-guard": "0.2.8"}}})
         before = self.read_state()
         for args in (["plugin", "marketplace", "update", "no-such"],
                      ["plugin", "install", f"no-such@{MP}", "--scope", "user", "--json"],
@@ -187,7 +188,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
         self.assertEqual(self.read_state(), before, "状態を変えないこと")
 
     def test_faults_fail_or_succeed_without_change(self):
-        self.write_state({"marketplaces": REGISTERED,
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY,
                           "clone": {MP: {"wording-guard": "0.2.8", "doc-dag": "0.1.0"}},
                           "published": {MP: {"wording-guard": "0.2.9", "doc-dag": "0.1.1"}},
                           "faults": [
@@ -216,7 +217,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
         self.assertEqual(codes, [0, 1, 1], "skip の数だけ呼び出しを通し、その後の呼び出しを失敗させること")
 
     def test_sigint_is_sent_to_parent(self):
-        self.write_state({"marketplaces": REGISTERED, "clone": {MP: {"wording-guard": "0.2.8"}},
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY, "clone": {MP: {"wording-guard": "0.2.8"}},
                           "faults": [{"prefix": ["plugin", "install", WG], "action": "sigint"}]})
         before = self.read_state()
         parent = _write_script(os.path.join(self.root, "parent"), (
@@ -235,7 +236,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
         self.assertEqual(self.read_state(), before, "状態を変えないこと")
 
     def test_unknown_args_exit_99(self):
-        self.write_state({"marketplaces": REGISTERED, "clone": {MP: {"wording-guard": "0.2.8"}}})
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY, "clone": {MP: {"wording-guard": "0.2.8"}}})
         before = self.read_state()
         for args in (["plugin", "update", WG],
                      ["plugin", "install", WG, "--scope", "user", "--json", "-y"],
@@ -250,7 +251,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
         self.assertEqual(self.read_state(), before, "状態を変えないこと")
 
     def test_records_args_and_cwd_in_order(self):
-        self.write_state({"marketplaces": REGISTERED})
+        self.write_state({"marketplaces": REGISTERED_OWN_ONLY})
         a = os.path.join(self.root, "a")
         b = os.path.join(self.root, "b")
         os.makedirs(a)
@@ -293,8 +294,7 @@ class RepoTest(plugintest.PluginTestCase):
     def test_fetch_without_insteadof_is_refused(self):
         self.make_repos([("wording-guard", "0.2.8")])
         plugintest.git(self.work, "config", "--unset", f"url.{self.source}.insteadOf", env=self.env)
-        r = subprocess.run(["git", "-C", self.work, "fetch", "origin", "main"], env=self.env, stdin=subprocess.DEVNULL,
-                           capture_output=True, text=True, timeout=plugintest.TIMEOUT)
+        r = plugintest.git(self.work, "fetch", "origin", "main", env=self.env, check=False)
         self.assertNotEqual(r.returncode, 0, "insteadOf が無ければ git fetch が失敗すること")
         self.assertIn("not allowed", r.stderr, "git が GIT_ALLOW_PROTOCOL=file によって https での取得を拒否すること")
 

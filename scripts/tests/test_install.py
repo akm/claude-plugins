@@ -15,7 +15,6 @@ Ctrl-C は、偽の claude が親のプロセス (スクリプト) に SIGINT �
 
 import json
 import os
-import subprocess
 import sys
 import unittest
 
@@ -25,38 +24,24 @@ sys.path.insert(0, _HERE)
 import plugintest  # noqa: E402
 
 MP = plugintest.MARKETPLACE
-SCRIPT_REL = os.path.join("scripts", "plugins.py")
-REGISTERED = [{"name": MP, "source": "github", "repo": plugintest.MARKETPLACE_REPO},
-              {"name": "claude-plugins-official", "source": "github", "repo": "anthropics/claude-plugins-official"}]
 # 配布元の main にある版 (最新の版)。marketplace.json はこの順にする。名前の辞書順と違う順にして、
 # インストールの順が marketplace.json の順であることを確認する
 PUBLISHED = [("wording-guard", "0.28.0"), ("doc-dag", "0.2.0"), ("pr-teeth", "0.5.1")]
 LATEST = dict(PUBLISHED)
 # マーケットプレイスの clone にある版 (最新の版より古い)。plugin marketplace update で、配布元の版に置き換わる
 CLONE = {"wording-guard": "0.27.0", "doc-dag": "0.1.0", "pr-teeth": "0.5.0"}
-# 状態を変えない claude のコマンド
+# 状態を変えない claude のコマンド (plugintest.READ_COMMANDS の 2 つ)
 LIST = ["plugin", "list", "--json"]
 MARKETPLACE_LIST = ["plugin", "marketplace", "list", "--json"]
-READ_COMMANDS = (LIST, MARKETPLACE_LIST)
 UPDATE = ["plugin", "marketplace", "update", MP]
-NOTHING_CHANGED = "何も変えていない"
 RESTART = "Claude Code を再起動する"
 UNKNOWN = "版が変わったか分からない"
 STATUS_HINT = "make plugins-status"
-OTHER_PROJECT = "/Users/example/other-project"
 
 
 def install_args(name):
     """プラグイン name を user スコープにインストールする claude の引数。"""
     return ["plugin", "install", f"{name}@{MP}", "--scope", "user", "--json"]
-
-
-def installed(name, scope, version, project_path=None):
-    """偽の claude の状態の installed の要素を作る。"""
-    entry = {"id": f"{name}@{MP}", "scope": scope, "version": version, "enabled": True}
-    if project_path is not None:
-        entry["projectPath"] = project_path
-    return entry
 
 
 def list_element(name, version, install_path):
@@ -69,6 +54,11 @@ def setup_command(install_path):
     return f"python3 {install_path}/scripts/wording_lint.py setup"
 
 
+def error_text(r):
+    """標準エラー出力のうち、エラーの文 (プログラム名で始まる行) だけを、改行でつないで返す。"""
+    return "\n".join(line for line in r.stderr.splitlines() if line.startswith("plugins.py: "))
+
+
 class InstallTestCase(plugintest.PluginTestCase):
     """配布元と作業用のリポジトリを作り、スクリプトを作業用のリポジトリにコピーする。
 
@@ -78,27 +68,16 @@ class InstallTestCase(plugintest.PluginTestCase):
     def setUp(self):
         super().setUp()
         self.make_repos(PUBLISHED)
-        self.copy_into_work([SCRIPT_REL])
+        self.copy_into_work([plugintest.SCRIPT_REL])
         self.set_state()
 
-    def set_state(self, installed_entries=(), faults=(), marketplaces=REGISTERED):
+    def set_state(self, installed_entries=(), faults=(), marketplaces=plugintest.REGISTERED):
         self.write_state({"marketplaces": marketplaces, "clone": {MP: dict(CLONE)}, "published": {MP: dict(LATEST)},
                           "installed": list(installed_entries), "faults": list(faults)})
 
     def run_install(self, *args, cwd=None):
-        """作業用のリポジトリにコピーしたスクリプトの install を、self.env で実行する。cwd を省略したときは self.root で実行する。
-
-        SIGINT の扱いはデフォルトに戻してから実行する。シェルのバックグラウンドのジョブなどでテストを実行すると、SIGINT を
-        無視する設定を受け継ぎ、偽の claude が送る SIGINT をスクリプトが受け取らないため。
-        """
-        return subprocess.run([sys.executable, os.path.join(self.work, SCRIPT_REL), "install", *args], env=self.env,
-                              cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                              timeout=plugintest.TIMEOUT, preexec_fn=plugintest.default_sigint)
-
-    def reset_record(self):
-        """偽の claude の記録を消す (1 つのテストで何度か実行するときに、前の実行の記録を残さないため)。"""
-        if os.path.exists(self.record_path):
-            os.remove(self.record_path)
+        """スクリプトの install を、メソッド run_script で実行する。"""
+        return self.run_script("install", *args, cwd=cwd)
 
     def commands(self):
         """偽の claude が受けた引数を、呼び出しの順に返す。"""
@@ -106,7 +85,7 @@ class InstallTestCase(plugintest.PluginTestCase):
 
     def changes(self):
         """偽の claude が受けた引数のうち、状態を変えないコマンドでないものを、呼び出しの順に返す。"""
-        return [args for args in self.commands() if args not in READ_COMMANDS]
+        return [args for args in self.commands() if args not in plugintest.READ_COMMANDS]
 
     def user_versions(self):
         """偽の claude の状態から、user スコープにインストール済みのプラグインの名前 → 版を返す。"""
@@ -115,6 +94,10 @@ class InstallTestCase(plugintest.PluginTestCase):
     def install_path(self, name, version):
         """偽の claude が plugin list --json で返す展開先。"""
         return os.path.join(self.config_dir, "plugins", "cache", MP, name, version)
+
+    def assert_succeeded(self, r):
+        """終了コード 0 で終了したこと。"""
+        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
 
     def assert_aborted(self, r, code=4):
         """終了コード code で終了し、エラーの文 (プログラム名で始まる行) が標準エラー出力の最後にあること。"""
@@ -127,10 +110,10 @@ class InstallTest(InstallTestCase):
     """user スコープに無いものだけを、marketplace.json の順にインストールする (R13・KD11・KTD8)。"""
 
     def test_installs_only_missing_in_marketplace_order(self):
-        self.set_state([installed("pr-teeth", "user", "0.5.0"),
-                        installed("doc-dag", "project", "0.1.0", project_path=OTHER_PROJECT)])
+        self.set_state([self.installed("pr-teeth", "user", "0.5.0"),
+                        self.installed("doc-dag", "project", "0.1.0", project_path=plugintest.OTHER_PROJECT)])
         r = self.run_install()
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertEqual(self.commands(), [
             MARKETPLACE_LIST, LIST,
             UPDATE,
@@ -146,9 +129,9 @@ class InstallTest(InstallTestCase):
                          "user スコープに無いものは最新の版でインストールし、古いものは扱わないこと")
 
     def test_reports_installed_and_restart(self):
-        self.set_state([installed("pr-teeth", "user", "0.5.0")])
+        self.set_state([self.installed("pr-teeth", "user", "0.5.0")])
         r = self.run_install()
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertEqual(r.stderr, "", "成功したときは標準エラー出力に何も書かないこと")
         lines = r.stdout.splitlines()
         self.assertIn("インストールしたもの (user スコープ): wording-guard 0.28.0, doc-dag 0.2.0", lines,
@@ -161,13 +144,13 @@ class InstallTest(InstallTestCase):
         self.set_state(faults=[{"prefix": LIST, "skip": 1, "action": "no_change",
                                 "stdout": json.dumps([list_element("wording-guard", "0.28.0", reread)])}])
         r = self.run_install("--plugins", "wording-guard")
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertIn(setup_command(reread), r.stdout.splitlines()[-1],
                       "textlint を入れるコマンドを、インストールの後に再度読み込んだ展開先で表示すること (KTD8)")
 
     def test_wording_guard_setup_with_install_path_from_fake(self):
         r = self.run_install()
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertIn(setup_command(self.install_path("wording-guard", "0.28.0")), r.stdout,
                       "wording-guard をインストールしたら、textlint を入れるコマンドを表示すること (R18)")
 
@@ -176,34 +159,34 @@ class InstallTest(InstallTestCase):
         self.set_state(faults=[{"prefix": LIST, "skip": 1, "action": "no_change",
                                 "stdout": json.dumps([list_element("wording-guard", "0.28.0", reread)])}])
         r = self.run_install("--plugins", "wording-guard")
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertIn(f"python3 '{reread}/scripts/wording_lint.py' setup", r.stdout,
                       "展開先に空白があれば、コピーしてそのまま実行できるよう、シェルの引用符で囲むこと")
 
     def test_no_wording_guard_setup_when_wording_guard_is_unchanged(self):
-        self.set_state([installed("wording-guard", "user", "0.27.0")])
+        self.set_state([self.installed("wording-guard", "user", "0.27.0")])
         r = self.run_install()
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertEqual(self.changes(), [UPDATE, install_args("doc-dag"), install_args("pr-teeth")])
         self.assertIn(RESTART, r.stdout)
         self.assertNotIn("wording_lint.py", r.stdout, "wording-guard を変えなかったときは、textlint を入れるコマンドを表示しないこと")
 
     def test_nothing_to_install(self):
-        self.set_state([installed("wording-guard", "user", "0.28.0"), installed("doc-dag", "user", "0.1.0"),
-                        installed("pr-teeth", "user", "0.6.0")])
+        self.set_state([self.installed("wording-guard", "user", "0.28.0"), self.installed("doc-dag", "user", "0.1.0"),
+                        self.installed("pr-teeth", "user", "0.6.0")])
         before = self.read_state()
         r = self.run_install()
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertEqual(r.stderr, "")
         self.assertEqual(self.changes(), [],
                          "入れるものが無いときは、plugin marketplace update も含めて、変える操作を実行しないこと (KD20)")
         self.assertEqual(self.read_state(), before, "インストール済みのプラグインもマーケットプレイスの clone も変えないこと")
-        self.assertIn(NOTHING_CHANGED, r.stdout, "何も変えていないことを表示すること")
+        self.assertIn(plugintest.NOTHING_CHANGED, r.stdout, "何も変えていないことを表示すること")
         self.assertNotIn(RESTART, r.stdout, "何も変えていないときは、再起動の案内を表示しないこと")
 
     def test_plugins_option_limits_targets(self):
         r = self.run_install("--plugins", "pr-teeth,wording-guard")
-        self.assertEqual(r.returncode, 0, f"終了コード 0 で終了すること: {r.stderr}")
+        self.assert_succeeded(r)
         self.assertEqual(self.changes(), [UPDATE, install_args("wording-guard"), install_args("pr-teeth")],
                          "--plugins で指定したものだけを、marketplace.json の順にインストールすること")
 
@@ -238,7 +221,7 @@ class AbortTest(InstallTestCase):
                       "再度読み込んだ、失敗したプラグインの実際の状態を示すこと (R15)")
         self.assertIn("処理しなかったもの: pr-teeth", lines, "処理しなかったプラグインの名前を示すこと")
         self.assertIn(RESTART, r.stderr, "中止したときも、インストールしたものがあれば再起動の案内を表示すること (R18)")
-        error = "\n".join(line for line in lines if line.startswith("plugins.py: "))
+        error = error_text(r)
         self.assertIn("doc-dag", error, "エラーの文に、失敗したプラグインの名前を書くこと")
         self.assertIn("一部が変わっている", error, "変える操作の途中で中止したことをエラーの文に書くこと")
 
@@ -286,7 +269,7 @@ class AbortTest(InstallTestCase):
                 self.assertEqual(self.changes()[-1], install_args(name),
                                  "版が最新の版にならなかったら、その時点で中止すること (R16)")
                 self.assertEqual(self.user_versions(), expected_versions)
-                error = "\n".join(line for line in r.stderr.splitlines() if line.startswith("plugins.py: "))
+                error = error_text(r)
                 self.assertIn(name, error, "エラーの文に、版が最新にならなかったプラグインの名前を書くこと")
                 self.assertIn(LATEST[name], error, "エラーの文に、最新の版を書くこと")
                 self.assertIn(actual, r.stderr, "再度読み込んだ実際の状態を示すこと")
@@ -310,7 +293,7 @@ class InterruptTest(InstallTestCase):
                       "処理中だったものを「版が変わったか分からない」と示し、make plugins-status で確認するよう案内すること")
         self.assertIn("処理しなかったもの: pr-teeth", lines)
         self.assertIn(RESTART, r.stderr, "中断したときも、インストールしたものがあれば再起動の案内を表示すること (R18)")
-        error = "\n".join(line for line in lines if line.startswith("plugins.py: "))
+        error = error_text(r)
         self.assertIn("Ctrl-C で中断した", error, "中断したことをエラーの文に書くこと")
 
     def test_ctrl_c_during_marketplace_update(self):
@@ -334,13 +317,13 @@ class PreconditionTest(InstallTestCase):
         ]
         for fragment, state, args in cases:
             with self.subTest(fragment=fragment):
-                self.set_state(faults=state.get("faults", ()), marketplaces=state.get("marketplaces", REGISTERED))
+                self.set_state(faults=state.get("faults", ()), marketplaces=state.get("marketplaces", plugintest.REGISTERED))
                 self.reset_record()
                 before = self.read_state()
                 r = self.run_install(*args)
                 self.assertEqual(r.returncode, 3, f"終了コード 3 で終了すること: {r.stderr}")
                 self.assertIn(fragment, r.stderr)
-                self.assertIn(NOTHING_CHANGED, r.stderr)
+                self.assertIn(plugintest.NOTHING_CHANGED, r.stderr)
                 self.assertEqual(self.changes(), [], "前提の検査でエラーになったら、変える操作を実行しないこと")
                 self.assertEqual(self.read_state(), before)
 
@@ -348,7 +331,7 @@ class PreconditionTest(InstallTestCase):
         plugintest.git(self.work, "remote", "set-url", "origin", "https://github.com/someone/other.git", env=self.env)
         r = self.run_install()
         self.assertEqual(r.returncode, 3, f"終了コード 3 で終了すること: {r.stderr}")
-        self.assertIn(NOTHING_CHANGED, r.stderr)
+        self.assertIn(plugintest.NOTHING_CHANGED, r.stderr)
         self.assertEqual(self.changes(), [], "前提の検査でエラーになったら、変える操作を実行しないこと")
 
 

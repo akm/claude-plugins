@@ -56,11 +56,16 @@ SIGINT_WAIT = 10
 TIMESTAMP = "2026-11-02T00:00:00.000Z"
 
 
-def respond(stdout="", stderr="", code=0):
+def write_output(stdout="", stderr=""):
+    """標準出力と標準エラー出力に書き、どちらもすぐに flush する。"""
     sys.stdout.write(stdout)
     sys.stdout.flush()
     sys.stderr.write(stderr)
     sys.stderr.flush()
+
+
+def respond(stdout="", stderr="", code=0):
+    write_output(stdout, stderr)
     sys.exit(code)
 
 
@@ -93,6 +98,8 @@ def parse(args):
 def load_state(path):
     with open(path, encoding="utf-8") as f:
         state = json.load(f)
+    # キーと空の値は、ファイル scripts/tests/plugintest.py のメソッド PluginTestCase.write_state の一覧と同じにする。
+    # このファイルは別のプロセスで動くので、import で共有しない
     for key, empty in (("marketplaces", []), ("clone", {}), ("published", {}), ("installed", []), ("faults", [])):
         state.setdefault(key, empty)
     return state
@@ -127,10 +134,7 @@ def apply_fault(fault, args):
     if action == "no_change":
         respond(stdout, stderr or "", 0)
     if action == "sigint":
-        sys.stdout.write(stdout)
-        sys.stdout.flush()
-        sys.stderr.write(stderr or "")
-        sys.stderr.flush()
+        write_output(stdout, stderr or "")
         os.kill(os.getppid(), signal.SIGINT)
         # 本物の Ctrl-C では、親と子が同時にシグナルを受ける。親が子の実行中にシグナルを受けるよう、親が終了させるまで待機する
         deadline = time.monotonic() + SIGINT_WAIT
