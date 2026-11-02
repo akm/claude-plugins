@@ -8,8 +8,15 @@
 # GNU Make 3.81 (macOS に付属) で動く書き方にする。
 
 # スクリプトのパスは、この Makefile の場所から求める。make -C や make -f で別のディレクトリから実行しても、
-# この Makefile と同じリポジトリのスクリプトを実行する
-PLUGINS_SCRIPT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))scripts/plugins.py)
+# この Makefile と同じリポジトリのスクリプトを実行する。
+# make の関数は空白で語を分けるので、パスを abspath で絶対パスにしない。make と make -C では Makefile の場所が
+# 相対パス (./) になり、レシピは make の作業ディレクトリで実行されるので、リポジトリのパスに空白があっても動く。
+# 空白を含むパスの Makefile を -f で指定したときだけは、make がそのパスを語に分けるので、スクリプトを見つけられない。
+# そのときは、別の手段で探さずに、理由と直し方を示して終了する
+PLUGINS_SCRIPT := $(dir $(lastword $(MAKEFILE_LIST)))scripts/plugins.py
+ifeq ($(wildcard $(PLUGINS_SCRIPT)),)
+$(error この Makefile の場所から scripts/plugins.py を見つけられない。空白を含むパスの Makefile を make -f で指定すると、make がパスを空白で分けるため起きる。リポジトリのルートで make を実行するか、make -C <リポジトリのルート> を使う)
+endif
 
 # 値は、シェルの単一引用符で囲んで 1 つの引数として渡す (値の中の単一引用符は '\'' にする)
 ifeq ($(origin PLUGINS),command line)
@@ -20,8 +27,8 @@ endif
 
 .PHONY: plugins-status
 plugins-status: ## このリポジトリのプラグインの、最新の版とインストール済みの版を表示する
-	python3 $(PLUGINS_SCRIPT) status $(PLUGINS_OPTION)
+	python3 '$(subst ','\'',$(PLUGINS_SCRIPT))' status $(PLUGINS_OPTION)
 
 .PHONY: plugins-install
 plugins-install: ## このリポジトリのプラグインのうち、user スコープにインストールされていないものを、配布元の main からインストールする
-	python3 $(PLUGINS_SCRIPT) install $(PLUGINS_OPTION)
+	python3 '$(subst ','\'',$(PLUGINS_SCRIPT))' install $(PLUGINS_OPTION)

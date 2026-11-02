@@ -11,6 +11,7 @@ scripts/tests/test_status.py と scripts/tests/test_install.py のテストと�
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import unittest
@@ -65,6 +66,29 @@ class MakefileStatusTest(MakeMixin, test_status.StatusTestCase):
         self.assertEqual(self.shown_names(r), test_status.NAMES,
                          "make を実行したディレクトリではなく、Makefile のあるディレクトリのスクリプトを実行すること")
         self.assertIn(self.origin_main_sha()[:12], r.stdout)
+
+    def copy_work_to_path_with_space(self):
+        """作業用のリポジトリを、空白を含むパスのディレクトリにコピーし、そのパスを返す。"""
+        spaced = os.path.join(self.root, "with space", "repo")
+        shutil.copytree(self.work, spaced, symlinks=True)
+        return spaced
+
+    def test_repository_path_with_space(self):
+        spaced = self.copy_work_to_path_with_space()
+        for args, cwd in ((["-C", spaced], None), ([], spaced)):
+            with self.subTest(args=args, cwd=cwd):
+                r = self.run_make(*args, "plugins-status", cwd=cwd)
+                self.assertEqual(self.shown_names(r), test_status.NAMES,
+                                 "リポジトリのパスに空白があっても、make と make -C で状況を表示すること")
+        self.assert_only_reads()
+
+    def test_makefile_path_with_space_given_by_f_fails_with_reason(self):
+        spaced = self.copy_work_to_path_with_space()
+        r = self.run_make("-f", os.path.join(spaced, MAKEFILE_REL), "plugins-status")
+        self.assertNotEqual(r.returncode, 0, "空白を含むパスの Makefile を -f で指定したときは、終了コード 0 以外で終了すること")
+        self.assertIn("空白", r.stderr, f"空白を含むパスでは動かないことを、エラーの文で示すこと: {r.stderr}")
+        self.assertIn("make -C", r.stderr, "直し方として make -C を示すこと")
+        self.assertEqual(self.read_record(), [], "claude を実行しないこと")
 
     def test_plugins_variable_limits_targets(self):
         cases = [("PLUGINS=wording-guard,doc-dag", ["doc-dag", "wording-guard"]),
