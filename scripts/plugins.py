@@ -37,7 +37,7 @@ Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
   6. remote origin の URL (git config --get remote.origin.url の値) が配布元を指す
   7. git fetch で origin の main を取得できる。失敗したときは、手元にある古い origin/main を使わない
   8. 取得した直後の origin/main の SHA にある marketplace.json の、マーケットプレイスの名前と配布元が、作業ツリーのものと同じ。
-     各プラグインの source が git-subdir で、ref が main で、sha (取得するコミットを固定するキー) が無い。marketplace.json と
+     各プラグインの source が git-subdir で、ref が main で、sha (取得するコミットを指定するキー) が無い。marketplace.json と
      plugin.json は、どれもこの SHA から読む
   9. --plugins の名前が、すべて origin/main の marketplace.json に載っている
   10. 対象のプラグインの plugin.json が origin/main にあり、version が X.Y.Z (3 つの 10 進の整数) の形である
