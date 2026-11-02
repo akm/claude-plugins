@@ -168,7 +168,7 @@ execution: code
 - CLI 2.1.285 の観察 (2026-11-02。読み取りだけのコマンドと、存在しない名前での `install` / `update` で確認):
   - `claude plugin list --json` は配列。要素のキーは `id`・`scope`・`version`・`enabled`・`projectEnabled`・`installPath`・`installedAt`・`lastUpdated`。project スコープの要素には `projectPath` もある。
   - `enabled` は、コマンドを実行したディレクトリで有効かを表す。別のプロジェクトの project スコープの要素も、このリポジトリで有効かどうかの値になる。
-  - `claude plugin marketplace list --json` は配列。要素のキーは `name`・`source`・`repo`・`installLocation`。URL の形で登録すると、`source` が `git` になり、`repo` の代わりに `url` を持つ (CLI の実装を読んで確認。KD21)。
+  - `claude plugin marketplace list --json` は配列。要素のキーは `name`・`source`・`repo`・`installLocation`。URL の形で登録すると、`source` が `git` になり、`repo` の代わりに `url` を持つ (CLI の実装を読んで確認。KD21)。ref (ブランチやタグ) を付けて登録すると、`ref` も持つ。`source` が `github` と `git` の要素は、登録の `path` (リポジトリの中の marketplace.json のパス) を出力しない (2026-11-03 のレビューで、利用者の手元での実行と CLI の実装を読んで確認)。
   - `claude plugin list --json` は、ディレクトリ `.claude/skills/` に置いたプラグインの要素も返す。その要素には `projectPath` が無いことがある (CLI の実装を読んで確認)。
   - `claude plugin install` / `update` に `--json` を付けると、結果を 1 行の JSON で標準出力に出す。失敗の終了コードは 1。`claude plugin marketplace update` は `--json` を持たない。
   - 存在しない名前で `install` / `update` を実行した直後に、マーケットプレイスの clone が取得し直されていた (どちらのコマンドによるものかは分かっていない)。
@@ -196,14 +196,14 @@ execution: code
   1. `git fetch` で `main` だけを取得し、`origin/main` の SHA を 1 回だけ決める。
   2. marketplace.json と各 plugin.json は、その SHA から読む。読み取りの途中で `origin/main` が動いても、別のコミットの内容が混ざらない。
   3. plugin.json のパスは、プラグインの名前ではなく `source.path` から作る。
-  4. 各プラグインの `source` が `git-subdir`・配布元の URL・`ref` が `main` でなければ、エラーにする。
+  4. 各プラグインの `source` が `git-subdir`・配布元の URL・`ref` が `main` でなければ、エラーにする。`sha` (取得するコミットを固定するキー) があるときもエラーにする。`sha` があると、`main` の先端ではなく、そのコミットを取得するため (2026-11-03 のレビューで足した)。
   5. plugin.json が無い場合と、JSON として読めない・`version` が無い場合は、別の文言でエラーにする。
 - KTD6. **版の比較は、X.Y.Z の 3 つの整数の組で行う** (KD8)。最新の版と、対象のプラグインのインストール済みの版の両方を `^[0-9]+\.[0-9]+\.[0-9]+$` で検査し、合わなければエラーにする。比べた結果は「同じ」「古い」「新しい」の 3 つ。標準ライブラリだけで書き、ほかのライブラリがあれば使うという分岐は作らない。
 - KTD7. **`claude` の出力は必要なキーを検査して読み、変える操作の出力は解析しない。**
   - `plugin list --json`: 配列であることと、すべての要素に `id` があることを検査する。ほかのキーは、`id` が `@<マーケットプレイスの名前>` で終わる要素 (このリポジトリのプラグイン) にだけ検査する。その要素に `scope`・`version`・`installPath` があること、user スコープの要素に真偽値の `enabled` があること、project / local スコープの要素に `projectPath` があること。無ければエラーにし、0 件として扱わない。ほかの要素は使わない。`.claude/skills/` のプラグインの要素には `projectPath` が無いことがあるので、すべての要素を検査すると、そうしたプラグインがあるだけでエラーになる (session-settled: user-approved。退けた案: すべての要素のキーを検査する)。知らないキーは無視する (CLI の版が上がってキーが増えてもエラーにならないように)。
-  - `plugin marketplace list --json`: 配列で、各要素に `name` と `source` があること。名前の一致する要素について、`source` が `github` なら `repo` を、`git` なら `url` を、KTD4 の 3 と同じ方法で正規化して配布元と比べる。ほかの `source` (手元のディレクトリなど) はエラーにする (R4・R5・KD21)。
+  - `plugin marketplace list --json`: 配列で、各要素に `name` と `source` があること。名前の一致する要素について、`source` が `github` なら `repo` を、`git` なら `url` を、KTD4 の 3 と同じ方法で正規化して配布元と比べる。要素に `ref` があり、`main` でなければエラーにする。登録の `path` は、`github` と `git` の要素では出力されないので検査できない (2026-11-03 のレビューで決めた)。ほかの `source` (手元のディレクトリなど) はエラーにする (R4・R5・KD21)。
   - `plugin install` は `--json` を付けて実行し、成否は終了コードと、その後の再度の読み込み (KTD8) で判定する。出力は解析せず、失敗したときに標準出力と標準エラー出力の末尾をそのまま表示する。
-  - `-y` は付けない。付けると、マーケットプレイスが宣言したコマンドを、利用者の確認なしに受け入れるため (利用者に判断を求める条件)。
+  - `-y` は付けない。付けると、マーケットプレイスが宣言したコマンドを、利用者の確認なしに受け入れるため (利用者に判断を求める条件)。そのため、宣言したコマンドを持つプラグインのインストールは失敗する。`claude` が終了コード 0 以外で終了し、再度読み込んでもインストールされていると分からなかったときは、直し方に、端末で `claude plugin install` を実行し、表示されたコマンドを確認してからインストールする進め方を添える (2026-11-03 のレビューで決めた)。
   - `~/.claude/plugins/` の下のファイル (`installed_plugins.json` など) は直接読まない。Claude Code の内部の実装で、公式の記載が無いため。
 - KTD8. **インストールは 1 つずつ行い、そのたびに `plugin list --json` を再度読み込む。**
   - 対象は marketplace.json に書かれた順に 1 つずつ扱う。成功したら再度読み込み、user スコープの版が最新の版と同じかを検査する (R16)。
@@ -227,7 +227,7 @@ execution: code
   - GNU Make 3.81 (macOS に付属) で動く書き方にする。
 - KTD12. **偽の claude を使う前に、偽物であることを毎回確認する** (session-settled: user-directed。退けた案: 確認せずに PATH の偽物を使う・スクリプトの中の関数をテストで差し替える。理由: 本物の `claude` を実行しないことを、使う前に保証する)。確認の順と安全策は session-settled: user-approved (退けた案: 固有のオプションの実行だけで確認する。理由: 本物の `claude` は、知らない語をプロンプトとして受け取って会話を始める可能性がある)。
   1. 偽の claude は、状態のファイル (登録したマーケットプレイス・マーケットプレイスの clone にある版・配布元にある版・インストール済みのプラグイン) を読み書きする。`plugin list --json` などを状態から返す。`plugin marketplace update` は配布元の版を clone に反映し、`plugin install` は clone の版をインストール済みにする。
-  2. 偽の claude は、受けた引数と cwd を 1 行ずつ記録する。状態のファイルで指定した場面では、失敗する (終了コード 1) か、成功を返して版を変えない。知らない引数は終了コード 99 で終える (`issue-dispatch/tests/fake-gh` と同じ)。状態のファイルで指定した呼び出しでは、親のプロセス (スクリプト) に SIGINT (Ctrl-C と同じシグナル) を送る。Ctrl-C のテストに使う。
+  2. 偽の claude は、受けた引数と cwd を 1 行ずつ記録する。状態のファイルで指定した場面では、失敗する (終了コード 1) か、成功を返して版を変えない。知らない引数は終了コード 99 で終える (`issue-dispatch/tests/fake-gh` と同じ)。状態のファイルで指定した呼び出しでは、親のプロセス (スクリプト) に SIGINT (Ctrl-C と同じシグナル) を送る。Ctrl-C のテストに使う。状態のファイルで指定した呼び出しでは、UTF-8 として読めない標準出力を書いて終了コード 0 で終える。インストールの失敗の直し方の場合分けのテストに使う (2026-11-03 のレビューで足した)。
   3. 偽の claude だけが持つオプション `--fake-claude-identity` を受けると、決めた文字列を出力する。
   4. テストの共通の準備は、偽の claude を使う前に、次の 2 つを順に確認する。どちらかが違えば、その場でテストを失敗させる。
      1. テストで使う PATH で `claude` を探し (`shutil.which`)、見つかったファイルの実体のパスが偽の claude の実体と同じであること
@@ -371,13 +371,13 @@ flowchart TB
   - 載っていない名前や、空の要素 (`a,,b`) を指定すると終了コード 3 で終え、偽の claude の記録に変える操作が無い。
   - マーケットプレイスが登録されていないとき、終了コード 3 で終え、標準エラー出力に `claude plugin marketplace add akm/claude-plugins` と、何も変えていないことが含まれる。
   - URL の形 (`source` が `git` で、`url` が `https://github.com/akm/claude-plugins.git` か `git@github.com:akm/claude-plugins.git`) で登録されているときは、エラーにならない (KD21)。
-  - 同じ名前で登録されているが、取得元が別の GitHub のリポジトリ (fork。`github` の形と URL の形の両方) のときと、`source` が `github` でも `git` でもない (手元のディレクトリ) ときは、終了コード 3 で終える。
+  - 同じ名前で登録されているが、取得元が別の GitHub のリポジトリ (fork。`github` の形と URL の形の両方) のときと、`source` が `github` でも `git` でもない (手元のディレクトリ) ときと、`ref` が `main` でないときは、終了コード 3 で終える。
   - URL の正規化の関数は、scp 形式・`ssh://`・`https://` (末尾の `.git` と `/` の有無)・大文字を含む URL を同じ配布元と判定し、別のホスト・別の所有者・別のリポジトリ・SSH の Host の別名を違うと判定する。
   - `origin` が無いときと、別のリポジトリを指すときは、終了コード 3 で終える。
   - `git fetch` が失敗する (bare リポジトリを消した) とき、終了コード 3 で終え、前に取得してあった `origin/main` を使わない。
   - `origin/main` に対象の plugin.json が無いときと、JSON として読めない・`version` が無いときは、違う文言で終了コード 3 で終える。
   - 版が `0.29.0-alpha1` や `1.2` のとき、終了コード 3 で終える。
-  - `origin/main` の marketplace.json の名前か配布元が作業ツリーのものと違うとき、プラグインの `source` が `git-subdir` でないとき、`ref` が `main` でないときは、終了コード 3 で終える。
+  - `origin/main` の marketplace.json の名前か配布元が作業ツリーのものと違うとき、プラグインの `source` が `git-subdir` でないとき、`ref` が `main` でないとき、`sha` があるときは、終了コード 3 で終える。
   - 作業用のリポジトリにコピーしたスクリプトを、別のディレクトリを cwd にして実行しても、コピーした先のリポジトリの `origin` を読む (KTD3)。
   - 環境変数 `GIT_DIR` が別のリポジトリを指していても、スクリプトのルートのリポジトリを読む (KTD2)。
   - 偽の claude の記録の cwd が、リポジトリのルートでも呼び出した側の cwd でもない空のディレクトリで、実行の後にそのディレクトリが残っていない (KTD2)。
