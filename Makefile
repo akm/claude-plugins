@@ -1,5 +1,6 @@
-# このリポジトリのプラグインについて、手元の Claude Code へのインストール状況を表示する。
-# 中身はスクリプト scripts/plugins.py が行う (表示するもの・前提の検査・終了コードは、そのファイルの docstring)。
+# このリポジトリのプラグインについて、手元の Claude Code へのインストール状況を表示し (plugins-status)、user スコープに
+# インストールされていないものをインストールする (plugins-install)。
+# 中身はスクリプト scripts/plugins.py が行う (表示するもの・前提の検査・インストール・中止と中断・終了コードは、そのファイルの docstring)。
 #
 # 変数 PLUGINS に、対象にするプラグインの名前をカンマで区切って指定できる。例: make plugins-status PLUGINS=doc-dag,wording-guard
 # make のコマンドラインで指定したときだけ、スクリプトに渡す。同じ名前の環境変数では対象を絞らない
@@ -20,3 +21,7 @@ endif
 .PHONY: plugins-status
 plugins-status: ## このリポジトリのプラグインの、最新の版とインストール済みの版を表示する
 	python3 $(PLUGINS_SCRIPT) status $(PLUGINS_OPTION)
+
+.PHONY: plugins-install
+plugins-install: ## このリポジトリのプラグインのうち、user スコープにインストールされていないものを、配布元の main からインストールする
+	python3 $(PLUGINS_SCRIPT) install $(PLUGINS_OPTION)

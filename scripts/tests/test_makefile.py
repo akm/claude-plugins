@@ -7,7 +7,7 @@
 
 Makefile とスクリプト scripts/plugins.py を作業用のリポジトリにコピーし、make をプロセスとして実行する。本物の claude は
 実行せず、GitHub に接続しない (共通の準備はファイル scripts/tests/plugintest.py)。make は、ファイル
-scripts/tests/test_status.py のテストと同じ偽の claude と一時的なリポジトリで動かす。
+scripts/tests/test_status.py と scripts/tests/test_install.py のテストと同じ偽の claude と一時的なリポジトリで動かす。
 """
 
 import os
@@ -19,6 +19,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 
 import plugintest  # noqa: E402
+import test_install  # noqa: E402
 import test_status  # noqa: E402
 
 MAKEFILE_REL = "Makefile"
@@ -84,6 +85,17 @@ class MakefileStatusTest(MakeMixin, test_status.StatusTestCase):
         self.assertIn("no-such", r.stderr)
         self.assertIn(test_status.NOTHING_CHANGED, r.stderr)
         self.assert_only_reads()
+
+
+class MakefileInstallTest(MakeMixin, test_install.InstallTestCase):
+    """ターゲット plugins-install と変数 PLUGINS (KTD11)。"""
+
+    def test_plugins_variable_limits_targets(self):
+        r = self.run_make("-C", self.work, "plugins-install", "PLUGINS=doc-dag")
+        self.assertEqual(r.returncode, 0, f"make が終了コード 0 で終了すること: {r.stderr}")
+        self.assertEqual(self.changes(), [test_install.UPDATE, test_install.install_args("doc-dag")],
+                         "コマンドラインの PLUGINS で指定したものだけをインストールすること")
+        self.assertEqual(self.user_versions(), {"doc-dag": "0.2.0"})
 
 
 if __name__ == "__main__":

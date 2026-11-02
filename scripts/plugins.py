@@ -53,6 +53,42 @@
 状況の表示は、インストール済みのプラグインもマーケットプレイスの clone も変えない (claude は plugin marketplace list と
 plugin list だけを実行する)。古いものがあっても、終了コード 0 で終了する。
 
+インストール (サブコマンド install)。前提の検査と読み取りの後、次の順に行う。
+  1. 対象のプラグインのうち、user スコープにインストールされていないものを、marketplace.json の順に選ぶ。user スコープに
+     インストール済みのものは、版が古くても扱わない (更新は、マーケットプレイスの自動更新に任せる)。選んだものが無ければ、
+     マーケットプレイスの定義も取得し直さずに、何も変えずに終了コード 0 で終了する
+  2. claude plugin marketplace update <マーケットプレイスの名前> で、マーケットプレイスの定義を取得し直す。clone が古いと
+     古い版が入り、clone を取得した後に足したプラグインは見つからないため
+  3. 選んだものを 1 つずつ、claude plugin install <名前>@<マーケットプレイスの名前> --scope user --json でインストールする。
+     -y は付けない (マーケットプレイスが宣言したコマンドを、利用者の確認なしに受け入れないため)。成功するたびに
+     claude plugin list --json を再度読み込み、user スコープの版が最新の版と同じかを検査する
+  4. 標準出力に、インストールしたものの一覧と、実行の後の案内を表示する
+変える操作の出力は解析しない。成否は、終了コードと、その後の再度の読み込みで判定する。進み具合 (取得し直すこと・
+インストールするもの・インストールしたもの) は、そのたびに標準出力に表示する。
+
+中止。次のときは、その時点で中止し、残りのプラグインは処理せずに、終了コード 4 で終了する。
+  - claude plugin marketplace update か claude plugin install が失敗した (終了コード 0 以外・タイムアウト・起動できない)。
+    インストールが失敗したときは、claude plugin list --json を再度読み込み、そのプラグインの実際の状態 (user スコープの版か、
+    インストールされていないこと) を示す。この読み込みも失敗したら、版が変わったか分からないと示す。再度読み込んだ版が
+    最新の版と同じなら、インストールしたものとして扱う
+  - claude plugin install が成功を返したのに、再度読み込んだ user スコープの版が最新の版と同じでない (インストールされて
+    いないことも含む)。再度の読み込みが失敗したときも中止し、版が変わったか分からないと示す
+中断。Ctrl-C で中断したときは、それ以上コマンドを実行せずに、終了コード 130 で終了する。処理中だったプラグインは、
+版が変わったか分からないと示し、make plugins-status で確認するよう案内する。
+中止・中断したときは、標準エラー出力に、インストールしたものの一覧・処理中だったものの状態・処理しなかったものの名前と、
+実行の後の案内 (要るときだけ) を書き、最後にエラーの文を書く。
+
+実行の後の案内。次のどれかがあれば、表示する。中止・中断したときも同じ。
+  - インストールしたもの
+  - 版が変わったか分からないもの
+  - 処理中だったもので、再度読み込むと user スコープにあったもの (版が最新の版と違っても、user スコープの状態は変わっている)
+案内は次の 2 つで、どちらも表示するだけで、実行はしない。
+  - Claude Code の再起動が要ること。再起動するまで、実行中のセッションには反映されない
+  - wording-guard が上のどれかに当たり、再度読み込んだ要素があれば、textlint を入れるコマンド
+    python3 <展開先>/scripts/wording_lint.py setup。展開先は、インストールの後に再度読み込んだ installPath (版ごとに変わるので、
+    前の値や組み立てたパスは使わない)。展開先に空白などがあれば、シェルの引用符で囲む。実行しないのは、npm で多くの
+    パッケージを取得するため
+
 URL は、scp 形式 (git@github.com:<所有者>/<リポジトリ>.git)・ssh://・https://・git:// を受け付ける。末尾の .git と / を
 除き、大文字と小文字を区別せずに、ホスト・所有者・リポジトリを比べる。SSH の設定の Host の別名は解決しないので、別名で書いた
 URL は配布元と判定しない。
@@ -60,7 +96,7 @@ URL は配布元と判定しない。
 リポジトリのルートは、このファイルの実体があるディレクトリ scripts/ の親ディレクトリとする。cwd からは決めない。
 claude は、実行のたびに作る空の一時ディレクトリを cwd にして実行し、実行が終了したら一時ディレクトリを消す
 (claude plugin list --json の enabled が、user スコープの設定の値になるため)。git は -C <ルート> で実行し、実行先の
-リポジトリを変える環境変数 (GIT_DIR など) を消す。
+リポジトリを変える環境変数 (GIT_DIR など) を消す。待機の上限は、読み取りが 60 秒、git fetch が 120 秒、変える操作が 300 秒。
 
 終了コード:
   0    成功
@@ -79,6 +115,7 @@ import json
 import os
 import posixpath
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -94,9 +131,11 @@ EXIT_PRECONDITION = 3
 EXIT_ABORTED = 4
 EXIT_INTERRUPTED = 130
 
-# 待機の上限 (秒)。読み取り (plugin list・plugin marketplace list と、fetch 以外の git) と git fetch
+# 待機の上限 (秒)。読み取り (plugin list・plugin marketplace list と、fetch 以外の git)・git fetch・変える操作。
+# 変える操作は、pr-teeth の CLONE_TIMEOUT と同じにする
 READ_TIMEOUT = 60
 FETCH_TIMEOUT = 120
+CHANGE_TIMEOUT = 300
 # 失敗したコマンドの出力のうち、エラーの文に添える末尾の行数
 TAIL_LINES = 20
 
@@ -117,6 +156,16 @@ AUTO_UPDATE_NOTE = (
     "すぐに更新したいときは、同じ画面で「Update marketplace」を選ぶ。\n"
     "公式ドキュメント: https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace"
 )
+
+# インストールの後の案内 (R18)。どちらも表示するだけで、実行はしない
+RESTART_NOTE = "Claude Code を再起動する必要がある。再起動するまで、実行中のセッションには、インストールしたプラグインが反映されない。"
+# textlint を入れるコマンドを案内するプラグインの名前と、そのコマンドのスクリプトの、展開先からの相対パス
+WORDING_GUARD = "wording-guard"
+WORDING_LINT_RELPATH = os.path.join("scripts", "wording_lint.py")
+WORDING_LINT_NOTE = ("wording-guard の textlint による検査 (任意) を使うときは、次のコマンドで textlint を入れる "
+                     "(Node と npm が必要。このスクリプトは実行しない):")
+# 版が変わったか分からないときの案内
+STATUS_HINT = "make plugins-status で確認する"
 
 # 実行先のリポジトリを変える git の環境変数。git rev-parse --local-env-vars の出力 (git 2.50.1)。
 # git のフックの中から実行されると、GIT_DIR などが別のリポジトリを指していることがあるので、git を実行する前に消す。
@@ -699,6 +748,208 @@ def status_lines(snapshot):
     return lines
 
 
+# ---- インストール ----
+
+class InstallAborted(Exception):
+    """変える操作の途中で中止したことを表す。message・fix・detail の意味は、クラス PluginsError と同じ。"""
+
+    def __init__(self, message, fix=None, detail=None):
+        super().__init__(message)
+        self.message = message
+        self.fix = fix
+        self.detail = detail
+
+
+class InstallProgress:
+    """インストールの進み具合。中止・中断したときに、何を変えたかを表示するために使う。
+
+    targets は、インストールする対象のプラグインの配列 (関数 prepare の結果の plugins の要素。marketplace.json の順)。
+    """
+
+    def __init__(self, marketplace, targets):
+        self.marketplace = marketplace
+        self.targets = targets
+        # マーケットプレイスの定義を取得し直している間は真
+        self.updating = False
+        # 処理を始めた対象の数。targets[started:] が、処理しなかったもの
+        self.started = 0
+        # 処理中の対象 (targets の要素)。最新の版でインストールしたことを確認したら None に戻す
+        self.current = None
+        # 最新の版でインストールしたもの。要素は (対象, 再度読み込んだ user スコープの要素)
+        self.installed = []
+        # 中止・中断したときの、処理中だった対象の状態 (関数 reread_outcome の値と同じ形)
+        self.outcome = None
+
+    def remaining(self):
+        return [t["name"] for t in self.targets[self.started:]]
+
+    def current_is_installed(self):
+        return any(t is self.current for t, _ in self.installed)
+
+
+def find_user_element(listed, name):
+    """関数 parse_plugin_list が返した要素 listed から、プラグイン name の user スコープの要素を返す。無ければ None を返す。"""
+    for element in listed:
+        if element["name"] == name and element["scope"] == "user":
+            return element
+    return None
+
+
+def is_latest(element, target):
+    """user スコープの要素 element の版が、対象 target の最新の版と同じなら真を返す。element が None なら偽を返す。"""
+    return element is not None and parse_version(element["version"]) == parse_version(target["latest"])
+
+
+def reread_user_element(marketplace, name):
+    """claude plugin list --json を再度読み込み、プラグイン name の user スコープの要素を返す。無ければ None を返す。
+
+    読み込みが失敗したとき (コマンドの失敗・出力の形の誤り) は PluginsError を投げる。
+    """
+    listed = parse_plugin_list(run_claude(["plugin", "list", "--json"], READ_TIMEOUT), marketplace)
+    return find_user_element(listed, name)
+
+
+def reread_outcome(marketplace, target):
+    """インストールが失敗した後に claude plugin list --json を再度読み込み、対象 target の状態を返す (R15・KTD8)。
+
+    返す値のキー: known (読み込めたら真)・element (user スコープの要素。無ければ None)・reason (読み込めなかった理由)。
+    """
+    try:
+        return {"known": True, "element": reread_user_element(marketplace, target["name"]), "reason": None}
+    except PluginsError as e:
+        return {"known": False, "element": None, "reason": e.message}
+
+
+def _progress(text):
+    """インストールの進み具合を標準出力に表示する。パイプに出力しているときも、すぐに表示されるよう flush する。"""
+    print(text, flush=True)
+
+
+def install_targets(progress):
+    """マーケットプレイスの定義を取得し直してから、対象を 1 つずつインストールする (R13・R15・R16・KTD8)。
+
+    中止するときは InstallAborted を投げる。進み具合は progress に書く。Ctrl-C の KeyboardInterrupt は捕まえない。
+    """
+    marketplace = progress.marketplace
+    update = ["plugin", "marketplace", "update", marketplace]
+    progress.updating = True
+    _progress(f"マーケットプレイス {marketplace} の定義を取得し直す (claude {' '.join(update)})")
+    try:
+        run_claude(update, CHANGE_TIMEOUT)
+    except CommandError as e:
+        raise InstallAborted(f"マーケットプレイス {marketplace} の定義の取得し直しが失敗したので、中止した ({e.message})",
+                             e.fix, e.detail) from None
+    progress.updating = False
+
+    for target in progress.targets:
+        name = target["name"]
+        latest = target["latest"]
+        progress.current = target
+        progress.started += 1
+        _progress(f"{name} をインストールする (最新の版 {latest})")
+        try:
+            run_claude(["plugin", "install", f"{name}@{marketplace}", "--scope", "user", "--json"], CHANGE_TIMEOUT)
+        except CommandError as e:
+            outcome = reread_outcome(marketplace, target)
+            if outcome["known"] and is_latest(outcome["element"], target):
+                progress.installed.append((target, outcome["element"]))
+            progress.outcome = outcome
+            raise InstallAborted(f"プラグイン {name} のインストールが失敗したので、中止した ({e.message})",
+                                 e.fix, e.detail) from None
+        try:
+            element = reread_user_element(marketplace, name)
+        except PluginsError as e:
+            progress.outcome = {"known": False, "element": None, "reason": e.message}
+            raise InstallAborted(f"プラグイン {name} のインストールの後、claude plugin list --json を再度読み込めなかったので、"
+                                 f"中止した ({e.message})", e.fix, e.detail) from None
+        if not is_latest(element, target):
+            progress.outcome = {"known": True, "element": element, "reason": None}
+            if element is None:
+                actual = "user スコープにインストールされていない"
+                fix = (f"{STATUS_HINT}。インストールされていなければ、claude plugin install {name}@{marketplace} --scope user を"
+                       "手で実行して、出力を確認する")
+            else:
+                actual = f"user スコープの版は {element['version']}"
+                fix = (f"{STATUS_HINT}。git fetch の後に配布元の main が更新されると、最新の版と違う版がインストールされて、"
+                       "このエラーになることがある")
+            raise InstallAborted(f"プラグイン {name} のインストールは成功を返したが、user スコープの版が最新の版 {latest} に"
+                                 f"ならなかったので、中止した (再度読み込んだ結果: {actual})", fix)
+        progress.installed.append((target, element))
+        progress.current = None
+        _progress(f"{name} {element['version']} を user スコープにインストールした")
+
+
+def outcome_line(progress):
+    """中止・中断したときの、処理中だったものの状態を示す行を返す (R15・R17・KTD8)。"""
+    if progress.updating:
+        return f"処理中だったもの: マーケットプレイス {progress.marketplace} の定義の取得し直し"
+    target = progress.current
+    if target is None:
+        return "処理中だったもの: なし"
+    name = target["name"]
+    outcome = progress.outcome
+    if outcome is None or not outcome["known"]:
+        reason = f" (claude plugin list --json を再度読み込めなかった: {outcome['reason']})" if outcome else ""
+        return f"処理中だったもの: {name} は、版が変わったか分からない{reason}。{STATUS_HINT}"
+    element = outcome["element"]
+    if element is None:
+        return f"処理中だったもの: {name} は、user スコープにインストールされていない (再度読み込んだ結果)"
+    if is_latest(element, target):
+        return f"処理中だったもの: {name} は、user スコープに最新の版 {element['version']} でインストールされている (再度読み込んだ結果)"
+    return (f"処理中だったもの: {name} は、user スコープの版が {element['version']} で、最新の版 {target['latest']} と違う"
+            " (再度読み込んだ結果)")
+
+
+def after_install_notes(progress):
+    """実行の後の案内 (R18) の行を返す。案内が要らなければ、空の配列を返す。
+
+    インストールしたものか、版が変わったか分からないものか、再度読み込んで user スコープにあった処理中のものがあれば、
+    再起動が要ることを示す。そのうち wording-guard があれば、再度読み込んだ展開先で、textlint を入れるコマンドを示す。
+    """
+    changed = {}
+    for target, element in progress.installed:
+        changed[target["name"]] = element
+    outcome = progress.outcome
+    if outcome is not None and outcome["element"] is not None:
+        changed[progress.current["name"]] = outcome["element"]
+    unknown = progress.current is not None and (outcome is None or not outcome["known"])
+    if not changed and not unknown:
+        return []
+    lines = ["", RESTART_NOTE]
+    element = changed.get(WORDING_GUARD)
+    if element is not None:
+        command = shlex.quote(os.path.join(element["installPath"], WORDING_LINT_RELPATH))
+        lines.extend([WORDING_LINT_NOTE, f"  python3 {command} setup"])
+    return lines
+
+
+def install_report_lines(progress, aborted):
+    """インストールしたものの一覧と、実行の後の案内の行を返す。aborted が真なら、処理中だったものと処理しなかったものも含める。"""
+    installed = ", ".join(f"{t['name']} {e['version']}" for t, e in progress.installed) or "なし"
+    lines = ["", f"インストールしたもの (user スコープ): {installed}"]
+    if aborted:
+        lines.append(outcome_line(progress))
+        lines.append(f"処理しなかったもの: {', '.join(progress.remaining()) or 'なし'}")
+    lines.extend(after_install_notes(progress))
+    return lines
+
+
+def report_install_stop(progress, message, fix=None, detail=None):
+    """中止・中断したときに、インストールしたもの・処理中だったものの状態・処理しなかったもの・案内を書いてから、
+    エラーの文を書く (KTD8)。どれも標準エラー出力に書く。
+    """
+    sys.stdout.flush()
+    for line in install_report_lines(progress, aborted=True):
+        print(line, file=sys.stderr)
+    print("", file=sys.stderr)
+    _print(message)
+    if detail:
+        for line in detail.splitlines():
+            print("  " + line, file=sys.stderr)
+    if fix:
+        _print(f"直し方: {fix}")
+
+
 # ---- サブコマンド ----
 
 def cmd_status(snapshot):
@@ -708,8 +959,36 @@ def cmd_status(snapshot):
 
 
 def cmd_install(snapshot):
-    raise NotImplementedError("サブコマンド install のインストールは、まだ実装していない "
-                              "(計画 docs/plans/2026-11-02-1748-feat-plugin-install-status-plan.md の U4 で足す)")
+    """user スコープにインストールされていない対象を、user スコープにインストールする (R13・R15〜R18・KTD8・KTD9)。"""
+    marketplace = snapshot["marketplace"]
+    plugins = snapshot["plugins"]
+    present = [p["name"] for p in plugins if any(e["scope"] == "user" for e in p["installed"])]
+    targets = [p for p in plugins if p["name"] not in present]
+    if present:
+        _progress(f"user スコープにインストール済みのもの (版が古くても扱わない): {', '.join(present)}")
+    if not targets:
+        _progress(f"user スコープにインストールするものが無いので、{NOTHING_CHANGED} (マーケットプレイスの定義も取得し直していない)。")
+        return EXIT_OK
+
+    progress = InstallProgress(marketplace, targets)
+    try:
+        _progress(f"user スコープにインストールするもの: {', '.join(t['name'] for t in targets)}")
+        install_targets(progress)
+    except InstallAborted as e:
+        report_install_stop(progress, e.message, e.fix, e.detail)
+        _print("変える操作の途中で中止したので、一部が変わっている可能性がある。変えたものは、"
+               "インストールしたものと処理中だったものの行に示した。")
+        return EXIT_ABORTED
+    except KeyboardInterrupt:
+        # 最新の版でインストールしたことを確認した直後に中断したときは、処理中だったものは無いとして扱う
+        if progress.outcome is None and progress.current_is_installed():
+            progress.current = None
+        report_install_stop(progress, "Ctrl-C で中断した。それ以上 claude のコマンドを実行していない。")
+        _print(f"変える操作の途中で中断したので、一部が変わっている可能性がある。{STATUS_HINT}。")
+        return EXIT_INTERRUPTED
+    for line in install_report_lines(progress, aborted=False):
+        print(line)
+    return EXIT_OK
 
 
 def _print(text):
