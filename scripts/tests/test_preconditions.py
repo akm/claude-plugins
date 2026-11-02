@@ -195,6 +195,14 @@ class RegistrationTest(ScriptTestCase):
                 self.write_state({"marketplaces": [entry]})
                 self.assert_stopped_without_change(self.run_script("status"), "取得元")
 
+    def test_credentials_in_registered_url_are_hidden(self):
+        self.write_state({"marketplaces": [{"name": MP, "source": "git",
+                                            "url": "https://x-access-token:ghp_SECRET123@github.com/someone/claude-plugins.git"}]})
+        r = self.run_script("status")
+        self.assert_stopped_without_change(r, "取得元", "https://***@github.com/someone/claude-plugins.git")
+        self.assertNotIn("ghp_SECRET123", r.stderr, "URL に埋め込んだ認証情報をエラーの文に書かないこと")
+        self.assertNotIn("x-access-token", r.stderr)
+
     def test_marketplace_list_failure_or_bad_output(self):
         for fault, fragment in (({"action": "fail", "stderr": "marketplace list broke\n"}, "marketplace list broke"),
                                 ({"action": "no_change", "stdout": "{}"}, "配列でない")):
@@ -242,6 +250,17 @@ class SourceUrlTest(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertNotEqual(plugins.source_key(url), expected, "違う配布元と判定すること")
 
+    def test_hide_credentials(self):
+        plugins = load_plugins()
+        for url, shown in (("https://user:token@github.com/a/b.git", "https://***@github.com/a/b.git"),
+                           ("ssh://git@github.com:22/a/b.git", "ssh://***@github.com:22/a/b.git"),
+                           ("https://github.com/a/b.git", "https://github.com/a/b.git"),
+                           ("git@github.com:a/b.git", "git@github.com:a/b.git"),
+                           ("akm/claude-plugins", "akm/claude-plugins")):
+            with self.subTest(url=url):
+                self.assertEqual(plugins.hide_credentials(url), shown,
+                                 "scheme のある URL の userinfo だけを *** にし、ほかは変えないこと")
+
 
 class OriginTest(ScriptTestCase):
     """remote origin と git fetch の検査 (R6・R7・KD10)。"""
@@ -255,6 +274,14 @@ class OriginTest(ScriptTestCase):
             with self.subTest(url=url):
                 plugintest.git(self.work, "remote", "set-url", "origin", url, env=self.env)
                 self.assert_stopped_without_change(self.run_script("status"), "remote origin", url)
+
+    def test_credentials_in_origin_url_are_hidden(self):
+        url = "https://x-access-token:ghp_SECRET123@github.com/someone/claude-plugins.git"
+        plugintest.git(self.work, "remote", "set-url", "origin", url, env=self.env)
+        r = self.run_script("status")
+        self.assert_stopped_without_change(r, "remote origin", "https://***@github.com/someone/claude-plugins.git")
+        self.assertNotIn("ghp_SECRET123", r.stderr, "URL に埋め込んだ認証情報をエラーの文に書かないこと")
+        self.assertNotIn("x-access-token", r.stderr)
 
     def test_fetch_failure_does_not_use_old_origin_main(self):
         old = plugintest.git(self.work, "rev-parse", "origin/main", env=self.env).stdout.strip()

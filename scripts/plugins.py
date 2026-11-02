@@ -182,6 +182,8 @@ _VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 # (issue-dispatch は配布していないので import しない)。scheme は KTD4 が挙げる 4 つに限る
 _SCP_RE = re.compile(r"^(?:[^@/:]+@)?(?P<host>[^:/]+):(?P<path>[^/].*)$")
 _URL_RE = re.compile(r"^(?:ssh|https|git)://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.+)$")
+# scheme のある URL の userinfo の部分 (関数 hide_credentials が *** にする)
+_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^@/]+@")
 # <所有者>/<リポジトリ> の形。どちらも、名前に使える文字 (英数字と ._-) の 1 文字以上
 _REPO_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
@@ -339,6 +341,15 @@ def source_key(url):
 def format_source(key):
     """関数 source_key の組を、表示する形 (github.com/akm/claude-plugins) にする。"""
     return "/".join(key)
+
+
+def hide_credentials(url):
+    """エラーの文に書くために、scheme のある URL の userinfo (scheme://<userinfo>@ の部分) を *** にして返す。
+
+    URL に認証情報 (https://<ユーザー>:<トークン>@github.com/... など) を埋め込んだ利用者のトークンを、標準エラー出力に
+    出さないため。scp 形式 (git@github.com:...) のユーザー名は秘密ではないので変えない。ほかの形の値はそのまま返す。
+    """
+    return _USERINFO_RE.sub(r"\1***@", url)
 
 
 def parse_version(value):
@@ -524,7 +535,8 @@ def check_registration(local):
             raise _shape_error(what, f"マーケットプレイス {name} の要素に、文字列の {key} が無い")
         url = prefix + value
         if source_key(url) != expected:
-            raise PluginsError(f"マーケットプレイス {name} の取得元 ({value}) が、配布元 ({format_source(expected)}) でない", fix)
+            shown = hide_credentials(value)
+            raise PluginsError(f"マーケットプレイス {name} の取得元 ({shown}) が、配布元 ({format_source(expected)}) でない", fix)
 
 
 def check_origin(root, local):
@@ -540,7 +552,7 @@ def check_origin(root, local):
                                fix) from None
         raise
     if source_key(url) != expected:
-        raise PluginsError(f"remote origin の URL ({url}) が、配布元 ({format_source(expected)}) を指していない。"
+        raise PluginsError(f"remote origin の URL ({hide_credentials(url)}) が、配布元 ({format_source(expected)}) を指していない。"
                            "最新の版を読む origin/main が、配布元の main でなくなる", fix)
 
 
