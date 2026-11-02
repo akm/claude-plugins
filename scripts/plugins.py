@@ -52,7 +52,7 @@ Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
   - user スコープにインストールされていないプラグインは、user スコープの行に、インストールされていないことを示す
   - user スコープの版が古いもの・user スコープにインストールされていないもの・user スコープで無効なものの名前のまとめ
   - 最後に、古いプラグインはマーケットプレイスの自動更新で更新されること、自動更新が有効かを確認して切り替える方法、
-    すぐに更新する方法と、公式ドキュメントの URL (文面は定数 AUTO_UPDATE_NOTE)。自動更新が有効かは判定しない。
+    すぐに更新する方法と、公式ドキュメントの URL (文面は定数 AUTO_UPDATE_NOTE にある)。自動更新が有効かは判定しない。
     設定が 3 か所 (設定ファイルの extraKnownMarketplaces・
     Claude Code が内部に持つファイル・管理者の設定) にあり、claude の CLI の出力からは判定できないため
 状況の表示は、インストール済みのプラグインもマーケットプレイスの clone も変えない (claude は plugin marketplace list と
@@ -74,7 +74,8 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
 インストールするもの・インストールしたもの) は、そのたびに標準出力に表示する。
 
 中止。次のときは、その時点で中止し、残りのプラグインは処理せずに、終了コード 4 で終了する。
-  - claude plugin marketplace update か claude plugin install が失敗した (失敗の場合はクラス CommandError の docstring)。
+  - claude plugin marketplace update か claude plugin install が失敗した (どの場合を失敗とするかは、クラス CommandError の
+    docstring に書いた)。
     インストールが失敗したときは、claude plugin list --json を再度読み込み、そのプラグインの実際の状態 (user スコープの版か、
     インストールされていないこと) を示す。この読み込みも失敗したら、版が変わったか分からないと示す。再度読み込んだ版が
     最新の版と同じなら、インストールしたものとして扱う
@@ -260,7 +261,10 @@ def _output_detail(stdout, stderr):
 
 
 def _run(argv, cwd, env, timeout):
-    """argv を実行し、標準出力を文字列で返す。失敗 (場合はクラス CommandError の docstring) は CommandError にする。"""
+    """argv を実行し、標準出力を文字列で返す。失敗したときは CommandError にする。
+
+    どの場合を失敗とするかは、クラス CommandError の docstring に書いた。
+    """
     shown = " ".join(argv)
     try:
         p = subprocess.run(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout)
@@ -907,7 +911,7 @@ def install_targets(progress):
             progress.outcome = outcome
             # 確認を求めて失敗したかは、出力を解析しない (docstring の方針) ので分からない。次のどちらにも当たるときに、
             # 確認を求めて失敗したときの進め方を添える。
-            # - claude が終了コード 0 以外で終了した。returncode が None のとき (場合はクラス CommandError の docstring) は、
+            # - claude が終了コード 0 以外で終了した。returncode が None になる場合 (クラス CommandError の docstring に挙げた) は、
             #   claude が終了コードを返していないので、確認を求めて失敗したのではない
             # - 再度読み込んだ結果で、インストールされていると分からなかった (インストールされていないか、読み込めなかった)。
             #   インストールされていると分かったときに添えると、処理中だったものの行と矛盾する
