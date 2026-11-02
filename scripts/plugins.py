@@ -72,7 +72,7 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
 インストールするもの・インストールしたもの) は、そのたびに標準出力に表示する。
 
 中止。次のときは、その時点で中止し、残りのプラグインは処理せずに、終了コード 4 で終了する。
-  - claude plugin marketplace update か claude plugin install が失敗した (終了コード 0 以外・タイムアウト・起動できない)。
+  - claude plugin marketplace update か claude plugin install が失敗した (失敗の場合はクラス CommandError の docstring)。
     インストールが失敗したときは、claude plugin list --json を再度読み込み、そのプラグインの実際の状態 (user スコープの版か、
     インストールされていないこと) を示す。この読み込みも失敗したら、版が変わったか分からないと示す。再度読み込んだ版が
     最新の版と同じなら、インストールしたものとして扱う
@@ -214,7 +214,14 @@ class PluginsError(ReportableError):
 
 
 class CommandError(PluginsError):
-    """外部のコマンド (claude・git) の失敗。returncode は終了コードで、起動できない・タイムアウトのときは None。"""
+    """外部のコマンド (claude・git) の失敗。関数 _run が作る。
+
+    returncode は、コマンドが終了コード 0 以外で終了したときの終了コード。次のときは、コマンドが失敗の終了コードを
+    返していないので None にする。None になる場合の一覧は、ここだけに書く。
+      - コマンドが見つからない・起動できない
+      - タイムアウトした
+      - 終了コード 0 で終了したが、標準出力を UTF-8 として読めない
+    """
 
     def __init__(self, message, fix=None, detail=None, returncode=None):
         super().__init__(message, fix, detail)
@@ -251,7 +258,7 @@ def _output_detail(stdout, stderr):
 
 
 def _run(argv, cwd, env, timeout):
-    """argv を実行し、標準出力を文字列で返す。起動できない・タイムアウト・終了コード 0 以外は CommandError にする。"""
+    """argv を実行し、標準出力を文字列で返す。失敗 (場合はクラス CommandError の docstring) は CommandError にする。"""
     shown = " ".join(argv)
     try:
         p = subprocess.run(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout)
@@ -888,8 +895,8 @@ def install_targets(progress):
             progress.outcome = outcome
             # 確認を求めて失敗したかは、出力を解析しない (docstring の方針) ので分からない。次のどちらにも当たるときに、
             # 確認を求めて失敗したときの進め方を添える。
-            # - claude が終了コード 0 以外で終了した (起動できない・タイムアウト・出力を UTF-8 として読めないときは、
-            #   returncode が None で、確認を求めて失敗したのではない)
+            # - claude が終了コード 0 以外で終了した。returncode が None のとき (場合はクラス CommandError の docstring) は、
+            #   claude が終了コードを返していないので、確認を求めて失敗したのではない
             # - 再度読み込んだ結果で、インストールされていると分からなかった (インストールされていないか、読み込めなかった)。
             #   インストールされていると分かったときに添えると、処理中だったものの行と矛盾する
             fix = e.fix
