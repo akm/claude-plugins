@@ -15,7 +15,6 @@ Ctrl-C は、偽の claude が親のプロセス (スクリプト) に SIGINT �
 
 import json
 import os
-import signal
 import subprocess
 import sys
 import unittest
@@ -65,11 +64,6 @@ def list_element(name, version, install_path):
     return {"id": f"{name}@{MP}", "version": version, "scope": "user", "enabled": True, "installPath": install_path}
 
 
-def _default_sigint():
-    """子のプロセスで、SIGINT の扱いをデフォルトに戻す (Python は、デフォルトのときだけ KeyboardInterrupt にする)。"""
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-
-
 def setup_command(install_path):
     """実行の後の案内に出る、textlint を入れるコマンド。"""
     return f"python3 {install_path}/scripts/wording_lint.py setup"
@@ -99,7 +93,7 @@ class InstallTestCase(plugintest.PluginTestCase):
         """
         return subprocess.run([sys.executable, os.path.join(self.work, SCRIPT_REL), "install", *args], env=self.env,
                               cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                              timeout=plugintest.TIMEOUT, preexec_fn=_default_sigint)
+                              timeout=plugintest.TIMEOUT, preexec_fn=plugintest.default_sigint)
 
     def reset_record(self):
         """偽の claude の記録を消す (1 つのテストで何度か実行するときに、前の実行の記録を残さないため)。"""

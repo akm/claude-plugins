@@ -16,6 +16,7 @@
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -69,6 +70,16 @@ def check_fake_claude(env, fake=FAKE_CLAUDE, identity=FAKE_CLAUDE_IDENTITY):
     if r.returncode != 0 or r.stdout != identity + "\n":
         raise FakeClaudeCheckError(
             "identity", f"claude --fake-claude-identity が決めた文字列を返さない (終了コード {r.returncode}、標準出力 {r.stdout!r})")
+
+
+def default_sigint():
+    """子のプロセスで、SIGINT の扱いをデフォルトに戻す。subprocess の引数 preexec_fn に渡す。
+
+    Python は、SIGINT の扱いがデフォルトのときだけ KeyboardInterrupt にする。シェルのバックグラウンドのジョブなどでテストを
+    実行すると、SIGINT を無視する設定を子のプロセスが受け継ぎ、偽の claude が送る SIGINT (Ctrl-C を模したもの) を
+    受け取らない。Ctrl-C のテストで、そのような環境でも同じ結果になるようにする。
+    """
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
 def git_env(base):

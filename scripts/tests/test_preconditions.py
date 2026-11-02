@@ -82,10 +82,13 @@ class ScriptTestCase(plugintest.PluginTestCase):
         self.write_state({"marketplaces": REGISTERED})
 
     def run_script(self, *args, cwd=None):
-        """作業用のリポジトリにコピーしたスクリプトを、self.env で実行する。cwd を省略したときは self.root で実行する。"""
+        """作業用のリポジトリにコピーしたスクリプトを、self.env で実行する。cwd を省略したときは self.root で実行する。
+
+        SIGINT の扱いはデフォルトに戻してから実行する (関数 plugintest.default_sigint)。
+        """
         return subprocess.run([sys.executable, os.path.join(self.work, SCRIPT_REL), *args], env=self.env,
                               cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                              timeout=plugintest.TIMEOUT)
+                              timeout=plugintest.TIMEOUT, preexec_fn=plugintest.default_sigint)
 
     def prepare(self, names=None, cwd=None, env=None):
         """作業用のリポジトリにコピーしたスクリプトの関数 prepare を別のプロセスで呼び、読み取った結果を返す。

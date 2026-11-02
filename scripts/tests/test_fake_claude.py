@@ -229,7 +229,7 @@ class FakeClaudeTest(plugintest.PluginTestCase):
             "print('returned', r.returncode)\n"))
         r = subprocess.run([sys.executable, parent, "claude", "plugin", "install", WG, "--scope", "user", "--json"],
                            env=self.env, cwd=self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                           timeout=plugintest.TIMEOUT)
+                           timeout=plugintest.TIMEOUT, preexec_fn=plugintest.default_sigint)
         self.assertEqual((r.returncode, r.stdout), (130, "interrupted\n"),
                          "親のプロセスが、偽の claude の実行中に SIGINT を受けること")
         self.assertEqual(self.read_state(), before, "状態を変えないこと")
