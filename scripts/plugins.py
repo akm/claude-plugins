@@ -181,19 +181,27 @@ _VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 # URL の形。ファイル issue-dispatch/scripts/issue_dispatch/repo.py の関数 parse_origin_url の形を写した
 # (issue-dispatch は配布していないので import しない)。scheme は KTD4 が挙げる 4 つに限る
 _SCP_RE = re.compile(r"^(?:[^@/:]+@)?(?P<host>[^:/]+):(?P<path>[^/].*)$")
-_URL_RE = re.compile(r"^(?P<scheme>ssh|https|git)://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.+)$")
+_URL_RE = re.compile(r"^(?:ssh|https|git)://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.+)$")
 # <所有者>/<リポジトリ> の形。どちらも、名前に使える文字 (英数字と ._-) の 1 文字以上
 _REPO_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
 
-class PluginsError(Exception):
-    """前提の検査か読み取りのエラー。message は起きたこと (1 行)、fix は直し方、detail はエラーの文に添える出力 (複数行)。"""
+class ReportableError(Exception):
+    """エラーの文に書く内容を持つ例外の基底クラス。message は起きたこと (1 行)、fix は直し方、detail はエラーの文に添える出力 (複数行)。
+
+    クラス PluginsError と InstallAborted が継承する。関数 main が PluginsError を前提の検査か読み取りのエラーとして捕まえるので、
+    InstallAborted は PluginsError の子にしない。
+    """
 
     def __init__(self, message, fix=None, detail=None):
         super().__init__(message)
         self.message = message
         self.fix = fix
         self.detail = detail
+
+
+class PluginsError(ReportableError):
+    """前提の検査か読み取りのエラー。message・fix・detail の意味は、クラス ReportableError と同じ。"""
 
 
 class CommandError(PluginsError):
@@ -287,7 +295,7 @@ def parse_names(value):
     if value is None:
         return None
     names = value.split(",")
-    if any(name == "" for name in names):
+    if "" in names:
         raise PluginsError(f"オプション --plugins の値「{value}」に空の要素がある",
                            "名前をカンマで区切り、空の要素 (続けて書いたカンマ・先頭か末尾のカンマ・空の値) を含めずに指定する。"
                            "例: doc-dag,wording-guard")
@@ -295,21 +303,18 @@ def parse_names(value):
 
 
 def parse_repo_url(url):
-    """URL から scheme・host・owner (所有者)・name (リポジトリ) を取り出す。読めない形なら None を返す。
+    """URL から host・owner (所有者)・name (リポジトリ) を取り出す。読めない形なら None を返す。
 
-    受け付ける形: scp 形式 (git@host:owner/name.git。scheme は scp)・ssh://・https://・git://。末尾の .git と / は除く。
+    受け付ける形: scp 形式 (git@host:owner/name.git)・ssh://・https://・git://。末尾の .git と / は除く。
     大文字と小文字はそのまま返す (比べるときは関数 source_key で小文字にそろえる)。
     """
     if not isinstance(url, str) or not url:
         return None
     m = _URL_RE.match(url)
-    if m:
-        scheme = m.group("scheme")
-    else:
+    if not m:
         m = _SCP_RE.match(url)
         if not m or "://" in url:
             return None
-        scheme = "scp"
     host = m.group("host")
     path = m.group("path").rstrip("/")
     if path.endswith(".git"):
@@ -317,7 +322,7 @@ def parse_repo_url(url):
     parts = path.split("/")
     if len(parts) != 2 or not all(parts) or not _REPO_NAME_RE.match(path):
         return None
-    return {"scheme": scheme, "host": host, "owner": parts[0], "name": parts[1]}
+    return {"host": host, "owner": parts[0], "name": parts[1]}
 
 
 def source_key(url):
@@ -357,6 +362,17 @@ def compare_versions(installed, latest):
 
 
 # ---- marketplace.json ----
+
+def _loads_json(text, what, fix):
+    """text を JSON として読み、その値を返す。読めなければ PluginsError を投げる。
+
+    what はエラーの文に書く、読んだもの (ファイルかコマンドの出力) の説明。fix は直し方。
+    """
+    try:
+        return json.loads(text)
+    except ValueError as e:
+        raise PluginsError(f"{what} を JSON として読めない: {e}", fix) from None
+
 
 def parse_marketplace(data, what):
     """marketplace.json の中身 data から、マーケットプレイスの名前・配布元 (関数 source_key の組)・プラグインの配列を読む。
@@ -411,11 +427,7 @@ def read_local_marketplace(root):
         raise PluginsError(f"{what} を読めない ({path}): {e}",
                            "リポジトリのルートに .claude-plugin/marketplace.json があることを確認する。"
                            "ルートは、このスクリプトの実体の位置から決めている") from None
-    try:
-        data = json.loads(text)
-    except ValueError as e:
-        raise PluginsError(f"{what} を JSON として読めない: {e}", "marketplace.json を JSON として正しい形に直す") from None
-    return parse_marketplace(data, what)
+    return parse_marketplace(_loads_json(text, what, "marketplace.json を JSON として正しい形に直す"), what)
 
 
 # ---- claude の出力の検査 (KTD7) ----
@@ -424,20 +436,13 @@ def _shape_error(what, detail):
     return PluginsError(f"{what} の形が想定と違う: {detail}", CLI_SHAPE_FIX)
 
 
-def _parse_output_json(text, what):
-    try:
-        return json.loads(text)
-    except ValueError as e:
-        raise PluginsError(f"{what} を JSON として読めない: {e}", CLI_SHAPE_FIX) from None
-
-
 def parse_marketplace_list(text):
     """claude plugin marketplace list --json の出力 text を検査して、要素の配列を返す。
 
     配列で、各要素が文字列の name と source を持つこと。ほかのキーは、ここでは検査しない。
     """
     what = "claude plugin marketplace list --json の出力"
-    data = _parse_output_json(text, what)
+    data = _loads_json(text, what, CLI_SHAPE_FIX)
     if not isinstance(data, list):
         raise _shape_error(what, "配列でない")
     for i, element in enumerate(data):
@@ -459,7 +464,7 @@ def parse_plugin_list(text, marketplace):
     projectPath (project / local スコープのときだけ文字列で、ほかは None)。
     """
     what = "claude plugin list --json の出力"
-    data = _parse_output_json(text, what)
+    data = _loads_json(text, what, CLI_SHAPE_FIX)
     if not isinstance(data, list):
         raise _shape_error(what, "配列でない")
     suffix = "@" + marketplace
@@ -507,15 +512,17 @@ def check_registration(local):
                            f"次のコマンドで登録してから、もう一度実行する: {add}")
     fix = (f"マーケットプレイス {name} を、配布元から登録したものにする (登録のコマンドは {add})。fork や手元のディレクトリから"
            "登録していると、インストールの取得元が配布元の main でなくなる")
+    # 取得元の種類 (要素の source) → (取得元を持つキー, そのキーの値を URL にするときに前に付ける文字列)
+    kinds = {"github": ("repo", "https://github.com/"), "git": ("url", "")}
     for m in matches:
-        if m["source"] not in ("github", "git"):
+        if m["source"] not in kinds:
             raise PluginsError(f"マーケットプレイス {name} の取得元の種類 (source が {m['source']}) が github でも git でもないので、"
                                f"取得元を配布元 ({format_source(expected)}) と比べられない", fix)
-        key = "repo" if m["source"] == "github" else "url"
+        key, prefix = kinds[m["source"]]
         value = m.get(key)
         if not isinstance(value, str):
             raise _shape_error(what, f"マーケットプレイス {name} の要素に、文字列の {key} が無い")
-        url = "https://github.com/" + value if key == "repo" else value
+        url = prefix + value
         if source_key(url) != expected:
             raise PluginsError(f"マーケットプレイス {name} の取得元 ({value}) が、配布元 ({format_source(expected)}) でない", fix)
 
@@ -579,11 +586,7 @@ def read_published(root, sha, local, names):
     if text is None:
         raise PluginsError(f"origin/main ({short}) に {MARKETPLACE_RELPATH} が無い",
                            "remote origin が配布元を指していることと、配布元の main の構成を確認する")
-    try:
-        data = json.loads(text)
-    except ValueError as e:
-        raise PluginsError(f"{what} を JSON として読めない: {e}", "配布元の main の marketplace.json を直す") from None
-    published = parse_marketplace(data, what)
+    published = parse_marketplace(_loads_json(text, what, "配布元の main の marketplace.json を直す"), what)
     fix_merge = "作業中のブランチでマーケットプレイスの名前か配布元を変えたなら、main にマージしてから実行する"
     if published["name"] != local["name"]:
         raise PluginsError(f"{what} のマーケットプレイスの名前 ({published['name']}) が、作業ツリーのもの ({local['name']}) と違う",
@@ -624,11 +627,7 @@ def read_published(root, sha, local, names):
         if text is None:
             raise PluginsError(f"origin/main ({short}) に {relpath} が無い (プラグイン {e['name']} の source.path は {e['path']})",
                                "marketplace.json の source.path と、配布元の main のディレクトリの構成を確認する")
-        try:
-            data = json.loads(text)
-        except ValueError as err:
-            raise PluginsError(f"origin/main ({short}) の {relpath} を JSON として読めない: {err}",
-                               "配布元の main の plugin.json を直す") from None
+        data = _loads_json(text, f"origin/main ({short}) の {relpath}", "配布元の main の plugin.json を直す")
         if not isinstance(data, dict) or "version" not in data:
             raise PluginsError(f"origin/main ({short}) の {relpath} にキー version が無い", "plugin.json に version を書く")
         version = data["version"]
@@ -655,6 +654,14 @@ def attach_installed(targets, installed, marketplace):
                                f"({element['version']!r}) が X.Y.Z (3 つの 10 進の整数) の形でない",
                                "claude plugin list でそのプラグインの版を確認する。このスクリプトは X.Y.Z の形の版だけを扱う")
         target["installed"].append(element)
+
+
+def find_user_element(listed, name):
+    """関数 parse_plugin_list が返した要素 listed から、プラグイン name の user スコープの要素を返す。無ければ None を返す。"""
+    for element in listed:
+        if element["name"] == name and element["scope"] == "user":
+            return element
+    return None
 
 
 def prepare(root, names):
@@ -694,7 +701,7 @@ def scope_rows(plugin):
     """
     entries = sorted(plugin["installed"], key=lambda e: SCOPES.index(e["scope"]))
     rows = [(e["scope"], e) for e in entries]
-    if not any(e["scope"] == "user" for e in entries):
+    if find_user_element(entries, plugin["name"]) is None:
         rows.insert(0, ("user", None))
     return rows
 
@@ -705,9 +712,9 @@ def status_lines(snapshot):
     plugins = snapshot["plugins"]
     rows = {p["name"]: scope_rows(p) for p in plugins}
     entries = [e for p in plugins for _, e in rows[p["name"]] if e is not None]
-    name_width = max([display_width(p["name"]) for p in plugins] + [0])
+    name_width = max((display_width(p["name"]) for p in plugins), default=0)
     scope_width = max(display_width(s) for s in SCOPES)
-    version_width = max([display_width(e["version"]) for e in entries] + [0])
+    version_width = max((display_width(e["version"]) for e in entries), default=0)
     label_width = max(display_width(label) for label in COMPARISON_LABELS.values())
 
     lines = [
@@ -750,14 +757,8 @@ def status_lines(snapshot):
 
 # ---- インストール ----
 
-class InstallAborted(Exception):
-    """変える操作の途中で中止したことを表す。message・fix・detail の意味は、クラス PluginsError と同じ。"""
-
-    def __init__(self, message, fix=None, detail=None):
-        super().__init__(message)
-        self.message = message
-        self.fix = fix
-        self.detail = detail
+class InstallAborted(ReportableError):
+    """変える操作の途中で中止したことを表す。message・fix・detail の意味は、クラス ReportableError と同じ。"""
 
 
 class InstallProgress:
@@ -777,7 +778,7 @@ class InstallProgress:
         self.current = None
         # 最新の版でインストールしたもの。要素は (対象, 再度読み込んだ user スコープの要素)
         self.installed = []
-        # 中止・中断したときの、処理中だった対象の状態 (関数 reread_outcome の値と同じ形)
+        # 中止・中断したときの、処理中だった対象の状態 (関数 outcome_known か outcome_unknown の値)
         self.outcome = None
 
     def remaining(self):
@@ -785,14 +786,6 @@ class InstallProgress:
 
     def current_is_installed(self):
         return any(t is self.current for t, _ in self.installed)
-
-
-def find_user_element(listed, name):
-    """関数 parse_plugin_list が返した要素 listed から、プラグイン name の user スコープの要素を返す。無ければ None を返す。"""
-    for element in listed:
-        if element["name"] == name and element["scope"] == "user":
-            return element
-    return None
 
 
 def is_latest(element, target):
@@ -809,15 +802,32 @@ def reread_user_element(marketplace, name):
     return find_user_element(listed, name)
 
 
+def outcome_known(element):
+    """claude plugin list --json を再度読み込めたときの、処理中だった対象の状態を返す。
+
+    element は、再度読み込んだ user スコープの要素 (無ければ None)。返す値のキー: known (読み込めたら真)・element・
+    reason (読み込めなかった理由。読み込めたときは None)。
+    """
+    return {"known": True, "element": element, "reason": None}
+
+
+def outcome_unknown(reason):
+    """claude plugin list --json を再度読み込めなかったときの、処理中だった対象の状態を返す。
+
+    reason は、読み込めなかった理由。返す値のキーは、関数 outcome_known と同じ。
+    """
+    return {"known": False, "element": None, "reason": reason}
+
+
 def reread_outcome(marketplace, target):
     """インストールが失敗した後に claude plugin list --json を再度読み込み、対象 target の状態を返す (R15・KTD8)。
 
-    返す値のキー: known (読み込めたら真)・element (user スコープの要素。無ければ None)・reason (読み込めなかった理由)。
+    返す値は、関数 outcome_known か outcome_unknown の値。
     """
     try:
-        return {"known": True, "element": reread_user_element(marketplace, target["name"]), "reason": None}
+        return outcome_known(reread_user_element(marketplace, target["name"]))
     except PluginsError as e:
-        return {"known": False, "element": None, "reason": e.message}
+        return outcome_unknown(e.message)
 
 
 def _progress(text):
@@ -859,11 +869,11 @@ def install_targets(progress):
         try:
             element = reread_user_element(marketplace, name)
         except PluginsError as e:
-            progress.outcome = {"known": False, "element": None, "reason": e.message}
+            progress.outcome = outcome_unknown(e.message)
             raise InstallAborted(f"プラグイン {name} のインストールの後、claude plugin list --json を再度読み込めなかったので、"
                                  f"中止した ({e.message})", e.fix, e.detail) from None
         if not is_latest(element, target):
-            progress.outcome = {"known": True, "element": element, "reason": None}
+            progress.outcome = outcome_known(element)
             if element is None:
                 actual = "user スコープにインストールされていない"
                 fix = (f"{STATUS_HINT}。インストールされていなければ、claude plugin install {name}@{marketplace} --scope user を"
@@ -942,12 +952,7 @@ def report_install_stop(progress, message, fix=None, detail=None):
     for line in install_report_lines(progress, aborted=True):
         print(line, file=sys.stderr)
     print("", file=sys.stderr)
-    _print(message)
-    if detail:
-        for line in detail.splitlines():
-            print("  " + line, file=sys.stderr)
-    if fix:
-        _print(f"直し方: {fix}")
+    _print_error(message, fix, detail)
 
 
 # ---- サブコマンド ----
@@ -962,7 +967,7 @@ def cmd_install(snapshot):
     """user スコープにインストールされていない対象を、user スコープにインストールする (R13・R15〜R18・KTD8・KTD9)。"""
     marketplace = snapshot["marketplace"]
     plugins = snapshot["plugins"]
-    present = [p["name"] for p in plugins if any(e["scope"] == "user" for e in p["installed"])]
+    present = [p["name"] for p in plugins if find_user_element(p["installed"], p["name"]) is not None]
     targets = [p for p in plugins if p["name"] not in present]
     if present:
         _progress(f"user スコープにインストール済みのもの (版が古くても扱わない): {', '.join(present)}")
@@ -995,14 +1000,22 @@ def _print(text):
     print(f"{PROG}: {text}", file=sys.stderr)
 
 
-def report_precondition_error(message, fix=None, detail=None):
-    """前提の検査か読み取りのエラーを、直し方と、何も変えていないことを添えて標準エラー出力に書く。"""
+def _print_error(message, fix=None, detail=None):
+    """エラーの文を標準エラー出力に書く。message の行、detail の各行を空白 2 文字で字下げした行、直し方 fix の行の順にする。
+
+    message・fix・detail の意味は、クラス ReportableError と同じ。detail と fix は、無ければ書かない。
+    """
     _print(message)
     if detail:
         for line in detail.splitlines():
             print("  " + line, file=sys.stderr)
     if fix:
         _print(f"直し方: {fix}")
+
+
+def report_precondition_error(message, fix=None, detail=None):
+    """前提の検査か読み取りのエラーを、直し方と、何も変えていないことを添えて標準エラー出力に書く。"""
+    _print_error(message, fix, detail)
     _print(f"{NOTHING_CHANGED}。前提の検査か読み取りでエラーになったので、変える操作の前に終了した。")
 
 
