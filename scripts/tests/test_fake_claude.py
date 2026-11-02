@@ -211,6 +211,16 @@ class FakeClaudeTest(plugintest.PluginTestCase):
         r = self.run_claude("plugin", "list", "--json")
         self.assertEqual((r.returncode, r.stdout), (0, "[{\"scope\": \"user\"}]"), "指定した標準出力をそのまま返すこと")
 
+    def test_fault_bad_utf8_writes_undecodable_stdout(self):
+        self.write_state({"faults": [{"prefix": ["plugin", "install", WG], "action": "bad_utf8"}]})
+        before = self.read_state()
+        r = subprocess.run(["claude", "plugin", "install", WG, "--scope", "user", "--json"], env=self.env, cwd=self.root,
+                           stdin=subprocess.DEVNULL, capture_output=True, timeout=plugintest.TIMEOUT)
+        self.assertEqual(r.returncode, 0, "UTF-8 として読めない出力を指定したコマンドは、終了コード 0 を返すこと")
+        with self.assertRaises(UnicodeDecodeError, msg="標準出力が UTF-8 として読めないこと"):
+            r.stdout.decode("utf-8")
+        self.assertEqual(self.read_state(), before, "状態を変えないこと")
+
     def test_fault_skip_lets_earlier_calls_through(self):
         self.write_state({"faults": [{"prefix": ["plugin", "list", "--json"], "action": "fail", "skip": 1}]})
         codes = [self.run_claude("plugin", "list", "--json").returncode for _ in range(3)]

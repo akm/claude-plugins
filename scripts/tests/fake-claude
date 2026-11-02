@@ -34,6 +34,7 @@
              no_change  状態を変えずに、終了コード 0 で終える (成功を返して版を変えない)
              sigint     状態を変えずに、親のプロセスに SIGINT (Ctrl-C と同じシグナル) を送る。親が終了させるまで待機し、
                         定数 SIGINT_WAIT の秒数がたっても終了させられなければ、終了コード 130 で終える
+             bad_utf8   状態を変えずに、UTF-8 として読めないバイト列を標準出力に書いて、終了コード 0 で終える
     stdout   標準出力に書く文字列 (省略時は空)。no_change で `plugin list --json` の出力を差し替えるのにも使う
     stderr   標準エラー出力に書く文字列 (省略時は、fail のときだけ決まった文を書く)
     skip     一致した呼び出しのうち、先頭からこの数だけは action を行わずに通す (省略時は 0)
@@ -133,6 +134,10 @@ def apply_fault(fault, args):
         respond(stdout, f"fake-claude: 状態のファイルの指定で失敗する: {args!r}\n" if stderr is None else stderr, 1)
     if action == "no_change":
         respond(stdout, stderr or "", 0)
+    if action == "bad_utf8":
+        sys.stdout.buffer.write(b"\xff\xfe\n")
+        sys.stdout.flush()
+        sys.exit(0)
     if action == "sigint":
         write_output(stdout, stderr or "")
         os.kill(os.getppid(), signal.SIGINT)

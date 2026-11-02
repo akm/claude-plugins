@@ -886,10 +886,14 @@ def install_targets(progress):
             if outcome["known"] and is_latest(outcome["element"], target):
                 progress.installed.append((target, outcome["element"]))
             progress.outcome = outcome
-            # 確認を求めて失敗したかは、出力を解析しない (docstring の方針) ので分からない。claude が終了コード 0 以外で
-            # 終了したとき (起動できない・タイムアウトでないとき) は、確認を求めて失敗したときの進め方を添える
+            # 確認を求めて失敗したかは、出力を解析しない (docstring の方針) ので分からない。次のどちらにも当たるときに、
+            # 確認を求めて失敗したときの進め方を添える。
+            # - claude が終了コード 0 以外で終了した (起動できない・タイムアウト・出力を UTF-8 として読めないときは、
+            #   returncode が None で、確認を求めて失敗したのではない)
+            # - 再度読み込んだ結果で、インストールされていると分からなかった (インストールされていないか、読み込めなかった)。
+            #   インストールされていると分かったときに添えると、処理中だったものの行と矛盾する
             fix = e.fix
-            if e.returncode is not None:
+            if e.returncode is not None and outcome["element"] is None:
                 fix = (f"{e.fix}。マーケットプレイスが宣言したコマンドの確認を求めて失敗したときは、端末で "
                        f"claude plugin install {name}@{marketplace} --scope user を実行し、表示されたコマンドを確認してから"
                        "インストールする (このスクリプトは確認を代わりに行わず、-y を付けない)")

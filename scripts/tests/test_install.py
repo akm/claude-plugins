@@ -40,6 +40,8 @@ UPDATE = ["plugin", "marketplace", "update", MP]
 RESTART = "Claude Code を再起動する"
 UNKNOWN = "版が変わったか分からない"
 STATUS_HINT = "make plugins-status"
+# インストールが確認を求めて失敗したときの進め方 (中止の文の直し方) の一部
+CONFIRM_GUIDE = "を実行し、表示されたコマンドを確認してからインストールする"
 
 
 def install_args(name):
@@ -255,6 +257,16 @@ class AbortTest(InstallTestCase):
         self.assertIn("インストールしたもの (user スコープ): wording-guard 0.28.0, doc-dag 0.2.0", lines,
                       "再度読み込んで最新の版で入っていたものは、インストールしたものとして示すこと")
         self.assertIn("処理しなかったもの: pr-teeth", lines)
+        self.assertNotIn(CONFIRM_GUIDE, r.stderr,
+                         "再度読み込んでインストールされていると分かったときは、確認の進め方を示さないこと")
+
+    def test_install_output_not_utf8_shows_no_confirm_guide(self):
+        self.set_state(faults=[{"prefix": install_args("doc-dag"), "action": "bad_utf8"}])
+        r = self.run_install()
+        self.assert_aborted(r)
+        self.assertIn("UTF-8 として読めない", r.stderr, "出力を読めないことを中止の文で示すこと")
+        self.assertNotIn(CONFIRM_GUIDE, r.stderr,
+                         "claude の終了コードで失敗したのでないとき (returncode が None) は、確認の進め方を示さないこと")
 
     def test_success_without_latest_version(self):
         cases = [
