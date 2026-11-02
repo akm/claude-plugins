@@ -223,6 +223,8 @@ class AbortTest(InstallTestCase):
         self.assertIn("処理中だったもの: doc-dag は、user スコープにインストールされていない (再度読み込んだ結果)", lines,
                       "再度読み込んだ、失敗したプラグインの実際の状態を示すこと (R15)")
         self.assertIn("処理しなかったもの: pr-teeth", lines, "処理しなかったプラグインの名前を示すこと")
+        self.assertIn(f"claude plugin install doc-dag@{plugintest.MARKETPLACE} --scope user を実行し", r.stderr,
+                      "確認を求めて失敗したときに、端末でインストールする進め方を直し方で示すこと")
         self.assertIn(RESTART, r.stderr, "中止したときも、インストールしたものがあれば再起動の案内を表示すること (R18)")
         error = error_text(r)
         self.assertIn("doc-dag", error, "エラーの文に、失敗したプラグインの名前を書くこと")

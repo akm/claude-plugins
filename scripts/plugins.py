@@ -63,8 +63,10 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
   2. claude plugin marketplace update <マーケットプレイスの名前> で、マーケットプレイスの定義を取得し直す。clone が古いと
      古い版が入り、clone を取得した後に足したプラグインは見つからないため
   3. 選んだものを 1 つずつ、claude plugin install <名前>@<マーケットプレイスの名前> --scope user --json でインストールする。
-     -y は付けない (マーケットプレイスが宣言したコマンドを、利用者の確認なしに受け入れないため)。成功するたびに
-     claude plugin list --json を再度読み込み、user スコープの版が最新の版と同じかを検査する
+     -y は付けない (マーケットプレイスが宣言したコマンドを、利用者の確認なしに受け入れないため)。宣言したコマンドを持つ
+     プラグインは、標準入出力が端末でないので確認を求められずにインストールが失敗し、中止する。そのときの進め方 (端末で
+     claude plugin install を実行し、表示されたコマンドを確認してからインストールする) は、中止の文の直し方で示す。
+     成功するたびに claude plugin list --json を再度読み込み、user スコープの版が最新の版と同じかを検査する
   4. 標準出力に、インストールしたものの一覧と、実行の後の案内を表示する
 変える操作の出力は解析しない。成否は、終了コードと、その後の再度の読み込みで判定する。進み具合 (取得し直すこと・
 インストールするもの・インストールしたもの) は、そのたびに標準出力に表示する。
@@ -884,8 +886,15 @@ def install_targets(progress):
             if outcome["known"] and is_latest(outcome["element"], target):
                 progress.installed.append((target, outcome["element"]))
             progress.outcome = outcome
+            # 確認を求めて失敗したかは、出力を解析しない (docstring の方針) ので分からない。claude が終了コード 0 以外で
+            # 終了したとき (起動できない・タイムアウトでないとき) は、確認を求めて失敗したときの進め方を添える
+            fix = e.fix
+            if e.returncode is not None:
+                fix = (f"{e.fix}。マーケットプレイスが宣言したコマンドの確認を求めて失敗したときは、端末で "
+                       f"claude plugin install {name}@{marketplace} --scope user を実行し、表示されたコマンドを確認してから"
+                       "インストールする (このスクリプトは確認を代わりに行わず、-y を付けない)")
             raise InstallAborted(f"プラグイン {name} のインストールが失敗したので、中止した ({e.message})",
-                                 e.fix, e.detail) from None
+                                 fix, e.detail) from None
         try:
             element = reread_user_element(marketplace, name)
         except PluginsError as e:
