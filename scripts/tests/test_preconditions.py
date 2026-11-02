@@ -198,6 +198,21 @@ class RegistrationTest(ScriptTestCase):
                 self.write_state({"marketplaces": [entry]})
                 self.assert_stopped_without_change(self.run_script("status"), "取得元")
 
+    def test_registration_ref_and_path(self):
+        accepted = [{"name": MP, "source": "github", "repo": "akm/claude-plugins", "ref": "main"},
+                    {"name": MP, "source": "github", "repo": "akm/claude-plugins", "path": ""}]
+        for entry in accepted:
+            with self.subTest(entry=entry):
+                self.write_state({"marketplaces": [entry]})
+                self.assertEqual(self.latest(self.prepare()), PUBLISHED, "ref が main か path が空の登録は受け付けること")
+        rejected = [({"name": MP, "source": "github", "repo": "akm/claude-plugins", "ref": "dev"}, "ref"),
+                    ({"name": MP, "source": "git", "url": "https://github.com/akm/claude-plugins.git", "ref": "v1.0.0"}, "ref"),
+                    ({"name": MP, "source": "github", "repo": "akm/claude-plugins", "path": "sub"}, "path")]
+        for entry, fragment in rejected:
+            with self.subTest(entry=entry):
+                self.write_state({"marketplaces": [entry]})
+                self.assert_stopped_without_change(self.run_script("status"), fragment)
+
     def test_credentials_in_registered_url_are_hidden(self):
         self.write_state({"marketplaces": [{"name": MP, "source": "git",
                                             "url": "https://x-access-token:ghp_SECRET123@github.com/someone/claude-plugins.git"}]})
@@ -334,6 +349,7 @@ class PublishedFilesTest(ScriptTestCase):
             ("配布元", marketplace_with(names, {n: {"url": "https://github.com/someone/claude-plugins"} for n in names})),
             ("git-subdir", marketplace_with(names, {"doc-dag": {"source": "url"}})),
             ("ref", marketplace_with(names, {"pr-teeth": {"ref": "develop"}})),
+            ("sha", marketplace_with(names, {"wording-guard": {"sha": "0123456789abcdef0123456789abcdef01234567"}})),
         ]
         for fragment, data in cases:
             with self.subTest(fragment=fragment):

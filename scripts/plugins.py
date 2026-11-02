@@ -31,12 +31,14 @@ Key Decisions (KD)・Key Technical Decisions (KTD) の番号。
      github.com の URL で、すべて同じ配布元を指す
   4. マーケットプレイスが登録されている (claude plugin marketplace list --json)。登録されていなければ、登録するコマンドを
      表示する。登録は利用者の環境に設定を足す操作なので、このスクリプトでは行わない
-  5. 登録したマーケットプレイスの取得元が配布元である。akm/claude-plugins の形で登録したものも、URL の形で登録したものも
-     受け付ける
+  5. 登録したマーケットプレイスの取得元が配布元の main である。akm/claude-plugins の形で登録したものも、URL の形で登録した
+     ものも受け付ける。ref (ブランチやタグ) を付けて登録したものは ref が main のときだけ、path を付けて登録したものは path が
+     空のときだけ受け付ける
   6. remote origin の URL (git config --get remote.origin.url の値) が配布元を指す
   7. git fetch で origin の main を取得できる。失敗したときは、手元にある古い origin/main を使わない
   8. 取得した直後の origin/main の SHA にある marketplace.json の、マーケットプレイスの名前と配布元が、作業ツリーのものと同じ。
-     各プラグインの source が git-subdir で、ref が main。marketplace.json と plugin.json は、どれもこの SHA から読む
+     各プラグインの source が git-subdir で、ref が main で、sha (取得するコミットを固定するキー) が無い。marketplace.json と
+     plugin.json は、どれもこの SHA から読む
   9. --plugins の名前が、すべて origin/main の marketplace.json に載っている
   10. 対象のプラグインの plugin.json が origin/main にあり、version が X.Y.Z (3 つの 10 進の整数) の形である
   11. claude plugin list --json の出力が、必要なキーを持つ。キーを検査するのは、このマーケットプレイスのプラグインの要素だけ。
@@ -538,8 +540,8 @@ def check_registration(local):
         raise PluginsError(f"マーケットプレイス {name} が登録されていない。登録は利用者の環境に設定を足す操作なので、"
                            "このスクリプトでは行わない",
                            f"次のコマンドで登録してから、もう一度実行する: {add}")
-    fix = (f"マーケットプレイス {name} を、配布元から登録したものにする (登録のコマンドは {add})。fork や手元のディレクトリから"
-           "登録していると、インストールの取得元が配布元の main でなくなる")
+    fix = (f"マーケットプレイス {name} を、配布元の main から登録したものにする (登録のコマンドは {add})。fork・手元のディレクトリ・"
+           "main 以外の ref から登録していると、インストールの取得元が配布元の main でなくなる")
     # 取得元の種類 (要素の source) → (取得元を持つキー, そのキーの値を URL にするときに前に付ける文字列)
     kinds = {"github": ("repo", "https://github.com/"), "git": ("url", "")}
     for m in matches:
@@ -554,6 +556,14 @@ def check_registration(local):
         if source_key(url) != expected:
             shown = hide_credentials(value)
             raise PluginsError(f"マーケットプレイス {name} の取得元 ({shown}) が、配布元 ({format_source(expected)}) でない", fix)
+        # ref と path は、取得する内容を変える。配布元の main を取得するのは、ref が無いか main で、path が無いか空のときだけ
+        ref = m.get("ref")
+        if ref not in (None, "main"):
+            raise PluginsError(f"マーケットプレイス {name} を ref {ref!r} を付けて登録している。取得元が配布元の main でない", fix)
+        path = m.get("path")
+        if path not in (None, ""):
+            raise PluginsError(f"マーケットプレイス {name} を path {path!r} を付けて登録している。"
+                               "配布元のマーケットプレイスは、リポジトリのルートにある", fix)
 
 
 def check_origin(root, local):
@@ -633,6 +643,10 @@ def read_published(root, sha, local, names):
         if source.get("ref") != "main":
             raise PluginsError(f"{what} のプラグイン {plugin_name} の source.ref ({source.get('ref')!r}) が main でない",
                                "インストールの取得元は配布元の main だけにする。source.ref を main にする")
+        if "sha" in source:
+            raise PluginsError(f"{what} のプラグイン {plugin_name} の source に sha ({source.get('sha')!r}) がある。"
+                               "sha があると、main の先端ではなく、そのコミットを取得する",
+                               "インストールの取得元は配布元の main だけにする。source.sha を消す")
         relpath = plugin_json_path(source.get("path"))
         if relpath is None:
             raise PluginsError(f"{what} のプラグイン {plugin_name} の source.path ({source.get('path')!r}) が、"
