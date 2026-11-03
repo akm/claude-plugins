@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>btrx798il</task-id>
+<tool-use-id>toolu_0194hHy3mHvMy2knwNYmogfJ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/a8111d06-1d30-48e8-9b76-e363fe6486f5/tasks/btrx798il.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the whole issue-dispatch test suite" completed (exit code 0)</summary>
+</task-notification>
