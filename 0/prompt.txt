@@ -1,0 +1,2 @@
+1. OK
+2. /review-triage:review-request skill:code-review model:sonnet effort:high
