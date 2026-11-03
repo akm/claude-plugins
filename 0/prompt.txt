@@ -1,0 +1,166 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>Bash, Edit, Read, Skill, ToolSearch, Write, mcp__Claude_Browser__computer, mcp__Claude_Browser__navigate, mcp__ccd_pr__get_status, mcp__ccd_turn__update_plan, mcp__ccd_turn__wrap_up</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+
+   Issue #135 asks to replace kun-reading words that are literal translations of English ("待ち", "問い", "尋ねる", "欠け", "確かめる", "置き場", and so on). The work, defined in the request file `tmp/request-issue-135.md`, is:
+   - Inventory the words and decide each one with the user. Never decide alone.
+   - Record the decisions in `.claude/akm-claude-plugins/wording-guard/terms.toml`.
+   - Fix docs, then code comments and docstrings, then test docstrings, then code strings (CLI help, error texts, test assertion messages, hook outputs; not log messages).
+   - Commit per word, following the motive-grouping rules.
+   - Review through review-request (code-review opus), run by the user in another session, then review-triage and review-triage-fix.
+   - After converging, push and open a PR to main, but only with the user's approval.
+
+   The user split the work into 4 PRs:
+   1. terms.toml, CLAUDE.md, root docs and small plugins: done, PR #138, merged at 621e3b5.
+   2. issue-dispatch: current.
+   3. review-triage: includes the 周回 → ループ and 回 1 → 1 回目 fixes from #87, plus CONCEPTS.md's review-loop section (周回, 周回の置き場 → ループのディレクトリ, 完了の印 → 完了のフラグファイル, 書く側, 終わり方 reference) and the root README tree comments with 周回.
+   4. Metaphors (検証の前払い・狂わせる・〜側): word-by-word proposals still to be asked.
+
+   Latest explicit request: "PR2 (issue-dispatch の言い換え) を main から新しいブランチで始めてください。"
+
+2. Key Technical Concepts:
+
+   - **wording-guard**
+     - `python3 wording-guard/scripts/wording_lint.py check <md>` or `check --stdin --filename x.md`; `terms` validates the terms file.
+     - textlint with prh rules. The allowlist filter takes the exceptions and allow entries.
+     - Text inside 「」 is excluded from checking.
+     - The PostToolUse hook blocks Write when the written text contains avoided words.
+   - **terms.toml entries**: pattern (JS regex in /…/), verdict avoid/allow, replacements, exceptions, reason, decided_in.
+   - **issue-dispatch comment header format**: `issue-dispatch | <role> | <name> | <session-id> | <種類> | <値>...`.
+     - Constants live in `issue-dispatch/scripts/issue_dispatch/comments.py` (MANAGER_KINDS, REQUEST_KINDS, WAIT_KINDS, VALUE_WORDS).
+     - `_split_value` matches the longest value word first.
+   - **review-triage workflow**
+     - Judgment flow D1–D8, E1/E2, A1/A2/H1–H7/R1–R3. Record YAML at `tmp/review-triages/docs-replace-kunyomi-literal-terms-135.yaml`, which is untracked.
+     - triagecheck commands:
+       - `ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/triagecheck . -current-dir "$PWD" -record-dir tmp/review-triages -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md -summary-command "triagecheck -write-summary" [-write-summary]`
+     - lineorigin for D8: `go run -C review-triage/tools/lineorigin . -root <abs> -base c15761e -file F -lines N -rev SHA`.
+     - nearedges: `git diff --cached -- '*.md' | go run -C review-triage/tools/nearedges . -root "$(pwd)" -hints`.
+     - doc-dag plus mermaid-preview diagrams in `tmp/*.html`.
+     - Convergence rules: (a) a full run with 0 adopted, or (b) the incremental run right after a post-convergence full run with 0 adopted.
+     - Threshold N=5: from round 6 on, ask the user who plans (stage 2).
+   - **Tests**: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s issue-dispatch/tests` (508 tests, about 105s). Quick subsets: `-p 'test_itemstate.py'`, `-p 'test_judge.py'`.
+
+3. Files and Code Sections:
+
+   - **Scratchpad** `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/scratchpad` ($S):
+     - `termcount.py`: `count <paths>` / `list <pattern> <paths>`. Uses the terms.toml avoid entries from #135 plus 周回, and skips terms.toml.
+     - `apply_map.py`: `apply_map.py <tsv regex\treplacement> <paths>`. Applies regexes in order to git ls-files of the paths; skips terms.toml.
+     - `apply_spec.py`: `apply_spec.py <tsv file\told\tnew>`. Replaces all occurrences in a file; fails without writing if a line has no match.
+     - `commit.sh`: defines `commit()`. It checks the message with wording_lint --stdin (requires "error 0 件・warning 0 件"), then runs `git add -u && git commit -q -F $1 --trailer 'Rules-Checked: yes'`. Use it via `source $S/commit.sh`.
+     - `env.sh`: PR1 path list.
+     - `id-files.txt`: issue-dispatch tracked files excluding `tests/fixtures/gh/*.stdout|stderr`.
+     - `map-tashikame.tsv`: conjugation map for 確かめ.
+   - **`.claude/akm-claude-plugins/wording-guard/terms.toml`** (merged in PR1): avoid entries for the #135 words, the 周回 entry (decided_in #87), the 目印 entry, allow entries, and a header comment with the criteria for 振る舞い and 誤り. Key patterns now:
+     - 待: `/(?<![一-龯々ァ-ヶー])待ち|待(つ|た|て|っ)/`
+     - 止: `/(?<![一-龯々])止(ま|め|っ)/`; its reason says forms after a kanji are not detected, "目で確認する".
+     - 知らせ: `/知らせ(?![るずてたなまれらよ、])/`
+     - 決まり: `/決まり(?![ま、])/`
+     - 続き exceptions: ["手続き","引き続き","続き、","続きま"]
+     - 並び: `/並び(?![順替])/` with exceptions ["並び、","並びま"]
+     - 終わ exceptions: ["` で終わ","で終わる名前","で終わる文字列"]
+     - 読み直 replacements: ["再確認","通読する","再度読み込む"]
+   - **PR2 branch** `docs/replace-kunyomi-literal-terms-issue-dispatch-135`, commits so far:
+     - 9b14375 答え → 回答 (WAIT_KINDS `利用者の回答`)
+     - 1af060e 待 → 待機 (`依存の待機`, `待機する Issue`, `待機する Issue の宣言`)
+     - 2db37d0 書き直 → 修正/上書き (`宣言の修正`; flow.md "**質問の対象と宣言の修正**"; judge.py docstring reference updated)
+     - 456939d fix: file-kinds.md "回答し、"
+     - ec2fe17 問い → 質問/判定の条件 (file-kinds.md heading "## 6 段の判定の条件と種類", column "判定の条件", line "種類は、パスに次の判定の条件を上から順に当てはめ、…"; filekinds.py comments)
+     - 1a4e1fd 尋ね → 質問する
+     - 52928f4 確かめ → 確認
+     - 232ce38 欠け → 欠損/無い
+   - **Memory** `/Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/memory/issue-135-kunyomi-progress.md` and the MEMORY.md index line: progress tracking, PR1 merged, next PR2.
+   - **Local notes** `tmp/issue-135-terms-proposal.md` (decision records) and `tmp/pr-body-135-1.md` (PR #138 body).
+
+4. Errors and fixes:
+
+   - **zsh word splitting**: unquoted `$PR1` and `$d` did not split. Fixed with `${=VAR}`. `$h:session…` was read as a zsh modifier.
+   - **Hook flagged "の列"** in a tmp doc: changed to "表の列".
+   - **Applied 4 words at once in PR1**: reverted with `git checkout -- .` and applied them one word per commit.
+   - **Wrong hook name in a commit message** (Stop → UserPromptSubmit): fixed with `--amend` before pushing.
+   - **Commit messages containing avoided words** (書き直し, 確かめる, 置く): rephrased before committing.
+   - **Wrong claim in the P1 option text** about prefix overlap of `待機する Issue の宣言`: corrected; `_split_value` is longest-first.
+   - **Record YAML `options` written as a list**: triagecheck rejected it; changed to the `|-` string form.
+   - **Wrong "59 か所" in the investigation scope**: corrected to "57 行".
+   - **Version-history check failed (zsh) but the commit message claimed it**: re-verified the history (0.1.0 → 0.1.1); the claim was correct.
+   - **PR2 答え map turned the 連用形 "答え、" into "回答、"**: fixed in a separate commit (456939d) to "回答し、" in file-kinds.md. resources.py "資源への回答、" is a noun and is correct.
+   - **"回答が待機するなら"**: changed to "回答が wait なら".
+   - **User feedback**:
+     - Choose 振る舞い/動作 by context.
+     - 書き込み元 ↔ 読み込み先.
+     - 言い回し → 表現.
+     - 待つ → 待機する.
+     - 誤り → ミス for human mistakes.
+     - 目印 → マーク.
+     - "1 回目".
+     - Option B for the 止 pattern.
+     - Do not enable Auto-fix.
+
+5. Problem Solving:
+
+   - Confirmed there are no old-format issue-dispatch comments anywhere (verify repos, user and org search, no local management directory). No compatibility reading is needed.
+   - The surface-pattern trade-off for 止 was resolved by the user's option B: accept missing detections, avoid false positives.
+   - The doc-dag checks found only duplications that already existed before this branch.
+
+6. All user messages:
+
+   - "/Users/akima/workspace/claude-plugins/tmp/request-issue-135.md"
+   - Q1/Q2 answers: "12 の「振る舞い」は仕様としてあるべき動作を表す言葉として「動作」よりも適切な場合もあるので、文脈に依存します。13 と 14 の書き手と読み手ですが「書き込み元」に対しては「読者」ではなく「読み込み先」( 文章の主体次第では「読み込み元」の場合もある) の方が自然な場合が多いと思います。Q2. 「言い回し」は[表現方法」「語彙選択」が良いと思いますが、どうでしょう？ 「〜待ち」はOKだとして「待つ」は「待機する」の方が良いです。「誤り」はOKな場合もありますが「ミス」「単純なミス」の場合が正しい場合もあります。"
+   - "Q3. 「完了のフラグファイル」が良いです Q4. 今回直しましょう Q5. 直します Q6. 調査してください Q7. はい Q8. OKです Q9. 追加のPR直しましょう"
+   - "N1. OK N2. はい、直します R1. OK R2. OK R3. OK R4. はい R5. はい R6. はい"
+   - "別のセッションでレビューを走らせます。結果が出たら知らせます。" (repeated for each round)
+   - /review-triage:review-triage-fix with args "1. 「1 回目」「N+1 回目以降」 2. 「マーク 」の方が自然だと思います。"
+   - /review-triage:review-triage with the result paths, once per round.
+   - "1. はい 2. はい /review-triage:review-triage-fix" (bump versions = yes; 目印 order = yes)
+   - "P1 は案 B (マークは v1 のまま、handoff-resume の手順 4 に古い節の名前を書く) で直してください。版は各プラグインとも patch で上げてください。"
+   - "採択した 1 件を review-triage-fix で直してください。" (several times)
+   - "案 B (前が漢字なら外す形に戻し、reason に「漢字に続く形は検出しないので、目で確かめる」と書く) で直してください。"
+   - "ブランチを push して、tmp/pr-body-135-1.md の本文で main への PR を作ってください。"
+   - "Auto-fix は有効にしなくてよいです。"
+   - "#138 をマージしました"
+   - "PR2 (issue-dispatch の言い換え) を main から新しいブランチで始めてください。"
+
+7. Pending Tasks:
+
+   - **PR2 words, one commit per word** (issue-dispatch, excluding fixtures/gh data):
+     - 終わ 129 (current), 止 56, 綴り 51, 書き手 37 (投稿者 / 書き込み元 / 筆者), 続き 34, 印 32 (フラグ / 接頭辞 etc.), 見分け 25, 置き場 23 (ディレクトリ etc.; 記録の置き場 → 記録のディレクトリ), 並び 20, 取り下げ 20 (撤回), 出どころ 13 (取得元; flow.md column), 読み直 13, 決まり 8, 戻り 6, 知らせ 5, 食い違 3, 書く側 / 読む側 2, 見立て 1.
+     - Also check 目印 and 言い回し in issue-dispatch.
+     - Then 振る舞い (spec vs observed) and 誤り → ミス by the criteria.
+   - Run the full tests per commit, bump issue-dispatch's plugin.json version (patch), create a full-review request (review-request code-review opus), and follow the review loop.
+   - PR3 (review-triage plus CONCEPTS.md / root README items) and PR4 (metaphors; the word-by-word proposal is still to be asked) come later.
+
+8. Current Work:
+
+   Processing the word 終わ in PR2. I had just listed the forms. Examples:
+   - "正常な終わり" (normal end of an assignment)
+   - "割り当ての終わり"
+   - "終わる条件" (heading "### 終わる条件と標準出力", column "| 待機 | 終わる条件 | 終わりの行 |" in observation.md)
+   - "終わりの行" (wait output line)
+   - "終了コード 6 で終わる"
+   - "修正を頼んで終わる"
+   - "では終わらない"
+   - "終わった後"
+   - end-of-string uses: "`|` で終わる名前", "`.tmp` で終わる名前", "(/. で終わる場合", "tmp` で終わる)"
+   - "# --- 終わりと" (a code section comment)
+
+   The planned replacements:
+   - Process, command or wait termination → 終了 (終わる条件 → 終了の条件; 終わりの行 → 終了の行; 終了コード N で終わる → 終了する).
+   - Assignment or work → 完了 (正常な終わり → 正常な完了; 割り当てが終わった後 → 割り当てが完了した後; では終わらない → では完了しない).
+   - End-of-string uses stay as they are.
+
+   Headings and table columns that change, together with the tests and code that reference them, must change consistently in the same commit.
+
+9. Optional Next Step:
+
+   Continue PR2 per the user's request "PR2 (issue-dispatch の言い換え) を main から新しいブランチで始めてください。":
+   1. Build the 終わ replacements for `$(cat $S/id-files.txt)`, splitting 終了 and 完了 by context and keeping the end-of-string uses. Apply them through apply_map or apply_spec.
+   2. Verify with `termcount.py list 終わ issue-dispatch`.
+   3. Run the full issue-dispatch tests.
+   4. Commit with a message checked by wording_lint, e.g. "📝 docs(issue-dispatch): 「終わる」を、終了・完了のうち指すものに合う語に言い換える (#135)".
+   5. Proceed to 止, 綴り, 書き手, and the rest, one commit per word.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
