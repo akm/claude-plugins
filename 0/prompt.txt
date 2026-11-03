@@ -1,0 +1,11 @@
+$ claude plugin marketplace update akm-claude-plugins
+Refreshing marketplace cache (timeout: 120s)…
+✔ Successfully updated marketplace: akm-claude-plugins
+
+は成功したのですが
+
+$ claude plugin update commit-rules-guard
+Checking for updates for plugin "commit-rules-guard" at user scope…
+✘ Failed to update plugin "commit-rules-guard": Plugin "commit-rules-guard" not found
+
+こちらは失敗しました。なぜでしょうか？
