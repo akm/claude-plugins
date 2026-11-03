@@ -1,0 +1,7 @@
+リポジトリ akm/claude-plugins のルートの README.md の「構成」の節 (ディレクトリの木の図) に、review-triage プラグインの同梱ツール `review-triage/tools/nearedges/` (Markdown の修正の差分から読み直す範囲を列挙する Go ツール。go.mod を持ち、CI の対象の一覧 `.github/test-targets.txt` には `go review-triage/tools/nearedges` として載っている) が載っていない。
+
+やること:
+- README.md の「構成」の図で、`review-triage/` の下の `tools/triagecheck/` の行の次に `tools/nearedges/` の行を足す。コメントは triagecheck の行に倣い、役割とテストのコマンド (`go test ./...`) を書く。役割の書き方は `review-triage/README.md` の「同梱の道具 (nearedges)」の節と `review-triage/tools/nearedges/README.md` を参照する。
+- 文書の言い回しの規則はリポジトリの CLAUDE.md に従う。
+- コミットは README の修正だけの 1 つにする (コミットルールは動機ごとに分ける)。
+- ブランチは main から切る。PR は作らない。
