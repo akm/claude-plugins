@@ -1,0 +1,6 @@
+<cross-session-message from="local_6d9b774b-8188-44ca-85fe-5d99cc4ab850">
+review-rally 20261101-1904-feat-review-request-target-dir-151 20261101-2017-feat-review-request-target-dir-151-10-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-dc84b9/tmp/review-rally/20261101-1904-feat-review-request-target-dir-151/review-20261101-2017-feat-review-request-target-dir-151-10-code-review-claude-opus-5-5.yaml
+- skill: Skill ツールで code-review を呼んだ (引数 "high 1d454bac..af82d2e2")。実際に渡した effort は high、モデルは claude-opus-5-5 (このセッションのモデル。skill にモデルの引数は無い)。
+- 指摘 4 件 (P2 が 1 件、P3 が 3 件)、residual 3 件。結果の YAML は safe_load で読め、トップレベルのキーは様式どおり。
+- HEAD はレビューの前後とも af82d2e2848efcc554aee54acf7059f55a9bdd28 で、git status --porcelain は前後とも空 (出力先は無視されるディレクトリにある)。作ったファイルは出力先の 1 つだけ。
+</cross-session-message>
