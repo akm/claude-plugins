@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>by2jm7gtn</task-id>
+<tool-use-id>toolu_01GpbpTr5Ch6M4dLJJbyus5a</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f7f0f00c-438d-4e02-82ff-a0c3c321ae66/tasks/by2jm7gtn.output</output-file>
+<status>completed</status>
+<summary>Background command "review-triage のテスト・Go のテスト・triagecheck の検査を実行する" completed (exit code 0)</summary>
+</task-notification>
