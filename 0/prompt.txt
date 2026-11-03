@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>br1gdi5py</task-id>
+<tool-use-id>toolu_01Nekpi8A2fLeU1UXW8qvJbK</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/br1gdi5py.output</output-file>
+<status>completed</status>
+<summary>Background command "wording-guard・Go のツール・issue-dispatch のテストと、記録の検査を走らせる" completed (exit code 0)</summary>
+</task-notification>
