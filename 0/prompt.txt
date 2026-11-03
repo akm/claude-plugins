@@ -1,0 +1,7 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins の Issue #87 の作業です。review-triage のコード (triagecheck・nearedges・lineorigin・review-loop のワーカー) と tools の README から、日本語の文中にあるダッシュ「—」をなくし、文を分けるか括弧・読点で書いています。ブランチは docs/replace-dash-review-triage-code-87 です。2 回目の採択 1 件は、コミット 1137202d で直しました。ワーカーのテストのコメントで、理由の文を、それが理由を述べるテストの目的の文の直後に移したものです。今回の 3 回目は、d57e0415..1137202d の増分だけをレビューします。依頼したセッションが、結果を review-triage で判定します。
+
+Task:
+依頼文 `/Users/akima/workspace/claude-plugins/tmp/review-request-20261029-2310-docs-replace-dash-review-triage-code-87-3-code-review-opus.md` を読み、そこに書かれた手順に従ってレビューを実行してください。結果は依頼文が指定する出力先の 1 ファイルだけに書き出してください。指摘を見つけても直さず、コミットもしないでください。作業ツリーは共有なので、HEAD と作業ツリーを変えないでください。終わったら、出力先のパスと、HEAD と作業ツリーが変わっていないことを報告してください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_0f7db631-e952-4173-a958-679e64632b91
