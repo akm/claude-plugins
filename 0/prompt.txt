@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b5x3ulx2u</task-id>
+<tool-use-id>toolu_01E7MWib3nyatMkMdNyh8uLJ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/d6f41b21-aca9-4cca-9450-e1a6d320cdc4/tasks/b5x3ulx2u.output</output-file>
+<status>completed</status>
+<summary>Background command "テストの対象を見て、review-triage のテストを実行する" completed (exit code 0)</summary>
+</task-notification>
