@@ -1,0 +1,91 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>Bash, ListAgents, Read, SendMessage, Skill, ToolSearch, Write, mcp__Claude_Browser__computer, mcp__Claude_Browser__find, mcp__Claude_Browser__javascript_tool, mcp__Claude_Browser__navigate, mcp__ccd_pr__get_status, mcp__ccd_session__mark_chapter, mcp__ccd_session__start_session, mcp__ccd_session_mgmt__archive_session, mcp__ccd_session_mgmt__get_session, mcp__ccd_session_mgmt__list_events, mcp__ccd_session_mgmt__list_sessions, mcp__ccd_session_mgmt__set_session_title, mcp__ccd_session_mgmt__stop_session, mcp__ccd_session_mgmt__unarchive_session, mcp__terminal__read_terminal, mcp__terminal__run_in_terminal, mcp__terminal__stop_terminal_tab</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+   - 継続中の作業: Issue #114 の計画 `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md` (issue-dispatch プラグイン) を単位 (U1〜U24) ごとに実装する。進め方 (利用者承認済みで毎回同じ): 作る順の案を示す → 利用者の OK → `main` からブランチ → テストを先に → 実装 → 文書 → コミット (wording-guard で確認、文書+コードのコミットは `--trailer 'Rules-Checked: yes'`) → `doc-dag` を `issue-dispatch/skills/` に回す (mermaid の図を `tmp/doc-dag-*.html` に出してブラウザで描画を確認) → `review-request` (1 回目は全量、base は `origin/main` との merge-base) → 利用者が別セッションでレビューを実行 → `review-triage` (記録 `tmp/review-triages/<ブランチ>.yaml`、lineorigin で `prior_defect`、サマリ再生成と triagecheck) → `review-triage-fix` (原因で束ね、1 問題 1 コミット、設計判断は `awaiting-human` で選択肢を示す、文書を変えたら nearedges と `doc_dag` を記録) → 増分レビュー (base は前回の head) → 指摘 0 件になったら push と PR (本文は wording-guard で確認、末尾 `🤖 Generated with [Claude Code](https://claude.com/claude-code)`) → 利用者がマージ → 記憶を更新 → 次の単位。
+   - 完了: U3 (PR #121)、U4 (PR #122)、U5 (PR #123)、U6 (PR #124)、U7 前半 (PR #125)。すべてマージ済み。`main` は `f9995ce`。
+   - 直近の利用者の指示: 「#125 をマージしました」。次は U7 後半 (Issue と PR) をブランチ `feat/issue-dispatch-u7-issues-114` で `main` から始める (作る順の案を示して OK を得てから)。
+   - 常時適用の規約: 日本語で会話し、利用者への問いはターンの最後の返答にまとめる。識別子は初出で種類を添える。比喩を使わない。ほかのプロジェクト名 (tecowl/lappds) を Issue/PR/計画など公開の場に書かない。コミット末尾 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`。記録 YAML と tmp/ はコミットしない。計画 (plan) は U3 以降更新しない方針 (決めたことは各正本の文書とモジュールが持つ。利用者承認)。実物の `gh` は検証用 Project #3 (`https://github.com/users/akm/projects/3`, ID `PVT_kwHNSeDOAZ7PAQ`) と private リポジトリ `akm/issue-dispatch-verify-a` に対して読むだけで使い、書き込みはしない。
+
+2. Key Technical Concepts:
+   - review-triage 0.23.0 の判定フロー (D1〜D8、A2 採択、R1 却下、H 保留)、記録スキーマ (`findings[]` に consequence/premise_check/verdict/verdict_reason/prior_defect、`plans[]` に cause/finding_ids/investigation/approach/order/options/verification.near_edges/doc_dag/sha/status)、閾値 N=5 (5 回目まで立案者を尋ねない)。却下ゲート名: hypothetical / developer-domain / disproportionate-cost / already-visible。
+   - 道具: `lineorigin` (`go run -C <plugin>/tools/lineorigin . -root <abs> -base <sha> -file <f> -lines <n> -rev <head>`)、`nearedges` (`git diff --cached -- '*.md' | go run -C .../tools/nearedges . -root $PWD -hints`)、`triagecheck` (summary: `-write-summary`)。
+   - wording-guard: `python3 wording-guard/scripts/wording_lint.py check --stdin`。「置く」「呼ぶ」は警告される (「ディレクトリを PATH の先頭に加える」「実行する」に言い換え)。
+   - テスト: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s issue-dispatch/tests` (現在 160 件)。偽のコマンドは PATH の先頭のディレクトリにシンボリックリンク (`fake-gh`, `fake-ssh`)。
+   - GitHub GraphQL: `gh api graphql --input -` で本文 `{"query","variables"}` を標準入力に渡す (`-F` は JSON の配列/オブジェクトを文字列のまま渡す)。`updateProjectV2Field` の `singleSelectOptions` は既存の選択肢を `id` 付きで含める (name/color/description 必須)。Timeline の itemTypes: CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, BLOCKED_BY_ADDED_EVENT, BLOCKED_BY_REMOVED_EVENT, PROJECT_V2_ITEM_STATUS_CHANGED_EVENT, ADDED_TO_PROJECT_V2_EVENT, REMOVED_FROM_PROJECT_V2_EVENT。`gh project item-edit --project-id --id --field-id --single-select-option-id|--text|--clear`、`gh project field-create <num> --owner --name --data-type TEXT|SINGLE_SELECT --single-select-options a,b`。
+   - U1 の実測の要点: `gh issue edit --add-blocked-by` は URL の形のみ、`includeClosedPrs: true` が要る、reopen で Todo に戻すワークフローは無い、`wasAutomated` は false、費用は 100 件で 7〜8 ポイント。
+
+3. Files and Code Sections (現在の main の状態):
+   - `issue-dispatch/scripts/issue_dispatch.py` — CLI 入口。サブコマンド: `config read`・`config add-edit-check`・`record read/apply/log`・`repo name --dir`・`project check/items/add-fields --project <owner>/<番号>`・`project set-status --project --item --status`・`files classify --dir <パス>...`。JSON を出せれば終了コード 0。`project add-fields` は `read_meta` の `warnings` が空でなければ `rejected`。`project check` は `check["partial"] = bool(meta["warnings"])` を足す。
+   - `issue-dispatch/scripts/issue_dispatch/config.py` — `load(root, role)`, `load_text(text, role, path)` (文字列から読む)、`_interpret`、`REPO_NAME_PATTERN = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"`、`REPO_NAME_RE`、`_check_files` は `kind` を `filekinds.RULE_KINDS` で検査、`_check_repositories` は綴りだけ違うキーの 2 つ目以降を警告して捨てる。
+   - `issue-dispatch/scripts/issue_dispatch/filekinds.py` + `file-kinds.json` + `references/file-kinds.md` (U3): `classify(path, rules, default_table)`、`normalize_path`、`matches`、区切りごとの正規表現 (`full_match` と同じ規則、`[seq]` 対応)、同じ種類は先に書いた規則、`**/*.json`・`**/npm-shrinkwrap.json`・`**/zz_generated.*.go`・`**/*.xlsx` の行あり。
+   - `issue-dispatch/scripts/issue_dispatch/gh.py` (U4): `run(args, timeout=60, mutation=False, expect_json=False, stdin=None)` → `{"args","exit_code","stdout","stderr_tail","timed_out","failure","json","json_error"}`。failure は `auth`/`rate_limit`/`network`/`timeout`/`missing`(PATH/権限)/`other`。stderr の正規表現と stdout の `errors[].type == RATE_LIMITED` だけで分類。mutation は呼び出し後に 1 秒待つ。`json_error` は `expect_json=True` のときだけ。`rate_limit_reset_at()`。stdin が None なら `/dev/null`。
+   - `issue-dispatch/tests/fake-gh` — 環境変数 `FAKE_GH_ARGS` (args・stdin・time・cwd を JSON 1 行で追記)、`FAKE_GH_MODE` (ok/auth_expired/not_logged_in/rate_limited/network/hang/exit)、`FAKE_GH_RESPONSES` (配列: `prefix`・`contains`・`substring` (文字列か配列。引数か標準入力に含まれる)・`stdout` (文字列/JSON/`{"fixture": name}`)・`stderr`・`exit`・`once`)。一致しなければ終了コード 99。`HERE = realpath(__file__)`。
+   - `issue-dispatch/tests/fixtures/gh/` + README.md (出所の表。実物/手で作ったを明記): auth-invalid-token, auth-not-logged-in, network-unreachable, graphql-bad-field, graphql-issue-ok, issue-view-ok, issue-not-found, pr-view-ok, rate-limit-status, graphql-rate-limited (手作り), project-meta-ok (実物、color/description 付き), project-items-ok (実物 100 件→5 件に切り詰め), project-items-page1/page2 (手で分けた)。
+   - `issue-dispatch/scripts/issue_dispatch/record.py` + `references/records.md` (U5): `record_dir(root, record_dir, project)` → `<root>/<record_dir>/<owner>-<number>/`、`new_record`、`load` (無ければ新規、壊れていれば `Corrupt`。要素の形も検査)、`save` (一時ファイル→`os.replace`)、`apply(rec, ops)` → `(rec, errors)` (1 つでも誤りなら適用しない。20 種の操作: set_manager, set_manager_state, count_exchange, reset_exchanges, set_session, set_session_state, set_waiting, clear_waiting, set_refused, set_intent, clear_intent, mark_notified, count_resend, set_conflict_choice, mark_reported, set_body_edit_confirmed, set_notice, set_opt_in, ask, answer)、`OPTIONAL_KEYS`、`items_without_notified`, `intent_matches`, `can_resend` (`resend_count < RESEND_LIMIT=1`)、`waiting_sessions`, `is_reported`, `unanswered_questions`, `append_action` (ACTION_KEYS: at, kind, target, before, after, reason)。`REPO_NAME_PATTERN` を写している (テストで config と一致確認)。
+   - `issue-dispatch/scripts/issue_dispatch/repo.py` + `references/repositories.md` + `tests/fake-ssh` (U6): `run_git` (bytes→utf-8 surrogateescape)、`parse_origin_url` (scheme/host/owner/name; 名前の形は REPO_NAME_RE)、`resolve_host` (`ssh -G`)、`effective_host` (scp/ssh のみ解決、ssh.github.com→github.com)、`same_repository`、`check_clone_root`、`read_repo_config(repositories, repo)` → status ok/missing/unreadable (REASONS: not-in-repositories, directory-missing, not-git, not-clone-root, no-origin, origin-mismatch, no-origin-head, git-failed, config-unreadable; unreadable なら config は None)、`repo_name(worktree)`。キーは大文字小文字を区別せず引く。
+   - `issue-dispatch/scripts/issue_dispatch/ids.py` (U7): `parse_issue_ref` (`owner/repo#n` と `https://github.com/owner/repo/issues/n`; PR の URL は None)、`issue_key`、`issue_url`、`same_issue`。
+   - `issue-dispatch/scripts/issue_dispatch/project.py` + `references/project-schema.md` + `graphql/{project-meta,items,issue-comments,issue-timeline,update-status-options}.graphql` (U7 前半): 定数 `CUSTOM_FIELDS`, `STUCK_STATES`, `STATUS_OPTIONS`, `ADDED_STATUS_OPTIONS`, `MANAGER_STATUSES`, `REQUIRED_WORKFLOWS=("Item closed",)`, `RECOMMENDED_WORKFLOWS`, `NOTICE_IF_ENABLED_WORKFLOWS=("Auto-add to project",)`, `DISCOURAGED_WORKFLOWS=("Pull request linked to issue",)`, `EVENT_TYPES`。`parse_project("owner/number")`、`graphql(name, variables, mutation)` → `(data, problem, errors)` (`--input -` で本文を stdin)、`read_meta(project)` → `{"status","project":{id,title,url,owner,number,fields{name:{id,data_type,options}},workflows{name:{id,number,enabled}}},"rate_limit","warnings"}`、`check(meta_project)` → `{ok, missing_fields, missing_status_options, workflows{required_disabled,recommended_disabled,notice_enabled,discouraged_enabled}, proposals{field_create:[args], update_options:[{field,fieldId,options}]}}`、`add_fields`、`simplify_item(node, position)` → `(item, problems)` (キー: item_id, position, item_updated_at, content_type, key, repo, number, url, title, state, created_at, author, visibility, in_organization, assignees, labels, parent, sub_issues, is_parent, blocked_by, status, fields, body_edits, prs, comments, events)、`items(project)` → status ok/partial/error と problems (items-page, graphql-errors, comments, events, labels-truncated 等)、`set_status`, `set_text_field`, `set_single_select_field`。
+   - 記憶ファイル (`/Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/memory/`): `issue-dispatch-u3-pr121.md`〜`issue-dispatch-u7a-pr125.md` と MEMORY.md の行 (いずれもマージ済みに更新済み)。
+   - 一時物: `tmp/review-triages/feat-issue-dispatch-u{3,4,5,6,7-project}-114.yaml` (記録)、`tmp/review-request-*.md`、`tmp/doc-dag-issue-dispatch-*.html`、`tmp/explain-u4-json-error.html` (説明のページ)。
+
+4. Errors and fixes:
+   - fake-gh がシンボリックリンク経由で固定データを見つけられない → `os.path.realpath(__file__)` に変更。空の responses ファイル → 空配列として扱う。
+   - `expect_json` を足したとき既存テスト 1 件の失敗をコミットしてしまった → テストを直して amend (push 前)。
+   - U6 で python の置換が途中で失敗 (`set -e` が効かず) し、fake-ssh の言い回しの警告 1 件が残ったまま commit → 直して amend。U7 前半の P1 でも同様に部分的なコミット (`gh.py` の 2 行だけ) ができた → 残りを適用して amend (gh.py は `text=True` なので `input=stdin` をそのまま渡す)。
+   - mermaid の辺のラベルに `--json` を書くと Syntax error → 利用者が指摘、ラベルを言い換え。
+   - GitGuardian が test_gh.py の `("auth_expired", "auth")` の組を Authentication Tuple と誤検出 → 利用者がダッシュボードで誤検出として閉じ、re-run で成功。
+   - U6 で「GitHub の規則」として名前の正規表現を写そうとして 3 回続けて指摘 (読めないバイト→先頭の `.`/`_`→owner の `_`) → 利用者が案 B (使える文字だけで決める `[A-Za-z0-9._-]+/[A-Za-z0-9._-]+`) を選択。
+   - U4 で `json_error` の扱いの指摘が 3 回続いた → 利用者が案 C (`expect_json` を呼び出し側が渡す) を選択。
+   - review-triage の記録で却下 (result wrong) の指摘に `prior_defect` を書くと検査が失敗 → 外して `verdict_reason` に参考として書く。
+   - レビュアが確認の 1 回目で本物の `gh` を読むだけ実行した事故 (U7 前半 run1) → 記録の notes に写した。
+
+5. Problem Solving:
+   - 各単位でレビューを収束させて PR 化 (U3: 4 回、U4: 4 回、U5: 3 回、U6: 5 回、U7 前半: 3 回)。
+   - 設計判断を利用者に委ねた選択肢: U3 同じ種類の複数一致は先に書いた規則 (案 A)、`**/*.json` を残し npm-shrinkwrap を generated に (案 A)、相互参照は残す (案 a); U4 再試行は呼び出し側、変更系は呼び出し後に 1 秒待つ (案 C)、`expect_json` 引数 (案 C); U5 サブコマンド 3 つ (案 B)、`refused` キーだけ決める; U6 bare は案内なし、GitHub 以外の host は合わない、名前は使える文字だけ (案 B); U7 は 2 つの PR に分ける (案 A)、`items` の出力の様式を project-schema.md に書く、OQ の U7 分 (blocked-by add の失敗は理由付き JSON で再試行しない、`deletedAt` はそのまま返し U13 で扱う、除かれた項目の URL 読みは U13 で足す)。
+
+6. All user messages (この要約の範囲):
+   - 「1. レビューを依頼しました 2. a 3. 足してください」
+   - `/review-triage:review-triage` (各回の結果ファイルのパス付き。U3 で 4 回、U4 で 4 回、U5 で 3 回、U6 で 5 回、U7 前半で 3 回)
+   - `/review-triage:review-triage-fix` (引数なし、各単位の 1 回目)
+   - 「1. 案A 2. OK」(U3 P3 と json 行)
+   - 「1. A 2. OK」(U3 run2 の P2)
+   - 「1. 直してください 2. レビューしてください 3. はい、足してください」(U3 run3)
+   - 「1. はい 2. push して PR を作ってください」(U3 計画は更新しない・push)
+   - 「#121 をマージしました」
+   - 「1. OK 2. OK 3. OK」(U4 の順)
+   - 「1. 案C」(U4 P4 間隔)
+   - `/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく問題を前提から説明してください`
+   - 「「2. 問題: json_error を入れる条件を、引数から推測している」の「今の状態」で 「Syntax error in text mermaid version 11.17.2」と出力されています」
+   - 「案C」(U4 run3 expect_json)
+   - 「1. 直してください 2. レビューしてください」(複数回)
+   - 「1. はい 2. push して PR を作ってください」(U4)
+   - 「https://github.com/akm/claude-plugins/pull/122/checks?check_run_id=119183513977 の指摘を確認してください」
+   - 「1 で閉じました」
+   - 「先ほど失敗した GitGuardian の workflow を re-run して成功したことを確認しました。#122 をマージしました」
+   - 「1. B 2. OK 3. はい」(U5)
+   - 「push して PR を作ってください」(U5, U6, U7 前半)
+   - 「#123 をマージしました」
+   - 「1. OK 2. OK 3. OK」(U6)
+   - 「1. 直してください 2. はい、一緒に直してください」(U6 run1 residual 自己採択)
+   - 「案B」(U6 run4 名前の形)
+   - 「#124 をマージしました」
+   - 「1. 案A 2. OK 3. OK 4. 案A」(U7 分割)
+   - 「1. はい」(U7 前半 run1 の修正)
+   - 「#125 をマージしました」
+
+7. Pending Tasks:
+   - U7 後半 (Issue と PR) を実装する: ブランチ `feat/issue-dispatch-u7-issues-114` を `main` (`f9995ce`) から作り、作る順の案を示して利用者の OK を得る。内容: `issue-dispatch/scripts/issue_dispatch/issues.py` (`blocked-by add` は URL 形で `gh issue edit --add-blocked-by`、失敗は理由付き JSON で再試行しない; `issue create` は本文の先頭行に分割の元 (Issue と宣言の ID) を書き、同じ先頭行の開いた Issue があれば作らずその番号を返す; `issue add-label` はリポジトリにラベルが無ければ先に作り、既に付いていれば何もしない)、`pr observe` (PR の URL を受けて状態・draft・`closingIssuesReferences`・作者 (トークンのログインと違えば無いものとする)・変えたファイルの一覧を返し、`In review` / 本文の追記が要る / `merged_issue_open` の種類を返す)、文書 `issue-dispatch/skills/issue-dispatch/references/issue-format.md` (依存関係・ラベル `resource:<名前>`・`human-handed`・担当者・親 Issue・大きさ・PR の `Closes`、分割で作る Issue の先頭行の様式。コメントの先頭行は U8、宣言は U10 で足す)、CLI のサブコマンド `issue create` / `blocked-by add` / `pr observe` / `issue add-label`、テスト `test_issues.py`。固定データは検証用リポジトリ (`akm/issue-dispatch-verify-a`: Issues #1 open/#2 closed/#3 open、PRs #4 merged/#5 closed/#6 open base other-base) を読むだけで取る。GraphQL は `graphql/*.graphql` に操作名を付け、偽の gh は `substring` で見分ける。その後は通常の流れ (レビュー → push → PR)。
+   - U7 後半の後: U8 (コメント) 以降を計画の順で。
+
+8. Current Work:
+   利用者の「#125 をマージしました」を受けて、`main` を `f9995ce` に更新し、ブランチ `feat/issue-dispatch-u7-project-114` を削除し、記憶 (`issue-dispatch-u7a-pr125.md` と MEMORY.md) を「PR #125 はマージ済み」に更新した。続けて U7 後半の案を作るために計画の R3 (Issue の様式)、R20 の分割で作る Issue の先頭行 (「新しい Issue の本文の先頭行には、分割の元の Issue と宣言のコメントの ID を書く」)、R29 (PR の報告と `Closes`) を読んだところで要約に入った。まだ利用者に案を示していない。
+
+9. Optional Next Step:
+   利用者に U7 後半の作る順の案と決めたいことを示して OK を得る (前回の案内: 「後半 (Issue と PR) は、この PR のマージ後に別のブランチで始めます」「次は、PR #125 のマージ後に U7 の後半 (Issue と PR) を `main` から別のブランチで始めます」)。案の骨子: 1. 固定データ (Issue/PR を読むだけのクエリ: `pr observe` 用の PR の状態と変えたファイル (`gh pr view --json` か GraphQL `pullRequest { files }`)、ラベル一覧) → 2. `test_issues.py` → 3. `issues.py` (`blocked-by add`・`issue create`・`issue add-label`・`pr observe`) → 4. CLI → 5. `issue-format.md` → 6. コミット → doc-dag → レビュー依頼 (全量)。決めたいこと: ブランチ名 `feat/issue-dispatch-u7-issues-114`、`pr observe` の出力の様式を `issue-format.md` に書くか `project-schema.md` に書くか、`issue create` の先頭行の様式の文面。利用者の OK の後にブランチを作って進める。
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/a8111d06-1d30-48e8-9b76-e363fe6486f5.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
