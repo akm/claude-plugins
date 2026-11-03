@@ -1,0 +1,11 @@
+<task-notification>
+<task-id>a8dfac20a7db5f9db</task-id>
+<tool-use-id>toolu_01Laa4z8RSXtBK22bmUx7WZ5</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/9794fa7d-62b7-419f-b715-b2ce4eec998a/tasks/a8dfac20a7db5f9db.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplify review: code quality" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This agent's report was delivered to you as a message from "a8dfac20a7db5f9db" (its SubagentHandback call). Read it there; it is not repeated here.
+</result>
+<usage><subagent_tokens>186409</subagent_tokens><tool_uses>19</tool_uses><duration_ms>281898</duration_ms></usage>
+</task-notification>
