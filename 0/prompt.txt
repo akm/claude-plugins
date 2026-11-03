@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bgxr5yilt</task-id>
+<tool-use-id>toolu_01Mv18MeCAcjuZ5Jti3Ey3iD</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/1ab8bc44-daae-4136-8430-37cb0c206e9a/tasks/bgxr5yilt.output</output-file>
+<status>completed</status>
+<summary>Background command "テストをもう一度実行し、出力をファイルに保存" completed (exit code 0)</summary>
+</task-notification>
