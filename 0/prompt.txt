@@ -1,0 +1,3 @@
+https://github.com/akm/claude-plugins/actions/runs/37072937175/job/111056681830 のテストが失敗しました。
+https://github.com/akm/claude-plugins/actions/runs/37071599163/attempts/1 も失敗していました。
+どうも python (review-triage/tests) が不安定なようです。  新セッションで対応できるように issue を作ってください
