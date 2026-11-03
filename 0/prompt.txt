@@ -1,0 +1,11 @@
+<task-notification>
+<task-id>a9191cb187901afe2</task-id>
+<tool-use-id>toolu_01Jt9ZMinJ7ay3AeFh4ib9Qy</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/feec6288-dfe0-4c5b-8d07-0e5eda3b96f8/tasks/a9191cb187901afe2.output</output-file>
+<status>completed</status>
+<summary>Agent "Review session-handoff branch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This agent's report was delivered to you as a message from "a9191cb187901afe2" (its SubagentHandback call). Read it there; it is not repeated here.
+</result>
+<usage><subagent_tokens>62559</subagent_tokens><tool_uses>7</tool_uses><duration_ms>70158</duration_ms></usage>
+</task-notification>
