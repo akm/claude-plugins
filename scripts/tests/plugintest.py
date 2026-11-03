@@ -291,17 +291,18 @@ class PluginTestCase(unittest.TestCase):
                               cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                               timeout=TIMEOUT, preexec_fn=default_sigint)
 
-    def run_script_closing_stdout(self, *args, after=None):
+    def run_script_closing_stdout(self, *args, after=None, merge_stderr=False):
         """メソッド run_script と同じくスクリプトを実行し、標準出力を読むプロセスを先に終了させる (標準出力のパイプを閉じる)。
 
         after が None なら、何も読まずにすぐ閉じる。after があれば、after を含む行を読んだところで閉じる。閉じた後に
-        スクリプトが標準出力に書くと、BrokenPipeError になる。subprocess.CompletedProcess を返す (stdout は閉じるまでに
-        読んだ分)。
+        スクリプトが標準出力に書くと、BrokenPipeError になる。merge_stderr が真なら、標準エラー出力も同じパイプに向ける
+        (2>&1 と同じ)。subprocess.CompletedProcess を返す (stdout は閉じるまでに読んだ分。merge_stderr が真なら、stderr は空)。
         """
         read = []
         with tempfile.TemporaryFile() as err:
             p = subprocess.Popen([sys.executable, os.path.join(self.work, SCRIPT_REL), *args], env=self.env, cwd=self.root,
-                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=err, text=True,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT if merge_stderr else err, text=True,
                                  preexec_fn=default_sigint)
             try:
                 if after is not None:

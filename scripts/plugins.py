@@ -88,7 +88,9 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
 標準出力を読むプロセスが先に終了したとき (make plugins-install | head など)。変える操作を始めた後 (マーケットプレイスの定義の
 取得し直しから最後の報告まで) なら、中止と同じく扱い、それ以上コマンドを実行せずに、終了コード 4 で終了する。変える操作を
 始める前なら、表示を途中でやめたことと何も変えていないことを標準エラー出力に書いて、終了コード 0 で終了する。状況の表示も
-同じく終了コード 0 で終了する。どちらも、標準出力を /dev/null に向け直してから標準エラー出力に書く。
+同じく終了コード 0 で終了する。どちらも、標準出力を /dev/null に向け直してから標準エラー出力に書く。標準エラー出力も
+閉じられていたら (2>&1 で標準出力と同じパイプに向けたときなど)、標準エラー出力も /dev/null に向け直して書くのをやめ、
+終了コードだけで結果を示す。
 
 実行の後の案内。次のどれかがあれば、表示する。中止・中断したときも同じ。
   - インストールしたもの
@@ -1027,10 +1029,13 @@ def report_install_stop(progress, message, fix=None, detail=None):
     """中止・中断したときに、インストールしたもの・処理中だったものの状態・処理しなかったもの・案内を書いてから、
     エラーの文を書く (KTD8)。どれも標準エラー出力に書く。
     """
-    sys.stdout.flush()
+    try:
+        sys.stdout.flush()
+    except BrokenPipeError:
+        discard_stream(sys.stdout)
     for line in install_report_lines(progress, aborted=True):
-        print(line, file=sys.stderr)
-    print("", file=sys.stderr)
+        _write_stderr(line)
+    _write_stderr("")
     _print_error(message, fix, detail)
 
 
@@ -1081,7 +1086,7 @@ def cmd_install(snapshot):
     except BrokenPipeError:
         if not progress.began:
             return stop_showing_without_change()
-        discard_stdout()
+        discard_stream(sys.stdout)
         report_install_stop(progress, f"{PIPE_CLOSED}ので、中止した。それ以上 claude のコマンドを実行していない。")
         _print("変える操作の途中で中止したので、一部が変わっている可能性がある。変えたものは、"
                "インストールしたものと処理中だったものの行に示した。")
@@ -1089,8 +1094,21 @@ def cmd_install(snapshot):
     return EXIT_OK
 
 
+def _write_stderr(line):
+    """標準エラー出力に 1 行書く。標準エラー出力に書くときは、どれもこの関数を通す。
+
+    標準エラー出力を読むプロセスが先に終了していたら (2>&1 で標準出力と同じパイプに向けたときなど)、標準エラー出力を
+    /dev/null に向け直して、それ以降は書かない。結果は終了コードで示す (R24・KD26)。BrokenPipeError を呼び出し元に
+    投げないので、中止・中断の報告の途中で関数 main に届き、何も変えていないと扱われることが無い。
+    """
+    try:
+        print(line, file=sys.stderr, flush=True)
+    except BrokenPipeError:
+        discard_stream(sys.stderr)
+
+
 def _print(text):
-    print(f"{PROG}: {text}", file=sys.stderr)
+    _write_stderr(f"{PROG}: {text}")
 
 
 def _print_error(message, fix=None, detail=None):
@@ -1101,7 +1119,7 @@ def _print_error(message, fix=None, detail=None):
     _print(message)
     if detail:
         for line in detail.splitlines():
-            print("  " + line, file=sys.stderr)
+            _write_stderr("  " + line)
     if fix:
         _print(f"直し方: {fix}")
 
@@ -1112,17 +1130,17 @@ def report_precondition_error(message, fix=None, detail=None):
     _print(f"{NOTHING_CHANGED}。前提の検査か読み取りでエラーになったので、変える操作の前に終了した。")
 
 
-def discard_stdout():
-    """標準出力を /dev/null に向け直す。標準出力を読むプロセスが先に終了した後に呼び、それ以降の書き込みと、終了するときの
-    flush が BrokenPipeError にならないようにする。"""
+def discard_stream(stream):
+    """stream (sys.stdout か sys.stderr) を /dev/null に向け直す。読むプロセスが先に終了した後に呼び、それ以降の書き込みと、
+    終了するときの flush が BrokenPipeError にならないようにする。"""
     devnull = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(devnull, sys.stdout.fileno())
+    os.dup2(devnull, stream.fileno())
     os.close(devnull)
 
 
 def stop_showing_without_change():
     """標準出力を読むプロセスが先に終了し、何も変えていないときに、表示を途中でやめたことを書いて、終了コードを返す (R24・KD26)。"""
-    discard_stdout()
+    discard_stream(sys.stdout)
     _print(f"{PIPE_CLOSED}ので、表示を途中でやめた。{NOTHING_CHANGED}。")
     return EXIT_OK
 

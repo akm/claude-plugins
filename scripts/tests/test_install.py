@@ -394,6 +394,21 @@ class PipeClosedTest(InstallTestCase):
                         f"閉じられる前にインストールしたものを、標準エラー出力に示すこと: {r.stderr}")
         self.assertIn(LOAD, r.stderr, "インストールしたものがあれば、読み込みの案内を標準エラー出力に示すこと (R18)")
 
+    def test_closed_with_stderr_in_same_pipe(self):
+        # 2>&1 と同じく標準エラー出力も同じパイプに向けると、報告は書けないので、終了コードだけで結果を示す
+        with self.subTest("変える操作を始める前"):
+            self.reset_record()
+            r = self.run_script_closing_stdout("install", merge_stderr=True)
+            self.assertEqual(r.returncode, 0, "何も変えていなければ、終了コード 0 で終了すること (R24・KD26)")
+            self.assertEqual(self.changes(), [], "変える操作を 1 つも実行しないこと")
+        with self.subTest("1 つ目をインストールした後"):
+            self.set_state()
+            self.reset_record()
+            r = self.run_script_closing_stdout("install", after="wording-guard 0.28.0 を user スコープにインストールした",
+                                               merge_stderr=True)
+            self.assertEqual(r.returncode, 4, "変える操作を始めた後なら、終了コード 4 で終了すること (R24・KD26)")
+            self.assertNotIn(install_args("pr-teeth"), self.commands(), "それ以上コマンドを実行しないこと")
+
 
 class PreconditionTest(InstallTestCase):
     """前提の検査でエラーになったときは、変える操作を 1 つも実行しない (R8)。"""

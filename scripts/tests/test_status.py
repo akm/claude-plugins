@@ -220,6 +220,11 @@ class AutoUpdateNoteTest(StatusTestCase):
         self.assertIn("標準出力を読むプロセスが先に終了したので、表示を途中でやめた。何も変えていない。", r.stderr)
         self.assertNotIn("Traceback", r.stderr, "トレースバックを出さないこと")
 
+    def test_closed_stdout_with_stderr_in_same_pipe(self):
+        r = self.run_script_closing_stdout("status", merge_stderr=True)
+        self.assertEqual(r.returncode, 0,
+                         "標準エラー出力も同じパイプに向けて閉じられても、終了コード 0 で終了すること (R24・KD26)")
+
     def test_note_matches_readme(self):
         """案内の公式ドキュメントの URL と /plugin の画面の項目の名前が、README.md の手順にもあること。
 
