@@ -1,0 +1,77 @@
+Base directory for this skill: /Users/akima/.claude/plugins/cache/akm-claude-plugins/mermaid-preview/0.1.0/skills/mermaid-preview
+
+# mermaid-preview: mermaid 図の HTML プレビュー
+
+mermaid の図を人間に見せるための HTML を生成して開く。**この文書が、mermaid を HTML で表示する方法の検証済み知見の正本** — 他のスキル・文書はここを参照し、再掲しない。
+
+## 検証済みの制約
+
+実際に作って確かめた知見 (2026-08-29 の検証)。理由ごと守る。
+
+| 制約 | 理由 |
+| --- | --- |
+| **出力先はプロジェクトフォルダ内の `tmp/`** | スクラッチパッド (`/private/tmp/...`) に置くと in-app ブラウザで静的スナップショット扱いになり、スクリプトが実行されず図がテキストのまま見える。`tmp/` が無ければ作り、`.gitignore` されていることを確認する (されていなければ `.gitignore` に追加する) |
+| **mermaid は CDN 参照** | ローカルからしか開かないので、同梱 (約 3.4MB) は負担に見合わない。CDN 版とローカル版はバイト単位で同一だった |
+| **読み込み失敗時のフォールバックを入れる** | ネットワーク不通か表示方法の問題かを画面上で切り分けられるようにする。無いと原因を取り違える |
+| **subgraph は、テーマ変数を使うページでは使わない** | mermaid が subgraph の背景を `#mermaid-<id>` 付きの CSS で当てるため、ページ側のテーマ変数が届かず、ライトテーマで暗い箱が残る。そのようなページでは囲みの代わりにノードの色分けで構造を示す。**テーマ変数を持たない素の [template.html](template.html) では問題なく描画される** (2026-08-30 実測) |
+| **`mermaid.min.js` は `eval` / `new Function` の中では動かない** | トップレベルの `var` を末尾で `globalThis` 経由で読む作りのため。`<script>` 要素として読み込む (テンプレートはそうなっている) |
+
+## 手順
+
+1. **図のソースを決める**: 引数の mermaid 記法、または依頼元のスキル・文書から受け取る。テーマ変数を使うページに埋め込む場合のみ、subgraph をノードの色分け (`style <id> fill:...`) に置き換える (上の制約)。
+2. **HTML を生成する**: [template.html](template.html) をコピーし、プレースホルダを置換する。
+   - `__TITLE__` — ページと見出しのタイトル
+   - `__NOTE__` — 図の説明 (凡例など。不要なら空にする)
+   - `__DIAGRAM__` — mermaid 記法のソース。図が複数あるときは `<pre class="mermaid">` ブロックごと増やす
+   - 出力先はプロジェクトルートの `tmp/` 配下。ファイル名は ASCII (例: `tmp/doc-dag-review-triage.html`)
+3. **ブラウザで開く**: 生成したファイルの絶対パスを `file://` で開いて提示する。**ブラウザを開けない実行経路 (headless・cron など) では、生成したパスを案内して終了する** — 図の生成までがこのスキルの成果で、表示は環境があるときだけ行う。
+4. **描画を確かめる**: 図が描画されていること (テキストのままでないこと) を確認してから人間に案内する。フォールバック文言が出ていたら、CDN への到達を疑う。
+
+## 後片付け
+
+- 生成した HTML は一時物。**コミットしない** (`tmp/` は `.gitignore` に入れておく)。
+- 同じ目的で作り直すときは同じファイル名に上書きし、ファイルを増やさない。
+
+## このスキルがしないこと
+
+- **図の内容の設計** — 何をどう図にするかは依頼元 (人間・他のスキル) が決める。
+- **Markdown への図の埋め込み** — 文書に残す図は Markdown の ```` ```mermaid ```` フェンスで書く。このスキルはブラウザで見せる一時的な提示だけを担う。
+
+
+ARGUMENTS: doc-dag: review-triage-loop の --base・G0・範囲に関わるセクションの依存と重複 (feat/loop-base-77、P1・P2 の修正の後)
+
+flowchart LR
+  subgraph SK["SKILL.md"]
+    SK_P["手順 (手順 1 の --base の項目)"]
+  end
+  subgraph AR["references/arguments.md"]
+    AR_S["様式 (--base の段落。起点のブランチ・経路・G0 で記録を読むことの正本)"]
+    AR_P["設定と引数の優先順位"]
+    AR_C["値の検査 (起点のブランチの検査)"]
+  end
+  subgraph RI["references/review-invocation.md"]
+    RI_G["G0 での解決"]
+    RI_R["範囲 (全量になる回の正本)"]
+  end
+  subgraph LF["references/loop-flow.md"]
+    LF_T["決定表 (G0・L1・S3 の行)"]
+  end
+  subgraph RR["review-request の SKILL.md"]
+    RR_2["手順 2 (merge-base の求め方の正本)"]
+  end
+
+  SK_P -->|"--base の扱い"| AR_S
+  SK_P -->|"図と決定表"| LF_T
+  LF_T -->|"G0: 決め方・記録の読み方"| AR_S
+  LF_T -->|"L1: 経路・範囲"| RI_R
+  RI_R -->|"S3: 報告の書き方"| LF_T
+  RI_R -->|"起点のブランチと経路 (このブランチで追加)"| AR_S
+  AR_S -->|"全量になる回 (このブランチで追加)"| RI_R
+  AR_S -->|"merge-base の求め方"| RR_2
+  AR_C -->|"検査の条件"| RR_2
+  RI_R -->|"基点の求め方"| RR_2
+  AR_P -->|"実効モデル"| RI_G
+
+  linkStyle 4 stroke:#b45309,stroke-width:2px
+  linkStyle 5 stroke:#dc2626,stroke-width:2px
+  linkStyle 6 stroke:#dc2626,stroke-width:2px
