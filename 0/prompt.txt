@@ -1,0 +1,30 @@
+<task-notification>
+<task-id>a813b1034db2fb4fa</task-id>
+<tool-use-id>toolu_018azZ27fT3nyyDQMmhsbJrD</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/d19aba18-687c-4226-9dd4-2a22cd5b458d/tasks/a813b1034db2fb4fa.output</output-file>
+<status>completed</status>
+<summary>Agent "Maintainability review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Working tree confirmed clean (read-only compliance verified).
+
+```json
+{
+  "reviewer": "maintainability",
+  "findings": [],
+  "residual_risks": [
+    "main.go's dispatch now handles 4 mutually-exclusive modes (検査 / -write-summary / -install-wrapper / -review-file) via 3 pairwise explicit[...] guards (main.go:71-83). Still readable and well-commented; a 5th mode would push this toward needing a mode enum instead of pairwise checks.",
+    "review_file.go intentionally mirrors record.go's checker shape and reuses recordLineCommentProblems / recordDateRe across the file boundary. Both reused helpers are format-generic (not domain logic from the record contract), so the sharing is coherent -- but if the two schemas' date/comment conventions ever diverge, that shared boundary is the first place to check."
+  ],
+  "testing_gaps": []
+}
+```
+
+Summary: reviewed all three flagged lens points directly against the diff and surrounding code.
+
+- **record.go vs review_file.go duplication** (`review-triage/tools/triagecheck/review_file.go`, `record.go`): The parallel checker shape is a deliberate, defensible choice — two independent contracts (record schema vs. review-request schema) that should be free to drift, with separate `AllowedKeys` maps, separate unknown-key walkers, and separate semantic-check functions. The two symbols it reuses across the boundary (`recordLineCommentProblems`, `recordDateRe`) are genuinely format-generic (pure YAML-node property, pure date regex), not record-specific domain logic, so this isn't "worst of both worlds" coupling. No finding; noted as a residual risk to watch if the two schemas' conventions ever diverge.
+- **review-request.md / review-request-template.md split**: Clean seam. The diff explicitly moves the normative prose ("文面は雛形の節が正本で、ここには写さない") into the template as the single source of the emitted text, while review-request.md keeps only rationale and operational rules (`--gen-request` semantics, scope rules). No duplicated normative rule found living in both places.
+- **main.go's 4th path / pairwise exclusion checks**: Single well-scoped commit (`6831b76`) adding one flag (`-review-file`) that follows the exact existing pattern, with all associated docs/comments already updated (comment even acknowledges "3 経路 → 4 経路"). 3 pairwise `explicit[...]` guards is not yet complex enough to warrant a mode enum. Flagged as a residual risk only — the next added mode is where this should be reconsidered.
+
+No P0-P3 findings met the anchor-50+ bar; all three targeted areas held up as defensible engineering rather than maintainability regressions. `git status --porcelain` confirmed clean throughout (read-only compliance).</result>
+<usage><subagent_tokens>167738</subagent_tokens><tool_uses>22</tool_uses><duration_ms>78191</duration_ms></usage>
+</task-notification>
