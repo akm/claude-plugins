@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bao98be4h</task-id>
+<tool-use-id>toolu_01Est3M2AfQAzDtWdVMbCHLP</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bao98be4h.output</output-file>
+<status>completed</status>
+<summary>Background command "1 回目のレビューの結果ファイルが書き出されるまで待つ" completed (exit code 0)</summary>
+</task-notification>
