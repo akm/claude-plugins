@@ -1,0 +1,24 @@
+<task-notification>
+<task-id>a1a70d377f6d4b79f</task-id>
+<tool-use-id>toolu_01YZkm2ADauT9Mg9mLgS41NR</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/2c23f68d-066c-4d98-8723-c3947740d051/tasks/a1a70d377f6d4b79f.output</output-file>
+<status>completed</status>
+<summary>Agent "project-standards review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Review complete. Summary of findings (also written to `/tmp/compound-engineering/ce-code-review/20260725-161823-88dfc637/project-standards.json`):
+
+**Verified consistent (no issues):**
+- README's documented config path `.claude/akm-claude-plugins/commit-rules-guard/config.json` matches the code constant `_PROJECT_CONFIG_REL` (line 104) and the docstring (line 17) exactly.
+- README's documented keys `generated_globs`, `custom_rules[].when_all_present`, `custom_rules[].message` are all honored by the code (`_generated_globs`, `_custom_rule_hints`).
+- Version bump 0.1.0 → 0.2.0 is consistent across `plugin.json` and README's `enabledPlugins` example. It's a genuinely additive, backward-compatible change (new params default to `None`/absent config), so a minor bump is semver-appropriate.
+- Docstring, README, and actual behavior otherwise agree (config load failure/malformed JSON falls back silently to defaults, as documented in both places).
+
+**Findings (both P3, low severity):**
+1. `commit-rules-guard/hook-scripts/guard-commit-rules.py:21` — stray/garbled word "lappds" in the docstring's config.json example sentence (likely a typo or leftover fragment), e.g. "lappds の「db/schema.sql と migrations/ の混在」...". Should be cleaned up or removed.
+2. `commit-rules-guard/hook-scripts/guard-commit-rules.py:193` — `custom_rules[].id` is documented in README as "任意/ラベル" (optional label) and confirmed to be purely cosmetic — the code never reads `rule.get("id")` anywhere. This matches the README's own framing, so it's not a doc/code mismatch, just worth a one-line docstring note for future readers.
+
+**Residual risks:** no dedup/validation on `custom_rules[].id`; malformed `custom_rules` entries (wrong types) fail silently rather than surfacing a config error.
+
+**Testing gaps:** no automated tests exist for `_load_project_config`, `_custom_rule_hints`, or the `generated_globs` merge logic (config + env + defaults) — only verified by manual code reading.</result>
+<usage><subagent_tokens>58513</subagent_tokens><tool_uses>10</tool_uses><duration_ms>51264</duration_ms></usage>
+</task-notification>
