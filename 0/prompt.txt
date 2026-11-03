@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>byiofavx1</task-id>
+<tool-use-id>toolu_01PVw2n9ykSfuSm9MCeQQWPZ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/3933e702-62c1-4930-a532-8181243ef1d8/tasks/byiofavx1.output</output-file>
+<status>completed</status>
+<summary>Background command "review-triage の Python のテストを実行する" completed (exit code 0)</summary>
+</task-notification>
