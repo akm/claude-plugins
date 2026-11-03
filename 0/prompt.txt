@@ -1,0 +1,1 @@
+収束後の全量レビューの依頼文を review-request (code-review opus high --full-review) で作ってください。
