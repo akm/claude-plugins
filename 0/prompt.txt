@@ -1,0 +1,1 @@
+docs/plans/2026-09-26-1338-feat-review-loop-plan.md に従って 実装を進めてください
