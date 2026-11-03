@@ -1,0 +1,6 @@
+<cross-session-message from="local_fc878636-cb48-44eb-9423-5fa809bb2f9d" from-name="review-rally 20261103-0049-feat-plugin-install-status-168 のレビュー">
+review-rally 20261103-0049-feat-plugin-install-status-168 20261103-0832-feat-plugin-install-status-168-10-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-2e429f/tmp/review-rally/20261103-0049-feat-plugin-install-status-168/review-20261103-0832-feat-plugin-install-status-168-10-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high 25b98171..0e7385f7")。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルを渡す引数は無く、セッションのモデルで実行した)。
+- 指摘 3 件 (どれも P3・medium)、residual 2 件。
+- HEAD はレビューの前後とも 0e7385f7 で、ブランチは変わっていない。git status --porcelain はレビューの前後とも空 (変更なし)。作ったのは出力先の 1 ファイルだけ (tmp/ は .gitignore の対象)。テスト (python3 -m unittest test_status・test_install) を実行したが、作業ツリーは変わっていないことを確かめた。
+</cross-session-message>
