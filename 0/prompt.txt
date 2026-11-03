@@ -1,0 +1,7 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins の Issue #87 の作業です。review-triage のコード (triagecheck・nearedges・lineorigin・review-loop のワーカー) と tools の README から、日本語の文中のダッシュ「—」をなくしています。ダッシュの箇所は、文を分けるか、括弧や読点を使って書き換えました。ブランチは docs/replace-dash-review-triage-code-87 です。8 回目で採択した 1 件は、コミット a32ea7a9 で直しました。直したのは、「既定」を一部だけ「デフォルト」に書き換えたために同じ値を指す語が混在していた問題で、triagecheck のディレクトリの「既定」40 か所をすべて「デフォルト」に書き換えています。ほかのディレクトリの「既定」は、利用者が範囲の外と決め、別の Issue で扱います。今回の 9 回目では、b9f92740..a32ea7a9 の増分だけをレビューします。結果は、依頼したセッションが review-triage で判定します。
+
+Task:
+依頼文 `/Users/akima/workspace/claude-plugins/tmp/review-request-20261030-0705-docs-replace-dash-review-triage-code-87-9-code-review-opus.md` を読み、そこに書かれた手順に従ってレビューを実行してください。結果は、依頼文が指定する出力先の 1 ファイルだけに書き出してください。指摘を見つけても直さず、コミットもしないでください。作業ツリーは共有なので、HEAD と作業ツリーを変えないでください。終わったら、出力先のパスと、HEAD と作業ツリーが変わっていないことを報告してください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_0f7db631-e952-4173-a958-679e64632b91
