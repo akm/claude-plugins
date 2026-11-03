@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b11n4f9as</task-id>
+<tool-use-id>toolu_01PLvkBgTj2QKAdvPXHiwo2p</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/a0c80a28-142f-4880-a087-6aa7785f61b6/tasks/b11n4f9as.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the full review-triage test suite in the background" completed (exit code 0)</summary>
+</task-notification>
