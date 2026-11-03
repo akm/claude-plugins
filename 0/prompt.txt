@@ -1,0 +1,1 @@
+公開 URL と呼び出し SA の LAPPDS_PROVIDER_URL と LAPPDS_WORKER_URL は別の通信経路なので、一つの契約にはまとめられないと思います。 LAPPDS_INVOKER_SA  はこれらの通信経路の両方で使われるんでしたっけ？
