@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bqxp76wwj</task-id>
+<tool-use-id>toolu_01XCneZ4grKfH7nkFFZfVeps</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/feec6288-dfe0-4c5b-8d07-0e5eda3b96f8/tasks/bqxp76wwj.output</output-file>
+<status>completed</status>
+<summary>Background command "review-loop 20261002-2046-docs-reword-avoided-terms-90 回 1 (20261002-2046-docs-reword-avoided-terms-90-1-code-review-opus) [この起動 1/5 回・収束後の全量 0 回・期限切れ 0・中断 0]: 完了の印を待つ (0 = 現れた / 124 = 期限切れ / それ以外 = 中断)。通知を受けたら review-loop の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
