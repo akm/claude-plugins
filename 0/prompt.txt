@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bb2k40hut</task-id>
+<tool-use-id>toolu_01DweB6hGt3RVYk2GQoyADAY</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/1ab8bc44-daae-4136-8430-37cb0c206e9a/tasks/bb2k40hut.output</output-file>
+<status>failed</status>
+<summary>Background command "review-loop 20260930-0938-feat-loop-base-77 回 1 (20260930-0939-feat-loop-base-77-1-code-review-opus) [この起動 1/5 回・収束後の全量 0 回・期限切れ 0・中断 0]: 完了の印を待つ (0 = 現れた / 124 = 期限切れ / それ以外 = 中断)。通知を受けたら review-loop の再入の手順へ" failed with exit code 124</summary>
+</task-notification>
