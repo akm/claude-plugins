@@ -1,0 +1,1 @@
+PR2 (issue-dispatch の言い換え) を main から新しいブランチで始めてください。
