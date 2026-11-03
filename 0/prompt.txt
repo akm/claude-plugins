@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bdq32o5ja</task-id>
+<tool-use-id>toolu_019GkTyuewgAfbJNeHici773</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bdq32o5ja.output</output-file>
+<status>completed</status>
+<summary>Background command "Python のテストを「作業側」のコミットで別の作業ツリーで走らせる" completed (exit code 0)</summary>
+</task-notification>
