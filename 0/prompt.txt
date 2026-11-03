@@ -1,0 +1,6 @@
+<cross-session-message from="local_853a398f-3d60-4e8a-9e1c-9655709f0698">
+review-rally 20261101-2200-feat-review-request-target-dir-151 20261101-2214-feat-review-request-target-dir-151-17-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-9b4ba6/tmp/review-rally/20261101-2200-feat-review-request-target-dir-151/review-20261101-2214-feat-review-request-target-dir-151-17-code-review-claude-sonnet-5-5.yaml
+skill: Skill ツールで code-review を呼んだ (呼んだ)。引数は `high 5f345ce2..0044652c`。実際に渡した effort は high、モデルは claude-sonnet-5-5 (このセッションのモデル)。
+指摘は 5 件 (P2 が 2 件、P3 が 3 件)、residual は 2 件。
+HEAD は開始前も終了後も 0044652c で、`git status --short` は空 (変更なし)。書き込んだのは出力先の 1 ファイルだけ。
+</cross-session-message>
