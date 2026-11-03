@@ -1,0 +1,27 @@
+<task-notification>
+<task-id>a81a96bdeb17a774a</task-id>
+<tool-use-id>toolu_01RG6kyBsru7kuRrpDvf6fJc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/a81a96bdeb17a774a.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplify: code-quality review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Builds and vets clean. No unused code, no dead branches introduced.
+
+Review complete. Nothing to flag.
+
+Summary of what I checked against the 11 categories:
+
+- **Redundant state**: `Recurrence *recordRecurrence` and `Reframe *recordReframe` use the pointer-for-optional pattern already established by `PlanRef`/`Investigation` in the same file (record.go:133, 166) — not new redundant state, matches convention.
+- **Parameter sprawl**: `recordRecurrenceProblems(f, ri, rec, verdictByID)` (record.go:670) takes exactly what it needs, mirrors the existing `verdictByID` reuse from the enclosing loop rather than recomputing or adding new params.
+- **Copy-paste with variation**: The status-exclusivity switch in `recordRecurrenceProblems` (record.go:715-745) structurally echoes the `pl.Status` switch (record.go:570-597), but the two state machines have different states and different per-state exclusive-key semantics — this is the same idiom applied consistently, not duplicated logic to consolidate.
+- **Leaky abstractions**: none — recurrence stays fully inside the record.go schema/render boundary.
+- **Stringly-typed code**: `Status`, `Condition`, `Source` are raw strings validated by switch statements, exactly matching the file's existing convention for `Verdict`, `pl.Status`, `PremiseCheck.Stages`, etc. (e.g., record.go:510-514). Correctly not introducing new enum types, as instructed.
+- **Nested conditionals**: max depth is switch-inside-function with simple if guards — no 3+ level nesting.
+- **Unnecessary comments**: all new Japanese comments explain non-obvious constraints (why evidence needs structured fields instead of free text, why status/key exclusivity matters for review-triage-fix, why recurrence is placed before 修正計画 in the summary) — these are "why" comments per repo convention, not restatements.
+- **Dead code/unused imports/exports**: none found; `go build` and `go vet` are clean.
+- **Context-dependent vocabulary**: terms (`detected`/`declined`/`reframed`, `fix-derived`/`same-location`, `human`/`skill`) are introduced consistently between record.go and record_test.go and align with the review-triage/review-triage-fix skill vocabulary described in the comments.
+- **Pre-release compatibility scaffolding**: none — this is new schema, not a superseded form being carried forward.
+
+One structural note (not a defect, just confirming correctness): `recordRecurrenceProblems`'s `noDeclinedReason`/`noReframe` closures capture `rec` and `add` from the enclosing function exactly like `externalOnly` does for plans — consistent, no changes needed.</result>
+<usage><subagent_tokens>91232</subagent_tokens><tool_uses>8</tool_uses><duration_ms>40597</duration_ms></usage>
+</task-notification>
