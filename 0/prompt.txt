@@ -1,0 +1,2 @@
+普通のファイルについても図に入れて検討したいです。
+.go .py .ts .js .svelte .md( frontmatter あり / なし ) .yaml .json .toml go.mod go.sum package.json package.lock pnpm-lock.json .html .css .png .svg .tf .tfstate Makefile .gitignore Dockerfile docker-compose.yml .github/workflows/*.yml
