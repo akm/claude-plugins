@@ -1,0 +1,3 @@
+tmp/review-triage を tmp/review-triages に変更してほしいです。
+
+また 最初に レビューの依頼文のファイルを作成してもらうスキルを追加してほしいです。 /review-request が良いです。デフォルトは skill:code-review が良さそうです。
