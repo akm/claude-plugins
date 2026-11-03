@@ -1,0 +1,73 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>Bash, ListAgents, Read, SendMessage, Skill, ToolSearch, WebSearch, Write, mcp__Claude_Browser__computer, mcp__Claude_Browser__find, mcp__Claude_Browser__javascript_tool, mcp__Claude_Browser__navigate, mcp__ccd_pr__get_status, mcp__ccd_session__mark_chapter, mcp__ccd_session__start_session, mcp__ccd_session_mgmt__archive_session, mcp__ccd_session_mgmt__get_session, mcp__ccd_session_mgmt__list_events, mcp__ccd_session_mgmt__list_sessions, mcp__ccd_session_mgmt__set_session_title, mcp__ccd_session_mgmt__stop_session, mcp__ccd_session_mgmt__unarchive_session, mcp__terminal__read_terminal, mcp__terminal__run_in_terminal, mcp__terminal__stop_terminal_tab</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+   - 継続中の作業: Issue #114 の計画 `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md` (issue-dispatch プラグイン) を単位 (U1〜U24) ごとに実装する。進め方 (利用者承認済みで毎回同じ): 作る順の案と決めたいことを示す → 利用者の OK → `main` からブランチ → テストを先に → 実装 → 文書 → コミット (wording-guard で確認、`--trailer 'Rules-Checked: yes'`) → `doc-dag` を `issue-dispatch/skills/` に回す (mermaid の図を `tmp/doc-dag-issue-dispatch-u<N>.html` に出してブラウザで描画を確認) → `review-request` (1 回目は全量、base は `origin/main` との merge-base) → 利用者が別セッションでレビューを実行 → `/review-triage:review-triage <結果ファイル>` (記録 `tmp/review-triages/<ブランチ>.yaml`、lineorigin で `prior_defect`、サマリ再生成と triagecheck) → `/review-triage:review-triage-fix` (原因で束ね、1 問題 1 コミット、設計判断は `awaiting-human` で選択肢を示す、文書を変えたら nearedges と `doc_dag` を記録) → 増分レビュー (base は前回の head) → 指摘 0 件になったら push と PR (本文は wording-guard で確認、末尾 `🤖 Generated with [Claude Code](https://claude.com/claude-code)`) → 利用者がマージ → 記憶を更新 → 次の単位。
+   - 完了してマージ済み: U7 後半 (PR #126)、U8 (PR #127)、U9 (PR #128)、U10 (PR #129)、U11 (PR #130)。`main` は `1121e88` (PR #130 のマージ)。
+   - 進行中: U12 (スナップショットと差分)。ブランチ `feat/issue-dispatch-u12-observe-114`、HEAD `0508b3b`。レビュー 3 回目の結果を読んだところで、判定 (review-triage) の途中。
+   - 常時適用の規約: 日本語で会話し、利用者への問いはターンの最後の返答にまとめる。識別子は初出で種類を添える。比喩を使わない。ほかのプロジェクト名 (tecowl/lappds) を Issue/PR/計画など公開の場に書かない。コミット末尾 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`。記録 YAML と tmp/ はコミットしない。計画 (plan) は U3 以降更新しない (決めたことは各正本の文書が持つ)。実物の `gh` は検証用 Project #3 と private リポジトリ `akm/issue-dispatch-verify-a` に対して読むだけで使い、書き込みはしない (ラベル作成なども含む)。個人の情報 (gh api user の company 等) は固定データに入れない。判断は自分で決めず尋ね、問いはまとめる。
+
+2. Key Technical Concepts:
+   - review-triage 0.23.0: 判定フロー (D1〜D8、A2 採択、R1 却下、H 保留)、記録スキーマ (`findings[]`: id, origin (residual の自己採択), file, line, summary, category (plugin-code/skill/test), audience, consequence{condition,who,what,detectability}, premise_check{stages,result}, verdict, verdict_reason, prior_defect{base,line_check,line_reason}, attrs; `plans[]`: problem_id, finding_ids, cause, investigation{scope,included}, approach, order, options, status (investigated/pending/awaiting-human/done), sha, verification.near_edges, doc_dag{scope,result}; `notes` は 1 文字列)。閾値 N=5 (5 回目まで立案者を尋ねない)。
+   - 道具: `lineorigin` (`ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/lineorigin . -root "$PWD" -base <sha> -file <f> -lines <n> -rev <head>`。zsh の `set -- $f` は分割しないので引数は直接書く)、`nearedges` (`git diff --cached -- '*.md' | go run -C ~/.claude/plugins/cache/akm-claude-plugins/review-triage/0.23.0/tools/nearedges . -root "$PWD" -hints`)、`triagecheck` (summary: `-write-summary`)、review-request の雛形 `~/.claude/plugins/cache/akm-claude-plugins/review-triage/0.23.0/skills/review-triage/references/review-request-template.md` を python で埋める (識別子 `<YYYYMMDD>-<hhmm>-<ブランチ>-<回>-code-review-opus`、一時名 `.review-request-<id>.md.tmp` → mv)。
+   - commit-rules-guard の hook: `git commit -F file --trailer 'Rules-Checked: yes'` で実行する (本文に書いただけでは止められることがある)。
+   - wording-guard: `python3 wording-guard/scripts/wording_lint.py check <md>` / `--stdin`。「効かない」→「適用されない/成り立たない」、「割に合わない」(役割に合わない の誤検出)、「の列」→「の配列」、「判断を行う」→「判断する」。
+   - テスト: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s issue-dispatch/tests` (現在 323 件)。偽の gh (`tests/fake-gh`、`FakeGhCase` を `test_project` から import、`sys.path.insert(0, _HERE)` が要る)、`substring` で GraphQL の操作名を見分ける。
+   - GitHub の規則: owner/repo・login・ラベル名は大文字小文字を区別しない (casefold/lower で比べる)。
+
+3. Files and Code Sections (main にマージ済みのもの):
+   - `issue-dispatch/scripts/issue_dispatch/issues.py` (U7 後半 + U12): `observe_pr(url, login=None)` (種類 `other_author`/`draft`/`needs_closing_reference`/`in_review`/`merged`/`merged_issue_open`/`merged_without_reference`/`closed`)、`create_issue` (先頭行 `split-from: <宣言のコメントの URL>`)、`add_label` (casefold、既存の綴りで足す)、`add_blocked_by`、`token_login`、`pr_state(url)` (U12。state/draft/merged だけ、作者で除かない)。GraphQL `graphql/pr-observe.graphql`。
+   - `issue-dispatch/scripts/issue_dispatch/ids.py`: `parse_pr_url` 追加。
+   - `issue-dispatch/scripts/issue_dispatch/comments.py` (U8): `format_header`/`parse_header` (右から読む、往復の一致を確かめる)、`list_comments(issue, login=None)`、`already_posted` (管理のセッションの種類だけ。`header_key` は role/kind/values、`引き継ぎ` だけ ID も。値は意味で比べる `_freeze` (並び不問、Issue 参照と PR URL は repo を lower))、`post` (作業のセッションの種類は確かめずに投稿)、`match_report`、`split_body`、`parse_wait_reason`。定数 MANAGER_KINDS/WORKER_KINDS/VALUE_WORDS/RELEASE_REASONS/REQUEST_KINDS/WAIT_KINDS/ID_KEYED_KINDS=("引き継ぎ",)。
+   - `issue-dispatch/scripts/issue_dispatch/sessions.py` (U9): `normalize_session_id` (`local_` の有無を区別、`.` で始まらない等)、`same_session_id`、`own_session_id(environ)` (HOST_SESSION_ID → SESSION_ID)、`manager_name(owner, number, login)` (`issue-dispatch <owner>/<number>/<login>`、小文字)、`parse_manager_name`、`session_temp_dir(session_id, environ)` (`${TMPDIR:-/tmp}/issue-dispatch/<id>`、normpath)。文書 `references/messaging.md` (実測の表 8 項目)。
+   - `issue-dispatch/scripts/issue_dispatch/declaration.py` (U10): `normalize_path` (posixpath.normpath)、`parse(obj, rules, default_table)` (誤りを全部集める、空の units・重複 resources (casefold) を差し戻し)、`held_resources`/`resource_changes` (casefold)、`update_kind` (`initial`/`full`/`resources-only`/`resources-removed-only`)、`conflictability(mine, others)` (相手ごと・パスごと `conflict`/`none`/`needs-user`、declaration None の相手は needs-user with problems)、`pr_files_check`。CLI `declaration parse --dir`・`declaration conflictability --dir <管理> --repo`。文書 `issue-format.md` の「宣言」節。
+   - `issue-dispatch/scripts/issue_dispatch/resources.py` (U11): `DEFAULTS={"capacity":1,"reserve":"on_assign","when_busy":"wait","release_undeclared":"ask"}`、`attributes(config_resources)`→(table, warnings)、`attributes_of`、`held_from_history(history)`、`judge_assign(item, label_resources, usage, attrs, answers)`→assign/skip/ask、`judge_declare(item, declared, reserved, usage, attrs, answers, undeclared_answers)`→go/wait/ask + release/keep/ask_undeclared/request_rewrite、`judge_update(item, kind, held, declared, usage, attrs, answers)`→go/wait/ask/skip、`judge_close`、`judge_release`。項目キーは `ids.same_issue` で比べる。CLI `resources attributes`・`resources judge --trigger` (本文を入れ子まで検査 `_check_judge_body`)。文書 `references/resources.md`。
+   - `issue-dispatch/scripts/issue_dispatch.py`: サブコマンド issue/blocked-by/pr/comment/declaration/resources/observe を追加。`_read_body`、`_read_json_body`、`_issue_error`、`_reflect(args, ops)`、`_snapshot_dir`、`_read_comment_prs(items, login, extra_urls)`、`_list_problems`。
+
+   U12 (ブランチ上、未マージ):
+   - `issue-dispatch/scripts/issue_dispatch/observe.py`: `SNAPSHOT_FILE="snapshot.json"`, `SNAPSHOT_VERSION=1`, `SNAPSHOT_KEYS`, `ITEM_KEYS` (item_id, position, state, status, fields, assignees, labels, blocked_by, body_edited_at, comment_ids, prs, partial), `LIST_PROBLEMS=("items-page","graphql-errors")`, `DIFF_KINDS=("status","field","assignees","labels","closed","reopened","removed","blocked_by","comment","pr","added","position","body_edit")`, `PR_URL_COMMENT_KINDS=("PR の報告",)`。関数: `load_snapshot(dir)`→status ok/missing/corrupt、`save_snapshot(dir, snap)` (mkstemp `.snapshot-*.json.tmp` + fsync + os.replace)、`snapshot_item(item, partial=())`、`build_snapshot(items_result, comment_prs, taken_at)` (problems の item 付きを `partial` に)、`skipped(before, after)`→{"items":{key:[what]},"prs":{url:理由}}、`pr_urls_in_comments(items, login)`、`reflect(snapshot, op)` (status/field/comment/blocked_by/labels/assignees)、`diff(before, after)` (skip 項目は飛ばす; `position` は共通項目の相対順が変わったとき 1 件 item None before/after 配列; `removed` は skip に無いときだけ)。
+   - CLI: `project items --write-snapshot --dir <管理>` (LIST_PROBLEMS があれば error・保存せず; それ以外は保存して status partial、`snapshot.skipped`)、`observe diff --dir --project` (LIST_PROBLEMS で error; ほか partial、`skipped`; スナップショットの comment_prs の URL も読み直す)、書き込み 4 サブコマンドの `--snapshot-dir`。
+   - 文書 `issue-dispatch/skills/issue-dispatch/references/observation.md`: 目的、様式の表 (`partial` 行あり)、差分の種類と処理の順の表 (13 種)、「欠けの扱い」の段落、書いた値の反映、CLI の表。
+   - テスト `issue-dispatch/tests/test_observe.py` (21 件)。
+   - 記録 `tmp/review-triages/feat-issue-dispatch-u12-observe-114.yaml`: 回 1 (採択 4: partial→removed、一時名、position、テスト失敗)、回 2 (採択 1: 欠けで観測が止まる)。すべて done。回 3 は未記録。
+   - コミット (U12 ブランチ): `e879c51` (機能)、`03e7893` (docs: --snapshot-dir の書き方)、`288b7e0` (mkstemp)、`b95b1f0` (並び順)、`2b6a12d` (partial で止める)、`0508b3b` (欠けの種類で分け、項目と PR を skip)。
+   - 記憶 (`~/.claude/projects/-Users-akima-workspace-claude-plugins/memory/`): `issue-dispatch-u7b-pr126.md`〜`issue-dispatch-u11-pr130.md` (すべてマージ済みに更新)、MEMORY.md の行。U12 の記憶ファイルはまだ無い。
+
+4. Errors and fixes:
+   - U7 後半 wording: 「参照が効かなかった」→「適用されなかった」。U9: コミットメッセージの「効かなかった」を amend で直した。
+   - `set -- $f` で lineorigin の引数が分割されない (zsh) → 引数を直接書く。
+   - テストの期待値の誤り (U9 `local_.` を拒む期待、U12 固定データの Status が `In Progress`) → テストを直す。U9 では push 前に amend。
+   - Bash の `&&` チェーンの途中で `S=...` が空になり heredoc が失敗、テストの実行が飛んでコミット (U12 回 1 の指摘 4: HEAD でテスト失敗) → 以後は変数の代入を独立の行にし、テストの成否を `grep -q "^OK"` で確かめてから commit。空の範囲の依頼文ができたので削除して作り直した。
+   - commit-rules-guard の hook が docs-only コミットを止めた → `--trailer 'Rules-Checked: yes'` を付け、本文の行を削除して再実行。
+   - review-triage の記録の様式: `notes` は 1 文字列、`investigation` は `scope`/`included`、`doc_dag` は `scope`/`result` (`target` は不可)。
+   - 利用者の選択 (設計判断): U8 既投稿の鍵 (案 B: 管理のセッションは ID を比べない、引き継ぎと作業は ID も)→ 後に案 A (作業のセッションの種類は確かめない)。U9 owner/login を小文字 (案 A)。U10 declaration の案は全部承認。U11 資源名 casefold・CLI 2 つ (案 A)。U12 `--snapshot-dir`・`observe diff`・PR の範囲・英語の値 (すべて OK)。
+
+5. Problem Solving:
+   - 各単位でレビューを収束させて PR 化 (U7 後半: 2 回、U8: 5 回、U9: 2 回、U10: 2 回、U11: 3 回)。U12 は 3 回目の結果に指摘 1 件あり未収束。
+   - U12 回 3 の指摘 (未判定): `diff` は `partial` のある項目をどの種類の変化も比べずに飛ばすので、上限を超える欠け (本文の編集 100 件超、blocker 50 件超) が続く項目の close・Status の変化・新しいコメント・Project からの除去がずっと差分に現れない (除去は次のスナップショットに項目が無くなるので後のターンでも見つからない)。residual: graphql-errors は LIST_PROBLEMS のまま (1 項目だけ読めない応答でも止める)、読めなかった PR が読めるようになった最初のターンの変化は差分に出ない。考えている直し方: 欠けの種類ごとに影響する側面だけを比べない (labels-truncated → labels、blocked_by-truncated → blocked_by、body_edits-truncated → body_edit、prs-truncated → prs、fields-truncated → field、comments → comment、events → 無し) ようにし、close/status/removed などほかの変化は比べる。
+
+6. All user messages (この要約の範囲):
+   - 「OK」(U7 後半・U8・U9・U10・U11・U12 の案の承認、各 1 回)
+   - 「はい」(push と PR の承認、各単位)
+   - 「#125 をマージしました」「マージしました」(U7 後半以降、各単位)
+   - `/review-triage:review-triage <結果ファイルのパス>` (U7 後半 2 回、U8 5 回、U9 2 回、U10 2 回、U11 3 回、U12 3 回)
+   - `/review-triage:review-triage-fix` (引数なし。U7 後半 1 回、U8 4 回、U9 1 回、U10 1 回、U11 2 回、U12 2 回)
+   - 「案B」(U8 既投稿の鍵)、「案A」(U8 作業のセッションの種類を確かめない)、「案A」(U9 owner/login を小文字)
+
+7. Pending Tasks:
+   - U12 レビュー 3 回目の判定: 指摘 1 件 (observe.py L193、P2、confidence high) を判定して記録に回 3 を追記 (採択の見込み、A2、prior_defect は not-holds)、residual 2 件を notes に写し、サマリ再生成と triagecheck、報告。
+   - 採択なら `/review-triage:review-triage-fix` (利用者が呼ぶ) で直し、増分レビュー (4 回目、base `0508b3b`) の依頼文を作る。
+   - 収束後: push と PR (本文に概要・変更・決めたこと・レビュー・確認)、記憶 `issue-dispatch-u12-pr<N>.md` と MEMORY.md、マージ後に U13 (項目の状態) を `main` から別のブランチで。
+   - 後の単位で見直すこと (記憶済み): U13・U15 で解析できない相手の宣言の扱い、U21・U23 で排他の名前の比べ方 (`parse_manager_name`)、U5 の記録ディレクトリ名の綴り。
+
+8. Current Work:
+   `/review-triage:review-triage /Users/akima/workspace/claude-plugins/tmp/review-20261023-1543-feat-issue-dispatch-u12-observe-114-3-code-review-opus.yaml` を受け、HEAD `0508b3b`・作業ツリー clean・reflog 不変を確かめ、結果ファイルを読んだ直後。結果: findings 1 件 (file `issue-dispatch/scripts/issue_dispatch/observe.py` line 193: 「diff は、1 項目の中に欠け (partial) がある項目を、どの種類の変化も比べずに飛ばす。…その項目の close・Status の変化・新しいコメント・Project からの除去は、ずっと差分に現れない」severity P2, confidence high)、residual 2 件 (graphql-errors は引き続き止める; 読めるようになった最初のターンの PR の変化は出ない)。記録 YAML には回 3 を未追記。
+
+9. Optional Next Step:
+   回 3 の判定を記録に書く: lineorigin を `-base 1121e88 -file issue-dispatch/scripts/issue_dispatch/observe.py -lines 193 -rev 0508b3b` で実行 (not-holds の見込み)、`tmp/review-triages/feat-issue-dispatch-u12-observe-114.yaml` に回 3 (採択 1 件、A2、帰結 4 項目、notes に residual 2 件) を追記、`triagecheck -write-summary` と検査、利用者に報告して `/review-triage:review-triage-fix` を案内する。修正の方向 (fix で決める): 欠けの種類ごとに影響する側面だけを比べない (close・status・comment・removed などは比べる)。
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/a8111d06-1d30-48e8-9b76-e363fe6486f5.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
