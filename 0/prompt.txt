@@ -1,0 +1,1 @@
+#82 をマージしました。次は新セッションで #80 に着手します /session-handoff:handoff-write
