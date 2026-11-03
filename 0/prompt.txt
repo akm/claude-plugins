@@ -1,0 +1,132 @@
+シナリオGでこんな風になってますが、次はどうしたら良いですか？
+
+----
+
+  
+
+<pasted_content id="b2e9">
+依頼文を書きました (回 3・この起動 1 回目 / 上限 5 回、識別子 20260927-0822-trial-review-loop-e2e-3-code-review-opus)。
+
+  ワーカーを起動してください。 周回 20260927-0118-trial-review-loop-e2e のレビューは、端末で起動するワーカーが行います。
+
+  1. 端末を開き、作業側と同じ作業ツリーに移動します。
+
+  cd "/Users/akima/workspace/claude-plugins"
+
+  2. 次のコマンドでワーカーを起動します。モデルと effort を書き換えないでください —
+     周回はこの値で始めたので、違う値で起動すると、各回の突き合わせでレビュー不成立として止まります。
+
+  bash "/Users/akima/workspace/claude-plugins/.claude/worktrees/review-loop-plugin/review-triage/scripts/review-loop-worker.sh"
+  "/Users/akima/workspace/claude-plugins/tmp/review-loop/20260927-0118-trial-review-loop-e2e" --model "opus" --effort xhigh --idle-minutes 180
+  --review-timeout-minutes 60
+
+  - ワーカーは端末に置いたままにしてください。依頼文が来るたびにレビューし、周回を /review-loop --end で終えると、応じた回の一覧を表示して終わります。
+  - 周回の間は、作業ツリーを変えないでください (編集・コミット・ブランチの切り替え)。変えると、その回はレビュー不成立になって止まります。
+  - 端末の claude は、Claude Desktop app とは別に認証が要ります。認証していなければ、先に端末で claude を 1 回起動してログインしてください。
+  - ワーカーを止めるときは、その端末で Ctrl-C を押します (レビュー中の回は失敗として完了の印が書かれます)。
+
+  ▎ [!NOTE]
+  ▎ 前回の起動は --idle-minutes 3 だったため遊休で終了しました。上のコマンドは loop.yaml の値 (180) を使っています。
+
+  ワーカーの起動を待ちます (期限 10 分)。
+
+⏺ Bash(bash "/Users/akima/workspace/claude-plugins/.claude/worktrees/review-loop-plugin/review-triage/scripts/review-loop-wait.sh" --await-worker
+      "/Users/akima/workspa…)
+  ⎿  Running in the background (↓ to manage)
+  ⎿  Allowed by auto mode classifier
+
+⏺ 回 3 の依頼文を書き、ワーカーの起動を待っています (期限 10 分)。上のコマンドで端末からワーカーを起動してください。
+
+✻ Sautéed for 1m 13s · done 8:23 · 1 shell still running
+
+⏺ Background command "review-loop 20260927-0118-trial-review-loop-e2e 回 3 (20260927-0822-trial-review-loop-e2e-3-code-review-opus) [この起動 1/5
+回・期限切れ 0・中断 0]: ワーカーの起動を待つ (0 = 現れた / 124 = 期限切れ / それ以外 = 中断)。通知を受けたら review-loop の再入の手順へ" completed (exit
+code 0)
+
+⏺ Exit code 0 — the wait ended with an event. Entering the reentry procedure.
+
+⏺ Bash(cat "/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/0b4523b7-df8b-455d-b923-411a2359a4e1/tasks/banowkl9a.output"; echo "=== loop.yaml
+      state:"; gr…)
+  ⎿  worker reviewing
+
+     [exited with code 0]
+     … +6 lines (ctrl+o to expand)
+  
+⏺ worker reviewing — the worker appeared and is reviewing. Per the event table, I wait again with wait_minutes (60), keeping the counts unchanged.
+
+⏺ Bash(cat worker.yaml; echo "=== now:"; date "+%Y-%m-%d %H:%M:%S"; echo "=== delivered marks:"; ls delivered-*.yaml 2>/dev/null)
+  ⎿  state: reviewing
+     current_request: "20260927-0822-trial-review-loop-e2e-3-code-review-opus"
+     pid: 60055
+     … +12 lines (ctrl+o to expand)
+
+⏺ The worker picked up the round 3 request and is reviewing it. Waiting again with the normal period.
+
+⏺ Bash(bash "/Users/akima/workspace/claude-plugins/.claude/worktrees/review-loop-plugin/review-triage/scripts/review-loop-wait.sh"
+      "/Users/akima/workspace/claude-plugi…)
+  ⎿  Running in the background (↓ to manage)
+  ⎿  Allowed by auto mode classifier
+
+⏺ ワーカーが起動し、回 3 の依頼文をレビュー中です。完了の印を待っています (期限 60 分)。
+
+✻ Baked for 18s · done 8:23 · 1 shell still running
+
+❯ /review-triage:review-loop --resume                                                                                                                       
+
+⏺ A --resume arrived while my wait for round 3 is still running. Let me check the current state.
+
+⏺ Bash(echo "=== loop.yaml:"; grep -E "^(state|stop_reason):" loop.yaml; sed -n '/^rejected:/,$p' loop.yaml; echo "=== worker.yaml:"; cat worker.yaml; echo
+      "=== now:";…)
+  ⎿  === loop.yaml:
+     state: active
+     stop_reason: "" 
+     … +26 lines (ctrl+o to expand)
+  
+  Read 1 file (ctrl+o to expand)
+
+⏺ The worker is actively reviewing round 3 right now (worker.yaml refreshed 4 seconds ago). Per reentry step 1, state is active, so I output the --resume
+  opening report, then continue.
+
+  --resume の開始の報告
+  
+  周回 20260927-0118-trial-review-loop-e2e を再開します。loop.yaml は active のままなので書き換えていません。
+
+  - 置き場: /Users/akima/workspace/claude-plugins/tmp/review-loop/20260927-0118-trial-review-loop-e2e
+  - 前のセッションについて: この --resume は、直前の起動が回 3
+    の完了の印を待っている最中に届きました。前の起動は報告せずに終わってはおらず、いま待機が走っています (バックグラウンドの待機 bs4mava3q、期限 60 分)。
+
+  条件 (loop.yaml から読んだもの)
+
+  - レビュースキル: code-review、そのオプション: high
+  - ワーカーのモデルの指定: opus (実効モデルは各回の完了の印で分かります)
+  - ワーカーの effort: xhigh
+  - 権限モード: default、許可の一覧: 指定なし (ワーカーの既定)
+  - 上限: 5 回、構造の関門 k: 3
+  - review-triage-fix に渡す回数の閾値 N: 1、段ごとの走らせ方: 指定なし (設定の既定)
+  - 待機の期限: 60 分 (ワーカーの起動待ちは 10 分)、停滞の秒数: 30
+
+  ワーカーの状態
+
+  動いています。 worker.yaml の state は reviewing、current_request は 20260927-0822-trial-review-loop-e2e-3-code-review-opus、更新時刻は 4 秒前 (停滞の秒数
+  30 以内)、pid 60055。
+
+  起動コマンド (端末を閉じた後に起動し直すときに使います):
+
+  cd "/Users/akima/workspace/claude-plugins"
+  bash "/Users/akima/workspace/claude-plugins/.claude/worktrees/review-loop-plugin/review-triage/scripts/review-loop-worker.sh"
+  "/Users/akima/workspace/claude-plugins/tmp/review-loop/20260927-0118-trial-review-loop-e2e" --model "opus" --effort xhigh --idle-minutes 180
+  --review-timeout-minutes 60
+
+  ---
+  
+  再入の手順を進めます。取り込む印はありません (回 3 の古い印は rejected にあります)。印の無い依頼文が 1 つあります —
+  20260927-0822-trial-review-loop-e2e-3-code-review-opus、いさにワーカーがレビュー中のものです。よって手順 6
+  の待機に入りますが、既に同じ識別子の待機が走っているので、新しい待機は起動しません — 二重に起動すると同じ印について通知が 2 度届きます。
+
+  既存の待機 bs4mava3q の通知を待ちます。ワーカーが回 3 のレビューを終えて完了の印を書けば、その通知で再入の手順の 4 に入り、突き合わせて review-triage
+  を呼びます。
+</pasted_content id="b2e9">
+
+----
+
+次にどうするべきか再度手順を示してください
