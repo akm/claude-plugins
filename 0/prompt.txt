@@ -1,0 +1,73 @@
+<task-notification>
+<task-id>aeb216cdef1149457</task-id>
+<tool-use-id>toolu_01GCxLtLfYYHB9hRN5nEc7Gy</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/aeb216cdef1149457.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplify review: code-quality" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>go vet はクリーン。以上を踏まえてレビュー結果を返す。
+
+## レビュー結果
+
+対象: `review-triage/tools/triagecheck/record.go`, `review-triage/tools/triagecheck/record_test.go` (main...HEAD の diff)
+
+### 指摘 1 件
+
+**`record.go:591-594` と `record.go:602-605`(コピペによる重複、項目 3)**
+
+新設した `case "investigated":` の中の SHA 拒否チェックが、既存の `case "pending", "awaiting-human":` の中の SHA 拒否チェックと完全に同一のコード (`externalOnly()` 呼び出し + 同じメッセージ書式の `if pl.SHA != "" { add(...) }`) になっている。
+
+```go
+case "investigated":
+    externalOnly()
+    if pl.SHA != "" {
+        add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+    }
+    ...
+case "pending", "awaiting-human":
+    externalOnly()
+    if pl.SHA != "" {
+        add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+    }
+    ...
+```
+
+この重複はこの diff が `investigated` の分岐を足したことで生じたもので、既存の正本 (スキーマ表・固定した決定) に触れずに解消できる。`approachRequired` と同じやり方で、両分岐から呼べる 1 つのクロージャに括り出せる。
+
+修正案 (`approachRequired` の定義の直後に追加):
+
+```go
+noSHAYet := func() {
+    externalOnly()
+    if pl.SHA != "" {
+        add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+    }
+}
+```
+
+呼び出し側を次のように差し替える (メッセージ文言・条件は一切変えないため挙動は不変):
+
+```go
+case "investigated":
+    noSHAYet()
+    if pl.Approach != "" { ... }
+    if pl.Order != 0 { ... }
+case "pending", "awaiting-human":
+    noSHAYet()
+    if pl.Status == "pending" {
+        approachRequired()
+    }
+    if pl.Status == "awaiting-human" &amp;&amp; pl.Options == "" { ... }
+```
+
+### 確認したが問題なしと判断した項目
+
+- **旧様式 `recurrence` の型・読み込み・描画の保持**: 固定した決定どおりで、レビュー観点 11 (プレリリース互換用の足場) の削除対象にはならない (実データが `tmp/review-triages/` に残る既存記録を読む用途のため、削除しないのが正しい)。
+- **コメント量が多い点 (項目 8)**: 「旧様式のキーを何故残すか」「status ごとに approach が必須になる条件」などはいずれもコードから読み取れない不変条件・設計判断の説明で、コードの言い直しや変更履歴の記述ではない。フラグ対象外と判断した。
+- **文字列ベタ書きの `status` 比較 (項目 5)**: 本 diff 以前から `pending` / `done` などの列挙値もすべて生文字列で、コードベースに enum/定数が存在しない。既存の型と整合しており、この diff だけの問題ではない。
+- **死んだコード (項目 9)**: `recordRecurrenceProblems` とその関連ヘルパー (`recurrenceRecordYAML` 等) は残存参照なく完全に除去されている (`grep` で確認済み)。`fmt` の import 追加も `legacyRunYAML` / `legacyEvidenceYAML` で使用されており未使用ではない。
+- **語彙 (項目 10)**: 「旧様式」は `README.md` と `record-schema.md` でも使われている既存の用語で、この diff だけの臨時的な言い回しではない。
+- **ネストした条件分岐 (項目 7)**: 新設コードの分岐はいずれも 1 段どまり。
+- `go vet ./...` はクリーン。</result>
+<usage><subagent_tokens>122896</subagent_tokens><tool_uses>8</tool_uses><duration_ms>120891</duration_ms></usage>
+</task-notification>
