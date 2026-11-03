@@ -1,0 +1,6 @@
+<cross-session-message from="local_c5323e39-471d-4290-819a-490f16b026a6" from-name="review-rally 20261102-2255-feat-plugin-install-status-168 のレビュー">
+review-rally 20261102-2255-feat-plugin-install-status-168 20261102-2350-feat-plugin-install-status-168-5-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1836fc/tmp/review-rally/20261102-2255-feat-plugin-install-status-168/review-20261102-2350-feat-plugin-install-status-168-5-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high 9019aa92..5457ccbe")。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルの引数は渡していない)。
+- 指摘 2 件 (P3・confidence high)・residual 2 件。
+- HEAD と作業ツリー: レビューの前後とも HEAD は 5457ccbe (detached HEAD)。git status --porcelain は前後とも空で、作業ツリーは不変。作業ツリーの中で書いたのは出力先の 1 ファイルだけ (tmp/ は .gitignore の対象)。確認のためのプローブとミューテーションは、HEAD を git archive で scratchpad (作業ツリーの外) に展開した複製の中で行った。
+</cross-session-message>
