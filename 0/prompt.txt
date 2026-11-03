@@ -1,0 +1,1 @@
+<bash-input>rm -rf /private/tmp/claude-501/-Users-akima-workspace-claude-plugins/feec6288-dfe0-4c5b-8d07-0e5eda3b96f8/scratchpad/probe</bash-input><bash-stdout>[No output was captured. The command ran in the terminal pane (tab 0); if it should have printed something, use read_terminal with tab_id "0" to check.]</bash-stdout><bash-stderr></bash-stderr>
