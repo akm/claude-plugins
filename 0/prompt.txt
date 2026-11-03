@@ -1,0 +1,97 @@
+$ claude plugin list
+Installed plugins:
+
+  ❯ commit-rules-guard@akm-claude-plugins
+    Version: 0.3.0
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ commit-rules-guard@akm-claude-plugins
+    Version: 0.4.0
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ commit-squash@akm-claude-plugins
+    Version: 0.1.0
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.13.1
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.21.4
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.21.4
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.21.4
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.21.4
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.21.4
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ compound-engineering@compound-engineering-plugin
+    Version: 3.21.4
+    Scope: project
+    Status: ✔ enabled
+
+  ❯ discord@claude-plugins-official
+    Version: 0.0.4
+    Scope: user
+    Status: ✘ disabled
+
+  ❯ doc-dag@akm-claude-plugins
+    Version: 0.1.0
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ gopls-lsp@claude-plugins-official
+    Version: 1.0.0
+    Scope: project
+    Status: ✘ disabled
+
+  ❯ mermaid-preview@akm-claude-plugins
+    Version: 0.1.0
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ pr-teeth@akm-claude-plugins
+    Version: 0.2.0
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ review-triage@akm-claude-plugins
+    Version: 0.6.0
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ skill-creator@claude-plugins-official
+    Version: c49e6f68fd62
+    Scope: user
+    Status: ✔ enabled
+
+  ❯ typescript-lsp@claude-plugins-official
+    Version: 1.0.0
+    Scope: project
+    Status: ✘ disabled
+
+  ❯ work-log-gh-comment@akm-claude-plugins
+    Version: 0.1.0
+    Scope: user
+    Status: ✔ enabled
