@@ -1,0 +1,3 @@
+先ほど失敗した GitGuardian の workflow を re-run して成功したことを確認しました。
+
+#122 をマージしました
