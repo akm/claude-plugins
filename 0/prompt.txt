@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>blnnqa073</task-id>
+<tool-use-id>toolu_01Y7UhjGvvQgZjTvqN6dhdN2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/a8111d06-1d30-48e8-9b76-e363fe6486f5/tasks/blnnqa073.output</output-file>
+<status>completed</status>
+<summary>Background command "Rerun the whole poll test module verbosely" completed (exit code 0)</summary>
+</task-notification>
