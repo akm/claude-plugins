@@ -1,0 +1,4 @@
+端末１で review-loop スキルと起動したところ
+「│ 同じブランチ trial/review-loop-e2e に、終わっていない周回 tmp/review-loop/pilot があります (loop.yaml が state: active のまま、end
+│ ファイルは人間が置き済み、ワーカーは left)。どう進めますか。」
+と出ました。
