@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>byfhuss2w</task-id>
+<tool-use-id>toolu_01FWptK5bAShqzog1oKki1df</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/byfhuss2w.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the full test suite" completed (exit code 0)</summary>
+</task-notification>
