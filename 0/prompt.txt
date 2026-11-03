@@ -1,0 +1,2 @@
+<bash-input>git branch -D backup/before-squash-4911ec8 squash/77</bash-input><bash-stdout>Deleted branch backup/before-squash-4911ec8 (was 4911ec8).
+Deleted branch squash/77 (was 8709b46).</bash-stdout><bash-stderr></bash-stderr>
