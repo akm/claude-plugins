@@ -1,0 +1,19 @@
+<task-notification>
+<task-id>a082005933057be0f</task-id>
+<tool-use-id>toolu_014ZAXViTzzABpHVVh63Ej2E</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a082005933057be0f.output</output-file>
+<status>completed</status>
+<summary>Agent "Doc review: scope-guardian-reviewer" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>```json
+{
+  "reviewer": "scope-guardian",
+  "findings": [],
+  "residual_risks": [
+    "実装単位 U9 (段の sub-agent 実行) の通し確認は、段 1・段 2・段 3 をそれぞれ単独で sub-agent にする 3 通りだけを対象にしており (U9 の Execution note)、複数の段を同時に sub-agent にした場合の相互作用は確認対象に入っていない。この計画のどの要求 (R-ID) も組み合わせの検証を明示的に求めていないため finding にはしないが、実装時に見落とされやすい点として記録する。"
+  ],
+  "deferred_questions": []
+}
+```</result>
+<usage><subagent_tokens>126358</subagent_tokens><tool_uses>3</tool_uses><duration_ms>233425</duration_ms></usage>
+</task-notification>
