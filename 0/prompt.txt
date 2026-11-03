@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bpjfrmnnp</task-id>
+<tool-use-id>toolu_017ouyNsTdt4tYcc9KtE3aTG</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/d6f41b21-aca9-4cca-9450-e1a6d320cdc4/tasks/bpjfrmnnp.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261030-1245-feat-review-request-target-dir-151 (20261030-1310-feat-review-request-target-dir-151-2-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
