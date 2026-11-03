@@ -1,0 +1,34 @@
+<bash-input>D="$(mktemp -d)"; mkdir -p "$D/home"; (cd "$D" && export HOME="$D/home" CLAUDE_CONFIG_DIR="$D/home/.claude" && claude plugin marketplace add 'akm/claude-plugins#main' && echo '--- list --json' && claude plugin marketplace list --json && echo '--- known_marketplaces.json' && cat "$D/home/.claude/plugins/known_marketplaces.json"); rm -rf "$D"</bash-input><bash-stdout>Cloning via SSH: git@github.com:
+akm/claude-plugins.git
+Refreshing marketplace cache
+(timeout: 120s)…
+Cloning repository (timeout:
+120s): git@github.com:akm/claude
+-plugins.git (ref: main)
+Clone complete, validating
+marketplace…
+✔ Successfully added
+marketplace: akm-claude-plugins
+(declared in user settings)
+--- list --json
+[
+  {
+    "name": "akm-claude-plugins",
+    "source": "github",
+    "repo": "akm/claude-plugins",
+    "ref": "main",
+    "installLocation": "/var/folders/ld/hbty9_hd3531vdtfn856144w0000gn/T/tmp.cUdChllUaB/home/.claude/plugins/marketplaces/akm-claude-plugins"
+  }
+]
+--- known_marketplaces.json
+{
+  "akm-claude-plugins": {
+    "source": {
+      "source": "github",
+      "repo": "akm/claude-plugins",
+      "ref": "main"
+    },
+    "installLocation": "/var/folders/ld/hbty9_hd3531vdtfn856144w0000gn/T/tmp.cUdChllUaB/home/.claude/plugins/marketplaces/akm-claude-plugins",
+    "lastUpdated": "2026-11-02T15:44:32.236Z"
+  }
+}%</bash-stdout><bash-stderr></bash-stderr>
