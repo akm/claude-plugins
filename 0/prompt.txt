@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bon2szont</task-id>
+<tool-use-id>toolu_01WDww7HK7WHizyYf2NQs7Vr</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bon2szont.output</output-file>
+<status>completed</status>
+<summary>Background command "Python のテストを最終の HEAD で別の作業ツリーで走らせる" completed (exit code 0)</summary>
+</task-notification>
