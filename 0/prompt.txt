@@ -1,0 +1,222 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+   - Continue PR #115 (akm/claude-plugins, branch `feat/issue-dispatch-plan-114`, Issue #114). The PR contains only the plan `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md` (plugin issue-dispatch).
+   - The workflow repeats every round:
+     1. review-request (skill ce-doc-review, model opus, incremental).
+     2. The user runs the review in a separate session.
+     3. /review-triage judges the findings.
+     4. /review-triage-fix fixes them:
+        - Group findings into problems by cause.
+        - Mechanical fixes first, one commit per problem.
+        - Design problems become awaiting-human, with one question per problem (the user chose 「問題ごとに問いをまとめる」).
+        - After fixes, list the details I decided and ask for confirmation.
+     5. Update the PR body draft `tmp/pr-115-body-draft.md`.
+     6. Make the next review request.
+   - **Constraint (verbatim):** 「push は諸々決まって、レビューが通ってから行うので、しばらくの間pushしません。」 Never push without asking. Ask about push, squash (commit-squash) and ready for review only after review passes.
+   - Explanations must suit first-time engineers. The user often invokes /mermaid-preview 「初見の技術者にわかりやすく問題を前提から説明してください」; I now create explainer pages in `tmp/` proactively. Page style rules:
+     - Write only premise, problem, options and question; no history.
+     - Write conditions in full and define terms.
+     - State the rule whenever something "doesn't match".
+     - Draw artifacts, the places where things are written (Issues, PRs, Project, snapshot, record) and the communication paths.
+     - Dependency arrows are labelled 「使う」: tail = the user of a thing, head = the thing used.
+     - Give recovery and behaviour sequences per case when asked.
+   - Communicate in Japanese.
+   - The final answer of each turn restates any question to the user.
+
+2. Key Technical Concepts:
+   - **review-triage 0.23.0**
+     - Judgment flow D1–D8 / A2. D8 results now go in `findings[].prior_defect`: `base`, `line_check`, `line_reason`, `same_defect`. Required from the first run that writes it.
+     - Record plans statuses: investigated / pending / awaiting-human / done. Each plan records `near_edges` (from nearedges) and `doc_dag`.
+     - Threshold N = 5 (round ≥ 6 requires planner selection).
+     - Run 4 is the current round.
+   - **issue-dispatch plan concepts touched in rounds 3–4**
+     - Comment `待機`:
+       - It is written whenever judgment can't be written yet, for any reason (R20).
+       - Its first line carries `理由 <利用者の答え・Issue <参照>・小さな PR (<参照>)・資源 <名前>・設定>` (R6).
+       - KTD2 idempotence: compare a new `待機` only with the latest `待機` on that declaration.
+     - Small PR tracking:
+       - The 依頼/報告 first line carries `待つ <owner/repo#番号>`.
+       - The manager identifies the PR from the report URL and writes it to the record and the snapshot; the wait script `wait` reads the PR state.
+       - Merged-before-report counts as merged; closed-unmerged → ask the user.
+     - Record rebuild (R24) restores waiting items from the `待機` reason and from labels.
+     - Worker restart (R26) uses `work held` (the latest judgment-requiring declaration, excluding resource-removal-only updates, plus 開始可 / 待機 / 依頼).
+     - `wait-decision --review-update` flag (renamed from `--in-review`).
+     - `plugin version` (in the U8 hooks+plugin-version part):
+       - Compares against all installPath entries; outside the cache → "比べられない".
+       - Unreadable → reported once, with a mark.
+       - Worker marks live in `${TMPDIR:-/tmp}/issue-dispatch/<セッション ID>/`.
+     - R18 start exclusivity:
+       - The 1st check excludes self.
+       - The post-rename check: line 1 (name part, minus the identifier) is the convention name AND no other row has it.
+       - If duplicates exist, both stop.
+     - KTD9: verify the repositories path is the clone root (`git rev-parse --show-toplevel`), then three steps: `rev-parse --verify --quiet origin/HEAD` → `ls-tree --name-only origin/HEAD -- <path>` → `git show`.
+     - R21 closed in-progress Issue: options are 止める or reopen して続ける. reopen is human-only; on reopen, re-judge if the awaited events already happened.
+   - **Mermaid techniques**
+     - Escape `#` followed by digits as `#35;` (not in style color lines).
+     - Set `sequence: {useMaxWidth:false, wrap:true, width:130, actorMargin:30}` and `flowchart: {useMaxWidth:false}`.
+     - Flip arrowheads after `mermaid.run()` so dependency arrows point from the user to the thing used, while keeping top-down layout.
+
+3. Files and Code Sections:
+   - `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md` (the deliverable)
+     - Round 3 commits:
+       - 11c8e12 (P4)
+       - 7a00c98 (P11)
+       - 4fb661f (P2)
+       - 2206f7c (P1)
+       - 9c75a36 (P3)
+       - b6c01bb (P5)
+       - d9307f7 (P6)
+       - db4b4de (P7)
+       - f1b3f64 (P8)
+       - ccf326c (P9)
+       - a805d00 (P10)
+       - 806c1f5 (P12)
+       - b2d6883 (P13)
+     - Round 4 commits so far:
+       - fcf0b2a (P6: 待つ相手 wording)
+       - 39ad324 (P11: Key Flows F11 options)
+       - 913a22c (P13: `--review-update` rename + AE46 Then + Covers R29)
+       - 241eb17 (P3: clone root check + reason list)
+       - 7d67ad1 (P7: idle-no-progress reset after request)
+       - a57c150 (P5: 待機 idempotence vs latest)
+       - 2702348 (P8: duplicate-name check)
+       - 4771265 (P9: unreadable report mark)
+       - b025d2f (P4: restart for In review and rewrites)
+       - 16c4ff4 (P10: re-judge on reopen)
+     - All are unpushed.
+   - `tmp/review-triages/feat-issue-dispatch-plan-114.yaml` (record; untracked, never commit)
+     - Runs 1–4.
+     - Run 4 has 23 findings with `prior_defect` (base e568828, line_check not-holds).
+     - Run 4 plans P1–P13:
+       - P1 (order 12, awaiting, depends_on P2) and P12 (order 13, awaiting) have options written.
+       - P2 (order 11) is pending.
+       - The others are done.
+   - `tmp/pr-115-body-draft.md`
+     - Updated with the 2026-10-16〜10-17 entry (4th document review).
+     - 「この PR の状態」 range is `8aec21f`〜`b2d6883`.
+   - Explainers in `tmp/`:
+     - issue-dispatch-unit-placement-114.html
+     - -start-rename-114 (P1)
+     - -wait-comment-114 (P3)
+     - -small-pr-tracking-114 (P5)
+     - -record-rebuild-114 (P6, with per-item recovery sequences)
+     - -worker-restart-114 (P7)
+     - -plugin-version-114 (P8)
+     - -review-resource-close-114 (P9)
+     - -continue-after-close-114 (P10)
+     - -plugin-version-unit-114 (P12)
+   - Review request / result files:
+     - `tmp/review-request-20261016-0802-…-3-…md` / `tmp/review-20261016-0802-…yaml`
+     - `tmp/review-request-20261017-1124-…-4-…md` / `tmp/review-20261017-1124-…yaml`
+   - Memory (`~/.claude/projects/-Users-akima-workspace-claude-plugins/memory/`):
+     - `dependency-arrow-uses.md`
+     - `explainer-diagram-show-where-written.md`
+     - MEMORY.md index lines added.
+   - Scratchpad: `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/b9807760-a222-4bc1-91da-3136fdb14684/scratchpad/`
+     - `done_auto.py`
+     - run4 / stage1 / stage2 scripts
+     - msg-r4p*.txt
+
+4. Errors and fixes:
+   - Backticks in double-quoted shell arguments to done2/done_auto were executed as commands, mangling the doc_dag text (P3 run 3, P9 run 4). Fixed in Python. From now on, use single quotes for those arguments.
+   - In Mermaid, `#9` dropped text. Escaped it as `#35;9`; the first pass also escaped style colors, which were restored.
+   - Diagrams were shrunk in the narrow pane. Fixed with `useMaxWidth:false` and `wrap:true`.
+   - Cluster order was wrong in the P12 explainer. Fixed with invisible links.
+   - The wording lint flagged several phrases; all were reworded:
+     - 置く
+     - 触る
+     - 判定を行う
+     - 依頼を行う
+     - 冗長
+   - The repo's triagecheck rejects `prior_defect`. I use the 0.23.0 plugin triagecheck instead; it reports no problems.
+   - A duplicated phrase in R26 and missing pieces in P3 and P13 were fixed by amending the same unpushed commit and updating the record sha.
+   - User feedback on the explainers (incorporated):
+     - Show Issues and PRs as participants.
+     - State the communication paths.
+     - Distinguish the 待機 script from the 待機 comment.
+     - Draw Project and snapshot as accessed things.
+     - Add per-case recovery sequences.
+     - Use 「使う」 arrows.
+
+5. Problem Solving:
+   - Rounds 2 and 3 are fully fixed.
+   - Round 4: 11 of 13 problems are done (P6, P11, P13, P3, P7, P5, P8, P9, P4, P10, plus P2 in progress).
+   - P1 and P12 await the user's decision (options are in the record).
+   - Records are checked with the 0.23.0 triagecheck.
+
+6. All user messages:
+   - 「依存の線に付いている文言が「使われる」となっていますが、依存であるならばその根本が使う方で、矢印の方が使われる方だと決めて「使う」に統一してください。」
+   - 「はい、案2でOKです」
+   - 「1. はい、OKです 2. OKです」 (P13 details; review request)
+   - /review-triage:review-triage with the round-3 output path
+   - /review-triage:review-triage-fix
+   - /mermaid-preview 「初見の技術者にわかりやすく P1 について問題の前提から説明してください」
+   - 「P1は案1 でOK。前回の細部もOKです」
+   - /mermaid-preview 「初見の技術者にわかりやすく問題を前提から説明してください」 (P3)
+   - 「P3 は (a) も (b) も推奨でお願いします」
+   - 「前提に Issue を介して セッション間のやり取りをすることが書かれていないのでは？他にも経路があったら書いてほしいです」
+   - 「「共通の変更を先に小さな PR にする」の流れ に Issue や PR 自身が登場していません。いつどのように Issue に何が記述され、いつ小さなPRが作られるのかを示すべきでは？」
+   - 「「2.1 待機が小さな PR のマージに気づかない」の「待機」は「1.2 「共通の変更を先に小さな PR にする」の流れ」のどれに該当しますか？」
+   - 「「管理のセッションの待機スクリプト wait」の「数分おきにProjectを読み、スナップショットと比べる」ですがアクセス先の「Project」と「スナップショット」も書くべきでは？きっとこれらに対して他からもアクセスがあるはずですよね？」
+   - 「「管理のセッションの待機スクリプトwait」が監視している Project に対して、PR がマージされたときにマージされたことを通知する記述を行う GitHub Actions を追加するのはどうでしょう？」
+   - 「待機スクリプトは 小さなPRを特定できるのですか？」
+   - 「P5 は 2.1 も 2.2 も推奨でお願いします」
+   - /mermaid-preview (P6)
+   - 「.html の説明の 「3. 対処案」に壊れた箇所ごとに、復旧シーケンスを記載してください」
+   - 「P6 は案 1 でお願いします」
+   - /mermaid-preview (P7)
+   - 「P7 は案 1 でお願いします」
+   - /mermaid-preview (P8)
+   - 「P8 は推奨でお願いします」
+   - 「P9 は案 1 でお願いします」
+   - 「P10 は案 1 でお願いします」
+   - 「P12 は案 1 でお願いします」
+   - 「はい、お願いします」 (round-4 review request)
+   - /review-triage:review-triage tmp/review-20261017-1124-feat-issue-dispatch-plan-114-4-ce-doc-review-opus.yaml
+   - /review-triage:review-triage-fix (round 4)
+
+7. Pending Tasks:
+   - Finish round-4 P2:
+     - Edit the plan.
+     - Commit.
+     - Record as done with `done_auto.py`, passing single-quoted args.
+   - Interview P1 (record rebuild reconciliation). The page should explain from the premise and recommend 案 1 (options are in the record).
+   - Interview P12 (`plugin version` module location and temp-dir helper; 案 1 puts the helper in U2 `config.py`).
+   - After each answer: record the answer, fix, commit, mark done, and list the details I decided.
+   - Then:
+     - Report the details decided for the mechanical round-4 fixes and ask for confirmation.
+     - Give the final report for round 4.
+     - Regenerate the summary with the 0.23.0 triagecheck.
+     - Ask whether to make the next review request (round 5, base b2d6883 → new HEAD).
+     - Update the PR body draft with round 4 (labelled the 5th document review).
+   - Later: ask about push / squash and ready for review only after the review passes. Never push without asking.
+
+8. Current Work:
+   I am working on round-4 problem P2 (finding 1: no re-judgment trigger after the user fixes an unreadable repository config; R24 rebuild also doesn't restore reason 設定). The approach recorded in the plan record (pending, order 11):
+
+   「R20・KTD9 に、理由 `設定` で止めた宣言の判定し直しを書く: 管理のセッションは再入のたびに (記録と設定を読む段で)、理由 `設定` で止めたリポジトリの設定を読み直し、読めれば止めた宣言を投稿の順に判定し直す。利用者に直し方を頼むときは、直したらこのセッションで知らせるよう添える (利用者の入力でターンが始まり、判定し直す)。R24 の作り直しで、理由 `設定` の宣言は、そのリポジトリの設定を読めれば判定し直し、読めなければ止めた宣言として戻す。U10 のテストを足す。」
+
+   I had just read KTD9's current sentence, which is to be extended:
+
+   「宣言に `待機` を書いて (R20)、利用者に直し方を頼む (パスの設定 (clone のルートのパス) か、`origin/HEAD` が無ければ `git -C <パス> remote set-head origin --auto` の実行。既定のブランチを `origin/main` などと推測して読まないのは、…誤った判定をするため)。」
+
+9. Optional Next Step:
+   Apply the P2 edits:
+   - KTD9: add "直したらこのセッションで知らせるよう添える" and the re-read / re-judge rule.
+   - R24 rebuild: add 「理由が `設定` なら、そのリポジトリの設定を読めれば判定し直し、読めなければ止めた宣言として戻す」.
+   - U10: add a test.
+
+   Then:
+   - Run the wording lint and nearedges.
+   - Commit with a P2 message (problem / cause / fix, ending in "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>").
+   - Run `python3 $SP/done_auto.py P2 '<scope>' '<result>'` with single quotes.
+   - Regenerate the summary and check with the 0.23.0 triagecheck.
+   - Report the mechanical round-4 fixes and their details.
+   - Ask the P1 question, with an explainer page in `tmp/` built from the premise, recommending 案 1.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/b9807760-a222-4bc1-91da-3136fdb14684.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
