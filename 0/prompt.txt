@@ -1,0 +1,7 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins のブランチ docs/replace-dash-87 (Issue #87 の 5a。文中のダッシュの言い換え) の、4 回目 (増分 38925ca..16779cd) のレビューです。依頼文は review-triage プラグインのスキル review-request が生成したもので、作業ツリーの扱いは「共有」です。この作業ツリーは依頼した側のセッションも使っているので、出力先の 1 ファイル以外を変えず、HEAD・ブランチ・作業ツリーも変えないでください。指摘を見つけても直しません。結果は依頼した側のセッションがスキル review-triage で判定します。
+
+Task:
+依頼文 `/Users/akima/workspace/claude-plugins/tmp/review-request-20261029-0829-docs-replace-dash-87-4-code-review-opus.md` を読み、書かれているとおりにレビューを実行して、結果を依頼文の出力先に書き出してください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_0f7db631-e952-4173-a958-679e64632b91
