@@ -1,0 +1,52 @@
+akm/claude-plugins の PR #37 (ブランチ fix/triagecheck-summary-command) をレビューし、出た指摘を review-triage スキルでトリアージしてください。
+
+## 手順
+
+1. `/code-review high 37` でレビューを実行する
+2. 続けて `/review-triage` を実行し、出た指摘を一件ずつ採択 / 保留 / 却下に選り分けて記録する (修正はしない)
+
+## 変更の背景
+
+Issue #36 への対応。`review-triage/tools/triagecheck` が、サマリの再生成手段として
+`make docs-review-triage-summary` という lappds 由来の Makefile ターゲット名を
+文字列で焼き込んでおり、そのターゲットを持たない利用側に存在しないコマンドを
+案内していた。エラー文 2 か所と、生成サマリ (.md) の 1 行目 (コミットされる) が対象。
+
+Issue の案 1 (フラグで受け取る) を採用した。
+
+## 主な変更
+
+- record.go: 焼き込んだ文字列をパッケージ変数 `summaryCommand` に置き換え。
+  既定は `triagecheck -write-summary`
+- main.go: `-summary-command` を追加。値は経路 (検査 / -write-summary /
+  -install-wrapper) の分岐より前で一度だけ据える。空白・不可視だけの明示指定は
+  `errEmptySummaryCommand` で拒否
+- wrapper.go: -install-wrapper で生成したラッパーは値を焼き込まず、実行時に
+  "$0 -write-summary" を組み立てて渡す
+- README.md / references/project-config.md: フラグの説明と、config.json の
+  `triage_summary_command` との対応を追記
+- docs/review-triage/*.md: このリポジトリ自身のサマリ 3 件を再生成 (1 行目のみの差分)
+- plugin.json: 0.3.1 → 0.4.0
+
+## 特に見てほしい点
+
+- `summaryCommand` をパッケージ変数にした判断。既存の `reviewTriageDir` /
+  `judgmentFlowPath` と同じ流儀に揃えたが、グローバルな可変状態を 1 つ増やしている。
+  引数で引き回す案と比べてどうか (呼び出し箇所とテストの数は多い)
+- ラッパーが "$0 -write-summary" を渡す設計。$0 は叩いた形そのものなので、
+  PATH 経由・リンク経由・シェル関数からの起動で案内として妥当か。
+  シェルの引用符の扱いに穴が無いか
+- 空指定の拒否に `isBlankPath` を再利用している点。名前が示す対象 (パス) と
+  用途 (コマンド文字列) がずれている
+- テストが実装の焼き直しになっていないか。特に
+  TestInstallWrapperSummaryCommandPointsAtWrapper は go の実行を伴うため重い
+- 生成サマリの 1 行目が変わることで、利用側の既存サマリすべてに差分が出る。
+  この移行の影響と、README に書いた案内で足りているか
+- record_test.go の TestReviewTriageRecordSummaryStale で、判定を
+  「docs-review-triage-summary を含むか」から「食い違っています を含むか」に
+  変えた。文言への結合として妥当か
+
+## 参照
+
+- Issue: https://github.com/akm/claude-plugins/issues/36
+- PR: https://github.com/akm/claude-plugins/pull/37
