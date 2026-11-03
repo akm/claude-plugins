@@ -1,0 +1,104 @@
+akm/claude-plugins のブランチ fix/triagecheck-summary-command を、報告のみでレビューしてください。
+結果は下の様式で YAML ファイルに書き出します。修正はしません。
+
+## 対象
+
+- リポジトリ: /Users/akima/workspace/claude-plugins (ブランチ fix/triagecheck-summary-command)
+- 範囲: main (f6e777f) からの全量 (scope: full)。`git diff main...HEAD` を対象にする。HEAD は f085d30
+- これは最終確認の full レビュー。1 回目の full (33c62b8) 以降の変更は増分レビュー 2 回で
+  収束 (最終回 0 件) している。目的は「増分の継ぎ目で見落としたもの」と「全体を通して読んだときの
+  整合」の確認で、増分で既に判定済みのものを蒸し返すことではない
+- docs/review-triage/ 配下 (トリアージ記録 YAML と生成サマリ .md) は当時の記録なので指摘の対象にしない。
+  ただし生成サマリが YAML と食い違っていれば報告する
+- 背景: Issue #36 (https://github.com/akm/claude-plugins/issues/36)。triagecheck が焼き込んでいた
+  `make docs-review-triage-summary` を -summary-command で渡せるようにし、-install-wrapper の
+  ラッパーには生成時に決めた案内を焼き込む。経緯はコミットログ (git log main..HEAD) にある
+
+## 既に判定済みで再度挙げなくてよいもの
+
+- ラッパーを -current-dir の外に置くと案内が ../ で始まる — 設計として受け入れ済み (-record-dir と同じ扱い)
+- isBlankPath をコマンド文字列の空判定に再利用している — 却下済み (仮定の条件)
+- $root が ls -d 由来で末尾 / を持ち "$root/tools/triagecheck" が二重スラッシュになる — 増分の外の既存挙動
+- -install-wrapper /abs -record-dir /abs (基準無し・明示無し) がエラーになる互換性の変更 —
+  意図した変更で、エラー文に直し方 2 通りを書いてある
+
+## 読み取り専用の厳守
+
+ファイルの編集・作成・削除・git の状態変更をしない。プローブやミューテーションを行った場合は必ず revert し、
+レビューの前後で `git rev-parse HEAD` と `git status --porcelain` が不変であることを確認して報告する。
+唯一の例外は出力先の tmp/ 配下のファイル 1 つ。
+
+## 特に見てほしい点 (全体を通して)
+
+- main.go の run → resolveInputs → 経路の分岐、という流れを main から通して読んだとき、
+  「規則は経路の分岐より前で 1 回」の設計が -summary-command についても崩れていないか。
+  検査 / -write-summary / -install-wrapper の 3 経路 × (明示 / 省略) × (-current-dir あり / なし) の
+  組み合わせで、エラー文・案内の値・baseUsed の扱いに矛盾する組み合わせが無いか
+- 3 つのパッケージ変数 (reviewTriageDir / judgmentFlowPath / summaryCommand) を run が書き換える
+  設計を、withRunGlobals を呼ばないテストが読んでいないか (全 *_test.go)
+- tools/triagecheck/README.md を先頭から通して読んだとき、-summary-command に関する記述
+  (フラグ表・「再生成コマンドの案内」節・「パスの渡し方」表の例外・-install-wrapper 節) が
+  互いに、および実装と矛盾していないか
+- skills/review-triage/references/project-config.md が README を正本として参照する形に変わった後、
+  project-config.md 単体で読んだ利用者が triage_summary_command に何を書けばよいか分かるか
+- 生成サマリの 1 行目の値が、このリポジトリ自身 (既定値で生成) と、ラッパー経由の利用側とで
+  それぞれ安定するか。同じコミットを別の叩き方・別のマシンで検査して赤くなる経路が残っていないか
+- plugin.json の版 (0.3.1 → 0.4.0) が変更の性質 (互換性の変更を含む) に対して妥当か
+
+## 検証の前払い (すべての指摘に必須)
+
+- evidence には次のいずれかを含める。どちらも含められない指摘は confidence を low にする。
+  - 実行した確認 — コマンドと出力の要点、またはプローブ・ミューテーションの手順と結果
+    (実施後は必ず revert し、作業ツリーが不変であることを確認して報告する)
+  - 対象箇所の逐語引用 (行番号つき)。矛盾の主張なら、矛盾する 2 箇所の両方を引く
+- 「〜の可能性がある」「余地がある」型の主張には、それを実際に起こす入力・状態を 1 つ添える。
+- テスト・検査の不在を主張する指摘 (「この入力のテストが無い」「この分岐が実行されていない」)
+  は、その入力を実際に通して報告が出ないことを確かめてから出す。確かめられなければ
+  confidence を low にする。テスト関数名の列挙や grep だけで結論しない — 別名のテストが
+  同じ分岐を踏んでいることがある。
+- Go の実行は review-triage/tools/triagecheck の中で行う (`.tool-versions` がそこにある)。
+  `go test ./...` は現時点で全緑。
+
+## 報告しない条件 (トリアージで却下される型)
+
+- 壊れる入力・状態を具体に挙げられない一般的懸念
+- 既存の関門 (テスト関数名・検査項目名で挙げられるもの) が顕在化を検出する欠陥
+- 対象そのものより大きい防御・再現の仕掛けを要求する指摘
+- プロセスの遵守が diff から証明できない、という型の観察
+- 整理・統一の好み (放置して壊れるものが無いもの)。リファクタ提案は 1 件まで、その旨を明記して
+
+上に当たるが捨てるには惜しいものは、findings に入れず、末尾の residual リストに
+1 行ずつだけ書く (id 無し・summary のみ)。判断の材料は残すが、指摘としては数えない。
+
+## 出力様式
+
+出力先: tmp/review-<スキル名>-<モデル名>-5th.yaml
+  (tmp/ には同じ組み合わせの 1st〜4th が既にあるので 5th を付ける)
+  - ファイル名は ASCII のみ。tmp/ が無ければ作る (.gitignore 済み)。コミットしない。
+
+形式 (この構造に厳密に従う):
+
+skill: code-review            # code-review / ce-code-review など
+model: opus-5                 # レビューを実行したモデル (実際の値を書く)
+level: ""                     # レベルや mode があれば (無ければ空)
+run_id: ""                    # run 識別子があれば (無ければ空)
+scope: full
+base: main
+head: "f085d30"               # レビュー時点の HEAD の短縮 SHA (実際に確認した値を書く)
+date: "2026-09-03"
+findings:
+  - id: 1                     # 1 からの連番
+    file: path/to/file.go
+    line: 12                  # 不明なら省略
+    summary: "1〜2 文の要旨"
+    evidence: "検証の前払いの節のとおり"
+    attrs:                    # レビューが付けた属性をそのまま。無い属性を補完しない
+      severity: P2
+      confidence: high
+residual: []                  # 報告しない条件に当たるが残す 1 行メモの列 (無ければ空)
+
+注意:
+- 指摘が 0 件なら findings: [] とだけ書く。件数の集計は書かない (読み手が計算する)。
+- 値に # を含むときは必ず引用符で囲む (YAML は「半角スペース + #」以降をコメントとして落とす)。
+- 指摘の取捨は「報告しない条件」に従い、それ以外は全件書く。修正はしない。
+- 書き出したら、レビューの前後で HEAD と作業ツリーが変わっていないことを確認して報告する。
