@@ -1,0 +1,80 @@
+<task-notification>
+<task-id>aa50002f674d922da</task-id>
+<tool-use-id>toolu_01SLYoSbRb6eLfeZZirj4zxv</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/aa50002f674d922da.output</output-file>
+<status>completed</status>
+<summary>Agent "U4: loop state machine without detection" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>作業は完了しました。git の書き込みは行っていません (3 ファイルが未コミットの変更として作業ツリーに残っています)。
+
+## 1. 変更したファイル
+
+- `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/references/loop-flow.md` — 図・方針・決定表を書き換え
+- `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/SKILL.md` — 前提知識・手順 2〜4・原則のノード ID と「検知」の記述
+- `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/references/reporting.md` — 停止ノードの範囲表記 (2 箇所) のみ。「書かないもの」は触っていない
+
+## 2. 新しい図と決定表の ID
+
+```mermaid
+flowchart TD
+  G0["G0: 設定と引数を読む"]
+  G2{"G2: 選択待ちがあるか"}
+  G3{"G3: 覆われていない採択・未着手のいずれかがあるか"}
+  L1["L1: レビューを起動する"]
+  L2["L2: review-triage を呼ぶ"]
+  J2{"J2: 覆われていない採択・未着手のいずれかがあるか"}
+  F1["F1: review-triage-fix を呼ぶ"]
+  J4{"J4: 選択待ちがあるか"}
+  J5{"J5: 回数が上限に達したか"}
+  S2["S2: 停止 (選択待ち)"]
+  S3["S3: 停止 (収束)"]
+  S4["S4: 停止 (上限)"]
+
+  G0 --&gt; G2
+  G2 -- ある --&gt; S2
+  G2 -- 無い --&gt; G3
+  G3 -- ある --&gt; F1
+  G3 -- 無い --&gt; L1
+  L1 --&gt; L2
+  L2 --&gt; J2
+  J2 -- ある --&gt; F1
+  J2 -- 無い --&gt; S3
+  F1 --&gt; J4
+  J4 -- ある --&gt; S2
+  J4 -- 無い --&gt; J5
+  J5 -- 達した --&gt; S4
+  J5 -- まだ --&gt; L1
+
+  style S2 fill:#f59e0b2e,stroke:#b45309
+  style S3 fill:#16a34a2e,stroke:#16803c,stroke-width:2px
+  style S4 fill:#dc26262e,stroke:#b91c1c
+  style F1 fill:#6366f12e,stroke:#4f46e5
+```
+
+決定表の ID (12 行): G0・G2・G3・L1・L2・J2・F1・J4・J5・S2・S3・S4。
+
+決定表の主な変更点:
+- G3: 「J2 と同じ条件」と単独実行直後の注記を残し、「未着手が残ったまま周回を起動し直したときも同じ」を加えた
+- J2: 「覆われていない採択」に「または全回の `plans` に `status: pending` の問題があるか」を加えた
+- F1: 「(通常)」の但し書きを外し、周回が「再開だけ」を区別して渡さないこと、対象の解決と再開時の続き (手順 7) は `review-triage-fix` の手順 1 が行い、その手順 1 が正本であることを書いた。「F1 と F2 の違いは…」の段落は削除
+- S4: 「継続するかを人間に問う」形にし、減っていれば継続を勧め、減っていなければ「上限に達した理由を推移と記録から人間が読み解くよう勧める (スキルが理由を決めつけない)」に留めた。閾値 N や立案者の選択には触れていない (KTD5 の「S4 で言い直さない」に従った)
+- 方針: 「人間の回答を待つ状態 (選択待ち) は…入口 (G2) でも周回の途中 (J4) でも同じ」、「未着手は止まる理由にしない…入口 (G3) でも周回の中 (J2) でも、レビューより先に `review-triage-fix` を呼んで片付ける (F1) — 直していない問題が次のレビューで再び指摘されないようにするため」。最初の項の `recurrence` は `pending` に置き換えた。冒頭の実測の段落は残した
+
+## 3. 検証の結果
+
+- **ID の 1:1**: mermaid のノード定義行から抜き出した ID 集合と、決定表の ID 列の集合が一致 (`diff` で差分なし)。遷移行で使う ID 集合も定義と一致
+- **grep**: `grep -rnE '検知|俯瞰|捉え直し|recurrence|reframing|G1|J1|S1|J3|F2|J6' review-triage/skills/review-triage-loop/` は 0 件。範囲表記は `S2〜S4` のみで、消した ID を含む範囲は残していない
+- **相対リンク**: 3 ファイルの相対リンク 18 件すべてが存在するファイルを指す
+- **手順番号**: `loop-flow.md` が参照する `review-triage-fix` の手順は「手順 1 (入力を読む・再開の対象の解決)」と「手順 7 (問題単位で直して、検証してからコミットする)」で、現在の `review-triage/skills/review-triage-fix/SKILL.md` の番号と一致。旧「手順 2 (俯瞰)」「手順 8」への参照は消えた
+
+## 4. テストを書かない理由と、残した懸念
+
+テストは書いていません。文書だけの変更で、`triagecheck` は `loop-flow.md` を検査しない (ファイル冒頭の規律どおり人手で照合する) ためです。上の ID 照合をそれに代えました。
+
+残した懸念:
+- **`review-triage-fix/SKILL.md` の手順 1 に、消した ID への参照が残っています**: 26 行目「(`review-triage-loop` が再開のために呼ぶ経路 — [loop-flow.md](../review-triage-loop/references/loop-flow.md) の F2)」。このファイルは触ってよい範囲外なので直していません。「F1」に書き換えるか、ID を消して「周回が再開のために呼ぶ経路」だけ残す修正が別途要ります。
+- 旧図では、レビュー後に未覆いの採択が無く未着手だけがある経路 (旧 J3 → F2 → J6) は再開の後に上限を見ずに S3 (収束) へ進みましたが、新図では J2 が未着手も拾うため F1 → J4 → J5 と進み、上限に達していなければもう 1 回レビューを回します。パケットの図のとおりに実装しましたが、振る舞いの差として記しておきます。
+- 「調査済み」の状態は指示どおり書いておらず、G3・J2 の条件は「覆われていない採択・未着手」までです (U6 で足す前提)。
+- `doc-dag` は、指示された検証項目に無かったため回していません (パケットの U4 Verification には含まれているので、呼び出し側で回す判断をお願いします)。</result>
+<usage><subagent_tokens>99242</subagent_tokens><tool_uses>12</tool_uses><duration_ms>205646</duration_ms></usage>
+</task-notification>
