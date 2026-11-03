@@ -1,0 +1,25 @@
+<task-notification>
+<task-id>a3c0c317bc65dfc2a</task-id>
+<tool-use-id>toolu_01UoMALv8oXiRjRU4n25Rdne</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/d19aba18-687c-4226-9dd4-2a22cd5b458d/tasks/a3c0c317bc65dfc2a.output</output-file>
+<status>completed</status>
+<summary>Agent "Learnings research" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`git status --porcelain` is clean; no files were modified.
+
+## Findings
+
+No violations or re-treads found. This diff does not contradict any captured learning in `docs/solutions/`.
+
+Notably, the diff's new `-review-file` flag in `review-triage/tools/triagecheck/main.go` and `review_file.go` (adding a 4th path-resolution route alongside검査/`-write-summary`/`-install-wrapper`) actively **follows** the learning at `docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md`. That learning's core rule — "パスの規則は経路で分岐する前に 1 か所で当てる" (apply the path rule once, before branching by route) — is honored here: `main.go` line 74-76 and line 294-295 route `-review-file` through the same `resolvePath(..., base, ...)` / `-current-dir` machinery as the other three entry points, rather than adding a fifth ad-hoc relative-path resolution. This is a positive confirmation, not a violation.
+
+I also checked the other three closest-matching learnings:
+- `docs/solutions/tooling-decisions/avoid-dual-parser-implementations.md` (dual YAML backends) — not applicable; the diff uses a single `gopkg.in/yaml.v3` parser throughout, no fallback parser introduced.
+- `docs/solutions/design-patterns/extract-identifiers-in-code-not-llm.md` (identifier extraction must be code, not LLM, when misinterpretation looks like a valid result) — topically adjacent (the new `-review-file` YAML-shape validator is exactly the kind of "confirm silently-wrong data doesn't look right" mechanism this learning calls for) but the diff is *adding* such a machine check, consistent with rather than violating the principle. Not a citable violation.
+- `docs/solutions/architecture-patterns/fail-soft-by-data-class.md` (fail-soft only for recoverable config, not accumulated/agent data) — the new review-file format validation (`review_file.go`, unknown-key rejection, required `findings: []` vs. null distinction at lines ~35-40) is consistent with this learning's guidance (treat agent-produced JSON/YAML strictly, reject rather than silently accept malformed shapes), not a violation.
+
+One line in `review-triage/skills/review-triage/SKILL.md` diff explicitly echoes the same "silent format drift" failure mode from the path-resolution learning: "様式外のキーは黙って無視されるので、読めてしまうことを『合っている』の根拠にしない" — this is the diff's own author independently re-deriving the same principle already written down (not a violation, but worth noting as reinforcement, not novelty).
+
+**Candidate for a new learning**: Possibly yes. The diff's own `review_file.go` doc comment cites a concrete real-world incident ("実測: 修正を記録するキーをレビュアが足していて、レビュア自身が修正を適用していたことに手順 1 で初めて気づいた") as the motivating case for the new format-check tool. This "reviewer silently applied fixes, detected only by an unknown-key check" incident, plus the "仕組みを足すときの随伴物 5 つの欄" table added to `investigation.md` (a generalized checklist for what accompanies a new mechanism: definition/consumer/guard/absence-behavior/boundary-crossing), both read as durable, generalizable insights distinct from what's already captured — but this is a separate observation from the violation search proper, per the task's instruction to keep it separate.</result>
+<usage><subagent_tokens>115553</subagent_tokens><tool_uses>13</tool_uses><duration_ms>42707</duration_ms></usage>
+</task-notification>
