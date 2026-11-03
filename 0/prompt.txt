@@ -1,0 +1,2 @@
+1. 続ける
+2. /review-triage:review-triage-fix で A
