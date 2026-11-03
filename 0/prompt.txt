@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bkwmfgwhs</task-id>
+<tool-use-id>toolu_017WjaHRQ4kdHWLWCgDSFR7f</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/bkwmfgwhs.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the full test suite for U5" completed (exit code 0)</summary>
+</task-notification>
