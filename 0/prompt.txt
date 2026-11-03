@@ -1,0 +1,55 @@
+<task-notification>
+<task-id>ac85f19357f9c9546</task-id>
+<tool-use-id>toolu_01VZpoywgoYYyVgdLnaea14K</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/ac85f19357f9c9546.output</output-file>
+<status>completed</status>
+<summary>Agent "U1: triagecheck legacy recurrence" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>U1 の作業を終えました。以下が報告です。
+
+## 1. 変更したファイル
+
+- `review-triage/tools/triagecheck/record.go`
+- `review-triage/tools/triagecheck/record_test.go`
+- `review-triage/tools/triagecheck/README.md`
+
+git の書き込み操作は行っていません (未コミットの変更として作業ツリーに残しています)。
+
+## 2. 検証の証拠
+
+### 振る舞いの変更
+
+- **消したもの**: 関数 `recordRecurrenceProblems` (検知の整合検査: 回 1 の禁止・`prior_run` が直前の回か・比べた回の状態と `prior` の形・状態ごとの専用キー・`status` / `condition` の列挙) と、関数 `recordSemanticProblems` からの呼び出し。
+- **残したもの**: 型 `recordRecurrence` / `recordRecurrenceEvidence` / `recordReframe` と YAML の読み込み、`recordAllowedKeys` の `recurrence` と 3 階層 (検知・根拠・捉え直し)、`recordNullSilentKeys`、`recordUnknownKeyProblems` の分岐、描画 `renderRecurrence` 系 (出力の文面は 1 文字も変えていない)。`plans[]` の検査は触っていません。
+- **コメントの更新**: 型と描画のコメントを「旧様式のキーで、既存の記録を読んで描画するために残す。検査は形だけ」の説明に改め、廃止される文書 `recurrence-detection.md` への言及と「俯瞰」を record.go から消しました。残る「捉え直し」の字面は、許可キーの階層名・生成サマリの出力文字列・そのテストの期待値だけです (出力を変えると既存サマリが古いと報告されるため)。
+- **README**: 「何を検査するか」の表の `review-triage-record` の行から整合検査の記述を外し、「`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る」に改めました。
+
+### テスト
+
+- **削除**: `TestReviewTriageRecordRecurrence*` 8 本と `TestReviewTriageSummaryRecurrence`、fixture の `recurrenceRecordYAML` / `recurrenceReframedThenRecordYAML` / `recurrenceEvidenceYAML`。事前に grep で確認し、これらは検知のテスト以外では使われていませんでした。
+- **追加** (fixture: `legacyRecordYAML` (可変長で回を足す) / `legacyRunYAML` / `legacyEvidenceYAML` / `legacyDeclinedYAML` / `legacyReframeYAML`):
+  - `TestReviewTriageRecordLegacyRecurrencePasses` — AE9。`declined` / `reframed` / `detected` / `declined` の回と `reframed` の回の両方 (3 回) / `same-location` の根拠 / `recurrence` の無い回、のすべてで問題 0 件。`recordFiles` が YAML からサマリを生成するので鮮度の検査も同時に通る。
+  - `TestReviewTriageRecordLegacyRecurrenceNotCrossChecked` — 整合検査が消えたことの確認。回 1 に `recurrence` / `prior_run` が直前でない (回 3 → 回 1) / 比べた回が `reframed` なのに `prior` が問題 id / `prior` が比べた回の plans に無い / `declined` に `declined_reason` が無い / `status` が列挙に無い、の 6 ケースで問題 0 件。
+  - `TestReviewTriageRecordLegacyRecurrenceUnknownKeys` — 形の検査は残る。検知・根拠・`reframe` の中の未知のキーと、`recurrence` と並ぶ実行の未知のキーは報告され、`recurrence` 自体は未知として報告されない。
+  - `TestReviewTriageRecordRecurrenceNull` — null の扱いは従来どおり 1 件報告 (新 fixture で書き直し)。
+  - `TestReviewTriageSummaryLegacyRecurrence` — 生成サマリの検知の小節の文面 (`detected` / `declined` / `reframed`) と位置 (回の節の中で指摘の表の後・修正計画の前) が変更前と同じ。無い回には出ない。
+- **先に観察した失敗** (本体を変える前に実行): `TestReviewTriageRecordLegacyRecurrenceNotCrossChecked` の 6 ケースすべてが失敗し、それぞれ旧検査の文面 (`回 1 の recurrence: 比べる過去の回が無いので書けません` / `prior_run 1 は直前の回 (2) ではありません` / `比べた回 2 は捉え直し済みなので prior は 捉え直し と書く` / `prior "P9" は回 1 の plans にありません` / `status declined には declined_reason ... が必須` / `status は detected / declined / reframed のいずれか: "found"`) が報告されました。他の 4 本は変更前から成功 (変えてはいけない振る舞いの確認)。本体を変えた後は全件成功。
+
+### 実行した検証コマンドと結果
+
+- `cd review-triage/tools/triagecheck &amp;&amp; ASDF_GOLANG_VERSION=1.25.4 go test ./...` → `ok` (`gofmt -l` と `go vet` も指摘なし)
+- `ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/triagecheck . -current-dir "$PWD" -record-dir tmp/review-triages ...` → `問題は見つかりませんでした`、exit 0
+- `tmp/review-triages/` の 2 ファイルの SHA-256 と更新時刻 (2026-09-15 11:21:09) が変更前後で一致。`git status` は上の 3 ファイルだけが変更。
+- 追加で、凍結扱いの `docs/review-triage/` (こちらも `recurrence` を含む) を `-record-dir` に指定して検査 → 成功、更新時刻も不変。
+
+### テストを書かなかった箇所
+
+ありません。パケットの Test scenarios の 6 項目はすべて上のテストで覆っています。
+
+## 3. 想定外だったこと・残した懸念
+
+- `recordAllowedKeys` の旧様式の 3 階層に説明コメントを添えようとしましたが、map リテラルの途中にコメントを挟むと gofmt が無関係な行 (`"調査"`) の桁揃えも変えるため取り下げました。旧様式である説明は型 `recordRun` の `Recurrence` のコメントに置いています。
+- 未知のキーの報告文には階層名として「検知」「捉え直し」がそのまま出ます (例: `捉え直しに未知のキー "table"`)。生成サマリには影響しませんが、後続の単位で用語を grep するときに検出される点は把握しておいてください。
+- 計画の Verification は `ASDF_GOLANG_VERSION=1.25.1` を指定していますが、指示どおり 1.25.4 で実行しました。設定ファイルの `gates` を直すのは U1 の範囲外なので触っていません。</result>
+<usage><subagent_tokens>153673</subagent_tokens><tool_uses>35</tool_uses><duration_ms>520120</duration_ms></usage>
+</task-notification>
