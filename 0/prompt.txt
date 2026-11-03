@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b8av0p488</task-id>
+<tool-use-id>toolu_01HC6DbLGVDJ9xk5KSSKKaX9</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/b8av0p488.output</output-file>
+<status>completed</status>
+<summary>Background command "全量レビューの結果ファイルが書き出されるまで待つ" completed (exit code 0)</summary>
+</task-notification>
