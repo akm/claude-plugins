@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bu7c08yxp</task-id>
+<tool-use-id>toolu_017NyEDrxU3A8H2i1QsDDDnp</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/84b55d91-a9d0-445f-b6f2-10ef29cb2771/tasks/bu7c08yxp.output</output-file>
+<status>failed</status>
+<summary>Background command "review-loop 20261001-0624-feat-loop-repo-text-86 回 1 (20261001-0753-feat-loop-repo-text-86-1-code-review-opus) [この起動 1/5 回・収束後の全量 0 回・期限切れ 0・中断 0]: ワーカーの起動を待つ (0 = 現れた / 124 = 期限切れ / それ以外 = 中断)。通知を受けたら review-loop の再入の手順へ" failed with exit code 124</summary>
+</task-notification>
