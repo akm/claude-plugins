@@ -1,0 +1,7 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins の Issue #87 の作業です。review-triage のコード (triagecheck・nearedges・lineorigin・review-loop のワーカー) と tools の README について、日本語の文中にあるダッシュ「—」をなくし、文を分けるか、括弧や読点で書き換えています。ブランチは docs/replace-dash-review-triage-code-87 です。12 回目 (収束後の全量) で採択した 2 件は、次の 2 つのコミットで直しました。07307c75 では、修正計画の表の最終列の説明「SHA と URL の 2 つの型を取る」を「SHA だけでなく URL も取る」に変えました。a2a59cbb では、investigation.scope が無いときのエラーメッセージの括弧の中を「(調べた範囲。実行したコマンドと目で読んだ対象を書く)」に変えました。triagecheck の外にある「既定」「落ちる」「落とす」は、利用者がこのブランチの範囲の外と決めています。今回の 13 回目は、7fd1ca85..a2a59cbb の増分だけをレビューします。結果は、依頼したセッションが review-triage で判定します。
+
+Task:
+依頼文 `/Users/akima/workspace/claude-plugins/tmp/review-request-20261030-0910-docs-replace-dash-review-triage-code-87-13-code-review-opus.md` を読み、そこに書かれた手順でレビューを実行してください。結果は、依頼文が指定する出力先の 1 ファイルだけに書き出してください。指摘を見つけても直さず、コミットもしないでください。作業ツリーは共有なので、HEAD と作業ツリーを変えないでください。終わったら、出力先のパスと、HEAD と作業ツリーが変わっていないことを報告してください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_0f7db631-e952-4173-a958-679e64632b91
