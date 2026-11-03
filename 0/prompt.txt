@@ -1,0 +1,51 @@
+<task-notification>
+<task-id>a5423d6a716e6cf83</task-id>
+<tool-use-id>toolu_016gUWCyfJxcYJn2vhsWTJNL</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/a5423d6a716e6cf83.output</output-file>
+<status>completed</status>
+<summary>Agent "Repo research: review-triage patterns" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I have everything needed. Here are the findings that change the plan.
+
+## Repository Research Summary
+
+### Structure and file-slot findings (would change the plan's file list)
+
+- **`review-triage/skills/review-triage/SKILL.md` 手順**: current steps are 1 入力の確認, 2 設定の読み込み, 3 判定, 4 記録の追記, 5 サマリの再生成, 6 コミット, 7 報告. The new "検知" logic (R1-R3) slots between step 3 (判定) and step 4 (記録の追記) — detection needs the just-finished round's判定 plus prior rounds already in the record, and must land in the same 記録の追記 write (step 4) so it doesn't need its own commit. Step 7 報告 needs one line added for reporting the detection fact (mirrors how 保留 is already reported there via hold-presentation.md).
+- **`review-triage/skills/review-triage-fix/SKILL.md` 手順**: steps 1 (入力を読む) through 3 (問題にまとめる) are as the planning context says. The new 俯瞰/捉え直し step (R4-R9) must land as a new step between step 1 and step 2, *not* before step 3 as the context suggested — because R9/R10 says the agreed reframing becomes the `cause` used in step 3's grouping, so the diagram/questions/write-back has to happen before step 2 ("原因を確かめる") begins, not merely before step 3. Existing step 9 (`doc-dag` invocation) is the precedent to mirror for optional-plugin handling — same "別のプラグインなので、無ければこの手順は飛ばし、飛ばしたことを報告に書く" phrasing pattern used for both `doc-dag` and (per hold-presentation.md) `mermaid-preview`.
+- **正本 (single-source) convention**: judgment-flow.md declares itself the sole owner of node IDs/transitions, with prose files forbidden from restating them (「散文は…順序・分岐・量化子を言い直さない」). The new detection/reframing logic has no existing "図が正本" node-graph — R2's 主/補助 conditions and R6-R9's question flow should each get **one** reference file that owns the decision logic (mirroring hold-presentation.md's role for H1-H6), with SKILL.md steps citing it by short label, not restating conditions inline.
+
+### record-schema.md and historical precedent for adding keys
+
+- **Exact historical pattern for adding a new record field** (from commits `9a4b4ac`/`6126c54` for `investigation`, and `0571013`/`495f4a0` for `done-external`): each addition touched exactly 3 files — `record-schema.md` (schema table + prose), `review-triage/tools/triagecheck/record.go` (struct field + `recordAllowedKeys` entry + validation in `recordSemanticProblems` + summary rendering), `review-triage/tools/triagecheck/record_test.go` (schema-violation cases + summary rendering cases). Neither addition touched `main.go`/`main_test.go` (those handle CLI/path plumbing only) or SKILL.md, **except** `done-external` which *also* touched `review-triage-fix/SKILL.md` step 7 and `committing.md` because it changed a *behavior* (a new terminal status), not just a passthrough field. This matters for the plan: the detection field is closer to `done-external` in kind (it changes review-triage's SKILL.md step 4/7 behavior) while the reframing field is closer to `investigation` (a plans[]-level enrichment that mainly needs schema+summary, referenced by grouping.md).
+- **A recurring failure mode explicitly logged in record-schema.md**: "実測: `done-external` の追加で `applied_external_url` / `notes` がこの文から漏れた" — the schema-summary prose paragraph (line 19) lists this risk explicitly and says not to enumerate `plans[]` keys a second time in prose. The plan must avoid re-listing new keys anywhere except the schema table itself.
+- **R13 ("既存の規則をこの俯瞰の工程に統合し、正本を1か所にする")**: the rule to replace lives in `record-schema.md`'s "生成サマリの読み方" section (the line added by commit `45525c1`: 「採択が同じファイルの同じ関数…回が2回続いたら、次の修正の前に表を書く」). That line must be **deleted/rewritten**, not just supplemented — otherwise there are two contradictory "正本" for the same trigger (the plan's R2 補助 condition vs. this existing line), violating the repo's own single-source discipline that record-schema.md itself preaches.
+- **`recordAllowedKeys` map** in record.go is keyed by Japanese level names (`"実行"`, `"修正計画"`, `"指摘"`, `"調査"`, `"束ね先"`, etc.) — a new nested object (e.g., for reframing's axes/table) would need its own new level entry, following the `"調査"` (`recordInvestigation`) precedent (pointer-typed struct field so null-vs-absent is distinguishable, per the `6126c54` fix pattern for catching "key present, value null").
+
+### triagecheck Go tool
+
+- **Everything (schema validation AND summary generation) lives in one file**, `record.go` (974 lines) — there is no separate summary-generation file. `main.go` (441 lines) only does CLI/path resolution; `judgment_flow.go` is a separate concern (mermaid-diagram-vs-decision-table consistency) and does **not** need touching unless the new detection/reframing logic gets its own mermaid decision diagram that triagecheck should cross-check — the plan doesn't call for that, so `judgment_flow.go` is out of scope.
+- **No `testdata/` directory** — all tests use inline YAML string fixtures in `record_test.go` (1303 lines) and `main_test.go` (903 lines). New tests should follow this inline-fixture convention, not introduce fixture files.
+- **Go version**: `go.mod` declares `go 1.24`; `.tool-versions` pins `golang 1.25.4`. Test command: `go test ./...`, plus a required environment-independence check: `CLAUDE_PLUGIN_ROOT=/nonexistent-root go test ./...`. No lint config/Makefile found in the tool directory or repo root.
+- **README's "何を検査するか" table** has exactly 2 rows (`review-triage-record`, `judgment-flow`) — the new fields are checks *within* `review-triage-record`, so this table likely needs no new row, just an addition to its existing "内容" cell listing (currently: 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー・行内コメント・`depends_on`の循環・生成サマリの鮮度).
+
+### hold-presentation.md / mermaid-preview / judgment-flow.md
+
+- **hold-presentation.md is the exact template to mirror**: "Markdown が正本" (judgment material lives in YAML+generated Markdown, same path as everything else — no extra machinery), "HTML は任意の表示形式" (mermaid-preview owns generation/CDN/fallback; **"別のプラグインなので、入っていなければ図は出せない"**; "図は正本ではないので、生成に失敗してもMarkdownがあれば判断は完了する"). This directly satisfies R11/AE6 and should be copied structurally for the new 2-stage diagram reference file rather than re-derived.
+- **judgment-flow.md does NOT need editing** for this feature — its mermaid diagram and decision table are specifically the D1-D7/E1-E2/A/H/R adopt-hold-reject flow, and `judgment_flow.go`'s consistency check is scoped to that one diagram. Detection (R1-R3) is a new judgment made *after* that flow completes (at report time), not a new node in it — confirmed by the plan's own Key Decision ("発火の根拠は…" is independent of the D1-D7 nodes). No evidence found that ties the new detection logic into the existing judgment-flow diagram/table.
+
+### doc-dag skill invocation (step 9 precedent)
+
+- review-triage-fix SKILL.md step 9 text: "`doc-dag` skill を修正した文書群に回し…**`doc-dag` は別のプラグインなので、無ければこの手順は飛ばし、飛ばしたことを報告に書く**。" This is the literal phrasing pattern (skip-and-report-skip) that both the new step's `mermaid-preview` dependency and its Markdown fallback (R11) should reuse verbatim in structure.
+
+### CI / gating
+
+- **No `.github/workflows/`, no root `Makefile`, no root CI config exists in this repo.** The plan's premise of "existing tests/CI config that gate changes" does not hold at the repo-root level — the only test/lint gate is `go test ./...` run manually inside `review-triage/tools/triagecheck/`.
+- **This repo has no `.claude/akm-claude-plugins/review-triage/config.json`** (only `.claude/review-triage.yaml`, which is the *category/audience config* per config-schema.md, not the project-config.md schema with `record_dir`/`gates`/`triage_check_command`/`triage_summary_command`). This means: this repo's own review-triage runs currently have **no configured `triage_check_command`/`triage_summary_command`**, so per SKILL.md step 5, every run so far should have reported "検査を走らせていない." **This is a gap the plan should be aware of**: if AE1 ("遡って当てると回3で発火する") is meant to be validated against `docs/review-triage/fix-triagecheck-explicit-path-must-exist.yaml` by actually running `triagecheck`, there is currently no wired command to do that in this repo — validation would need direct `go run -C .../tools/triagecheck` invocation with explicit flags, not a configured command.
+- **`record_dir` mismatch**: project-config.md's documented default is `docs/review-triages` (plural), but this repo's actual directory is `docs/review-triage` (singular) — confirmed by `ls`. This is consistent with the plan's own citations (which correctly use the singular form), so it's not an error in the plan, but worth flagging as a repo-specific deviation from the documented default in case any new reference text writes example paths.
+
+### Vocabulary check (CONCEPTS.md)
+
+- `修正由来の指摘` and `捉え直し` are already defined in CONCEPTS.md's last section "レビューの収束" (added, presumably, in anticipation of this plan) — definitions match R2/R9 precisely, including the explicit distinction "同じ場所への指摘とは別の概念である" and "型に名前を付けることとは別の作業である." No new terms need adding to CONCEPTS.md beyond what's already there; the plan should reuse these definitions verbatim rather than redefine them in SKILL.md/references.</result>
+<usage><subagent_tokens>135760</subagent_tokens><tool_uses>28</tool_uses><duration_ms>121271</duration_ms></usage>
+</task-notification>
