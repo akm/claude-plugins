@@ -74,7 +74,7 @@ make plugins-install
 ```
 
 - ターゲット `plugins-status` は、このリポジトリのプラグインごとに、最新の版と、スコープ (user / project / local) ごとのインストール済みの版を並べ、最新の版と比べた結果 (同じ・古い・新しい) を示します。表示するだけで、インストール済みのプラグインは変えません。
-- ターゲット `plugins-install` は、user スコープにインストールされていないプラグインを、user スコープにインストールします。user スコープにインストール済みのプラグインは、古くても更新しません。更新には、次の節のマーケットプレイスの自動更新を使います。インストールの後に必要な手順 (Claude Code の再起動など) は、実行の最後に表示します。
+- ターゲット `plugins-install` は、user スコープにインストールされていないプラグインを、user スコープにインストールします。user スコープにインストール済みのプラグインは、古くても更新しません。更新には、次の節のマーケットプレイスの自動更新を使います。インストールの後に必要な手順は、実行の最後に表示します。
 
 変数 `PLUGINS` にプラグインの名前をカンマで区切って指定すると、そのプラグインだけを対象にします。make のコマンドラインで指定したときだけ対象を絞り、同じ名前の環境変数では絞りません。
 
@@ -103,7 +103,7 @@ make plugins-status PLUGINS=doc-dag,wording-guard
 }
 ```
 
-更新した版は、実行中のセッションには反映されません。コマンド `/reload-plugins` を実行するか、次に Claude Code を起動したときに反映されます。すぐに更新したいときは、同じ Marketplaces タブで akm-claude-plugins を選んで、「Update marketplace」を選びます。詳しくは、公式ドキュメントの[マーケットプレイスの自動更新をオンまたはオフにする](https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace)を参照してください。
+すぐに更新したいときは、同じ Marketplaces タブで akm-claude-plugins を選んで、「Update marketplace」を選びます。詳しくは、公式ドキュメント[プラグインのインストールと管理](https://code.claude.com/docs/ja/plugins/install)の節[マーケットプレイスの自動更新をオンまたはオフにする](https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace)を参照してください。自動更新がいつ実行され、更新した版がいつ読み込まれるかは、公式ドキュメント[プラグイン読み込みリファレンス](https://code.claude.com/docs/ja/plugins/loading)の節[自動アップデートが実行される場合](https://code.claude.com/docs/ja/plugins/loading#when-auto-update-runs)を参照してください。
 
 プラグイン wording-guard で textlint を使っている場合は、wording-guard の版が変わったら、textlint を入れるコマンド `wording_lint.py setup` をもう一度実行します。実行するコマンドは、ファイル `wording-guard/README.md` の節「[textlint による検査 (任意)](wording-guard/README.md#textlint-による検査-任意)」を参照してください。
 
@@ -147,7 +147,7 @@ project / local スコープの場合は、**`--scope` の指定と、そのプ�
 claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ```
 
-**更新後は Claude Code の再起動が必要です。** 再起動するまで、実行中のセッションには更新内容が反映されません。
+更新した版を実行中のセッションに読み込む方法は、公式ドキュメント[プラグイン読み込みリファレンス](https://code.claude.com/docs/ja/plugins/loading)の節[プラグインが到達したステージを確認](https://code.claude.com/docs/ja/plugins/loading#check-which-stage-a-plugin-reached)を参照してください。
 
 `.claude/settings.json` の `enabledPlugins` で有効化している場合も、プラグイン本体の取得は同じ仕組みのため、更新手順は同様です。設定ファイルに書いてあるだけでは最新版が自動で使われるわけではない点に注意してください。
 

@@ -37,7 +37,7 @@ CLONE = {"wording-guard": "0.27.0", "doc-dag": "0.1.0", "pr-teeth": "0.5.0"}
 LIST = ["plugin", "list", "--json"]
 MARKETPLACE_LIST = ["plugin", "marketplace", "list", "--json"]
 UPDATE = ["plugin", "marketplace", "update", MP]
-RESTART = "Claude Code を再起動する"
+LOAD = "実行中のセッションに読み込む方法"
 UNKNOWN = "版が変わったか分からない"
 STATUS_HINT = "make plugins-status"
 # インストールが確認を求めて失敗したときの進め方 (中止の文の直し方) の一部
@@ -133,7 +133,7 @@ class InstallTest(InstallTestCase):
         self.assertEqual(self.user_versions(), {"wording-guard": "0.28.0", "doc-dag": "0.2.0", "pr-teeth": "0.5.0"},
                          "user スコープに無いものは最新の版でインストールし、古いものは扱わないこと")
 
-    def test_reports_installed_and_restart(self):
+    def test_reports_installed_and_load_note(self):
         self.set_state([self.installed("pr-teeth", "user", "0.5.0")])
         r = self.run_install()
         self.assert_succeeded(r)
@@ -141,7 +141,7 @@ class InstallTest(InstallTestCase):
         lines = r.stdout.splitlines()
         self.assertIn("インストールしたもの (user スコープ): wording-guard 0.28.0, doc-dag 0.2.0", lines,
                       "インストールしたものの一覧を、インストールした版とともに表示すること")
-        self.assertIn(RESTART, r.stdout, "インストールしたものがあれば、再起動が要ることを表示すること (R18)")
+        self.assertIn(LOAD, r.stdout, "インストールしたものがあれば、読み込みの案内を表示すること (R18)")
         self.assertIn("pr-teeth", r.stdout, "user スコープにインストール済みなので扱わなかったものを表示すること")
 
     def test_wording_guard_setup_uses_reread_install_path(self):
@@ -173,7 +173,7 @@ class InstallTest(InstallTestCase):
         r = self.run_install()
         self.assert_succeeded(r)
         self.assertEqual(self.changes(), [UPDATE, install_args("doc-dag"), install_args("pr-teeth")])
-        self.assertIn(RESTART, r.stdout)
+        self.assertIn(LOAD, r.stdout)
         self.assertNotIn("wording_lint.py", r.stdout, "wording-guard を変えなかったときは、textlint を入れるコマンドを表示しないこと")
 
     def test_nothing_to_install(self):
@@ -187,7 +187,7 @@ class InstallTest(InstallTestCase):
                          "入れるものが無いときは、plugin marketplace update も含めて、変える操作を実行しないこと (KD20)")
         self.assertEqual(self.read_state(), before, "インストール済みのプラグインもマーケットプレイスの clone も変えないこと")
         self.assertIn(plugintest.NOTHING_CHANGED, r.stdout, "何も変えていないことを表示すること")
-        self.assertNotIn(RESTART, r.stdout, "何も変えていないときは、再起動の案内を表示しないこと")
+        self.assertNotIn(LOAD, r.stdout, "何も変えていないときは、読み込みの案内を表示しないこと")
 
     def test_plugins_option_limits_targets(self):
         r = self.run_install("--plugins", "pr-teeth,wording-guard")
@@ -209,7 +209,7 @@ class AbortTest(InstallTestCase):
         self.assertIn("network error", r.stderr, "失敗したコマンドの出力を標準エラー出力に書くこと")
         self.assertIn("update stdout", r.stderr)
         self.assertIn("処理しなかったもの: wording-guard, doc-dag, pr-teeth", r.stderr.splitlines())
-        self.assertNotIn(RESTART, r.stderr + r.stdout, "何もインストールしていないときは、再起動の案内を表示しないこと")
+        self.assertNotIn(LOAD, r.stderr + r.stdout, "何もインストールしていないときは、読み込みの案内を表示しないこと")
 
     def test_second_install_fails(self):
         self.set_state(faults=[{"prefix": install_args("doc-dag"), "action": "fail", "stderr": "doc-dag のエラー\n"}])
@@ -227,7 +227,7 @@ class AbortTest(InstallTestCase):
         self.assertIn("処理しなかったもの: pr-teeth", lines, "処理しなかったプラグインの名前を示すこと")
         self.assertIn(f"claude plugin install doc-dag@{plugintest.MARKETPLACE} --scope user を実行し", r.stderr,
                       "確認を求めて失敗したときに、端末でインストールする進め方を直し方で示すこと")
-        self.assertIn(RESTART, r.stderr, "中止したときも、インストールしたものがあれば再起動の案内を表示すること (R18)")
+        self.assertIn(LOAD, r.stderr, "中止したときも、インストールしたものがあれば読み込みの案内を表示すること (R18)")
         error = error_text(r)
         self.assertIn("doc-dag", error, "エラーの文に、失敗したプラグインの名前を書くこと")
         self.assertIn("一部が変わっている", error, "変える操作の途中で中止したことをエラーの文に書くこと")
@@ -243,7 +243,7 @@ class AbortTest(InstallTestCase):
                       "再度の読み込みも失敗したら、処理中だったものを「版が変わったか分からない」と示すこと (KTD8)")
         self.assertIn(STATUS_HINT, r.stderr)
         self.assertIn("処理しなかったもの: pr-teeth", lines)
-        self.assertIn(RESTART, r.stderr, "版が変わったか分からないものがあれば、再起動の案内を表示すること (R18)")
+        self.assertIn(LOAD, r.stderr, "版が変わったか分からないものがあれば、読み込みの案内を表示すること (R18)")
         self.assertIn(CONFIRM_GUIDE, r.stderr,
                       "再度読み込めず、インストールされたか分からないときは、確認の進め方を示すこと")
 
@@ -306,7 +306,7 @@ class AbortTest(InstallTestCase):
                 self.assertIn(actual, r.stderr, "再度読み込んだ実際の状態を示すこと")
                 self.assertIn("インストールしたもの (user スコープ): " + (", ".join(
                     f"{n} {LATEST[n]}" for n in before_names) or "なし"), r.stderr.splitlines())
-                self.assertIn(RESTART, r.stderr, "user スコープの状態を変えたので、再起動の案内を表示すること")
+                self.assertIn(LOAD, r.stderr, "user スコープの状態を変えたので、読み込みの案内を表示すること")
 
 
 class InterruptTest(InstallTestCase):
@@ -323,7 +323,7 @@ class InterruptTest(InstallTestCase):
         self.assertIn(f"処理中だったもの: doc-dag は、{UNKNOWN}。{STATUS_HINT} で確認する", lines,
                       "処理中だったものを「版が変わったか分からない」と示し、make plugins-status で確認するよう案内すること")
         self.assertIn("処理しなかったもの: pr-teeth", lines)
-        self.assertIn(RESTART, r.stderr, "中断したときも、インストールしたものがあれば再起動の案内を表示すること (R18)")
+        self.assertIn(LOAD, r.stderr, "中断したときも、インストールしたものがあれば読み込みの案内を表示すること (R18)")
         error = error_text(r)
         self.assertIn("Ctrl-C で中断した", error, "中断したことをエラーの文に書くこと")
 
@@ -334,7 +334,7 @@ class InterruptTest(InstallTestCase):
         self.assertEqual(self.changes(), [UPDATE], "中断したら、それ以上コマンドを実行しないこと")
         self.assertIn("処理しなかったもの: wording-guard, doc-dag, pr-teeth", r.stderr.splitlines())
         self.assertIn(STATUS_HINT, r.stderr)
-        self.assertNotIn(RESTART, r.stderr, "プラグインを 1 つも処理していないときは、再起動の案内を表示しないこと")
+        self.assertNotIn(LOAD, r.stderr, "プラグインを 1 つも処理していないときは、読み込みの案内を表示しないこと")
 
 
 class PreconditionTest(InstallTestCase):

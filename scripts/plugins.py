@@ -91,7 +91,8 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
   - 版が変わったか分からないもの
   - 処理中だったもので、再度読み込むと user スコープにあったもの (版が最新の版と違っても、user スコープの状態は変わっている)
 案内は次の 2 つで、どちらも表示するだけで、実行はしない。
-  - Claude Code の再起動が要ること。再起動するまで、実行中のセッションには反映されない
+  - インストールしたプラグインを実行中のセッションに読み込む方法を書いた、公式ドキュメントの節の URL (文面は定数 LOAD_NOTE に
+    ある)。読み込みの方法と時期は Claude Code の振る舞いなので、このスクリプトには書かない
   - wording-guard が上のどれかに当たり、再度読み込んだ要素があれば、textlint を入れるコマンド
     python3 <展開先>/scripts/wording_lint.py setup。展開先は、インストールの後に再度読み込んだ installPath (版ごとに変わるので、
     前の値や組み立てたパスは使わない)。展開先に空白などがあれば、シェルの引用符で囲む。実行しないのは、npm で多くの
@@ -167,8 +168,13 @@ AUTO_UPDATE_NOTE = (
     "公式ドキュメント: https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace"
 )
 
-# インストールの後の案内 (R18)。どちらも表示するだけで、実行はしない
-RESTART_NOTE = "Claude Code を再起動する必要がある。再起動するまで、実行中のセッションには、インストールしたプラグインが反映されない。"
+# インストールの後の案内 (R18)。どちらも表示するだけで、実行はしない。読み込みの案内 (LOAD_NOTE) は、読み込みの方法と時期を
+# 書かずに、公式ドキュメントの節を示す (KD17)
+LOAD_NOTE = (
+    "インストールしたプラグインを実行中のセッションに読み込む方法は、公式ドキュメントのページ「プラグインのインストールと管理」の"
+    "節「シェルからインストール」にある。\n"
+    "公式ドキュメント: https://code.claude.com/docs/ja/plugins/install#install-from-your-shell"
+)
 # textlint を入れるコマンドを案内するプラグインの名前と、そのコマンドのスクリプトの、展開先からの相対パス
 WORDING_GUARD = "wording-guard"
 WORDING_LINT_RELPATH = os.path.join("scripts", "wording_lint.py")
@@ -970,7 +976,7 @@ def after_install_notes(progress):
     """実行の後の案内 (R18) の行を返す。案内が要らなければ、空の配列を返す。
 
     インストールしたものか、版が変わったか分からないものか、再度読み込んで user スコープにあった処理中のものがあれば、
-    再起動が要ることを示す。そのうち wording-guard があれば、再度読み込んだ展開先で、textlint を入れるコマンドを示す。
+    読み込みの案内を示す。そのうち wording-guard があれば、再度読み込んだ展開先で、textlint を入れるコマンドを示す。
     """
     changed = {}
     for target, element in progress.installed:
@@ -981,7 +987,7 @@ def after_install_notes(progress):
     unknown = progress.current is not None and (outcome is None or not outcome["known"])
     if not changed and not unknown:
         return []
-    lines = ["", RESTART_NOTE]
+    lines = ["", *LOAD_NOTE.splitlines()]
     element = changed.get(WORDING_GUARD)
     if element is not None:
         command = shlex.quote(os.path.join(element["installPath"], WORDING_LINT_RELPATH))

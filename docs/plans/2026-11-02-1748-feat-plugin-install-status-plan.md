@@ -72,7 +72,7 @@ execution: code
 - KD14. **成功を返しても版が最新にならなければ、エラーにして中止する** (session-settled: user-approved。退けた案: 成功として扱う。理由: 利用者に知らせずに古い版が残る)。Governs R16, R18。
 - KD15. **インストール済みの版の方が新しいときは「新しい」と示す** (session-settled: user-approved。退けた案: エラーにする)。Governs R9。
 - KD16. **Ctrl-C で中断したときも、中止と同じく、それまでの変更を案内する** (session-settled: user-approved。退けた案: 何も表示せずに終える)。Governs R17, R18。
-- KD17. **インストールに伴う手順 (Claude Code の再起動と、wording-guard の `wording_lint.py setup`) は、案内を表示するだけにする** (session-settled: user-directed。退けた案: `wording_lint.py setup` まで実行する・扱わない。理由: `wording_lint.py setup` は npm で約 380 個のパッケージを取得する)。Governs R18。
+- KD17. **インストールに伴う手順 (実行中のセッションへの読み込みと、wording-guard の `wording_lint.py setup`) は、案内を表示するだけにする** (session-settled: user-directed。退けた案: `wording_lint.py setup` まで実行する・扱わない。理由: `wording_lint.py setup` は npm で約 380 個のパッケージを取得する)。読み込みの案内は、読み込みの方法と時期を書かずに、公式ドキュメントの節を示す (理由: 読み込みの方法と時期は Claude Code の振る舞いで、変わりうる。2026-11-03 のレビューで決めた)。Governs R18。
 - KD18. **状況の表示は、古いものがあっても終了コード 0 で終える** (session-settled: user-approved。退けた案: 古いものがあれば 0 以外で終える)。Governs R12。
 - KD19. **中止・中断したときは、処理中だったプラグインの版と、処理しなかったプラグインの名前を示す。前提の検査でエラーになったときは、何も変えていないことを書く** (session-settled: user-approved。退けた案: 処理中だったものはいつも「版が変わったか分からない」と示し、処理しなかったものは `make plugins-status` で確認してもらう。理由: `claude` の処理の途中で中止すると版が変わっていることがあり、make を通すと終了コードはどれも 2 になって区別できない)。Governs R8, R15, R17, R18。
 - KD20. **入れるものが 1 つも無いときは、マーケットプレイスの定義も取得し直さない** (session-settled: user-approved。退けた案: 入れるものが無くても取得し直す。理由: 入れるものが無いのに、手元の clone を変えるだけになる)。Governs R13。
@@ -80,7 +80,7 @@ execution: code
 - KD22. **自動更新が有効かは判定せず、確認する方法と公式ドキュメントの URL を、状況の表示の最後に示す** (session-settled: user-directed。退けた案: 自動更新が有効かを示さない。理由: 自動更新の設定は 3 か所 (設定ファイルの `extraKnownMarketplaces`・Claude Code が内部に持つファイル・管理者の設定) にあり、`claude` の CLI の出力からは判定できないが、更新を自動更新に任せる以上、利用者が確認できる必要がある)。Governs R21。
 - KD23. **状況の表示の最後に、user スコープの「版が古いもの」「インストールされていないもの」「無効なもの」の名前をまとめて示す** (session-settled: user-approved。退けた案: プラグインごとの行だけを示す。理由: 対象のプラグインが多いと、どれが古いかを一目で読み取りにくい。2026-11-02 の実装の後に決めた)。Governs R22。
 - KD24. **インストールの最初に、user スコープにインストール済みで扱わないものを示し、中止したときの「処理しなかったもの」は、当てはまるものが無くても「なし」と示す** (session-settled: user-approved。退けた案: どちらも示さない。理由: インストールのターゲットが古いものを更新しないことと、処理しなかったものが無いことが、出力から分かる。2026-11-02 の実装の後に決めた)。Governs R15, R23。
-- KD25. **インストールが失敗して中止した後に記録を読み込み、処理中だったプラグインが user スコープに入っていれば、版が最新でなくても再起動の案内を出す** (session-settled: user-approved。退けた案: インストールしたものと「版が変わったか分からない」ものがあるときだけ出す。理由: 手元の状態が変わっていて、再起動が要る。2026-11-02 の実装の後に決めた)。Governs R18。
+- KD25. **インストールが失敗して中止した後に記録を読み込み、処理中だったプラグインが user スコープに入っていれば、版が最新でなくても読み込みの案内を出す** (session-settled: user-approved。退けた案: インストールしたものと「版が変わったか分からない」ものがあるときだけ出す。理由: 手元の状態が変わっていて、実行中のセッションに読み込む必要がある。2026-11-02 の実装の後に決めた)。Governs R18。
 
 ### Requirements
 
@@ -121,7 +121,7 @@ execution: code
 **実行の後の案内**
 
 - R18. 新しくインストールしたプラグインがあれば、実行の最後に次を表示する。中止・中断したときも、それまでにインストールしたものか、版が変わったか分からないものか、再度読み込んだ結果 user スコープに入っていた処理中のもの (版が最新でなくても) があれば表示する。どちらも実行はしない。
-  - Claude Code の再起動が要ること。再起動するまで、実行中のセッションには反映されない
+  - インストールしたプラグインを実行中のセッションに読み込む方法を書いた、公式ドキュメントのページ[プラグインのインストールと管理](https://code.claude.com/docs/ja/plugins/install)の節[シェルからインストール](https://code.claude.com/docs/ja/plugins/install#install-from-your-shell)の URL (読み込みの案内。KD17)
   - インストールしたものに wording-guard があれば、textlint を入れるコマンド `python3 <展開先>/scripts/wording_lint.py setup`。展開先は、インストールの後に再度読み込んだ実際のパス
 
 **テストと文書**
@@ -142,7 +142,7 @@ execution: code
 - project / local スコープへのインストール (KD5)
 - 状況の表示で、自動更新が有効かを判定して示すこと。代わりに、確認する方法と公式ドキュメントの URL を示す (KD22)
 - marketplace.json に載っていない、開発中のプラグイン (ディレクトリ `issue-dispatch/` など)
-- `wording_lint.py setup` の実行と、Claude Code の再起動 (KD17)
+- `wording_lint.py setup` の実行と、実行中のセッションへの読み込み (KD17)
 - 有効か無効かを切り替えること (`claude plugin enable` / `claude plugin disable`)
 - pre-release の付いた版 (KD8)
 - `make help` (KD4)
@@ -429,16 +429,16 @@ flowchart TB
 - **Execution note:** Ctrl-C での中断は、偽の claude に、指定した呼び出しで親のプロセスへ SIGINT を送らせ、作業用のリポジトリにコピーしたスクリプトをプロセスとして実行して確認する。スクリプトの中の関数をテストで差し替えない (KTD12)。
 - **Test scenarios:**
   - user スコープに無いものが 2 つ、古いものが 1 つあるとき、無い 2 つだけが marketplace.json の順にインストールされ、古いものは扱われない。記録では、`plugin marketplace update` が 1 回、インストールより前にあり、`plugin install` には `--scope user` が付いている。`plugin update`・`plugin enable`・`plugin disable` は無い。
-  - インストールの後、インストールしたものの一覧と、再起動が要ることが表示され、終了コード 0 で終える。
+  - インストールの後、インストールしたものの一覧と、読み込みの案内が表示され、終了コード 0 で終える。
   - wording-guard をインストールしたとき、`python3 <展開先>/scripts/wording_lint.py setup` が表示され、展開先はインストール後に再度読み込んだ値である。wording-guard を変えなかったときは表示されない。
-  - user スコープに無いものが無いとき、`plugin marketplace update` も含めて変える操作を 1 つも実行せず、再起動の案内も出さずに、終了コード 0 で終える (KD20)。
-  - `plugin marketplace update` が失敗すると、インストールを実行せずに終了コード 4 で終え、標準エラー出力にマーケットプレイスの名前と失敗の出力が出る。再起動の案内は出ない。
-  - 3 つのうち 2 つ目のインストールが失敗すると、3 つ目は実行されず、終了コード 4 で終える。標準エラー出力に 2 つ目の名前と失敗の出力が出る。1 つ目をインストールしたことと再起動の案内、再度読み込んだ 2 つ目の実際の状態、処理しなかった 3 つ目の名前も出る。
-  - 2 つ目のインストールが失敗した後の再度の読み込みも失敗すると、2 つ目は「版が変わったか分からない」と示され、再起動の案内も出る。
+  - user スコープに無いものが無いとき、`plugin marketplace update` も含めて変える操作を 1 つも実行せず、読み込みの案内も出さずに、終了コード 0 で終える (KD20)。
+  - `plugin marketplace update` が失敗すると、インストールを実行せずに終了コード 4 で終え、標準エラー出力にマーケットプレイスの名前と失敗の出力が出る。読み込みの案内は出ない。
+  - 3 つのうち 2 つ目のインストールが失敗すると、3 つ目は実行されず、終了コード 4 で終える。標準エラー出力に 2 つ目の名前と失敗の出力が出る。1 つ目をインストールしたことと読み込みの案内、再度読み込んだ 2 つ目の実際の状態、処理しなかった 3 つ目の名前も出る。
+  - 2 つ目のインストールが失敗した後の再度の読み込みも失敗すると、2 つ目は「版が変わったか分からない」と示され、読み込みの案内も出る。
   - 2 つ目のインストールが失敗したが、再度読み込むと 2 つ目が最新の版で入っているとき、2 つ目もインストールしたものとして示される。
   - インストールが失敗したときの直し方に、確認の進め方 (端末で `claude plugin install` を実行して確認してからインストールする) を添えるのは、`claude` が終了コード 0 以外で終了し、再度読み込んだ結果がインストールされていない・読み込めなかったときだけ。最新の版か古い版で入っていたときと、`claude` が終了コードを返さなかった (どの場合かは、スクリプトのクラス `CommandError` の docstring に書いた) ときは添えない (KTD7。2026-11-02 のレビューで足した)。
   - インストールが成功を返したのに版が変わらないとき、終了コード 4 で終え、その名前が標準エラー出力に出る (R16)。
-  - 偽の claude が 2 つ目のインストールで親のプロセスに SIGINT を送ると、それ以上コマンドを実行せず、1 つ目をインストールしたこと・2 つ目は「版が変わったか分からない」こと・処理しなかった 3 つ目の名前・`make plugins-status` での確認の案内・再起動の案内を表示して、終了コード 130 で終える。
+  - 偽の claude が 2 つ目のインストールで親のプロセスに SIGINT を送ると、それ以上コマンドを実行せず、1 つ目をインストールしたこと・2 つ目は「版が変わったか分からない」こと・処理しなかった 3 つ目の名前・`make plugins-status` での確認の案内・読み込みの案内を表示して、終了コード 130 で終える。
   - 前提の検査でエラーになったとき、変える操作は 1 つも実行されない。
   - `make plugins-install PLUGINS=a` は a だけを対象にする。
 - **Verification:** U4 のテストがすべて成功する。
@@ -451,7 +451,7 @@ flowchart TB
 - **Files:** 変える: `README.md`。
 - **Approach:**
   1. 節「最新版に更新する」の初めに、このリポジトリを clone している人向けの手順として、2 つのターゲットと `PLUGINS` (カンマ区切り) を書く。
-  2. マーケットプレイス akm-claude-plugins の自動更新を有効にする手順 (`/plugin` の Marketplaces タブの「Enable auto-update」か、`~/.claude/settings.json` の `extraKnownMarketplaces.akm-claude-plugins.autoUpdate`) と、更新の後に `/reload-plugins` か再起動で反映されることを書く。wording-guard の版が変わったら `wording_lint.py setup` を実行し直すことは、`wording-guard/README.md` を参照する形で書く。
+  2. マーケットプレイス akm-claude-plugins の自動更新を有効にする手順 (`/plugin` の Marketplaces タブの「Enable auto-update」か、`~/.claude/settings.json` の `extraKnownMarketplaces.akm-claude-plugins.autoUpdate`) を書く。更新した版がいつ読み込まれるかは書かず、公式ドキュメントの節を示す (KD17 と同じ理由。2026-11-03 のレビューで決めた)。wording-guard の版が変わったら `wording_lint.py setup` を実行し直すことは、`wording-guard/README.md` を参照する形で書く。
   3. 手作業で更新する手順は、自動更新を使わない人向けとして残す (Deferred to Follow-Up Work の記述は変えない)。
   4. 振る舞いの詳細は書き写さず、SSOT として、U2〜U4 で書いたスクリプトのモジュールの docstring を参照する。
   5. 節「構成」のツリーに `Makefile` と `scripts/` (テストの実行コマンドを添える) を足す。節「自動テスト」の、テストをプラグインのものに限る書き方を、`scripts/tests` も含む書き方に直す。
@@ -476,7 +476,7 @@ flowchart TB
 | --- | --- | --- |
 | 1 | `make plugins-status` | 表示が `claude plugin list` と一致する。別のプロジェクトの project スコープの要素がパス付きで出る。表示の最後の URL が開け、そこに書かれた確認の方法 (`/plugin` の Marketplaces タブ) が実際の画面と合う。終了コード 0 |
 | 2 | `make plugins-status PLUGINS=no-such` | 終了コード 0 以外。手元のプラグインが変わらない |
-| 3 | 利用者が選んだ 1 つを `claude plugin uninstall <名前>@akm-claude-plugins --scope user` で外してから、`make plugins-install PLUGINS=<名前>` | user スコープに最新の版で入る。確認を求められずに終了する (`-y` が要らない)。再起動の案内が出る。wording-guard を選んだときは `wording_lint.py setup` の案内が出て、そのパスが実在する |
+| 3 | 利用者が選んだ 1 つを `claude plugin uninstall <名前>@akm-claude-plugins --scope user` で外してから、`make plugins-install PLUGINS=<名前>` | user スコープに最新の版で入る。確認を求められずに終了する (`-y` が要らない)。読み込みの案内が出る。wording-guard を選んだときは `wording_lint.py setup` の案内が出て、そのパスが実在する |
 | 4 | README の手順 (U6) で、マーケットプレイス akm-claude-plugins の自動更新を有効にする。Claude Code を起動して最初のメッセージを送り、更新の表示 (Plugin updated) が出るまで待機してから、Claude Code を再起動する | 9 個のプラグインが更新される |
 | 5 | 別のディレクトリで `make -C <リポジトリのルート> plugins-status` | 9 個すべての user スコープの版が最新の版と同じ |
 
