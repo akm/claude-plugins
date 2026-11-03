@@ -1,0 +1,13 @@
+<bash-input>bash /private/tmp/claude-501/-Users-akima-workspace-claude-plugins/1ab8bc44-daae-4136-8430-37cb0c206e9a/scratchpad/check-local-binding.sh</bash-input><bash-stdout>== 1-no-setting (終了コード 0)
+bind: [Errno 1] Operation not permitted
+connect: [Errno 1] Operation not permitted
+
+== 2-project-true (終了コード 0)
+bind: OK
+connect: OK
+
+== 3-cli-true (終了コード 0)
+bind: OK
+connect: OK
+
+ログ: /var/folders/ld/hbty9_hd3531vdtfn856144w0000gn/T/tmp.pYH5Xejaqw</bash-stdout><bash-stderr></bash-stderr>
