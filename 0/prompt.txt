@@ -1,0 +1,61 @@
+<bash-input>git switch main && git pull --ff-only && git branch -d feat/review-loop-sandbox-68</bash-input><bash-stdout>Switched to branch 'main'
+Your branch is behind 'origin/main' by 32 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+Updating 562dee2..f787097
+Fast-forward
+ CONCEPTS.md           |    7 +-
+ README.md             |    2 +-
+ ...op-sandbox-plan.md |  929 +++
+ .../plugin.json       |    2 +-
+ .../README.md         |   15 +-
+ ...iew-loop-worker.sh | 1215 +++-
+ ...w_write_problem.py |   34 +
+ ...d_settings_json.py |   46 +
+ ...ettings_problem.py |   46 +
+ .../copy_result.py    |   53 +
+ .../make_removable.py |   60 +
+ ...ke_request_copy.py |   64 +
+ .../read_log_facts.py |  152 +
+ ..._worker_version.py |   28 +
+ .../rename_dir.py     |   17 +
+ ...lt_file_problem.py |   35 +
+ .../setpgid_exec.py   |   15 +
+ ...ngs_arg_problem.py |   29 +
+ .../stop_cwd_procs.py |   87 +
+ ...ettings_problem.py |   43 +
+ ...ebfetch_domains.py |   27 +
+ .../workspace_hash.py |   13 +
+ .../SKILL.md          |    9 +-
+ .../arguments.md      |   10 +-
+ .../guide-template.md |   18 +-
+ .../loop-files.md     |   67 +-
+ .../reentry.md        |    6 +-
+ .../round.md          |   26 +-
+ .../stops.md          |   37 +-
+ .../worker.md         |  345 +-
+ .../SKILL.md          |    5 +-
+ .../project-config.md |   14 +-
+ ...equest-template.md |   23 +-
+ .../tests/fake-claude |  246 +-
+ .../tests/fake-uname  |   20 +
+ ...iew_loop_worker.py | 1966 +++++-
+ 36 files changed, 5306 insertions(+), 405 deletions(-)
+ create mode 100644 docs/plans/2026-09-27-1431-feat-review-loop-sandbox-plan.md
+ create mode 100644 review-triage/scripts/review-loop-worker/allow_write_problem.py
+ create mode 100644 review-triage/scripts/review-loop-worker/build_settings_json.py
+ create mode 100644 review-triage/scripts/review-loop-worker/clone_settings_problem.py
+ create mode 100644 review-triage/scripts/review-loop-worker/copy_result.py
+ create mode 100644 review-triage/scripts/review-loop-worker/make_removable.py
+ create mode 100644 review-triage/scripts/review-loop-worker/make_request_copy.py
+ create mode 100644 review-triage/scripts/review-loop-worker/read_log_facts.py
+ create mode 100644 review-triage/scripts/review-loop-worker/read_worker_version.py
+ create mode 100644 review-triage/scripts/review-loop-worker/rename_dir.py
+ create mode 100644 review-triage/scripts/review-loop-worker/result_file_problem.py
+ create mode 100644 review-triage/scripts/review-loop-worker/setpgid_exec.py
+ create mode 100644 review-triage/scripts/review-loop-worker/settings_arg_problem.py
+ create mode 100644 review-triage/scripts/review-loop-worker/stop_cwd_procs.py
+ create mode 100644 review-triage/scripts/review-loop-worker/user_settings_problem.py
+ create mode 100644 review-triage/scripts/review-loop-worker/webfetch_domains.py
+ create mode 100644 review-triage/scripts/review-loop-worker/workspace_hash.py
+ create mode 100755 review-triage/tests/fake-uname
+Deleted branch feat/review-loop-sandbox-68 (was 1417b26).</bash-stdout><bash-stderr></bash-stderr>
