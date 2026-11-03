@@ -1,0 +1,1 @@
+<bash-input>pwd</bash-input><bash-stdout>/Users/akima/workspace/claude-plugins</bash-stdout><bash-stderr></bash-stderr>
