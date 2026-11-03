@@ -1,0 +1,11 @@
+<task-notification>
+<task-id>ac5fec6bf4cd3f648</task-id>
+<tool-use-id>toolu_01LohTqitYt2BZAvxEKJ1vFf</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/a0c80a28-142f-4880-a087-6aa7785f61b6/tasks/ac5fec6bf4cd3f648.output</output-file>
+<status>completed</status>
+<summary>Agent "Check issues 44 and 43" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This agent's report was delivered to you as a message from "ac5fec6bf4cd3f648" (its SubagentHandback call). Read it there; it is not repeated here.
+</result>
+<usage><subagent_tokens>150941</subagent_tokens><tool_uses>29</tool_uses><duration_ms>194280</duration_ms></usage>
+</task-notification>
