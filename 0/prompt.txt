@@ -1,0 +1,11 @@
+<task-notification>
+<task-id>af176a6f83a19dd98</task-id>
+<tool-use-id>toolu_01YQo1w8QYijAweyueEtDPey</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/feec6288-dfe0-4c5b-8d07-0e5eda3b96f8/tasks/af176a6f83a19dd98.output</output-file>
+<status>completed</status>
+<summary>Agent "Round-5 review commit-rules-guard" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This agent's report was delivered to you as a message from "af176a6f83a19dd98" (its SubagentHandback call). Read it there; it is not repeated here.
+</result>
+<usage><subagent_tokens>68186</subagent_tokens><tool_uses>7</tool_uses><duration_ms>94869</duration_ms></usage>
+</task-notification>
