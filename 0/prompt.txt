@@ -1,0 +1,38 @@
+<task-notification>
+<task-id>a329a1f27acc597d6</task-id>
+<tool-use-id>toolu_01QUQn7LVRNHhqTHGSYTgmKE</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/a329a1f27acc597d6.output</output-file>
+<status>completed</status>
+<summary>Agent "Doc review: feasibility (retry)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This grounds U2's Test scenario reference to "回 3〜5 の `wrapper.go`" reasonably well. Sufficient. Now producing the final JSON output.
+
+```json
+{
+  "reviewer": "feasibility",
+  "findings": [
+    {
+      "title": "recordUnknownKeyProblems と recordNullSilentKeys が U1 の対象ファイル一覧から漏れている",
+      "severity": "P1",
+      "section": "Implementation Unit U1",
+      "why_it_matters": "U1 の Files 節は record.go の変更対象を「構造体、recordAllowedKeys の階層、recordSemanticProblems の検査、サマリ描画」と挙げているが、recurrence: とだけ書いて値が無い記録を検出するには、plan_ref / investigation と同じく recurrence を recordNullSilentKeys マップ (record.go:315) に追加し、recurrence 配下の未知キー検出には recordUnknownKeyProblems 内の switch 文 (record.go:352-365、consequence / premise_check / plan_ref / investigation がそれぞれ個別の case を持つ) に recurrence の case を追加する必要がある。この関数は recordAllowedKeys や recordSemanticProblems とは別の独立した関数であり、名指しされていない。実装者が Files 節の記述どおりに 3 か所だけ直すと、U1 の Test scenarios が明記する「recurrence: とだけ書いて値が無い記録が『値の無い構造キー』として報告される」「未知のキーを recurrence の下に書くと報告される」というテストが失敗する。",
+      "finding_type": "omission",
+      "autofix_class": "safe_auto",
+      "suggested_fix": "U1 の Files 節の record.go の説明に「recordUnknownKeyProblems の未知キー検出 (recurrence 配下への case 追加) と recordNullSilentKeys への recurrence の追加」を加える。",
+      "confidence": 75,
+      "evidence": [
+        "`review-triage/tools/triagecheck/record.go` (構造体、`recordAllowedKeys` の階層 `\"検知\"`・`\"根拠\"`・`\"捉え直し\"`、`recordSemanticProblems` の検査、サマリ描画)",
+        "`recurrence:` とだけ書いて値が無い記録が「値の無い構造キー」として報告される。",
+        "未知のキーを `recurrence` の下に書くと報告される。"
+      ]
+    }
+  ],
+  "residual_risks": [
+    "KTD4 は直前回に `reframed` があるときの比較対象切り替えのみを規定し、直前回の `recurrence.status` が `detected`（未処理）のままの場合の扱いを明示していないが、KTD5 の「未処理は最も古い回から扱う」原則と整合しており、検知ロジックが通常どおり直前回の `plans[].cause` と照合すれば足りると読めるため、finding としては見送った。",
+      "R2 の主条件（『修正由来の指摘』の判定）は `review-triage` が自スキルの findings に `cause` を持たないまま前回の `plans[].cause` と照合することを要求するが、これは KTD1 の session-settled 決定（機械検出でなくスキルの読みに委ねる）そのものであり、意図された設計であるため finding にしなかった。"
+  ],
+  "deferred_questions": []
+}
+```</result>
+<usage><subagent_tokens>119961</subagent_tokens><tool_uses>27</tool_uses><duration_ms>130188</duration_ms></usage>
+</task-notification>
