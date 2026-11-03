@@ -1,0 +1,240 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>AskUserQuestion, Bash, Edit, Read, Skill, ToolSearch, Write, mcp__Claude_Browser__computer, mcp__Claude_Browser__navigate, mcp__Claude_Browser__preview_start, mcp__ccd_pr__get_status, mcp__ccd_turn__update_plan, mcp__ccd_turn__wrap_up</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+   - Overall: finish Issue #87 (unnatural Japanese wording in akm/claude-plugins). Items 1/4/8 done in PR #144 (merged 385daa4). For items 5–7, the user decided (recorded in `tmp/issue-87-remaining-decisions.md`) and the work is split into 5 PRs, one per word, each started from main after the previous one merges:
+     1. PR1 #145: principle 3 and kind-expansion. Merged (61674ed).
+     2. PR2 #146: 「段」→「フェーズ」. Merged (acc6a4a).
+     3. PR3 #148: 「走らせる」「走る」→「実行する」「実行される」, plus 「並走」「併走」. Merged (3699f8a).
+     4. PR4: 「正本」→ SSOT, split into 4a (`docs/replace-seihon-87`) and 4b (`docs/replace-seihon-review-triage-87`).
+     5. PR5: in-sentence dashes.
+     - Only the last PR body uses `Closes #87`; the others use `Refs #87`.
+   - PR4 decisions by the user (2026-10-28):
+     - Define SSOT as a term in CONCEPTS.md and replace 「正本」 with SSOT. This cancels the earlier meaning-based plan.
+     - First-use explanation goes into each plugin's README.md and SKILL.md: 「SSOT (single source of truth。ある事実を定めている唯一の記述)」.
+     - Replacement rules: 「正本」→「SSOT」, keeping the sentence shape. Put a half-width space between SSOT and Japanese characters, but none next to brackets or punctuation.
+     - Keep the doc-dag reference-form examples 「正本は X」/「正本は B」 next to the SSOT examples.
+     - nearedges keeps detecting 「正本は」 and also detects 「SSOT は」.
+     - Terms entry text was approved.
+     - Split into 4a and 4b.
+   - Current request: 「直す」, meaning fix the 4 adopted findings of PR4a round 1 using review-triage-fix.
+   - Standing constraints from the user and the instructions:
+     - Push and PR only with explicit approval.
+     - Never decide rules (決まり) without asking: show the text and get approval.
+     - Ask rather than decide; ask one question at a time in prose when there are many.
+     - Do not enable Auto-fix.
+     - Do not write other project names in public places.
+     - Commit messages and docs must pass wording-guard.
+     - Commits are grouped by motive.
+     - Invoke the review-triage skills each time.
+     - Converse in Japanese, and restate asks in the final reply.
+
+2. Key Technical Concepts:
+   - wording-guard:
+     - `python3 wording-guard/scripts/wording_lint.py check <files>`, `check --stdin --filename t.md`, and `terms`.
+     - Text inside 「」 (on a single line) is not checked.
+     - The PostToolUse hook blocks avoided words in Write/Edit.
+     - The terms file is `.claude/akm-claude-plugins/wording-guard/terms.toml`; new entries go before `# ---- 許容する語 ----`.
+   - review-triage flow:
+     - review-request writes the request file into tmp/ from the template at `/Users/akima/.claude/plugins/cache/akm-claude-plugins/review-triage/0.23.0/skills/review-triage/references/review-request-template.md`. The user runs the review in another session.
+     - review-triage judges (D1–D8, A2, H7).
+     - review-triage-fix has 3 phases: 調査 / 立案 / 修正.
+     - Records are in `tmp/review-triages/<branch-with-dashes>.yaml`. Regenerate and check with `eval "$(jq -r .triage_summary_command .claude/akm-claude-plugins/review-triage/config.json)"` and `.triage_check_command`.
+     - `plans` can only cover adopted findings.
+     - D8 holds → verdict must be held (H7). Issue #147 records the missing path for "H7 → fix in this branch".
+   - lineorigin: `env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/lineorigin . -root "$PWD" -base <base> -file <f> -lines <n> -rev <head>`.
+   - nearedges: `git diff | ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/nearedges . -root "$(pwd)" -hints`.
+   - Scratchpad `S=/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/scratchpad`:
+     - `commit.sh` has been fixed so it no longer runs `git add -u`. Stage files explicitly, then `source $S/commit.sh && commit <msgfile>`. It lints the message and adds the trailer `Rules-Checked: yes`.
+     - `runtest.sh <sha>` runs the review-triage Python tests (154) in a worktree; use run_in_background.
+   - Go tests: `env -u GIT_DIR ... ASDF_GOLANG_VERSION=1.25.4 go test -C review-triage/tools/<x> -count=1 ./...`.
+   - Python tests:
+     - wording-guard: `python3 -m pytest -q wording-guard/tests`
+     - pr-teeth, commit-rules-guard, session-handoff, issue-dispatch: `cd <p> && python3 -m pytest -q tests` (issue-dispatch takes about 100s)
+     - work-log evals: `cd work-log-gh-comment/skills/work-log-gh-comment/evals && python3 -m pytest -q`
+   - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. PR bodies end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+   - Words avoided, learned via rejections or hooks:
+     - Avoided terms: 確かめ, 食い違, 書き直, 止ま, 答え, 尋ね, 問い, の列, 走る, 並走, 正本, 段 N, 立案の段, 周回, 回 N.
+     - Also flagged: 置く (warning only).
+     - A 「」 quote that spans a line break, or is nested, is not exempted.
+
+3. Files and Code Sections:
+   - `CONCEPTS.md` (commit 9760752): new section appended at the end.
+     ```
+     ## 文書
+
+     ### SSOT
+     single source of truth の略。ある事実 (規則・様式・値・手順) を定めている唯一の記述。ほかの文書やコードは、その事実を書き写さずに SSOT を参照する。文書では「X の SSOT は Y」(X を定めているのは Y) と書く。
+
+     生成物では、生成元を SSOT と呼ぶ (triagecheck のサマリの SSOT は記録 YAML)。生成物が SSOT と一致しなければ、SSOT から生成し直す。`doc-dag` は、同じ事実が 2 か所に書かれた重複を、片方を SSOT にし、もう片方をそこへの参照にして解消する (依存の向きは「参照元 → SSOT」)。
+     ```
+     - L89 still uses SSOT without a link; P3 adds `[SSOT](#ssot)`.
+   - `.claude/akm-claude-plugins/wording-guard/terms.toml` (commit b1ac4ba). The header comment line 5 now reads 「様式の SSOT は …」 (commit a26cb72).
+     ```toml
+     [[terms]]
+     pattern = "正本"
+     verdict = "avoid"
+     replacements = ["SSOT"]
+     reason = "法律の語の流用で、法律では原本と同じ効力を持つ写しを指し、ここで指したい元の記述とはずれる。ある事実を定めている唯一の記述は SSOT (single source of truth。定義は CONCEPTS.md) と書く。doc-dag が調べる文書に現れる参照の形として引くときは、かぎ括弧で「正本は X」と書く"
+     decided_in = "https://github.com/akm/claude-plugins/issues/87"
+     ```
+   - The 4a replacement commits:
+     - Root files: CLAUDE.md, README.md, CONCEPTS.md, .github/test-targets.txt, terms comment.
+     - One commit per plugin: issue-dispatch, wording-guard, doc-dag, pr-teeth, session-handoff, work-log-gh-comment, commit-squash, mermaid-preview, commit-rules-guard.
+     - First-use explanations were added in 15 README.md/SKILL.md files. In commit-squash/README.md and pr-teeth/skills/pr-glossary/SKILL.md, the explanation is a sentence after the parenthesis (commit-squash uses 敬体 「…指します。」).
+     - Version bumps: wording-guard 0.2.6, doc-dag 0.1.4, pr-teeth 0.2.5, session-handoff 0.1.3, work-log-gh-comment 0.1.4, commit-squash 0.1.3, mermaid-preview 0.1.3, commit-rules-guard 0.4.4.
+   - `doc-dag/skills/doc-dag/SKILL.md`:
+     - L14: 「…リンクする・「正本は B」「SSOT は B」と参照する関係。向きは **参照元 → SSOT** (SSOT は single source of truth。ある事実を定めている唯一の記述)。」
+     - L22: 「「正本は X」「SSOT は X」の参照」 is kept.
+     - L29, fixed in ca963b8: 「SSOT でない記述に「SSOT は X」と向きを書く」.
+   - `doc-dag/skills/doc-dag/references/project-config.md` L27, fixed in ca963b8: 「凍結された文書を SSOT でない文書にする案は採らない」.
+   - `review-triage/tools/nearedges/hints.go` (commit 27df773):
+     ```go
+     // SSOT (ある事実を定めている唯一の記述) を指して参照する書き方。リンクが無ければ、検証の観点 B の
+     // 手がかりにする。このリポジトリの書き方は「SSOT は」。「正本は」は、ほかのリポジトリの文書が
+     // 同じ意味で書く形なので見続ける。
+     var referenceWords = []string{"SSOT は", "正本は"}
+     ...
+     			for _, w := range referenceWords {
+     				if strings.Contains(c.Text, w) && !strings.Contains(c.Text, "](") {
+     					add(fmt.Sprintf("観点 B: 変更行に「%s」があるがリンクが無い (%s %d 行目) — 正本を再確認し、参照をリンクにする", w, f, c.Line))
+     				}
+     			}
+     ```
+     - The tail 「正本を再確認し」 and the README table are left for 4b.
+   - `review-triage/tools/nearedges/nearedges_test.go` gains a new test, `TestHintsReferenceWithoutLink`.
+     - The diff adds 3 lines: 「様式の SSOT は terms.md。」, 「様式の正本は terms.md。」, and 「様式の SSOT は [terms.md](terms.md)。」.
+     - It expects the hints for lines 1 and 2, and no hint for 3 行目.
+     - It fails when 「SSOT は」 is removed from the detection (checked).
+   - `review-triage/.claude-plugin/plugin.json`: 0.25.2 (commit cb91649).
+   - `tmp/review-triages/docs-replace-seihon-87.yaml`: run 1 (full, head 9d45b13) with 4 adopted findings.
+     - Finding 1: doc-dag SKILL.md L29.
+     - Finding 2: nearedges hints.go L48. D8 holds by line, but same_defect is not-holds.
+     - Finding 3: CLAUDE.md L15, missing first-use explanation.
+     - Finding 4: origin residual, spacing in project-config L27.
+     - Plans:
+       - P1 (findings 1 and 4): done, sha ca963b8, with verification.near_edges.
+       - P2: approach from the human answer (案 A), order 2, still `status: pending`. It needs updating to done, sha 27df773.
+       - P3: approach from the human answer (案 A), order 3, `status: pending`. This approach is invalid because issue-dispatch has no SKILL.md.
+   - `tmp/issue-87-pr4-seihon-proposal.md`: the SSOT plan with the decisions recorded.
+   - `tmp/pr-body-87-4a.md`: PR body draft (Refs #87). It needs updating with the round-1 fixes: doc-dag fix, nearedges change, review-triage 0.25.2, and the P3 result.
+   - `tmp/issue-87-remaining-decisions.md`: 5b changed to SSOT; work-split row 4 updated to 4a/4b.
+
+4. Errors and fixes:
+   - The replacement script also rewrote `pattern = "正本"` to SSOT in terms.toml; I restored it with sed.
+   - The keep-list held back the string 「正本は X」 by literal text, so the doc-dag L29 instruction was kept too (review finding 1). Fixed in ca963b8.
+   - The 「非正本」 rule did not add a space (residual, finding 4). Fixed in ca963b8.
+   - `commit.sh` used `git add -u`, which caused combined commits in PR3. I fixed the script and redid the commits with reset --soft (not pushed at the time).
+   - Commit messages were rejected by wording-guard:
+     - Avoided words: 確かめ, 食い違, 書き直, 止ま.
+     - Quotes that broke the 「」 exemption: nested 「「未設定」の定義 (正本)」, and a line-wrapped quote.
+     - Each time I rephrased and recommitted.
+   - The PR #146 CI failed on timing-dependent tests that had also failed on main. The user asked for a rerun, and it passed.
+   - A `cd` inside a command changed the working directory; I use absolute paths since then.
+
+5. Problem Solving:
+   - #87 PRs 1–3 are merged. PR4a is in progress on `docs/replace-seihon-87`, HEAD cb91649, not pushed.
+   - Round-1 findings:
+     - P1 and P2 are fixed.
+     - P3 needs to be asked again. The user chose 案 A, but A assumed issue-dispatch has a SKILL.md, and it does not: `issue-dispatch/skills/issue-dispatch/` contains only `references/`.
+   - Files lacking a first-use explanation, per the investigation:
+     - Root: CLAUDE.md L15, README.md L191, CONCEPTS.md L89.
+     - issue-dispatch: 10 references files, with the first use at line 3.
+     - Code docstrings, .github/test-targets.txt, and the terms comment, which are excluded under 案 A.
+
+6. All user messages (since the previous summary):
+   - "採択した 2 件を review-triage-fix で直してください。" (earlier)
+   - AskUserQuestion answers: CLAUDE.md に足す (推奨); 後読みを足す (推奨)
+   - "収束後の全量レビューの依頼文を review-request (code-review opus high --full-review) で作ってください。"
+   - "ブランチを push して、tmp/pr-body-87.md の本文 (Refs #87 のまま) で main への PR を作ってください。"
+   - "#144 をマージしました"
+   - "残りの対応を行いましょう"
+   - "「立案の段」は日本語では不自然ですし、技術文書ではなおさら不自然です。「{立案/調査}の{フェーズ/ステップ/ステージ}」と考えると「ステップ」が良さそうだと思うのですが、他に候補はありますか？"
+   - "「段」は「フェーズ」に言い換え、「調査フェーズ」「立案フェーズ」「修正フェーズ」と書いてください。"
+   - "「正本」は案 B (意味ごとに言い換える) にしてください。"
+   - "「走らせる」「走る」は案 A (両方を避ける語として登録し、「実行する」「実行される」に言い換える) にしてください。"
+   - "ダッシュは案 A (文中のダッシュだけを避け、見出し・項目名と説明の区切り・表の空欄は使い続ける) にしてください。"
+   - "kind-expansion.md の種類の例の表に、案の 4 行を案の文面で足してください。"
+   - "原則 3 は案 A (CLAUDE.md の原則 3 に案の 1 文を足す) にしてください。"
+   - "作業の分け方の案のとおりに進めてください。1 つ目の PR (原則 3 と kind-expansion.md) を main から新しいブランチで始めてください。"
+   - "wording-guard の SKILL.md の既定の原則 3 にも、同じ 2 文を足してください。"
+   - /review-triage:review-triage (PR1 round 1), "採択した 1 件を review-triage-fix で直してください。", AskUserQuestion: "A: 行を後の PR に移す (推奨)"
+   - /review-triage:review-triage (round 2), "収束後の全量レビューの依頼文を review-request (code-review opus high --full-review) で作ってください。", /review-triage:review-triage (round 3)
+   - "ブランチを push して、tmp/pr-body-87-1.md の本文 (Refs #87) で main への PR を作ってください。"
+   - "#145 をマージしました"
+   - "2 つ目の PR (「段」を「フェーズ」に言い換える) を main から新しいブランチで始めてください。用語ファイルの項目の文面と、言い換えの案を先に見せてください。"
+   - "言い換えの規則 (案の 2) と用語ファイルの 2 項目 (案の 3) は、案のとおりにしてください。別の意味の「段」(案の 4) に進んでください。"
+   - "review-loop のワーカーの「準備の段」は案 A (「準備の各処理」「手順 6 の各処理」「処理の名前」と書き、ログのメッセージ 2 か所もそろえる) にしてください。"
+   - "issue-dispatch の「段」は案 A (「6 つの判定の条件」、表の列「順」、「表の 2〜6 番目」と書く) にしてください。"
+   - "pr-teeth の「段」は案 A (「候補」「処理」「2〜4 番目」と書き、pr-teeth を 0.2.3 に上げる) にしてください。"
+   - /review-triage:review-triage (PR2 round 1)
+   - "ブランチを push して、tmp/pr-body-87-2.md の本文 (Refs #87) で main への PR を作ってください。"
+   - "#146 の CIで失敗しました"
+   - "#146 の CI の失敗したジョブを再実行してください。"
+   - "CIはパスしたようです"
+   - "#146 をマージしました"
+   - "3 つ目の PR (「走らせる」「走る」を「実行する」「実行される」に言い換える) を main から新しいブランチで始めてください。用語ファイルの項目の文面と、言い換えの案を先に見せてください。"
+   - "言い換えの規則 (案の 2) と用語ファイルの項目 (案の 3) は、案のとおりにしてください。直し始めてください。"
+   - /review-triage:review-triage (PR3 round 1)
+   - "pr-teeth の「並走」「併走」もこの PR で言い換えてください。言い換えの案を先に見せてください。"
+   - "「並走」「併走」の言い換えと用語ファイルの項目は、案のとおりにしてください。直し始めてください。"
+   - "H7 の保留をこのブランチで直すと決めたときの記録の経路が無いことを記録する Issue の案を作って、先に見せてください。"
+   - "tmp/issue-h7-fix-in-branch.md の本文と tmp/issue-h7-fix-in-branch-title.txt の題で、Issue を起票してください。" → #147
+   - /review-triage:review-triage (PR3 round 2)
+   - "ブランチを push して、tmp/pr-body-87-3.md の本文 (Refs #87) で main への PR を作ってください。"
+   - "#148 をマージしました"
+   - "4 つ目の PR (「正本」を意味ごとに言い換える) を main から新しいブランチで始めてください。意味ごとの言い換えの表と、用語ファイルの項目の文面を先に見せてください。"
+   - "意味 1 の「X の正本は Y」は「X の定義は Y」にしてください。次の質問に進んでください。"
+   - "意味 1 の残りの形は案のとおりにしてください。次の質問に進んでください。"
+   - "意味 2 の言い換えは案のとおりにしてください。次の質問に進んでください。"
+   - "これは変更しない方が良いのでは？"
+   - "doc-dag の参照の形の例と nearedges の手がかりは「正本は」を残して「定義は」を足し、意味 3 の残りは案のとおりにしてください。次の質問に進んでください。"
+   - "「正典」などと誤用しないのであれば「正本」という用語自身は使って良いと思います。敢えて使わないのであれば代わりにSSOTなどを使った方が良いと思いますが、どうでしょう？これを avoid にしないと起こる問題などはありますか？"
+   - "「正本」は用語として定義されていますか？"
+   - "正本を用語として定義すること、SSOTを用語として定義することのどちらが本プロジェクトやユーザーにとって良いでしょうか？"
+   - "SSOT を用語として定義し、「正本」を SSOT に言い換えます。定義の文面と、言い換えの案を見せてください。"
+   - "SSOT の定義と初出の説明の扱いは案のとおりにしてください。次の質問に進んでください。"
+   - "言い換えの規則と残すものは案のとおりにしてください。次の質問に進んでください。"
+   - "案の文面で" (terms entry)
+   - "2 つに分ける"
+   - /review-triage:review-triage (PR4a round 1)
+   - "直す"
+   - AskUserQuestion answers: P2 "A: 4a で判定を足す (推奨)", P3 "A: リンクと SKILL.md (推奨)"
+
+7. Pending Tasks:
+   - Finish review-triage-fix for PR4a round 1:
+     - Mark P2 done (sha 27df773) in the record.
+     - Re-ask P3, because issue-dispatch has no SKILL.md, then implement it.
+     - Run the doc-dag check for the changed docs and record `doc_dag`.
+     - Regenerate the summary and run the check.
+     - Run the tests.
+     - Update `tmp/pr-body-87-4a.md`.
+     - Create the round-2 incremental request with review-request (code-review opus high).
+   - Later:
+     - Push and PR for 4a (only with approval).
+     - 4b: review-triage replacement plus first-use explanations; triagecheck output and summary format change (review-triage 0.26.0, README table row, tests); nearedges message tail 「SSOT を再確認し」 and README table; kind-expansion 「正本」 row with a wording-guard bump.
+     - PR5: dashes. The kind-expansion row for 文中の「—」 and the detection method still need to be proposed.
+     - The final PR closes #87.
+
+8. Current Work:
+   - review-triage-fix on branch `docs/replace-seihon-87`.
+   - Already committed: ca963b8 (P1 doc-dag fixes), 27df773 (P2 nearedges 「SSOT は」 detection plus test), cb91649 (review-triage 0.25.2).
+   - The record still has P2 as `status: pending` (approach order 2) and P3 pending with an approach that cannot be applied.
+   - I discovered that `issue-dispatch/skills/issue-dispatch/` contains only `references/`; there is no SKILL.md. The user's choice for P3 (案 A: "ルートの CLAUDE.md・README.md の初出に CONCEPTS.md の節「SSOT」へのリンクを添え、CONCEPTS.md の 89 行目には同じファイルの節へのリンクを添える。issue-dispatch は SKILL.md に SSOT を説明する 1 文を足す") was based on my wrong premise.
+   - Revised options to present:
+     - Root-doc links as in 案 A, which still apply: `[SSOT](CONCEPTS.md#ssot)` in CLAUDE.md L15 and README.md L191, and `[SSOT](#ssot)` at CONCEPTS.md L89.
+     - For issue-dispatch, either add the explanation at the first use in each of the 10 references files, or defer it until the SKILL.md is created.
+
+9. Optional Next Step:
+   - Update the record: P2 gets `sha: 27df773`, `status: done`, and verification near_edges is not applicable for code; then regenerate and check.
+   - Then tell the user that the P3 premise was wrong and ask how to handle issue-dispatch. My last statement to the user was: "issue-dispatch には SKILL.md がそもそも無いことが分かったので、P3 は、P2 を終えてから直し方を改めて尋ねます。"
+   - Proposed options:
+     - (a) Root links as in 案 A, plus the explanation at the first use in each of the 10 issue-dispatch references files.
+     - (b) Root links only, and add the explanation when issue-dispatch's SKILL.md is created later.
+   - After the answer: implement P3, run the doc-dag check and tests, update the record and PR body, and create the round-2 incremental review request.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
