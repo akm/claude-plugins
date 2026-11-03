@@ -1,0 +1,3 @@
+以下の２つのレビュー結果を合わせて review-triage/skills/review-triage を実行してください
+tmp/review-code-review-opus-5.yaml
+tmp/review-code-review-opus-5-2nd.yaml
