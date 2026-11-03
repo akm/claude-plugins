@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b59jqjbhh</task-id>
+<tool-use-id>toolu_01KBueV6qhqgDJC5Mk2c8nAs</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/4862d6cc-dca9-417a-8d80-e8d5b7473239/tasks/b59jqjbhh.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261101-2200-feat-review-request-target-dir-151 (20261101-2232-feat-review-request-target-dir-151-19-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
