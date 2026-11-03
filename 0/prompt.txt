@@ -1,0 +1,1 @@
+claude "review-triage --gen-config" を実行したけど何かできました？
