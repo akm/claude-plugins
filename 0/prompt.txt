@@ -1,0 +1,53 @@
+<task-notification>
+<task-id>a7cbefd512534679b</task-id>
+<tool-use-id>toolu_01LLAWbdHUorkxNbyWCAoVuR</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a7cbefd512534679b.output</output-file>
+<status>completed</status>
+<summary>Agent "U9: stage sub-agent execution" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>U9 の作業が終わりました。git の書き込みは行っていません (すべて未コミットの作業ツリーの変更です)。
+
+## 1. 変更・新設したファイル
+
+| ファイル | 変更 |
+| --- | --- |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-fix/references/stage-subagent.md` | **新設**。段の走らせ方の決定・effort と定義名の対応表・実効モデルの解決・起動の形・依頼文の雛形・呼び出し側の検証・失敗時・追跡内の記録・実行情報は報告のみ |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-fix/references/arguments.md` | `--stage &lt;段&gt;[=&lt;値&gt;]` の様式・優先順位・値の検査を追加 |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-fix/SKILL.md` | description に `--stage`、前提知識に 1 項、手順 1 (3 段分の決定)、手順 2・5・7 の冒頭 (走らせ方)、手順 4・6 (sub-agent のときの記録のコミットは呼び出し側)、手順 8 (走らせ方の報告)、手順 9 (`doc-dag` はセッション側) |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage/references/project-config.md` | `fix` 節に `stages` (JSON の例と表の 4 行)、「未設定」の扱い、回 N+1 以降の段 2 には効かない旨 |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/SKILL.md` | description と手順 1 に `--stage` の受け渡し |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/references/arguments.md` | 様式・表・受け渡しの段落・優先順位・値の検査に `--stage` |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/references/loop-flow.md` | G0 の「報告に書くもの」に段ごとの走らせ方 (それ以外は触っていない) |
+| `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage-loop/references/reporting.md` | 「必ず出すもの」4 に段の走らせ方、「書かないもの」を「段の走らせ方以外の内部の進み方」に狭めた |
+| `/Users/akima/workspace/claude-plugins/review-triage/README.md` | 設定例の JSON の `fix` に `stages` (説明文は U10 に委ねた) |
+
+## 2. `stage-subagent.md` の全文
+
+直前のツール出力 (`cat` の結果) がそのまま全文です。構成は次のとおり: 冒頭 (正本の宣言) → なぜ段ごとに出せるか (用語 = 指定 / 実効モデル、effort は 指定 / 定義名) → 段と手順・文書の対応 (表) → 走らせ方の決定 (4 段階、effort と定義名の対応表、実効モデルの解決表) → 起動の形 (`run_in_background: false`・逐次・`isolation` を渡さない・再開しない・写しを取らない) → 依頼文 (運ぶもの / 運ばないもの / 段ごとの禁止事項 / 雛形) → 呼び出し側の検証 (共通 4 点と段ごとの表) → 失敗時 → 追跡内の記録 → 実行情報は報告のみ。
+
+## 3. `arguments.md` の `--stage` の節と `project-config.md` の `stages` の表
+
+`arguments.md` の `--stage` の節は、上のツール出力 (ファイル書き出し後に表示された 19〜31 行目) と「値の検査」の 50〜55 行目にあります。要点: `&lt;段&gt;` は `investigate` / `plan` / `fix`、`&lt;値&gt;` は `session` か `&lt;model&gt;[:&lt;effort&gt;]` (`&lt;model&gt;` は空にできない)、`=` 以降を省くと sub-agent で両方未設定、`--stage` はその段の 3 キーをまとめて上書き、段ごとに 1 つ、回 N+1 以降の段 2 には引数も設定も効かない。検査は 段の名前・値の形・effort の 5 値・`subagent` の真偽値・モデルの指定が実効モデルに解決できること (3 段分を手順を始める前に行う)。
+
+`project-config.md` の `stages` の表は直前のツール出力のとおり (`stages` / `stages.&lt;段&gt;.subagent` / `stages.&lt;段&gt;.model` / `stages.&lt;段&gt;.effort` の 4 行)。
+
+## 4. 検証の結果
+
+- 相対リンク: 変更・新設した 9 ファイルの全リンクが実在するファイルを指す (python で機械検査、missing 0)。
+- `grep -rn 'fix-stage' review-triage/`: 対応表の 6 つの定義名 (`review-triage:fix-stage`、`-low` / `-medium` / `-high` / `-xhigh` / `-max`) が `review-triage/agents/*.md` の `name` 6 つと一致。
+- 段の識別子: `project-config.md`・`arguments.md` (両スキル)・`stage-subagent.md`・`SKILL.md` で `investigate` / `plan` / `fix` の綴りが一貫。
+- 廃止語 (検知・俯瞰・捉え直し・旧ファイル名) は変更した全ファイルに無い。
+- 雛形の `{{…}}` と「運ぶもの」の表の項目が過不足なく対応 (機械検査)。
+- CLAUDE.md の避ける言い回し (黙って・素通り・固定する・型 等) は持ち込んでいない。
+
+## 5. 残した懸念
+
+1. **依頼文に `{{targets}}` (対象の識別子) を運ぶことにした。** KTD8 の列挙には無いが、呼び出し側の検証 (「対象の採択が `investigated` で覆われた」) が対象を知っている必要があり、値を依頼文に書く流儀とも合うので足した。不要なら表の 1 行と雛形の 1 行を消せば戻る。
+2. **引数で model を省いて effort だけを指定する形は無い** (`--stage fix=:high` は不可、設定 `stages.fix.effort` で書く)。KTD6 の `&lt;model&gt;[:&lt;effort&gt;]` に従ったが、通し確認で不便なら `inherit` のような綴りを足す判断が要る。
+3. **モデルの突き合わせは「版を除いた部分」の比較にした。** Agent ツールの `model` が版を含まない別名しか受けないため、別名がどの版を指すかの食い違いは検出できない。「限界」として書いていないので、必要なら「effort と定義名の対応」の限界と並べて明記する。
+4. **段 3 を sub-agent で始める前に作業ツリーが clean であることを求めた。** KTD8 の「段 3 の後に未コミットの変更が無い」を意味のある確認にするための前提で、パケットには無い規則の追加。`review-request` スキルの同種の規則 (手順 2) と同じ形。
+5. **Agent ツールの別名の列挙は文書に写していない** (「規範文書に実測値を書かない」に従い、起動するセッションが Agent ツールの定義で確かめると書いた)。通し確認で、名前 → 別名の解決を毎回セッションに委ねて問題ないかを見る必要がある。
+6. `SKILL.md` の手順 4 の立案者 B は「この経路はまだ無い」のまま (U11 の範囲)。手順 5 では「A ならセッション内」とだけ書いた。
+7. 通し確認 (fixture の記録での 3 通りと停止の再現) と `doc-dag` は行っていない。</result>
+<usage><subagent_tokens>199885</subagent_tokens><tool_uses>53</tool_uses><duration_ms>867749</duration_ms></usage>
+</task-notification>
