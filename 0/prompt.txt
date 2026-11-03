@@ -1,0 +1,36 @@
+<task-notification>
+<task-id>a637773c45fb83149</task-id>
+<tool-use-id>toolu_01S7Ynprs51RPZEJLoRw6X4j</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/a637773c45fb83149.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplify: code-reuse review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I now have enough context on the full file's existing helpers and patterns.
+
+## Findings
+
+**`record.go:679-703` (`recordRecurrenceProblems`, evidence loop) — reinvents the "required non-empty string fields" pattern already factored out elsewhere in the same function.**
+
+The loop:
+```go
+for _, kv := range []struct{ key, val string }{{"prior", ev.Prior}, {"reason", ev.Reason}} {
+    if strings.TrimSpace(kv.val) == "" {
+        add("%s: %s がありません", en, kv.key)
+    }
+}
+```
+is structurally identical to the pattern used at `record.go:731-737` for `reframe`'s four fields, and to `record.go:604-613` (`investigation.included`/`excluded`) and `record.go:487-494` (`consequence`'s four fields). This is not a bug, but it's the third near-identical inline literal of the same "slice of {key, val} pairs → TrimSpace-empty check" shape added in this diff alone (evidence's prior/reason, reframe's four fields). Given the file already has this pattern duplicated 3+ times pre-existing this diff, no single new symbol is missing to reuse — but if a helper `recordRequiredNonEmpty(add func(string, ...any), prefix string, kv ...struct{key, val string})` existed, this diff would be a good place to introduce and use it. Not flagging as a hard defect since the file's own established style is to inline this per-callsite; just noting the duplication is real and growing.
+
+**`record.go:715-745` (status-exclusivity switch in `recordRecurrenceProblems`) parallels `record.go:570-597` (the `pl.Status` switch in `recordSemanticProblems` for `recordPlan`) almost line for line** — both use a `default: add("... は X / Y / Z のいずれか: %q", ...)` enum-violation branch and both use small closures (`externalOnly` vs `noDeclinedReason`/`noReframe`) to check "field must be empty unless status is X". This mirroring is intentional per the comment at `record.go:668-669` ("plans の status と同じ扱い"), so it's deliberate parallel structure, not accidental duplication — no fix needed, just confirming it's not a missed-reuse case since the two switches operate on different types (`recordPlan.Status` with 4 values vs `recordRecurrence.Status` with 3) and can't share a body without losing type safety.
+
+**`record.go:1029-1060` (three `recordXxxJa` translation functions) correctly reuse the existing pattern from `recordVerdictJa` (`record.go:1067-1077`) and `recordStatusJa` (`record.go:1079-1091`)** — same shape (switch on string, fallback to raw/`recordCell`). No consolidation opportunity beyond what's already established; a generic `map[string]string` lookup table could replace all five functions, but that's a pre-existing pattern the diff correctly follows rather than a new duplication.
+
+**`renderRecurrence` (`record.go:1012-1027`) correctly reuses `recordCell`** for every free-text field (`ev.Prior`, `ev.Reason`, `rec.DeclinedReason`, `rf.Pattern`, etc.) — matches the established rule ("自由文字列は... recordCell を通す") and matches how `renderInvestigation`/`renderPlanCells` do it. No missed reuse.
+
+**Test file (`record_test.go`)**: `recurrenceRecordYAML` (line 287) correctly reuses `validRecordYAML` rather than duplicating a full run-1 fixture, and the new tests reuse `recordFiles` (test helper) exactly as existing tests do. No duplication found there.
+
+## Summary
+
+Nothing rises to a concrete "replace this with existing symbol X" defect. The one soft observation: the evidence-field-required-check loop at `record.go:696-701` continues a copy-pasted micro-pattern (3rd occurrence in this file, 2 of them added by this diff) that could be extracted into a shared helper, but the codebase's own established convention is per-callsite inlining (see `consequence`, `investigation.included/excluded` checks pre-dating this diff), so this diff is consistent with existing style rather than introducing a new kind of duplication. No behavior-changing reuse recommendation to make.</result>
+<usage><subagent_tokens>88634</subagent_tokens><tool_uses>3</tool_uses><duration_ms>27004</duration_ms></usage>
+</task-notification>
