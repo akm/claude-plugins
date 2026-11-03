@@ -1,0 +1,24 @@
+<task-notification>
+<task-id>a0bf13d4a3375f445</task-id>
+<tool-use-id>toolu_01HpmLJnkKs6K5c5fkTTcZU2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a0bf13d4a3375f445.output</output-file>
+<status>completed</status>
+<summary>Agent "Doc review: coherence-reviewer" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>```json
+{
+  "reviewer": "coherence",
+  "findings": [],
+  "residual_risks": [
+    "Sequencing section groups U7 under Stage 3 alongside U10, but U7's dependencies (U6, U9) are in Stage 2, and line 716 states U7 sequentially follows U9. While the dependency table is explicit and line 716 provides clarification, a reader scanning the Sequencing section alone might misunderstand the work order. Not a contradiction since dependencies are authoritative, but readability could be improved.",
+    "Objective mentions '立案者の選択' (proposer choice) as a mechanism within what reads as an outcome statement. The rule for Objective form permits this when the outcome is stated for an external observer (the human being involved), and the document establishes that proposer choice is how human involvement occurs. However, another reader might parse the Objective as mechanism-bound rather than outcome-shaped.",
+    "Cross-reference at line 346 uses Japanese gloss '順序' (order/sequencing) for what is section-titled 'Sequencing' in English. Not a broken reference, but a minor terminology inconsistency in a otherwise Japanese-language document with some English section headings."
+  ],
+  "deferred_questions": [
+    "Verification Contract (line 983-991) specifies fixture-based 'handoff and scenario testing' for U6, U7, U9 but leaves the exact fixture files and pre-conditions to implementation. Confirm during implementation that existing fixtures (referenced but not listed) are sufficient or define new ones.",
+    "KTD9 (line 638-639) notes that effort-to-definition mapping goes into stage-subagent.md, but the current document does not show whether all 5 effort values (low/medium/high/xhigh/max) are supported by the model ecosystems in use. This will be confirmed at U8/U9 implementation."
+  ]
+}
+```</result>
+<usage><subagent_tokens>93105</subagent_tokens><tool_uses>4</tool_uses><duration_ms>143793</duration_ms></usage>
+</task-notification>
