@@ -1,0 +1,5 @@
+<bash-input>git status</bash-input><bash-stdout>On branch feat/issue-dispatch-plan-114
+Your branch is ahead of 'origin/feat/issue-dispatch-plan-114' by 165 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean</bash-stdout><bash-stderr></bash-stderr>
