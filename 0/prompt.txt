@@ -1,0 +1,2 @@
+<bash-input>git branch -d feat/review-loop-impl-63 docs/readme-nearedges</bash-input><bash-stdout>Deleted branch feat/review-loop-impl-63 (was 9c5bb50).
+Deleted branch docs/readme-nearedges (was ac3ca87).</bash-stdout><bash-stderr></bash-stderr>
