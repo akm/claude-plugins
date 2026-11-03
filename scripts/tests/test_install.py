@@ -274,13 +274,36 @@ class AbortTest(InstallTestCase):
         self.assertNotIn(CONFIRM_GUIDE, r.stderr,
                          "再度読み込んで古い版でインストールされていると分かったときも、確認の進め方を示さないこと")
 
-    def test_install_output_not_utf8_shows_no_confirm_guide(self):
+    def test_install_output_not_utf8_judged_by_exit_code_and_reread(self):
+        # 偽の claude の bad_utf8 は状態を変えないので、再度読み込むと doc-dag はインストールされていない
         self.set_state(faults=[{"prefix": install_args("doc-dag"), "action": "bad_utf8"}])
         r = self.run_install()
         self.assert_aborted(r)
-        self.assertIn("UTF-8 として読めない", r.stderr, "出力を読めないことを中止の文で示すこと")
+        self.assertIn("プラグイン doc-dag のインストールは成功を返したが", r.stderr,
+                      "変える操作の標準出力を UTF-8 として読めなくても、終了コード 0 なら成功を返したとして扱い、"
+                      "再度の読み込みで版を検査すること (KTD7)")
+        self.assertNotIn("UTF-8 として読めない", r.stderr, "変える操作の標準出力は読まないこと (KTD7)")
         self.assertNotIn(CONFIRM_GUIDE, r.stderr,
-                         "claude の終了コードで失敗したのでないとき (returncode が None) は、確認の進め方を示さないこと")
+                         "claude が終了コード 0 で終了したときは、確認の進め方を示さないこと")
+
+    def test_install_output_not_utf8_continues_when_latest(self):
+        reread = [list_element(name, version, self.install_path(name, version)) for name, version in PUBLISHED]
+        self.set_state(faults=[{"prefix": install_args("doc-dag"), "action": "bad_utf8"},
+                               {"prefix": LIST, "skip": 2, "action": "no_change", "stdout": json.dumps(reread)}])
+        r = self.run_install()
+        self.assert_succeeded(r)
+        self.assertIn(install_args("pr-teeth"), self.commands(),
+                      "標準出力を UTF-8 として読めなくても、終了コード 0 で再度読み込んだ版が最新の版なら、続けてインストールすること")
+        self.assertIn("インストールしたもの (user スコープ): wording-guard 0.28.0, doc-dag 0.2.0, pr-teeth 0.5.1",
+                      r.stdout.splitlines())
+
+    def test_reread_output_not_utf8_aborts(self):
+        self.set_state(faults=[{"prefix": LIST, "skip": 1, "action": "bad_utf8"}])
+        r = self.run_install()
+        self.assert_aborted(r)
+        self.assertIn("UTF-8 として読めない", r.stderr,
+                      "出力を使う読み取りのコマンドは、標準出力を UTF-8 として読めなければ失敗として中止すること")
+        self.assertIn("wording-guard は、版が変わったか分からない", r.stderr)
 
     def test_success_without_latest_version(self):
         cases = [

@@ -70,7 +70,7 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
      claude plugin install を実行し、表示されたコマンドを確認してからインストールする) は、中止の文の直し方で示す。
      成功するたびに claude plugin list --json を再度読み込み、user スコープの版が最新の版と同じかを検査する
   4. 標準出力に、インストールしたものの一覧と、実行の後の案内を表示する
-変える操作の出力は解析しない。成否は、終了コードと、その後の再度の読み込みで判定する。進み具合 (取得し直すこと・
+変える操作の標準出力は読まない (UTF-8 として読めるかも見ない)。成否は、終了コードと、その後の再度の読み込みで判定する。進み具合 (取得し直すこと・
 インストールするもの・インストールしたもの) は、そのたびに標準出力に表示する。
 
 中止。次のときは、その時点で中止し、残りのプラグインは処理せずに、終了コード 4 で終了する。
@@ -229,7 +229,8 @@ class CommandError(PluginsError):
     返していないので None にする。None になる場合の一覧は、ここだけに書く。
       - コマンドが見つからない・起動できない
       - タイムアウトした
-      - 終了コード 0 で終了したが、標準出力を UTF-8 として読めない
+      - 標準出力を使うコマンドが終了コード 0 で終了したが、標準出力を UTF-8 として読めない (変える操作は標準出力を読まない
+        ので、当たらない)
     """
 
     def __init__(self, message, fix=None, detail=None, returncode=None):
@@ -266,9 +267,10 @@ def _output_detail(stdout, stderr):
     return "\n".join(parts) or None
 
 
-def _run(argv, cwd, env, timeout):
+def _run(argv, cwd, env, timeout, read_stdout=True):
     """argv を実行し、標準出力を文字列で返す。失敗したときは CommandError にする。
 
+    read_stdout が偽なら、標準出力を読まずに None を返す。出力を使わない変える操作で偽にする。
     どの場合を失敗とするかは、クラス CommandError の docstring に書いた。
     """
     shown = " ".join(argv)
@@ -287,20 +289,24 @@ def _run(argv, cwd, env, timeout):
         raise CommandError(f"コマンド {shown} が終了コード {p.returncode} で失敗した",
                            "出力を見て原因を取り除いてから、もう一度実行する",
                            _output_detail(_decode(p.stdout), _decode(p.stderr)), p.returncode)
+    if not read_stdout:
+        return None
     try:
         return p.stdout.decode("utf-8")
     except UnicodeDecodeError as e:
         raise CommandError(f"コマンド {shown} の標準出力を UTF-8 として読めない: {e}", "出力を見て原因を取り除く") from None
 
 
-def run_claude(args, timeout):
+def run_claude(args, timeout, read_stdout=True):
     """claude を、実行のたびに作る空の一時ディレクトリを cwd にして実行し、標準出力を返す。実行が終了したら一時ディレクトリを消す。
+
+    read_stdout は、関数 _run と同じ。
 
     claude plugin list --json の enabled は、実行したディレクトリの設定も反映する。空のディレクトリなら、user スコープの
     設定の値になる。
     """
     with tempfile.TemporaryDirectory(prefix="plugins-claude-") as cwd:
-        return _run(["claude"] + list(args), cwd, None, timeout)
+        return _run(["claude"] + list(args), cwd, None, timeout, read_stdout)
 
 
 def git_env():
@@ -896,7 +902,7 @@ def install_targets(progress):
     progress.updating = True
     _progress(f"マーケットプレイス {marketplace} の定義を取得し直す (claude {' '.join(update)})")
     try:
-        run_claude(update, CHANGE_TIMEOUT)
+        run_claude(update, CHANGE_TIMEOUT, read_stdout=False)
     except CommandError as e:
         raise InstallAborted(f"マーケットプレイス {marketplace} の定義の取得し直しが失敗したので、中止した ({e.message})",
                              e.fix, e.detail) from None
@@ -909,7 +915,8 @@ def install_targets(progress):
         progress.started += 1
         _progress(f"{name} をインストールする (最新の版 {latest})")
         try:
-            run_claude(["plugin", "install", f"{name}@{marketplace}", "--scope", "user", "--json"], CHANGE_TIMEOUT)
+            run_claude(["plugin", "install", f"{name}@{marketplace}", "--scope", "user", "--json"], CHANGE_TIMEOUT,
+                       read_stdout=False)
         except CommandError as e:
             outcome = reread_outcome(marketplace, target)
             if outcome["known"] and is_latest(outcome["element"], target):
