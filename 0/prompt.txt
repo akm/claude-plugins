@@ -1,0 +1,143 @@
+<task-notification>
+<task-id>a3b285c3ed5af2e62</task-id>
+<tool-use-id>toolu_01JqWJwRXoUvg17RYb7K43qX</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a3b285c3ed5af2e62.output</output-file>
+<status>completed</status>
+<summary>Agent "Doc review: adversarial-document-reviewer" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>{
+  "reviewer": "adversarial",
+  "findings": [
+    {
+      "title": "investigated の推移列は既存サマリの鮮度検査を全件失敗させる",
+      "severity": "P1",
+      "section": "Planning Contract — KTD2 (段 1 の結果を plans[].status: investigated で置く) / U6 (3 段化と investigated の状態) / Open Questions (investigated の見せ方)",
+      "why_it_matters": "U6 の実装者が Open Questions の「推移の表に列を足す」を選ぶと、置き場にある全記録の生成サマリが `triagecheck` の鮮度検査で「食い違い」と報告され、`triage_check_command` の関門が止まる — record.go の `reviewTriageRecordProblems` は描画結果と `.md` をバイト単位で比較し、推移の表は全回に無条件で出るため、列の追加は `investigated` を持たない既存記録の出力も必ず変える。通すには既存サマリを再生成するしかなく、R19 (既存の生成サマリを書き換えない) と AE9 に反する。推移の表は指摘の verdict の件数であって計画の状態の列を持たないので、この選択肢は開いていない。検知の節と同じく「その状態がある回にだけ描画する」形なら既存サマリの出力は変わらない。",
+      "finding_type": "omission",
+      "autofix_class": "gated_auto",
+      "suggested_fix": "Open Questions の `investigated` の見せ方を決めて閉じる: 推移の表には列を足さず、`investigated` の問題がある回にだけ修正計画の表の外に注記を出す (record.go の検知の節と同じく、無い回には何も出さない条件付きの描画)。KTD2 に「既存の記録の生成サマリの出力を変えない」を制約として書き、U6 の試験シナリオ「生成サマリの件数の推移に `investigated` が数えられる」をこの形に書き換える。",
+      "confidence": 75,
+      "evidence": [
+        "生成サマリの件数の推移に `investigated` が数えられる (Open Questions の見せ方に従う)。",
+        "`investigated` 状態の生成サマリでの見せ方 (件数の推移の表に列を足すか、注記にするか)。",
+        "既存の記録 (置き場に残る `recurrence` を含む記録) があっても検査は成功し、既存の生成サマリを書き換えない。"
+      ]
+    },
+    {
+      "title": "C の待ちを awaiting-human で表すと approach 必須の検査に当たる",
+      "severity": "P1",
+      "section": "Planning Contract — KTD3 (C の待ちは既存の awaiting-human で表す) と KTD2 (approach の必須条件)",
+      "why_it_matters": "U7 で C の待ちを `awaiting-human` に書いた時点で、現行の `triagecheck` が「approach がありません」を報告して関門で止まる — record.go は status を問わず `approach` を必須にし、record_test.go の `awaiting-human` の fixture も `approach` と `options` の両方を持つ (現行の選択待ちは推奨案を持つ状態で、未立案の状態ではない)。KTD2 の「`pending` 以降は現行どおり `approach` 必須」は、状態遷移図で `awaiting_human` が `pending` の前に置かれているため `awaiting-human` を含むのか読めず、U6 (検査) と U7 (C の待ち) の実装者が別の解釈を取りうる。人間がまだ立案していない問題は `approach` を持てないので、状態ごとの必須条件を決めないと KTD3 の再利用は成り立たない。",
+      "finding_type": "error",
+      "autofix_class": "manual",
+      "suggested_fix": "`approach` の必須条件を状態ごとに明記する — `pending` / `done` / `done-external` は必須、`investigated` は禁止、`awaiting-human` は任意 (設計・仕様変更の案は `options` に書き、C の待ちでは書かない)。KTD2・KTD3・U6 の手順 1〜2 と `record-schema.md` の `approach` の行をこの条件に揃え、U6 の試験シナリオに「`awaiting-human` で `approach` が無くても報告しない」を足す。",
+      "confidence": 75,
+      "evidence": [
+        "状態を 1 つ足し、`investigated` では `approach` と `order` を書かず (書いてあれば検査が報告)、`pending` 以降は現行どおり `approach` 必須にする。",
+        "`options` に「立案者 C: 人間が立案する」と書く。",
+        "investigated --&gt; awaiting_human: 段 2 が設計・仕様変更の案を出す / 人間が C を選ぶ"
+      ]
+    },
+    {
+      "title": "閾値 N を sub-agent 化の後に置く順序は、段階 1 単体で関門を失う",
+      "severity": "P1",
+      "section": "Planning Contract — Sequencing (段階 1〜3 の順序) と Goal Capsule の優先順位",
+      "why_it_matters": "段階 1 だけを出すと、検知の停止 (U4) が消え上限が 10 (U5) になる一方で、置き換えの関門である閾値 N (U7) は段階 3 まで無いため、周回は選択待ち以外で人間を挟まずに最大 10 回回る — 現行より関門が減り上限が倍になった状態が「出せる形」として残る。Goal Capsule が「効き目の中心」と呼ぶ閾値 N が最後に来るので、最も不確実な段階 2 (リポジトリ初の `agents/`、`~/.claude/rules/` の読み込み未確認、手動シナリオ 8 本) が滞ると中心の効き目が出ない。U7 が U9 に依存する理由は立案者 B だけで、A と C は U6 だけで動くため、B を切り出す順序は検討されないまま捨てられている。",
+      "finding_type": "error",
+      "autofix_class": "manual",
+      "suggested_fix": "U7 を U9 に依存させず、立案者 B の経路 (`stage-subagent.md` に従って段 2 を走らせる部分) だけを U9 の後の小さな単位 (U7b) に切り出す。Sequencing を 段階 2 = U6 → U7 (A/C)、段階 3 = U8 → U9 → U7b → U10 にし、Goal Capsule の「段階 3 が閾値と立案者の選択になる」をこの順に合わせる。",
+      "confidence": 75,
+      "evidence": [
+        "効き目の中心は「俯瞰の廃止 + 閾値 N + 上限 10」で、「段の sub-agent 化」と「立案者の選択」はその上に載る付加。",
+        "立案者 B (指定モデルの sub-agent で段 2 を行う) は U9 の仕組みをそのまま使うので、U7 は U9 の後に置く。",
+        "実装単位は 3 つの段階に分け、段階 1 だけでも出せる形にする。"
+      ]
+    },
+    {
+      "title": "--stage 引数は段をセッション内に戻せない",
+      "severity": "P2",
+      "section": "Planning Contract — KTD6 (閾値 N と段の設定を fix 節に置き、引数で上書きする) と R13 (段ごとに設定と引数で選べる)",
+      "why_it_matters": "設定で `subagent: true` にした段を 1 回だけセッション内で走らせたいとき (KTD8 の「止めて報告する」の後に手元で続ける場合など)、`--stage &lt;段&gt;[=&lt;model&gt;[:&lt;effort&gt;]]` は段を sub-agent にする方向しか表せず、利用者は `config.json` を直すしかない。R13 の「設定と引数で選べる」は sub-agent にするかどうかの両方向を約束しているので、KTD6 の文法はその契約を満たしていない — `loop` の引数が設定のキーと 1:1 なのに対し、`stages.*.subagent` (真偽) に対応する引数が無い。値 1 つを足せば文法は閉じる。",
+      "finding_type": "omission",
+      "autofix_class": "gated_auto",
+      "suggested_fix": "`--stage &lt;段&gt;=session` (値 `session` はその段をセッション内で走らせる指定で、設定の `subagent: true` を上書きする) を KTD6 の引数の文法と値の検査 (段の名前・`session` か `&lt;model&gt;[:&lt;effort&gt;]`) に足し、U9 の `arguments.md` の様式にも書く。",
+      "confidence": 75,
+      "evidence": [
+        "段 1〜3 のそれぞれを sub-agent で走らせるかを、段ごとに設定と引数で選べる。既定はセッション内 (現行と同じ)。",
+        "`--stage` は段ごとに 1 つで、`=` 以降を省くと継承。"
+      ]
+    },
+    {
+      "title": "追跡内の record_dir では段 1・2 の「コミットしない」が記録の規範と衝突する",
+      "severity": "P2",
+      "section": "Planning Contract — KTD8 (段の依頼文と呼び出し側の検証) の禁止事項と検証",
+      "why_it_matters": "`record_dir` を git の追跡内にした利用者 (KTD11 が存在を前提にしている) では、`record-schema.md` のコミット節と `review-triage-fix` の手順 7 が「計画を記録に書いたら記録とサマリを単独のコミットにする」と定めているため、段 2 の sub-agent は「コミットしない」を守ると記録の規範に反し、規範を守ると呼び出し側の「段 1・2 の後は HEAD が変わっていない」検証で止まる。この計画は追跡内の記録のコミットを誰が担うかを定めていないので、追跡内の利用者は段 1・2 を sub-agent にした途端にどちらかで止まる。既定の置き場 (`tmp/`、追跡外) だけを見て組んだ契約で、既存文書が支えるもう 1 つの置き方が抜けている。",
+      "finding_type": "omission",
+      "autofix_class": "manual",
+      "suggested_fix": "KTD8 に、追跡内の `record_dir` では記録とサマリのコミット (`record-schema.md` のコミット節の分け方) を呼び出し側が検証の後に行うと書き、段 1・2 の sub-agent の禁止事項「コミットしない」が記録のコミットも含むことを明記する。段 3 は現行の手順 8 のとおり区切りで sub-agent が記録をコミットしてよいことも併記する。",
+      "confidence": 75,
+      "evidence": [
+        "禁止事項: 段 1・2 は記録と生成サマリ以外に書かない。コミットしない。",
+        "段 1・2 の後は HEAD と作業ツリーが記録とサマリ以外で変わっていないことを確かめる",
+        "置き場を git の追跡内にしている利用者は git で戻せる。"
+      ]
+    },
+    {
+      "title": "継承の model を名前に解決せず渡すと突き合わせが効かない",
+      "severity": "P2",
+      "section": "Planning Contract — KTD6 (継承の定義) / KTD9 (model の突き合わせ) / R14 (段ごとの model と effort)",
+      "why_it_matters": "設定や引数で model を空 (継承) にした段で `model` を省略して sub-agent を呼ぶと、`review-invocation.md` の「G0 より後の規則」が警告しているとおり、agent 定義の `model` → 環境変数 `CLAUDE_CODE_SUBAGENT_MODEL` → 親のモデルの順で解決され、周回が知らないモデルで走りうる。KTD9 の「指定と申告の突き合わせ」は継承では比べる名前が無く、置き換わっても検出できない。既存の経路は「継承は呼び出し元の名前に解決して `model` に必ず明示して渡す」規律を持つので、段の sub-agent もそれに乗せれば同じ検出が効く。",
+      "finding_type": "omission",
+      "autofix_class": "gated_auto",
+      "suggested_fix": "KTD6 の「継承」を「セッションのモデルの名前に解決して `model` に明示して渡す」と定め、KTD9 の突き合わせは常にその名前と申告を比べると書く (`review-invocation.md` の「G0 より後の規則」の再利用)。",
+      "confidence": 50,
+      "evidence": [
+        "既定はセッションの model と effort。",
+        "文字列の空は「未設定」= 継承で、定義は `loop` の「未設定」を再利用する。"
+      ]
+    },
+    {
+      "title": "run_in_background を「使わない」では既定の background 起動になる",
+      "severity": "P3",
+      "section": "Planning Contract — KTD8 の実行の形 / Assumptions (foreground で起動し結果を待つ)",
+      "why_it_matters": "現行の Agent ツールは sub-agent を既定で background で起動し、結果を待つには `run_in_background: false` を明示する契約なので、依頼文の正本に「使わない」と書くと実装者はフラグを渡さず、段が background で走って呼び出し側の「記録を読み直す」検証が完了通知を待つ形に変わる。Assumptions の「foreground で起動し、結果を待つ」はフラグを明示して初めて成り立つ。",
+      "finding_type": "error",
+      "autofix_class": "gated_auto",
+      "suggested_fix": "KTD8 の「`run_in_background` は使わない」を「`run_in_background: false` を渡し、結果が返るまで次の段に進まない」に置き換える。",
+      "confidence": 50,
+      "evidence": [
+        "`run_in_background` は使わない。",
+        "段の sub-agent は対話セッションから foreground で起動し、結果を待つ。"
+      ]
+    },
+    {
+      "title": "J2 に未着手を含めた周回は、進まない未着手で上限まで回る",
+      "severity": "P2",
+      "section": "Planning Contract — KTD5 (周回の状態機械) と High-Level Technical Design の 2 つ目の図 (周回の状態機械の形)",
+      "why_it_matters": "新しい図では J2 が未着手を含み、F1 → J4 → J5 → L1 とレビューに戻るので、段 3 が直せずに `pending` のまま残した問題 (関門の失敗でコミットを見送った場合や、sub-agent が途中で止まった場合) があると、現行の J3 → F2 → J6 → S3 のように 1 回で止まらず、レビューを走らせては同じ未着手で F1 に入ることを上限 10 回まで繰り返す。各回でレビューの sub-agent が走るので費用だけが積み上がる。修正後に再レビューする利点との引き換えなので、止め方は設計判断として示す。",
+      "finding_type": "omission",
+      "autofix_class": "manual",
+      "suggested_fix": "F1 の後に「記録の `plans` の状態が 1 つも進まなかった」ことを条件に止まるノードを足し、決定表に「直せなかった未着手」の報告を書く。",
+      "confidence": 50,
+      "evidence": [
+        "J2{\"覆われていない採択・調査済み・未着手のいずれかがあるか\"}",
+        "J5 -- \"まだ\" --&gt; L1"
+      ]
+    }
+  ],
+  "residual_risks": [
+    "`fix.stages.*.model` と `--stage` の model は自由文字列で検査されない (現行の `review_model` と同じ流儀)。このセッションの Agent ツールは `model` に別名の列挙しか受けないため、完全なモデル ID を渡すと U9 の「置き換わったことを突き合わせで検出」ではなく、呼び出し時の入力エラーとして止まる。",
+    "KTD5 の S4 の案内「継続すれば回 N+1 以降として毎回立案者を選ぶ」は、上限に達した時点の記録の回番号が N 以下であることを前提にしている。既定 (N = 5、上限 10) で新しい記録から回すと、回 6〜10 で既に立案者を選んでいるので、案内は既に効いている状態を未来形で伝えることになる。",
+    "U8 の検証は `/tasks` の表示で effort の継承を確かめるが、その表示に effort が出ることは確かめていない。",
+    "KTD7 の `description` で自動委任を抑える案は、選ばれにくくするだけで選ばれないことを保証しない。",
+    "record_test.go にある `TestReviewTriageRecordRecurrence*` は 8 本 (`Passes` / `Violations` / `PriorReframedWithoutPlans` / `OnFirstRun` / `PriorRunNotPrevious` / `PriorReframedRunRequiresReframeMarker` / `PriorReframed` / `Null`) で、KTD13 と U1 が書く 9 本と食い違う。現状との一致は feasibility の領域なので指摘にはしない。",
+    "KTD5 の散文は「J2 に調査済みを加える」とだけ書き、図の J2 は未着手も含む。どちらが正かは coherence の領域なので、上の J2 の指摘は図の形を前提にした。"
+  ],
+  "deferred_questions": [
+    "人間の C の案や選択待ちへの答えが、段 1 が `investigated` で書いた問題の分け方と一致しないとき (2 つの問題を 1 つの設計変更で扱う・1 つを分ける)、`review-triage-fix` は `plans[]` の要素と `finding_ids` / `plan_ref` をどう書き換えるか。KTD4 は既存の要素に `approach` と `order` を書くことしか定めていない。",
+    "段の sub-agent が `triage_summary_command` を走らせると、置き場の全記録のサマリが (内容が同じでも) 書き直される。AE9 の「書き換わらない」を更新時刻で確かめる U1 の検証と、通常運用でのサマリ再生成の扱いをどう切り分けるか。",
+    "段 3 の sub-agent が関門の失敗などで問題を `pending` のまま返したとき、`review-triage-loop` はその報告をどう扱うか (図には `review-triage-fix` の失敗の枝が無い)。"
+  ]
+}</result>
+<usage><subagent_tokens>210914</subagent_tokens><tool_uses>24</tool_uses><duration_ms>742509</duration_ms></usage>
+</task-notification>
