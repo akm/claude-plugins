@@ -1,0 +1,8 @@
+<task-notification>
+<task-id>ad40ca445f7c38340</task-id>
+<tool-use-id>toolu_01JgqMMcp7ES53jY7TDtDoKX</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/ad40ca445f7c38340.output</output-file>
+<status>failed</status>
+<summary>Agent "Doc review: feasibility" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id req_011CeghqwMYitUMxgRodtBsS, model sent to the API: claude-fable-5-1)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
