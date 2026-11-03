@@ -1,0 +1,5 @@
+2 については以下のようになるかなと。
+
+review-request ならば --full-review が指定されたら常に 全量レビュー。
+review-loop 開始時に --full-review が指定された場合、収束後に自動で全量レビューを開始
+review-loop 開始後に --full-review が指定された場合、直ちに 全量レビューを開始
