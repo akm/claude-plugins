@@ -1,0 +1,2 @@
+「2. 問題: json_error を入れる条件を、引数から推測している」の「今の状態」で 「Syntax error in text
+mermaid version 11.17.2」と出力されています
