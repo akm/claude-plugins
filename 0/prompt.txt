@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bj3eyzecb</task-id>
+<tool-use-id>toolu_0176ghgmbTeUha5o7PWrHtYY</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/bj3eyzecb.output</output-file>
+<status>completed</status>
+<summary>Background command "Run full tests after simplification" completed (exit code 0)</summary>
+</task-notification>
