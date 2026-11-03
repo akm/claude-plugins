@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>btfurmku1</task-id>
+<tool-use-id>toolu_01QWpjmeGreYD3A4FNmn9qip</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/btfurmku1.output</output-file>
+<status>completed</status>
+<summary>Background command "review-triage の Python のテストを別の作業ツリーで走らせる" completed (exit code 0)</summary>
+</task-notification>
