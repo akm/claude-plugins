@@ -1,0 +1,7 @@
+<cross-session-message from="local_e6125c3c-c443-4659-b789-82927e593d37" from-name="review-rally の worktree の書き込みの試験">
+試験 W2: 結果
+1. git rev-parse --short HEAD = 83013f7(切り替え前は e3de9e5)
+ git branch --show-current = 空(出力なし。detached HEAD とみられる)
+ git status --porcelain = 空(出力なし)。w1.txt も出ない(tmp/ は ignore 対象とみられる)
+2. Read で tmp/rally-probe/m1.txt: 成功。内容は 1 行 "m1 (メインのセッションから書いた)"
+</cross-session-message>
