@@ -1,0 +1,2 @@
+1. Issueにしてください
+2. /review-triage:review-loop --resume --full-review
