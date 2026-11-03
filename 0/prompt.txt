@@ -1,0 +1,1 @@
+「競合の可能性」の英訳を「conflictibity」として「declaration overlap」を「declaration conflictibity」とした方が良い気がしますが問題や懸念はありますか？
