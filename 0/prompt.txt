@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bo5z83ea1</task-id>
+<tool-use-id>toolu_01GLzdorQDRJrLDa6DrSaE3y</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bo5z83ea1.output</output-file>
+<status>completed</status>
+<summary>Background command "変えたプラグインのテストを走らせ、変更をプラグインごとに数える" completed (exit code 0)</summary>
+</task-notification>
