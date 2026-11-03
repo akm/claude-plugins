@@ -1,0 +1,7 @@
+<cross-session-message from="local_1566af1b-0671-4d4e-8f09-0c45f07ea3d8">
+review-rally 20261101-2321-feat-review-request-target-dir-151 20261101-2323-feat-review-request-target-dir-151-22-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-a29595/tmp/review-rally/20261101-2321-feat-review-request-target-dir-151/review-20261101-2323-feat-review-request-target-dir-151-22-code-review-claude-sonnet-5-5.yaml
+- skill: Skill ツールで code-review を呼んだ (引数は `high 5f345ce2..12f0c2b6`)。
+- 渡した effort は high、実効モデルは claude-sonnet-5-5 (get_session の値)。
+- 指摘は 5 件 (P3)、residual は 2 件。YAML は読み込めることを確認した。
+- 作業開始時も終了時も、HEAD は 12f0c2b6 (detached) のままで、`git status --porcelain` は空。出力先の 1 ファイル以外は作っていない。
+</cross-session-message>
