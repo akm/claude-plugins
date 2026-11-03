@@ -38,7 +38,7 @@ execution: code
   - ほかのプラグインのディレクトリ・`.claude-plugin/marketplace.json`・`.github/workflows/test.yml`・ディレクトリ `.claude/` を変えなければ実装できない。
 - **進め方**: 単位ごとに、テストを先に書く。テストは偽の claude と手元の一時的なリポジトリで動かし、本物の `claude` を実行せず、GitHub に接続しない (KTD12・KTD13)。本物の `claude` での確認は、すべての単位の後に、利用者の許可を得てから行う (Verification Contract の通し確認)。
 - **後始末の担当**: コミットは動機ごとに分ける (規範は利用者のコミットルール)。PR の作成と、Issue #168 へのコメントは、利用者の指示を受けてから行う。
-- **Product Contract の保全**: 要件の出所は Issue #168 と 2026-11-02 の会話。Issue の本文に無く、会話で決めたものは KD3・KD6〜KD8・KD11・KD13〜KD16・KD18〜KD25。KD4 (更新のターゲットを作らない) は、2026-11-02 に Issue の本文にも反映した。
+- **Product Contract の保全**: 要件の出所は Issue #168 と 2026-11-02・2026-11-03 の会話。Issue の本文に無く、会話で決めたものは KD3・KD6〜KD8・KD11・KD13〜KD16・KD18〜KD26。KD4 (更新のターゲットを作らない) は、2026-11-02 に Issue の本文にも反映した。
 
 ---
 
@@ -81,6 +81,7 @@ execution: code
 - KD23. **状況の表示の最後に、user スコープの「版が古いもの」「インストールされていないもの」「無効なもの」の名前をまとめて示す** (session-settled: user-approved。退けた案: プラグインごとの行だけを示す。理由: 対象のプラグインが多いと、どれが古いかを一目で読み取りにくい。2026-11-02 の実装の後に決めた)。Governs R22。
 - KD24. **インストールの最初に、user スコープにインストール済みで扱わないものを示し、中止したときの「処理しなかったもの」は、当てはまるものが無くても「なし」と示す** (session-settled: user-approved。退けた案: どちらも示さない。理由: インストールのターゲットが古いものを更新しないことと、処理しなかったものが無いことが、出力から分かる。2026-11-02 の実装の後に決めた)。Governs R15, R23。
 - KD25. **インストールが失敗して中止した後に記録を読み込み、処理中だったプラグインが user スコープに入っていれば、版が最新でなくても読み込みの案内を出す** (session-settled: user-approved。退けた案: インストールしたものと「版が変わったか分からない」ものがあるときだけ出す。理由: 手元の状態が変わっていて、実行中のセッションに読み込む必要がある。2026-11-02 の実装の後に決めた)。Governs R18。
+- KD26. **標準出力を読むプロセスが先に終了したときは、変える操作を始めた後なら中止と同じく扱って終了コード 4 で終え、何も変えていなければ表示を途中でやめたことを書いて終了コード 0 で終える** (session-settled: user-approved。退けた案: 新しい終了コードを足して 0 以外で終える・状況の表示はトレースバックのまま残す。理由: 何も変えておらず、表示を短くしたのは利用者の操作なので、make がエラーとして表示しないほうがよい。2026-11-03 のレビューで決めた)。Governs R24。
 
 ### Requirements
 
@@ -117,6 +118,7 @@ execution: code
 - R15. `claude` コマンドが失敗したら、その時点で中止し、残りのプラグインは処理しない。失敗したプラグイン (マーケットプレイスの定義の取得し直しが失敗したときはマーケットプレイス) と、エラーの内容を標準エラー出力に表示し、終了コード 0 以外で終える。インストールが失敗したときは、インストールの記録を再度読み込み、そのプラグインの実際の版 (入っていなければ、入っていないこと) を示す。処理しなかったプラグインの名前も示す。当てはまるものが無いときは「なし」と示す。
 - R16. `claude` コマンドが成功を返しても、インストールの後の user スコープの版が最新の版と同じでなければ、R15 と同じく中止する。
 - R17. Ctrl-C で中断したときも、中止として扱う。ただし、それ以上コマンドを実行せず、処理中だったプラグインを「版が変わったか分からない」と示し、`make plugins-status` で確認するよう案内する。処理しなかったプラグインの名前も示す。
+- R24. 標準出力を読むプロセスが先に終了したとき (`make plugins-install | head` など)、インストールで変える操作を始めた後なら、R15 と同じく中止として扱い、それ以上コマンドを実行せずに、インストールしたものなどを標準エラー出力に示して終了コード 4 で終える。変える操作を始める前と状況の表示では、表示を途中でやめたことと何も変えていないことを標準エラー出力に示し、終了コード 0 で終える。
 
 **実行の後の案内**
 
@@ -387,7 +389,7 @@ flowchart TB
 ### U3. 状況の表示 (読み取りの操作)
 
 - **Goal:** インストール済みの版と最新の版を照合して状況を表示する。Makefile とターゲット `plugins-status` を作る。
-- **Requirements:** R9〜R12・R21・R22。KD5・KD6・KD15・KD18・KD22・KD23。KTD7・KTD11。
+- **Requirements:** R9〜R12・R21・R22・R24。KD5・KD6・KD15・KD18・KD22・KD23・KD26。KTD7・KTD11。
 - **Dependencies:** U2。
 - **Files:** 作る: `Makefile`・`scripts/tests/test_status.py`・`scripts/tests/test_makefile.py`。変える: `scripts/plugins.py`。
 - **Approach:**
@@ -412,12 +414,13 @@ flowchart TB
   - `make plugins-status PLUGINS=a,b` は a と b だけを表示し、`PLUGINS=` (空) はすべてを表示する。
   - 環境変数 `PLUGINS` を設定して `make plugins-status` を実行しても、すべてが表示される (KTD11)。
   - `make plugins-status PLUGINS=no-such` は、make が終了コード 0 以外で終える。
+  - 標準出力を読むプロセスが先に終了すると、標準エラー出力に表示を途中でやめたことと何も変えていないことが出て、終了コード 0 で終える (R24。2026-11-03 のレビューで足した)。
 - **Verification:** U3 のテストがすべて成功する。
 
 ### U4. インストール (変える操作の共通部分を含む)
 
 - **Goal:** user スコープに無いプラグインをインストールする。中止と中断の扱いと案内を含め、ターゲット `plugins-install` を足す。
-- **Requirements:** R13・R15〜R18・R23。KD11・KD12・KD14・KD16・KD17・KD19・KD20・KD24・KD25。KTD7〜KTD9・KTD11。
+- **Requirements:** R13・R15〜R18・R23・R24。KD11・KD12・KD14・KD16・KD17・KD19・KD20・KD24〜KD26。KTD7〜KTD9・KTD11。
 - **Dependencies:** U3。
 - **Files:** 作る: `scripts/tests/test_install.py`。変える: `scripts/plugins.py`・`Makefile`・`scripts/tests/test_makefile.py`。
 - **Approach:**
@@ -441,6 +444,8 @@ flowchart TB
   - 偽の claude が 2 つ目のインストールで親のプロセスに SIGINT を送ると、それ以上コマンドを実行せず、1 つ目をインストールしたこと・2 つ目は「版が変わったか分からない」こと・処理しなかった 3 つ目の名前・`make plugins-status` での確認の案内・読み込みの案内を表示して、終了コード 130 で終える。
   - 前提の検査でエラーになったとき、変える操作は 1 つも実行されない。
   - `make plugins-install PLUGINS=a` は a だけを対象にする。
+  - 変える操作を始める前に標準出力を読むプロセスが先に終了すると、変える操作を 1 つも実行せず、表示を途中でやめたことと何も変えていないことが標準エラー出力に出て、終了コード 0 で終える (R24。2026-11-03 のレビューで足した)。
+  - 1 つ目をインストールした後に標準出力を読むプロセスが先に終了すると、それ以上コマンドを実行せず、1 つ目をインストールしたことと読み込みの案内が標準エラー出力に出て、終了コード 4 で終える (R24。2026-11-03 のレビューで足した)。
 - **Verification:** U4 のテストがすべて成功する。
 
 ### U6. README の更新
@@ -464,7 +469,7 @@ flowchart TB
 
 | 検査 | コマンド / 手段 | 対象の単位 | 証明するもの |
 | --- | --- | --- | --- |
-| 単体テスト | `python3 -m unittest discover -s scripts/tests` (偽の claude と一時的なリポジトリ。本物の `claude` を実行せず、GitHub に接続しない) | U1〜U4 | R1〜R13・R15〜R19・R21〜R23 |
+| 単体テスト | `python3 -m unittest discover -s scripts/tests` (偽の claude と一時的なリポジトリ。本物の `claude` を実行せず、GitHub に接続しない) | U1〜U4 | R1〜R13・R15〜R19・R21〜R24 |
 | CI の対象の一覧 | `.github/workflows/test.yml` の discover ジョブ (PR を開いたときと、PR への push で実行される。ブランチへの push だけでは実行されない) | U1 | `.github/test-targets.txt` と実際の対象が一致する |
 | 変えないものの差分 | `git diff --stat main -- commit-rules-guard pr-teeth doc-dag mermaid-preview commit-squash review-triage work-log-gh-comment wording-guard session-handoff issue-dispatch .claude-plugin .github/workflows .claude` | U1〜U4・U6 | 差分が無い (利用者に判断を求める条件) |
 | 表現 | 変えた Markdown と、Python の日本語のコメント・docstring・テストのメッセージを、スキル `wording-guard` (Markdown 以外は `wording_lint.py check --stdin`) と目視で検査する | U1〜U4・U6 | 避ける語が無い。日本語の文中で、理由や補足を続けるダッシュを使っていない |
@@ -485,7 +490,7 @@ flowchart TB
 ## Definition of Done
 
 - U1〜U4・U6 がすべて完了し、Verification Contract の全項目が成功している。通し確認で利用者が行わないと決めた手順があれば、その手順と理由が PR の本文にある。
-- R1〜R13・R15〜R19・R21〜R23 のそれぞれが、単体テストか通し確認のどれかで確認されている。R20 (README) は、U6 の確認 (表現の検査・リンクと節の名前の実在・docstring の内容) で確認されている。
+- R1〜R13・R15〜R19・R21〜R24 のそれぞれが、単体テストか通し確認のどれかで確認されている。R20 (README) は、U6 の確認 (表現の検査・リンクと節の名前の実在・docstring の内容) で確認されている。
 - ほかのプラグインのディレクトリ・`.claude-plugin/marketplace.json`・`.github/workflows/`・`.claude/` に差分が無い。
 - 単位ごとに、動機でコミットが分かれている。`.github/test-targets.txt` の 1 行は最初のテストのコミットに入っている。計画のコミットは実装と分かれている。
 - 実装が計画と合わなかったところは、計画の R と KTD が実装に合わせて直され、直した理由が PR の本文にある。Open Questions への回答が、KTD7 か PR の本文に書かれている。

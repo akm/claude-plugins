@@ -360,6 +360,41 @@ class InterruptTest(InstallTestCase):
         self.assertNotIn(LOAD, r.stderr, "プラグインを 1 つも処理していないときは、読み込みの案内を表示しないこと")
 
 
+class PipeClosedTest(InstallTestCase):
+    """標準出力を読むプロセスが先に終了したとき (R24・KD26)。"""
+
+    def test_closed_before_changes(self):
+        cases = [
+            # 最初の表示 (インストールするもの) は、cmd_install の中で、変える操作を始める前に書く
+            ("user スコープに無いものだけ", []),
+            # 最初の表示 (インストール済みのもの) は、cmd_install の try の外で書き、関数 main が捕まえる
+            ("user スコープにあるものも含む", [self.installed("pr-teeth", "user", "0.5.0")]),
+        ]
+        for label, installed in cases:
+            with self.subTest(label):
+                self.set_state(installed)
+                self.reset_record()
+                r = self.run_script_closing_stdout("install")
+                self.assert_succeeded(r)
+                self.assertIn("標準出力を読むプロセスが先に終了したので、表示を途中でやめた。何も変えていない。", r.stderr,
+                              "変える操作を始める前に標準出力が閉じられたら、何も変えていないことを書くこと")
+                self.assertNotIn("Traceback", r.stderr, "トレースバックを出さないこと")
+                self.assertEqual(self.changes(), [], "変える操作を 1 つも実行しないこと")
+
+    def test_closed_during_install(self):
+        r = self.run_script_closing_stdout("install", after="wording-guard 0.28.0 を user スコープにインストールした")
+        self.assert_aborted(r)
+        self.assertIn("plugins.py: 標準出力を読むプロセスが先に終了したので、中止した。それ以上 claude のコマンドを実行していない。",
+                      r.stderr.splitlines(), "インストールの途中で標準出力が閉じられたら、中止と同じく扱うこと")
+        self.assertNotIn("Traceback", r.stderr, "トレースバックを出さないこと")
+        # 閉じた直後の表示 (doc-dag をインストールする) が閉じる前に書けていれば、doc-dag のインストールの後の表示で失敗する
+        self.assertNotIn(install_args("pr-teeth"), self.commands(), "標準出力が閉じられたら、それ以上コマンドを実行しないこと")
+        self.assertTrue(any(line.startswith("インストールしたもの (user スコープ): wording-guard 0.28.0")
+                            for line in r.stderr.splitlines()),
+                        f"閉じられる前にインストールしたものを、標準エラー出力に示すこと: {r.stderr}")
+        self.assertIn(LOAD, r.stderr, "インストールしたものがあれば、読み込みの案内を標準エラー出力に示すこと (R18)")
+
+
 class PreconditionTest(InstallTestCase):
     """前提の検査でエラーになったときは、変える操作を 1 つも実行しない (R8)。"""
 

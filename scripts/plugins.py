@@ -85,6 +85,10 @@ plugin list だけを実行する)。古いものがあっても、終了コー�
 版が変わったか分からないと示し、make plugins-status で確認するよう案内する。
 中止・中断したときは、標準エラー出力に、インストールしたものの一覧・処理中だったものの状態・処理しなかったものの名前と、
 実行の後の案内 (要るときだけ) を書き、最後にエラーの文を書く。
+標準出力を読むプロセスが先に終了したとき (make plugins-install | head など)。変える操作を始めた後 (マーケットプレイスの定義の
+取得し直しから最後の報告まで) なら、中止と同じく扱い、それ以上コマンドを実行せずに、終了コード 4 で終了する。変える操作を
+始める前なら、表示を途中でやめたことと何も変えていないことを標準エラー出力に書いて、終了コード 0 で終了する。状況の表示も
+同じく終了コード 0 で終了する。どちらも、標準出力を /dev/null に向け直してから標準エラー出力に書く。
 
 実行の後の案内。次のどれかがあれば、表示する。中止・中断したときも同じ。
   - インストールしたもの
@@ -108,9 +112,9 @@ claude は、実行のたびに作る空の一時ディレクトリを cwd に�
 リポジトリを変える環境変数 (GIT_DIR など) を消す。待機の上限は、読み取りが 60 秒、git fetch が 120 秒、変える操作が 300 秒。
 
 終了コード:
-  0    成功
+  0    成功。標準出力を読むプロセスが先に終了して、何も変えずに表示を途中でやめたときも 0
   3    前提の検査か読み取りでエラーになり、何も変えずに終了した
-  4    変える操作の途中で中止した。一部が変わっている可能性がある
+  4    変える操作の途中で中止した (標準出力を読むプロセスが先に終了したときを含む)。一部が変わっている可能性がある
   130  Ctrl-C で中断した
 1 と 2 は Python 自身 (捕まえていない例外・引数の誤り) が使うので、専用の終了コードには使わない。make から実行すると、
 スクリプトの終了コードが 0 以外ならどれも make の終了コード 2 になるので、何を変えたかはエラーの文 (標準エラー出力) に書く。
@@ -151,6 +155,8 @@ TAIL_LINES = 20
 GITHUB_HOST = "github.com"
 SCOPES = ("user", "project", "local")
 NOTHING_CHANGED = "何も変えていない"
+# 標準出力に書けなくなった (BrokenPipeError) ときの文 (R24・KD26)
+PIPE_CLOSED = "標準出力を読むプロセスが先に終了した"
 CLI_SHAPE_FIX = ("Claude Code の版が上がって、出力の形が変わった可能性がある。claude の出力を見て、"
                  "scripts/plugins.py の読み方を直す")
 
@@ -827,6 +833,8 @@ class InstallProgress:
     def __init__(self, marketplace, targets):
         self.marketplace = marketplace
         self.targets = targets
+        # 変える操作 (マーケットプレイスの定義の取得し直し) を始めたら真
+        self.began = False
         # マーケットプレイスの定義を取得し直している間は真
         self.updating = False
         # 処理を始めた対象の数。targets[started:] が、処理しなかったもの
@@ -899,8 +907,10 @@ def install_targets(progress):
     """
     marketplace = progress.marketplace
     update = ["plugin", "marketplace", "update", marketplace]
-    progress.updating = True
+    # 進み具合は、状態を進める前に表示する。表示が失敗したときに、まだ実行していないものを処理中として示さないため
     _progress(f"マーケットプレイス {marketplace} の定義を取得し直す (claude {' '.join(update)})")
+    progress.began = True
+    progress.updating = True
     try:
         run_claude(update, CHANGE_TIMEOUT, read_stdout=False)
     except CommandError as e:
@@ -911,9 +921,9 @@ def install_targets(progress):
     for target in progress.targets:
         name = target["name"]
         latest = target["latest"]
+        _progress(f"{name} をインストールする (最新の版 {latest})")
         progress.current = target
         progress.started += 1
-        _progress(f"{name} をインストールする (最新の版 {latest})")
         try:
             run_claude(["plugin", "install", f"{name}@{marketplace}", "--scope", "user", "--json"], CHANGE_TIMEOUT,
                        read_stdout=False)
@@ -1027,13 +1037,17 @@ def report_install_stop(progress, message, fix=None, detail=None):
 # ---- サブコマンド ----
 
 def cmd_status(snapshot):
-    """状況を標準出力に表示する。何も変えず、古いものがあっても終了コード 0 で終了する (R12・KD18)。"""
-    print("\n".join(status_lines(snapshot)))
+    """状況を標準出力に表示する。何も変えず、古いものがあっても終了コード 0 で終了する (R12・KD18)。
+
+    flush して、標準出力を読むプロセスが先に終了したときの BrokenPipeError を、終了するときの flush ではなくここで起こす
+    (関数 main が捕まえる。R24)。
+    """
+    print("\n".join(status_lines(snapshot)), flush=True)
     return EXIT_OK
 
 
 def cmd_install(snapshot):
-    """user スコープにインストールされていない対象を、user スコープにインストールする (R13・R15〜R18・KTD8・KTD9)。"""
+    """user スコープにインストールされていない対象を、user スコープにインストールする (R13・R15〜R18・R24・KTD8・KTD9)。"""
     marketplace = snapshot["marketplace"]
     plugins = snapshot["plugins"]
     present = [p["name"] for p in plugins if find_user_element(p["installed"], p["name"]) is not None]
@@ -1048,6 +1062,10 @@ def cmd_install(snapshot):
     try:
         _progress(f"user スコープにインストールするもの: {', '.join(t['name'] for t in targets)}")
         install_targets(progress)
+        for line in install_report_lines(progress, aborted=False):
+            print(line)
+        # 標準出力を読むプロセスが先に終了したときの BrokenPipeError を、終了するときの flush ではなくここで起こす
+        sys.stdout.flush()
     except InstallAborted as e:
         report_install_stop(progress, e.message, e.fix, e.detail)
         _print("変える操作の途中で中止したので、一部が変わっている可能性がある。変えたものは、"
@@ -1060,8 +1078,14 @@ def cmd_install(snapshot):
         report_install_stop(progress, "Ctrl-C で中断した。それ以上 claude のコマンドを実行していない。")
         _print(f"変える操作の途中で中断したので、一部が変わっている可能性がある。{STATUS_HINT}。")
         return EXIT_INTERRUPTED
-    for line in install_report_lines(progress, aborted=False):
-        print(line)
+    except BrokenPipeError:
+        if not progress.began:
+            return stop_showing_without_change()
+        discard_stdout()
+        report_install_stop(progress, f"{PIPE_CLOSED}ので、中止した。それ以上 claude のコマンドを実行していない。")
+        _print("変える操作の途中で中止したので、一部が変わっている可能性がある。変えたものは、"
+               "インストールしたものと処理中だったものの行に示した。")
+        return EXIT_ABORTED
     return EXIT_OK
 
 
@@ -1086,6 +1110,21 @@ def report_precondition_error(message, fix=None, detail=None):
     """前提の検査か読み取りのエラーを、直し方と、何も変えていないことを添えて標準エラー出力に書く。"""
     _print_error(message, fix, detail)
     _print(f"{NOTHING_CHANGED}。前提の検査か読み取りでエラーになったので、変える操作の前に終了した。")
+
+
+def discard_stdout():
+    """標準出力を /dev/null に向け直す。標準出力を読むプロセスが先に終了した後に呼び、それ以降の書き込みと、終了するときの
+    flush が BrokenPipeError にならないようにする。"""
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, sys.stdout.fileno())
+    os.close(devnull)
+
+
+def stop_showing_without_change():
+    """標準出力を読むプロセスが先に終了し、何も変えていないときに、表示を途中でやめたことを書いて、終了コードを返す (R24・KD26)。"""
+    discard_stdout()
+    _print(f"{PIPE_CLOSED}ので、表示を途中でやめた。{NOTHING_CHANGED}。")
+    return EXIT_OK
 
 
 def build_parser():
@@ -1115,7 +1154,11 @@ def main(argv=None):
     except KeyboardInterrupt:
         _print(f"Ctrl-C で中断した。前提の検査と読み取りの途中だったので、{NOTHING_CHANGED}。")
         return EXIT_INTERRUPTED
-    return args.func(snapshot)
+    try:
+        return args.func(snapshot)
+    except BrokenPipeError:
+        # 状況の表示と、インストールで変える操作を始める前 (関数 cmd_install が捕まえない区間) に、標準出力に書けなくなった
+        return stop_showing_without_change()
 
 
 if __name__ == "__main__":

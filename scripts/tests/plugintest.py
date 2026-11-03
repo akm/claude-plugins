@@ -291,6 +291,34 @@ class PluginTestCase(unittest.TestCase):
                               cwd=cwd or self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                               timeout=TIMEOUT, preexec_fn=default_sigint)
 
+    def run_script_closing_stdout(self, *args, after=None):
+        """メソッド run_script と同じくスクリプトを実行し、標準出力を読むプロセスを先に終了させる (標準出力のパイプを閉じる)。
+
+        after が None なら、何も読まずにすぐ閉じる。after があれば、after を含む行を読んだところで閉じる。閉じた後に
+        スクリプトが標準出力に書くと、BrokenPipeError になる。subprocess.CompletedProcess を返す (stdout は閉じるまでに
+        読んだ分)。
+        """
+        read = []
+        with tempfile.TemporaryFile() as err:
+            p = subprocess.Popen([sys.executable, os.path.join(self.work, SCRIPT_REL), *args], env=self.env, cwd=self.root,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=err, text=True,
+                                 preexec_fn=default_sigint)
+            try:
+                if after is not None:
+                    for line in p.stdout:
+                        read.append(line)
+                        if after in line:
+                            break
+                p.stdout.close()
+                p.wait(timeout=TIMEOUT)
+            finally:
+                if p.poll() is None:
+                    p.kill()
+                    p.wait()
+            err.seek(0)
+            stderr = err.read().decode("utf-8")
+        return subprocess.CompletedProcess(p.args, p.returncode, "".join(read), stderr)
+
     def assert_stopped_without_change(self, r, *fragments):
         """終了コード 3 で終了し、何も変えていないことと fragments が標準エラー出力にあり、状態を変えないコマンドだけを実行したこと。
 

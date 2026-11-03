@@ -214,6 +214,12 @@ class AutoUpdateNoteTest(StatusTestCase):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, note, "プラグインの行より後ろに、自動更新を確認する方法を表示すること")
 
+    def test_closed_stdout_stops_without_change(self):
+        r = self.run_script_closing_stdout("status")
+        self.assertEqual(r.returncode, 0, f"標準出力を読むプロセスが先に終了しても、終了コード 0 で終了すること (R24・KD26): {r.stderr}")
+        self.assertIn("標準出力を読むプロセスが先に終了したので、表示を途中でやめた。何も変えていない。", r.stderr)
+        self.assertNotIn("Traceback", r.stderr, "トレースバックを出さないこと")
+
     def test_note_matches_readme(self):
         """案内の公式ドキュメントの URL と /plugin の画面の項目の名前が、README.md の手順にもあること。
 
