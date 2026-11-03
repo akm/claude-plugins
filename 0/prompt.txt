@@ -1,0 +1,13 @@
+<pasted_content id="c5db">
+Issue #87 の 5a (ブランチ docs/replace-dash-87、HEAD bca5846) の 1 回目のレビューをクラウドで実行した。指摘は 7 件で、まだ判定も記録もしていない。review-triage で判定し、tmp/review-triages/ に記録してほしい。
+
+1. 見出しの区切り (`## 名前 — 説明`) と、箇条書きの項目名の区切り (`- **名前** — 説明`、`1. **名前** — 説明`) にも sentence-connection の warning が出る。使い続けると決めた形なのに、textlintrc.json の allowlist は表の空欄しか除いていない。例: doc-dag/skills/doc-dag/references/project-config.md 21・32 行、wording-guard/skills/wording-guard/SKILL.md 79〜82 行、mermaid-preview の SKILL.md 26〜28・40〜41 行。(textlint を実行して warning が出ることを確かめた)
+2. review-triage を言い換える前に規則を全体で有効にしたので、review-triage を中心に約 665 件の warning が出る。
+3. work-log-gh-comment/skills/work-log-gh-comment/SKILL.md 128〜130 行と references/format.md 204〜206 行に、「項目 — 理由」の形が残っている。
+4. wording-guard/skills/wording-guard/references/kind-expansion.md の「文中の「—」」の行に、使い続ける形 (見出し・項目名・表の空欄) が書かれていない。
+5. #87 の決定が terms.toml に記録されていない。
+6. session-handoff/skills/handoff-resume/SKILL.md 40 行が、述語の無い「〜引き継ぎ文なので。」で終わっている。
+7. pr-teeth/CONCEPTS.md 47 行だけ、句点が太字の外にある (`**`review` は名前に含めない**。`)。ほかの言い換えは `**…。**` の形。
+
+クラウドでの判定案: 1・3・4・6 は採択する。2 は 5b で解消するので不採択にする (規則を有効にするのを 5b に移す案もある)。5 は「用語ファイルには登録しない」という決定に反するので不採択にする。7 は決めかねている (括弧の中の句なので、文頭の主張の形とは違うとも言える)。
+</pasted_content id="c5db">
