@@ -1,0 +1,1 @@
+HTML に /wording-guard:wording-guard を適用してください
