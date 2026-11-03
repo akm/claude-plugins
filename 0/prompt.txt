@@ -1,0 +1,74 @@
+<task-notification>
+<task-id>ad086635ded2884bb</task-id>
+<tool-use-id>toolu_01TiTwhzWrEVxsb3z2n7bgyU</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/ad086635ded2884bb.output</output-file>
+<status>completed</status>
+<summary>Agent "U6: three stages and investigated state" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>U6 の作業を終えました。git の書き込みは行っていません (未コミットの変更として作業ツリーに残しています)。
+
+## 1. 変更したファイル
+
+- `review-triage/skills/review-triage-fix/SKILL.md`
+- `review-triage/skills/review-triage/references/record-schema.md`
+- `review-triage/tools/triagecheck/record.go`
+- `review-triage/tools/triagecheck/record_test.go`
+- `review-triage/skills/review-triage-loop/references/loop-flow.md`
+
+`review-triage-fix/references/*.md` は触っていません (手順番号を変えていないので、手順 4・5・9 への既存の参照はそのまま一致)。
+
+## 2. 検証の証拠
+
+**テストを先に書いて失敗を観察** — `record_test.go` の末尾に 9 本を追加し、本体を変える前に `go test` を実行:
+- 失敗 (6 本): `TestReviewTriageRecordInvestigatedPasses` (「approach がありません」と status 列挙違反)、`TestReviewTriageRecordInvestigatedRejectsPlanningKeys` (approach / order の 2 ケース)、`TestReviewTriageRecordApproachRequiredByStatus` の「awaiting-human で approach が無く options がある」サブテスト、`TestReviewTriageRecordUnknownStatusListsInvestigated`、`TestReviewTriageSummaryInvestigated`、`TestRenderPlanCellsInvestigated`
+- 変更前のコードで成功 (3 本): `TestReviewTriageSummaryWithoutInvestigatedUnchanged` (変更前の生成サマリ全文を定数 `summaryWithoutInvestigated` として持つ golden。変更前のコードの出力を一時テストで書き出して埋めた)、`TestReviewTriageRecordInvestigatedCoverage`、`TestReviewTriageRecordApproachRequiredByStatus` の他のサブテスト
+
+**本体変更後**: `ASDF_GOLANG_VERSION=1.25.4 go test ./...` → `ok` (54 本すべて成功)、`gofmt -l .` → 出力なし、`go vet ./...` → 指摘なし。
+
+**既存記録の検査**: 指定のコマンド (`go run -C review-triage/tools/triagecheck . -current-dir "$PWD" -record-dir tmp/review-triages ...`) → 「問題は見つかりませんでした」exit 0。`tmp/review-triages/` の 2 ファイルの更新時刻 (Sep 15 11:21:09) と SHA (`e9fc1434…` / `1a890422…`) は作業の前後で同一。
+
+**fixture の通し確認** (scratchpad に置いた記録): `status: investigated` の記録 → 検査成功・注記あり → `approach`/`order` を書いて `pending` に進める → 検査成功・注記が消える → `investigated` のまま `approach` を書く → 「調査済み (investigated) では approach を書かない」で exit 1。
+
+**文書**: `loop-flow.md` の図のノード ID 集合と決定表の ID 集合は 1:1 (F1 G0 G2 G3 J2 J4 J5 L1 L2 S2 S3 S4)。相対リンク (アンカー含む) はすべて実在。
+
+## 3. `SKILL.md` の文
+
+**段と手順の対応** (「## 手順」の直下):
+&gt; **手順 2〜4 が段 1 (調査)、手順 5〜6 が段 2 (立案)、手順 7〜9 が段 3 (修正)。** 段の名前は、記録の状態 (`investigated` は段 1 の終わり、`pending` は段 2 の終わり) と、再開するときにどの段から続けるか (手順 1) を指すのに使う。
+
+各手順 2〜9 の太字の見出しにも「(段 1)」「(段 2)」「(段 3)」を添えました。前提知識には R16 の 1 項「**段のあいだの受け渡しは記録 YAML だけ。** …記録に無い情報 (会話の途中の見立てなど) を次の段の前提にしない…」を足しました。
+
+**手順 4 末尾**:
+&gt; **段 1 の終わり: 問題ごとの原因・束ね・調査の結果を記録の同じ回の `plans` に書く (`status: investigated`)。** 修正方法 (`approach`) と順序 (`order`) はまだ書かない — 状態ごとに何を書くかの正本は [記録 README] の `plans[]` の表。書いたらサマリを再生成し、置き場が git の追跡内なら記録とサマリをコミットする (手順 6 と同じ規則)。段 2 はここに書いたものだけを読む。
+
+**手順 6**:
+&gt; **計画を記録に追記する** (段 2): 段 1 で記録に書いた問題 (`status: investigated`) に修正方法と順序 (`approach`・`order`) を書いて `status: pending` に進める。設計判断を人間に返す問題は、手順 5 のとおり `options` を書いて `status: awaiting-human` にする。サマリを再生成し、置き場が git の追跡内なら記録とサマリをコミットする (要否と分け方の正本は [記録 README のコミット節])。**直す前に書く** — 途中で止まっても、記録に残っていない計画を作らないため。
+
+**手順 1 の再開** (3 か所):
+&gt; **全回の `plans` を 1 パスで見て**、`status: investigated` (調査済み・未立案)・`status: pending` (未着手)・`status: awaiting-human` (選択待ち) が残っていれば回数を問わず報告する。調査済みと未着手は再開の対象、**選択待ちは実装しない** — 人間に返した判断をスキルが代わりに決めない。
+
+&gt; **過去の回の調査済み・未着手を再開するときは、その問題が属する回の `findings` から `finding_ids` を解決する。** 再開する段は状態で決まる — **`investigated` (調査済み・未立案) は段 1 (手順 2〜4) を飛ばして段 2 (手順 5) から、`pending` (未着手) は段 1・段 2 (手順 2〜6) を飛ばして、その問題の `plans` (`approach`・`order`) に従って段 3 (手順 7) から続ける** — 段 1 の結果と計画は既に記録にあるので作り直さない。再開だけのとき (未覆いの採択が無く、調査済み・未着手だけが対象) も同じで、段 1 から始めない。 `finding_ids` は回の中でだけ一意なので、最後の回の `findings` と取り違えない。
+
+&gt; …対象とは、未覆いの採択と、再開する調査済み (`status: investigated`)・未着手 (`status: pending`) のすべて。**未覆いの採択が 0 件でも、調査済みか未着手があれば再開する** (`review-triage-loop` がそれらを片付けるために呼ぶ経路 — loop-flow.md の F1)。
+
+手順 8 の報告の残したものにも `investigated` を足しました。
+
+## 4. 生成サマリの注記
+
+文面 (関数 `renderInvestigatedNote`):
+```
+- **調査済み・未立案 (investigated) が 2 件: P1, P2** — 修正方法と順序をまだ持たない。`review-triage-fix` が立案 (段 2) から続ける
+```
+出る条件: その回の `plans` に `status: investigated` の問題が 1 つ以上あるときだけ、修正計画の表の直後 (選択待ち・リポジトリ外・調査の各行より前) に 1 行。無い回・無い記録には 1 バイトも出さない (golden テストで固定)。推移の表には列を足していません。あわせて、表の状態の欄は `investigated` を「調査済み」と出し、`approach` が空の行の修正方法の欄は空セルではなく「—」を出します (変更前は `approach` 必須だったので既存サマリに空の欄は無く、出力は変わらない)。
+
+検査の文面: 「調査済み (investigated) では approach を書かない。修正方法を決めたのなら status: pending にする」(order も同様)。状態の列挙違反の文面は「status は investigated / pending / awaiting-human / done / done-external のいずれか」に更新。
+
+## 5. 残した懸念
+
+- **`order` の「必須」について**: 指示の「`pending` / `done` / `done-external` では必須 (現行どおり)」は `approach` に当て、`order` は現行どおり任意のまま (`investigated` では書けば報告) にしました。`record-schema.md` の `order` の行にそう書いています。`order` も必須にしたい意図なら別途の変更が要ります。
+- **`awaiting-human` の `options` 文言**: 立案者 C の待ちの文言 (`options` に「立案者 C: 人間が立案する」と書く) は U7 の正本なので、`record-schema.md` には「`approach` は人間の答えの後に書く」までしか書いていません。
+- **`review-triage-loop/references/reporting.md`** の「残っているもの」は未着手 (`pending`) だけを挙げており、調査済みを含めていません。触ってよいファイルの範囲外なので残しました (U7 か U9 で扱うのが自然です)。
+- **通し確認の限界**: fixture で検査ツールに通したのは記録の遷移だけで、スキル本体を実行してセッションを切る手動シナリオ (AE10・AE1) は行っていません。
+- 手順 9 (`doc-dag`) は指示どおりそのままにし、KTD8 の「段 3 の sub-agent に含めず、セッション側で行う」は書いていません (U9 の範囲)。`doc-dag` skill は今回は回していません。</result>
+<usage><subagent_tokens>230795</subagent_tokens><tool_uses>43</tool_uses><duration_ms>615807</duration_ms></usage>
+</task-notification>
