@@ -1,0 +1,6 @@
+別の環境で以下を実行したところ、エラーになりました。public リポジトリになっているのですが 何が問題なのでしょう？
+
+$ claude plugin marketplace add https://github.com/akm/claude-plugins/blob/main/.claude-plugin/marketplace.json
+Adding marketplace…
+✘ Failed to add marketplace: Failed to clone marketplace repository: Cloning into '/Users/takeshi/.claude/plugins/marketplaces/temp_1785111058473'...
+fatal: repository 'https://github.com/akm/claude-plugins/blob/main/.claude-plugin/marketplace.json.git/' not found
