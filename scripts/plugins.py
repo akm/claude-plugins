@@ -156,10 +156,10 @@ CLI_SHAPE_FIX = ("Claude Code の版が上がって、出力の形が変わっ�
 
 # 状況の表示で、最新の版と比べた結果 (関数 compare_versions の値) を示す語
 COMPARISON_LABELS = {"same": "同じ", "older": "古い", "newer": "新しい"}
-# 状況の表示の最後に示す、自動更新の案内 (R21)。このスクリプトの中では、公式ドキュメントの URL と /plugin の画面の
-# 項目の名前をここだけに書く。README.md の節「マーケットプレイスの自動更新を有効にする」にも、利用者向けに同じ URL と
-# 項目の名前があるので、変わったら両方を直す (テスト test_status.py の test_note_matches_readme が、片方だけを直したときに
-# 失敗する)。{marketplace} には、marketplace.json から読んだマーケットプレイスの名前が入る
+# 状況の表示の最後に示す、自動更新の案内 (R21)。公式ドキュメントの URL と /plugin の画面の項目の名前は、README.md の節
+# 「マーケットプレイスの自動更新を有効にする」にも利用者向けに同じものがあるので、変わったら両方を直す (テスト test_status.py の
+# test_note_matches_readme が、片方だけを直したときに失敗する)。{marketplace} には、marketplace.json から読んだ
+# マーケットプレイスの名前が入る
 AUTO_UPDATE_NOTE = (
     "古いプラグインは、マーケットプレイス {marketplace} の自動更新で更新される。\n"
     "自動更新が有効かは、Claude Code のセッションで /plugin を開き、Marketplaces タブで {marketplace} を選ぶと確認できる。"
