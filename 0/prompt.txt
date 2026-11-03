@@ -1,0 +1,101 @@
+リポジトリ /Users/akima/workspace/claude-plugins のブランチ fix/a1-exemption-label-43 を
+レビューしてください。結果はファイルに書き出すだけで、修正はしません。
+
+対象:
+- リポジトリ: /Users/akima/workspace/claude-plugins
+- ブランチ: fix/a1-exemption-label-43
+- 差分の範囲: 76bc08f..cda64f2 (増分。76bc08f は前回レビュー済みの地点)
+- scope: incremental
+- 増分の外は、増分が壊した場合のみ報告してください。
+
+この増分で行ったこと (レビューの手がかり。この記述自体の正しさも確かめてください):
+1. 記録の findings に verdict_node を新設し、生成サマリの「判定の内訳」の集計を
+   verdict_reason の文字列の先頭一致から、この専用キーに移した。
+   verdict_node は決着ノードの ID の列挙として検査し、verdict との種別の整合
+   (JNA* なら adopted / JNH* なら held / JNR* なら rejected) も検査します。
+2. 判定フローに 4 ノードを足した。JND8 (人間が保留を解いたか) と、その帰結の
+   JNA3 (採択) / JNR4 (却下) / JNH7 (判断待ちのまま)。保留 JNH1〜JNH6 のすべてから
+   JND8 へ遷移します。人間が保留を覆した実在の記録を verdict_node で表せなかったのが
+   動機です。
+3. 過去のトリアージ記録 8 組 98 件に verdict_node を追記した。値は verdict_reason の
+   先頭にある決着ノードを写したもので、当時の判断は変えていません。ただし
+   feat-review-triage-reframe の回 7 指摘 1 だけは、reason が「H2。…」で始まるのに
+   verdict が adopted なので、写さずに JNA3 を書きました。
+4. スキーマ文書 (record-schema.md)・ツールの README・hold-presentation.md の範囲を
+   あわせて更新した。
+
+読み取り専用の厳守:
+- ファイルの編集・作成・削除をしない (出力先の tmp/ 配下のファイルだけは例外)。
+- git の状態を変えない。レビューの前後で HEAD と作業ツリーが不変であること。
+
+検証の前払い (すべての指摘に必須):
+- evidence には次のいずれかを含める。どちらも含められない指摘は confidence を low にする。
+  - 実行した確認 — コマンドと出力の要点、またはプローブ・ミューテーションの手順と結果
+    (実施後は必ず revert し、作業ツリーが不変であることを確認して報告する)
+  - 対象箇所の逐語引用 (行番号つき)。矛盾の主張なら、矛盾する 2 箇所の両方を引く
+- 「〜の可能性がある」「余地がある」という形の主張には、それを実際に起こす入力・状態を 1 つ添える。
+- テスト・検査の不在を主張する指摘 (「この入力のテストが無い」「この分岐が実行されていない」)
+  は、その入力を実際に通して報告が出ないことを確かめてから出す。確かめられなければ
+  confidence を low にする。テスト関数名の列挙や grep だけで結論しない — 別名のテストが
+  同じ分岐を踏んでいることがある。
+
+このリポジトリの関門 (検証に使えるコマンド):
+- Go のテスト・vet・整形:
+    cd review-triage/tools/triagecheck && go test ./... && go vet ./... && gofmt -l .
+  (リポジトリ直下からは asdf の都合で go が起動しないので、必ずこのディレクトリに入る)
+- 記録とサマリの検査 (同じディレクトリから):
+    go run . -record-dir /Users/akima/workspace/claude-plugins/docs/review-triage \
+      -judgment-flow /Users/akima/workspace/claude-plugins/review-triage/skills/review-triage/references/judgment-flow.md
+- サマリの再生成 (検査せず書き出すだけ。作業ツリーを変えるので、確認後は git checkout で戻す):
+    go run . -write-summary -record-dir /Users/akima/workspace/claude-plugins/docs/review-triage
+
+とくに見てほしい点 (これ以外を報告してはいけないという意味ではありません):
+- 内訳と推移表が、あらゆる記録で同じ数を語るか。前回の指摘 1 はこの食い違いでした。
+  verdict_node と verdict の整合検査で本当に塞げているか、抜ける入力が無いか。
+- 過去の記録 8 組への追記が、当時の判断を変えていないか。とくに
+  feat-review-triage-reframe の回 7 指摘 1 に JNA3 を書いた判断の妥当性。
+- 新設した 4 ノードが判定フローとして整合しているか。JND8 への遷移を保留 6 つすべてに
+  張りましたが、到達できないノードや、決着しない経路が生まれていないか。
+- verdict_node を必須にしたことで、新しい記録を書くときの負担や失敗の仕方が
+  変わっていないか (書き忘れたときに何が起きるか)。
+- 生成サマリはコミットされるので、実行環境や引数の渡し方で値が変わらないこと。
+
+報告しない条件 (トリアージで却下される種類):
+- 壊れる入力・状態を具体に挙げられない一般的懸念
+- 既存の関門 (テスト関数名・検査項目名で挙げられるもの) が顕在化を検出する欠陥
+- 対象そのものより大きい防御・再現の仕掛けを要求する指摘
+- プロセスの遵守が diff から証明できない、という種類の観察
+- 整理・統一の好み (放置して壊れるものが無いもの)。リファクタ提案は 1 件まで、その旨を明記して
+
+上に当たるが捨てるには惜しいものは、findings に入れず、末尾の residual リストに
+1 行ずつだけ書く (id 無し・summary のみ)。判断の材料は残すが、指摘としては数えない。
+
+出力先: tmp/review-code-review-opus-5-3rd.yaml
+  - ファイル名は ASCII のみ。tmp/ が無ければ作る (.gitignore 済み)。コミットしない。
+
+形式 (この構造に厳密に従う):
+
+skill: code-review
+model: opus-5
+level: high
+run_id: ""
+scope: incremental
+base: 76bc08f
+head: "cda64f2"
+date: "2026-09-04"
+findings:
+  - id: 1                     # 1 からの連番
+    file: path/to/file.md
+    line: 12                  # 不明なら省略
+    summary: "1〜2 文の要旨"
+    evidence: "検証の前払いの節のとおり"
+    attrs:                    # レビューが付けた属性をそのまま。無い属性を補完しない
+      severity: P2
+      confidence: high
+residual: []                  # 報告しない条件に当たるが残す 1 行メモの列 (無ければ空)
+
+注意:
+- 指摘が 0 件なら findings: [] とだけ書く。件数の集計は書かない (読み手が計算する)。
+- 値に # を含むときは必ず引用符で囲む (YAML は「半角スペース + #」以降をコメントとして取り除く)。
+- 指摘の取捨は「報告しない条件」に従い、それ以外は全件書く。修正はしない。
+- 書き出したら、レビューの前後で HEAD と作業ツリーが変わっていないことを確認して報告する。
