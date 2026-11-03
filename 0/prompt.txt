@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bpj2vk37l</task-id>
+<tool-use-id>toolu_017w64vMsrchztGr4kKjPYtp</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/bpj2vk37l.output</output-file>
+<status>completed</status>
+<summary>Background command "Run final tests and check unchanged areas" completed (exit code 0)</summary>
+</task-notification>
