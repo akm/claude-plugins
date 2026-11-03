@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b0k6ua4rj</task-id>
+<tool-use-id>toolu_01NzgQ31VUzfyK7C44E3ijbg</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/b0k6ua4rj.output</output-file>
+<status>completed</status>
+<summary>Background command "review-loop 20260928-0103-trial-review-loop-sandbox-b 回 1 (20260928-0110-trial-review-loop-sandbox-b-1-code-review-sonnet) [この起動 1/5 回・期限切れ 0・中断 0]: ワーカーの起動を待つ (0 = 現れた / 124 = 期限切れ / それ以外 = 中断)。通知を受けたら review-loop の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
