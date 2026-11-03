@@ -1,0 +1,1 @@
+https://github.com/akm/claude-plugins/issues/44 の Issue を作ったのですが、これとかなり被っている問題だと思われます
