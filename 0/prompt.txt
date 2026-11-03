@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b2e0f43qn</task-id>
+<tool-use-id>toolu_019Lzvp4aaKmTWwGnkDJqxYV</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/3031b59d-6df8-411e-99c8-6ccc5278efe2/tasks/b2e0f43qn.output</output-file>
+<status>completed</status>
+<summary>Background command "review-triage の Python のテストを実行する" completed (exit code 0)</summary>
+</task-notification>
