@@ -1,0 +1,185 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>AskUserQuestion, Bash, Edit, Read, Skill, ToolSearch, Write, mcp__Claude_Browser__computer, mcp__Claude_Browser__navigate, mcp__ccd_pr__get_status, mcp__ccd_turn__update_plan, mcp__ccd_turn__wrap_up</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+   - Issue #135: replace kun-reading literal-translation words (待ち, 問い, 尋ねる, 欠け, 確かめる, 置き場, 止まる, 終わる, 印, etc.) per decisions recorded in `.claude/akm-claude-plugins/wording-guard/terms.toml`.
+     - Commit per word.
+     - Review via review-request (code-review opus high), run by the user in another session, then review-triage and review-triage-fix.
+     - Push and create a PR only with approval.
+   - The user split the work into PRs.
+     - PR1: #138, merged.
+     - PR2 (issue-dispatch): #139, merged c86a49c.
+     - PR3 split into:
+       - PR3a (review-loop skill, review-triage/scripts, review-triage/tests, CONCEPTS.md review-loop section L101-123, root README.md line 176 review-loop row): #140, merged df22399.
+       - PR3b (rest of review-triage: skills review-triage/review-triage-fix/review-triage-loop/review-request, Go tools triagecheck/lineorigin/nearedges, review-triage/README.md, agents; CONCEPTS.md "回数の閾値" section lines 92/94 「周回」; root README.md line 175 review-triage-loop row; the other avoided words remaining on the 8 lines PR3a partially changed).
+     - PR4: metaphors (検証の前払い, 狂わせる, 〜側). Word-by-word proposals are still to be asked.
+   - #87 (周回→ループ, 回 1→1 回目) is handled in PR3a/PR3b. #87 and #135 stay open until PR3b.
+   - Latest request: "PR3b (review-triage の残りの言い換え) を main から新しいブランチで始めてください。"
+
+2. Key Technical Concepts:
+   - **wording-guard**
+     - `python3 wording-guard/scripts/wording_lint.py check <md>` / `check --stdin --filename x.md` / `terms`.
+     - Text inside 「」 is not checked.
+     - The PostToolUse hook blocks Write when written text contains avoided words.
+   - **terms.toml entries**: pattern, verdict, replacements, exceptions, reason, decided_in.
+     - The header comment holds the criteria: 振る舞い (spec) vs 動作 (observed); 誤り (value/input) vs ミス (human work).
+   - **Decided replacements and rules**
+     - 待: "待機" takes no object. Use "〜待ち" after a kanji noun, otherwise "〜まで待機する". The waited-on party is "〈出来事〉待ちの相手"; the reason is "待機の理由". The reason text was added in PR2 with approval.
+     - (書く|読む)側: 書き込み元 / 読み込み先. The reason now also says: "ファイルを読むプロセスを主語にする文は「(ファイルを) 読むプロセス」と書く。「読み込み先」「読み込み元」は、読まれるファイルとも読めるため" (added in PR3a with approval).
+     - 止: 停止 (processes; also loop stop nodes, matching the existing 「停止ノード」), 拒否 (sandbox/rules/hooks), 中断 (making a round unusable / stopping a procedure and returning to the human). Otherwise write what happens: 「進まなくなる」「処理が返らなくなる」「防ぐ」.
+     - 終わ: 終了 (processes) / 完了 (work). End-of-string uses: keep the backticked form; otherwise write 「末尾」.
+     - 印: complete-flag files → 「完了のフラグファイル」/「フラグファイル」; loop.yaml `full_review_next` → 「フラグ」. Check each occurrence; never apply a blanket rule.
+     - 周回 → ループ; 1 周 → 1 回; 回 N → N 回目.
+     - 置き場 by context: ディレクトリ / パス / 配置先 / 保存先 (記録の置き場 → 記録のディレクトリ). Avoid duplicate words such as 「ディレクトリがディレクトリとして」.
+     - 答え → 回答 (verb: 回答する / 回答できない). 尋ねる → 質問する (ps queries → 問い合わせる). 問い → 質問 or 判定の条件. 確かめ → 確認 (via the conjugation map). Other words as recorded in terms.toml.
+     - Test inputs (data) are not changed.
+   - **review-triage workflow**
+     - Judgment flow D1-D8, E1/E2, A1/A2/H1-H7/R1-R3.
+     - Records go in `tmp/review-triages/<branch-with-dashes>.yaml` (git-ignored, not committed).
+     - triagecheck commands:
+       - `ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/triagecheck . -current-dir "$PWD" -record-dir tmp/review-triages -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md -summary-command "triagecheck -write-summary" [-write-summary]`
+       - Run with `-write-summary` first, then the check.
+     - lineorigin: `go run -C review-triage/tools/lineorigin . -root "$PWD" -base <sha> -file F -lines N -rev SHA`.
+     - nearedges: `git diff --cached -- '*.md' | go run -C review-triage/tools/nearedges . -root "$(pwd)" -hints`.
+     - Category config `.claude/review-triage.yaml`:
+       - `review-triage/scripts/**` → shared (developer), not plugin-code.
+       - `issue-dispatch/scripts/**` and `review-triage/tools/**` → plugin-code (operator).
+       - `**/skills/**` → skill (operator).
+       - tests → developer.
+     - Convergence rules:
+       - (a) a full run with 0 adopted.
+       - (b) the incremental run right after a post-convergence full run with 0 adopted.
+     - Threshold N=5. There is no `fix` key in config.json, so all stages run in-session.
+     - doc-dag plus a mermaid-preview HTML in `tmp/` after doc fixes; record `plans[].doc_dag` and `verification.near_edges`.
+   - **Tests**
+     - review-triage Python: `PYTHONDONTWRITEBYTECODE=1 env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE python3 -m unittest discover -s review-triage/tests` (154 tests, about 12 minutes). Run in the background in a separate worktree via `$S/runtest.sh <sha>`.
+     - Go: `ASDF_GOLANG_VERSION=1.25.4 go test -C review-triage/tools/{triagecheck,lineorigin,nearedges} ./...`.
+     - wording-guard: `python3 -m unittest discover -s wording-guard/tests`.
+     - work-log-gh-comment evals: `make -C work-log-gh-comment/skills/work-log-gh-comment/evals test` (80 tests).
+     - issue-dispatch: `python3 -m unittest discover -s issue-dispatch/tests` (508 tests).
+   - The worker (PR3a code) parses lines of review-request-template.md (PR3b scope), and the tests build requests from the real template. Changing the template requires running the Python tests.
+   - Go triagecheck outputs `## 回 %d` (record.go about L851), plus error messages and table cells. record_test.go expects these. lineorigin outputs Japanese reason strings that its tests assert.
+   - Fixups: `git commit --fixup=<sha>` then `git rebase --autosquash main` (non-interactive works on git 2.50).
+
+3. Files and Code Sections:
+   - **Scratchpad** `$S=/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/scratchpad`:
+     - `termcount.py count|list`
+     - `apply_map.py <tsv regex\trepl> <paths>` (skips terms.toml)
+     - `apply_spec.py <tsv file\told\tnew>`: all-or-nothing; fails if any row has no match.
+     - `src2spec.py <src>`: lines "PREFIX/file :: old ⇒ new". Prefixes:
+       - P=issue-dispatch/scripts/issue_dispatch, R=issue-dispatch/skills/issue-dispatch/references, T=issue-dispatch/tests, S=issue-dispatch/skills/issue-dispatch, C=issue-dispatch/scripts
+       - L=review-triage/skills/review-loop, LR=review-triage/skills/review-loop/references, W=review-triage/scripts, WT=review-triage/tests
+       - '.'=repo root (e.g. `./CONCEPTS.md`)
+     - `commit.sh` (`source` it, then `commit <msgfile>`): checks the message with wording_lint (needs 「error 0 件・warning 0 件」), then `git add -u && git commit -F --trailer 'Rules-Checked: yes'`.
+     - `ctx.py <regex> <filelist> [width]` lists occurrences with context.
+     - `showchg.py [width]` shows working-tree changes inline as [old→new].
+     - `runtest.sh <sha>`: separate worktree, runs the Python tests, writes `test-<sha>.log`.
+     - `apply_rules_tomaru.py` (ordered regex rules for 止).
+     - `map-tashikame.tsv` (確かめ conjugation map).
+     - `rl-files.txt` (PR3a files) and `rt-files.txt` (PR3b: review-triage files excluding skills/review-loop, scripts, tests; 61 files).
+   - **terms.toml**: 待 reason extended (PR2); (書く|読む)側 reason extended (PR3a).
+   - **Records**:
+     - `tmp/review-triages/docs-replace-kunyomi-literal-terms-issue-dispatch-135.yaml` (3 runs).
+     - `tmp/review-triages/docs-replace-kunyomi-literal-terms-review-loop-135.yaml` (4 runs; P1-P4 in run 1 and P1-P2 in run 3, all done).
+   - **PR bodies**: `tmp/pr-body-135-2.md` (#139) and `tmp/pr-body-135-3a.md` (#140).
+   - **Memory**: `memory/issue-135-kunyomi-progress.md` and the MEMORY.md line "PR1 は #138 でマージ済み。PR2 は #139 でマージ済み。PR3 は 3a (review-loop) と 3b に分けた。3a は #140 でマージ済み (df22399)。次は 3b (review-triage の残り)".
+   - **PR3b inventory** (current branch, from df22399):
+     - Counts by word: 確かめ 255, 周回 164, 置き場 149, 止 120, 焼き込 60, 終わ 49, 尋ね 41, 読み直 41, 答え 39, 食い違 39, 待 29, 並び 24, 印 22, 欠け 18, 見分け 16, 書き直 16, 在り処 15, 綴り 14, 行き先 10, 見立て 9, 続き 7, 読み手 6, 問い 6, 戻り 3, 書き手 2, 書く側 2, 決まり 1, 目印 1, 言い回し 1.
+     - Largest files: lineorigin_test.go 77, loop-flow.md 69, review-triage-fix SKILL.md 59, record-schema.md 58, lineorigin README 57, review-triage-loop SKILL.md 53, premise-check.md 49, stage-subagent.md 48, project-config.md 45, triagecheck README 43, record.go 43.
+     - Also handle: CONCEPTS.md L92/L94 (周回), README.md L175, 回 N forms (record.go `## 回 %d`, record_test.go about 18), and the 振る舞い/誤り pass.
+   - **答え/問い contexts just listed in PR3b**:
+     - review-triage-fix/SKILL.md: lines 32-68. Includes the heading/term "人間の答えの反映" (referenced in stage-subagent.md:23, record-schema.md:112, loop-flow.md:89, SKILL.md:51/67/68), "答えを待つ" (L48), and "**問いには、段 1 の問題に加えて…**" (L48).
+     - loop-flow.md:84 ("人間に問うて答えを待っている間"・"同じ問いが二度出る"・"返した問いや報告"), L89 ("**答えの渡し先も書く**"), L90 ("「継続するか」の問いが出て").
+     - premise-check.md:71 table header "| 問い | どこを見るか |", L86 ("という答えは"), L91 ("上の 4 つの問い"), L92 ("『分からなかった』と答える").
+     - record-schema.md:105, 112, 193.
+     - triagecheck README:223 ("原理的に答えを持たない").
+     - record.go:206, 660 (comments "人間の答えの後に書く"); record_test.go:1653.
+
+4. Errors and fixes:
+   - **Commit messages with avoided words** (待つ, 確かめる, 止まる, 周回, 置き場, 終わ): rephrased before committing.
+   - **PR2 round 1, 待→待機 transitive and meaning-flip**: 5 findings. Fixed with the user's choices; the reason was added to terms.toml.
+   - **PR3a blanket 印→フラグファイル**: wrong where 印 meant loop.yaml `full_review_next` (fixed to フラグ in arguments/loop-files/stops), the diagram IN (記号), mtime (示す), or produced 「フラグファイルのファイル」 in fake-claude. Found in rounds 1/3 and by investigation.
+   - **置き場→ループのディレクトリ** produced 「ループのディレクトリがディレクトリとして存在しない」 → 「ループのディレクトリが無いか、ディレクトリではない: <path>」. Also fixed 「周回のディレクトリは周回のディレクトリのパス」 → 「値は…」.
+   - **止めたもの→拒否したもの** was wrong for permission-mode and version causes → 「原因」. 「止められたときの直し方」 → 「拒否されたときの直し方」.
+   - **読む側→読み込み先** was ambiguous → 「(ファイルを) 読むプロセス」 (user's choice C).
+   - **Missed the 振る舞い/誤り pass in PR3a** → added later. Lesson: in PR3b, do this pass.
+   - **CONCEPTS.md misses** (書く側, bare 印) → fixed with fixup commits and autosquash.
+   - **Record classification error**: review-triage/scripts was set as plugin-code; corrected to shared with audience_initial developer overridden to operator.
+   - **Heredoc chains broke when a commit failed**: wrote files separately.
+   - **apply_spec all-or-nothing failures** when old strings had already changed: corrected the src rows.
+   - **The user asked about #139 merge, but GitHub showed it OPEN**: reported this; the user merged again later.
+
+5. Problem Solving:
+   - Python tests are slow (12 minutes), so they run in a separate worktree in the background (`runtest.sh`); work continues meanwhile.
+   - All PR3a commits were verified: 154 tests OK at d05557a, 9791c89 and 3260710.
+   - The PR split rationale was preserved, with option B to align glossary terms across the split.
+
+6. All user messages (since the previous summary):
+   - "/review-triage:review-triage …review-20261026-0744-…-135-7-…yaml" (wrong file: PR1's; reported head mismatch)
+   - "PR2 の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR2 round 1)
+   - "採択した 5 件を review-triage-fix で直してください。"
+   - AskUserQuestion answers:
+     - "「待つ」は避ける語のまま。「回答待ちの間」「Issue の完了まで待機する」「待機の理由」のように書き直すが、「待機の相手」は採用せず「回答待ちの相手」とする。用語ファイルの reason に目的語を取る用法の書き方を足す。"
+     - "このブランチで直す (推奨)" (work-log-gh-comment)
+     - "待つ出来事で書き分ける (推奨)"
+     - "この文面で足す"
+   - "2 回目の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR2 round 2)
+   - "収束後の全量レビューの依頼文を review-request (code-review opus high --full-review) で作ってください。"
+   - "3 回目の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR2 round 3)
+   - "ブランチを push して、tmp/pr-body-135-2.md の本文で main への PR を作ってください。"
+   - "マージしました" (GitHub still showed OPEN)
+   - "#139 をマージしました"
+   - "PR3 (review-triage の言い換え) を main から新しいブランチで始めてください。"
+   - AskUserQuestion: "2 つに分ける (推奨)"
+   - "PR3a の 1 回目の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR3a round 1)
+   - "採択した 5 件を review-triage-fix で直してください。"
+   - AskUserQuestion: "B: 7 行の用語だけ PR3a で直す (推奨)"
+   - "PR3a の 2 回目の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR3a round 2)
+   - "収束後の全量レビューの依頼文を review-request (code-review opus high --full-review) で作ってください。"
+   - "PR3a の 3 回目の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR3a round 3)
+   - "採択した 2 件を review-triage-fix で直してください。"
+   - AskUserQuestion answers: "C: 「読むプロセス」と書く (推奨)"; "この文面で足す" (reason addition)
+   - "PR3a の 4 回目の依頼文で別のセッションのレビューを走らせます。結果が出たら知らせます。"
+   - /review-triage:review-triage (PR3a round 4)
+   - "ブランチを push して、tmp/pr-body-135-3a.md の本文で main への PR を作ってください。"
+   - "#140 をマージンしました"
+   - "PR3b (review-triage の残りの言い換え) を main から新しいブランチで始めてください。"
+   - Standing constraints from earlier:
+     - Do not enable Auto-fix ("Auto-fix は有効にしなくてよいです").
+     - Push and PRs only with approval.
+     - Never decide rules without asking.
+     - Ask rather than decide.
+
+7. Pending Tasks:
+   - **PR3b**: one commit per word across rt-files.txt, plus CONCEPTS.md L92/L94, README.md L175, 回 N forms (including the Go triagecheck `## 回 %d` output and its tests), and the 振る舞い/誤り pass.
+   - Then bump review-triage (0.23.1 → 0.23.2), run Python/Go/wording-guard tests and wording-guard checks, and create the full review request via review-request (code-review opus high).
+   - Follow the review loop; push and PR only with user approval.
+   - PR4 (metaphors): word-by-word proposals still to be asked.
+   - Update memory after milestones.
+
+8. Current Work:
+   - Started PR3b on branch `docs/replace-kunyomi-literal-terms-review-triage-135` (from main df22399). The task list was set: step 2 「PR3b の避ける語を洗い出す」 in progress.
+   - Created `$S/rt-files.txt` (61 files) and counted the words.
+   - Just ran `python3 $S/ctx.py '答え|問い(?!合)' $S/rt-files.txt 28` and got the contexts listed above, to start the 答え, 問い and 尋ね commits.
+
+9. Optional Next Step:
+   Continue the user's request "PR3b (review-triage の残りの言い換え) を main から新しいブランチで始めてください。"
+   - Next, write and apply specs for 答え → 回答, one commit.
+     - Handle the cross-file term "人間の答えの反映" → "人間の回答の反映" consistently in all referencing files (review-triage-fix SKILL.md, stage-subagent.md, record-schema.md, loop-flow.md).
+     - Verb forms: 答えたとき → 回答したとき; 答えを待つ → 回答待ち.
+     - Go comments in record.go and record_test.go: "人間の回答の後に書く".
+   - Then 問い (premise-check.md table header "| 問い |" → "| 確認項目 |" or 質問 by context; loop-flow.md "問いが二度出る" → "質問が二度出る").
+   - Then 尋ね → 質問する.
+   - Then proceed through the remaining words, running Go tests after Go changes and Python tests (via runtest.sh) after template or script-affecting changes.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
