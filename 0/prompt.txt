@@ -1,0 +1,2 @@
+main (と origin/main ) を 38b145130e737c147d638b39fc8ed5ec12504547 に戻しました。
+fix/commit-rules-guard-config-fail-open を push したので PR を作成してください
