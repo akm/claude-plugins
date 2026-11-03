@@ -1,0 +1,6 @@
+<cross-session-message from="local_853a398f-3d60-4e8a-9e1c-9655709f0698">
+review-rally 20261101-2200-feat-review-request-target-dir-151 20261101-2232-feat-review-request-target-dir-151-19-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-9b4ba6/tmp/review-rally/20261101-2200-feat-review-request-target-dir-151/review-20261101-2232-feat-review-request-target-dir-151-19-code-review-claude-sonnet-5-5.yaml
+- skill: Skill ツールで code-review を実際に呼んだ (args は "high 182e8440..e22a607a")。effort は high、モデルは claude-sonnet-5-5 (このセッションのモデル。モデルは skill に渡していない)。
+- 指摘は 2 件、residual は 1 件。1 件目 (P2) は、同じ結果を 2 回取り込まない確認が done メッセージの行にしか無い、という内容。2 件目 (P3) は、手順 4 で SendMessage の後に waiting を書く順にしたため、間で中断すると結果が失われる、という内容。
+- 確認: レビューの前後で HEAD は e22a607a のまま、git status --porcelain は空。書き出したのは出力先の 1 ファイルだけで、コミットはしていない。
+</cross-session-message>
