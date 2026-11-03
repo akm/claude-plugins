@@ -1,0 +1,86 @@
+<task-notification>
+<task-id>ab9d20ee0626b04c5</task-id>
+<tool-use-id>toolu_01B5TEgrc6oCrzP48P63fatb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/ab9d20ee0626b04c5.output</output-file>
+<status>completed</status>
+<summary>Agent "U3: remove 俯瞰 from review-triage-fix" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>検証が終わりました。残っている参照は Go の型 (`record.go`・`record_test.go`)、ビルド済みバイナリ、`tools/triagecheck/tmp/` の fixture、そして U4 が直す `loop-flow.md` だけです。
+
+## 報告
+
+### 1. 変更・削除・改名したファイル
+
+| 操作 | パス |
+| --- | --- |
+| 削除 | `review-triage/skills/review-triage-fix/references/reframing.md` |
+| 改名 + 書き換え | `review-triage/skills/review-triage-fix/references/same-location-fix.md` → `review-triage/skills/review-triage-fix/references/doc-fix-form.md` |
+| 変更 | `review-triage/skills/review-triage-fix/SKILL.md` |
+| 変更 | `review-triage/skills/review-triage-fix/references/grouping.md` (節「捉え直しがあるとき」を削除) |
+| 変更 | `review-triage/skills/review-triage-fix/references/investigation.md` (手順番号のみ: 5 → 4) |
+| 変更 | `CONCEPTS.md` (節「レビューの収束」を見出しごと削除。末尾は「エージェント入力」で終わる) |
+| 変更 | `review-triage/README.md` (表の 2 行から検知・俯瞰の説明を外す、節「繰り返しを検知して捉え直す」を削除、`mermaid-preview` の行から俯瞰の図の言及を外す) |
+
+git の書き込み操作は行っていません (`rm` と `mv` のみ)。`git status` 上は `same-location-fix.md` が D、`doc-fix-form.md` が ?? で見えます。
+
+### 2. `SKILL.md` の手順番号の対応 (旧 → 新)
+
+| 旧 | 新 | 手順 |
+| --- | --- | --- |
+| 1 | 1 | 入力を読む |
+| 2 | (削除) | 俯瞰する |
+| 3 | 2 | 原因を確かめる (捉え直しの優先の文を外した) |
+| 4 | 3 | 問題にまとめる |
+| 5 | 4 | 調査する |
+| 6 | 5 | 修正方法と順序を決める (`doc-fix-form.md` への参照に変更) |
+| 7 | 6 | 計画を記録に追記する |
+| 8 | 7 | 問題単位で直して、検証してからコミットする |
+| 9 | 8 | 報告する (「未処理の検知」を外した) |
+| 10 | 9 | 文書の構造を確かめる |
+
+番号の参照を直した箇所:
+- `SKILL.md` 前提知識「手順 5 の調査」→ 手順 4
+- `SKILL.md` 手順 1 の再開の説明「手順 3〜7 を飛ばして…手順 8 から続ける」→ 手順 2〜6 / 手順 7 (「俯瞰 (手順 2) は行い」「未処理の検知があれば人間の回答を待つのは同じ」も外した)
+- `SKILL.md` 手順 7 (旧 8)「手順 6 がこれを決める」→ 手順 5
+- `SKILL.md` 原則「調査 (手順 5)」→ 手順 4
+- `references/investigation.md`「手順 5」→ 手順 4
+- `references/doc-fix-form.md`「手順 6」→ 手順 5、「手順 10」→ 手順 9
+
+`loop-flow.md` の F2・S1・散文が指す「手順 2 (俯瞰)」「手順 8」は U4 に委ねて触っていません。
+
+### 3. `doc-fix-form.md` の冒頭と「いつ当てるか」の全文
+
+```
+# 文書の記述を直すときの形
+
+**このファイルが、文書の記述を直すときに、中身を書く前にその記述の形 (列挙の件数・正本の複製) を見る規則の正本。**
+
+## いつ当てるか
+
+**文書の記述を直すときは常に当てる。** その記述を前の回の修正が書いたかどうかを問わず、書き直す前に下の手で形を見て、当たらなければ通常どおり中身を直す。前の回が書いた記述に限って当てる形にすると、当てる前に前の回の記録や履歴と突き合わせる手間が要り、突き合わせを省いた回では中身だけを書き直すことになる。実測で、ある回の修正で書いた 2 文が続く 2 回で書き直され、そのたびに次の指摘を生んだ — どちらの回も、修正はその 2 文の中身を書き直した。
+```
+
+残す節への小さな変更 (文面は保った):
+- 節見出し「なぜ同じ場所が続くか」→「なぜ同じ記述への指摘が続くか」。本文の「同じ場所への指摘が続く典型は、その場所の記述が」→「同じ記述への指摘が続く典型は、その記述が」
+- 「手」の導入「同じ場所というだけで形を変えない」→「形を見るのは常でも、形を変えるのは当たるときだけ」(旧文は同じ場所という発火条件を前提にしていたため)
+- 「数を書かない」の例「修正由来の指摘が 2 回連続したら発火する」→「1 問題 1 コミット」の 1 (廃止した規則を例にしていたため。`SKILL.md` の原則にある現行の規則に置き換えた)
+- 「記録に書く」の「同じ場所への指摘」→「同じ記述への指摘」
+
+### 4. 検証の結果
+
+- `grep -rnE '俯瞰|捉え直し|reframing|same-location-fix|declined|reframed|修正由来|見立て|recurrence' review-triage/skills/review-triage-fix/ CONCEPTS.md review-triage/README.md` → 0 件。追加で「同じ場所」「検知」も同じ範囲で 0 件。
+- 相対リンク: `SKILL.md`・`doc-fix-form.md`・`grouping.md`・`investigation.md`・`review-triage/README.md`・`CONCEPTS.md` の全リンク (32 本) が存在するファイルを指すことを確認 (アンカー付きもファイルの存在を確認)。
+- 手順番号: `review-triage-fix/` 配下の「手順 N」の参照 8 箇所すべてが新しい番号の手順の内容と一致 (上の表のとおり)。
+- `doc-dag` は回していません (依頼の検証項目に無く、ブラウザ提示を伴うため)。パケットの Verification にはあるので、統合時に `review-triage/skills/review-triage-fix/` へ回す必要があります。
+
+### 5. テストを書かない理由と残した懸念
+
+テストは書いていません。変更は Markdown の文書だけで、検査対象のコード (`triagecheck`) は触っていないためです。
+
+残した懸念:
+- `doc-fix-form.md` の「いつ当てるか」と「手」の導入がどちらも「当たらなければ通常どおり中身を直す」を含みます。依頼の趣旨どおりに書いたための重複で、`doc-dag` が指摘する可能性があります。
+- `review-triage/README.md` の「`code-review` や `ce-code-review` が出した指摘を入力にします。**2 つのスキルの間の受け渡しは…**」は触っていません (依頼の範囲外)。
+- パケットの Approach 4 (`CONCEPTS.md` に「立案者の選択」を足す) は、依頼文の指示 (U7 が足す) を優先して足していません。
+- 私の範囲外で廃止語が残るのは `review-triage/skills/review-triage-loop/references/loop-flow.md` (U4)、Go の型 (`record.go`・`record_test.go`)、ビルド済みバイナリ `review-triage/tools/triagecheck/triagecheck`、fixture `review-triage/tools/triagecheck/tmp/review-code-review-opus-5-13th.yaml` です。</result>
+<usage><subagent_tokens>139650</subagent_tokens><tool_uses>47</tool_uses><duration_ms>374618</duration_ms></usage>
+</task-notification>
