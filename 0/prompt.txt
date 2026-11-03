@@ -1,0 +1,5 @@
+1件目で齟齬が見つかったのでまだ2件目に進みません。
+
+「計画の Status の選択肢は Todo・In Progress・In review・Blocked・Done の 5 つで、Ready はありません。」
+
+推奨の「Item added to project」を有効にすると、Issue は優先順位などは関係なく Todo に入ります。その Todo の issues 群をすべて作業の対象にすると、どの issue を優先するのか指定できないまま作業に着手することになってしまいませんか？
