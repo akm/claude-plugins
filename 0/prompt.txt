@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bvxrgsfte</task-id>
+<tool-use-id>toolu_017k8Eg6eM3kJa77kxTJ45uK</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/43f1f9f1-f2d1-49a9-9524-e116ea46866e/tasks/bvxrgsfte.output</output-file>
+<status>completed</status>
+<summary>Background command "Short background wait before reading ListAgents for the waiting session" completed (exit code 0)</summary>
+</task-notification>
