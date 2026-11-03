@@ -1,0 +1,1 @@
+review-triage/skills/review-triage を使ってレビューのトリアージする前提で、別セッションでレビューするための指示文を教えてください
