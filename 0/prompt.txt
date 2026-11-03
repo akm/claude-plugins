@@ -1,0 +1,1 @@
+<bash-input>git branch -d feat/request-sandbox-limits-76</bash-input><bash-stdout>Deleted branch feat/request-sandbox-limits-76 (was 62beee2).</bash-stdout><bash-stderr></bash-stderr>
