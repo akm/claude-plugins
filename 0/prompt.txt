@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>boan919n4</task-id>
+<tool-use-id>toolu_0114GTvJ8WLpuRoiyF62EQWF</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/95f0954b-e9a4-43b0-8bca-003ba8cef2f3/tasks/boan919n4.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261103-1754-feat-plugin-install-status-168 (20261103-1932-feat-plugin-install-status-168-18-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
