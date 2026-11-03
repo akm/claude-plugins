@@ -1,0 +1,81 @@
+<task-notification>
+<task-id>a24aa32e9df3b77de</task-id>
+<tool-use-id>toolu_01NDQY6o6frXemyxS6VW4iMN</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a24aa32e9df3b77de.output</output-file>
+<status>completed</status>
+<summary>Agent "Repo research: patterns and conventions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Repository Research Summary (Scope: patterns, conventions)
+
+### Critical finding: `same-location-fix.md` is missing from R18's file list and its mechanism breaks if recurrence/reframe are removed
+
+`review-triage/skills/review-triage-fix/references/same-location-fix.md` is a **new file, introduced in this branch's own most recent commit** (`490f4b4 ✨ feat(review-triage-fix): 同じ場所を再び直すときは件数を落とし重複を参照にする`, per git log). It is not in the planning-context.md summary, not in grounding.md, and **not listed in R18's "参照する箇所" enumeration** (plan lines 93-95: only lists the 3 SKILL.md, `record-schema.md`, `loop-flow.md`, `grouping.md`, README, CONCEPTS.md). But it is wired directly into the machinery being removed:
+
+- `same-location-fix.md:3` — "場所が同じかどうかの基準…は `recurrence-detection.md` の「補助の条件」と同じで、ここでは言い直さない" (cites the doc being deleted as the basis-of-truth for its own trigger condition).
+- `same-location-fix.md:7` — its primary detection path is "直前の回の `recurrence.evidence` に `condition: same-location` の根拠があれば" and its fallback path cites `recurrence-detection.md`'s "件数による緩和" section (also deleted).
+- `same-location-fix.md:9` — explicitly handles the `declined` status ("人間が繰り返しではないと答えた (`declined`) 回でも…") — a status value that disappears with `recurrence`.
+- `same-location-fix.md:11` — cross-references `reframing.md`'s `reframe.fix_unit`.
+- It's invoked from `review-triage-fix/SKILL.md:18` (前提知識) and `:39` (手順 6, 段 2/立案 in the new 3-stage split).
+
+This file's *own normative content* (数を書かない / 重複を参照にする — a genuinely independent fix-technique doc, not just cross-refs) should survive the restructure, but every sentence that leans on `recurrence`/`declined`/`reframe.fix_unit` needs rewriting to use whatever new signal replaces detection (round number? nothing?). **This should be added to R18's file list**, and flagged in planning as needing more than a reference-swap — its "いつ当てるか" section's primary detection path (`recurrence.evidence` lookup) has no replacement once detection is gone, so the plan needs to decide what the fallback path (`git blame` / `findings[]` position matching, already described at line 7) becomes the *only* path.
+
+### `triagecheck` recurrence-removal surface is well-isolated but larger than grounding.md showed
+
+Recurrence-specific Go code is cleanly separable — good news for R19:
+- Types: `recordRecurrence`, `recordRecurrenceEvidence`, `recordReframe` (`review-triage/tools/triagecheck/record.go:84,91-96,98-110,112-120`)
+- Validation: `recordRecurrenceProblems` (`record.go:674-777`, one self-contained function, called once from `recordSemanticProblems` at `record.go:653-654`)
+- Rendering: `renderRecurrence`, `recordRecurrenceStatusJa`, `recordRecurrenceConditionJa`, `recordReframeSourceJa` (`record.go:1041,1058,1071,1081`), plus the call site `record.go:891-893`
+- Schema plumbing to also touch: `recordAllowedKeys["実行"]` includes `"recurrence"` (`record.go:204`), `recordAllowedKeys["検知"]` (`record.go:215`), `recordNullSilentKeys` includes `"recurrence"` (`record.go:359`), unknown-key case `"recurrence"` (`record.go:409`)
+
+But `record_test.go` has **8 dedicated test functions**, not just "recurrence checks" generically — all need removal/rewrite, not just the generic note in R19:
+`TestReviewTriageRecordRecurrencePasses` (1365), `TestReviewTriageRecordRecurrenceViolations` (1399), `TestReviewTriageRecordRecurrencePriorReframedWithoutPlans` (1518), `TestReviewTriageRecordRecurrenceOnFirstRun` (1571), `TestReviewTriageRecordRecurrencePriorRunNotPrevious` (1582), `TestReviewTriageRecordRecurrencePriorReframedRunRequiresReframeMarker` (1605), `TestReviewTriageRecordRecurrencePriorReframed` (1628), `TestReviewTriageRecordRecurrenceNull` (1644), `TestReviewTriageSummaryRecurrence` (1656) — plus the two helper builders `recurrenceRecordYAML` (1308) and `recurrenceReframedThenRecordYAML` (1470) that other non-recurrence tests may or may not depend on (worth checking before deletion — `recurrenceRecordYAML` builds the base 2-run fixture other tests could reuse without the recurrence block since it accepts `""`).
+
+`plans[]` validation (relevant to R5-R17, since stages write `plans[]`) is **not** a separate function — it's inline inside the large `recordSemanticProblems` (~`record.go:431-660`), interleaved with recurrence checks in the same function body. This means R19's "drop recurrence checks" edit to `record.go` is a surgical excision inside a shared function, not a clean function deletion — worth flagging for the implementer.
+
+### `review-triage-fix/SKILL.md`'s current 10 steps map cleanly to the new 3 stages
+
+Full text read at `review-triage/skills/review-triage-fix/SKILL.md`. Useful for scoping R5/F1/F2 implementation:
+- Step 1 (read input) needs its `recurrence` sub-bullet removed (`SKILL.md:26`).
+- Step 2 (俯瞰, `SKILL.md:29`) — deleted entirely (this is the seam where R7's "ask A/B/C after stage 1" hook goes instead).
+- Steps 3-5 (原因を確かめる/問題にまとめる/調査する) → **段 1 (調査)**.
+- Steps 6-7 (修正方法と順序を決める/計画を記録に追記) → **段 2 (立案)**; step 6 also currently invokes `same-location-fix.md` (`SKILL.md:39`, see finding above) and the `awaiting-human` fork (`SKILL.md:40`, this is R10's existing mechanism — confirmed reusable as-is).
+- Steps 8-10 (修正して検証してコミット/報告/doc-dag 確認) → **段 3 (修正)**. Step 10's `doc-dag` call (`SKILL.md:45`) is optional-plugin-guarded ("`doc-dag` は別のプラグインなので、無ければこの手順は飛ばし…") — same soft-dependency pattern used for `mermaid-preview`.
+
+### Sub-agent invocation convention to mirror (item 2)
+
+The existing pattern for writing a request prompt to an independent sub-agent — directly reusable for R13-R17's stage sub-agents — is in `review-triage/skills/review-triage/references/review-request-template.md` and `review-triage/skills/review-request/SKILL.md`:
+- **Values written literally, not left for the sub-agent to choose**: `review-request-template.md:21` — "skill: `{{skill}}` / effort: `{{effort}}` / モデル: `{{model}}` — **この値で呼ぶ。自分で別の値を選ばない。**"
+- **Mandatory report-back of what was actually run**: `review-request-template.md:22` — "報告に、skill を実際に呼んだか…と、実際に渡した effort とモデルを含める。受け取る側はこの報告を上の指定と突き合わせる。" This directly matches plan R12's "各回の報告…には、各段をどこで…走らせたかを書く."
+- **Single output-file handoff, strict schema, no extra keys**: `review-request-template.md:51-53` — "この 1 ファイルだけ…**ここに無いキーを足さない**." Matches Key Decision "段のあいだの受け渡しは記録 YAML だけにする" (R16).
+- **Read-only guardrails for the sub-agent** are spelled out explicitly as their own section (`review-request-template.md:12-17`) — worth reusing verbatim style for stage sub-agents that must not act outside their stage.
+- `review-invocation.md:14-16` also establishes a terminology discipline worth copying: exactly two named concepts (指定 vs 実効モデル), explicitly rejecting ad hoc middle terms — this is the kind of vocabulary discipline CLAUDE.md's rules ask for, and the new stage/effort/model concepts should get the same "name exactly N things, no synonyms" treatment.
+
+### Config/argument convention to mirror (item 3)
+
+`project-config.md`'s `loop` sub-object (`project-config.md:16-22,51-74`) is the direct template for placing the new N threshold and per-stage sub-agent settings — it already has the exact shape needed: nested JSON object, a table of key/meaning/"未設定のときの扱い", and a dedicated "「未設定」の定義" subsection (`project-config.md:64-70`) defining "未設定" precisely as *(key absent) OR (string-typed key = "")*, explicitly excluding integer keys like `max_rounds` from that definition (`max_rounds` empty/non-integer is a validation error, not "unset"). Any new N key should follow this same string-vs-integer distinction.
+
+`arguments.md` shows the priority chain to replicate for new CLI args: `--flag` &gt; config `loop.*` &gt; per-key hardcoded default &gt; ask-human (`arguments.md:22-27`), plus a separate "値の検査" section (`arguments.md:31-42`) that validates the *resolved* value regardless of source and reports which source (arg vs config) it came from on error (`arguments.md:40`). New args for N and per-stage sub-agent config should get an equivalent validation table entry, not just documentation prose.
+
+`config-schema.md` (the `.claude/review-triage.yaml` classification file) is a **different config file** for a different concern (audience classification) — its "3 値で扱う" (OK/対象外/読めない) pattern is not the right model here; `project-config.md` is.
+
+### `plans[]` schema (item 4) — already fully quoted in grounding.md, confirmed accurate
+
+Full table read at `record-schema.md:57-72` (keys) and `150-178` (status enum + done-external). No corrections to grounding.md's extraction. One addition: the schema's own meta-rule at `record-schema.md:19` explicitly forbids the plan-writing prose from individually enumerating `plans[]` keys ("ここで `plans` のキーを個別に数え上げない" — citing a past incident where `done-external`'s `applied_external_url`/`notes` were added to the schema table but missed in prose). **Any new plan doc or SKILL.md text describing what stage 2 (立案) writes to `plans[]` must not re-enumerate the keys** — point at this table instead, per the repo's own established anti-drift rule.
+
+### `loop-flow.md` node inventory for state-machine redesign (item 5)
+
+Full graph read at `loop-flow.md:19-96`. Nodes to remove/replace for the new design: **G1** (entry gate: unprocessed detection exists?), **J1** (per-round: detection this round?), **S1** (stop: detection, wait for human) — these three form the complete detection-related subgraph, cleanly separable from G2/J4/J6/S2 (awaiting-human, untouched) and G3/J2/J3/F1/F2 (coverage/pending, untouched). New nodes for R7 (ask A/B/C after stage 1, in rounds ≥ N+1) need to be inserted into this same graph/decision-table pair, obeying the file's own hard rule (`loop-flow.md:5,8`): **the mermaid diagram is the sole source of truth for node IDs, ordering and branching; the decision table only adds per-node conditions and report content; prose (SKILL.md/reporting.md) may only reference node IDs, never restate branching** — this discipline caused a real incident when violated (`loop-flow.md:7`, 5 of 6 rounds hit the same defect). Confirmed at `loop-flow.md:8`: **`triagecheck` does NOT check `loop-flow.md`** (only `judgment-flow.md` has a `-judgment-flow` machine check, in `review-triage/tools/triagecheck/judgment_flow.go`) — this matches the plan's Scope Boundary ("`triagecheck` に `loop-flow.md` の検査を足すことは対象外") with no contradiction found.
+
+### Plugin packaging (item 7)
+
+`review-triage/.claude-plugin/plugin.json` version is currently `0.8.0`. **No plugin in this repo currently ships an `agents/` directory** (`find . -maxdepth 2 -type d -name agents` returned nothing across all 7 plugins: review-triage, commit-rules-guard, pr-teeth, work-log-gh-comment, doc-dag, commit-squash, mermaid-preview). R15's 6 generic agent definitions would be this repo's **first** `agents/` directory — there is no local convention to follow; the plan's Dependencies section already correctly flags this as relying solely on external Claude Code docs, which is the right call given no in-repo precedent exists.
+
+### Tooling/CI facts (item 6) — corrects an assumption in the research brief
+
+This repo has **no root `Makefile` and no `.github/workflows/`** (verified via `find`). The `"gates": ["make lint", "make test", "make check-docs"]` shown in `review-triage/README.md:46` is an *example for a consuming repository* (the README explicitly says gate names must be "自分のリポジトリの実在するものに読み替えて", `README.md:73`), not this repo's own CI. The only `.tool-versions` in the repo is `review-triage/tools/triagecheck/.tool-versions` (`golang 1.25.4`), scoped to the Go tool subdirectory, not the repo root. Test command per `review-triage/tools/triagecheck/README.md:242,248`: plain `go test ./...` (run from inside `tools/triagecheck`; the tool itself is invoked elsewhere via `go run -C &lt;path&gt;/tools/triagecheck .`, README.md:27,83,116). `commit-rules-guard` (hooks-based commit-motivation-mixing reminder plugin) exists as a sibling plugin in this repo and is cited stylistically by `project-config.md:5` ("[commit-rules-guard]…と同じ流儀") but is not itself part of `review-triage`'s dependency chain.
+
+### Worked examples (item 8) — no additional cleanup surface found beyond the gap above
+
+Only one `*-examples.md` file exists in `review-triage`: `review-triage/skills/review-triage/references/gate-examples.md`, and it is about rejection-gate examples (lappds-specific file paths), **unrelated to recurrence/俯瞰** — no changes needed there. `verification.md:66` is the normative rule requiring that "changing a norm → reread every `*-examples.md` and every node that exemplifies that norm" — applying it, the only worked-example content restating detection/reframing rules lives *inside* `recurrence-detection.md` and `reframing.md` themselves (both deleted per R18) and inside `same-location-fix.md` (the gap above) and `grouping.md`'s "捉え直しがあるとき" section (`grouping.md:26-28`, already in R18's list). `investigation.md:29`'s "実例" is about an unrelated wrapper-script incident — false positive, no action needed.</result>
+<usage><subagent_tokens>178260</subagent_tokens><tool_uses>38</tool_uses><duration_ms>205473</duration_ms></usage>
+</task-notification>
