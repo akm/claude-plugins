@@ -1,0 +1,120 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>Bash, Edit, Read, ReportFindings, Skill, Write, mcp__ccd_turn__update_plan, mcp__ccd_turn__wrap_up</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+   - 利用者は、review-triage の review-request スキルが生成した依頼文 (`tmp/review-request-<日時>-<ブランチ>-<N>-code-review-opus.md`) のパスを渡し、そのとおりにレビューすることを繰り返し求めている。
+   - 毎回の手順:
+     1. 依頼文を読む (前回の依頼文との diff で、差分の範囲・scope・run_id・base・head・出力先の違いを確かめる)
+     2. skill `code-review` を effort `high` で呼ぶ (引数は 「high <base>..<head>」)。モデルは引数で渡せないので、セッションの Opus 5.5 (claude-opus-5-5) で実行する。
+     3. 結果を、依頼文が指定する `tmp/review-<日時>-…-code-review-opus.yaml` に、厳密な様式で書き出す。
+     4. ReportFindings を呼ぶ → wrap_up → 日本語で報告する。
+   - **依頼文の制約 (逐語)**:
+     - 「**「共有」のとき — 読み取り専用を厳守する。** ファイルの編集・作成・削除をしない。git の状態 (HEAD・作業ツリー・インデックス・ブランチ) を変えない。例外は出力先の 1 ファイルだけ。他のファイルを作らない。レビューの前後で HEAD と作業ツリーが不変であることを確認して報告する。」
+     - 「どちらの値でも、指摘を見つけても直さない。」
+     - 「ここに無いキーを足さない。」
+     - 「行内コメント (` #` 以降) を書かない。」
+     - 「報告に、skill を実際に呼んだか (呼んだ / 呼ばずに自分で読んだ) と、実際に渡した effort とモデルを含める。」
+     - evidence には、実行した確認か、逐語の引用を行番号つきで書く。テストの不在を言う指摘は、実際にその入力を通して確かめる。
+     - 報告しない条件に当たるものは residual に 1 行ずつ書く。
+   - 出力の YAML の様式:
+     - トップレベル: `skill: code-review`, `model: opus`, `level: "high"`, `run_id`, `scope`, `base`, `head`, `date`, `attrs` (skill_invoked, effort_passed, model_passed, worktree_check, checks_run を入れてきた), `findings`, `residual`
+     - 指摘のキー: `id`, `file`, `line`, `summary`, `evidence`, `attrs{severity, confidence}`
+
+2. Key Technical Concepts:
+   - review-triage プラグイン:
+     - review-request、review-triage (判定)、review-triage-fix (調査・立案・修正のフェーズ。引数 `--stage`、agent 定義 `fix-stage-*`)、review-loop (ワーカー `review-triage/scripts/review-loop-worker.sh`)
+   - review-triage の Go ツール:
+     - triagecheck: 記録 YAML の検査と、生成サマリの鮮度の検査 (全文一致)。サマリの書式の変更は README の 「生成サマリの書式の変更」 の表に書く。
+     - lineorigin
+     - nearedges: 観点 B の案内。`referenceWords = {"SSOT は", "正本は"}`
+   - wording-guard:
+     - 用語ファイル `.claude/akm-claude-plugins/wording-guard/terms.toml` (prh のパターン・exceptions は allowlist になる)。textlint の設定の allowlist は `/「[^」\n]*」/`。
+     - `wording_lint.py terms|check|fix`
+   - ルートの CLAUDE.md:
+     - 3 原則。原則 3 の追記は 「説明を添えても、語そのものの不自然さは解消しない」。
+     - トリアージ記録 (`tmp/review-triages/`, `docs/review-triage/`) は書き換えない。docs/review-triage のサマリは再生成せず、triagecheck で検査しない。
+   - 用語 SSOT: CONCEPTS.md の `### SSOT` (アンカー `#ssot`) で定義している。
+   - #135 (訓読みの直訳) と #87 (周回・回 N・段→フェーズ・走る→実行する・正本→SSOT) の PR 群。
+
+3. Files and Code Sections:
+   - 依頼文: `/Users/akima/workspace/claude-plugins/tmp/review-request-*.md` (毎回、前回と diff を取って読む)
+   - 結果: `/Users/akima/workspace/claude-plugins/tmp/review-*-code-review-opus.yaml` (毎回書き出す)
+   - `review-triage/tools/nearedges/hints.go`: referenceWords と案内の文言 「— SSOT を再確認し、参照をリンクにする」 (前の PR で直った)
+   - `review-triage/tools/triagecheck/record.go`: サマリの描画。899 行付近の 「## %d 回目」、束ね先、根拠、「スキルの見解 (skill)」、調査済みの注記 「立案フェーズから続ける」。今回のブランチでも変更がある (22 行)。
+   - 今回のブランチの変更ファイル (コード・設定):
+     - review-triage/.claude-plugin/plugin.json (0.26.0)
+     - agents/fix-stage*.md
+     - scripts/review-loop-wait.sh
+     - scripts/review-loop-worker.sh (60 行)
+     - scripts/review-loop-worker/*.py
+     - tests/test_review_loop_*.py
+     - tools/triagecheck/{judgment_flow.go, main.go, record.go, record_test.go}
+     - wording-guard/.claude-plugin/plugin.json (0.2.7)
+     - wording-guard の kind-expansion.md に 「正本」 の行を追加
+
+4. Errors and fixes:
+   - zsh で `echo ==` がエラーになった → 区切りの文字列を変えた。
+   - `git grep -E` が先読み `(?!..)` を扱えなかった → 先読みを使わない形と grep -v に変えた。
+   - review-triage の全体のテストが 10 分のタイムアウトを越えた → run_in_background で実行し、通知を待つようにした。
+   - 結果の YAML に書いた誤り (「確認した事實」、行番号 0、行数の数え違い 49→48、terms.toml の行番号) は、Edit で直した。
+   - 過去の全量レビューで、フラグファイルの誤用を絞り込みのせいで見落とした → 以降は全件を一覧して確かめた。
+
+5. Problem Solving:
+   - これまでに確かめた主な問題の種類:
+     - 置き換えで意味が反転したもの (待つ対象を 「待機する〜」 と書く、mtime を 「フラグファイル」 と呼ぶ)
+     - 生成物の書式の変更で、既存のサマリが不一致になるもの (起点の triagecheck を git archive でスクラッチパッドに取り出して比べた)
+     - 避ける語のパターンの誤検出 (標準入力で試行した)
+     - nearedges の文字列での検出 (差分を標準入力で渡して試した)
+     - SSOT の初出の説明
+
+6. All user messages:
+   - 各 user メッセージは、依頼文のパス 1 つだけ。順に:
+     - tmp/review-request-20261025-2044-…-135-1 / 呼び出し元のセッションで review-triage を実行します / …-2224-…-2 / …-2255-…-3 / …-2304-…-4 / 20261026-0648-…-5 / …-0727-…-6 / …-0744-…-7
+     - issue-dispatch-135 の 1 / 2 / 3
+     - review-loop-135 の 1 / 2 / 3 / 4
+     - review-triage-135 の 1 / 2 / 3
+     - replace-metaphors-135 の 1
+     - replace-metaphors-review-triage-135 の 1 / 2 / 3
+     - fix-remaining-wording-87 の 1 / 2 / 3
+     - docs-wording-principles-87 の 1 / 2 / 3
+     - docs-rename-stage-to-phase-87 の 1
+     - docs-replace-hashiru-87 の 1 / 2
+     - docs-replace-seihon-87 の 1 / 2 / 3 / 4
+     - 最新: `/Users/akima/workspace/claude-plugins/tmp/review-request-20261028-1850-docs-replace-seihon-review-triage-87-1-code-review-opus.md`
+   - 文章のメッセージは 「呼び出し元のセッションで review-triage を実行します」 だけ。そのほかは依頼文のパスだけ。
+
+7. Pending Tasks:
+   - 依頼文 20261028-1850 (ブランチ docs/replace-seihon-review-triage-87、全量 6d9f747..83013f7、run_id 「20261028-1850-docs-replace-seihon-review-triage-87-1-code-review-opus」、scope full、base 「6d9f747」、head 「83013f7」、date 「2026-10-28」) のレビューを終える。
+   - 結果の出力先: `/Users/akima/workspace/claude-plugins/tmp/review-20261028-1850-docs-replace-seihon-review-triage-87-1-code-review-opus.yaml`
+
+8. Current Work:
+   - 確認済みのこと: HEAD は 83013f7、作業ツリーは clean、merge-base は 6d9f747。
+   - code-review skill は 「high 6d9f747..83013f7」 で呼んだ。
+   - コミットの一覧:
+     - ffab145: kind-expansion.md に 「正本」 の行を追加
+     - 2b3f47a: wording-guard 0.2.7
+     - efc9b3f: 「✨ feat(review-triage): triagecheck の出力と生成サマリの「正本」を SSOT にする」
+     - 509fee1: README・SKILL.md・agent 定義の初出に説明を追加
+     - 91d500f: コードのコメントと docstring
+     - 83013f7: review-triage 0.26.0
+   - 変更は 72 ファイル。コード・設定の変更ファイルを一覧したところで止まっている。
+
+9. Optional Next Step:
+   - docs/replace-seihon-review-triage-87 の全量レビューを続ける。手順:
+     1. `git diff 6d9f747..83013f7` で、triagecheck の Go (record.go のサマリの文言が変わったか)、worker.sh・Python・テストの差分 (コメント以外の変更) を読む。
+     2. サマリの書式が変わっていれば、次を確かめる:
+        - README の 「生成サマリの書式の変更」 の表に 0.26.0 の行があるか
+        - `go run -C review-triage/tools/triagecheck . -current-dir "$PWD" -record-dir tmp/review-triages -judgment-flow review-triage/skills/review-triage/references/judgment-flow.md` で検査に通るか
+     3. go test (triagecheck・nearedges・lineorigin) を実行し、review-triage の Python のテスト (約 12 分) をバックグラウンドで実行する (env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE、PYTHONDONTWRITEBYTECODE=1)。
+     4. 次を確かめる:
+        - `wording_lint.py terms` と `check`
+        - 残る 「正本」 (doc-dag の参照の形・nearedges の検出の文字列・テストのデータを除く)
+        - SSOT の初出の説明 (README・SKILL.md・agent 定義)
+        - kind-expansion.md の例
+     5. 結果の YAML を書き出し、様式を確かめる → ReportFindings → wrap_up → 日本語で報告する。報告には、skill を呼んだこと・effort high・モデルは渡していないこと・HEAD と作業ツリーが変わっていないことを書く。
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/3933e702-62c1-4930-a532-8181243ef1d8.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
