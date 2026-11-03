@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bv7giu3uh</task-id>
+<tool-use-id>toolu_012SHPqCkZ2aJAvjunGXDMGk</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/bv7giu3uh.output</output-file>
+<status>completed</status>
+<summary>Background command "Check U3 diff size, wording, headings, and tests" completed (exit code 0)</summary>
+</task-notification>
