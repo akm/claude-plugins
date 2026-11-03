@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>byy16rrg2</task-id>
+<tool-use-id>toolu_01L7iXCgybLbueBWgaWpv3n8</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/byy16rrg2.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the full test suite for U10" completed (exit code 0)</summary>
+</task-notification>
