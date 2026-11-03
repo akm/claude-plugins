@@ -1,0 +1,58 @@
+<task-notification>
+<task-id>aa01ecb304d9eb115</task-id>
+<tool-use-id>toolu_01FLfc2SSGWfvGetujkQAu82</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/aa01ecb304d9eb115.output</output-file>
+<status>completed</status>
+<summary>Agent "U3: reframing step in review-triage-fix" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## U3 実装報告
+
+**Worktree**: `/Users/akima/workspace/claude-plugins/.claude/worktrees/agent-aa01ecb304d9eb115`
+
+**注意 (base の相違)**: worktree の初期 HEAD は `619cf54` (main) で、想定の `eae27fa` ではなかった。`eae27fa` (U1 の `record-schema.md` の `recurrence` 表) を前提にする単位なので、作業前に `git reset --hard eae27fa` で base を合わせた (status は clean だったので失われた変更は無い)。現在の HEAD は `eae27fa`。コミット・`git add` はしていない。
+
+### 変更したファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| `review-triage/skills/review-triage-fix/references/reframing.md` (新規, 108 行) | 俯瞰の正本。対象の選び方 (最も古い未処理の `detected`、複数は残りを報告、途中状態は持たず第 1 段からやり直す) / 第 1 段 (`evidence` 1 件 = 辺 1 本の mermaid flowchart、問い「繰り返していると認めますか」、否定なら `declined` + `declined_reason`) / 第 2 段 (軸の表、確認の問いだけ、合意まで繰り返す) / 見立てを出す条件 (`source: skill` / `human`) / 記録に書いてコミットしてから束ねる / 束ねへの引き継ぎ / 図の提示 (hold-presentation.md の形を写し、未導入と実行時失敗を区別して報告) / 実例「規則 × 経路」の表 (回 7〜14、P19・P29・P31) |
+| `review-triage/skills/review-triage-fix/SKILL.md` | 前提知識に俯瞰の 1 項目 (初出の説明つき)、手順 1 に未処理の検知の報告の副項目、手順 2「俯瞰する」を挿入し 2→3 … 9→10 に付け替え (手順 4→5、手順 5→6 の引用も訂正)、手順 3 に `root_cause` 優先の 1 文、手順 9 の報告に「未処理の検知」、原則に「見立ては人間が出せないときだけ出す」 |
+| `references/grouping.md` | 節「捉え直しがあるとき」を 1 段落追加 (定義は CONCEPTS.md を引く) |
+| `references/investigation.md` | 「手順 4」→「手順 5」 |
+
+`ordering.md` / `verification.md` / `committing.md` は手順番号を引用していなかったので未変更。`review-triage/README.md` と `review-triage/skills/review-triage/` 配下にも fix の手順番号の引用は無かった (grep で確認)。
+
+### 検証
+
+**(a) 手順番号の引用** — `grep -rn "手順 [0-9]" review-triage/skills/review-triage-fix/` の全 6 件が付け替え後の番号と一致 (手順 2 = 俯瞰、手順 5 = 調査、手順 6 = 修正方法と順序)。番号付き手順は 1〜10 が連番。
+
+**(b) AE の手動の通し確認** (参照文書の文に照らした結果)
+
+- AE4 (認めない): 第 1 段の問いに「繰り返しではない」→ 記録は
+  ```yaml
+  recurrence:
+    status: declined
+    evidence: [...]   # review-triage が書いたまま
+    declined_reason: 回 3 の指摘 1 は回 2 の修正ではなく元から残っていた欠陥で、繰り返しではない
+  ```
+  `reframe` は書かず、束ねは grouping.md の通常の基準。検知と否定の両方が残る。
+- AE5 (合意、人間由来): 第 2 段で表を直して合意 → `status: reframed`、`reframe: {pattern: 経路によって契約が違う, axes: 規則 × 経路 × フラグ, root_cause: ..., fix_unit: ..., source: human}`。手順 3 で `cause` は `root_cause` を指し、空いたマスは investigation.md の探索で問題に含める。合意までのスキルの発話は「合っていますか / 違和感はどこですか / 他に軸はありますか」の 3 種だけで、見立ては出ない (reframing.md「第 2 段 &gt; 問い」に明記)。
+- 「出せない」→ 見立て → `source: skill`: 人間が「出せない」と答えたときだけ「これは見立てです」と明示して案を出し、認められれば上と同じ `reframe` で `source: skill`。認められなければ捉え直しにせず、第 2 段に戻るか `declined`。
+- AE6 (mermaid-preview 無し): 第 1 段から Markdown の表と箇条書きで続け、報告の行は「図は出していない: `mermaid-preview` プラグインが入っていない」(実行時失敗なら「入っているが実行時に失敗した」と書き分ける)。俯瞰は Markdown で完了。
+- AE7 (回 3・回 4 に未処理): 手順 1 の報告に「未処理の検知: 回 3、回 4」、手順 2 は回 3 を対象にし「回 4 の検知は回 3 の俯瞰を記録に書いた後に扱う」と報告。セッションが切れれば `detected` のままなので次回は第 1 段から。
+
+**(c) 検査ツール** — `docs/review-triage/fix-triagecheck-explicit-path-must-exist.yaml` を `tmp/reframe-sample.yaml` に複製し、回 3 に `status: reframed` と完全な `reframe` (`source: human`) を挿入。`ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/triagecheck . -record-dir &lt;worktree&gt;/tmp -write-summary=true` でサマリ生成 (exit 0、サマリに「### 検知 / 状態: 捉え直し済み / 根拠 / 捉え直し」が出た)、続けて検査を実行 → `問題は見つかりませんでした（検査: review-triage-record, judgment-flow）` exit 0。その後 `tmp/` ごと削除し、`git status` に tmp は無い。注: worktree 直下に `.tool-versions` が無く `go` が版未設定で失敗するため、`ASDF_GOLANG_VERSION=1.25.4` を付けて実行した。
+
+**(d) 3 原則の読み直し** — 「俯瞰」「見立て」「捉え直し」は各ファイルの初出で説明を添えた (見立ての説明が後の節に重複していたので冒頭側に寄せた)。実例の回数は実測として書き、「俯瞰を行う回数の基準ではない」と明記。
+
+**(e)** `git status --short`: M SKILL.md / M grouping.md / M investigation.md / ?? reframing.md。`git diff --stat`: 3 files changed, 19 insertions(+), 11 deletions(-) (新規ファイルは untracked のため stat 外)。
+
+### 意図して残したもの
+
+- `reframing.md` から `../../review-triage/references/recurrence-detection.md` へリンクしているが、そのファイルは U2 が作る (現時点では存在しない)。
+- `record-schema.md` の「2 回続いたら表を書く」段落 (KTD8) と `review-triage/` 配下、README は触っていない (U2 / U4 の範囲)。
+- `declined` の検査ツール確認は、コマンド構成の制約で実行していない (`reframed` の確認のみ)。
+- `doc-dag` による重複確認 (計画の Verification に記載) は実行していない。</result>
+<usage><subagent_tokens>130498</subagent_tokens><tool_uses>52</tool_uses><duration_ms>474644</duration_ms></usage>
+<worktree><worktreePath>/Users/akima/workspace/claude-plugins/.claude/worktrees/agent-aa01ecb304d9eb115</worktreePath><worktreeBranch>worktree-agent-aa01ecb304d9eb115</worktreeBranch></worktree>
+</task-notification>
