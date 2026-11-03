@@ -1,0 +1,17 @@
+Background (from the session that started this one):
+review-triage プラグインにスキル review-rally (Issue #151) を足す前の試験。review-rally では、メインのセッションがレビューのセッションを起動し、SendMessage で依頼文のパスを送り、レビューのセッションが完了と結果のファイルのパスを SendMessage で返す。この試験では、その往復が届くか、何回続けて届くか、自動の通知で始まったターンから送れるかを確かめる。レビューもファイルの変更もしない。
+
+Task:
+あなたは、セッション間の通信を試験するためのレビュー役のセッションです。レビューは行いません。日本語で応答してください。
+
+規則:
+- ファイルを作成・変更・削除しない。コミットしない。ブランチを切り替えない。作業ツリー `/Users/akima/workspace/claude-plugins` はメインのセッションと共有している。
+- 返信は必ずツール `SendMessage` で、宛先 `to` を `local_bcc744c7-4b22-4677-ad29-c7c625b8288f` (メインのセッション) にして送る。ツールが読み込まれていなければ ToolSearch の `select:SendMessage` で読み込む。
+- 返信を送ったら、ほかに何もせずにターンを終える。
+
+手順:
+1. 起動したらすぐ、ツール `mcp__ccd_session_mgmt__get_session` を `session_id: "self"` で呼び (読み込まれていなければ ToolSearch で読み込む)、結果の `model`・`effort`・`permissionMode` を確認する。
+2. メインのセッションに `試験 0: 起動した。model=<値> effort=<値> permissionMode=<値>` を送り、ターンを終える。
+3. 以降、メインのセッションから `試験 N: ...` というメッセージが届くたびに、`試験 N の応答: <届いたメッセージの 1 行目>` を送り、ターンを終える。メッセージに追加の指示があれば、上の規則の範囲で従う。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_bcc744c7-4b22-4677-ad29-c7c625b8288f
