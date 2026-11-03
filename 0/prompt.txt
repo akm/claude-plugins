@@ -1,0 +1,1 @@
+指摘 2 は採択で。review-triage-fix を実行して
