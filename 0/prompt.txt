@@ -1,0 +1,133 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+<tools-used-before-summary>Agent, AskUserQuestion, Bash, Edit, Skill, ToolSearch, Write, mcp__Claude_Browser__computer, mcp__Claude_Browser__navigate, mcp__Claude_Browser__preview_start, mcp__ccd_pr__get_status, mcp__ccd_session__start_session, mcp__ccd_turn__update_plan, mcp__ccd_turn__wrap_up</tools-used-before-summary>
+Summary:
+1. Primary Request and Intent:
+   - **Overall task:** Issue #87 (akm/claude-plugins), replacing in-sentence dashes "—".
+     - Judge review findings with the review-triage skill and record them in tmp/review-triages/.
+     - When the user says "直す", fix adopted findings with review-triage-fix.
+     - Create review requests with review-request. When the user says "作って渡す", pass the request to a new local session.
+     - Create PRs when asked.
+   - **5a** (PR #154) is merged.
+   - **5b** was split into two PRs (案 B):
+     - 5b-1 (docs) is PR #155, merged as cd50ea07.
+     - 5b-2 (code: triagecheck, nearedges, lineorigin README, review-loop worker, tools READMEs) closes #87. It is in progress on branch docs/replace-dash-review-triage-code-87.
+   - **Output texts:** the user approved the section 3 proposals ("案のとおり始める"). This keeps the test data "立案者 C — 人間が立案する" unchanged.
+   - **User rules (from CLAUDE.md and memory):**
+     - All prose is in Japanese and follows the wording rules.
+     - Commits are grouped by motive and need `--trailer 'Rules-Checked: yes'`.
+     - Check commit messages and Markdown with wording-guard, chaining with `&&`.
+     - Ask rather than decide.
+     - Don't write other project names in public.
+     - Invoke the review-triage skills each time.
+     - Run review requests in separate sessions.
+     - Repeat any request to the user in the final reply.
+     - No dash "—" in Japanese prose (including commit messages).
+     - Avoided words: 終わる, 確かめる, 書き直す, 読み直す, 食い違い, 決まり, 書き手, 並び, 言い回し, 走る/走らせる, 正本, 段, 周回, 回 N, の列 (array).
+
+2. Key Technical Concepts:
+   - **review-triage flow:** D1–D8, A2/R1/R2/H7, and the 4 gates.
+   - **D8:** checked with lineorigin:
+     `ASDF_GOLANG_VERSION=1.25.4 go run -C review-triage/tools/lineorigin . -root "$PWD" -base <sha> -rev <sha> -file <f> -lines a,b`
+   - **Record schema:**
+     - Run fields: runs, findings (origin: residual for self-adopted residuals), prior_defect.
+     - Plan fields: problem_id, cause, finding_ids, investigation (scope/included/excluded), approach, order, sha, status.
+   - **Summary regeneration and check:** read from .claude/akm-claude-plugins/review-triage/config.json (`triage_summary_command`, then `triage_check_command`), run via `eval "$(python3 -c ...)"`.
+   - **Dash criterion:**
+     - Rewrite when the text before the dash is a sentence.
+     - Keep it when what precedes is a name, noun phrase, or table value (as a separator), and keep heading separators and table blanks.
+     - When splitting, mark reason sentences with ため/からである. Do not put ため on consequence sentences.
+   - **Go commands:** `ASDF_GOLANG_VERSION=1.25.4 go -C <dir> test -count=1 ./...`. `-C` must be the first flag.
+   - **Python tests:** `python3 -m unittest discover -s review-triage/tests` (154 tests, about 10 minutes, run in the background).
+   - **Wording check:** `python3 /Users/akima/.claude/plugins/cache/akm-claude-plugins/wording-guard/0.2.0/scripts/wording_lint.py check --stdin --filename x.md < msg`.
+   - **Review requests:**
+     - Built by filling the template /Users/akima/.claude/plugins/cache/akm-claude-plugins/review-triage/0.23.0/skills/review-triage/references/review-request-template.md with Python: write to `tmp/.review-request-<id>.md.tmp`, then rename.
+     - Placeholders: repo, repo_dir, branch, base, head, scope, scope_note, skill, model, effort, date, run_id, output_path.
+     - Identifier: `<YYYYMMDD-hhmm>-<branch with / → ->-<round>-code-review-opus`.
+     - Incremental scope_note: "前回の HEAD `<sha>` からの増分。増分の外は、増分が壊した場合のみ報告する". The base is the previous run's head.
+   - **Review sessions:** started with start_session using:
+     - initiation user_asked, context fresh, use_worktree false, wake_when_done true
+     - model claude-opus-5-5, effort high
+     - a prompt pointing to the request path, plus a background explanation
+
+3. Files and Code Sections:
+   - **5b-2 commits** (branch docs/replace-dash-review-triage-code-87, from cd50ea07; not pushed):
+     - **b503b381:** nearedges.
+       - edges.go Reasons now read "表のセルを変えた (再確認するのはその表の全行)", etc. The L184 " — 変更行: " is kept.
+       - hints.go sentences are split.
+       - nearedges_test.go L242–243 expectations updated.
+       - README.md updated.
+     - **ac3ad708:** triagecheck.
+       - record.go errors split into sentences.
+       - L871: `"<!-- 生成物。手で編集しない。SSOT は %s。`%s` で再生成する。 -->\n\n"`
+       - L1152: `"\n- **調査済み・未立案 (investigated) が %d 件: %s。** 修正方法と順序をまだ持たない。…"`
+       - Kept: L1079 the verdict cell, L1187 the 根拠 line, and the table blanks.
+       - main.go, wrapper.go (including the wrapper template comment), and judgment_flow.go comments rewritten. Test expectations updated.
+       - README.md rewritten. Added the row: "| 0.27.0 | 冒頭のコメント「SSOT は <YAML> — `<コマンド>` で再生成する。」→「SSOT は <YAML>。`<コマンド>` で再生成する。」、調査済み・未立案の注記「**…が N 件: P1** — 修正方法と…」→「**…が N 件: P1。** 修正方法と…」([#87](…issues/87)) |"
+     - **d9b13750:** lineorigin README L115; worker.sh comments and the L1708 log ("ループは終了していない。同じコマンドで起動し直せる"); review-loop-wait.sh, read_log_facts.py, and test_review_loop_worker.py comments.
+     - **67cd0cf8:** review-triage/.claude-plugin/plugin.json version changed from 0.26.2 to 0.27.0.
+     - **d57e0415** (P1 fix):
+       - worker.sh L783–784: "…戻らない。そのため、\n# まだ停止していない準備のコマンドやレビュアの実行が残っていれば、ワーカーが終了しない"
+       - L846: "POLL_SECONDS 秒残るため (…)"
+       - L956: "…初めから処理するため"
+       - test_review_loop_worker.py L2757: "…で子が終了するため。偽の ps は…"
+   - **tmp/review-triages/docs-replace-dash-review-triage-code-87.yaml:**
+     - Run 1: full, head 67cd0cf8, run_id 20261029-1616-…-1-code-review-opus.
+     - Finding 1: worker.sh L784, adopted A2, prior_defect not-holds.
+     - Finding 2: L955, origin residual, adopted A2, not-holds.
+     - Plan P1: finding_ids [1, 2], sha d57e0415, status done. The summary has been regenerated.
+   - **Review result:** tmp/review-20261029-1616-docs-replace-dash-review-triage-code-87-1-code-review-opus.yaml.
+   - **tmp/issue-87-pr5b-dash-proposal.md:** the 5b proposal (section 3 output texts, now approved).
+   - **Memory:**
+     - issue-87-remaining.md updated with the #155 merge, the 5b-2 commits, round 1 results, and P1 d57e0415. It also notes that because round 1 (full) had adoptions, a post-convergence full review will be needed.
+     - MEMORY.md line updated.
+
+4. Errors and fixes:
+   - **`go test -count=1 -C dir` failed** ("-C flag must be first"). Fixed by using `go -C dir test -count=1 ./...`.
+   - **Wrong "ため" (review finding 1):** I had added "ため" to a consequence sentence in stop_background. Fixed in P1 by removing it and joining with "そのため、".
+   - **Earlier errors from before compaction:** use `&&` (not `;`) when chaining the check and commit; use the `--trailer` for commit-rules-guard; avoid `echo ===` in zsh.
+
+5. Problem Solving:
+   - **Reviewing subagent diffs:** I found 7 worker reason sentences that lacked ため and added it myself. One of those additions was wrong (finding 1) and is now fixed.
+   - **Residuals not adopted:**
+     - The nearedges link hint repeats 再確認する/確認する. Left as is because it follows the approved proposal.
+     - The 根拠 line and the nearedges heading dash are kept forms.
+   - **Quoted output texts:** no Markdown outside tmp/ and docs/review-triage/ quotes the changed output texts verbatim. docs/review-triage/ is frozen.
+
+6. All user messages (post-compaction):
+   - "マージしました"
+   - "案のとおり始める"
+   - "作って渡す"
+   - "直す"
+   - (Earlier messages are listed in the prior summary: …, "PR を作る", etc.)
+
+7. Pending Tasks:
+   - Write the closing message for the P1 fix turn.
+   - Then, if the user agrees ("作って渡す"), create the round 2 review request:
+     - incremental scope, base 67cd0cf8, head d57e0415
+     - generated via the review-request skill
+     - passed to a new session
+   - Continue the loop until convergence. Then run a post-convergence full review (base cd50ea07), because round 1 full had adoptions.
+   - Write the PR body (Closes #87) and create the PR when asked. Push is not done yet.
+
+8. Current Work:
+   - Just completed the review-triage-fix for round 1. P1 was committed as d57e0415, and the record was updated to done with sha d57e0415. The summary was regenerated and the check passed.
+   - wrap_up was called:
+     - recap: "採択した 2 件を、同じ原因の 2 か所と一緒に P1 として直しました (d57e0415)。記録は done です。push はまだで、増分のレビューは未実施です。"
+     - ask: "2 回目 (増分) のレビューの依頼文を作って、新しいセッションに渡しますか？"
+     - button: "作って渡す"
+   - The closing message to the user has not yet been written.
+
+9. Optional Next Step:
+   - Write the closing message in Japanese. It should report:
+     - P1 (findings 1 and 2, plus idle_sleep L846 and test L2757) fixed in d57e0415.
+     - Stages run in-session; round 1 ≤ N=5, so no planner was chosen.
+     - The Go gate passed. Comment-only change, so the Python tests were not re-run.
+     - The record is done.
+   - Repeat the question: "2 回目 (増分 67cd0cf8..d57e0415) のレビューの依頼文を作って、新しいセッションに渡してよいですか。"
+   - Do not create the request until the user answers.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/3031b59d-6df8-411e-99c8-6ccc5278efe2.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
