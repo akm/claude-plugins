@@ -1,0 +1,18 @@
+<cross-session-message from="local_fd48d77d-6367-4541-b3b5-90c2c8cd24d4" from-name="review-loop の停止の条件の重複を解消する (#158)">
+Issue #158 の対応と、そこから見つかった作業 (#160・#162) が終わりました。PR はすべて main にマージ済みで、3 つの Issue は閉じています。
+
+- #158: スキル review-loop の停止 RA1〜RA3 に進む条件を、手順だけが持つようにした。ファイル review-triage/skills/review-loop/references/stops.md の mermaid の図は消した。決定表は、停止の名前と報告に書くものだけを持つ。review-rally (PR #159) と同じ形で、案 A として利用者が選んだ。PR #161 (05ec9db6、review-triage 0.28.1) でマージ済み。
+- #160: #158 の 3 か所以外に残っていた同じ条件の重複を、サイドセッションで直した。重複は、ファイル review-triage/skills/review-loop/references/loop-files.md の表と、ファイル review-triage/skills/review-loop/references/worker.md の説明にあった。PR #163 (8d682384、0.28.2) と PR #166 (41e9c622、0.28.4) でマージ済み。
+- #162: array の意味で書いた「の列」を「配列」に直した。これもサイドセッションで行い、PR #164 (851dfaa2、0.28.3) でマージ済み。
+
+未着手の Issue が 2 つ残っています。どちらも #162 の作業中に見つかったものです。
+- #165: 文書に残っている wording-guard の error は、リポジトリ全体を手で検査したときにしか見つからない。
+- #167: 一般的な表の column を「欄」と書いた箇所がある。利用者の回答は「一般的な表は「列」、RDB のテーブルは「カラム」」で、PR #164 で「欄」にした 3 か所はこれと食い違う。
+
+片付けたもの:
+- サイドセッション 3 つをアーカイブした (#160 のセッション、#162 のセッション、#160 のセッションが始めた review-hook-160)。
+- 作業ツリー .claude/worktrees/review-rally-a29595/ と .claude/worktrees/review-rally-9b4ba6/ は git worktree remove で消した。消す前に、中のディレクトリ tmp/ をメインの作業ツリーの tmp/ に上書きせずに写した。写したのは、判定の記録 2 組と、#151 の review-rally の 14〜25 回目の依頼文とレビューの結果。
+- 手元のブランチ claude/happy-brahmagupta-d25326・claude/cool-kowalevski-502989・docs/deny-tmp-hook-docstring-160 は、利用者が消した。どれも先端が origin/main に含まれることを確かめてある。
+
+このセッションの作業ツリー .claude/worktrees/vigorous-leakey-c3d045/ と、手元のブランチ claude/vigorous-leakey-c3d045 (マージ済み) は残っています。
+</cross-session-message>
