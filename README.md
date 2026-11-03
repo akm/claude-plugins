@@ -84,7 +84,7 @@ make plugins-status PLUGINS=doc-dag,wording-guard
 
 #### マーケットプレイスの自動更新を有効にする
 
-自動更新を有効にすると、Claude Code はセッションを開始した後に、マーケットプレイス akm-claude-plugins の定義を取得し直し、インストール済みのプラグインを更新します。インストールされていないプラグインは、インストールしません。有効にする方法は、次の 2 つです。
+自動更新を有効にすると、Claude Code はマーケットプレイス akm-claude-plugins の定義を取得し直し、インストール済みのプラグインを更新します。インストールされていないプラグインは、インストールしません。有効にする方法は、次の 2 つです。
 
 - Claude Code のセッションでコマンド `/plugin` を実行し、Marketplaces タブで akm-claude-plugins を選んで、「Enable auto-update」を選ぶ
 - ファイル `~/.claude/settings.json` のキー `extraKnownMarketplaces.akm-claude-plugins` に、`"autoUpdate": true` を書く。取得元を表す `source` も一緒に書く (下の例)
