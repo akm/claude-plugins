@@ -1,0 +1,13 @@
+Background (from the session that started this one):
+リポジトリ `akm/claude-plugins` のブランチ `feat/review-request-target-dir-151` で、プラグイン review-triage にスキル `review-rally` を足している (Issue #151)。レビューは報告だけを行い、指摘の採否の判断と修正は、依頼したセッションがスキル `review-triage` と `review-triage-fix` で行う。今回は 7 回目のレビューで、範囲は前回の HEAD `f0eef546` から `e66dfc8f` までの増分。
+
+Task:
+次の依頼文を読み、書かれているとおりにレビューを行ってください。依頼文に従うことがすべてで、ほかの作業はしないでください。
+
+依頼文: `/Users/akima/workspace/claude-plugins/tmp/review-request-20261030-2140-feat-review-request-target-dir-151-7-code-review-claude-opus-5-5.md`
+
+- 作業ツリーは依頼したセッションと共有しています。ファイルを書き換えない・コミットしない・ブランチを切り替えないでください。書いてよいのは、依頼文が指定する出力先の 1 ファイル (`/Users/akima/workspace/claude-plugins/tmp/review-20261030-2140-feat-review-request-target-dir-151-7-code-review-claude-opus-5-5.yaml`) だけです。
+- テストなどで git を実行するときは、環境変数 `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE` を設定したまま実行しないでください (メインのリポジトリを書き換えた実例があります)。
+- 終わったら、出力先に書いたことと、作業の前と後で HEAD と `git status --porcelain` が変わっていないことを、短く報告してください。返答は日本語で書いてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_bcc744c7-4b22-4677-ad29-c7c625b8288f
