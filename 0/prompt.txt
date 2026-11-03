@@ -1,0 +1,190 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+   - Continue PR #115 (akm/claude-plugins, branch `feat/issue-dispatch-plan-114`, Issue #114). The PR is only the plan `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md` for plugin `issue-dispatch`.
+   - **Constraint (verbatim): 「push は諸々決まって、レビューが通ってから行うので、しばらくの間pushしません。」 Never push without asking.**
+   - Current process:
+     - Run 2 (incremental) ce-doc-review findings were triaged (31 adopted). They are being fixed with review-triage-fix.
+     - Mechanical problems are fixed first. Design problems get an interview, one question message per problem; the user chose 「問題ごとに問いをまとめる」.
+     - After each fix, list the details I decided and ask for confirmation.
+   - Explanations should be for first-time engineers. The user often requests /mermaid-preview HTML explainers in `tmp/`.
+   - Explainer page style (from user feedback, now in memory):
+     - Write premise / problem / options / question concisely, with no history; describe problems as current state.
+     - Don't abbreviate conditions; write who, what, and when.
+     - Define terms on first use.
+     - When saying something "doesn't match", state the rule for how it should be.
+     - Draw the "作るもの" (artifacts) in diagrams, not just units; don't omit things in diagrams.
+   - Later steps:
+     - Final report.
+     - Recommend the next incremental review (review-request).
+     - Update the PR #115 body draft `tmp/pr-115-body-draft.md` (approved earlier) to add run 2 in 「経緯」 and 「この PR の状態」 (the file was modified on disk afterwards; read it first).
+     - Ask about push / commit-squash and about ready for review only after review passes.
+
+2. Key Technical Concepts:
+   - review-triage 0.22.0: judgment-flow (D1–D8, A2), lineorigin (D8 not-holds; base e568828), record schema (runs[].findings/plans/notes; plan status investigated/pending/awaiting-human/done; near_edges; doc_dag), and triagecheck.
+   - review-triage-fix: stages investigate, plan, fix. "人間の答えの反映" writes the approach, keeps options, and sets status to pending. One commit per problem; nearedges for viewpoint B; doc-dag; threshold N = 5.
+   - mermaid-preview: HTML goes in `tmp/` with mermaid from CDN. Check rendering in the browser pane.
+   - New technique: `mermaid.initialize({startOnLoad:false, flowchart:{useMaxWidth:false}})`, then `mermaid.run()`, then flip arrowheads on paths whose data-id is listed in `data-flip` (swap marker-end pointEnd → marker-start pointStart). This keeps the top-down unit order while drawing upward "使われる" arrows. The `<--` syntax is not supported.
+   - Plan concepts decided in run 2:
+     - Worker waits are state-based, with `--blocked` / `--in-review`, and use the KTD6 state × event table and the exit-code table.
+     - `解放` comment after user approval for an in-progress close; deferred resource release.
+     - `待機` comment while awaiting a user answer.
+     - Reopen handling split by whether the assignment continues; rebuild only open issues, detecting reopen by Status Todo/Done.
+     - Resource table rows connected to re-judgment.
+     - Repo config read from the `repositories` path via `git show origin/HEAD:`.
+     - PR-file comparison adds files to the declaration copy.
+     - `小さな PR の報告` comment.
+     - Malformed declarations: deadline counts only valid ones; `request` (rewrite) gets notify_when_idle.
+     - Exclusivity before writes and rename, with a re-check after rename.
+     - Plugin update: running sessions keep the old version until the user types /reload-plugins; version check against `installed_plugins.json`; record not written when the CLI path is missing.
+     - Worker CLI subcommands `work check` / `work held` / `plugin version`.
+   - Verified Claude Code facts (2026-10-16): official docs plugins/loading and cli-reference; `.in_use/<PID>` files; 14-day orphan cleanup; Desktop Claude Code 2.1.299.
+
+3. Files and Code Sections:
+   - `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md` (the deliverable). Run-2 commits so far, all unpushed:
+     - fada6e2 (P4)
+     - 73fe3d7 (P8)
+     - 90811eb (P14)
+     - 108b2e2 (P15)
+     - dcef0df (P1)
+     - 0328b6e (P2)
+     - 5ec0bf3 (P3)
+     - 203c670 (P5)
+     - edd58a9 (P6)
+     - e9f105a (P7)
+     - 3d57288 (P9)
+     - a0d9cc4 (P5 follow-up)
+     - b72e85d (P10)
+     - 0ff2654 (P11)
+     - b7f07b3 (P12)
+   - `tmp/review-triages/feat-issue-dispatch-plan-114.yaml` (untracked; never commit):
+     - Run 2 has 31 findings (ids 24–31 are residual self-adoptions) and plans P1–P15.
+     - P13 is the only one still awaiting-human. Its options:
+       - 案 1: re-split units and renumber.
+       - 案 2 (推奨): keep IDs; Sequencing says U8 hooks may start after U2, and preflight + plugin version may start after U5 (before U7); snapshot read/write and its tests move to U5, with poll.py only reading and diffing; U4 writes flow.md's resource section (the trigger table) first, then tests and the function, and U7 adds the rest; KTD8's "契機の表の正本は flow.md (U7)" → "(U4)"; U4 Verification snapshot → U5.
+   - `tmp/issue-dispatch-unit-placement-114.html` (current P13 explainer).
+     - Sections:
+       - 1 前提: allocation concept and 3 rules (1: use only things from the same or an earlier unit; 2: things with few dependencies start right after them; 3: doc → test → impl in the same unit), the full unit table, and an artifact-level diagram of U2 and U4–U8 with 4 red flipped edges.
+       - 2 問題: subsections 2.1–2.4, each with current and expected diagrams.
+       - 3 対処案: 案 2 table with a 満たす決まり column, a full artifact diagram, and a resolution table; then 案 1.
+       - 4 問い.
+     - Final script:
+       ```
+       mermaid.initialize({ startOnLoad: false, flowchart: { useMaxWidth: false } });
+       mermaid.run().then(function () {
+         document.querySelectorAll('pre.mermaid[data-flip]').forEach(function (pre) {
+           pre.dataset.flip.split(',').forEach(function (id) {
+             pre.querySelectorAll('path[data-id^="L_' + id + '_"]').forEach(function (path) {
+               var end = path.getAttribute('marker-end');
+               if (!end) { return; }
+               path.setAttribute('marker-start', end.replace('pointEnd', 'pointStart'));
+               path.removeAttribute('marker-end');
+             });
+           });
+         });
+       });
+       ```
+     - The premise pre has `data-flip="prj_snap,t4_tbl,fn_tbl,re_pv"`. Its edges are defined top-down (e.g. `prj -->|使われる| snap`) with `linkStyle 11,13,14,15 stroke:#cf222e,...`.
+   - Other explainers in `tmp/`: issue-dispatch-reopen-and-rebuild-114.html, -resource-answers-114.html, -repo-config-read-114.html, -pr-file-check-114.html, -small-pr-url-114.html, -malformed-declaration-114.html, -start-exclusion-114.html, -plugin-update-114.html, -worker-checks-cli-114.html, and issue-dispatch-plan-diagrams-114.html (renders the plan's 3 mermaid blocks).
+   - Memory:
+     - `~/.claude/projects/-Users-akima-workspace-claude-plugins/memory/write-conditions-in-full.md` (new, with additions).
+     - `ask-rather-than-decide-batch-questions.md` (updated).
+     - MEMORY.md (index lines updated).
+
+4. Errors and fixes:
+   - A stage-1 script ran after a failed edit and wrote stale text. I restored the record from a backup and reran.
+   - Lint flags were reworded: 「寄せて」, 「拾う」, 「を置きます」, 「反映を行う」.
+   - Commit message 「前のコミットで決めた」 was inaccurate; fixed with --amend to name 203c670.
+   - Near-edge line numbers in the record were corrected several times.
+   - Covers-not-in-Requirements recurred after P12; fixed by adding AE45/AE53 to U5 and AE56 to U8.
+   - Mermaid layout reversed cluster order when edges pointed upward. Fixed by provider→consumer edges plus `~~~` links, and for the premise by defining edges top-down and flipping markers in JS.
+   - Wide diagrams in the narrow pane: switched to TB and useMaxWidth false.
+   - User feedback was incorporated as described in sections 1 and 7: abbreviations, history, the term 置き場, missing "should be", per-finding subsections, abbreviated diagrams, and artifacts in diagrams.
+
+5. Problem Solving:
+   - All run-2 problems except P13 are fixed and recorded done, with near_edges and doc_dag.
+   - P13 explainer iterations are complete per the latest user request. The final verification was done: lint 0 warnings, 10 diagrams render, premise order U2>U4>U5>U6>U7>U8, 4 flipped edges.
+
+6. All user messages (this portion):
+   - 「1. OK 2. OK 3. OK」 (P30 details, review request, PR body draft process)
+   - /review-triage:review-triage with the run-2 output path
+   - 「1. /review-triage:review-triage-fix 2. はい 3. はい」
+   - 「提案どおり、その方針で進めてください」 (P1 q1)
+   - 「提案どおり、その扱いで進めてください」 (P1 q2)
+   - 「推奨でお願いします」 (P1 q3)
+   - 「はい、OKです」 (P1 q4)
+   - 「提案どおり、その扱いで進めてください」 (P1 q5)
+   - 「提案どおり、その表で進めてください」
+   - 「OKです」 (P1 details)
+   - 「確認は残り何個ありますか？」
+   - 「問題ごとに問いをまとめる ように進めたいです」
+   - /mermaid-preview 「初見の技術者にわかりやすく問題それぞれについて前提から説明してください」
+   - 「どちらも推奨でお願いします」 (P2)
+   - 「OKです」 (P2 details)
+   - 「HTML の説明が「when_busy が ask で利用者が「待つ」を選んだら、wait と同じに扱う」というような初見の技術者技術者にわかりやすいとは言えない説明になっています。「when_busy が ask に設定されている資源について、（〇〇なときに）利用者が「待つ」を選んだら、wait と同じに扱う」というような文章ではないかと思われますが、どうでしょうか？ 全体的に、略が多すぎて意味がわかりにくいです」
+   - 「1. OK 2. 「(後で) 解放してよい」となっている箇所が「(後で) 解放してはいけない」という回答の場合はどうなりますか？」
+   - 「はい、その扱いでOKです」
+   - 「はい」 (P3 details)
+   - /mermaid-preview 「初見の技術者にわかりやすく問題を前提から説明してください」 (P5)
+   - 「GitHub からリポジトリの設定を読むのではなく、管理のセッション にそれぞれのリポジトリのパス( worktree にある設定がよければそのパス ) を設定するのはどうでしょうか？」
+   - 「どれも推奨でお願いします」 (P5)
+   - 「OKです」 (P5 details)
+   - 「推奨でお願いします」 (P6)
+   - 「OKです」 (P6)
+   - 「推奨でお願いします」 (P7)
+   - 「OKです」 (P7)
+   - 「「形の誤った宣言」とは具体的にどういうものですか？」
+   - 「改めた推奨で」
+   - 「1. OK 2. OKです」
+   - 「推奨でお願いします」 (P10)
+   - 「はい、OKです」
+   - 「今確かめられる部分はありませんか？」 (P11)
+   - 「どれも推奨でお願いします」 (P11)
+   - 「はい、OKです」
+   - 「推奨でお願いします」 (P12)
+   - 「はい、OKです」
+   - 「説明のHTMLの セクション2「問題」の「分け直したとき」は セクション1 「前提」 の 実装単位 (U1〜U11) のどこのことですか？」
+   - 「HTMLに「分け直したとき」の説明をしてください。実装の単位なのか、その計画の話なのか、それとも別なのか説明がなく「分け直した時」とだけ書かれてもわかりません。何を分け直したのか、いつ時点の話なのか説明してください」
+   - 「HTMLのファイルは問題を前提から説明するものとして作ってもらったものですが、その説明に経緯の説明は不要では？端的に、問題の前提と問題自身と対処案を説明する形にできませんか？」
+   - 「「置き場が、依存と合っていないもの」の「置き場」が説明もなく使われていますが、何の「置き場」ですか？また「合っていない」というのであれば、どうあるべきかを説明するべきでは？」
+   - 「説明のHTMLのセクション2 の各指摘をサブセクションとして説明を詳しくしてください。「どうあるべきか」と「今の割り振り」を図示してください」
+   - 「対処案 には U2 と U5、U4 と U7 、U5 と U6 の関係の改善が反映されていないように見えます。略して書いていませんか？」
+   - 「じつは 前提 にかかれている図も略されていませんか？」
+   - 「説明の図に 実装単位しか書かないから依存関係が不自然なんだと思います。前提、問題、対処案それぞれで「作るもの」も図に書いてみたらどうでしょうか？」
+
+7. Pending Tasks:
+   - Report the premise-diagram change (artifact-level) and re-ask the P13 question (案 2 vs 案 1).
+   - Then implement P13 per the answer:
+     - Edit the plan: Sequencing, U8 Dependencies, U5/U6 Files and tests (snapshot), U4 (flow.md resource section), U7, KTD8 「(U7)」 → 「(U4)」, and U4 Verification.
+     - Record the approach, commit, run done2, then summary and triagecheck.
+     - Report the P13 details and ask for confirmation.
+   - After all problems:
+     - Final report.
+     - Recommend the next incremental review via review-request.
+     - Update the PR body draft (read it first; it changed on disk).
+     - Later, ask about push / squash and ready for review. Do not push without asking.
+
+8. Current Work:
+   I was revising the P13 explainer `tmp/issue-dispatch-unit-placement-114.html` per the user's latest message: 「説明の図に 実装単位しか書かないから依存関係が不自然なんだと思います。前提、問題、対処案それぞれで「作るもの」も図に書いてみたらどうでしょうか？」
+
+   Done so far:
+   - Replaced the premise unit-level diagram with an artifact-level diagram of U2, U4–U8. Nodes: config.py; resource test and record.py; Project read/write (project.py・issues.py) and project check; snapshot (poll.py) and diff/wait (poll.py); flow.md trigger table, flow.md rest, and reentry.md; preflight.py, plugin version, and hooks.
+   - The "使われる" edges are defined top-down. The 4 violations are red, with arrowheads flipped by the post-render JS (data-flip).
+   - Added an explanatory legend paragraph.
+   - Section 2 subsection diagrams and the section 3 案 2 diagram already show artifacts inside unit clusters.
+   - Verified: all 10 diagrams render, cluster orders are correct, and the wording lint reports 0 errors and 0 warnings.
+   - The reply to the user describing these changes has not been written yet.
+
+9. Optional Next Step:
+   Write the reply to the user, in Japanese, without further tool calls. It should cover:
+   - The premise diagram now draws 作るもの (artifacts) and their 「使われる」 relations instead of unit-to-unit dependencies, with upward red arrows marking the problems.
+   - Sections 2 and 3 already draw 作るもの with the same notation.
+   - Re-ask the P13 question (案 2 vs 案 1), in line with the user's latest request: 「前提、問題、対処案それぞれで「作るもの」も図に書いてみたらどうでしょうか？」.
+
+   The question to re-ask: **P13 は、案 2 でよいですか。** 案 2 is: 実装単位の分け方と番号は変えず、フックと `plugin version` は U8 の中で着手できる時期を分けて Sequencing に書き、スナップショットの読み書きは U5 に、契機の表の正本の文書は U4 に割り振り直す. Also ask whether 案 1 is preferred instead.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/34369b45-b709-4817-b7d1-7625d22a8e39.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
