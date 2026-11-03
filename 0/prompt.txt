@@ -1,0 +1,34 @@
+<task-notification>
+<task-id>a9715942c49826f7c</task-id>
+<tool-use-id>toolu_012HpdD5h351GV1bRDRjb1AQ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a9715942c49826f7c.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplify review: code-reuse" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>レビュー観点書 `/tmp/compound-engineering-501/ce-brainstorm/review-triage-restructure-20260918/simplify/code-reuse-reviewer.prompt.md` の規則に従い、対象ファイル review-triage/tools/triagecheck/record.go と review-triage/tools/triagecheck/record_test.go の diff (main...HEAD) を精査しました。現在の作業ツリーの review-triage/tools/triagecheck/record.go 全文も読んで文脈を確認しています。
+
+## 1. 既存のユーティリティ・ヘルパー
+
+**箇所**: review-triage/tools/triagecheck/record.go:592-594
+
+**重複・見逃した再利用**: 関数 `recordSemanticProblems` の中で、diff が新設した `case "investigated":` (record.go:587-600) の sha チェック
+
+```go
+if pl.SHA != "" {
+    add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
+}
+```
+
+が、同じ関数の `case "pending", "awaiting-human":` (record.go:601-611) に元からあった同名の sha チェック (record.go:603-604) と条件・文言とも一字一句同一です。この関数はすでに `externalOnly` (done-external 専用キーの排他) と `approachRequired` (approach の必須チェック) という 2 つのローカルクロージャを、複数の `case` から呼べる形に切り出す設計になっています。今回 `investigated` を足すときだけこの設計から外れ、既存の sha チェックをコピーして新しい `case` に埋め込んでいます。
+
+**代わりに使うべきもの**: `externalOnly` / `approachRequired` と同じ場所・同じ形で、例えば `noSHA := func() { if pl.SHA != "" { add(...) } }` のようなクロージャを切り出し、`case "investigated":` と `case "pending", "awaiting-human":` の両方から呼ぶ。報告する条件と文言は変えずに、複製された 3 行を消せます。
+
+## 2. 標準ライブラリ・ランタイムの組み込み
+
+指摘なし。diff で新設した `renderInvestigatedNote` (record.go:944-959) は `len()` / `strings.Join` など、ファイル内の他の描画関数 (`renderFindingCells` の `gates` など) と同じ形で標準ライブラリを使っており、手書きロジックを組み込みに置き換えられる箇所は見当たりません。
+
+## 3. プラットフォーム・フレームワーク・下流の保証
+
+指摘なし。diff は YAML の読み込み (`gopkg.in/yaml.v3`) や既存の検査基盤 (`recordAllowedKeys`、`recordNullSilentKeys`、`recordUnknownKeyProblems` の走査など) をそのまま使っており、これらがすでに持つ保証を手で再実装している箇所はありません。`record_test.go` 側の新しいフィクスチャ関数 (`legacyRunYAML` など) も、既存のヘルパー (`recordFiles`、`replaceRecordPlans`) を適切に呼び出しており、重複した再実装は見当たりません。</result>
+<usage><subagent_tokens>124310</subagent_tokens><tool_uses>11</tool_uses><duration_ms>122410</duration_ms></usage>
+</task-notification>
