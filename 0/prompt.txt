@@ -1,0 +1,15 @@
+<pasted_content id="b2e9">
+$ claude auth status
+{
+  "loggedIn": true,
+  "authMethod": "claude.ai",
+  "apiProvider": "firstParty",
+  "analyticsDisabled": false,
+  "projectsDirectory": "/Users/akima/.claude/projects",
+  "configDirectory": "/Users/akima/.claude",
+  "email": "t-akima@tecowl.co.jp",
+  "orgId": "4b6cfd9f-f677-4d68-af33-c7c6264f859b",
+  "orgName": "t-akima@tecowl.co.jp's Organization",
+  "subscriptionType": "max"
+}
+</pasted_content id="b2e9">
