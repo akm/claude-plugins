@@ -1,0 +1,1 @@
+README.md の 使い方 に user レベルでのインストールだけでなく、 リポジトリに明示的に設定する場合の方法も追加してください。 settings.json ではなく settings.local.json でも設定可能ならば、それも記載してください
