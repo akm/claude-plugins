@@ -1,0 +1,109 @@
+Base directory for this skill: /Users/akima/.claude/plugins/cache/compound-engineering-plugin/compound-engineering/3.24.0/skills/ce-plan
+
+# Create Technical Plan
+
+**Note: The current year is 2026.**
+
+**Outcome:** a plan an implementer can start from confidently — a few sentences in chat, a chat brief, or a durable plan artifact — handed off through its owning terminal workflow. `ce-brainstorm` defines **WHAT** to build as a requirements-only unified plan; `ce-plan` enriches it with **HOW**; `ce-work` executes it. A prior brainstorm is useful but never required.
+
+**An explicit invocation always produces a plan.** Never classify a direct invocation as "not a planning task" and route out. It may select any output contract below, and the smallest valid plan is a few sentences in chat.
+
+**Research, decide, and write the plan — never implement.** Do not write production code, run tests, or learn from execution-time results. Directional pseudo-code and grammar sketches may communicate design; changing code to see what happens belongs in `ce-work`.
+
+## Mandatory Completion Contract
+
+A run is complete when its output contract's done condition is met. Every normal interactive branch that produces a plan artifact or checkpoint is incomplete until its owning handoff question is presented: for a Durable software implementation-plan run that continues past Phase 0.1b, the Phase 5.4 menu presented and any selected action has actually fired. For Direct, the change stated and the handoff offered; for a Chat brief, the brief and its one-line save-or-`ce-work` offer in chat. Neither presents the Phase 5.4 menu. Non-software and approach-altitude routes use their reference workflow's terminal handoff. Answer-seeking may end after the answer unless its owner requires save/share.
+
+Writing the file, checking confidence, and running or explicitly skipping `ce-doc-review` are intermediate milestones. Pipeline mode is complete only when the plan, confidence check, and non-interactive document-review state are returned to its caller; the caller owns the next action.
+
+## Interaction Method
+
+Ask one question at a time through the host's blocking question tool already in the current tool list. Match by capability; never probe a user-facing tool to discover it. If none is listed or a real question call errors, render numbered choices in chat; never silently skip a required question. If no feature description was supplied, ask what to plan and wait.
+
+## Output Contract
+
+The gate resolves at the start of Phase 0.6, before depth and the scoping synthesis. It applies only when no Phase 0.1 route fired and Phase 0.2 found no upstream artifact. Ground it with bounded inline reads of the surfaces the request names; dispatch no subagent. Select one:
+
+- **Direct** — the work can be stated, done, and verified in one pass with no decision the user would weigh. State the change in a few sentences and offer the handoff to `ce-work` or the user; execution starts only with implementation authority, which `references/output-contracts.md` defines.
+- **Chat brief** — bounded work with at most one decision the user would weigh and no risk surface. Deliver it in chat and stop.
+- **Durable** — everything else. Continue the workflow below.
+
+`references/output-contracts.md` owns Direct and Chat brief; read it when either is selected. When the tier is still uncertain after those reads, take the heavier one. When a read surfaces a decision the user would weigh, a risk surface, or multi-pass verification, re-resolve to the heavier tier before emitting anything. Durable regardless of size: a run with no synchronous user to act on chat this turn (pipeline, headless, goal- or scheduler-driven), a request whose wording asks for a plan, a plan file, or an output format, a request that continues an existing plan's item, and a risk surface — authentication, payments, migrations, external contracts.
+
+## Workflow
+
+Phases run in order unless an owner routes out or short-circuits. Read a phase's required reference when that phase is entered, completely; a read made before that phase does not satisfy it, and a terminal owner is read again at its step even when already in context. If a required reference cannot be read, stop before its governed action and report the blocker and recovery path; never reconstruct the missing mechanism from memory. In pipeline mode, every required-owner failure returns `status: blocked`, `phase`, `blocker`, and `recovery_path`; include `artifact_path` and preserve the artifact when one exists. Blocked status outranks artifact presence.
+
+### Phase 0: Output, Resume, and Scope
+
+1. **Output first.** Read `references/output-mode.md` before interpreting any phase. It owns token parsing, output and confirmation precedence, renderer selection, artifact-root rules, and when a repository may be resolved.
+2. **Resume, deepen, approach, and domain.** Read `references/resume.md` before acting. It owns repo-backed resume discovery, requirements-only enrichment, deepen fast paths, approach-altitude routing, and the software/non-software split. Follow any terminal route it selects; otherwise continue.
+3. **Source and scope.** Read `references/intake.md` before Phase 0.2 and follow it through Phase 0.7. It owns upstream-contract discovery, preservation, bootstrap route-outs, blocking questions, depth, named-resource handling, and solo scoping synthesis; the Output Contract gate above resolves inside it. Do not cross a required gate that has not resolved.
+
+### Phases 1-4: Research and Compose
+
+4. Read `references/research.md` before gathering context. It owns local and external research, agent-native triage, consolidation, depth reclassification, and flow analysis.
+5. Read `references/structure.md` before resolving questions or structuring the plan. It owns settled-decision handling, stable U-IDs, technical design, depth, and planning boundaries.
+6. Compose from `references/plan-sections.md` plus the format-rendering reference selected by `output-mode.md`.
+
+### Phase 5: Review, Write, Deepen, and Hand Off
+
+7. Read `references/final-review.md` before pre-write review. It owns Phase 5.1 through 5.3.2, including scoping synthesis, write-path mechanics, unified-plan metadata, confidence mode, and the deepening gate. When directed, read `references/deepening-workflow.md` for steps 5.3.3-5.3.7.
+8. **Model elevation.** Immediately before authoring, read `references/reasoning-elevation.md`, resolve the choice at this boundary, and follow it. Do not author until activation resolution has completed and any selected dispatch or transparent fallback has settled.
+9. In pipeline mode, invalidating evidence against a session-settled decision stops the write. Return the exact token `settled-decision-invalidated`, the decision, and the reason; do not resolve it silently.
+10. Write the plan before presenting options, then complete the confidence path owned by `final-review.md`.
+
+**STOP. Read `references/plan-handoff.md` immediately before Phase 5.3.8 and 5.4.** Document review is mandatory for a Durable plan and the default is non-interactive (`mode:non-interactive`). The reference owns final checks, menu visibility and rendering, every selected route, and issue creation. In interactive software runs, ask exactly: "Plan ready at `<absolute path to plan>`. What would you like to do next?" Present the owner-defined menu and wait. If the selection arrives after a user turn, reload `references/plan-handoff.md` before acting. Rendering the menu, receiving a selection, or announcing a route is not completion; execute the selected action.
+
+
+ARGUMENTS: Issue akm/claude-plugins#72 (https://github.com/akm/claude-plugins/issues/72) の計画を docs/plans/ に書く。ブランチ feat/full-review-72 (main 932e1d1 から作成済み)。文書は日本語で、ルートの CLAUDE.md の「文書の言い回し」に従う。前例: docs/plans/2026-09-27-1431-feat-review-loop-sandbox-plan.md (同じ様式で書く)。
+
+## 利用者との会話で決まったこと (2026-09-28、すべて user-directed)
+
+用語: 収束後の全量レビュー = 増分の回で採択が 0 件になった後に、範囲をブランチの全量に広げて行うレビュー。
+
+A. 要否
+- A1. 全量の回で収束した場合は、収束後の全量レビューは不要。判定条件は「記録に、head がいまの HEAD と同じで、採択が 0 件の全量の回があれば要らない」(収束した回の scope では判定しない。#71 で、1 回目の全量で収束した後にコミットせず --model を変えて起動し直すと、範囲が空の増分の回で収束して「要る」と誤る問題が出たため)。
+- A2. 要らないとき、S3 の「次に回すときの条件の推奨」には「強いて言えば、別のモデルか effort で実施する」と書く。
+- A3. 収束後の全量レビューで指摘が出たら、直して増分の回に戻る。
+- A4. 保留は発生時に人間に判断を任せる (既存どおり)。全量の回 (収束後の全量レビュー) は周回の回数に数えないので、既存の増分の回の回数 (上限) について振る舞いは何も変えない。指摘が出た全量の回の後には数えられる増分の回が必ず続くので、全量の回の数は「周回の上限 + 1」に収まり、周回は止まる (#71 で出た「全量の回を上限なく繰り返しうる」への答え)。最初の 1 回の全量 (記録に回が無いとき) は従来どおり上限に数える。
+
+B. 手段
+- B1. スキル review-request に --full-review を足す。指定が無ければ今まで通り。指定されたら常に全量 (記録に回があっても)。起点は下の --base。
+- B2. スキル review-loop に --full-review を足す。
+  - 開始時に指定 → 条件として loop.yaml に残し、増分の回が収束 (S3 に向かう) したとき、A1 の条件で要るなら自動で全量の回を行う。全量の回で指摘が出て直すと HEAD が変わるので、再び収束したらまた全量の回を行う (繰り返す)。
+  - --resume と一緒に指定 → その起動の次の回 (次に依頼文を書く時点 = L1) を全量にする。S2 などで修正の途中から再開した場合は、残りの修正を済ませてから次の回を全量にする。--resume の --full-review は周回の条件を変えない (自動の全量は開始時の条件のまま)。現在 --resume は --max だけを受け付ける規則 (review-triage/skills/review-loop/references/arguments.md) を、--full-review も受け付けるように変える。範囲は回ごとに記録の scope に残るので「条件を変えない」規則の理由と矛盾しない。
+  - 明示の指定は A1 の「要らない」より優先する (同じ HEAD でもう一度全量を行う。別のモデルで見直す手段になる)。
+  - 全量の回は周回の上限 (J5) に数えない。review-triage/skills/review-triage-loop/references/review-invocation.md の「収束後の全量レビューは周回に含めない」理由 (上限の意味が変わる) への答え: 数えないので上限の意味は変わらない。
+- B3. sub-agent の経路 (スキル review-triage-loop) には --full-review を足さない。ただし S3 の行 (loop-flow.md) は共通なので、A1・A2 の要否の変更は両経路の報告に反映される。
+- 起点 (--base): スタックされたブランチでは、起点は派生元のブランチとの merge-base であるべき。いまの review-request 手順 2 は「分岐元 (既定は main)」と書くだけで求め方が無く、1 回目の全量にも同じ欠けがある。記録は回ごとの base を持たない。決定: review-request と review-loop に --base <ブランチ> を足す。起点はそのブランチとの merge-base。省略時は main (origin/HEAD が指すブランチ) との merge-base。review-loop では周回の条件として loop.yaml に残し、自動の全量の回も同じ起点を使う。決まった起点を開始前の報告に書く。sub-agent の経路の起点の決め打ち (review-invocation.md 92 行の git merge-base <main ブランチ> HEAD) は本計画の範囲外にし、Deferred に置く (別 Issue 候補)。
+
+C. 勧めるモデル
+- C1. 収束後の全量レビューを、モデルの使い分けの目安 (review-triage/skills/review-triage/references/record-schema.md 195 行) の「実害の検出」の側 (粒度の細かいモデル、Opus) に置く。理由: 増分の回は差分しか見ないので、回をまたいだ変更どうしの食い違いは全量でしか見つからない。目安の「最上位モデルの全量レビューを収束条件にすると終わらない」懸念は A1 (全量で採択 0 件なら終わる) と A4 (上限の中で止まる) で抑える。実測は #71 の 1 回だけ (Opus で採択 4 件) なので暫定の目安として書く。ワーカーは周回の中でモデルを変えられないので、S3 の推奨は「収束後の全量レビューを行うなら、Opus で --full-review を付けて起動する」形になる。
+- C2. 「仕上げ」を言い換える: record-schema.md 195 行「収束確認 (0 件に到達させる仕上げ)」→「収束の確認 (採択を 0 件まで減らしていく回)」、review-triage/skills/review-triage-loop/SKILL.md 17 行「収束の仕上げだけ別のモデルで回す」→「採択が減ってきた後の周回だけ、別のモデルで回す」。reporting.md 12 行の写しも合わせる。
+
+## 解消する既知の食い違い
+- review-triage/skills/review-triage/references/review-request.md 21 行の定義は収束を増分の回に限っている。A1 で解消する (定義を「収束した後に、A1 の条件で要るときに行う」形に)。
+
+## #71 で試して取り消した案 (再び採らない。採るなら問題への答えを先に用意する)
+- 定義から「増分の回で」を外し、収束した回の種類を問わない → 同じ HEAD をもう一度全量で見させる・終わりの条件が無くなる。
+- 要否を収束した回の scope で決める → 要らない場合の推奨が決まらない・--model を変えて起動し直すと誤る。(A1・A2 で答えた)
+- 「採択が 0 件なら、そこで終わる」を足す → 保留が残っても終わる・全量の回を上限なく繰り返しうる・主語の読み違え。(A1・A4 で答えた)
+
+## 関わる箇所 (main 932e1d1)
+- review-triage/skills/review-triage/references/review-request.md 19・21 (範囲の規則と定義の正本)
+- review-triage/skills/review-request/SKILL.md 37・38 (手順 2)
+- review-triage/skills/review-loop/references/round.md 38 (RL1 手順 a の 4)、arguments.md (様式・--resume の規則)、stops.md 98、loop-files.md (loop.yaml の様式)、reentry.md、guide-template.md
+- review-triage/skills/review-triage-loop/references/review-invocation.md 92・94、loop-flow.md 90 (S3)、reporting.md 12、SKILL.md 17
+- review-triage/skills/review-triage/references/record-schema.md 195
+- doc-dag が見つけた節の単位の巡回: loop-flow.md の S3 の行 ↔ review-invocation.md の「範囲」(#71 より前から)。直せるなら直す。
+
+## 未確認
+- review-triage のバージョン (今は 0.14.0) を上げるか (引数が増えるので上げるのが自然)。
+- 設定 .claude/akm-claude-plugins/review-triage/config.json の検査コマンドは ASDF_GOLANG_VERSION=1.25.1 を指定するが環境に無く、1.25.4 なら通る。
+- 1 回目の全量で収束した周回を実際に動かしたことは無い。
+
+## 進め方
+- 実装後、review-loop かレビューの依頼文でレビューし、review-triage / review-triage-fix で直す。変えた文書に doc-dag と wording-guard をかける。
+- push・PR 作成 (本文に Closes #72) は人間の指示を受けてから。
+- 計画のコミットは実装と分ける。
