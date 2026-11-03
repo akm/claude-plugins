@@ -1,0 +1,2 @@
+最後 GitGuardian でエラーになっているので テスト用のデータについては無視するように設定を追加してもらえますか？
+https://github.com/akm/claude-plugins/pull/28/checks?check_run_id=99536219680
