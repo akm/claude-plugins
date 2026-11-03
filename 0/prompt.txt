@@ -1,0 +1,1 @@
+ファイルの競合は git の conflict という言葉で浸透しているので、conflictibity あるいは conflictability をファイルの競合に使いたいです。割り当ての衝突の方を mismatch などを変えたいです
