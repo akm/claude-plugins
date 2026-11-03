@@ -1,0 +1,64 @@
+<task-notification>
+<task-id>afdfa0e2801fcea2c</task-id>
+<tool-use-id>toolu_01CbroxKPKnGBo7sZ89hg7q8</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/afdfa0e2801fcea2c.output</output-file>
+<status>completed</status>
+<summary>Agent "U2: detection step in review-triage" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>U2 は完了しました。コミットも `git add` もしていません。
+
+## ワークツリー
+
+`/Users/akima/workspace/claude-plugins/.claude/worktrees/agent-afdfa0e2801fcea2c`
+
+**注意 (base のずれ):** 起動時のこのワークツリーの HEAD は `619cf54` (main) で、期待された `eae27fa` ではありませんでした。`eae27fa` は `feat/review-triage-reframe` ブランチにあり、U1 の `record-schema.md` の表も計画書もこのワークツリーに無かったため、作業ツリーがクリーンであることを確認したうえで `git reset --hard eae27fa` でワークツリーのブランチ (`worktree-agent-afdfa0e2801fcea2c`) を `eae27fa` に移してから作業しました。差分はすべて `eae27fa` 起点です。
+
+## 変更したファイル
+
+1. **新規** `review-triage/skills/review-triage/references/recurrence-detection.md` — 検知の正本。節: いつ何を比べるか (直前の 1 回・scope 不問・回 1 では判断しない・採択のみ) / 主の条件 (修正由来 2 回連続、手がかり、直前の回に `recurrence` が無い場合の読み方) / 補助の条件 (同じファイルの同じ関数・節、行番号不問) / 直前が `reframed` のとき `reframe.axes` と `root_cause` に照らす、`declined` なら通常どおり / 発火時に書くもの (`prior` の選び方: 問題の識別子・`指摘 N`・`捉え直し`、`reason` に直前の回の修正由来の根拠も含める、発火しなければ `recurrence` を書かない) / 報告の形 (検知・根拠の要約・俯瞰の案内、勝手に呼ばない) / 回ごとに判断する (未処理の `detected` があっても判断する) / 従来の目安との統合 (require-explicit-basis-for-relative-paths.md の引用をここへ移動、表を書く作業は `reframing.md` へリンク) / 実例: 回 3 (記録の cause・summary を短く引用し、`recurrence` ブロックを提示)。キーの意味は record-schema.md の表へ委ね、言い直していません。実測値は書いていません。
+2. `review-triage/skills/review-triage/SKILL.md` — 前提知識に 1 行追加。手順 4「検知」を挿入し、4→5、5→6、6→7、7→8 に繰り上げ。手順 8 (報告) に検知の出力と俯瞰の案内、「直すかどうか、俯瞰に進むかどうかは人間が決める」を追加。
+3. `review-triage/skills/review-triage/references/record-schema.md` — 「生成サマリの読み方」の「2 回続いたら表を書く」の箇条を、指示どおりの 1 箇条に置換。隣の「構造を疑う」の箇条とスキーマ表は無変更。
+4. 手順番号の引用: `review-request.md:3` の「手順 1」は番号が動かないので変更不要。`review-triage/README.md` に手順番号の引用は無し。`review-triage-fix/` 配下の「手順 N」はすべて自スキルの手順を指しており未変更。
+
+## 検証
+
+- (a) `grep -rn "2 回続いたら" review-triage/` → `recurrence-detection.md:57` の 1 件のみ。
+- (b) `grep -rn "手順 [0-9]"` → `SKILL.md:23` (手順 1 ×2、不変)、`SKILL.md:36` (手順 5 = 新しい記録の追記、正しい)、`review-request.md:3` (手順 1、不変)。
+- (d) `go run . -current-dir &lt;worktree&gt; -record-dir docs/review-triage` → 「問題は見つかりませんでした（検査: review-triage-record, judgment-flow）」exit 0。
+- (e) 自分の文を 3 原則で読み直し、「下限の網」(説明のない比喩) と裸の `evidence` を書き直しました。
+- (f) `git status --short`: `M SKILL.md`、`M record-schema.md`、`?? recurrence-detection.md`。`git diff --stat`: 2 files, +7 −5 (新規ファイルは未追跡)。
+
+## AE の手動の通し確認
+
+**AE1 (回 1〜3):** 回 1 P1 が `$PWD` 基準で絶対化 → 回 2 採択 1・2 は「P1 で断ったはずの誤解決が…復活する」= 回 1 の修正由来。回 2 P6 が `-current-dir "$(pwd)"` を焼き込む → 回 3 採択 1 は「-current-dir "$PWD" を無条件に焼き込むため…規則に自分で抵触」= 回 2 の修正由来。主の条件で発火。補助の条件は当たらない (回 2 は main.go:143/150/59、回 3 は wrapper.go:42、main.go:116 で同じ関数なし)。書く形:
+
+```yaml
+    recurrence:
+      status: detected
+      evidence:
+        - condition: fix-derived
+          finding_id: 1
+          prior_run: 2
+          prior: P6
+          reason: &gt;-
+            回 2 の P6 が焼き込んだ -current-dir "$(pwd)" が、同じ増分で入れた規則と
+            食い違っている。回 2 の採択 1・2 も回 1 の P1 が基準にした $PWD の修正由来で、
+            修正由来の指摘が 2 回連続した
+```
+(回 3 採択 2「ラッパーの契約を検査するテストが無い」も P6 由来なので、`finding_id: 2` の 2 件目を足す読みも成り立ちます。)
+
+**AE2 (回 1 のみ):** `runs[]` に直前の要素が無いので判断せず、`recurrence` も報告の検知の項目も出ない。
+
+**AE3 (回 3→4→5、wrapper.go):** 回 4 採択 1 (wrapper.go:39、`script_dir` を求める箇所) と回 5 採択 1 (wrapper.go:45、同じ箇所のハードリンク) は同じファイルの同じ箇所 → `same-location` で発火 (`finding_id: 1, prior_run: 4, prior: 指摘 1`)。回 5 採択 1 の欠陥 (readlink はハードリンクを辿れない) は回 4 の修正が生んだものではなく回 3 の `script_dir` 導入時から在るので、この採択では主の条件は当たらない。なお回 5 採択 3 (`cd -P` の固定テスト不在) は回 4 P13 が入れた `cd -P` の修正由来と読めるので、両条件を書く読みも成り立つ — 参照文書のとおり独立に判断し、当たったものを両方書く。
+
+**AE8 (直前が `reframed`):** 直前の回の `plans[]` の修正作業ではなく `recurrence.reframe.axes` (例: 規則 × 経路 × フラグ) と `root_cause` に照らし、今回の採択がその表の別の空いたマス (同じ規則の別の経路など) を指せば `fix-derived` で発火し、`prior_run` は直前の回、`prior` は `捉え直し` と書く。
+
+## 意図して行わなかったこと
+
+- `reframing.md` へのリンクは張りましたが、ファイルは U3 が書くのでまだ存在しません (現時点ではリンク切れ)。
+- 「構造を疑う」の隣の箇条は変更していません (指示は「残してよい」で、新しい参照を足す必然が無いため)。
+- `judgment-flow.md`、スキーマ表、`review-triage-fix/` 配下、`docs/review-triage/` 配下は未変更。
+- `doc-dag` による重複確認 (U2 の Verification 項目) は実行していません — U3 の `reframing.md` が無い状態では結果が変わるため、統合後に回すのが適切です。</result>
+<usage><subagent_tokens>111298</subagent_tokens><tool_uses>28</tool_uses><duration_ms>274719</duration_ms></usage>
+<worktree><worktreePath>/Users/akima/workspace/claude-plugins/.claude/worktrees/agent-afdfa0e2801fcea2c</worktreePath><worktreeBranch>worktree-agent-afdfa0e2801fcea2c</worktreeBranch></worktree>
+</task-notification>
