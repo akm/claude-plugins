@@ -1,0 +1,95 @@
+akm/claude-plugins のブランチ fix/triagecheck-summary-command を、報告のみでレビューしてください。
+結果は下の様式で YAML ファイルに書き出します。修正はしません。
+
+## 対象
+
+- リポジトリ: /Users/akima/workspace/claude-plugins (ブランチ fix/triagecheck-summary-command)
+- 範囲: 59d5e2d..f915ad5 の増分 (scope: incremental)。`git diff 59d5e2d...HEAD` を対象にする
+- 増分の外 (59d5e2d 以前の内容) は、増分が壊した場合にのみ報告する
+- docs/review-triage/ 配下 (トリアージ記録 YAML と生成サマリ .md) は当時の記録なので指摘の対象にしない。
+  ただし生成サマリが YAML と食い違っていれば報告する
+- 背景: 前回の増分レビューで採択した 1 件 (ラッパーのテンプレートで plugin_cache・-record-dir・
+  明示の -judgment-flow が %q のままで、$(...) 等が実行時に展開される) を直した増分。
+  直した内容はコミットメッセージ (c471354) にある。コードの差分は
+  review-triage/tools/triagecheck/{wrapper.go,wrapper_test.go,main_test.go} の 3 ファイル
+- 前回の増分レビューで却下した指摘 (ラッパーを -current-dir の外に置くと案内が ../ で始まる) は、
+  設計として受け入れ済みなので再度挙げない
+
+## 読み取り専用の厳守
+
+ファイルの編集・作成・削除・git の状態変更をしない。プローブやミューテーションを行った場合は必ず revert し、
+レビューの前後で `git rev-parse HEAD` と `git status --porcelain` が不変であることを確認して報告する。
+唯一の例外は出力先の tmp/ 配下のファイル 1 つ。
+
+## 特に見てほしい点
+
+- wrapper.go のテンプレートで、単一引用符に変えた「焼き込む値」3 箇所と、二重引用符のまま残した
+  「実行時に展開させる変数」3 箇所 (-current-dir "$script_dir"、既定の -judgment-flow "$root/..."、
+  -C "$root/tools/triagecheck") の区別が正しいか。取り違えて単一にした箇所、逆に二重のまま残った
+  焼き込み値が無いか
+- shellSingleQuote に通した値が bash の単一引用符の中で意図どおり保持されるか。特に plugin_cache は
+  `ls -d "$plugin_cache"/*/` で使われるので、値に ' や空白が含まれるときの実行時の挙動
+- 生成したラッパーを実際に実行するテスト (TestInstallWrapperGeneratesRunnableScript /
+  TestInstallWrapperSummaryCommandPointsAtWrapper) が単一引用符化の後も本当に実行経路を通っているか
+  (Skip に落ちていないか)
+- TestInstallWrapperQuotesAllBakedValuesForShell が実装の焼き直しになっていないか。
+  $(echo X) を含むディレクトリ名は実在させて生成しているが、生成物を実行して非展開を確かめてはいない
+- テンプレート引数の説明 (wrapper.go 冒頭のコメント) と fmt.Sprintf の引数の順序・個数が一致しているか
+
+## 検証の前払い (すべての指摘に必須)
+
+- evidence には次のいずれかを含める。どちらも含められない指摘は confidence を low にする。
+  - 実行した確認 — コマンドと出力の要点、またはプローブ・ミューテーションの手順と結果
+    (実施後は必ず revert し、作業ツリーが不変であることを確認して報告する)
+  - 対象箇所の逐語引用 (行番号つき)。矛盾の主張なら、矛盾する 2 箇所の両方を引く
+- 「〜の可能性がある」「余地がある」型の主張には、それを実際に起こす入力・状態を 1 つ添える。
+- テスト・検査の不在を主張する指摘 (「この入力のテストが無い」「この分岐が実行されていない」)
+  は、その入力を実際に通して報告が出ないことを確かめてから出す。確かめられなければ
+  confidence を low にする。テスト関数名の列挙や grep だけで結論しない — 別名のテストが
+  同じ分岐を踏んでいることがある。
+- Go の実行は review-triage/tools/triagecheck の中で行う (`.tool-versions` がそこにある)。
+  `go test ./...` は現時点で全緑。
+
+## 報告しない条件 (トリアージで却下される型)
+
+- 壊れる入力・状態を具体に挙げられない一般的懸念
+- 既存の関門 (テスト関数名・検査項目名で挙げられるもの) が顕在化を検出する欠陥
+- 対象そのものより大きい防御・再現の仕掛けを要求する指摘
+- プロセスの遵守が diff から証明できない、という型の観察
+- 整理・統一の好み (放置して壊れるものが無いもの)。リファクタ提案は 1 件まで、その旨を明記して
+
+上に当たるが捨てるには惜しいものは、findings に入れず、末尾の residual リストに
+1 行ずつだけ書く (id 無し・summary のみ)。判断の材料は残すが、指摘としては数えない。
+
+## 出力様式
+
+出力先: tmp/review-<スキル名>-<モデル名>-4th.yaml
+  (tmp/ には同じ組み合わせの 1st〜3rd が既にあるので 4th を付ける)
+  - ファイル名は ASCII のみ。tmp/ が無ければ作る (.gitignore 済み)。コミットしない。
+
+形式 (この構造に厳密に従う):
+
+skill: code-review            # code-review / ce-code-review など
+model: opus-5                 # レビューを実行したモデル (実際の値を書く)
+level: ""                     # レベルや mode があれば (無ければ空)
+run_id: ""                    # run 識別子があれば (無ければ空)
+scope: incremental
+base: "59d5e2d"
+head: "f915ad5"               # レビュー時点の HEAD の短縮 SHA (実際に確認した値を書く)
+date: "2026-09-02"
+findings:
+  - id: 1                     # 1 からの連番
+    file: path/to/file.go
+    line: 12                  # 不明なら省略
+    summary: "1〜2 文の要旨"
+    evidence: "検証の前払いの節のとおり"
+    attrs:                    # レビューが付けた属性をそのまま。無い属性を補完しない
+      severity: P2
+      confidence: high
+residual: []                  # 報告しない条件に当たるが残す 1 行メモの列 (無ければ空)
+
+注意:
+- 指摘が 0 件なら findings: [] とだけ書く。件数の集計は書かない (読み手が計算する)。
+- 値に # を含むときは必ず引用符で囲む (YAML は「半角スペース + #」以降をコメントとして落とす)。
+- 指摘の取捨は「報告しない条件」に従い、それ以外は全件書く。修正はしない。
+- 書き出したら、レビューの前後で HEAD と作業ツリーが変わっていないことを確認して報告する。
