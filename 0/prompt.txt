@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bx0t68sbl</task-id>
+<tool-use-id>toolu_013AwQmx5cA8qkABzx8AorMW</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bx0t68sbl.output</output-file>
+<status>completed</status>
+<summary>Background command "変えたプラグインのテストを実行する" completed (exit code 0)</summary>
+</task-notification>
