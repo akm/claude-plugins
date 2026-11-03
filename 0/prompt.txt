@@ -1,0 +1,2 @@
+ローカルのブランチを消してください。
+#72  に新セッションで着手するので /session-handoff:handoff-write
