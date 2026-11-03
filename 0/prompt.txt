@@ -1,0 +1,71 @@
+<task-notification>
+<task-id>a678d1229666169e3</task-id>
+<tool-use-id>toolu_01TYd2ugArxZRqHXXWN1n4f2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/a678d1229666169e3.output</output-file>
+<status>completed</status>
+<summary>Agent "Learnings research in docs/solutions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>CONCEPTS.md（リポジトリルート）を Step 0 として読んだうえで、`docs/solutions/` 配下の全 6 件（この件数ならグレップによる絞り込みより frontmatter を直接確認する方が早いと判断）を確認し、作業コンテキストと照らして関連度を評価した。`docs/solutions/patterns/critical-patterns.md` は存在しない。
+
+## 学びの検索結果
+
+### 検索コンテキスト
+- **対象作業**: `review-triage` プラグインの実装計画の肉付け。`recurrence-detection.md` と `reframing.md` の削除、周回数の閾値 N によるプランナー選択の導入、`review-triage-fix` の 3 段階 (調査/立案/修正) へのサブエージェント化、`loop.max_rounds` の既定値変更
+- **使用したキーワード**: review-triage, 正本, 記録 YAML, エージェント入力, サブエージェント, 実効モデル, effort, relative-path, agent-input
+- **走査したファイル数**: 6 件（`docs/solutions/` 全件）
+- **関連度の高い一致**: 4 件（うち 1 件は module が review-triage 本体）
+
+### 関連する学び
+
+#### 1. 検査ツールの相対パスは基準を推測せず明示させる
+- **ファイル**: `docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md`（2026-09-02）
+- **モジュール**: review-triage（`triagecheck` 本体）
+- **Problem Type**: `tooling_decision`
+- **関連性**: 今回の計画が対象とする `review-triage` プラグイン自身の学び。ループの状態機械を作り直し、`review-triage-fix` の各段をサブエージェントで走らせる構成に変えると、プロセスのカレントディレクトリと記録の置き場 (`-record-dir` 相当) の関係が再び揺れる可能性がある。
+- **キーとなる指摘**: 「経路ごとに規則を書くと収束しない」——`-install-wrapper` など複数の経路にパスの規則を別々に実装したところ、レビュー指摘が同じ型で 4 巡続けて再発した。規則は「フラグを読んだ直後の 1 か所」で当て、経路には解決済みの絶対パスだけを渡す構成に直した。**もう一つ、このドキュメント自身が「正本は複製しない」を実践している** — サポートする配置の一覧を `triagecheck/README.md` に一元化し、ここでは言い直さないと明記している。これは work-context の「正本 (single source of truth) discipline」「散文が図を言い直さない」と同じ原則。
+- **Severity**: high
+
+#### 2. LLM が組み立てる入力は型で縛る
+- **ファイル**: `docs/solutions/design-patterns/typed-contract-for-agent-input.md`（2026-08-01）
+- **モジュール**: pr-teeth（別プラグインだが原則は移植可能）
+- **Problem Type**: `design_pattern`
+- **関連性**: 計画は「記録 YAML as the only hand-off」を維持しつつスキーマを変更する。この学びは、LLM/サブエージェントが組み立てて渡すペイロードに対し `.get()` 的な寛容な読み取りをすると、キー名の取り違えが exit=0・警告なしで握りつぶされることを実例で示している。
+- **キーとなる指摘**: 必須性は「検査」ではなく「構造」にする（必須フィールドは位置引数にする、未知キーはエラーにする、falsy だが有効な値 (`0` 等) を欠落と誤判定しない）。記録 YAML に新しいフィールド（プランナー選択、段階ごとの model/effort など）を足す際、Go 側の構造体だけでなく、記録を書き込むスキル側のプロースにも同じ考え方を適用する価値がある。
+- **Severity**: high
+
+#### 3. データ種別ごとに失敗時の態度を変える
+- **ファイル**: `docs/solutions/architecture-patterns/fail-soft-by-data-class.md`（2026-08-01）
+- **モジュール**: pr-teeth
+- **Problem Type**: `architecture_pattern`
+- **関連性**: 計画は「設定」（`loop.max_rounds` のデフォルト変更、新設定キーの追加）と「記録 YAML」（蓄積・引き継ぎデータ）の両方を同時に変更する。この学びは両者を同じロード関数・同じ既定値フォールバックで扱うと性質の異なる 3 種の不具合が同じ根から生まれると述べている。
+- **キーとなる指摘**: 設定は「既定値で続行 + 警告」でよいが、記録（蓄積データ／エージェント入力）は「壊れていれば保存を拒否して停止」が原則。新しい `loop.max_rounds` や planner 選択の設定キーはこれまで通り fail-soft でよいが、記録 YAML のスキーマ変更・書き込みには同じ寛容さを適用しない、という切り分けを計画の実装方針に明記する価値がある。
+- **Severity**: high
+
+#### 4. 識別子の抽出は LLM ではなくコードに置く
+- **ファイル**: `docs/solutions/design-patterns/extract-identifiers-in-code-not-llm.md`（2026-08-02）
+- **モジュール**: pr-teeth
+- **Problem Type**: `design_pattern`
+- **関連性**: 判断基準は「取り違えた結果を、出力だけ見て誤りと判別できるか」。work-context の「実効モデル」「effort の受け渡し」は、まさにこの基準に当てはまりうる——サブエージェントに渡すモデル名や effort の値を、スキルのプロース内で LLM がその場で解釈・整形すると、取り違えが「それらしく完成したサブエージェント呼び出し」として現れ、レビューでも気づかれない可能性がある。
+- **キーとなる指摘**: 「識別子を確定させる場所を 1 箇所に絞る」「同一性の次元を数え上げる」。段階 (調査/立案/修正) ごとに model/effort を受け渡す実装では、その解決ロジックを一箇所のコード（またはテスト済みの決定的な処理）に閉じ込め、スキルのプロースには任せない設計を検討すべき。
+- **Severity**: high
+
+### 計画の決定事項と突き合わせて見つけた懸念（学び以外の一次情報）
+
+`recurrence-detection.md` と `reframing.md` を削除する決定について、リポジトリ全体を実際にグレップしたところ、この 2 ファイルを参照している文書が **CONCEPTS.md を含めて 13 件**見つかった（`grep -rl "recurrence-detection\.md\|reframing\.md" --include='*.md' .` の実測）。代表的なもの:
+- `CONCEPTS.md` の「修正由来の指摘」節が、両ファイルを名指しで正本として参照している（例: 「条件と例外の正本は `review-triage` の `recurrence-detection.md` で、ここでは言い直さない」）
+- `review-triage/skills/review-triage/SKILL.md`, `review-triage/skills/review-triage-fix/SKILL.md`, `review-triage/skills/review-triage-fix/references/grouping.md`, `same-location-fix.md`, `review-triage/skills/review-triage-loop/references/loop-flow.md`, `review-triage/README.md`, `review-triage/skills/review-triage/references/record-schema.md` など
+
+これは学び #1 が述べる「正本を複製しない／複製すると片方だけ更新される型を作り込む」の裏返しで、**正本を消すときは、それを指す全参照側も同時に直す必要がある**ことを実例で裏付けている。計画のタスク分解に「両ファイルへの参照の網羅的な置き換え（CONCEPTS.md を含む）」を明示的な作業項目として入れることを推奨する。
+
+### 隣接する学び（参考、適用は限定的）
+
+- `docs/solutions/tooling-decisions/avoid-dual-parser-implementations.md`（2026-08-01, `tooling_decision`）— 依存回避のための二重実装を避ける、という原則。確認したところ `review-triage/tools/triagecheck/record.go` は既に `gopkg.in/yaml.v3` の単一ライブラリで記録 YAML を読んでおり（自前パーサは無い）、現状はこの失敗パターンに該当しない。ただし記録スキーマに新フィールド（プランナー種別、段階ごとの model/effort）を足す際、シェルラッパーや別スクリプト側で正規表現による簡易パースを新設しないよう注意する価値はある。
+- `docs/solutions/conventions/plugin-cannot-resolve-its-own-source.md`（2026-08-01, `convention`）— プラグインは自分の配布元を実行時に知れない、という制約。「effort-variant agent definitions をプラグインに同梱する」という決定に直接関わるものではないが、プラグインの展開先 (CONCEPTS.md の「展開先」) からエージェント定義ファイルを解決するコードを書く場合は、この制約（配布元ごとの設定置き場を推測せずリテラルに持たせる）を思い出す価値がある。
+
+### 推奨事項
+1. 記録 YAML のスキーマ変更は、学び #2・#3 に沿って「未知キーは拒否」「必須フィールドの欠落は構造的に検出」「記録の破損時は fail-loud」の方針を実装レベルの受け入れ基準に落とす。
+2. サブエージェントへの model/effort の受け渡しは、学び #4 に沿って解決ロジックを一箇所に閉じ込め、決定的な単体テストを付ける。
+3. `recurrence-detection.md` / `reframing.md` 削除に伴う 13 件の参照先（`CONCEPTS.md` を含む）の洗い出しと更新を、計画のタスクとして明示する。
+4. サブエージェント実行時のカレントディレクトリ・記録の置き場の関係が変わる場合は、学び #1 の「経路ごとに規則を書くと収束しない」を踏まえ、パス解決を 1 か所に集約する設計にする。</result>
+<usage><subagent_tokens>107990</subagent_tokens><tool_uses>21</tool_uses><duration_ms>123992</duration_ms></usage>
+</task-notification>
