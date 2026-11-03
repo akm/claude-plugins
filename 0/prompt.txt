@@ -1,0 +1,1 @@
+review-triage-fix で採択した 3 件を修正して
