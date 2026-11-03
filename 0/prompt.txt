@@ -1,0 +1,2 @@
+<bash-input>git push origin --delete feat/request-sandbox-limits-76</bash-input><bash-stdout>error: unable to delete 'feat/request-sandbox-limits-76': remote ref does not exist
+error: failed to push some refs to 'github.com:akm/claude-plugins.git'</bash-stdout><bash-stderr></bash-stderr>
