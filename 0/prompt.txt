@@ -1,0 +1,20 @@
+<task-notification>
+<task-id>ad41a3d45b99a6f98</task-id>
+<tool-use-id>toolu_01QxKfN5nxUfP2wDcALJggbD</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/ce16a336-c9a3-4b5f-9763-2dc24fa5272b/tasks/ad41a3d45b99a6f98.output</output-file>
+<status>completed</status>
+<summary>Agent "Verify brainstorm claims against repo" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Summary
+
+All 17 claims: **17 confirmed, 0 refuted, 0 unverifiable.**
+
+Verified directly against the codebase (not the grounding dossier) using targeted grep/sed reads. Notable precision checks:
+
+- Claim 11 (recurrence counts): confirmed exactly — `docs/review-triage/feat-review-triage-loop.yaml` has 22 runs, 15 `recurrence` blocks (8 `declined`, 7 `reframed`); `tmp/review-triages/feat-review-triage-record-dir-tmp.yaml` has 4 `recurrence` blocks (3 `declined`, 1 `reframed`). Cross-checked that `declined`/`reframed`/`detected` values don't collide with `findings[].verdict` (which uses `adopted`/`held`/`rejected`) or `plans[].status` (which uses `pending`/`awaiting-human`/`done`/`done-external`), so the plain grep counts are unambiguous.
+- Claim 13: confirmed both parts — within `review-triage/skills/review-triage-fix/`, only `references/reframing.md` mentions `mermaid-preview` (2 occurrences); `SKILL.md` step 10 separately mentions `doc-dag`, a different plugin, consistent with the claim's parenthetical. Full per-file counts for `mermaid-preview`, `reframing.md`, `俯瞰`, `捉え直し` under `review-triage/` are recorded in the verdict table.
+- Claim 17: confirmed via negative grep — no `threshold`/`planner`/`立案者`/`閾値`/`effort` hits anywhere under `review-triage/skills/review-triage-fix/`; the one `effort` hit in `project-config.md` refers to the review sub-skill's `review_args`, not a per-step model/effort control, so it doesn't contradict the claim.
+
+Full verdict table with file:line evidence for all 17 claims written to `/tmp/compound-engineering-501/ce-brainstorm/review-triage-restructure-20260918/verification.md`.</result>
+<usage><subagent_tokens>105435</subagent_tokens><tool_uses>33</tool_uses><duration_ms>153180</duration_ms></usage>
+</task-notification>
