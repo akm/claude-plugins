@@ -1,0 +1,1 @@
+文書の構造はそれぞれの場合でどうなりますか？ /mermaid-preview:mermaid-preview
