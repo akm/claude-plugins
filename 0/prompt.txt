@@ -1,0 +1,11 @@
+<task-notification>
+<task-id>ad2f086dab3b8279b</task-id>
+<tool-use-id>toolu_01NbTG43XLLzVZdiCA78XMqD</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/feec6288-dfe0-4c5b-8d07-0e5eda3b96f8/tasks/ad2f086dab3b8279b.output</output-file>
+<status>completed</status>
+<summary>Agent "Incremental review review-triage" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This agent's report was delivered to you as a message from "ad2f086dab3b8279b" (its SubagentHandback call). Read it there; it is not repeated here.
+</result>
+<usage><subagent_tokens>83705</subagent_tokens><tool_uses>11</tool_uses><duration_ms>212472</duration_ms></usage>
+</task-notification>
