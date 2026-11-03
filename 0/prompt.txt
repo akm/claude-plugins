@@ -1,0 +1,11 @@
+<task-notification>
+<task-id>a46751b2a7b2ce21d</task-id>
+<tool-use-id>toolu_013UHYzpEinvDPWytpFho9ut</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f58b122e-2a82-4bd9-8a85-efc4420ba800/tasks/a46751b2a7b2ce21d.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplify: efficiency review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This agent's report was delivered to you as a message from "a46751b2a7b2ce21d" (its SubagentHandback call). Read it there; it is not repeated here.
+</result>
+<usage><subagent_tokens>184432</subagent_tokens><tool_uses>23</tool_uses><duration_ms>152982</duration_ms></usage>
+</task-notification>
