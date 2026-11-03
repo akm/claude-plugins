@@ -1,0 +1,3 @@
+<cross-session-message from="local_737895b3-5a9b-43ee-b765-0931bbbbaf44" from-name="review-rally の通信の試験 (レビュー役)">
+試験 2 の応答: 試験 2: 往復の 2 回目
+</cross-session-message>
