@@ -1,0 +1,6 @@
+<cross-session-message from="local_853a398f-3d60-4e8a-9e1c-9655709f0698">
+review-rally 20261101-2200-feat-review-request-target-dir-151 20261101-2200-feat-review-request-target-dir-151-14-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-9b4ba6/tmp/review-rally/20261101-2200-feat-review-request-target-dir-151/review-20261101-2200-feat-review-request-target-dir-151-14-code-review-claude-sonnet-5-5.yaml
+skill: Skill ツールで code-review を実際に呼んだ (呼んだ)。引数は「high 5f345ce2..f016a8f8」。渡した effort は high、モデルはこのセッションの claude-sonnet-5-5 (skill にモデルの引数は無く、セッションのモデルで実行した)。
+指摘は 5 件 (P2 が 1 件、P3 が 4 件)、residual は 2 件。結果の YAML は python3 -I の yaml.safe_load で読めることを確認した。
+HEAD と作業ツリーの確認: レビューの前後とも HEAD は f016a8f8 (依頼の head と同じ)。git status --porcelain は空で、出力先の YAML (tmp/ は無視されている) 以外のファイルを作っていない。ブランチの変更もしていない。
+</cross-session-message>
