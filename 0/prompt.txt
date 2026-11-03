@@ -1,0 +1,13 @@
+Base directory for this skill: /Users/akima/workspace/claude-plugins/tmp/issue-dispatch-u1/marketplace/u1-probe/skills/u1-probe
+
+# u1-probe
+
+このスキルは、プラグインがどの版・どのパスから読み込まれているかを報告するためのもの。
+
+報告する内容:
+
+- このスキルの版: **0.1.0**
+- プラグインのルートのパス (`/Users/akima/workspace/claude-plugins/tmp/issue-dispatch-u1/marketplace/u1-probe` の置換結果): `/Users/akima/workspace/claude-plugins/tmp/issue-dispatch-u1/marketplace/u1-probe`
+- Bash ツールで `cat "/Users/akima/workspace/claude-plugins/tmp/issue-dispatch-u1/marketplace/u1-probe/.claude-plugin/plugin.json"` を実行した結果の `version`
+
+上の 3 つを、そのまま最後の返答に書く。ほかのことはしない。
