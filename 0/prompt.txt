@@ -1,0 +1,56 @@
+<task-notification>
+<task-id>a1e4845565e9b0bef</task-id>
+<tool-use-id>toolu_01MN3wnFN7eczEpJJ3XzGapH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/a1e4845565e9b0bef.output</output-file>
+<status>completed</status>
+<summary>Agent "Verify claims against repo records" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Good, this confirms the P20 references I found earlier (at absolute lines ~1465, ~1491, ~1500) are indeed within run 8 (1454-1603). And the P31 cause (line 2522, "install-wrapper 経路が... 分岐して... 前に届かない") is within run14 (2400-2602) — matching claim (d) exactly. And P29 (line 2303, referencing P19) is within run13 (2172-2400) — matching claim (c).
+
+All sub-parts of claim 7 are confirmed. Now let me compile the final verdicts.
+
+## Verification Results
+
+**Claim 1 — CONFIRMED**
+`review-triage/skills/review-triage/references/record-schema.md:141`
+&gt; 「採択が同じファイルの同じ関数 (または同じ節) を指す回が 2 回続いたら、次の修正の前に表を書く。行を規則、列を分岐 (経路・種別・モードなど...) にして...」
+
+Matches the claim exactly (rows=rules, columns=branches/paths, table before next fix).
+
+**Claim 2 — CONFIRMED**
+`docs/review-triage/feat-review-triage-fix-investigation.yaml:2,198,283` — all `date: "2026-09-03"`.
+`docs/review-triage/fix-triagecheck-explicit-path-must-exist.yaml:2,316,555,...,2838` (17 runs) — all `date: "2026-09-02"`.
+
+**Claim 3 — CONFIRMED**
+17 run blocks confirmed at lines 2,316,555,753,917,1062,1179,1454,1603,1818,1932,2077,2172,2400,2602,2632,2838 (run numbers 1–17). `scope: full` occurs at lines 6, 1183, 2081, 2176, 2636, which map exactly to run numbers **1, 7, 12, 13, 16**.
+
+**Claim 4 — CONFIRMED**
+`review-triage/skills/review-triage/references/record-schema.md:65,106` define `awaiting-human` (options required; "実装しない。報告だけする").
+`review-triage/skills/review-triage-fix/SKILL.md:35` (step 5, "修正方法と順序を決める"): "修正方法が複数あり得て、規範や構造の設計を変える場合は、決めずに人間に返す。その問題は `options` に選択肢とトレードオフを書き、`status: awaiting-human` にして実装しない".
+
+**Claim 5 — CONFIRMED**
+`review-triage/skills/review-triage/references/record-schema.md:3`
+&gt; "2 つのスキルの間のデータの受け渡しは、この記録だけで行う (受け渡しの契約)。"
+
+**Claim 6 — CONFIRMED**
+`review-triage/skills/review-triage/references/hold-presentation.md:25`
+&gt; "生成と表示の方法は `mermaid-preview` skill が正本...別のプラグインなので、入っていなければ図は出せない。図は正本ではないので、生成に失敗しても Markdown があれば判断は完了する。"
+
+**Claim 7 — CONFIRMED (all four sub-parts)**
+- (a) Run 2, `docs/review-triage/fix-triagecheck-explicit-path-must-exist.yaml` (problem P6, near line 469): "相対パスの基準を、プロセス自身が知る事実 (実カレント) ではなく外から渡される環境変数 ($PWD) に求めた。" — mentions the `$PWD` choice (not literally "黙って緑"/"誤って赤" wording, but the $PWD choice is present).
+- (b) Run 8 (problem P23/P24, ~line 1554–1600): "TestRunRequiresRecordDir が P20 で直したのと同じ文言の部分一致で判定しており..." and "P20 (54bf2ea) で隣接するテストの同じ結合を直したのに、この関数を読み直さなかった" — references P20.
+- (c) Run 13, line 2303–2312 (problem P29): "P19 で『経路によって契約が違う』型を直したとき、検査と -write-summary の 2 経路はそろえたが、-install-wrapper の経路を対象に入れなかった...回 12 では同じ欠陥を『空白だけの値』という症状の側から捉えたため、範囲が狭すぎた" — references P19.
+- (d) Run 14, line 2522–2531 (problem P31): "-install-wrapper の経路が、パスの解決 (main.go:98 以降) より前で分岐して戻るため、検査の経路が持つ規則が 1 つも届かず..." — matches "branches before path resolution so the rules never reach it."
+
+**Claim 8 — CONFIRMED**
+`review-triage/skills/review-triage-fix/SKILL.md:31` (step 4, "調査する") and `review-triage/skills/review-triage-fix/references/investigation.md` (exists; title line 1: "直す前の調査 (類似箇所と影響範囲)"; line 7 "前向きの調査: 同じ原因が生んだ別の箇所"; line 31 "後ろ向きの調査: 直した後に影響を受ける箇所"). Matches forward (類似箇所) and backward (影響範囲) investigation before deciding a fix.
+
+**Claim 9 — CONFIRMED**
+`review-triage/skills/review-triage/SKILL.md:38` (step 7, "報告"): "採択があれば review-triage-fix を案内する。**勝手に呼ばない** — 直すかどうかは人間が決める。"
+
+**Claim 10 — CONFIRMED**
+`review-triage/skills/review-triage/references/record-schema.md:140` (under section "生成サマリの読み方" at line 135): "1 回目の試行では、終盤 10 件中 8 件が前ラウンドの修正由来だった。"
+
+All 10 claims (including all 4 sub-parts of claim 7) are **CONFIRMED** against the actual repository files, with no discrepancies found from the grounding dossier's apparent claims.</result>
+<usage><subagent_tokens>54962</subagent_tokens><tool_uses>29</tool_uses><duration_ms>89197</duration_ms></usage>
+</task-notification>
