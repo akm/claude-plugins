@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bm2lce65e</task-id>
+<tool-use-id>toolu_019KzQrsZbwaYo1wNhXTZwwa</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bm2lce65e.output</output-file>
+<status>completed</status>
+<summary>Background command "wording-guard と review-triage の Python のテストを実行する" completed (exit code 0)</summary>
+</task-notification>
