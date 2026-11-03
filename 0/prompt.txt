@@ -1,0 +1,1 @@
+<bash-input>echo $DISABLE_AUTOUPDATER</bash-input>
