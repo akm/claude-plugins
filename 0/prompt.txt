@@ -1,0 +1,1 @@
+ブランチを派生した ｍain が古かったので origin/main に rebase してください
