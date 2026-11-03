@@ -1,0 +1,6 @@
+<bash-input>git branch -D claude/review-rally-1836fc claude/review-rally-0282d6 claude/review-rally-2e429f claude/review-rally-d018b6 claude/review-rally-121fc0 claude/review-rally-6cdd62</bash-input><bash-stdout>Deleted branch claude/review-rally-1836fc (was 41e9c622).
+Deleted branch claude/review-rally-0282d6 (was 41e9c622).
+Deleted branch claude/review-rally-2e429f (was 41e9c622).
+Deleted branch claude/review-rally-d018b6 (was 41e9c622).
+Deleted branch claude/review-rally-121fc0 (was 41e9c622).
+Deleted branch claude/review-rally-6cdd62 (was 41e9c622).</bash-stdout><bash-stderr></bash-stderr>
