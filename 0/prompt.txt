@@ -1,0 +1,46 @@
+<task-notification>
+<task-id>ad3086af1d92d1962</task-id>
+<tool-use-id>toolu_01NkhyMrtxL3PVVEN4jPbHsb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/ad3086af1d92d1962.output</output-file>
+<status>completed</status>
+<summary>Agent "Agent-native planning assessment" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This confirms the precedent precisely: `awaiting-human` is a `plans[]`-level status, requiring `options`, reported every round regardless of elapsed time, and machine-checked (`triagecheck` requires `options` when status is `awaiting-human`). This is a strong structural template the reframe pause could reuse — but critically, the reframe happens **before** `plans[]` exists (R4: "束ねる前に俯瞰を行う"), so it cannot literally reuse the `plans[].status` field; it needs its own equivalent state at the `runs[]` level, one level up.
+
+I have what I need.
+
+## Agent-Native Planning Assessment
+
+### Applicability
+**Required** — This plan modifies two agent skills' primary domain actions (detect, report, pause-for-confirmation, write) and their sole handoff object (the record YAML). The plan already treats the record as shared state and defines a resumability model (`awaiting-human`) for one part of the schema (`plans[]`), but does not extend that model to the new reframe step, which is a gap in a plan that otherwise takes agent-native shared-state design seriously.
+
+### Planning Changes
+
+- **Requirements:**
+  - R5 currently says only "俯瞰は人間の回答を待って進む" — it does not require a record-visible state for "reframe started, awaiting stage-1 or stage-2 answer." Add a requirement that the reframe's in-progress/paused state is written to the record (not just held in conversation), analogous to `plans[].status: awaiting-human`, so a resumed `review-triage-fix` session (new context window, or a different operator) can tell "detected, not yet reframed" apart from "detected, reframe declined" (F2) apart from "detected, reframe agreed and written" (R9).
+  - R9 ("合意した捉え直しを記録のその回に書く。書いてから束ねる") implicitly assumes the reframe dialogue completes in one sitting. Add a requirement covering resume: if the session ends between R4 (pause triggered) and R9 (written), what a fresh `review-triage-fix` invocation does on that record — restart the 2-stage dialogue from scratch, or detect and report a stale in-progress reframe. Right now this is unspecified, and it's exactly the kind of gap `awaiting-human` was built to close for `plans[]`.
+  - R8's "no hypothesis" constraint has no requirement tying it to verification. Add a requirement (or explicitly defer, per Scope Boundaries) for how this behavioral constraint is checked — otherwise it is a norm nobody can fail loudly against.
+
+- **Key Technical Decisions:**
+  - The reframe outcome (R9: 型の名前, 軸, 根本の原因, 修正の単位) needs a schema location decided at `runs[]` scope, not `plans[]` scope, because R4 places the reframe *before* grouping/`plans[]` exists. This is a genuine new schema decision, not a natural extension of the existing `plans[]` table — Deferred to Planning question 1 ("記録の様式に足す検知と捉え直しの項目の形") should explicitly note this ordering constraint so the schema design doesn't try to shoehorn the reframe into `plans[]`.
+  - Recommend reusing the *shape* of `awaiting-human` (a status enum value + a required companion field, machine-checked by `triagecheck`) for the reframe pause state, rather than inventing a different resumability idiom. The existing precedent is proven (tests exist, `review-triage-fix` already has a "scan all `plans` for `pending`/`awaiting-human` regardless of round count" habit at SKILL.md step 1) and reduces the number of state machines a maintainer has to hold in their head.
+
+- **Implementation Units:** Add an explicit unit for "reframe pause state in schema + triagecheck validation" as a prerequisite for the "俯瞰 (R4-R11)" unit, sequenced before it — the fix skill's stage-1/stage-2 dialogue logic depends on knowing what state to write and read back.
+
+- **System-Wide Impact / Risks:**
+  - **False positives on R2's primary condition** ("修正由来の指摘が2回連続") are a skill judgment call with no calibration loop. The record already logs `verdict_reason` per finding for auditability of triage judgments; the plan should require the same treatment for detection judgments (what evidence was read, which finding/problem in the prior round it matched) so a human can later audit whether the "主の条件" is over- or under-firing — this is R3's content, but the plan should state explicitly that this doubles as the false-positive audit trail, otherwise it may be written too tersely to serve that purpose.
+  - **Human-never-answers** is named in the assignment as a lens to check but the plan has no requirement for it. F1/F2 describe "agrees" and "declines" but not "never responds" (session ends, human walks away). Given R5 hard-blocks progress without an answer, an indefinitely stuck `awaiting-reframe`-type state is a realistic operational outcome and should be at minimum a Scope Boundary note ("what happens to a stalled reframe" deferred vs. in-scope), not silently absent.
+
+- **Verification:**
+  - R8 ("no hypothesis, questions only") is an output-shape/behavioral constraint on generated text, not a YAML structural constraint — `triagecheck` cannot verify it (it validates schema, not skill dialogue content). This needs an eval/fixture-style check (transcript assertions against a fixture scenario: given a detected repeat, assert the skill's stage-1/stage-2 output contains no diagnostic verb forms like "原因は" / "べきだ") — the plan should name this as a verification gap to close in Planning rather than leaving it to `triagecheck`'s existing scope by default, since a reader could otherwise assume "検査ツールが形を検査する" (R12) covers it and it doesn't.
+  - AE5 already asserts "スキルの発話には見立てが含まれない" as an acceptance example — good — but Acceptance Examples are not automatically wired to a runnable check. Planning should decide whether AE5 is verified by human read-through per release (cheap, matches "俯瞰の自動化は後回し" posture) or by an eval fixture (more durable). Either is acceptable, but the plan should say which, since silence here tends to default to "nobody checks it after the first pass."
+
+- **Scope Boundaries:** Worth recording explicitly (currently absent):
+  - **Later** — automated/fixture-based verification of R8's "no hypothesis" behavior; for now, human read-through at review time is the check (consistent with "俯瞰の自動化は後回し").
+  - **Never in this plan** — resolving a stalled/unanswered reframe automatically; note it as a known gap rather than silently unhandled, mirroring how `awaiting-human` is explicit that the fix skill will not decide on the human's behalf.
+
+### Open Questions
+- Where exactly does the reframe pause-state live in the schema — a new field under `runs[]` (sibling to `plans`), or nested under the detection marker written by `review-triage` in R3? This determines whether `review-triage` (which writes the detection marker) or `review-triage-fix` (which runs the reframe) owns the field, and the plan's Actors section (A2 vs A3) doesn't yet say who writes/updates the pause state itself.
+- Does a stale in-progress reframe (detected, stage 1 or 2 shown, no agreement, session ended) block a later `review-triage` run from firing again on a *new* recurrence in a later round, or does it need resolution first? R3 says detection re-fires after a completed reframe, but doesn't address firing while one is still open.</result>
+<usage><subagent_tokens>84424</subagent_tokens><tool_uses>9</tool_uses><duration_ms>57887</duration_ms></usage>
+</task-notification>
