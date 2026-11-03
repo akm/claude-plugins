@@ -1,0 +1,53 @@
+<task-notification>
+<task-id>a7e0f9e0b82e1cd68</task-id>
+<tool-use-id>toolu_01HJN2P4DURY3txUwxdQjWjH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/f2a9fafb-3c2c-4c71-b5d5-dd664dfbd5a3/tasks/a7e0f9e0b82e1cd68.output</output-file>
+<status>completed</status>
+<summary>Agent "U1: recurrence schema in triagecheck" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>U1 は完了しました。以下が報告です。
+
+## (a) 変更したファイル
+
+- `/Users/akima/workspace/claude-plugins/review-triage/tools/triagecheck/record.go`
+  - `recordRun.Recurrence *recordRecurrence` を追加。新規構造体 `recordRecurrence` / `recordRecurrenceEvidence` / `recordReframe`。
+  - `recordAllowedKeys` に `"実行"` の `recurrence`、階層 `"検知"` / `"根拠"` / `"捉え直し"` を追加。`recordUnknownKeyProblems` の walk に `recurrence` → 検知、`evidence` → 根拠 (列)、`reframe` → 捉え直し の分岐を追加。`recordNullSilentKeys` に `recurrence` を追加。
+  - 新関数 `recordRecurrenceProblems(f, ri, rec, verdictByID)` を `recordSemanticProblems` の回ループ末尾から呼ぶ。検査: status 列挙、evidence 1 件以上、condition 列挙、finding_id が同じ回の adopted を指す (存在しない / 採択でない を別文言で報告)、prior_run が 1〜自回-1、prior / reason 必須、declined は declined_reason 必須 + reframe 禁止、reframed は reframe 必須で 4 項目 + source 列挙、detected は declined_reason / reframe 禁止。列挙外の status では専用キーの検査を重ねない (plans の status と同じ方針)。問題文はすべて `&lt;file&gt;: 回 N の recurrence: ...` の形。
+  - サマリ: 回の節で指摘の表の後・修正計画の前に `### 検知` を出す `renderRecurrence` と日本語ラベル関数 3 つ。自由文字列はすべて `recordCell` を通す。推移の表には列を足していない。
+- `/Users/akima/workspace/claude-plugins/review-triage/tools/triagecheck/record_test.go` — インライン YAML のみ (testdata ディレクトリなし)。
+- `/Users/akima/workspace/claude-plugins/review-triage/tools/triagecheck/README.md` — `review-triage-record` の行 1 行のみ。
+- `/Users/akima/workspace/claude-plugins/review-triage/skills/review-triage/references/record-schema.md` — `runs[]` の表に `recurrence` 行、新節「検知 (`runs[].recurrence`)」「根拠 (`recurrence.evidence[]`)」「捉え直し (`recurrence.reframe`)」と YAML 例、「書き換えない範囲」の例外段落に `recurrence` の `status` / `declined_reason` / `reframe` の更新を追記 (`plans` のキーは数え上げていない)。用語は CONCEPTS.md「レビューの収束」を参照し再定義していない。
+
+## (b) 検証
+
+- behavior_changed = yes
+- 参照した既存テスト: `TestReviewTriageRecordSchemaViolations` (null / 未知キーの流儀)、`TestReviewTriageRecordInvestigationPasses`、`TestReviewTriageSummaryInvestigation`、`TestReviewTriageRecordDoneExternalPasses`、`recordFiles` ヘルパ。
+- 追加したテスト: `TestReviewTriageRecordRecurrencePasses` (キー無し / detected / declined / reframed / same-location)、`TestReviewTriageRecordRecurrenceViolations` (20 ケース: status 列挙外・欠落、evidence 空・欠落、condition 列挙外、finding_id 非採択・不在、prior_run 自回以上・0、prior / reason 欠落、declined の理由欠落、detected に declined_reason、reframed の reframe 欠落、reframe 項目欠落、source 列挙外、detected に reframe、recurrence / evidence / reframe 直下の未知キー)、`TestReviewTriageRecordRecurrenceNull` (`recurrence:` null が「recurrence に値がありません」1 件で報告される)、`TestReviewTriageSummaryRecurrence` (小節の有無・位置・3 状態の行・縦棒の無害化)。ヘルパ `recurrenceRecordYAML` / 定数 `recurrenceEvidenceYAML` を追加。
+- 実装前の赤 (抜粋):
+  ```
+  --- FAIL: TestReviewTriageRecordRecurrencePasses/detected
+      record_test.go:1393: 正しい recurrence で問題が出た: [docs/review-triages/feat-x.yaml:106: 実行に未知のキー "recurrence"。...]
+  --- FAIL: TestReviewTriageRecordRecurrenceViolations/status_の列挙値違反
+      record_test.go:1452: "status" を含む問題が出ない。出た問題: [... 実行に未知のキー "recurrence" ...]
+  FAIL	github.com/akm/claude-plugins/review-triage/tools/triagecheck	1.823s
+  ```
+- 実装後: `go vet ./...` 問題なし、`go test ./...` → `ok  github.com/akm/claude-plugins/review-triage/tools/triagecheck  2.581s`
+- 環境非依存: `CLAUDE_PLUGIN_ROOT=/nonexistent-root go test ./...` → `ok ... 1.789s`
+- 実記録の検査: `go run . -current-dir /Users/akima/workspace/claude-plugins -record-dir docs/review-triage` → exit 0、出力は `triagecheck: 問題は見つかりませんでした（検査: review-triage-record, judgment-flow）` (このツールは緑でもこの 1 行を出す仕様で、「無出力」ではありません)。6 件の YAML すべて通過、サマリの鮮度も通過。
+  - 注: リポジトリのルートから `go run -C ...` を叩くと asdf の `.tool-versions` にルート用の golang が無く exit 126 になります。ツールのディレクトリから実行しました (計画の Verification Contract のコマンドそのものは環境要因で走らない点を伝えてください)。
+- `git status --short`:
+  ```
+   M review-triage/skills/review-triage/references/record-schema.md
+   M review-triage/tools/triagecheck/README.md
+   M review-triage/tools/triagecheck/record.go
+   M review-triage/tools/triagecheck/record_test.go
+  ```
+  `docs/review-triage/*.md` は再生成しておらず差分なし。コミット・`git add` は行っていません。
+
+## (c) 意図的に省いたもの
+
+- `recurrence:` null の検査は Violations の表に混ぜず、独立した `TestReviewTriageRecordRecurrenceNull` にしました (「問題が 1 件だけ」を断言するため。指示のテスト名一覧との差分はこれだけ)。
+- `gofmt -w` により record.go の構造体タグの位置揃えが整形されています (機能変更なし)。
+- サマリの推移の表への列追加、`record-schema.md` の「2 回続いたら表を書く」段落の削除 (KTD8、別ユニット)、スキル手順書・参照文書の追加 (U2/U3) には触れていません。</result>
+<usage><subagent_tokens>113851</subagent_tokens><tool_uses>15</tool_uses><duration_ms>323897</duration_ms></usage>
+</task-notification>
