@@ -1,0 +1,1 @@
+関係するデータのモデルを概念レベルのクラス図を作成して、どのように実装に反映するのかを検討する必要があると思います。manager_name というときの manager と <owner>/<number> で表される概念との関係を明確にした上で決定したいです。 前提からの説明を含めて /mermaid-preview:mermaid-preview
