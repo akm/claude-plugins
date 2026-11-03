@@ -1,0 +1,2 @@
+https://github.com/akm/claude-plugins/runs/99652749985
+で同じようにエラーになっていますね
