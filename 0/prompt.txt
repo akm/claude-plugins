@@ -1,0 +1,92 @@
+次のブランチの増分をレビューしてください。修正はせず、結果を YAML ファイルに書き出すだけにしてください。
+
+## 対象
+
+- リポジトリ: /Users/akima/workspace/claude-plugins
+- ブランチ: feat/review-triage-fix-investigation
+- 差分の範囲: 64fa3b2..08cf572 (前回レビュー時の HEAD からの増分)。`git diff 64fa3b2..08cf572` を対象にする
+- scope: incremental
+- 背景: 前回 (full、tmp/review-code-review-opus-5-6th.yaml) の指摘 3 件をトリアージし、採択 2 件を直した増分。判定と修正計画は docs/review-triage/feat-review-triage-fix-investigation.yaml (と生成サマリ .md) にある
+  - P1 (前回の指摘 2): `plan_ref:` / `investigation:` とキーだけ書いて値を省いた記録 (YAML の null) を triagecheck の検査で報告するようにした。コミット 6126c54
+  - P2 (前回の指摘 1): investigation.md の検証フェーズの文を verification.md どおりに直した。コミット aec403f
+  - 加えて doc-dag で見つけた向きの無い重複 4 組に、正本へのリンクを足した。コミット 08cf572
+  - 前回の指摘 3 (参照へのアンカー付与) は却下 (R2) しており、直していない
+- 変更ファイル (増分):
+  - review-triage/tools/triagecheck/record.go
+  - review-triage/tools/triagecheck/record_test.go
+  - review-triage/tools/triagecheck/README.md
+  - review-triage/skills/review-triage-fix/SKILL.md
+  - review-triage/skills/review-triage-fix/references/investigation.md
+  - review-triage/skills/review-triage/references/record-schema.md
+  - docs/review-triage/feat-review-triage-fix-investigation.yaml / .md (トリアージ記録。当時の記録として扱い、内容の是非は指摘の対象にしない。スキーマ違反があれば対象)
+- 増分の外は、増分が壊した場合のみ報告する
+- 依頼様式の正本: review-triage/skills/review-triage/references/review-request.md (読んで従うこと)
+
+## 特に見てほしい点
+
+- 増分の継ぎ目: P1 で足した null の検査が、既存の検査 (未知のキー・必須サブキーの欠落・被覆) と重なって 1 つの書き忘れを複数の問題として報告しないか。`consequence:` / `premise_check:` を null にしたときの報告件数を実測して確かめる
+- P1 の対象を plan_ref / investigation に限った判断 (record.go の recordNullSilentKeys のコメント) が、他の構造キーで黙る形を残していないか。残すなら、それを起こす入力を挙げる
+- P2 で直した文 (investigation.md:5) が verification.md:11 と、同ファイルの他の型への言及 (50・54・63 行目) と整合しているか
+- 08cf572 で足したリンクの先 (アンカー含む) が実在するか
+
+## 読み取り専用の厳守
+
+- ファイルの編集・作成・削除、git の状態変更 (checkout / stash / commit / reset など) をしない。
+- 例外は出力先 tmp/ 配下の YAML 1 つだけ。
+- レビューの前後で `git rev-parse --short HEAD` と `git status --short` を取り、HEAD と作業ツリーが不変であることを確認して報告する。
+- テストや検査の実行は可 (review-triage/tools/triagecheck で `go test ./...`、`go run . -record-dir <絶対パス>/docs/review-triage -judgment-flow <絶対パス>/review-triage/skills/review-triage/references/judgment-flow.md`)。プローブやミューテーションを入れた場合は必ず revert し、作業ツリーが不変であることを確認する。
+
+## 検証の前払い (すべての指摘に必須)
+
+- evidence には次のいずれかを含める。どちらも含められない指摘は confidence を low にする。
+  - 実行した確認 — コマンドと出力の要点、またはプローブ・ミューテーションの手順と結果
+    (実施後は必ず revert し、作業ツリーが不変であることを確認して報告する)
+  - 対象箇所の逐語引用 (行番号つき)。矛盾の主張なら、矛盾する 2 箇所の両方を引く
+- 「〜の可能性がある」「余地がある」型の主張には、それを実際に起こす入力・状態を 1 つ添える。
+- テスト・検査の不在を主張する指摘 (「この入力のテストが無い」「この分岐が実行されていない」)
+  は、その入力を実際に通して報告が出ないことを確かめてから出す。確かめられなければ
+  confidence を low にする。テスト関数名の列挙や grep だけで結論しない — 別名のテストが
+  同じ分岐を踏んでいることがある。
+
+## 報告しない条件 (トリアージで却下される型)
+
+- 壊れる入力・状態を具体に挙げられない一般的懸念
+- 既存の関門 (テスト関数名・検査項目名で挙げられるもの) が顕在化を検出する欠陥
+- 対象そのものより大きい防御・再現の仕掛けを要求する指摘
+- プロセスの遵守が diff から証明できない、という型の観察
+- 整理・統一の好み (放置して壊れるものが無いもの)。リファクタ提案は 1 件まで、その旨を明記して
+
+上に当たるが捨てるには惜しいものは、findings に入れず、末尾の residual リストに
+1 行ずつだけ書く (id 無し・summary のみ)。判断の材料は残すが、指摘としては数えない。
+
+## 出力様式
+
+出力先: tmp/review-code-review-opus-5-7th.yaml (同じ組み合わせの 7 回目。モデルが opus-5 でなければ <モデル名> に置き換える)
+  - ファイル名は ASCII のみ。tmp/ が無ければ作る (.gitignore 済み)。コミットしない。
+
+形式 (この構造に厳密に従う):
+
+skill: code-review            # code-review / ce-code-review など、実際に使ったスキル名
+model: opus-5                 # レビューを実行したモデル
+level: ""                     # レベルや mode があれば (無ければ空)
+run_id: ""                    # run 識別子があれば (無ければ空)
+scope: incremental
+base: "64fa3b2"
+head: "08cf572"               # レビュー時点の HEAD の短縮 SHA (実測値を書く)
+date: "2026-09-03"
+findings:
+  - id: 1                     # 1 からの連番
+    file: path/to/file.md
+    line: 12                  # 不明なら省略
+    summary: "1〜2 文の要旨"
+    evidence: "検証の前払いの節のとおり"
+    attrs:                    # レビューが付けた属性をそのまま。無い属性を補完しない
+      severity: P2
+      confidence: high
+residual: []                  # 報告しない条件に当たるが残す 1 行メモの列 (無ければ空)
+
+注意:
+- 指摘が 0 件なら findings: [] とだけ書く。件数の集計は書かない (読み手が計算する)。
+- 値に # を含むときは必ず引用符で囲む (YAML は「半角スペース + #」以降をコメントとして落とす)。
+- 指摘の取捨は「報告しない条件」に従い、それ以外は全件書く。修正はしない。
+- 書き出したら、レビューの前後で HEAD と作業ツリーが変わっていないことを確認して、出力先のパスとともに報告する。
