@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bp3zo6kz1</task-id>
+<tool-use-id>toolu_01Q9Jt8iVsCGzAGUumAT7FSR</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/a8111d06-1d30-48e8-9b76-e363fe6486f5/tasks/bp3zo6kz1.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the whole suite and the gates on the committed state" completed (exit code 0)</summary>
+</task-notification>
