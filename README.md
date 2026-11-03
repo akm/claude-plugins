@@ -58,7 +58,56 @@ claude plugin install commit-rules-guard
 
 ### 最新版に更新する
 
-このリポジトリの `main` に PR がマージされてプラグインが更新された場合、手元には自動では反映されません。以下の手順で最新を取り込みます。
+このリポジトリの `main` に PR がマージされてプラグインが更新されても、手元のプラグインはそのままでは更新されません。マーケットプレイス akm-claude-plugins はサードパーティのマーケットプレイスで、自動更新がデフォルトで無効なためです。最新の版を取り込む手順は、次の 3 つです。
+
+- [make のターゲットを使う](#make-のターゲットを使う-このリポジトリを-clone-している人向け): このリポジトリを clone している人向け。どのプラグインが古いかを表示し、user スコープに入っていないものをインストールする
+- [マーケットプレイスの自動更新を有効にする](#マーケットプレイスの自動更新を有効にする): インストール済みのプラグインを、Claude Code が自動で更新する
+- [手作業で更新する](#手作業で更新する-自動更新を使わない人向け): 自動更新を使わない人向け。プラグインを 1 つずつ更新する
+
+#### make のターゲットを使う (このリポジトリを clone している人向け)
+
+リポジトリのルートのファイル `Makefile` に、2 つのターゲットがあります。どちらも、最新の版を[配布元](CONCEPTS.md#配布元)の `main` から読みます。振る舞い (前提の検査・終了コード・途中で中止したときの表示など) の [SSOT](CONCEPTS.md#ssot) は、スクリプト [`scripts/plugins.py`](scripts/plugins.py) のモジュールの docstring で、以下はその要約です。
+
+```bash
+make plugins-status
+make plugins-install
+```
+
+- ターゲット `plugins-status` は、このリポジトリのプラグインごとに、最新の版と、スコープ (user / project / local) ごとのインストール済みの版を並べ、最新の版と比べた結果 (同じ・古い・新しい) を示します。表示するだけで、インストール済みのプラグインは変えません。
+- ターゲット `plugins-install` は、user スコープにインストールされていないプラグインを、user スコープにインストールします。user スコープにインストール済みのプラグインは、古くても更新しません。更新には、次の節のマーケットプレイスの自動更新を使います。インストールの後に必要な手順は、実行の最後に表示します。
+
+変数 `PLUGINS` にプラグインの名前をカンマで区切って指定すると、そのプラグインだけを対象にします。make のコマンドラインで指定したときだけ対象を絞り、同じ名前の環境変数では絞りません。
+
+```bash
+make plugins-status PLUGINS=doc-dag,wording-guard
+```
+
+#### マーケットプレイスの自動更新を有効にする
+
+自動更新を有効にすると、Claude Code はマーケットプレイス akm-claude-plugins の定義を取得し直し、インストール済みのプラグインを更新します。インストールされていないプラグインは、インストールしません。有効にする方法は、次の 2 つです。
+
+- Claude Code のセッションでコマンド `/plugin` を実行し、Marketplaces タブで akm-claude-plugins を選んで、「Enable auto-update」を選ぶ
+- ファイル `~/.claude/settings.json` のキー `extraKnownMarketplaces.akm-claude-plugins` に、`"autoUpdate": true` を書く。取得元を表す `source` も一緒に書く (下の例)
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "akm-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "akm/claude-plugins"
+      },
+      "autoUpdate": true
+    }
+  }
+}
+```
+
+すぐに更新したいときは、同じ Marketplaces タブで akm-claude-plugins を選んで、「Update marketplace」を選びます。詳しくは、公式ドキュメント[プラグインのインストールと管理](https://code.claude.com/docs/ja/plugins/install)の節[マーケットプレイスの自動更新をオンまたはオフにする](https://code.claude.com/docs/ja/plugins/install#turn-auto-update-on-or-off-for-a-marketplace)を参照してください。自動更新がいつ実行され、更新した版がいつ読み込まれるかは、公式ドキュメント[プラグイン読み込みリファレンス](https://code.claude.com/docs/ja/plugins/loading)の節[自動アップデートが実行される場合](https://code.claude.com/docs/ja/plugins/loading#when-auto-update-runs)を参照してください。
+
+プラグイン wording-guard で textlint を使っている場合は、wording-guard の版が変わったら、textlint を入れるコマンド `wording_lint.py setup` をもう一度実行します。実行するコマンドは、ファイル `wording-guard/README.md` の節「[textlint による検査 (任意)](wording-guard/README.md#textlint-による検査-任意)」を参照してください。
+
+#### 手作業で更新する (自動更新を使わない人向け)
 
 **1. インストール先のスコープを確認する**
 
@@ -98,7 +147,7 @@ project / local スコープの場合は、**`--scope` の指定と、そのプ�
 claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ```
 
-**更新後は Claude Code の再起動が必要です。** 再起動するまで、実行中のセッションには更新内容が反映されません。
+更新した版を実行中のセッションに読み込む方法は、公式ドキュメント[プラグイン読み込みリファレンス](https://code.claude.com/docs/ja/plugins/loading)の節[プラグインが到達したステージを確認](https://code.claude.com/docs/ja/plugins/loading#check-which-stage-a-plugin-reached)を参照してください。
 
 `.claude/settings.json` の `enabledPlugins` で有効化している場合も、プラグイン本体の取得は同じ仕組みのため、更新手順は同様です。設定ファイルに書いてあるだけでは最新版が自動で使われるわけではない点に注意してください。
 
@@ -114,7 +163,11 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   └── marketplace.json          # マーケットプレイス定義 (収録プラグインの一覧)
 ├── .github/
 │   ├── test-targets.txt          # CI が期待するテストの対象の一覧
-│   └── workflows/test.yml        # 各プラグインの自動テストを GitHub Actions で実行する
+│   └── workflows/test.yml        # 自動テストを GitHub Actions で実行する
+├── Makefile                      # プラグインのインストール状況の表示 (plugins-status) とインストール (plugins-install)
+├── scripts/                      # どのプラグインにも属さないスクリプト
+│   ├── plugins.py                # Makefile のターゲットが実行する本体。振る舞いはモジュールの docstring
+│   └── tests/                    # python3 -m unittest discover -s scripts/tests
 ├── commit-rules-guard/           # hooks 型
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
@@ -187,14 +240,14 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 
 ## 自動テスト
 
-各プラグインのテストは、上の「構成」の節で各ディレクトリに添えたコマンドで実行します。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
+テストは、上の「構成」の節で各ディレクトリに添えたコマンドで実行します。各プラグインのテストのほかに、どのプラグインにも属さないスクリプトのテスト (ディレクトリ `scripts/tests/`) もあります。GitHub Actions のワークフロー (ファイル `.github/workflows/test.yml`) が、ブランチ `main` への push と、PR を開いたときと PR に push したときに、同じテストを実行します。
 
 対象はワークフローに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つけ、ファイル `.github/test-targets.txt` に書いた期待の一覧と比べます。差があれば失敗にするので、テストが対象から外れても、一覧に無いテストが増えても気づけます。見つけ方・比べ方と各 job の失敗の条件の [SSOT](CONCEPTS.md#ssot) はワークフローのコメントで、以下はその要約です。
 
 - ファイル `test_*.py` を含むディレクトリごとにコマンド `python3 -m unittest discover -s <ディレクトリ>` を実行する (Python は 3.11。pr-teeth が前提とする下限に合わせている)
 - ファイル `go.mod` を含むディレクトリごとに `go test ./...` を実行する (Go は各モジュールの `go.mod` が宣言するバージョン)
 
-新しいプラグインがこの命名でテストを置き、`.github/test-targets.txt` に 1 行足せば、ワークフローを変えずにテストが実行されるようになります。
+プラグインのテストでも、`scripts/tests/` のようにどのプラグインにも属さないテストでも、この命名でテストを書き、`.github/test-targets.txt` に 1 行足せば、ワークフローを変えずにテストが実行されるようになります。
 
 ## 文書の書き方
 
