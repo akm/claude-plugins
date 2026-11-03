@@ -1,0 +1,2 @@
+<bash-input>git fetch --prune</bash-input><bash-stdout>From github.com:akm/claude-plugins
+ - [deleted]         (none)     -&gt; origin/feat/request-sandbox-limits-76</bash-stdout><bash-stderr></bash-stderr>
