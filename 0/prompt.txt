@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bre3uubkb</task-id>
+<tool-use-id>toolu_01UNHsbr4mwKBD36RLqh9u84</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/34861fc5-874b-4259-9f08-d9b65ee7f229/tasks/bre3uubkb.output</output-file>
+<status>completed</status>
+<summary>Background command "修正の後の先端で Python のテストを別の作業ツリーで走らせる" completed (exit code 0)</summary>
+</task-notification>
