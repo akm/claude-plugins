@@ -1,0 +1,201 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+   - **Task:** continue PR #115 (akm/claude-plugins, branch `feat/issue-dispatch-plan-114`, Issue #114) through the review-triage cycle. The PR contains only `docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md`.
+   - **Cycle:**
+     1. review-request (ce-doc-review, opus, incremental).
+     2. The user runs it in a separate session.
+     3. `/review-triage:review-triage`.
+     4. `/review-triage:review-triage-fix`. Group by cause, one commit per problem, and design choices are asked to the user. From round 6 on (N=5), the user chooses the planner (A/B/C) after stage 1.
+     5. Update `tmp/pr-115-body-draft.md`.
+     6. Make the next review request.
+   - **Constraint (verbatim):** 「push は諸々決まって、レビューが通ってから行うので、しばらくの間pushしません。」 Never push without asking. Ask about push, squash and ready-for-review only after the review passes.
+   - **Communication rules:**
+     - Japanese; the final answer of each turn restates the questions.
+     - Explainer pages in `tmp/` for first-time engineers: premise, problem, options, question; no history; define terms; draw the places where things are written and the communication paths; dependency arrows 「使う」 (tail = user, head = used, flipped after `mermaid.run()`).
+   - **Current major direction (approved by the user):**
+     - Round 7 overall frame **Y**: delegate details to implementation-unit decision tables and tests; the plan keeps rules plus lists of what units decide and test; end with one full review.
+     - User's guidance (verbatim): 「領域の分け方は CLAUDE.md にあるように層ではなく依存関係に基づくドメインの考え方を参考にできる箇所は参考してください。方針としてはできるだけ実装を優先して後付で仕様や設計を実装に合うようにフィードバックすることも視野に入れてください」
+     - User's direction: review the domains (which data belongs to which domain is the essence of spec/design), then redesign "記録の作り直しと reopen の判断を持つモジュールが無い" and "スナップショットが 3 つの単位に分かれている".
+     - **Approved 「1. OK 2. OK 3. C1 4. OK」:**
+       - Proposal A: re-split domains by data ownership (D1–D19).
+       - Proposal B: snapshot, diff and waits form the observation domain D11.
+       - Proposal C1: derive item state each turn from observation plus record; the record holds only non-derivable data; rebuild and reopen become the ordinary derivation.
+       - Renumber the implementation units (U-IDs change).
+     - Proposal 2's process (unit order test → impl → canonical doc; feed implementation results back into the plan's R/KTD) was included in the redesign page's section 6.
+
+2. Key Technical Concepts:
+   - **review-triage 0.23.0:**
+     - Judgment flow D1–D8, `prior_defect` (only for findings whose premise_check result is verified).
+     - Plan statuses investigated / pending / awaiting-human / done; threshold N=5; planner choice A/B/C.
+     - J9 near-fix streak: 6 rounds.
+     - Stage sub-agent definitions `review-triage:fix-stage-<effort>`, model alias (fable).
+     - Caller-side verification of a sub-agent stage: report format, record check, model match, HEAD unchanged.
+     - Tools: lineorigin (`-lines`), nearedges, triagecheck.
+   - **issue-dispatch plan concepts:**
+     - Manager and worker sessions (LLM), CLI scripts, GitHub as source of truth (KTD1), record.json, snapshot.json, wait scripts.
+     - Declaration stages and update kinds: "持っている資源", 判定の要る宣言.
+     - Resource attributes: capacity, reserve, when_busy, release_undeclared.
+     - Small-PR request/report first lines with the waiting declaration ID; 待機 reasons; origin URL parsing; clone-root checks.
+     - ListAgents name rules; hooks; plugin version.
+   - **Domain redesign (approved):**
+     - D1 設定
+     - D2 ファイルの種類
+     - D3 リポジトリ (repo.py new)
+     - D4 GitHub I/O
+     - D5 Project/Issue/PR
+     - D6 コメント (comments.py new)
+     - D7 宣言
+     - D8 資源 (resources.py, resources.md new)
+     - D9 セッション (sessions.py new)
+     - D10 記録 (non-derivable only)
+     - D11 観測 (observe.py, observation.md new)
+     - D12 項目の状態 (itemstate.py new; also work check/held)
+     - D13 判定 (judge.py new)
+     - D14 割り当て (assign.py new)
+     - D15 合図
+     - D16 状態機械と再入
+     - D17 plugin version, D18 hooks, D19 preflight
+   - **Mermaid notes:**
+     - Edge labels containing parentheses must be quoted: `-.->|"使う (計画に無い)"|`.
+     - Use the arrowhead flip script on diagrams with an id.
+     - Use `useMaxWidth:false`.
+
+3. Files and Code Sections:
+   - **`docs/plans/2026-10-06-2025-feat-issue-dispatch-plan.md`** (the deliverable; 1391 lines; HEAD 683c6bc; nothing pushed).
+     - Section lines: Implementation Units 944–1343 (U1 962, U2 983, U3 1017, U4 1053, U5 1080, U6 1135, U7 1170, U8 1187, U9 1232, U10 1267, U11 1322), Output Structure 877, Sequencing 828–831, Verification Contract 1344, Definition of Done 1383.
+     - U-ID references outside the units section are listed per ID: U1 lines 46, 82, 140, 154, 156, 584–593, 694, 699, 700, 830, 859, 860, 1348–1390; plus others at 44, 133, 160, 162, 177, 571, 624, 674, 692, 696, 793, 869.
+     - Commits this session:
+       - Round 4: P2 cec1582, P10 6b26e9a, P3 c1319e5 (and others rebased).
+       - Round 4 follow-up: P1 9f9e22e, P12 edb66e0.
+       - Round 5: c7e729a, 8e13e07, ed58d4f, e700ff6, 42c6df8, 29ab0a7, 04ff06c, fb88b47, 9b4e225, d21ad13, e75618a.
+       - Round 6: 0a5a975, 7187bbd, 11c2908, 6938dbc, eddc3a5, b7a892d, 87d51eb, d793c1a, d608f41, 683c6bc.
+   - **`tmp/review-triages/feat-issue-dispatch-plan-114.yaml`** (record; untracked, never commit).
+     - Runs 1–7 exist.
+     - Run 7: 18 adopted; plans P1–P10 are `awaiting-human` with options 「立案者 C: 人間が立案する。案を会話で伝える」.
+     - The answers (Y + A/B/C1 + renumbering) are not yet written into the record.
+   - **`tmp/pr-115-body-draft.md`:** entries up to the 7th doc review (round 6 fixes); state range `e75618a`〜`683c6bc`.
+   - **Review requests:** `tmp/review-request-20261017-2016-…-7-ce-doc-review-opus.md`; result at `tmp/review-20261017-2016-…-7-….yaml`.
+   - **Explainer pages (tmp/):**
+     - issue-dispatch-round6-problems-114.html
+     - issue-dispatch-round7-problems-114.html
+     - issue-dispatch-y-proposal-114.html (section 1.2 rewritten with artifact dependencies (a)–(e))
+     - issue-dispatch-domain-redesign-114.html (the approved proposals A/B/C1)
+   - **Scratchpad** `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/b9807760-a222-4bc1-91da-3136fdb14684/scratchpad/`:
+     - done_auto.py (usage: `python3 done_auto.py <problem_id> '<doc_dag scope>' '<doc_dag result>'`; runs nearedges on HEAD and marks the last run's problem done).
+     - run5.py, run6.py, run7.py, stage1-run6.py, stage1-run7.py, msg-r6p*.txt.
+     - restructure/old_units.json: the parsed old units with fields Goal / Requirements / Dependencies / Files / Approach / Execution note / Patterns to follow / Test scenarios / Verification, as item lists.
+   - **Memory:** no new memory files were written this session.
+
+4. Errors and fixes:
+   - **Autosquash conflicts:** fixups on non-HEAD commits conflicted because paragraphs are single long lines. Fixed with `git checkout --ours` and reapplying the edits via Python, then `GIT_EDITOR=true git rebase --continue`. Record SHAs were updated afterwards.
+   - **triagecheck error:** "prior_defect は D8 で判定した指摘 (premise_check.result が verified) にだけ書く". Fixed by removing prior_defect from the R1-rejected finding.
+   - **lineorigin flag:** the flag is `-lines`, not `-line`.
+   - **Wording lint hits fixed:** 「置く/置いて」, 「拾い」, 「に立って」 (→ 基づく), 「を置いて」 in a commit message (amended P7 commit to 683c6bc and updated the record SHA).
+   - **Mermaid parse error:** an edge label with parentheses → quoted the label.
+   - **Mermaid width:** the module diagram was too wide → shortened node labels.
+   - **My own mistakes caught:**
+     - A misplaced parenthetical in P10 (round 4).
+     - Clone-root comparison not handling symlinks (round 4 P3).
+     - Missed finding 8 in round-6 grouping (added P10).
+     - The U10 test sentence was not updated (caught in round 7 as finding 9).
+     - Mislabelled KTD15 → KTD14.
+   - **User feedback:**
+     - Section 1.2 was just work order → redraw as artifact dependencies.
+     - Domains should be reviewed by data ownership.
+
+5. Problem Solving:
+   - Rounds 4–6 are fully fixed and committed.
+   - Round 7 is triaged and investigated. The user chose the Y frame and the domain redesign (A, B, C1, renumber). The plan rewrite has not started.
+   - The adopted-findings trend is 38→31→23→23→15→16→18. Findings keep arising at the boundaries of prose details, which motivated the redesign.
+
+6. All user messages (non-tool-result, chronological this session):
+   - 「1. OK 2. 案1 3. 案1」 (round-4 details / P1 / P12)
+   - 「1. はい 2. 案1 3. はい」 (details / multi-reason 待機 / draft + request)
+   - /review-triage:review-triage tmp/review-20261017-1500-…-5-…yaml
+   - /review-triage:review-triage-fix
+   - 「1. はい 2. 案1 3. 案1 4. 案1」
+   - 「1. OK 2. OK」 (round-5 details; next request)
+   - /review-triage:review-triage tmp/review-20261017-1607-…-6-…yaml
+   - /review-triage:review-triage-fix (chose C via the AskUserQuestion tool)
+   - 「fable / high で直し方を再度検討できますか？」
+   - 「P3: 案2 P7: 案1 P10: 案1」
+   - 「1. OK 2. OK」 (round-6 details; next request)
+   - /review-triage:review-triage tmp/review-20261017-2016-…-7-…yaml
+   - /review-triage:review-triage-fix (chose C)
+   - 「1. Y」
+   - 「1. 領域の分け方は CLAUDE.md にあるように層ではなく依存関係に基づくドメインの考え方を参考にできる箇所は参考してください。方針としてはできるだけ実装を優先して後付で仕様や設計を実装に合うようにフィードバックすることも視野に入れてください 2. 1 を再確認してから。」
+   - /mermaid-preview:mermaid-preview 「初見の技術者にわかりやすく 提案1 と 提案２を前提から説明してください」
+   - 「説明の「1.2 実装単位はドメインで分けてある」を見ると一直線にならんでいるので、ドメインの分け方が不十分だと思います。本当に一直線に依存しているのであればもっと問題は簡単なはずです。おそらく現在記載されているものは単に作業の順序を依存という言い方をして見せただけです。作業だけでなく作業の入力となるモノと作成されるモノの依存関係で何がどのように関係しているのかをわかるようにしてください。」
+   - 「「(e) モノの依存から見える、ドメインの分け方の足りないところ」に「計画に書かれていない依存がある」、「1 つの単位に、別のデータのドメインが混ざっている」と「資源のドメインが 3 つの単位に分かれている」とあるので、ドメインを見直してみてはどうでしょう？どのデータがどのドメインに属するべきかを考え直すというのは仕様や設計の作業の本質です。その上で「記録の作り直しと reopen の判断を持つモジュールが無い」「スナップショットが 3 つの単位に分かれている」について、設計として見直すのが妥当だと思います。」
+   - 「1. OK 2. OK 3. C1 4. OK」
+
+7. Pending Tasks:
+   - **Record the round-7 answers** for P1–P10 as approach: 利用者の答え: 大枠 Y + ドメインの見直し (提案 A・B・C1・実装単位の振り直し). Move the plans to pending; covering commits may share one SHA across problems.
+   - **Execute the plan rewrite in motive-separated commits:**
+     1. Re-split the implementation units by data-ownership domains (A + B). Covers:
+        - the new Implementation Units section and table;
+        - Sequencing (domain dependency DAG; one valid order);
+        - Output Structure (new modules and docs);
+        - Verification Contract and DoD;
+        - Goal Capsule;
+        - all ~120 U-ID references remapped by context.
+     2. C1:
+        - R11 and KTD5: the record holds only non-derivable data.
+        - R24 rebuild and R21 reopen become the ordinary derivation (D12).
+        - R20 references to the record go away.
+        - work check/held become derivation reads.
+        - The flow decision table becomes state → actions.
+        - KTD6 and KTD5 snapshot ownership moves to D11.
+     3. Process: unit order "テスト → 実装 → 正本の文書"; feed implementation back into the plan's R/KTD and note it in the PR.
+     4. Y: trim prose details into rules plus per-unit "決めること・確かめる場合". The round-7 edge cases go into unit test lists:
+        - P1 held resources incl. add-while-remove
+        - P5/P6 small-PR first lines & carry-over
+        - P7/P8 URL/clone checks (ssh.github.com, `repo name` subcommand, no origin, bare)
+        - P9 terminal names + U1 measurement
+        - P10 MultiEdit/NotebookEdit measurement in U1
+   - **Per commit:** wording lint, nearedges, `done_auto.py`, record SHAs, triagecheck (plugin 0.23.0).
+   - **After the rewrite:**
+     - Report the details decided and ask for confirmation.
+     - Update the PR draft (8th doc review).
+     - Create the round-8 review request as a **full** review (`--full-review`; base = merge-base with origin/HEAD e568828).
+   - **Later:** ask about push / squash / ready for review only after the review passes.
+
+8. Current Work:
+   - Immediately before the summary, I was preparing commit 1 (domain re-split).
+   - I had read the full Implementation Units section and parsed it into `restructure/old_units.json`.
+   - I listed all old items with indices for reassignment, e.g.:
+     - U2 Files 0–7, Test 0–10
+     - U3 Files 0–4, Test 0–14
+     - U4 Files 0–4, Test 0–5
+     - U5 Files 0–9, Approach 0–4, Test 0–27
+     - U6 Files 0–3, Test 0–17
+     - U8 Files 0–8, Approach 0–4, Test 0–18
+   - The intended new unit list (U1–U21) and its dependencies are in the analysis above.
+   - Plan for building the new section: a Python script that defines new units (Goal / Requirements / Dependencies / Files / Approach / Execution note / Patterns / Test scenarios / Verification), reuses old items by index or prefix, splits items as needed, and computes AE lists from the "Covers" lines. Splits include:
+     - config.py → config.py / repo.py / sessions.py
+     - ids.py → Issue-ref / comment-first-line / session parts
+     - project.py → project.py / observe.py / assign.py
+     - issues.py → comments.py / itemstate.py (work check/held)
+     - record.py → record.py / resources.py
+     - flow.md resource section → resources.md
+     - records.md snapshot part → observation.md
+   - The script then replaces lines 944–1343 and updates the other sections and references.
+
+9. Optional Next Step:
+   - Write the round-7 answers into the record (approach = Y + A/B/C1 + renumbering; status pending).
+   - Then build and apply commit 1: the domain re-split of the Implementation Units (new U1–U21 by data ownership, including observation domain D11 and item-state domain D12), plus the table, Sequencing, Output Structure, Verification Contract, DoD and U-ID references.
+   - Follow with the C1, process and Y commits.
+   - This follows the user's latest approval 「1. OK 2. OK 3. C1 4. OK」 to the questions:
+     - 「提案 A のドメインの分け方 (どのデータをどのドメインが持つか) は、これでよいか」
+     - 「提案 B (スナップショット・差分・待機を D11 観測にまとめる)」
+     - 「提案 C は、C1 … と C2 … のどちらにするか」
+     - 「実装単位をこのドメインで振り直す (U-ID が変わる) ことでよいか」
+   - And my stated plan: 「書き換えは次の 4 つのコミットに分けて進めます。1. ドメインで実装単位を分け直す (提案 A・B) … 2. 項目の状態を毎回導く (提案 C1) … 3. 単位の中の順を「テスト → 実装 → 正本の文書」にする … 4. 細部を単位に任せる (大枠 Y)」.
+   - Do not push.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/akima/.claude/projects/-Users-akima-workspace-claude-plugins/b9807760-a222-4bc1-91da-3136fdb14684.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+The messages after this summary are the most recent messages from before compaction, kept verbatim. The summary was written without seeing them, so something it says has not happened yet may already have happened in them.
