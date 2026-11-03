@@ -1,0 +1,1 @@
+.gitguardian.yaml は revert しておいて
