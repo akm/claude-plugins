@@ -1,0 +1,1 @@
+review-loop スキルで実行される claude の設定の WebFetch  に "xbrl-cn.org"  "xbrl.cninfo.com.cn" という見に覚えのないドメインが追加されています。これは何によるものですか？
