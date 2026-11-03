@@ -1,0 +1,1 @@
+1. /review-triage:review-triage-fix で直してください 2. 足してください
