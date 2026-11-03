@@ -1,0 +1,12 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins のブランチ `docs/replace-dash-review-triage-code-87` は、Issue #87 の 5 つ目の PR の後半のコード側 (5b-2) にあたる。ここでは、review-triage のコード (triagecheck・nearedges・lineorigin の README・review-loop のワーカー) の日本語のコメント・出力の文言にある、文中で前の文に理由や補足を続けるダッシュ「—」を、文を分けるか括弧で書く形に言い換えた。見出しの区切り・項目名と説明の区切り・表の空欄のダッシュは使い続ける。規則はルートの `CLAUDE.md` の節「文書の表現」にある。レビューの結果は、別のセッションが review-triage で判定する。
+
+Task:
+次の依頼文を読み、そこに書かれたとおりにレビューを実行して、結果を依頼文が指定する出力先に書き出してください。
+依頼文: `/Users/akima/workspace/claude-plugins/tmp/review-request-20261029-1616-docs-replace-dash-review-triage-code-87-1-code-review-opus.md`
+
+- レビューは報告のみで行い、修正しない。
+- HEAD と作業ツリーを変えない (commit・checkout・stash などをしない)。
+- 出力先以外のファイルを書かない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_0f7db631-e952-4173-a958-679e64632b91
