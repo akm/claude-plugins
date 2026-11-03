@@ -1,0 +1,2 @@
+1. OKです
+2. /review-triage:review-triage-fix
