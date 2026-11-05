@@ -110,5 +110,5 @@ waiting:
 | `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode`・`branch` は `get_session` の値。`reused` と `original_head` は上の「起動」の 3 |
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
-| `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 2) |
+| `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 1) |
 | `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`refs` は依頼を送る直前のリポジトリのブランチの一覧 (1 つのブランチが 1 要素)。結果待ちが無ければ `run_id` を空にする |

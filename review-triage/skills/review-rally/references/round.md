@@ -24,8 +24,7 @@
 
 ### 手順
 
-1. **レビューの worktree を HEAD に合わせる。** `git -C <レビューの worktree> status --porcelain` が空であることを確認してから、`git -C <レビューの worktree> checkout --detach <呼び出し元のセッションの作業ツリーの HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。
-2. **依頼文を書く。** 次をすべて確認してから、Skill ツールで [review-request](../../review-request/SKILL.md) を呼び出す。当たれば RR4 で、当たったものをすべて一度に報告する。
+1. **依頼文を書く。** 次をすべて確認してから、Skill ツールで [review-request](../../review-request/SKILL.md) を呼び出す。当たれば RR4 で、当たったものをすべて一度に報告する。
    - 呼び出し元のセッションの作業ツリーが clean である (`git status --porcelain` が空)。
    - 記録が読める。
    - 増分の回 (記録に回があり、`next_full` が偽) なら、最後の回の `head` が HEAD の祖先である (`git merge-base --is-ancestor <head> HEAD`)。
@@ -34,20 +33,22 @@
    - `review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら、Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-rally <ループの id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-rally の再入の手順へ」にして、ターンを終える。
    - それ以外の理由で書かなかったら RR4。
    - 書けたら、`next_full` を偽にする。
-3. **会話を消す。** `rally.yaml` の `requests` が 1 以上なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。
-4. **依頼する。** 送る直前に、リポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・ブランチの一覧 (`refs`) を書き、`requests` を 1 つ増やす。記録に回がある状態の全量の回でなければ、`rounds` も 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
-5. **待機を起動して、ターンを終える** (下の「待機」)。
-6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
+2. **会話を消す。** `rally.yaml` の `requests` が 1 以上なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。
+3. **依頼する。** 送る直前に、リポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・ブランチの一覧 (`refs`) を書き、`requests` を 1 つ増やす。記録に回がある状態の全量の回でなければ、`rounds` も 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
+4. **待機を起動して、ターンを終える** (下の「待機」)。
+5. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
    1. 結果のファイル (結果のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
    2. レビューの worktree の HEAD が依頼文の `head` と同じコミットで、`git -C <レビューの worktree> status --porcelain` が空である。
    3. 呼び出し元のセッションの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (`git symbolic-ref -q --short HEAD` の出力。detached HEAD なら何も出ない) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
-   4. ブランチの一覧 (取り方は手順 4) が `rally.yaml` の `waiting.refs` と同じである。3 と 4 を確認するのは、レビュアのテストがリポジトリのブランチと HEAD を書き換えた実例があるため。
+   4. ブランチの一覧 (取り方は手順 3) が `rally.yaml` の `waiting.refs` と同じである。3 と 4 を確認するのは、レビュアのテストがリポジトリのブランチと HEAD を書き換えた実例があるため。
 
    すべて通れば L2 に進む。
 
 ### 依頼のメッセージ
 
-**会話を消した後に送るので、レビューの規則をすべて書く。** `<回>` は記録の `runs` の数 + 1。
+**会話を消した後に送るので、レビューの規則をすべて書く。** `<回>` は記録の `runs` の数 + 1。`<レビューのセッションのブランチ>` は `rally.yaml` の `session.branch`。`<SHA>` は呼び出し元のセッションの `git rev-parse HEAD` の結果。
+
+レビューの worktree の HEAD は、レビューのセッションが自分の作業ツリーで切り替える。呼び出し元のセッションの `git -C` は hook に拒否されないが、別の作業ツリーのファイルを変える操作になるためである。`--detach` を使わないのは、ブランチがどの worktree にもチェックアウトされていない状態になり、同時に動く別のループの突き合わせで、増えたブランチとして扱われるためである。
 
 ```
 review-rally <ループの id>: 記録の回番号 <回> のレビューの依頼 (識別子 <識別子>)
@@ -55,9 +56,12 @@ review-rally <ループの id>: 記録の回番号 <回> のレビューの依�
 あなたは review-rally のレビューのセッションです。この会話より前のやり取りは消してあるので、
 このメッセージに書いたことだけに従ってください。日本語で応答してください。
 
-1. 依頼文 <依頼文の絶対パス> を Read ツールで読み、そのとおりにレビューする。指摘を見つけても直さない。
+1. あなたの作業ツリー (cwd) を、レビューするコミットに切り替える。git status --porcelain の出力が
+   空であることを確認してから、git checkout -B <レビューのセッションのブランチ> <SHA> を実行する。
+   出力が空でないか、切り替えられなければ、依頼文を読まずに、下の 3 の失敗のメッセージを送る。
+2. 依頼文 <依頼文の絶対パス> を Read ツールで読み、そのとおりにレビューする。指摘を見つけても直さない。
    依頼文の「対象」の作業ツリーは、あなたの作業ツリー (cwd) である。
-2. 結果を書き出したら、ツール SendMessage で、宛先 to を <呼び出し元のセッションの id> にして、
+3. 結果を書き出したら、ツール SendMessage で、宛先 to を <呼び出し元のセッションの id> にして、
    次の形の 1 行目で始まるメッセージを送り、ほかに何もせずにターンを終える。
    ツールが読み込まれていなければ ToolSearch の select:SendMessage で読み込む。
    - 成功: review-rally <ループの id> <識別子>: done <結果のファイルの絶対パス>
@@ -90,7 +94,7 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
 
    | ターンを始めたもの | 扱い |
    | --- | --- |
-   | レビューのセッション (`from` が `session.id`) のメッセージで、1 行目が `review-rally <ループの id> <識別子>: done <パス>` | 識別子が `waiting.run_id` と違うか、記録に同じ `run_id` の回があれば、何もせずに終える。同じなら手順 6 (突き合わせ) に進む |
+   | レビューのセッション (`from` が `session.id`) のメッセージで、1 行目が `review-rally <ループの id> <識別子>: done <パス>` | 識別子が `waiting.run_id` と違うか、記録に同じ `run_id` の回があれば、何もせずに終える。同じなら手順 5 (突き合わせ) に進む |
    | 同じく、1 行目が `review-rally <ループの id> <識別子>: failed <理由>` | 識別子が `waiting.run_id` と同じなら RR1。違えば何もせずに終える |
    | 同じく、1 行目がどちらの形でもない | RR1 |
    | ターンの終了の通知だけ | 下の「完了のメッセージが無いまま来たターン」 |
@@ -106,7 +110,7 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
 | `true` | 今から 60 分以内 | レビュー中。待機の通知で入ったなら、待機を起動し直す。ターンの終了の通知で入ったなら、何もせずに終える |
 | `true` | 今から 60 分より前 | RR1 (応答なし) |
 | `false` | `waiting.sent_at` より前 | 依頼を受けたターンがまだ始まっていない。待機の通知で入ったなら RR3 (依頼が処理されない)。ターンの終了の通知で入ったなら、何もせずに終える |
-| `false` | `waiting.sent_at` より後 | 依頼を受けたターンが、完了のメッセージを送らずに終了した。結果のディレクトリに結果のファイル (`review-<識別子>.yaml`) があれば手順 6 に進む。無ければ RR1 |
+| `false` | `waiting.sent_at` より後 | 依頼を受けたターンが、完了のメッセージを送らずに終了した。結果のディレクトリに結果のファイル (`review-<識別子>.yaml`) があれば手順 5 に進む。無ければ RR1 |
 
 ## L2 で `review-triage` に渡すもの
 
@@ -124,5 +128,5 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
 review-rally: <ループの id> / review_session: <session.id> / model: <loop.model> (実効: <session.model>) / effort: <loop.effort> (実効: <session.effort>) / permission_mode: <session.permission_mode> / review_minutes: <分>
 ```
 
-- `review_minutes` は、`waiting.sent_at` から、手順 6 に入ったターンまでの分 (小数第 1 位まで)。
+- `review_minutes` は、`waiting.sent_at` から、手順 5 に入ったターンまでの分 (小数第 1 位まで)。
 - 記録のスキーマは変えない。ほかの経路の回と収束を比べるときは、この行の有無で経路を分ける。

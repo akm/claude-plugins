@@ -26,7 +26,7 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 
 - **`--model`** と **`--effort`** は、レビューのセッションを起動するときに `start_session` の `model` と `effort` に渡す。
 - **`--threshold` と `--stage` は、`review-triage-fix` にそのまま渡す。** 扱いの SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落。開始前の報告に書くために、同じ規則で値を決めて検査する。
-- **`--base <ブランチ>`** は、全量の起点を求める派生元のブランチ。全量の回 ([round.md](round.md) の手順 2) で、`review-request` に `--base` として渡す (起点の求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を、`review-request` の手順 2 と同じ求め方で解決して書く。解決できなければ、ループを始めずに人間に質問する。** 空のまま書くと、開始の報告にブランチ名が出ないためである。
+- **`--base <ブランチ>`** は、全量の起点を求める派生元のブランチ。全量の回 ([round.md](round.md) の手順 1) で、`review-request` に `--base` として渡す (起点の求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を、`review-request` の手順 2 と同じ求め方で解決して書く。解決できなければ、ループを始めずに人間に質問する。** 空のまま書くと、開始の報告にブランチ名が出ないためである。
 - **`--full-first`** は、この起動の 1 回目の依頼文を、収束後の全量レビューの要否を問わずに全量にする。記録に回が無ければ、付けなくても 1 回目は全量になる。
 - **`--full-review`** は、収束した後に、収束後の全量レビューが要れば、停止せずに全量の回を行う ([stops.md](stops.md) の RRJ1)。
 
