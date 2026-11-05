@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01LqEHn39j2zEqNAsmvVAMqL",
+  "agent_id": "ababe8f2fb75d7cd0",
+  "subagent_type": "general-purpose",
+  "task_description": "計画の前提を反証レビュー",
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 183800,
+    "cache_read_tokens": 730266,
+    "output_tokens": 54071,
+    "api_call_count": 7
+  },
+  "started_at": "2026-11-05T17:27:44.498806+09:00",
+  "completed_at": "2026-11-05T17:36:30.67822+09:00"
+}
