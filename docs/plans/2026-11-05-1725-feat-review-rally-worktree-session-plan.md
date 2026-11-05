@@ -107,7 +107,8 @@ worktree で動くセッションから使うときは、ほかの worktree で�
 
 #### Deferred to Follow-Up Work
 
-- ファイル `review-triage/skills/review-rally/references/stops.md` の片付けの案内の「アーカイブで worktree も片付けられる」が実態と違う可能性は、別の Issue にする (session-settled: user-approved。退けた案: この計画に含める案。理由: アーカイブの後の worktree の扱いの調査が要り、動機も違う)。2026-11-05 に試験のセッションをアーカイブしたとき、worktree のディレクトリは残った。
+- ファイル `review-triage/skills/review-rally/references/stops.md` の片付けの案内の「アーカイブで worktree も片付けられる」が実態と違う可能性は、別の Issue にする (session-settled: user-approved。退けた案: この計画に含める案。理由: アーカイブの後の worktree の扱いの調査が要り、動機も違う)。2026-11-05 に試験のセッションをアーカイブしたとき、worktree のディレクトリは残った。 [#172](https://github.com/akm/claude-plugins/issues/172) に記録した。
+- 片付けの案内のそのほかの場合 (`session.reused` が空のままになる、依頼の前の停止で `rm -r` の対象が無い、アプリが worktree を新しいブランチに切り替えずに返す) も、[#172](https://github.com/akm/claude-plugins/issues/172) に記録した (session-settled: user-directed。退けた案: このブランチで直してレビューを続ける案。理由: レビューの結果を受け取るループが、前の回の修正の近くで指摘が続くことを検出して 2 度停止した)。
 
 ### Sources / Research
 
@@ -132,6 +133,8 @@ worktree で動くセッションから使うときは、ほかの worktree で�
 - KTD7. **`.claude/worktrees/` が無視されているかの確認は、呼び出し元のセッションの作業ツリーで無条件に行う。** worktree で動く呼び出し元のセッションにとっては必須ではないが、分岐を作らないため (R2)。無視されていないリポジトリでは、メインの作業ツリーで動くセッションと同じ案内を出す。
 - KTD8. **`get_session` の `worktreePath` の確認を、`--target-dir` と同じ条件に変える。** 同じリポジトリの worktree のルートであることに加えて、次の 2 つを確認する。`git rev-parse` の `--git-dir` と `--git-common-dir` が違うこと (メインの作業ツリーではないこと) と、呼び出し元のセッションの作業ツリーと違うこと。レビューのセッションがその作業ツリーの HEAD を切り替えるため。`.claude/worktrees/` の下にあることは確認しない。位置はアプリが決めることで、スキルの手順はその位置に依存せず、呼び出し元のセッションが worktree かどうかで分岐しないため (R2)。
 - KTD9. **レビューのセッションは `git checkout -B <レビューのセッションのブランチ> <SHA>` で切り替える** (session-settled: user-directed。退けた案: `git checkout --detach <SHA>` のまま、2 つのループを同時に動かしたときの停止を受け入れる案。理由: ブランチがチェックアウトされたまま残るので、別のループの突き合わせ (KD3) で除かれ、そのループが停止しない)。このブランチはレビューのセッション専用で、指定のコミットに移しても困らない。Governs R5。
+- KTD10. **起動の手順は、`worktreePath` の確認 → `worktree`・`branch`・再利用の判定を `session` に書く → 残りの値を書いて確認する、の順にする。片付けの案内は、停止ノードの名前ではなく `session` の値があるかどうかで分ける** (session-settled: user-directed。退けた案: RR2 の案内を具体化する案。理由: 再利用の判定の手順が 2 か所になる)。確認に通っていない値を案内が使わないようにするため。`session.branch` は `get_session` の値ではなく `git -C <worktreePath> branch --show-current` の出力にする。`git checkout -B` が動かし、片付けの案内の `git branch -D` が消すブランチなので、実際にチェックアウトされているブランチを書く。
+- KTD11. **ブランチの名前は、同じ名前のタグがあっても形が変わらない方法で取る。** ブランチの一覧は `%(refname:lstrip=2)`、worktree の一覧のブランチは `branch` の行の値から `refs/heads/` を除いた名前、現在のブランチは `git branch --show-current` にする。`%(refname:short)` と `git symbolic-ref --short` は、同じ名前のタグがあると `heads/<名前>` を出力し、突き合わせが一致しなくなるため。
 
 ### High-Level Technical Design
 
