@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>btr4b381h</task-id>
+<tool-use-id>toolu_014WbrkQoxZXx8sWGsEjsBGS</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins/4862d6cc-dca9-417a-8d80-e8d5b7473239/tasks/btr4b381h.output</output-file>
+<status>completed</status>
+<summary>Background command "review-triage の既存のテストを実行する" completed (exit code 0)</summary>
+</task-notification>
