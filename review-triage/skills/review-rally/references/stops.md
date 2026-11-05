@@ -22,10 +22,11 @@
 
 ## 片付けの案内
 
-停止の報告に、`rally.yaml` の `session` から組み立てた次の手順を、人間が実行できる形で書く。
+停止の報告に、次の手順を、人間が実行できる形で書く。RR2 以外の停止の手順は、`rally.yaml` の `session` から組み立てる。
 
-- **新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
-- **再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。結果のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
+- **RR2 で停止したとき**: アーカイブと `git branch -D` を案内しない。`session` の値は、確認に通っていないか、まだ書かれていない ([session.md](session.md) の「起動」)。その値で案内すると、再利用された worktree のセッションのアーカイブや、レビューと関係のないブランチの削除を案内することになるためである。片付ける前に、人間がレビューのセッションの worktree とブランチの状態を確認するよう案内する。
+- **RR2 以外の停止で、新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
+- **RR2 以外の停止で、再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。結果のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
 - **ループのディレクトリと記録は消さない。** ほかの経路と収束を比べる材料になる。どちらも呼び出し元のセッションの作業ツリーにあり ([session.md](session.md) の「開始の前提」)、その作業ツリーが片付けられると一緒に消えるので、残すときは片付ける前に複製する。
 
 ## 停止の報告に足すもの
