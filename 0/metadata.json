@@ -1312,6 +1312,37 @@
         "label": "Skill: review-triage:review-triage-fix",
         "default_collapsed": true
       }
+    },
+    {
+      "id": "claude-skill-toolu_01GZKZVL3CX32SJ623v9acox",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "doc-dag:doc-dag"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a02aaaf4c80b",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 8091,
+        "end": 8092,
+        "entry_ids": [
+          "fd37a178-f272-473e-8b6e-39bcdae6eef8"
+        ],
+        "tool_use_id": "toolu_01GZKZVL3CX32SJ623v9acox"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GZKZVL3CX32SJ623v9acox"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: doc-dag:doc-dag",
+        "default_collapsed": true
+      }
     }
   ],
   "session_metrics": {
