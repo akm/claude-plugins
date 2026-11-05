@@ -39,7 +39,7 @@
 5. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
    1. 結果のファイル (結果のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
    2. レビューの worktree の HEAD が依頼文の `head` と同じコミットで、`git -C <レビューの worktree> status --porcelain` が空である。
-   3. 呼び出し元のセッションの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (`git symbolic-ref -q --short HEAD` の出力。detached HEAD なら何も出ない) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
+   3. 呼び出し元のセッションの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (`git branch --show-current` の出力。detached HEAD なら何も出ない) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
    4. ブランチの一覧 (取り方は手順 3) が `rally.yaml` の `waiting.refs` と同じである。比べる前に、`waiting.worktree_branches` と、今の worktree の一覧のメインの作業ツリー以外の項目のブランチを、両方の一覧から除く。メインの作業ツリー以外の worktree で動くセッションのコミットで停止しないようにするため。呼び出し元のセッションのブランチが除かれても、3 で確認している。
    5. メインの作業ツリーの HEAD (取り方は手順 3) が `rally.yaml` の `waiting.main_head` と同じである。呼び出し元のセッションが worktree で動くと、3 はメインの作業ツリーの HEAD を見ないため。
 
