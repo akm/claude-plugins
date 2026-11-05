@@ -51,7 +51,7 @@
 3. **確認に通った worktree の値を、`rally.yaml` の `session` に書く** (書く値の出所は下の「`rally.yaml`」の `session` の行)。`worktree` と `branch` を書く。次に、レビューの worktree が再利用されたかを控える。アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) は、これらの値で手順を分ける。
 
 4. **残りの値を `rally.yaml` の `session` に書いてから確認する。** 次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
-   - `model` が指定と違う。指定が別名 (`opus` など) なら、`model` から `claude-` と版を除いた部分が別名と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。
+   - `model` が指定と違う。比べ方の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「モデルの名前の比べ方」。
    - `effort` が指定と違う。
    - `session.branch` が空である。レビューの worktree の HEAD がブランチを指していないので、依頼のメッセージの `git checkout -B` に渡す名前が決まらない。
    - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
