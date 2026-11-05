@@ -36,13 +36,13 @@
 2. **会話を消す。** `rally.yaml` の `requests` が 1 以上なら、ツール `clear_session` でレビューのセッションの会話を消す。拒否されたら RR3。
 3. **依頼する。** 送る直前に、リポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:lstrip=2) %(objectname:short)' refs/heads`) と、worktree の一覧 (`git worktree list --porcelain`) を取る。worktree の一覧の最初の項目が、メインの作業ツリーである。最初の項目からメインの作業ツリーの HEAD (`branch` の行のブランチの名前。detached HEAD なら `HEAD` の行の SHA) を、残りの項目からチェックアウトされているブランチの名前を取る。ブランチの名前は、`branch` の行の値から `refs/heads/` を除いたものである。ブランチの一覧に `%(refname:short)` を使わないのは、同じ名前のタグがあるブランチが `heads/<名前>` になり、worktree の一覧のブランチの名前と一致しないためである。ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・ブランチの一覧 (`refs`)・メインの作業ツリーの HEAD (`main_head`)・チェックアウトされているブランチの名前 (`worktree_branches`) を書き、`requests` を 1 つ増やす。記録に回がある状態の全量の回でなければ、`rounds` も 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
 4. **待機を起動して、ターンを終える** (下の「待機」)。
-5. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
+5. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。報告に書くものの SSOT は [stops.md](stops.md) の決定表の RR1 の行。
    1. 結果のファイル (結果のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
    2. レビューの worktree の HEAD が依頼文の `head` と同じコミットで、`git -C <レビューの worktree> status --porcelain` が空である。
-   3. 呼び出し元のセッションの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (`git branch --show-current` の出力。detached HEAD なら何も出ない) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
+   3. 呼び出し元のセッションの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (取り方は [session.md](session.md) の「`rally.yaml`」の表の `branch` の行) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
    4. ブランチの一覧 (取り方は手順 3) が `rally.yaml` の `waiting.refs` と同じである。比べる前に、`waiting.worktree_branches` と、今の worktree の一覧のメインの作業ツリー以外の項目のブランチを、両方の一覧から除く。メインの作業ツリー以外の worktree で動くセッションのコミットで停止しないようにするため。呼び出し元のセッションのブランチが除かれても、3 で確認している。
    5. メインの作業ツリーの HEAD (取り方は手順 3) が `rally.yaml` の `waiting.main_head` と同じである。呼び出し元のセッションが worktree で動くと、3 はメインの作業ツリーの HEAD を見ないため。
-   6. 完了のメッセージの 2 行目以降の報告が、依頼文の skill・effort・モデルと一致する。完了のメッセージが無いまま手順 5 に入った回は、報告が無いものとして扱う。一致しないとする条件と、比べない経路の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」で、そこで「記録に写す前に人間に報告する」と書くものは、このスキルでは RR1。モデルの名前の比べ方は [session.md](session.md) の「起動」の 4 と同じ。確認できるのはレビュアの報告だけなので、事実と違う報告を書いた回は検出できない。
+   6. 完了のメッセージの 2 行目以降の報告が、依頼文の skill・effort・モデルと一致する。完了のメッセージが無いまま手順 5 に入った回は、報告が無いものとして扱う。一致しないとする条件と、比べない経路の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「呼ぶ skill・effort・モデル — 値で明記し、報告させる」で、そこで「記録に写す前に人間に報告する」と書くものは、このスキルでは RR1。名前の比べ方の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「モデルの名前の比べ方」。確認できるのはレビュアの報告だけなので、事実と違う報告を書いた回は検出できない。
 
    3〜5 を確認するのは、レビュアのテストがリポジトリのブランチと HEAD を書き換えた実例があるため。メインの作業ツリーのブランチは比べるので、メインの作業ツリーで動く別のセッションがレビューの最中にコミットするか、ブランチを切り替えても停止する。レビュアのテストによる変更と区別できないためである。
 

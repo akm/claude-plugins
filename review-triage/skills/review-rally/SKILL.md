@@ -24,7 +24,7 @@ description: レビューを、このセッションから起動した別の Cla
 | --- | --- | --- |
 | [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RRG0、L1 → RRL1 ([round.md](references/round.md))。J2 の「無い」と S3 の間に RRJ1。追加の判定 RRJ1 と停止 RR1〜RR4 ([stops.md](references/stops.md)) |
 | [reporting.md](../review-triage-loop/references/reporting.md) | 必ず出すもの 6 項目 (停止した理由に RR1〜RR4 を含める) | このループで足す項目 ([stops.md](references/stops.md) の「停止の報告に足すもの」) |
-| [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表・「effort の既定」・「別のプロセスでレビューした結果の取り込み」(呼ぶスキル・結果のファイルの照合・`review-triage` に渡すもの) | 「G0 での解決」(レビューのセッションのモデルは人間が決める)・「範囲」(基点は `review-request` の規則) |
+| [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表・「モデルの名前の比べ方」・「effort の既定」・「別のプロセスでレビューした結果の取り込み」(呼ぶスキル・結果のファイルの照合・`review-triage` に渡すもの) | 「G0 での解決」(レビューのセッションのモデルは人間が決める)・「範囲」(基点は `review-request` の規則) |
 | [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |
 
 ## 手順

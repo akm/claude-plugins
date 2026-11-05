@@ -174,7 +174,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 
 1. **報告が様式のとおりか** — 項目の不足・様式に無い項目・「不明」の項目。
 2. **記録 YAML を再度読み込み、設定の `triage_check_command` を実行する** (未設定なら実行していないことを報告に書く。[project-config.md](../../review-triage/references/project-config.md) を参照)。
-3. **モデルの突き合わせ** — 報告の「動いているモデル」が実効モデルの指すモデルと同じか。別名は版を含まないので、申告の名前のうち版を除いた部分と比べる。**一致しなければ人間に報告する** ([review-request.md](../../review-triage/references/review-request.md) の「値で明記し、報告させる」の規則と同じ。sub-agent で変わった値を、依頼どおりの値として報告しないため)。
+3. **モデルの突き合わせ** — 報告の「動いているモデル」が実効モデルの指すモデルと同じか。比べ方の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「モデルの名前の比べ方」。**一致しなければ人間に報告する** ([review-request.md](../../review-triage/references/review-request.md) の「値で明記し、報告させる」の規則と同じ。sub-agent で変わった値を、依頼どおりの値として報告しないため)。
 4. **effort** — 報告には、使った定義名から導いた effort を書く (「effort と定義名の対応」を逆に引く)。
 
 フェーズごとに確認すること:
