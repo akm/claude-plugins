@@ -26,7 +26,7 @@
 
 - **新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
 - **再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。結果のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
-- **ループのディレクトリと記録は消さない。** ほかの経路と収束を比べる材料になる。どちらも呼び出し元のセッションの作業ツリーにあり、その作業ツリーが片付けられると一緒に消えるので、残すときは片付ける前に複製する。
+- **ループのディレクトリと記録は消さない。** ほかの経路と収束を比べる材料になる。どちらも呼び出し元のセッションの作業ツリーにあり ([session.md](session.md) の「開始の前提」)、その作業ツリーが片付けられると一緒に消えるので、残すときは片付ける前に複製する。
 
 ## 停止の報告に足すもの
 

@@ -14,7 +14,7 @@
 | 4 | 記録が読める | 記録 YAML (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`) が無いか、YAML として読める | 無ければ新規として扱う。あるのに読めなければ、読めない理由を報告する |
 | 5 | 全量の起点のブランチが決まる | [arguments.md](arguments.md) の `--base` の段落と「値の検査」 | `--base` で、使えるブランチを指定する |
 
-呼び出し元のセッションは、worktree で動いていても、メインの作業ツリー (`git worktree add` で追加したものではない、元の作業ツリー) で動いていてもよい。どちらでも手順は同じで、上の確認はすべて呼び出し元のセッションの作業ツリーについて行う。記録とループのディレクトリもこの作業ツリーにあるので、別の作業ツリーで同じブランチのループを始めると、記録が無いものとして扱われる。
+呼び出し元のセッションは、worktree で動いていても、メインの作業ツリーで動いていてもよい。どちらでも手順は同じで、上の確認はすべて呼び出し元のセッションの作業ツリーについて行う。記録とループのディレクトリもこの作業ツリーにあるので、別の作業ツリーで同じブランチのループを始めると、記録が無いものとして扱われる。
 
 ## ループのディレクトリを作る
 
@@ -47,8 +47,8 @@
    - `model` が指定と違う。指定が別名 (`opus` など) なら、`model` から `claude-` と版を除いた部分が別名と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。
    - `effort` が指定と違う。
    - `worktreePath` が無いか、次のどれかを満たさない。レビューのセッションがこの作業ツリーの HEAD を切り替えるので、メインの作業ツリーと呼び出し元のセッションの作業ツリーを除く。
-     - 同じリポジトリの worktree のルートである (`git -C <worktreePath> rev-parse --show-toplevel` がそのパス自身の実体パスで、`git -C <worktreePath> rev-parse --path-format=absolute --git-common-dir` が呼び出し元のセッションの同じ値と一致する)。
-     - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が上の `--git-common-dir` の値と違う)。
+     - 同じリポジトリの worktree のルートである (確認の仕方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 1 の `--target-dir` の確認)。
+     - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が、同じオプションの `--git-common-dir` の値と違う)。
      - 呼び出し元のセッションの作業ツリーと違う。
    - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
 
@@ -119,4 +119,4 @@ waiting:
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 1) |
-| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`refs` は依頼を送る直前のリポジトリのブランチの一覧 (1 つのブランチが 1 要素)、`main_head` は依頼を送る直前のメインの作業ツリーの HEAD が指すブランチの名前 (detached HEAD なら SHA)、`worktree_branches` は依頼を送る直前にメインの作業ツリー以外の worktree がチェックアウトしていたブランチの名前の配列 (取り方は [round.md](round.md) の手順 3)。結果待ちが無ければ `run_id` を空にする |
+| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`refs` は依頼を送る直前のリポジトリのブランチの一覧 (1 つのブランチが 1 要素)、`main_head` は依頼を送る直前のメインの作業ツリーの HEAD が指すブランチの名前 (detached HEAD なら SHA)、`worktree_branches` は依頼を送る直前にメインの作業ツリー以外の worktree がチェックアウトしていたブランチの名前の配列。結果待ちが無ければ `run_id` を空にする |
