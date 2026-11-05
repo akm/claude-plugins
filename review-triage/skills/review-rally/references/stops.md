@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | RRJ1 | 判定 | `rally.yaml` の `loop.full_review` が真で、収束後の全量レビューが要るか (要否の規則の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」)。J2 の「無い」で通る。上限 (J5) を見ない。「はい」なら `next_full` を真にしてから、[round.md](round.md) の手順 1 に入る。「いいえ」なら S3 | — |
 | RR1 | 停止 | レビュー不成立 | その回の識別子と、不成立の理由 (失敗の通知の理由・通知の 1 行目・一致しなかった項目と両方の値)。結果のファイルの有無と、複製したパス (下の「停止のときに行うこと」の 1)。応答なしなら、承認待ちなどでレビューのセッションのターンが進んでいないおそれがあること (人間がレビューのセッションを開いて確認する)。レビューの worktree が clean でないか、切り替えに失敗したときは、失敗の通知の理由にそのことが書かれる。突き合わせ ([round.md](round.md) の手順 5) の 4 (ブランチの一覧が変わった) か 5 (メインの作業ツリーの HEAD が変わった) なら、SHA が変わった・増えた・消えたブランチと、依頼の前と後の値。メインの作業ツリーで動く別のセッションの操作でも同じ差が出ること。戻すかどうかは人間が決めること |
-| RR2 | 停止 | レビューのセッションを使えない | 当たった項目と、指定の値と実際の値。モデルか effort が違うなら、呼び出し元のセッションのモデルか effort を上げるか、指定を下げて新しいループを始めること ([session.md](session.md) の「起動」の 2) |
+| RR2 | 停止 | レビューのセッションを使えない | 当たった項目と、指定の値と実際の値。モデルか effort が違うなら、呼び出し元のセッションのモデルか effort を上げるか、指定を下げて新しいループを始めること ([session.md](session.md) の「起動」の 4) |
 | RR3 | 停止 | 拒否された | 拒否したツールと、その結果の文面。`clear_session` なら、人間がレビューのセッションを画面に開いているかピン留めしていると拒否されるので、閉じるか外してから新しいループを始めること。`SendMessage` や依頼が処理されないなら、メッセージが承認待ちになっているおそれがあること ([session.md](session.md) の「起動」の 1) |
 | RR4 | 停止 | 依頼文を作れない | 当たったものすべてと、何を片付ければよいか。汚れたファイルの一覧、記録のパスと読めない理由、基点の SHA と現在の HEAD、`review-request` が報告した理由。ループのディレクトリが無視されていなければ、どのファイル (`.gitignore`) に何 (`tmp/`) を足し、どのブランチ (現在のブランチ) にコミットするか。基点が祖先でないときは、ループの間に履歴を書き換えた (reset・rebase・squash) ことが原因であり、どう続けるかは人間が決めること |
 
@@ -22,11 +22,12 @@
 
 ## 片付けの案内
 
-停止の報告に、次の手順を、人間が実行できる形で書く。RR2 以外の停止の手順は、`rally.yaml` の `session` から組み立てる。
+停止の報告に、次の手順を、人間が実行できる形で書く。手順は `rally.yaml` の `session` から組み立てる。`session` の値は、起動の手順のどこまで進んだかで決まる ([session.md](session.md) の「起動」)。値が空のキーを使う手順は書かない。
 
-- **RR2 で停止したとき**: アーカイブと `git branch -D` を案内しない。`session` の値は、確認に通っていないか、まだ書かれていない ([session.md](session.md) の「起動」)。その値で案内すると、再利用された worktree のセッションのアーカイブや、レビューと関係のないブランチの削除を案内することになるためである。片付ける前に、人間がレビューのセッションの worktree とブランチの状態を確認するよう案内する。
-- **RR2 以外の停止で、新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
-- **RR2 以外の停止で、再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。結果のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
+- **`session.id` が空なら** (`start_session` が失敗した): 片付けるものは無いと書く。
+- **`session.id` があり、`session.worktree` が空なら** (`worktreePath` の確認に通らなかった): worktree とブランチを確認していないので、アーカイブと `git branch -D` を案内しない。レビューのセッション (`session.name`・`session.id`) を開いて、どう片付けるかを人間が決めると書く。
+- **`session.worktree` があり、新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
+- **`session.worktree` があり、再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。結果のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
 - **ループのディレクトリと記録は消さない。** ほかの経路と収束を比べる材料になる。どちらも呼び出し元のセッションの作業ツリーにあり ([session.md](session.md) の「開始の前提」)、その作業ツリーが片付けられると一緒に消えるので、残すときは片付ける前に複製する。
 
 ## 停止の報告に足すもの

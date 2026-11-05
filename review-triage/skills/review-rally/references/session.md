@@ -26,7 +26,7 @@
 
 **レビューのセッションの起動は、開始のターン (`/review-rally` を受けたターン) で行う。**
 
-1. **ツール `start_session` を、次の値で呼び出す。** 失敗したら RR2。
+1. **ツール `start_session` を、次の値で呼び出す。** 失敗したら RR2。成功したら、`rally.yaml` の `session` に `id` と `name` を書く。
 
    | 引数 | 値 |
    | --- | --- |
@@ -43,17 +43,18 @@
 
    **`permission_mode` は渡さない。** 呼び出し元のセッションの権限モードが引き継がれ、メッセージが承認待ちにならない。
 
-2. **ツール `get_session` で起動したセッションの値を読み、`rally.yaml` の `session` に書いてから確認する** (書く値の出所は下の「`rally.yaml`」の `session` の行。`reused` と `original_head` は次の 3 で書く)。次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
+2. **レビューの worktree を確認する。** ツール `get_session` で起動したセッションの値を読む。`worktreePath` が無いか、次のどれかを満たさなければ RR2。レビューのセッションがこの作業ツリーの HEAD を切り替えるので、メインの作業ツリーと呼び出し元のセッションの作業ツリーを除く。
+   - 同じリポジトリの worktree のルートである (確認の仕方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 1 の `--target-dir` の確認)。
+   - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が、同じオプションの `--git-common-dir` の値と違う)。
+   - 呼び出し元のセッションの作業ツリーと違う。
+
+3. **確認に通った worktree の値を、`rally.yaml` の `session` に書く** (書く値の出所は下の「`rally.yaml`」の `session` の行)。`worktree` と `branch` を書く。次に、レビューの worktree が再利用されたかを控える。アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) は、これらの値で手順を分ける。
+
+4. **残りの値を `rally.yaml` の `session` に書いてから確認する。** 次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
    - `model` が指定と違う。指定が別名 (`opus` など) なら、`model` から `claude-` と版を除いた部分が別名と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。
    - `effort` が指定と違う。
-   - `worktreePath` が無いか、次のどれかを満たさない。レビューのセッションがこの作業ツリーの HEAD を切り替えるので、メインの作業ツリーと呼び出し元のセッションの作業ツリーを除く。
-     - 同じリポジトリの worktree のルートである (確認の仕方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 1 の `--target-dir` の確認)。
-     - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が、同じオプションの `--git-common-dir` の値と違う)。
-     - 呼び出し元のセッションの作業ツリーと違う。
    - `session.branch` が空である。レビューの worktree の HEAD がブランチを指していないので、依頼のメッセージの `git checkout -B` に渡す名前が決まらない。
    - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
-
-3. **レビューの worktree が再利用されたかを控える。** アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) で使う。
 
 ### 最初の指示文
 
@@ -116,7 +117,7 @@ waiting:
 | `state` | `active` (回している) か `stopped` (停止した) |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
-| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode` は `get_session` の値、`branch` は `git -C <worktreePath> branch --show-current` の出力。`branch` に `get_session` の値を使わないのは、依頼のメッセージの `git checkout -B` が動かし、片付けの案内の `git branch -D` が消すブランチなので、実際にチェックアウトされているブランチを書くためである。`reused` と `original_head` は上の「起動」の 3 |
+| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode` は `get_session` の値、`branch` は `git -C <worktreePath> branch --show-current` の出力。`branch` に `get_session` の値を使わないのは、依頼のメッセージの `git checkout -B` が動かし、片付けの案内の `git branch -D` が消すブランチなので、実際にチェックアウトされているブランチを書くためである。`reused` と `original_head` は上の「起動」の 3。書く順序は上の「起動」のとおりで、進まなかった手順の値は空のままである |
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 1) |

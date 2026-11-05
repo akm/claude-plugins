@@ -60,6 +60,6 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 | 語 | 何か | 決めるもの |
 | --- | --- | --- |
 | レビューのセッションのモデルの指定 | `start_session` の `model` に渡す値 | 人間 (`--model` か `loop.review_model`) |
-| 実効モデル | レビューのセッションが実際に動くモデル (`get_session` の `model`) | アプリ ([session.md](session.md) の「起動」の 2) |
+| 実効モデル | レビューのセッションが実際に動くモデル (`get_session` の `model`) | アプリ ([session.md](session.md) の「起動」の 4) |
 | レビューのセッションの effort | `start_session` の `effort` に渡す、レビューのセッションの effort | 人間 (`--effort`) |
 | レビュースキルの effort | レビュースキル (`code-review`) に渡す effort | `--review-args` か `loop.review_args` (無ければ既定。SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「effort の既定」) |
