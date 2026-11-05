@@ -48,7 +48,7 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 | 値 | 条件 |
 | --- | --- |
 | レビューのセッションのモデルの指定 | 空でない文字列。表記は検査しない (起動の後に実際の値と比べる。[session.md](session.md) の「起動」) |
-| レビューのセッションの effort | `low` / `medium` / `high` / `xhigh` / `max` のいずれかで、メインのセッションの effort (`get_session` の `self` の `effort`) 以下。上なら、メインのセッションの effort を上げるか、指定を下げるよう案内する |
+| レビューのセッションの effort | `low` / `medium` / `high` / `xhigh` / `max` のいずれかで、呼び出し元のセッションの effort (`get_session` の `self` の `effort`) 以下。上なら、呼び出し元のセッションの effort を上げるか、指定を下げるよう案内する |
 | `review_skill`・`review_args`・`max_rounds`・`structure_rounds` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
 | `threshold_rounds`・`stages` | [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 |
 | `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す |

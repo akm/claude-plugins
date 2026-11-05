@@ -8,17 +8,17 @@
 
 | # | 確認すること | 確認の仕方 | 満たさないときの直し方 |
 | --- | --- | --- | --- |
-| 1 | メインのセッションが worktree で動いていない | `git rev-parse --path-format=absolute --git-dir` と `git rev-parse --path-format=absolute --git-common-dir` が同じ | メインの作業ツリー (`git rev-parse --git-common-dir` の親) で動くセッションから起動し直す |
-| 2 | メインの作業ツリーから見て、`tmp/review-rally/` が git に無視されている | `git check-ignore -q tmp/review-rally/x/rally.yaml` | ファイル `.gitignore` に `tmp/` を足し、現在のブランチにコミットしてから起動し直す |
-| 3 | メインの作業ツリーから見て、`.claude/worktrees/` が git に無視されている | `git check-ignore -q .claude/worktrees/review-rally` | ファイル `.gitignore` に `.claude/worktrees/` を足し、現在のブランチにコミットしてから起動し直す |
-| 4 | メインの作業ツリーが clean である | `git status --porcelain` が空 | 出ている変更をコミットするか退避してから起動し直す |
+| 1 | 呼び出し元のセッションが worktree で動いていない | `git rev-parse --path-format=absolute --git-dir` と `git rev-parse --path-format=absolute --git-common-dir` が同じ | メインの作業ツリー (`git rev-parse --git-common-dir` の親) で動くセッションから起動し直す |
+| 2 | 呼び出し元のセッションの作業ツリーから見て、`tmp/review-rally/` が git に無視されている | `git check-ignore -q tmp/review-rally/x/rally.yaml` | ファイル `.gitignore` に `tmp/` を足し、現在のブランチにコミットしてから起動し直す |
+| 3 | 呼び出し元のセッションの作業ツリーから見て、`.claude/worktrees/` が git に無視されている | `git check-ignore -q .claude/worktrees/review-rally` | ファイル `.gitignore` に `.claude/worktrees/` を足し、現在のブランチにコミットしてから起動し直す |
+| 4 | 呼び出し元のセッションの作業ツリーが clean である | `git status --porcelain` が空 | 出ている変更をコミットするか退避してから起動し直す |
 | 5 | 記録が読める | 記録 YAML (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`) が無いか、YAML として読める | 無ければ新規として扱う。あるのに読めなければ、読めない理由を報告する |
 | 6 | 全量の起点のブランチが決まる | [arguments.md](arguments.md) の `--base` の段落と「値の検査」 | `--base` で、使えるブランチを指定する |
 
 ## ループのディレクトリを作る
 
 1. **ループの id を決める**: `<YYYYMMDD>-<hhmm>-<ブランチ名>`。ブランチ名の整え方は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 3 の表の「ブランチ名」の行と同じ。
-2. **ループのディレクトリ `tmp/review-rally/<ループの id>/` を、メインの作業ツリーに作る。** 既にあれば作らずに報告して終了する。
+2. **ループのディレクトリ `tmp/review-rally/<ループの id>/` を、呼び出し元のセッションの作業ツリーに作る。** 既にあれば作らずに報告して終了する。
 3. **`rally.yaml` を書く** (様式は下の「`rally.yaml`」)。`next_full` には `loop.full_first` の値を書く。`rounds` と `requests` は 0、`waiting` は `run_id`・`sent_at` を空、`refs` を空の配列にする (下の例は 1 回目の依頼を送った後の状態)。`session` は空にしておき、起動の後に書く。
 
 ## 起動
@@ -40,27 +40,27 @@
    | `prompt` | 下の「最初の指示文」 |
    | `background` | ループの目的 (このブランチのレビューを回ごとに依頼すること)・レビューのセッションは指摘を直さないこと・依頼のたびに会話が消されること |
 
-   **`permission_mode` は渡さない。** メインのセッションの権限モードが引き継がれ、メッセージが承認待ちにならない。
+   **`permission_mode` は渡さない。** 呼び出し元のセッションの権限モードが引き継がれ、メッセージが承認待ちにならない。
 
 2. **ツール `get_session` で起動したセッションの値を読み、`rally.yaml` の `session` に書いてから確認する** (書く値の出所は下の「`rally.yaml`」の `session` の行。`reused` と `original_head` は次の 3 で書く)。次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
    - `model` が指定と違う。指定が別名 (`opus` など) なら、`model` から `claude-` と版を除いた部分が別名と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。
    - `effort` が指定と違う。
    - `worktreePath` が無いか、メインの作業ツリーの `.claude/worktrees/` の下にない。
-   - `permissionMode` がメインのセッション (`get_session` の `self`) と違う。
+   - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
 
 3. **レビューの worktree が再利用されたかを控える。** アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) で使う。
 
 ### 最初の指示文
 
 ```
-あなたは review-rally のレビューのセッションです。メインのセッション (<メインのセッションの id>) から、
+あなたは review-rally のレビューのセッションです。呼び出し元のセッション (<呼び出し元のセッションの id>) から、
 レビューの依頼がメッセージで届きます。このターンでは何もせず、返信も送らずにターンを終えてください。
 依頼が届いたら、そのメッセージの指示に従ってください。依頼の前に、この会話は消されます。
 ```
 
 ## `rally.yaml`
 
-ループのディレクトリに置く、ループの状態のファイル。**書き込み元はメインのセッションだけ。** 会話が compact されても、再入の手順がこのファイルから状態を戻せるようにする。書くときは、一時名 `.rally.yaml.tmp` に書いてから `mv` で改名する。
+ループのディレクトリに置く、ループの状態のファイル。**書き込み元は呼び出し元のセッションだけ。** 会話が compact されても、再入の手順がこのファイルから状態を戻せるようにする。書くときは、一時名 `.rally.yaml.tmp` に書いてから `mv` で改名する。
 
 ```yaml
 loop_id: "20261029-0903-feat-foo"
@@ -103,7 +103,7 @@ waiting:
 
 | キー | 内容 |
 | --- | --- |
-| `loop_id`・`branch`・`repo_dir` | ループの id・現在のブランチ・メインの作業ツリーのルートの実体パス |
+| `loop_id`・`branch`・`repo_dir` | ループの id・現在のブランチ・呼び出し元のセッションの作業ツリーのルートの実体パス |
 | `state` | `active` (回している) か `stopped` (停止した) |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
@@ -111,4 +111,4 @@ waiting:
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 2) |
-| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`refs` は依頼を送る直前のメインのリポジトリのブランチの一覧 (1 つのブランチが 1 要素)。結果待ちが無ければ `run_id` を空にする |
+| `waiting` | 結果待ちの依頼。`run_id` は依頼文の識別子、`sent_at` は依頼のメッセージを送った時刻 (UTC の秒まで)、`refs` は依頼を送る直前のリポジトリのブランチの一覧 (1 つのブランチが 1 要素)。結果待ちが無ければ `run_id` を空にする |
