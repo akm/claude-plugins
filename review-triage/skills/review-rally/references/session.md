@@ -113,7 +113,7 @@ waiting:
 
 | キー | 内容 |
 | --- | --- |
-| `loop_id`・`branch`・`repo_dir` | ループの id・現在のブランチ (取り方は [round.md](round.md) の手順 5 の 3)・呼び出し元のセッションの作業ツリーのルートの実体パス |
+| `loop_id`・`branch`・`repo_dir` | ループの id・現在のブランチ (`git branch --show-current` の出力。detached HEAD なら何も出ない)・呼び出し元のセッションの作業ツリーのルートの実体パス |
 | `state` | `active` (回している) か `stopped` (停止した) |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
