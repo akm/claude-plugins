@@ -8,12 +8,13 @@
 
 | # | 確認すること | 確認の仕方 | 満たさないときの直し方 |
 | --- | --- | --- | --- |
-| 1 | 呼び出し元のセッションが worktree で動いていない | `git rev-parse --path-format=absolute --git-dir` と `git rev-parse --path-format=absolute --git-common-dir` が同じ | メインの作業ツリー (`git rev-parse --git-common-dir` の親) で動くセッションから起動し直す |
-| 2 | 呼び出し元のセッションの作業ツリーから見て、`tmp/review-rally/` が git に無視されている | `git check-ignore -q tmp/review-rally/x/rally.yaml` | ファイル `.gitignore` に `tmp/` を足し、現在のブランチにコミットしてから起動し直す |
-| 3 | 呼び出し元のセッションの作業ツリーから見て、`.claude/worktrees/` が git に無視されている | `git check-ignore -q .claude/worktrees/review-rally` | ファイル `.gitignore` に `.claude/worktrees/` を足し、現在のブランチにコミットしてから起動し直す |
-| 4 | 呼び出し元のセッションの作業ツリーが clean である | `git status --porcelain` が空 | 出ている変更をコミットするか退避してから起動し直す |
-| 5 | 記録が読める | 記録 YAML (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`) が無いか、YAML として読める | 無ければ新規として扱う。あるのに読めなければ、読めない理由を報告する |
-| 6 | 全量の起点のブランチが決まる | [arguments.md](arguments.md) の `--base` の段落と「値の検査」 | `--base` で、使えるブランチを指定する |
+| 1 | 呼び出し元のセッションの作業ツリーから見て、`tmp/review-rally/` が git に無視されている | `git check-ignore -q tmp/review-rally/x/rally.yaml` | ファイル `.gitignore` に `tmp/` を足し、現在のブランチにコミットしてから起動し直す |
+| 2 | 呼び出し元のセッションの作業ツリーから見て、`.claude/worktrees/` が git に無視されている | `git check-ignore -q .claude/worktrees/review-rally` | ファイル `.gitignore` に `.claude/worktrees/` を足し、現在のブランチにコミットしてから起動し直す |
+| 3 | 呼び出し元のセッションの作業ツリーが clean である | `git status --porcelain` が空 | 出ている変更をコミットするか退避してから起動し直す |
+| 4 | 記録が読める | 記録 YAML (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`) が無いか、YAML として読める | 無ければ新規として扱う。あるのに読めなければ、読めない理由を報告する |
+| 5 | 全量の起点のブランチが決まる | [arguments.md](arguments.md) の `--base` の段落と「値の検査」 | `--base` で、使えるブランチを指定する |
+
+呼び出し元のセッションは、worktree で動いていても、メインの作業ツリー (`git worktree add` で追加したものではない、元の作業ツリー) で動いていてもよい。どちらでも手順は同じで、上の確認はすべて呼び出し元のセッションの作業ツリーについて行う。記録とループのディレクトリもこの作業ツリーにあるので、別の作業ツリーで同じブランチのループを始めると、記録が無いものとして扱われる。
 
 ## ループのディレクトリを作る
 
@@ -45,7 +46,10 @@
 2. **ツール `get_session` で起動したセッションの値を読み、`rally.yaml` の `session` に書いてから確認する** (書く値の出所は下の「`rally.yaml`」の `session` の行。`reused` と `original_head` は次の 3 で書く)。次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
    - `model` が指定と違う。指定が別名 (`opus` など) なら、`model` から `claude-` と版を除いた部分が別名と等しければ一致とする。指定が版を含む名前なら、`claude-` を除いた名前どうしで比べる。
    - `effort` が指定と違う。
-   - `worktreePath` が無いか、メインの作業ツリーの `.claude/worktrees/` の下にない。
+   - `worktreePath` が無いか、次のどれかを満たさない。レビューのセッションがこの作業ツリーの HEAD を切り替えるので、メインの作業ツリーと呼び出し元のセッションの作業ツリーを除く。
+     - 同じリポジトリの worktree のルートである (`git -C <worktreePath> rev-parse --show-toplevel` がそのパス自身の実体パスで、`git -C <worktreePath> rev-parse --path-format=absolute --git-common-dir` が呼び出し元のセッションの同じ値と一致する)。
+     - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が上の `--git-common-dir` の値と違う)。
+     - 呼び出し元のセッションの作業ツリーと違う。
    - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
 
 3. **レビューの worktree が再利用されたかを控える。** アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) で使う。
