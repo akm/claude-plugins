@@ -1,0 +1,42 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M6NH5T9F3WBQ2E6812PQMTYD",
+  "strategy": "manual-commit",
+  "branch": "feat/review-rally-worktree-session-170",
+  "checkpoints_count": 29,
+  "files_touched": [
+    "review-triage/skills/review-rally/references/round.md",
+    "review-triage/skills/review-rally/references/session.md",
+    "review-triage/skills/review-rally/references/stops.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 10227,
+    "cache_read_tokens": 1222563,
+    "output_tokens": 9159,
+    "api_call_count": 2
+  },
+  "redaction": {
+    "replacements": 27,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 4,
+      "key_context": 23,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
