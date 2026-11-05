@@ -50,7 +50,7 @@
      - 同じリポジトリの worktree のルートである (確認の仕方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 1 の `--target-dir` の確認)。
      - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が、同じオプションの `--git-common-dir` の値と違う)。
      - 呼び出し元のセッションの作業ツリーと違う。
-   - `branch` が空か、レビューの worktree でチェックアウトされているブランチ (`git -C <worktreePath> branch --show-current` の出力) と違う。依頼のメッセージの `git checkout -B` がこの名前のブランチを動かすので、別のブランチを指していると、関係のないブランチが動くためである。
+   - `session.branch` が空である。レビューの worktree の HEAD がブランチを指していないので、依頼のメッセージの `git checkout -B` に渡す名前が決まらない。
    - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
 
 3. **レビューの worktree が再利用されたかを控える。** アプリは、残っている worktree を再利用して新しいブランチに切り替えることがある。`git -C <worktreePath> reflog -n 2 --format=%gs` の 1 行目が `checkout: moving from <元の HEAD> to <新しいブランチ>` の形なら、再利用された worktree である。`<元の HEAD>` (detached HEAD なら SHA、ブランチならブランチ名) を `rally.yaml` の `session.original_head` に書き、`session.reused` を真にする。片付けの案内 ([stops.md](stops.md)) で使う。
@@ -116,7 +116,7 @@ waiting:
 | `state` | `active` (回している) か `stopped` (停止した) |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
-| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode`・`branch` は `get_session` の値。`reused` と `original_head` は上の「起動」の 3 |
+| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode` は `get_session` の値、`branch` は `git -C <worktreePath> branch --show-current` の出力。`branch` に `get_session` の値を使わないのは、依頼のメッセージの `git checkout -B` が動かし、片付けの案内の `git branch -D` が消すブランチなので、実際にチェックアウトされているブランチを書くためである。`reused` と `original_head` は上の「起動」の 3 |
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 1) |
