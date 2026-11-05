@@ -13,24 +13,24 @@
 
 | ディレクトリ | 置くもの | 書き込み元 |
 | --- | --- | --- |
-| 呼び出し元のセッションの作業ツリーの `tmp/review-rally/<ループの id>/` (ループのディレクトリ) | `rally.yaml` ([session.md](session.md))・停止のときの依頼文と結果の複製 ([stops.md](stops.md)) | 呼び出し元のセッション |
-| レビューの worktree の `tmp/review-rally/<ループの id>/` (依頼のディレクトリ) | 依頼文 (`review-request` が書く)・結果 (レビューのセッションが書く) | 呼び出し元のセッション (`review-request` を通して)・レビューのセッション |
+| 呼び出し元のセッションの作業ツリーの `tmp/review-rally/<ループの id>/` (ループのディレクトリ) | `rally.yaml` ([session.md](session.md))・依頼文 (`review-request` が書く)・停止のときの結果の複製 ([stops.md](stops.md)) | 呼び出し元のセッション |
+| レビューの worktree の `tmp/review-rally/<ループの id>/` (結果のディレクトリ) | 結果 | レビューのセッション |
 
-`review-request` の `--dir` には、依頼のディレクトリを、呼び出し元のセッションの作業ツリーのルートからの相対パス (`.claude/worktrees/<名前>/tmp/review-rally/<ループの id>`) で渡す。
+各セッションは自分の作業ツリーにだけ書き、もう一方のセッションには絶対パスで渡す。Claude のデスクトップアプリの hook が、worktree で動くセッションから別の作業ツリーへの Write ツールの書き込みを拒否するためである。
+
+`review-request` の `--dir` には `tmp/review-rally/<ループの id>` を渡す。`--target-dir` にレビューの worktree を渡すので、結果の出力先は結果のディレクトリになる ([review-request](../../review-request/SKILL.md) の手順 3)。
 
 ## 1 回のレビュー (RRL1)
 
 ### 手順
 
-1. **レビューの worktree を HEAD に合わせる。** `git -C <レビューの worktree> status --porcelain` が空であることを確認してから、`git -C <レビューの worktree> checkout --detach <呼び出し元のセッションの作業ツリーの HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。続けて、`git -C <レビューの worktree> check-ignore -q tmp/review-rally/<ループの id>/x` で、依頼のディレクトリが無視されていることを確認する。無視されていなければ RR4。
-   - パスは、レビューの worktree のルートからの相対パスで渡す。`.claude/worktrees/` から始まるパスを渡すと、`tmp/` の規則と関係なく無視と判定される。
-   - 依頼文を書く前に合わせるのは、レビューする HEAD の `.gitignore` で判定するため。
+1. **レビューの worktree を HEAD に合わせる。** `git -C <レビューの worktree> status --porcelain` が空であることを確認してから、`git -C <レビューの worktree> checkout --detach <呼び出し元のセッションの作業ツリーの HEAD の SHA>` を実行する。空でないか、切り替えられなければ RR2。
 2. **依頼文を書く。** 次をすべて確認してから、Skill ツールで [review-request](../../review-request/SKILL.md) を呼び出す。当たれば RR4 で、当たったものをすべて一度に報告する。
    - 呼び出し元のセッションの作業ツリーが clean である (`git status --porcelain` が空)。
    - 記録が読める。
    - 増分の回 (記録に回があり、`next_full` が偽) なら、最後の回の `head` が HEAD の祖先である (`git merge-base --is-ancestor <head> HEAD`)。
 
-   呼び出しは `review-request <loop.review_skill> <loop.model> <loop.review_args> --dir <依頼のディレクトリの相対パス> --target-dir <レビューの worktree の絶対パス>` (値は `rally.yaml`。`ce-code-review` には `<loop.review_args>` を渡さない)。記録に回が無いか、`rally.yaml` の `next_full` が真なら全量の回で、`--base <loop.base>` も渡す。記録に回がある状態の全量の回では、`--full-review` も渡す。
+   呼び出しは `review-request <loop.review_skill> <loop.model> <loop.review_args> --dir tmp/review-rally/<ループの id> --target-dir <レビューの worktree の絶対パス>` (値は `rally.yaml`。`ce-code-review` には `<loop.review_args>` を渡さない)。記録に回が無いか、`rally.yaml` の `next_full` が真なら全量の回で、`--base <loop.base>` も渡す。記録に回がある状態の全量の回では、`--full-review` も渡す。
    - `review-request` が「同じ識別子の依頼文か結果が既にある」で書かなかったら、Bash ツールで `sleep 60` をバックグラウンドで起動し (`run_in_background: true`)、`description` を「review-rally <ループの id>: 識別子の衝突を避けるため分が変わるまで待機する。通知を受けたら review-rally の再入の手順へ」にして、ターンを終える。
    - それ以外の理由で書かなかったら RR4。
    - 書けたら、`next_full` を偽にする。
@@ -38,7 +38,7 @@
 4. **依頼する。** 送る直前に、リポジトリのブランチの一覧 (`git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads`) を取る。ツール `SendMessage` で、宛先 `to` をレビューのセッションの id (`rally.yaml` の `session.id`) にして、下の「依頼のメッセージ」を送る。結果が `delivered` か `queued` でなければ RR3。送ったら、`rally.yaml` の `waiting` に、識別子・送った時刻 (`date -u +%Y-%m-%dT%H:%M:%SZ`)・ブランチの一覧 (`refs`) を書き、`requests` を 1 つ増やす。記録に回がある状態の全量の回でなければ、`rounds` も 1 つ増やす (J5 が見る回数。数えるのはここだけ。数えない回の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「収束後の全量レビューと、その要否」の「上限」の段落)。
 5. **待機を起動して、ターンを終える** (下の「待機」)。
 6. **突き合わせる。** 上から順に確認し、最初に通らなかったところで RR1。
-   1. 結果のファイル (依頼のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
+   1. 結果のファイル (結果のディレクトリの `review-<識別子>.yaml`) を照合する。照合することの SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」の「結果のファイルの照合」。
    2. レビューの worktree の HEAD が依頼文の `head` と同じコミットで、`git -C <レビューの worktree> status --porcelain` が空である。
    3. 呼び出し元のセッションの作業ツリーの HEAD が依頼文の `head` と同じコミットで、現在のブランチ (`git symbolic-ref -q --short HEAD` の出力。detached HEAD なら何も出ない) が `rally.yaml` の `branch` と同じで、`git status --porcelain` が空である。ブランチも比べるのは、同じコミットを指す別のブランチに替わったことを検出するため。
    4. ブランチの一覧 (取り方は手順 4) が `rally.yaml` の `waiting.refs` と同じである。3 と 4 を確認するのは、レビュアのテストがリポジトリのブランチと HEAD を書き換えた実例があるため。
@@ -106,7 +106,7 @@ review-rally <ループの id> (<識別子>): 依頼の後の 30 分ごとの確
 | `true` | 今から 60 分以内 | レビュー中。待機の通知で入ったなら、待機を起動し直す。ターンの終了の通知で入ったなら、何もせずに終える |
 | `true` | 今から 60 分より前 | RR1 (応答なし) |
 | `false` | `waiting.sent_at` より前 | 依頼を受けたターンがまだ始まっていない。待機の通知で入ったなら RR3 (依頼が処理されない)。ターンの終了の通知で入ったなら、何もせずに終える |
-| `false` | `waiting.sent_at` より後 | 依頼を受けたターンが、完了のメッセージを送らずに終了した。依頼のディレクトリに結果のファイル (`review-<識別子>.yaml`) があれば手順 6 に進む。無ければ RR1 |
+| `false` | `waiting.sent_at` より後 | 依頼を受けたターンが、完了のメッセージを送らずに終了した。結果のディレクトリに結果のファイル (`review-<識別子>.yaml`) があれば手順 6 に進む。無ければ RR1 |
 
 ## L2 で `review-triage` に渡すもの
 
