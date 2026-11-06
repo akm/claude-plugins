@@ -301,26 +301,10 @@ func recordBelowMinimumRefProblems(doc *recordDoc, ri int, fd recordFinding) []s
 // 足したかどうかは、この回の指摘の below_minimum_ref が参照しているかで見る。呼び出し元は、
 // 記録の最後の回についてだけ呼ぶ。
 func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
-	type key struct{ run, finding int }
-	remaining := map[key]string{} // 残っている下限未満の指摘と、その必要度
-	var order []key
-	for pi := 0; pi < ri; pi++ {
-		for _, fd := range doc.Runs[pi].Findings {
-			if ref := fd.BelowMinimumRef; ref != nil && !(judgmentOmitted(fd) && fd.Verdict == "below_minimum") {
-				// 判定し直したか、採択 (A3) にした。参照先は残っていない。
-				delete(remaining, key{ref.Run, ref.Finding})
-			}
-			if fd.Verdict == "below_minimum" && fixNecessityRank(fd.FixNecessity) > 0 {
-				k := key{pi + 1, fd.ID}
-				remaining[k] = fd.FixNecessity
-				order = append(order, k)
-			}
-		}
-	}
-	referenced := map[key]bool{}
+	referenced := map[[2]int]bool{}
 	for _, fd := range doc.Runs[ri].Findings {
 		if ref := fd.BelowMinimumRef; ref != nil {
-			referenced[key{ref.Run, ref.Finding}] = true
+			referenced[[2]int{ref.Run, ref.Finding}] = true
 		}
 	}
 	minimum := doc.Runs[ri].MinFixNecessity
@@ -330,14 +314,14 @@ func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
 		return nil
 	}
 	var problems []string
-	for _, k := range order {
-		necessity, ok := remaining[k]
-		if !ok || referenced[k] || fixNecessityBelow(necessity, minimum) {
+	for _, e := range belowMinimumEntries(doc.Runs[:ri]) {
+		necessity := e.finding.FixNecessity
+		if e.resolved || referenced[[2]int{e.run, e.finding.ID}] || fixNecessityBelow(necessity, minimum) {
 			continue
 		}
 		problems = append(problems, fmt.Sprintf(
 			"残っている下限未満の指摘 (%d 回目の id %d。必要度 %s) が、この回の下限 %s 以上なのに、この回の findings に足されていません (origin: prior_below_minimum と below_minimum_ref を書いて足す)",
-			k.run, k.finding, necessity, minimum))
+			e.run, e.finding.ID, necessity, minimum))
 	}
 	return problems
 }
@@ -381,18 +365,14 @@ type belowMinimumEntry struct {
 	reported []string
 }
 
-// renderBelowMinimumSection は節「下限未満の指摘」を書く。記録に下限未満の指摘が 1 件も
-// 無ければ何も書かない。並べるのは残っている指摘だけで、必要度ごとの表にする。
-// 件数はここで数え、人が書いた集計をどこからも読まない (推移の表と同じ)。
-func renderBelowMinimumSection(b *strings.Builder, doc *recordDoc) {
+// belowMinimumEntries は、runs の中の、必要度を判定して下限未満にした指摘を、記録の順に返す。
+// 足し忘れの検査と節「下限未満の指摘」の両方が、これで「残っている」を決める。別々に決めると、
+// 片方だけを変えたときに、検査と生成サマリの結果が一致しなくなる。
+func belowMinimumEntries(runs []recordRun) []*belowMinimumEntry {
 	var entries []*belowMinimumEntry
 	index := map[[2]int]*belowMinimumEntry{}
-	hasBelowMinimum := false
-	for ri, run := range doc.Runs {
+	for ri, run := range runs {
 		for _, fd := range run.Findings {
-			if fd.Verdict == "below_minimum" {
-				hasBelowMinimum = true
-			}
 			if ref := fd.BelowMinimumRef; ref != nil {
 				if e := index[[2]int{ref.Run, ref.Finding}]; e != nil {
 					if judgmentOmitted(fd) && fd.Verdict == "below_minimum" {
@@ -409,10 +389,26 @@ func renderBelowMinimumSection(b *strings.Builder, doc *recordDoc) {
 			}
 		}
 	}
+	return entries
+}
+
+// renderBelowMinimumSection は節「下限未満の指摘」を書く。記録に下限未満の指摘が 1 件も
+// 無ければ何も書かない。並べるのは残っている指摘だけで、必要度ごとの表にする。
+// 件数はここで数え、人が書いた集計をどこからも読まない (推移の表と同じ)。
+func renderBelowMinimumSection(b *strings.Builder, doc *recordDoc) {
+	hasBelowMinimum := false
+	for _, run := range doc.Runs {
+		for _, fd := range run.Findings {
+			if fd.Verdict == "below_minimum" {
+				hasBelowMinimum = true
+			}
+		}
+	}
 	if !hasBelowMinimum {
 		return
 	}
 	b.WriteString("\n## 下限未満の指摘\n")
+	entries := belowMinimumEntries(doc.Runs)
 	remaining := 0
 	for _, necessity := range []string{"must", "should", "could"} {
 		var rows []*belowMinimumEntry
