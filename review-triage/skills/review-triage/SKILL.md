@@ -1,6 +1,6 @@
 ---
 name: review-triage
-description: code-review や ce-code-review が出したレビュー指摘を一件ずつ吟味し、採択 / 保留 / 却下 / 下限未満 (修正の必要度が、指定した下限に満たない) を判断して記録する。修正は行わない。「レビューの指摘を選り分けて」「この指摘は対処すべきか判断して」「review-triage を実行して」のような依頼で使う。同じセッションで直前に実行したレビューの指摘を対象にする。唯一の引数 --gen-config は、指摘の有無に関わらず設定ファイルの雛形を生成して終了する。
+description: code-review や ce-code-review が出したレビュー指摘を一件ずつ吟味し、採択 / 保留 / 却下 / 下限未満 (修正の必要度が、指定した下限に満たない) を判断して記録する。修正は行わない。「レビューの指摘を選り分けて」「この指摘は対処すべきか判断して」「review-triage を実行して」のような依頼で使う。同じセッションで直前に実行したレビューの指摘を対象にする。引数 --min-fix-necessity <must|should|could> で、修正の必要度の下限を指定できる。引数 --gen-config は、指摘の有無に関わらず設定ファイルの雛形を生成して終了する。
 ---
 
 # review-triage: レビュー指摘の採否の判断
@@ -23,12 +23,13 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 
 1. **入力の確認**: 入力の経路は 2 つで、同じセッションの文脈から受け取るか、**別セッションのレビュー結果を YAML ファイルで受け取る** (依頼の運用と様式の SSOT は [references/review-request.md](references/review-request.md)。依頼文は [review-request](../review-request/SKILL.md) スキルが生成する)。どのスキルかは記録の `skill` に残す。
    - ファイル経由の場合、読むのは**依頼文に埋め込んだ出力先の 1 ファイル** (`tmp/review-<識別子>.yaml`)。`head` が現在の HEAD と一致することを確認してから判定に進む。`residual` の要素は指摘として数えず、目を通して気になるものだけ記録の `notes` に写す。**直したい residual は `notes` ではなく、自己採択の指摘 (`origin: residual`) として `findings` に足し、他の指摘と同じ判定を通す** (様式と理由の SSOT は [references/record-schema.md](references/record-schema.md) の「ループ中に記録の外で直さない」)。トップレベルの `attrs` も同じ扱いで、記録に写す場所は無いので、残す価値があるものだけ `notes` に写す。
-   - **前の回までの残っている下限未満の指摘のうち、修正の必要度がこの回の下限以上のもの (下限が無い回ではすべて) は、この回の指摘として `findings` に足す** (`origin: prior_below_minimum`。条件と様式の SSOT は [references/record-schema.md](references/record-schema.md) の「下限未満の指摘の参照」)。足した指摘も、下の「指摘が見当たらなければ」の指摘に数える。
+   - **前の回までの残っている下限未満の指摘のうち、修正の必要度がこの回の下限以上のもの (下限が無い回ではすべて) は、この回の指摘として `findings` に足す** (`origin: prior_below_minimum`。条件と様式の SSOT は [references/record-schema.md](references/record-schema.md) の「下限未満の指摘の参照」)。この回の下限は、手順 2 の決め方で先に決める。足した指摘も、下の「指摘が見当たらなければ」の指摘に数える。
    - **出力先には過去の回のファイルが残る。** 識別子で名前が区別できる (成分の SSOT は [review-request](../review-request/SKILL.md) の手順 3) が、それでも `head` が現在の HEAD と一致するものだけを対象にし、一致するものが無ければ指摘が無い場合と同じ扱いにする。古い結果を現在の HEAD への指摘として判定すると、既に直した箇所を再び却下・採択することになる。
    - **上流が報告のみで実行されたかを確認する** (実行前後で HEAD と作業ツリーが不変)。適用済みなら判定に進まず、その旨を報告して次から報告のみで実行するよう案内する。
    - 指摘が見当たらなければ、レビューを先に実行するよう案内して終了する。**勝手にレビューを実行しない。**
 2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) で、「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
    - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録のディレクトリ・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が検査されないまま通る)。
+   - **この回の修正の必要度の下限を決める。** 引数 `--min-fix-necessity <must|should|could>` があればその値、無ければ設定の `triage.min_fix_necessity`、どちらにも無ければ下限は無い (キーと未設定の定義の SSOT は [references/project-config.md](references/project-config.md) の「`triage`」)。値が 3 つのどれでもなければ、判定を始めずに、引数と設定のどちらの値かを添えてエラーを報告する。
 3. **判定**: 指摘ごとに [references/judgment-flow.md](references/judgment-flow.md) の図に従って決着させる。
    - **指摘が解決策を示しているときは、問題と解決策を分けて書く。** 問題を要旨 (`summary`) と帰結に書き、解決策は `suggested_fix` に写す (様式の SSOT は [references/record-schema.md](references/record-schema.md) の `findings[]`)。判定と必要度は、問題に対して決める。
    - 帰結の 4 項目 (D3 で書くもの) は、D1 に進んだ指摘の**全件に書く。** D1・D2 で決着した指摘にも記録の材料として残す。
