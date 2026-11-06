@@ -334,6 +334,59 @@ func TestReviewTriageRecordFixNecessityRequiredFromFirstRun(t *testing.T) {
 	}
 }
 
+// 残っている下限未満の指摘のうち、必要度がその回の下限以上のものを、その回の指摘として
+// 足していなければ報告する。下限に満たないもの・その回が参照しているもの・前の回で判定し直したか
+// 採択にしたものは報告しない。
+func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
+	// 1 回目 (下限 must) に、Should (id 1) と Could (id 2) の下限未満がある。
+	run1 := fixNecessityRunYAML("must",
+		fixNecessityFindingYAML(1, "should", reasonShould, "below_minimum", "B1")+
+			fixNecessityFindingYAML(2, "could", reasonCould, "below_minimum", "B1"), "")
+	other := fixNecessityFindingYAML(9, "must", reasonMust, "adopted", "A2")
+	addShould := omittedFindingYAML(1, 1, 1, "prior_below_minimum", "adopted", "A3")
+	addCould := omittedFindingYAML(2, 1, 2, "prior_below_minimum", "adopted", "A3")
+	const missing = "この回の findings に足されていません"
+	cases := []struct {
+		name string
+		runs string
+		want []string // 報告に含まれるべき語 (1 件に 1 つ)。空なら報告されない
+	}{
+		{"下限が同じ回は、足さなくてよい", fixNecessityRunYAML("must", other, ""), nil},
+		{"下限を should に下げた回は、Should を足す", fixNecessityRunYAML("should", other, ""),
+			[]string{"1 回目の id 1。必要度 should) が、この回の下限 should 以上"}},
+		{"下限を should に下げて Should を足した回は、報告しない", fixNecessityRunYAML("should", addShould, ""), nil},
+		{"下限を無くした回は、すべて足す", fixNecessityRunYAML("", other, ""),
+			[]string{"1 回目の id 1。必要度 should) が、この回に下限が無い", "1 回目の id 2。必要度 could) が、この回に下限が無い"}},
+		{"下限を無くして両方を足した回は、報告しない", fixNecessityRunYAML("", addShould+addCould, ""), nil},
+		{"前の回で採択にした指摘は、後の回で足さなくてよい",
+			fixNecessityRunYAML("should", addShould, fixNecessityPlanYAML) + fixNecessityRunYAML("should", other, ""), nil},
+		{"足し忘れた回の次の回でも報告する",
+			fixNecessityRunYAML("should", fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2"), fixNecessityPlanYAML) +
+				fixNecessityRunYAML("should", other, ""),
+			[]string{"runs[1]", "runs[2]"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			for _, p := range fixNecessityProblems("runs:\n" + run1 + tc.runs) {
+				if strings.Contains(p, missing) {
+					got = append(got, p)
+				} else {
+					t.Fatalf("足し忘れのほかの問題が出た: %s", p)
+				}
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("足し忘れの報告が %d 件、want %d 件 (%v)。出た問題: %v", len(got), len(tc.want), tc.want, got)
+			}
+			for i, w := range tc.want {
+				if !strings.Contains(got[i], w) {
+					t.Fatalf("報告 %d に %q が無い: %q", i, w, got[i])
+				}
+			}
+		})
+	}
+}
+
 // 生成サマリの、推移の表・節「下限未満の指摘」・指摘の表の判定の欄を検証する。
 func TestReviewTriageSummaryFixNecessity(t *testing.T) {
 	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(fixNecessityRecordYAML()))

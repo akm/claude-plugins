@@ -652,6 +652,10 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 		}
 
+		for _, m := range recordPriorBelowMinimumProblems(doc, ri) {
+			add("%s: %s", rn, m)
+		}
+
 		problemIDs := map[string]bool{}
 		for _, pl := range run.Plans {
 			if pl.ProblemID != "" && problemIDs[pl.ProblemID] {

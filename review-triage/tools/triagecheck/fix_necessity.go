@@ -282,6 +282,57 @@ func recordBelowMinimumRefProblems(doc *recordDoc, ri int, fd recordFinding) []s
 	return problems
 }
 
+// recordPriorBelowMinimumProblems は、回 (添字 ri) に足すべき下限未満の指摘が、足されているかを
+// 検査する。それより前の回の、残っている下限未満の指摘 (必要度を判定して下限未満にした指摘で、
+// この回より前の回の指摘が参照して、判定し直しても採択にしてもいないもの) のうち、必要度がこの回の
+// 下限以上のもの (下限が無い回ではすべて) は、この回の指摘として足す (record-schema.md の
+// 「下限未満の指摘の参照」)。足し忘れると、下限を下げても、その指摘は採択にならず直されないまま残る。
+// 足したかどうかは、この回の指摘の below_minimum_ref が参照しているかで見る。
+func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
+	type key struct{ run, finding int }
+	remaining := map[key]string{} // 残っている下限未満の指摘と、その必要度
+	var order []key
+	for pi := 0; pi < ri; pi++ {
+		for _, fd := range doc.Runs[pi].Findings {
+			if ref := fd.BelowMinimumRef; ref != nil && !(judgmentOmitted(fd) && fd.Verdict == "below_minimum") {
+				// 判定し直したか、採択 (A3) にした。参照先は残っていない。
+				delete(remaining, key{ref.Run, ref.Finding})
+			}
+			if fd.Verdict == "below_minimum" && fixNecessityRank(fd.FixNecessity) > 0 {
+				k := key{pi + 1, fd.ID}
+				remaining[k] = fd.FixNecessity
+				order = append(order, k)
+			}
+		}
+	}
+	referenced := map[key]bool{}
+	for _, fd := range doc.Runs[ri].Findings {
+		if ref := fd.BelowMinimumRef; ref != nil {
+			referenced[key{ref.Run, ref.Finding}] = true
+		}
+	}
+	minimum := doc.Runs[ri].MinFixNecessity
+	var problems []string
+	for _, k := range order {
+		necessity, ok := remaining[k]
+		if !ok || referenced[k] || fixNecessityBelow(necessity, minimum) {
+			continue
+		}
+		// 下限が列挙に無い値のときは、比べられないので報告しない (列挙の誤りは別に報告する)。
+		if minimum != "" && fixNecessityRank(minimum) == 0 {
+			continue
+		}
+		limit := "この回に下限が無い"
+		if minimum != "" {
+			limit = "この回の下限 " + minimum + " 以上"
+		}
+		problems = append(problems, fmt.Sprintf(
+			"残っている下限未満の指摘 (%d 回目の id %d。必要度 %s) が、%sのに、この回の findings に足されていません (origin: prior_below_minimum と below_minimum_ref を書いて足す)",
+			k.run, k.finding, necessity, limit))
+	}
+	return problems
+}
+
 // findingFixNecessity は指摘の必要度を返す。判定を省略した指摘は、参照先の必要度。
 // 分からなければ空。
 func findingFixNecessity(doc *recordDoc, ri int, fd recordFinding) string {
