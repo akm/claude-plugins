@@ -139,8 +139,8 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | --- | --- | --- |
 | `run` | ✓ | 参照先の指摘の回 (同じファイル内の 1 始まりの回番号)。この回より前の回 |
 | `finding` | ✓ | 参照先の指摘の `id`。**参照先にできるのは、必要度を判定して下限未満にした指摘 (`verdict: below_minimum` で、`fix_necessity` を持つ) だけ。** 判定を省略した指摘 (B2) は参照先にしない |
-| `line_check` | ✓ | D9 の (2) の結果。ツール lineorigin が返した `holds` / `not-holds` / `unverifiable` |
-| `line_reason` | ✓ | (2) の結果の理由。書き方は `prior_defect` の `line_reason` と同じ |
+| `line_check` | ✓ | D9 の (2) の結果。`holds` / `not-holds` / `unverifiable` |
+| `line_reason` | ✓ | (2) の結果の理由。ツールを使ったときの書き方は、`prior_defect` の `line_reason` と同じ |
 
 - **`line_check` が `holds` の指摘は、D9 で当たって判定を省略した指摘 (A3・B2) である。** 分類 (`category`)・被害者・帰結・根拠の検証・ゲート・前からある欠陥・必要度のキーは書かず、読むときは参照先の指摘のものを読む。`verdict` は、参照先の `fix_necessity` と、この回の `min_fix_necessity` から決まる (D12)。機械検査は、参照先の実在と、書かないキーが無いことと、`verdict` を報告する。
 - **`line_check` が `holds` 以外の指摘は、D1 から通常どおり判定した指摘である。** ほかのキーも通常どおり書く。
