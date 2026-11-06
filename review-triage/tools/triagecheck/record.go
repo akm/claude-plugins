@@ -715,14 +715,14 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
 			// status ごとに決まる (スキーマ表の approach の行)。修正に進む状態
 			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
-			// では任意 (人間の立案待ちは approach を持たず、人間の回答の後に書く)、
-			// investigated では逆に書いてあれば報告する。
+			// では任意 (人間の立案待ちは approach を持たず、人間の回答の後に書く)、not-fixed
+			// でも任意 (直さないと決めた問題)、investigated では逆に書いてあれば報告する。
 			approachRequired := func() {
 				if pl.Approach == "" {
 					add("%s: approach がありません", pn)
 				}
 			}
-			// noSHAYet はまだ修正していない状態 (investigated / pending / awaiting-human) の
+			// noSHAYet はまだ修正していない状態 (investigated / pending / awaiting-human / not-fixed) の
 			// 共通の検査で、done-external 専用のキーが無く、sha も無いことを確認する。
 			noSHAYet := func() {
 				externalOnly()
