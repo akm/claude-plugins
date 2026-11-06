@@ -249,7 +249,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `doc_change` | | 文書への指摘で検討した結果。`remove` (消す) / `rewrite` (書き換える) / `add` (足す)。`choice` が `undecided` なら書かない。文書を変える問題かどうかは記録から決められないので、無いことは検査しない |
 | `doc_change_reason` | △ | 前の順のもので済まない理由。**`doc_change` が `rewrite` か `add` なら必須、それ以外では書かない** |
 
-**必須にする状態は `pending` / `done` / `done-external` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human`。** `pending` / `done` / `done-external` で必須にする回の決め方は、`prior_defect` と同じ (上の「前からある欠陥」の「必須にするのは」の段落) で、記録の中で最初に `decision` を書いた回と、それより後の回だけである。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
+**必須にする状態は `pending` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human` / `done` / `done-external`。** `pending` で必須にする回の決め方は、`prior_defect` と同じ (上の「前からある欠陥」の「必須にするのは」の段落) で、記録の中で最初に `decision` を書いた回と、それより後の回だけである。`done` / `done-external` で必須にしないのは、`plans` は過去の回も後から更新するので、`decision` を書く前に直した問題が、どの回にもありうるためである。修正を終える問題は `pending` を通るので、書き忘れは立案の直後の検査で報告される。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
 
 ```yaml
       - problem_id: P1

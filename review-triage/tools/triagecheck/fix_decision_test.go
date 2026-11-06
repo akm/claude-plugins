@@ -141,11 +141,16 @@ func TestReviewTriageRecordDecisionCombinationsPass(t *testing.T) {
 	}
 }
 
-// decision を必須にするのは、記録の中で最初に書いた回と、それより後の回。それより前の回と、
-// 1 度も書いていない記録は、無くても報告しない (prior_defect と同じ決め方)。選択待ちでは任意。
+// pending の問題に decision を必須にするのは、記録の中で最初に書いた回と、それより後の回。それより
+// 前の回と、1 度も書いていない記録は、無くても報告しない (prior_defect と同じ決め方)。done には
+// どの回でも求めない (plans は過去の回を後から更新するので、書く前に直した問題が後の回にもありうる)。
 func TestReviewTriageRecordDecisionRequiredFromFirstRun(t *testing.T) {
 	asLaterRun := func(src string) string { return strings.TrimPrefix(src, "runs:\n") }
 	with := decisionRecordYAML(t, decisionBaselineYAML, "pending")
+	done := strings.Replace(validRecordYAML, "        sha: \"\"\n        status: pending\n", "        sha: abc1234\n        status: done\n", 1)
+	if done == validRecordYAML {
+		t.Fatal("フィクスチャの置換が適用されていない")
+	}
 	cases := []struct {
 		name string
 		src  string
@@ -154,6 +159,7 @@ func TestReviewTriageRecordDecisionRequiredFromFirstRun(t *testing.T) {
 		{"1 度も書いていない記録は報告しない", validRecordYAML + asLaterRun(validRecordYAML), nil},
 		{"書いた回より前の回は報告しない", validRecordYAML + asLaterRun(with), nil},
 		{"書いた回より後の回の書き忘れを報告する", with + asLaterRun(validRecordYAML), []string{"runs[1]"}},
+		{"書いた回より後の回でも、done には求めない", with + asLaterRun(done), nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
