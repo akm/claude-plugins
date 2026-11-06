@@ -38,7 +38,7 @@ description: レビューを、このセッションから起動した別の Cla
 
 人間のメッセージ以外で始まったターンは、[round.md](references/round.md) の「再入の手順」に入る。
 
-- L2 では、Skill ツールで `review-triage` を呼び出す。指摘が 0 件の回も呼び出す。`rally.yaml` に `loop.min_fix_necessity` があれば、`--min-fix-necessity` に渡す。渡すものは [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」。
+- L2 では、Skill ツールで `review-triage` を呼び出す。指摘が 0 件の回も呼び出す。`rally.yaml` に `loop.min_fix_necessity` があれば、`--min-fix-necessity` に渡す (扱いの SSOT は [arguments.md](references/arguments.md))。渡すものは [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」。
 - F1 では、Skill ツールで `review-triage-fix` を呼び出し、ループの状態のファイル `tmp/review-rally/<ループの id>/rally.yaml` (様式は [session.md](references/session.md)) の `loop.threshold` を `--threshold` に、`loop.stages` の各要素を `--stage` に渡す。
 
 ### 停止

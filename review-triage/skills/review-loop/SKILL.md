@@ -54,7 +54,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 **待機の通知と `--resume` は、同じ 1 つの入口 ([reentry.md](references/reentry.md) の「再入の手順」) に入る。** 通知の `description` にループ id・回・識別子が書いてあるので、会話の文脈が無くても入口に戻れる。
 
 - `--resume [<ループのディレクトリ>]` は、ループを探し (探し方と、受け付ける引数 `--max`・`--full-review` (と、`loop.yaml` に `review.base` が無いときだけ `--base`) の扱いは [arguments.md](references/arguments.md))、条件を `loop.yaml` から読んでから入口に入る (レビュアの実行のサンドボックスで書き込みを許す場所と接続を許すドメインだけは、入口の手順 1 で設定から再度読み込む)。この起動で数える回数は 0 から始める。
-- 取り込んだ回は、L2 で Skill ツールで `review-triage` を呼んで渡す (指摘が 0 件の回も呼ぶ。`loop.yaml` に `loop.min_fix_necessity` があれば、`--min-fix-necessity` に渡す。呼ぶスキルの規則と渡すものの SSOT は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」、このスキルでの値は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)。その後は図のとおり J2 に進む。
+- 取り込んだ回は、L2 で Skill ツールで `review-triage` を呼んで渡す (指摘が 0 件の回も呼ぶ。`loop.yaml` に `loop.min_fix_necessity` があれば、`--min-fix-necessity` に渡す (扱いの SSOT は [arguments.md](references/arguments.md))。呼ぶスキルの規則と渡すものの SSOT は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」、このスキルでの値は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)。その後は図のとおり J2 に進む。
 - F1 では Skill ツールで `review-triage-fix` を呼び、`loop.yaml` の `loop.threshold` を `--threshold` に、`loop.stages` の各要素を `--stage` に渡す。
 
 ### 停止
