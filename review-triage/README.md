@@ -92,7 +92,7 @@ Markdown の修正の差分から、コミット前に再確認する範囲を�
 
 `loop` は `review-triage-loop` の既定 (上限・レビュースキル・そのオプション・モデル) で、`review-triage` と `review-triage-fix` だけを使うなら要りません。各キーの意味と「未設定」の定義は [project-config.md](skills/review-triage/references/project-config.md) の「`loop`」を参照してください。
 
-`triage` は `review-triage` の既定を書くキーで、修正の必要度の下限 (`min_fix_necessity`) を書けます。無ければ下限は無く、必要度に関わらず採択にします。
+`triage` は `review-triage` のデフォルト値を書くキーで、修正の必要度の下限 (`min_fix_necessity`) を書けます。無ければ下限は無く、必要度に関わらず採択にします。
 
 `fix` は `review-triage-fix` の既定を書くキーで、回数の閾値 N (`threshold_rounds`) と、フェーズ (調査 / 立案 / 修正) ごとに sub-agent で実行するか・その model と effort (`stages`) を書けます。無くても既定 (閾値 5、どのフェーズもセッション内) で動きます。各キーの意味は同ファイルの「`fix`」を参照してください。
 

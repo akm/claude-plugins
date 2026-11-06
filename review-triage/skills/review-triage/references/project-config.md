@@ -54,7 +54,7 @@
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を実行するコマンド | 検査を実行せず、**実行していないことを報告に明記する** |
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが SSOT として残る |
-| `triage` | `review-triage` の既定値 (下記) | 判定の既定値を持たない。修正の必要度の下限は無い |
+| `triage` | `review-triage` のデフォルト値 (下記) | 判定のデフォルト値を持たない。修正の必要度の下限は無い |
 | `loop` | `review-triage-loop` の既定値 (下記) | ループの既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に質問する |
 | `fix` | `review-triage-fix` の既定値 (下記) | 修正の既定値を持たない。`review-triage-fix` はキーごとの既定 (下の「`fix`」の表) に従う |
 | `review_loop` | `review-loop` (レビューを端末のワーカーに任せるループ) の既定値 (下記) | キーごとの既定 (下の「`review_loop`」の表) に従う |
@@ -76,9 +76,9 @@
 
 **`gates` が空のとき、免除条項は使わない。** 突き合わせ先が無いまま名前を書かせると、存在しない関門名が検査されないまま通る。**「関門が無いことを確認した」と「関門の一覧を持っていない」は別の事実である。**
 
-## `triage` — 判定の既定値
+## `triage` — 判定のデフォルト値
 
-[review-triage](../SKILL.md) が読む。ループの 3 つのスキル ([review-triage-loop](../../review-triage-loop/SKILL.md)・[review-loop](../../review-loop/SKILL.md)・[review-rally](../../review-rally/SKILL.md)) も、開始前の報告に書くために同じ既定を読む。**引数 `--min-fix-necessity` で指定された値が設定より優先する。**
+[review-triage](../SKILL.md) が読む。ループの 3 つのスキル ([review-triage-loop](../../review-triage-loop/SKILL.md)・[review-loop](../../review-loop/SKILL.md)・[review-rally](../../review-rally/SKILL.md)) も、開始前の報告に書くために同じデフォルト値を読む。**引数 `--min-fix-necessity` で指定された値が設定より優先する。**
 
 | キー | 意味 | 未設定のときの扱い |
 | --- | --- | --- |
