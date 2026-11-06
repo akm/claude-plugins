@@ -229,12 +229,14 @@ type recordPlan struct {
 	Verification *recordVerification `yaml:"verification"`
 	// DocDag は修正の後の doc-dag の確認 (対象と、どちらが SSOT か決まっていない重複・参照の循環の有無と対処)。任意だが、
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
-	DocDag    *recordDocDag `yaml:"doc_dag"`
-	Options   string        `yaml:"options"`
-	Order     int           `yaml:"order"`
-	DependsOn []string      `yaml:"depends_on"`
-	SHA       string        `yaml:"sha"`
-	Status    string        `yaml:"status"`
+	DocDag *recordDocDag `yaml:"doc_dag"`
+	// Decision は立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。型と検査は fix_decision.go。
+	Decision  *recordDecision `yaml:"decision"`
+	Options   string          `yaml:"options"`
+	Order     int             `yaml:"order"`
+	DependsOn []string        `yaml:"depends_on"`
+	SHA       string          `yaml:"sha"`
+	Status    string          `yaml:"status"`
 	// AppliedExternalURL / Notes は status: done-external の反映先の記録。
 	// リポジトリ外の成果物 (PR 本文・Issue のコメント・外部 Wiki など) への修正は
 	// コミットが立たないので sha を書けない。URL を必須にすると、URL を持たない
@@ -288,8 +290,10 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"帰結":      {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証":   {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
-		"investigation": true, "verification": true, "doc_dag": true, "options": true, "order": true, "depends_on": true, "sha": true,
+		"investigation": true, "verification": true, "doc_dag": true, "decision": true, "options": true, "order": true, "depends_on": true, "sha": true,
 		"status": true, "applied_external_url": true, "notes": true},
+	"立案の結果": {"target": true, "baseline": true, "baseline_fixed": true, "choice": true, "choice_reason": true,
+		"doc_change": true, "doc_change_reason": true},
 	"調査":          {"scope": true, "included": true, "excluded": true},
 	"検証":          {"near_edges": true},
 	"doc-dag の確認": {"scope": true, "result": true},
@@ -437,7 +441,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 旧様式の recurrence も同じで、null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない。重ねると 1 つの書き忘れが複数の問題になるため。
-var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "fix_necessity_reason": true, "below_minimum_ref": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "fix_necessity_reason": true, "below_minimum_ref": true, "decision": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
 // 値の無い構造キー (recordNullSilentKeys) を列挙する。
@@ -497,6 +501,8 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "検証")
 			case "doc_dag":
 				walkMap(v, "doc-dag の確認")
+			case "decision":
+				walkMap(v, "立案の結果")
 			case "recurrence":
 				walkMap(v, "検知")
 			case "evidence":
@@ -537,6 +543,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 	}
 	priorDefectFirstRun := recordPriorDefectFirstRun(doc.Runs)
 	fixNecessityFirstRun := recordFixNecessityFirstRun(doc.Runs)
+	decisionFirstRun := recordDecisionFirstRun(doc.Runs)
 	for ri, run := range doc.Runs {
 		rn := fmt.Sprintf("runs[%d] (%s %s)", ri, run.Date, run.Skill)
 		if !recordDateRe.MatchString(run.Date) {
@@ -768,8 +775,14 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: status done-external には applied_external_url (反映先の URL) か "+
 						"notes (反映先と、反映を確認した方法) のどちらかが必須", pn)
 				}
+			case "not-fixed":
+				// 今回は直さないと人間が決めた問題。コミットも外部への反映も無い。
+				noSHAYet()
 			default:
-				add("%s: status は investigated / pending / awaiting-human / done / done-external のいずれか: %q", pn, pl.Status)
+				add("%s: status は investigated / pending / awaiting-human / done / done-external / not-fixed のいずれか: %q", pn, pl.Status)
+			}
+			for _, m := range recordDecisionProblems(decisionFirstRun >= 0 && ri >= decisionFirstRun, pl) {
+				add("%s: %s", pn, m)
 			}
 			// 調査は investigated 以外の状態では任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
@@ -1019,6 +1032,12 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 			for _, pl := range run.Plans {
 				if pl.Investigation != nil {
 					fmt.Fprintf(&b, "\n- **%s の調査**: %s\n", recordCell(pl.ProblemID), renderInvestigation(pl.Investigation))
+				}
+			}
+			// 立案の結果。無い問題の行は出さない。無い記録の出力が変わると、既存のサマリがすべて古いと報告されるため。
+			for _, pl := range run.Plans {
+				if pl.Decision != nil {
+					fmt.Fprintf(&b, "\n- **%s の立案**: %s\n", recordCell(pl.ProblemID), renderDecision(pl.Decision))
 				}
 			}
 		}
@@ -1328,6 +1347,8 @@ func recordStatusJa(s string) string {
 		return "済"
 	case "done-external":
 		return "済 (リポジトリ外)"
+	case "not-fixed":
+		return "直さない"
 	}
 	return s
 }

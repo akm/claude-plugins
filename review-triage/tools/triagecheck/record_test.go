@@ -1811,7 +1811,7 @@ func TestReviewTriageRecordUnknownStatusListsInvestigated(t *testing.T) {
 	problems := reviewTriageRecordProblems([]string{reviewTriageDir + "feat-x.yaml"}, read)
 	found := false
 	for _, p := range problems {
-		if strings.Contains(p, "status は investigated / pending / awaiting-human / done / done-external のいずれか") {
+		if strings.Contains(p, "status は investigated / pending / awaiting-human / done / done-external / not-fixed のいずれか") {
 			found = true
 		}
 	}
