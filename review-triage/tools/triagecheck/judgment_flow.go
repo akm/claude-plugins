@@ -26,16 +26,16 @@ import (
 var judgmentFlowPath = ".claude/skills/review-triage/references/judgment-flow.md"
 
 var (
-	// judgmentFlowIDRe はノード ID の形。判定 (D)・評価 (E)・採択 (A)・保留 (H)・却下 (R)。
-	judgmentFlowIDRe = regexp.MustCompile(`\b([ADEHR]\d+)\b`)
+	// judgmentFlowIDRe はノード ID の形。判定 (D)・評価 (E)・採択 (A)・下限未満 (B)・保留 (H)・却下 (R)。
+	judgmentFlowIDRe = regexp.MustCompile(`\b([ABDEHR]\d+)\b`)
 	// judgmentFlowTableRowRe は決定表の行 (先頭セルが ID)。パイプ前後の空白の
 	// 詰め方には依存しない。
-	judgmentFlowTableRowRe = regexp.MustCompile(`^\|\s*([ADEHR]\d+)\s*\|`)
+	judgmentFlowTableRowRe = regexp.MustCompile(`^\|\s*([ABDEHR]\d+)\s*\|`)
 	// judgmentFlowQuoteRe は mermaid のラベル文字列。ID の抽出前に取り除く
 	// (ラベル内の "D1: ..." のような表示用の ID を数えないため)。
 	judgmentFlowQuoteRe = regexp.MustCompile(`"[^"]*"`)
 	// judgmentFlowColorRe は色コード。`#A12` のような大文字の短い 16 進が
-	// ID の形 ([ADEHR]\d+) に一致してしまうため、抽出前に取り除く (観点 F の反例)。
+	// ID の形 ([ABDEHR]\d+) に一致してしまうため、抽出前に取り除く (観点 F の反例)。
 	judgmentFlowColorRe = regexp.MustCompile(`#[0-9A-Fa-f]+`)
 	// judgmentFlowSeparatorRe は表の区切り行 (| --- | --- |)。直前の行は見出しで、
 	// 先頭セルが ID の形でも本体行として数えない。

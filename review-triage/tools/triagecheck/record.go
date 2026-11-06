@@ -67,15 +67,17 @@ type recordDoc struct {
 }
 
 type recordRun struct {
-	Date     string          `yaml:"date"`
-	Skill    string          `yaml:"skill"`
-	RunID    string          `yaml:"run_id"`
-	Model    string          `yaml:"model"`
-	Level    string          `yaml:"level"`
-	Scope    string          `yaml:"scope"`
-	Head     string          `yaml:"head"`
-	Findings []recordFinding `yaml:"findings"`
-	Plans    []recordPlan    `yaml:"plans"`
+	Date  string `yaml:"date"`
+	Skill string `yaml:"skill"`
+	RunID string `yaml:"run_id"`
+	Model string `yaml:"model"`
+	Level string `yaml:"level"`
+	Scope string `yaml:"scope"`
+	Head  string `yaml:"head"`
+	// MinFixNecessity は、この回の判定に使った修正の必要度の下限。下限が無い回では空。
+	MinFixNecessity string          `yaml:"min_fix_necessity"`
+	Findings        []recordFinding `yaml:"findings"`
+	Plans           []recordPlan    `yaml:"plans"`
 	// Recurrence は旧様式のキー。同じ種類の指摘が続いていることの判断 (検知) を
 	// 記録していたが、検知は廃止したので新しい回には書かれない。ディレクトリに残る
 	// 既存の記録を読み、生成サマリに従来どおり描画するために型と読み込みを残す。
@@ -137,7 +139,14 @@ type recordFinding struct {
 	// (premise_check.result が verified) にだけ書く。verdict_reason の自由記述に書く
 	// 規則だけでは、書き忘れても検査が何も報告しなかったため、キーにした (#110)。
 	PriorDefect *recordPriorDefect `yaml:"prior_defect"`
-	Attrs       map[string]any     `yaml:"attrs"`
+	// FixNecessity は修正の必要度 (must / should / could)。E3 で決められたときだけ書く。
+	// FixNecessityReason は E3 の 2 つの条件の結果で、E3 を行った指摘
+	// (premise_check.result が verified) にだけ書く。BelowMinimumRef は、D9 で同じ問題だと
+	// した前の回の下限未満の指摘への参照。型と検査は fix_necessity.go。
+	FixNecessity       string                    `yaml:"fix_necessity"`
+	FixNecessityReason *recordFixNecessityReason `yaml:"fix_necessity_reason"`
+	BelowMinimumRef    *recordBelowMinimumRef    `yaml:"below_minimum_ref"`
+	Attrs              map[string]any            `yaml:"attrs"`
 }
 
 // recordPriorDefect は findings[].prior_defect を表し、D8 の条件 (1)(2) の結果を持つ。
@@ -264,12 +273,15 @@ type recordInvestigation struct {
 var recordAllowedKeys = map[string]map[string]bool{
 	"トップレベル": {"runs": true},
 	"実行": {"date": true, "skill": true, "run_id": true, "model": true, "level": true,
-		"scope": true, "head": true, "findings": true, "plans": true, "recurrence": true, "notes": true},
+		"scope": true, "head": true, "min_fix_necessity": true, "findings": true, "plans": true, "recurrence": true, "notes": true},
 	"指摘": {"id": true, "file": true, "line": true, "summary": true, "category": true,
 		"audience": true, "audience_initial": true, "consequence": true, "premise_check": true,
-		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "prior_defect": true, "attrs": true},
+		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "prior_defect": true,
+		"fix_necessity": true, "fix_necessity_reason": true, "below_minimum_ref": true, "attrs": true},
 	"束ね先":     {"run": true, "problem": true},
 	"前からある欠陥": {"base": true, "line_check": true, "line_reason": true, "same_defect": true, "same_defect_reason": true},
+	"必要度の理由":  {"goal_without_action": true, "workaround": true, "workaround_reason": true},
+	"下限未満の参照": {"run": true, "finding": true, "line_check": true, "line_reason": true},
 	"帰結":      {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証":   {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
@@ -422,7 +434,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 旧様式の recurrence も同じで、null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない。重ねると 1 つの書き忘れが複数の問題になるため。
-var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "fix_necessity_reason": true, "below_minimum_ref": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
 // 値の無い構造キー (recordNullSilentKeys) を列挙する。
@@ -472,6 +484,10 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "束ね先")
 			case "prior_defect":
 				walkMap(v, "前からある欠陥")
+			case "fix_necessity_reason":
+				walkMap(v, "必要度の理由")
+			case "below_minimum_ref":
+				walkMap(v, "下限未満の参照")
 			case "investigation":
 				walkMap(v, "調査")
 			case "verification":
@@ -517,6 +533,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 		}
 	}
 	priorDefectFirstRun := recordPriorDefectFirstRun(doc.Runs)
+	fixNecessityFirstRun := recordFixNecessityFirstRun(doc.Runs)
 	for ri, run := range doc.Runs {
 		rn := fmt.Sprintf("runs[%d] (%s %s)", ri, run.Date, run.Skill)
 		if !recordDateRe.MatchString(run.Date) {
@@ -534,8 +551,12 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 		if run.Head == "" {
 			add("%s: head がありません (レビュー時点の短縮 SHA)", rn)
 		}
+		if run.MinFixNecessity != "" && fixNecessityRank(run.MinFixNecessity) == 0 {
+			add("%s: min_fix_necessity は must / should / could のいずれか (下限が無い回では書かない): %q", rn, run.MinFixNecessity)
+		}
 
 		priorDefectRequired := priorDefectFirstRun >= 0 && ri >= priorDefectFirstRun
+		fixNecessityRequired := fixNecessityFirstRun >= 0 && ri >= fixNecessityFirstRun
 		verdictByID := map[int]string{}
 		for fi, fd := range run.Findings {
 			fn := fmt.Sprintf("%s: findings[%d] (id %d)", rn, fi, fd.ID)
@@ -547,6 +568,43 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			verdictByID[fd.ID] = fd.Verdict
 			for _, kv := range []struct{ key, val string }{
 				{"file", fd.File}, {"summary", fd.Summary},
+			} {
+				if kv.val == "" {
+					add("%s: %s がありません", fn, kv.key)
+				}
+			}
+			switch fd.Verdict {
+			case "adopted", "held", "rejected", "below_minimum":
+			default:
+				add("%s: verdict は adopted / held / rejected / below_minimum のいずれか: %q", fn, fd.Verdict)
+			}
+			if fd.VerdictReason == "" {
+				add("%s: verdict_reason がありません (判定の経路をノード ID で書く)", fn)
+			}
+			// 指摘の出所。省略時は上流のレビュー (review)。residual はループ中に自己採択したもの
+			// (record-schema.md「ループ中に記録の外で直さない」)。prior_below_minimum は、前の回までの
+			// 下限未満の指摘を、この回の指摘として足したもの (同「下限未満の指摘の参照」)。
+			switch fd.Origin {
+			case "", "review", "residual", "prior_below_minimum":
+			default:
+				add("%s: origin は review / residual / prior_below_minimum のいずれか (省略時は review): %q", fn, fd.Origin)
+			}
+			if fd.PlanRef != nil {
+				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
+					add("%s: plan_ref の run %d は存在しません (回は 1〜%d)", fn, fd.PlanRef.Run, len(doc.Runs))
+				} else if !plansByRun[fd.PlanRef.Run-1][fd.PlanRef.Problem] {
+					add("%s: plan_ref の問題 %q は %d 回目の plans にありません", fn, fd.PlanRef.Problem, fd.PlanRef.Run)
+				}
+			}
+			for _, m := range recordBelowMinimumRefProblems(doc, ri, fd) {
+				add("%s: %s", fn, m)
+			}
+			// D9 で当たって判定を省略した指摘 (A3・B2) は、分類・被害者・帰結・根拠の検証・
+			// ゲート・必要度を書かない。書かないことは recordBelowMinimumRefProblems が検査する。
+			if judgmentOmitted(fd) {
+				continue
+			}
+			for _, kv := range []struct{ key, val string }{
 				{"category", fd.Category}, {"audience", fd.Audience},
 			} {
 				if kv.val == "" {
@@ -583,30 +641,11 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				add("%s: stages が none のときだけ result は skipped (stages %q / result %q)",
 					fn, fd.PremiseCheck.Stages, fd.PremiseCheck.Result)
 			}
-			switch fd.Verdict {
-			case "adopted", "held", "rejected":
-			default:
-				add("%s: verdict は adopted / held / rejected のいずれか: %q", fn, fd.Verdict)
-			}
-			if fd.VerdictReason == "" {
-				add("%s: verdict_reason がありません (判定の経路をノード ID で書く)", fn)
-			}
-			// 指摘の出所。省略時は上流のレビュー (review)。residual はループ中に自己採択したもの
-			// (record-schema.md「ループ中に記録の外で直さない」)。
-			switch fd.Origin {
-			case "", "review", "residual":
-			default:
-				add("%s: origin は review / residual のいずれか (省略時は review): %q", fn, fd.Origin)
-			}
 			for _, m := range recordPriorDefectProblems(priorDefectRequired, fd) {
 				add("%s: %s", fn, m)
 			}
-			if fd.PlanRef != nil {
-				if fd.PlanRef.Run < 1 || fd.PlanRef.Run > len(doc.Runs) {
-					add("%s: plan_ref の run %d は存在しません (回は 1〜%d)", fn, fd.PlanRef.Run, len(doc.Runs))
-				} else if !plansByRun[fd.PlanRef.Run-1][fd.PlanRef.Problem] {
-					add("%s: plan_ref の問題 %q は %d 回目の plans にありません", fn, fd.PlanRef.Problem, fd.PlanRef.Run)
-				}
+			for _, m := range recordFixNecessityProblems(fixNecessityRequired, run.MinFixNecessity, fd) {
+				add("%s: %s", fn, m)
 			}
 		}
 
@@ -872,10 +911,11 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 	fmt.Fprintf(&b, "SSOT は [%s](%s)。読み方と収束の目安は [README](README.md)。\n\n", base, base)
 
 	b.WriteString("## 推移\n\n")
-	b.WriteString("| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n")
-	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+	b.WriteString("| 回 | 日付 | スキル | model | scope | 下限 | 全件 | 採択 | 保留 | 却下 | 下限未満 | Must | Should | Could |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+	fixNecessityFirstRun := recordFixNecessityFirstRun(doc.Runs)
 	for i, run := range doc.Runs {
-		adopted, held, rejected := 0, 0, 0
+		adopted, held, rejected, belowMinimum := 0, 0, 0, 0
 		for _, fd := range run.Findings {
 			switch fd.Verdict {
 			case "adopted":
@@ -884,15 +924,23 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 				held++
 			case "rejected":
 				rejected++
+			case "below_minimum":
+				belowMinimum++
 			}
+		}
+		minimum := "—"
+		if run.MinFixNecessity != "" {
+			minimum = recordCell(run.MinFixNecessity)
 		}
 		// 自由文字列の欄 (skill・model など) は recordCell で無害化する。縦棒が
 		// 入ると桁がずれ、偽の数字が集計値の手前に並ぶため (列挙で守られない欄は検査も
 		// 捕まえない)。
-		fmt.Fprintf(&b, "| %d | %s | `%s` | `%s` | %s | %d | %d | %d | %d |\n",
+		fmt.Fprintf(&b, "| %d | %s | `%s` | `%s` | %s | %s | %d | %d | %d | %d | %d | %s |\n",
 			i+1, recordCell(run.Date), recordCell(run.Skill), recordCell(run.Model),
-			recordCell(run.Scope), len(run.Findings), adopted, held, rejected)
+			recordCell(run.Scope), minimum, len(run.Findings), adopted, held, rejected, belowMinimum,
+			strings.Join(renderFixNecessityCounts(doc, i, fixNecessityFirstRun), " | "))
 	}
+	renderBelowMinimumSection(&b, doc)
 
 	for i, run := range doc.Runs {
 		// 鮮度の検査は描画結果の全文一致なので、サマリに出す文言を変えると、ディレクトリに残る
@@ -1051,6 +1099,13 @@ func renderFindingCells(fd recordFinding) []string {
 	if fd.PremiseCheck.Stages != "none" {
 		premise = fd.PremiseCheck.Stages + ": " + fd.PremiseCheck.Result
 	}
+	category := recordCell(fd.Category) + " / " + recordCell(aud)
+	consequence := recordCell(fd.Consequence.Condition) + " / " + recordCell(fd.Consequence.What) +
+		" / " + recordCell(fd.Consequence.Detectability)
+	if judgmentOmitted(fd) {
+		// 判定を省略した指摘 (A3・B2) は、分類・帰結・検証を書かない。参照先は判定の欄に出る。
+		category, consequence, premise = "—", "—", "—"
+	}
 	gates := "—"
 	if len(fd.GatesFired) > 0 {
 		gates = strings.Join(fd.GatesFired, ", ")
@@ -1063,19 +1118,18 @@ func renderFindingCells(fd recordFinding) []string {
 	return []string{
 		strconv.Itoa(fd.ID),
 		"`" + recordCell(loc) + "` " + summary,
-		recordCell(fd.Category) + " / " + recordCell(aud),
-		recordCell(fd.Consequence.Condition) + " / " + recordCell(fd.Consequence.What) +
-			" / " + recordCell(fd.Consequence.Detectability),
+		category,
+		consequence,
 		premise,
 		recordCell(gates),
 		renderVerdictCell(fd),
 	}
 }
 
-// renderVerdictCell は判定セル (判定 — 経路。D8 の結果と束ね先があれば添える) を返す。
-// D8 の結果は prior_defect を書いた指摘にだけ添える。過去の記録の生成サマリを変えないため。
+// renderVerdictCell は判定セル (判定 — 経路。必要度・下限未満の指摘の参照・D8 の結果・束ね先が
+// あれば添える) を返す。どれも、そのキーを書いた指摘にだけ添える。
 func renderVerdictCell(fd recordFinding) string {
-	cell := recordVerdictJa(fd.Verdict) + " — " + recordCell(fd.VerdictReason)
+	cell := recordVerdictJa(fd.Verdict) + " — " + recordCell(fd.VerdictReason) + renderFixNecessityNote(fd)
 	if pd := fd.PriorDefect; pd != nil {
 		hit := "当たらない"
 		if priorDefectHit(pd) {
@@ -1244,6 +1298,8 @@ func recordVerdictJa(v string) string {
 		return "**保留**"
 	case "rejected":
 		return "**却下**"
+	case "below_minimum":
+		return "**下限未満**"
 	}
 	return v
 }

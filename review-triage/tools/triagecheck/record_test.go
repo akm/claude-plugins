@@ -1863,7 +1863,7 @@ func TestReviewTriageRecordInvestigatedCoverage(t *testing.T) {
 	}
 }
 
-// summaryWithoutInvestigated は、validRecordYAML から生成したサマリの全文 (0.24.0 の書式)。
+// summaryWithoutInvestigated は、validRecordYAML から生成したサマリの全文 (0.30.0 の書式)。
 // 鮮度の検査は描画結果の全文一致なので、investigated の無い記録の出力が
 // 1 バイトでも変わると、ディレクトリに残る既存のサマリがすべて古いと報告される。注記は
 // investigated の問題がある回にだけ出し、推移の表には列を足さない。
@@ -1875,9 +1875,9 @@ const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSO
 	"\n" +
 	"## 推移\n" +
 	"\n" +
-	"| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n" +
-	"| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" +
-	"| 1 | 2026-08-30 | `code-review` | `sonnet-5` | full | 3 | 1 | 1 | 1 |\n" +
+	"| 回 | 日付 | スキル | model | scope | 下限 | 全件 | 採択 | 保留 | 却下 | 下限未満 | Must | Should | Could |\n" +
+	"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" +
+	"| 1 | 2026-08-30 | `code-review` | `sonnet-5` | full | — | 3 | 1 | 1 | 1 | 0 | — | — | — |\n" +
 	"\n" +
 	"## 1 回目: 2026-08-30 `code-review`\n" +
 	"\n" +
@@ -1942,7 +1942,7 @@ func TestReviewTriageSummaryInvestigated(t *testing.T) {
 		t.Fatalf("注記が修正計画の表より前に出ている:\n%s", one)
 	}
 	// 推移の表には列を足さない。
-	if !strings.Contains(one, "| 回 | 日付 | スキル | model | scope | 全件 | 採択 | 保留 | 却下 |\n") {
+	if !strings.Contains(one, "| 回 | 日付 | スキル | model | scope | 下限 | 全件 | 採択 | 保留 | 却下 | 下限未満 | Must | Should | Could |\n") {
 		t.Fatalf("推移の表の見出しが変わっている:\n%s", one)
 	}
 
