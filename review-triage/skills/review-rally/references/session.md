@@ -26,7 +26,7 @@
 
 **レビューのセッションの起動は、開始のターン (`/review-rally` を受けたターン) で行う。**
 
-1. **ツール `start_session` を、次の値で呼び出す。** 失敗したら RR2。成功したら、`rally.yaml` の `session` に `id` と `name` を書く。
+1. **リポジトリのブランチの名前の一覧 (`git for-each-ref --format='%(refname:lstrip=2)' refs/heads`) を取ってから、ツール `start_session` を、次の値で呼び出す。** 失敗したら RR2。成功したら、`rally.yaml` の `session` に `id` と `name` を書く。
 
    | 引数 | 値 |
    | --- | --- |
@@ -48,12 +48,12 @@
    - メインの作業ツリーではない (`git -C <worktreePath> rev-parse --path-format=absolute --git-dir` が、同じオプションの `--git-common-dir` の値と違う)。
    - 呼び出し元のセッションの作業ツリーと違う。
 
-3. **確認に通った worktree の値を、`rally.yaml` の `session` に書く** (書く値の出所は下の「`rally.yaml`」の `session` の行)。`worktree` と `branch` を書く。
+3. **確認に通った worktree の値を、`rally.yaml` の `session` に書く** (書く値の出所は下の「`rally.yaml`」の `session` の行)。`worktree` と `branch` を書く。ただし、`branch` の値が手順 1 の一覧にあれば、`branch` は書かずに空のままにする。起動の前からあるブランチは別の作業のものかもしれず、依頼のメッセージの `git checkout -B` がそのブランチの指すコミットを変えると、未 push のコミットをたどれなくなるおそれがあるため。
 
 4. **残りの値を `rally.yaml` の `session` に書いてから確認する。** 次のどれかに当たれば RR2。アプリは起動元より上のモデルと effort を指定されてもエラーにせずに無視するので、ここで比べる。
    - `model` が指定と違う。比べ方の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「モデルの名前の比べ方」。
    - `effort` が指定と違う。
-   - `session.branch` が空である。レビューの worktree の HEAD がブランチを指していないので、依頼のメッセージの `git checkout -B` に渡す名前が決まらない。
+   - `session.branch` が空である。レビューの worktree の HEAD がブランチを指していないと、依頼のメッセージの `git checkout -B` に渡す名前が決まらない。手順 3 で書かなかったときの理由は、手順 3 のとおりである。
    - `permissionMode` が呼び出し元のセッション (`get_session` の `self`) と違う。
 
 ### 最初の指示文
@@ -115,7 +115,7 @@ waiting:
 | `state` | `active` (回している) か `stopped` (停止した) |
 | `stop_reason` | `"<停止ノードの ID>: <1 行の理由>"`。`active` の間は空 |
 | `loop` | ループの条件 ([arguments.md](arguments.md) で決めたもの)。`model` と `effort` は指定、`base` は全量の起点のブランチ |
-| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode` は `get_session` の値、`branch` は `git -C <worktreePath> branch --show-current` の出力。`branch` に `get_session` の値を使わないのは、依頼のメッセージの `git checkout -B` が動かし、片付けの案内の `git branch -D` が消すブランチなので、実際にチェックアウトされているブランチを書くためである。書く順序は上の「起動」のとおりで、進まなかった手順の値は空のままである |
+| `session` | 起動したレビューのセッション。`id` は `start_session` の結果、`name` は `start_session` に渡した `name`、`worktree` は `get_session` の `worktreePath`、`model`・`effort`・`permission_mode` は `get_session` の値、`branch` は `git -C <worktreePath> branch --show-current` の出力 (書かない場合は上の「起動」の 3)。`branch` に `get_session` の値を使わないのは、依頼のメッセージの `git checkout -B` が動かし、片付けの案内の `git branch -D` が消すブランチなので、実際にチェックアウトされているブランチを書くためである。書く順序は上の「起動」のとおりで、進まなかった手順の値は空のままである |
 | `rounds` | この起動で数えた回数 (J5 が見る) |
 | `requests` | この起動でレビューのセッションに送った依頼の数 |
 | `next_full` | 真なら、次に書く依頼文を全量にする ([round.md](round.md) の手順 1) |
