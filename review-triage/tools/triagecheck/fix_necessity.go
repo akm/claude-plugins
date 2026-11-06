@@ -328,12 +328,13 @@ func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
 		if minimum != "" && fixNecessityRank(minimum) == 0 {
 			continue
 		}
-		limit := "この回に下限が無い"
+		// 「無い」には「のに」が、「以上」には「なのに」が付くので、句ごとに「のに」まで書く。
+		limit := "この回に下限が無いのに"
 		if minimum != "" {
-			limit = "この回の下限 " + minimum + " 以上"
+			limit = "この回の下限 " + minimum + " 以上なのに"
 		}
 		problems = append(problems, fmt.Sprintf(
-			"残っている下限未満の指摘 (%d 回目の id %d。必要度 %s) が、%sのに、この回の findings に足されていません (origin: prior_below_minimum と below_minimum_ref を書いて足す)",
+			"残っている下限未満の指摘 (%d 回目の id %d。必要度 %s) が、%s、この回の findings に足されていません (origin: prior_below_minimum と below_minimum_ref を書いて足す)",
 			k.run, k.finding, necessity, limit))
 	}
 	return problems

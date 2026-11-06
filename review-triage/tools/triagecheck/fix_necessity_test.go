@@ -360,10 +360,10 @@ func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
 	}{
 		{"下限が同じ回は、足さなくてよい", fixNecessityRunYAML("must", other, ""), nil},
 		{"下限を should に下げた回は、Should を足す", fixNecessityRunYAML("should", other, ""),
-			[]string{"1 回目の id 1。必要度 should) が、この回の下限 should 以上"}},
+			[]string{"1 回目の id 1。必要度 should) が、この回の下限 should 以上なのに、この回の findings に"}},
 		{"下限を should に下げて Should を足した回は、報告しない", fixNecessityRunYAML("should", addShould, ""), nil},
 		{"下限を無くした回は、すべて足す", fixNecessityRunYAML("", other, ""),
-			[]string{"1 回目の id 1。必要度 should) が、この回に下限が無い", "1 回目の id 2。必要度 could) が、この回に下限が無い"}},
+			[]string{"1 回目の id 1。必要度 should) が、この回に下限が無いのに、この回の findings に", "1 回目の id 2。必要度 could) が、この回に下限が無いのに、この回の findings に"}},
 		{"下限を無くして両方を足した回は、報告しない", fixNecessityRunYAML("", addShould+addCould, ""), nil},
 		{"前の回で採択にした指摘は、後の回で足さなくてよい",
 			fixNecessityRunYAML("should", addShould, fixNecessityPlanYAML) + fixNecessityRunYAML("should", other, ""), nil},
