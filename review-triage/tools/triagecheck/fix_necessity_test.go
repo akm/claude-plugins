@@ -609,6 +609,31 @@ func TestBelowMinimumFixedTogether(t *testing.T) {
 
 // 判定を省略した下限未満の指摘 (B2) には plan_ref を書かない。一緒に直したことは、必要度を判定した
 // 指摘 (B1) に書く。判定を省略した採択 (A3) には、今までどおり書ける。
+// 一緒に直した後に、行が変わらないまま同じ問題が報告されたら (B2)、箇所は直っていないので
+// 残っている。節に並び、また報告された回も出て、下限を下げた回では足し忘れの検査の対象になる。
+func TestBelowMinimumFixedTogetherReportedAgain(t *testing.T) {
+	src := fixedTogetherRecordYAML(fixNecessityPlanYAML, "must") +
+		fixNecessityRunYAML("must", omittedFindingYAML(1, 1, 1, "", "below_minimum", "B2"), "") +
+		fixNecessityRunYAML("could", fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2"), "")
+	const missing = "1 回目の id 1。必要度 should) が、この回の下限 could 以上なのに"
+	reported := false
+	for _, p := range fixNecessityProblems(src) {
+		reported = reported || strings.Contains(p, missing)
+	}
+	if !reported {
+		t.Fatalf("足し忘れが報告されない: %v", fixNecessityProblems(src))
+	}
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	for _, want := range []string{"### Should (1 件)", "4 回目 #1"} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("生成サマリに %q が無い:\n%s", want, summary)
+		}
+	}
+}
+
 func TestBelowMinimumPlanRefOnOmitted(t *testing.T) {
 	planRef := "        plan_ref:\n          run: 1\n          problem: P1\n"
 	withPlan := fixNecessityRunYAML("must",

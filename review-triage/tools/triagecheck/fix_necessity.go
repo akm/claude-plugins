@@ -363,10 +363,11 @@ func renderFixNecessityCounts(doc *recordDoc, ri, firstRun int) []string {
 // 採択した問題と一緒に直した (plan_ref の問題が直った) こと。
 // reported は、同じ問題がまた報告されて判定を省略した指摘 (B2) の位置。
 type belowMinimumEntry struct {
-	run      int
-	finding  recordFinding
-	resolved bool
-	reported []string
+	run           int
+	finding       recordFinding
+	resolved      bool
+	fixedTogether bool
+	reported      []string
 }
 
 // belowMinimumEntries は、記録の最初の n 回の中の、必要度を判定して下限未満にした指摘を、記録の順に返す。
@@ -381,13 +382,18 @@ func belowMinimumEntries(doc *recordDoc, n int) []*belowMinimumEntry {
 				if e := index[[2]int{ref.Run, ref.Finding}]; e != nil {
 					if judgmentOmitted(fd) && fd.Verdict == "below_minimum" {
 						e.reported = append(e.reported, fmt.Sprintf("%d 回目 #%d", ri+1, fd.ID))
+						// 一緒に直す問題の状態が done でも、行が変わらないまま同じ問題が報告されたなら、箇所は直っていない。
+						if e.fixedTogether {
+							e.resolved = false
+						}
 					} else {
 						e.resolved = true
 					}
 				}
 			}
 			if fd.Verdict == "below_minimum" && fixNecessityRank(fd.FixNecessity) > 0 {
-				e := &belowMinimumEntry{run: ri + 1, finding: fd, resolved: planRefFixed(doc, fd.PlanRef)}
+				fixed := planRefFixed(doc, fd.PlanRef)
+				e := &belowMinimumEntry{run: ri + 1, finding: fd, resolved: fixed, fixedTogether: fixed}
 				entries = append(entries, e)
 				index[[2]int{ri + 1, fd.ID}] = e
 			}
