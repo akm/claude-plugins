@@ -1,0 +1,31 @@
+Background (from the session that started this one):
+review-rally の通し確認。ブランチ test/review-rally-worktree-170-probe のレビューを回ごとに依頼する。レビューのセッションは指摘を直さない。依頼のたびに会話が消される。
+
+Task:
+あなたは review-rally のレビューのセッションです。呼び出し元のセッション (local_1e3ec3ad-b44d-4141-8ab1-e7ae7a9b25e2) から、
+レビューの依頼がメッセージで届きます。このターンでは何もせず、返信も送らずにターンを終えてください。
+依頼が届いたら、そのメッセージの指示に従ってください。依頼の前に、この会話は消されます。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_1e3ec3ad-b44d-4141-8ab1-e7ae7a9b25e2
+
+---
+
+<cross-session-message from="local_1e3ec3ad-b44d-4141-8ab1-e7ae7a9b25e2" from-name="review-rally 通し確認">
+review-rally 20261105-1853-test-review-rally-worktree-170-probe: 記録の回番号 1 のレビューの依頼 (識別子 20261105-1854-test-review-rally-worktree-170-probe-1-code-review-claude-sonnet-5-5)
+
+あなたは review-rally のレビューのセッションです。この会話より前のやり取りは消してあるので、
+このメッセージに書いたことだけに従ってください。日本語で応答してください。
+
+1. あなたの作業ツリー (cwd) を、レビューするコミットに切り替える。git status --porcelain の出力が
+   空であることを確認してから、git checkout -B claude/review-rally-118aa3 21872129e54665974eb016b866377853300ba589 を実行する。
+   出力が空でないか、切り替えられなければ、依頼文を読まずに、下の 3 の失敗のメッセージを送る。
+2. 依頼文 /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1836fc/tmp/review-rally/20261105-1853-test-review-rally-worktree-170-probe/review-request-20261105-1854-test-review-rally-worktree-170-probe-1-code-review-claude-sonnet-5-5.md を Read ツールで読み、そのとおりにレビューする。指摘を見つけても直さない。
+   依頼文の「対象」の作業ツリーは、あなたの作業ツリー (cwd) である。
+3. 結果を書き出したら、ツール SendMessage で、宛先 to を local_1e3ec3ad-b44d-4141-8ab1-e7ae7a9b25e2 にして、
+   次の形の 1 行目で始まるメッセージを送り、ほかに何もせずにターンを終える。
+   ツールが読み込まれていなければ ToolSearch の select:SendMessage で読み込む。
+   - 成功: review-rally 20261105-1853-test-review-rally-worktree-170-probe 20261105-1854-test-review-rally-worktree-170-probe-1-code-review-claude-sonnet-5-5: done <結果のファイルの絶対パス>
+   - 失敗: review-rally 20261105-1853-test-review-rally-worktree-170-probe 20261105-1854-test-review-rally-worktree-170-probe-1-code-review-claude-sonnet-5-5: failed <理由>
+   2 行目以降に、依頼文が求める報告 (skill を実際に呼んだか・実際に渡した effort とモデル・
+   HEAD と作業ツリーが不変であることの確認の結果) を書く。
+</cross-session-message>
