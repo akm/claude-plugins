@@ -1622,3 +1622,49 @@ func TestAllowSameCommitDoesNotChangeOtherCases(t *testing.T) {
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), holds)
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD", "-allow-same-commit"), notHolds)
 }
+
+// フラグ -allow-same-commit で、-base と -rev が同じコミットのときの結果は、判定の時点の HEAD によらない。
+// 範囲 <起点>..<起点> には起点でないコミットが無く、git blame は HEAD を親として作業ツリーの内容を調べるので、
+// この範囲で git blame を実行すると、HEAD が -rev より後のときに、後のコミットが書き換えて元へ戻した行が
+// 成り立たなくなる。
+func TestAllowSameCommitDoesNotDependOnHead(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nB\nc\n")
+	r.commit("change line 2")
+	r.write("f.md", "a\nb\nc\n")
+	r.commit("revert line 2")
+
+	// HEAD は起点より後。指摘のファイルの作業ツリーの内容は、起点と同じ
+	o := r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", base, "-allow-same-commit")
+	wantKind(t, o, holds)
+	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 2 行目)")
+
+	// ほかのファイルだけを変えたコミットが後にあっても同じ
+	r.write("g.md", "later\n")
+	r.commit("change other file")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-rev", base, "-allow-same-commit"), holds)
+}
+
+// フラグ -allow-same-commit で、-rev より後のコミットが指摘のファイルを変えたままなら、作業ツリーの内容が
+// レビューした内容のコミットと違うので、確認できないとする (フラグが無いときと同じ確認)。
+func TestAllowSameCommitLaterCommitChangedFile(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nB\nc\n")
+	r.commit("change line 2")
+
+	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", base, "-allow-same-commit")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "レビューした内容のコミット")
+}
+
+// フラグ -allow-same-commit で同じコミットのときも、行がレビューした内容の行数を越えるのは入力の誤り。
+func TestAllowSameCommitLineBeyondEndIsInputError(t *testing.T) {
+	r, base := branched(t)
+
+	o := r.check(base, "-file", "f.md", "-lines", "4", "-rev", "HEAD", "-allow-same-commit")
+	if o.code != 2 {
+		t.Fatalf("終了コードが %d (期待は 2)。stdout: %s stderr: %s", o.code, o.stdout, o.stderr)
+	}
+	wantContains(t, o.stderr, "input-error:")
+	wantContains(t, o.stderr, "越えます")
+}

@@ -142,11 +142,49 @@ func check(opts options) (result, error) {
 		}
 	}
 
+	if base == target && !opts.worktree {
+		// ここに来るのは、フラグ -allow-same-commit を付けて、-rev に起点と同じコミットを渡したときだけ。
+		// 範囲 <起点>..<起点> には起点でないコミットが無く、git blame はこの範囲を渡されると、HEAD を親として
+		// 作業ツリーの内容を調べる。-rev が HEAD と違うと、結果が判定の時点の HEAD で変わる。レビューした内容は
+		// 起点のコミットそのもので、指摘のファイルにコミットしていない変更が無いことも上で確認したので、
+		// git blame を実行せずに、どの行も起点にあったままとする。-worktree のときは、レビューした内容の
+		// コミットが HEAD なので、下の git blame が HEAD を親として作業ツリーの内容を調べるのが正しい。
+		return sameCommitResult(g, base, target, opts)
+	}
+
 	blamed, err := g.blame(base, target, opts)
 	if err != nil {
 		return result{}, err
 	}
 	return classify(base, opts.file, blamed), nil
+}
+
+// sameCommitResult は、起点とレビューした内容が同じコミットのときの結果を返す。レビューした内容の
+// どの行も、起点の同じ行番号の行である。行がレビューした内容の行数を越えるのは、git blame を実行する
+// ときと同じく入力の誤りにする。
+func sameCommitResult(g gitRunner, base, target string, opts options) (result, error) {
+	n, err := g.lineCount(target, opts)
+	if err != nil {
+		return result{}, err
+	}
+	if err := checkLastLine(opts, n); err != nil {
+		return result{}, err
+	}
+	res := result{kind: holds, reason: fmt.Sprintf("対象の行はどれも、全量の起点 %s にあったまま変わっていない", short(base))}
+	for _, r := range opts.ranges {
+		for line := r.from; line <= r.to; line++ {
+			res.lines = append(res.lines, lineResult{line: line, kind: holds, note: fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", line)})
+		}
+	}
+	return res, nil
+}
+
+// checkLastLine は、渡した行がレビューした内容の行数 n を越えないかを確認する。越えるのは渡し方の誤り。
+func checkLastLine(opts options, n int) error {
+	if last := opts.ranges[len(opts.ranges)-1].to; last > n {
+		return inputf("行 %d が、レビューした内容の -file の行数 (%d) を越えます", last, n)
+	}
+	return nil
 }
 
 // classify は blame の結果を行ごとに分類し、全体の結果を決める。
@@ -681,8 +719,8 @@ func (g gitRunner) blame(base, target string, opts options) ([]blameLine, error)
 	if err != nil {
 		return nil, err
 	}
-	if last := opts.ranges[len(opts.ranges)-1].to; last > n {
-		return nil, inputf("行 %d が、レビューした内容の -file の行数 (%d) を越えます", last, n)
+	if err := checkLastLine(opts, n); err != nil {
+		return nil, err
 	}
 	args = append(args, base+".."+target, "--", opts.file)
 	out, _, err := g.run(args...)
