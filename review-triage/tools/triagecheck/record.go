@@ -652,8 +652,13 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			}
 		}
 
-		for _, m := range recordPriorBelowMinimumProblems(doc, ri) {
-			add("%s: %s", rn, m)
+		// 足すはずの下限未満の指摘は、最後の回についてだけ検査する。前の回の findings は後から
+		// 書き換えない (record-schema.md の「スキーマ」) ので、報告しても直せない。足し忘れは、
+		// その回を書いた直後の検査 (その回が最後の回のとき) で報告される。
+		if ri == len(doc.Runs)-1 {
+			for _, m := range recordPriorBelowMinimumProblems(doc, ri) {
+				add("%s: %s", rn, m)
+			}
 		}
 
 		problemIDs := map[string]bool{}

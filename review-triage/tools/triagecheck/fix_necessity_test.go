@@ -340,9 +340,10 @@ func TestReviewTriageRecordFixNecessityRequiredFromFirstRun(t *testing.T) {
 	}
 }
 
-// 残っている下限未満の指摘のうち、必要度がその回の下限以上のものを、その回の指摘として
-// 足していなければ報告する。下限に満たないもの・その回が参照しているもの・前の回で判定し直したか
-// 採択にしたものは報告しない。
+// 記録の最後の回が、残っている下限未満の指摘のうち、必要度がその回の下限以上のものを、
+// その回の指摘として足していなければ報告する。下限に満たないもの・その回が参照しているもの・
+// 前の回で判定し直したか採択にしたものは報告しない。前の回の足し忘れは、findings を後から
+// 書き換えないので報告しない。
 func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
 	// 1 回目 (下限 must) に、Should (id 1) と Could (id 2) の下限未満がある。
 	run1 := fixNecessityRunYAML("must",
@@ -366,10 +367,14 @@ func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
 		{"下限を無くして両方を足した回は、報告しない", fixNecessityRunYAML("", addShould+addCould, ""), nil},
 		{"前の回で採択にした指摘は、後の回で足さなくてよい",
 			fixNecessityRunYAML("should", addShould, fixNecessityPlanYAML) + fixNecessityRunYAML("should", other, ""), nil},
-		{"足し忘れた回の次の回でも報告する",
+		{"足し忘れが続いていれば、最後の回だけを報告する",
 			fixNecessityRunYAML("should", fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2"), fixNecessityPlanYAML) +
 				fixNecessityRunYAML("should", other, ""),
-			[]string{"runs[1]", "runs[2]"}},
+			[]string{"runs[2]"}},
+		{"足し忘れた回の後の回で足していれば、報告しない",
+			fixNecessityRunYAML("should", fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2"), fixNecessityPlanYAML) +
+				fixNecessityRunYAML("should", addShould, ""),
+			nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

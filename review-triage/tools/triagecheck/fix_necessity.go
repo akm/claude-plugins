@@ -292,7 +292,8 @@ func recordBelowMinimumRefProblems(doc *recordDoc, ri int, fd recordFinding) []s
 // この回より前の回の指摘が参照して、判定し直しても採択にしてもいないもの) のうち、必要度がこの回の
 // 下限以上のもの (下限が無い回ではすべて) は、この回の指摘として足す (record-schema.md の
 // 「下限未満の指摘の参照」)。足し忘れると、下限を下げても、その指摘は採択にならず直されないまま残る。
-// 足したかどうかは、この回の指摘の below_minimum_ref が参照しているかで見る。
+// 足したかどうかは、この回の指摘の below_minimum_ref が参照しているかで見る。呼び出し元は、
+// 記録の最後の回についてだけ呼ぶ。
 func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
 	type key struct{ run, finding int }
 	remaining := map[key]string{} // 残っている下限未満の指摘と、その必要度
