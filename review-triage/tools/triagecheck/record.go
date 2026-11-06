@@ -911,7 +911,7 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 		}
 		b.WriteString("\n\n")
 
-		b.WriteString("| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |\n")
+		b.WriteString("| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づかされるか) | 検証 | ゲート | 判定 |\n")
 		b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
 		for _, fd := range run.Findings {
 			b.WriteString(recordRow(renderFindingCells(fd)))

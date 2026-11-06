@@ -248,6 +248,7 @@ bin/review-triage-check -write-summary   # 生成サマリを書き出す
 | 0.25.0 | 調査済み・未立案の注記の末尾「`review-triage-fix` が立案 (段 2) から続ける」→「`review-triage-fix` が立案フェーズから続ける」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.26.0 | 冒頭のコメント「正本は <YAML> — …」→「SSOT は <YAML> — …」、本文の 1 行目「正本は [<YAML>](<YAML>)。…」→「SSOT は [<YAML>](<YAML>)。…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.27.0 | 冒頭のコメント「SSOT は <YAML> — `<コマンド>` で再生成する。」→「SSOT は <YAML>。`<コマンド>` で再生成する。」、調査済み・未立案の注記「**調査済み・未立案 (investigated) が N 件: P1** — 修正方法と…」→「**調査済み・未立案 (investigated) が N 件: P1。** 修正方法と…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
+| 0.30.0 | 指摘の表の見出し「帰結 (条件 / 何が / 気づけるか)」→「帰結 (条件 / 何が / 気づかされるか)」([#178](https://github.com/akm/claude-plugins/issues/178)) |
 
 ## テスト
 

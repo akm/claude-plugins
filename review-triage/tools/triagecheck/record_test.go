@@ -1883,7 +1883,7 @@ const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSO
 	"\n" +
 	"- HEAD `abc1234` / model `sonnet-5` / scope full / level medium\n" +
 	"\n" +
-	"| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づけるか) | 検証 | ゲート | 判定 |\n" +
+	"| # | 指摘 | 分類 / 被害者 | 帰結 (条件 / 何が / 気づかされるか) | 検証 | ゲート | 判定 |\n" +
 	"| --- | --- | --- | --- | --- | --- | --- |\n" +
 	"| 1 | `docs/foo.md:10` 数の食い違い | doc-other / developer | 検算するとき / 分母を誤る / 気づかない | A: verified | — | **採択** — ゲート 0 件で採択 (A2) |\n" +
 	"| 2 | `internal/bar.go` 仕様違反の主張 | production / operator | 運用中 / 配信が止まる / 気づかない | A+B: unverifiable | — | **保留** — 根拠を確かめられず保留 (H3) |\n" +
