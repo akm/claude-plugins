@@ -25,9 +25,8 @@
 停止の報告に、次の手順を、人間が実行できる形で書く。手順は `rally.yaml` の `session` から組み立てる。`session` の値は、起動の手順のどこまで進んだかで決まる ([session.md](session.md) の「起動」)。値が空のキーを使う手順は書かない。
 
 - **`session.id` が空なら** (`start_session` が失敗した): 片付けるものは無いと書く。
-- **`session.id` があり、`session.worktree` が空なら** (`worktreePath` の確認に通らなかった): worktree とブランチを確認していないので、アーカイブと `git branch -D` を案内しない。レビューのセッション (`session.name`・`session.id`) を開いて、どう片付けるかを人間が決めると書く。
-- **`session.worktree` があり、新しく作られた worktree なら** (`session.reused` が偽): レビューのセッション (`session.name`・`session.id`) をアーカイブする (サイドバーから。アーカイブで worktree も片付けられる)。アーカイブの後にブランチ (`session.branch`) が残っていれば、`git branch -D <session.branch>` で消す。
-- **`session.worktree` があり、再利用された worktree なら** (`session.reused` が真): レビューのセッションを**アーカイブしない** (以前の作業のファイルが消えるおそれがある)。結果のディレクトリを消し (`rm -r <レビューの worktree>/tmp/review-rally/<ループの id>`)、worktree を元の HEAD に戻し (`git -C <レビューの worktree> show-ref --verify --quiet refs/heads/<session.original_head>` が成功すれば `git -C <レビューの worktree> checkout <session.original_head>`、失敗すれば `git -C <レビューの worktree> checkout --detach <session.original_head>`)、ブランチを消す (`git branch -D <session.branch>`)。
+- **`session.id` があり、`session.worktree` が空か、RR1 で停止したなら**: worktree かブランチに別の作業や残す変更があるかもしれないので、レビューのセッション (`session.name`・`session.id`) を開いて、どう片付けるかを人間が決めると書く。残すものが無いと決めたら、次の項目の手順で片付けることも書く。
+- **それ以外で `session.worktree` があれば**: レビューのセッション (`session.name`・`session.id`) をサイドバーからアーカイブし、ブランチが残っていれば `git branch -D <session.branch>` で消す。`git branch -D` は、ブランチが worktree で共有されるので、このリポジトリのどの作業ツリーで実行してもよい。アーカイブの後に worktree のディレクトリが残っていても、手で消さない。アプリが新しいセッションで再利用するか、回収する。
 - **ループのディレクトリと記録は消さない。** ほかの経路と収束を比べる材料になる。どちらも呼び出し元のセッションの作業ツリーにあり ([session.md](session.md) の「開始の前提」)、その作業ツリーが片付けられると一緒に消えるので、残すときは片付ける前に複製する。
 
 ## 停止の報告に足すもの
@@ -37,7 +36,7 @@
 | 項目 | 書くもの |
 | --- | --- |
 | ループ | ループの id と、ループのディレクトリの絶対パス |
-| レビューのセッション | 名前・id・worktree のパス・実効モデルと effort (`rally.yaml` の `session`) |
+| レビューのセッション | 名前・id・worktree のパス・ブランチ・実効モデルと effort (`rally.yaml` の `session`) |
 | 複製 | 上の「停止のときに行うこと」の 1 で複製したか、複製先の絶対パス |
 | 片付け | 上の「片付けの案内」 |
 | 回数 | この起動で回した回数と上限 (reporting.md の 2) |
