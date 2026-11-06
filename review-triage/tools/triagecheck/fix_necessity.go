@@ -90,11 +90,16 @@ func judgmentOmitted(fd recordFinding) bool {
 	return fd.BelowMinimumRef != nil && fd.BelowMinimumRef.LineCheck == "holds"
 }
 
-// recordFixNecessityFirstRun は、記録の中で最初に fix_necessity_reason を書いた回の添字を
-// 返す。無ければ -1。この回と、それより後の回では fix_necessity_reason を必須にする。
-// 決め方と理由は recordPriorDefectFirstRun と同じ (過去の記録を書き換えさせずに通すため)。
+// recordFixNecessityFirstRun は、記録の中で最初に fix_necessity_reason か、回の
+// min_fix_necessity を書いた回の添字を返す。無ければ -1。この回と、それより後の回では
+// fix_necessity_reason を必須にする。過去の記録を書き換えさせずに通すための決め方で、理由は
+// recordPriorDefectFirstRun と同じ。回の下限も見るのは、下限を書いた回は必要度を判定する規則で
+// 判定した回なので、その回で必要度を全件書き忘れた記録を報告するため。
 func recordFixNecessityFirstRun(runs []recordRun) int {
 	for ri, run := range runs {
+		if run.MinFixNecessity != "" {
+			return ri
+		}
 		for _, fd := range run.Findings {
 			if fd.FixNecessityReason != nil {
 				return ri
@@ -346,8 +351,8 @@ func findingFixNecessity(doc *recordDoc, ri int, fd recordFinding) string {
 }
 
 // renderFixNecessityCounts は推移の表の必要度の 3 列 (Must・Should・Could) を返す。
-// 判定に関わらず、その回で必要度が分かる指摘を数える。fix_necessity_reason を書き始める前の
-// 回 (firstRun より前。1 度も書いていない記録ではすべての回) は「—」にする。0 と書くと、
+// 判定に関わらず、その回で必要度が分かる指摘を数える。fix_necessity_reason を必須にする回
+// (recordFixNecessityFirstRun) より前の回 (必須にする回が無い記録ではすべての回) は「—」にする。0 と書くと、
 // 必要度を判定して 0 件だったように読めるため。
 func renderFixNecessityCounts(doc *recordDoc, ri, firstRun int) []string {
 	if firstRun < 0 || ri < firstRun {

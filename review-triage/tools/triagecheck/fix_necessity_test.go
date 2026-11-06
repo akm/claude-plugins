@@ -290,9 +290,9 @@ func TestReviewTriageRecordFixNecessityViolations(t *testing.T) {
 	}
 }
 
-// fix_necessity_reason を必須にするのは、記録の中で最初に書いた回と、それより後の回。
-// それより前の回と、1 度も書いていない記録は、必要度の判定が無い判定フローで判定した
-// ものと見なし、無くても報告しない (prior_defect と同じ決め方)。
+// fix_necessity_reason を必須にするのは、記録の中で最初に fix_necessity_reason か、回の
+// min_fix_necessity を書いた回と、それより後の回。それより前の回と、どちらも 1 度も書いて
+// いない記録は、必要度の判定が無い判定フローで判定したものと見なし、無くても報告しない。
 func TestReviewTriageRecordFixNecessityRequiredFromFirstRun(t *testing.T) {
 	without := func() string {
 		return fixNecessityRunYAML("", fixNecessityFindingYAML(1, "", "", "adopted", "A2"), fixNecessityPlanYAML)
@@ -308,6 +308,12 @@ func TestReviewTriageRecordFixNecessityRequiredFromFirstRun(t *testing.T) {
 		{"1 度も書いていない記録は報告しない", "runs:\n" + without() + without(), nil},
 		{"書いた回より前の回は報告しない", "runs:\n" + without() + with(), nil},
 		{"書いた回より後の回の書き忘れを報告する", "runs:\n" + with() + without(), []string{"runs[1]"}},
+		{"下限だけを書いた回の書き忘れを報告する",
+			"runs:\n" + fixNecessityRunYAML("must", fixNecessityFindingYAML(1, "", "", "adopted", "A2"), fixNecessityPlanYAML),
+			[]string{"runs[0]"}},
+		{"下限だけを書いた回より前の回は報告しない",
+			"runs:\n" + without() + fixNecessityRunYAML("must", fixNecessityFindingYAML(1, "", "", "adopted", "A2"), fixNecessityPlanYAML),
+			[]string{"runs[1]"}},
 		{"書いた回の中の書き忘れを報告する",
 			"runs:\n" + fixNecessityRunYAML("",
 				fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2")+fixNecessityFindingYAML(2, "", "", "held", "H6"),
