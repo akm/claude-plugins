@@ -1,6 +1,6 @@
 # 引数の様式
 
-**このファイルが `review-rally` の引数と、ループの条件の決め方の SSOT。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」「`fix`」が SSOT。このスキルは新しい設定のキーを持たない。
+**このファイルが `review-rally` の引数と、ループの条件の決め方の SSOT。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」「`fix`」「`triage`」が SSOT。このスキルは新しい設定のキーを持たない。
 
 ## 様式
 
