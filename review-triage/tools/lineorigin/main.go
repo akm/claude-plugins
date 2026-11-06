@@ -1,5 +1,6 @@
 // lineorigin は、レビューの指摘の対象の行が、全量の起点 (ブランチの作り始めのコミット) から、
 // レビューした内容まで変わっていないかを確認する。review-triage の判定ノード D8 の条件 (1)。
+// 判定ノード D9 の条件 (2) では、-base に前の指摘を判定した回のコミットを渡し、-allow-same-commit を付ける。
 //
 // 結果は「成り立つ」(holds)・「成り立たない」(not-holds)・「確認できない」(unverifiable) の 3 つで、
 // 理由と行ごとの内訳を添えて標準出力に書く。結果を出せないときは標準出力に何も書かず、
@@ -52,6 +53,8 @@ type options struct {
 	ranges   []lineRange // -lines (並べ替え、重なりと隣り合いをまとめたもの)
 	rev      string      // -rev (-worktree のときは空)
 	worktree bool        // -worktree
+	// -allow-same-commit。起点とレビューした内容が同じコミットのときも確認する (判定ノード D9 用)
+	allowSameCommit bool
 }
 
 func parseFlags(args []string) (options, error) {
@@ -65,6 +68,7 @@ func parseFlags(args []string) (options, error) {
 	lines := fs.String("lines", "", "指摘の行 (必須)。「12」「12-15」か、それらをコンマで並べた形 (「12,20-23」)")
 	rev := fs.String("rev", "", "レビューした内容のコミット。結果のファイルで受け取ったレビューならその head。-worktree と同時には使えない")
 	worktree := fs.Bool("worktree", false, "レビューした内容が作業ツリー (コミットしていない変更を含む) のとき。-rev と同時には使えない")
+	allowSameCommit := fs.Bool("allow-same-commit", false, "起点とレビューした内容が同じコミットのときも確認する。判定ノード D9 で付ける (D8 では付けない)")
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
 	}
@@ -96,7 +100,7 @@ func parseFlags(args []string) (options, error) {
 	if err != nil {
 		return options{}, err
 	}
-	return options{root: *root, base: *base, file: f, ranges: ranges, rev: *rev, worktree: *worktree}, nil
+	return options{root: *root, base: *base, file: f, ranges: ranges, rev: *rev, worktree: *worktree, allowSameCommit: *allowSameCommit}, nil
 }
 
 // normalizeFile は -file をルートからの相対パスに整える。ルートの外を指すパスは受け付けない。

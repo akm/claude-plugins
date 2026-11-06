@@ -65,7 +65,11 @@ func check(opts options) (result, error) {
 
 	// 全量の起点がレビューした内容のコミットと同じなら、範囲 <起点>..<コミット> が空になり、
 	// コミット済みのどの行も起点にあったままと報告される。ブランチの変更と前からある行を区別できない。
-	if base == target {
+	// フラグ -allow-same-commit (判定ノード D9) では、起点は前の指摘を判定した回のコミットで、
+	// 確認するのは、そのコミットからレビューした内容までに行が変わっていないかである。同じコミットなら、
+	// コミット済みの行が起点にあったままと報告されるのが正しい結果なので、下の確認 (シンボリックリンク・
+	// 属性・コミットしていない変更) と git blame に進む。
+	if base == target && !opts.allowSameCommit {
 		return result{kind: unverifiable, reason: fmt.Sprintf("全量の起点 %s が、レビューした内容のコミット (%s) と同じで、このブランチの変更と前からある行を区別できない", short(base), targetName)}, nil
 	}
 	ok, err := g.isAncestor(base, target)

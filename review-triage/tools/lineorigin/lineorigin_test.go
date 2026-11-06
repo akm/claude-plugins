@@ -1552,3 +1552,73 @@ func TestParsePorcelainUnquotesFileName(t *testing.T) {
 		t.Fatalf("読み取りが違う: %+v", lines)
 	}
 }
+
+// フラグ -allow-same-commit (判定ノード D9) では、起点とレビューした内容が同じコミットでも確認する。
+// コミット済みの行は起点にあったままなので成り立つ。フラグが無いとき (D8) の結果は変えない
+// (TestBaseEqualToReviewedCommitIsUnverifiable)。
+func TestAllowSameCommitHoldsForCommittedLines(t *testing.T) {
+	r, base := branched(t)
+
+	o := r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", "HEAD", "-allow-same-commit")
+	wantKind(t, o, holds)
+	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 2 行目)")
+
+	// フラグが無ければ、同じコミットは確認できない
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", "HEAD"), unverifiable)
+}
+
+// フラグ -allow-same-commit でも、-rev のときのコミットしていない変更の確認は行う。レビュアが読んだ
+// 内容がコミットと違いうるので、変更があれば確認できないとする (誤った holds にしない)。
+func TestAllowSameCommitChecksUncommittedChange(t *testing.T) {
+	r, base := branched(t)
+
+	r.write("f.md", "a\nb\nc\nd\n")
+	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "コミットしていない変更")
+
+	// ステージした変更も同じ
+	r.git("add", "f.md")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), unverifiable)
+
+	// ほかのファイルの変更は見ない
+	r.git("reset", "-q", "--hard")
+	r.write("g.md", "edited\n")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), holds)
+}
+
+// フラグ -allow-same-commit でも、skip-worktree が付いたファイルの編集は、コミットしていない変更として扱う。
+// git status は、この編集を変更として出さない。
+func TestAllowSameCommitSkipWorktreeEdit(t *testing.T) {
+	r, base := branched(t)
+
+	r.git("update-index", "--skip-worktree", "f.md")
+	r.write("f.md", "a\nb\nX\n")
+	if st := r.git("status", "--porcelain"); st != "" {
+		t.Fatalf("git status が変更を出した (skip-worktree が効いていない): %q", st)
+	}
+	o := r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD", "-allow-same-commit")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "コミットしていない変更")
+}
+
+// フラグ -allow-same-commit と -worktree では、作業ツリーで書き換えた行は成り立たず、書き換えていない行は成り立つ。
+func TestAllowSameCommitWorktreeContent(t *testing.T) {
+	r, base := branched(t)
+
+	r.write("f.md", "a\nb\nX\n")
+	o := r.check(base, "-file", "f.md", "-lines", "3", "-worktree", "-allow-same-commit")
+	wantKind(t, o, notHolds)
+	wantContains(t, o.lines["line 3"], "コミットしていない行")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree", "-allow-same-commit"), holds)
+}
+
+// フラグ -allow-same-commit は、起点とレビューした内容が違うコミットのときの結果を変えない。
+func TestAllowSameCommitDoesNotChangeOtherCases(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD", "-allow-same-commit"), notHolds)
+}
