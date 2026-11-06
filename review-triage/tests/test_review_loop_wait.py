@@ -256,17 +256,21 @@ class TestAwaitWorker(WaitTestBase):
 
 
 class TestDeadline(WaitTestBase):
+    """スクリプトは締切を date +%s の整数の秒で測るので、0.1 分 (6 秒) の待機は、起動の時刻によって約 5 秒か約 6 秒で終了する。
+    このクラスのテストは、どちらの長さでも成り立つことだけを検査する (経緯は #184)。"""
+
     def test_nothing_returns_124(self):
         rc, out, _, elapsed = self.run_wait(minutes="0.1")
         self.assertEqual(rc, 124)
         self.assertEqual(out, "")
-        self.assertGreaterEqual(elapsed, 5.5)
+        self.assertGreaterEqual(elapsed, 5)
         self.assertLess(elapsed, 9)
 
-    def test_file_placed_just_before_deadline_returns_zero(self):
-        # 期限切れを宣言する前にもう 1 度確認するので、締切の直前に置いたものは 0 で返る
+    def test_file_placed_near_deadline_returns_zero(self):
+        # 4 秒の時点で作ったファイルは、どちらの長さでも約 5 秒の確認で見つかるので、期限切れにならずに 0 で返る。
+        # ループの先頭の確認で見つかるので、期限切れを宣言する前の確認 (スクリプトの exit 124 の直前の check_once) は、このテストでは検査できない
         rc, out, err, _ = self.run_wait(
-            minutes="0.1", actions=[(5.5, lambda: _write(self.path("end"), ""))]
+            minutes="0.1", actions=[(4, lambda: _write(self.path("end"), ""))]
         )
         self.assertEqual(rc, 0, err)
         self.assertEqual(out, "end")
