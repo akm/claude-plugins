@@ -417,6 +417,26 @@ func TestReviewTriageSummaryBelowMinimumSection(t *testing.T) {
 	}
 }
 
+// 指摘が示した解決策 (suggested_fix) は、書いても検査が報告せず、生成サマリにも出ない。
+func TestReviewTriageRecordSuggestedFix(t *testing.T) {
+	src := strings.Replace(validRecordYAML, "        summary: 数の食い違い\n",
+		"        summary: 数の食い違い\n        suggested_fix: 表の数を本文に合わせる\n", 1)
+	if src == validRecordYAML {
+		t.Fatal("フィクスチャの置換が適用されていない")
+	}
+	files, read := recordFiles(t, src)
+	if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
+		t.Fatalf("suggested_fix を書いた記録で問題が出た: %v", problems)
+	}
+	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("サマリの生成に失敗: %v", err)
+	}
+	if summary != summaryWithoutInvestigated {
+		t.Fatalf("suggested_fix を書いた記録の生成サマリが、書いていない記録と違う:\n%s", summary)
+	}
+}
+
 // 下限未満の指摘が 1 件も無い記録には、節「下限未満の指摘」を出さない。
 func TestReviewTriageSummaryNoBelowMinimumSection(t *testing.T) {
 	summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(validRecordYAML))

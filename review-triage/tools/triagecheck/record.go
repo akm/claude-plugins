@@ -121,10 +121,13 @@ type recordReframe struct {
 }
 
 type recordFinding struct {
-	ID              int               `yaml:"id"`
-	File            string            `yaml:"file"`
-	Line            int               `yaml:"line"`
-	Summary         string            `yaml:"summary"`
+	ID      int    `yaml:"id"`
+	File    string `yaml:"file"`
+	Line    int    `yaml:"line"`
+	Summary string `yaml:"summary"`
+	// SuggestedFix は指摘が示した解決策 (レビュアの提案で、採択した修正方法ではない)。
+	// 内容は検査せず、生成サマリにも出さない。
+	SuggestedFix    string            `yaml:"suggested_fix"`
 	Category        string            `yaml:"category"`
 	Audience        string            `yaml:"audience"`
 	AudienceInitial string            `yaml:"audience_initial"`
@@ -274,7 +277,7 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"トップレベル": {"runs": true},
 	"実行": {"date": true, "skill": true, "run_id": true, "model": true, "level": true,
 		"scope": true, "head": true, "min_fix_necessity": true, "findings": true, "plans": true, "recurrence": true, "notes": true},
-	"指摘": {"id": true, "file": true, "line": true, "summary": true, "category": true,
+	"指摘": {"id": true, "file": true, "line": true, "summary": true, "suggested_fix": true, "category": true,
 		"audience": true, "audience_initial": true, "consequence": true, "premise_check": true,
 		"gates_fired": true, "verdict": true, "verdict_reason": true, "plan_ref": true, "origin": true, "prior_defect": true,
 		"fix_necessity": true, "fix_necessity_reason": true, "below_minimum_ref": true, "attrs": true},

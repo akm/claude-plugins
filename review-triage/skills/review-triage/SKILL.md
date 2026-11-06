@@ -30,6 +30,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 2. **設定の読み込み**: `.claude/review-triage.yaml` を読む。読み込みは 3 値 ([references/config-schema.md](references/config-schema.md)) で、「読めない」なら判定を始めずにエラーを報告する。無ければ `--gen-config` を案内して終了する。
    - あわせて `.claude/akm-claude-plugins/review-triage/config.json` を読む ([references/project-config.md](references/project-config.md))。記録のディレクトリ・関門の一覧・検査コマンドを決める。**無くても判定は進むが、関門の一覧が無いと免除条項は使えない** (突き合わせ先が無いまま関門名を書かせると、実在しない名前が検査されないまま通る)。
 3. **判定**: 指摘ごとに [references/judgment-flow.md](references/judgment-flow.md) の図に従って決着させる。
+   - **指摘が解決策を示しているときは、問題と解決策を分けて書く。** 問題を要旨 (`summary`) と帰結に書き、解決策は `suggested_fix` に写す (様式の SSOT は [references/record-schema.md](references/record-schema.md) の `findings[]`)。判定と必要度は、問題に対して決める。
    - 帰結の 4 項目 (D3 で書くもの) は、D1 に進んだ指摘の**全件に書く。** D1・D2 で決着した指摘にも記録の材料として残す。
    - 評価 (E1〜E3) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
    - 境目が判断しづらいときは [references/gate-examples.md](references/gate-examples.md) の対になった例と突き合わせる。
