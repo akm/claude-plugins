@@ -1,6 +1,6 @@
 ---
 name: review-triage-loop
-description: レビュー・トリアージ・修正の 3 つを上限回数まで繰り返し、収束したか停止したかを人間に返す。各回で review-triage と review-triage-fix を呼び、終了条件に当たったら理由を添えて停止する。「レビューから修正までを回して」「収束するまで繰り返して」「review-triage-loop を実行して」のような依頼で使う。引数で上限・レビュースキル・そのオプション・モデル・全量の起点にする派生元のブランチ (--base)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す) を指定でき、省略時は設定の既定に従う。
+description: レビュー・トリアージ・修正の 3 つを上限回数まで繰り返し、収束したか停止したかを人間に返す。各回で review-triage と review-triage-fix を呼び、終了条件に当たったら理由を添えて停止する。「レビューから修正までを回して」「収束するまで繰り返して」「review-triage-loop を実行して」のような依頼で使う。引数で上限・レビュースキル・そのオプション・モデル・全量の起点にする派生元のブランチ (--base)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す)・修正の必要度の下限 (--min-fix-necessity。review-triage に渡す) を指定でき、省略時は設定の既定に従う。
 ---
 
 # review-triage-loop: レビューから修正までのループ
@@ -27,6 +27,7 @@ description: レビュー・トリアージ・修正の 3 つを上限回数ま�
    - **構造の関門 k (`--structure-rounds`、設定は `loop.structure_rounds`) はループの条件で、J9 が使う** (意味・既定・値の検査の SSOT は [project-config.md](../review-triage/references/project-config.md) の「`loop`」と [references/arguments.md](references/arguments.md))。
    - **回数の閾値 N (`--threshold`、設定は `fix.threshold_rounds`) はループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味・決め方・検査の SSOT は [review-triage-fix の arguments.md](../review-triage-fix/references/arguments.md))。
    - **フェーズ (`review-triage-fix` の手順を区切った区分。定義の SSOT は [その SKILL.md](../review-triage-fix/SKILL.md) の「手順」の冒頭) の実行方法 (`--stage`、設定は `fix.stages`) も同じくループの条件ではなく、`review-triage-fix` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。実行方法の決定と、sub-agent で実行したフェーズの検証の SSOT は [review-triage-fix の stage-subagent.md](../review-triage-fix/references/stage-subagent.md))。ループはフェーズの sub-agent を自分で立てない。立てるのも検証するのも `review-triage-fix` である。
+   - **修正の必要度の下限 (`--min-fix-necessity`、設定は `triage.min_fix_necessity`) もループの条件ではなく、`review-triage` にそのまま渡す** (受け渡しの規則は [references/arguments.md](references/arguments.md)。値の意味と決め方の SSOT は [project-config.md](../review-triage/references/project-config.md) の「`triage`」)。
    - 決まった条件をループの開始前に報告する (書くものは決定表の G0)。**どの条件で回るかを、回り始める前に人間が知っている状態にする。**
 2. **入口の関門** (G2・G3): 記録 YAML を読み (ディレクトリは設定の `record_dir`、ファイルは `<ブランチ名>.yaml`)、図の順に判定する。各ノードの条件・遷移先・停止するときの報告は、図と決定表が SSOT。
 3. **ループ** (L1 → S2〜S6): 図に従って回す。各ノードで行うことと見る場所は決定表のとおり。**各回の冒頭で、いま何回目かと上限を報告する** (L1)。

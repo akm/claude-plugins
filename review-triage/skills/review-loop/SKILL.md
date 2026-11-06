@@ -1,6 +1,6 @@
 ---
 name: review-loop
-description: レビューを端末のワーカー (依頼文ごとに claude -p を人間が決めたモデルと effort で実行するスクリプト。起動は人間が承認する) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。受け渡しはループのディレクトリのファイルだけで、完了のフラグファイルが現れるまでバックグラウンドで待機する。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base) を指定でき、--resume で停止したループを続け (--resume --full-review なら次の回を全量にする)、--end でループを終える。
+description: レビューを端末のワーカー (依頼文ごとに claude -p を人間が決めたモデルと effort で実行するスクリプト。起動は人間が承認する) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。受け渡しはループのディレクトリのファイルだけで、完了のフラグファイルが現れるまでバックグラウンドで待機する。「レビューをワーカーに任せて回して」「別プロセスでレビューして収束まで回して」「review-loop を実行して」のような依頼で使う。引数でワーカーのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・収束の後に全量の回を行うか (--full-review)・全量の起点にする派生元のブランチ (--base)・修正の必要度の下限 (--min-fix-necessity。review-triage に渡す) を指定でき、--resume で停止したループを続け (--resume --full-review なら次の回を全量にする)、--end でループを終える。
 ---
 
 # review-loop: レビューを端末のワーカーに任せるループ
@@ -18,7 +18,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 | [loop-flow.md](../review-triage-loop/references/loop-flow.md) の図と決定表 | G2・G3・L2・J2・J4・J5・J7・J8・J9・F1・S2〜S6 のノードと行 | G0 → RG0、L1 → RL1 ([round.md](references/round.md))。G3 の「無い」の先 (RJ0) と J2 の「無い」の先 (RJ1)、追加の停止 RA1〜RA3 ([stops.md](references/stops.md)) |
 | [reporting.md](../review-triage-loop/references/reporting.md) | 必ず出すもの 6 項目 (停止した理由に RA1〜RA3 を含める) | このループで足す項目 ([stops.md](references/stops.md) の「停止の報告に足すもの」) |
 | [review-invocation.md](../review-triage-loop/references/review-invocation.md) | 「記録のキーの出所」の表 (読み替え方は同じファイルの「別のプロセスでレビューした結果の取り込み」、このスキルでの値は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)・「モデルの名前の比べ方」・「effort の既定」・「別のプロセスでレビューした結果の取り込み」(呼ぶスキル・結果のファイルの照合・`review-triage` に渡すもの) | 「G0 での解決」(ワーカーのモデルは人間が決める)・「範囲」(基点は `review-request` の規則。[round.md](references/round.md) の RL1 の手順 a) |
-| [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |
+| [arguments.md (review-triage-loop)](../review-triage-loop/references/arguments.md) | 優先順位と、`loop`・`fix`・`triage` のキーの値の検査 | このスキルの引数の様式 ([arguments.md](references/arguments.md)) |
 
 ループのディレクトリのファイルの様式の SSOT は [loop-files.md](references/loop-files.md)、ワーカーの振る舞いの SSOT は [worker.md](references/worker.md)。
 
@@ -54,7 +54,7 @@ description: レビューを端末のワーカー (依頼文ごとに claude -p 
 **待機の通知と `--resume` は、同じ 1 つの入口 ([reentry.md](references/reentry.md) の「再入の手順」) に入る。** 通知の `description` にループ id・回・識別子が書いてあるので、会話の文脈が無くても入口に戻れる。
 
 - `--resume [<ループのディレクトリ>]` は、ループを探し (探し方と、受け付ける引数 `--max`・`--full-review` (と、`loop.yaml` に `review.base` が無いときだけ `--base`) の扱いは [arguments.md](references/arguments.md))、条件を `loop.yaml` から読んでから入口に入る (レビュアの実行のサンドボックスで書き込みを許す場所と接続を許すドメインだけは、入口の手順 1 で設定から再度読み込む)。この起動で数える回数は 0 から始める。
-- 取り込んだ回は、L2 で Skill ツールで `review-triage` を呼んで渡す (指摘が 0 件の回も呼ぶ。呼ぶスキルの規則と渡すものの SSOT は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」、このスキルでの値は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)。その後は図のとおり J2 に進む。
+- 取り込んだ回は、L2 で Skill ツールで `review-triage` を呼んで渡す (指摘が 0 件の回も呼ぶ。`loop.yaml` に `loop.min_fix_necessity` があれば、`--min-fix-necessity` に渡す (扱いの SSOT は [arguments.md](references/arguments.md))。呼ぶスキルの規則と渡すものの SSOT は [review-invocation.md](../review-triage-loop/references/review-invocation.md) の「別のプロセスでレビューした結果の取り込み」、このスキルでの値は [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」)。その後は図のとおり J2 に進む。
 - F1 では Skill ツールで `review-triage-fix` を呼び、`loop.yaml` の `loop.threshold` を `--threshold` に、`loop.stages` の各要素を `--stage` に渡す。
 
 ### 停止

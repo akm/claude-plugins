@@ -13,6 +13,9 @@
   "gates": ["make lint", "make test", "make check-docs"],
   "triage_check_command": "make triage-check",
   "triage_summary_command": "make triage-summary",
+  "triage": {
+    "min_fix_necessity": ""
+  },
   "loop": {
     "max_rounds": 10,
     "structure_rounds": 3,
@@ -51,6 +54,7 @@
 | `gates` | このリポジトリの関門コマンド。免除条項の突き合わせに使う | 空。**突き合わせ先が無いので、免除条項は使えない** (下記) |
 | `triage_check_command` | 記録のスキーマ検査を実行するコマンド | 検査を実行せず、**実行していないことを報告に明記する** |
 | `triage_summary_command` | 生成サマリを再生成するコマンド | サマリを再生成しない。記録 (YAML) だけが SSOT として残る |
+| `triage` | `review-triage` のデフォルト値 (下記) | 判定のデフォルト値を持たない。修正の必要度の下限は無い |
 | `loop` | `review-triage-loop` の既定値 (下記) | ループの既定値を持たない。`review-triage-loop` は引数で補えないものがあれば人間に質問する |
 | `fix` | `review-triage-fix` の既定値 (下記) | 修正の既定値を持たない。`review-triage-fix` はキーごとの既定 (下の「`fix`」の表) に従う |
 | `review_loop` | `review-loop` (レビューを端末のワーカーに任せるループ) の既定値 (下記) | キーごとの既定 (下の「`review_loop`」の表) に従う |
@@ -71,6 +75,16 @@
 - **突き合わせは行の完全一致で行う。部分一致にしない。** 短い名前が長い名前に含まれると、実在しない関門名が実在すると誤判定される。
 
 **`gates` が空のとき、免除条項は使わない。** 突き合わせ先が無いまま名前を書かせると、存在しない関門名が検査されないまま通る。**「関門が無いことを確認した」と「関門の一覧を持っていない」は別の事実である。**
+
+## `triage` — 判定のデフォルト値
+
+[review-triage](../SKILL.md) が読む。ループの 3 つのスキル ([review-triage-loop](../../review-triage-loop/SKILL.md)・[review-loop](../../review-loop/SKILL.md)・[review-rally](../../review-rally/SKILL.md)) も、開始前の報告に書くために同じデフォルト値を読む。**引数 `--min-fix-necessity` で指定された値が設定より優先する。**
+
+| キー | 意味 | 未設定のときの扱い |
+| --- | --- | --- |
+| `min_fix_necessity` | 修正の必要度の下限 (`must` / `should` / `could`)。必要度がこれに満たない指摘は、採択にせず下限未満として記録する (判定の SSOT は [judgment-flow.md](judgment-flow.md) の D10〜D12) | 下限は無い。どの指摘も下限未満にしない |
+
+`triage` のキーの「未設定」は、`loop` の「「未設定」の定義」に従う (`triage` 自体が無いか、キーが無いか、値が空文字列)。**3 つの値のどれでもない値は、未設定と読まず、判定を始めずにエラーとして報告する。** 誤記を未設定と読むと、下限を指定したつもりの回で、下限が適用されない。
 
 ## `loop` — ループの既定値
 

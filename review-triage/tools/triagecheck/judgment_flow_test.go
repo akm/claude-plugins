@@ -51,6 +51,36 @@ func TestJudgmentFlowDiagramOnlyID(t *testing.T) {
 	}
 }
 
+// 下限未満の決着 (B) も、ノード ID として図と表を照合する。
+func TestJudgmentFlowBelowMinimumID(t *testing.T) {
+	inDiagram := strings.Replace(judgmentFlowFixture,
+		"  D1 -- 当たる --> A2\n",
+		"  D1 -- 当たる --> A2\n  D1 -- 下限に満たない --> B1\n", 1)
+	cases := []struct {
+		name    string
+		content string
+		want    string // 空なら問題が出ない
+	}{
+		{"図と表の両方にある", inDiagram + "| B1 | 決着 | 下限未満 | verdict |\n", ""},
+		{"図だけにある", inDiagram, "B1 は図にあるが決定表にありません"},
+		{"表だけにある", judgmentFlowFixture + "| B1 | 決着 | 下限未満 | verdict |\n", "B1 は決定表にあるが図にありません"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(tc.content), "")
+			if tc.want == "" {
+				if len(problems) != 0 {
+					t.Fatalf("問題が出た: %v", problems)
+				}
+				return
+			}
+			if len(problems) != 1 || !strings.Contains(problems[0], tc.want) {
+				t.Fatalf("%q を含む問題が 1 件だけ出るべき。出た問題: %v", tc.want, problems)
+			}
+		})
+	}
+}
+
 func TestJudgmentFlowTableOnlyID(t *testing.T) {
 	content := judgmentFlowFixture + "| H9 | 決着 | 保留 | verdict |\n"
 	problems := judgmentFlowProblems([]string{judgmentFlowPath}, judgmentFlowRead(content), "")

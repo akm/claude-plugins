@@ -83,6 +83,7 @@ loop:
   structure_rounds: 3
   threshold: 5
   stages: []
+  min_fix_necessity: must
   base: "origin/main"
   full_first: false
   full_review: true

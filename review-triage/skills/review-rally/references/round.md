@@ -6,7 +6,7 @@
 
 | ID | 種類 | 条件・内容 | 報告に書くもの |
 | --- | --- | --- | --- |
-| RRG0 | 手順 | 新しいループなら、次の順に行う。(1) 条件を決める ([arguments.md](arguments.md))。(2) 開始の前提を確認する ([session.md](session.md) の「開始の前提」)。(3) ループのディレクトリと `rally.yaml` を作る ([session.md](session.md) の「ループのディレクトリを作る」)。(4) レビューのセッションを起動し、実際の値を確認する ([session.md](session.md) の「起動」)。再入なら、下の「再入の手順」 | 新しいループのときだけ、決まった条件をループの開始前に出す。書くのは、レビューのセッションのモデルの指定と実効モデル・effort (指定と `get_session` の値)・権限モード、レビュースキルとそのオプション、上限、構造の関門 k、全量の起点のブランチ (`loop.base` と、`--base` による指定か `origin/HEAD` による既定か)、`review-triage-fix` に渡す回数の閾値 N とフェーズごとの実行方法 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ)、`--full-first` と `--full-review` の有無、ループの id とループのディレクトリの絶対パス、レビューのセッション (名前・id・worktree のパス) |
+| RRG0 | 手順 | 新しいループなら、次の順に行う。(1) 条件を決める ([arguments.md](arguments.md))。(2) 開始の前提を確認する ([session.md](session.md) の「開始の前提」)。(3) ループのディレクトリと `rally.yaml` を作る ([session.md](session.md) の「ループのディレクトリを作る」)。(4) レビューのセッションを起動し、実際の値を確認する ([session.md](session.md) の「起動」)。再入なら、下の「再入の手順」 | 新しいループのときだけ、決まった条件をループの開始前に出す。書くのは、レビューのセッションのモデルの指定と実効モデル・effort (指定と `get_session` の値)・権限モード、レビュースキルとそのオプション、上限、構造の関門 k、全量の起点のブランチ (`loop.base` と、`--base` による指定か `origin/HEAD` による既定か)、`review-triage-fix` に渡す回数の閾値 N とフェーズごとの実行方法 (書き方は [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の G0 の行と同じ)、`review-triage` に渡す修正の必要度の下限 (書き方は同じ行と同じ)、`--full-first` と `--full-review` の有無、ループの id とループのディレクトリの絶対パス、レビューのセッション (名前・id・worktree のパス) |
 | RRL1 | 手順 | 下の「1 回のレビュー」の手順 | いま何回目か (この起動で数えた回数) と上限、記録の回番号、範囲 (全量か増分か)、識別子 |
 
 ## ファイルのディレクトリ

@@ -1552,3 +1552,119 @@ func TestParsePorcelainUnquotesFileName(t *testing.T) {
 		t.Fatalf("読み取りが違う: %+v", lines)
 	}
 }
+
+// フラグ -allow-same-commit (判定ノード D9) では、起点とレビューした内容が同じコミットでも確認する。
+// コミット済みの行は起点にあったままなので成り立つ。フラグが無いとき (D8) の結果は変えない
+// (TestBaseEqualToReviewedCommitIsUnverifiable)。
+func TestAllowSameCommitHoldsForCommittedLines(t *testing.T) {
+	r, base := branched(t)
+
+	o := r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", "HEAD", "-allow-same-commit")
+	wantKind(t, o, holds)
+	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 2 行目)")
+
+	// フラグが無ければ、同じコミットは確認できない
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", "HEAD"), unverifiable)
+}
+
+// フラグ -allow-same-commit でも、-rev のときのコミットしていない変更の確認は行う。レビュアが読んだ
+// 内容がコミットと違いうるので、変更があれば確認できないとする (誤った holds にしない)。
+func TestAllowSameCommitChecksUncommittedChange(t *testing.T) {
+	r, base := branched(t)
+
+	r.write("f.md", "a\nb\nc\nd\n")
+	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "コミットしていない変更")
+
+	// ステージした変更も同じ
+	r.git("add", "f.md")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), unverifiable)
+
+	// ほかのファイルの変更は見ない
+	r.git("reset", "-q", "--hard")
+	r.write("g.md", "edited\n")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), holds)
+}
+
+// フラグ -allow-same-commit でも、skip-worktree が付いたファイルの編集は、コミットしていない変更として扱う。
+// git status は、この編集を変更として出さない。
+func TestAllowSameCommitSkipWorktreeEdit(t *testing.T) {
+	r, base := branched(t)
+
+	r.git("update-index", "--skip-worktree", "f.md")
+	r.write("f.md", "a\nb\nX\n")
+	if st := r.git("status", "--porcelain"); st != "" {
+		t.Fatalf("git status が変更を出した (skip-worktree が効いていない): %q", st)
+	}
+	o := r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD", "-allow-same-commit")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "コミットしていない変更")
+}
+
+// フラグ -allow-same-commit と -worktree では、作業ツリーで書き換えた行は成り立たず、書き換えていない行は成り立つ。
+func TestAllowSameCommitWorktreeContent(t *testing.T) {
+	r, base := branched(t)
+
+	r.write("f.md", "a\nb\nX\n")
+	o := r.check(base, "-file", "f.md", "-lines", "3", "-worktree", "-allow-same-commit")
+	wantKind(t, o, notHolds)
+	wantContains(t, o.lines["line 3"], "コミットしていない行")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree", "-allow-same-commit"), holds)
+}
+
+// フラグ -allow-same-commit は、起点とレビューした内容が違うコミットのときの結果を変えない。
+func TestAllowSameCommitDoesNotChangeOtherCases(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nb\nC\n")
+	r.commit("change line 3")
+
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD", "-allow-same-commit"), holds)
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD", "-allow-same-commit"), notHolds)
+}
+
+// フラグ -allow-same-commit で、-base と -rev が同じコミットのときの結果は、判定の時点の HEAD によらない。
+// 範囲 <起点>..<起点> には起点でないコミットが無く、git blame は HEAD を親として作業ツリーの内容を調べるので、
+// この範囲で git blame を実行すると、HEAD が -rev より後のときに、後のコミットが書き換えて元へ戻した行が
+// 成り立たなくなる。
+func TestAllowSameCommitDoesNotDependOnHead(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nB\nc\n")
+	r.commit("change line 2")
+	r.write("f.md", "a\nb\nc\n")
+	r.commit("revert line 2")
+
+	// HEAD は起点より後。指摘のファイルの作業ツリーの内容は、起点と同じ
+	o := r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", base, "-allow-same-commit")
+	wantKind(t, o, holds)
+	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 2 行目)")
+
+	// ほかのファイルだけを変えたコミットが後にあっても同じ
+	r.write("g.md", "later\n")
+	r.commit("change other file")
+	wantKind(t, r.check(base, "-file", "f.md", "-lines", "2", "-rev", base, "-allow-same-commit"), holds)
+}
+
+// フラグ -allow-same-commit で、-rev より後のコミットが指摘のファイルを変えたままなら、作業ツリーの内容が
+// レビューした内容のコミットと違うので、確認できないとする (フラグが無いときと同じ確認)。
+func TestAllowSameCommitLaterCommitChangedFile(t *testing.T) {
+	r, base := branched(t)
+	r.write("f.md", "a\nB\nc\n")
+	r.commit("change line 2")
+
+	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", base, "-allow-same-commit")
+	wantKind(t, o, unverifiable)
+	wantContains(t, o.reason, "レビューした内容のコミット")
+}
+
+// フラグ -allow-same-commit で同じコミットのときも、行がレビューした内容の行数を越えるのは入力の誤り。
+func TestAllowSameCommitLineBeyondEndIsInputError(t *testing.T) {
+	r, base := branched(t)
+
+	o := r.check(base, "-file", "f.md", "-lines", "4", "-rev", "HEAD", "-allow-same-commit")
+	if o.code != 2 {
+		t.Fatalf("終了コードが %d (期待は 2)。stdout: %s stderr: %s", o.code, o.stdout, o.stderr)
+	}
+	wantContains(t, o.stderr, "input-error:")
+	wantContains(t, o.stderr, "越えます")
+}
