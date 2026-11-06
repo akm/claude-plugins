@@ -1,6 +1,6 @@
 ---
 name: review-rally
-description: レビューを、このセッションから起動した別の Claude Code のセッション (レビューのセッション。専用の worktree で動く) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。依頼と完了の通知はセッション間のメッセージで行い、2 回目以降は依頼の前にレビューのセッションの会話を消す。「レビューを別のセッションに任せて回して」「セッションを起動してレビューから修正までを回して」「review-rally を実行して」のような依頼で使う。引数でレビューのセッションのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・全量の起点にする派生元のブランチ (--base)・1 回目を全量にするか (--full-first)・収束の後に全量の回を行うか (--full-review)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す) を指定できる。Claude のデスクトップアプリのセッションから使う。セッションは worktree で動いていても、メインの作業ツリーで動いていてもよい。
+description: レビューを、このセッションから起動した別の Claude Code のセッション (レビューのセッション。専用の worktree で動く) に任せ、トリアージと修正をこのセッションで行うループを、停止するまで回す。依頼と完了の通知はセッション間のメッセージで行い、2 回目以降は依頼の前にレビューのセッションの会話を消す。「レビューを別のセッションに任せて回して」「セッションを起動してレビューから修正までを回して」「review-rally を実行して」のような依頼で使う。引数でレビューのセッションのモデル (--model) と effort (--effort)・レビュースキルとそのオプション・上限・全量の起点にする派生元のブランチ (--base)・1 回目を全量にするか (--full-first)・収束の後に全量の回を行うか (--full-review)・回数の閾値とフェーズの実行方法 (どちらも review-triage-fix に渡す)・修正の必要度の下限 (--min-fix-necessity。review-triage に渡す) を指定できる。Claude のデスクトップアプリのセッションから使う。セッションは worktree で動いていても、メインの作業ツリーで動いていてもよい。
 ---
 
 # review-rally: レビューを別のセッションに任せるループ
@@ -38,7 +38,7 @@ description: レビューを、このセッションから起動した別の Cla
 
 人間のメッセージ以外で始まったターンは、[round.md](references/round.md) の「再入の手順」に入る。
 
-- L2 では、Skill ツールで `review-triage` を呼び出す。指摘が 0 件の回も呼び出す。渡すものは [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」。
+- L2 では、Skill ツールで `review-triage` を呼び出す。指摘が 0 件の回も呼び出す。`rally.yaml` に `loop.min_fix_necessity` があれば、`--min-fix-necessity` に渡す。渡すものは [round.md](references/round.md) の「L2 で `review-triage` に渡すもの」。
 - F1 では、Skill ツールで `review-triage-fix` を呼び出し、ループの状態のファイル `tmp/review-rally/<ループの id>/rally.yaml` (様式は [session.md](references/session.md)) の `loop.threshold` を `--threshold` に、`loop.stages` の各要素を `--stage` に渡す。
 
 ### 停止

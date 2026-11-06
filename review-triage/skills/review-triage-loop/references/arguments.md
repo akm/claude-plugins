@@ -5,7 +5,7 @@
 ## 様式
 
 ```
-review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <スキル名>] [--review-args "<引数>"] [--model <モデル>] [--base <ブランチ>] [--threshold <N>] [--stage <フェーズ>[=<値>]]...
+review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <スキル名>] [--review-args "<引数>"] [--model <モデル>] [--base <ブランチ>] [--threshold <N>] [--stage <フェーズ>[=<値>]]... [--min-fix-necessity <must|should|could>]
 ```
 
 | 引数 | 対応する設定のキー | 例 |
@@ -18,10 +18,13 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 | `--base` | — (設定のキーを持たない) | `--base feat/a` |
 | `--threshold` | `fix.threshold_rounds` (`review-triage-fix` の設定) | `--threshold 3` |
 | `--stage` | `fix.stages.<フェーズ>` (`review-triage-fix` の設定) | `--stage investigate=sonnet:high` |
+| `--min-fix-necessity` | `triage.min_fix_necessity` (`review-triage` の設定) | `--min-fix-necessity must` |
 
 **`--threshold <N>` はループの条件ではなく、`review-triage-fix` にそのまま渡す。** 回数の閾値 N (記録の回番号がこれを越えた回で、`review-triage-fix` が調査の後に人間に立案者の選択を求める) の意味・決め方・検査の SSOT は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) と [project-config.md](../../review-triage/references/project-config.md) の「`fix`」で、ループはこの値で分岐しない。ループが行うのは 2 つだけで、開始前の報告 (決定表 G0) に書くために同じ規則で値を決めて検査すること (下の「値の検査」) と、`review-triage-fix` を呼ぶ (F1) たびにその値を渡すことである。
 
 **`--stage <フェーズ>[=<値>]` も同じ扱いで、`review-triage-fix` にそのまま渡す。** フェーズ (`investigate` = 調査 / `plan` = 立案 / `fix` = 修正) をセッション内で実行するか sub-agent で実行するか、sub-agent ならそのモデルと effort の指定で、様式・優先順位・値の検査の SSOT は [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「`--stage`」、実行方法の決定 (定義名・実効モデル) の SSOT は [review-triage-fix の stage-subagent.md](../../review-triage-fix/references/stage-subagent.md)。ループが行うのは `--threshold` と同じ 2 つで、開始前の報告 (G0) に書くために同じ規則でフェーズごとの実行方法を決めて検査することと、`review-triage-fix` を呼ぶ (F1) たびにそのまま渡すことである。**`--model` はレビューのモデル、`--stage` の `<model>` はフェーズの sub-agent のモデルで、別のものである。**
+
+**`--min-fix-necessity <must|should|could>` もループの条件ではなく、`review-triage` にそのまま渡す。** 修正の必要度の下限 (必要度がこれに満たない指摘を、`review-triage` が採択にせず下限未満として記録する) の意味と決め方の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「`triage`」で、ループはこの値で分岐しない。ループが行うのは 2 つで、開始前の報告 (G0) に書くために同じ規則で値を決めて検査することと、`review-triage` を呼び出す (L2) たびに、下限があるときだけその値を渡すことである。下限が無いときは、引数を渡さない。
 
 **`--base <ブランチ>` は、全量の回の起点を求める派生元のブランチ** (別の作業ブランチから派生したブランチなら、その作業ブランチ)。**設定のキーを持たない。** ブランチごとに変わる値なので、`review-request` と `review-loop` の `--base` と同じく設定には置かない。**どの回・どの経路で起点のブランチを使い、省いたときにどのブランチになるかの SSOT は [review-invocation.md](review-invocation.md) の「範囲」。** G0 は、下の「値の検査」で読む記録の回の有無と経路から、この起動で起点のブランチを使うかを決める。使うなら起点のブランチを決め、同じ「値の検査」のとおり検査する。使わないのに指定があれば、無視する。
 
@@ -32,8 +35,8 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 決定の順に見る。
 
 1. 引数にあればその値
-2. 無ければ設定の `loop` の値 (「未設定」の定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」。上の段落のとおり、`--threshold` と `--stage` だけは設定の `fix` を見る)
-3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の「`loop`」の表。`--threshold` と `--stage` は「`fix`」の表)
+2. 無ければ設定の `loop` の値 (「未設定」の定義の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「「未設定」の定義」。上の段落のとおり、`--threshold` と `--stage` は設定の `fix` を、`--min-fix-necessity` は設定の `triage` を見る)
+3. どちらにも無ければ、キーごとの既定 ([project-config.md](../../review-triage/references/project-config.md) の「`loop`」の表。`--threshold` と `--stage` は「`fix`」の表、`--min-fix-necessity` は「`triage`」の表)
 4. 既定で決まらないものは**人間に質問する**。質問するのは、`review_skill` (既定を持たない。理由は同じ表の下の説明) を決めるときと、`review_model` で呼び出し元が既定の対応表に無いとき ([review-invocation.md](review-invocation.md) の「G0 での解決」) である。ループがモデルを決めない経路では質問しない (SSOT は同ファイルの「G0 での解決」)
 
 **設定で決まっていれば質問しない。** リポジトリごとに決めるものは、本来は設定に書くものだからである。質問するのは、引数でも設定でも未設定 (定義は上の参照先) のときだけ。
@@ -49,6 +52,7 @@ review-triage-loop [--max <回数>] [--structure-rounds <回数>] [--review <ス
 - `review_model` の値は検査しない。指定が適用されなかったときの報告の条件は [review-invocation.md](review-invocation.md) の「実効モデル」が SSOT。
 - `fix.threshold_rounds` (`--threshold`) は、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」の条件で検査する (条件はそちらが SSOT)。誤りはループを始めずにエラーとして報告する。`review-triage-fix` を呼んだ回で初めて気づくと、そこまでのレビューの実行が無駄になる。
 - `fix.stages` (`--stage`) も同じく、[review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 (フェーズの名前・`<値>` の形・effort の 5 値・`subagent` の真偽値・モデルの指定が実効モデルに解決できること) で検査する。誤りはループを始めずにエラーとして報告する (例: `--stage investigate=sonnet:ultra` は effort が 5 値に無いので、ループを始めずにエラーになる)。
+- `triage.min_fix_necessity` (`--min-fix-necessity`) は `must` / `should` / `could` のいずれか (未設定なら下限は無い)。それ以外の値は、ループを始めずにエラーとして報告する。
 - **記録** (ディレクトリとファイル名の SSOT は [review-triage の record-schema.md](../../review-triage/references/record-schema.md) の「ファイルの単位」。引数や設定の値ではないが、ループを始める前に確認する入力なのでここに置く) は、経路を問わず G0 で読めることを確認する。記録が無ければ回は無いとする。記録があるのに読めない (YAML として壊れている・`runs` が無い) なら、ループを始めずにその旨を報告する ([review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 と同じ扱い)。読めない記録を「無い」に寄せると、G2 と G3 が選択待ちと覆われていない採択を見落とし、記録に追記する回の番号も過去の回と重なる。
 - **全量の起点のブランチ** (この起動で起点のブランチを使うときに限る。使う回と経路の SSOT は [review-invocation.md](review-invocation.md) の「範囲」) は、[review-request の SKILL.md](../../review-request/SKILL.md) の手順 2 と同じ条件で検査する。`--base` のブランチが解決できない、`--base` が無くて `origin/HEAD` が無い、または HEAD との merge-base が求まらない (共通祖先が無い) なら、ループを始めずにその旨を報告し、起点のブランチをどれにするかを人間に質問する。
 

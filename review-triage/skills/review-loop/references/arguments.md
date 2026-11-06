@@ -1,12 +1,13 @@
 # 引数の様式
 
-**このファイルが `review-loop` の引数と、ループの条件の決め方の SSOT。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」「`fix`」「`review_loop`」が SSOT。ここでは言い直さない。
+**このファイルが `review-loop` の引数と、ループの条件の決め方の SSOT。** 設定のキーと既定値は [project-config.md](../../review-triage/references/project-config.md) の「`loop`」「`fix`」「`triage`」「`review_loop`」が SSOT。ここでは言い直さない。
 
 ## 様式
 
 ```
 review-loop [--model <指定>] [--effort <値>] [--review <スキル名>] [--review-args "<引数>"]
             [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <フェーズ>[=<値>]]...
+            [--min-fix-necessity <must|should|could>]
             [--wait-minutes <分>] [--worker-wait-minutes <分>] [--full-review] [--base <ブランチ>]
 review-loop --resume [<ループのディレクトリ>] [--max <回数>] [--full-review] [--base <ブランチ>]
 review-loop --end [<ループのディレクトリ>]
@@ -22,6 +23,7 @@ review-loop --end [<ループのディレクトリ>]
 | `--structure-rounds` | `loop.structure_rounds` | `--structure-rounds 0` |
 | `--threshold` | `fix.threshold_rounds` | `--threshold 3` |
 | `--stage` | `fix.stages.<フェーズ>` | `--stage investigate=sonnet:high` |
+| `--min-fix-necessity` | `triage.min_fix_necessity` | `--min-fix-necessity must` |
 | `--wait-minutes` | `review_loop.wait_minutes` | `--wait-minutes 5` |
 | `--worker-wait-minutes` | `review_loop.worker_wait_minutes` | `--worker-wait-minutes 5` |
 | `--full-review` | 無し (`loop.yaml` の `review.full_review` に書く) | `--full-review` |
@@ -42,6 +44,8 @@ review-loop --end [<ループのディレクトリ>]
 **`review_loop.permission_mode` が未設定なら、デフォルトの `auto` を `loop.yaml` の `worker.permission_mode` に書く** (デフォルト値の SSOT は [project-config.md](../../review-triage/references/project-config.md) の「`review_loop`」)。ループの権限モードは `loop.yaml` に書いた値で決まり、ワーカーのデフォルトには任せない。案内の起動コマンドはこの値を常に渡し、各回の突き合わせは完了のフラグファイルの権限モードの指定をこの値と比べる。
 
 **`--threshold` と `--stage` はループの条件ではなく、`review-triage-fix` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落。ループは開始前の報告に書くために同じ規則で値を決めて検査し、`review-triage-fix` を呼ぶ (F1) たびに渡す。
+
+**`--min-fix-necessity` もループの条件ではなく、`review-triage` にそのまま渡す。** 扱いは `review-triage-loop` と同じで、SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落。決めた値は `loop.yaml` の `loop.min_fix_necessity` に書き、L2 で `review-triage` を呼び出すたびに渡す。下限が無ければ、キーを書かず、引数も渡さない。
 
 **`--resume` で受け付けるのは `--max` と `--full-review` だけ。** 例外は `--base` で、`loop.yaml` に `review.base` が無いとき (下の「0.14.0 以前に始めたループ」) だけ受け付ける。ほかの引数と、`review.base` があるときの `--base` は、引数の誤りとして再開せずにエラーにする。ほかの条件は `loop.yaml` から復元する。再開のたびに条件が変わると、記録の回ごとの違いが条件の違いによるものか収束によるものかを読み解けなくなる。条件を変えたいときは、`--end` で終えてから新しいループを始める。`--max` は起動ごとの上限 (J5 は起動ごとに 0 から数える) なので、再開のたびに決めてよい。省略時は `loop.yaml` の `loop.max_rounds`。
 
@@ -69,14 +73,14 @@ review-loop --end [<ループのディレクトリ>]
 **検査するのは、引数か設定かを問わず、決定の結果として採る値。** 誤りの扱いは出所で分ける。
 
 - **引数の誤りは、ループを始めずにエラーとして報告する。** 引数はその場で言い直せる。
-- **`loop`・`fix` の設定の誤りも、ループを始めずにエラーとして報告する** (`review-triage-loop` と同じ規則)。
+- **`loop`・`fix`・`triage` の設定の誤りも、ループを始めずにエラーとして報告する** (`review-triage-loop` と同じ規則)。
 - **`review_loop` の設定の誤りは、そのキーを未設定として扱い (既定があれば既定、無ければ人間に質問する)、警告を開始の報告に書く。** 失われるのは利用者が書いた数行で、既定で続けてもループの記録は壊れない (失敗時の態度の SSOT は [loop-files.md](loop-files.md) の「ファイルの種類ごとの態度」)。
 
 | 値 | 条件 |
 | --- | --- |
 | ワーカーのモデルの指定 | 空でない文字列。表記は検査しない (`claude --model` が解釈する) |
 | ワーカーの effort | `low` / `medium` / `high` / `xhigh` / `max` のいずれか |
-| `review_skill`・`review_args`・`max_rounds`・`structure_rounds` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
+| `review_skill`・`review_args`・`max_rounds`・`structure_rounds`・`min_fix_necessity` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
 | `threshold_rounds`・`stages` | [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 |
 | `wait_minutes`・`worker_wait_minutes`・`worker_idle_minutes`・`review_timeout_minutes` | 正の数 (小数を許す) |
 | `worker_stale_seconds` | 10 以上の整数 (ワーカーは 5 秒おきに更新時刻を進めるので、それより短いと動いているワーカーを停滞と読む) |

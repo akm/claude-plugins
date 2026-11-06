@@ -30,7 +30,7 @@
 
 ## `loop.yaml`
 
-review-loop のセッションがループの条件と状態を書く。`--resume` はこのファイルからループの条件を復元する (再開のときに何を変えてよいかの SSOT は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`review_loop`) のキー名と揃え、値の意味の SSOT は [project-config.md](../../review-triage/references/project-config.md) の各節にある。下の表は対応する設定のキーだけを書く。設定のキーを持たない条件 (`loop.stages`・`review.full_review`・`review.base`) は、引数の値を書き、意味の SSOT は [arguments.md](arguments.md)。
+review-loop のセッションがループの条件と状態を書く。`--resume` はこのファイルからループの条件を復元する (再開のときに何を変えてよいかの SSOT は [arguments.md](arguments.md) の「様式」)。**条件のキーには、開始時に決めた値 (引数か設定か既定) を書く。** キーの名前は設定 (`config.json` の `loop`・`fix`・`triage`・`review_loop`) のキー名と揃え、値の意味の SSOT は [project-config.md](../../review-triage/references/project-config.md) の各節にある。下の表は対応する設定のキーだけを書く。設定のキーを持たない条件 (`loop.stages`・`review.full_review`・`review.base`) は、引数の値を書き、意味の SSOT は [arguments.md](arguments.md)。
 
 ```yaml
 id: "20260926-1400-feat-review-loop-63"
@@ -56,6 +56,7 @@ loop:
   structure_rounds: 3
   threshold: 5
   stages: []
+  min_fix_necessity: "must"
 wait:
   wait_minutes: 60
   worker_wait_minutes: 15
@@ -88,6 +89,7 @@ full_review_next: false
 | `loop.structure_rounds` | ◯ | `loop.structure_rounds` |
 | `loop.threshold` | ◯ | `fix.threshold_rounds` |
 | `loop.stages` | ◯ | 引数 `--stage` の値の配列 (引数で指定したものだけ。設定 `fix.stages` は `review-triage-fix` が自分で読む)。無ければ `[]` |
+| `loop.min_fix_necessity` | | `triage.min_fix_necessity`。修正の必要度の下限が無ければ書かない |
 | `wait.wait_minutes` | ◯ | `review_loop.wait_minutes` |
 | `wait.worker_wait_minutes` | ◯ | `review_loop.worker_wait_minutes` |
 | `wait.worker_stale_seconds` | ◯ | `review_loop.worker_stale_seconds` |

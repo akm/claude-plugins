@@ -7,6 +7,7 @@
 ```
 review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--review-args "<引数>"]
              [--max <回数>] [--structure-rounds <回数>] [--threshold <N>] [--stage <フェーズ>[=<値>]]...
+             [--min-fix-necessity <must|should|could>]
              [--base <ブランチ>] [--full-first] [--full-review]
 ```
 
@@ -20,12 +21,14 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 | `--structure-rounds` | `loop.structure_rounds` | `--structure-rounds 0` |
 | `--threshold` | `fix.threshold_rounds` | `--threshold 3` |
 | `--stage` | `fix.stages.<フェーズ>` | `--stage investigate=sonnet:high` |
+| `--min-fix-necessity` | `triage.min_fix_necessity` | `--min-fix-necessity must` |
 | `--base` | 無し (`rally.yaml` の `loop.base` に書く) | `--base feat/a` |
 | `--full-first` | 無し (`rally.yaml` の `loop.full_first` に書く) | `--full-first` |
 | `--full-review` | 無し (`rally.yaml` の `loop.full_review` に書く) | `--full-review` |
 
 - **`--model`** と **`--effort`** は、レビューのセッションを起動するときに `start_session` の `model` と `effort` に渡す。
 - **`--threshold` と `--stage` は、`review-triage-fix` にそのまま渡す。** 扱いの SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落。開始前の報告に書くために、同じ規則で値を決めて検査する。
+- **`--min-fix-necessity` は、`review-triage` にそのまま渡す。** 扱いの SSOT は [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の該当の段落。決めた値は `rally.yaml` の `loop.min_fix_necessity` に書き、L2 で `review-triage` を呼び出すたびに渡す。下限が無ければ、キーを書かず、引数も渡さない。
 - **`--base <ブランチ>`** は、全量の起点を求める派生元のブランチ。全量の回 ([round.md](round.md) の手順 1) で、`review-request` に `--base` として渡す (起点の求め方の SSOT は [review-request の SKILL.md](../../review-request/SKILL.md) の手順 2)。**省いたら、開始時に `origin/HEAD` が指すブランチ名を、`review-request` の手順 2 と同じ求め方で解決して書く。解決できなければ、ループを始めずに人間に質問する。** 空のまま書くと、開始の報告にブランチ名が出ないためである。
 - **`--full-first`** は、この起動の 1 回目の依頼文を、収束後の全量レビューの要否を問わずに全量にする。記録に回が無ければ、付けなくても 1 回目は全量になる。
 - **`--full-review`** は、収束した後に、収束後の全量レビューが要れば、停止せずに全量の回を行う ([stops.md](stops.md) の RRJ1)。
@@ -49,7 +52,7 @@ review-rally [--model <指定>] [--effort <値>] [--review <スキル名>] [--re
 | --- | --- |
 | レビューのセッションのモデルの指定 | 空でない文字列。表記は検査しない (起動の後に実際の値と比べる。[session.md](session.md) の「起動」) |
 | レビューのセッションの effort | `low` / `medium` / `high` / `xhigh` / `max` のいずれかで、呼び出し元のセッションの effort (`get_session` の `self` の `effort`) 以下。上なら、呼び出し元のセッションの effort を上げるか、指定を下げるよう案内する |
-| `review_skill`・`review_args`・`max_rounds`・`structure_rounds` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
+| `review_skill`・`review_args`・`max_rounds`・`structure_rounds`・`min_fix_necessity` | [review-triage-loop の arguments.md](../../review-triage-loop/references/arguments.md) の「値の検査」と同じ条件 |
 | `threshold_rounds`・`stages` | [review-triage-fix の arguments.md](../../review-triage-fix/references/arguments.md) の「値の検査」と同じ条件 |
 | `--base` のブランチ | `git rev-parse --verify --quiet "<ブランチ>^{commit}"` でコミットに解決でき、`git merge-base <ブランチ> HEAD` が共通祖先を返す |
 
