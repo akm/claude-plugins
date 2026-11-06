@@ -23,7 +23,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 
 1. **入力の確認**: 入力の経路は 2 つで、同じセッションの文脈から受け取るか、**別セッションのレビュー結果を YAML ファイルで受け取る** (依頼の運用と様式の SSOT は [references/review-request.md](references/review-request.md)。依頼文は [review-request](../review-request/SKILL.md) スキルが生成する)。どのスキルかは記録の `skill` に残す。
    - ファイル経由の場合、読むのは**依頼文に埋め込んだ出力先の 1 ファイル** (`tmp/review-<識別子>.yaml`)。`head` が現在の HEAD と一致することを確認してから判定に進む。`residual` の要素は指摘として数えず、目を通して気になるものだけ記録の `notes` に写す。**直したい residual は `notes` ではなく、自己採択の指摘 (`origin: residual`) として `findings` に足し、他の指摘と同じ判定を通す** (様式と理由の SSOT は [references/record-schema.md](references/record-schema.md) の「ループ中に記録の外で直さない」)。トップレベルの `attrs` も同じ扱いで、記録に写す場所は無いので、残す価値があるものだけ `notes` に写す。
-   - **前の回までの残っている下限未満の指摘のうち、修正の必要度がこの回の下限以上のもの (下限が無い回ではすべて) は、この回の指摘として `findings` に足す** (`origin: prior_below_minimum`。条件と様式の SSOT は [references/record-schema.md](references/record-schema.md) の「下限未満の指摘の参照」)。この回の下限は、手順 2 の決め方で先に決める。足すのは、現在の HEAD のレビュー結果があるとき (指摘が 0 件の結果を含む) だけにする。
+   - **前の回までの残っている下限未満の指摘のうち、修正の必要度がこの回の下限以上のものは、この回の指摘として `findings` に足す (下限が無い回では足さない)** (`origin: prior_below_minimum`。条件と様式の SSOT は [references/record-schema.md](references/record-schema.md) の「下限未満の指摘の参照」)。この回の下限は、手順 2 の決め方で先に決める。足すのは、現在の HEAD のレビュー結果があるとき (指摘が 0 件の結果を含む) だけにする。
    - **出力先には過去の回のファイルが残る。** 識別子で名前が区別できる (成分の SSOT は [review-request](../review-request/SKILL.md) の手順 3) が、それでも `head` が現在の HEAD と一致するものだけを対象にし、一致するものが無ければ指摘が無い場合と同じ扱いにする。古い結果を現在の HEAD への指摘として判定すると、既に直した箇所を再び却下・採択することになる。
    - **上流が報告のみで実行されたかを確認する** (実行前後で HEAD と作業ツリーが不変)。適用済みなら判定に進まず、その旨を報告して次から報告のみで実行するよう案内する。
    - 指摘が見当たらなければ、レビューを先に実行するよう案内して終了する。**勝手にレビューを実行しない。**

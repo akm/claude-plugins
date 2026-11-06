@@ -226,6 +226,11 @@ func recordBelowMinimumRefProblems(doc *recordDoc, ri int, fd recordFinding) []s
 	add := func(format string, args ...any) {
 		problems = append(problems, fmt.Sprintf(format, args...))
 	}
+	// 下限が無い回では、前の回までの下限未満の指摘を足さない (record-schema.md の「下限未満の指摘の参照」)。
+	// 足すと、下限を指定していないのに、下限未満の指摘が採択になる。
+	if fd.Origin == "prior_below_minimum" && doc.Runs[ri].MinFixNecessity == "" {
+		add("回に下限 (min_fix_necessity) が無いのに、origin が prior_below_minimum の指摘があります (下限が無い回では、前の回までの下限未満の指摘を足さない)")
+	}
 	ref := fd.BelowMinimumRef
 	if ref == nil {
 		if fd.Origin == "prior_below_minimum" {
@@ -290,8 +295,9 @@ func recordBelowMinimumRefProblems(doc *recordDoc, ri int, fd recordFinding) []s
 // recordPriorBelowMinimumProblems は、回 (添字 ri) に足すべき下限未満の指摘が、足されているかを
 // 検査する。それより前の回の、残っている下限未満の指摘 (必要度を判定して下限未満にした指摘で、
 // この回より前の回の指摘が参照して、判定し直しても採択にしてもいないもの) のうち、必要度がこの回の
-// 下限以上のもの (下限が無い回ではすべて) は、この回の指摘として足す (record-schema.md の
-// 「下限未満の指摘の参照」)。足し忘れると、下限を下げても、その指摘は採択にならず直されないまま残る。
+// 下限以上のものは、この回の指摘として足す (record-schema.md の「下限未満の指摘の参照」)。
+// 足し忘れると、下限を下げても、その指摘は採択にならず直されないまま残る。下限が無い回では足さない
+// (下限を指定せずにループを起動し直しただけで、下限未満の指摘が採択にならないようにするため) ので、何も求めない。
 // 足したかどうかは、この回の指摘の below_minimum_ref が参照しているかで見る。呼び出し元は、
 // 記録の最後の回についてだけ呼ぶ。
 func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
@@ -318,24 +324,20 @@ func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
 		}
 	}
 	minimum := doc.Runs[ri].MinFixNecessity
+	// 下限が無い回では足さない。下限が列挙に無い値のときは、比べられないので報告しない
+	// (列挙の誤りは別に報告する)。
+	if fixNecessityRank(minimum) == 0 {
+		return nil
+	}
 	var problems []string
 	for _, k := range order {
 		necessity, ok := remaining[k]
 		if !ok || referenced[k] || fixNecessityBelow(necessity, minimum) {
 			continue
 		}
-		// 下限が列挙に無い値のときは、比べられないので報告しない (列挙の誤りは別に報告する)。
-		if minimum != "" && fixNecessityRank(minimum) == 0 {
-			continue
-		}
-		// 「無い」には「のに」が、「以上」には「なのに」が付くので、句ごとに「のに」まで書く。
-		limit := "この回に下限が無いのに"
-		if minimum != "" {
-			limit = "この回の下限 " + minimum + " 以上なのに"
-		}
 		problems = append(problems, fmt.Sprintf(
-			"残っている下限未満の指摘 (%d 回目の id %d。必要度 %s) が、%s、この回の findings に足されていません (origin: prior_below_minimum と below_minimum_ref を書いて足す)",
-			k.run, k.finding, necessity, limit))
+			"残っている下限未満の指摘 (%d 回目の id %d。必要度 %s) が、この回の下限 %s 以上なのに、この回の findings に足されていません (origin: prior_below_minimum と below_minimum_ref を書いて足す)",
+			k.run, k.finding, necessity, minimum))
 	}
 	return problems
 }

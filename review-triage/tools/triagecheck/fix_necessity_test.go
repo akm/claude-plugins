@@ -342,8 +342,8 @@ func TestReviewTriageRecordFixNecessityRequiredFromFirstRun(t *testing.T) {
 
 // 記録の最後の回が、残っている下限未満の指摘のうち、必要度がその回の下限以上のものを、
 // その回の指摘として足していなければ報告する。下限に満たないもの・その回が参照しているもの・
-// 前の回で判定し直したか採択にしたものは報告しない。前の回の足し忘れは、findings を後から
-// 書き換えないので報告しない。
+// 前の回で判定し直したか採択にしたものは報告しない。下限が無い回では足さないので、何も求めない。
+// 前の回の足し忘れは、findings を後から書き換えないので報告しない。
 func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
 	// 1 回目 (下限 must) に、Should (id 1) と Could (id 2) の下限未満がある。
 	run1 := fixNecessityRunYAML("must",
@@ -362,9 +362,10 @@ func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
 		{"下限を should に下げた回は、Should を足す", fixNecessityRunYAML("should", other, ""),
 			[]string{"1 回目の id 1。必要度 should) が、この回の下限 should 以上なのに、この回の findings に"}},
 		{"下限を should に下げて Should を足した回は、報告しない", fixNecessityRunYAML("should", addShould, ""), nil},
-		{"下限を無くした回は、すべて足す", fixNecessityRunYAML("", other, ""),
-			[]string{"1 回目の id 1。必要度 should) が、この回に下限が無いのに、この回の findings に", "1 回目の id 2。必要度 could) が、この回に下限が無いのに、この回の findings に"}},
-		{"下限を無くして両方を足した回は、報告しない", fixNecessityRunYAML("", addShould+addCould, ""), nil},
+		{"下限が無い回は、足さなくてよい", fixNecessityRunYAML("", other, ""), nil},
+		{"下限を could に下げた回は、すべて足す", fixNecessityRunYAML("could", other, ""),
+			[]string{"1 回目の id 1。必要度 should) が、この回の下限 could 以上なのに、この回の findings に", "1 回目の id 2。必要度 could) が、この回の下限 could 以上なのに、この回の findings に"}},
+		{"下限を could に下げて両方を足した回は、報告しない", fixNecessityRunYAML("could", addShould+addCould, ""), nil},
 		{"前の回で採択にした指摘は、後の回で足さなくてよい",
 			fixNecessityRunYAML("should", addShould, fixNecessityPlanYAML) + fixNecessityRunYAML("should", other, ""), nil},
 		{"足し忘れが続いていれば、最後の回だけを報告する",
@@ -393,6 +394,37 @@ func TestReviewTriageRecordPriorBelowMinimumMustBeAdded(t *testing.T) {
 				if !strings.Contains(got[i], w) {
 					t.Fatalf("報告 %d に %q が無い: %q", i, w, got[i])
 				}
+			}
+		})
+	}
+}
+
+// 下限が無い回に、前の回までの下限未満の指摘を足すと報告する。下限を指定せずにループを起動し直した
+// だけで、下限未満の指摘が採択になることを防ぐため。レビュアがその回に報告した同じ問題の指摘
+// (origin が prior_below_minimum でないもの) は報告しない。
+func TestReviewTriageRecordPriorBelowMinimumNotAddedWithoutMinimum(t *testing.T) {
+	run1 := fixNecessityRunYAML("must", fixNecessityFindingYAML(1, "should", reasonShould, "below_minimum", "B1"), "")
+	const want = "下限が無い回では、前の回までの下限未満の指摘を足さない"
+	cases := []struct {
+		name   string
+		origin string
+		report bool
+	}{
+		{"足した指摘は報告する", "prior_below_minimum", true},
+		{"レビュアが報告した指摘は報告しない", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := "runs:\n" + run1 + fixNecessityRunYAML("", omittedFindingYAML(1, 1, 1, tc.origin, "adopted", "A3"), "")
+			problems := fixNecessityProblems(src)
+			if !tc.report {
+				if len(problems) != 0 {
+					t.Fatalf("問題が出た: %v", problems)
+				}
+				return
+			}
+			if len(problems) != 1 || !strings.Contains(problems[0], want) {
+				t.Fatalf("%q を含む問題が 1 件だけ出るべき。出た問題: %v", want, problems)
 			}
 		})
 	}
