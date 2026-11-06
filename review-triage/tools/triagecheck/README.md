@@ -249,6 +249,7 @@ bin/review-triage-check -write-summary   # 生成サマリを書き出す
 | 0.26.0 | 冒頭のコメント「正本は <YAML> — …」→「SSOT は <YAML> — …」、本文の 1 行目「正本は [<YAML>](<YAML>)。…」→「SSOT は [<YAML>](<YAML>)。…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.27.0 | 冒頭のコメント「SSOT は <YAML> — `<コマンド>` で再生成する。」→「SSOT は <YAML>。`<コマンド>` で再生成する。」、調査済み・未立案の注記「**調査済み・未立案 (investigated) が N 件: P1** — 修正方法と…」→「**調査済み・未立案 (investigated) が N 件: P1。** 修正方法と…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.30.0 | 指摘の表の見出し「帰結 (条件 / 何が / 気づけるか)」→「帰結 (条件 / 何が / 気づかされるか)」。推移の表に、列「下限」「下限未満」「Must」「Should」「Could」を足した (「—」になる回の SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「生成サマリの読み方」)。下限未満の指摘がある記録には、推移の表の次に節「下限未満の指摘」が出る ([#178](https://github.com/akm/claude-plugins/issues/178)) |
+| 0.31.0 | 節「下限未満の指摘」の、残っている指摘が無いときの文「(後の回で判定し直したか、採択にした)」→「(後の回で判定し直したか、採択にしたか、採択した問題と一緒に直した)」([#178](https://github.com/akm/claude-plugins/issues/178)) |
 
 ## テスト
 

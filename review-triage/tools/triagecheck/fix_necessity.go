@@ -253,6 +253,9 @@ func recordBelowMinimumRefProblems(doc *recordDoc, ri int, fd recordFinding) []s
 	if !judgmentOmitted(fd) {
 		return problems
 	}
+	if fd.Verdict == "below_minimum" && fd.PlanRef != nil {
+		add("判定を省略した下限未満の指摘 (B2) には plan_ref を書かない (一緒に直したことは、必要度を判定した参照先の指摘に書く)")
+	}
 	// 判定を省略した指摘 (A3・B2)。分類・被害者・帰結・根拠の検証・ゲート・必要度は書かない。
 	// 書いてあると、参照先の値と、この指摘の値のどちらを読むのかが決まらない。
 	for _, kv := range []struct {
@@ -314,7 +317,7 @@ func recordPriorBelowMinimumProblems(doc *recordDoc, ri int) []string {
 		return nil
 	}
 	var problems []string
-	for _, e := range belowMinimumEntries(doc.Runs[:ri]) {
+	for _, e := range belowMinimumEntries(doc, ri) {
 		necessity := e.finding.FixNecessity
 		if e.resolved || referenced[[2]int{e.run, e.finding.ID}] || fixNecessityBelow(necessity, minimum) {
 			continue
@@ -356,7 +359,8 @@ func renderFixNecessityCounts(doc *recordDoc, ri, firstRun int) []string {
 }
 
 // belowMinimumEntry は、節「下限未満の指摘」の 1 行になる指摘 (必要度を判定して下限未満に
-// した指摘)。resolved は、後の回の指摘が参照して、判定し直したか採択 (A3) にしたこと。
+// した指摘)。resolved は、後の回の指摘が参照して、判定し直したか採択 (A3) にしたか、
+// 採択した問題と一緒に直した (plan_ref の問題が直った) こと。
 // reported は、同じ問題がまた報告されて判定を省略した指摘 (B2) の位置。
 type belowMinimumEntry struct {
 	run      int
@@ -365,13 +369,13 @@ type belowMinimumEntry struct {
 	reported []string
 }
 
-// belowMinimumEntries は、runs の中の、必要度を判定して下限未満にした指摘を、記録の順に返す。
+// belowMinimumEntries は、記録の最初の n 回の中の、必要度を判定して下限未満にした指摘を、記録の順に返す。
 // 足し忘れの検査と節「下限未満の指摘」の両方が、これで「残っている」を決める。別々に決めると、
 // 片方だけを変えたときに、検査と生成サマリの結果が一致しなくなる。
-func belowMinimumEntries(runs []recordRun) []*belowMinimumEntry {
+func belowMinimumEntries(doc *recordDoc, n int) []*belowMinimumEntry {
 	var entries []*belowMinimumEntry
 	index := map[[2]int]*belowMinimumEntry{}
-	for ri, run := range runs {
+	for ri, run := range doc.Runs[:n] {
 		for _, fd := range run.Findings {
 			if ref := fd.BelowMinimumRef; ref != nil {
 				if e := index[[2]int{ref.Run, ref.Finding}]; e != nil {
@@ -383,13 +387,27 @@ func belowMinimumEntries(runs []recordRun) []*belowMinimumEntry {
 				}
 			}
 			if fd.Verdict == "below_minimum" && fixNecessityRank(fd.FixNecessity) > 0 {
-				e := &belowMinimumEntry{run: ri + 1, finding: fd}
+				e := &belowMinimumEntry{run: ri + 1, finding: fd, resolved: planRefFixed(doc, fd.PlanRef)}
 				entries = append(entries, e)
 				index[[2]int{ri + 1, fd.ID}] = e
 			}
 		}
 	}
 	return entries
+}
+
+// planRefFixed は、plan_ref の問題が直ったか (状態が done か done-external か) を返す。問題がまだ
+// 直っていないか、直さないと決めた (not-fixed) なら、指摘の箇所も直っていない。参照の実在は別に検査する。
+func planRefFixed(doc *recordDoc, ref *recordPlanRef) bool {
+	if ref == nil || ref.Run < 1 || ref.Run > len(doc.Runs) {
+		return false
+	}
+	for _, pl := range doc.Runs[ref.Run-1].Plans {
+		if pl.ProblemID == ref.Problem {
+			return pl.Status == "done" || pl.Status == "done-external"
+		}
+	}
+	return false
 }
 
 // renderBelowMinimumSection は節「下限未満の指摘」を書く。記録に下限未満の指摘が 1 件も
@@ -408,7 +426,7 @@ func renderBelowMinimumSection(b *strings.Builder, doc *recordDoc) {
 		return
 	}
 	b.WriteString("\n## 下限未満の指摘\n")
-	entries := belowMinimumEntries(doc.Runs)
+	entries := belowMinimumEntries(doc, len(doc.Runs))
 	remaining := 0
 	for _, necessity := range []string{"must", "should", "could"} {
 		var rows []*belowMinimumEntry
@@ -429,7 +447,7 @@ func renderBelowMinimumSection(b *strings.Builder, doc *recordDoc) {
 		}
 	}
 	if remaining == 0 {
-		b.WriteString("\n残っている下限未満の指摘はありません (後の回で判定し直したか、採択にした)。\n")
+		b.WriteString("\n残っている下限未満の指摘はありません (後の回で判定し直したか、採択にしたか、採択した問題と一緒に直した)。\n")
 	}
 }
 

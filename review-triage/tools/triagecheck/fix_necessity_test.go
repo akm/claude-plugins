@@ -449,7 +449,7 @@ func TestReviewTriageSummaryFixNecessity(t *testing.T) {
 		"\n" +
 		"## 下限未満の指摘\n" +
 		"\n" +
-		"残っている下限未満の指摘はありません (後の回で判定し直したか、採択にした)。\n" +
+		"残っている下限未満の指摘はありません (後の回で判定し直したか、採択にしたか、採択した問題と一緒に直した)。\n" +
 		"\n" +
 		"## 1 回目: "
 	if !strings.Contains(summary, wantHead) {
@@ -541,5 +541,87 @@ func TestReviewTriageSummaryNoBelowMinimumSection(t *testing.T) {
 	}
 	if strings.Contains(summary, "下限未満の指摘") {
 		t.Fatalf("下限未満の指摘が無い記録に節が出ている:\n%s", summary)
+	}
+}
+
+// fixedTogetherRecordYAML は、1 回目の下限未満の指摘 (id 1。必要度 Should) を、2 回目の問題 P1 と
+// 一緒に直す記録。plan は 2 回目の P1 の YAML、last は 3 回目の下限。
+func fixedTogetherRecordYAML(plan, last string) string {
+	run1 := fixNecessityRunYAML("must", strings.Replace(
+		fixNecessityFindingYAML(1, "should", reasonShould, "below_minimum", "B1"),
+		"        verdict: below_minimum\n",
+		"        plan_ref:\n          run: 2\n          problem: P1\n        verdict: below_minimum\n", 1), "")
+	run2 := fixNecessityRunYAML("must", fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2"), plan)
+	run3 := fixNecessityRunYAML(last, fixNecessityFindingYAML(9, "must", reasonMust, "adopted", "A2"), "")
+	return "runs:\n" + run1 + run2 + run3
+}
+
+const (
+	planPendingYAML      = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        approach: 直す\n        status: pending\n"
+	planNotFixedYAML     = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        decision:\n          target: t\n          baseline: b\n          choice: undecided\n          choice_reason: r\n        status: not-fixed\n"
+	planDoneExternalYAML = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        approach: 直す\n        applied_external_url: \"https://example.com\"\n        status: done-external\n"
+)
+
+// 下限未満の指摘を、採択した問題と一緒に直したら (plan_ref の問題が done か done-external)、
+// 残っている指摘から除く。問題がまだ直っていなければ (未着手・直さない)、残っている。
+func TestBelowMinimumFixedTogether(t *testing.T) {
+	cases := []struct {
+		name      string
+		plan      string
+		remaining bool
+	}{
+		{"問題が done なら残っていない", fixNecessityPlanYAML, false},
+		{"問題が done-external なら残っていない", planDoneExternalYAML, false},
+		{"問題が pending なら残っている", planPendingYAML, true},
+		{"問題が not-fixed なら残っている", planNotFixedYAML, true},
+	}
+	const missing = "1 回目の id 1。必要度 should) が、この回の下限 could 以上なのに"
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := fixedTogetherRecordYAML(tc.plan, "could")
+			reported := false
+			for _, p := range fixNecessityProblems(src) {
+				if strings.Contains(p, missing) {
+					reported = true
+				} else if !strings.Contains(p, "採択が修正計画に載っていません") {
+					t.Fatalf("足し忘れのほかの問題が出た: %s", p)
+				}
+			}
+			if reported != tc.remaining {
+				t.Fatalf("足し忘れを報告するべきか: %v。報告: %v", tc.remaining, reported)
+			}
+			summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(src))
+			if err != nil {
+				t.Fatalf("サマリの生成に失敗: %v", err)
+			}
+			if listed := strings.Contains(summary, "### Should (1 件)"); listed != tc.remaining {
+				t.Fatalf("節に並ぶべきか: %v。生成サマリ:\n%s", tc.remaining, summary)
+			}
+			if !tc.remaining && !strings.Contains(summary, "残っている下限未満の指摘はありません (後の回で判定し直したか、採択にしたか、採択した問題と一緒に直した)。") {
+				t.Fatalf("節の文が期待と違う:\n%s", summary)
+			}
+			if !strings.Contains(summary, "**下限未満** — B1 (必要度: Should) (束ね先: 2 回目の P1)") {
+				t.Fatalf("判定の欄に束ね先が無い:\n%s", summary)
+			}
+		})
+	}
+}
+
+// 判定を省略した下限未満の指摘 (B2) には plan_ref を書かない。一緒に直したことは、必要度を判定した
+// 指摘 (B1) に書く。判定を省略した採択 (A3) には、今までどおり書ける。
+func TestBelowMinimumPlanRefOnOmitted(t *testing.T) {
+	planRef := "        plan_ref:\n          run: 1\n          problem: P1\n"
+	withPlan := fixNecessityRunYAML("must",
+		fixNecessityFindingYAML(1, "should", reasonShould, "below_minimum", "B1")+fixNecessityFindingYAML(2, "must", reasonMust, "adopted", "A2"),
+		strings.Replace(fixNecessityPlanYAML, "finding_ids: [1]", "finding_ids: [2]", 1))
+	const want = "判定を省略した下限未満の指摘 (B2) には plan_ref を書かない"
+	b2 := "runs:\n" + withPlan + fixNecessityRunYAML("must", omittedFindingYAML(1, 1, 1, "", "below_minimum", "B2")+planRef, "")
+	problems := fixNecessityProblems(b2)
+	if len(problems) != 1 || !strings.Contains(problems[0], want) {
+		t.Fatalf("%q を含む問題が 1 件だけ出るべき。出た問題: %v", want, problems)
+	}
+	a3 := "runs:\n" + withPlan + fixNecessityRunYAML("should", omittedFindingYAML(1, 1, 1, "prior_below_minimum", "adopted", "A3")+planRef, "")
+	if problems := fixNecessityProblems(a3); len(problems) != 0 {
+		t.Fatalf("A3 の plan_ref で問題が出た: %v", problems)
 	}
 }

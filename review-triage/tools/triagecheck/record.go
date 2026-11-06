@@ -200,7 +200,8 @@ type recordPremise struct {
 	Result string `yaml:"result"`
 }
 
-// recordPlanRef は採択の束ね先 (どの回のどの問題で直すか) の構造化参照。
+// recordPlanRef は採択の束ね先 (どの回のどの問題で直すか) の構造化参照。採択した問題と一緒に
+// 直した下限未満の指摘にも書く (record-schema.md の plan_ref の行)。
 // 回をまたいで同因の指摘を束ねたとき (並列レビューの運用)、対応関係を
 // 自由記述でなく機械で辿れる形で残す。run は同じファイル内の 1 始まりの回番号。
 type recordPlanRef struct {
