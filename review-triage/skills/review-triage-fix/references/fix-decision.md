@@ -21,6 +21,8 @@
 
 **基準が変えられないもの (外部の仕様・実際の動作など) なら、`target` と `neither` は候補にならない。**
 
+**`target` を選んだ問題は、報告に一覧で出す。** 立案フェーズが人間に確認せずに基準を変えられるので、人間が後から確認できるようにするため。出す報告は、[SKILL.md](../SKILL.md) の手順 8 と、ループの [reporting.md](../../review-triage-loop/references/reporting.md)。
+
 **人間が決める選択肢を立案フェーズが選ばない。** 候補になるなら、`options` に書いて `status: awaiting-human` にする。人間が `undecided` を選んだら、`status: not-fixed` にする (人間の回答の反映の SSOT は [SKILL.md](../SKILL.md) の手順 1)。
 
 ## 修正の内容

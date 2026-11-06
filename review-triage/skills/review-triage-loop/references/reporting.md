@@ -33,6 +33,10 @@
 
 **件数は記録 YAML から数える。** 各回の報告の文面からは数えない。要約は一部を書き落としうる。
 
+## 基準を直した問題の一覧
+
+**この起動の回の修正計画に、`decision.choice` が `target` の問題があれば、停止した理由を問わず、その回と識別子・基準 (`decision.baseline`)・`approach` を一覧で出す。** 意味の SSOT は [fix-decision.md](../../review-triage-fix/references/fix-decision.md)。記録 YAML から求め、各回の報告の文面からは求めない。
+
 ## 停止した理由ごとに足すもの
 
 **SSOT は [loop-flow.md](loop-flow.md) の決定表の停止ノード (S2〜S6) の「報告に書くもの」。** ここには写さない。写すと、停止の条件を足したときに片方だけが古くなる。
