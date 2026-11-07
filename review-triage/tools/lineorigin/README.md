@@ -71,7 +71,7 @@ go run -C '<プラグインの展開先>/tools/lineorigin' . -root '<レビュ�
 | フラグ | 必須 | 内容 |
 | --- | --- | --- |
 | `-root` | ✓ | レビュアが指摘の `file` を読んだ作業ツリーのルートか、その中のディレクトリの絶対パス (上の段落)。ルートは道具が求める |
-| `-base` | ✓ | 全量の起点のコミット。起点のブランチの先端ではなく、そのブランチと HEAD の merge-base (決め方の SSOT は [premise-check.md](../../skills/review-triage/references/premise-check.md) の「全量の起点」) なので、ブランチ名ではなくそのコミットの SHA を渡す |
+| `-base` | ✓ | 起点のコミット。D9 では前の指摘を判定した回の `head` (SSOT は [judgment-flow.md](../../skills/review-triage/references/judgment-flow.md) の D9 の行)。D8 では全量の起点で、起点のブランチの先端ではなく、そのブランチと HEAD の merge-base (決め方の SSOT は [premise-check.md](../../skills/review-triage/references/premise-check.md) の「全量の起点」) なので、ブランチ名ではなくそのコミットの SHA を渡す |
 | `-file` | ✓ | 指摘の `file`。リポジトリのルートからの相対パス。パターンの文字 (`[` や `*`) や先頭の `:` も、書いたとおりのファイル名として読む |
 | `-lines` | ✓ | 指摘の行。`12`・`12-15` か、それらをコンマで並べた形 (`12,20-23`。連続しない行にまたがる指摘を 1 回で渡す) で、レビューした内容の行番号 |
 | `-rev` | `-worktree` とどちらか 1 つ | レビューした内容のコミット |
