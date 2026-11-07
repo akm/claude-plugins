@@ -219,9 +219,13 @@ comma_join() {
   tr '\n' ',' | sed -e 's/,$//' -e 's/,/, /g'
 }
 
-# そのプロセスグループに、終了していない (ゾンビでない) プロセスが残っているか
+# そのプロセスグループに、終了していない (ゾンビでない) プロセスが残っているか。コマンド ps が失敗したときは、分からないので
+# 残っているとみなす。残っていないとみなすと、関数 stop_group が KILL を送らず、TERM で終了しないプロセスが残るため。本当に
+# 残っていなければ、次に確認したときに分かる。パイプラインの終了コードには ps の失敗が現れないので、ps の出力を変数に受ける
 group_alive() {
-  ps -A -o pgid=,stat= 2>/dev/null | awk -v g="$1" '$1 == g && $2 !~ /^Z/ { found = 1 } END { exit !found }'
+  local out
+  out=$(ps -A -o pgid=,stat= 2>/dev/null) || return 0
+  printf '%s\n' "$out" | awk -v g="$1" '$1 == g && $2 !~ /^Z/ { found = 1 } END { exit !found }'
 }
 
 # ---- python3 のスクリプト ----
@@ -889,7 +893,8 @@ wait_group_gone() {
 # 専用のプロセスグループで起動したコマンド (PID $1。プロセスグループの番号も同じ) を、プロセスグループごと停止する。TERM を送り、
 # STOP_GRACE_SECONDS 秒のうちに空にならなければ KILL を送る。待機する間に使う ps と sleep が、ワーカーのプロセスグループに届いた
 # 割り込み (端末の Ctrl-C など) で停止しないように、INT・TERM・HUP を無視するサブシェルで行う (無視はコマンドに引き継がれる)。
-# そのあとコマンドの終了まで待機し、終了コードを WAITED_RC に入れる
+# ただし Ubuntu 24.04 の ps (procps-ng 4.0.4) は、無視を引き継いでいても、実行中に TERM か HUP を受けると終了する (そのときの判定は
+# 関数 group_alive)。そのあとコマンドの終了まで待機し、終了コードを WAITED_RC に入れる
 stop_group() {
   local pgid=$1
   (

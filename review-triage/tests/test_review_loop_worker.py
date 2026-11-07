@@ -518,6 +518,20 @@ class WorkerTestBase(unittest.TestCase):
         os.chmod(path, 0o755)
         self.env.update(FAKE_PS_TRIGGER=trigger, FAKE_PS_LOG=log, FAKE_PS_REAL=shutil.which("ps"))
 
+    def install_failing_group_ps(self, exit_code, always=False):
+        """PATH の先頭の bin/ に偽のコマンド ps を作る。プロセスグループの確認の呼び出し (ps -A -o pgid=,stat=。ワーカーの関数 group_alive) は、
+        何も出力せずに終了コード exit_code で終了する。always が偽なら失敗するのは最初の 1 回だけで、それ以外の呼び出しは本物の ps を実行する。"""
+        path = os.path.join(self.bin, "ps")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\ncase " $* " in *" pgid=,stat= "*)\n'
+                    '  if [ -n "$FAKE_PS_ALWAYS" ] || [ ! -e "$FAKE_PS_FAILED" ]; then\n'
+                    f'    : >"$FAKE_PS_FAILED"; exit {exit_code}\n'
+                    '  fi ;;\nesac\n'
+                    'exec "$FAKE_PS_REAL" "$@"\n')
+        os.chmod(path, 0o755)
+        self.env.update(FAKE_PS_FAILED=os.path.join(self.root, "group-ps-failed"), FAKE_PS_REAL=shutil.which("ps"),
+                        FAKE_PS_ALWAYS="1" if always else "")
+
     def start_until_child_checks_parent(self, trigger, log):
         """ワーカーを起動し、この起動の worker.yaml が idle になってからファイル trigger を作り、子 (親が起動したサブシェル) が
         親の生存を確認する ps を実行するまで待機して、起動したプロセスを返す。先に偽の ps (install_fake_ps) を置いておく。
@@ -2901,6 +2915,37 @@ class TestEnding(WorkerTestBase):
         self.assertEqual(marker["status"], "failed")
         self.assertEqual(marker["error"], "timeout")
         self.wait_for(lambda: not _group_alive(p.pid), timeout=10, what="ワーカーのプロセスグループが空になる")
+
+    def stop_reviewer_after_timeout_with_failing_ps(self, exit_code, always=False):
+        """上限を越えたレビュアの実行を停止する間に、プロセスが残っているかの確認 (関数 group_alive) の ps が失敗する回を実行し、
+        5 秒の猶予の後に KILL を送って回を終えることを確認して、起動したプロセスを返す。偽の claude は TERM を受けても終了しないので、
+        KILL を送らないと、ワーカーは偽の claude の終了を待機し続け、フラグファイルを書かない (経緯は #187)。"""
+        received = os.path.join(self.root, "term-received")
+        self.install_failing_group_ps(exit_code, always)
+        self.env.update(FAKE_CLAUDE_MODE="hang_ignore_term", FAKE_CLAUDE_TERM_RECEIVED=received)
+        self.put_request()
+        p = self.start("--review-timeout-minutes", "0.05")
+        self.wait_for(lambda: os.path.exists(received), timeout=30, what="上限を越えて、レビュアの実行に TERM が送られること")
+        term_seen = time.monotonic()
+        marker = self.wait_marker(timeout=30)
+        # 猶予の 5 秒より短い 3 秒と比べる。負荷でこのテストが TERM に気づくのが遅れても、誤って失敗しないようにするため
+        self.assertGreaterEqual(time.monotonic() - term_seen, 3, "KILL を送るまでの猶予が短くなっている")
+        self.assertEqual(marker["status"], "failed")
+        self.assertEqual(marker["error"], "timeout")
+        return p
+
+    def test_group_check_ps_exits_with_1_while_stopping_reviewer(self):
+        # Ubuntu 24.04 の ps (procps-ng 4.0.4) が、実行中に HUP を受けて終了したときの終了コード
+        self.finish(self.stop_reviewer_after_timeout_with_failing_ps(1))
+
+    def test_group_check_ps_stopped_by_term_while_stopping_reviewer(self):
+        # 同じ ps が、実行中に TERM を受けて終了したときに、bash から見える終了コード (128 + 15)
+        self.finish(self.stop_reviewer_after_timeout_with_failing_ps(143))
+
+    def test_group_check_ps_keeps_failing_while_stopping_reviewer(self):
+        # ps が失敗し続けて残っているかを確認できなくても、KILL を送って回を終え、確認できなかったことをログに書く
+        _, _, err = self.finish(self.stop_reviewer_after_timeout_with_failing_ps(1, always=True))
+        self.assertIn("が停止しない", err)
 
     def test_interrupt_while_reviewing(self):
         # AE16: 割り込みを受けたら、レビュアの実行とその子を停止して failed のフラグファイルと left を書く。作業場所は残らない
