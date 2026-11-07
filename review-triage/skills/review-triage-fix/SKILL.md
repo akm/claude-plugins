@@ -38,7 +38,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 2. **原因を確認する** (調査フェーズ): 採択した指摘ごとに「なぜそうなったか」を書く。**書けなければ束ねられない** ([references/grouping.md](references/grouping.md))。
    - **調査フェーズの実行方法**: 手順 1 で決めた実行方法がこのフェーズを sub-agent なら、[references/stage-subagent.md](references/stage-subagent.md) に従って手順 2〜4 (末尾の「立案者の選択」を除く) を sub-agent で実行し、返ったら同ファイルの「呼び出し元の検証」を通してから、手順 4 の末尾の「立案者の選択」に進む。そうでなければセッション内で手順 2〜4 を進める。
 3. **問題にまとめる** (調査フェーズ): 同じ原因の指摘を 1 つの問題にする。**束ねる根拠は原因であって、ファイルが同じことではない** (基準の SSOT は [references/grouping.md](references/grouping.md))。
-   - **別の回の採択を同じ原因で束ねる場合は、その指摘に `plan_ref` (束ね先の回と問題) を追記する。** 対応関係を自由記述に残さない。様式と被覆の規則の SSOT は [記録 README](../review-triage/references/record-schema.md) のスキーマ表。
+   - **別の回の採択を同じ原因で束ねる場合は、その指摘に `plan_ref` (束ね先の回と問題) を追記する。束ね先が `status: not-fixed` なら束ねない ([references/investigation.md](references/investigation.md))。** 対応関係を自由記述に残さない。様式と被覆の規則の SSOT は [記録 README](../review-triage/references/record-schema.md) のスキーマ表。
 4. **調査する** (調査フェーズ): 問題ごとに、直す前に 2 方向を調べる ([references/investigation.md](references/investigation.md))。
    - **前向き (類似箇所)**: 原因を起点に、同じ原因が生んだ別の箇所が指摘されていない場所に無いかを探す。語の grep と、構造・役割からの探索の両方で探す。語が違う類似実装は grep に掛からない。
    - **後ろ向き (影響範囲)**: 直した後に影響を受ける箇所 (呼び出し元・参照元・その記述を前提にしている箇所) に、考慮すべきものが無いかを調べる。
