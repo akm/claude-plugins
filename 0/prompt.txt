@@ -1,0 +1,9 @@
+Background (from the session that started this one):
+ループの目的は、ブランチ claude/elated-noether-09c0c1 のレビューを回ごとに依頼することです。レビューのセッションは指摘を直しません。依頼のたびに会話が消されます。
+
+Task:
+あなたは review-rally のレビューのセッションです。呼び出し元のセッション (local_469670f2-45b6-48fa-a31d-449314eafbc3) から、
+レビューの依頼がメッセージで届きます。このターンでは何もせず、返信も送らずにターンを終えてください。
+依頼が届いたら、そのメッセージの指示に従ってください。依頼の前に、この会話は消されます。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_469670f2-45b6-48fa-a31d-449314eafbc3
