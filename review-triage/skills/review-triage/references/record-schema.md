@@ -181,7 +181,6 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
       - problem_id: P2
         cause: 表の見出しだけを変え、行を埋める処理に追随しなかった
         finding_ids: [3]
-        approach: renderPlanCells の証拠の欄を見出しの 2 つの種類に合わせる
         investigation:
           scope: >-
             grep -rn '証拠\|SHA |' review-triage/tools/triagecheck と、
@@ -190,7 +189,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
             - record_test.go の見出しを固定するテスト (見出しの文字列を持つ)
           excluded:
             - README.md の検査項目の表は列の意味が違う (見出しと行の対応ではない)
-        status: pending
+        status: investigated
 ```
 
 ### 検証 (`plans[].verification`)
