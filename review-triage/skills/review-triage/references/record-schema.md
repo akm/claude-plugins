@@ -272,7 +272,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | 値 | 意味 | 再開時の扱い |
 | --- | --- | --- |
 | `investigated` | 調査済み・未立案 — `review-triage-fix` の調査フェーズの結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 立案フェーズから続ける (再開の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
-| `pending` | 未着手 — 修正方法と順序が決まっている | 修正フェーズから続ける (同上) |
+| `pending` | 未着手 — 修正方法と順序が決まっている | 再開の扱いは `review-triage-fix` の手順 1 に従う (同上) |
 | `awaiting-human` | 人間の回答待ちの問題。立案者 C (人間が立案する) の立案待ちも同じ状態で表す。どの場合にこの状態にするかと、`options` に書くものは、[review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順に従う | **実装しない。** 報告だけする。回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |
