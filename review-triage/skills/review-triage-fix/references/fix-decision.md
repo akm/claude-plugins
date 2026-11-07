@@ -25,6 +25,8 @@
 
 **人間が決める選択肢を立案フェーズが選ばない。** 候補になるなら、`options` に書いて `status: awaiting-human` にする。
 
+**今回は直さないと人間が決めた問題 (`status: not-fixed`) と同じ問題が採択になっていたら (調査の結果の `investigation` に書いてある)、修正方法を決めず、`options` に前の決定 (回と識別子・`decision.choice_reason`) を書いて `status: awaiting-human` にする。** 人間の決定を、人間に確認せずに覆さないため。
+
 ## 修正の内容
 
 **修正の内容は `approach` に書く。** 何を足し、何を書き換え、何を消すかを書く。下限未満の指摘を一緒に直す ([investigation.md](investigation.md)) なら、どの回のどの指摘かも書く。文書への指摘では、[doc-fix-form.md](doc-fix-form.md) の「消す → 書き換える → 足す」の順に検討する。コードへの指摘では、この順を適用しない。消すと動作が変わるため。
