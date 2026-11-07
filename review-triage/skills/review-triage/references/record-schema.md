@@ -114,7 +114,7 @@ E3 の 2 つの条件の結果を書く。条件と、必要度の決め方の S
 
 **`fix_necessity` には、この結果から決まる値を書く。** `goal_without_action` が `holds` なら `could`。`not-holds` で、`workaround` が `holds` なら `should`、`not-holds` なら `must`。どちらかが `undecided` なら `fix_necessity` を書かない。機械検査は、次の 3 つを報告する。`fix_necessity` がこの対応と合わない指摘。必要度を決められなかったのに `verdict` が `adopted` の指摘 (H8 の保留になる)。`verdict` が、必要度と回の `min_fix_necessity` から決まるものと合わない指摘 (下限に満たないのに `adopted`、下限以上か下限が無いのに `below_minimum`)。
 
-**必須にする回の決め方は、`prior_defect` と同じ** (上の「前からある欠陥」の「必須にするのは」の段落)。記録の中で最初に `fix_necessity_reason` か、回の `min_fix_necessity` を書いた回と、それより後の回だけで必須にする。下限を書いた回は、必要度を判定する規則で判定した回だからである。
+**必須にするのは、記録の中で最初に `fix_necessity_reason` か、回の `min_fix_necessity` を書いた回と、それより後の回だけ。** 既存の記録を書き換えずに検査を通すための考え方は、`prior_defect` と同じである (上の「前からある欠陥」の「必須にするのは」の段落)。`prior_defect` と違って回の `min_fix_necessity` も数えるのは、下限を書いた回は、必要度を判定する規則で判定した回だからである。
 
 次の例は、後の工程で気づかされるので Should とし、下限 (`must`) に満たないので B1 で下限未満にした指摘である (`summary` から `premise_check` までのキーと `prior_defect` は省いた)。
 
