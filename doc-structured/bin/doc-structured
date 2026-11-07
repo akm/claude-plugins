@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# プロジェクトが設定したバージョンのツール doc-structured を取得して実行する入口。
+# スキル・人間・CI が、このスクリプトを同じように実行する。説明の SSOT はプラグインの README
+# (https://github.com/akm/claude-plugins/blob/main/doc-structured/README.md の「ツールの実行」)。要点:
+#   - 設定ファイル .claude/akm-claude-plugins/doc-structured/config.yaml の「version: X.Y.Z」の形の 1 行からバージョンを読む
+#     (文字列の一致だけで、YAML としては読まない。YAML として読むのはツール)
+#   - そのバージョンのタグ doc-structured--vX.Y.Z から、pip で venv に取得して実行する。2 回目以降は取得済みの venv を使う
+#   - 取得に失敗したら、別の方法を試さず、エラーを標準エラー出力に書いて 0 以外の終了コードで終了する
+#   - 環境変数 DOC_STRUCTURED_CHECKOUT (リポジトリ akm/claude-plugins のチェックアウトのルート) があれば、version の取得をせず、
+#     そのチェックアウトのツールを editable で入れた venv を使う (開発のためだけに使う)
+# Python 3.12 以上の python3 と、取得に git が要る。
+set -euo pipefail
+
+repo_url="https://github.com/akm/claude-plugins"
+config_rel=".claude/akm-claude-plugins/doc-structured/config.yaml"
+cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/akm-claude-plugins/doc-structured"
+
+die() {
+  echo "doc-structured: $*" >&2
+  exit 1
+}
+
+project_root=$(cd "$(dirname "$0")/.." && pwd)
+
+python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' 2>/dev/null \
+  || die "Python 3.12 以上の python3 が要る (見つかったのは: $(python3 --version 2>&1 || echo 無し))"
+
+if [ -n "${DOC_STRUCTURED_CHECKOUT:-}" ]; then
+  tool_src="$DOC_STRUCTURED_CHECKOUT/doc-structured/tool"
+  [ -f "$tool_src/pyproject.toml" ] \
+    || die "DOC_STRUCTURED_CHECKOUT=$DOC_STRUCTURED_CHECKOUT に doc-structured/tool/pyproject.toml が無い"
+  venv="$cache_root/checkout"
+  pip_args=(--editable "$tool_src")
+else
+  config="$project_root/$config_rel"
+  [ -f "$config" ] || die "設定ファイルが無い: $config"
+  version_lines=$(grep -E '^version: [0-9]+\.[0-9]+\.[0-9]+$' "$config" || true)
+  count=$(printf '%s' "$version_lines" | grep -c . || true)
+  [ "$count" = 1 ] \
+    || die "$config には「version: X.Y.Z」の形の行が 1 行だけ要る (見つかったのは $count 行)"
+  version=${version_lines#version: }
+  venv="$cache_root/$version"
+  pip_args=("git+$repo_url@doc-structured--v$version#subdirectory=doc-structured/tool")
+fi
+
+if [ ! -f "$venv/installed" ]; then
+  # 途中で失敗した venv を取得済みと見なさないよう、取得が終わってからファイル installed を置く
+  # (venv は移動すると中のスクリプトが動かなくなるので、別の名前で作ってから移すことはしない)
+  rm -rf "$venv"
+  mkdir -p "$cache_root"
+  if ! { python3 -m venv "$venv" \
+      && "$venv/bin/python" -m pip install --quiet --disable-pip-version-check "${pip_args[@]}"; }; then
+    rm -rf "$venv"
+    die "ツールの取得に失敗した: ${pip_args[*]}"
+  fi
+  : > "$venv/installed"
+fi
+
+exec "$venv/bin/doc-structured" "$@"

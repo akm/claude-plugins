@@ -1,0 +1,64 @@
+# プラグイン doc-structured のスクリプト bin/doc-structured (ツールの入口) を、ランナー ubuntu-slim で確認する。
+#
+# このチェックアウトのスクリプトを架空のプロジェクトに置き、公開済みの新しい 2 つのバージョン (タグ doc-structured--v*) について、
+# 設定の version を書き換えると実行されるツールのバージョンが変わること・2 回目の実行は取得済みのものを使うことを確認する。
+# 公開したバージョンが 2 つに満たないときは失敗する。sub-issue #193 のクローズ条件の、CI での確認。
+name: doc-structured-bin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - doc-structured/**
+      - .github/workflows/doc-structured-bin.yml
+  pull_request:
+    paths:
+      - doc-structured/**
+      - .github/workflows/doc-structured-bin.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    name: run published versions on ubuntu-slim
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Show runner's python3
+        run: python3 --version
+      - name: Run the two newest published versions
+        run: |
+          set -o pipefail
+          versions=$(git ls-remote --tags --refs origin 'doc-structured--v*' | sed 's#.*/doc-structured--v##' | sort -V | tail -2)
+          echo "公開済みの新しい 2 つのバージョン: $(echo $versions)"
+          if [ "$(printf '%s\n' "$versions" | grep -c .)" != 2 ]; then
+            echo "::error::公開したバージョンが 2 つに満たない"
+            exit 1
+          fi
+          project="$RUNNER_TEMP/library-loans"
+          config="$project/.claude/akm-claude-plugins/doc-structured/config.yaml"
+          mkdir -p "$project/bin" "$(dirname "$config")"
+          cp doc-structured/bin/doc-structured "$project/bin/doc-structured"
+          cd "$project"
+          for version in $versions; do
+            printf '# 図書館の貸出 (架空の題材) の設定\nversion: %s\n' "$version" > "$config"
+            echo "--- version: $version (1 回目。取得する)"
+            time bin/doc-structured version | tee "$RUNNER_TEMP/out.txt"
+            [ "$(cat "$RUNNER_TEMP/out.txt")" = "doc-structured $version" ] || { echo "::error::実行されたバージョンが違う"; exit 1; }
+            echo "--- version: $version (2 回目。取得済みのものを使う)"
+            time bin/doc-structured version | tee "$RUNNER_TEMP/out.txt"
+            [ "$(cat "$RUNNER_TEMP/out.txt")" = "doc-structured $version" ] || { echo "::error::実行されたバージョンが違う"; exit 1; }
+          done
+          echo "--- 公開していないバージョンでは、取得に失敗して終了する"
+          printf 'version: 0.0.0\n' > "$config"
+          if bin/doc-structured version; then
+            echo "::error::取得に失敗したのに終了コードが 0"
+            exit 1
+          fi

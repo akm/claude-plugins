@@ -1,0 +1,27 @@
+# ツール doc-structured の Python パッケージの定義。
+# バージョンはファイル src/doc_structured/__init__.py の __version__ から読む (プラグインの plugin.json の version と同じ値にする。
+# 同じであることはテスト tests/test_versions.py が検査する)。
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doc-structured"
+description = "アプリケーションの文書の構成の、生成と検査のツール"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dynamic = ["version"]
+dependencies = [
+  # YAML の読み書き。コメント・記述の順序・空行を保ったまま書き換えられる (確認はテスト tests/test_yamlio.py)
+  "ruamel.yaml>=0.18",
+]
+
+[project.scripts]
+doc-structured = "doc_structured.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "doc_structured.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

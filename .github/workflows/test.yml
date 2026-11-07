@@ -1,7 +1,9 @@
 # 各プラグインの自動テストを GitHub Actions で実行する。
 #
 # 対象の一覧はこのファイルに書かず、リポジトリが追跡しているファイル (コマンド `git ls-files` が挙げるファイル) から見つける。
-# - Python: ファイル `test_*.py` を含むディレクトリごとに `python3 -m unittest discover -s <ディレクトリ>`
+# - Python: ファイル `test_*.py` を含むディレクトリごとに `python3 -m unittest discover -s <ディレクトリ>`。
+#   そのディレクトリの親にファイル `.python-version` があればその版の Python で、無ければ 3.11 で実行する。
+#   親にファイル `pyproject.toml` があれば、そのパッケージを editable で入れてからテストを実行する (依存も一緒に入る)
 # - Go: ファイル `go.mod` を含むディレクトリごとに `go test ./...`
 # 見つけた対象はファイル `.github/test-targets.txt` の期待の一覧と種類ごとに比べ、差があれば失敗にする (対象が減っても増えても気づけるように)。
 # 新しいプラグインがこの命名に従ってテストを置き、一覧に 1 行足せば、このファイルを変えずに CI の対象になる。
@@ -67,10 +69,34 @@ jobs:
         dir: ${{ fromJSON(needs.discover.outputs.python-dirs) }}
     steps:
       - uses: actions/checkout@v7
+      - id: python-version
+        name: Decide Python version
+        env:
+          TEST_DIR: ${{ matrix.dir }}
+        # 既定の 3.11 は、pr-teeth が前提とする下限 (設定の読み込みに Python 3.11 以降の標準ライブラリ tomllib を使う)。
+        # それより新しい版を要るパッケージ (doc-structured のツールなど) は、テストのディレクトリの親の .python-version で指定する
+        run: |
+          parent=$(dirname "$TEST_DIR")
+          if [ -f "$parent/.python-version" ]; then
+            version=$(tr -d '[:space:]' < "$parent/.python-version")
+          else
+            version=3.11
+          fi
+          echo "Python $version ($TEST_DIR)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v7
         with:
-          # pr-teeth が前提とする下限 (設定の読み込みに Python 3.11 以降の標準ライブラリ tomllib を使う) に合わせる
-          python-version: "3.11"
+          python-version: ${{ steps.python-version.outputs.version }}
+      - name: Install the package under test
+        env:
+          TEST_DIR: ${{ matrix.dir }}
+        run: |
+          parent=$(dirname "$TEST_DIR")
+          if [ -f "$parent/pyproject.toml" ]; then
+            python3 -m pip install --quiet --disable-pip-version-check --editable "$parent"
+          else
+            echo "pyproject.toml が無いので、何も入れない ($parent)"
+          fi
       - name: unittest
         env:
           TEST_DIR: ${{ matrix.dir }}
