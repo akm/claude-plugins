@@ -215,8 +215,8 @@ type recordPlan struct {
 	FindingIDs []int  `yaml:"finding_ids"`
 	// Approach (修正方法) と Order (順序) は review-triage-fix の立案フェーズが書く。
 	// 書く条件は status ごとに決まる。pending / done / done-external では approach が
-	// 必須、awaiting-human では任意 (人間の回答の後に書く)、investigated (調査フェーズの
-	// 結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
+	// 必須、awaiting-human では任意 (人間の回答の後に書く)、not-fixed でも任意 (直さないと
+	// 決めた問題)、investigated (調査フェーズの結果だけを持つ) では両方とも書かない。検査は recordSemanticProblems。
 	Approach string `yaml:"approach"`
 	// Investigation は修正方法を決める前の調査 (類似箇所・影響範囲) の範囲と結果。
 	// 無いことは「未調査」を意味し、「調査済みで波及なし」は scope だけを書いた
@@ -1203,7 +1203,7 @@ func renderPlanCells(pl recordPlan) []string {
 	case pl.AppliedExternalURL != "":
 		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
-	// 修正方法の欄。investigated (と人間の立案待ちの awaiting-human) は approach を
+	// 修正方法の欄。investigated (と人間の立案待ちの awaiting-human、直さない not-fixed) は approach を
 	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す。空のセルは書き忘れと
 	// 区別できないため。approach を持つ状態の行は変わらない。
 	approach := "—"
