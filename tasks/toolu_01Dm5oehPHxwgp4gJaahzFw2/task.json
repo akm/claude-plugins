@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01Dm5oehPHxwgp4gJaahzFw2",
+  "agent_id": "aa0d014d7bc0b85f6",
+  "subagent_type": "general-purpose",
+  "task_description": "敵対的なレビュー",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 217064,
+    "cache_read_tokens": 2359604,
+    "output_tokens": 40467,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-06T08:23:06.819371+09:00",
+  "completed_at": "2026-11-06T08:30:56.168537+09:00"
+}

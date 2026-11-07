@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_016UEapAtGQjozbxdCDvniMJ",
+  "agent_id": "a0b0aec91b8e30576",
+  "subagent_type": "general-purpose",
+  "task_description": "メンテナンスの観点のレビュー",
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 148338,
+    "cache_read_tokens": 1565959,
+    "output_tokens": 36918,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-06T08:23:06.816399+09:00",
+  "completed_at": "2026-11-06T08:31:31.567901+09:00"
+}

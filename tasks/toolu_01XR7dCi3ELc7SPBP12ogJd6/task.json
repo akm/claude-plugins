@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01XR7dCi3ELc7SPBP12ogJd6",
+  "agent_id": "a962e119d75acfac8",
+  "subagent_type": "general-purpose",
+  "task_description": "デリバリーの観点のレビュー",
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 231322,
+    "cache_read_tokens": 1678248,
+    "output_tokens": 41953,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-06T08:23:06.791284+09:00",
+  "completed_at": "2026-11-06T08:31:43.518605+09:00"
+}

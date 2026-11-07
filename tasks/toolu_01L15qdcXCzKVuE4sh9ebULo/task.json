@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01L15qdcXCzKVuE4sh9ebULo",
+  "agent_id": "a84654458373a46fa",
+  "subagent_type": "general-purpose",
+  "task_description": "動作確認の観点のレビュー",
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 137343,
+    "cache_read_tokens": 895994,
+    "output_tokens": 35589,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-06T08:23:06.806491+09:00",
+  "completed_at": "2026-11-06T08:29:54.310976+09:00"
+}
