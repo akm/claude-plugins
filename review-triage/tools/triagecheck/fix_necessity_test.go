@@ -607,8 +607,6 @@ func TestBelowMinimumFixedTogether(t *testing.T) {
 	}
 }
 
-// 判定を省略した下限未満の指摘 (B2) には plan_ref を書かない。一緒に直したことは、必要度を判定した
-// 指摘 (B1) に書く。判定を省略した採択 (A3) には、今までどおり書ける。
 // 一緒に直した後に、行が変わらないまま同じ問題が報告されたら (B2)、箇所は直っていないので
 // 残っている。節に並び、また報告された回も出て、下限を下げた回では足し忘れの検査の対象になる。
 func TestBelowMinimumFixedTogetherReportedAgain(t *testing.T) {
@@ -634,6 +632,8 @@ func TestBelowMinimumFixedTogetherReportedAgain(t *testing.T) {
 	}
 }
 
+// 判定を省略した下限未満の指摘 (B2) には plan_ref を書かない。一緒に直したことは、必要度を判定した
+// 指摘 (B1) に書く。判定を省略した採択 (A3) には、今までどおり書ける。
 func TestBelowMinimumPlanRefOnOmitted(t *testing.T) {
 	planRef := "        plan_ref:\n          run: 1\n          problem: P1\n"
 	withPlan := fixNecessityRunYAML("must",
