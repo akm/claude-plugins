@@ -96,6 +96,25 @@ func TestReviewTriageRecordDecisionUnknownStatusReportedOnce(t *testing.T) {
 	}
 }
 
+// status の誤字があっても、status に関係しない decision の検査 (choice の列挙など) は行う。
+// 行わないのは、status と組み合わせる検査だけである。
+func TestReviewTriageRecordDecisionChecksWithUnknownStatus(t *testing.T) {
+	typo := strings.Replace(decisionBaselineYAML, "choice: baseline", "choice: basline", 1)
+	problems := decisionProblems(decisionRecordYAML(t, typo, "pendng"))
+	var enum, choice bool
+	for _, p := range problems {
+		if strings.Contains(p, "status は investigated / pending") {
+			enum = true
+		}
+		if strings.Contains(p, "decision.choice は baseline / target / neither / undecided") {
+			choice = true
+		}
+	}
+	if !enum || !choice {
+		t.Fatalf("status と decision.choice の列挙違反が両方報告されない: %v", problems)
+	}
+}
+
 func TestReviewTriageRecordDecisionViolations(t *testing.T) {
 	undecided := strings.Replace(decisionBaselineYAML, "choice: baseline", "choice: undecided", 1)
 	undecided = strings.Replace(undecided, "          doc_change: remove\n", "", 1)

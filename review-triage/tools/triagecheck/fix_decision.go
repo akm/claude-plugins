@@ -17,8 +17,10 @@ type recordDecision struct {
 }
 
 // recordDecisionProblems は問題 1 つの decision を検査する。done と done-external には求めない。
-// 理由は record-schema.md の「立案の結果」。
-func recordDecisionProblems(pl recordPlan) []string {
+// 理由は record-schema.md の「立案の結果」。statusKnown が偽 (status が列挙の外) なら、choice と状態を
+// 組み合わせる検査はしない。status の列挙違反は呼び出し元が報告するので、重ねると 1 つの誤字が
+// 2 つの問題になるため。
+func recordDecisionProblems(pl recordPlan, statusKnown bool) []string {
 	var problems []string
 	add := func(format string, args ...any) {
 		problems = append(problems, fmt.Sprintf(format, args...))
@@ -53,7 +55,7 @@ func recordDecisionProblems(pl recordPlan) []string {
 		add("decision.baseline_fixed が true なのに、decision.choice が %s です (基準が変えられないなら、基準を直す選択肢は候補にならない)", d.Choice)
 	}
 	if d.Choice == "undecided" {
-		if pl.Status != "not-fixed" && pl.Status != "awaiting-human" {
+		if statusKnown && pl.Status != "not-fixed" && pl.Status != "awaiting-human" {
 			add("decision.choice が undecided なのに、status が %s です (今回は直さないなら not-fixed、人間の回答を待つなら awaiting-human)", pl.Status)
 		}
 		if d.DocChange != "" {

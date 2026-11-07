@@ -729,8 +729,8 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 					add("%s: status %s なのに sha %q があります。直したのなら status: done にする", pn, pl.Status, pl.SHA)
 				}
 			}
-			// statusKnown は status が列挙の値か。列挙外なら default が列挙違反を報告するので、decision の
-			// 検査 (状態との組み合わせ) は行わない。重ねると 1 つの誤字が 2 つの問題になるため。
+			// statusKnown は status が列挙の値か。列挙外なら default が列挙違反を報告するので、decision と
+			// 状態を組み合わせる検査はしない。重ねると 1 つの誤字が 2 つの問題になるため。
 			statusKnown := true
 			switch pl.Status {
 			case "investigated":
@@ -785,10 +785,8 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				add("%s: status は investigated / pending / awaiting-human / done / done-external / not-fixed のいずれか: %q", pn, pl.Status)
 				statusKnown = false
 			}
-			if statusKnown {
-				for _, m := range recordDecisionProblems(pl) {
-					add("%s: %s", pn, m)
-				}
+			for _, m := range recordDecisionProblems(pl, statusKnown) {
+				add("%s: %s", pn, m)
 			}
 			// 調査は investigated 以外の状態では任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
 			// 範囲の無い調査は「どこまで調べたか」を残さず、未調査と区別できない。
