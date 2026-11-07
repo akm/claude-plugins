@@ -97,7 +97,7 @@ D8 の条件 (1)(2) の結果を書く。条件と、当たるかどうかの決
         prior_defect:
           base: 40a2f3e
           line_check: holds
-          line_reason: 全量の起点にあったまま (起点の 40 行目)
+          line_reason: 起点にあったまま (起点の 40 行目)
           same_defect: holds
           same_defect_reason: 全量の起点の 40〜45 行目にも同じ手順があり、同じく途中まで入ったデータベースでは使えない
 ```

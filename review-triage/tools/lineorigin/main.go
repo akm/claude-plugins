@@ -63,7 +63,7 @@ func parseFlags(args []string) (options, error) {
 	// (フラグの一覧は、ファイル review-triage/tools/lineorigin/README.md の「使い方」)
 	fs.SetOutput(io.Discard)
 	root := fs.String("root", "", "リポジトリのルートか、その中のディレクトリの絶対パス (必須)")
-	base := fs.String("base", "", "全量の起点 (必須)。コミットに解決できる版")
+	base := fs.String("base", "", "起点 (必須)。コミットに解決できる版。判定ノード D8 では全量の起点、D9 では前の指摘を判定した回の head")
 	file := fs.String("file", "", "指摘の file (必須)。リポジトリのルートからの相対パス")
 	lines := fs.String("lines", "", "指摘の行 (必須)。「12」「12-15」か、それらをコンマで並べた形 (「12,20-23」)")
 	rev := fs.String("rev", "", "レビューした内容のコミット。結果のファイルで受け取ったレビューならその head。-worktree と同時には使えない")

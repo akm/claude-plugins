@@ -156,11 +156,11 @@ func TestUnchangedLineHolds(t *testing.T) {
 
 	o := r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD")
 	wantKind(t, o, holds)
-	wantContains(t, o.lines["line 1"], "全量の起点にあったまま")
+	wantContains(t, o.lines["line 1"], "起点にあったまま")
 
 	o = r.check(base, "-file", "f.md", "-lines", "3", "-rev", "HEAD")
 	wantKind(t, o, notHolds)
-	wantContains(t, o.lines["line 3"], "全量の起点より後のコミット")
+	wantContains(t, o.lines["line 3"], "起点より後のコミット")
 }
 
 func TestRangeWithOneChangedLineDoesNotHold(t *testing.T) {
@@ -215,7 +215,7 @@ func TestLineShiftedByInsertionHolds(t *testing.T) {
 
 	o := r.check(base, "-file", "f.md", "-lines", "2", "-rev", "HEAD")
 	wantKind(t, o, holds)
-	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 1 行目)")
+	wantContains(t, o.lines["line 2"], "起点にあったまま (起点の 1 行目)")
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-rev", "HEAD"), notHolds)
 }
 
@@ -276,7 +276,7 @@ func TestReorderedLinesFollowDiff(t *testing.T) {
 	o := r.check(base, "-file", "f.md", "-lines", "3-5", "-rev", "HEAD")
 	wantKind(t, o, holds)
 	for i, l := range []string{"line 3", "line 4", "line 5"} {
-		wantContains(t, o.lines[l], fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", i+1))
+		wantContains(t, o.lines[l], fmt.Sprintf("起点にあったまま (起点の %d 行目)", i+1))
 	}
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-2", "-rev", "HEAD"), notHolds)
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-5", "-rev", "HEAD"), notHolds)
@@ -298,7 +298,7 @@ func TestDuplicateLinesReportBaseLine(t *testing.T) {
 		o := r.check(base, "-file", "f.md", "-lines", strconv.Itoa(final), "-rev", "HEAD")
 		wantKind(t, o, holds)
 		var orig int
-		if _, err := fmt.Sscanf(strings.TrimPrefix(o.lines[l], "全量の起点にあったまま (起点の "), "%d", &orig); err != nil {
+		if _, err := fmt.Sscanf(strings.TrimPrefix(o.lines[l], "起点にあったまま (起点の "), "%d", &orig); err != nil {
 			t.Fatalf("%s の内訳から起点の行番号を読めない: %q", l, o.lines[l])
 		}
 		if orig != final-1 || baseLines[orig-1] != "```" {
@@ -351,7 +351,7 @@ func TestFileRenamedOntoDeletedPathDoesNotHold(t *testing.T) {
 
 	o := r.check(base, "-file", "g.md", "-lines", "1", "-rev", "HEAD")
 	wantKind(t, o, notHolds)
-	wantContains(t, o.lines["line 1"], "全量の起点では f.md")
+	wantContains(t, o.lines["line 1"], "起点では f.md")
 }
 
 // ブランチで書き換えた行を、マージ (衝突の解消などで相手の親の内容を取る) で起点の内容に戻すと、
@@ -885,7 +885,7 @@ func TestWorktreeLineNumbersFollowWorktreeContent(t *testing.T) {
 	r.write("f.md", "new\na\nb\nc\n")
 	o := r.check(base, "-file", "f.md", "-lines", "2", "-worktree")
 	wantKind(t, o, holds)
-	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 1 行目)")
+	wantContains(t, o.lines["line 2"], "起点にあったまま (起点の 1 行目)")
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1", "-worktree"), notHolds)
 }
 
@@ -977,7 +977,7 @@ func TestNotHoldsTakesPrecedenceOverUnverifiable(t *testing.T) {
 	o := r.check(base, "-file", "m.md", "-lines", "1-2", "-rev", "HEAD")
 	wantKind(t, o, notHolds)
 	wantContains(t, o.lines["line 1"], "境界のコミット")
-	wantContains(t, o.lines["line 2"], "全量の起点より後のコミット")
+	wantContains(t, o.lines["line 2"], "起点より後のコミット")
 }
 
 // 無関係な履歴をマージして入った行は、そのルートのコミットの行として報告され、成り立たない。
@@ -1561,7 +1561,7 @@ func TestAllowSameCommitHoldsForCommittedLines(t *testing.T) {
 
 	o := r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", "HEAD", "-allow-same-commit")
 	wantKind(t, o, holds)
-	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 2 行目)")
+	wantContains(t, o.lines["line 2"], "起点にあったまま (起点の 2 行目)")
 
 	// フラグが無ければ、同じコミットは確認できない
 	wantKind(t, r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", "HEAD"), unverifiable)
@@ -1637,7 +1637,7 @@ func TestAllowSameCommitDoesNotDependOnHead(t *testing.T) {
 	// HEAD は起点より後。指摘のファイルの作業ツリーの内容は、起点と同じ
 	o := r.check(base, "-file", "f.md", "-lines", "1-3", "-rev", base, "-allow-same-commit")
 	wantKind(t, o, holds)
-	wantContains(t, o.lines["line 2"], "全量の起点にあったまま (起点の 2 行目)")
+	wantContains(t, o.lines["line 2"], "起点にあったまま (起点の 2 行目)")
 
 	// ほかのファイルだけを変えたコミットが後にあっても同じ
 	r.write("g.md", "later\n")
