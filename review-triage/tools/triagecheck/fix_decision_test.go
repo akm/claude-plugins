@@ -5,7 +5,13 @@ import (
 	"testing"
 )
 
-const decisionPlanOld = "        status: pending\n"
+// decisionPlanOld は、validRecordYAML の問題 P1 の状態と立案の結果。
+const decisionPlanOld = "        status: pending\n" +
+	"        decision:\n" +
+	"          target: docs/foo.md の 10 行目\n" +
+	"          baseline: 実際の件数\n" +
+	"          choice: baseline\n" +
+	"          choice_reason: 実際の件数が実測の値である\n"
 
 // decisionBaselineYAML は、基準の内容を正として消す立案の結果。
 const decisionBaselineYAML = "        decision:\n" +
@@ -141,41 +147,35 @@ func TestReviewTriageRecordDecisionCombinationsPass(t *testing.T) {
 	}
 }
 
-// pending の問題に decision を必須にするのは、記録の中で最初に書いた回と、それより後の回。それより
-// 前の回と、1 度も書いていない記録は、無くても報告しない (prior_defect と同じ決め方)。done には
-// どの回でも求めない (plans は過去の回を後から更新するので、書く前に直した問題が後の回にもありうる)。
-func TestReviewTriageRecordDecisionRequiredFromFirstRun(t *testing.T) {
-	asLaterRun := func(src string) string { return strings.TrimPrefix(src, "runs:\n") }
-	with := decisionRecordYAML(t, decisionBaselineYAML, "pending")
-	done := strings.Replace(validRecordYAML, "        sha: \"\"\n        status: pending\n", "        sha: abc1234\n        status: done\n", 1)
-	if done == validRecordYAML {
-		t.Fatal("フィクスチャの置換が適用されていない")
-	}
+// decision は pending と not-fixed で必須で、done と awaiting-human では求めない。
+func TestReviewTriageRecordDecisionRequiredStatus(t *testing.T) {
 	cases := []struct {
-		name string
-		src  string
-		want []string
+		name   string
+		status string
+		extra  string
+		want   string
 	}{
-		{"1 度も書いていない記録は報告しない", validRecordYAML + asLaterRun(validRecordYAML), nil},
-		{"書いた回より前の回は報告しない", validRecordYAML + asLaterRun(with), nil},
-		{"書いた回より後の回の書き忘れを報告する", with + asLaterRun(validRecordYAML), []string{"runs[1]"}},
-		{"書いた回より後の回でも、done には求めない", with + asLaterRun(done), nil},
+		{"pending の書き忘れを報告する", "pending", "", "status pending には decision が必須"},
+		{"not-fixed の書き忘れを報告する", "not-fixed", "", "status not-fixed には decision が必須"},
+		{"done には求めない", "done", "", ""},
+		{"awaiting-human には求めない", "awaiting-human", "        options: 案 A か案 B\n", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var got []string
-			for _, p := range decisionProblems(tc.src) {
-				if strings.Contains(p, "decision がありません") {
-					got = append(got, p)
-				}
+			src := decisionRecordYAML(t, tc.extra, tc.status)
+			if tc.status == "done" {
+				src = strings.Replace(src, "        sha: \"\"\n", "        sha: abc1234\n", 1)
 			}
-			if len(got) != len(tc.want) {
-				t.Fatalf("欠落の報告が %d 件、want %d 件 (%v)。出た問題: %v", len(got), len(tc.want), tc.want, got)
+			problems := decisionProblems(src)
+			found := false
+			for _, p := range problems {
+				found = found || (tc.want != "" && strings.Contains(p, tc.want))
 			}
-			for i, w := range tc.want {
-				if !strings.Contains(got[i], w) {
-					t.Fatalf("欠落の報告 %d に %q が無い: %q", i, w, got[i])
-				}
+			if tc.want != "" && !found {
+				t.Fatalf("%q の報告が無い: %v", tc.want, problems)
+			}
+			if tc.want == "" && len(problems) != 0 {
+				t.Fatalf("問題が報告された: %v", problems)
 			}
 		})
 	}
@@ -192,7 +192,7 @@ func TestReviewTriageSummaryDecision(t *testing.T) {
 	if !strings.Contains(summary, want) {
 		t.Fatalf("生成サマリに %q が無い:\n%s", want, summary)
 	}
-	plain, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(validRecordYAML))
+	plain, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(decisionRecordYAML(t, "        options: 案 A か案 B\n", "awaiting-human")))
 	if err != nil {
 		t.Fatalf("サマリの生成に失敗: %v", err)
 	}

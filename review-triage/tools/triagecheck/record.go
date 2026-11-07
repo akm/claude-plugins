@@ -544,7 +544,6 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 	}
 	priorDefectFirstRun := recordPriorDefectFirstRun(doc.Runs)
 	fixNecessityFirstRun := recordFixNecessityFirstRun(doc.Runs)
-	decisionFirstRun := recordDecisionFirstRun(doc.Runs)
 	for ri, run := range doc.Runs {
 		rn := fmt.Sprintf("runs[%d] (%s %s)", ri, run.Date, run.Skill)
 		if !recordDateRe.MatchString(run.Date) {
@@ -782,7 +781,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			default:
 				add("%s: status は investigated / pending / awaiting-human / done / done-external / not-fixed のいずれか: %q", pn, pl.Status)
 			}
-			for _, m := range recordDecisionProblems(decisionFirstRun >= 0 && ri >= decisionFirstRun, pl) {
+			for _, m := range recordDecisionProblems(pl) {
 				add("%s: %s", pn, m)
 			}
 			// 調査は investigated 以外の状態では任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。

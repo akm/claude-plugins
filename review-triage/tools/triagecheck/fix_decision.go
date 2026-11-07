@@ -16,24 +16,9 @@ type recordDecision struct {
 	DocChangeReason string `yaml:"doc_change_reason"`
 }
 
-// recordDecisionFirstRun は、記録の中で最初に decision を書いた回の添字を返す。無ければ -1。
-// この回と、それより後の回では、pending の問題に decision を必須にする。決め方と理由は
-// recordPriorDefectFirstRun と同じ (過去の記録を書き換えさせずに通すため)。
-func recordDecisionFirstRun(runs []recordRun) int {
-	for ri, run := range runs {
-		for _, pl := range run.Plans {
-			if pl.Decision != nil {
-				return ri
-			}
-		}
-	}
-	return -1
-}
-
-// recordDecisionProblems は問題 1 つの decision を検査する。required が偽の回
-// (recordDecisionFirstRun の回より前の回) では、pending に無くても報告しない。done と
-// done-external には、どの回でも求めない。理由は record-schema.md の「立案の結果」。
-func recordDecisionProblems(required bool, pl recordPlan) []string {
+// recordDecisionProblems は問題 1 つの decision を検査する。done と done-external には求めない。
+// 理由は record-schema.md の「立案の結果」。
+func recordDecisionProblems(pl recordPlan) []string {
 	var problems []string
 	add := func(format string, args ...any) {
 		problems = append(problems, fmt.Sprintf(format, args...))
@@ -44,9 +29,7 @@ func recordDecisionProblems(required bool, pl recordPlan) []string {
 		case "not-fixed":
 			add("status not-fixed には decision が必須 (choice: undecided と、直さない理由を書く)")
 		case "pending":
-			if required {
-				add("decision がありません (立案の結果を書く。この記録では、この回かそれより前の回で decision を書いている)")
-			}
+			add("status pending には decision が必須 (立案の結果を書く)")
 		}
 		return problems
 	}

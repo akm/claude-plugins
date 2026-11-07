@@ -557,7 +557,7 @@ func fixedTogetherRecordYAML(plan, last string) string {
 }
 
 const (
-	planPendingYAML      = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        approach: 直す\n        status: pending\n"
+	planPendingYAML      = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        approach: 直す\n        decision:\n          target: t\n          baseline: b\n          choice: baseline\n          choice_reason: r\n        status: pending\n"
 	planNotFixedYAML     = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        decision:\n          target: t\n          baseline: b\n          choice: undecided\n          choice_reason: r\n        status: not-fixed\n"
 	planDoneExternalYAML = "      - problem_id: P1\n        cause: 原因\n        finding_ids: [1]\n        approach: 直す\n        applied_external_url: \"https://example.com\"\n        status: done-external\n"
 )

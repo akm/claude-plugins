@@ -158,7 +158,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `investigation` | △ | 修正方法を決める前の調査 (類似箇所と影響範囲) の範囲と結果 (下記)。**無いことは「未調査」を意味する。`investigated` では必須** (無ければ検査が報告する。調査済みの状態と矛盾するため。調べたなら `scope` を書き、まだなら `plans` に載せない)。「調査済みで波及なし」は `scope` だけを書いて表す。この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の SSOT は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `verification` | | 修正の後の検証のうち、観点 B (周りの記述を再確認する) で読んだ範囲 (下記)。**任意だが、書くなら `near_edges` が要る** (無ければ検査が報告する。書いたつもりの検証が「無い」と読まれないため)。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 7 (文書を変えたコミット) |
 | `doc_dag` | | 修正の後の `doc-dag` の確認 (下記) — 対象と、どちらが SSOT か決まっていない重複 (doc-dag の語では「向きの無い重複」)・参照の循環 (doc-dag の語では「巡回」) の有無と対処。**任意だが、書くなら `scope` と `result` が要る**。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 9 (文書を変えた問題) |
-| `decision` | △ | 立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。様式と、必須にする状態と回は、下の「立案の結果」 |
+| `decision` | △ | 立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。様式と、必須にする状態は、下の「立案の結果」 |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
 | `depends_on` | | 依存する問題の `problem_id` |
@@ -249,7 +249,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `doc_change` | | 文書への指摘で検討した結果。`remove` (消す) / `rewrite` (書き換える) / `add` (足す)。`choice` が `undecided` なら書かない。文書を変える問題かどうかは記録から決められないので、無いことは検査しない |
 | `doc_change_reason` | △ | 前の順のもので済まない理由。**`doc_change` が `rewrite` か `add` なら必須、それ以外では書かない** |
 
-**必須にする状態は `pending` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human` / `done` / `done-external`。** `pending` で必須にする回の決め方は、`prior_defect` と同じ (上の「前からある欠陥」の「必須にするのは」の段落) で、記録の中で最初に `decision` を書いた回と、それより後の回だけである。`done` / `done-external` で必須にしないのは、`plans` は過去の回も後から更新するので、`decision` を書く前に直した問題が、どの回にもありうるためである。修正を終える問題は `pending` を通るので、書き忘れは立案の直後の検査で報告される。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
+**必須にする状態は `pending` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human` / `done` / `done-external`。** `done` / `done-external` で必須にしないのは、`decision` を書く前に直した問題を、既存の記録を書き換えずに検査を通すためである。修正を終える問題は `pending` を通るので、書き忘れは立案の直後の検査で報告される。`decision` の無い `pending` が残る既存の記録は、再開して `decision` を書くまで検査が報告する (書く手順は `review-triage-fix` の手順 1)。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
 
 ```yaml
       - problem_id: P1

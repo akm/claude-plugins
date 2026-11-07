@@ -75,6 +75,11 @@ const validRecordYAML = `runs:
         order: 1
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
     notes: 最初の回。
 `
 
@@ -653,6 +658,11 @@ func TestReviewTriageSummaryRenderBranches(t *testing.T) {
         approach: a1
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
       - problem_id: P2
         cause: c2
         finding_ids: [2]
@@ -902,6 +912,11 @@ func TestReviewTriageRecordDependsOnCycle(t *testing.T) {
         depends_on: [P2]
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
       - problem_id: P2
         cause: c2
         finding_ids: [1]
@@ -909,6 +924,11 @@ func TestReviewTriageRecordDependsOnCycle(t *testing.T) {
         depends_on: [P1]
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
 `
 	origPlans := `    plans:
       - problem_id: P1
@@ -918,6 +938,11 @@ func TestReviewTriageRecordDependsOnCycle(t *testing.T) {
         order: 1
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
 `
 	mutated := strings.Replace(validRecordYAML, origPlans, cyclePlans, 1)
 	if mutated == validRecordYAML {
@@ -994,6 +1019,11 @@ func replaceRecordPlans(t *testing.T, plans string) string {
         order: 1
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
 `
 	mutated := strings.Replace(validRecordYAML, origPlans, plans, 1)
 	if mutated == validRecordYAML {
@@ -1414,6 +1444,11 @@ func legacyRunYAML(runNo int, recurrence string) string {
         order: 1
         sha: ""
         status: pending
+        decision:
+          target: docs/foo.md の 10 行目
+          baseline: 実際の件数
+          choice: baseline
+          choice_reason: 実際の件数が実測の値である
 `, runNo, runNo)
 	if recurrence != "" {
 		run += "    recurrence:\n" + recurrence
@@ -1894,6 +1929,8 @@ const summaryWithoutInvestigated = "<!-- 生成物。手で編集しない。SSO
 	"| 問題 | 原因 | 含む指摘 | 修正方法 | 順 | 状態 | 証拠 (SHA / URL) |\n" +
 	"| --- | --- | --- | --- | --- | --- | --- |\n" +
 	"| P1 | 数えずに書いた | #1 | 数え直して単位を書く | 1 | 未着手 | — |\n" +
+	"\n" +
+	"- **P1 の立案**: 箇所: docs/foo.md の 10 行目 / 基準: 実際の件数 / 選択: 基準の内容を正とする / 理由: 実際の件数が実測の値である\n" +
 	"\n" +
 	"### 観察\n" +
 	"\n" +
