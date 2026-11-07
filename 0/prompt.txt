@@ -1,0 +1,25 @@
+Background (from the session that started this one):
+Issue #180 の確認の 1 つです。スキル `review-rally` の停止 RR2 のうち、`start_session` が失敗する経路を、呼び出し元のセッションが別のセッションから始まっている条件で実行します。レビュー自体は行いません。呼び出し元より上のモデルを指定する経路は、起動元のセッションで確認済みです。
+
+Task:
+Skill ツールでスキル `review-triage:review-rally` を、引数 `--model claude-sonnet-5-5 --effort low --review code-review --review-args low --max 1 --base main` で呼び出し、スキルの手順のとおりに進めてください。
+
+手順の「起動」では、ツール `start_session` を、ファイル `session.md` の表のとおり `initiation: user_asked` で実際に呼び出してください。このセッションは別のセッションから始まっているので、アプリが拒否する見込みです。拒否されるかどうかを確かめるのがこの確認の目的なので、拒否を予想して呼び出しを省かず、`own_initiative` や `offer` に替えないでください。拒否されたら、それ以上起動を試みず、手順のとおりに停止してください。
+
+`start_session` が成功したときは、依頼のメッセージを送らずにそこで止めて、起動したセッションの id を報告してください。ファイルの変更をコミットしないでください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_469670f2-45b6-48fa-a31d-449314eafbc3
+
+---
+
+<cross-session-message from="local_469670f2-45b6-48fa-a31d-449314eafbc3" from-name="review-rally の未確認の経路を確認する (#180)">
+review-rally の RR2 の確認を、手順の順序どおりにやり直してください (Issue #180)。
+
+前回は、ファイル round.md の決定表の RRG0 の (3) (ループのディレクトリと rally.yaml を作る) を行う前に start_session を呼んだので、停止のときの手順が実行されていません。今回は新しいループとして次のとおり行ってください。
+
+1. 引数は前回と同じです。RRG0 の (1)〜(4) を順に行います。ループの id は今の時刻で作ります。
+2. start_session は前回と同じ値で、initiation: user_asked のまま実際に呼び出します。このターンも別のセッションのメッセージから始まるので、拒否される見込みです。拒否されたら再試行しません。
+3. RR2 に進んだら、ファイル stops.md の全文を Read ツールで読み、節「停止のときに行うこと」「片付けの案内」「停止の報告に足すもの」のとおりに行って報告します。
+
+start_session が成功したときは、依頼のメッセージを送らずにそこで止めて、起動したセッションの id を報告してください。コミットはしないでください。
+</cross-session-message>
