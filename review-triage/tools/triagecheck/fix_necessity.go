@@ -360,6 +360,7 @@ func renderFixNecessityCounts(doc *recordDoc, ri, firstRun int) []string {
 // belowMinimumEntry は、節「下限未満の指摘」の 1 行になる指摘 (必要度を判定して下限未満に
 // した指摘)。resolved は、後の回の指摘が参照して、判定し直したか採択 (A3) にしたか、
 // 採択した問題と一緒に直した (plan_ref の問題が直った) こと。
+// fixedTogether は、resolved が plan_ref の問題だけで決まっていること。後の回の B2 で resolved を戻す。
 // reported は、同じ問題がまた報告されて判定を省略した指摘 (B2) の位置。
 type belowMinimumEntry struct {
 	run           int
@@ -382,7 +383,7 @@ func belowMinimumEntries(doc *recordDoc, n int) []*belowMinimumEntry {
 					if judgmentOmitted(fd) && fd.Verdict == "below_minimum" {
 						e.reported = append(e.reported, fmt.Sprintf("%d 回目 #%d", ri+1, fd.ID))
 						// 問題を直した後の回で、行が変わらないまま同じ問題が報告されたなら、箇所は直っていない。
-						// plans は回の後に修正するので、plan_ref の回より後の回の報告が、直した後の報告である。
+						// 記録に修正の時点が無いので、plan_ref の回より後の回の報告を、直した後の報告とする。
 						if e.fixedTogether && ri+1 > e.finding.PlanRef.Run {
 							e.resolved = false
 						}
