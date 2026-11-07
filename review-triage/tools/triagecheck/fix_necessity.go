@@ -64,25 +64,21 @@ func fixNecessityBelow(necessity, minimum string) bool {
 	return n > 0 && m > 0 && n < m
 }
 
-// fixNecessityFromReason は、2 つの条件の結果から決まる必要度を返す。どちらかの条件が
-// undecided なら空 (必要度を付けない)。ok が偽なら、結果の形が誤っていて決まらない。
-func fixNecessityFromReason(r *recordFixNecessityReason) (necessity string, ok bool) {
+// fixNecessityFromReason は、2 つの条件の結果から決まる必要度を返す。どちらかの条件が undecided なら
+// 空を返す。結果の形 (書く組み合わせ) は呼び出し元が先に検査する。
+func fixNecessityFromReason(r *recordFixNecessityReason) string {
 	switch r.GoalWithoutAction {
 	case "holds":
-		return "could", r.Workaround == ""
-	case "undecided":
-		return "", r.Workaround == ""
+		return "could"
 	case "not-holds":
 		switch r.Workaround {
 		case "holds":
-			return "should", true
+			return "should"
 		case "not-holds":
-			return "must", true
-		case "undecided":
-			return "", true
+			return "must"
 		}
 	}
-	return "", false
+	return ""
 }
 
 // judgmentOmitted は、D9 で当たって判定を省略した指摘 (A3・B2) かを返す。
@@ -174,7 +170,7 @@ func recordFixNecessityProblems(required bool, minimum string, fd recordFinding)
 	if !shapeValid {
 		return problems
 	}
-	want, _ := fixNecessityFromReason(r)
+	want := fixNecessityFromReason(r)
 	if fd.FixNecessity != want {
 		if want == "" {
 			add("fix_necessity_reason では必要度が決まらない (undecided がある) のに、fix_necessity %q があります", fd.FixNecessity)
