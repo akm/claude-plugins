@@ -132,5 +132,6 @@ sub-agent に包まず、`mode:agent` を付けて呼ぶ。
 
 - **記録のキー (`model` / `skill` / `level` / `scope`) の値の出所は、上の「記録のキーの出所」の表で、そのレビュースキル (`code-review` か `ce-code-review`) の欄に書いたとおり。ただし、表の「sub-agent の報告」は、その経路がレビュアの実行を確認した材料と読み替える。`scope` は、結果のファイルの `scope` の値 (依頼文に `review-request` が埋めた値) を使う。** 表の「ループが決めた範囲」を同じファイルの「範囲」の節で読むと、全量は記録に回が無いときだけなので、収束後の全量の回が `incremental` として記録されるため。別のプロセスに任せる経路のために出所の表を増やさない (表を複数の文書に持つと、同じ場所への採択が続いた実測がある)。`model` の採り方と、記録の `notes` に書く 1 行は、経路ごとにそれぞれのスキルの文書が定める。
 - **`run_id` は、結果のファイルの値をそのまま写すこと** (規則の SSOT は [review-request.md](../../review-triage/references/review-request.md) の「出力様式」の節)。
+- **修正の必要度の下限があれば、引数 `--min-fix-necessity` で渡すこと** (扱いの SSOT は [arguments.md](arguments.md) の `--min-fix-necessity` の段落)。
 
 **`review-triage` が結果の様式を差し戻したら、その経路のレビュー不成立にする。** `review-triage` が返ったら、**記録の末尾の回の `run_id` が識別子と一致することを確認し、一致しなければ、その経路のレビュー不成立にする** (報告に「`review-triage` が `run_id` を写さなかった」と書く)。一致しないまま進むと、同じ結果を 2 度取り込むことがある。
