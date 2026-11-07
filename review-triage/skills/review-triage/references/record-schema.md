@@ -53,7 +53,7 @@ YAML はトップレベルに `runs` (実行の配列) を持ち、1 回の実�
 | `gates_fired` | | 引っかかったゲート id の配列。無ければ省略 (空とみなす) |
 | `verdict` | ✓ | `adopted` (採択) / `held` (保留) / `rejected` (却下) / `below_minimum` (下限未満。修正の必要度が、回の下限に満たない) |
 | `verdict_reason` | ✓ | 判定の経路 — どのノードでどう決まったか。ノード ID の SSOT は [判定フロー](judgment-flow.md) |
-| `plan_ref` | △ | 束ね先の構造化参照 `{run, problem}` — 別の回の問題で束ねた採択に書く (`run` は同じファイル内の 1 始まりの回番号)。**採択は自回の `plans` か `plan_ref` で覆われていなければならない** (機械検査が保証する)。免除されるのは `plans` がまだ無い**最後の回**だけ。fix 前の状態を指す。後続の回が追記された時点でその回は fix 前ではなくなるので、免除は解ける。`review-triage-fix` が束ねるときに追記する。キーだけ書いて値を省いた形 (null) は検査が報告する (「無い」と同じに読まれ、束ね先を書いたつもりの採択が気づかれないまま覆われなくなる)。**検査が保証するのは参照の実在まで。** 参照先の問題が本当にその指摘を扱うかは機械で確認できないので、束ねるときは参照先の問題の `approach` にも対応する指摘 (どの回のどれか) を書く |
+| `plan_ref` | △ | 束ね先の構造化参照 `{run, problem}`。別の回の問題で束ねた採択と、採択した問題と一緒に直した下限未満の指摘 (必要度を判定した B1。必要度は変えない) に書く (`run` は同じファイル内の 1 始まりの回番号)。採択の束ね先を `status: not-fixed` の問題にしない (理由は [investigation.md](../../review-triage-fix/references/investigation.md))。検査はしない。束ねた後に人間が束ね先を「決めない」にした記録も同じ形になるため。**採択は自回の `plans` か `plan_ref` で覆われていなければならない** (機械検査が保証する)。免除されるのは `plans` がまだ無い**最後の回**だけ。fix 前の状態を指す。後続の回が追記された時点でその回は fix 前ではなくなるので、免除は解ける。`review-triage-fix` が束ねるときに追記する。キーだけ書いて値を省いた形 (null) は検査が報告する (「無い」と同じに読まれ、束ね先を書いたつもりの採択が気づかれないまま覆われなくなる)。**検査が保証するのは参照の実在まで。** 参照先の問題が本当にその指摘を扱うかは機械で確認できないので、束ねるときは参照先の問題の `approach` にも対応する指摘 (どの回のどれか) を書く |
 | `prior_defect` | △ | D8 (指摘の対象が、このブランチより前からある欠陥か) の条件 (1)(2) の結果 (下の「前からある欠陥」)。**D8 で判定した指摘 (`premise_check.result` が `verified` の指摘) では必須、それ以外では書かない** (判定フローでは、D4 で根拠を確認した指摘だけが D8 に進む)。どの回で必須にするかは、下の「前からある欠陥」 |
 | `fix_necessity` | △ | 修正の必要度。`must` / `should` / `could`。E3 で決められたときだけ書く。値は `fix_necessity_reason` から決まる (下の「修正の必要度」) |
 | `fix_necessity_reason` | △ | E3 の 2 つの条件の結果 (下の「修正の必要度」)。**E3 を行った指摘 (`premise_check.result` が `verified` の指摘) では必須、それ以外では書かない** |
@@ -145,7 +145,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 - **`line_check` が `holds` の指摘は、D9 で当たって判定を省略した指摘 (A3・B2) である。** 分類 (`category`)・被害者・帰結・根拠の検証・ゲート・前からある欠陥・必要度のキーは書かず、読むときは参照先の指摘のものを読む。`verdict` は、参照先の `fix_necessity` と、この回の `min_fix_necessity` から決まる (D12)。機械検査は、参照先の実在と、書かないキーが無いことと、`verdict` を報告する。
 - **`line_check` が `holds` 以外の指摘は、D1 から通常どおり判定した指摘である。** ほかのキーも通常どおり書く。
 
-**前の回までの残っている下限未満の指摘のうち、必要度がこの回の下限以上のものは、この回の指摘として `findings` に足す** (`origin: prior_below_minimum`。足すのは `review-triage` の手順 1)。下限を前の回より下げた回で、これに当たる指摘が出る。**下限が無い回では足さない。** 下限を指定せずにループを起動し直しただけで、下限未満の指摘が採択になって直されることを防ぐためで、すべてを直すときは下限に `could` を指定する。2 回目以降のレビューは増分 (前の回からの差分) を読むので、足さないと、前の回で下限未満にした指摘は報告されず、下限を下げても直されないまま残る。「残っている」は、後の回の指摘が `below_minimum_ref` で参照して、判定し直しても、採択 (A3) にしてもいないことを指す。足す指摘の `summary` は参照先から写し、`file` と `line` は、この回でレビューした内容での位置にする。`below_minimum_ref` を必ず書き、ほかの指摘と同じく D9 から判定する。機械検査は、記録の最後の回について、足すはずの指摘を、その回のどの指摘の `below_minimum_ref` も参照していなければ報告する。前の回は、`findings` を後から書き換えないので、報告しない。下限が無い回に足した指摘 (`origin: prior_below_minimum`) も報告する。
+**前の回までの残っている下限未満の指摘のうち、必要度がこの回の下限以上のものは、この回の指摘として `findings` に足す** (`origin: prior_below_minimum`。足すのは `review-triage` の手順 1)。下限を前の回より下げた回で、これに当たる指摘が出る。**下限が無い回では足さない。** 下限を指定せずにループを起動し直しただけで、下限未満の指摘が採択になって直されることを防ぐためで、すべてを直すときは下限に `could` を指定する。2 回目以降のレビューは増分 (前の回からの差分) を読むので、足さないと、前の回で下限未満にした指摘は報告されず、下限を下げても直されないまま残る。「残っている」は、後の回の指摘が `below_minimum_ref` で参照して、判定し直しても、採択 (A3) にしてもおらず、`plan_ref` の問題の状態が `done` でも `done-external` でもないことを指す。`plan_ref` の問題を直して残っていないとした指摘は、`plan_ref` の回より後の回で、判定を省略して B2 にした指摘が参照したら、箇所が直っていないので、残っているとする。判定し直すか A3 にした後の B2 では、残っているとしない。記録に修正の時点が無いので、問題を `plan_ref` の回より後の回で直すと、直す前の B2 も同じ扱いになる。足す指摘の `summary` は参照先からコピーし、`file` と `line` は、この回でレビューした内容での位置にする。`below_minimum_ref` を必ず書き、ほかの指摘と同じく D9 から判定する。機械検査は、記録の最後の回について、足すはずの指摘を、その回のどの指摘の `below_minimum_ref` も参照していなければ報告する。前の回は、`findings` を後から書き換えないので、報告しない。下限が無い回に足した指摘 (`origin: prior_below_minimum`) も報告する。
 
 ### 修正計画 (`plans[]`)
 
@@ -154,13 +154,14 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `problem_id` | ✓ | 回の中で一意な識別子 (例: `P1`) |
 | `cause` | ✓ | 原因 — なぜそうなったか。**束ねる根拠はこれであって、ファイルが同じことではない** (基準の SSOT は [grouping.md](../../review-triage-fix/references/grouping.md)) |
 | `finding_ids` | ✓ | この問題にまとめた指摘の `id` (1 つ以上)。同じ回の `verdict: adopted` の指摘だけを指せる |
-| `approach` | △ | 何をどう直すか。書く条件は状態で決まる。**`pending` / `done` / `done-external` では必須。`awaiting-human` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の回答の後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する。`review-triage-fix` の調査フェーズの結果に立案の中身が混ざると、どのフェーズが書いたかを記録から読めなくなる) |
+| `approach` | △ | 何をどう直すか。書く条件は状態で決まる。**`pending` / `done` / `done-external` では必須。`awaiting-human` と `not-fixed` では任意** (設計・仕様変更の案は `options` に書き、`approach` は人間の回答の後に書く)。**`investigated` では書かない** (書いてあれば検査が報告する。`review-triage-fix` の調査フェーズの結果に立案の中身が混ざると、どのフェーズが書いたかを記録から読めなくなる) |
 | `investigation` | △ | 修正方法を決める前の調査 (類似箇所と影響範囲) の範囲と結果 (下記)。**無いことは「未調査」を意味する。`investigated` では必須** (無ければ検査が報告する。調査済みの状態と矛盾するため。調べたなら `scope` を書き、まだなら `plans` に載せない)。「調査済みで波及なし」は `scope` だけを書いて表す。この 2 つを記録上で区別しないと、次のレビューで同じ種類の指摘が来たとき、前回の調査漏れか新規かを判別できない。調査の手順の SSOT は [investigation.md](../../review-triage-fix/references/investigation.md) |
 | `verification` | | 修正の後の検証のうち、観点 B (周りの記述を再確認する) で読んだ範囲 (下記)。**任意だが、書くなら `near_edges` が要る** (無ければ検査が報告する。書いたつもりの検証が「無い」と読まれないため)。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 7 (文書を変えたコミット) |
 | `doc_dag` | | 修正の後の `doc-dag` の確認 (下記) — 対象と、どちらが SSOT か決まっていない重複 (doc-dag の語では「向きの無い重複」)・参照の循環 (doc-dag の語では「巡回」) の有無と対処。**任意だが、書くなら `scope` と `result` が要る**。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 9 (文書を変えた問題) |
+| `decision` | △ | 立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。様式と、必須にする状態は、下の「立案の結果」 |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
-| `depends_on` | | 依存する問題の `problem_id` |
+| `depends_on` | | 依存する問題の `problem_id`。依存先が `not-fixed` でも検査しない。人間が回答で `pending` に戻した記録も同じ形になるため |
 | `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空**。**1 つのコミットが複数の問題を覆ったときは、覆われた問題すべてに同じ短縮 SHA を書く** (起きる条件の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 の「人間の回答の反映」) |
 | `applied_external_url` | | リポジトリ外の反映先の URL。**`status: done-external` 専用。他の状態では空** |
 | `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` 専用。他の状態では空。`applied_external_url` が無いとき必須** |
@@ -180,7 +181,6 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
       - problem_id: P2
         cause: 表の見出しだけを変え、行を埋める処理に追随しなかった
         finding_ids: [3]
-        approach: renderPlanCells の証拠の欄を見出しの 2 つの種類に合わせる
         investigation:
           scope: >-
             grep -rn '証拠\|SHA |' review-triage/tools/triagecheck と、
@@ -189,7 +189,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
             - record_test.go の見出しを固定するテスト (見出しの文字列を持つ)
           excluded:
             - README.md の検査項目の表は列の意味が違う (見出しと行の対応ではない)
-        status: pending
+        status: investigated
 ```
 
 ### 検証 (`plans[].verification`)
@@ -234,6 +234,36 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
         status: done
 ```
 
+### 立案の結果 (`plans[].decision`)
+
+立案フェーズが書く。選択肢の意味と誰が決めるかの SSOT は [fix-decision.md](../../review-triage-fix/references/fix-decision.md)、文書の修正の内容を検討する順の SSOT は [doc-fix-form.md](../../review-triage-fix/references/doc-fix-form.md)。修正の内容は `approach` に書き、ここに重ねて書かない。
+
+| キー | 必須 | 内容 |
+| --- | --- | --- |
+| `target` | ✓ | 指摘された箇所 |
+| `baseline` | ✓ | 基準 |
+| `baseline_fixed` | | 基準が変えられないものなら `true`。そのとき `choice` に `target` と `neither` は書けない |
+| `choice` | ✓ | 選んだ選択肢。`baseline` / `target` / `neither` / `undecided` |
+| `choice_reason` | ✓ | ほかを選ばなかった理由 |
+| `doc_change` | | 文書への指摘で検討した結果。`remove` (消す) / `rewrite` (書き換える) / `add` (足す)。`choice` が `undecided` なら書かない。文書を変える問題かどうかは記録から決められないので、無いことは検査しない |
+| `doc_change_reason` | △ | 前の順のもので済まない理由。**`doc_change` が `rewrite` か `add` なら必須、それ以外では書かない** |
+
+**必須にする状態は `pending` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human` / `done` / `done-external`。** `done` / `done-external` で必須にしないのは、`decision` を書く前に直した問題を、既存の記録を書き換えずに検査を通すためである。修正を終える問題は `pending` を通るので、書き忘れは立案の直後の検査で報告される。`decision` の無い `pending` が残る既存の記録は、選択待ちにするまで検査が報告する。検査は記録のディレクトリの全記録を見るので、別のブランチの記録でも報告する。記録のパスを引数に渡して `review-triage-fix` を実行すると、どのブランチからでも選択待ちにできる (手順は `review-triage-fix` の手順 1)。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
+
+```yaml
+      - problem_id: P1
+        cause: 手順を足したとき、同じ節の説明を読み直さなかった
+        finding_ids: [2]
+        approach: 説明の 2 文目を消す。同じ節の冒頭に同じ内容がある
+        decision:
+          target: docs/manual.md の 42 行目の説明
+          baseline: 同じ節の冒頭の手順
+          choice: baseline
+          choice_reason: 手順は実装と一致している。説明を正とすると実装も変えることになる
+          doc_change: remove
+        status: pending
+```
+
 ### 状態 (`status`)
 
 「SHA が空」のような読者の解釈に依存する状態表現を使わず、状態は必ずこの列挙で書く。
@@ -241,10 +271,11 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | 値 | 意味 | 再開時の扱い |
 | --- | --- | --- |
 | `investigated` | 調査済み・未立案 — `review-triage-fix` の調査フェーズの結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 立案フェーズから続ける (再開の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
-| `pending` | 未着手 — 修正方法と順序が決まっている | 修正フェーズから続ける (同上) |
-| `awaiting-human` | 設計判断を人間に返した選択待ち。立案者 C (人間が立案する) の立案待ちも同じ状態で表す。選択と `options` に書くものの SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 4 | **実装しない。** 報告だけする。回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
+| `pending` | 未着手 — 修正方法と順序が決まっている | 再開の扱いは `review-triage-fix` の手順 1 に従う (同上) |
+| `awaiting-human` | 人間の回答待ちの問題。立案者 C (人間が立案する) の立案待ちも同じ状態で表す。どの場合にこの状態にするかと、`options` に書くものは、[review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順に従う | **実装しない。** 報告だけする。回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |
+| `not-fixed` | 今回は直さないと人間が決めた (`decision.choice` が `undecided`。理由は `decision.choice_reason`)。書くのは、人間の回答を受けた `review-triage-fix` だけ | 何もしない。報告には出す (ループの報告の SSOT は [reporting.md](../../review-triage-loop/references/reporting.md)) |
 
 `review-triage-fix` は全回の `plans` を 1 パスで見て、`investigated` / `pending` / `awaiting-human` が残っていれば回数を問わず報告する。報告しないと、人間が回答しないまま回が進んだとき、エスカレーションされた判断が気づかれないまま消える。フェーズの名前と手順の対応の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順。
 

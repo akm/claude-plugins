@@ -58,7 +58,7 @@ ID の接頭辞を `R` にするのは、`loop-flow.md` に将来足されるノ
 
 ## 停止の報告に足すもの
 
-**停止の報告の全体は [reporting.md](../../review-triage-loop/references/reporting.md) の「必ず出すもの」の 6 項目で、S2〜S6 ごとに足すものは [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表の「報告に書くもの」。** 1 の「停止した理由」には RA1〜RA3 も入る。このループでは、どの停止 (S2〜S6・RA1〜RA3) でも次を足す。
+**停止の報告の全体は [reporting.md](../../review-triage-loop/references/reporting.md) の「必ず出すもの」で、S2〜S6 ごとに足すものは [loop-flow.md](../../review-triage-loop/references/loop-flow.md) の決定表の「報告に書くもの」。** 1 の「停止した理由」には RA1〜RA3 も入る。このループでは、どの停止 (S2〜S6・RA1〜RA3) でも次を足す。
 
 | 項目 | 書くもの |
 | --- | --- |

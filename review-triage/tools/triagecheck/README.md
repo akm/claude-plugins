@@ -8,7 +8,7 @@ lappds の `tools/doccheck` から、review-triage に関わる 2 つの検査�
 
 | 検査 | 内容 |
 | --- | --- |
-| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `fix_necessity_reason` / `below_minimum_ref` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「前からある欠陥」) と、D8 が当たる記録の `verdict` が `held` であること・修正の必要度 (`fix_necessity` と `fix_necessity_reason`) を書く条件と、必要度と回の下限 (`min_fix_necessity`) から決まる `verdict` (SSOT は同じ文書の「修正の必要度」)・下限未満の指摘の参照 (`below_minimum_ref`) の参照先と、判定を省略した指摘に書かないキー・記録の最後の回が、必要度がその回の下限以上になった、残っている下限未満の指摘を、その回の指摘として足していることと、下限が無い回に足していないこと (同「下限未満の指摘の参照」)。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
+| `review-triage-record` | 必須キー・列挙値・参照の整合・未知のキー・値の無い構造キー (`plan_ref` / `prior_defect` / `fix_necessity_reason` / `below_minimum_ref` / `decision` / `investigation` / `recurrence` の null)・行内コメント・`depends_on` の循環・生成サマリの鮮度・`prior_defect` (D8 の結果) を書く条件 (SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「前からある欠陥」) と、D8 が当たる記録の `verdict` が `held` であること・修正の必要度 (`fix_necessity` と `fix_necessity_reason`) を書く条件と、必要度と回の下限 (`min_fix_necessity`) から決まる `verdict` (SSOT は同じ文書の「修正の必要度」)・下限未満の指摘の参照 (`below_minimum_ref`) の参照先と、判定を省略した指摘に書かないキー・記録の最後の回が、必要度がその回の下限以上になった、残っている下限未満の指摘を、その回の指摘として足していることと、下限が無い回に足していないこと (同「下限未満の指摘の参照」)・立案の結果 (`decision`) を書く状態と、選択肢と状態の組み合わせ (同「立案の結果」)。`recurrence` は旧様式のキー (廃止した検知の項目) で、形 (許可キーと値の有無) だけを見る |
 | `judgment-flow` | 判定フローの mermaid 図のノード ID 集合と、決定表の ID 集合が 1:1 で一致するか |
 
 **記録は git 追跡でなくファイルシステムを走査する。** `git add` 前の最初の記録が検査されないまま通過する条件をなくすため。デフォルトのディレクトリ `tmp/review-triages/` は `.gitignore` で無視する前提で、そもそも追跡されない (無視されていなければスキルは案内して終了し、`.gitignore` は変えない。SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の冒頭)。
@@ -249,6 +249,7 @@ bin/review-triage-check -write-summary   # 生成サマリを書き出す
 | 0.26.0 | 冒頭のコメント「正本は <YAML> — …」→「SSOT は <YAML> — …」、本文の 1 行目「正本は [<YAML>](<YAML>)。…」→「SSOT は [<YAML>](<YAML>)。…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.27.0 | 冒頭のコメント「SSOT は <YAML> — `<コマンド>` で再生成する。」→「SSOT は <YAML>。`<コマンド>` で再生成する。」、調査済み・未立案の注記「**調査済み・未立案 (investigated) が N 件: P1** — 修正方法と…」→「**調査済み・未立案 (investigated) が N 件: P1。** 修正方法と…」([#87](https://github.com/akm/claude-plugins/issues/87)) |
 | 0.30.0 | 指摘の表の見出し「帰結 (条件 / 何が / 気づけるか)」→「帰結 (条件 / 何が / 気づかされるか)」。推移の表に、列「下限」「下限未満」「Must」「Should」「Could」を足した (「—」になる回の SSOT は [record-schema.md](../../skills/review-triage/references/record-schema.md) の「生成サマリの読み方」)。下限未満の指摘がある記録には、推移の表の次に節「下限未満の指摘」が出る ([#178](https://github.com/akm/claude-plugins/issues/178)) |
+| 0.31.0 | 節「下限未満の指摘」の、残っている指摘が無いときの文「(後の回で判定し直したか、採択にした)」→「(後の回で判定し直したか、採択にしたか、採択した問題と一緒に直した)」([#178](https://github.com/akm/claude-plugins/issues/178)) |
 
 ## テスト
 
