@@ -76,6 +76,26 @@ func TestReviewTriageRecordNotFixedPasses(t *testing.T) {
 	}
 }
 
+// status の誤字は、列挙違反の 1 件だけを報告する。decision の検査 (undecided と状態の組み合わせ) を
+// 重ねると、1 つの誤字が 2 つの問題として報告される。
+func TestReviewTriageRecordDecisionUnknownStatusReportedOnce(t *testing.T) {
+	undecided := strings.Replace(decisionBaselineYAML, "choice: baseline", "choice: undecided", 1)
+	undecided = strings.Replace(undecided, "          doc_change: remove\n", "", 1)
+	problems := decisionProblems(decisionRecordYAML(t, undecided, "not_fixed"))
+	enum := 0
+	for _, p := range problems {
+		if strings.Contains(p, "status は investigated / pending") {
+			enum++
+		}
+		if strings.Contains(p, "decision.") {
+			t.Fatalf("status の誤字に decision の問題が重なった: %v", problems)
+		}
+	}
+	if enum != 1 {
+		t.Fatalf("列挙違反が 1 件ではない (%d 件): %v", enum, problems)
+	}
+}
+
 func TestReviewTriageRecordDecisionViolations(t *testing.T) {
 	undecided := strings.Replace(decisionBaselineYAML, "choice: baseline", "choice: undecided", 1)
 	undecided = strings.Replace(undecided, "          doc_change: remove\n", "", 1)
