@@ -1,0 +1,18 @@
+Background (from the session that started this one):
+ブランチ `fix/review-rally-cleanup-guide-172` は、スキル `review-rally` の片付けの案内を直すブランチです (Issue #172)。3 回目のレビューの指摘を直した 1 つのコミットの増分を、修正を書いたセッションとは別のセッションで見直すのが目的です。このセッションは呼び出し元と同じ worktree を読み取り専用で共有するので、作業ツリーと git の状態を変えないでください。結果は呼び出し元のセッションがスキル `review-triage` で判定します。
+
+Task:
+次の依頼文を Read ツールで読み、そのとおりにレビューしてください。依頼文に書かれていることが、作業の指示のすべてです。
+
+`/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1836fc/tmp/review-request-20261106-1300-fix-review-rally-cleanup-guide-172-4-code-review-opus-5-5.md`
+
+依頼文に加えて、次を守ってください。
+
+- 指摘を見つけても直さないでください。
+- 書いてよいのは、依頼文の出力先の 1 ファイルだけです。cwd にもほかのファイルを作らないでください。
+- メインの作業ツリー (`/Users/akima/workspace/claude-plugins`) とほかの作業ツリーでは、checkout を含めて何も変えないでください。スキル `code-review` を呼ぶときは、依頼文の差分の範囲を渡してください。
+- テストを実行するときは、環境変数 `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE` を設定しないでください。
+
+完了の条件: 依頼文の様式どおりの結果が出力先に書き出されていることです。最後の報告に、スキルを実際に呼んだか、実際に渡した effort とモデル、HEAD と作業ツリーが不変であることの確認の結果を書いてください。日本語で応答してください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_bb43c5e5-3a16-4aee-95c6-5b48016fe8e6
