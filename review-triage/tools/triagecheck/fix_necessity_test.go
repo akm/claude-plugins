@@ -632,6 +632,42 @@ func TestBelowMinimumFixedTogetherReportedAgain(t *testing.T) {
 	}
 }
 
+// 再度報告された後の回で一緒に直したなら、直した前の報告なので、残っていない。一緒に直した後に
+// 採択 (A3) で解決した指摘も、後の回の B2 で残っている指摘に戻さない。
+func TestBelowMinimumFixedTogetherNotReopened(t *testing.T) {
+	b1 := func(planRun string) string {
+		return fixNecessityRunYAML("must", strings.Replace(
+			fixNecessityFindingYAML(1, "should", reasonShould, "below_minimum", "B1"),
+			"        verdict: below_minimum\n",
+			"        plan_ref:\n          run: "+planRun+"\n          problem: P1\n        verdict: below_minimum\n", 1), "")
+	}
+	adopted := fixNecessityFindingYAML(1, "must", reasonMust, "adopted", "A2")
+	b2 := fixNecessityRunYAML("must", omittedFindingYAML(1, 1, 1, "", "below_minimum", "B2"), "")
+	last := fixNecessityRunYAML("could", adopted, "")
+	cases := []struct{ name, src string }{
+		{"B2 の後の回で一緒に直した", "runs:\n" + b1("3") + b2 + fixNecessityRunYAML("must", adopted, fixNecessityPlanYAML) + last},
+		{"一緒に直した後に A3 で解決した", "runs:\n" + b1("2") + fixNecessityRunYAML("must", adopted, fixNecessityPlanYAML) +
+			fixNecessityRunYAML("should", omittedFindingYAML(1, 1, 1, "prior_below_minimum", "adopted", "A3"), "") + b2 + last},
+	}
+	const missing = "1 回目の id 1。必要度 should) が、この回の下限 could 以上なのに"
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, p := range fixNecessityProblems(tc.src) {
+				if strings.Contains(p, missing) {
+					t.Fatalf("残っていない指摘の足し忘れが報告された: %s", p)
+				}
+			}
+			summary, err := renderReviewTriageSummary(reviewTriageDir+"feat-x.yaml", []byte(tc.src))
+			if err != nil {
+				t.Fatalf("サマリの生成に失敗: %v", err)
+			}
+			if strings.Contains(summary, "### Should (1 件)") {
+				t.Fatalf("節に並んだ:\n%s", summary)
+			}
+		})
+	}
+}
+
 // 判定を省略した下限未満の指摘 (B2) には plan_ref を書かない。一緒に直したことは、必要度を判定した
 // 指摘 (B1) に書く。判定を省略した採択 (A3) には、今までどおり書ける。
 func TestBelowMinimumPlanRefOnOmitted(t *testing.T) {

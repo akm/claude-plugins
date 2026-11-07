@@ -381,12 +381,14 @@ func belowMinimumEntries(doc *recordDoc, n int) []*belowMinimumEntry {
 				if e := index[[2]int{ref.Run, ref.Finding}]; e != nil {
 					if judgmentOmitted(fd) && fd.Verdict == "below_minimum" {
 						e.reported = append(e.reported, fmt.Sprintf("%d 回目 #%d", ri+1, fd.ID))
-						// 一緒に直す問題の状態が done でも、行が変わらないまま同じ問題が報告されたなら、箇所は直っていない。
-						if e.fixedTogether {
+						// 問題を直した後の回で、行が変わらないまま同じ問題が報告されたなら、箇所は直っていない。
+						// plans は回の後に修正するので、plan_ref の回より後の回の報告が、直した後の報告である。
+						if e.fixedTogether && ri+1 > e.finding.PlanRef.Run {
 							e.resolved = false
 						}
 					} else {
 						e.resolved = true
+						e.fixedTogether = false
 					}
 				}
 			}
