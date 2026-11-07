@@ -249,7 +249,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `doc_change` | | 文書への指摘で検討した結果。`remove` (消す) / `rewrite` (書き換える) / `add` (足す)。`choice` が `undecided` なら書かない。文書を変える問題かどうかは記録から決められないので、無いことは検査しない |
 | `doc_change_reason` | △ | 前の順のもので済まない理由。**`doc_change` が `rewrite` か `add` なら必須、それ以外では書かない** |
 
-**必須にする状態は `pending` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human` / `done` / `done-external`。** `done` / `done-external` で必須にしないのは、`decision` を書く前に直した問題を、既存の記録を書き換えずに検査を通すためである。修正を終える問題は `pending` を通るので、書き忘れは立案の直後の検査で報告される。`decision` の無い `pending` が残る既存の記録は、`decision` を書くまで検査が報告する。検査は記録のディレクトリの全記録を見るので、別のブランチの記録でも報告する。その記録のブランチに切り替えて再開すると、立案フェーズで `decision` を書く (再開の手順は `review-triage-fix` の手順 1)。ブランチを消したか、別の作業ツリーが使っていて再開できず、この問題を直さないなら、記録のパスを引数に渡して `review-triage-fix` を実行し、今回は直さないと回答する (`status: not-fixed`)。別の作業ツリーでこの問題を直すなら、記録のファイルをその作業ツリーの記録のディレクトリへ移し、そこで再開する。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
+**必須にする状態は `pending` / `not-fixed`、書かない状態は `investigated`、任意の状態は `awaiting-human` / `done` / `done-external`。** `done` / `done-external` で必須にしないのは、`decision` を書く前に直した問題を、既存の記録を書き換えずに検査を通すためである。修正を終える問題は `pending` を通るので、書き忘れは立案の直後の検査で報告される。`decision` の無い `pending` が残る既存の記録は、選択待ちにするまで検査が報告する。検査は記録のディレクトリの全記録を見るので、別のブランチの記録でも報告する。記録のパスを引数に渡して `review-triage-fix` を実行すると、どのブランチからでも選択待ちにできる (手順は `review-triage-fix` の手順 1)。別の作業ツリーでこの問題を直すなら、記録のファイルをその作業ツリーの記録のディレクトリへ移し、そこで再開する。`choice` が `undecided` の問題の状態は、`awaiting-human` か `not-fixed` である。`not-fixed` の問題の `choice` は `undecided` である。
 
 ```yaml
       - problem_id: P1
@@ -272,7 +272,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | 値 | 意味 | 再開時の扱い |
 | --- | --- | --- |
 | `investigated` | 調査済み・未立案 — `review-triage-fix` の調査フェーズの結果 (原因・束ね・調査) を持ち、修正方法 (`approach`) と順序 (`order`) をまだ持たない | 立案フェーズから続ける (再開の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1) |
-| `pending` | 未着手 — 修正方法と順序が決まっている | 修正フェーズから続ける。`decision` が無ければ立案フェーズから続ける (同上) |
+| `pending` | 未着手 — 修正方法と順序が決まっている | 修正フェーズから続ける (同上) |
 | `awaiting-human` | 人間の回答待ちの問題。立案者 C (人間が立案する) の立案待ちも同じ状態で表す。どの場合にこの状態にするかと、`options` に書くものは、[review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順に従う | **実装しない。** 報告だけする。回が進んでも `pending` として扱わない。人間の回答は `review-triage-fix` が記録に反映する (手順 1) |
 | `done` | 修正済み (`sha` に短縮 SHA) | 何もしない |
 | `done-external` | リポジトリ外の成果物へ反映済み (コミットが無い) | 何もしない |

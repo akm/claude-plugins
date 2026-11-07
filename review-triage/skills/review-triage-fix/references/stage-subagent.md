@@ -15,7 +15,7 @@
 | フェーズ | 名前 (設定・引数) | sub-agent に含める手順 (番号の SSOT は [SKILL.md](../SKILL.md) の「手順」の直下にあるフェーズと手順の対応) | フェーズの規範 (references/) | 進める状態 |
 | --- | --- | --- | --- | --- |
 | 調査フェーズ | `investigate` | 調査フェーズの手順のうち、**末尾の「立案者の選択」は含めない。** 人間に問うのは呼び出し元のセッション | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
-| 立案フェーズ | `plan` | 立案フェーズの手順 | [fix-decision.md](fix-decision.md)・[ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` か `decision` の無い `pending` → `decision` のある `pending` か `awaiting-human` |
+| 立案フェーズ | `plan` | 立案フェーズの手順 | [fix-decision.md](fix-decision.md)・[ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
 | 修正フェーズ | `fix` | 修正フェーズの手順のうち、**報告と `doc-dag` の確認は含めない。** 呼び出し元のセッションで行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
 
 全フェーズに共通して読ませる文書: [SKILL.md](../SKILL.md) (該当の手順と「原則」)、[record-schema.md](../../review-triage/references/record-schema.md) (記録の様式・状態・コミット節)、[project-config.md](../../review-triage/references/project-config.md) (設定のキーの意味)。
@@ -83,7 +83,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | `{{config_path}}` | 設定ファイル `.claude/akm-claude-plugins/review-triage/config.json` の絶対パス |
 | `{{repo_dir}}` / `{{branch}}` | `git rev-parse --show-toplevel` / 現在のブランチ名 |
 | `{{round}}` | 対象の回の番号 (記録の `runs` の要素数) |
-| `{{targets}}` | 手順 1 で解決した対象。調査フェーズ: 覆われていない採択の回と `id`。立案フェーズ: `status: investigated` と、`decision` の無い `status: pending` の問題の回と `problem_id`。修正フェーズ: `status: pending` の問題の回と `problem_id` |
+| `{{targets}}` | 手順 1 で解決した対象。調査フェーズ: 覆われていない採択の回と `id`。立案フェーズ: `status: investigated` の問題の回と `problem_id`。修正フェーズ: `status: pending` の問題の回と `problem_id` |
 | `{{consider_design_change}}` | 設計・仕様変更を含めて検討するか (`true` / `false`)。N+1 回目以降の立案フェーズなら `true`、それ以外 (調査フェーズ・修正フェーズと、N 回目までの立案フェーズ) は `false`。**N+1 回目以降かどうかを sub-agent に計算させない。** N の決め方は呼び出し元にしか無い |
 | `{{skill_md_path}}` / `{{record_schema_path}}` / `{{project_config_path}}` / `{{stage_references}}` | 読ませる文書の絶対パス (「フェーズと手順・文書の対応」)。**プラグインの展開先の絶対パスで書く。** 依頼文を書くセッションは自分のスキルの配置先 (この SKILL.md を読んだディレクトリ) を知っている。相対パスは sub-agent の作業ディレクトリ (リポジトリ) から解決できない |
 | `{{agent_name}}` | 定義名 (「effort と定義名の対応」)。sub-agent は自分の定義名を知らないので、報告に写させるために書く |
@@ -182,7 +182,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | フェーズ | 状態の遷移 | HEAD と作業ツリー |
 | --- | --- | --- |
 | 調査フェーズ | `{{targets}}` の採択がすべて `plans` (`status: investigated`) か `plan_ref` で覆われた。`investigated` に `investigation` がある (検査が報告する)。`investigated` に `approach`・`order` が無い (検査が報告する) | HEAD がフェーズの前と同じ。`git status --porcelain` の差分が記録のディレクトリ (`record_dir`) 配下だけ |
-| 立案フェーズ | `{{targets}}` がすべて、`decision` のある `pending` か `awaiting-human` に進んだ。`awaiting-human` に `options` がある (検査が報告する)。`investigated` のまま残った問題があれば、理由が報告の「できなかったこと」にある | 同上 |
+| 立案フェーズ | `{{targets}}` の `investigated` がすべて `pending` か `awaiting-human` に進んだ。`awaiting-human` に `options` がある (検査が報告する)。`investigated` のまま残った問題があれば、理由が報告の「できなかったこと」にある | 同上 |
 | 修正フェーズ | `{{targets}}` の `pending` が `done` (`sha`) か `done-external` に進んだ。**`done` の各 `sha` が HEAD の履歴にある** (`git merge-base --is-ancestor <sha> HEAD`)。`pending` のまま残った問題があれば、理由が報告にある (区切りでの中断は失敗ではない。次の再開が修正フェーズから続ける) | **作業ツリーに未コミットの変更が無い** (`git status --porcelain` が空)。**最終 HEAD で設定の `gates` を 1 度実行する。** sub-agent がコミットごとに通したと報告していても、呼び出し元は最終状態を自分で確認する。`gates` が未設定なら、実行していないことを報告に書く |
 
 検証が通ったら次のフェーズに進む (調査フェーズの後は、手順 4 の末尾の「立案者の選択」を呼び出し元のセッションで行ってから)。
