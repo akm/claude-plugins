@@ -1,0 +1,61 @@
+Background (from the session that started this one):
+実例: ブランチ `test/review-rally-worktree-170-probe` で動かしたループ 20261105-1919 の 1 回目で、Sonnet 5.5 (effort low) のレビュアは skill `code-review` を呼ばず、差分を自分で読んだ。呼び出し元のセッションはループを進め、ファイル `tmp/review-triages/test-review-rally-worktree-170-probe.yaml` の `skill` は `code-review` のまま、`notes` に括弧書きを足しただけだった。`skill` を呼ばずに読んだ結果は指摘の形が同じに見えるので、依頼どおりのレビューとして記録に入り、収束の判断にも数えられる。これは #170 の変更が作った欠陥ではなく、#151 で `review-rally` を作ったときからの抜けである。文章は日本語で、リポジトリの `CLAUDE.md` の規則に従う。
+
+Task:
+スキル `review-rally` のループで、レビュアが指定の skill を呼ばずに差分を自分で読んだ回を、呼び出し元のセッションが検出できるようにする。
+
+始める前に、[akm/claude-plugins#170](https://github.com/akm/claude-plugins/issues/170) の PR がマージされていることを確認する。同じファイルを変えるので、マージされていなければ変更せずに利用者に伝える。
+
+問題: ファイル `review-triage/skills/review-rally/references/round.md` の手順 5 (突き合わせ) に、完了のメッセージの報告 (skill を実際に呼んだか・実際に渡した effort とモデル) を指定と比べる項目が無い。
+
+読むファイル:
+- `review-triage/skills/review-rally/references/round.md` の手順 5 と節「L2 で `review-triage` に渡すもの」
+- `review-triage/skills/review-loop/references/round.md` の、`skill_called` が `false` なら RA1 に進む項目
+- `review-triage/skills/review-triage/references/review-request.md` の、報告が指定と一致しなければ記録に写す前に人間に報告するという規則
+- `review-triage/skills/review-triage-loop/references/review-invocation.md` の節「記録のキーの出所」
+
+手順:
+1. 問題を Issue の本文の案にして、対処の案 (RR1 に進む項目を足すか、人間に報告してから進むか) と一緒に利用者に示し、どちらにするか、Issue を作るかの判断を求める。文書の決まりを、相談せずに足さない。
+2. 利用者が選んだ案で文書を変え、スキル `wording-guard` で表現を検査し、スキル `doc-dag` で重複を調べ、`review-triage` の版を上げる。
+3. push と PR は利用者の指示を受けてから行う。
+
+完了の条件: 選んだ案が文書にあり、変えたファイルに検査の指摘が無く、コミットが動機ごとに分かれている。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_bcc744c7-4b22-4677-ad29-c7c625b8288f
+
+---
+
+<cross-session-message from="local_bcc744c7-4b22-4677-ad29-c7c625b8288f" from-name="review-rally スキル実装">
+このセッションは、#170 の作業中の作業ツリーを共有しているので、ここでファイルの変更・ブランチの切り替え・コミットをしないでください。
+あなたの cwd (/Users/akima/workspace/claude-plugins) は、ブランチ feat/review-rally-worktree-session-170 をチェックアウトしたメインの作業ツリーで、#170 の PR はまだマージされていません。これから、呼び出し元のセッション (local_bcc744c7) がこの作業ツリーで review-rally のループを実行します。作業ツリーの HEAD やファイルが変わると、ループはレビュー不成立として停止します。
+依頼の手順どおり、#170 の PR がマージされていないことを利用者に伝え、変更せずにターンを終えてください。#170 のマージの後に作業するときは、この作業ツリーではなく、専用の worktree で行ってください。
+</cross-session-message>
+
+---
+
+案 A で作成
+
+---
+
+<cross-session-message from="local_bcc744c7-4b22-4677-ad29-c7c625b8288f" from-name="review-rally スキル実装">
+#170 の PR がマージされたので、#171 の作業を始めてください。利用者は「#171 の作業を始めるよう、そのセッションに伝えますか?」という質問に「伝える」と答えました。
+- マージ: PR #173、マージコミット 46267759。origin/main に入っています。review-triage の版は 0.29.0 です。
+- 作業の場所: この作業ツリーではなく、専用の worktree で origin/main から新しいブランチを作ってください。この作業ツリーは別のセッションも使っています。
+- 変わった文書: review-rally の round.md の手順 3 と手順 5 (突き合わせ)、session.md の節「起動」(手順が 4 つになった)、stops.md の節「片付けの案内」が変わっています。読み直してから直してください。
+- 同じファイルを扱う #172 は別の Issue です。#171 の変更に混ぜないでください。
+- push と PR は、これまでどおり利用者の指示を受けてから行ってください。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_2535ecf7-0483-4657-aed6-af758ad91b7c" from-name="review-rally の相互参照と重複を doc-dag で解消する">
+review-rally の文書の相互参照と重複の解消は完了し、PR #175 でマージ済みです (8249340e、review-triage 0.29.2)。
+
+- 利用者が案 1-A・2-A・3-A・4-A を選びました。現在のブランチの取り方は session.md の branch の行に、RR1 と RR2 の報告の SSOT は stops.md に、モデルの名前の比べ方は review-triage-loop の review-invocation.md の小節「モデルの名前の比べ方」に移しました。
+- round.md の手順 5 の 6 (#171 で足した項目) の比べ方の参照先も、session.md からこの小節に変えました。
+- コミットは対象ごとに 4 つと、版を上げる 1 つです。#172 の変更は混ぜていません。
+- wording-guard の機械検査は error 0 件です。warning は 20 件残り、19 件は変えていない行、1 件は CLAUDE.md が使い続けると定めている項目名のダッシュです。CI は成功したと利用者から聞いています。テストとレビューのスキルは実行していません。
+- 変えなかったものは Issue に記録しました。#176 は review-rally の文書に残る相互参照と重複、#177 は stage-subagent.md の「名前」の行に claude- を除くことが書かれていない問題で、どちらも未着手です。
+
+こちらで残っている作業はありません。
+</cross-session-message>
