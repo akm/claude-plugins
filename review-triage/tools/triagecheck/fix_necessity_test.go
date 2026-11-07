@@ -632,7 +632,7 @@ func TestBelowMinimumFixedTogetherReportedAgain(t *testing.T) {
 	}
 }
 
-// 再度報告された後の回で一緒に直したなら、直した前の報告なので、残っていない。一緒に直した後に
+// 再度報告された回か、それより後の回で一緒に直したなら、直す前の報告なので、残っていない。一緒に直した後に
 // 採択 (A3) で解決した指摘も、後の回の B2 で残っている指摘に戻さない。
 func TestBelowMinimumFixedTogetherNotReopened(t *testing.T) {
 	b1 := func(planRun string) string {
@@ -646,6 +646,9 @@ func TestBelowMinimumFixedTogetherNotReopened(t *testing.T) {
 	last := fixNecessityRunYAML("could", adopted, "")
 	cases := []struct{ name, src string }{
 		{"B2 の後の回で一緒に直した", "runs:\n" + b1("3") + b2 + fixNecessityRunYAML("must", adopted, fixNecessityPlanYAML) + last},
+		{"B2 と同じ回で一緒に直した", "runs:\n" + b1("2") + fixNecessityRunYAML("must",
+			omittedFindingYAML(1, 1, 1, "", "below_minimum", "B2")+fixNecessityFindingYAML(2, "must", reasonMust, "adopted", "A2"),
+			strings.Replace(fixNecessityPlanYAML, "finding_ids: [1]", "finding_ids: [2]", 1)) + last},
 		{"一緒に直した後に A3 で解決した", "runs:\n" + b1("2") + fixNecessityRunYAML("must", adopted, fixNecessityPlanYAML) +
 			fixNecessityRunYAML("should", omittedFindingYAML(1, 1, 1, "prior_below_minimum", "adopted", "A3"), "") + b2 + last},
 	}
