@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: doc-structured
+Version: 0.1.0
+Summary: アプリケーションの文書の構成の、生成と検査のツール
+License-Expression: MIT
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: ruamel.yaml>=0.18
+
+# doc-structured (ツール)
+
+プラグイン doc-structured の、生成と検査のツールの Python パッケージです。実行の仕方・設定・開発・公開の手順は、プラグインの [README](../README.md) を参照してください。

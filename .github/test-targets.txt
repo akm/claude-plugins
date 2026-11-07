@@ -13,3 +13,4 @@ go review-triage/tools/nearedges
 go review-triage/tools/lineorigin
 python issue-dispatch/tests
 python scripts/tests
+python doc-structured/tool/tests
