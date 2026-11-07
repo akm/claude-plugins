@@ -161,7 +161,7 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `decision` | △ | 立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。様式と、必須にする状態は、下の「立案の結果」 |
 | `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
-| `depends_on` | | 依存する問題の `problem_id` |
+| `depends_on` | | 依存する問題の `problem_id`。依存先が `not-fixed` でも検査しない。人間が回答で `pending` に戻した記録も同じ形になるため |
 | `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空**。**1 つのコミットが複数の問題を覆ったときは、覆われた問題すべてに同じ短縮 SHA を書く** (起きる条件の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 の「人間の回答の反映」) |
 | `applied_external_url` | | リポジトリ外の反映先の URL。**`status: done-external` 専用。他の状態では空** |
 | `notes` | △ | 反映先と、反映を確認した方法。**`status: done-external` 専用。他の状態では空。`applied_external_url` が無いとき必須** |
