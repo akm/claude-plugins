@@ -1,0 +1,34 @@
+Background (from the session that started this one):
+Issue #178 は、レビュー・トリアージ・修正のループ (スキル review-triage-loop・review-loop・review-rally) が収束しにくい問題への要望で、review-triage が各指摘に「修正の必要度」(Must・Should・Could) を付け、人間が事前に指定した「必要度の下限」に満たない指摘を、採択にせず新しい判定「下限未満」にする。利用者と 2026-11-06 に決めた内容は、すべて Issue の本文の「決めたこと」に書いてある。実装は A (必要度の判定)・B (下限と判定「下限未満」)・C (問題と修正方法を分けた評価)・D (下限未満の指摘の、後の回での扱い) の 4 つの単位に分け、単位ごとに PR にすると決めた。このセッションは A だけを扱う。
+
+守ること: 会話と文章は日本語。リポジトリの `CLAUDE.md` と利用者の `~/.claude/CLAUDE.md` の文章の規約に従う。名前は「修正の必要度」「必要度の判定」「必要度の下限」「下限未満」を使い、「区分」「見送り」「priority」は使わない (利用者が選ばなかった)。「必要性」ではなく「必要度」で揃える。規約や方針に当たるものを、利用者に相談せずに作らない。判断が要る点は自分で決めずに利用者に質問し、質問は 1 回のターンに 1 つにする。コミットは変更の動機ごとに分ける。ほかのプロジェクトの名前を Issue・PR に書かない。足す記述は最小限にする (足した記述が新しいレビュー指摘を生むことが、この Issue の動機のため)。
+
+Task:
+リポジトリ akm/claude-plugins の Issue #178 (`gh issue view 178`) の「決めたこと」のうち、節「進め方」の単位 A (必要度の判定) だけを実装し、PR を作る。単位 B・C・D には着手しない。
+
+最初に Issue #178 の本文をすべて読み、実装計画を利用者に示して承認を得てから実装する。計画は、利用者の `~/.claude/CLAUDE.md` の「実装計画を立てるとき」に従い、層でまとめずドメインで分ける。
+
+単位 A の内容 (Issue の節「修正の必要度と下限」「名前と、下限の指定の方法」「必要度の基準」「必要度の判定の、境界の判断の例」が SSOT):
+
+- スキル review-triage の判定フロー (`review-triage/skills/review-triage/references/judgment-flow.md`) に「必要度の判定」を足す。判定フローの D4 で根拠を確認した指摘 (A1・A2・H5・H6・H7・R3) のすべてに、修正の必要度 (記録のキー `fix_necessity`、値は `must`・`should`・`could`) を付ける。2 つの判定の条件と、回避策に含める 3 つの範囲、読み違いの指摘の扱いは Issue のとおり。必要度を決められない指摘は保留にする。
+- 帰結の 4 項目の「気づけるか」を「気づかされるか」に変え、書く内容の定義を Issue のとおりにする。キー `consequence.detectability` の名前を変えるかは、Issue の「実装のときに決めること」にあり、既存の記録の移行が要るので、案を示して利用者に確認する。
+- 必要度と一緒に、判定の条件の結果 (困る人が何もしなくても目的を達成できるか・回避策の手段、無いときは無い理由) を記録のキーに書かせる。キーの名前は案を示して利用者に確認する。
+- 必要度の判定では、上流のレビューが付けた深刻度 (`attrs.severity`) を材料にしない。`review-triage/skills/review-triage/SKILL.md` の節「このスキルが検出しないもの」の「指摘の深刻度が妥当か」は残し、必要度は上流の深刻度の検証でも補完でもないことを添える。
+- 記録の様式 (`review-triage/skills/review-triage/references/record-schema.md`) と、検査ツール triagecheck (`review-triage/tools/triagecheck/`。Go) に、新しいキーの検査を足す。テストも足す。既存の記録 (`tmp/review-triages/`) が検査で失敗しないようにする方法を決める。
+- 生成サマリ (triagecheck が記録から作る `<ブランチ名>.md`) の「推移」の表に、必要度ごと (Must・Should・Could) の件数を列として足す。
+- `review-triage/skills/review-triage/references/gate-examples.md` に、境界の判断の例を Issue の表の 3 組だけ足す。これ以上は足さない。
+- プラグイン review-triage のバージョンを上げる (既存のコミットの形に合わせる)。
+
+単位 A に含めないもの: 下限の引数と設定・判定「下限未満」(`below_minimum`)・ループのスキルの変更 (単位 B)、問題と修正方法を分けた評価 (単位 C)、下限未満の指摘の後の回での扱い (単位 D)。
+
+完了の状態: main から作ったブランチに、動機ごとに分けたコミットがあり、`review-triage/tools/triagecheck/` の Go のテストがすべて成功し、変更した Markdown・Go のコメント・コミットメッセージが wording-guard の検査 (`python3 wording-guard/scripts/wording_lint.py check --stdin --filename <名前> < <ファイル>`) で error 0 件になっていて、PR が作られている (本文に `Refs #178`。`Closes` は書かない。単位 B〜D が残るため)。push と PR の作成の前に、利用者に確認する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7e02b538-e874-4083-a936-a3eb830dcfb6
+
+---
+
+計画を直したい
+
+---
+
+４つのドメインとは A,B,C,D ですか？ これはドメインではない気がするのですが。
