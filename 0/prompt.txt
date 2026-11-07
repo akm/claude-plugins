@@ -1,0 +1,59 @@
+Background (from the session that started this one):
+スキル `review-rally` は、レビューを別の Claude Code のセッションに任せるループで、手順は `review-triage/skills/review-rally/references/` の下の `round.md`・`session.md`・`stops.md` にある。Issue #171 で手順 5 に項目 6 を足したときに doc-dag を実行し、#171 の前からある相互参照と重複を見つけたが、#171 の変更には混ぜなかった。利用者の好みは、ファイルの中の相互参照は片方を SSOT にし、ファイルの間の相互参照は他のファイルから参照されるものを参照される側のファイルにまとめること。文章は日本語で、リポジトリの `CLAUDE.md` の規則に従う。
+
+Task:
+スキル `review-rally` の文書にある相互参照と重複について、解消の案を利用者に示し、選ばれた案で文書を変える。
+
+始める前に、Issue akm/claude-plugins#171 の変更 (ブランチ `fix/review-rally-report-check-171`) が origin/main にマージされていることを確認する。同じファイル `round.md` を変えるので、マージされていなければ変更せずに利用者に伝える。
+
+対象 (#171 の doc-dag で見つけたもの。#171 の前からある):
+1. `review-triage/skills/review-rally/references/round.md` の節「1 回のレビュー」の手順 5 の 3 と、`review-triage/skills/review-rally/references/session.md` の節「`rally.yaml`」の表の `branch` の行 (現在のブランチの取り方) の相互参照。
+2. `round.md` の手順 5 の 4・5 と、`review-triage/skills/review-rally/references/stops.md` の決定表の RR1 の行の相互参照。
+3. `session.md` の節「起動」の 4 と、`stops.md` の決定表の RR2 の行の相互参照。
+4. モデルの名前の比べ方の重複。`session.md` の節「起動」の 4 と、`review-triage/skills/review-loop/references/round.md` の手順 (c) の 6 に同じ規則があり、後者は `review-triage/skills/review-triage-fix/references/stage-subagent.md` の節「実効モデルの解決」も参照している。
+
+手順:
+1. スキル `doc-dag` を実行し、上の 4 つが今もあるかを読み比べて確認する。
+2. それぞれの解消の案とトレードオフを利用者に示す。どちらを SSOT にするかを自分で決めない。相互参照を解消しないという選択肢も示す。文書の決まりを相談せずに足さない。
+3. 選ばれた案で文書を変え、スキル `wording-guard` で表現を検査し、`review-triage` の版を上げる。
+4. push と PR は利用者の指示を受けてから行う。
+
+完了の条件: 選ばれた案が文書にあり、変えたファイルに検査の指摘が無く、コミットが動機ごとに分かれている。Issue #172 (片付けの案内) の変更は混ぜない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_ecddff92-36e6-422b-8f92-5b1a6200bfef
+
+---
+
+案だけ先に出して
+
+---
+
+PR #174 がマージされ、#171 がクローズされました
+
+---
+
+おすすめで進める
+
+---
+
+push して PR を作る
+
+---
+
+Issue に記録する
+
+---
+
+この案で作る
+
+---
+
+CI をパスしていたのでマージしました
+
+---
+
+このセッションの残りのタスクはありますか？
+
+---
+
+呼び出し元のセッションに完了したことを報告してください
