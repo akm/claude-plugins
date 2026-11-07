@@ -63,20 +63,21 @@ func check(opts options) (result, error) {
 		return result{}, inputf("レビューした内容のコミット (%s) を解決できません", targetName)
 	}
 
-	// 全量の起点がレビューした内容のコミットと同じなら、範囲 <起点>..<コミット> が空になり、
-	// コミット済みのどの行も起点にあったままと報告される。ブランチの変更と前からある行を区別できない。
+	// 全量の起点がレビューした内容のコミットと同じなら、範囲 <起点>..<コミット> には起点でないコミットが無く、
+	// git blame ではブランチの変更と前からある行を区別できない (git blame の振る舞いは下の sameCommitResult
+	// を呼ぶ箇所のコメント)。
 	// フラグ -allow-same-commit (判定ノード D9) では、起点は前の指摘を判定した回のコミットで、
 	// 確認するのは、そのコミットからレビューした内容までに行が変わっていないかである。ブランチの変更と
 	// 区別する必要が無いので、同じコミットでも確認できないとしない。
 	if base == target && !opts.allowSameCommit {
-		return result{kind: unverifiable, reason: fmt.Sprintf("全量の起点 %s が、レビューした内容のコミット (%s) と同じで、このブランチの変更と前からある行を区別できない", short(base), targetName)}, nil
+		return result{kind: unverifiable, reason: fmt.Sprintf("起点 %s が、レビューした内容のコミット (%s) と同じで、このブランチの変更と前からある行を区別できない", short(base), targetName)}, nil
 	}
 	ok, err := g.isAncestor(base, target)
 	if err != nil {
 		return result{}, asRun(err)
 	}
 	if !ok {
-		return result{kind: unverifiable, reason: fmt.Sprintf("全量の起点 %s が、レビューした内容のコミット (%s) の祖先ではない", short(base), targetName)}, nil
+		return result{kind: unverifiable, reason: fmt.Sprintf("起点 %s が、レビューした内容のコミット (%s) の祖先ではない", short(base), targetName)}, nil
 	}
 
 	// 指摘の file は、レビューした内容にあるはず (根拠の照合 E1 を通っている)。無ければ入力の誤り。
@@ -96,7 +97,7 @@ func check(opts options) (result, error) {
 	if baseEntry, err := g.entry(base, opts.file); err != nil {
 		return result{}, err
 	} else if baseEntry != entryFile && baseEntry != entrySymlink {
-		return result{kind: notHolds, reason: fmt.Sprintf("全量の起点 %s に同じパスのファイルが無い (このブランチで作った・改名した・移したファイル)", short(base))}, nil
+		return result{kind: notHolds, reason: fmt.Sprintf("起点 %s に同じパスのファイルが無い (このブランチで作った・改名した・移したファイル)", short(base))}, nil
 	}
 	if opts.worktree && targetEntry != entryFile && targetEntry != entrySymlink {
 		return result{kind: notHolds, reason: "HEAD に同じパスのファイルが無い (コミットしていないファイル)"}, nil
@@ -169,13 +170,24 @@ func sameCommitResult(g gitRunner, base, target string, opts options) (result, e
 	if err := checkLastLine(opts, n); err != nil {
 		return result{}, err
 	}
-	res := result{kind: holds, reason: fmt.Sprintf("対象の行はどれも、全量の起点 %s にあったまま変わっていない", short(base))}
+	res := result{kind: holds, reason: holdsReason(base)}
 	for _, r := range opts.ranges {
 		for line := r.from; line <= r.to; line++ {
-			res.lines = append(res.lines, lineResult{line: line, kind: holds, note: fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", line)})
+			res.lines = append(res.lines, lineResult{line: line, kind: holds, note: holdsNote(line)})
 		}
 	}
 	return res, nil
+}
+
+// holdsReason は、対象の行がどれも起点にあったままのときの理由の文を返す。sameCommitResult と
+// classify が同じ文を使う。
+func holdsReason(base string) string {
+	return fmt.Sprintf("対象の行はどれも、起点 %s にあったまま変わっていない", short(base))
+}
+
+// holdsNote は、起点にあったままの行の内訳の文を返す。orig は対応させた起点の行番号。
+func holdsNote(orig int) string {
+	return fmt.Sprintf("起点にあったまま (起点の %d 行目)", orig)
 }
 
 // checkLastLine は、渡した行がレビューした内容の行数 n を越えないかを確認する。越えるのは渡し方の誤り。
@@ -196,16 +208,16 @@ func classify(base, file string, blamed []blameLine) result {
 		case isZero(b.commit):
 			l.kind, l.note = notHolds, "コミットしていない行"
 		case !b.boundary:
-			l.kind, l.note = notHolds, fmt.Sprintf("全量の起点より後のコミット %s が書いた・書き換えた行", short(b.commit))
+			l.kind, l.note = notHolds, fmt.Sprintf("起点より後のコミット %s が書いた・書き換えた行", short(b.commit))
 		case b.commit != base:
 			// 起点より前に分かれた履歴をマージすると、行がその分岐点まで遡り、そこが境界になる。
 			// その行が起点にもあったかは、この結果からは決められない。
-			l.kind, l.note = unverifiable, fmt.Sprintf("全量の起点を通らない履歴 (起点より前に分かれた履歴のマージなど) から来た行で、境界のコミットが %s。全量の起点にあったかを決められない", short(b.commit))
+			l.kind, l.note = unverifiable, fmt.Sprintf("起点を通らない履歴 (起点より前に分かれた履歴のマージなど) から来た行で、境界のコミットが %s。起点にあったかを決められない", short(b.commit))
 		case b.filename != file:
-			l.kind, l.note = notHolds, fmt.Sprintf("このブランチで改名・移動したファイルの行 (全量の起点では %s)", b.filename)
+			l.kind, l.note = notHolds, fmt.Sprintf("このブランチで改名・移動したファイルの行 (起点では %s)", b.filename)
 		default:
 			// 境界が起点でパスも同じなので、フィールド orig は起点のファイルでの行番号
-			l.kind, l.note = holds, fmt.Sprintf("全量の起点にあったまま (起点の %d 行目)", b.orig)
+			l.kind, l.note = holds, holdsNote(b.orig)
 		}
 		res.lines = append(res.lines, l)
 		switch {
@@ -217,11 +229,11 @@ func classify(base, file string, blamed []blameLine) result {
 	}
 	switch res.kind {
 	case notHolds:
-		res.reason = "対象の行のうち、全量の起点から変わった行がある"
+		res.reason = "対象の行のうち、起点から変わった行がある"
 	case unverifiable:
-		res.reason = "対象の行のうち、全量の起点にあったかを決められない行がある"
+		res.reason = "対象の行のうち、起点にあったかを決められない行がある"
 	default:
-		res.reason = fmt.Sprintf("対象の行はどれも、全量の起点 %s にあったまま変わっていない", short(base))
+		res.reason = holdsReason(base)
 	}
 	return res
 }

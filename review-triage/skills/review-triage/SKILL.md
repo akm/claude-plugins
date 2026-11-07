@@ -33,7 +33,7 @@ description: code-review や ce-code-review が出したレビュー指摘を一
 3. **判定**: 指摘ごとに [references/judgment-flow.md](references/judgment-flow.md) の図に従って決着させる。
    - **指摘が解決策を示しているときは、問題と解決策を分けて書く。** 問題を要旨 (`summary`) と帰結に書き、解決策は `suggested_fix` に写す (様式の SSOT は [references/record-schema.md](references/record-schema.md) の `findings[]`)。判定と必要度は、問題に対して決める。
    - 帰結の 4 項目 (D3 で書くもの) は、D1 に進んだ指摘の**全件に書く。** D1・D2 で決着した指摘にも記録の材料として残す。
-   - 評価 (E1〜E3) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
+   - 行った評価 (E1〜E3) の結果は、判定がどこで決まっても**すべて記録に載せる** (評価と判定の分離)。どの指摘にどの評価を行うかは、判定フローの図が決める (例えば、D4 で決着した指摘には E3 を行わない)。照合の仕方は [references/premise-check.md](references/premise-check.md)、ゲートの定義は [references/rejection-gates.md](references/rejection-gates.md)。
    - 境目が判断しづらいときは [references/gate-examples.md](references/gate-examples.md) の対になった例と突き合わせる。
 4. **記録の追記**: 記録 YAML に 1 回分を追記する (様式・スキーマの SSOT は [references/record-schema.md](references/record-schema.md))。`model`・`scope`・`head` を必ず書き、下限がある回では `min_fix_necessity` も書く。`verdict_reason` には決着ノードの ID を書く。既定のディレクトリを使うとき、そのディレクトリが `git check-ignore` で無視されていなければ、記録を書かずに「`.gitignore` に `tmp/` を足してコミットしてから再実行する」と案内して終了する。スキルは `.gitignore` を変えない (前提と設定で明示したディレクトリの扱いの SSOT は [references/record-schema.md](references/record-schema.md) の冒頭)。無視されていれば、ディレクトリが無ければ作る。
 5. **サマリの再生成と検査**: [記録 README の「書いた後にすること」](references/record-schema.md#書いた後にすること) の 1 と 2 を行う (コマンドと、未設定のときの扱いの SSOT は [references/project-config.md](references/project-config.md))。
