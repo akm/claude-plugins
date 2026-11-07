@@ -1,0 +1,24 @@
+Background (from the session that started this one):
+スキル `review-rally` は、レビューを別のセッションに任せてレビューと修正を繰り返すスキルで、ループが停止すると、レビューのセッションと worktree とブランチの片付けの手順を報告に書く。PR #173 (Issue #170) で worktree で動くセッションからも使えるようにしたとき、この案内への指摘が前の回の修正の近くで続き、ループの判定 J9 で 2 度停止したので、残りを #172 に記録して PR #173 をマージした。観測: セッションをアーカイブしても worktree のディレクトリとディレクトリ `tmp/` は残り、HEAD は detached になる (2026-11-05 の 8 回と 2026-11-06 の 1 回)。残った worktree は後で起動したセッションが再利用した。アプリが保証している動作かは分かっていない。文書の規則はリポジトリの `CLAUDE.md` に従う。同じ箇所への追記を重ねると指摘が続いたので、記述を足す前に、参照にする・書かない、という形も検討する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/172 を読み、スキル `review-rally` の片付けの案内を、実際の状態で実行できる形に直してください。
+
+対象の中心はファイル `review-triage/skills/review-rally/references/stops.md` の節「片付けの案内」と、ファイル `review-triage/skills/review-rally/references/session.md` の節「起動」です。Issue には次の 4 つの問題が書かれています。
+1. アーカイブの後も worktree が残るのに、案内は片付けられると書いている
+2. 新しい worktree で `session.reused` が空のままになり、片付けの手順が出ない
+3. 依頼を送る前に停止すると、`rm -r` の対象が無くエラーになる
+4. アプリが worktree を新しいブランチに切り替えずに返すと、別の作業のものを片付けの対象にする (観測はしていない)
+
+進め方:
+- 修正の前に、問題ごとに前提・問題・対処案をまとめて利用者に示し、案を選んでもらう。問題 4 と、問題 1 のうちアプリの動作に依存する部分は、利用者が判断を保留しているので、自分で決めない。
+- Issue https://github.com/akm/claude-plugins/issues/176 が同じ節の相互参照と重複を扱っている。同じ節を変えるので、#176 をこの作業に含めるかも利用者に確認する。
+- コミットと push と PR の作成は、利用者の指示を受けてから行う。
+
+完了の条件: 利用者が選んだ案が文書に反映され、`python3 -m unittest discover -s review-triage/tests` と wording-guard の検査が成功し、review-triage の版を上げた PR ができている。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_bcc744c7-4b22-4677-ad29-c7c625b8288f
+
+---
+
+1. -A
