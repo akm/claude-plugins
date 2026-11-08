@@ -14,7 +14,7 @@ from pathlib import Path
 from . import generated_header
 from .direction import check_direction
 from .domains import Project, load_project
-from .generate import GITATTRIBUTES_PATH, generated_files, render_project
+from .generate import GITATTRIBUTES_PATH, HANDWRITTEN_MESSAGE, generated_files, handwritten_fix, render_project
 from .problems import Problem
 
 LIGHT = ("a", "h", "i")
@@ -50,6 +50,9 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
         path = root / relative
         if not path.is_file():
             problems.append(Problem("a", relative, f"生成するはずのファイルが無い。{header.command} を実行する"))
+            continue
+        if generated_header.read_file_header(path) is None:
+            problems.append(Problem("a", relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}"))
             continue
         actual = path.read_text(encoding="utf-8")
         if actual == expected:

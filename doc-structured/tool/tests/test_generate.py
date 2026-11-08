@@ -8,7 +8,7 @@ import subprocess
 import unittest
 
 from doc_structured.domains import load_project
-from doc_structured.generate import generated_files, render_project
+from doc_structured.generate import generated_files, render_project, write_outputs
 from tooltest import PYTHON, SAMPLE_PROJECT, ProjectTestCase, clean_env
 
 MINIMAL = """\
@@ -78,6 +78,50 @@ class GenerateTest(ProjectTestCase):
         self.assertEqual(self.run_tool("generate").returncode, 0)
         names = sorted(generated_files(self.project))
         self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
+
+    def test_handwritten_file_at_output_stops_generation(self):
+        self.copy_sample()
+        handwritten = {
+            "docs/domains/02-loans/models.md": "# 貸出のモデル (手で書いた)\n",
+            "docs/.gitattributes": "*.png binary\n",
+        }
+        for relative, text in handwritten.items():
+            self.write(relative, text)
+        (self.project / "docs/glossary.md").unlink()
+        result = self.run_tool("generate")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "docs/domains/02-loans/models.md: 手で書いたファイルが、生成するファイルの場所にある。"
+            "ファイルの名前を変えるか、内容を手書きの文書に移してから、このファイルを消す",
+            result.stderr,
+        )
+        self.assertIn(
+            "docs/.gitattributes: 手で書いたファイルが、生成するファイルの場所にある。"
+            "手で書いた行をリポジトリのルートの .gitattributes に移してから、このファイルを消す",
+            result.stderr,
+        )
+        self.assertIn("手で書いたファイルが 2 件あるので、何も生成しなかった", result.stderr)
+        self.assertEqual(result.stdout, "")
+        # 手で書いたファイルは変わらず、ほかのファイルも書かない
+        for relative, text in handwritten.items():
+            with self.subTest(file=relative):
+                self.assertEqual((self.project / relative).read_text(encoding="utf-8"), text)
+        self.assertFalse((self.project / "docs/glossary.md").exists())
+
+        # 手で書いたファイルを消せば、生成できる
+        for relative in handwritten:
+            (self.project / relative).unlink()
+        self.assertEqual(self.run_tool("generate").returncode, 0)
+        self.assertTrue((self.project / "docs/glossary.md").is_file())
+
+    def test_write_outputs_refuses_to_overwrite_handwritten_file(self):
+        self.copy_sample()
+        self.write("docs/glossary.md", "# 手で書いた用語集\n")
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        with self.assertRaises(ValueError):
+            write_outputs(self.project, render_project(project))
+        self.assertEqual((self.project / "docs/glossary.md").read_text(encoding="utf-8"), "# 手で書いた用語集\n")
 
     def test_yaml_errors_stop_generation(self):
         self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")

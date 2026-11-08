@@ -81,6 +81,18 @@ class CheckTest(ProjectTestCase):
             result.stdout,
         )
 
+    def test_check_a_reports_handwritten_file_at_output(self):
+        self.write(MODELS, "# 貸出のモデル (手で書いた)\n")
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            f"{MODELS}: 検査 a: 手で書いたファイルが、生成するファイルの場所にある。"
+            "ファイルの名前を変えるか、内容を手書きの文書に移してから、このファイルを消す",
+            result.stdout,
+        )
+        # 生成し直した内容との差分は出さない (generate を促さない)
+        self.assertNotIn("生成し直した内容と違う", result.stdout)
+
     def test_check_h_failure_skips_a_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")
         result = self.run_check()

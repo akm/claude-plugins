@@ -9,6 +9,7 @@ docs/glossary.md を生成する。生成するファイルの中身の SSOT は
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
   - docs/.gitattributes に、生成したファイル (docs/.gitattributes 自身を含む) の merge の設定を書く
+  - 生成するファイルの場所に、先頭の記述の無いファイル (手で書いたファイル) があれば、何も書かない (呼び出し元がエラーにする)
 同じ入力からは、いつも同じ出力を作る (時刻や環境に依存する値を書かない)。
 """
 
@@ -259,12 +260,35 @@ def generated_files(root: Path) -> dict[str, generated_header.Header]:
     return found
 
 
+HANDWRITTEN_MESSAGE = "手で書いたファイルが、生成するファイルの場所にある"
+
+
+def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
+    """生成するファイルの場所にある、先頭の記述の無いファイル (手で書いたファイル) の、リポジトリのルートからの相対パス。"""
+    return [
+        relative
+        for relative in outputs
+        if (root / relative).is_file() and generated_header.read_file_header(root / relative) is None
+    ]
+
+
+def handwritten_fix(relative: str) -> str:
+    """手で書いたファイルが生成するファイルの場所にあるときの直し方。"""
+    if relative == GITATTRIBUTES_PATH:
+        return "手で書いた行をリポジトリのルートの .gitattributes に移してから、このファイルを消す"
+    return "ファイルの名前を変えるか、内容を手書きの文書に移してから、このファイルを消す"
+
+
 def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[str]]:
     """生成したファイルを書き、生成し直すと無くなるファイルを消す。書いたファイルと消したファイルを返す。
 
     消すのは、先頭の記述を持つファイル (生成したファイル) だけ。手書きのファイルは消さない。
-    内容が同じファイルは書かない。
+    内容が同じファイルは書かない。生成するファイルの場所に手で書いたファイルがあれば、書かずに ValueError を送出する
+    (呼び出し元は先に handwritten_at_outputs で確認し、利用者にエラーを伝える)。
     """
+    handwritten = handwritten_at_outputs(root, outputs)
+    if handwritten:
+        raise ValueError(f"{HANDWRITTEN_MESSAGE}: {', '.join(handwritten)}")
     written: list[str] = []
     for relative, content in outputs.items():
         path = root / relative
