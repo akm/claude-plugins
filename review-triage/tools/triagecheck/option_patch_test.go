@@ -231,6 +231,10 @@ func TestReviewTriageRecordOptionPatchesViolations(t *testing.T) {
 		{"案を選んで pending にしたのに chosen_option が無い", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "        chosen_option: A\n", "", 1) + "        status: pending\n", "status pending で option_patches があるのに、chosen_option がありません"},
 		{"直した問題に chosen_option が無い", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "        chosen_option: A\n", "", 1) + "        sha: 1a2b3c4\n        status: done\n", "status done で option_patches があるのに、chosen_option がありません"},
 		{"決めないと回答したのに chosen_option がファイルを変える案を指す", p1Tail, "            no_change: true\n" + optionP1NotFixed("A") + "        status: not-fixed\n", "status not-fixed なのに、chosen_option \"A\" はファイルを変える案です"},
+		{"決めないと回答したのに chosen_option がほかの問題のパッチで覆う案を指す", "              option: A\n        status: awaiting-human\n",
+			"              option: A\n        chosen_option: A\n        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n" +
+				"          choice: undecided\n          choice_reason: 今回は直さない\n        status: not-fixed\n",
+			"status not-fixed なのに、chosen_option \"A\" はファイルを変える案です"},
 		{"pending の chosen_option がファイルを変えない案を指す", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "chosen_option: A", "chosen_option: B", 1) + "        status: pending\n", "chosen_option \"B\" はファイルを変えない案 (no_change) です"},
 		{"option_patches の値が無い (null)", "        option_patches:\n          - option: A\n            covered_by:\n              problem_id: P1\n              option: A\n", "        option_patches:\n", "option_patches に値がありません"},
 		{"covered_by の値が無い (null)", "            covered_by:\n              problem_id: P1\n              option: A\n", "            covered_by:\n", "covered_by に値がありません"},
