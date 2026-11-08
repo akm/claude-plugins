@@ -25,6 +25,12 @@ HEADER_LINES = 3
 MAX_LINE_BYTES = 4096
 NOTE = "(このファイルを直接編集せず、生成元を直して生成し直す)"
 GENERATE_COMMAND = "bin/doc-structured generate"
+# 生成した .gitattributes の直し方。内容は YAML ではなく生成したファイルの一覧から作るので、YAML を直す案内をしない。
+# 検査 a と hook が使う
+GITATTRIBUTES_GUIDE = (
+    "内容は生成したファイルの一覧から作る。"
+    "手で属性を足すときは、リポジトリのルートの .gitattributes に、リポジトリのルートからの相対のパターンで書く"
+)
 
 _FIELDS_RE = re.compile(r"生成元: (?P<source>\S+) コマンド: (?P<command>.+?) \(")
 

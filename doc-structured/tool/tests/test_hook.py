@@ -68,7 +68,13 @@ class GuardGeneratedHookTest(ProjectTestCase):
                 self.assertIn(MODELS, reason)
 
     def test_denies_generated_gitattributes(self):
-        self.assert_denied(self.run_hook("Edit", str(self.project / "docs/.gitattributes")), "docs/domains/")
+        # 内容は生成したファイルの一覧から作るので、生成元の YAML ではなく、属性を足す場所を案内する
+        result = self.run_hook("Edit", str(self.project / "docs/.gitattributes"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        reason = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn(gh.GITATTRIBUTES_GUIDE, reason)
+        self.assertNotIn("生成元 docs/domains/", reason)
+        self.assertIn("bin/doc-structured generate", reason)
 
     def test_denies_generated_markdown_with_frontmatter(self):
         path = self.write(

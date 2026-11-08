@@ -86,7 +86,9 @@ def main():
     shown = os.path.normpath(full_path)
     command = header.command or generated_header.GENERATE_COMMAND
     run = f"スキル {SKILL} (リポジトリのルートで実行するコマンド {command})"
-    if header.source:
+    if os.path.basename(full_path) == ".gitattributes":
+        how = f"{generated_header.GITATTRIBUTES_GUIDE}。生成し直すときは {run} を使う"
+    elif header.source:
         how = f"生成元 {header.source} (リポジトリのルートからの相対パス) を直し、{run} で生成し直す"
     else:
         how = f"先頭の記述から生成元を読み取れなかった。生成元を直し、{run} で生成し直す"

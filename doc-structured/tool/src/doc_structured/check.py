@@ -40,11 +40,7 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
     for relative, expected in outputs.items():
         header = generated_header.read_header(expected)
         if relative == GITATTRIBUTES_PATH:
-            # 内容は YAML ではなく生成したファイルの一覧から作るので、YAML を直す案内をしない
-            how = (
-                f"このファイルを直接編集せず、{header.command} を実行する。内容は生成したファイルの一覧から作る。"
-                "手で属性を足すときは、リポジトリのルートの .gitattributes に、リポジトリのルートからの相対のパターンで書く"
-            )
+            how = f"このファイルを直接編集せず、{header.command} を実行する。{generated_header.GITATTRIBUTES_GUIDE}"
         else:
             how = f"このファイルを直接編集せず、生成元 {header.source} の YAML を直して {header.command} を実行する"
         path = root / relative
