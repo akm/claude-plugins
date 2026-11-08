@@ -158,6 +158,17 @@ func recordOptionPatchProblems(pl recordPlan, plans []recordPlan) []string {
 		} else if ok && pl.Status == "pending" && op.NoChange != nil && *op.NoChange {
 			add("status pending なのに、chosen_option %q はファイルを変えない案 (no_change) です (修正フェーズが当てるパッチが無い。直さないなら status: not-fixed にする)", c)
 		}
+		// 1 つの修正で覆う問題は、同じ回答で参照先の案も選ぶ (SKILL.md の手順 1 の「人間の回答の反映」)。
+		// 参照先が選んでいないと、修正フェーズは人間がまだ選んでいない参照先の変更をコミットする。
+		if ok && (pl.Status == "pending" || pl.Status == "done") && op.CoveredBy != nil {
+			ref := *op.CoveredBy
+			for _, other := range plans {
+				if other.ProblemID == ref.ProblemID && other.ProblemID != pl.ProblemID && other.ChosenOption != ref.Option {
+					add("chosen_option %q は %s の案 %q のパッチで覆う案なのに、%s の chosen_option が %q です (1 つの修正で覆う問題は、同じ回答で参照先の案も選ぶ)",
+						c, ref.ProblemID, ref.Option, ref.ProblemID, other.ChosenOption)
+				}
+			}
+		}
 	}
 	return problems
 }
