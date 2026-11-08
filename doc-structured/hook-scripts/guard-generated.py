@@ -55,7 +55,7 @@ def main():
         return error(f"hook の入力を JSON として読めない ({e})。生成したファイルかどうかを判定せずに、編集を実行させる")
     if not isinstance(data, dict):
         return error("hook の入力が JSON のオブジェクトでない。生成したファイルかどうかを判定せずに、編集を実行させる")
-    # 既定値を使うのはキーが無いときだけ。値があって型が違えば (0 や false も)、入力の誤りとして報告する
+    # デフォルト値を使うのはキーが無いときだけ。値があって型が違えば (0 や false も)、入力の誤りとして報告する
     tool_input = data.get("tool_input", {})
     if not isinstance(tool_input, dict):
         return error("hook の入力の tool_input が JSON のオブジェクトでない。生成したファイルかどうかを判定せずに、編集を実行させる")
