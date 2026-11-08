@@ -147,6 +147,20 @@ class CheckHTest(ProjectTestCase):
             '検査 h: モデル loan の name_ja に、改行と " は使えない',
         )
 
+    def test_definition_and_description_must_not_contain_cr(self):
+        # 生成したファイルは改行の CR を LF として読むので、CR を含む文は生成し直した内容と一致しなくなる
+        text = MINIMAL_DOMAIN.replace("definition: 利用者が図書を借りてから返すまでの 1 回の記録。", 'definition: "利用者が図書を\\r借りる記録。"')
+        self.assert_problem(
+            {"docs/domains/01-loans/domain.yaml": text},
+            "docs/domains/01-loans/domain.yaml:6:17: 検査 h: モデル loan の definition に、CR は使えない",
+        )
+        self.setUp()
+        text = MINIMAL_DOMAIN.replace("description: 図書の貸出と返却を扱う。", 'description: "図書の貸出と\\r返却を扱う。"')
+        self.assert_problem(
+            {"docs/domains/01-loans/domain.yaml": text},
+            "docs/domains/01-loans/domain.yaml:2:16: 検査 h: domain の description に、CR は使えない",
+        )
+
     def test_duplicate_names(self):
         self.assert_problem(
             {
