@@ -86,13 +86,14 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | `{{targets}}` | 手順 1 で解決した対象。調査フェーズ: 覆われていない採択の回と `id`。立案フェーズ: `status: investigated` の問題の回と `problem_id`。修正フェーズ: `status: pending` の問題の回と `problem_id` |
 | `{{consider_design_change}}` | 設計・仕様変更を含めて検討するか (`true` / `false`)。N+1 回目以降の立案フェーズなら `true`、それ以外 (調査フェーズ・修正フェーズと、N 回目までの立案フェーズ) は `false`。**N+1 回目以降かどうかを sub-agent に計算させない。** N の決め方は呼び出し元にしか無い |
 | `{{skill_md_path}}` / `{{record_schema_path}}` / `{{project_config_path}}` / `{{stage_references}}` | 読ませる文書の絶対パス (「フェーズと手順・文書の対応」)。**プラグインの展開先の絶対パスで書く。** 依頼文を書くセッションは自分のスキルの配置先 (この SKILL.md を読んだディレクトリ) を知っている。相対パスは sub-agent の作業ディレクトリ (リポジトリ) から解決できない |
+| `{{human_decides_all}}` | すべての問題について人間が決めるか (`true` / `false`)。手順 4 で立案者 C を選んだ回の立案フェーズなら `true`、それ以外は `false`。`true` のとき、立案フェーズは修正方法を決めず、対象のすべての問題について `options` を書いて `status: awaiting-human` にする (規則の SSOT は [SKILL.md](../SKILL.md) の手順 5)。**C を選んだかどうかを sub-agent に判断させない。** 立案者の選択は呼び出し元にしか無い |
 | `{{agent_name}}` | 定義名 (「effort と定義名の対応」)。sub-agent は自分の定義名を知らないので、報告に写させるために書く |
 | `{{stage_prohibitions}}` | 下の「フェーズごとの禁止事項」の該当するフェーズの項目 |
 
 ### 運ばないもの
 
 - **指摘や計画の中身の言い直し。** 記録が SSOT で、sub-agent は記録から読む。依頼文に写すと、写し間違いがフェーズの前提になる。
-- **回数の閾値 N、対象の回が N+1 以上かどうか、立案者の選択の回答。** フェーズが受け取るのは「設計・仕様変更を含めて検討するか」の真偽だけ。
+- **回数の閾値 N、対象の回が N+1 以上かどうか、立案者の選択の回答。** フェーズが受け取るのは「設計・仕様変更を含めて検討するか」と「すべての問題について人間が決めるか」の真偽だけ。
 
 ### フェーズごとの禁止事項
 
@@ -103,7 +104,8 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - `status: awaiting-human` の問題を扱わない (修正を実装せず、記録も書き換えない)。人間に返した判断を代わりに決めない。
 - 指示されたフェーズの前後のフェーズに進まない。
 - sub-agent を入れ子で立てた場合、その結果も検証してから使う。
-- 人間に問えない。人間の判断が要るものは、記録の該当の問題を `status: awaiting-human` にして `options` に案とトレードオフを書き、報告に残す。**ただしフェーズごとの項目が優先する。** 調査フェーズは下のとおり選択待ちにしない。
+- 人間に問えない。人間の判断が要るものは、記録の該当の問題を `status: awaiting-human` にして `options` に案とトレードオフを書き (案ごとに行を分け、行の先頭にラベルを書く)、報告に残す。**ただしフェーズごとの項目が優先する。** 調査フェーズは下のとおり選択待ちにしない。
+- 案のパッチ (`option_patches`) を作らない・書かない。パッチは呼び出し元が作る ([SKILL.md](../SKILL.md) の「案のパッチ」)。そのため、選択待ちにした問題の案の要素が `option_patches` に無いという記録の検査の報告は、呼び出し元がパッチを作るまで出る。**この報告だけなら失敗として扱わず**、報告の「通した関門と結果」にそのまま書く。
 
 調査フェーズ・立案フェーズ:
 
@@ -115,6 +117,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 修正フェーズ:
 
 - 対象 (`{{targets}}`) 以外の問題を直さない。
+- `chosen_option` のある問題は、`approach` の文からではなく、その案のパッチを当てて直す ([SKILL.md](../SKILL.md) の「案のパッチ」の「当て方」)。パッチが当たらないときと、当てた後に検証を通らないときは、「当て方」のとおり `chosen_option` を消して `status: awaiting-human` に戻し、報告の「できなかったこと」に書く。パッチは作り直さない (呼び出し元が作る)。
 - 1 問題 1 コミット。各コミットの前に、設定の `gates` の関門と観点 A〜F を通す (SSOT は committing.md・verification.md)。
 - コミットしたら記録の該当の問題を `status: done`・`sha` に更新する。区切り (全問題の完了、または中断) で、記録のディレクトリが git の追跡内なら記録とサマリをコミットする (分け方の SSOT は record-schema.md のコミット節)。**未コミットの変更を残して返らない。**
 - 手順 8 (報告) と手順 9 (`doc-dag`) を行わない。
@@ -135,6 +138,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - 対象の回: {{round}} (記録の `runs` の要素数)。新しく書く `plans` は、その採択が属する回に置く (別の回の採択を同じ原因で束ねるときは、束ね先の問題に `plan_ref` を書く。規則の SSOT は record-schema.md の `finding_ids` と `plan_ref` の行)。
 - 対象: {{targets}}
 - 設計・仕様変更を含めて検討する: {{consider_design_change}} — この値をそのまま使う。回の番号から自分で判断しない。
+- すべての問題について人間が決める: {{human_decides_all}} — この値をそのまま使う。`true` なら、修正方法を決めず、対象のすべての問題について `options` に案とトレードオフを書いて `status: awaiting-human` にする。
 - 定義名: `{{agent_name}}` — 報告にこの値をそのまま写す。
 
 ## 読む文書 (絶対パス)
@@ -173,7 +177,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 全フェーズに共通:
 
 1. **報告が様式のとおりか** — 項目の不足・様式に無い項目・「不明」の項目。
-2. **記録 YAML を再度読み込み、設定の `triage_check_command` を実行する** (未設定なら実行していないことを報告に書く。[project-config.md](../../review-triage/references/project-config.md) を参照)。
+2. **記録 YAML を再度読み込み、パッチを作る問題があれば作ってから、設定の `triage_check_command` を実行する** (パッチを作るのは、立案フェーズが `status: awaiting-human` にした問題と、修正フェーズでパッチが当たらずに選択待ちに戻った問題。作り方の SSOT は [SKILL.md](../SKILL.md) の「案のパッチ」)。パッチを作る前に実行すると、sub-agent がパッチを書かないことによる報告で失敗する (未設定なら実行していないことを報告に書く。[project-config.md](../../review-triage/references/project-config.md) を参照)。
 3. **モデルの突き合わせ** — 報告の「動いているモデル」が実効モデルの指すモデルと同じか。比べ方の SSOT は [review-invocation.md](../../review-triage-loop/references/review-invocation.md) の「モデルの名前の比べ方」。**一致しなければ人間に報告する** ([review-request.md](../../review-triage/references/review-request.md) の「値で明記し、報告させる」の規則と同じ。sub-agent で変わった値を、依頼どおりの値として報告しないため)。
 4. **effort** — 報告には、使った定義名から導いた effort を書く (「effort と定義名の対応」を逆に引く)。
 
@@ -182,8 +186,8 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | フェーズ | 状態の遷移 | HEAD と作業ツリー |
 | --- | --- | --- |
 | 調査フェーズ | `{{targets}}` の採択がすべて `plans` (`status: investigated`) か `plan_ref` で覆われた。`investigated` に `investigation` がある (検査が報告する)。`investigated` に `approach`・`order` が無い (検査が報告する) | HEAD がフェーズの前と同じ。`git status --porcelain` の差分が記録のディレクトリ (`record_dir`) 配下だけ |
-| 立案フェーズ | `{{targets}}` の `investigated` がすべて `pending` か `awaiting-human` に進んだ。`awaiting-human` に `options` がある (検査が報告する)。`investigated` のまま残った問題があれば、理由が報告の「できなかったこと」にある | 同上 |
-| 修正フェーズ | `{{targets}}` の `pending` が `done` (`sha`) か `done-external` に進んだ。**`done` の各 `sha` が HEAD の履歴にある** (`git merge-base --is-ancestor <sha> HEAD`)。`pending` のまま残った問題があれば、理由が報告にある (区切りでの中断は失敗ではない。次の再開が修正フェーズから続ける) | **作業ツリーに未コミットの変更が無い** (`git status --porcelain` が空)。**最終 HEAD で設定の `gates` を 1 度実行する。** sub-agent がコミットごとに通したと報告していても、呼び出し元は最終状態を自分で確認する。`gates` が未設定なら、実行していないことを報告に書く |
+| 立案フェーズ | `{{targets}}` の `investigated` がすべて `pending` か `awaiting-human` に進んだ。`awaiting-human` に `options` と、呼び出し元が作った `option_patches` がある (検査が報告する)。`investigated` のまま残った問題があれば、理由が報告の「できなかったこと」にある | 同上 |
+| 修正フェーズ | `{{targets}}` の `pending` が `done` (`sha`) か `done-external` に進んだか、パッチが当たらないか当てた後に検証を通らずに `awaiting-human` に戻った (理由が報告の「できなかったこと」にある)。**`done` の各 `sha` が HEAD の履歴にある** (`git merge-base --is-ancestor <sha> HEAD`)。`pending` のまま残った問題があれば、理由が報告にある (区切りでの中断は失敗ではない。次の再開が修正フェーズから続ける) | **作業ツリーに未コミットの変更が無い** (`git status --porcelain` が空)。**最終 HEAD で設定の `gates` を 1 度実行する。** sub-agent がコミットごとに通したと報告していても、呼び出し元は最終状態を自分で確認する。`gates` が未設定なら、実行していないことを報告に書く |
 
 検証が通ったら次のフェーズに進む (調査フェーズの後は、手順 4 の末尾の「立案者の選択」を呼び出し元のセッションで行ってから)。
 
