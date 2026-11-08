@@ -63,31 +63,39 @@ class HeaderTest(unittest.TestCase):
             broken.write_bytes(gh.markdown_line(SOURCE).encode("utf-8") + b"\n\xff\xfe\n")
             self.assertEqual(gh.read_file_header(broken), gh.Header(SOURCE, COMMAND))
 
-    def test_read_file_header_does_not_keep_whole_line_in_memory(self):
-        # LF の無い大きなファイルでも、1 回に読むのは MAX_LINE_BYTES バイトまで
+    def test_read_file_header_reads_only_header_bytes(self):
+        # LF の無い大きなファイルでも、読むのは先頭の HEADER_BYTES バイトまで
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "minified.js"
-            path.write_bytes(b"x" * (gh.MAX_LINE_BYTES * gh.HEADER_LINES * 10))
+            path.write_bytes(b"x" * (gh.HEADER_BYTES * 10))
             read = []
             original = open
 
             def spy(*args, **kwargs):
                 f = original(*args, **kwargs)
-                readline = f.readline
-                f.readline = lambda *a: read.append(len(chunk := readline(*a))) or chunk
+                f_read = f.read
+                f.read = lambda *a: read.append(len(chunk := f_read(*a))) or chunk
                 return f
 
             with mock.patch("builtins.open", spy):
                 self.assertIsNone(gh.read_file_header(path))
-            self.assertLessEqual(max(read), gh.MAX_LINE_BYTES)
+            self.assertLessEqual(sum(read), gh.HEADER_BYTES)
 
-    def test_long_line_before_header_is_counted_as_one_line(self):
-        # MAX_LINE_BYTES を越える行も 1 行として数えるので、その後ろの先頭の 3 行の中の記述は、read_file と同じく見つかる
+    def test_both_functions_judge_from_the_same_header_bytes(self):
+        # 2 つの関数は、先頭の HEADER_BYTES バイトの中の先頭の 3 行で同じく判定する (行の区切りの種類に関わらない)
+        line = gh.hash_line(SOURCE).encode("utf-8")
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "long.md"
-            path.write_bytes(b"a" * (gh.MAX_LINE_BYTES + 1000) + b"\n\n" + gh.hash_line(SOURCE).encode("utf-8") + b"\n")
-            self.assertEqual(gh.read_file_header(path), gh.Header(SOURCE, COMMAND))
-            self.assertEqual(gh.read_file(path).header, gh.Header(SOURCE, COMMAND))
+            path = Path(tmp) / "x.md"
+            for long_line, separator in (
+                (b"a" * 10, b"\n"),
+                (b"a" * 10, b"\r"),
+                (b"a" * 10, "\u2028".encode("utf-8")),
+                (b"a" * gh.HEADER_BYTES, b"\n"),
+                (b"a" * gh.HEADER_BYTES, b"\r"),
+            ):
+                with self.subTest(length=len(long_line), separator=separator):
+                    path.write_bytes(long_line + separator + line + b"\n")
+                    self.assertEqual(gh.read_file_header(path), gh.read_file(path).header)
 
     def test_read_file_header_raises_when_file_cannot_be_read(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -6,6 +6,7 @@
   frontmatter のある Markdown (frontmatter の中の 2 行目)・YAML (1 行目)・シェルスクリプト (shebang の次の 2 行目):
     # doc-structured:generated 生成元: <パス> コマンド: <コマンド> (このファイルを直接編集せず、生成元を直して生成し直す)
 判定の規則 (バージョンをまたいで変えない): 先頭の 3 行の中に、HTML_PREFIX か HASH_PREFIX で始まる行があれば、生成したファイル。
+先頭の 3 行は、ファイルの先頭の HEADER_BYTES バイトの中で数える (それより後ろは読まない)。
 生成したファイルを読むときは、どの処理も関数 decode の読み方 (UTF-8 として読めないバイトは置き換え、先頭の BOM を除き、改行の CRLF と CR を LF にする) で読む。
 生成元は、リポジトリのルートからの相対パス (複数の YAML から作るときはディレクトリで、末尾に「/」)。
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-docs.md)。
@@ -21,8 +22,8 @@ MARKER = "doc-structured:generated"
 HTML_PREFIX = f"<!-- {MARKER} "
 HASH_PREFIX = f"# {MARKER} "
 HEADER_LINES = 3
-# 関数 read_file_header が 1 行についてメモリに保持する上限のバイト数。LF の無い大きなファイルの全体をメモリに保持しないため
-MAX_LINE_BYTES = 4096
+# 先頭の記述を探す範囲のバイト数。read_file と read_file_header が同じ範囲を同じ読み方で読み、LF の無い大きなファイルの全体を読まないため
+HEADER_BYTES = 4096
 NOTE = "(このファイルを直接編集せず、生成元を直して生成し直す)"
 GENERATE_COMMAND = "bin/doc-structured generate"
 # 生成した .gitattributes の直し方。内容は YAML ではなく生成したファイルの一覧から作るので、YAML を直す案内をしない。
@@ -114,28 +115,16 @@ def read_file(path: str | Path) -> FileContent:
     """ファイルの全体を decode の読み方で読む。ファイルを読めないときの OSError は、呼び出し元に渡す。"""
     raw = Path(path).read_bytes()
     text = decode(raw)
-    return FileContent(text=text, header=read_header(text), exact=_is_exact(raw))
+    return FileContent(text=text, header=read_header(decode(raw[:HEADER_BYTES])), exact=_is_exact(raw))
 
 
 def read_file_header(path: str | Path) -> Header | None:
-    """ファイルの先頭の HEADER_LINES 行を decode の読み方で読み、先頭の記述を返す。生成したファイルでなければ None。
+    """ファイルの先頭の HEADER_BYTES バイトだけを decode の読み方で読み、先頭の記述を返す。生成したファイルでなければ None。
 
-    全体をメモリに置かずに判定する処理 (プラグインの hook (hook-scripts/guard-generated.py) と、generate の生成したファイルの一覧) が使う。
-    行の数え方は関数 read_file と同じ (LF で区切る)。1 行は先頭の MAX_LINE_BYTES バイトだけをメモリに保持し、残りは読み捨てる
-    (先頭の記述の行はそれより短いので、判定は read_file と変わらない)。
+    全体を読まずに判定する処理 (プラグインの hook (hook-scripts/guard-generated.py) と、generate の生成したファイルの一覧) が使う。
+    判定に使うバイト列と読み方は関数 read_file と同じなので、結果も同じになる。
     ファイルを読めないときの OSError は、呼び出し元に渡す。
     """
     with open(path, "rb") as f:
-        head = b"".join(_read_line(f) for _ in range(HEADER_LINES))
+        head = f.read(HEADER_BYTES)
     return read_header(decode(head))
-
-
-def _read_line(f) -> bytes:
-    """バイナリモードのファイルから 1 行 (LF まで) を読み、MAX_LINE_BYTES バイトを越える部分は読み捨てる。"""
-    line = f.readline(MAX_LINE_BYTES)
-    if len(line) < MAX_LINE_BYTES or line.endswith(b"\n"):
-        return line
-    while rest := f.readline(MAX_LINE_BYTES):
-        if rest.endswith(b"\n"):
-            return line + b"\n"
-    return line
