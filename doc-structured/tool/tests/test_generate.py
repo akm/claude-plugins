@@ -97,7 +97,8 @@ class GenerateTest(ProjectTestCase):
         )
         self.assertIn(
             "docs/.gitattributes: 手で書いたファイルが、生成するファイルの場所にある。"
-            "手で書いた行をリポジトリのルートの .gitattributes に移してから、このファイルを消す",
+            "手で書いた行を、パターンをリポジトリのルートからの相対に書き換えて (docs/.gitattributes のパターンは docs/ からの相対)、"
+            "リポジトリのルートの .gitattributes に移してから、このファイルを消す",
             result.stderr,
         )
         self.assertIn("手で書いたファイルが 2 件あるので、何も生成しなかった", result.stderr)

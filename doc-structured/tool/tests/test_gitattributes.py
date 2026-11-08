@@ -73,7 +73,7 @@ class GitattributesTest(ProjectTestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(
             f"{GITATTRIBUTES_PATH}: 検査 a: 生成し直した内容と違う。このファイルを直接編集せず、bin/doc-structured generate を実行する。"
-            "内容は生成したファイルの一覧から作る。手で属性を足すときは、リポジトリのルートの .gitattributes に書く",
+            "内容は生成したファイルの一覧から作る。手で属性を足すときは、リポジトリのルートの .gitattributes に、リポジトリのルートからの相対のパターンで書く",
             result.stdout,
         )
         self.assertNotIn("YAML を直して", result.stdout)
