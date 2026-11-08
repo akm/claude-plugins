@@ -83,7 +83,7 @@ description: review-triage が採択したレビュー指摘を、原因で束�
 
 1. **残った一時的な worktree を片付ける。** `git worktree list` で、パスに `review-triage-fix-patch` を含む worktree が残っていないかを確認する。残っていれば `git worktree remove --force <パス>` で消し、`git worktree prune` も実行する。前の起動が途中で中断して残したものである。消した worktree があれば報告 (手順 8) に書く。
 2. **一時的な worktree を作る。** `mktemp -d "${TMPDIR:-/tmp}/review-triage-fix-patch.XXXXXX"` で OS の一時ディレクトリ (環境変数 `TMPDIR`、無ければ `/tmp`) にディレクトリを作り、`git worktree add --detach <そのディレクトリ> HEAD` で HEAD と同じ内容の作業ツリーにする。リポジトリの外なので、`.gitignore` に関係なく作れる。
-3. **案ごとに、その worktree の中で案の文のとおりにファイルを変え、`git -C <worktree> add -A` の後の `git -C <worktree> diff --cached` の出力をパッチにする。** 新しく作ったファイルも差分に含めるため、`add -A` してから取る。パッチの文字列を直接書かない (行数の見出しや前後の行を誤りやすい)。次の案に進む前に、`git -C <worktree> reset --hard HEAD` と `git -C <worktree> clean -fd` で HEAD の内容に戻す。`base` には HEAD の短縮 SHA を書く。
+3. **案ごとに、その worktree の中で案の文のとおりにファイルを変え、`git -C <worktree> add -A` の後の `git -C <worktree> diff --cached --binary` の出力をパッチにする。** 新しく作ったファイルも差分に含めるため、`add -A` してから取る。`--binary` を付けるのは、バイナリファイルの変更も内容ごと取るためで、付けないとバイナリファイルの差分が内容の無い行 (`Binary files … differ`) になり、`git apply` が当てられない。パッチの文字列を直接書かない (行数の見出しや前後の行を誤りやすい)。次の案に進む前に、`git -C <worktree> reset --hard HEAD` と `git -C <worktree> clean -fd` で HEAD の内容に戻す。`base` には HEAD の短縮 SHA を書く。
 4. **一時的な worktree を消す** (`git worktree remove --force <パス>`)。パッチを作り終えるたびに消す。
 5. **記録の `option_patches` に、案ごとに書く。**
 
