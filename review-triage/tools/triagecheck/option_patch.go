@@ -4,9 +4,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // recordOptionPatch は plans[].option_patches の 1 要素。patch・no_change・covered_by のどれか 1 つを持つ。
@@ -210,6 +213,47 @@ func recordPatchRefProblems(self string, ref recordPatchRef, plans []recordPlan)
 		return append(problems, fmt.Sprintf("covered_by の案 %q は、問題 %s の option_patches にありません", ref.Option, ref.ProblemID))
 	}
 	return append(problems, fmt.Sprintf("covered_by の問題 %q は同じ回の plans にありません", ref.ProblemID))
+}
+
+// recordPatchCRProblems は、記録のファイルの生のバイト列で、patch のブロックの行に CR があれば報告する。
+// YAML は読み込むときに CR を LF にそろえるので、行末が CRLF のファイルのパッチは、読み込んだ後の値からは
+// 見えないまま CR を失い、当たらなくなる (record-schema.md の patch の行)。patch 以外の値は、CR が消えても
+// 中身が変わらないので見ない。
+func recordPatchCRProblems(f string, root *yaml.Node, data []byte) []string {
+	lines := bytes.Split(data, []byte("\n"))
+	var problems []string
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n.Kind == yaml.MappingNode {
+			for i := 0; i+1 < len(n.Content); i += 2 {
+				k, v := n.Content[i], n.Content[i+1]
+				if k.Value != "patch" || v.Kind != yaml.ScalarNode {
+					continue
+				}
+				// ブロック (|) の値の行は、インジケータの行 (v.Line) の次の行から、値の行の数だけ続く。
+				first, count := v.Line+1, strings.Count(v.Value, "\n")
+				if !strings.HasSuffix(v.Value, "\n") {
+					count++
+				}
+				if v.Style != yaml.LiteralStyle && v.Style != yaml.FoldedStyle {
+					first, count = v.Line, 1
+				}
+				for ln := first; ln < first+count && ln-1 < len(lines); ln++ {
+					if bytes.ContainsRune(lines[ln-1], '\r') {
+						problems = append(problems, fmt.Sprintf(
+							"%s:%d: patch に CR があります。YAML は読み込むときに CR を消すので、行末が CRLF のファイルのパッチは記録に保てない (その案は、パッチを作れない案として扱う)",
+							f, ln))
+						break
+					}
+				}
+			}
+		}
+		for _, c := range n.Content {
+			walk(c)
+		}
+	}
+	walk(root)
+	return problems
 }
 
 // renderOptionPatches は option_patches を持つ問題の小節「#### <問題> の案」を書く。要素ごとに、options の

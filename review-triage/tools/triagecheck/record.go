@@ -429,6 +429,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 		return []string{fmt.Sprintf("%s: 記録が空です (runs がありません)", f)}, nil
 	}
 	problems := recordLineCommentProblems(f, &root)
+	problems = append(problems, recordPatchCRProblems(f, &root, data)...)
 	problems = append(problems, recordUnknownKeyProblems(f, root.Content[0])...)
 	var doc recordDoc
 	if err := root.Decode(&doc); err != nil {

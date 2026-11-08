@@ -318,3 +318,25 @@ func TestReviewTriageSummaryNoOptionPatches(t *testing.T) {
 		t.Fatalf("option_patches の無い記録に案の小節が出ている:\n%s", summary)
 	}
 }
+
+// YAML は読み込むときに CR を LF にそろえるので、patch のブロックの行にある CR は、読み込んだ後の値からは
+// 見えないまま消える。記録のファイルの生のバイト列で見つけて報告する。patch 以外の値の CR は、消えても中身が
+// 変わらないので報告しない。
+func TestReviewTriageRecordOptionPatchCR(t *testing.T) {
+	t.Run("patch のブロックの行の CR を報告する", func(t *testing.T) {
+		src := optionReplace(t, optionRecordYAML, "-再開のときは、調査からやり直す。\n", "-再開のときは、調査からやり直す。\r\n")
+		found := false
+		for _, p := range optionPatchProblems(src) {
+			found = found || strings.Contains(p, "patch に CR があります")
+		}
+		if !found {
+			t.Fatalf("patch の CR が報告されない: %v", optionPatchProblems(src))
+		}
+	})
+	t.Run("patch 以外の値の CR は報告しない", func(t *testing.T) {
+		src := optionReplace(t, optionRecordYAML, "        cause: 再開の手順を変えたとき、説明を読み直さなかった\n", "        cause: 再開の手順を変えたとき、説明を読み直さなかった\r\n")
+		if problems := optionPatchProblems(src); len(problems) != 0 {
+			t.Fatalf("patch 以外の値の CR で問題が出た: %v", problems)
+		}
+	})
+}
