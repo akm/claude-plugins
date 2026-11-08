@@ -263,21 +263,22 @@ def generated_files(root: Path) -> dict[str, generated_header.Header]:
 HANDWRITTEN_MESSAGE = "手で書いたファイルが、生成するファイルの場所にある"
 
 
-def is_handwritten(path: Path) -> bool:
-    """手で書いたファイルか。先頭の記述が無く、空白と BOM (U+FEFF) 以外の文字があるファイルを、手で書いたファイルとする。
+def is_handwritten(content: generated_header.FileContent) -> bool:
+    """generated_header.read_file で読んだファイルが、手で書いたファイルか。
 
+    先頭の記述が無く、空白と BOM (U+FEFF) 以外の文字があるファイルを、手で書いたファイルとする。
     空のファイルと、空白と BOM だけのファイル (生成したファイルが中身ごと消えたものなど) は、失う内容が無いので含めない。
     """
-    if not path.is_file():
-        return False
-    # ファイルを 1 回だけ読み、同じ文字列で先頭の記述と空白を判定する
-    text = path.read_text(encoding="utf-8", errors="replace")
-    return generated_header.read_header(text) is None and text.replace("\ufeff", "").strip() != ""
+    return content.header is None and not content.is_blank
 
 
 def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
     """生成するファイルの場所にある、手で書いたファイル (関数 is_handwritten) の、リポジトリのルートからの相対パス。"""
-    return [relative for relative in outputs if is_handwritten(root / relative)]
+    return [
+        relative
+        for relative in outputs
+        if (root / relative).is_file() and is_handwritten(generated_header.read_file(root / relative))
+    ]
 
 
 class HandwrittenFilesError(Exception):
@@ -308,7 +309,8 @@ def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[
     written: list[str] = []
     for relative, content in outputs.items():
         path = root / relative
-        if path.is_file() and path.read_text(encoding="utf-8") == content:
+        # 読まずにバイト列どうしで比べる (BOM や UTF-8 として読めないバイトがあれば、違うので書き直す)
+        if path.is_file() and path.read_bytes() == content.encode("utf-8"):
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="\n") as f:

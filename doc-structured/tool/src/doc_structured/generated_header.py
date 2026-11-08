@@ -6,6 +6,7 @@
   frontmatter のある Markdown (frontmatter の中の 2 行目)・YAML (1 行目)・シェルスクリプト (shebang の次の 2 行目):
     # doc-structured:generated 生成元: <パス> コマンド: <コマンド> (このファイルを直接編集せず、生成元を直して生成し直す)
 判定の規則 (バージョンをまたいで変えない): 先頭の 3 行の中に、HTML_PREFIX か HASH_PREFIX で始まる行があれば、生成したファイル。
+生成したファイルを読むときは、どの処理も関数 decode の読み方 (UTF-8 として読めないバイトは置き換え、先頭の BOM を除く) で読む。
 生成元は、リポジトリのルートからの相対パス (複数の YAML から作るときはディレクトリで、末尾に「/」)。
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-docs.md)。
 sub-issue 3 の hook も、このモジュールで生成したファイルかどうかを判定する。
@@ -60,13 +61,42 @@ def read_header(text: str) -> Header | None:
     return None
 
 
-def read_file_header(path: str | Path) -> Header | None:
-    """ファイルの先頭の HEADER_LINES 行を読み、先頭の記述を返す。生成したファイルでなければ None。
+def decode(raw: bytes) -> str:
+    """生成したファイルのバイト列を文字列にする。生成したファイルの読み方は、この関数だけが決める。
 
-    ツールの generate と、プラグインの hook (hook-scripts/guard-generated.py) の両方がこの関数で判定する。
-    文字コードは UTF-8 で、読めないバイトは置き換えて読む (判定に使うのは決まった ASCII の接頭辞だけのため)。
+    UTF-8 として読めないバイトは置き換え (判定に使うのは決まった ASCII の接頭辞だけのため)、
+    先頭の BOM (U+FEFF。エディタが保存のときに付けることがある) を除く。
+    """
+    return raw.decode("utf-8", errors="replace").removeprefix("\ufeff")
+
+
+@dataclass(frozen=True)
+class FileContent:
+    """関数 read_file で読んだファイル。"""
+
+    text: str  # decode で読んだ内容
+    header: Header | None  # 先頭の記述。生成したファイルでなければ None
+    exact: bool  # 読んだバイト列が、text を UTF-8 で書いたものと同じか (BOM の除去も、バイトの置き換えも無かったか)
+
+    @property
+    def is_blank(self) -> bool:
+        """空白だけ (空を含む) か。"""
+        return self.text.strip() == ""
+
+
+def read_file(path: str | Path) -> FileContent:
+    """ファイルの全体を decode の読み方で読む。ファイルを読めないときの OSError は、呼び出し元に渡す。"""
+    raw = Path(path).read_bytes()
+    text = decode(raw)
+    return FileContent(text=text, header=read_header(text), exact=raw == text.encode("utf-8"))
+
+
+def read_file_header(path: str | Path) -> Header | None:
+    """ファイルの先頭の HEADER_LINES 行を decode の読み方で読み、先頭の記述を返す。生成したファイルでなければ None。
+
+    全体を読まずに判定する処理 (プラグインの hook (hook-scripts/guard-generated.py) と、generate の生成したファイルの一覧) が使う。
     ファイルを読めないときの OSError は、呼び出し元に渡す。
     """
-    with open(path, encoding="utf-8", errors="replace") as f:
-        head = "".join(f.readline() for _ in range(HEADER_LINES))
-    return read_header(head)
+    with open(path, "rb") as f:
+        head = b"".join(f.readline() for _ in range(HEADER_LINES))
+    return read_header(decode(head))

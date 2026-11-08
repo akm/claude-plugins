@@ -125,6 +125,21 @@ class GenerateTest(ProjectTestCase):
                 self.assertIn(f"書いた: {relative}", result.stdout)
                 self.assertIsNotNone(generated_files(self.project).get(relative))
 
+    def test_generated_file_with_bom_or_invalid_bytes_is_regenerated(self):
+        # BOM 付きで保存された生成したファイルと、UTF-8 として読めないバイトを含む生成したファイルは、
+        # 生成したファイルとして扱い (一覧に入り、手で書いたファイルとしない)、generate が書き直す
+        self.copy_sample()
+        glossary = self.project / "docs/glossary.md"
+        original = glossary.read_bytes()
+        for broken in (b"\xef\xbb\xbf" + original, original + b"\xff\n"):
+            with self.subTest(head=broken[:3]):
+                glossary.write_bytes(broken)
+                self.assertIn("docs/glossary.md", generated_files(self.project))
+                result = self.run_tool("generate")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("書いた: docs/glossary.md", result.stdout)
+                self.assertEqual(glossary.read_bytes(), original)
+
     def test_write_outputs_refuses_to_overwrite_handwritten_file(self):
         self.copy_sample()
         self.write("docs/glossary.md", "# 手で書いた用語集\n")

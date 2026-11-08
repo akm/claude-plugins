@@ -51,15 +51,25 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
         if not path.is_file():
             problems.append(Problem("a", relative, f"生成するはずのファイルが無い。{header.command} を実行する"))
             continue
-        if is_handwritten(path):
+        content = generated_header.read_file(path)
+        if is_handwritten(content):
             problems.append(Problem("a", relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}"))
             continue
-        actual = path.read_text(encoding="utf-8", errors="replace")
-        if actual == expected:
+        if content.text == expected and content.exact:
             continue
-        if generated_header.read_header(actual) is None:
+        if content.header is None:
             # 先頭の記述が無く、手で書いたファイルでもない (空白と BOM だけの) ファイル。YAML の修正は要らない
             problems.append(Problem("a", relative, f"生成したファイルの中身が無い。{header.command} を実行する"))
+            continue
+        actual = content.text
+        if actual == expected:
+            # 読んだ内容は同じで、BOM か UTF-8 として読めないバイトだけが違う。YAML の修正は要らない
+            problems.append(
+                Problem(
+                    "a", relative,
+                    f"生成し直した内容と違う (BOM か、UTF-8 として読めないバイトがある)。{header.command} を実行する",
+                )
+            )
             continue
         diff = "".join(
             difflib.unified_diff(

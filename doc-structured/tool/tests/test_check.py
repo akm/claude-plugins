@@ -101,6 +101,27 @@ class CheckTest(ProjectTestCase):
         self.assertNotIn("手で書いたファイル", result.stdout)
         self.assertNotIn("YAML を直して", result.stdout)
 
+    def test_check_a_reports_bom_and_invalid_bytes_in_generated_file(self):
+        path = self.project / MODELS
+        original = path.read_bytes()
+        path.write_bytes(b"\xef\xbb\xbf" + original)
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            f"{MODELS}: 検査 a: 生成し直した内容と違う (BOM か、UTF-8 として読めないバイトがある)。bin/doc-structured generate を実行する",
+            result.stdout,
+        )
+        path.write_bytes(original + b"\xff\n")
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"{MODELS}: 検査 a: 生成し直した内容と違う。", result.stdout)
+        # 案内どおりに generate を実行すると直る
+        generate = subprocess.run(
+            [PYTHON, "-m", "doc_structured", "generate"], cwd=self.project, env=clean_env(), capture_output=True, text=True
+        )
+        self.assertEqual(generate.returncode, 0, generate.stderr)
+        self.assertEqual(self.run_check("--only", "a").returncode, 0)
+
     def test_check_h_failure_skips_a_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")
         result = self.run_check()

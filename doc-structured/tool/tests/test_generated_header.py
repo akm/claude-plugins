@@ -67,6 +67,31 @@ class HeaderTest(unittest.TestCase):
             with self.assertRaises(OSError):
                 gh.read_file_header(Path(tmp) / "missing.md")
 
+    def test_bom_and_invalid_bytes_are_read_the_same_way_everywhere(self):
+        line = gh.markdown_line(SOURCE).encode("utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp) / "plain.md"
+            plain.write_bytes(line + b"\n# x\n")
+            bom = Path(tmp) / "bom.md"
+            bom.write_bytes(b"\xef\xbb\xbf" + line + b"\n# x\n")
+            broken = Path(tmp) / "broken.md"
+            broken.write_bytes(line + b"\n# x\xff\n")
+            bom_only = Path(tmp) / "bom-only.md"
+            bom_only.write_bytes(b"\xef\xbb\xbf\n")
+            # 先頭の BOM と読めないバイトは、先頭の記述の判定に影響しない (先頭だけ読む関数も、全体を読む関数も同じ)
+            for path in (plain, bom, broken):
+                with self.subTest(file=path.name):
+                    self.assertEqual(gh.read_file_header(path), gh.Header(SOURCE, COMMAND))
+                    self.assertEqual(gh.read_file(path).header, gh.Header(SOURCE, COMMAND))
+            # 読んだまま正確かは、BOM の除去とバイトの置き換えがあったかで決まる
+            self.assertTrue(gh.read_file(plain).exact)
+            self.assertFalse(gh.read_file(bom).exact)
+            self.assertFalse(gh.read_file(broken).exact)
+            self.assertEqual(gh.read_file(bom).text, gh.read_file(plain).text)
+            # BOM だけのファイルは空白だけのファイルとして扱う
+            self.assertTrue(gh.read_file(bom_only).is_blank)
+            self.assertIsNone(gh.read_file(bom_only).header)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -77,6 +77,11 @@ class GuardGeneratedHookTest(ProjectTestCase):
         )
         self.assert_denied(self.run_hook("Write", str(path)), "docs/domains/02-loans/")
 
+    def test_denies_generated_file_saved_with_bom(self):
+        path = self.project / MODELS
+        path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+        self.assert_denied(self.run_hook("Edit", str(path)), "docs/domains/02-loans/")
+
     def test_relative_path_is_resolved_from_cwd(self):
         self.assert_denied(self.run_hook("Edit", MODELS), "docs/domains/02-loans/")
         self.assert_allowed(self.run_hook("Edit", HANDWRITTEN))
