@@ -37,7 +37,7 @@ bin/doc-structured version
 | --- | --- |
 | `doc-structured version` | ツールのバージョンを表示する |
 | `doc-structured --version` | 同じ。設定ファイルは読まない |
-| `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く中身のあるファイル) があれば、何も書かず、終了コード 1 で終了する |
+| `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する |
 | `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
 
 生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・h (YAML の形式と参照先)・i (YAML の参照の向き) です。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
