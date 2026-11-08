@@ -272,15 +272,6 @@ def is_handwritten(content: generated_header.FileContent) -> bool:
     return content.header is None and not content.is_blank
 
 
-def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
-    """生成するファイルの場所にある、手で書いたファイル (関数 is_handwritten) の、リポジトリのルートからの相対パス。"""
-    return [
-        relative
-        for relative in outputs
-        if (root / relative).is_file() and is_handwritten(generated_header.read_file(root / relative))
-    ]
-
-
 class HandwrittenFilesError(Exception):
     """生成するファイルの場所に手で書いたファイルがあるので、何も書かなかったことを表す。"""
 
@@ -306,14 +297,18 @@ def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[
     内容が同じファイルは書かない。生成するファイルの場所に手で書いたファイルがあれば、何も書かずに
     HandwrittenFilesError を送出する (呼び出し元が、そのパスの配列から利用者にエラーを伝える)。
     """
-    handwritten = handwritten_at_outputs(root, outputs)
+    # 生成するファイルの場所にある今のファイルを 1 回だけ読み、手で書いたファイルの判定と書く前の比較の両方に使う
+    existing = {
+        relative: generated_header.read_file(root / relative) for relative in outputs if (root / relative).is_file()
+    }
+    handwritten = [relative for relative, current in existing.items() if is_handwritten(current)]
     if handwritten:
         raise HandwrittenFilesError(handwritten)
     written: list[str] = []
     for relative, content in outputs.items():
         path = root / relative
         # 検査 a と同じ判定で比べる (改行の違いだけなら書かず、BOM や UTF-8 として読めないバイトがあれば上書きする)
-        if path.is_file() and generated_header.read_file(path).matches(content):
+        if relative in existing and existing[relative].matches(content):
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="\n") as f:
