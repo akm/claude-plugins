@@ -97,8 +97,9 @@ class CheckTest(ProjectTestCase):
         self.write(MODELS, "")
         result = self.run_check("--only", "a")
         self.assertEqual(result.returncode, 1)
-        self.assertIn(f"{MODELS}: 検査 a: 生成し直した内容と違う。", result.stdout)
+        self.assertIn(f"{MODELS}: 検査 a: 生成したファイルの中身が無い。bin/doc-structured generate を実行する", result.stdout)
         self.assertNotIn("手で書いたファイル", result.stdout)
+        self.assertNotIn("YAML を直して", result.stdout)
 
     def test_check_h_failure_skips_a_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")

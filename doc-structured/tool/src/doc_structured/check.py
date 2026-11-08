@@ -54,8 +54,12 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
         if is_handwritten(path):
             problems.append(Problem("a", relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}"))
             continue
-        actual = path.read_text(encoding="utf-8")
+        actual = path.read_text(encoding="utf-8", errors="replace")
         if actual == expected:
+            continue
+        if generated_header.read_header(actual) is None:
+            # 先頭の記述が無く、手で書いたファイルでもない (空白と BOM だけの) ファイル。YAML の修正は要らない
+            problems.append(Problem("a", relative, f"生成したファイルの中身が無い。{header.command} を実行する"))
             continue
         diff = "".join(
             difflib.unified_diff(
