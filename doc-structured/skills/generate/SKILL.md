@@ -1,0 +1,29 @@
+---
+name: generate
+description: プラグイン doc-structured の構成で、ドメインの YAML (docs/domains/ の下) から、モデルの文書・未分類のアプリケーション用語の文書・用語の索引を生成し直す。「文書を生成して」「YAML を直したので生成し直して」「doc-structured:generate を実行して」のような依頼や、スキル doc-structured:check の検査 a が失敗したときに使う。
+---
+
+# doc-structured:generate: 生成したファイルを作り直す
+
+ドメインの YAML から、生成したファイル (ドメインごとの `README.md`・`models.md`・`unclassified_app_terms.md`・`terms.md` と、全体の `docs/glossary.md`) を作り直す。形式と規則の SSOT (single source of truth。ある事実を定めている唯一の記述) は、プラグインの規則の文書 [doc-structured-domains.md](../../rules/doc-structured-domains.md) と [doc-structured-docs.md](../../rules/doc-structured-docs.md)。
+
+生成したファイルは手で直さない。直すときは生成元の YAML を直してから、このスキルを実行する。
+
+## 手順
+
+1. **前置き**: プロジェクトのルートで、次のコマンドを実行する。出力があれば、その 1 行をそのまま利用者に伝えてから続ける。終了コードが 1 なら、標準エラー出力の文を利用者に伝えて中断する。
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/plugin-version-notice"
+   ```
+
+2. **生成する**: プロジェクトのルートで `bin/doc-structured generate` を実行する。
+3. **終了コードが 0 のとき**: 出力の「書いた」「消した」のファイルの一覧を、そのまま利用者に伝える。「すべて最新だった」なら、そう伝える。生成したファイルをコミットするかどうかは、利用者の指示に従う。
+4. **終了コードが 1 のとき**: YAML に誤りがあり、ツールは何も生成していない。出力の誤り (「パス:行:列: 検査 h: メッセージ」の形) を一覧にして利用者に伝える。YAML をどう直すか (名前・日本語名・定義・参照先) は内容の判断なので、このスキルは決めない。誤りごとに直し方の候補を示して利用者に質問し、回答のとおりに YAML を直してから、手順 2 に戻る。
+5. **そのほかの終了コード**: 出力をそのまま利用者に伝えて中断する。
+
+## このスキルがしないこと
+
+- 生成したファイルを手で直すこと。
+- YAML の内容 (名前・定義・参照先) を、利用者に質問せずに決めること。
+- 検査。検査はスキル `doc-structured:check` が行う。
