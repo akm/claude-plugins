@@ -16,6 +16,8 @@ PLUGIN_DIR = TOOL_DIR.parent
 REPO_ROOT = PLUGIN_DIR.parent
 BIN_SCRIPT = PLUGIN_DIR / "bin" / "doc-structured"
 CONFIG_RELATIVE_PATH = Path(".claude/akm-claude-plugins/doc-structured/config.yaml")
+# 架空の題材「図書館の貸出」のサンプルのプロジェクト。ドメインの YAML と、生成したファイル (コミット済み) を持つ
+SAMPLE_PROJECT = TESTS_DIR / "fixtures" / "library-loans"
 
 # 架空の題材の設定。コメント付きで、version の行は決まった形
 SAMPLE_CONFIG = """\
@@ -45,6 +47,19 @@ class ProjectTestCase(unittest.TestCase):
 
     def write_config(self, text: str = SAMPLE_CONFIG, project: Path | None = None) -> Path:
         path = (project or self.project) / CONFIG_RELATIVE_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def copy_sample(self) -> Path:
+        """サンプルのプロジェクトを、一時ディレクトリの self.project にコピーする。"""
+        shutil.rmtree(self.project)
+        shutil.copytree(SAMPLE_PROJECT, self.project)
+        return self.project
+
+    def write(self, relative: str, text: str) -> Path:
+        """self.project の下にファイルを書く。"""
+        path = self.project / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         return path

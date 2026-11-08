@@ -1,0 +1,14 @@
+# 予約のモデル。貸出 (親のディレクトリの domain.yaml) から参照されるので、サブディレクトリに置く
+models:
+  reservation:
+    name_ja: 予約
+    definition: 貸出中の図書が返ったときに、次に借りる権利を取っておく記録。
+    attributes:
+      book:
+        name_ja: 予約図書
+        definition: 予約した図書。
+        refers_to: d-catalog-m-book
+      previous:
+        name_ja: 前の予約
+        definition: 同じ図書について、この予約の 1 つ前の予約。
+        refers_to: d-loans-m-reservation

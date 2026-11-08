@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""スキルに共通する前置き: インストール済みのプラグインのバージョンと、プロジェクトの設定の version を比べる。
+
+  - 同じなら、何も出力せず終了コード 0 で終了する
+  - 違えば、そのことを 1 行で標準出力に書き、終了コード 0 で終了する (スキルはその 1 行を伝えてから作業を続ける)
+  - 設定ファイルが無い・version の行が無いときは、エラーを標準エラー出力に書き、終了コード 1 で終了する
+    (ツールを実行しても同じエラーになるため、スキルはそのエラーを伝えて止まる)
+
+プラグインのバージョンは、このスクリプトのディレクトリの親 (プラグインのルート) の .claude-plugin/plugin.json から読む。
+設定ファイル .claude/akm-claude-plugins/doc-structured/config.yaml は、カレントディレクトリから親へ向かって探す
+(ツール doc-structured と同じ)。version は、スクリプト bin/doc-structured と同じく「version: X.Y.Z」の形の行を
+文字列の一致で取り出す。Python 3.12 以上の標準ライブラリだけを使う (プラグインのインストールだけで動くように)。
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+CONFIG_RELATIVE_PATH = Path(".claude/akm-claude-plugins/doc-structured/config.yaml")
+VERSION_LINE_RE = re.compile(r"^version: (\d+\.\d+\.\d+)$", re.MULTILINE)
+
+
+def main() -> int:
+    plugin_json = Path(__file__).resolve().parent.parent / ".claude-plugin" / "plugin.json"
+    plugin_version = json.loads(plugin_json.read_text(encoding="utf-8"))["version"]
+
+    start = Path.cwd().resolve()
+    config = next(
+        (d / CONFIG_RELATIVE_PATH for d in (start, *start.parents) if (d / CONFIG_RELATIVE_PATH).is_file()), None
+    )
+    if config is None:
+        print(
+            f"doc-structured: 設定ファイル {CONFIG_RELATIVE_PATH} が見つからない ({start} から親のディレクトリへ向かって探した)",
+            file=sys.stderr,
+        )
+        return 1
+    versions = VERSION_LINE_RE.findall(config.read_text(encoding="utf-8"))
+    if len(versions) != 1:
+        print(f"doc-structured: {config} には「version: X.Y.Z」の形の行が 1 行だけ要る (見つかったのは {len(versions)} 行)", file=sys.stderr)
+        return 1
+
+    if versions[0] != plugin_version:
+        print(
+            f"プラグイン doc-structured は {plugin_version}、このプロジェクトの設定の version は {versions[0]} です。"
+            "スキルの説明とツールの振る舞いが違う場合があります。"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

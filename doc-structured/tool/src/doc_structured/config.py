@@ -37,6 +37,11 @@ class Config:
     path: Path
     version: str
 
+    @property
+    def root(self) -> Path:
+        """リポジトリのルート (設定ファイルのディレクトリ .claude/ の親)。"""
+        return self.path.parents[len(CONFIG_RELATIVE_PATH.parts) - 1]
+
 
 def find_config(start: Path) -> Path:
     """start (ふつうはカレントディレクトリ) から親へ向かって設定ファイルを探す。"""

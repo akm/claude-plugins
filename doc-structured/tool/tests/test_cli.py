@@ -40,9 +40,9 @@ class CliTest(ProjectTestCase):
 
     def test_unknown_subcommand_exits_with_2(self):
         self.write_config()
-        result = self.run_tool("generate")
+        result = self.run_tool("no-such-command")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("generate", result.stderr)
+        self.assertIn("no-such-command", result.stderr)
         self.assertEqual(result.stdout, "")
 
     def test_no_subcommand_exits_with_2(self):

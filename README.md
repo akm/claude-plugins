@@ -15,6 +15,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 | [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な表現を、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに作業を継続したいときに使う) |
+| [doc-structured](doc-structured/README.md) | アプリケーションの文書を、列挙できる事実は YAML に書いて人が読む Markdown を生成し、生成物と参照を検査する構成で書く (作成中) |
 
 ## 使い方
 
@@ -218,6 +219,15 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── hooks/hooks.json
 │   ├── hook-scripts/             # 引き継ぎ文の保存先を貼ったときに再開を促す
 │   ├── tests/                     # python3 -m unittest discover -s session-handoff/tests
+│   └── README.md
+├── doc-structured/               # skill 型 + 同梱ツール (作成中)
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/generate/          # YAML から文書を生成し直す
+│   ├── skills/check/             # 文書を検査し、直す
+│   ├── rules/                    # 規則の文書 (プロジェクトの .claude/rules/ に置くコピーの元)
+│   ├── scripts/                  # スキルの前置き (プラグインと設定のバージョンの比較)
+│   ├── bin/doc-structured        # プロジェクトに置く、ツールの入口のスクリプト
+│   ├── tool/                     # 生成と検査のツール (Python)。テストは tool/tests/
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json

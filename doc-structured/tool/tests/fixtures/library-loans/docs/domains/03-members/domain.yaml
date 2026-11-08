@@ -1,0 +1,11 @@
+# 架空の題材「図書館の貸出」の、利用者のドメイン
+domain:
+  description: 図書館に登録した利用者を扱う。
+models:
+  member:
+    name_ja: 利用者
+    definition: 図書館に登録し、図書を借りられる人。
+    attributes:
+      name:
+        name_ja: 氏名
+        definition: 利用者の名前。

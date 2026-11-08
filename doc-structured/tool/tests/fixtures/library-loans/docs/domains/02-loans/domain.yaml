@@ -1,0 +1,34 @@
+# 架空の題材「図書館の貸出」の、貸出のドメイン
+domain:
+  description: 図書の貸出と返却を扱う。
+models:
+  loan:
+    name_ja: 貸出
+    definition: 利用者が図書を借りてから返すまでの 1 回の記録。
+    attributes:
+      book:
+        name_ja: 貸出図書
+        definition: 貸し出した図書。
+        refers_to: d-catalog-m-book
+      member:
+        name_ja: 借りた利用者
+        definition: 図書を借りた利用者。
+        refers_to: d-members-m-member
+      reservation:
+        name_ja: 元の予約
+        definition: この貸出のもとになった予約。予約せずに借りたときは無い。
+        refers_to: d-loans-m-reservation
+      status:
+        name_ja: 貸出状態
+        definition: 貸出が今どの段階にあるか。
+        values:
+          on_loan:
+            name_ja: 貸出中
+            definition: 図書が利用者の手元にある。
+          returned:
+            name_ja: 返却済み
+            definition: 図書が図書館に戻った。
+unclassified_app_terms:
+  business_day:
+    name_ja: 開館日
+    definition: 図書館が利用者に開いている日。休館日を除く。
