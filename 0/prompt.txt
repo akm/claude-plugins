@@ -1,0 +1,19 @@
+<cross-session-message from="local_9ddc560b-1e34-4099-ad15-6267fc2229f7" from-name="#178 単位 A: 必要度の判定を実装する">
+review-rally 20261107-2246-fix-review-triage-residual-178: 記録の回番号 5 のレビューの依頼 (識別子 20261107-2248-fix-review-triage-residual-178-5-code-review-opus)
+
+あなたは review-rally のレビューのセッションです。この会話より前のやり取りは消してあるので、
+このメッセージに書いたことだけに従ってください。日本語で応答してください。
+
+1. あなたの作業ツリー (cwd) を、レビューするコミットに切り替える。git status --porcelain の出力が
+   空であることを確認してから、git checkout -B claude/review-rally-af048e b55688a13cfd0c09fdaae09c49f49c136ad029db を実行する。
+   出力が空でないか、切り替えられなければ、依頼文を読まずに、下の 3 の失敗のメッセージを送る。
+2. 依頼文 /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-121fc0/tmp/review-rally/20261107-2246-fix-review-triage-residual-178/review-request-20261107-2248-fix-review-triage-residual-178-5-code-review-opus.md を Read ツールで読み、そのとおりにレビューする。指摘を見つけても直さない。
+   依頼文の「対象」の作業ツリーは、あなたの作業ツリー (cwd) である。
+3. 結果を書き出したら、ツール SendMessage で、宛先 to を local_9ddc560b-1e34-4099-ad15-6267fc2229f7 にして、
+   次の形の 1 行目で始まるメッセージを送り、ほかに何もせずにターンを終える。
+   ツールが読み込まれていなければ ToolSearch の select:SendMessage で読み込む。
+   - 成功: review-rally 20261107-2246-fix-review-triage-residual-178 20261107-2248-fix-review-triage-residual-178-5-code-review-opus: done <結果のファイルの絶対パス>
+   - 失敗: review-rally 20261107-2246-fix-review-triage-residual-178 20261107-2248-fix-review-triage-residual-178-5-code-review-opus: failed <理由>
+   2 行目以降に、依頼文が求める報告 (skill を実際に呼んだか・実際に渡した effort とモデル・
+   HEAD と作業ツリーが不変であることの確認の結果) を書く。
+</cross-session-message>
