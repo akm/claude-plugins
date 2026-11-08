@@ -86,7 +86,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 | `{{targets}}` | 手順 1 で解決した対象。調査フェーズ: 覆われていない採択の回と `id`。立案フェーズ: `status: investigated` の問題の回と `problem_id`。修正フェーズ: `status: pending` の問題の回と `problem_id` |
 | `{{consider_design_change}}` | 設計・仕様変更を含めて検討するか (`true` / `false`)。N+1 回目以降の立案フェーズなら `true`、それ以外 (調査フェーズ・修正フェーズと、N 回目までの立案フェーズ) は `false`。**N+1 回目以降かどうかを sub-agent に計算させない。** N の決め方は呼び出し元にしか無い |
 | `{{skill_md_path}}` / `{{record_schema_path}}` / `{{project_config_path}}` / `{{stage_references}}` | 読ませる文書の絶対パス (「フェーズと手順・文書の対応」)。**プラグインの展開先の絶対パスで書く。** 依頼文を書くセッションは自分のスキルの配置先 (この SKILL.md を読んだディレクトリ) を知っている。相対パスは sub-agent の作業ディレクトリ (リポジトリ) から解決できない |
-| `{{human_decides_all}}` | すべての問題について人間が決めるか (`true` / `false`)。手順 4 で立案者 C を選んだ回の立案フェーズなら `true`、それ以外は `false`。`true` のとき、立案フェーズは修正方法を決めず、対象のすべての問題について `options` を書いて `status: awaiting-human` にする (規則の SSOT は [SKILL.md](../SKILL.md) の手順 5)。**C を選んだかどうかを sub-agent に判断させない。** 立案者の選択は呼び出し元にしか無い |
+| `{{human_decides_all}}` | すべての問題について人間が決めるか (`true` / `false`)。手順 4 で立案者 C を選んだ回の立案フェーズなら `true`、それ以外は `false`。`true` のときの規則の SSOT は [SKILL.md](../SKILL.md) の手順 5。**C を選んだかどうかを sub-agent に判断させない。** 立案者の選択は呼び出し元にしか無い |
 | `{{agent_name}}` | 定義名 (「effort と定義名の対応」)。sub-agent は自分の定義名を知らないので、報告に写させるために書く |
 | `{{stage_prohibitions}}` | 下の「フェーズごとの禁止事項」の該当するフェーズの項目 |
 
