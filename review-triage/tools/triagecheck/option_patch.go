@@ -157,6 +157,8 @@ func recordOptionPatchProblems(pl recordPlan, plans []recordPlan) []string {
 			add("判断待ち (awaiting-human) に chosen_option があります (パッチを作り直して判断待ちに戻すときは消す)")
 		} else if ok && pl.Status == "pending" && op.NoChange != nil && *op.NoChange {
 			add("status pending なのに、chosen_option %q はファイルを変えない案 (no_change) です (修正フェーズが当てるパッチが無い。直さないなら status: not-fixed にする)", c)
+		} else if ok && pl.Status == "not-fixed" && (op.NoChange == nil || !*op.NoChange) {
+			add("status not-fixed なのに、chosen_option %q はファイルを変える案です (決めないと回答したときに選べるのは、ファイルを変えない案 (no_change) だけ)", c)
 		}
 		// 1 つの修正で覆う問題は、同じ回答で参照先の案も選ぶ (SKILL.md の手順 1 の「人間の回答の反映」)。
 		// 参照先が選んでいないと、修正フェーズは人間がまだ選んでいない参照先の変更をコミットする。
@@ -169,6 +171,10 @@ func recordOptionPatchProblems(pl recordPlan, plans []recordPlan) []string {
 				}
 			}
 		}
+	} else if (pl.Status == "pending" || pl.Status == "done") && len(pl.OptionPatches) > 0 {
+		// 案を選んで pending にした問題は、修正フェーズが chosen_option の案のパッチを当てる (SKILL.md の手順 1 の
+		// 「人間の回答の反映」)。無いと、人間が見たパッチを当てずに approach の文から直すことになる。
+		add("status %s で option_patches があるのに、chosen_option がありません (人間が選んだ案のラベルを書く。修正フェーズは、その案のパッチを当てる)", pl.Status)
 	}
 	return problems
 }

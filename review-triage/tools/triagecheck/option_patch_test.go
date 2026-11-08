@@ -94,6 +94,19 @@ const optionP1Pending = "        approach: 案 A のとおり、再開の説明�
 	"          choice: baseline\n" +
 	"          choice_reason: 手順は実装と一致している\n"
 
+// optionP1NotFixed は、P1 に「決めない」の回答を反映した後の立案の結果。chosen が空でなければ chosen_option も書く。
+func optionP1NotFixed(chosen string) string {
+	c := ""
+	if chosen != "" {
+		c = "        chosen_option: " + chosen + "\n"
+	}
+	return c + "        decision:\n" +
+		"          target: docs/manual.md の 4 行目\n" +
+		"          baseline: 上の手順\n" +
+		"          choice: undecided\n" +
+		"          choice_reason: 今回は直さない\n"
+}
+
 // awaitingOptionsYAML は、判断待ちの問題に書く最小の options と option_patches (案 1 つで、ファイルを変えない)。
 // 選択待ちの問題を使うほかのテストのフィクスチャが使う。
 const awaitingOptionsYAML = "        options: |\n" +
@@ -147,6 +160,14 @@ func TestReviewTriageRecordOptionPatchesPass(t *testing.T) {
 				"              option: A\n        approach: P1 の案 A の修正で直す\n        chosen_option: A\n"+
 					"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n"+
 					"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        status: pending\n")
+		}},
+		{"決めないと回答し、ファイルを変えない案を選んだ (not-fixed と chosen_option)", func(t *testing.T) string {
+			return optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
+				"            no_change: true\n"+optionP1NotFixed("B")+"        status: not-fixed\n")
+		}},
+		{"案を選ばずに決めないと回答した (not-fixed で chosen_option 無し)", func(t *testing.T) string {
+			return optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
+				"            no_change: true\n"+optionP1NotFixed("")+"        status: not-fixed\n")
 		}},
 		{"option_patches の無い pending の自由な書き方の options", func(t *testing.T) string {
 			// 過去の記録の pending に残る options は、ラベルで始まらなくても報告しない (書き換えられないため)。
@@ -207,6 +228,9 @@ func TestReviewTriageRecordOptionPatchesViolations(t *testing.T) {
 				"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n" +
 				"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        sha: 1a2b3c4\n        status: done\n",
 			"chosen_option \"A\" は P1 の案 \"A\" のパッチで覆う案なのに、P1 の chosen_option が \"\" です"},
+		{"案を選んで pending にしたのに chosen_option が無い", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "        chosen_option: A\n", "", 1) + "        status: pending\n", "status pending で option_patches があるのに、chosen_option がありません"},
+		{"直した問題に chosen_option が無い", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "        chosen_option: A\n", "", 1) + "        sha: 1a2b3c4\n        status: done\n", "status done で option_patches があるのに、chosen_option がありません"},
+		{"決めないと回答したのに chosen_option がファイルを変える案を指す", p1Tail, "            no_change: true\n" + optionP1NotFixed("A") + "        status: not-fixed\n", "status not-fixed なのに、chosen_option \"A\" はファイルを変える案です"},
 		{"pending の chosen_option がファイルを変えない案を指す", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "chosen_option: A", "chosen_option: B", 1) + "        status: pending\n", "chosen_option \"B\" はファイルを変えない案 (no_change) です"},
 		{"option_patches の値が無い (null)", "        option_patches:\n          - option: A\n            covered_by:\n              problem_id: P1\n              option: A\n", "        option_patches:\n", "option_patches に値がありません"},
 		{"covered_by の値が無い (null)", "            covered_by:\n              problem_id: P1\n              option: A\n", "            covered_by:\n", "covered_by に値がありません"},
