@@ -115,10 +115,10 @@ class GenerateTest(ProjectTestCase):
         self.assertTrue((self.project / "docs/glossary.md").is_file())
 
     def test_empty_file_at_output_is_overwritten(self):
-        # 空のファイルと空白だけのファイルは、失う内容が無いので、手で書いたファイルとせずに上書きする
+        # 空のファイルと、空白と BOM だけのファイルは、失う内容が無いので、手で書いたファイルとせずに上書きする
         self.copy_sample()
-        for relative, text in (("docs/glossary.md", ""), ("docs/.gitattributes", " \n\n")):
-            with self.subTest(file=relative):
+        for relative, text in (("docs/glossary.md", ""), ("docs/.gitattributes", " \n\n"), ("docs/glossary.md", "\ufeff\n")):
+            with self.subTest(file=relative, text=text):
                 self.write(relative, text)
                 result = self.run_tool("generate")
                 self.assertEqual(result.returncode, 0, result.stderr)

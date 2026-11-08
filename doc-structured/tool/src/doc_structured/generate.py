@@ -264,15 +264,15 @@ HANDWRITTEN_MESSAGE = "手で書いたファイルが、生成するファイル
 
 
 def is_handwritten(path: Path) -> bool:
-    """手で書いたファイルか。先頭の記述が無く、空白以外の文字があるファイルを、手で書いたファイルとする。
+    """手で書いたファイルか。先頭の記述が無く、空白と BOM (U+FEFF) 以外の文字があるファイルを、手で書いたファイルとする。
 
-    空のファイルと空白だけのファイル (生成したファイルが中身ごと消えたものなど) は、失う内容が無いので含めない。
+    空のファイルと、空白と BOM だけのファイル (生成したファイルが中身ごと消えたものなど) は、失う内容が無いので含めない。
     """
     if not path.is_file():
         return False
     # ファイルを 1 回だけ読み、同じ文字列で先頭の記述と空白を判定する
     text = path.read_text(encoding="utf-8", errors="replace")
-    return generated_header.read_header(text) is None and text.strip() != ""
+    return generated_header.read_header(text) is None and text.replace("\ufeff", "").strip() != ""
 
 
 def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
