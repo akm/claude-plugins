@@ -55,7 +55,7 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
         if is_handwritten(content):
             problems.append(Problem("a", relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}"))
             continue
-        if content.text == expected and content.exact:
+        if content.matches(expected):
             continue
         if content.header is None:
             # 先頭の記述が無く、手で書いたファイルでもない (空白と BOM だけの) ファイル。YAML の修正は要らない

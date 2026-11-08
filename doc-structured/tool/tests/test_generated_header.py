@@ -88,9 +88,30 @@ class HeaderTest(unittest.TestCase):
             self.assertFalse(gh.read_file(bom).exact)
             self.assertFalse(gh.read_file(broken).exact)
             self.assertEqual(gh.read_file(bom).text, gh.read_file(plain).text)
-            # BOM だけのファイルは空白だけのファイルとして扱う
-            self.assertTrue(gh.read_file(bom_only).is_blank)
-            self.assertIsNone(gh.read_file(bom_only).header)
+            # BOM だけのファイルは空白だけのファイルとして扱う。BOM が 2 つ以上並んでいても同じ
+            double_bom = Path(tmp) / "double-bom.md"
+            double_bom.write_bytes(b"\xef\xbb\xbf\xef\xbb\xbf\n")
+            for path in (bom_only, double_bom):
+                with self.subTest(file=path.name):
+                    self.assertTrue(gh.read_file(path).is_blank)
+                    self.assertIsNone(gh.read_file(path).header)
+
+    def test_line_endings_are_read_as_lf(self):
+        # 改行の CRLF と CR は LF として読み、生成し直した内容と比べるときの違いに数えない
+        text = gh.markdown_line(SOURCE) + "\n# x\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, newline in (("crlf.md", b"\r\n"), ("cr.md", b"\r")):
+                with self.subTest(file=name):
+                    path = Path(tmp) / name
+                    path.write_bytes(text.encode("utf-8").replace(b"\n", newline))
+                    content = gh.read_file(path)
+                    self.assertEqual(content.text, text)
+                    self.assertTrue(content.matches(text))
+                    self.assertEqual(gh.read_file_header(path), gh.Header(SOURCE, COMMAND))
+            # BOM があれば、内容が同じでも生成し直した内容と同じとはしない
+            bom = Path(tmp) / "bom.md"
+            bom.write_bytes(b"\xef\xbb\xbf" + text.encode("utf-8"))
+            self.assertFalse(gh.read_file(bom).matches(text))
 
 
 if __name__ == "__main__":

@@ -309,8 +309,8 @@ def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[
     written: list[str] = []
     for relative, content in outputs.items():
         path = root / relative
-        # 読まずにバイト列どうしで比べる (BOM や UTF-8 として読めないバイトがあれば、違うので書き直す)
-        if path.is_file() and path.read_bytes() == content.encode("utf-8"):
+        # 検査 a と同じ判定で比べる (改行の違いだけなら書かず、BOM や UTF-8 として読めないバイトがあれば上書きする)
+        if path.is_file() and generated_header.read_file(path).matches(content):
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="\n") as f:

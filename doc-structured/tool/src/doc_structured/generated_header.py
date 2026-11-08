@@ -6,12 +6,13 @@
   frontmatter のある Markdown (frontmatter の中の 2 行目)・YAML (1 行目)・シェルスクリプト (shebang の次の 2 行目):
     # doc-structured:generated 生成元: <パス> コマンド: <コマンド> (このファイルを直接編集せず、生成元を直して生成し直す)
 判定の規則 (バージョンをまたいで変えない): 先頭の 3 行の中に、HTML_PREFIX か HASH_PREFIX で始まる行があれば、生成したファイル。
-生成したファイルを読むときは、どの処理も関数 decode の読み方 (UTF-8 として読めないバイトは置き換え、先頭の BOM を除く) で読む。
+生成したファイルを読むときは、どの処理も関数 decode の読み方 (UTF-8 として読めないバイトは置き換え、先頭の BOM を除き、改行の CRLF と CR を LF にする) で読む。
 生成元は、リポジトリのルートからの相対パス (複数の YAML から作るときはディレクトリで、末尾に「/」)。
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-docs.md)。
 sub-issue 3 の hook も、このモジュールで生成したファイルかどうかを判定する。
 """
 
+import codecs
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,9 +66,22 @@ def decode(raw: bytes) -> str:
     """生成したファイルのバイト列を文字列にする。生成したファイルの読み方は、この関数だけが決める。
 
     UTF-8 として読めないバイトは置き換え (判定に使うのは決まった ASCII の接頭辞だけのため)、
-    先頭の BOM (U+FEFF。エディタが保存のときに付けることがある) を除く。
+    先頭の BOM (U+FEFF。エディタが保存のときに付けることがある) を除き、改行の CRLF と CR を LF にする
+    (git の設定 core.autocrlf やエディタが改行を変えても、内容は変わっていないため)。
     """
-    return raw.decode("utf-8", errors="replace").removeprefix("\ufeff")
+    text = raw.decode("utf-8", errors="replace").removeprefix("\ufeff")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _is_exact(raw: bytes) -> bool:
+    """バイト列を decode で読むときに、BOM の除去も、UTF-8 として読めないバイトの置き換えも無いか。改行の違いは数えない。"""
+    if raw.startswith(codecs.BOM_UTF8):
+        return False
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 @dataclass(frozen=True)
@@ -76,19 +90,23 @@ class FileContent:
 
     text: str  # decode で読んだ内容
     header: Header | None  # 先頭の記述。生成したファイルでなければ None
-    exact: bool  # 読んだバイト列が、text を UTF-8 で書いたものと同じか (BOM の除去も、バイトの置き換えも無かったか)
+    exact: bool  # BOM の除去も、UTF-8 として読めないバイトの置き換えも無かったか (改行の違いは数えない)
 
     @property
     def is_blank(self) -> bool:
-        """空白だけ (空を含む) か。"""
-        return self.text.strip() == ""
+        """空白と BOM (U+FEFF) だけ (空を含む) か。"""
+        return self.text.replace("\ufeff", "").strip() == ""
+
+    def matches(self, expected: str) -> bool:
+        """生成し直した内容 expected と同じか。generate の書く前の比較と検査 a が、この判定を使う。"""
+        return self.text == expected and self.exact
 
 
 def read_file(path: str | Path) -> FileContent:
     """ファイルの全体を decode の読み方で読む。ファイルを読めないときの OSError は、呼び出し元に渡す。"""
     raw = Path(path).read_bytes()
     text = decode(raw)
-    return FileContent(text=text, header=read_header(text), exact=raw == text.encode("utf-8"))
+    return FileContent(text=text, header=read_header(text), exact=_is_exact(raw))
 
 
 def read_file_header(path: str | Path) -> Header | None:

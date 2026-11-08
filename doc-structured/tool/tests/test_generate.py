@@ -117,7 +117,12 @@ class GenerateTest(ProjectTestCase):
     def test_empty_file_at_output_is_overwritten(self):
         # 空のファイルと、空白と BOM だけのファイルは、失う内容が無いので、手で書いたファイルとせずに上書きする
         self.copy_sample()
-        for relative, text in (("docs/glossary.md", ""), ("docs/.gitattributes", " \n\n"), ("docs/glossary.md", "\ufeff\n")):
+        for relative, text in (
+            ("docs/glossary.md", ""),
+            ("docs/.gitattributes", " \n\n"),
+            ("docs/glossary.md", "\ufeff\n"),
+            ("docs/glossary.md", "\ufeff\ufeff\n"),
+        ):
             with self.subTest(file=relative, text=text):
                 self.write(relative, text)
                 result = self.run_tool("generate")
@@ -139,6 +144,19 @@ class GenerateTest(ProjectTestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("書いた: docs/glossary.md", result.stdout)
                 self.assertEqual(glossary.read_bytes(), original)
+
+    def test_generated_file_with_crlf_is_not_rewritten(self):
+        # 改行だけが CRLF になった生成したファイルは、内容が同じなので上書きしない (検査 a も報告しない)
+        self.copy_sample()
+        glossary = self.project / "docs/glossary.md"
+        crlf = glossary.read_bytes().replace(b"\n", b"\r\n")
+        glossary.write_bytes(crlf)
+        result = self.run_tool("generate")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("docs/glossary.md", result.stdout)
+        self.assertEqual(glossary.read_bytes(), crlf)
+        check = self.run_tool("check", "--only", "a")
+        self.assertEqual(check.returncode, 0, check.stdout)
 
     def test_write_outputs_refuses_to_overwrite_handwritten_file(self):
         self.copy_sample()
