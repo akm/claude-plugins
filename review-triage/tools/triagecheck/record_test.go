@@ -1775,7 +1775,7 @@ func TestReviewTriageRecordInvestigatedRequiresInvestigation(t *testing.T) {
 
 // approach の必須は状態ごとに決まる。pending / done / done-external では従来どおり
 // 無ければ報告し、awaiting-human では options があれば approach が無くても通る。
-// 人間の立案待ち (立案者 C) は approach を持たないため。
+// 判断待ちの問題は、人間の回答の後に approach を書くため。
 func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 	// approach の行を消した validRecordYAML。sha と status は各ケースが差し替える。
 	noApproach := strings.Replace(validRecordYAML, "        approach: 数え直して単位を書く\n", "", 1)
@@ -1812,19 +1812,19 @@ func TestReviewTriageRecordApproachRequiredByStatus(t *testing.T) {
 
 	t.Run("awaiting-human で approach が無く options があれば報告しない", func(t *testing.T) {
 		mutated := strings.Replace(noApproach, "        sha: \"\"\n        status: pending\n",
-			"        status: awaiting-human\n        options: 立案者 C — 人間が立案する\n", 1)
+			awaitingOptionsYAML+"        status: awaiting-human\n", 1)
 		if mutated == noApproach {
 			t.Fatal("フィクスチャの置換が適用されていない")
 		}
 		files, read := recordFiles(t, mutated)
 		if problems := reviewTriageRecordProblems(files, read); len(problems) != 0 {
-			t.Fatalf("approach の無い awaiting-human (人間の立案待ち) で問題が出た: %v", problems)
+			t.Fatalf("approach の無い awaiting-human で問題が出た: %v", problems)
 		}
 	})
 
 	t.Run("awaiting-human で approach があっても報告しない", func(t *testing.T) {
 		mutated := strings.Replace(validRecordYAML, "        sha: \"\"\n        status: pending\n",
-			"        status: awaiting-human\n        options: 案 a は最小修正 / 案 b は構造の変更\n", 1)
+			awaitingOptionsYAML+"        status: awaiting-human\n", 1)
 		if mutated == validRecordYAML {
 			t.Fatal("フィクスチャの置換が適用されていない")
 		}
