@@ -21,7 +21,7 @@ MARKER = "doc-structured:generated"
 HTML_PREFIX = f"<!-- {MARKER} "
 HASH_PREFIX = f"# {MARKER} "
 HEADER_LINES = 3
-# 関数 read_file_header が 1 行として読む上限のバイト数。LF の無い大きなファイルの全体を読まないため
+# 関数 read_file_header が 1 行についてメモリに保持する上限のバイト数。LF の無い大きなファイルの全体をメモリに保持しないため
 MAX_LINE_BYTES = 4096
 NOTE = "(このファイルを直接編集せず、生成元を直して生成し直す)"
 GENERATE_COMMAND = "bin/doc-structured generate"
@@ -114,10 +114,22 @@ def read_file(path: str | Path) -> FileContent:
 def read_file_header(path: str | Path) -> Header | None:
     """ファイルの先頭の HEADER_LINES 行を decode の読み方で読み、先頭の記述を返す。生成したファイルでなければ None。
 
-    全体を読まずに判定する処理 (プラグインの hook (hook-scripts/guard-generated.py) と、generate の生成したファイルの一覧) が使う。
-    1 行は MAX_LINE_BYTES バイトまで読み、それより長い行は 2 行以上として数える (先頭の記述の行はそれより短いので、判定は変わらない)。
+    全体をメモリに置かずに判定する処理 (プラグインの hook (hook-scripts/guard-generated.py) と、generate の生成したファイルの一覧) が使う。
+    行の数え方は関数 read_file と同じ (LF で区切る)。1 行は先頭の MAX_LINE_BYTES バイトだけをメモリに保持し、残りは読み捨てる
+    (先頭の記述の行はそれより短いので、判定は read_file と変わらない)。
     ファイルを読めないときの OSError は、呼び出し元に渡す。
     """
     with open(path, "rb") as f:
-        head = b"".join(f.readline(MAX_LINE_BYTES) for _ in range(HEADER_LINES))
+        head = b"".join(_read_line(f) for _ in range(HEADER_LINES))
     return read_header(decode(head))
+
+
+def _read_line(f) -> bytes:
+    """バイナリモードのファイルから 1 行 (LF まで) を読み、MAX_LINE_BYTES バイトを越える部分は読み捨てる。"""
+    line = f.readline(MAX_LINE_BYTES)
+    if len(line) < MAX_LINE_BYTES or line.endswith(b"\n"):
+        return line
+    while rest := f.readline(MAX_LINE_BYTES):
+        if rest.endswith(b"\n"):
+            return line + b"\n"
+    return line

@@ -63,8 +63,8 @@ class HeaderTest(unittest.TestCase):
             broken.write_bytes(gh.markdown_line(SOURCE).encode("utf-8") + b"\n\xff\xfe\n")
             self.assertEqual(gh.read_file_header(broken), gh.Header(SOURCE, COMMAND))
 
-    def test_read_file_header_does_not_read_whole_file_without_lf(self):
-        # LF の無い大きなファイルでも、先頭の HEADER_LINES 行 (1 行は MAX_LINE_BYTES バイトまで) だけを読む
+    def test_read_file_header_does_not_keep_whole_line_in_memory(self):
+        # LF の無い大きなファイルでも、1 回に読むのは MAX_LINE_BYTES バイトまで
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "minified.js"
             path.write_bytes(b"x" * (gh.MAX_LINE_BYTES * gh.HEADER_LINES * 10))
@@ -79,7 +79,15 @@ class HeaderTest(unittest.TestCase):
 
             with mock.patch("builtins.open", spy):
                 self.assertIsNone(gh.read_file_header(path))
-            self.assertLessEqual(sum(read), gh.MAX_LINE_BYTES * gh.HEADER_LINES)
+            self.assertLessEqual(max(read), gh.MAX_LINE_BYTES)
+
+    def test_long_line_before_header_is_counted_as_one_line(self):
+        # MAX_LINE_BYTES を越える行も 1 行として数えるので、その後ろの先頭の 3 行の中の記述は、read_file と同じく見つかる
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "long.md"
+            path.write_bytes(b"a" * (gh.MAX_LINE_BYTES + 1000) + b"\n\n" + gh.hash_line(SOURCE).encode("utf-8") + b"\n")
+            self.assertEqual(gh.read_file_header(path), gh.Header(SOURCE, COMMAND))
+            self.assertEqual(gh.read_file(path).header, gh.Header(SOURCE, COMMAND))
 
     def test_read_file_header_raises_when_file_cannot_be_read(self):
         with tempfile.TemporaryDirectory() as tmp:
