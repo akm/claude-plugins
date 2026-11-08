@@ -31,6 +31,8 @@ ATTRIBUTE_KEYS = ("name_ja", "definition", "values", "refers_to")
 VALUE_KEYS = ("name_ja", "definition")
 TERM_KEYS = ("name_ja", "definition")
 REQUIRED_KEYS = ("name_ja", "definition")
+# read_yaml が、YAML として読めないファイルに返す値 (空のファイルの None と区別する)
+_UNREADABLE = object()
 
 # 日本語名に使えない文字。完全な名前を定義の行の title ("…") に書くため
 NAME_JA_FORBIDDEN = ("\n", "\r", '"')
@@ -184,6 +186,9 @@ class _Loader:
             path_rel = rel(self.root, path)
             domain.yaml_files.append(path_rel)
             data = self.read_yaml(path, path_rel)
+            if data is _UNREADABLE:
+                # 読めないファイルは、キー domain があるかどうかが分からないので、無いとは報告しない
+                continue
             if data is None:
                 if path == root_file:
                     self.problem(path_rel, "キー domain (ドメインの説明) が無い")
@@ -206,7 +211,8 @@ class _Loader:
             if path == root_file and "domain" not in data:
                 self.problem(path_rel, "キー domain (ドメインの説明) が無い", 1, 1)
 
-    def read_yaml(self, path: Path, path_rel: str) -> CommentedMap | None:
+    def read_yaml(self, path: Path, path_rel: str) -> CommentedMap | None | object:
+        """YAML を読む。空のファイルは None、読めないファイルは問題を報告して _UNREADABLE を返す。"""
         try:
             data = yamlio.load(path.read_text(encoding="utf-8"))
         except YAMLError as e:
@@ -216,12 +222,12 @@ class _Loader:
                 self.problem(path_rel, f"YAML として読めない: {reason}", mark.line + 1, mark.column + 1)
             else:
                 self.problem(path_rel, f"YAML として読めない: {reason}")
-            return None
+            return _UNREADABLE
         if data is None:
             return None
         if not isinstance(data, CommentedMap):
             self.problem(path_rel, "ファイルの全体は、キーと値のマッピングでなければならない", 1, 1)
-            return None
+            return _UNREADABLE
         return data
 
     def unknown_key(self, path_rel: str, key, allowed: tuple[str, ...], line: int, column: int) -> None:

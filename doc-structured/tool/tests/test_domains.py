@@ -188,6 +188,28 @@ class CheckHTest(ProjectTestCase):
             "docs/domains/01-loans/domain.yaml:3:1: 検査 h: YAML として読めない",
         )
 
+    def test_yaml_syntax_error_in_root_domain_yaml_is_reported_once(self):
+        # 引用符の無い値の「: 」は YAML の誤り。読めないファイルに、キー domain が無いとは報告しない
+        # (キーがあるかどうかは、読めないと分からないため)
+        self.assertEqual(
+            self.problems_for(
+                {
+                    "docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN
+                    + "unclassified_app_terms:\n"
+                    + "  opening_hours:\n"
+                    + "    name_ja: 開館時間\n"
+                    + "    definition: 図書館が開いている時刻の範囲 (例: 9:00〜17:00)。\n"
+                }
+            ),
+            ["docs/domains/01-loans/domain.yaml:10:34: 検査 h: YAML として読めない: mapping values are not allowed here"],
+        )
+
+    def test_empty_root_domain_yaml_lacks_domain_key(self):
+        self.assert_problem(
+            {"docs/domains/01-loans/domain.yaml": ""},
+            "docs/domains/01-loans/domain.yaml: 検査 h: キー domain (ドメインの説明) が無い",
+        )
+
     def test_refers_to(self):
         def with_ref(target: str) -> str:
             return MINIMAL_DOMAIN + (
