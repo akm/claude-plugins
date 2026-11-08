@@ -202,6 +202,11 @@ func TestReviewTriageRecordOptionPatchesViolations(t *testing.T) {
 				"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n" +
 				"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        status: pending\n",
 			"chosen_option \"A\" は P1 の案 \"A\" のパッチで覆う案なのに、P1 の chosen_option が \"\" です"},
+		{"covered_by の案を選んで直したのに、参照先の問題が同じ案を選んでいない", "              option: A\n        status: awaiting-human\n",
+			"              option: A\n        approach: P1 の案 A の修正で直す\n        chosen_option: A\n" +
+				"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n" +
+				"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        sha: 1a2b3c4\n        status: done\n",
+			"chosen_option \"A\" は P1 の案 \"A\" のパッチで覆う案なのに、P1 の chosen_option が \"\" です"},
 		{"pending の chosen_option がファイルを変えない案を指す", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "chosen_option: A", "chosen_option: B", 1) + "        status: pending\n", "chosen_option \"B\" はファイルを変えない案 (no_change) です"},
 		{"option_patches の値が無い (null)", "        option_patches:\n          - option: A\n            covered_by:\n              problem_id: P1\n              option: A\n", "        option_patches:\n", "option_patches に値がありません"},
 		{"covered_by の値が無い (null)", "            covered_by:\n              problem_id: P1\n              option: A\n", "            covered_by:\n", "covered_by に値がありません"},
