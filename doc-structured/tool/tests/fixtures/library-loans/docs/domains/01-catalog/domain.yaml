@@ -1,0 +1,25 @@
+# 架空の題材「図書館の貸出」の、蔵書のドメイン
+domain:
+  description: 図書館が持つ図書と、その目録を扱う。
+models:
+  book:
+    name_ja: 図書
+    definition: 図書館が貸し出す 1 冊の本。
+    attributes:
+      title:
+        name_ja: 書名
+        definition: 図書の題名。
+      shelf_status:
+        name_ja: 配架状態
+        definition: 図書が書架にあるか、除いたか。
+        values:
+          shelved:
+            name_ja: 配架中
+            definition: 書架にあり、貸し出せる。
+          withdrawn:
+            name_ja: 除籍
+            definition: 蔵書から除き、貸し出さない。
+unclassified_app_terms:
+  call_number:
+    name_ja: 請求記号
+    definition: 図書を書架で探すために、背に貼る記号。
