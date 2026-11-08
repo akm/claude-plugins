@@ -35,6 +35,10 @@ REQUIRED_KEYS = ("name_ja", "definition")
 # 日本語名に使えない文字。完全な名前を定義の行の title ("…") に書くため
 NAME_JA_FORBIDDEN = ("\n", "\r", '"')
 
+# 定義 (definition) と、ドメインの説明 (description) に使えない文字。生成したファイルは改行の CR を LF として読むので、
+# CR を含む文は、生成し直した内容と一致しなくなるため
+CR = "\r"
+
 
 @dataclass
 class Entry:
@@ -239,7 +243,9 @@ class _Loader:
             if key not in DOMAIN_KEYS:
                 self.unknown_key(path_rel, key, DOMAIN_KEYS, *_key_position(mapping, key))
         line, column = _key_position(data, "domain")
-        description = self.text(mapping, "description", path_rel, line, column, "domain")
+        description = self.without_cr(
+            mapping, "description", self.text(mapping, "description", path_rel, line, column, "domain"), path_rel, "domain"
+        )
         if description is not None:
             domain.description = description
 
@@ -254,6 +260,13 @@ class _Loader:
             self.problem(path_rel, f"{owner} の {key} は、空でない文字列でなければならない", vline, vcolumn)
             return None
         return value.strip()
+
+    def without_cr(self, mapping: CommentedMap, key: str, value: str | None, path_rel: str, owner: str) -> str | None:
+        """関数 text で読んだ値に CR があれば、問題を足して None を返す。"""
+        if value is not None and CR in value:
+            self.problem(path_rel, f"{owner} の {key} に、CR は使えない", *_value_position(mapping, key))
+            return None
+        return value
 
     def entry(
         self,
@@ -280,7 +293,9 @@ class _Loader:
                 self.unknown_key(path_rel, key, allowed, *_key_position(mapping, key))
         owner = f"{label} {name}"
         name_ja = self.text(mapping, "name_ja", path_rel, line, column, owner)
-        definition = self.text(mapping, "definition", path_rel, line, column, owner)
+        definition = self.without_cr(
+            mapping, "definition", self.text(mapping, "definition", path_rel, line, column, owner), path_rel, owner
+        )
         if name_ja is not None and any(ch in name_ja for ch in NAME_JA_FORBIDDEN):
             self.problem(
                 path_rel, f'{owner} の name_ja に、改行と " は使えない', *_value_position(mapping, "name_ja")

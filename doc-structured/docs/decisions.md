@@ -59,11 +59,11 @@
 README.md                                  手書き (製品の段落・動かし方・docs/ へのリンク)
 CLAUDE.md                                  手書き (プラグインの規則へのリンクとプロジェクト固有のこと)
 bin/doc-structured                         生成 (ツールの入口。setup が最初に作り、generate が生成し直す)
-.gitattributes                             生成したファイルの merge driver (ours) の設定。誰が書くかは sub-issue 3 で決める
 .claude/rules/doc-structured*.md           生成 (規則のコピー)
 .claude/akm-claude-plugins/doc-structured/config.yaml   設定
 .github/                                   Issue と PR のテンプレート (選んだときだけ)
 docs/
+  .gitattributes                           生成 (docs/ の下の生成したファイルの merge driver binary の設定。sub-issue 3 で決めた)
   README.md                                生成 (索引)
   CONCEPT.md                               手書き
   glossary.md                              生成 (全ドメインの用語の索引)
@@ -204,7 +204,7 @@ docs/
 
 - 生成するファイルは「ディレクトリの全体像」のとおり。すべてコミットする (`schema-actual.md` だけプロジェクトごと)。スクリプト `bin/doc-structured` も生成したファイル (`setup` が最初に作り、`generate` が生成し直し、hook が直接の編集を拒否する)。
 - 生成の出力は、同じ入力からいつも同じにする。プロジェクトの整形ツール (prettier など) には合わせず、**生成したファイルは整形ツールの対象から外す** (`setup` が設定する。問 12 (4))。
-- 生成したファイルの競合の規則は「ツールで生成したファイルの競合を手動で解決せず生成し直す」の 1 文だけ (規則に手順を含めない)。生成したファイルには、git の組み込みの merge driver `ours` を `.gitattributes` で設定する (利用者ごとの git の設定は要らない)。それ以外のファイルの競合を、競合のマークが入ったまま一度コミットし、解決するコミットを別に足し、その後 `generate` してコミットする流れも使える (規則・hook・CI はこれを妨げない。競合のマークが入った YAML で `generate` がエラーになるのは意図どおり)。
+- 生成したファイルの競合の規則は「ツールで生成したファイルの競合を手動で解決せず生成し直す」の 1 文だけ (規則に手順を含めない)。生成したファイルには、git の組み込みの merge driver `binary` を設定する (利用者ごとの git の設定は要らない。競合したときに残る内容は、規則の文書 [rules/doc-structured-docs.md](../rules/doc-structured-docs.md) の「生成したファイル」)。設定は `generate` がファイル `docs/.gitattributes` に生成する (sub-issue 3 で決めた。経緯は [#195](https://github.com/akm/claude-plugins/issues/195))。`docs/.gitattributes` が設定するのはディレクトリ `docs/` の下の生成したファイルだけで、`docs/` の外の生成したファイル (`bin/doc-structured`・`.claude/rules/doc-structured*.md` など) には、それを生成する sub-issue で、同じ形のファイル `.gitattributes` をそのディレクトリに足す。それ以外のファイルの競合を、競合のマークが入ったまま一度コミットし、解決するコミットを別に足し、その後 `generate` してコミットする流れも使える (規則・hook・CI はこれを妨げない。競合のマークが入った YAML で `generate` がエラーになるのは意図どおり)。
 - 被参照の一覧のファイル `backlinks.md` は作らない。ある ID を参照しているファイルと節は、サブコマンド `refs <ID>` がその場で出力する。
 - 参照される定義に「これを参照するもの」の一覧を生成するのは 1 か所だけ: `models.md` の各モデルの「このモデルを参照するモデルとテーブル」。
 
@@ -368,6 +368,7 @@ docs/
 | 問 5: ドメインの依存はモデルの参照から求める | YAML からほかのドメインの ID へのすべての参照を数える | 指摘 9 |
 | 問 3: 複雑な遷移はファイル `state-machines/<属性>.yaml` | 同じディレクトリの `state-machines-<属性>.yaml`。YAML はサブディレクトリに分けてもよい | 指摘 9 |
 | 問 12: スクリプト `bin/doc-structured` は `setup` が作る | 生成したファイルにし、`generate` が生成し直す | 指摘 C1 |
+| 問 12 (1): 生成したファイルに、git の組み込みの merge driver `ours` を設定する (`.gitattributes` を誰が書くかは sub-issue 3) | 組み込みの merge driver `binary` にし、`generate` がファイル `docs/.gitattributes` を生成する (`ours` は組み込みではなかった) | sub-issue 3 ([#195](https://github.com/akm/claude-plugins/issues/195)) |
 
 ## 計画で決めること・確認したこと
 
@@ -388,6 +389,7 @@ docs/
 - ラベルにコードの書式を含める書き方 (`` [`orders`] ``) の表示: Markdown の描画 API で、Issue・PR の描画 (gfm) でもファイルの描画でも、リンクの中にコードの書式 (`<a><code>orders</code></a>`) で描画される。
 - 実際のプロジェクトの prettier (`singleQuote: true`) は、定義の行の title の引用符を `'` に書き換え、表の列の幅をそろえ、`<a name>` と見出しの間に空行を入れる。`.prettierignore` は `docs/` を除いていない。
 - PreToolUse の hook は、Edit と Write のファイルのパスを受け取り、拒否と理由を返せる。hook が起動できないときは、編集はそのまま実行される。
+- git の merge driver `ours` は、組み込みの driver ではない (2026-11-08 に sub-issue 3 で確認した)。組み込みは `text`・`binary`・`union` の 3 つだけで、知らない名前を指定すると通常の 3-way マージになり、競合のマークが入る。`binary` は、競合のマークを入れず、ファイルを競合の状態のままにする (残る内容は、規則の文書 [rules/doc-structured-docs.md](../rules/doc-structured-docs.md) の「生成したファイル」)。git 2.50.1 の一時的なリポジトリで確認した。
 - `.claude/rules/` の `paths` の規則は、Claude が Read・Write・Edit か読み取りのコマンドで対象のファイルを扱ったときに読み込まれる。frontmatter が YAML として読めないと、常に読み込む規則になる。1 ファイルが 40,000 文字を超えると先頭だけになる。
 - プラグインの自動更新のデフォルトは、公式以外のマーケットプレイスでは無効。
 - GitHub の必須の検査は、ワークフローが起動しないと完了せずマージできない。ジョブを条件で実行しないと成功として扱われる。

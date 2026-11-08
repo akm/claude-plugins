@@ -1,0 +1,15 @@
+# doc-structured:generated 生成元: docs/domains/ コマンド: bin/doc-structured generate (このファイルを直接編集せず、生成元を直して生成し直す)
+# 生成したファイルが競合したときは、git が ours とする側の内容が残る (組み込みの merge driver binary。どの側が ours になるかは git のコマンドによって違う)。生成し直してから git add する
+/.gitattributes merge=binary
+/domains/01-catalog/README.md merge=binary
+/domains/01-catalog/models.md merge=binary
+/domains/01-catalog/terms.md merge=binary
+/domains/01-catalog/unclassified_app_terms.md merge=binary
+/domains/02-loans/README.md merge=binary
+/domains/02-loans/models.md merge=binary
+/domains/02-loans/terms.md merge=binary
+/domains/02-loans/unclassified_app_terms.md merge=binary
+/domains/03-members/README.md merge=binary
+/domains/03-members/models.md merge=binary
+/domains/03-members/terms.md merge=binary
+/glossary.md merge=binary

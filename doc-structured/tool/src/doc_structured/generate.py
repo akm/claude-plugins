@@ -8,6 +8,8 @@ docs/glossary.md を生成する。生成するファイルの中身の SSOT は
   - リンクは reference-style で、ラベルを ID にし、定義の行 [ID]: 相対パス#ID "完全な名前" をファイルの末尾に書く
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
+  - docs/.gitattributes に、生成したファイル (docs/.gitattributes 自身を含む) の merge の設定を書く
+  - 生成するファイルの場所に、先頭の記述が無く、空白と BOM 以外の文字があるファイル (手で書いたファイル) があれば、何も書かない (呼び出し元がエラーにする)
 同じ入力からは、いつも同じ出力を作る (時刻や環境に依存する値を書かない)。
 """
 
@@ -18,6 +20,14 @@ from . import generated_header, names
 from .domains import DOMAINS_DIR, Domain, Entry, Project
 
 GLOSSARY_PATH = "docs/glossary.md"
+GITATTRIBUTES_PATH = "docs/.gitattributes"
+# 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し、
+# 競合のマークを入れない (ファイルは競合の状態のまま)。どの側が ours になるかは git のコマンドによって違い、
+# 残った内容は古いことがあるので、生成し直してから git add する
+GITATTRIBUTES_COMMENT = (
+    "# 生成したファイルが競合したときは、git が ours とする側の内容が残る (組み込みの merge driver binary。"
+    "どの側が ours になるかは git のコマンドによって違う)。生成し直してから git add する"
+)
 README = "README.md"
 FILE_DESCRIPTIONS = {
     "models": "モデル・属性・値の定義",
@@ -198,6 +208,17 @@ def render_readme(domain: Domain, files: list[str]) -> str:
     return _document(f"{domain.dir}/", domain.id, blocks, links)
 
 
+def render_gitattributes(paths: list[str]) -> str:
+    """paths は、ディレクトリ docs/ の下の生成するファイルの、リポジトリのルートからの相対パス (docs/.gitattributes を除く)。"""
+    base = posixpath.dirname(GITATTRIBUTES_PATH)
+    lines = [generated_header.hash_line(f"{DOMAINS_DIR.as_posix()}/"), GITATTRIBUTES_COMMENT]
+    for path in sorted([*paths, GITATTRIBUTES_PATH]):
+        if not path.startswith(f"{base}/"):
+            raise ValueError(f"ディレクトリ {base}/ の外のファイルは {GITATTRIBUTES_PATH} に書けない: {path}")
+        lines.append(f"/{posixpath.relpath(path, base)} merge=binary")
+    return "\n".join(lines) + "\n"
+
+
 def render_project(project: Project) -> dict[str, str]:
     """生成するファイルの、リポジトリのルートからの相対パスと内容。"""
     outputs: dict[str, str] = {}
@@ -216,36 +237,78 @@ def render_project(project: Project) -> dict[str, str]:
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
     if any(d.models or d.terms for d in project.domains):
         outputs[GLOSSARY_PATH] = render_glossary(project)
+    if outputs:
+        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs))
     return dict(sorted(outputs.items()))
 
 
 def generated_files(root: Path) -> dict[str, generated_header.Header]:
-    """ディレクトリ docs/ の下の、先頭の記述を持つファイル (生成したファイル) と、その記述。"""
+    """ディレクトリ docs/ の下の、先頭の記述を持つファイル (生成したファイル) と、その記述。
+
+    調べるのは、拡張子が .md と .yaml のファイルと、名前が .gitattributes のファイル。
+    """
     found: dict[str, generated_header.Header] = {}
     docs = root / "docs"
     if not docs.is_dir():
         return found
     for path in sorted(docs.rglob("*")):
-        if not path.is_file() or path.suffix not in (".md", ".yaml"):
+        if not path.is_file() or (path.suffix not in (".md", ".yaml") and path.name != ".gitattributes"):
             continue
-        with path.open(encoding="utf-8", errors="replace") as f:
-            head = "".join(f.readline() for _ in range(generated_header.HEADER_LINES))
-        header = generated_header.read_header(head)
+        header = generated_header.read_file_header(path)
         if header is not None:
             found[path.relative_to(root).as_posix()] = header
     return found
+
+
+HANDWRITTEN_MESSAGE = "手で書いたファイルが、生成するファイルの場所にある"
+
+
+def is_handwritten(content: generated_header.FileContent) -> bool:
+    """generated_header.read_file で読んだファイルが、手で書いたファイルか。
+
+    先頭の記述が無く、空白と BOM (U+FEFF) 以外の文字があるファイルを、手で書いたファイルとする。
+    空のファイルと、空白と BOM だけのファイル (生成したファイルが中身ごと消えたものなど) は、失う内容が無いので含めない。
+    """
+    return content.header is None and not content.is_blank
+
+
+class HandwrittenFilesError(Exception):
+    """生成するファイルの場所に手で書いたファイルがあるので、何も書かなかったことを表す。"""
+
+    def __init__(self, paths: list[str]):
+        super().__init__(f"{HANDWRITTEN_MESSAGE}: {', '.join(paths)}")
+        self.paths = paths
+
+
+def handwritten_fix(relative: str) -> str:
+    """手で書いたファイルが生成するファイルの場所にあるときの直し方。"""
+    if relative == GITATTRIBUTES_PATH:
+        return (
+            "手で書いた行を、パターンをリポジトリのルートからの相対に書き換えて (docs/.gitattributes のパターンは docs/ からの相対)、"
+            "リポジトリのルートの .gitattributes に移してから、このファイルを消す"
+        )
+    return "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す"
 
 
 def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[str]]:
     """生成したファイルを書き、生成し直すと無くなるファイルを消す。書いたファイルと消したファイルを返す。
 
     消すのは、先頭の記述を持つファイル (生成したファイル) だけ。手書きのファイルは消さない。
-    内容が同じファイルは書かない。
+    内容が同じファイルは書かない。生成するファイルの場所に手で書いたファイルがあれば、何も書かずに
+    HandwrittenFilesError を送出する (呼び出し元が、そのパスの配列から利用者にエラーを伝える)。
     """
+    # 生成するファイルの場所にある今のファイルを 1 回だけ読み、手で書いたファイルの判定と書く前の比較の両方に使う
+    existing = {
+        relative: generated_header.read_file(root / relative) for relative in outputs if (root / relative).is_file()
+    }
+    handwritten = [relative for relative, current in existing.items() if is_handwritten(current)]
+    if handwritten:
+        raise HandwrittenFilesError(handwritten)
     written: list[str] = []
     for relative, content in outputs.items():
         path = root / relative
-        if path.is_file() and path.read_text(encoding="utf-8") == content:
+        # 検査 a と同じ判定で比べる (改行の違いだけなら書かず、BOM や UTF-8 として読めないバイトがあれば上書きする)
+        if relative in existing and existing[relative].matches(content):
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="\n") as f:

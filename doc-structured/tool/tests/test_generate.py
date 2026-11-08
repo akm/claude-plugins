@@ -8,7 +8,7 @@ import subprocess
 import unittest
 
 from doc_structured.domains import load_project
-from doc_structured.generate import generated_files, render_project
+from doc_structured.generate import HandwrittenFilesError, generated_files, render_project, write_outputs
 from tooltest import PYTHON, SAMPLE_PROJECT, ProjectTestCase, clean_env
 
 MINIMAL = """\
@@ -73,11 +73,104 @@ class GenerateTest(ProjectTestCase):
         readme = (self.project / "docs/domains/01-loans/README.md").read_text(encoding="utf-8")
         self.assertNotIn("unclassified_app_terms.md", readme)
 
-        # 定義が 1 つも無いドメインは、README.md だけ
+        # 定義が 1 つも無いドメインは、README.md だけ (と、その merge の設定の docs/.gitattributes)
         self.write("docs/domains/01-loans/domain.yaml", "domain:\n  description: 空のドメイン。\n")
         self.assertEqual(self.run_tool("generate").returncode, 0)
         names = sorted(generated_files(self.project))
-        self.assertEqual(names, ["docs/domains/01-loans/README.md"])
+        self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
+
+    def test_handwritten_file_at_output_stops_generation(self):
+        self.copy_sample()
+        handwritten = {
+            "docs/domains/02-loans/models.md": "# 貸出のモデル (手で書いた)\n",
+            "docs/.gitattributes": "*.png binary\n",
+        }
+        for relative, text in handwritten.items():
+            self.write(relative, text)
+        (self.project / "docs/glossary.md").unlink()
+        result = self.run_tool("generate")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "docs/domains/02-loans/models.md: 手で書いたファイルが、生成するファイルの場所にある。"
+            "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す",
+            result.stderr,
+        )
+        self.assertIn(
+            "docs/.gitattributes: 手で書いたファイルが、生成するファイルの場所にある。"
+            "手で書いた行を、パターンをリポジトリのルートからの相対に書き換えて (docs/.gitattributes のパターンは docs/ からの相対)、"
+            "リポジトリのルートの .gitattributes に移してから、このファイルを消す",
+            result.stderr,
+        )
+        self.assertIn("手で書いたファイルが 2 件あるので、何も生成しなかった", result.stderr)
+        self.assertEqual(result.stdout, "")
+        # 手で書いたファイルは変わらず、ほかのファイルも書かない
+        for relative, text in handwritten.items():
+            with self.subTest(file=relative):
+                self.assertEqual((self.project / relative).read_text(encoding="utf-8"), text)
+        self.assertFalse((self.project / "docs/glossary.md").exists())
+
+        # 手で書いたファイルを消せば、生成できる
+        for relative in handwritten:
+            (self.project / relative).unlink()
+        self.assertEqual(self.run_tool("generate").returncode, 0)
+        self.assertTrue((self.project / "docs/glossary.md").is_file())
+
+    def test_empty_file_at_output_is_overwritten(self):
+        # 空のファイルと、空白と BOM だけのファイルは、失う内容が無いので、手で書いたファイルとせずに上書きする
+        self.copy_sample()
+        for relative, text in (
+            ("docs/glossary.md", ""),
+            ("docs/.gitattributes", " \n\n"),
+            ("docs/glossary.md", "\ufeff\n"),
+            ("docs/glossary.md", "\ufeff\ufeff\n"),
+        ):
+            with self.subTest(file=relative, text=text):
+                self.write(relative, text)
+                result = self.run_tool("generate")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"書いた: {relative}", result.stdout)
+                self.assertIsNotNone(generated_files(self.project).get(relative))
+
+    def test_generated_file_with_bom_or_invalid_bytes_is_regenerated(self):
+        # BOM 付きで保存された生成したファイルと、UTF-8 として読めないバイトを含む生成したファイルは、
+        # 生成したファイルとして扱い (一覧に入り、手で書いたファイルとしない)、generate が書き直す
+        self.copy_sample()
+        glossary = self.project / "docs/glossary.md"
+        original = glossary.read_bytes()
+        for broken in (b"\xef\xbb\xbf" + original, original + b"\xff\n"):
+            with self.subTest(head=broken[:3]):
+                glossary.write_bytes(broken)
+                self.assertIn("docs/glossary.md", generated_files(self.project))
+                result = self.run_tool("generate")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("書いた: docs/glossary.md", result.stdout)
+                self.assertEqual(glossary.read_bytes(), original)
+
+    def test_generated_file_with_crlf_or_cr_is_not_rewritten(self):
+        # 改行だけが CRLF か CR になった生成したファイルは、内容が同じなので上書きしない (検査 a も報告しない)
+        self.copy_sample()
+        glossary = self.project / "docs/glossary.md"
+        original = glossary.read_bytes()
+        for newline in (b"\r\n", b"\r"):
+            with self.subTest(newline=newline):
+                changed = original.replace(b"\n", newline)
+                glossary.write_bytes(changed)
+                result = self.run_tool("generate")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("docs/glossary.md", result.stdout)
+                self.assertEqual(glossary.read_bytes(), changed)
+                check = self.run_tool("check", "--only", "a")
+                self.assertEqual(check.returncode, 0, check.stdout)
+
+    def test_write_outputs_refuses_to_overwrite_handwritten_file(self):
+        self.copy_sample()
+        self.write("docs/glossary.md", "# 手で書いた用語集\n")
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        with self.assertRaises(HandwrittenFilesError) as raised:
+            write_outputs(self.project, render_project(project))
+        self.assertEqual(raised.exception.paths, ["docs/glossary.md"])
+        self.assertEqual((self.project / "docs/glossary.md").read_text(encoding="utf-8"), "# 手で書いた用語集\n")
 
     def test_yaml_errors_stop_generation(self):
         self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")

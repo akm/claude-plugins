@@ -14,7 +14,7 @@ from pathlib import Path
 from . import generated_header
 from .direction import check_direction
 from .domains import Project, load_project
-from .generate import generated_files, render_project
+from .generate import GITATTRIBUTES_PATH, HANDWRITTEN_MESSAGE, generated_files, handwritten_fix, is_handwritten, render_project
 from .problems import Problem
 
 LIGHT = ("a", "h", "i")
@@ -39,13 +39,33 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
     outputs = render_project(project)
     for relative, expected in outputs.items():
         header = generated_header.read_header(expected)
-        how = f"このファイルを直接編集せず、生成元 {header.source} の YAML を直して {header.command} を実行する"
+        if relative == GITATTRIBUTES_PATH:
+            how = f"このファイルを直接編集せず、{header.command} を実行する。{generated_header.GITATTRIBUTES_GUIDE}"
+        else:
+            how = f"このファイルを直接編集せず、生成元 {header.source} の YAML を直して {header.command} を実行する"
         path = root / relative
         if not path.is_file():
             problems.append(Problem("a", relative, f"生成するはずのファイルが無い。{header.command} を実行する"))
             continue
-        actual = path.read_text(encoding="utf-8")
+        content = generated_header.read_file(path)
+        if is_handwritten(content):
+            problems.append(Problem("a", relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}"))
+            continue
+        if content.matches(expected):
+            continue
+        if content.header is None:
+            # 先頭の記述が無く、手で書いたファイルでもない (空白と BOM だけの) ファイル。YAML の修正は要らない
+            problems.append(Problem("a", relative, f"生成したファイルの中身が無い。{header.command} を実行する"))
+            continue
+        actual = content.text
         if actual == expected:
+            # 読んだ内容は同じで、BOM か UTF-8 として読めないバイトだけが違う。YAML の修正は要らない
+            problems.append(
+                Problem(
+                    "a", relative,
+                    f"生成し直した内容と違う (BOM か、UTF-8 として読めないバイトがある)。{header.command} を実行する",
+                )
+            )
             continue
         diff = "".join(
             difflib.unified_diff(

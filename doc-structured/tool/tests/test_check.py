@@ -81,6 +81,47 @@ class CheckTest(ProjectTestCase):
             result.stdout,
         )
 
+    def test_check_a_reports_handwritten_file_at_output(self):
+        self.write(MODELS, "# 貸出のモデル (手で書いた)\n")
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            f"{MODELS}: 検査 a: 手で書いたファイルが、生成するファイルの場所にある。"
+            "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す",
+            result.stdout,
+        )
+        # 生成し直した内容との差分は出さない (generate を促さない)
+        self.assertNotIn("生成し直した内容と違う", result.stdout)
+
+    def test_check_a_asks_to_regenerate_empty_file_at_output(self):
+        self.write(MODELS, "")
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"{MODELS}: 検査 a: 生成したファイルの中身が無い。bin/doc-structured generate を実行する", result.stdout)
+        self.assertNotIn("手で書いたファイル", result.stdout)
+        self.assertNotIn("YAML を直して", result.stdout)
+
+    def test_check_a_reports_bom_and_invalid_bytes_in_generated_file(self):
+        path = self.project / MODELS
+        original = path.read_bytes()
+        path.write_bytes(b"\xef\xbb\xbf" + original)
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            f"{MODELS}: 検査 a: 生成し直した内容と違う (BOM か、UTF-8 として読めないバイトがある)。bin/doc-structured generate を実行する",
+            result.stdout,
+        )
+        path.write_bytes(original + b"\xff\n")
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"{MODELS}: 検査 a: 生成し直した内容と違う。", result.stdout)
+        # 案内どおりに generate を実行すると直る
+        generate = subprocess.run(
+            [PYTHON, "-m", "doc_structured", "generate"], cwd=self.project, env=clean_env(), capture_output=True, text=True
+        )
+        self.assertEqual(generate.returncode, 0, generate.stderr)
+        self.assertEqual(self.run_check("--only", "a").returncode, 0)
+
     def test_check_h_failure_skips_a_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")
         result = self.run_check()

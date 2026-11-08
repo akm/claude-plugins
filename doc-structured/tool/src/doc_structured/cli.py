@@ -19,7 +19,7 @@ from . import __version__
 from . import check
 from .config import Config, ConfigError, find_config, load_config
 from .domains import load_project
-from .generate import render_project, write_outputs
+from .generate import HANDWRITTEN_MESSAGE, HandwrittenFilesError, handwritten_fix, render_project, write_outputs
 
 VERSION_TEXT = f"doc-structured {__version__}"
 
@@ -83,7 +83,16 @@ def run_generate(config: Config) -> int:
             print(problem.format(), file=sys.stderr)
         print(f"doc-structured: YAML に {len(problems)} 件の誤りがあるので、何も生成しなかった", file=sys.stderr)
         return 1
-    written, deleted = write_outputs(config.root, render_project(project))
+    try:
+        written, deleted = write_outputs(config.root, render_project(project))
+    except HandwrittenFilesError as e:
+        for relative in e.paths:
+            print(f"{relative}: {HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}", file=sys.stderr)
+        print(
+            f"doc-structured: 生成するファイルの場所に手で書いたファイルが {len(e.paths)} 件あるので、何も生成しなかった",
+            file=sys.stderr,
+        )
+        return 1
     for path in written:
         print(f"書いた: {path}")
     for path in deleted:

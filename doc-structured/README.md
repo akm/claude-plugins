@@ -10,6 +10,7 @@ Claude Code で作るアプリケーションの文書を、定義が 1 か所�
 | [tool/](tool/) | ツール `doc-structured` の Python パッケージ (コマンド `doc-structured`) とテスト |
 | [rules/](rules/) | 規則の文書。プロジェクトのディレクトリ `.claude/rules/` に置くコピーの元 |
 | [skills/](skills/) | スキル `doc-structured:generate` と `doc-structured:check` |
+| [hooks/hooks.json](hooks/hooks.json)・[hook-scripts/](hook-scripts/) | 生成したファイルの直接の編集を拒否する hook (下の節「hook」) |
 | [scripts/plugin-version-notice](scripts/plugin-version-notice) | スキルの前置きで、プラグインと設定のバージョンの違いを 1 行で伝えるスクリプト |
 | [docs/decisions.md](docs/decisions.md) | 文書の構成の決定の一覧 |
 | [docs/release.md](docs/release.md) | 公開の手順 |
@@ -36,12 +37,21 @@ bin/doc-structured version
 | --- | --- |
 | `doc-structured version` | ツールのバージョンを表示する |
 | `doc-structured --version` | 同じ。設定ファイルは読まない |
-| `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあれば何も書かず、終了コード 1 で終了する |
+| `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する |
 | `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
 
 生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・h (YAML の形式と参照先)・i (YAML の参照の向き) です。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
 
 スキル `doc-structured:generate` と `doc-structured:check` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どちらも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
+
+## hook
+
+プラグインをインストールすると、PreToolUse の hook (スクリプト [hook-scripts/guard-generated.py](hook-scripts/guard-generated.py)) が、生成したファイルへの Edit・Write・NotebookEdit を、編集が実行される前に拒否し、生成元のパスと生成のコマンドを Claude に伝えます。生成した `.gitattributes` では、生成元の代わりに、属性を足す場所 (リポジトリのルートの `.gitattributes`) を伝えます。
+
+- 生成したファイルかどうかは、ファイル自身の先頭の記述で判定します (形式は規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) の「生成したファイル」)。判定には、プラグインに入っているツールのモジュールを使います。プロジェクトの設定は読まず、検査も実行しません。
+- まだ無いファイルと、手書きのファイルへの編集は拒否しません。
+- Bash での編集と人のエディタでの編集は防げません。スキル `doc-structured:check` の検査 a が検出します。
+- Python 3.12 以上の `python3` が要ります。古い `python3` では判定をせず、標準エラー出力に理由を書いて終了コード 1 で終了します。このとき Claude Code は編集をそのまま実行します。
 
 ## 設定ファイル
 
