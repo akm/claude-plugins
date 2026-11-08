@@ -6,7 +6,6 @@
   frontmatter のある Markdown (frontmatter の中の 2 行目)・YAML (1 行目)・シェルスクリプト (shebang の次の 2 行目):
     # doc-structured:generated 生成元: <パス> コマンド: <コマンド> (このファイルを直接編集せず、生成元を直して生成し直す)
 判定の規則 (バージョンをまたいで変えない): 先頭の 3 行の中に、HTML_PREFIX か HASH_PREFIX で始まる行があれば、生成したファイル。
-先頭の 3 行は、ファイルの先頭の HEADER_BYTES バイトの中で数える (それより後ろは読まない)。
 生成したファイルを読むときは、どの処理も関数 decode の読み方 (UTF-8 として読めないバイトは置き換え、先頭の BOM を除き、改行の CRLF と CR を LF にする) で読む。
 生成元は、リポジトリのルートからの相対パス (複数の YAML から作るときはディレクトリで、末尾に「/」)。
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-docs.md)。
@@ -22,8 +21,6 @@ MARKER = "doc-structured:generated"
 HTML_PREFIX = f"<!-- {MARKER} "
 HASH_PREFIX = f"# {MARKER} "
 HEADER_LINES = 3
-# 先頭の記述を探す範囲のバイト数。read_file と read_file_header が同じ範囲を同じ読み方で読み、LF の無い大きなファイルの全体を読まないため
-HEADER_BYTES = 4096
 NOTE = "(このファイルを直接編集せず、生成元を直して生成し直す)"
 GENERATE_COMMAND = "bin/doc-structured generate"
 # 生成した .gitattributes の直し方。内容は YAML ではなく生成したファイルの一覧から作るので、YAML を直す案内をしない。
@@ -115,16 +112,16 @@ def read_file(path: str | Path) -> FileContent:
     """ファイルの全体を decode の読み方で読む。ファイルを読めないときの OSError は、呼び出し元に渡す。"""
     raw = Path(path).read_bytes()
     text = decode(raw)
-    return FileContent(text=text, header=read_header(decode(raw[:HEADER_BYTES])), exact=_is_exact(raw))
+    return FileContent(text=text, header=read_header(text), exact=_is_exact(raw))
 
 
 def read_file_header(path: str | Path) -> Header | None:
-    """ファイルの先頭の HEADER_BYTES バイトだけを decode の読み方で読み、先頭の記述を返す。生成したファイルでなければ None。
+    """ファイルの先頭の HEADER_LINES 行 (LF で区切る) を decode の読み方で読み、先頭の記述を返す。生成したファイルでなければ None。
 
     全体を読まずに判定する処理 (プラグインの hook (hook-scripts/guard-generated.py) と、generate の生成したファイルの一覧) が使う。
-    判定に使うバイト列と読み方は関数 read_file と同じなので、結果も同じになる。
+    LF で区切った先頭の 3 行は、関数 read_file が splitlines で分けた先頭の 3 行を必ず含むので、判定は read_file と同じになる。
     ファイルを読めないときの OSError は、呼び出し元に渡す。
     """
     with open(path, "rb") as f:
-        head = f.read(HEADER_BYTES)
+        head = b"".join(f.readline() for _ in range(HEADER_LINES))
     return read_header(decode(head))

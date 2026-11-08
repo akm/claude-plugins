@@ -2,7 +2,6 @@
 
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
 
 from doc_structured import generated_header as gh
@@ -63,39 +62,17 @@ class HeaderTest(unittest.TestCase):
             broken.write_bytes(gh.markdown_line(SOURCE).encode("utf-8") + b"\n\xff\xfe\n")
             self.assertEqual(gh.read_file_header(broken), gh.Header(SOURCE, COMMAND))
 
-    def test_read_file_header_reads_only_header_bytes(self):
-        # LF の無い大きなファイルでも、読むのは先頭の HEADER_BYTES バイトまで
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "minified.js"
-            path.write_bytes(b"x" * (gh.HEADER_BYTES * 10))
-            read = []
-            original = open
-
-            def spy(*args, **kwargs):
-                f = original(*args, **kwargs)
-                f_read = f.read
-                f.read = lambda *a: read.append(len(chunk := f_read(*a))) or chunk
-                return f
-
-            with mock.patch("builtins.open", spy):
-                self.assertIsNone(gh.read_file_header(path))
-            self.assertLessEqual(sum(read), gh.HEADER_BYTES)
-
-    def test_both_functions_judge_from_the_same_header_bytes(self):
-        # 2 つの関数は、先頭の HEADER_BYTES バイトの中の先頭の 3 行で同じく判定する (行の区切りの種類に関わらない)
+    def test_both_functions_judge_the_same(self):
+        # 1 行目が長くても、行の区切りの種類に関わらず、2 つの関数は同じく判定する
         line = gh.hash_line(SOURCE).encode("utf-8")
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "x.md"
-            for long_line, separator in (
-                (b"a" * 10, b"\n"),
-                (b"a" * 10, b"\r"),
-                (b"a" * 10, "\u2028".encode("utf-8")),
-                (b"a" * gh.HEADER_BYTES, b"\n"),
-                (b"a" * gh.HEADER_BYTES, b"\r"),
-            ):
-                with self.subTest(length=len(long_line), separator=separator):
-                    path.write_bytes(long_line + separator + line + b"\n")
-                    self.assertEqual(gh.read_file_header(path), gh.read_file(path).header)
+            for long_line in (b"a" * 10, b"a" * 10000):
+                for separator in (b"\n", b"\r", "\u2028".encode("utf-8")):
+                    with self.subTest(length=len(long_line), separator=separator):
+                        path.write_bytes(long_line + separator + line + b"\n")
+                        self.assertEqual(gh.read_file_header(path), gh.Header(SOURCE, COMMAND))
+                        self.assertEqual(gh.read_file(path).header, gh.Header(SOURCE, COMMAND))
 
     def test_read_file_header_raises_when_file_cannot_be_read(self):
         with tempfile.TemporaryDirectory() as tmp:
