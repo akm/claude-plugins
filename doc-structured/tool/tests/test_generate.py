@@ -8,7 +8,7 @@ import subprocess
 import unittest
 
 from doc_structured.domains import load_project
-from doc_structured.generate import generated_files, render_project, write_outputs
+from doc_structured.generate import HandwrittenFilesError, generated_files, render_project, write_outputs
 from tooltest import PYTHON, SAMPLE_PROJECT, ProjectTestCase, clean_env
 
 MINIMAL = """\
@@ -130,8 +130,9 @@ class GenerateTest(ProjectTestCase):
         self.write("docs/glossary.md", "# 手で書いた用語集\n")
         project, problems = load_project(self.project)
         self.assertEqual(problems, [])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(HandwrittenFilesError) as raised:
             write_outputs(self.project, render_project(project))
+        self.assertEqual(raised.exception.paths, ["docs/glossary.md"])
         self.assertEqual((self.project / "docs/glossary.md").read_text(encoding="utf-8"), "# 手で書いた用語集\n")
 
     def test_yaml_errors_stop_generation(self):

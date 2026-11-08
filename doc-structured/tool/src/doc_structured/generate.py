@@ -278,6 +278,14 @@ def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
     return [relative for relative in outputs if is_handwritten(root / relative)]
 
 
+class HandwrittenFilesError(Exception):
+    """生成するファイルの場所に手で書いたファイルがあるので、何も書かなかったことを表す。"""
+
+    def __init__(self, paths: list[str]):
+        super().__init__(f"{HANDWRITTEN_MESSAGE}: {', '.join(paths)}")
+        self.paths = paths
+
+
 def handwritten_fix(relative: str) -> str:
     """手で書いたファイルが生成するファイルの場所にあるときの直し方。"""
     if relative == GITATTRIBUTES_PATH:
@@ -289,12 +297,12 @@ def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[
     """生成したファイルを書き、生成し直すと無くなるファイルを消す。書いたファイルと消したファイルを返す。
 
     消すのは、先頭の記述を持つファイル (生成したファイル) だけ。手書きのファイルは消さない。
-    内容が同じファイルは書かない。生成するファイルの場所に手で書いたファイルがあれば、書かずに ValueError を送出する
-    (呼び出し元は先に handwritten_at_outputs で確認し、利用者にエラーを伝える)。
+    内容が同じファイルは書かない。生成するファイルの場所に手で書いたファイルがあれば、何も書かずに
+    HandwrittenFilesError を送出する (呼び出し元が、そのパスの配列から利用者にエラーを伝える)。
     """
     handwritten = handwritten_at_outputs(root, outputs)
     if handwritten:
-        raise ValueError(f"{HANDWRITTEN_MESSAGE}: {', '.join(handwritten)}")
+        raise HandwrittenFilesError(handwritten)
     written: list[str] = []
     for relative, content in outputs.items():
         path = root / relative
