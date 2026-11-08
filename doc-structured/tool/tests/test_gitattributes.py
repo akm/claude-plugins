@@ -143,5 +143,6 @@ class GitattributesTest(ProjectTestCase):
         self.assert_generate_resolves()
         self.git("-c", "core.editor=true", "rebase", "--continue")
 
+
 if __name__ == "__main__":
     unittest.main()
