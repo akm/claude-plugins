@@ -86,16 +86,14 @@ class GuardGeneratedHookTest(ProjectTestCase):
         self.assert_denied(self.run_hook("Edit", MODELS), "docs/domains/02-loans/")
         self.assert_allowed(self.run_hook("Edit", HANDWRITTEN))
 
-    def test_reason_shows_relative_path_for_directory_starting_with_dots(self):
-        # cwd の直下の、名前が「..」で始まるディレクトリは cwd の中なので、相対パスで示す
-        path = self.write("..cache/generated.md", gh.markdown_line("docs/domains/02-loans/") + "\n# 本文\n")
-        reason = self.assert_denied(self.run_hook("Edit", str(path)), "docs/domains/02-loans/")
-        self.assertTrue(reason.startswith("..cache/generated.md は "), reason)
-        # cwd の外のファイルは絶対パスで示す
-        outside = self.tmp / "outside.md"
-        outside.write_text(gh.markdown_line("docs/domains/02-loans/") + "\n", encoding="utf-8")
-        reason = self.assert_denied(self.run_hook("Edit", str(outside)), "docs/domains/02-loans/")
-        self.assertTrue(reason.startswith(f"{outside} は "), reason)
+    def test_reason_shows_absolute_path_and_bases(self):
+        # 対象は cwd に関わらず絶対パスで示し、生成元とコマンドの基準 (リポジトリのルート) を書く
+        for cwd, path in ((self.project, MODELS), (self.project / "docs", "../" + MODELS)):
+            with self.subTest(cwd=cwd):
+                reason = self.assert_denied(self.run_hook("Edit", path, cwd=cwd), "docs/domains/02-loans/")
+                self.assertTrue(reason.startswith(f"{self.project / MODELS} は "), reason)
+                self.assertIn("(リポジトリのルートからの相対パス)", reason)
+                self.assertIn("リポジトリのルートで実行するコマンド bin/doc-structured generate", reason)
 
     def test_allows_handwritten_files(self):
         for tool_name in ("Edit", "Write"):

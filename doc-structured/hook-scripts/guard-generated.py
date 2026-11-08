@@ -82,15 +82,14 @@ def main():
     if header is None:
         return 0
 
-    relative = os.path.relpath(full_path, cwd)
-    # cwd の外かどうかはパスの要素で判定する (cwd の直下の「..cache」のような名前のディレクトリは cwd の中)
-    outside = relative == os.pardir or relative.startswith(os.pardir + os.sep)
-    shown = full_path if outside else relative
+    # 対象のパスは絶対パスで示す。生成元とコマンドはリポジトリのルートが基準で、hook はリポジトリのルートを知らないため
+    shown = os.path.normpath(full_path)
     command = header.command or generated_header.GENERATE_COMMAND
+    run = f"スキル {SKILL} (リポジトリのルートで実行するコマンド {command})"
     if header.source:
-        how = f"生成元 {header.source} を直し、スキル {SKILL} (コマンド {command}) で生成し直す"
+        how = f"生成元 {header.source} (リポジトリのルートからの相対パス) を直し、{run} で生成し直す"
     else:
-        how = f"先頭の記述から生成元を読み取れなかった。生成元を直し、スキル {SKILL} (コマンド {command}) で生成し直す"
+        how = f"先頭の記述から生成元を読み取れなかった。生成元を直し、{run} で生成し直す"
     deny(f"{shown} は doc-structured が生成したファイル (先頭に doc-structured:generated の記述がある) なので、直接編集しない。{how}。")
     return 0
 
