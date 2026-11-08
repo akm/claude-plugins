@@ -69,7 +69,9 @@ def main():
         return 0
 
     relative = os.path.relpath(full_path, cwd)
-    shown = full_path if relative.startswith("..") else relative
+    # cwd の外かどうかはパスの要素で判定する (cwd の直下の「..cache」のような名前のディレクトリは cwd の中)
+    outside = relative == os.pardir or relative.startswith(os.pardir + os.sep)
+    shown = full_path if outside else relative
     command = header.command or generated_header.GENERATE_COMMAND
     if header.source:
         how = f"生成元 {header.source} を直し、スキル {SKILL} (コマンド {command}) で生成し直す"

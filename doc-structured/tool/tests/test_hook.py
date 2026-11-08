@@ -81,6 +81,17 @@ class GuardGeneratedHookTest(ProjectTestCase):
         self.assert_denied(self.run_hook("Edit", MODELS), "docs/domains/02-loans/")
         self.assert_allowed(self.run_hook("Edit", HANDWRITTEN))
 
+    def test_reason_shows_relative_path_for_directory_starting_with_dots(self):
+        # cwd の直下の、名前が「..」で始まるディレクトリは cwd の中なので、相対パスで示す
+        path = self.write("..cache/generated.md", gh.markdown_line("docs/domains/02-loans/") + "\n# 本文\n")
+        reason = self.assert_denied(self.run_hook("Edit", str(path)), "docs/domains/02-loans/")
+        self.assertTrue(reason.startswith("..cache/generated.md は "), reason)
+        # cwd の外のファイルは絶対パスで示す
+        outside = self.tmp / "outside.md"
+        outside.write_text(gh.markdown_line("docs/domains/02-loans/") + "\n", encoding="utf-8")
+        reason = self.assert_denied(self.run_hook("Edit", str(outside)), "docs/domains/02-loans/")
+        self.assertTrue(reason.startswith(f"{outside} は "), reason)
+
     def test_allows_handwritten_files(self):
         for tool_name in ("Edit", "Write"):
             with self.subTest(tool=tool_name):
