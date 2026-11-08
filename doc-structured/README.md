@@ -8,6 +8,9 @@ Claude Code で作るアプリケーションの文書を、定義が 1 か所�
 | --- | --- |
 | [bin/doc-structured](bin/doc-structured) | プロジェクトに置くスクリプト (ツールの入口)。プロジェクトが設定したバージョンのツールを取得して実行する |
 | [tool/](tool/) | ツール `doc-structured` の Python パッケージ (コマンド `doc-structured`) とテスト |
+| [rules/](rules/) | 規則の文書。プロジェクトのディレクトリ `.claude/rules/` に置くコピーの元 |
+| [skills/](skills/) | スキル `doc-structured:generate` と `doc-structured:check` |
+| [scripts/plugin-version-notice](scripts/plugin-version-notice) | スキルの前置きで、プラグインと設定のバージョンの違いを 1 行で伝えるスクリプト |
 | [docs/decisions.md](docs/decisions.md) | 文書の構成の決定の一覧 |
 | [docs/release.md](docs/release.md) | 公開の手順 |
 
@@ -33,8 +36,12 @@ bin/doc-structured version
 | --- | --- |
 | `doc-structured version` | ツールのバージョンを表示する |
 | `doc-structured --version` | 同じ。設定ファイルは読まない |
+| `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあれば何も書かず、終了コード 1 で終了する |
+| `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
 
-ほかのサブコマンド (`generate`・`check` など) は、sub-issue ごとに足します。
+生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・h (YAML の形式と参照先)・i (YAML の参照の向き) です。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
+
+スキル `doc-structured:generate` と `doc-structured:check` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どちらも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
 
 ## 設定ファイル
 
@@ -65,6 +72,12 @@ python3 -m venv .venv && .venv/bin/pip install -e doc-structured/tool
 
 ```bash
 PATH="$PWD/.venv/bin:$PATH" .venv/bin/python -m unittest discover -s doc-structured/tool/tests
+```
+
+テストの題材は、架空の「図書館の貸出」のプロジェクト [tool/tests/fixtures/library-loans/](tool/tests/fixtures/library-loans/) です。生成したファイルもコミットしてあり、テスト `tests/test_generate.py` が、生成し直した内容と同じであることを検査します。生成の形を変えたときは、そのディレクトリでツールの `generate` を実行し、生成し直したファイルを同じコミットに含めます。
+
+```bash
+(cd doc-structured/tool/tests/fixtures/library-loans && ../../../../../.venv/bin/doc-structured generate)
 ```
 
 CI では、ワークフロー `.github/workflows/test.yml` がこのテストを Python 3.12 (ファイル `tool/.python-version`) で実行し、ワークフロー `.github/workflows/doc-structured-bin.yml` がランナー `ubuntu-slim` で、公開済みの新しい 2 つのバージョンについて、スクリプトが設定の `version` のとおりのバージョンを実行することを確認します。
