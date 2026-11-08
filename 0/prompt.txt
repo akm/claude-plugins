@@ -1,0 +1,27 @@
+Background (from the session that started this one):
+スキル `review-rally` は、レビューを別のセッションに任せるループである。Issue #180 の確認の途中で、同時に動く別のループの待機中に片付けを行うと、そのループが RR1 (レビュー不成立) で停止することが問題として見えた。Issue #180 のコメントにも観測として書く予定だが、対処は #180 の範囲に含めない。文書の規則はリポジトリのファイル `CLAUDE.md` に従い、ほかのプロジェクトの名前は Issue に書かない。
+
+Task:
+スキル `review-rally` で、別のループの待機中にブランチを片付けると、そのループが停止 RR1 になる問題を、GitHub の Issue に問題として記録してください。解決策の Issue にせず、問題と経緯を書き、関連する Issue・PR・ファイルへのリンクを残します。文書は変更しません。投稿の前に文面を利用者に示して承認を得てください。
+
+確認すること:
+- ファイル `review-triage/skills/review-rally/references/round.md` の突き合わせの 4 は、依頼の前の `waiting.refs` と今のブランチの一覧を比べ、worktree にチェックアウトされているブランチだけを除く。
+- ファイル `review-triage/skills/review-rally/references/stops.md` の節「片付けの案内」は、`git branch -D` を「このリポジトリのどの作業ツリーで実行してもよい」と書く。同じファイルの RR1 の行は、差が出る操作としてメインの作業ツリーで動く別のセッションの操作だけを挙げる。
+- 実際に起きた例: ループ `20261106-2200-feat-review-triage-fix-necessity-178` は、依頼の間にチェックアウトされていないブランチ `claude/blissful-jepsen-2c3383` が消えて RR1 で停止した。誰が消したかは分かっていない。状態のファイルは、作業ツリー `.claude/worktrees/review-rally-121fc0` のディレクトリ `tmp/review-rally/` の下にある。
+- 起きると推測している 2 つの形を、ファイルの記述に照らして確認する。(1) 依頼の前からあり、チェックアウトされていないブランチを待機中に消す。(2) 待機中に起動したセッションをアーカイブして HEAD が detached になり、ブランチだけが残る。
+
+完了の条件: Issue ができて、URL を報告している。対処の案は Issue の検討の材料として書いてよいが、決めない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_469670f2-45b6-48fa-a31d-449314eafbc3
+
+---
+
+この文面で投稿
+
+---
+
+書き換える
+
+---
+
+このセッションの残りのタスクはありますか？
