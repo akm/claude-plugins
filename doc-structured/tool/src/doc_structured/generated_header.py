@@ -5,7 +5,8 @@
     <!-- doc-structured:generated 生成元: <パス> コマンド: <コマンド> (このファイルを直接編集せず、生成元を直して生成し直す) -->
   frontmatter のある Markdown (frontmatter の中の 2 行目)・YAML (1 行目)・シェルスクリプト (shebang の次の 2 行目):
     # doc-structured:generated 生成元: <パス> コマンド: <コマンド> (このファイルを直接編集せず、生成元を直して生成し直す)
-判定の規則 (バージョンをまたいで変えない): 先頭の 3 行の中に、HTML_PREFIX か HASH_PREFIX で始まる行があれば、生成したファイル。
+判定の規則: 先頭の 3 行の中に、HTML_PREFIX か HASH_PREFIX で始まる行があれば、生成したファイル。バージョンをまたいで変えないのは先頭の記述の形で、
+0.3.0 からは先頭の BOM を除いてから判定する (BOM 付きのファイルだけは、0.2.x と判定が違う)。
 生成したファイルを読むときは、どの処理も関数 decode の読み方 (UTF-8 として読めないバイトは置き換え、先頭の BOM を除き、改行の CRLF と CR を LF にする) で読む。
 生成元は、リポジトリのルートからの相対パス (複数の YAML から作るときはディレクトリで、末尾に「/」)。
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-docs.md)。
