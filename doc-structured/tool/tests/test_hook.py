@@ -119,6 +119,11 @@ class GuardGeneratedHookTest(ProjectTestCase):
             '{"tool_input": "x"}',
             '{"tool_input": {"file_path": 1}}',
             '{"tool_input": {"file_path": "docs/glossary.md"}, "cwd": 1}',
+            # 偽と評価される値も、型が違えば誤りとして報告する
+            '{"tool_input": 0}',
+            '{"tool_input": {"file_path": false}}',
+            '{"tool_input": {"file_path": "docs/glossary.md"}, "cwd": 0}',
+            '{"tool_input": {"file_path": "docs/glossary.md"}, "cwd": false}',
         ):
             with self.subTest(input=text):
                 result = subprocess.run(

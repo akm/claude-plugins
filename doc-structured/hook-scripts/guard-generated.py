@@ -55,17 +55,23 @@ def main():
         return error(f"hook の入力を JSON として読めない ({e})。生成したファイルかどうかを判定せずに、編集を実行させる")
     if not isinstance(data, dict):
         return error("hook の入力が JSON のオブジェクトでない。生成したファイルかどうかを判定せずに、編集を実行させる")
-    tool_input = data.get("tool_input") or {}
+    # 既定値を使うのはキーが無いときだけ。値があって型が違えば (0 や false も)、入力の誤りとして報告する
+    tool_input = data.get("tool_input", {})
     if not isinstance(tool_input, dict):
         return error("hook の入力の tool_input が JSON のオブジェクトでない。生成したファイルかどうかを判定せずに、編集を実行させる")
-    path = tool_input.get("file_path") or tool_input.get("notebook_path")
+    path = ""
+    for key in ("file_path", "notebook_path"):
+        if key not in tool_input:
+            continue
+        if not isinstance(tool_input[key], str):
+            return error(f"hook の入力の {key} が文字列でない。生成したファイルかどうかを判定せずに、編集を実行させる")
+        path = path or tool_input[key]
     if not path:
         return 0
-    if not isinstance(path, str):
-        return error("hook の入力の file_path か notebook_path が文字列でない。生成したファイルかどうかを判定せずに、編集を実行させる")
-    cwd = data.get("cwd") or os.getcwd()
+    cwd = data.get("cwd", "")
     if not isinstance(cwd, str):
         return error("hook の入力の cwd が文字列でない。生成したファイルかどうかを判定せずに、編集を実行させる")
+    cwd = cwd or os.getcwd()
     full_path = os.path.join(cwd, path)
     if not os.path.isfile(full_path):
         return 0
