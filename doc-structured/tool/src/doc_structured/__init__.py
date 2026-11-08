@@ -4,4 +4,4 @@ __version__ はプラグインのバージョン (ファイル doc-structured/.c
 公開のタグ doc-structured--v<バージョン> もこの値から作る (手順はファイル doc-structured/docs/release.md)。
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
