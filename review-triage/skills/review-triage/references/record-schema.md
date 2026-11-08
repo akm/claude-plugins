@@ -159,7 +159,9 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
 | `verification` | | 修正の後の検証のうち、観点 B (周りの記述を再確認する) で読んだ範囲 (下記)。**任意だが、書くなら `near_edges` が要る** (無ければ検査が報告する。書いたつもりの検証が「無い」と読まれないため)。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 7 (文書を変えたコミット) |
 | `doc_dag` | | 修正の後の `doc-dag` の確認 (下記) — 対象と、どちらが SSOT か決まっていない重複 (doc-dag の語では「向きの無い重複」)・参照の循環 (doc-dag の語では「巡回」) の有無と対処。**任意だが、書くなら `scope` と `result` が要る**。書く条件は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 9 (文書を変えた問題) |
 | `decision` | △ | 立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。様式と、必須にする状態は、下の「立案の結果」 |
-| `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須** |
+| `options` | △ | 選択肢とトレードオフ。**`status: awaiting-human` のとき必須。** 案ごとに行を分け、行の先頭に案のラベル (英大文字で始まる英大文字と数字。例: `A`・`B`・`H1`) を書き、ラベルの後に半角空白か `(` か `:` を続ける (例: `A (推奨): ……`)。`option_patches` は、このラベルで案を指す |
+| `option_patches` | △ | 案ごとのパッチ (下記)。**`status: awaiting-human` のとき、`options` のすべての案のラベルに 1 つずつ要素が必要。** 人間の回答の後も消さずに残す |
+| `chosen_option` | | 人間が選んだ案のラベル。人間の回答を反映するときに書き、`pending` の問題にこれがあれば、修正フェーズは `approach` の文からではなく、その案のパッチを当てて直す。パッチを作り直して判断待ちに戻すときは消す |
 | `order` | | コミットの順序。**`investigated` では書かない** (書いてあれば検査が報告する)。それ以外の状態では任意で、無ければ問題の並び順 |
 | `depends_on` | | 依存する問題の `problem_id`。依存先が `not-fixed` でも検査しない。人間が回答で `pending` に戻した記録も同じ形になるため |
 | `sha` | △ | 直したコミットの短縮 SHA。**`status: done` のとき必須、それ以外 (`done-external` を含む) は空**。**1 つのコミットが複数の問題を覆ったときは、覆われた問題すべてに同じ短縮 SHA を書く** (起きる条件の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md) の手順 1 の「人間の回答の反映」) |
@@ -262,6 +264,55 @@ D9 の (1) (前の回までの下限未満の指摘と、問題が同じ) が成
           choice_reason: 手順は実装と一致している。説明を正とすると実装も変えることになる
           doc_change: remove
         status: pending
+```
+
+### 案のパッチ (`plans[].option_patches`)
+
+判断待ちの問題の案ごとの変更を、パッチ (`git diff` が出力する unified diff の形の差分) で残す。人間はパッチを見て案を選び、修正フェーズは選ばれた案のパッチを当てる。パッチの作り方とやり直しの手順の SSOT は [review-triage-fix の SKILL.md](../../review-triage-fix/SKILL.md)。
+
+1 つの要素には、`option` と、`patch`・`no_change`・`covered_by` のどれか 1 つを書く。
+
+| キー | 必須 | 内容 |
+| --- | --- | --- |
+| `option` | ✓ | 案のラベル。同じ問題の `options` のどれかの行の先頭にあること |
+| `patch` | △ | パッチ。`diff --git` で始まる。YAML のブロック (`\|`) で書き、末尾の改行を残す (`git apply` が末尾の改行を要るため) |
+| `base` | △ | パッチを作ったときの HEAD の短縮 SHA。**`patch` があるとき必須、それ以外では書かない** |
+| `no_change` | | `true` なら、ファイルを変えない案 (例: 直さない) |
+| `covered_by` | | ほかの問題の案のパッチで、この案も覆う (人間の回答が 2 つ以上の問題を 1 つの修正で覆うとき)。`problem_id` と `option` で、同じ回のパッチのある要素を指す |
+
+次の例は、判断待ちの 2 つの問題である (`cause` から `decision` までのキーは省いた)。P2 の案 A は、P1 の案 A のパッチで一緒に直す。
+
+```yaml
+      - problem_id: P1
+        options: |
+          A (推奨): 再開の説明を、上の手順への参照に書き換える
+          B: 直さない。説明は古い版の手順だが、手順と並べて読めば誤らない
+        option_patches:
+          - option: A
+            base: 3dfff27
+            patch: |
+              diff --git a/docs/manual.md b/docs/manual.md
+              index 9804839..4e231ad 100644
+              --- a/docs/manual.md
+              +++ b/docs/manual.md
+              @@ -1,4 +1,4 @@
+               ## 再開
+               中断した作業は、記録を読んで続ける。
+               記録の状態から、どのフェーズから続けるかが決まる。
+              -再開のときは、調査からやり直す。
+              +再開のときに続けるフェーズは、上の手順のとおり。
+          - option: B
+            no_change: true
+        status: awaiting-human
+      - problem_id: P2
+        options: |
+          A: P1 の案 A の修正で、この問題も直る
+        option_patches:
+          - option: A
+            covered_by:
+              problem_id: P1
+              option: A
+        status: awaiting-human
 ```
 
 ### 状態 (`status`)
