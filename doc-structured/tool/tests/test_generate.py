@@ -73,11 +73,11 @@ class GenerateTest(ProjectTestCase):
         readme = (self.project / "docs/domains/01-loans/README.md").read_text(encoding="utf-8")
         self.assertNotIn("unclassified_app_terms.md", readme)
 
-        # 定義が 1 つも無いドメインは、README.md だけ
+        # 定義が 1 つも無いドメインは、README.md だけ (と、その merge の設定の docs/.gitattributes)
         self.write("docs/domains/01-loans/domain.yaml", "domain:\n  description: 空のドメイン。\n")
         self.assertEqual(self.run_tool("generate").returncode, 0)
         names = sorted(generated_files(self.project))
-        self.assertEqual(names, ["docs/domains/01-loans/README.md"])
+        self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
 
     def test_yaml_errors_stop_generation(self):
         self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")

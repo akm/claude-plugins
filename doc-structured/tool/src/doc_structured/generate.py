@@ -8,6 +8,7 @@ docs/glossary.md を生成する。生成するファイルの中身の SSOT は
   - リンクは reference-style で、ラベルを ID にし、定義の行 [ID]: 相対パス#ID "完全な名前" をファイルの末尾に書く
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
+  - docs/.gitattributes に、生成したファイル (docs/.gitattributes 自身を含む) の merge の設定を書く
 同じ入力からは、いつも同じ出力を作る (時刻や環境に依存する値を書かない)。
 """
 
@@ -18,6 +19,10 @@ from . import generated_header, names
 from .domains import DOMAINS_DIR, Domain, Entry, Project
 
 GLOSSARY_PATH = "docs/glossary.md"
+GITATTRIBUTES_PATH = "docs/.gitattributes"
+# 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに自分のブランチの内容を残し、
+# 競合のマークを入れない (ファイルは競合の状態のまま)。生成し直してから git add する
+GITATTRIBUTES_COMMENT = "# 生成したファイルが競合したときは、自分のブランチの内容を残す (組み込みの merge driver binary)。生成し直してから git add する"
 README = "README.md"
 FILE_DESCRIPTIONS = {
     "models": "モデル・属性・値の定義",
@@ -198,6 +203,17 @@ def render_readme(domain: Domain, files: list[str]) -> str:
     return _document(f"{domain.dir}/", domain.id, blocks, links)
 
 
+def render_gitattributes(paths: list[str]) -> str:
+    """paths は、ディレクトリ docs/ の下の生成するファイルの、リポジトリのルートからの相対パス (docs/.gitattributes を除く)。"""
+    base = posixpath.dirname(GITATTRIBUTES_PATH)
+    lines = [generated_header.hash_line(f"{DOMAINS_DIR.as_posix()}/"), GITATTRIBUTES_COMMENT]
+    for path in sorted([*paths, GITATTRIBUTES_PATH]):
+        if not path.startswith(f"{base}/"):
+            raise ValueError(f"ディレクトリ {base}/ の外のファイルは {GITATTRIBUTES_PATH} に書けない: {path}")
+        lines.append(f"/{posixpath.relpath(path, base)} merge=binary")
+    return "\n".join(lines) + "\n"
+
+
 def render_project(project: Project) -> dict[str, str]:
     """生成するファイルの、リポジトリのルートからの相対パスと内容。"""
     outputs: dict[str, str] = {}
@@ -216,17 +232,22 @@ def render_project(project: Project) -> dict[str, str]:
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
     if any(d.models or d.terms for d in project.domains):
         outputs[GLOSSARY_PATH] = render_glossary(project)
+    if outputs:
+        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs))
     return dict(sorted(outputs.items()))
 
 
 def generated_files(root: Path) -> dict[str, generated_header.Header]:
-    """ディレクトリ docs/ の下の、先頭の記述を持つファイル (生成したファイル) と、その記述。"""
+    """ディレクトリ docs/ の下の、先頭の記述を持つファイル (生成したファイル) と、その記述。
+
+    調べるのは、拡張子が .md と .yaml のファイルと、名前が .gitattributes のファイル。
+    """
     found: dict[str, generated_header.Header] = {}
     docs = root / "docs"
     if not docs.is_dir():
         return found
     for path in sorted(docs.rglob("*")):
-        if not path.is_file() or path.suffix not in (".md", ".yaml"):
+        if not path.is_file() or (path.suffix not in (".md", ".yaml") and path.name != ".gitattributes"):
             continue
         with path.open(encoding="utf-8", errors="replace") as f:
             head = "".join(f.readline() for _ in range(generated_header.HEADER_LINES))
