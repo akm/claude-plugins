@@ -71,7 +71,12 @@ class GitattributesTest(ProjectTestCase):
         path.write_text(path.read_text(encoding="utf-8") + "/domains/01-catalog/concept.md merge=binary\n", encoding="utf-8")
         result = self.run_tool("check", "--only", "a")
         self.assertEqual(result.returncode, 1)
-        self.assertIn(f"{GITATTRIBUTES_PATH}: 検査 a: 生成し直した内容と違う。", result.stdout)
+        self.assertIn(
+            f"{GITATTRIBUTES_PATH}: 検査 a: 生成し直した内容と違う。このファイルを直接編集せず、bin/doc-structured generate を実行する。"
+            "内容は生成したファイルの一覧から作る。手で属性を足すときは、リポジトリのルートの .gitattributes に書く",
+            result.stdout,
+        )
+        self.assertNotIn("YAML を直して", result.stdout)
 
     def test_check_a_passes_after_generate(self):
         self.copy_sample()

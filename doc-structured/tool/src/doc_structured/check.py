@@ -14,7 +14,7 @@ from pathlib import Path
 from . import generated_header
 from .direction import check_direction
 from .domains import Project, load_project
-from .generate import generated_files, render_project
+from .generate import GITATTRIBUTES_PATH, generated_files, render_project
 from .problems import Problem
 
 LIGHT = ("a", "h", "i")
@@ -39,7 +39,14 @@ def check_generated(root: Path, project: Project) -> list[Problem]:
     outputs = render_project(project)
     for relative, expected in outputs.items():
         header = generated_header.read_header(expected)
-        how = f"このファイルを直接編集せず、生成元 {header.source} の YAML を直して {header.command} を実行する"
+        if relative == GITATTRIBUTES_PATH:
+            # 内容は YAML ではなく生成したファイルの一覧から作るので、YAML を直す案内をしない
+            how = (
+                f"このファイルを直接編集せず、{header.command} を実行する。内容は生成したファイルの一覧から作る。"
+                "手で属性を足すときは、リポジトリのルートの .gitattributes に書く"
+            )
+        else:
+            how = f"このファイルを直接編集せず、生成元 {header.source} の YAML を直して {header.command} を実行する"
         path = root / relative
         if not path.is_file():
             problems.append(Problem("a", relative, f"生成するはずのファイルが無い。{header.command} を実行する"))
