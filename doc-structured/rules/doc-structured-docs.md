@@ -52,7 +52,7 @@ ID は、定義のアンカーの名前であり、リンクのフラグメン�
 
 生成したファイルへの Edit・Write・NotebookEdit は、プラグインの hook が、編集が実行される前に拒否します。Bash での編集と人のエディタでの編集は、検査 a が検出します。
 
-ディレクトリ `docs/` の下の生成したファイルには、生成するファイル `docs/.gitattributes` で、git の組み込みの merge driver `binary` を設定します。生成したファイルが競合したときは、自分のブランチの内容が、競合のマーク無しで残ります。
+ディレクトリ `docs/` の下の生成したファイルには、生成するファイル `docs/.gitattributes` で、git の組み込みの merge driver `binary` を設定します。生成したファイルが競合したときは、git が自分の側 (ours) とする内容が、競合のマーク無しで残ります。git merge では現在のブランチの内容、git rebase では引数に指定したブランチの内容です。
 
 - 生成したファイルを直接編集しない。直すときは生成元を直し、スキル `doc-structured:generate` (コマンド `bin/doc-structured generate`) で生成し直す。
 - ツールで生成したファイルの競合を手動で解決せず生成し直す。

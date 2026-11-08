@@ -1,8 +1,8 @@
 """生成するファイル docs/.gitattributes (生成したファイルの merge の設定) のテスト。
 
 docs/.gitattributes は、ディレクトリ docs/ の下の生成したファイルに、git の組み込みの merge driver binary を設定する。
-生成したファイルが競合したマージの後に、自分のブランチの内容が残り (競合のマークは入らない)、
-generate で生成し直すと正しい内容になることを、一時的な git のリポジトリで確認する。
+生成したファイルが競合したマージとリベースの後に、git が ours とする側 (merge では現在のブランチ、rebase では引数に指定したブランチ) の
+内容が競合のマーク無しで残り、generate で生成し直すと正しい内容になることを、一時的な git のリポジトリで確認する。
 """
 
 import subprocess
@@ -82,7 +82,9 @@ class GitattributesTest(ProjectTestCase):
         self.assertIn(f"書いた: {GITATTRIBUTES_PATH}", result.stdout)
         self.assertEqual(self.run_tool("check", "--only", "a").returncode, 0)
 
-    def test_conflict_keeps_our_side_and_generate_fixes_it(self):
+    def make_conflicting_branches(self) -> None:
+        """2 つのブランチ main と other が、同じドメインの別の YAML のファイルに未分類の用語を足す。
+        YAML は競合しないが、生成したファイル unclassified_app_terms.md は同じ位置に足されて競合する。最後は main にいる。"""
         self.copy_sample()
         self.git("init", "--quiet", "--initial-branch=main")
         self.git("add", "--all")
@@ -90,33 +92,29 @@ class GitattributesTest(ProjectTestCase):
         self.assertEqual(
             self.git("check-attr", "merge", TERMS_FILE).stdout.strip(), f"{TERMS_FILE}: merge: binary"
         )
-
-        # 2 つのブランチが、同じドメインの別の YAML のファイルに未分類の用語を足す。YAML は競合しないが、
-        # 生成したファイル unclassified_app_terms.md は同じ位置に足されて競合する
         self.git("switch", "--quiet", "--create", "other")
         self.write("docs/domains/01-catalog/other/terms.yaml", term_yaml("isbn", "国際標準図書番号", "図書を識別する番号。"))
         self.assertEqual(self.run_tool("generate").returncode, 0)
         self.git("add", "--all")
         self.git("commit", "--quiet", "-m", "other")
-
         self.git("switch", "--quiet", "main")
         self.write("docs/domains/01-catalog/main/terms.yaml", term_yaml("spine_label", "背ラベル", "図書の背に貼るラベル。"))
         self.assertEqual(self.run_tool("generate").returncode, 0)
         self.git("add", "--all")
         self.git("commit", "--quiet", "-m", "main")
 
-        merge = self.git("merge", "--no-edit", "other", check=False)
-        self.assertNotEqual(merge.returncode, 0, merge.stdout)
+    def assert_conflicts_keep(self, kept_rev: str) -> None:
+        """競合したのは生成したファイルだけで、kept_rev の内容が競合のマーク無しで残っている。"""
         conflicted = self.git("diff", "--name-only", "--diff-filter=U").stdout.split()
         self.assertIn(TERMS_FILE, conflicted)
         for path in conflicted:
             with self.subTest(file=path):
-                # 生成したファイルだけが競合し、自分のブランチ (main) の内容が競合のマーク無しで残る
                 self.assertIn(path, generated_files(self.project))
                 actual = (self.project / path).read_text(encoding="utf-8")
                 self.assertNotIn("<<<<<<<", actual)
-                self.assertEqual(actual, self.git("show", f"HEAD:{path}").stdout)
+                self.assertEqual(actual, self.git("show", f"{kept_rev}:{path}").stdout)
 
+    def assert_generate_resolves(self) -> None:
         result = self.run_tool("generate")
         self.assertEqual(result.returncode, 0, result.stderr)
         terms = (self.project / TERMS_FILE).read_text(encoding="utf-8")
@@ -125,8 +123,25 @@ class GitattributesTest(ProjectTestCase):
         self.assertEqual(self.run_tool("check").returncode, 0)
         self.git("add", "--all")
         self.assertEqual(self.git("diff", "--name-only", "--diff-filter=U").stdout, "")
+
+    def test_merge_conflict_keeps_current_branch_and_generate_fixes_it(self):
+        self.make_conflicting_branches()
+        merge = self.git("merge", "--no-edit", "other", check=False)
+        self.assertNotEqual(merge.returncode, 0, merge.stdout)
+        # git merge では、現在のブランチ (main) の内容が残る
+        self.assert_conflicts_keep("main")
+        self.assert_generate_resolves()
         self.git("commit", "--quiet", "--no-edit")
 
+    def test_rebase_conflict_keeps_upstream_and_generate_fixes_it(self):
+        self.make_conflicting_branches()
+        self.git("switch", "--quiet", "other")
+        rebase = self.git("rebase", "main", check=False)
+        self.assertNotEqual(rebase.returncode, 0, rebase.stdout)
+        # git rebase では、引数に指定したブランチ (main) の内容が残る。リベースしているブランチ (other) の内容ではない
+        self.assert_conflicts_keep("main")
+        self.assert_generate_resolves()
+        self.git("-c", "core.editor=true", "rebase", "--continue")
 
 if __name__ == "__main__":
     unittest.main()

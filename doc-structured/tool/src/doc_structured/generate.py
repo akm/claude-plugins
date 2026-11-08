@@ -20,9 +20,13 @@ from .domains import DOMAINS_DIR, Domain, Entry, Project
 
 GLOSSARY_PATH = "docs/glossary.md"
 GITATTRIBUTES_PATH = "docs/.gitattributes"
-# 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに自分のブランチの内容を残し、
-# 競合のマークを入れない (ファイルは競合の状態のまま)。生成し直してから git add する
-GITATTRIBUTES_COMMENT = "# 生成したファイルが競合したときは、自分のブランチの内容を残す (組み込みの merge driver binary)。生成し直してから git add する"
+# 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し
+# (git merge では現在のブランチ、git rebase では引数に指定したブランチ)、競合のマークを入れない (ファイルは競合の状態のまま)。
+# 残った内容は古いことがあるので、生成し直してから git add する
+GITATTRIBUTES_COMMENT = (
+    "# 生成したファイルが競合したときは、git が ours とする側 (git merge では現在のブランチ、git rebase では引数に指定したブランチ) の"
+    "内容が残る (組み込みの merge driver binary)。生成し直してから git add する"
+)
 README = "README.md"
 FILE_DESCRIPTIONS = {
     "models": "モデル・属性・値の定義",
