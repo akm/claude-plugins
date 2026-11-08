@@ -46,7 +46,7 @@ bin/doc-structured version
 
 ## hook
 
-プラグインをインストールすると、PreToolUse の hook (スクリプト [hook-scripts/guard-generated.py](hook-scripts/guard-generated.py)) が、生成したファイルへの Edit・Write・NotebookEdit を、編集が実行される前に拒否し、生成元のパスと生成のコマンドを Claude に伝えます。
+プラグインをインストールすると、PreToolUse の hook (スクリプト [hook-scripts/guard-generated.py](hook-scripts/guard-generated.py)) が、生成したファイルへの Edit・Write・NotebookEdit を、編集が実行される前に拒否し、生成元のパスと生成のコマンドを Claude に伝えます。生成した `.gitattributes` では、生成元の代わりに、属性を足す場所 (リポジトリのルートの `.gitattributes`) を伝えます。
 
 - 生成したファイルかどうかは、ファイル自身の先頭の記述で判定します (形式は規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) の「生成したファイル」)。判定には、プラグインに入っているツールのモジュールを使います。プロジェクトの設定は読まず、検査も実行しません。
 - まだ無いファイルと、手書きのファイルへの編集は拒否しません。
