@@ -1,0 +1,25 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins (公開) に、Claude Code で作るアプリケーションの文書の構成を扱う新しいプラグイン `doc-structured` を作る。親の Issue は #192 で、sub-issue 29 件 (#193〜#221) が GitHub の sub-issue として付いている。決定の一覧はファイル `doc-structured/docs/decisions.md` (PR #190 でマージ済み) で、Issue は決定を繰り返して書かず、このファイルを参照する。今は `doc-structured/` にこのファイルしか無く、ツール・スキル・hook はこれから作る。利用者 (akm) は決定を 1 つずつインタビュー形式 (背景・質問・選択肢・推奨を短く、1 ターン 1 題) で確認してから進めることを求めている。推測で決めず、選択肢と推奨を示して利用者に選んでもらう。会話は日本語。文章の規約はルートの `CLAUDE.md` と `~/.claude/CLAUDE.md` に従い、Markdown・コードのコメント・コミットメッセージは wording-guard (スクリプト `~/.claude/plugins/cache/akm-claude-plugins/wording-guard/<最新の版>/scripts/wording_lint.py check --stdin --filename <パス>`) で error 0 件にしてからコミットする。実際のプロジェクト (非公開) の名前・番号・リンクは、このリポジトリの Issue・PR・ファイルに書かず「実際のプロジェクト」と書く。コミットは動機ごとに分ける (`~/.claude/rules/commit-rules.md`)。sub-issue 1 件につき PR 1 つ。
+
+Task:
+sub-issue #193「ツールを、プロジェクトが設定したバージョンで、手元でも CI でも同じように実行したい」に着手する。まず `gh issue view 193` と `gh issue view 192`、ファイル `doc-structured/docs/decisions.md` (特に「問 12: 生成物・検査・分担・配り方」の「(4) 配り方」と「計画で決めること・確認したこと」) を読む。
+
+この sub-issue で決めることと作るものは #193 の本文のとおり。要点:
+
+1. **決めること** (利用者に選択肢と推奨を示して決めてもらう。1 ターン 1 題): ツールの言語と、バージョンを指定して取得する方法 (条件: バージョンを指定して取得し実行できる・ランナー `ubuntu-slim` で時間がかからない・YAML のコメントと記述の順序を保って書き換えられる・取得に失敗したら別の方法を試さずエラーで終了する)、公開の手順 (タグの名前の形と作り方)、手元のチェックアウトのツールを使う指定 (環境変数など) の名前。材料は #193 の「本文に書く材料」にある。
+2. **作るもの**: スクリプト `bin/doc-structured` (設定ファイル `.claude/akm-claude-plugins/doc-structured/config.yaml` の `version: 1.2.3` の形の行だけを文字列の一致で取り出し、そのバージョンのツールを取得して実行する。最小にする)、ツール `doc-structured` の最小の形 (バージョンの表示・起動時に設定の全体を YAML として読んで形が違えばエラー・知らないサブコマンドはエラーで終了)、選んだ言語のテストをこのリポジトリの CI (`.github/workflows/test.yml`) に足す、公開の手順の記録。テストは架空の題材のサンプルを使う。
+3. **クローズ条件**は #193 のとおり。「公開した 2 つのバージョンで、`version` の書き換えで実行されるバージョンが変わる」には、タグ (または同等の公開) を 2 回作る必要がある。タグや release の作成・push は利用者に確認してから行う。
+4. 同じ PR で、`doc-structured/docs/decisions.md` の冒頭に親の Issue #192 への参照を 1 行足す (「親の Issue は #192」)。これは別のコミットにする。
+5. プラグインとしての最小の形 (`doc-structured/.claude-plugin/plugin.json` と `.claude-plugin/marketplace.json` への登録) が必要かどうかは、既存のプラグイン (例: `review-triage/`、`wording-guard/`) の構成とスクリプト `scripts/plugins.py` の docstring を読んで判断し、利用者に確認する。
+
+完了の形: ブランチにコミットし、`Closes #193` を本文に書いた PR を作り (本文は「何を変えるか・なぜ変えるか・確認したこと」)、利用者に報告する。マージは利用者が行う。分からないことや、決定の一覧と矛盾することが出たら、推測で進めずに利用者に質問する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+Python (推奨)
+
+---
+
+3.14 以降の方が uv での管理に移行しやすいと思います。ユーザーにも uv の利用を促進したいので 3.14 にしたいのですが、それだと問題ありますか？
