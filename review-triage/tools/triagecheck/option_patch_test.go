@@ -146,12 +146,20 @@ func TestReviewTriageRecordOptionPatchesPass(t *testing.T) {
 			return optionReplace(t, optionRecordYAML, "          B: 直さない\n", "\n          B: 直さない\n")
 		}},
 		{"人間の回答の後 (pending と chosen_option)", func(t *testing.T) string {
-			return optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
+			src := optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
 				"            no_change: true\n"+optionP1Pending+"        status: pending\n")
+			return optionReplace(t, src, "              option: A\n        status: awaiting-human\n",
+				"              option: A\n        approach: P1 の案 A の修正で直す\n        chosen_option: A\n"+
+					"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n"+
+					"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        status: pending\n")
 		}},
 		{"直した後 (done と chosen_option)", func(t *testing.T) string {
-			return optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
+			src := optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
 				"            no_change: true\n"+optionP1Pending+"        sha: 1a2b3c4\n        status: done\n")
+			return optionReplace(t, src, "              option: A\n        status: awaiting-human\n",
+				"              option: A\n        approach: P1 の案 A の修正で直す\n        chosen_option: A\n"+
+					"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n"+
+					"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        sha: 1a2b3c4\n        status: done\n")
 		}},
 		{"covered_by の要素を選んだ pending", func(t *testing.T) string {
 			src := optionReplace(t, optionRecordYAML, "            no_change: true\n        status: awaiting-human\n",
@@ -228,6 +236,8 @@ func TestReviewTriageRecordOptionPatchesViolations(t *testing.T) {
 				"        decision:\n          target: docs/guide.md の 9 行目\n          baseline: 上の手順\n" +
 				"          choice: baseline\n          choice_reason: 手順は実装と一致している\n        sha: 1a2b3c4\n        status: done\n",
 			"chosen_option \"A\" は P1 の案 \"A\" のパッチで覆う案なのに、P1 の chosen_option が \"\" です"},
+		{"参照先だけが案を選び、覆われる問題が判断待ち", p1Tail, "            no_change: true\n" + optionP1Pending + "        status: pending\n",
+			"P1 が案 \"A\" を選んでおり、そのパッチはこの問題の案 \"A\" も覆うのに、この問題の chosen_option が \"\" です"},
 		{"案を選んで pending にしたのに chosen_option が無い", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "        chosen_option: A\n", "", 1) + "        status: pending\n", "status pending で option_patches があるのに、chosen_option がありません"},
 		{"直した問題に chosen_option が無い", p1Tail, "            no_change: true\n" + strings.Replace(optionP1Pending, "        chosen_option: A\n", "", 1) + "        sha: 1a2b3c4\n        status: done\n", "status done で option_patches があるのに、chosen_option がありません"},
 		{"決めないと回答したのに chosen_option がファイルを変える案を指す", p1Tail, "            no_change: true\n" + optionP1NotFixed("A") + "        status: not-fixed\n", "status not-fixed なのに、chosen_option \"A\" はファイルを変える案です"},

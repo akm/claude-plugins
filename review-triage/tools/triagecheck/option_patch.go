@@ -176,6 +176,21 @@ func recordOptionPatchProblems(pl recordPlan, plans []recordPlan) []string {
 		// 「人間の回答の反映」)。無いと、人間が見たパッチを当てずに approach の文から直すことになる。
 		add("status %s で option_patches があるのに、chosen_option がありません (人間が選んだ案のラベルを書く。修正フェーズは、その案のパッチを当てる)", pl.Status)
 	}
+	// 参照先の問題が、この問題の covered_by が指す案を選んだなら、この問題も同じ回答でその案を選ぶ。
+	// 選んでいないと、修正フェーズが参照先のパッチを当て、この問題の変更が人間の選ばないままコミットされる。
+	for _, op := range pl.OptionPatches {
+		ref := op.CoveredBy
+		if ref == nil || ref.ProblemID == pl.ProblemID || pl.ChosenOption == op.Option {
+			continue
+		}
+		for _, other := range plans {
+			if other.ProblemID == ref.ProblemID && other.ChosenOption != "" && other.ChosenOption == ref.Option &&
+				(other.Status == "pending" || other.Status == "done") {
+				add("%s が案 %q を選んでおり、そのパッチはこの問題の案 %q も覆うのに、この問題の chosen_option が %q です (1 つの修正で覆う問題は、同じ回答で両方の案を選ぶ)",
+					ref.ProblemID, ref.Option, op.Option, pl.ChosenOption)
+			}
+		}
+	}
 	return problems
 }
 
