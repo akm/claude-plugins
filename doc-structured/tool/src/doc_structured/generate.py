@@ -9,7 +9,7 @@ docs/glossary.md を生成する。生成するファイルの中身の SSOT は
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
   - docs/.gitattributes に、生成したファイル (docs/.gitattributes 自身を含む) の merge の設定を書く
-  - 生成するファイルの場所に、先頭の記述の無いファイル (手で書いたファイル) があれば、何も書かない (呼び出し元がエラーにする)
+  - 生成するファイルの場所に、先頭の記述が無く中身のあるファイル (手で書いたファイル) があれば、何も書かない (呼び出し元がエラーにする)
 同じ入力からは、いつも同じ出力を作る (時刻や環境に依存する値を書かない)。
 """
 
@@ -263,13 +263,19 @@ def generated_files(root: Path) -> dict[str, generated_header.Header]:
 HANDWRITTEN_MESSAGE = "手で書いたファイルが、生成するファイルの場所にある"
 
 
+def is_handwritten(path: Path) -> bool:
+    """手で書いたファイルか。先頭の記述が無く、空白以外の文字があるファイルを、手で書いたファイルとする。
+
+    空のファイルと空白だけのファイル (生成したファイルが中身ごと消えたものなど) は、失う内容が無いので含めない。
+    """
+    if not path.is_file() or generated_header.read_file_header(path) is not None:
+        return False
+    return path.read_text(encoding="utf-8", errors="replace").strip() != ""
+
+
 def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
-    """生成するファイルの場所にある、先頭の記述の無いファイル (手で書いたファイル) の、リポジトリのルートからの相対パス。"""
-    return [
-        relative
-        for relative in outputs
-        if (root / relative).is_file() and generated_header.read_file_header(root / relative) is None
-    ]
+    """生成するファイルの場所にある、手で書いたファイル (関数 is_handwritten) の、リポジトリのルートからの相対パス。"""
+    return [relative for relative in outputs if is_handwritten(root / relative)]
 
 
 def handwritten_fix(relative: str) -> str:

@@ -93,6 +93,13 @@ class CheckTest(ProjectTestCase):
         # 生成し直した内容との差分は出さない (generate を促さない)
         self.assertNotIn("生成し直した内容と違う", result.stdout)
 
+    def test_check_a_asks_to_regenerate_empty_file_at_output(self):
+        self.write(MODELS, "")
+        result = self.run_check("--only", "a")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"{MODELS}: 検査 a: 生成し直した内容と違う。", result.stdout)
+        self.assertNotIn("手で書いたファイル", result.stdout)
+
     def test_check_h_failure_skips_a_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")
         result = self.run_check()

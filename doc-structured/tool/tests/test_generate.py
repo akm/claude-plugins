@@ -114,6 +114,17 @@ class GenerateTest(ProjectTestCase):
         self.assertEqual(self.run_tool("generate").returncode, 0)
         self.assertTrue((self.project / "docs/glossary.md").is_file())
 
+    def test_empty_file_at_output_is_overwritten(self):
+        # 空のファイルと空白だけのファイルは、失う内容が無いので、手で書いたファイルとせずに上書きする
+        self.copy_sample()
+        for relative, text in (("docs/glossary.md", ""), ("docs/.gitattributes", " \n\n")):
+            with self.subTest(file=relative):
+                self.write(relative, text)
+                result = self.run_tool("generate")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"書いた: {relative}", result.stdout)
+                self.assertIsNotNone(generated_files(self.project).get(relative))
+
     def test_write_outputs_refuses_to_overwrite_handwritten_file(self):
         self.copy_sample()
         self.write("docs/glossary.md", "# 手で書いた用語集\n")
