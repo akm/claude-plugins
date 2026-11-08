@@ -1,0 +1,15 @@
+Background (from the session that started this one):
+#178 (review-triage の修正の必要度と下限の指定) は、PR #183 (指摘とその判定、0.30.0) と PR #191 (修正計画、0.31.0) で実装し、#191 のマージで閉じた。#183 のレビューの residual 19 件は採否の判定を通さないまま Issue のコメントに残した。#191 の変更で当てはまらなくなったものもありうる。会話と文書は日本語で、利用者の CLAUDE.md の文章の規則に従う。他のプロジェクトの名前は Issue に書かない。
+
+Task:
+Issue akm/claude-plugins#178 のコメント https://github.com/akm/claude-plugins/issues/178#issuecomment-6689972087 に、1 つ目の PR (#183) のレビューで判定していない residual (報告しない条件に当たるが残した 1 行のメモ) が 19 件ある。main (PR #191 のマージ後、review-triage 0.31.0) で、各件がまだ当てはまるかを確認し、当てはまるものについて、直すか・別の Issue にするか・直さないかの案を利用者に示す。判定は利用者が決める。コードや文書はこのタスクでは変えない。完了は、19 件ごとの「当てはまるか」と案の一覧を利用者に示し、選択を受け取った時点。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_9ddc560b-1e34-4099-ad15-6267fc2229f7
+
+---
+
+推奨どおり
+
+---
+
+このセッションの残りのタスクはありますか？
