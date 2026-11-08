@@ -64,6 +64,8 @@ def main():
     if not isinstance(path, str):
         return error("hook の入力の file_path か notebook_path が文字列でない。生成したファイルかどうかを判定せずに、編集を実行させる")
     cwd = data.get("cwd") or os.getcwd()
+    if not isinstance(cwd, str):
+        return error("hook の入力の cwd が文字列でない。生成したファイルかどうかを判定せずに、編集を実行させる")
     full_path = os.path.join(cwd, path)
     if not os.path.isfile(full_path):
         return 0
