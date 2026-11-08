@@ -62,11 +62,9 @@ def main():
     if not os.path.isfile(full_path):
         return 0
     try:
-        with open(full_path, encoding="utf-8", errors="replace") as f:
-            head = "".join(f.readline() for _ in range(generated_header.HEADER_LINES))
+        header = generated_header.read_file_header(full_path)
     except OSError as e:
         return error(f"{full_path} を読めない ({e})。生成したファイルかどうかを判定せずに、編集を実行させる")
-    header = generated_header.read_header(head)
     if header is None:
         return 0
 

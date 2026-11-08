@@ -13,6 +13,7 @@ sub-issue 3 の hook も、このモジュールで生成したファイルか�
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 MARKER = "doc-structured:generated"
 HTML_PREFIX = f"<!-- {MARKER} "
@@ -57,3 +58,15 @@ def read_header(text: str) -> Header | None:
                 return Header(source="", command="")
             return Header(source=match.group("source"), command=match.group("command"))
     return None
+
+
+def read_file_header(path: str | Path) -> Header | None:
+    """ファイルの先頭の HEADER_LINES 行を読み、先頭の記述を返す。生成したファイルでなければ None。
+
+    ツールの generate と、プラグインの hook (hook-scripts/guard-generated.py) の両方がこの関数で判定する。
+    文字コードは UTF-8 で、読めないバイトは置き換えて読む (判定に使うのは決まった ASCII の接頭辞だけのため)。
+    ファイルを読めないときの OSError は、呼び出し元に渡す。
+    """
+    with open(path, encoding="utf-8", errors="replace") as f:
+        head = "".join(f.readline() for _ in range(HEADER_LINES))
+    return read_header(head)

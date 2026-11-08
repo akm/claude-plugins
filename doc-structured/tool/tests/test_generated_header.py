@@ -1,6 +1,8 @@
 """生成したファイルの先頭の記述 (モジュール generated_header) のテスト。"""
 
+import tempfile
 import unittest
+from pathlib import Path
 
 from doc_structured import generated_header as gh
 
@@ -43,6 +45,27 @@ class HeaderTest(unittest.TestCase):
 
     def test_marker_without_fields_is_still_generated(self):
         self.assertEqual(gh.read_header("<!-- doc-structured:generated 壊れた行 -->\n"), gh.Header("", ""))
+
+    def test_read_file_header_reads_first_lines_of_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            generated = Path(tmp) / "models.md"
+            generated.write_text(gh.markdown_line(SOURCE) + "\n\n# モデル\n", encoding="utf-8")
+            self.assertEqual(gh.read_file_header(generated), gh.Header(SOURCE, COMMAND))
+            # 文字列のパスも受け付ける
+            self.assertEqual(gh.read_file_header(str(generated)), gh.Header(SOURCE, COMMAND))
+            # 先頭の 3 行より後にある記述は判定に使わない
+            late = Path(tmp) / "notes.md"
+            late.write_text("# メモ\n\n説明\n" + gh.markdown_line(SOURCE) + "\n", encoding="utf-8")
+            self.assertIsNone(gh.read_file_header(late))
+            # UTF-8 として読めないバイトがあっても、置き換えて判定する
+            broken = Path(tmp) / "broken.md"
+            broken.write_bytes(gh.markdown_line(SOURCE).encode("utf-8") + b"\n\xff\xfe\n")
+            self.assertEqual(gh.read_file_header(broken), gh.Header(SOURCE, COMMAND))
+
+    def test_read_file_header_raises_when_file_cannot_be_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(OSError):
+                gh.read_file_header(Path(tmp) / "missing.md")
 
 
 if __name__ == "__main__":

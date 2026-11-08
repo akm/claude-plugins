@@ -253,9 +253,7 @@ def generated_files(root: Path) -> dict[str, generated_header.Header]:
     for path in sorted(docs.rglob("*")):
         if not path.is_file() or (path.suffix not in (".md", ".yaml") and path.name != ".gitattributes"):
             continue
-        with path.open(encoding="utf-8", errors="replace") as f:
-            head = "".join(f.readline() for _ in range(generated_header.HEADER_LINES))
-        header = generated_header.read_header(head)
+        header = generated_header.read_file_header(path)
         if header is not None:
             found[path.relative_to(root).as_posix()] = header
     return found
