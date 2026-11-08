@@ -1,8 +1,8 @@
 """生成するファイル docs/.gitattributes (生成したファイルの merge の設定) のテスト。
 
 docs/.gitattributes は、ディレクトリ docs/ の下の生成したファイルに、git の組み込みの merge driver binary を設定する。
-生成したファイルが競合したマージとリベースの後に、git が ours とする側 (merge では現在のブランチ、rebase では引数に指定したブランチ) の
-内容が競合のマーク無しで残り、generate で生成し直すと正しい内容になることを、一時的な git のリポジトリで確認する。
+生成したファイルが競合したマージとリベースの後に、git が ours とする側 (このテストの git merge では現在のブランチ、
+git rebase main ではリベース先のブランチ main) の内容が競合のマーク無しで残り、generate で生成し直すと正しい内容になることを、一時的な git のリポジトリで確認する。
 """
 
 import subprocess
@@ -138,7 +138,7 @@ class GitattributesTest(ProjectTestCase):
         self.git("switch", "--quiet", "other")
         rebase = self.git("rebase", "main", check=False)
         self.assertNotEqual(rebase.returncode, 0, rebase.stdout)
-        # git rebase では、引数に指定したブランチ (main) の内容が残る。リベースしているブランチ (other) の内容ではない
+        # git rebase main では、リベース先のブランチ (main) の内容が残る。リベースしているブランチ (other) の内容ではない
         self.assert_conflicts_keep("main")
         self.assert_generate_resolves()
         self.git("-c", "core.editor=true", "rebase", "--continue")
