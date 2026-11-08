@@ -268,9 +268,11 @@ def is_handwritten(path: Path) -> bool:
 
     空のファイルと空白だけのファイル (生成したファイルが中身ごと消えたものなど) は、失う内容が無いので含めない。
     """
-    if not path.is_file() or generated_header.read_file_header(path) is not None:
+    if not path.is_file():
         return False
-    return path.read_text(encoding="utf-8", errors="replace").strip() != ""
+    # ファイルを 1 回だけ読み、同じ文字列で先頭の記述と空白を判定する
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return generated_header.read_header(text) is None and text.strip() != ""
 
 
 def handwritten_at_outputs(root: Path, outputs: dict[str, str]) -> list[str]:
