@@ -145,18 +145,21 @@ class GenerateTest(ProjectTestCase):
                 self.assertIn("書いた: docs/glossary.md", result.stdout)
                 self.assertEqual(glossary.read_bytes(), original)
 
-    def test_generated_file_with_crlf_is_not_rewritten(self):
-        # 改行だけが CRLF になった生成したファイルは、内容が同じなので上書きしない (検査 a も報告しない)
+    def test_generated_file_with_crlf_or_cr_is_not_rewritten(self):
+        # 改行だけが CRLF か CR になった生成したファイルは、内容が同じなので上書きしない (検査 a も報告しない)
         self.copy_sample()
         glossary = self.project / "docs/glossary.md"
-        crlf = glossary.read_bytes().replace(b"\n", b"\r\n")
-        glossary.write_bytes(crlf)
-        result = self.run_tool("generate")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("docs/glossary.md", result.stdout)
-        self.assertEqual(glossary.read_bytes(), crlf)
-        check = self.run_tool("check", "--only", "a")
-        self.assertEqual(check.returncode, 0, check.stdout)
+        original = glossary.read_bytes()
+        for newline in (b"\r\n", b"\r"):
+            with self.subTest(newline=newline):
+                changed = original.replace(b"\n", newline)
+                glossary.write_bytes(changed)
+                result = self.run_tool("generate")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("docs/glossary.md", result.stdout)
+                self.assertEqual(glossary.read_bytes(), changed)
+                check = self.run_tool("check", "--only", "a")
+                self.assertEqual(check.returncode, 0, check.stdout)
 
     def test_write_outputs_refuses_to_overwrite_handwritten_file(self):
         self.copy_sample()
