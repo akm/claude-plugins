@@ -112,12 +112,16 @@ class GuardGeneratedHookTest(ProjectTestCase):
         self.assert_allowed(self.run_hook("Edit", str(self.project / HANDWRITTEN)))
 
     def test_invalid_input_is_reported_without_deciding(self):
-        result = subprocess.run(
-            [PYTHON, str(HOOK_SCRIPT)], input="{", cwd=self.tmp, env=clean_env(), capture_output=True, text=True
-        )
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout, "")
-        self.assertIn("doc-structured:", result.stderr)
+        # JSON として読めない・オブジェクトでない・tool_input がオブジェクトでない・パスが文字列でない
+        for text in ("{", "[]", '{"tool_input": "x"}', '{"tool_input": {"file_path": 1}}'):
+            with self.subTest(input=text):
+                result = subprocess.run(
+                    [PYTHON, str(HOOK_SCRIPT)], input=text, cwd=self.tmp, env=clean_env(), capture_output=True, text=True
+                )
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stdout, "")
+                self.assertTrue(result.stderr.startswith("doc-structured: "), result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
 
     def test_registered_as_pre_tool_use_hook(self):
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))["hooks"]

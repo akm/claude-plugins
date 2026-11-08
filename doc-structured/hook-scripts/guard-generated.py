@@ -53,10 +53,16 @@ def main():
         data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         return error(f"hook の入力を JSON として読めない ({e})。生成したファイルかどうかを判定せずに、編集を実行させる")
+    if not isinstance(data, dict):
+        return error("hook の入力が JSON のオブジェクトでない。生成したファイルかどうかを判定せずに、編集を実行させる")
     tool_input = data.get("tool_input") or {}
+    if not isinstance(tool_input, dict):
+        return error("hook の入力の tool_input が JSON のオブジェクトでない。生成したファイルかどうかを判定せずに、編集を実行させる")
     path = tool_input.get("file_path") or tool_input.get("notebook_path")
     if not path:
         return 0
+    if not isinstance(path, str):
+        return error("hook の入力の file_path か notebook_path が文字列でない。生成したファイルかどうかを判定せずに、編集を実行させる")
     cwd = data.get("cwd") or os.getcwd()
     full_path = os.path.join(cwd, path)
     if not os.path.isfile(full_path):
