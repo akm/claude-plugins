@@ -232,12 +232,15 @@ type recordPlan struct {
 	// 書くなら scope と result が要る (record-schema.md「doc-dag の確認」)。
 	DocDag *recordDocDag `yaml:"doc_dag"`
 	// Decision は立案の結果 (指摘された箇所と基準、選んだ選択肢と理由)。型と検査は fix_decision.go。
-	Decision  *recordDecision `yaml:"decision"`
-	Options   string          `yaml:"options"`
-	Order     int             `yaml:"order"`
-	DependsOn []string        `yaml:"depends_on"`
-	SHA       string          `yaml:"sha"`
-	Status    string          `yaml:"status"`
+	Decision *recordDecision `yaml:"decision"`
+	Options  string          `yaml:"options"`
+	// OptionPatches は判断待ちの案ごとのパッチ、ChosenOption は人間が選んだ案のラベル。型と検査は option_patch.go。
+	OptionPatches []recordOptionPatch `yaml:"option_patches"`
+	ChosenOption  string              `yaml:"chosen_option"`
+	Order         int                 `yaml:"order"`
+	DependsOn     []string            `yaml:"depends_on"`
+	SHA           string              `yaml:"sha"`
+	Status        string              `yaml:"status"`
 	// AppliedExternalURL / Notes は status: done-external の反映先の記録。
 	// リポジトリ外の成果物 (PR 本文・Issue のコメント・外部 Wiki など) への修正は
 	// コミットが立たないので sha を書けない。URL を必須にすると、URL を持たない
@@ -291,10 +294,12 @@ var recordAllowedKeys = map[string]map[string]bool{
 	"帰結":      {"condition": true, "who": true, "what": true, "detectability": true},
 	"根拠の検証":   {"stages": true, "result": true},
 	"修正計画": {"problem_id": true, "cause": true, "finding_ids": true, "approach": true,
-		"investigation": true, "verification": true, "doc_dag": true, "decision": true, "options": true, "order": true, "depends_on": true, "sha": true,
-		"status": true, "applied_external_url": true, "notes": true},
+		"investigation": true, "verification": true, "doc_dag": true, "decision": true, "options": true,
+		"option_patches": true, "chosen_option": true, "order": true, "depends_on": true, "sha": true, "status": true, "applied_external_url": true, "notes": true},
 	"立案の結果": {"target": true, "baseline": true, "baseline_fixed": true, "choice": true, "choice_reason": true,
 		"doc_change": true, "doc_change_reason": true},
+	"案のパッチ":       {"option": true, "patch": true, "base": true, "no_change": true, "covered_by": true},
+	"パッチの参照":      {"problem_id": true, "option": true},
 	"調査":          {"scope": true, "included": true, "excluded": true},
 	"検証":          {"near_edges": true},
 	"doc-dag の確認": {"scope": true, "result": true},
@@ -442,7 +447,7 @@ func recordProblemsInYAML(f string, data []byte) ([]string, *recordDoc) {
 // 旧様式の recurrence も同じで、null は「無い」と同一になり、書きかけの項目が消える。
 // consequence / premise_check の null は必須サブキーの欠落として既に報告されるので
 // ここに含めない。重ねると 1 つの書き忘れが複数の問題になるため。
-var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "fix_necessity_reason": true, "below_minimum_ref": true, "decision": true, "investigation": true, "verification": true, "doc_dag": true, "recurrence": true}
+var recordNullSilentKeys = map[string]bool{"plan_ref": true, "prior_defect": true, "fix_necessity_reason": true, "below_minimum_ref": true, "decision": true, "investigation": true, "verification": true, "doc_dag": true, "option_patches": true, "covered_by": true, "recurrence": true}
 
 // recordUnknownKeyProblems は許可キー集合との突き合わせで未知のキーと、
 // 値の無い構造キー (recordNullSilentKeys) を列挙する。
@@ -504,6 +509,10 @@ func recordUnknownKeyProblems(f string, n *yaml.Node) []string {
 				walkMap(v, "doc-dag の確認")
 			case "decision":
 				walkMap(v, "立案の結果")
+			case "option_patches":
+				walkSeq(v, "案のパッチ")
+			case "covered_by":
+				walkMap(v, "パッチの参照")
 			case "recurrence":
 				walkMap(v, "検知")
 			case "evidence":
@@ -716,7 +725,7 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 			// approachRequired は修正方法 (approach) が無いことを報告する。必須かどうかは
 			// status ごとに決まる (スキーマ表の approach の行)。修正に進む状態
 			// (pending) と修正を終えた状態 (done / done-external) では必須、awaiting-human
-			// では任意 (人間の立案待ちは approach を持たず、人間の回答の後に書く)、not-fixed
+			// では任意 (判断待ちの問題は、人間の回答の後に approach を書く)、not-fixed
 			// でも任意 (直さないと決めた問題)、investigated では逆に書いてあれば報告する。
 			approachRequired := func() {
 				if pl.Approach == "" {
@@ -788,6 +797,9 @@ func recordSemanticProblems(f string, doc *recordDoc) []string {
 				statusKnown = false
 			}
 			for _, m := range recordDecisionProblems(pl, statusKnown) {
+				add("%s: %s", pn, m)
+			}
+			for _, m := range recordOptionPatchProblems(pl, run.Plans) {
 				add("%s: %s", pn, m)
 			}
 			// 調査は investigated 以外の状態では任意 (無ければ未調査) だが、書くなら範囲 (scope) が要る。
@@ -1046,6 +1058,10 @@ func renderReviewTriageSummaryDoc(yamlPath string, doc *recordDoc) string {
 					fmt.Fprintf(&b, "\n- **%s の立案**: %s\n", recordCell(pl.ProblemID), renderDecision(pl.Decision))
 				}
 			}
+			// 案ごとのパッチ。option_patches の無い問題には出さない (立案の行と同じ理由)。
+			for _, pl := range run.Plans {
+				renderOptionPatches(&b, pl)
+			}
 		}
 
 		if run.Notes != "" {
@@ -1208,7 +1224,7 @@ func renderPlanCells(pl recordPlan) []string {
 	case pl.AppliedExternalURL != "":
 		sha = "`" + recordCell(pl.AppliedExternalURL) + "`"
 	}
-	// 修正方法の欄。investigated (と人間の立案待ちの awaiting-human、直さない not-fixed) は approach を
+	// 修正方法の欄。investigated (と、approach を書く前の awaiting-human・not-fixed) は approach を
 	// 持たないので、空のセルではなく順序の欄と同じ「—」を出す。空のセルは書き忘れと
 	// 区別できないため。approach を持つ状態の行は変わらない。
 	approach := "—"

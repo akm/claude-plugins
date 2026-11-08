@@ -175,7 +175,7 @@ func TestReviewTriageRecordDecisionCombinationsPass(t *testing.T) {
 		{"基準が変えられないなら baseline", strings.Replace(decisionBaselineYAML, "choice: baseline", "baseline_fixed: true\n          choice: baseline", 1), "pending"},
 		{"指摘された箇所を正とする", strings.Replace(decisionBaselineYAML, "choice: baseline", "choice: target", 1), "pending"},
 		{"どちらも正としない", strings.Replace(decisionBaselineYAML, "choice: baseline", "choice: neither", 1), "pending"},
-		{"選択待ちで決めない", undecided + "        options: 案 A か案 B\n", "awaiting-human"},
+		{"選択待ちで決めない", undecided + awaitingOptionsYAML, "awaiting-human"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -197,7 +197,7 @@ func TestReviewTriageRecordDecisionRequiredStatus(t *testing.T) {
 		{"pending の書き忘れを報告する", "pending", "", "status pending には decision が必須"},
 		{"not-fixed の書き忘れを報告する", "not-fixed", "", "status not-fixed には decision が必須"},
 		{"done には求めない", "done", "", ""},
-		{"awaiting-human には求めない", "awaiting-human", "        options: 案 A か案 B\n", ""},
+		{"awaiting-human には求めない", "awaiting-human", awaitingOptionsYAML, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -25,9 +25,9 @@
 
 **修正方法が複数あり得て、規範や構造の設計を変える場合は、表で立案フェーズが決めるとした選択肢でも人間が決める。** 設計のトレードオフは誤りの訂正ではないので、スキルが人間に諮らずに決めない。
 
-**人間が決める選択肢を立案フェーズが選ばない。** 候補になるなら、`options` に書いて `status: awaiting-human` にする。
+**人間が決める選択肢を立案フェーズが選ばない。** 候補になるなら、`options` に書いて `status: awaiting-human` にする。`options` の書き方 (案ごとの行と、行の先頭のラベル) の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の `options` の行、選択待ちにした問題の案のパッチの作り方の SSOT は [SKILL.md](../SKILL.md) の「案のパッチ」。
 
-**今回は直さないと人間が決めた問題 (`status: not-fixed`) と同じ問題が採択になっていたら (調査の結果の `investigation` に書いてある)、修正方法を決めず、`options` に前の決定 (回と識別子・`decision.choice_reason`) を書いて `status: awaiting-human` にする。** 人間の決定を、人間に確認せずに覆さないため。
+**今回は直さないと人間が決めた問題 (`status: not-fixed`) と同じ問題が採択になっていたら (調査の結果の `investigation` に書いてある)、修正方法を決めず、`options` の案に前の決定 (回と識別子・`decision.choice_reason`) を添えて書き、`status: awaiting-human` にする。** 人間の決定を、人間に確認せずに覆さないため。
 
 ## 修正の内容
 
