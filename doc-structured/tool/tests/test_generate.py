@@ -92,7 +92,7 @@ class GenerateTest(ProjectTestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(
             "docs/domains/02-loans/models.md: 手で書いたファイルが、生成するファイルの場所にある。"
-            "ファイルの名前を変えるか、内容を手書きの文書に移してから、このファイルを消す",
+            "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す",
             result.stderr,
         )
         self.assertIn(

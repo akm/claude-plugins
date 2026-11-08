@@ -282,7 +282,7 @@ def handwritten_fix(relative: str) -> str:
     """手で書いたファイルが生成するファイルの場所にあるときの直し方。"""
     if relative == GITATTRIBUTES_PATH:
         return "手で書いた行をリポジトリのルートの .gitattributes に移してから、このファイルを消す"
-    return "ファイルの名前を変えるか、内容を手書きの文書に移してから、このファイルを消す"
+    return "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す"
 
 
 def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[str]]:

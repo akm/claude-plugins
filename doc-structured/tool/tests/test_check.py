@@ -87,7 +87,7 @@ class CheckTest(ProjectTestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(
             f"{MODELS}: 検査 a: 手で書いたファイルが、生成するファイルの場所にある。"
-            "ファイルの名前を変えるか、内容を手書きの文書に移してから、このファイルを消す",
+            "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す",
             result.stdout,
         )
         # 生成し直した内容との差分は出さない (generate を促さない)
