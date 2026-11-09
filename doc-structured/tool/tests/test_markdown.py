@@ -89,6 +89,10 @@ class LinkAndUrlTest(unittest.TestCase):
             [("autolink", "https://example.com/a", 1), ("bare", "https://example.com/b", 27), ("bare", "https://example.com/c", 52)],
         )
 
+    def test_bare_url_stops_before_angle_bracket(self):
+        doc = markdown.parse("see https://example.com<br> ok\n")
+        self.assertEqual([(u.form, u.url) for u in doc.urls], [("bare", "https://example.com")])
+
     def test_url_in_inline_link_is_not_reported_twice(self):
         doc = markdown.parse("[a](https://example.com)\n")
         self.assertEqual(doc.urls, [])

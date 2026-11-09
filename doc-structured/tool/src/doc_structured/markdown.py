@@ -43,7 +43,7 @@ EMAIL_AUTOLINK_RE = re.compile(r"<(?P<url>[A-Za-z0-9.!#$%&'*+/=?^_`{|}~\-]+@[A-Z
 # インラインの HTML のタグ
 HTML_TAG_RE = re.compile(r"</?[A-Za-z][A-Za-z0-9\-]*(?:\s+[^<>]*?)?/?>")
 # 文中にそのまま書いた URL。空白・山括弧・ASCII 以外の文字の手前までを URL とする
-BARE_URL_RE = re.compile(r"https?://[\x21-\x7e]+")
+BARE_URL_RE = re.compile(r"https?://[\x21-\x3b\x3d\x3f-\x7e]+")
 # 文中にそのまま書いた URL の末尾から除く文字 (文の句読点として書くことが多いもの)
 BARE_URL_TRAILING = ".,:;!?'\")]*_~"
 
