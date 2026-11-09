@@ -196,6 +196,14 @@ class JudgmentTest(ScratchTestCase):
 
 
 class DefinitionBlockTest(ScratchTestCase):
+    def test_keeps_reference_style_image_definitions(self):
+        text = f"{HEAD}図は ![貸出の流れ][flow] のとおり。\n\n[flow]: images/flow.png 'x'\n"
+        self.write(CONCEPT, text)
+        result = self.run_tool("links-fix")
+        self.assertEqual((result.returncode, result.stdout), (0, "直すものは無かった\n"))
+        self.assertEqual(self.read(CONCEPT), text)
+        self.assertCheckPasses()
+
     def test_removes_unused_definitions(self):
         self.write(CONCEPT, f"{HEAD}本文\n\n{LOAN_DEFINITION}\n")
         self.assertEqual(self.run_tool("links-fix").returncode, 0)

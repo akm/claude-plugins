@@ -126,6 +126,14 @@ class LinkFormTest(LinksTestCase):
     def test_images_are_not_checked(self):
         self.assertPasses(f"{HEAD}![図](images/loan.png)\n")
 
+    def test_reference_style_image_definitions_are_not_checked(self):
+        self.assertPasses(f"{HEAD}図は ![貸出の流れ][flow] のとおり。\n\n[flow]: images/flow.png\n")
+
+    def test_label_used_by_link_and_image_is_checked_as_link(self):
+        self.assertReports(
+            f"{HEAD}[flow] と ![貸出の流れ][flow]\n\n[flow]: images/flow.png\n", "ID のアンカー (#<ID>) を指していない", 7
+        )
+
 
 class LabelTest(LinksTestCase):
     def test_undefined_label_with_candidates(self):

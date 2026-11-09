@@ -7,7 +7,8 @@
   (markdown-it-py は行の範囲を返すが列を返さず、定義の無いラベルをただの文字列として扱うため)。
 - コードブロック・mermaid の図・HTML のブロックの中は読まない。行の中では、インラインコード・HTML のコメントとタグ・
   エスケープした「\\[」の中を読まない。
-- 画像 (![説明](パス)・![説明][ラベル]) は読み飛ばす。脚注 ([^1])・タスクリストのチェックボックス ([ ]・[x])・
+- 画像 (![説明](パス)・![説明][ラベル]) は、リンクとして読まない。reference-style の画像のラベルだけを image_labels に残す
+  (その定義の行を、リンクの規則の対象から外すため)。脚注 ([^1])・タスクリストのチェックボックス ([ ]・[x])・
   GitHub の注記 ([!NOTE] など) はラベルとして扱わない。
 
 行と列は 1 から数える。列は文字 (コードポイント) で数える。
@@ -123,6 +124,8 @@ class Document:
     definitions: list[Definition] = field(default_factory=list)
     anchors: list[Anchor] = field(default_factory=list)
     headings: list[Heading] = field(default_factory=list)
+    # reference-style の画像 (![説明][ラベル]・![ラベル][]・![ラベル]) が使うラベル
+    image_labels: list[str] = field(default_factory=list)
     # 本文の行数。末尾の定義の行のまとまり (定義の行と、その間と前後の空行) を除いた、先頭からの行数
     body_end: int = 0
 
@@ -413,10 +416,15 @@ class _InlineScanner:
             paren = self.matching_paren(after)
             if paren is not None:
                 return paren + 1
+        inner = self.text[i + 1 : close]
         if self.text.startswith("[", after):
             label_close = self.matching_bracket(after)
             if label_close is not None:
+                label = self.text[after + 1 : label_close]
+                self.document.image_labels.append(label if label.strip() else inner)
                 return label_close + 1
+        if inner.strip():
+            self.document.image_labels.append(inner)
         return after
 
     def read_bracket(self, i: int) -> int:

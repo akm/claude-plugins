@@ -11,6 +11,8 @@
   - 定義の行を末尾のまとまりに書き、段落の一部になっていない
   - 定義の行の href が、ID の形で、参照先のアンカーのあるファイルを指し、title が参照先の完全な名前と同じ
     (外部の URL の定義の行は、title を検査しない)
+画像は規則の対象にしないので、本文のリンクで使われず、reference-style の画像だけが使うラベルの定義の行は、
+href・title・使われていないことを検査しない。
 """
 
 import posixpath
@@ -65,6 +67,12 @@ def definition_line(label: str, target: Target, from_path: str, quote: str = '"'
     """参照先 target を指す定義の行。"""
     title = markdown.escape_title(target.full_name(), quote)
     return f"[{label}]: {target.href(from_path)} {quote}{title}{markdown.closing_quote(quote)}"
+
+
+def image_only_labels(document: markdown.Document) -> set[str]:
+    """本文のリンクで使われず、reference-style の画像だけが使うラベル (比べる形)。"""
+    used = {markdown.normalize_label(r.label) for r in document.references}
+    return {markdown.normalize_label(label) for label in document.image_labels} - used
 
 
 def candidate_text(targets: list[Target]) -> str:
@@ -155,6 +163,7 @@ class _FileChecker:
     def check_definitions(self) -> None:
         document = self.document
         defined: dict[str, markdown.Definition] = {}
+        images = image_only_labels(document)
         previous_in_paragraph = -1
         for definition in document.definitions:
             key = markdown.normalize_label(definition.label)
@@ -169,7 +178,8 @@ class _FileChecker:
                 self.problem(f"ラベル {definition.label} の定義の行は、{defined[key].line} 行目にもある", *where)
                 continue
             defined[key] = definition
-            self.check_definition_target(definition)
+            if key not in images:
+                self.check_definition_target(definition)
         used: set[str] = set()
         for reference in document.references:
             key = markdown.normalize_label(reference.label)
@@ -183,7 +193,7 @@ class _FileChecker:
                 hint = "。参照先の候補は無い"
             self.problem(f"ラベル {reference.label} の定義の行が無い{hint}", reference.label_line, reference.label_column)
         for key, definition in defined.items():
-            if key not in used:
+            if key not in used and key not in images:
                 self.problem(f"ラベル {definition.label} の定義の行が、本文で使われていない", definition.line, definition.column)
 
     def check_definition_target(self, definition: markdown.Definition) -> None:

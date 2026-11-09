@@ -58,6 +58,11 @@ class ReferenceTest(unittest.TestCase):
         self.assertEqual([r.label for r in doc.references], ["a"])
         self.assertEqual(doc.inline_links, [])
 
+    def test_reference_style_image_labels_are_kept(self):
+        doc = markdown.parse("![図](a.png) と ![流れ][flow] と ![表][] と ![配置図] と [a]\n")
+        self.assertEqual(doc.image_labels, ["flow", "表", "配置図"])
+        self.assertEqual([r.label for r in doc.references], ["a"])
+
     def test_empty_brackets_are_not_labels(self):
         self.assertEqual(markdown.parse("空の [] と [ ]\n").references, [])
 

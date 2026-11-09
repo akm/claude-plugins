@@ -8,6 +8,7 @@
     (ラベルの書き間違いのことがあるため)
   - 本文の途中の定義の行と、段落の一部になった定義の行を、末尾のまとまりに移す
   - 同じラベルの定義の行のうち、参照先が同じものは後の行を消す。参照先が違えば報告する
+reference-style の画像だけが使うラベルの定義の行は、画像が規則の対象でないので、消さず書き換えない (末尾のまとまりへは移す)。
 判断の要るもの: 参照先の候補が 0 件か複数のラベル・消さなかった使われていない定義の行・参照先の違う同じラベルの定義の行。
 利用者が選んだ参照先は、Choice (オプション --choose) で受け取り、定義の行の href と title はツールが作る。
 """
@@ -17,7 +18,7 @@ from pathlib import Path
 
 from . import markdown
 from .documents import HandwrittenFile, Index
-from .links import candidate_text, definition_line, is_external, resolve, strip_angle
+from .links import candidate_text, definition_line, image_only_labels, is_external, resolve, strip_angle
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class _FileFixer:
                 seen_used.add(key)
                 used_order.append((key, reference))
 
+        images = image_only_labels(document)
         chosen: dict[str, str] = {}
         for choice in self.choices:
             key = markdown.normalize_label(choice.label)
@@ -132,7 +134,7 @@ class _FileFixer:
 
         # title の書き換え
         for key, definition in first.items():
-            if is_external(definition.destination):
+            if key in images or is_external(definition.destination):
                 continue
             resolved = resolve(self.file, definition, self.index)
             if resolved.target is None:
@@ -171,7 +173,7 @@ class _FileFixer:
 
         # 使われていない定義の行
         for key, definition in first.items():
-            if key in seen_used or key in chosen:
+            if key in seen_used or key in chosen or key in images:
                 continue
             if unresolved:
                 self.report(
