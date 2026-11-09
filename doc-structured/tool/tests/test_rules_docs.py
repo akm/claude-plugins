@@ -1,6 +1,7 @@
 """プラグインの規則の文書とスキルの本文のテスト。
 
 - 規則の文書 rules/doc-structured-docs.md の「限定付きの名前」の表が、ツールの表 (モジュール names) と同じであること
+  (節と子のファイルの行を含む)
 - 規則の文書とスキルの本文で、スキル名を接頭辞付き (doc-structured:generate) で書いていること
 """
 
@@ -26,13 +27,17 @@ class NameTableTest(unittest.TestCase):
         rows = name_table_rows()
         kind_rows = {}
         file_row = None
+        other_rows = {}
         for label, symbols, form, _example in rows:
             found = re.findall(r"`([^`]+)`", symbols)
             if label == names.FILE_KIND_LABEL:
                 file_row = (found, form)
-            else:
-                self.assertEqual(len(found), 1, f"記号は 1 つ: {symbols}")
+                continue
+            self.assertEqual(len(found), 1, f"記号は 1 つ: {symbols}")
+            if found[0] in names.KINDS:
                 kind_rows[found[0]] = (label, form)
+            else:
+                other_rows[found[0]] = (label, form)
         self.assertEqual(sorted(kind_rows), sorted(names.KINDS))
         for symbol, (label, form) in kind_rows.items():
             kind = names.KINDS[symbol]
@@ -41,8 +46,17 @@ class NameTableTest(unittest.TestCase):
                 placeholder = "<日本語名>" if kind.user_level else "<英語名>"
                 self.assertEqual(form, names.format_part(symbol, placeholder))
         self.assertIsNotNone(file_row)
-        self.assertEqual(file_row[0], list(names.FILE_KINDS))
+        self.assertEqual(file_row[0], list(names.FILE_KINDS) + list(names.HANDWRITTEN_FILE_KINDS))
         self.assertEqual(file_row[1], names.format_part("models", "<ファイル名>"))
+        # 節と子のファイル
+        self.assertEqual(sorted(other_rows), sorted([names.SECTION.symbol, names.CHILD_FILE_SYMBOL]))
+        self.assertEqual(
+            other_rows[names.SECTION.symbol], (names.SECTION.label, names.format_part("h", "<見出しの文>"))
+        )
+        self.assertEqual(
+            other_rows[names.CHILD_FILE_SYMBOL][1],
+            names.format_part(names.CHILD_FILE_SYMBOL, "<ドメインのディレクトリからのパス>"),
+        )
 
 
 class SkillNamePrefixTest(unittest.TestCase):
