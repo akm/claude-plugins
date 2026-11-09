@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Problem:
-    check: str  # 検査の記号 (a・h・i)
+    check: str  # 検査の記号 (a・b・h・i など)
     path: str  # リポジトリのルートからの相対パス
     message: str
     line: int | None = None  # 1 から数える

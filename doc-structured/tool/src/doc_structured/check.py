@@ -1,10 +1,10 @@
 """サブコマンド check が実行する検査と、検査 a (生成し直して差分が無い)。
 
 検査の群 (決定の一覧の問 12 (3)):
-  軽い群 (--light。デフォルト)  文書と YAML だけで実行できる検査。この版では a・h・i
+  軽い群 (--light。デフォルト)  文書と YAML だけで実行できる検査。この版では a・b・h・i
   重い群 (--heavy)              データベースなどが要る検査。この版には無い
 --all は両方、--only <検査> は 1 つだけを実行する。
-検査 h (YAML の形式) に誤りがあると、定義の一覧が正しく作れないので、検査 a と i は実行せず、そのことを報告する。
+検査 h (YAML の形式) に誤りがあると、定義の一覧と完全な名前が正しく作れないので、検査 a・b・i は実行せず、そのことを報告する。
 """
 
 import difflib
@@ -13,11 +13,13 @@ from pathlib import Path
 
 from . import generated_header
 from .direction import check_direction
+from .documents import load_documents
 from .domains import Project, load_project
 from .generate import GITATTRIBUTES_PATH, HANDWRITTEN_MESSAGE, generated_files, handwritten_fix, is_handwritten, render_project
+from .links import check_links
 from .problems import Problem
 
-LIGHT = ("a", "h", "i")
+LIGHT = ("a", "b", "h", "i")
 HEAVY: tuple[str, ...] = ()
 ALL = LIGHT + HEAVY
 
@@ -96,8 +98,11 @@ def run_checks(root: Path, checks: tuple[str, ...]) -> CheckResult:
     if "h" in checks:
         result.problems += yaml_problems
     if yaml_problems:
-        result.skipped = [c for c in checks if c in ("a", "i")]
+        result.skipped = [c for c in checks if c in ("a", "b", "i")]
         return result
+    if "b" in checks:
+        index, document_problems = load_documents(root, project)
+        result.problems += document_problems + check_links(index)
     if "i" in checks:
         result.problems += check_direction(project)
     if "a" in checks:
