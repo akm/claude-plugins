@@ -5,6 +5,8 @@
   doc-structured generate          ドメインの YAML から、人が読む Markdown を生成する
   doc-structured check [--light|--heavy|--all|--only <検査>]
                                    検査を実行する。指定が無ければ軽い群 (--light)
+  doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...
+                                   手書きの Markdown の定義の行とファイルのアンカーを直す。判断の要るものが残れば終了コード 1
   doc-structured <知らない名前>     使い方を標準エラー出力に書き、終了コード 2 で終了する
 
 サブコマンドは、起動時に設定ファイルを読み、形が違えばエラーの文を標準エラー出力に書いて終了コード 1 で終了する。
@@ -18,8 +20,10 @@ from pathlib import Path
 from . import __version__
 from . import check
 from .config import Config, ConfigError, find_config, load_config
+from .documents import load_documents
 from .domains import load_project
 from .generate import HANDWRITTEN_MESSAGE, HandwrittenFilesError, handwritten_fix, render_project, write_outputs
+from .links_fix import Choice, ChoiceError, fix_files
 
 VERSION_TEXT = f"doc-structured {__version__}"
 
@@ -39,6 +43,17 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--heavy", action="store_true", help="重い群の検査を実行する")
     group.add_argument("--all", action="store_true", help="すべての検査を実行する")
     group.add_argument("--only", metavar="<検査>", help="1 つの検査だけを実行する (例 --only a)")
+    fix_parser = subparsers.add_parser(
+        "links-fix",
+        help="手書きの Markdown の定義の行とファイルのアンカーを直す。判断の要るものが残れば終了コード 1",
+    )
+    fix_parser.add_argument(
+        "paths", nargs="*", metavar="<ファイル>", help="直す手書きの Markdown。指定が無ければ、すべての手書きの Markdown"
+    )
+    fix_parser.add_argument(
+        "--choose", nargs=3, action="append", default=[], metavar=("<ファイル>", "<ラベル>", "<ID か URL>"),
+        help="ファイルのラベルの参照先を、参照先の ID か外部の URL で指定する (何度でも指定できる)",
+    )
     return parser
 
 
@@ -102,6 +117,58 @@ def run_generate(config: Config) -> int:
     return 0
 
 
+def _relative(config: Config, path: str) -> str | None:
+    """コマンドに渡したパス (今のディレクトリからの相対か絶対) を、リポジトリのルートからの相対パスにする。"""
+    resolved = (Path.cwd() / path).resolve()
+    try:
+        return resolved.relative_to(config.root.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def run_links_fix(config: Config, args: argparse.Namespace) -> int:
+    project, problems = load_project(config.root)
+    if problems:
+        for problem in problems:
+            print(problem.format(), file=sys.stderr)
+        print(f"doc-structured: YAML に {len(problems)} 件の誤りがあるので、何も直さなかった", file=sys.stderr)
+        return 1
+    index, _ = load_documents(config.root, project)
+    paths: list[str] | None = None
+    if args.paths:
+        paths = []
+        for given in args.paths:
+            relative = _relative(config, given)
+            if relative is None or index.file(relative) is None:
+                print(
+                    f"doc-structured: {given} は、ドメインのディレクトリの下の手書きの Markdown でない", file=sys.stderr
+                )
+                return 1
+            paths.append(relative)
+    choices: list[Choice] = []
+    for given, label, value in args.choose:
+        relative = _relative(config, given)
+        if relative is None:
+            print(f"doc-structured: --choose のファイル {given} は、リポジトリの外にある", file=sys.stderr)
+            return 1
+        choices.append(Choice(relative, label, value))
+    try:
+        result = fix_files(config.root, index, paths, choices)
+    except ChoiceError as e:
+        print(f"doc-structured: {e}", file=sys.stderr)
+        return 1
+    for path in result.changed:
+        print(f"書き換えた: {path}")
+    for report in result.reports:
+        print(report.format())
+    if result.reports:
+        print(f"判断の要るものが {len(result.reports)} 件ある (参照先を --choose で渡して、もう一度実行する)")
+        return 1
+    if not result.changed:
+        print("直すものは無かった")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -117,5 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_generate(config)
     if args.command == "check":
         return run_check(config, args)
+    if args.command == "links-fix":
+        return run_links_fix(config, args)
     # argparse が知らないサブコマンドを拒否するので、ここには来ない
     raise AssertionError(f"知らないサブコマンド: {args.command} (設定: {config.path})")
