@@ -9,7 +9,7 @@ Claude Code で作るアプリケーションの文書を、定義が 1 か所�
 | [bin/doc-structured](bin/doc-structured) | プロジェクトに置くスクリプト (ツールの入口)。プロジェクトが設定したバージョンのツールを取得して実行する |
 | [tool/](tool/) | ツール `doc-structured` の Python パッケージ (コマンド `doc-structured`) とテスト |
 | [rules/](rules/) | 規則の文書。プロジェクトのディレクトリ `.claude/rules/` に置くコピーの元 |
-| [skills/](skills/) | スキル `doc-structured:generate` と `doc-structured:check` |
+| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix` |
 | [hooks/hooks.json](hooks/hooks.json)・[hook-scripts/](hook-scripts/) | 生成したファイルの直接の編集を拒否する hook (下の節「hook」) |
 | [scripts/plugin-version-notice](scripts/plugin-version-notice) | スキルの前置きで、プラグインと設定のバージョンの違いを 1 行で伝えるスクリプト |
 | [docs/decisions.md](docs/decisions.md) | 文書の構成の決定の一覧 |
@@ -39,10 +39,11 @@ bin/doc-structured version
 | `doc-structured --version` | 同じ。設定ファイルは読まない |
 | `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する |
 | `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
+| `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行とファイルのアンカーのうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベルなど) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
 
-生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・h (YAML の形式と参照先)・i (YAML の参照の向き) です。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
+生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・h (YAML の形式と参照先)・i (YAML の参照の向き)・k (手書きの Markdown の行数) です。リンクとアンカーと行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
 
-スキル `doc-structured:generate` と `doc-structured:check` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どちらも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
+スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
 
 ## hook
 
@@ -99,5 +100,9 @@ sub-issue [#193](https://github.com/akm/claude-plugins/issues/193) で決めま�
 - **言語は Python (3.12 以上)、YAML は ruamel.yaml**。コメント付きの YAML を読み、1 つの値だけ書き換えて書き出す確認を 3 つの言語で行い、ruamel.yaml (round-trip モード) だけが変えた値以外を 1 文字も変えずに保ちました。Node.js の yaml はコメントの前の空白の数をそろえ、Go の gopkg.in/yaml.v3 は空行を消しました。確認はテスト [tool/tests/test_yamlio.py](tool/tests/test_yamlio.py) に残しています。
 - **最低のバージョンは 3.12**。ランナー `ubuntu-slim` に入っている Python が 3.12.3 で、GitHub Actions の実行時間を優先したためです。3.14 以降と uv にする案は、ランナーに uv も 3.14 も無く、ジョブごとに両方の取得が要るので採りませんでした。
 - **取得は venv + pip で、このリポジトリのタグから**。ランナーにあるもの (python3・pip・git) だけで取得でき、公開がタグを作るだけで済むためです。Go のバイナリを GitHub Release に置く案と、Node.js のパッケージの案は、ビルドして置くワークフローか npm レジストリへの公開が要るので採りませんでした。
+
+手書きの Markdown の読み取りは、sub-issue [#196](https://github.com/akm/claude-plugins/issues/196) で決めました。
+
+- **ブロックの構造は markdown-it-py で求める**。コードブロック・HTML のブロック・見出しの行の範囲を、CommonMark のとおりに読むためです (リストや引用の中の字下げしたコードブロックを、自分で書いた読み取りでは判別しにくい)。行の中のラベル・インラインコード・エスケープは、ツールが自分で読みます。markdown-it-py は行の範囲を返しますが列を返さず、`links-fix` が書き換えない部分を 1 文字も変えずに保つ必要があるためです。
 
 公開の手順は [docs/release.md](docs/release.md) を参照してください。
