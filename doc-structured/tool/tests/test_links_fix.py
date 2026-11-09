@@ -204,6 +204,14 @@ class DefinitionBlockTest(ScratchTestCase):
         self.assertEqual(self.read(CONCEPT), text)
         self.assertCheckPasses()
 
+    def test_label_used_only_as_collapsed_reference_is_kept(self):
+        self.write(CONCEPT, f"{HEAD}[モデル「貸出」][]を書く。\n\n{LOAN_DEFINITION}\n")
+        result = self.run_tool("links-fix")
+        self.assertEqual((result.returncode, result.stdout), (0, "直すものは無かった\n"))
+        self.write(CONCEPT, f"{HEAD}[モデル「貸出」][]を書く。\n")
+        self.assertEqual(self.run_tool("links-fix").returncode, 0)
+        self.assertIn(LOAN_DEFINITION, self.read(CONCEPT))
+
     def test_removes_unused_definitions(self):
         self.write(CONCEPT, f"{HEAD}本文\n\n{LOAN_DEFINITION}\n")
         self.assertEqual(self.run_tool("links-fix").returncode, 0)

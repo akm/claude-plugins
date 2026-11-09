@@ -94,9 +94,10 @@ class _FileFixer:
         replaced: dict[int, str | None] = {}
         used_order: list[tuple[str, markdown.Reference]] = []
         seen_used: set[str] = set()
+        # [ラベル][] (collapsed) も、検査 b と同じく使われているものとして数える (形の誤りは検査 b が報告する)
         for reference in document.references:
             key = markdown.normalize_label(reference.label)
-            if reference.form != "collapsed" and key not in seen_used:
+            if key not in seen_used:
                 seen_used.add(key)
                 used_order.append((key, reference))
 
