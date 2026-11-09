@@ -150,6 +150,7 @@ deepened: 2026-11-09
 - KTD14. **Issue の表にある Google スライドの API の挙動への対処は、Google スライドの指示を作る処理で行う**。対処ごとに、理由をコードのコメントに書き、テストで期待の指示を確認する。対象は、基準の大きさと拡大率・円などの中の文字を重ねた文字の箱に分けること・内側の余白の分だけ箱を広げること・大きな箱を四角で描くこと・箇条書きの字下げ 16 ポイント・書式の範囲に改行の文字を含めること・逆向きの線を負の拡大率で描くこと・マスターの配色を `updatePageProperties` の `colorScheme` で変えること。`createLine` には、非推奨の `lineCategory` ではなく `category` を使う。
 - KTD15. **資料のディレクトリの `build/` に、内容が `*` のファイル `.gitignore` を書く**。生成したファイルが、プロジェクトのコミットに入らないようにする。プロジェクトの `.gitignore` は変えない。
 - KTD16. **セットアップのツールは、Node.js の標準の機能だけで書いた TypeScript にする**。ライブラリを入れる前に動く必要があり、Node.js は前提にしているため。
+- KTD17. **入口のサブコマンドごとの `--help` を、引数・出力・終了コードの SSOT にする**。入口は、ファイル `slide-deck/src/cli.ts` のサブコマンド (`setup status`・`setup install`・`check`・`pptx`・`requests`) と、画像をまとめるファイル `slide-deck/python/slide_deck_tools/thumbs_grid.py`。終了コードは、どの入口も、成功 0・検査の指摘あり 1・実行の誤り (ライブラリが無い・入力の形が違うなど) 2 に分ける。3 つのスキルの SKILL.md と `references/` は、引数や終了コードを書かずに `--help` を参照する。サブコマンドを作る単位で `--help` も書き、テストで、`--help` が引数・出力・終了コードの 3 つを示すことを確認する。スキルは U9 で書くので、それまでの単位の間に、スキルに書く引数と入口の引数が合わなくなることを防ぐため。
 
 ### High-Level Technical Design
 
@@ -206,7 +207,7 @@ stateDiagram-v2
 ### System-Wide Impact
 
 - **CI**: ワークフロー `.github/workflows/test.yml` の discover ジョブと `.github/test-targets.txt` に、種類 `node` と `uv` を足す (KTD12)。ほかのプラグインのテストの見つけ方は変えない。種類 `python` の探し方から `uv.lock` の下を除く変更は、既存の対象が 1 つも減らないことを、一覧との比較で確認する。
-- **マーケットプレイス**: `.claude-plugin/marketplace.json` に項目が増える。ルートの `Makefile` のターゲット `plugins-status`・`plugins-install` (ファイル `scripts/plugins.py`) は marketplace.json から対象を作るので、変更は要らない。
+- **マーケットプレイス**: U9 で `.claude-plugin/marketplace.json` に項目が増える。それまでは載せない。ルートの `Makefile` のターゲット `plugins-status`・`plugins-install` (ファイル `scripts/plugins.py`) は marketplace.json から対象を作るので、変更は要らない。
 - **利用者の環境**: キャッシュのディレクトリに、typescript (約 24MB)・pptxgenjs (約 5MB) などと Python の venv が入る。取得の前に承認を得る (R24)。
 
 ### Risks & Dependencies
@@ -259,19 +260,33 @@ slide-deck/
 
 ## Implementation Units
 
+表と節は、進める順に並べる。
+
 | U-ID | 内容 | 主なファイル | 依存 |
 | --- | --- | --- | --- |
 | U1 | プラグインのディレクトリと検査の設定・CI | `slide-deck/package.json`・`.github/workflows/test.yml` | - |
 | U2 | スライドのデータ・テーマ・部品の関数 | `slide-deck/src/data/` | U1 |
-| U3 | 構成案の読み込みとキーの突き合わせ | `slide-deck/src/outline/` | U2 |
+| U3 | 構成案の読み込みとキーの突き合わせ・見本の資料 | `slide-deck/src/outline/`・`slide-deck/examples/sample/` | U2 |
 | U4 | はみ出しの見積もり | `slide-deck/src/fit/` | U2 |
-| U5 | PowerPoint の書き出しと検査の入口 | `slide-deck/src/pptx/`・`slide-deck/src/cli.ts` | U2, U3, U4 |
+| U8 | キャッシュのディレクトリへのインストール | `slide-deck/src/setup/`・`slide-deck/src/cli.ts` | U1 |
+| U5 | PowerPoint の書き出しと検査の入口 | `slide-deck/src/pptx/`・`slide-deck/src/cli.ts` | U2, U3, U4, U8 |
 | U11 | Google スライドの API の前提の確認 | - | U1 |
 | U6 | Google スライドの指示の作成 | `slide-deck/src/gslides/` | U2, U3, U11 |
 | U7 | 画像をまとめるツール | `slide-deck/python/` | U1 |
-| U8 | キャッシュのディレクトリへのインストール | `slide-deck/src/setup/` | U1 |
-| U9 | 3 つのスキル・説明・見本・README | `slide-deck/skills/`・`slide-deck/references/` | U5, U6, U7, U8 |
+| U9 | 3 つのスキル・説明・README・公開 | `slide-deck/skills/`・`slide-deck/references/`・`.claude-plugin/marketplace.json` | U5, U6, U7, U8 |
 | U10 | 本物の Google スライドでの通し確認 | - | U9 |
+
+### 単位の進め方とクローズ条件
+
+- 単位ごとに、Issue #242 の sub-issue を 1 つ作る。U10 と U11 を除く単位は、1 つの単位を 1 つの PR にし、PR の本文に `Closes #<sub-issue の番号>` を書く。
+- どの単位も、次のすべてを満たしたら閉じる。単位の節の Verification は、これに加えて満たす条件。
+  - CI のすべてのジョブが成功している。取り消されたジョブは、成功として扱わない。
+  - 変えた Markdown・コードの日本語のコメントと docstring・コミットメッセージを wording-guard で検査し、指摘が無い。
+  - サブコマンドを作った単位では、`--help` が KTD17 のとおり引数・出力・終了コードを示す。
+  - 実装で R や KTD と合わないことが分かったときは、同じ PR で計画の R と KTD を直してある (Goal Capsule の「SSOT の優先順位」)。
+- PR をマージした後も sub-issue が開いたままなら、PR への参照を付けたコメントを書いて、手で閉じる。
+- U10 と U11 は、変えるファイルが無いので PR を作らない。結果を sub-issue のコメントに書いて閉じる。確認で見つかった問題は、新しい Issue に記録し、Issue #242 の sub-issue に足す。
+- プラグインは、3 つのスキルがそろう U9 で公開する。U1〜U8 の間は、`.claude-plugin/marketplace.json` に載せず、プラグインのバージョンを 0.0.1 のまま上げない。公開していないので、利用者がインストールすることはない。U9 で、バージョンを 0.1.0 にし、marketplace.json とルートの `README.md` に載せる。
 
 ### U1. プラグインのディレクトリと検査の設定・CI
 
@@ -279,11 +294,9 @@ slide-deck/
 - **Requirements**: R26, R27, KD7, KTD3, KTD4, KTD5, KTD7, KTD12
 - **Dependencies**: なし
 - **Files**:
-  - `slide-deck/.claude-plugin/plugin.json` (バージョン 0.1.0)
+  - `slide-deck/.claude-plugin/plugin.json` (バージョン 0.0.1。U9 まで上げない)
   - `slide-deck/package.json`・`slide-deck/package-lock.json`・`slide-deck/tsconfig.json`・`slide-deck/eslint.config.mjs`
   - `slide-deck/pyproject.toml`・`slide-deck/uv.lock`・`slide-deck/.python-version`
-  - `.claude-plugin/marketplace.json` (項目を足す)
-  - `README.md` (プラグインの一覧と構成の図に足す)
   - `.github/workflows/test.yml`・`.github/test-targets.txt`
   - `slide-deck/tests/smoke.test.ts`・`slide-deck/python/tests/test_smoke.py`
 - **Approach**:
@@ -315,19 +328,20 @@ slide-deck/
   - 一言の部品は、スライドの下の決まった位置の文字の箱になる。
   - 1 枚のスライドに要素を足した順序が、データの順序 (重なりの順序) になる。
   - テーマに、アクセント色の値が 6 つ揃っていないと、型エラーになる (型の検査で確認するテスト)。
-- **Verification**: 見本の資料の図が、この部品の関数だけで書ける。
+- **Verification**: 部品の関数のテストが成功する。見本の資料の図が部品の関数だけで書けることは、見本の資料を作る U3 で確認する。
 
-### U3. 構成案の読み込みとキーの突き合わせ
+### U3. 構成案の読み込みとキーの突き合わせ・見本の資料
 
-- **Goal**: 構成案を読み、資料の情報とスライドごとの題名・一言・ノートを取り出し、資料ごとのスクリプトのキーと突き合わせる。
-- **Requirements**: R2, R3, R4, R9, R15, KD4, KD8, KTD13
+- **Goal**: 構成案を読み、資料の情報とスライドごとの題名・一言・ノートを取り出し、資料ごとのスクリプトのキーと突き合わせる。後の単位のテストの入力にする見本の資料を作る。
+- **Requirements**: R2, R3, R4, R9, R15, R28, KD4, KD5, KD8, KTD13
 - **Dependencies**: U2
-- **Files**: `slide-deck/src/outline/parse.ts`・`slide-deck/src/outline/match.ts`・`slide-deck/src/outline/url.ts` (Google スライドの URL の行を書き込む)・`slide-deck/tests/outline.test.ts`・`slide-deck/tests/fixtures/outline/`
+- **Files**: `slide-deck/src/outline/parse.ts`・`slide-deck/src/outline/match.ts`・`slide-deck/src/outline/url.ts` (Google スライドの URL の行を書き込む)・`slide-deck/tests/outline.test.ts`・`slide-deck/tests/fixtures/outline/`・`slide-deck/examples/sample/outline.md`・`slide-deck/examples/sample/deck.ts`
 - **Approach**:
-  1. KTD13 の書式を読み、誤りは行番号を付けてすべて集めてから返す (最初の 1 件で中断しない)。
-  2. 【提案】が付いたスライドが残っているときは、`build` が中断できるよう、その一覧を返す。
-  3. 資料ごとのスクリプトのキーと突き合わせ、片方にしか無いキーを一覧にする (R9)。
-  4. Google スライドの URL の行と slide-deck の版の行を書き込むときは、ほかの行を 1 文字も変えない。
+  1. 見本の資料 (3〜5 枚) を作る。どのプロジェクトの話でもない題材にし、部品の関数を一通り使う (KD5)。U4・U5・U6 のテストと U9 のスキルの手順の例は、この見本の資料を使う。`slide-deck/tsconfig.json` の `paths` に、名前 `slide-deck` を `src/index.ts` に対応させる設定を足し、`examples/` も `tsc` と eslint の検査の対象に入れる。
+  2. KTD13 の書式を読み、誤りは行番号を付けてすべて集めてから返す (最初の 1 件で中断しない)。
+  3. 【提案】が付いたスライドが残っているときは、`build` が中断できるよう、その一覧を返す。
+  4. 資料ごとのスクリプトのキーと突き合わせ、片方にしか無いキーを一覧にする (R9)。
+  5. Google スライドの URL の行と slide-deck の版の行を書き込むときは、ほかの行を 1 文字も変えない。
 - **Patterns to follow**: [docs/solutions/design-patterns/typed-contract-for-agent-input.md](../solutions/design-patterns/typed-contract-for-agent-input.md) (形が違えば期待する形を示して誤りにする)。
 - **Test scenarios**:
   - 見本の構成案から、資料の情報・キーの順序・題名・一言・ノートが取り出せる。
@@ -339,7 +353,8 @@ slide-deck/
   - 構成案にだけあるキーと、資料ごとのスクリプトにだけあるキーが、別々の一覧になる。
   - Google スライドの URL の行が無い構成案に URL を書き込むと、資料の情報の最後に 1 行が足され、ほかの行は変わらない。既にあれば、その行だけが置き換わる。
   - 固有名の項目が「一般化する」「そのまま書く」以外の値なら誤りになる。
-- **Verification**: 誤りのある構成案で、すべての誤りが行番号付きで 1 回で報告される。
+  - 見本の資料の構成案と資料ごとのスクリプトのキーが一致する。
+- **Verification**: 誤りのある構成案で、すべての誤りが行番号付きで 1 回で報告される。見本の資料の `deck.ts` が、部品の関数だけで書かれ、`tsc` と eslint の検査を通る。
 
 ### U4. はみ出しの見積もり
 
@@ -361,19 +376,46 @@ slide-deck/
   - 幅が余白より狭い箱は、一覧に出る。
 - **Verification**: 見本の資料で一覧が空になる。わざと狭くした箱で一覧に出る。
 
+### U8. キャッシュのディレクトリへのインストール
+
+- **Goal**: ライブラリが入っているかを確認し、入っていなければ (承認の後に) キャッシュのディレクトリに入れる入口を作る。
+- **Requirements**: R23, R24, R25, KD10, KTD7, KTD8, KTD16
+- **Dependencies**: U1
+- **Files**: `slide-deck/src/setup/setup.ts`・`slide-deck/src/cli.ts` (サブコマンド `setup status` と `setup install`)・`slide-deck/tests/setup.test.ts`
+- **Approach**:
+  1. `setup status` は、uv と Node.js の有無、venv と `node_modules` のディレクトリの状態 (無い・入っている・壊れている) と、取得するものを示す。何も入れない。
+  2. `setup install` は、無いものだけを KTD8 の形で入れる。スキルは、`setup status` の結果を利用者に示して承認を得てから、`setup install` を実行する (KD10)。
+  3. ディレクトリがあるのにフラグファイルが無い venv は、もう一度 `uv sync` で作る (uv の同期は何度実行しても同じ結果になるため)。`node_modules` は、wording-guard と同じく、壊れていれば消すよう案内して中断する。
+  4. 環境変数 `SLIDE_DECK_CACHE_DIR` を設定すると、キャッシュのディレクトリ (`~/.cache/akm-claude-plugins/slide-deck/`) の代わりに、その場所そのものを使う (テストと開発のため)。キャッシュのディレクトリと、venv と `node_modules` のディレクトリのパスを求める関数は、U5 も使うので、`setup.ts` から書き出す。
+  5. 取得に失敗したら、作りかけの一時的なディレクトリを消し、別の方法を試さずに誤りを示す。
+  6. 入口 `slide-deck/src/cli.ts` は、この単位で作る。サブコマンド `setup status` と `setup install` の `--help` を書く (KTD17)。
+- **Patterns to follow**: `wording-guard/scripts/wordingguard/textlint.py` の `setup` (一時的なディレクトリで `npm ci` して改名する・同時に実行した別の setup が先に入れた場合の扱い)。`doc-structured/bin/doc-structured` (フラグファイル)。
+- **Test scenarios**:
+  - 偽の `uv` と `npm` (PATH の先頭に置いたスクリプト) で、何も無い状態から `setup install` を実行すると、2 つのディレクトリができ、venv にフラグファイルがある。
+  - 入っている状態で `setup status` を実行すると「入っている」と示し、`setup install` は何も実行しない。
+  - `package-lock.json` を変えると、別のハッシュ値のディレクトリを入れる対象になる。
+  - `uv` が PATH に無いと、入れ方を示して終了コード 2 になる。Node.js が古い (24 未満) ときも同じ。
+  - `npm ci` が失敗すると、一時的なディレクトリが残らず、`node-<ハッシュ値>/` も作られない。
+  - 改名の直前に、別の実行が `node-<ハッシュ値>/` を作り終えていたら、入ったものとして扱う。
+  - フラグファイルの無い venv のディレクトリがあると、もう一度 `uv sync` を実行してフラグファイルを作る。
+  - `SLIDE_DECK_CACHE_DIR` を設定すると、パスを求める関数がその場所の下のパスを返す。
+  - `setup status --help` と `setup install --help` が、引数・出力・終了コードを示す。
+- **Verification**: 手元の uv と npm で、空のキャッシュのディレクトリから入れられ、2 回目は何もしない。
+
 ### U5. PowerPoint の書き出しと検査の入口
 
 - **Goal**: 資料ごとのスクリプトを検査して、PowerPoint のファイルを書き、形式とはみ出しを検査する入口を作る。
 - **Requirements**: R8, R9, R10, R11, R12, R13, R25, KTD2, KTD4, KTD11, KTD15
-- **Dependencies**: U2, U3, U4
-- **Files**: `slide-deck/src/pptx/write.ts`・`slide-deck/src/cli.ts`・`slide-deck/src/check/deck.ts` (tsc と eslint の実行)・`slide-deck/tests/pptx.test.ts`・`slide-deck/tests/cli.test.ts`
+- **Dependencies**: U2, U3, U4, U8
+- **Files**: `slide-deck/src/pptx/write.ts`・`slide-deck/src/cli.ts`・`slide-deck/src/check/deck.ts` (tsc と eslint の実行)・`slide-deck/tests/pptx.test.ts`・`slide-deck/tests/cli.test.ts`・`slide-deck/tests/helpers/cache.ts` (テストのキャッシュのディレクトリを作る補助)・`slide-deck/tests/fixtures/pptx-skill/` (テストの偽の pptx のスキル)
 - **Approach**:
   1. 入口のサブコマンド `check` は、資料のディレクトリの `build/tsconfig.json` を書き (KTD2)、`tsc` と eslint を実行し、構成案を読んでキーを突き合わせ、はみ出しを見積もる。
   2. サブコマンド `pptx` は、`check` が成功したときだけ PowerPoint のファイルを書き、`pptx[desktop]:apply_theme.js` でテーマの色を書き込み、`pptx:office/validate.py` を venv の Python で実行する。pptx のスキルのディレクトリは引数で受け取る (KTD11)。
   3. テーマの色を書き込む処理は、テストで差し替えられるよう、関数として渡す。
-  4. ライブラリは、KTD8 のとおり、キャッシュのディレクトリから場所を明示して読み込む。キャッシュの場所は、U8 と同じ規則 (環境変数 `SLIDE_DECK_CACHE_DIR`) で決める。
+  4. ライブラリは、KTD8 のとおり、キャッシュのディレクトリから場所を明示して読み込む。キャッシュの場所は、U8 の関数で求める。
   5. `build/.gitignore` を書く (KTD15)。
-  6. 終了コードは、成功 0・検査の指摘あり 1・実行の誤り (ライブラリが無い・pptx のスキルが無いなど) 2 に分ける。
+  6. 終了コードは KTD17 のとおりに分け、サブコマンド `check` と `pptx` の `--help` を書く。
+  7. テストでは、補助の関数が、一時的なディレクトリを `SLIDE_DECK_CACHE_DIR` に設定し、その下に U8 と同じ名前 (`node-<ハッシュ値>/`) で、CI が `npm ci` で入れた `slide-deck/node_modules` へのシンボリックリンクを作る。venv は、フラグファイルと、引数を記録するだけの `bin/python` を持つ偽物を作る。pptx のスキルは、引数を記録するだけの `scripts/apply_theme.js` と `scripts/office/validate.py` を持つ偽のディレクトリを使う。CI には pptx のスキルが無いため。
 - **Patterns to follow**: 元の `build.js` の最後の数行 (`writeFile` の後に `applyTheme`)。wording-guard の `wording_lint.py` の、終了コードの分け方。
 - **Test scenarios**:
   - 見本の資料から PowerPoint のファイルができ、スライドの数・各スライドの文字・発表者ノートが構成案と一致する (ファイルの XML を読んで確認する)。
@@ -386,21 +428,24 @@ slide-deck/
   - `build/.gitignore` が書かれる。
   - プラグインのディレクトリに `node_modules` が無く、ライブラリがキャッシュのディレクトリ (別の場所) にだけある状態で、`check` と `pptx` が成功する。
   - 資料のディレクトリより上 (プロジェクトのルート) に別の `tsconfig.json` があっても、`check` が `build/tsconfig.json` で検査して成功する。
-- **Verification**: 見本の資料で `check` と `pptx` が成功し、`pptx:office/validate.py` が誤りを出さない。
+  - `pptx` が、偽の pptx のスキルの `scripts/apply_theme.js` を `NODE_PATH` 付きで、`scripts/office/validate.py` を venv の `bin/python` で実行する (記録した引数で確認する)。
+  - `check --help` と `pptx --help` が、引数・出力・終了コードを示す。
+- **Verification**: 単位のテストが成功する。加えて、Claude のデスクトップアプリが配る pptx のスキルがある手元で、見本の資料に `check` と `pptx` を実行し、成功することと、`pptx:office/validate.py` が誤りを出さないことを確認し、実行したコマンドと結果を PR の本文に書く。
 
 ### U11. Google スライドの API の前提の確認
 
 - **Goal**: 計画が前提にしているコネクタの 3 つの使い方が、本物の Google スライドで動くことを、U6 を作る前に確認する。
 - **Requirements**: R16, KTD10, KTD14
 - **Dependencies**: U1
-- **Files**: なし (結果は PR の本文に書く)
+- **Files**: なし (結果は sub-issue のコメントに書く)
 - **Approach**:
   1. 利用者の許可を得てから、Claude のデスクトップアプリのセッションで、Google ドライブのコネクタで空の資料を 1 つ作る。
   2. 次の 3 つを 1 回ずつ行う: 項目を指定した読み込み (KTD10 の項目)・`writeControl.requiredRevisionId` 付きの書き込み・マスターの `colorScheme` の変更。
   3. どれかが動かなければ、Goal Capsule の「利用者に判断を求める条件」に従い、U6 に進まずに利用者に判断を求める。
   4. 確認し終えた資料を消すかは、利用者に質問する。
+  5. 3 つの使い方ごとに、送った内容と結果を sub-issue のコメントに書く。読み込みの結果の例は、U6 のテストの入力 (`build/presentation.json` の形) の元にする。
 - **Test scenarios**:
-  - Test expectation: none -- 手で行う確認。結果は PR の本文に書く。
+  - Test expectation: none -- 手で行う確認。結果は sub-issue のコメントに書く。
 - **Verification**: 3 つの使い方がそれぞれ成功し、読み込みの結果が KTD10 の項目を持つ。
 
 ### U6. Google スライドの指示の作成
@@ -408,7 +453,7 @@ slide-deck/
 - **Goal**: スライドのデータから、Google スライドの `batchUpdate` に渡す指示の配列を、作る・作り直す・消す・並べ替える・ノートを入れる場面ごとに書く。
 - **Requirements**: R11, R16, R17, R19, R20, KTD9, KTD10, KTD14
 - **Dependencies**: U2, U3, U11
-- **Files**: `slide-deck/src/gslides/requests.ts`・`slide-deck/src/gslides/plan.ts` (差を求める)・`slide-deck/src/gslides/notes.ts`・`slide-deck/src/cli.ts` (サブコマンド `requests`)・`slide-deck/tests/gslides.test.ts`・`slide-deck/tests/fixtures/gslides/` (期待の指示の配列)
+- **Files**: `slide-deck/src/gslides/requests.ts`・`slide-deck/src/gslides/plan.ts` (差を求める)・`slide-deck/src/gslides/notes.ts`・`slide-deck/src/gslides/presentation.ts` (読み込みの結果の型と検査)・`slide-deck/src/cli.ts` (サブコマンド `requests`)・`slide-deck/tests/gslides.test.ts`・`slide-deck/tests/fixtures/gslides/` (期待の指示の配列)
 - **Approach**:
   1. 要素ごとの指示は、元の `gslides.js` の変換を引き継ぎ、KTD14 の対処をすべて入れる。
   2. スライドの ID と図形の ID は KTD9 の形にする。
@@ -418,6 +463,7 @@ slide-deck/
   6. マスターの配色の指示は、読み込みの結果のマスターの ID を使う。
   7. 新しく作った資料では、最初の指示のファイルの先頭に、最初からあるタイトルのスライドを消す指示を入れる (R15)。
   8. 指示のファイルに `revisionId` は書かない。Claude が送る直前に読んだ値を付ける (R16)。
+  9. `build/presentation.json` の形は、`presentation.ts` の型で決める。読み込みで指定する項目 (field mask) の文字列も同じファイルで定め、サブコマンド `requests` の `--help` で示す (KTD17)。U11 の読み込みの結果の例に合わせる。Claude がコネクタの結果から `build/presentation.json` を書く手順は、U9 の `references/google-slides.md` に書く。
 - **Patterns to follow**: 元の `gslides.js` の関数 `slideRequests`・`lineRequests`・`textRequests`・`colorSchemeRequest`。
 - **Test scenarios**:
   - 見本の資料の指示の配列が、期待のファイルと一致する。
@@ -443,6 +489,8 @@ slide-deck/
   - ノートの指示は、再度読み込んだ結果のノートの欄の ID を使い、構成案のノートの文を入れる。欄に文があれば、消す指示を先に入れ、空なら消す指示を入れない。
   - スライドを作った後、ノートを入れる前に失敗した資料 (ハッシュ値は一致し、ノートが空) をもう一度処理すると、そのスライドのノートの指示が作られる。
   - 読み込みの結果に必要なキー (スライドの一覧・マスター) が無ければ、期待する形を示して誤りになる。
+  - U11 で得た読み込みの結果の例が、`presentation.ts` の検査を通る。
+  - `requests --help` が、引数・出力・終了コードと、読み込みで指定する項目を示す。
 - **Verification**: 見本の資料で、作る・作り直す・途中からの再開の 3 つの場面の指示の配列が、期待と一致する。
 
 ### U7. 画像をまとめるツール
@@ -455,73 +503,56 @@ slide-deck/
   1. 元の `grid2.py` を引き継ぎ、取得の失敗を、どの URL かを示した誤りにする (一部を飛ばさない)。
   2. 大きさの違う画像は、最初の画像の大きさに縮小して並べる。
   3. 枚数が奇数のときは、最後の行の右を空ける。
+  4. 終了コードは KTD17 のとおりに分け、`--help` を書く。
 - **Patterns to follow**: 元の `grid2.py`。
 - **Test scenarios**:
   - 同じ大きさの画像 3 枚から、2 列 2 行の画像ができ、右下が空いている。
   - 大きさの違う画像を渡すと、最初の画像の大きさにそろえて並ぶ。
-  - 取得できない URL があると、その URL を示して終了コード 0 以外で終了し、画像を書かない。
+  - 取得できない URL があると、その URL を示して終了コード 2 で終了し、画像を書かない。
   - mypy の検査 (KTD5 の設定) が通る。
+  - `--help` が、引数・出力・終了コードを示す。
 - **Verification**: ローカルのファイルの URL (`file://`) で作った画像を、目で確認する。
 
-### U8. キャッシュのディレクトリへのインストール
+### U9. 3 つのスキル・説明・README・公開
 
-- **Goal**: ライブラリが入っているかを確認し、入っていなければ (承認の後に) キャッシュのディレクトリに入れる入口を作る。
-- **Requirements**: R23, R24, R25, KD10, KTD7, KTD8, KTD16
-- **Dependencies**: U1
-- **Files**: `slide-deck/src/setup/setup.ts`・`slide-deck/src/cli.ts` (サブコマンド `setup status` と `setup install`)・`slide-deck/tests/setup.test.ts`
-- **Approach**:
-  1. `setup status` は、uv と Node.js の有無、venv と `node_modules` のディレクトリの状態 (無い・入っている・壊れている) と、取得するものを示す。何も入れない。
-  2. `setup install` は、無いものだけを KTD8 の形で入れる。スキルは、`setup status` の結果を利用者に示して承認を得てから、`setup install` を実行する (KD10)。
-  3. ディレクトリがあるのにフラグファイルが無い venv は、もう一度 `uv sync` で作る (uv の同期は何度実行しても同じ結果になるため)。`node_modules` は、wording-guard と同じく、壊れていれば消すよう案内して中断する。
-  4. 環境変数 `SLIDE_DECK_CACHE_DIR` を設定すると、キャッシュのディレクトリ (`~/.cache/akm-claude-plugins/slide-deck/`) の代わりに、その場所そのものを使う (テストと開発のため)。
-  5. 取得に失敗したら、作りかけの一時的なディレクトリを消し、別の方法を試さずに誤りを示す。
-- **Patterns to follow**: `wording-guard/scripts/wordingguard/textlint.py` の `setup` (一時的なディレクトリで `npm ci` して改名する・同時に実行した別の setup が先に入れた場合の扱い)。`doc-structured/bin/doc-structured` (フラグファイル)。
-- **Test scenarios**:
-  - 偽の `uv` と `npm` (PATH の先頭に置いたスクリプト) で、何も無い状態から `setup install` を実行すると、2 つのディレクトリができ、venv にフラグファイルがある。
-  - 入っている状態で `setup status` を実行すると「入っている」と示し、`setup install` は何も実行しない。
-  - `package-lock.json` を変えると、別のハッシュ値のディレクトリを入れる対象になる。
-  - `uv` が PATH に無いと、入れ方を示して終了コード 2 になる。Node.js が古い (24 未満) ときも同じ。
-  - `npm ci` が失敗すると、一時的なディレクトリが残らず、`node-<ハッシュ値>/` も作られない。
-  - 改名の直前に、別の実行が `node-<ハッシュ値>/` を作り終えていたら、入ったものとして扱う。
-  - フラグファイルの無い venv のディレクトリがあると、もう一度 `uv sync` を実行してフラグファイルを作る。
-- **Verification**: 手元の uv と npm で、空のキャッシュのディレクトリから入れられ、2 回目は何もしない。
-
-### U9. 3 つのスキル・説明・見本・README
-
-- **Goal**: スキル `outline`・`build`・`publish` の手順と、共通の説明・見本の資料・README を書く。
-- **Requirements**: R1〜R7, R14〜R22, R24, R25, R28, KD1〜KD10, KTD10, KTD11
+- **Goal**: スキル `outline`・`build`・`publish` の手順と、共通の説明・README を書き、プラグインを公開する。
+- **Requirements**: R1〜R7, R14〜R22, R24, R25, R28, KD1〜KD10, KTD10, KTD11, KTD17
 - **Dependencies**: U5, U6, U7, U8
 - **Files**:
   - `slide-deck/skills/outline/SKILL.md`・`slide-deck/skills/build/SKILL.md`・`slide-deck/skills/publish/SKILL.md`
   - `slide-deck/references/outline-format.md` (構成案の書式。KTD13 の SSOT)
   - `slide-deck/references/deck-script.md` (資料ごとのスクリプトの書き方と部品の関数)
-  - `slide-deck/references/google-slides.md` (コネクタの使い方・KTD14 の対処の一覧・ID の形)
-  - `slide-deck/examples/sample/outline.md`・`slide-deck/examples/sample/deck.ts`
+  - `slide-deck/references/google-slides.md` (コネクタの使い方・`build/presentation.json` の書き方・KTD14 の対処の一覧・ID の形)
   - `slide-deck/README.md`
+  - `slide-deck/.claude-plugin/plugin.json` (バージョンを 0.1.0 にする)
+  - `.claude-plugin/marketplace.json` (項目を足す)
+  - `README.md` (プラグインの一覧と構成の図に足す)
 - **Approach**:
   1. `outline` は R1〜R7 を手順にする。文章の規約は、利用者とプロジェクトの規約に従い、プロジェクトに wording-guard の設定があれば構成案を検査する (R7)。
   2. `build` は、最初に `setup status` を実行し、R24 の承認を得る。続けて、pptx のスキルを読み込んでディレクトリを得て (KTD11)、資料ごとのスクリプトを書き、`check` と `pptx` を実行する。
   3. `publish` は、High-Level Technical Design の節にある、スキル `publish` の手順の図のとおりにする。google-workspace のスキルを読み込み、その書き込みの規則に従う。
-  4. 共通の説明は `references/` に 1 回だけ書き、3 つのスキルから参照する。
-  5. 見本の資料は、どのプロジェクトの話でもない題材にし、部品の関数を一通り使う (KD5)。
+  4. 共通の説明は `references/` に 1 回だけ書き、3 つのスキルから参照する。入口の引数と終了コードは書かず、`--help` を参照する (KTD17)。
+  5. スキルの手順の例には、U3 で作った見本の資料を使う。
   6. 3 つの SKILL.md に、「このスキルがしないこと」の節を書く (既存のスキルの形)。
+  7. プラグインのバージョンを 0.1.0 にし、`.claude-plugin/marketplace.json` とルートの `README.md` に載せる (「単位の進め方とクローズ条件」の公開の時期)。
 - **Patterns to follow**: `doc-structured/skills/generate/SKILL.md` (手順・終了コードごとの扱い・しないこと)。wording-guard の README の、セットアップの承認の書き方。
 - **Test scenarios**:
-  - Test expectation: 手順の文書なので、振る舞いのテストは無い。見本の資料は U5 と U6 のテストの入力として使われる。
-- **Verification**: 文書を wording-guard で検査し、指摘が無い。3 つのスキルの手順が、High-Level Technical Design の節の図と R1〜R25 を漏れなく扱っている (目で確認する)。
+  - Test expectation: 手順の文書なので、振る舞いのテストは無い。
+- **Verification**: 3 つのスキルの手順が、High-Level Technical Design の節の図と R1〜R25 を漏れなく扱っている (目で確認する)。SKILL.md と `references/` に書いたサブコマンドと引数が、`--help` の内容と一致する。
 
 ### U10. 本物の Google スライドでの通し確認
 
-- **Goal**: 見本の資料を、本物の Google スライドで、作る・直す・足す・途中から再開する、の 4 つの場面で確認する。
-- **Requirements**: R14〜R22
+- **Goal**: 公開したプラグインで、見本の題材の資料を、本物の Google スライドで、作る・直す・足す・途中から再開する、の 4 つの場面で確認する。スキル `outline` の手順 (R1・R4〜R7) も確認する。
+- **Requirements**: R1, R4〜R7, R14〜R22
 - **Dependencies**: U9
-- **Files**: なし (結果は PR の本文に書く)
+- **Files**: なし (結果は sub-issue のコメントに書く)
 - **Approach**:
-  1. 利用者の許可を得てから、Claude のデスクトップアプリのセッションで、3 つのスキルを順に使う。
-  2. KTD14 の対処ごとに、画像で機能していることを確認し、確認できなかったものは PR に書く。
-  3. 確認し終えた資料を消すかは、利用者に質問する。
+  1. 利用者の許可を得てから、Claude のデスクトップアプリのセッションで、マーケットプレイスから入れた版の 3 つのスキルを順に使う。スキル `outline` は、見本の題材で構成案を作るところから使う。
+  2. KTD14 の対処ごとに、画像で機能していることを確認する。
+  3. 場面ごとの結果と、確認できなかったものを、sub-issue のコメントに書く。見つかった問題は、新しい Issue に記録し、Issue #242 の sub-issue に足す。
+  4. 確認し終えた資料を消すかは、利用者に質問する。
 - **Test scenarios**:
-  - Test expectation: none -- 手で行う確認。結果は PR の本文に場面ごとに書く。
+  - Test expectation: none -- 手で行う確認。結果は sub-issue のコメントに場面ごとに書く。
 - **Verification**: 4 つの場面で、発表者ノートが構成案と一致し、キーの無いスライドが残っている。
 
 ---
@@ -536,14 +567,17 @@ slide-deck/
 | Python の型 | `slide-deck/` で `uv sync --frozen` の後に `uv run mypy python` | U7 |
 | Python のテスト | `uv run python -m unittest discover -s python/tests` | U7 |
 | CI | ワークフロー `.github/workflows/test.yml` の種類 `node`・`uv` のジョブが成功し、既存のジョブも成功する | U1 |
-| 文書の表現 | 変えた Markdown を wording-guard で検査する | U9 |
-| 本物の Google スライド | U11 の 3 つの使い方と、U10 の 4 つの場面 | U11, U10 |
+| 入口の契約 | `--help` が引数・出力・終了コードを示すことを、テストで確認する (KTD17) | U5〜U8 |
+| 文書の表現 | 変えた Markdown・コードの日本語のコメントと docstring・コミットメッセージを wording-guard で検査する | U1〜U9 |
+| pptx のスキルとの結合 | pptx のスキルがある手元で、見本の資料に `check` と `pptx` を実行する。結果は PR の本文に書く | U5 |
+| 本物の Google スライド | U11 の 3 つの使い方と、U10 の 4 つの場面。結果は sub-issue のコメントに書く | U11, U10 |
 
 ---
 
 ## Definition of Done
 
-- R1〜R28 を、単位のテストか U10 の確認で確認した。R1・R4〜R7 (スキル `outline` の手順) は、U9 の後に見本の題材でスキル `outline` を手で実行して確認し、結果を PR の本文に書いた。
+- R1〜R28 を、単位のテストか U10 の確認で確認した。R1・R4〜R7 (スキル `outline` の手順) は、U10 で見本の題材でスキル `outline` を手で実行して確認し、結果を U10 の sub-issue のコメントに書いた。
+- 11 の sub-issue が、「単位の進め方とクローズ条件」のとおりに閉じている。
 - Verification Contract の検査がすべて成功している。
 - プラグインの `version` を 0.1.0 にし、`.claude-plugin/marketplace.json` とルートの `README.md` に載せた。
 - 試して使わなかった実装 (差し替えの仕掛けなど) が、差分に残っていない。
