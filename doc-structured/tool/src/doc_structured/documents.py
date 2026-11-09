@@ -6,7 +6,8 @@ doc-structured/rules/doc-structured-domains.md)。要点:
   - 手書きのファイルは、ドメインのディレクトリの直下の concept.md・problem.md・design.md と、
     その種類と同じ名前のサブディレクトリの <名前>.md (子のファイル。1 階層だけ)
   - ほかの名前・場所の .md は、検査 b のエラーにする
-  - 参照先のアンカーは、今のファイルの内容から読む (生成したファイルが古いことは検査 a が報告する)
+  - 参照先のアンカーは、今のファイルの内容から読む (生成したファイルが古いことは検査 a が報告する)。YAML から決まる参照先
+    (ドメイン・定義・生成したファイル) のファイルは、生成する側の対応で決め、そのファイルにアンカーがあるときだけ参照先にする
   - 参照先のラベルの候補は、ID・名前・限定付きの名前 (「種類 + 名前」に、親を直近から 0 個以上足した形)
 """
 
@@ -16,6 +17,7 @@ from pathlib import Path
 
 from . import generated_header, markdown, names
 from .domains import DOMAINS_DIR, Domain, Project, rel
+from .generate import entry_file, file_path
 from .names import Part
 from .problems import Problem
 
@@ -194,26 +196,22 @@ class _Finder:
             for anchor in document.anchors:
                 self.index.anchors.setdefault(anchor.name, []).append((path_rel, anchor))
 
-    def anchor_path(self, target_id: str) -> str | None:
-        found = self.index.anchors.get(target_id)
-        return found[0][0] if found else None
-
-    def add_target(self, target_id: str, parts: list[str], name: str | None, path: str | None = None) -> None:
-        path = path or self.anchor_path(target_id)
-        if path is None:
-            return
-        self.index.targets[target_id] = Target(target_id, path, parts, name)
+    def add_target(self, target_id: str, parts: list[str], name: str | None, path: str) -> None:
+        """path のファイルに target_id のアンカーがあれば、参照先にする。"""
+        if any(found == path for found, _ in self.index.anchors.get(target_id, [])):
+            self.index.targets[target_id] = Target(target_id, path, parts, name)
 
     def add_targets(self) -> None:
         for domain in self.project.domains:
-            self.add_target(domain.id, [domain.full_name()], None)
+            # ファイルは、生成する側 (モジュール generate) の対応で決める
+            self.add_target(domain.id, [domain.full_name()], None, f"{domain.dir}/{README}")
             for symbol, file_name in names.FILE_KINDS.items():
                 file_id = names.build_id([Part("d", domain.name), Part(symbol, None)])
                 parts = [domain.full_name(), names.format_part(symbol, file_name)]
-                self.add_target(file_id, parts, f"`{file_name}`")
+                self.add_target(file_id, parts, f"`{file_name}`", file_path(domain, symbol))
             for entry in domain.entries():
                 parts = [domain.full_name()] + [names.format_part(e.symbol, e.name_ja) for e in entry.lineage()]
-                self.add_target(entry.id, parts, entry.name_ja)
+                self.add_target(entry.id, parts, entry.name_ja, entry_file(entry))
         for handwritten in self.index.files:
             document = handwritten.document
             first = document.first_nonblank()

@@ -74,7 +74,7 @@ def _file_name(symbol: str) -> str:
     return names.FILE_KINDS.get(symbol) or names.HANDWRITTEN_FILE_KINDS[symbol]
 
 
-def _file_path(domain: Domain, symbol: str) -> str:
+def file_path(domain: Domain, symbol: str) -> str:
     return f"{domain.dir}/{_file_name(symbol)}"
 
 
@@ -86,13 +86,13 @@ def _file_title(domain: Domain, symbol: str) -> str:
     return names.join_parts([domain.full_name(), names.format_part(symbol, _file_name(symbol))])
 
 
-def _entry_file(entry: Entry) -> str:
+def entry_file(entry: Entry) -> str:
     symbol = "unclassified_app_terms" if entry.symbol == "ut" else "models"
-    return _file_path(entry.domain, symbol)
+    return file_path(entry.domain, symbol)
 
 
 def _entry_link(links: _Links, entry: Entry, text: str) -> str:
-    return links.link(text, entry.id, _entry_file(entry), entry.full_name())
+    return links.link(text, entry.id, entry_file(entry), entry.full_name())
 
 
 def _reference_text(entry: Entry, from_domain: Domain) -> str:
@@ -135,7 +135,7 @@ def _referencing_models(project: Project) -> dict[str, list[Entry]]:
 
 
 def render_models(project: Project, domain: Domain, referencing: dict[str, list[Entry]]) -> str:
-    path = _file_path(domain, "models")
+    path = file_path(domain, "models")
     links = _Links(path)
     blocks = [f"# {domain.full_name()} のモデル"]
     for model in domain.models:
@@ -156,7 +156,7 @@ def render_models(project: Project, domain: Domain, referencing: dict[str, list[
 
 
 def render_unclassified_app_terms(domain: Domain) -> str:
-    path = _file_path(domain, "unclassified_app_terms")
+    path = file_path(domain, "unclassified_app_terms")
     links = _Links(path)
     blocks = [f"# {domain.full_name()} の{names.KINDS['ut'].label}"]
     blocks += [_definition_block(term) for term in domain.terms]
@@ -174,7 +174,7 @@ def _sorted_terms(entries: list[Entry]) -> list[Entry]:
 
 
 def render_terms(domain: Domain) -> str:
-    path = _file_path(domain, "terms")
+    path = file_path(domain, "terms")
     links = _Links(path)
     rows = ["| 用語 | 種類 | 英語名 |", "|---|---|---|"]
     for entry in _sorted_terms(list(domain.entries())):
@@ -209,7 +209,7 @@ def render_readme(domain: Domain, files: list[str]) -> str:
         rows = ["| 文書 | 中身 |", "|---|---|"]
         for symbol in files:
             link = links.link(
-                f"`{_file_name(symbol)}`", _file_id(domain, symbol), _file_path(domain, symbol),
+                f"`{_file_name(symbol)}`", _file_id(domain, symbol), file_path(domain, symbol),
                 _file_title(domain, symbol),
             )
             rows.append(f"| {link} | {FILE_DESCRIPTIONS[symbol]} |")
@@ -234,15 +234,15 @@ def render_project(project: Project) -> dict[str, str]:
     referencing = _referencing_models(project)
     for domain in project.domains:
         # 手書きのファイルは、今あるものを表に載せる (足したり消したりすると、検査 a が README.md の生成し直しを求める)
-        files = [s for s in names.HANDWRITTEN_FILE_KINDS if (project.root / _file_path(domain, s)).is_file()]
+        files = [s for s in names.HANDWRITTEN_FILE_KINDS if (project.root / file_path(domain, s)).is_file()]
         if domain.models:
-            outputs[_file_path(domain, "models")] = render_models(project, domain, referencing)
+            outputs[file_path(domain, "models")] = render_models(project, domain, referencing)
             files.append("models")
         if domain.terms:
-            outputs[_file_path(domain, "unclassified_app_terms")] = render_unclassified_app_terms(domain)
+            outputs[file_path(domain, "unclassified_app_terms")] = render_unclassified_app_terms(domain)
             files.append("unclassified_app_terms")
         if domain.models or domain.terms:
-            outputs[_file_path(domain, "terms")] = render_terms(domain)
+            outputs[file_path(domain, "terms")] = render_terms(domain)
             files.append("terms")
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
     if any(d.models or d.terms for d in project.domains):

@@ -162,6 +162,12 @@ class TargetTest(DocumentsTestCase):
         ids = [t.id for t in index.candidates("`models.md`")]
         self.assertEqual(ids, ["d-catalog-models", "d-loans-models", "d-members-models"])
 
+    def test_generated_target_path_does_not_follow_duplicate_anchor(self):
+        self.write("docs/domains/02-loans/concept.md", CONCEPT + '\n<a name="d-loans-m-loan"></a>\n\n## 貸出\n')
+        index, _ = self.load()
+        self.assertEqual(index.targets["d-loans-m-loan"].path, "docs/domains/02-loans/models.md")
+        self.assertEqual(len(index.anchors["d-loans-m-loan"]), 2)
+
     def test_invalid_anchors_are_not_targets(self):
         self.write(
             "docs/domains/02-loans/concept.md",
