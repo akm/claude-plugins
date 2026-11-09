@@ -15,7 +15,8 @@ HTML のファイルに書いたマークのコメントを、差分を表示す
 
 `<SHA>` は 4〜40 文字の英小文字の 16 進数で書く。次の場合はエラーにする。
 
-- `review-triage-diff` で始まるコメントが、上の形に合わない
+- `review-triage-diff` で始まるコメントが、上の形に合わない (`review-triage-diff` の直後に空白が無いものを含む)
+- `review-triage-diff` で始まるコメントに、閉じ `-->` が無い
 - 回・問題・案が記録 YAML に無いか、案の要素に `patch` が無い (`no_change` か `covered_by` の要素)
 - `git show` が失敗する (コミットが無いなど)
 

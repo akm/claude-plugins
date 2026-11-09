@@ -71,6 +71,8 @@ func TestParseMarker(t *testing.T) {
 		"review-triage-diff commit HEAD",
 		"review-triage-diff commit cc5f25b2 cc5f25b3",
 		"review-triage-diff file a.txt",
+		"review-triage-diffpatch run=1 problem=P1 option=A",
+		"review-triage-diffcommit cc5f25b2",
 	}
 	for _, in := range ng {
 		if _, err := parseMarker(in); err == nil {
@@ -320,6 +322,20 @@ func TestFillInsertsStyleBeforeHeadEndAfterCaseChangingRunes(t *testing.T) {
 	want := "<title>\u212a\u212a\u212a</title>" + diffStyle + "</HEAD>"
 	if !strings.Contains(got, want) {
 		t.Errorf("<style> が </HEAD> の直前に無い:\n%s", got)
+	}
+}
+
+func TestFillReportsMalformedMarkers(t *testing.T) {
+	// 閉じ --> の無いマークと、review-triage-diff の直後に空白の無いマークを、エラーにすることを確認する
+	for _, body := range []string{
+		"<!-- review-triage-diff commit abcd </body>",
+		"<!-- review-triage-diff commit abcd <p>x</p> <!-- review-triage-diff commit abcd -->",
+		"<!--review-triage-diffpatch run=1 problem=P1 option=A-->",
+	} {
+		in := "<html><head></head><body>" + body + "</body></html>"
+		if _, err := fill(in, sources{record: &record{}, git: fakeGit{"abcd": "diff --git a/a b/a\n"}}); err == nil {
+			t.Errorf("形の誤ったマークでエラーにならなかった: %q", body)
+		}
 	}
 }
 

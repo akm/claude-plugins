@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // marker は、HTML に書いたマークのコメント 1 つ。kind が "patch" なら run・problem・option で記録 YAML の
@@ -18,9 +19,12 @@ type marker struct {
 	sha     string
 }
 
-// markerRe は、マークの候補になるコメント。review-triage-diff で始まるコメントはすべて対象にし、形の検査は
-// 関数 parseMarker が行う。形の誤ったマークを、マークでないコメントとして残さないため。
-var markerRe = regexp.MustCompile(`<!--(\s*review-triage-diff\b[\s\S]*?)-->`)
+// markerRe は、マークの候補になるコメント。review-triage-diff で始まるコメントはすべて対象にし (直後に空白が
+// 無いものも含む)、形の検査は関数 parseMarker が行う。形の誤ったマークを、マークでないコメントとして残さないため。
+var markerRe = regexp.MustCompile(`<!--(\s*review-triage-diff[\s\S]*?)-->`)
+
+// markerStartRe は、マークの始まり。この数が markerRe の一致の数と違えば、閉じ --> の無いマークがある
+var markerStartRe = regexp.MustCompile(`<!--\s*review-triage-diff`)
 
 var (
 	patchRe  = regexp.MustCompile(`^patch run=([0-9]+) problem=(\S+) option=(\S+)$`)
@@ -35,6 +39,10 @@ var (
 func parseMarker(body string) (marker, error) {
 	s := strings.TrimSpace(body)
 	rest, ok := strings.CutPrefix(s, "review-triage-diff")
+	// review-triage-diff の直後には空白を求める (review-triage-diffpatch のような書き誤りをエラーにする)
+	if ok && rest != "" && !unicode.IsSpace([]rune(rest)[0]) {
+		ok = false
+	}
 	rest = strings.TrimSpace(rest)
 	if !ok || rest == "" {
 		return marker{}, fmt.Errorf("マークの形が違います: <!--%s-->", body)
@@ -70,6 +78,9 @@ const styleID = "rt-diff-style"
 // 1 つでも置き換えられないマークがあれば、すべての理由をまとめてエラーにする。
 func fill(html string, src sources) (string, error) {
 	var errs []error
+	if starts, closed := len(markerStartRe.FindAllStringIndex(html, -1)), len(markerRe.FindAllStringIndex(html, -1)); starts != closed {
+		errs = append(errs, fmt.Errorf("閉じ --> の無いマークがあります (マークの始まり %d 個に対し、閉じたマーク %d 個)", starts, closed))
+	}
 	out := markerRe.ReplaceAllStringFunc(html, func(c string) string {
 		body := markerRe.FindStringSubmatch(c)[1]
 		m, err := parseMarker(body)
