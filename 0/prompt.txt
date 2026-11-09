@@ -1,0 +1,95 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221 (29 件)。順序は 1 → 2 → 3 → A1 → (4a〜4d・5〜7・11a〜11c・17) → A2 → … で、sub-issue 1 (#193) はマージ済み。この sub-issue 2 (#194) は、ツールの `generate` と `check` (検査 a・h と検査 i の YAML の参照の向き) とスキルに共通する前置きを足す最初の機能の単位。ツールは Python 3.12 以上 + ruamel.yaml、取得は venv + pip でタグ `doc-structured--v<バージョン>` から、手元のチェックアウトを使う環境変数は `DOC_STRUCTURED_CHECKOUT` (いずれも #193 で決定)。未追跡の `.claude/settings.json` と `.entire/` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#194 (sub-issue 2「モデル・属性・値・未分類のアプリケーション用語を YAML に書き、モデルの文書と用語の索引を生成したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 194` (ゴール・入力・この sub-issue で決める形式・成果物と機能・クローズ条件)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧)
+- sub-issue 1 (#193、PR #224 でマージ済み) で作ったもの: スクリプト `doc-structured/bin/doc-structured`、ツール `doc-structured/tool/` (cli.py・config.py・yamlio.py とテスト)、`doc-structured/README.md`、`doc-structured/docs/release.md`、CI (`.github/workflows/test.yml` の python ジョブと `.github/workflows/doc-structured-bin.yml`)。共有ノートに #193 のセッションが書いた引き継ぎのメモ `193-doc-structured-versioned-run.md` があれば読む
+
+進め方:
+- Issue の「この sub-issue で決める形式」(YAML の項目、未分類のアプリケーション用語の項目名と生成ファイル名、サブディレクトリの分け方、ID の形と種類の記号、限定付きの名前の形の表、生成ファイルの先頭の記述) は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #194 に書く (Issue の「共通のこと」の指示)。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットとPR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。marketplace.json への登録は、最初のスキルか hook を足す sub-issue で行うと #193 で決めているので、この sub-issue でスキルを足すならここで登録する (利用者に確認する)。
+- 実際のプロジェクトでの確認が要る場合も、公開の場 (Issue・PR・ファイル) にそのプロジェクトの名前・番号・リンクを書かない。「実際のプロジェクト」と書く。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、Issue #194 が閉じている。終わったら、呼び出し元のセッションに結果 (PR 番号・決めたこと・次の sub-issue) を報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+案 A (推奨)
+
+---
+
+項目 unclassified_app_terms、生成ファイル  unclassified_app_terms.md はどうでしょう？
+
+---
+
+案 A (推奨)
+
+---
+
+案 A (推奨)
+
+---
+
+案 A (推奨)
+
+---
+
+この表でよい
+
+---
+
+案 A (推奨)
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく提案を前提から説明してください
+
+---
+
+すべて推奨で
+
+---
+
+個別に答える
+
+---
+
+案A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+推奨の通りでOK
+
+---
+
+このタスクをここで実行してください：「doc-structured の egg-info を追跡から外す」
+
+---
+
+/doc-structured:check
