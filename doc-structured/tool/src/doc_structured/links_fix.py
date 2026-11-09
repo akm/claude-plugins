@@ -1,7 +1,8 @@
 """サブコマンド links-fix (手書きの Markdown の定義の行とファイルのアンカーを直す)。
 
 直し方が 1 通りに決まるものだけを書き換え、判断の要るものは「パス:行:列: メッセージ」の形で報告する。本文の文は変えない。
-  - 先頭にファイルの ID のアンカーが無ければ、足す
+  - 先頭の行 (空行を除く) がアンカーでなければ、ファイルの ID のアンカーを足す。先頭のアンカーの ID が違うときは、
+    書き換えるか残すかの判断が要るので、足さずに報告する
   - 定義の無いラベルのうち、参照先の候補が 1 件のものに、定義の行を足す (本文で最初に使った順に、末尾のまとまりの後ろへ)
   - 定義の行の title が参照先の完全な名前と違えば、書き換える (引用符の種類は変えない。title が無ければ「"」で足す)
   - 使われていない定義の行を消す。ただし、同じファイルに定義の無いラベルが残るときは、消さずに報告する
@@ -11,7 +12,7 @@
   - 同じラベルの定義の行のうち、参照先が同じものは後の行を消す。参照先が違えば報告する
 reference-style の画像だけが使うラベルの定義の行は、画像が規則の対象でないので、消さず書き換えない (末尾のまとまりへは移す)。
 判断の要るもの: 参照先の候補が 0 件か複数のラベル・消さなかった使われていない定義の行・参照先の違う同じラベルの定義の行・
-href から参照先を求められない、本文で使われている定義の行。
+href から参照先を求められない、本文で使われている定義の行・ファイルの ID と違う先頭のアンカー。
 利用者が選んだ参照先は、Choice (オプション --choose) で受け取り、定義の行の href と title はツールが作る。
 """
 
@@ -205,9 +206,18 @@ class _FileFixer:
         return self.rebuild(lines, replaced, added, needs_anchor)
 
     def needs_file_anchor(self) -> bool:
+        """先頭の行 (空行を除く) がアンカーでなければ True。アンカーの ID が違えば、報告して False。"""
         first = self.document.first_nonblank()
         anchor = next((a for a in self.document.anchors if a.line == first), None)
-        return anchor is None or anchor.name != self.file.id
+        if anchor is None:
+            return True
+        if anchor.name != self.file.id:
+            self.report(
+                anchor.line, anchor.column,
+                f"先頭のアンカーの ID {anchor.name} が、ファイルの ID {self.file.id} と違う。"
+                "アンカーを書き換えるかどうかを決めて、手で直す",
+            )
+        return False
 
     def rebuild(self, lines: list[str], replaced: dict[int, str | None], added: list[str], needs_anchor: bool) -> list[str]:
         """本文の途中の定義の行を末尾のまとまりへ移し、末尾のまとまりを「本文 + 空行 + 定義の行」の形に組み直す

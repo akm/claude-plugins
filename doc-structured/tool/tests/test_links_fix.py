@@ -106,6 +106,18 @@ class RenameTest(LinksFixTestCase):
 
 
 class FileAnchorTest(LinksFixTestCase):
+    def test_reports_file_anchor_with_other_id_without_adding(self):
+        text = self.read(CONCEPT).replace('<a name="d-loans-concept"></a>', '<a name="d-loans-old"></a>', 1)
+        self.write(CONCEPT, text)
+        result = self.run_tool("links-fix", CONCEPT)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            f"{CONCEPT}:1:1: 先頭のアンカーの ID d-loans-old が、ファイルの ID d-loans-concept と違う。"
+            "アンカーを書き換えるかどうかを決めて、手で直す",
+            result.stdout,
+        )
+        self.assertEqual(self.read(CONCEPT), text)
+
     def test_adds_missing_file_anchor(self):
         self.write(CONCEPT, self.read(CONCEPT).replace('<a name="d-loans-concept"></a>\n\n', "", 1))
         self.assertEqual(self.run_tool("links-fix").returncode, 0)
