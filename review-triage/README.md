@@ -41,6 +41,10 @@ Markdown の修正の差分から、コミット前に再確認する範囲を�
 
 レビューの指摘の対象の行が、全量の起点 (ブランチの作り始めのコミット) から、レビューした内容まで変わっていないかを確認します。`review-triage` が判定ノード D8 (このブランチより前からある欠陥か) の条件 (1) と、D9 (前の回までの下限未満の指摘と同じ問題で、対象の行が変わっていないか) の条件 (2) に使い、結果 (成り立つ・成り立たない・確認できない) を判定の記録に残します。使い方は [tools/lineorigin/README.md](tools/lineorigin/README.md)。**Go と git が要ります** (triagecheck と同じく `go run` で都度実行)。
 
+## 同梱のツール (diffhtml)
+
+HTML のファイルに書いたマークのコメントを、記録 YAML の案のパッチか、コミットの差分を表示する HTML に置き換えます。`review-triage-fix` が説明の HTML (選択待ちの問題を判断するためのものと、直した問題を確認するためのもの) を作るときに使います。差分をモデルにコピーさせないためです。使い方は [tools/diffhtml/README.md](tools/diffhtml/README.md)。**Go と git が要ります** (triagecheck と同じく `go run` で都度実行)。
+
 ## 同梱のワーカー (review-loop-worker)
 
 `review-loop` のレビューを行うスクリプト `scripts/review-loop-worker.sh` です。**端末で 1 回起動**すると、ループのディレクトリ (review-loop のセッションとの受け渡しに使うディレクトリ) に依頼文が現れるたびに `claude -p` を指定のモデルと effort で実行し、結果を確認してから完了のフラグファイルを書き、次の依頼文が書かれるまで待機します。起動コマンドは `review-loop` が案内します。Claude Desktop app で Terminal パネルのツールが使えるときは、`review-loop` がモデル・effort・コマンドを示して承認を求め、承認すると端末のタブで起動します。
