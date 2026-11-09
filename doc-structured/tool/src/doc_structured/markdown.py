@@ -427,6 +427,21 @@ class _InlineScanner:
             self.document.image_labels.append(inner)
         return after
 
+    def scan_images(self, start: int, end: int) -> None:
+        """text[start:end] (リンクの文) の中の画像を読む。エスケープとインラインコードの中は読まない。"""
+        text = self.text
+        j = start
+        while j < end:
+            char = text[j]
+            if char == "\\" and j + 1 < len(text) and text[j + 1] in ASCII_PUNCTUATION:
+                j += 2
+            elif char == "`":
+                j = self.skip_code(j)
+            elif char == "!" and text.startswith("[", j + 1):
+                j = self.skip_image(j + 1)
+            else:
+                j += 1
+
     def read_bracket(self, i: int) -> int:
         text = self.text
         if i in self.ignored or text.startswith("[^", i):
@@ -440,6 +455,8 @@ class _InlineScanner:
             # [] はリンクにならない (CommonMark のとおり)
             return close + 1
         line, column = self.position(i)
+        # リンクの文の中の画像 ([![CI][ci-badge]][ci] のようなバッジ) のラベルも残す
+        self.scan_images(i + 1, close)
         after = close + 1
         if text.startswith("(", after):
             paren = self.matching_paren(after)

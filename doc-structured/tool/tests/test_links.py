@@ -129,6 +129,11 @@ class LinkFormTest(LinksTestCase):
     def test_reference_style_image_definitions_are_not_checked(self):
         self.assertPasses(f"{HEAD}図は ![貸出の流れ][flow] のとおり。\n\n[flow]: images/flow.png\n")
 
+    def test_image_inside_link_text_is_not_checked(self):
+        self.assertPasses(
+            f"{HEAD}[![CI][ci-badge]][ci]\n\n[ci]: https://example.com/ci\n[ci-badge]: https://example.com/badge.svg\n"
+        )
+
     def test_label_used_by_link_and_image_is_checked_as_link(self):
         self.assertReports(
             f"{HEAD}[flow] と ![貸出の流れ][flow]\n\n[flow]: images/flow.png\n", "ID のアンカー (#<ID>) を指していない", 7

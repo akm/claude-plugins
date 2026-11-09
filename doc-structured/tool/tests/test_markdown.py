@@ -58,6 +58,11 @@ class ReferenceTest(unittest.TestCase):
         self.assertEqual([r.label for r in doc.references], ["a"])
         self.assertEqual(doc.inline_links, [])
 
+    def test_image_labels_inside_link_text_are_kept(self):
+        doc = markdown.parse("[![CI][ci-badge]][ci] と [![図][fig]](https://example.com) と [`![x][y]`][z]\n")
+        self.assertEqual(doc.image_labels, ["ci-badge", "fig"])
+        self.assertEqual([(r.form, r.label) for r in doc.references], [("full", "ci"), ("full", "z")])
+
     def test_reference_style_image_labels_are_kept(self):
         doc = markdown.parse("![図](a.png) と ![流れ][flow] と ![表][] と ![配置図] と [a]\n")
         self.assertEqual(doc.image_labels, ["flow", "表", "配置図"])
