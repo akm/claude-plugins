@@ -342,21 +342,28 @@ class _InlineScanner:
                 j += 1
         return run_end
 
-    def read_angle(self, i: int) -> int:
+    def angle_end(self, i: int) -> tuple[int, str | None]:
+        """text[i] の「<」で始まる要素 (HTML のコメント・autolink・HTML のタグ) の終わりの位置と、autolink なら その URL。
+        どれでもなければ、「<」の次の位置。"""
         text = self.text
         if text.startswith("<!--", i):
             end = text.find("-->", i + 4)
-            return len(text) if end < 0 else end + 3
+            return (len(text) if end < 0 else end + 3), None
         for regex in (AUTOLINK_RE, EMAIL_AUTOLINK_RE):
             match = regex.match(text, i)
             if match:
-                line, column = self.position(i)
-                self.document.urls.append(Url("autolink", match.group("url"), line, column))
-                return match.end()
+                return match.end(), match.group("url")
         match = HTML_TAG_RE.match(text, i)
         if match:
-            return match.end()
-        return i + 1
+            return match.end(), None
+        return i + 1, None
+
+    def read_angle(self, i: int) -> int:
+        end, url = self.angle_end(i)
+        if url is not None:
+            line, column = self.position(i)
+            self.document.urls.append(Url("autolink", url, line, column))
+        return end
 
     def read_bare_url(self, i: int) -> int:
         match = BARE_URL_RE.match(self.text, i)
@@ -428,7 +435,7 @@ class _InlineScanner:
         return after
 
     def scan_images(self, start: int, end: int) -> None:
-        """text[start:end] (リンクの文) の中の画像を読む。エスケープとインラインコードの中は読まない。"""
+        """text[start:end] (リンクの文) の中の画像を読む。エスケープ・インラインコード・HTML・autolink の中は読まない。"""
         text = self.text
         j = start
         while j < end:
@@ -437,6 +444,8 @@ class _InlineScanner:
                 j += 2
             elif char == "`":
                 j = self.skip_code(j)
+            elif char == "<":
+                j = self.angle_end(j)[0]
             elif char == "!" and text.startswith("[", j + 1):
                 j = self.skip_image(j + 1)
             else:

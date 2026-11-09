@@ -63,6 +63,11 @@ class ReferenceTest(unittest.TestCase):
         self.assertEqual(doc.image_labels, ["ci-badge", "fig"])
         self.assertEqual([(r.form, r.label) for r in doc.references], [("full", "ci"), ("full", "z")])
 
+    def test_html_and_autolink_inside_link_text_are_not_read_as_images(self):
+        for text in ('[<!-- ![a][b] -->x][c]', '[<span title="![a][b]">x</span>][c]', "[x <https://e.com/![a][b]>][c]"):
+            with self.subTest(text=text):
+                self.assertEqual(markdown.parse(text + "\n").image_labels, [])
+
     def test_reference_style_image_labels_are_kept(self):
         doc = markdown.parse("![図](a.png) と ![流れ][flow] と ![表][] と ![配置図] と [a]\n")
         self.assertEqual(doc.image_labels, ["flow", "表", "配置図"])
