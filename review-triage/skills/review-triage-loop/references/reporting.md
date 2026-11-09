@@ -11,6 +11,7 @@
 5. **残っているもの** — 調査済み (`status: investigated`) と未着手 (`status: pending`) の問題があれば、その回と識別子。**停止した理由を問わず出す。** ループの後に残ったものは次のループか人間が引き継ぐので、報告に無いと引き継ぎ先が知る手段が無い。今回は直さないと人間が決めた問題 (`status: not-fixed`) も、その回と識別子を出す。記録に残っている下限未満の指摘 (「残っている」の定義の SSOT は [record-schema.md](../../review-triage/references/record-schema.md) の「下限未満の指摘の参照」) があれば、その件数と、一覧が生成サマリの節「下限未満の指摘」にあることも出す。**下限未満の指摘を直すことを、続け方として提案しない。** 一覧で示すだけにして、直すかどうかは人間が決める。
 6. **次に回すときの条件の推奨** — 推移から導いた、次のループのレビューのモデルと effort の推奨と、その理由。目安 (どの回にどの粒度のモデルが向くか) の SSOT は [record-schema.md の「生成サマリの読み方」](../../review-triage/references/record-schema.md#生成サマリの読み方)。**ループは条件を変えない** (原則)。推奨を出すだけで、変えるかどうかは人間が次の起動で決める。停止した理由を問わず出す ([#58](https://github.com/akm/claude-plugins/issues/58))。
 7. **基準を直した (または基準に合わせない理由を書いた) 問題の一覧** — 記録の全回の、修正を終えた問題 (`status: done` か `done-external`) のうち、`decision.choice` が `target` の問題の、回と識別子・基準 (`decision.baseline`)・`approach`。**停止した理由を問わず出す。** 無ければ出さない。意味の SSOT は [fix-decision.md](../../review-triage-fix/references/fix-decision.md)。記録 YAML から求め、各回の報告の文面からは求めない。
+8. **説明の HTML の絶対パス** — この起動の各回で `review-triage-fix` が報告した説明の HTML (選択待ちの問題を判断するためのものと、直した問題を確認するためのもの) の絶対パス。作らなかったと報告された回は、その理由。**停止した理由を問わず出す。** 回ごとの報告に埋もれると、人間が HTML を見つけられないため。作る場面と構成の SSOT は [review-triage-fix の explainer-html.md](../../review-triage-fix/references/explainer-html.md)。
 
 ## 採択件数の推移
 
