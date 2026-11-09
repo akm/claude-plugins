@@ -25,6 +25,10 @@ var markerRe = regexp.MustCompile(`<!--(\s*review-triage-diff\b[\s\S]*?)-->`)
 var (
 	patchRe  = regexp.MustCompile(`^patch run=([0-9]+) problem=(\S+) option=(\S+)$`)
 	commitRe = regexp.MustCompile(`^commit ([0-9a-f]{4,40})$`)
+	// headEndRe は </head> を大文字と小文字を区別せずに探す。元の文字列に当てるので、見つけた位置で
+	// 元の文字列を切れる。strings.ToLower で変えた文字列の位置は、小文字にするとバイト数が変わる文字
+	// (ケルビン記号 U+212A など) があると、元の文字列の位置と一致しない
+	headEndRe = regexp.MustCompile(`(?i)</head>`)
 )
 
 // parseMarker は、コメントの中身 (<!-- と --> の間) をマークとして読む。
@@ -81,11 +85,11 @@ func fill(html string, src sources) (string, error) {
 		return renderDiff(diff)
 	})
 	if !strings.Contains(out, `id="`+styleID+`"`) {
-		i := strings.Index(strings.ToLower(out), "</head>")
-		if i < 0 {
+		loc := headEndRe.FindStringIndex(out)
+		if loc == nil {
 			errs = append(errs, errors.New("HTML に </head> がありません (色分けの <style> を入れる位置が無い)"))
 		} else {
-			out = out[:i] + diffStyle + out[i:]
+			out = out[:loc[0]] + diffStyle + out[loc[0]:]
 		}
 	}
 	if len(errs) > 0 {

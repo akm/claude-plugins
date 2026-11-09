@@ -309,6 +309,20 @@ func TestFillReportsAllErrors(t *testing.T) {
 	}
 }
 
+func TestFillInsertsStyleBeforeHeadEndAfterCaseChangingRunes(t *testing.T) {
+	// ケルビン記号 (U+212A、3 バイト) は小文字にすると k (1 バイト) になる。</head> の位置を、小文字にした
+	// 文字列ではなく元の文字列で求めていることを確認する
+	in := "<html><head><title>\u212a\u212a\u212a</title></HEAD><body></body></html>"
+	got, err := fill(in, sources{record: &record{}, git: fakeGit{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "<title>\u212a\u212a\u212a</title>" + diffStyle + "</HEAD>"
+	if !strings.Contains(got, want) {
+		t.Errorf("<style> が </HEAD> の直前に無い:\n%s", got)
+	}
+}
+
 func TestFillRequiresHeadEnd(t *testing.T) {
 	if _, err := fill("<html><body></body></html>", sources{record: &record{}, git: fakeGit{}}); err == nil {
 		t.Error("</head> が無いのにエラーにならなかった")
