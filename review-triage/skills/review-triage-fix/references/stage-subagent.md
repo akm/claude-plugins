@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | 調査フェーズ | `investigate` | 調査フェーズの手順のうち、**末尾の「立案者の選択」は含めない。** 人間に問うのは呼び出し元のセッション | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
 | 立案フェーズ | `plan` | 立案フェーズの手順 | [fix-decision.md](fix-decision.md)・[ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
-| 修正フェーズ | `fix` | 修正フェーズの手順のうち、**報告と `doc-dag` の確認は含めない。** 呼び出し元のセッションで行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
+| 修正フェーズ | `fix` | 修正フェーズの手順のうち、**報告と `doc-dag` の確認と説明の HTML の作成は含めない。** 呼び出し元のセッションで行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
 
 全フェーズに共通して読ませる文書: [SKILL.md](../SKILL.md) (該当の手順と「原則」)、[record-schema.md](../../review-triage/references/record-schema.md) (記録の様式・状態・コミット節)、[project-config.md](../../review-triage/references/project-config.md) (設定のキーの意味)。
 
@@ -120,7 +120,7 @@ Agent ツールの `model` は、モデルの別名 (`opus` / `sonnet` のよう
 - `chosen_option` のある問題は、`approach` の文からではなく、その案のパッチを当てて直す ([SKILL.md](../SKILL.md) の「案のパッチ」の「当て方」)。パッチが当たらないときと、当てた後に検証を通らないときは、「当て方」のとおり `chosen_option` を消して `status: awaiting-human` に戻し、報告の「できなかったこと」に書く。パッチは作り直さない (呼び出し元が作る)。
 - 1 問題 1 コミット。各コミットの前に、設定の `gates` の関門と観点 A〜F を通す (SSOT は committing.md・verification.md)。
 - コミットしたら記録の該当の問題を `status: done`・`sha` に更新する。区切り (全問題の完了、または中断) で、記録のディレクトリが git の追跡内なら記録とサマリをコミットする (分け方の SSOT は record-schema.md のコミット節)。**未コミットの変更を残して返らない。**
-- 手順 8 (報告) と手順 9 (`doc-dag`) を行わない。
+- 手順 8 (報告)・手順 9 (`doc-dag`)・手順 10 (説明の HTML) を行わない。
 
 ### 雛形
 
