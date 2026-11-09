@@ -66,7 +66,8 @@ def _definition_key(handwritten: HandwrittenFile, definition: markdown.Definitio
     if is_external(definition.destination):
         return strip_angle(definition.destination)
     resolved = resolve(handwritten, definition, index)
-    return resolved.target.id if resolved.target else None
+    target = resolved.target or resolved.by_id
+    return target.id if target else None
 
 
 def _choice_line(choice: Choice, label: str, handwritten: HandwrittenFile, index: Index) -> str:
@@ -143,11 +144,9 @@ class _FileFixer:
             resolved = resolve(self.file, definition, self.index)
             quote = definition.quote or '"'
             if resolved.target is None:
-                fragment = strip_angle(definition.destination).partition("#")[2]
-                target = self.index.targets.get(fragment)
-                if target is not None:
+                if resolved.by_id is not None:
                     # ID は参照先にあり、パスだけが違う。直し方は 1 つに決まる
-                    replaced[definition.line] = definition_line(definition.label, target, self.file.path, quote)
+                    replaced[definition.line] = definition_line(definition.label, resolved.by_id, self.file.path, quote)
                 elif key in seen_used:
                     self.report(
                         definition.line, definition.column,

@@ -38,10 +38,14 @@ def strip_angle(destination: str) -> str:
 
 @dataclass(frozen=True)
 class Resolved:
-    """内部の定義の行の参照先。target が None なら、message が誤りの説明。"""
+    """内部の定義の行の参照先。target が None なら、message が誤りの説明。
+
+    by_id は、href の ID の参照先はあるがパスだけが違うときの、その参照先 (直し方が 1 つに決まる)。
+    """
 
     target: Target | None
     message: str = ""
+    by_id: Target | None = None
 
 
 def resolve(handwritten: HandwrittenFile, definition: markdown.Definition, index: Index) -> Resolved:
@@ -59,7 +63,11 @@ def resolve(handwritten: HandwrittenFile, definition: markdown.Definition, index
         return Resolved(None, f"href の参照先 {fragment} のアンカーが無い")
     resolved = handwritten.path if not path else posixpath.normpath(posixpath.join(posixpath.dirname(handwritten.path), path))
     if resolved != target.path:
-        return Resolved(None, f"href が、参照先 {fragment} のアンカーのあるファイルを指していない (正しい href は {target.href(handwritten.path)})")
+        return Resolved(
+            None,
+            f"href が、参照先 {fragment} のアンカーのあるファイルを指していない (正しい href は {target.href(handwritten.path)})",
+            by_id=target,
+        )
     return Resolved(target)
 
 

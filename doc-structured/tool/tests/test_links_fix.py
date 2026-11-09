@@ -234,6 +234,14 @@ class DefinitionBlockTest(ScratchTestCase):
         )
         self.assertCheckPasses()
 
+    def test_duplicate_definitions_with_same_stale_href(self):
+        stale = "[モデル「貸出」]: terms.md#d-loans-m-loan \"x\""
+        self.write(CONCEPT, f"{HEAD}[モデル「貸出」]\n\n{stale}\n{stale}\n")
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read(CONCEPT), f"{HEAD}[モデル「貸出」]\n\n{LOAN_DEFINITION}\n")
+        self.assertCheckPasses()
+
     def test_reports_definition_whose_href_cannot_be_resolved(self):
         self.write(CONCEPT, f"{HEAD}[貸出]\n\n[貸出]: models.md#d-loans-m-rental \"x\"\n")
         result = self.run_tool("links-fix")
