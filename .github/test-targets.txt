@@ -11,6 +11,7 @@ python wording-guard/tests
 go review-triage/tools/triagecheck
 go review-triage/tools/nearedges
 go review-triage/tools/lineorigin
+go review-triage/tools/diffhtml
 python issue-dispatch/tests
 python scripts/tests
 python doc-structured/tool/tests
