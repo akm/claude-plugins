@@ -96,9 +96,16 @@ class Index:
     anchors: dict[str, list[tuple[str, markdown.Anchor]]] = field(default_factory=dict)
     documents: dict[str, markdown.Document] = field(default_factory=dict)  # パスから、読んだ Markdown への対応
 
+    # 比べる形のラベルから、その候補の参照先への対応。最初の candidates の呼び出しで、参照先の一覧から 1 度だけ作る
+    _by_label: dict[str, list[Target]] | None = field(default=None, repr=False)
+
     def candidates(self, label: str) -> list[Target]:
-        key = markdown.normalize_label(label)
-        return sorted((t for t in self.targets.values() if key in t.labels()), key=lambda t: t.id)
+        if self._by_label is None:
+            self._by_label = {}
+            for target in sorted(self.targets.values(), key=lambda t: t.id):
+                for key in target.labels():
+                    self._by_label.setdefault(key, []).append(target)
+        return list(self._by_label.get(markdown.normalize_label(label), []))
 
     def file(self, path: str) -> HandwrittenFile | None:
         for handwritten in self.files:
