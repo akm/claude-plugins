@@ -15,6 +15,9 @@ dynamic = ["version"]
 dependencies = [
   # YAML の読み書き。コメント・記述の順序・空行を保ったまま書き換えられる (確認はテスト tests/test_yamlio.py)
   "ruamel.yaml>=0.18",
+  # 手書きの Markdown のブロックの構造 (コードブロック・HTML のブロック・見出しの行の範囲) を CommonMark のとおりに求める。
+  # 行の中のラベルとインラインコードは、モジュール markdown が自分で読む (ライブラリは列の位置を返さないため)
+  "markdown-it-py>=3.0",
 ]
 
 [project.scripts]

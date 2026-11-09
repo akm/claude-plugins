@@ -3,6 +3,8 @@
 ID は、種類の記号と名前 (snake_case) をハイフンで交互につなぎ、親から子の順に並べたもの
 (例 d-loans-m-loan-a-status-v-on_loan)。ファイルの ID は、親の ID にファイルの種類の記号を足したもの
 (例 d-loans-models)。ファイルの種類の記号は名前を取らない。
+手書きのファイル (concept・design・problem) の下には、節 (記号 h) と子のファイル (記号 f) の ID を作る
+(例 d-loans-concept-h-return_deadline・d-push-design-f-device_operations)。子のファイルの下には節だけを作る。
 
 限定付きの名前は、親から順に「種類 + 名前」を「の」でつないだもの。ユーザーレベルの種類は日本語名をかぎ括弧で、
 開発レベルの種類は英語名をコードの書式で書く。名前の形の表の SSOT はプラグインの規則の文書
@@ -39,13 +41,24 @@ KINDS: dict[str, Kind] = {
     )
 }
 
-# ファイルの種類の記号と、そのファイル名。親はドメイン
+# 生成するファイルの種類の記号と、そのファイル名。親はドメイン
 FILE_KINDS: dict[str, str] = {
     "models": "models.md",
     "terms": "terms.md",
     "unclassified_app_terms": "unclassified_app_terms.md",
 }
+# 手書きのファイルの種類の記号と、そのファイル名。親はドメイン。ドメインの README.md の表に、この順に載せる
+HANDWRITTEN_FILE_KINDS: dict[str, str] = {
+    "concept": "concept.md",
+    "problem": "problem.md",
+    "design": "design.md",
+}
 FILE_KIND_LABEL = "ファイル"
+
+# 手書きのファイルの節。名前は書く人が決める snake_case で、限定付きの名前には見出しの文を書く
+SECTION = Kind("h", "節", True, ())
+# 手書きのファイルの子のファイル (100 行を超えたファイルを分けた先)。限定付きの名前には、ドメインのディレクトリからのパスを書く
+CHILD_FILE_SYMBOL = "f"
 
 
 class IdError(ValueError):
@@ -81,9 +94,15 @@ def parse_id(text: str) -> list[Part]:
     while i < len(tokens):
         symbol = tokens[i]
         parent = parts[-1].symbol if parts else None
-        if symbol in KINDS:
-            kind = KINDS[symbol]
-            if (parent is None and kind.parents) or (parent is not None and parent not in kind.parents):
+        if symbol in KINDS or symbol in (SECTION.symbol, CHILD_FILE_SYMBOL):
+            if symbol in KINDS:
+                kind = KINDS[symbol]
+                allowed = (parent is None and not kind.parents) or (parent is not None and parent in kind.parents)
+            elif symbol == SECTION.symbol:
+                allowed = parent in HANDWRITTEN_FILE_KINDS or parent == CHILD_FILE_SYMBOL
+            else:
+                allowed = parent in HANDWRITTEN_FILE_KINDS
+            if not allowed:
                 raise IdError(f"ID {text} の {symbol} は、{parent or '先頭'} の後に書けない")
             if i + 1 >= len(tokens):
                 raise IdError(f"ID {text} の {symbol} の後に名前が無い")
@@ -95,6 +114,11 @@ def parse_id(text: str) -> list[Part]:
         elif symbol in FILE_KINDS:
             if parent != "d" or i + 1 != len(tokens):
                 raise IdError(f"ID {text} のファイルの種類 {symbol} は、ドメインの直後の最後にだけ書ける")
+            parts.append(Part(symbol, None))
+            i += 1
+        elif symbol in HANDWRITTEN_FILE_KINDS:
+            if parent != "d":
+                raise IdError(f"ID {text} のファイルの種類 {symbol} は、ドメインの直後にだけ書ける")
             parts.append(Part(symbol, None))
             i += 1
         else:
@@ -110,9 +134,12 @@ def kind_of(text: str) -> str:
 
 
 def format_part(symbol: str, display: str) -> str:
-    """「種類 + 名前」の 1 つ。display は、ユーザーレベルなら日本語名、開発レベルなら英語名、ファイルならファイル名。"""
-    if symbol in FILE_KINDS:
+    """「種類 + 名前」の 1 つ。display は、ユーザーレベルなら日本語名、開発レベルなら英語名、ファイルならファイル名、
+    子のファイルならドメインのディレクトリからのパス、節なら見出しの文。"""
+    if symbol in FILE_KINDS or symbol in HANDWRITTEN_FILE_KINDS or symbol == CHILD_FILE_SYMBOL:
         return f"{FILE_KIND_LABEL} `{display}`"
+    if symbol == SECTION.symbol:
+        return f"{SECTION.label}「{display}」"
     kind = KINDS[symbol]
     if kind.user_level:
         return f"{kind.label}「{display}」"
