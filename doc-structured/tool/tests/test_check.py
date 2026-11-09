@@ -27,12 +27,12 @@ class CheckTest(ProjectTestCase):
         )
 
     def test_sample_project_passes_all_light_checks(self):
-        for args in ((), ("--light",), ("--all",), ("--only", "a"), ("--only", "b"), ("--only", "h"), ("--only", "i")):
+        for args in ((), ("--light",), ("--all",), ("--only", "a"), ("--only", "b"), ("--only", "h"), ("--only", "i"), ("--only", "k")):
             with self.subTest(args=args):
                 result = self.run_check(*args)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertTrue(result.stdout.endswith(": 問題は無かった\n"), result.stdout)
-        self.assertEqual(self.run_check().stdout, "検査 a・b・h・i: 問題は無かった\n")
+        self.assertEqual(self.run_check().stdout, "検査 a・b・h・i・k: 問題は無かった\n")
 
     def test_check_a_reports_hand_edited_file_with_source_and_command(self):
         path = self.project / MODELS
@@ -46,7 +46,7 @@ class CheckTest(ProjectTestCase):
         )
         self.assertIn("-貸し出した本。", result.stdout)
         self.assertIn("+貸し出した図書。", result.stdout)
-        self.assertIn("検査 a・b・h・i: 問題が 1 件あった", result.stdout)
+        self.assertIn("検査 a・b・h・i・k: 問題が 1 件あった", result.stdout)
 
     def test_check_a_reports_missing_generated_file(self):
         (self.project / "docs/glossary.md").unlink()
@@ -165,7 +165,7 @@ class CheckTest(ProjectTestCase):
     def test_unknown_check_is_usage_error(self):
         result = self.run_check("--only", "j")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・h・i)", result.stderr)
+        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・h・i・k)", result.stderr)
 
     def test_options_are_mutually_exclusive(self):
         result = self.run_check("--light", "--all")
