@@ -7,9 +7,11 @@
   - 使われていない定義の行を消す。ただし、同じファイルに定義の無いラベルが残るときは、消さずに報告する
     (ラベルの書き間違いのことがあるため)
   - 本文の途中の定義の行と、段落の一部になった定義の行を、末尾のまとまりに移す
+  - 定義の行の href の ID が参照先にあり、パスだけが違えば、href を正しい値に書き換える
   - 同じラベルの定義の行のうち、参照先が同じものは後の行を消す。参照先が違えば報告する
 reference-style の画像だけが使うラベルの定義の行は、画像が規則の対象でないので、消さず書き換えない (末尾のまとまりへは移す)。
-判断の要るもの: 参照先の候補が 0 件か複数のラベル・消さなかった使われていない定義の行・参照先の違う同じラベルの定義の行。
+判断の要るもの: 参照先の候補が 0 件か複数のラベル・消さなかった使われていない定義の行・参照先の違う同じラベルの定義の行・
+href から参照先を求められない、本文で使われている定義の行。
 利用者が選んだ参照先は、Choice (オプション --choose) で受け取り、定義の行の href と title はツールが作る。
 """
 
@@ -138,13 +140,24 @@ class _FileFixer:
             if key in images or is_external(definition.destination):
                 continue
             resolved = resolve(self.file, definition, self.index)
+            quote = definition.quote or '"'
             if resolved.target is None:
+                fragment = strip_angle(definition.destination).partition("#")[2]
+                target = self.index.targets.get(fragment)
+                if target is not None:
+                    # ID は参照先にあり、パスだけが違う。直し方は 1 つに決まる
+                    replaced[definition.line] = definition_line(definition.label, target, self.file.path, quote)
+                elif key in seen_used:
+                    self.report(
+                        definition.line, definition.column,
+                        f"ラベル {definition.label} の定義の行の href から参照先を求められない ({resolved.message})。"
+                        "--choose で参照先を渡す",
+                    )
                 continue
             full_name = resolved.target.full_name()
             if definition.title_text == full_name:
                 continue
             line = lines[definition.line - 1]
-            quote = definition.quote or '"'
             head = line[: definition.title_start].rstrip()
             replaced[definition.line] = f"{head} {quote}{markdown.escape_title(full_name, quote)}{markdown.closing_quote(quote)}"
 

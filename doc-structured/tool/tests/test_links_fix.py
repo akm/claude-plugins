@@ -212,6 +212,29 @@ class DefinitionBlockTest(ScratchTestCase):
         self.assertEqual(self.run_tool("links-fix").returncode, 0)
         self.assertIn(LOAN_DEFINITION, self.read(CONCEPT))
 
+    def test_rewrites_href_whose_path_is_stale(self):
+        self.write(CONCEPT, f"{HEAD}[モデル「貸出」]\n\n[モデル「貸出」]: terms.md#d-loans-m-loan 'x'\n")
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.read(CONCEPT),
+            f"{HEAD}[モデル「貸出」]\n\n[モデル「貸出」]: models.md#d-loans-m-loan 'ドメイン `loans` のモデル「貸出」'\n",
+        )
+        self.assertCheckPasses()
+
+    def test_reports_definition_whose_href_cannot_be_resolved(self):
+        self.write(CONCEPT, f"{HEAD}[貸出]\n\n[貸出]: models.md#d-loans-m-rental \"x\"\n")
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            f"{CONCEPT}:7:1: ラベル 貸出 の定義の行の href から参照先を求められない "
+            "(href の参照先 d-loans-m-rental のアンカーが無い)。--choose で参照先を渡す",
+            result.stdout,
+        )
+        chosen = self.run_tool("links-fix", "--choose", CONCEPT, "貸出", "d-loans-m-loan")
+        self.assertEqual(chosen.returncode, 0, chosen.stdout + chosen.stderr)
+        self.assertCheckPasses()
+
     def test_removes_unused_definitions(self):
         self.write(CONCEPT, f"{HEAD}本文\n\n{LOAN_DEFINITION}\n")
         self.assertEqual(self.run_tool("links-fix").returncode, 0)
