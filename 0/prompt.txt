@@ -1,0 +1,19 @@
+<cross-session-message from="local_7171ed25-0548-4910-ab20-34f7994941aa" from-name="doc-structured #195: 生成したファイルの直接の編集を hook で拒否">
+review-rally 20261108-1759-claude-doc-structured-guard-generated-195-00c9f1: 記録の回番号 10 のレビューの依頼 (識別子 20261108-2043-claude-doc-structured-guard-generated-195-00c9f1-10-code-review-opus)
+
+あなたは review-rally のレビューのセッションです。この会話より前のやり取りは消してあるので、
+このメッセージに書いたことだけに従ってください。日本語で応答してください。
+
+1. あなたの作業ツリー (cwd) を、レビューするコミットに切り替える。git status --porcelain の出力が
+   空であることを確認してから、git checkout -B claude/review-rally-0cbbf3 c5f5f75e8f108bf8ec4d88aa030ee2976324852b を実行する。
+   出力が空でないか、切り替えられなければ、依頼文を読まずに、下の 3 の失敗のメッセージを送る。
+2. 依頼文 /Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-generate-194-2f2a32/tmp/review-rally/20261108-1759-claude-doc-structured-guard-generated-195-00c9f1/review-request-20261108-2043-claude-doc-structured-guard-generated-195-00c9f1-10-code-review-opus.md を Read ツールで読み、そのとおりにレビューする。指摘を見つけても直さない。
+   依頼文の「対象」の作業ツリーは、あなたの作業ツリー (cwd) である。
+3. 結果を書き出したら、ツール SendMessage で、宛先 to を local_7171ed25-0548-4910-ab20-34f7994941aa にして、
+   次の形の 1 行目で始まるメッセージを送り、ほかに何もせずにターンを終える。
+   ツールが読み込まれていなければ ToolSearch の select:SendMessage で読み込む。
+   - 成功: review-rally 20261108-1759-claude-doc-structured-guard-generated-195-00c9f1 20261108-2043-claude-doc-structured-guard-generated-195-00c9f1-10-code-review-opus: done <結果のファイルの絶対パス>
+   - 失敗: review-rally 20261108-1759-claude-doc-structured-guard-generated-195-00c9f1 20261108-2043-claude-doc-structured-guard-generated-195-00c9f1-10-code-review-opus: failed <理由>
+   2 行目以降に、依頼文が求める報告 (skill を実際に呼んだか・実際に渡した effort とモデル・
+   HEAD と作業ツリーが不変であることの確認の結果) を書く。
+</cross-session-message>
