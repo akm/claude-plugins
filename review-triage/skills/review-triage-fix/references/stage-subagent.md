@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | 調査フェーズ | `investigate` | 調査フェーズの手順のうち、**末尾の「立案者の選択」は含めない。** 人間に問うのは呼び出し元のセッション | [grouping.md](grouping.md)・[investigation.md](investigation.md)・[doc-fix-form.md](doc-fix-form.md) | 覆われていない採択 → `plans` (`status: investigated`) か `plan_ref` |
 | 立案フェーズ | `plan` | 立案フェーズの手順 | [fix-decision.md](fix-decision.md)・[ordering.md](ordering.md)・[doc-fix-form.md](doc-fix-form.md) | `investigated` → `pending` か `awaiting-human` |
-| 修正フェーズ | `fix` | 修正フェーズの手順のうち、**報告と `doc-dag` の確認と説明の HTML の作成は含めない。** 呼び出し元のセッションで行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
+| 修正フェーズ | `fix` | 修正フェーズの手順のうち、**報告と `doc-dag` の確認は含めない。** 呼び出し元のセッションで行う | [committing.md](committing.md)・[verification.md](verification.md) | `pending` → `done` (`sha`) か `done-external` |
 
 全フェーズに共通して読ませる文書: [SKILL.md](../SKILL.md) (該当の手順と「原則」)、[record-schema.md](../../review-triage/references/record-schema.md) (記録の様式・状態・コミット節)、[project-config.md](../../review-triage/references/project-config.md) (設定のキーの意味)。
 
