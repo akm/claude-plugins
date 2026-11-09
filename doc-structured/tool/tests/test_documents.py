@@ -1,5 +1,6 @@
 """手書きの Markdown の発見と、リンクの参照先の一覧 (モジュール documents) のテスト。"""
 
+import shutil
 import unittest
 
 from doc_structured.documents import load_documents, section_name
@@ -31,9 +32,15 @@ CHILD = """\
 
 
 class DocumentsTestCase(ProjectTestCase):
+    """サンプルのプロジェクトから手書きのファイルを除いたものを使う (テストごとに手書きのファイルを書く)。"""
+
     def setUp(self) -> None:
         super().setUp()
         self.copy_sample()
+        loans = self.project / "docs/domains/02-loans"
+        (loans / "concept.md").unlink()
+        (loans / "design.md").unlink()
+        shutil.rmtree(loans / "design")
 
     def load(self):
         project, problems = load_project(self.project)
@@ -85,6 +92,18 @@ class FindFilesTest(DocumentsTestCase):
     def test_generated_files_are_not_handwritten(self):
         index, problems = self.load()
         self.assertEqual((index.files, problems), ([], []))
+
+
+class SampleProjectTest(ProjectTestCase):
+    def test_sample_handwritten_files(self):
+        self.copy_sample()
+        project, _ = load_project(self.project)
+        index, problems = load_documents(self.project, project)
+        self.assertEqual(problems, [])
+        self.assertEqual(
+            [f.id for f in index.files],
+            ["d-loans-concept", "d-loans-design", "d-loans-design-f-overdue_notice"],
+        )
 
 
 class TargetTest(DocumentsTestCase):

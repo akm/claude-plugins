@@ -8,6 +8,7 @@ docs/glossary.md を生成する。生成するファイルの中身の SSOT は
   - リンクは reference-style で、ラベルを ID にし、定義の行 [ID]: 相対パス#ID "完全な名前" をファイルの末尾に書く
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
+  - README.md の表には、ドメインのディレクトリの直下にある手書きのファイルを先に、生成したファイルを後に並べる
   - docs/.gitattributes に、生成したファイル (docs/.gitattributes 自身を含む) の merge の設定を書く
   - 生成するファイルの場所に、先頭の記述が無く、空白と BOM 以外の文字があるファイル (手で書いたファイル) があれば、何も書かない (呼び出し元がエラーにする)
 同じ入力からは、いつも同じ出力を作る (時刻や環境に依存する値を書かない)。
@@ -30,6 +31,9 @@ GITATTRIBUTES_COMMENT = (
 )
 README = "README.md"
 FILE_DESCRIPTIONS = {
+    "concept": "概念・境界・不変条件・方針・理由",
+    "problem": "問題",
+    "design": "設計の判断と短い理由",
     "models": "モデル・属性・値の定義",
     "unclassified_app_terms": "未分類のアプリケーション用語の定義",
     "terms": "このドメインの用語の索引",
@@ -66,8 +70,12 @@ class _Links:
         return [f'[{label}]: {href} "{title}"' for label, (href, title) in sorted(self.definitions.items())]
 
 
+def _file_name(symbol: str) -> str:
+    return names.FILE_KINDS.get(symbol) or names.HANDWRITTEN_FILE_KINDS[symbol]
+
+
 def _file_path(domain: Domain, symbol: str) -> str:
-    return f"{domain.dir}/{names.FILE_KINDS[symbol]}"
+    return f"{domain.dir}/{_file_name(symbol)}"
 
 
 def _file_id(domain: Domain, symbol: str) -> str:
@@ -75,7 +83,7 @@ def _file_id(domain: Domain, symbol: str) -> str:
 
 
 def _file_title(domain: Domain, symbol: str) -> str:
-    return names.join_parts([domain.full_name(), names.format_part(symbol, names.FILE_KINDS[symbol])])
+    return names.join_parts([domain.full_name(), names.format_part(symbol, _file_name(symbol))])
 
 
 def _entry_file(entry: Entry) -> str:
@@ -190,7 +198,8 @@ def render_glossary(project: Project) -> str:
 
 
 def render_readme(domain: Domain, files: list[str]) -> str:
-    """files は、このドメインで生成するファイルの種類の記号 (models・unclassified_app_terms・terms)。"""
+    """files は、表に載せるファイルの種類の記号。ドメインのディレクトリの直下にある手書きのファイル (concept・problem・design)
+    を先に、このドメインで生成するファイル (models・unclassified_app_terms・terms) を後に並べる。"""
     path = f"{domain.dir}/{README}"
     links = _Links(path)
     blocks = [f"# {domain.full_name()}"]
@@ -200,7 +209,7 @@ def render_readme(domain: Domain, files: list[str]) -> str:
         rows = ["| 文書 | 中身 |", "|---|---|"]
         for symbol in files:
             link = links.link(
-                f"`{names.FILE_KINDS[symbol]}`", _file_id(domain, symbol), _file_path(domain, symbol),
+                f"`{_file_name(symbol)}`", _file_id(domain, symbol), _file_path(domain, symbol),
                 _file_title(domain, symbol),
             )
             rows.append(f"| {link} | {FILE_DESCRIPTIONS[symbol]} |")
@@ -224,7 +233,8 @@ def render_project(project: Project) -> dict[str, str]:
     outputs: dict[str, str] = {}
     referencing = _referencing_models(project)
     for domain in project.domains:
-        files: list[str] = []
+        # 手書きのファイルは、今あるものを表に載せる (足したり消したりすると、検査 a が README.md の生成し直しを求める)
+        files = [s for s in names.HANDWRITTEN_FILE_KINDS if (project.root / _file_path(domain, s)).is_file()]
         if domain.models:
             outputs[_file_path(domain, "models")] = render_models(project, domain, referencing)
             files.append("models")

@@ -79,6 +79,36 @@ class GenerateTest(ProjectTestCase):
         names = sorted(generated_files(self.project))
         self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
 
+    def test_readme_lists_handwritten_files_first(self):
+        self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        # 書いた順と関係なく、concept.md → problem.md → design.md の順に載せる。子のファイルは載せない
+        self.write("docs/domains/01-loans/design.md", '<a name="d-loans-design"></a>\n\n# 設計\n')
+        self.write("docs/domains/01-loans/problem.md", '<a name="d-loans-problem"></a>\n\n# 問題\n')
+        self.write("docs/domains/01-loans/concept.md", '<a name="d-loans-concept"></a>\n\n# 概念\n')
+        self.write("docs/domains/01-loans/design/overdue.md", '<a name="d-loans-design-f-overdue"></a>\n\n# 延滞\n')
+        self.assertEqual(self.run_tool("generate").returncode, 0)
+        readme = (self.project / "docs/domains/01-loans/README.md").read_text(encoding="utf-8")
+        rows = [line for line in readme.splitlines() if line.startswith("| [")]
+        self.assertEqual(
+            rows,
+            [
+                "| [`concept.md`][d-loans-concept] | 概念・境界・不変条件・方針・理由 |",
+                "| [`problem.md`][d-loans-problem] | 問題 |",
+                "| [`design.md`][d-loans-design] | 設計の判断と短い理由 |",
+                "| [`models.md`][d-loans-models] | モデル・属性・値の定義 |",
+                "| [`terms.md`][d-loans-terms] | このドメインの用語の索引 |",
+            ],
+        )
+        self.assertIn('[d-loans-concept]: concept.md#d-loans-concept "ドメイン `loans` のファイル `concept.md`"', readme)
+        self.assertNotIn("overdue", readme)
+
+        # 手書きのファイルを消すと、README.md の表からも消える
+        (self.project / "docs/domains/01-loans/problem.md").unlink()
+        self.assertEqual(self.run_tool("generate").returncode, 0)
+        readme = (self.project / "docs/domains/01-loans/README.md").read_text(encoding="utf-8")
+        self.assertNotIn("problem.md", readme)
+
     def test_handwritten_file_at_output_stops_generation(self):
         self.copy_sample()
         handwritten = {
