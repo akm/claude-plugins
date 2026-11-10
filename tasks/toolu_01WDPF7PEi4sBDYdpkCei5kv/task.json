@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01WDPF7PEi4sBDYdpkCei5kv",
+  "agent_id": "a68566404ea11b627",
+  "subagent_type": "general-purpose",
+  "task_description": "20 回のレビューの振り返り",
+  "token_usage": {
+    "input_tokens": 76,
+    "cache_creation_tokens": 269019,
+    "cache_read_tokens": 6732603,
+    "output_tokens": 78428,
+    "api_call_count": 38
+  },
+  "started_at": "2026-11-09T00:23:58.58606+09:00",
+  "completed_at": "2026-11-09T00:37:20.870963+09:00"
+}

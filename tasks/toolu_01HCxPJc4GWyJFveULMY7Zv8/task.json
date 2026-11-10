@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01HCxPJc4GWyJFveULMY7Zv8",
+  "agent_id": "a20c67a2c91caf0fd",
+  "subagent_type": "general-purpose",
+  "task_description": "収束に向かうための案の作成",
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 150754,
+    "cache_read_tokens": 2701474,
+    "output_tokens": 34349,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-09T00:38:25.114084+09:00",
+  "completed_at": "2026-11-09T00:45:00.834081+09:00"
+}
