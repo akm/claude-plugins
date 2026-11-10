@@ -1,0 +1,25 @@
+# プラグイン slide-deck の Python の依存と、mypy の設定。
+# パッケージとしては入れず (build-system を書かない)、uv が依存だけを venv に入れる。
+[project]
+name = "slide-deck"
+version = "0.0.1"
+description = "slide-deck の、画像をまとめるツールと、pptx のスキルの office/validate.py を実行する環境"
+requires-python = ">=3.14"
+dependencies = [
+  # スライドの画像をまとめるツールが使う
+  "pillow",
+  # lxml と defusedxml は、pptx のスキルの scripts/office/validate.py が使う
+  "lxml",
+  "defusedxml",
+]
+
+[dependency-groups]
+dev = ["mypy"]
+
+[tool.mypy]
+strict = true
+# Any を使わない (計画の KTD5)
+disallow_any_explicit = true
+disallow_any_expr = true
+disallow_any_decorated = true
+disallow_any_unimported = true
