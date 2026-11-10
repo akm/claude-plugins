@@ -4,7 +4,8 @@
 # - Python: ファイル `test_*.py` を含むディレクトリごとに `python3 -m unittest discover -s <ディレクトリ>`。
 #   そのディレクトリの親にファイル `.python-version` があればその版の Python で、無ければ 3.11 で実行する。
 #   親にファイル `pyproject.toml` があれば、そのパッケージを editable で入れてからテストを実行する (依存も一緒に入る)。
-#   ファイル `uv.lock` を含むディレクトリの `python/tests` とその下は、種類 uv が検査するので除く (そのディレクトリのほかの場所は除かない)
+#   ファイル `uv.lock` を含むディレクトリの `python/tests` は、種類 uv が検査するので除く (そのディレクトリのほかの場所は除かない)。
+#   そのディレクトリでは、テストを `python/tests` の直下に置く。下のディレクトリに `test_*.py` があれば失敗にする
 # - Go: ファイル `go.mod` を含むディレクトリごとに `go test ./...`
 # - Node.js (種類 node): ファイル `tests/*.test.ts` とファイル `package-lock.json` の両方を含むディレクトリごとに、
 #   Node.js 24 で `npm ci` の後に `npm test` (型の検査・lint・テストを続けて実行する npm のスクリプト)。
@@ -45,12 +46,18 @@ jobs:
         name: List test targets
         run: |
           uv_dirs=$(git ls-files | grep -E '(^|/)uv\.lock$' | xargs -r -n1 dirname | sort -u)
-          # uv.lock のあるディレクトリの python/tests とその下は、種類 uv の unittest discover が実行するので、種類 python の対象から除く。
+          # uv.lock のあるディレクトリの python/tests は、種類 uv の unittest discover が実行するので、種類 python の対象から除く。
           # 種類 uv が実行しないほかのディレクトリまで除くと、どのジョブにも実行されず、一覧との比較でも検出されない
           python_dirs=$(git ls-files | grep -E '(^|/)test_[^/]*\.py$' | xargs -r -n1 dirname | sort -u | while read -r d; do
-            for u in $uv_dirs; do case "$d" in ("$u"/python/tests | "$u"/python/tests/*) continue 2 ;; esac; done
+            for u in $uv_dirs; do case "$d" in ("$u"/python/tests) continue 2 ;; esac; done
             echo "$d"
           done)
+          # unittest discover は __init__.py の無い下のディレクトリを辿らないので、python/tests の下のディレクトリのテストは、
+          # __init__.py の有無で種類 uv に実行されたりされなかったりする。そこに置かせず、テストは python/tests の直下に限る
+          nested=$(git ls-files | grep -E '(^|/)test_[^/]*\.py$' | xargs -r -n1 dirname | sort -u | while read -r d; do
+            for u in $uv_dirs; do case "$d" in ("$u"/python/tests/*) echo "$d" ;; esac; done
+          done)
+          [ -z "$nested" ] || { echo "::error::uv.lock のあるディレクトリでは、テストを python/tests の直下に置く: $(echo $nested)"; exit 1; }
           go_modules=$(git ls-files | grep -E '(^|/)go\.mod$' | xargs -r -n1 dirname | sort -u)
           # tests/*.test.ts の 2 つ上のディレクトリのうち、package-lock.json を追跡しているもの
           node_dirs=$(git ls-files | grep -E '(^|/)tests/[^/]*\.test\.ts$' | xargs -r -n1 dirname | xargs -r -n1 dirname | sort -u | while read -r d; do
