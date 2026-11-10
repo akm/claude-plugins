@@ -14,7 +14,7 @@ export default defineConfig(
       },
     },
     rules: {
-      // node:test の test・describe などは Promise を返す。テストの実行器がその完了まで待機するので、
+      // node:test の test・describe などは Promise を返す。テストランナーがその完了まで待機するので、
       // これらを await しない呼び出しを、規則 no-floating-promises の指摘の対象から除く
       "@typescript-eslint/no-floating-promises": [
         "error",
