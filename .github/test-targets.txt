@@ -1,5 +1,5 @@
 # CI のワークフロー .github/workflows/test.yml の discover ジョブが期待する、テストの対象の一覧。
-# 1 行に 1 つ、「python <ディレクトリ>」か「go <ディレクトリ>」の形で書く。行頭の # はコメント。
+# 1 行に 1 つ、「<種類> <ディレクトリ>」の形で書く。種類は python・go・node・uv のどれか。行頭の # はコメント。
 # discover は追跡ファイルから実際の対象を見つけてこの一覧と比べ、差があれば失敗にする
 # (見つけ方と比べ方の SSOT はワークフローの冒頭のコメント)。テストを足した・移した・消したときは、この一覧も直す。
 python commit-rules-guard/tests
@@ -15,3 +15,5 @@ go review-triage/tools/diffhtml
 python issue-dispatch/tests
 python scripts/tests
 python doc-structured/tool/tests
+node slide-deck
+uv slide-deck
