@@ -302,7 +302,7 @@ slide-deck/
 - **Approach**:
   1. npm と uv のロックファイルを、KTD7 の依存で作る。
   2. CI の discover ジョブに、種類 `node` と `uv` を、KTD12 の探し方で足す。`node` は `npm ci` の後に `npm test` (tsc・eslint・node --test を続けて実行する npm のスクリプト) を、`uv` は `uv sync --frozen` の後に mypy と unittest を実行する。
-  3. 既存の種類 `python` の探し方から、`uv.lock` のあるディレクトリの `python/tests` を除く (除く範囲の SSOT は KTD12)。
+  3. 既存の種類 `python` の探し方から、`uv.lock` のあるディレクトリの `python/tests` を除く (KTD12)。
   4. 2 つの新しいジョブは、Node.js 24 (`.ts` をそのまま実行できる版) と uv を、GitHub Actions のセットアップの action で用意する。
 - **Patterns to follow**: `.github/workflows/test.yml` の、対象を見つけて期待の一覧と比べる形と、テストが 0 件なら失敗にする確認。
 - **Test scenarios**:
