@@ -1,0 +1,192 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins のプラグイン review-triage のスキル review-triage-fix に、問題の説明と変更の差分を示す HTML を足す (Issue #229)。作業は 2 つの PR に分け、PR1 (修正の案とパッチ: 記録 YAML の option_patches・chosen_option、triagecheck、人間が選んだ案のパッチを当てる手順) は PR #238 でマージ済み。これは PR2 で、判断待ちの問題の判断のための HTML (どの回でも作りブラウザで開く) と、N+1 回目以降に直した問題の確認のための HTML (開かずに絶対パスを報告) を、保留の提示と同じく mermaid-preview の方法で作る。判断の材料の SSOT は記録 YAML と生成サマリで、HTML は任意の表示形式。決めたことは Issue #229 の本文とコメントにある。起動元のセッションは進捗の管理用で、PR ごとに新しいセッションで作業する方針を利用者が決めた。
+
+Task:
+Issue akm/claude-plugins#229 の PR2 (ドメイン「説明の HTML」) を実装し、PR を作るところまで進めてください。PR1 (修正の案とパッチ) は PR #238 でマージ済み (be67f2e6、review-triage 0.32.0)。
+
+## まず読むもの (SSOT)
+- `gh issue view 229 --comments`: 本文 (論点 5・6-1〜6-4 で決めた HTML の役割・作る場面・開き方・ファイル名・`.gitignore` の扱い) と、コメント「進め方の計画」(issuecomment-6716110277) の「PR2 の手順」1〜6、コメント「PR1 (修正の案とパッチ) で決めたこと」(issuecomment-6716334069)
+- `gh pr view 238`: PR1 で入った記録の項目 `option_patches`・`chosen_option` と、確認していないこと・残した指摘
+- ファイル `review-triage/skills/review-triage-fix/SKILL.md` (PR1 後)、`review-triage/skills/review-triage/references/hold-presentation.md` (前例)、`review-triage/skills/review-triage/references/record-schema.md`、`mermaid-preview/skills/mermaid-preview/SKILL.md`、ループの文書 (`review-triage/skills/review-triage-loop/`・`review-loop`・`review-rally`)
+
+## 進め方
+計画のコメントの「PR2 の手順」に従う。
+1. 文面の前に決めること (HTML の構成: 判断のための HTML と確認のための HTML の項目、1 つのコミットが複数の問題を覆う場合と `done-external` の扱い、差分のエスケープ、案がたたき台で未検証であることの明記) を、推奨を添えて利用者に 1 つずつ質問する。自分で決めない。
+2. 提示の SSOT として新しい参照ファイル (例: `review-triage/skills/review-triage-fix/references/explainer-html.md`) を足す。SKILL.md の手順 4 の C で終了する前の報告と手順 8 の報告への HTML の絶対パス、`.gitignore` の確認、ループの文書の停止の報告で HTML のパスを渡すこと、review-triage の README の mermaid-preview の用途。**規則を足す・変える文面は、差分を利用者に示して承認を得てから書く。**
+3. review-triage を 0.33.0 に上げる。
+4. 確認: PR1 の記録の例 (または新しく作る例) から 2 種類の HTML を実際に作り、ブラウザで描画を確認する。変えた Markdown に wording-guard と doc-dag。
+5. レビューの方法とオプションは、始める前に利用者に確認する。PR1 では review-rally (Sonnet 5.5・high) で、下限 Should・1 回目を全量にし、git などのツールの細部の指摘は Must だけ直す方針で収束した。同じ方針にするかも利用者に確認する。
+6. PR を作る。本文に `Closes #229` を書く。マージ後に #229 が開いたままなら、PR への参照を付けて手で閉じる。
+
+## 守ること
+- ユーザーの CLAUDE.md・リポジトリの CLAUDE.md の文章の規則に従う。コミットは動機ごとに分け、メッセージに `#229` を付ける。コミットメッセージと Markdown のコメントは、コミットの前に wording-guard (`--stdin`) で検査する。
+- 完了したら、PR の URL・コミットの一覧・確認の結果・未確認のことを、起動元のセッションに報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_add6b80a-0b44-4cd4-b22f-8bef7a4ad357
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+この案で書く
+
+---
+
+PR1 と同じで
+
+---
+
+<cross-session-message from="local_46d13163-a371-4462-afc7-e771ce7ce810" from-name="review-rally 20261109-1315-feat-review-triage-fix-explainer-htm…">
+review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 20261109-1316-feat-review-triage-fix-explainer-html-229-1-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1146d6/tmp/review-rally/20261109-1315-feat-review-triage-fix-explainer-html-229/review-20261109-1316-feat-review-triage-fix-explainer-html-229-1-code-review-claude-sonnet-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 high be67f2e6..3a497d20)。渡した effort は high。モデルは claude-sonnet-5-5 (このセッションのモデルで、skill には引数として渡していない)。
+- 指摘 5 件 (P2 が 1 件、P3 が 4 件)、residual 2 件。YAML は Python の yaml.safe_load で読めることを確認した。
+- 確認の中で、go test ./... (成功) と、ケルビン記号を使った一時のテストファイル (指摘 2 の再現。確認後に削除) を実行した。
+- HEAD は 3a497d2065976f061d51eff744425fbf7553fe17、ブランチは claude/review-rally-3bf741 のままで、git status --porcelain の出力は空。確認で作った tmp/probeY6VL (空のディレクトリ) は rmdir で消した。出力先の 1 ファイルのほかに、作業ツリーのファイルは残っていない。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_46d13163-a371-4462-afc7-e771ce7ce810" from-name="review-rally 20261109-1315-feat-review-triage-fix-explainer-htm…">
+review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 20261109-1326-feat-review-triage-fix-explainer-html-229-2-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1146d6/tmp/review-rally/20261109-1315-feat-review-triage-fix-explainer-html-229/review-20261109-1326-feat-review-triage-fix-explainer-html-229-2-code-review-claude-sonnet-5-5.yaml
+- skill: 呼んだ (Skill ツールで code-review を呼んだ)。引数は「high 3a497d20..c28fcdfb」。
+- effort とモデル: effort は high を渡した。モデルは claude-sonnet-5-5 (このセッションのモデル)。モデルは引数では渡していない。
+- 結果: findings 3 件 (すべて P3・confidence low。SKILL.md の手順 10 まわり)、residual 3 件。diffhtml の修正 (fill.go) には指摘なし。go test は成功した。
+- HEAD と作業ツリー: レビューの前後で HEAD は c28fcdfbede43cc4131304b6b208df0f2bd797b5 のまま。git status --porcelain は空。出力先の 1 ファイル以外は作っていない (tmp/ は無視されている)。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_46d13163-a371-4462-afc7-e771ce7ce810" from-name="review-rally 20261109-1315-feat-review-triage-fix-explainer-htm…">
+review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 20261109-1332-feat-review-triage-fix-explainer-html-229-3-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1146d6/tmp/review-rally/20261109-1315-feat-review-triage-fix-explainer-html-229/review-20261109-1332-feat-review-triage-fix-explainer-html-229-3-code-review-claude-sonnet-5-5.yaml
+skill: code-review を Skill ツールで実際に呼んだ (引数 "high c28fcdfb..f273bdd9")。渡した effort は high。モデルは claude-sonnet-5-5 (このセッションのモデル。別の値は渡していない)。
+指摘は 3 件 (P3 のみ) と residual 1 件。
+確認: HEAD は f273bdd9f0f2215596f4bc44e633aedb4f5a302c のまま、git status --porcelain は空 (ファイルの編集・git の状態の変更なし。書いたのは出力先の 1 ファイルだけ)。出力先の YAML は yaml.safe_load で読めることを確認した。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_46d13163-a371-4462-afc7-e771ce7ce810" from-name="review-rally 20261109-1315-feat-review-triage-fix-explainer-htm…">
+review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 20261109-1335-feat-review-triage-fix-explainer-html-229-4-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1146d6/tmp/review-rally/20261109-1315-feat-review-triage-fix-explainer-html-229/review-20261109-1335-feat-review-triage-fix-explainer-html-229-4-code-review-claude-sonnet-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (呼んだ)。渡した引数は `high be67f2e6..f273bdd9`。実際に渡した effort は high。モデルは claude-sonnet-5-5 (このセッションのモデル)。
+- 結果: 指摘 2 件 (fill.go の閉じていないマーク・書き誤ったマークが検出されない P2、git.go の core.quotePath 未指定で日本語のファイル名が 8 進数になる P3)、residual 3 件。どちらも作業ツリー外のコピーで再現した。YAML は python の yaml.safe_load で読めることを確認した。
+- 確認: レビューの前後で HEAD は f273bdd9f0f2215596f4bc44e633aedb4f5a302c のまま、ブランチは claude/review-rally-3bf741、git status --porcelain は空。出力先の 1 ファイル以外は作業ツリーに書いていない (調べ物は scratchpad のコピーで行った)。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_46d13163-a371-4462-afc7-e771ce7ce810" from-name="review-rally 20261109-1315-feat-review-triage-fix-explainer-htm…">
+review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 20261109-1341-feat-review-triage-fix-explainer-html-229-5-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-1146d6/tmp/review-rally/20261109-1315-feat-review-triage-fix-explainer-html-229/review-20261109-1341-feat-review-triage-fix-explainer-html-229-5-code-review-claude-sonnet-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 `high f273bdd9..e5d891b1`)。渡した effort は high。モデルは claude-sonnet-5-5 (このセッションのモデル。別の値は渡していない)。
+- 結果: 指摘 5 件 (すべて severity P3・confidence low。実行による確認はしていない)。内訳は、正しさ 2 件 (閉じ無しのマークの後ろに通常のコメントがあるときのエラーの読みにくさ・markerRe の `\s` と unicode.IsSpace の食い違い)、リファクタ 2 件、テスト 1 件 (エラーの有無だけを見ている)。residual は空。YAML は yaml.safe_load で読めることを確認した。
+- 検査: 範囲 f273bdd9..e5d891b1 のテスト `go test ./...` (review-triage/tools/diffhtml) は成功した。
+- 作業ツリーの扱い: 共有。冒頭の `git checkout -B claude/review-rally-3bf741 e5d891b1` (依頼のとおり) のほかに、git の状態を変えていない。
+- 最後の確認: HEAD は e5d891b157c5846cbeedc9bd14946cf4d4c5bcf8 (ブランチ claude/review-rally-3bf741)。`git status --porcelain` の出力は空 (出力先の YAML は tmp/ にあり、git の管理外)。
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>b953qas34</task-id>
+<tool-use-id>toolu_01NhjaCKwZB9YZ2ELpRwHk53</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-0cbbf3/6780a10c-dcbe-4360-b1bd-8de2b8916d8a/tasks/b953qas34.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 (20261109-1316-feat-review-triage-fix-explainer-html-229-1-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<task-notification>
+<task-id>b40x0w949</task-id>
+<tool-use-id>toolu_01SHneQ2Ytk6UaCNk7yf52Lb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-0cbbf3/6780a10c-dcbe-4360-b1bd-8de2b8916d8a/tasks/b40x0w949.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 (20261109-1326-feat-review-triage-fix-explainer-html-229-2-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bajfpfhvt</task-id>
+<tool-use-id>toolu_01PJQhfqWJB4zx6sRrGUkfqJ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-0cbbf3/6780a10c-dcbe-4360-b1bd-8de2b8916d8a/tasks/bajfpfhvt.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 (20261109-1332-feat-review-triage-fix-explainer-html-229-3-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bjkqin6ts</task-id>
+<tool-use-id>toolu_01K5vBanYcvzWBiR3JP2Q9eT</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-0cbbf3/6780a10c-dcbe-4360-b1bd-8de2b8916d8a/tasks/bjkqin6ts.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 (20261109-1335-feat-review-triage-fix-explainer-html-229-4-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+片付ける
+
+---
+
+<task-notification>
+<task-id>bohi41xai</task-id>
+<tool-use-id>toolu_01V4DU6YSmCQH5SymBQidVgQ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-0cbbf3/6780a10c-dcbe-4360-b1bd-8de2b8916d8a/tasks/bohi41xai.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1315-feat-review-triage-fix-explainer-html-229 (20261109-1341-feat-review-triage-fix-explainer-html-229-5-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+マージしました
+
+---
+
+残りのタスクは？
+
+---
+
+呼び出し元セッションに上記も含めて現状を報告してください
+
+---
+
+PR 本文で足りる
+
+---
+
+呼び出し元セッションに状況を報告してください
