@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01FfagrAY5QA8fZuEjG2hHBv",
+  "agent_id": "ab444d689b47c2857",
+  "subagent_type": "general-purpose",
+  "task_description": "案のファイルを厳しくレビュー",
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 124835,
+    "cache_read_tokens": 986999,
+    "output_tokens": 24208,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-08T09:38:36.146606+09:00",
+  "completed_at": "2026-11-08T09:42:29.308516+09:00"
+}
