@@ -1,0 +1,5 @@
+https://github.com/akm/claude-plugins/issues/242 に対応してください
+
+---
+
+場所を伝える
