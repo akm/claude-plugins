@@ -53,7 +53,9 @@ jobs:
           go_modules=$(git ls-files | grep -E '(^|/)go\.mod$' | xargs -r -n1 dirname | sort -u)
           # tests/*.test.ts の 2 つ上のディレクトリのうち、package-lock.json を追跡しているもの
           node_dirs=$(git ls-files | grep -E '(^|/)tests/[^/]*\.test\.ts$' | xargs -r -n1 dirname | xargs -r -n1 dirname | sort -u | while read -r d; do
-            git ls-files --error-unmatch "$d/package-lock.json" > /dev/null 2>&1 && echo "$d"
+            # 本体の最後を「条件 && echo」にすると、最後の候補を除いたときにループの終了ステータスが 1 になり、
+            # bash -e で動くこの手順が理由を示さずに終了するので、if で書く
+            if git ls-files --error-unmatch "$d/package-lock.json" > /dev/null 2>&1; then echo "$d"; fi
           done)
           printf 'Python:\n%s\nGo:\n%s\nNode.js:\n%s\nuv:\n%s\n' "$python_dirs" "$go_modules" "$node_dirs" "$uv_dirs"
           # 1 つも見つからないときは、テストが無いまま合格したように見えないよう失敗にする
