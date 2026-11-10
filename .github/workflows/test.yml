@@ -215,7 +215,7 @@ jobs:
       UV_FROZEN: "1"
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           cache-dependency-glob: ${{ matrix.dir }}/uv.lock
       - name: uv sync
