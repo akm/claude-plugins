@@ -145,7 +145,7 @@ deepened: 2026-11-09
 - KTD9. **Google スライドのスライドの ID は `sd_<キー>_<内容のハッシュ値>`** (session-settled: user-approved; chosen over `<キー>_<作り直した回数>`: 作り直すスライドと、途中で失敗した後に残る作業が、資料を読むだけで機械的に決まるため)。内容のハッシュ値は、そのスライドのデータ (図形・線・文字・題名・一言) から計算し、ID・位置・発表者ノートを含めない (session-settled: user-approved; chosen over 指示の配列から計算すること: ノートだけの修正・前へのスライドの挿入・指示の作り方の修正で、変えていないスライドまで作り直しにならないため)。発表者ノートは ID に含めず、KTD10 のとおり文を比べて入れ直す。接頭辞 `sd_` は、キーの無いスライドと判別するためと、ID の長さの下限 (5 文字) を満たすため。図形の ID は `<スライドの ID>_<番号>`。キーは `[a-z0-9-]` の 1〜32 文字、ハッシュ値は 16 進数の 10 文字、図形の番号は 3 桁まで (Google スライドの objectId の上限 50 文字に収まる: 3+32+1+10+1+3=50)。
 - KTD10. **`publish` は、読む → 差を求める → 承認を得る → 送る → 確認する、の順にする**。差は、構成案のキーと順序・新しいハッシュ値と、資料から読んだ ID を比べて求め、作る・作り直す・消す・並べ替えるキーに分ける。発表者ノートは、資料から読んだ文と構成案の文をキーごとに比べ、違うキーだけ入れ直す (欄が空でなければ、文を消してから入れる。空の欄の文を消す指示は失敗するため)。構成案の先頭に、最後に `publish` したプラグインの版を記録し、今の版と違うときは、すべてのスライドを作り直すかを利用者に質問する (指示の作り方の修正は、ハッシュ値を変えないため)。指示のファイルは 2 枚ずつに分ける (1 枚分の指示は約 1 万字で、Bash の出力の上限の約 3 万字を超えないため)。資料を読むときは、google-workspace のスキルが勧める項目の指定 (field mask) で、スライドの ID の順序・ノートの欄の ID と文・マスターの ID・`revisionId` だけを読み、Claude がその結果を資料のディレクトリの `build/presentation.json` に書いてツールに渡す (session-settled: user-approved; chosen over ツールを使わず Claude が比べること: ID の取り違えをテストで防ぐため。[docs/solutions/design-patterns/extract-identifiers-in-code-not-llm.md](../solutions/design-patterns/extract-identifiers-in-code-not-llm.md))。発表者ノートの欄の ID はスライドを作った後でないと分からないので、作った後に再度読み込んでから入れる。
 - KTD11. **pptx のスキルのディレクトリは、スキル `build` が明示して渡す**。`build` は Claude にスキル `anthropic-skills:pptx` を読み込ませ、示されるスキルのディレクトリ (Base directory) を、ツールの引数で渡す。ツールは `scripts/apply_theme.js` と `scripts/office/validate.py` があることを確認し、無ければ中断する。`~/.claude` の下を探さない (配置は公式に決まっていないため)。
-- KTD12. **テストは node:test と unittest で書き、CI に種類 `node` と `uv` を足す** (session-settled: user-approved; chosen over すべて Python の unittest で書くこと)。ワークフロー `.github/workflows/test.yml` の discover ジョブが、追跡ファイルから対象を見つけ (種類 `node` は `tests/*.test.ts` と `package-lock.json` を持つディレクトリ、種類 `uv` は `uv.lock` を持つディレクトリ。`package-lock.json` だけを持つ `wording-guard/textlint/` は対象にしない)、`.github/test-targets.txt` の一覧と比べる。`uv.lock` のあるディレクトリの下のテストは、既存の種類 `python` の対象から除く。
+- KTD12. **テストは node:test と unittest で書き、CI に種類 `node` と `uv` を足す** (session-settled: user-approved; chosen over すべて Python の unittest で書くこと)。ワークフロー `.github/workflows/test.yml` の discover ジョブが、追跡ファイルから対象を見つけ (種類 `node` は `tests/*.test.ts` と `package-lock.json` を持つディレクトリ、種類 `uv` は `uv.lock` を持つディレクトリ。`package-lock.json` だけを持つ `wording-guard/textlint/` は対象にしない)、`.github/test-targets.txt` の一覧と比べる。`uv.lock` のあるディレクトリの `python/tests` (種類 `uv` が実行するディレクトリ) は、既存の種類 `python` の対象から除く。
 - KTD13. **構成案の書式**。先頭の `# <資料の題名>` の後に、資料の情報を `- <項目>: <値>` の行で書く (読者・ねらい・形・固有名・Google スライド・slide-deck の版)。章は `## <章の名前>`、スライドは `### <キー>: <題名>`、採否を質問するスライドは `### 【提案】<キー>: <題名>`。スライドの見出しの下に `- 図: …` と `- 一言: …` の行を書き、その後の段落を発表者ノートにする。スライドの順序は、構成案の見出しの順序で決める。書式に合わない行は、行番号を付けた誤りにする ([docs/solutions/design-patterns/typed-contract-for-agent-input.md](../solutions/design-patterns/typed-contract-for-agent-input.md))。
 - KTD14. **Issue の表にある Google スライドの API の挙動への対処は、Google スライドの指示を作る処理で行う**。対処ごとに、理由をコードのコメントに書き、テストで期待の指示を確認する。対象は、基準の大きさと拡大率・円などの中の文字を重ねた文字の箱に分けること・内側の余白の分だけ箱を広げること・大きな箱を四角で描くこと・箇条書きの字下げ 16 ポイント・書式の範囲に改行の文字を含めること・逆向きの線を負の拡大率で描くこと・マスターの配色を `updatePageProperties` の `colorScheme` で変えること。`createLine` には、非推奨の `lineCategory` ではなく `category` を使う。
 - KTD15. **資料のディレクトリの `build/` に、内容が `*` のファイル `.gitignore` を書く**。生成したファイルが、プロジェクトのコミットに入らないようにする。プロジェクトの `.gitignore` は変えない。
@@ -206,7 +206,7 @@ stateDiagram-v2
 
 ### System-Wide Impact
 
-- **CI**: ワークフロー `.github/workflows/test.yml` の discover ジョブと `.github/test-targets.txt` に、種類 `node` と `uv` を足す (KTD12)。ほかのプラグインのテストの見つけ方は変えない。種類 `python` の探し方から `uv.lock` の下を除く変更は、既存の対象が 1 つも減らないことを、一覧との比較で確認する。
+- **CI**: ワークフロー `.github/workflows/test.yml` の discover ジョブと `.github/test-targets.txt` に、種類 `node` と `uv` を足す (KTD12)。ほかのプラグインのテストの見つけ方は変えない。種類 `python` の探し方から `uv.lock` のあるディレクトリの `python/tests` を除く変更は、既存の対象が 1 つも減らないことを、一覧との比較で確認する。
 - **マーケットプレイス**: U9 で `.claude-plugin/marketplace.json` に項目が増える。それまでは載せない。ルートの `Makefile` のターゲット `plugins-status`・`plugins-install` (ファイル `scripts/plugins.py`) は marketplace.json から対象を作るので、変更は要らない。
 - **利用者の環境**: キャッシュのディレクトリに、typescript (約 24MB)・pptxgenjs (約 5MB) などと Python の venv が入る。取得の前に承認を得る (R24)。
 
@@ -302,7 +302,7 @@ slide-deck/
 - **Approach**:
   1. npm と uv のロックファイルを、KTD7 の依存で作る。
   2. CI の discover ジョブに、種類 `node` と `uv` を、KTD12 の探し方で足す。`node` は `npm ci` の後に `npm test` (tsc・eslint・node --test を続けて実行する npm のスクリプト) を、`uv` は `uv sync --frozen` の後に mypy と unittest を実行する。
-  3. 既存の種類 `python` の探し方から、`uv.lock` のあるディレクトリの下を除く。
+  3. 既存の種類 `python` の探し方から、`uv.lock` のあるディレクトリの `python/tests` を除く。
   4. 2 つの新しいジョブは、Node.js 24 (`.ts` をそのまま実行できる版) と uv を、GitHub Actions のセットアップの action で用意する。
 - **Patterns to follow**: `.github/workflows/test.yml` の、対象を見つけて期待の一覧と比べる形と、テストが 0 件なら失敗にする確認。
 - **Test scenarios**:
