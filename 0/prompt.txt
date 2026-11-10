@@ -1,0 +1,42 @@
+/Users/akima/workspace/claude-plugins/tmp/zero-downtime 以下にあります
+
+---
+
+claude で使うことを想定しており、かつ pptx と google-workspace は Anthropic の公式のスキルなので、今後もメンテナンスが継続して行われると思われます。ですので 案B が良いです
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすくそれぞれの論点について選択肢のメリット・デメリットを説明してください
+
+---
+
+各ファイルの名前だけではわかりにくいので、どのプラグイン、どのスキルが提供するファイルなのかをHTMLに明記してください
+
+---
+
+「資料のスクリプト」という別名ではなく正確な名称`build.js` と呼んでください。わかりにくいです。
+
+tmp/zero-downtime/ 以下にあるものは zero-downtime:build.js という表記にしてください。
+
+プラグイン等で提供されるものは以下のようにお願いします。
+
+pptx[desktop]:apply_theme.js
+ppts:office/validate.py
+google-workspace:slides_helper.py
+
+---
+
+「要求の JSON」とは何ですか？
+
+---
+
+書き換える
+
+---
+
+一つずつインタビューしてください
+
+---
+
+論点 2-3に戻って、再度考えさせてください。 案L1 だと 細かい修正でも バージョンごとに venv と node_modules ディレクトリができてバージョンごとにバージョンが変わって無くてもライブラリをインストールすることになりますよね。
+バージョンが違ってもできるだけ同じ venv と node_modules を使いたいのですが、可能ですか？
