@@ -30,6 +30,7 @@ const FAKE_UV = `#!/bin/sh
 printf 'uv %s\\n' "$*" >> "$FAKE_LOG"
 if [ -n "$FAKE_UV_FAIL" ]; then echo "偽の uv: 失敗" >&2; exit 1; fi
 /bin/mkdir -p "$UV_PROJECT_ENVIRONMENT/bin" || exit 1
+if [ -n "$FAKE_UV_FAIL_AFTER_CREATE" ]; then echo "偽の uv: venv を作った後に失敗" >&2; exit 1; fi
 : > "$UV_PROJECT_ENVIRONMENT/bin/python"
 printf 'UV_PROJECT_ENVIRONMENT=%s\\n' "$UV_PROJECT_ENVIRONMENT" >> "$FAKE_LOG"
 `;
@@ -305,11 +306,26 @@ describe("setup install", () => {
     assert.equal(sandbox.calls().filter((c) => c.startsWith("uv sync")).length, 1);
   });
 
-  test("uv sync が失敗すると、venv にフラグファイルを作らず、node_modules も入れない", () => {
+  test("uv sync が venv を作る前に失敗すると、作る前に失敗したと示し、node_modules も入れない", () => {
     const env = sandbox.env({ FAKE_UV_FAIL: "1" });
-    assert.throws(() => { install({ env, log: silent }); }, (e: unknown) => e instanceof SetupError && /uv sync が失敗した[\s\S]*偽の uv: 失敗/.test(e.message));
+    assert.throws(
+      () => { install({ env, log: silent }); },
+      (e: unknown) => e instanceof SetupError && /uv sync が失敗した[^\n]*を作る前に失敗した:\n偽の uv: 失敗/.test(e.message),
+    );
     const p = cachePaths({ env });
-    assert.notEqual(venvState(p), "installed");
+    assert.equal(venvState(p), "missing");
+    assert.equal(nodeState(p), "missing");
+    assert.deepEqual(sandbox.calls().filter((c) => c.startsWith("npm")), []);
+  });
+
+  test("uv sync が venv を作った後に失敗すると、フラグファイルを作らずに残したと示し、node_modules も入れない", () => {
+    const env = sandbox.env({ FAKE_UV_FAIL_AFTER_CREATE: "1" });
+    assert.throws(
+      () => { install({ env, log: silent }); },
+      (e: unknown) => e instanceof SetupError && /フラグファイルを作らずに残した[^\n]*:\n偽の uv: venv を作った後に失敗/.test(e.message),
+    );
+    const p = cachePaths({ env });
+    assert.equal(venvState(p), "incomplete");
     assert.equal(nodeState(p), "missing");
     assert.deepEqual(sandbox.calls().filter((c) => c.startsWith("npm")), []);
   });

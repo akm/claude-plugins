@@ -446,8 +446,9 @@ function exitText(r: RunResult): string {
 /**
  * venv を、その場で uv sync して作り、作り終えたらフラグファイルを作る (uv の venv は、中のスクリプトが作ったときの絶対パスを
  * 持つので、別の名前で作って改名しない)。同じ venv を同時に入れる実行は、uv が venv の中のロックで排他する。
- * 失敗したら、venv のディレクトリをフラグファイルを作らずに残す。消すと、同時に入れている別の実行の venv も消えるため。
- * 次の setup install が uv sync をやり直す (uv の同期は、何度実行しても同じ結果になる)
+ * 失敗したら、venv のディレクトリができていれば、フラグファイルを作らずに残す。消すと、同時に入れている別の実行の venv も消えるため。
+ * 次の setup install が uv sync をやり直す (uv の同期は、何度実行しても同じ結果になる)。
+ * uv は Python の取得などで venv を作る前にも失敗するので、誤りの文はディレクトリの有無で分ける
  */
 function installVenv(uv: string, pluginDir: string, paths: CachePaths, env: NodeJS.ProcessEnv, log: (line: string) => void): void {
   mkdirSync(paths.cacheDir, { recursive: true });
@@ -457,10 +458,10 @@ function installVenv(uv: string, pluginDir: string, paths: CachePaths, env: Node
     UV_PROJECT_ENVIRONMENT: paths.venvDir,
   });
   if (r.status !== 0) {
-    throw new SetupError(
-      `uv sync が失敗した (${exitText(r)})。venv のディレクトリ ${paths.venvDir} は、フラグファイルを作らずに残した ` +
-        `(次の setup install が uv sync をやり直す):\n${r.stderr.trim()}`,
-    );
+    const state = existsSync(paths.venvDir)
+      ? `venv のディレクトリ ${paths.venvDir} は、フラグファイルを作らずに残した (次の setup install が uv sync をやり直す)`
+      : `venv のディレクトリ ${paths.venvDir} を作る前に失敗した`;
+    throw new SetupError(`uv sync が失敗した (${exitText(r)})。${state}:\n${r.stderr.trim()}`);
   }
   writeFileSync(paths.venvFlag, "");
   log(`venv を入れた: ${paths.venvDir}`);
