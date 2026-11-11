@@ -12,6 +12,7 @@ import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import {
   cachePaths,
+  formatPackages,
   inspect,
   install,
   nodeState,
@@ -310,6 +311,36 @@ describe("setup status", () => {
     assert.deepEqual(npm.packages.map((p) => p.name).sort(), ["@eslint/js", "eslint", "pptxgenjs", "typescript", "typescript-eslint"]);
     // 開発のときだけ使う @types/node は数えない
     assert.ok(npm.count > npm.packages.length);
+  });
+
+  test("uv.lock に同じ名前のパッケージが条件ごとに複数あると、そのバージョンをすべて読んで示す", () => {
+    const uvLock = [
+      "version = 1",
+      "",
+      "[[package]]",
+      'name = "pillow"',
+      'version = "12.0.0"',
+      'source = { registry = "https://pypi.org/simple" }',
+      "",
+      "[[package]]",
+      'name = "pillow"',
+      'version = "13.0.0"',
+      'source = { registry = "https://pypi.org/simple" }',
+      "",
+      "[[package]]",
+      'name = "slide-deck"',
+      'version = "0.0.1"',
+      'source = { virtual = "." }',
+      "dependencies = [",
+      '    { name = "pillow", version = "12.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < \'3.15\'" },',
+      '    { name = "pillow", version = "13.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= \'3.15\'" },',
+      "]",
+      "",
+    ].join("\n");
+    const packages = readUvLockDependencies(uvLock);
+    assert.deepEqual(packages, [{ name: "pillow", versions: ["12.0.0", "13.0.0"] }]);
+    assert.equal(formatPackages(packages), "pillow 12.0.0 か 13.0.0 (uv.lock で、Python のバージョンなどの条件ごとに分かれている)");
+    assert.equal(formatPackages([{ name: "lxml", versions: ["6.1.3"] }, { name: "pillow", versions: ["13.0.0"] }]), "lxml 6.1.3・pillow 13.0.0");
   });
 });
 

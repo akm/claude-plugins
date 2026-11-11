@@ -169,10 +169,14 @@ export function findExecutable(name: string, env: NodeJS.ProcessEnv): string | u
   return undefined;
 }
 
-/** 取得するものの説明に使う、ロックファイルのパッケージの名前とバージョン */
+/**
+ * 取得するものの説明に使う、ロックファイルのパッケージの名前とバージョン。
+ * uv.lock は、Python のバージョンなどで分かれると、同じ名前のパッケージを複数のバージョンで持つので、バージョンを配列で持つ
+ */
 export interface LockedPackage {
   readonly name: string;
-  readonly version: string;
+  /** 1 つ以上。uv.lock に現れた順 */
+  readonly versions: readonly string[];
 }
 
 /** 取得するもの (setup status が示す) */
@@ -206,11 +210,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * uv.lock から、プロジェクト自身 (source が virtual のパッケージ) の dependencies の名前とバージョンを読む。
+ * 同じ名前の [[package]] が複数あれば (resolution-markers で分かれたとき)、そのバージョンをすべて返す。
  * uv.lock は TOML だが、Node.js の標準の機能に TOML を読むものが無いので、uv が書く行の形 (行頭の name = "…" など) で読む
  */
 export function readUvLockDependencies(uvLock: string): LockedPackage[] {
   const blocks = uvLock.split(/^\[\[package\]\]$/m).slice(1);
-  const versions = new Map<string, string>();
+  const versions = new Map<string, string[]>();
   let root: string | undefined;
   for (const block of blocks) {
     const name = /^name = "([^"]+)"$/m.exec(block)?.[1];
@@ -218,7 +223,7 @@ export function readUvLockDependencies(uvLock: string): LockedPackage[] {
     if (name === undefined || version === undefined) {
       throw new SetupError(`uv.lock の [[package]] に、name か version の行が無い: ${block.slice(0, 80)}`);
     }
-    versions.set(name, version);
+    versions.set(name, [...(versions.get(name) ?? []), version]);
     if (/^source = \{ virtual = "\." \}$/m.test(block)) {
       root = block;
     }
@@ -227,13 +232,14 @@ export function readUvLockDependencies(uvLock: string): LockedPackage[] {
     throw new SetupError('uv.lock に、プロジェクト自身のパッケージ (source = { virtual = "." }) が無い');
   }
   const deps = /^dependencies = \[\n([\s\S]*?)^\]/m.exec(root)?.[1] ?? "";
-  return [...deps.matchAll(/\{ name = "([^"]+)"/g)].map((m) => {
-    const name = m[1] ?? "";
-    const version = versions.get(name);
-    if (version === undefined) {
+  // 分かれたパッケージは、dependencies にも同じ名前が marker 付きで複数並ぶので、名前を 1 つにまとめる
+  const names = [...new Set([...deps.matchAll(/\{ name = "([^"]+)"/g)].map((m) => m[1] ?? ""))];
+  return names.map((name) => {
+    const found = versions.get(name);
+    if (found === undefined) {
       throw new SetupError(`uv.lock に、プロジェクトが使うパッケージ ${name} の項目が無い`);
     }
-    return { name, version };
+    return { name, versions: found };
   });
 }
 
@@ -255,7 +261,7 @@ export function readPackageLock(packageLock: string): { packages: LockedPackage[
     if (typeof version !== "string") {
       throw new SetupError(`package-lock.json に、node_modules/${name} の version が無い`);
     }
-    return { name, version };
+    return { name, versions: [version] };
   });
   const count = Object.entries(packages).filter(([key, entry]) => key !== "" && !(isRecord(entry) && entry["dev"] === true)).length;
   return { packages: direct, count };
@@ -330,8 +336,11 @@ const NODE_STATE_TEXT: Readonly<Record<NodeState, string>> = {
   missing: "無い",
 };
 
-function formatPackages(packages: readonly LockedPackage[]): string {
-  return packages.map((p) => `${p.name} ${p.version}`).join("・");
+/** 取得するものの説明に使う、パッケージの名前とバージョンを「・」で区切って続けた文字列 */
+export function formatPackages(packages: readonly LockedPackage[]): string {
+  return packages
+    .map((p) => (p.versions.length === 1 ? `${p.name} ${p.versions.join("")}` : `${p.name} ${p.versions.join(" か ")} (uv.lock で、Python のバージョンなどの条件ごとに分かれている)`))
+    .join("・");
 }
 
 /** setup status の出力の文 */
