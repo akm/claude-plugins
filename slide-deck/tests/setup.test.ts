@@ -236,6 +236,20 @@ describe("setup install", () => {
     assert.deepEqual(sandbox.calls(), []);
   });
 
+  test("強制終了で残った一時的な名前のディレクトリがあると、setup status がそのパスを示し、終了コードは変わらない", () => {
+    assert.equal(runCli(sandbox, ["setup", "install"]).status, 0);
+    const p = cachePaths({ env: sandbox.env() });
+    const leftover = join(sandbox.cache, `${basename(p.nodeDir)}.AbC123`);
+    mkdirSync(join(leftover, "node_modules"), { recursive: true });
+
+    const status = runCli(sandbox, ["setup", "status"]);
+    assert.equal(status.status, 0, status.stderr);
+    assert.match(status.stdout, /残っている一時的なディレクトリ .*:\n- (.+)$/m);
+    assert.ok(status.stdout.includes(`- ${leftover}\n`), status.stdout);
+    // 入っている node-<ハッシュ値>/ と venv-<ハッシュ値>/ は示さない
+    assert.equal(inspect({ env: sandbox.env() }).leftoverDirs.length, 1);
+  });
+
   test("npm ci が失敗すると、一時的なディレクトリが残らず、node-<ハッシュ値>/ も作られない", () => {
     const env = sandbox.env({ FAKE_NPM_FAIL: "1" });
     assert.throws(() => { install({ env, log: silent }); }, (e: unknown) => e instanceof SetupError && /npm ci が失敗した[\s\S]*偽の npm: 失敗/.test(e.message));

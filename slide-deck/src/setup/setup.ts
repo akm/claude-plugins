@@ -13,6 +13,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -202,6 +203,11 @@ export interface SetupReport {
   readonly downloads: Downloads;
   /** 入れられない理由と直し方。空でなければ setup install は何も入れずに終了する */
   readonly problems: readonly string[];
+  /**
+   * キャッシュのディレクトリに残っている、node_modules を入れるときの一時的な名前のディレクトリ。
+   * setup install が npm ci の途中で強制終了されると残る (finally が実行されないため)。入れることには影響しない
+   */
+  readonly leftoverDirs: readonly string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -313,7 +319,32 @@ export function inspect(options: SetupOptions = {}): SetupReport {
         `ディレクトリを消してから (rm -rf "${paths.nodeDir}")、もう一度 setup install を実行する`,
     );
   }
-  return { paths, nodeVersion, uv, npm, venv, node, downloads: readDownloads(pluginDir), problems };
+  return {
+    paths,
+    nodeVersion,
+    uv,
+    npm,
+    venv,
+    node,
+    downloads: readDownloads(pluginDir),
+    problems,
+    leftoverDirs: findLeftoverDirs(paths.cacheDir),
+  };
+}
+
+/**
+ * キャッシュのディレクトリの、node_modules を入れるときの一時的な名前のディレクトリ
+ * (関数 installNodeModules の mkdtempSync が作る node-<16 文字の 16 進数>.<6 文字>) を返す。
+ * 自動では消さない。同時に実行している別の setup install のディレクトリかもしれないため
+ */
+function findLeftoverDirs(dir: string): string[] {
+  if (!existsSync(dir)) {
+    return [];
+  }
+  return readdirSync(dir)
+    .filter((name) => /^node-[0-9a-f]{16}\.[A-Za-z0-9]{6}$/.test(name))
+    .sort()
+    .map((name) => join(dir, name));
 }
 
 /** setup status の終了コード。入れられない理由があれば 2、入れるものがあれば 1、どちらも入っていれば 0 */
@@ -372,6 +403,13 @@ export function formatStatus(report: SetupReport): string {
   }
   if (report.problems.length > 0) {
     lines.push("", "入れられない理由:", ...report.problems.map((p) => `- ${p}`));
+  }
+  if (report.leftoverDirs.length > 0) {
+    lines.push(
+      "",
+      "残っている一時的なディレクトリ (setup install が途中で強制終了されたときに残る。setup install を実行していなければ消してよい):",
+      ...report.leftoverDirs.map((d) => `- ${d}`),
+    );
   }
   return lines.join("\n") + "\n";
 }
