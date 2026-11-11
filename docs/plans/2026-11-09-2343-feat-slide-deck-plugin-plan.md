@@ -505,8 +505,8 @@ slide-deck/
 - **Dependencies**: U1
 - **Files**: `slide-deck/python/slide_deck_tools/thumbs_grid.py`・`slide-deck/python/tests/test_thumbs_grid.py`
 - **Approach**:
-  1. 元の `grid2.py` を引き継ぎ、取得の失敗を、どの URL かを示した誤りにする (一部を飛ばさない)。
-  2. 大きさの違う画像は、最初の画像の大きさに縮小して並べる。
+  1. 元の `grid2.py` を引き継ぎ、取得の失敗を、どの URL かを示した誤りにする (一部を飛ばさない)。1 つの URL の取得では、応答まで待機する時間の上限を 30 秒にし、超えたら取得の失敗として扱う (元の `grid2.py` は応答が来るまで待機し続ける)。
+  2. 大きさの違う画像は、最初の画像の大きさにそろえて (拡大か縮小して) 並べる。
   3. 枚数が奇数のときは、最後の行の右を空ける。
   4. 終了コードは KTD17 のとおりに分け、`--help` を書く。
 - **Patterns to follow**: 元の `grid2.py`。
