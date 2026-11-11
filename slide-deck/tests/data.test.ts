@@ -433,6 +433,26 @@ describe("関数 bullets", () => {
     ]);
   });
 
+  test("明示した空の部分の後に箇条書きの項目を続けても、空の部分の段落は残る", () => {
+    const s = slide("k");
+    text(s, [{ text: "見出し", breakLine: true }, { text: "" }, { text: "a", bullet: true }], 0, 0, 1, 1);
+    text(s, [{ text: "", bullet: true }, { text: "b", bullet: true }], 0, 0, 1, 1);
+    const summaries = s.elements.map((e) =>
+      e.kind === "textBox" ? e.text.paragraphs.map((p) => [p.bullet, p.runs.map((r) => r.text)]) : [],
+    );
+    assert.deepEqual(summaries, [
+      [
+        [false, ["見出し"]],
+        [false, [""]],
+        [true, ["a"]],
+      ],
+      [
+        [true, [""]],
+        [true, ["b"]],
+      ],
+    ]);
+  });
+
   test("最後の項目の後に、空の段落を作らない", () => {
     const s = slide("k");
     text(s, [{ text: "a", bullet: true, breakLine: true }], 0, 0, 1, 1);

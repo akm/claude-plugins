@@ -17,7 +17,8 @@ import type {
 /**
  * 文字の一部分の入力。省略した書式は、その文字を渡した部品の関数の書式を使う。
  * breakLine が true なら、この部分の後で段落を分ける。
- * bullet が true なら、いまの段落に空でない部分があればこの部分の前で段落を分け (pptxgenjs と同じ)、この部分を含む段落を箇条書きの項目にする。
+ * bullet が true なら、いまの段落に部分が 1 つでもあれば (明示した空の部分を含む) この部分の前で段落を分け (pptxgenjs と同じ)、
+ * この部分を含む段落を箇条書きの項目にする。
  * 文字の中の改行 ("\n") でも、段落を分ける。
  */
 export interface RunInput {
@@ -150,7 +151,7 @@ function toMargin(m: MarginInput): Margin {
 
 /**
  * 文字の入力を段落に分ける。
- * 部分の breakLine と文字の中の改行で段落を分ける。bullet を持つ部分は、いまの段落に空でない部分があれば、その前でも段落を分ける。
+ * 部分の breakLine と文字の中の改行で段落を分ける。bullet を持つ部分は、いまの段落に部分が 1 つでもあれば、その前でも段落を分ける。
  * 部分の bullet は、その部分を含む段落に付ける。
  * 空行の段落と、入力が空 (空の配列など) のときの段落にも、文字が空の部分を 1 つ足す。
  * 段落の文字の大きさ・太字・色を、文字が無い段落でも書き出しの処理に渡すため。
@@ -172,7 +173,8 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
   };
   for (const input of inputs) {
     // 見出しなどの部分の後に箇条書きの項目が続いても、見出しを箇条書きにしないため
-    if (input.bullet === true && !isBlank(current)) breakParagraph();
+    // 明示した空の部分 (空行) だけの段落も、箇条書きの項目に取り込まずに残す
+    if (input.bullet === true && current.runs.length > 0) breakParagraph();
     const lines = input.text.split("\n");
     lines.forEach((line, i) => {
       if (i > 0) breakParagraph();
