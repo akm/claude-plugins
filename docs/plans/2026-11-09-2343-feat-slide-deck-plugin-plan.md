@@ -141,7 +141,7 @@ deepened: 2026-11-09
 - KTD5. **Python は、画像をまとめるツールと、`pptx:office/validate.py` の実行環境だけに使う**。Python のコードは mypy strict で検査し、`Any` を使わない (session-settled: user-directed; chosen over 型を検査しない Python: 利用者の要望)。mypy の設定は `strict` に加えて `disallow_any_explicit`・`disallow_any_expr`・`disallow_any_decorated`・`disallow_any_unimported`。Pillow は、この設定を通ることを実験で確認した。
 - KTD6. **はみ出しの見積もりは、TypeScript でスライドのデータに対して行う** (session-settled: user-approved; chosen over Python で PowerPoint のファイルを読むこと: python-pptx 1.0.2 の `prs.slides` などが `Any` になり、KTD5 の設定を通らないため)。見積もりの式は元の `fitcheck.py` のもの (全角の文字を 1、半角の文字を 0.58、空白を 0.3 文字分の幅とし、行の高さを文字の大きさの 1.25 倍とする)。
 - KTD7. **ライブラリのバージョンは `uv.lock` と `package-lock.json` で決め、`uv sync --frozen --no-dev` と `npm ci --omit=dev` で入れる** (session-settled: user-directed; chosen over pip と `requirements.txt`・利用者が手で入れること: `uv.lock` を配布する案は利用者の提案で、間接的に使うライブラリまでバージョンが決まるため)。npm の実行時の依存は pptxgenjs・typescript・eslint・`@eslint/js`・typescript-eslint (`build` が資料ごとのスクリプトを検査するので、typescript と eslint も実行時に要る)。Python の実行時の依存は Pillow・lxml・defusedxml (lxml と defusedxml は `pptx:office/validate.py` が使う)。開発のときだけ使う依存は `@types/node` と mypy。Python のバージョンはファイル `.python-version` で決め、uv が用意する (指定しないと uv は最新の 3.14 を選ぶ)。
-- KTD8. **キャッシュのディレクトリを、ロックファイルのハッシュ値ごとに分ける** (session-settled: user-approved; chosen over プラグインのバージョンごとに分けること・1 つだけにすること: ライブラリを変えない細かな修正でも入れ直さないため)。venv は `venv-<uv.lock のハッシュ値>/` にその場で作り、作り終えたらフラグファイルを作る (uv の venv は、中のスクリプトが作ったときの絶対パスを持つので改名しない。同時の実行は uv が環境の中の `.lock` で排他する)。`node_modules` は wording-guard と同じく、一時的な名前のディレクトリで `npm ci` してから `node-<package-lock.json のハッシュ値>/` に改名する (`.bin` のリンクは相対パスで、改名しても動く)。ハッシュ値は、wording-guard と同じく SHA-256 の先頭 16 文字。プラグインのコードは展開先にあり、Node.js は読み込むファイルの位置から `node_modules` を探すので、キャッシュのライブラリは場所を明示して読み込む: pptxgenjs はキャッシュの `node_modules` を起点にした `createRequire` で読み込み、`tsc` と eslint はキャッシュの `node_modules/.bin` のものを、プラグインの設定ファイルを指定して実行し、`pptx[desktop]:apply_theme.js` は環境変数 `NODE_PATH` にキャッシュの `node_modules` を指定した子プロセスで実行する (session-settled: user-approved; chosen over 実行のたびにプラグインのコードをキャッシュにコピーすること: 版の違うセッションが同時に動くと、コピーしたコードを上書きし合うため)。この作り方も利用者が選んだ (session-settled: user-approved; chosen over 両方をその場に作ること)。
+- KTD8. **キャッシュのディレクトリを、ロックファイルのハッシュ値ごとに分ける** (session-settled: user-approved; chosen over プラグインのバージョンごとに分けること・1 つだけにすること: ライブラリを変えない細かな修正でも入れ直さないため)。venv は `venv-<uv.lock と .python-version のハッシュ値>/` にその場で作り、作り終えたらフラグファイルを作る (uv の venv は、中のスクリプトが作ったときの絶対パスを持つので改名しない。同時の実行は uv が環境の中の `.lock` で排他する)。ファイル `.python-version` もハッシュ値に含めるのは、`uv.lock` に含まれず、Python のバージョンだけを変えたときにも別の venv にするため (session-settled: user-approved; chosen over `uv.lock` だけにすること)。`uv sync` が失敗したら、venv をフラグファイルを作らずに残し、次の実行が `uv sync` をやり直す (session-settled: user-approved; chosen over 失敗したら消すこと: 消すと、同じ venv を同時に入れている別の実行の venv も消えるため)。`node_modules` は wording-guard と同じく、一時的な名前のディレクトリで `npm ci` してから `node-<package-lock.json のハッシュ値>/` に改名する (`.bin` のリンクは相対パスで、改名しても動く)。ハッシュ値は、wording-guard と同じく SHA-256 の先頭 16 文字 (venv は、2 つのファイルの内容を続けたものから求める)。キャッシュのディレクトリは、wording-guard と doc-structured と同じく、環境変数 `XDG_CACHE_HOME` があれば `~/.cache` の代わりにその下を使う (session-settled: user-approved; chosen over 常に `~/.cache` の下にすること)。プラグインのコードは展開先にあり、Node.js は読み込むファイルの位置から `node_modules` を探すので、キャッシュのライブラリは場所を明示して読み込む: pptxgenjs はキャッシュの `node_modules` を起点にした `createRequire` で読み込み、`tsc` と eslint はキャッシュの `node_modules/.bin` のものを、プラグインの設定ファイルを指定して実行し、`pptx[desktop]:apply_theme.js` は環境変数 `NODE_PATH` にキャッシュの `node_modules` を指定した子プロセスで実行する (session-settled: user-approved; chosen over 実行のたびにプラグインのコードをキャッシュにコピーすること: 版の違うセッションが同時に動くと、コピーしたコードを上書きし合うため)。この作り方も利用者が選んだ (session-settled: user-approved; chosen over 両方をその場に作ること)。
 - KTD9. **Google スライドのスライドの ID は `sd_<キー>_<内容のハッシュ値>`** (session-settled: user-approved; chosen over `<キー>_<作り直した回数>`: 作り直すスライドと、途中で失敗した後に残る作業が、資料を読むだけで機械的に決まるため)。内容のハッシュ値は、そのスライドのデータ (図形・線・文字・題名・一言) から計算し、ID・位置・発表者ノートを含めない (session-settled: user-approved; chosen over 指示の配列から計算すること: ノートだけの修正・前へのスライドの挿入・指示の作り方の修正で、変えていないスライドまで作り直しにならないため)。発表者ノートは ID に含めず、KTD10 のとおり文を比べて入れ直す。接頭辞 `sd_` は、キーの無いスライドと判別するためと、ID の長さの下限 (5 文字) を満たすため。図形の ID は `<スライドの ID>_<番号>`。キーは `[a-z0-9-]` の 1〜32 文字、ハッシュ値は 16 進数の 10 文字、図形の番号は 3 桁まで (Google スライドの objectId の上限 50 文字に収まる: 3+32+1+10+1+3=50)。
 - KTD10. **`publish` は、読む → 差を求める → 承認を得る → 送る → 確認する、の順にする**。差は、構成案のキーと順序・新しいハッシュ値と、資料から読んだ ID を比べて求め、作る・作り直す・消す・並べ替えるキーに分ける。発表者ノートは、資料から読んだ文と構成案の文をキーごとに比べ、違うキーだけ入れ直す (欄が空でなければ、文を消してから入れる。空の欄の文を消す指示は失敗するため)。構成案の先頭に、最後に `publish` したプラグインの版を記録し、今の版と違うときは、すべてのスライドを作り直すかを利用者に質問する (指示の作り方の修正は、ハッシュ値を変えないため)。指示のファイルは 2 枚ずつに分ける (1 枚分の指示は約 1 万字で、Bash の出力の上限の約 3 万字を超えないため)。資料を読むときは、google-workspace のスキルが勧める項目の指定 (field mask) で、スライドの ID の順序・ノートの欄の ID と文・マスターの ID・`revisionId` だけを読み、Claude がその結果を資料のディレクトリの `build/presentation.json` に書いてツールに渡す (session-settled: user-approved; chosen over ツールを使わず Claude が比べること: ID の取り違えをテストで防ぐため。[docs/solutions/design-patterns/extract-identifiers-in-code-not-llm.md](../solutions/design-patterns/extract-identifiers-in-code-not-llm.md))。発表者ノートの欄の ID はスライドを作った後でないと分からないので、作った後に再度読み込んでから入れる。
 - KTD11. **pptx のスキルのディレクトリは、スキル `build` が明示して渡す**。`build` は Claude にスキル `anthropic-skills:pptx` を読み込ませ、示されるスキルのディレクトリ (Base directory) を、ツールの引数で渡す。ツールは `scripts/apply_theme.js` と `scripts/office/validate.py` があることを確認し、無ければ中断する。`~/.claude` の下を探さない (配置は公式に決まっていないため)。
@@ -200,7 +200,9 @@ stateDiagram-v2
   無い --> 承認待ち: スキルが状態を確認する
   承認待ち --> 入れている: 利用者が承認する
   入れている --> 入っている: 成功してフラグファイルを作る (venv) / 改名する (node)
-  入れている --> 無い: 失敗して誤りを示す
+  入れている --> 無い: 失敗して誤りを示す (node)
+  入れている --> 作りかけ: 失敗して誤りを示す (venv)
+  作りかけ --> 承認待ち: スキルが状態を確認する
   入っている --> [*]
 ```
 
@@ -383,11 +385,11 @@ slide-deck/
 - **Dependencies**: U1
 - **Files**: `slide-deck/src/setup/setup.ts`・`slide-deck/src/cli.ts` (サブコマンド `setup status` と `setup install`)・`slide-deck/tests/setup.test.ts`
 - **Approach**:
-  1. `setup status` は、uv と Node.js の有無、venv と `node_modules` のディレクトリの状態 (無い・入っている・壊れている) と、取得するものを示す。何も入れない。
+  1. `setup status` は、uv と Node.js の有無、venv と `node_modules` のディレクトリの状態 (無い・入っている・作りかけ (venv)・壊れている (`node_modules`)) と、取得するものを示す。何も入れない。終了コードは、どちらも入っていれば 0、入れるものがあれば 1、入れられない (Node.js が 24 未満・入れるのに要る uv か npm が無い・`node_modules` が壊れている) なら 2 (session-settled: user-approved; chosen over 状態を示せたら 0 にすること: スキルが終了コードで承認を求めるかを分けられるため)。uv は venv を、npm は `node_modules` を入れるときだけ要るので、入っているものに要るツールが無くても 2 にしない。
   2. `setup install` は、無いものだけを KTD8 の形で入れる。スキルは、`setup status` の結果を利用者に示して承認を得てから、`setup install` を実行する (KD10)。
   3. ディレクトリがあるのにフラグファイルが無い venv は、もう一度 `uv sync` で作る (uv の同期は何度実行しても同じ結果になるため)。`node_modules` は、wording-guard と同じく、壊れていれば消すよう案内して中断する。
-  4. 環境変数 `SLIDE_DECK_CACHE_DIR` を設定すると、キャッシュのディレクトリ (`~/.cache/akm-claude-plugins/slide-deck/`) の代わりに、その場所そのものを使う (テストと開発のため)。キャッシュのディレクトリと、venv と `node_modules` のディレクトリのパスを求める関数は、U5 も使うので、`setup.ts` から書き出す。
-  5. 取得に失敗したら、作りかけの一時的なディレクトリを消し、別の方法を試さずに誤りを示す。
+  4. 環境変数 `SLIDE_DECK_CACHE_DIR` を設定すると、キャッシュのディレクトリ (`~/.cache/akm-claude-plugins/slide-deck/`。`XDG_CACHE_HOME` があればその下。KTD8) の代わりに、その場所そのものを使う (テストと開発のため)。キャッシュのディレクトリと、venv と `node_modules` のディレクトリのパスを求める関数は、U5 も使うので、`setup.ts` から書き出す。
+  5. 取得に失敗したら、別の方法を試さずに誤りを示す。`npm ci` の失敗では一時的なディレクトリを消し、`uv sync` の失敗では venv をフラグファイルを作らずに残す (KTD8)。
   6. 入口 `slide-deck/src/cli.ts` は、この単位で作る。サブコマンド `setup status` と `setup install` の `--help` を書く (KTD17)。
 - **Patterns to follow**: `wording-guard/scripts/wordingguard/textlint.py` の `setup` (一時的なディレクトリで `npm ci` して改名する・同時に実行した別の setup が先に入れた場合の扱い)。`doc-structured/bin/doc-structured` (フラグファイル)。
 - **Test scenarios**:
@@ -398,7 +400,10 @@ slide-deck/
   - `npm ci` が失敗すると、一時的なディレクトリが残らず、`node-<ハッシュ値>/` も作られない。
   - 改名の直前に、別の実行が `node-<ハッシュ値>/` を作り終えていたら、入ったものとして扱う。
   - フラグファイルの無い venv のディレクトリがあると、もう一度 `uv sync` を実行してフラグファイルを作る。
-  - `SLIDE_DECK_CACHE_DIR` を設定すると、パスを求める関数がその場所の下のパスを返す。
+  - `uv sync` が失敗すると、venv にフラグファイルを作らず、`node_modules` も入れない。
+  - `.python-version` だけを変えても、別のハッシュ値の venv のディレクトリになる。
+  - `node_modules` のディレクトリが壊れていると、消すよう案内して終了コード 2 になり、何も入れない。
+  - `SLIDE_DECK_CACHE_DIR` を設定すると、パスを求める関数がその場所の下のパスを返す。無ければ `XDG_CACHE_HOME` の下、それも無ければ `~/.cache` の下を返す。
   - `setup status --help` と `setup install --help` が、引数・出力・終了コードを示す。
 - **Verification**: 手元の uv と npm で、空のキャッシュのディレクトリから入れられ、2 回目は何もしない。
 
