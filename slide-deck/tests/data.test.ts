@@ -397,6 +397,22 @@ describe("bullets", () => {
     ]);
   });
 
+  test("書式を指定しなければ、受け取る部品の関数の書式を使う", () => {
+    const s = slide("k");
+    box(s, 0, 0, 4, 1, bullets(["a", "b"]), { fontSize: 11, color: "lt1" });
+    text(s, bullets(["c"]), 0, 0, 4, 1);
+    const [boxed, plain] = s.elements;
+    assert.ok(boxed?.kind === "shape" && plain?.kind === "textBox");
+    assert.deepEqual(
+      boxed.text?.paragraphs.map((p) => p.runs.map((r) => [r.text, r.fontSize, r.color])),
+      [[["a", 11, "lt1"]], [["b", 11, "lt1"]]],
+    );
+    assert.deepEqual(
+      plain.text.paragraphs.map((p) => p.runs.map((r) => [r.text, r.fontSize, r.color])),
+      [[["c", 14, "dk1"]]],
+    );
+  });
+
   test("最後の項目の後に、空の段落を作らない", () => {
     const s = slide("k");
     text(s, [{ text: "a", bullet: true, breakLine: true }], 0, 0, 1, 1);

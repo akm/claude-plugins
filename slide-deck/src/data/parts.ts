@@ -122,11 +122,14 @@ export interface CardOptions {
   name?: string;
 }
 
-/** 関数 bullets のオプション。 */
+/**
+ * 関数 bullets のオプション。
+ * 指定しなかった書式は、箇条書きを受け取る部品の関数 (box・text) の書式を使う。
+ */
 export interface BulletsOptions {
-  /** 文字の大きさ (ポイント)。デフォルト値は 14。 */
+  /** 文字の大きさ (ポイント)。デフォルト値は、受け取る部品の関数の文字の大きさ。 */
   fontSize?: number;
-  /** 文字の色。デフォルト値は dk1。 */
+  /** 文字の色。デフォルト値は、受け取る部品の関数の文字の色。 */
   color?: ThemeColorName;
 }
 
@@ -417,15 +420,17 @@ export function card(
   });
 }
 
-/** 箇条書きの文字を作る。戻り値を関数 text や box に渡す。項目ごとに段落を分ける。 */
+/**
+ * 箇条書きの文字を作る。戻り値を関数 text や box に渡す。項目ごとに段落を分ける。
+ * 指定しなかった書式は項目に書かず、受け取る部品の関数の書式を使う (型 RunInput の説明のとおり)。
+ */
 export function bullets(items: string[], o: BulletsOptions = {}): RunInput[] {
-  return items.map((t, i) => ({
-    text: t,
-    bullet: true,
-    breakLine: i < items.length - 1,
-    fontSize: o.fontSize ?? 14,
-    color: o.color ?? "dk1",
-  }));
+  return items.map((t, i) => {
+    const item: RunInput = { text: t, bullet: true, breakLine: i < items.length - 1 };
+    if (o.fontSize !== undefined) item.fontSize = o.fontSize;
+    if (o.color !== undefined) item.color = o.color;
+    return item;
+  });
 }
 
 /** 資料ごとのスクリプトに渡す、部品の関数の集まり (計画の KTD2)。 */
