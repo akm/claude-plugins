@@ -17,6 +17,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "slide_deck_tools" / "thumbs_grid
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+WHITE = (255, 255, 255)
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
@@ -128,6 +129,17 @@ class ThumbsGridTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn(text.as_uri(), result.stderr, "画像として読めなかった URL を示していない")
         self.assertFalse(out.exists(), "画像として読めなかったのに画像を書いた")
+
+    def test_transparent_pixels_are_composited_on_the_background(self) -> None:
+        path = self.dir / "transparent.png"
+        Image.new("RGBA", (40, 30), (0, 0, 0, 0)).save(path)
+        out = self.dir / "grid.png"
+
+        result = run_tool(str(out), path.as_uri())
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (pixel,) = self.read_pixels(out, [(20, 15)])
+        self.assertEqual(pixel, WHITE, "透明な画素が背景の色で描かれていない")
 
     def test_help_shows_arguments_output_and_exit_codes(self) -> None:
         result = run_tool("--help")

@@ -17,6 +17,8 @@ from PIL import Image
 # 画像の間の幅 (ピクセル) と、画像の間と空いたマスを塗る色。色は、スライドの境目が分かるように、スライドではあまり使わない色 (マゼンタ) にする
 GAP = 6
 BACKGROUND = (200, 0, 200)
+# 透過のある画像を合成する背景の色。スライドの多くは背景が白なので、表示に近い色にする
+TRANSPARENT_BACKGROUND = (255, 255, 255)
 # 1 つの URL の取得で、接続と読み取りのそれぞれで応答まで待機する秒数の上限
 TIMEOUT_SECONDS = 30
 
@@ -28,6 +30,7 @@ EPILOG = f"""\
 出力:
   引数 OUTPUT のパスに、引数 URL の順に左から右・上から下へ並べた画像を書く。画像の形式は OUTPUT の拡張子で決まる (.png を勧める)。
   大きさの違う画像は、最初の画像の大きさにそろえる。枚数が奇数なら、最後の行の右を空ける。
+  透過のある画像は、白 RGB{TRANSPARENT_BACKGROUND} の背景に合成してから並べる。
   画像の間と空いたマスは、色 RGB{BACKGROUND} で塗る。標準出力には何も書かない。
   1 つでも取得できない URL があれば、画像を書かない。
 
@@ -74,10 +77,19 @@ def fetch_image(url: str) -> Image.Image:
         raise ToolError(f"URL を取得できない: {url}: {e}") from e
     try:
         with Image.open(io.BytesIO(data)) as image:
-            return image.convert("RGB")
+            return to_rgb(image)
     except OSError as e:
         # Pillow が画像の形式を判別できないときに送出する例外 UnidentifiedImageError も、OSError の派生クラス
         raise ToolError(f"URL のデータを画像として読めない: {url}: {e}") from e
+
+
+def to_rgb(image: Image.Image) -> Image.Image:
+    """画像を RGB にする。透過のある画像は、convert("RGB") だとアルファを捨てて透明な画素の RGB の値 (多くは黒) が残るので、背景に合成する。"""
+    if not image.has_transparency_data:
+        return image.convert("RGB")
+    rgba = image.convert("RGBA")
+    background = Image.new("RGBA", rgba.size, (*TRANSPARENT_BACKGROUND, 255))
+    return Image.alpha_composite(background, rgba).convert("RGB")
 
 
 def make_grid(images: list[Image.Image]) -> Image.Image:
