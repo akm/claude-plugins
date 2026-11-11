@@ -200,7 +200,7 @@ class ThumbsGridTest(unittest.TestCase):
         self.assertIn(str(out), result.stderr, "書けなかった OUTPUT を示していない")
         names: list[str] = sorted(path.name for path in self.dir.iterdir())
         expected: list[str] = ["1.png"]
-        self.assertEqual(names, expected, "書けなかったのに OUTPUT か一時ファイルが残った")
+        self.assertEqual(names, expected, "書けなかったのに OUTPUT が残った")
 
     def test_failed_write_keeps_the_existing_output(self) -> None:
         # 形式 XBM は RGB の画像を書けないので、Image.save が書き込みの途中で失敗する
@@ -215,7 +215,7 @@ class ThumbsGridTest(unittest.TestCase):
         self.assertEqual(out.read_bytes(), b"previous image", "書けなかったのに OUTPUT にあったファイルが変わった")
         names: list[str] = sorted(path.name for path in self.dir.iterdir())
         expected: list[str] = ["1.png", "grid.xbm"]
-        self.assertEqual(names, expected, "一時ファイルが残った")
+        self.assertEqual(names, expected, "OUTPUT のほかにファイルが残った")
 
     def test_new_output_gets_the_permissions_of_the_umask(self) -> None:
         mask = os.umask(0)
@@ -236,6 +236,19 @@ class ThumbsGridTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(stat.S_IMODE(out.stat().st_mode), 0o640, "既にある OUTPUT の権限が変わった")
+
+    def test_symlink_output_writes_to_the_link_target(self) -> None:
+        target = self.dir / "real.png"
+        target.write_bytes(b"previous image")
+        out = self.dir / "grid.png"
+        out.symlink_to(target)
+
+        result = run_tool(str(out), self.write_image("1.png", (40, 30), RED))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(out.is_symlink(), "シンボリックリンクの OUTPUT が通常のファイルに置き換わった")
+        with Image.open(target) as image:
+            self.assertEqual(image.height, 30, "リンク先に画像を書いていない")
 
     def test_help_shows_arguments_output_and_exit_codes(self) -> None:
         result = run_tool("--help")

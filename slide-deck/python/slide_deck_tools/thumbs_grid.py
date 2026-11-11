@@ -8,10 +8,7 @@
 import argparse
 import http.client
 import io
-import os
-import stat
 import sys
-import tempfile
 import urllib.request
 from pathlib import Path
 from typing import IO
@@ -36,7 +33,7 @@ EPILOG = f"""\
   大きさの違う画像は、最初の画像の大きさにそろえる。枚数が奇数なら、最後の行の右を空ける。
   透過のある画像は、白 RGB{TRANSPARENT_BACKGROUND} の背景に合成してから並べる。
   画像の間と空いたマスは、色 RGB{BACKGROUND} で塗る。標準出力には何も書かない。
-  1 つでも取得できない URL があれば、画像を書かない。画像を書けなかったときは、OUTPUT にあったファイルを変えない。
+  1 つでも取得できない URL があれば、画像を書かない。画像の形式に変換できなかったときは、OUTPUT にあったファイルを変えない。
 
 終了コード:
   {EXIT_OK}  画像を書いた
@@ -119,35 +116,24 @@ def run(arguments: Arguments) -> None:
 
 
 def write_image(grid: Image.Image, output: Path) -> None:
-    """画像を、OUTPUT と同じディレクトリの一時ファイルに書いてから、OUTPUT に置き換える。
+    """画像をメモリに書いてから、OUTPUT に書く。
 
-    メソッド Image.save は、既にあるファイルを切り詰めてから書き、途中で失敗しても元に戻さない。
-    OUTPUT に直接書くと、書き込みに失敗したときに前の実行の画像が壊れたまま残るため。
-    一時ファイルの拡張子を OUTPUT と同じにするのは、Image.save が拡張子から画像の形式を決めるため。
+    メソッド Image.save に OUTPUT のパスを渡すと、既にあるファイルを切り詰めてから書き、
+    画像の形式に変換する途中で失敗しても元に戻さないので、前の実行の画像が壊れたまま残る。
+    一時ファイルに書いて置き換える方法は、OUTPUT のパスに付いた権限・所有者・シンボリックリンクを失う。
+    メモリに書いてから OUTPUT に書けば、変換の失敗では OUTPUT を変えず、パスの属性も保つ。
+    OUTPUT への書き込みそのものが途中で失敗したとき (ディスクの空きが無い、など) は、書きかけの内容が残る。
     """
+    # メモリに書くときは Image.save が拡張子を見ないので、拡張子から形式を求めて渡す
+    image_format = Image.registered_extensions().get(output.suffix.lower())
+    if image_format is None:
+        raise ToolError(f"画像を書けない: {output}: 拡張子 {output.suffix!r} から画像の形式を決められない")
+    buffer = io.BytesIO()
     try:
-        fd, name = tempfile.mkstemp(dir=output.parent, prefix=f".{output.name}.", suffix=output.suffix)
-    except OSError as e:
-        raise ToolError(f"画像を書けない: {output}: {e}") from e
-    os.close(fd)
-    temporary = Path(name)
-    try:
-        grid.save(temporary)
-        # mkstemp は権限 0600 でファイルを作るので、OUTPUT に直接書いたときと同じ権限にしてから置き換える。
-        # 既にある OUTPUT ならその権限を、無ければ 0666 から umask を除いた権限にする
-        temporary.chmod(stat.S_IMODE(output.stat().st_mode) if output.exists() else 0o666 & ~current_umask())
-        os.replace(temporary, output)
+        grid.save(buffer, format=image_format)
+        output.write_bytes(buffer.getvalue())
     except (OSError, ValueError) as e:
-        # 引数 OUTPUT の拡張子から画像の形式を決められないと、メソッド Image.save は例外 ValueError を送出する
-        temporary.unlink(missing_ok=True)
         raise ToolError(f"画像を書けない: {output}: {e}") from e
-
-
-def current_umask() -> int:
-    """プロセスの umask を返す。os.umask は設定しないと読めないので、設定してすぐに戻す。"""
-    mask = os.umask(0)
-    os.umask(mask)
-    return mask
 
 
 def main(argv: list[str]) -> int:
