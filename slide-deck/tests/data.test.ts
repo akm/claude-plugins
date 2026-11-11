@@ -436,6 +436,17 @@ describe("bullets", () => {
     ]);
   });
 
+  test("項目の無い箇条書きと空の配列は、部品の関数の書式の空の部分を持つ段落 1 つになる", () => {
+    const s = slide("k");
+    text(s, [], 0, 0, 1, 1, { fontSize: 12, color: "dk2" });
+    text(s, bullets([]), 0, 0, 1, 1);
+    const paragraphs = s.elements.map((e) => (e.kind === "textBox" ? e.text.paragraphs : []));
+    assert.deepEqual(paragraphs, [
+      [{ runs: [{ text: "", fontSize: 12, bold: false, color: "dk2", link: null }], bullet: false }],
+      [{ runs: [{ text: "", fontSize: 14, bold: false, color: "dk1", link: null }], bullet: false }],
+    ]);
+  });
+
   test("文字の末尾の改行で作られた段落だけを除き、その前の空行は残る", () => {
     const s = slide("k");
     text(s, "a\n\n", 0, 0, 1, 1);

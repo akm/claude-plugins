@@ -149,7 +149,8 @@ function toMargin(m: MarginInput): Margin {
 /**
  * 文字の入力を段落に分ける。
  * 部分の breakLine と文字の中の改行で段落を分け、部分の bullet はその部分を含む段落に付ける。
- * 空行の段落にも、文字が空の部分を 1 つ足す。段落の文字の大きさ・太字・色を、空行でも書き出しの処理に渡すため。
+ * 空行の段落と、入力が空 (空の配列など) のときの段落にも、文字が空の部分を 1 つ足す。
+ * 段落の文字の大きさ・太字・色を、文字が無い段落でも書き出しの処理に渡すため。
  * 最後の段落が、区切り (最後の部分の breakLine か、文字の末尾の改行) で作られ、その後に部分が入っていなければ除く。
  * 明示した空の部分 (text が "" の部分) が入った段落は除かない。
  */
@@ -193,6 +194,12 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
     if (input.breakLine === true) breakParagraph();
   }
   if (paragraphs.length > 1 && state.fromBreakOnly) paragraphs.pop();
+  // 入力が空の配列のときは、最初の段落に部分が入っていないので、部品の関数の書式の空の部分を足す
+  for (const p of paragraphs) {
+    if (p.runs.length === 0) {
+      p.runs.push({ text: "", fontSize: d.fontSize, bold: d.bold, color: d.color, link: null });
+    }
+  }
   return paragraphs;
 }
 
