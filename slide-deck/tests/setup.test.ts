@@ -355,6 +355,17 @@ describe("setup status", () => {
     assert.deepEqual(packages, [{ name: "pillow", versions: ["12.0.0", "13.0.0"] }]);
     assert.equal(formatPackages(packages), "pillow 12.0.0 か 13.0.0 (uv.lock で、Python のバージョンなどの条件ごとに分かれている)");
     assert.equal(formatPackages([{ name: "lxml", versions: ["6.1.3"] }, { name: "pillow", versions: ["13.0.0"] }]), "lxml 6.1.3・pillow 13.0.0");
+
+    // dependencies の行が片方のバージョンだけを指すときは、そのバージョンだけを示す
+    const onlyNew = uvLock.replace(/^ {4}\{ name = "pillow", version = "12\.0\.0".*\n/m, "");
+    assert.deepEqual(readUvLockDependencies(onlyNew), [{ name: "pillow", versions: ["13.0.0"] }]);
+
+    // version の無い行で名前が分かれていると、どのバージョンを使うかが決まらないので誤りにする
+    const noVersion = onlyNew.replace(/\{ name = "pillow", version = "13\.0\.0", [^\n]*/, '{ name = "pillow" },');
+    assert.throws(
+      () => readUvLockDependencies(noVersion),
+      (e: unknown) => e instanceof SetupError && e.message.includes("pillow の行に version が無いのに"),
+    );
   });
 });
 

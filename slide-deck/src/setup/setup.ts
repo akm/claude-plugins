@@ -216,12 +216,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * uv.lock から、プロジェクト自身 (source が virtual のパッケージ) の dependencies の名前とバージョンを読む。
- * 同じ名前の [[package]] が複数あれば (resolution-markers で分かれたとき)、そのバージョンをすべて返す。
+ * uv は、同じ名前の [[package]] が複数あると (resolution-markers で分かれたとき)、dependencies の行に使うバージョンを
+ * version = "…" で書く。その行はそのバージョンを使い、version の無い行は、その名前の [[package]] のバージョン (1 つだけのはず) を使う。
  * uv.lock は TOML だが、Node.js の標準の機能に TOML を読むものが無いので、uv が書く行の形 (行頭の name = "…" など) で読む
  */
 export function readUvLockDependencies(uvLock: string): LockedPackage[] {
   const blocks = uvLock.split(/^\[\[package\]\]$/m).slice(1);
-  const versions = new Map<string, string[]>();
+  const locked = new Map<string, string[]>();
   let root: string | undefined;
   for (const block of blocks) {
     const name = /^name = "([^"]+)"$/m.exec(block)?.[1];
@@ -229,7 +230,7 @@ export function readUvLockDependencies(uvLock: string): LockedPackage[] {
     if (name === undefined || version === undefined) {
       throw new SetupError(`uv.lock の [[package]] に、name か version の行が無い: ${block.slice(0, 80)}`);
     }
-    versions.set(name, [...(versions.get(name) ?? []), version]);
+    locked.set(name, [...(locked.get(name) ?? []), version]);
     if (/^source = \{ virtual = "\." \}$/m.test(block)) {
       root = block;
     }
@@ -238,15 +239,26 @@ export function readUvLockDependencies(uvLock: string): LockedPackage[] {
     throw new SetupError('uv.lock に、プロジェクト自身のパッケージ (source = { virtual = "." }) が無い');
   }
   const deps = /^dependencies = \[\n([\s\S]*?)^\]/m.exec(root)?.[1] ?? "";
-  // 分かれたパッケージは、dependencies にも同じ名前が marker 付きで複数並ぶので、名前を 1 つにまとめる
-  const names = [...new Set([...deps.matchAll(/\{ name = "([^"]+)"/g)].map((m) => m[1] ?? ""))];
-  return names.map((name) => {
-    const found = versions.get(name);
-    if (found === undefined) {
+  // 名前が分かれたパッケージは、dependencies にも同じ名前が marker 付きで複数並ぶので、名前ごとにバージョンを集める
+  const used = new Map<string, string[]>();
+  for (const m of deps.matchAll(/\{ name = "([^"]+)"(?:, version = "([^"]+)")?/g)) {
+    const name = m[1] ?? "";
+    const candidates = locked.get(name);
+    if (candidates === undefined) {
       throw new SetupError(`uv.lock に、プロジェクトが使うパッケージ ${name} の項目が無い`);
     }
-    return { name, versions: found };
-  });
+    const version = m[2] ?? (candidates.length === 1 ? candidates[0] : undefined);
+    if (version === undefined) {
+      throw new SetupError(
+        `uv.lock の、プロジェクトが使うパッケージ ${name} の行に version が無いのに、${name} が複数のバージョン (${candidates.join("・")}) で分かれている`,
+      );
+    }
+    const versions = used.get(name) ?? [];
+    if (!versions.includes(version)) {
+      used.set(name, [...versions, version]);
+    }
+  }
+  return [...used].map(([name, versions]) => ({ name, versions }));
 }
 
 /** package-lock.json から、package.json の dependencies の名前とバージョンと、開発のときだけ使うものを除いたパッケージの数を読む */
