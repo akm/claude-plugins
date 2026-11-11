@@ -13,7 +13,7 @@ import urllib.request
 from pathlib import Path
 from typing import IO, cast
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 # 画像の間の幅 (ピクセル) と、画像の間と空いたマスを塗る色。色は、スライドの境目が分かるように、スライドではあまり使わない色 (マゼンタ) にする
 GAP = 6
@@ -101,14 +101,32 @@ def to_rgb(image: Image.Image) -> Image.Image:
         transparency = info.get("transparency")
         if not isinstance(transparency, int):
             return gray
-        opaque = Image.new("L", values.size, 255)
-        opaque.putdata([0 if value == transparency else 255 for value in values.get_flattened_data()])
-        return Image.composite(gray, Image.new("RGB", gray.size, TRANSPARENT_BACKGROUND), opaque)
+        return Image.composite(gray, Image.new("RGB", gray.size, TRANSPARENT_BACKGROUND), opaque_mask(values, transparency))
     if not image.has_transparency_data:
         return image.convert("RGB")
     rgba = image.convert("RGBA")
     background = Image.new("RGBA", rgba.size, (*TRANSPARENT_BACKGROUND, 255))
     return Image.alpha_composite(background, rgba).convert("RGB")
+
+
+def opaque_mask(values: Image.Image, transparency: int) -> Image.Image:
+    """モード I の画像から、値が transparency の画素を 0、それ以外を 255 にしたモード L のマスクを作る。
+
+    画素の値を Python の配列にすると、画素数に比例してメモリと時間を使うので、Pillow の中で作る。
+    透過色との差の正の部分と負の部分を、それぞれ 8 ビットに切り詰めて重ねると、差が 0 の画素だけが 0 になる。
+    """
+
+    def above(value: float) -> float:
+        return value - transparency
+
+    def below(value: float) -> float:
+        return transparency - value
+
+    def opaque(value: int) -> int:
+        return 255 if value else 0
+
+    difference = ImageChops.lighter(values.point(above).convert("L"), values.point(below).convert("L"))
+    return difference.point(opaque)
 
 
 def scale_16_to_8_bits(value: float) -> float:
