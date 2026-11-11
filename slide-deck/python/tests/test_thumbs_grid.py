@@ -250,6 +250,18 @@ class ThumbsGridTest(unittest.TestCase):
         with Image.open(target) as image:
             self.assertEqual(image.height, 30, "リンク先に画像を書いていない")
 
+    def test_16_bit_grayscale_is_scaled_to_8_bits(self) -> None:
+        path = self.dir / "gray16.png"
+        Image.new("I;16", (40, 30), 30000).save(path)
+        out = self.dir / "grid.png"
+
+        result = run_tool(str(out), path.as_uri())
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (pixel,) = self.read_pixels(out, [(20, 15)])
+        expected = (30000 // 256,) * 3
+        self.assertEqual(pixel, expected, "16 ビットの値が 8 ビットに縮められていない")
+
     def test_help_shows_arguments_output_and_exit_codes(self) -> None:
         result = run_tool("--help")
 

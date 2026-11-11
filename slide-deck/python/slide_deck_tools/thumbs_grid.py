@@ -32,6 +32,7 @@ EPILOG = f"""\
   引数 OUTPUT のパスに、引数 URL の順に左から右・上から下へ並べた画像を書く。画像の形式は OUTPUT の拡張子で決まる (.png を勧める)。
   大きさの違う画像は、最初の画像の大きさにそろえる。枚数が奇数なら、最後の行の右を空ける。
   透過のある画像は、白 RGB{TRANSPARENT_BACKGROUND} の背景に合成してから並べる。
+  16 ビットのグレースケールの画像は、値を 8 ビットに縮めてから並べる。
   画像の間と空いたマスは、色 RGB{BACKGROUND} で塗る。標準出力には何も書かない。
   1 つでも取得できない URL があれば、画像を書かない。画像の形式に変換できなかったときは、OUTPUT にあったファイルを変えない。
 
@@ -90,11 +91,20 @@ def fetch_image(url: str) -> Image.Image:
 
 def to_rgb(image: Image.Image) -> Image.Image:
     """画像を RGB にする。透過のある画像は、convert("RGB") だとアルファを捨てて透明な画素の RGB の値 (多くは黒) が残るので、背景に合成する。"""
+    if image.mode.startswith("I;16"):
+        # 16 ビットのグレースケール (I;16 など) を convert("RGB") で変換すると、255 を超える値がすべて 255 になるので、
+        # 値を 256 で割って 8 ビットにしてから変換する
+        return image.convert("I").point(scale_16_to_8_bits).convert("L").convert("RGB")
     if not image.has_transparency_data:
         return image.convert("RGB")
     rgba = image.convert("RGBA")
     background = Image.new("RGBA", rgba.size, (*TRANSPARENT_BACKGROUND, 255))
     return Image.alpha_composite(background, rgba).convert("RGB")
+
+
+def scale_16_to_8_bits(value: float) -> float:
+    """16 ビットの画素の値を、8 ビットの範囲 (0〜255) に縮める。"""
+    return value / 256
 
 
 def make_grid(images: list[Image.Image]) -> Image.Image:
