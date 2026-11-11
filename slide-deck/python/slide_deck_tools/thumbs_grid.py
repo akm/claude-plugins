@@ -11,9 +11,9 @@ import io
 import sys
 import urllib.request
 from pathlib import Path
-from typing import IO, cast
+from typing import IO
 
-from PIL import Image, ImageChops
+from PIL import Image
 
 # 画像の間の幅 (ピクセル) と、画像の間と空いたマスを塗る色。色は、スライドの境目が分かるように、スライドではあまり使わない色 (マゼンタ) にする
 GAP = 6
@@ -32,7 +32,7 @@ EPILOG = f"""\
   引数 OUTPUT のパスに、引数 URL の順に左から右・上から下へ並べた画像を書く。画像の形式は OUTPUT の拡張子で決まる (.png を勧める)。
   大きさの違う画像は、最初の画像の大きさにそろえる。枚数が奇数なら、最後の行の右を空ける。
   透過のある画像は、白 RGB{TRANSPARENT_BACKGROUND} の背景に合成してから並べる。
-  16 ビットのグレースケールの画像のうち、Pillow がモード I;16 で開くもの (16 ビットの PNG など) は、値を 8 ビットに縮めてから並べる。
+  16 ビットのグレースケールの画像は扱わない。255 を超える値は 255 として並ぶ。
   画像の間と空いたマスは、色 RGB{BACKGROUND} で塗る。標準出力には何も書かない。
   1 つでも取得できない URL があれば、画像を書かない。画像の形式に変換できなかったときは、OUTPUT にあったファイルを変えない。
 
@@ -91,47 +91,11 @@ def fetch_image(url: str) -> Image.Image:
 
 def to_rgb(image: Image.Image) -> Image.Image:
     """画像を RGB にする。透過のある画像は、convert("RGB") だとアルファを捨てて透明な画素の RGB の値 (多くは黒) が残るので、背景に合成する。"""
-    if image.mode.startswith("I;16"):
-        # 16 ビットのグレースケール (I;16 など) を convert("RGB") で変換すると、255 を超える値がすべて 255 になるので、
-        # 値を 256 で割って 8 ビットにしてから変換する。透過色 (PNG の tRNS) があれば、その値の画素を白の背景に合成する
-        values = image.convert("I")
-        gray = values.point(scale_16_to_8_bits).convert("L").convert("RGB")
-        # image.info の値の型は Any なので、cast で値を object にした辞書として受けてから、int かを調べる
-        info = cast("dict[str, object]", image.info)
-        transparency = info.get("transparency")
-        if not isinstance(transparency, int):
-            return gray
-        return Image.composite(gray, Image.new("RGB", gray.size, TRANSPARENT_BACKGROUND), opaque_mask(values, transparency))
     if not image.has_transparency_data:
         return image.convert("RGB")
     rgba = image.convert("RGBA")
     background = Image.new("RGBA", rgba.size, (*TRANSPARENT_BACKGROUND, 255))
     return Image.alpha_composite(background, rgba).convert("RGB")
-
-
-def opaque_mask(values: Image.Image, transparency: int) -> Image.Image:
-    """モード I の画像から、値が transparency の画素を 0、それ以外を 255 にしたモード L のマスクを作る。
-
-    画素の値を Python の配列にすると、画素数に比例してメモリと時間を使うので、Pillow の中で作る。
-    透過色との差の正の部分と負の部分を、それぞれ 8 ビットに切り詰めて重ねると、差が 0 の画素だけが 0 になる。
-    """
-
-    def above(value: float) -> float:
-        return value - transparency
-
-    def below(value: float) -> float:
-        return transparency - value
-
-    def opaque(value: int) -> int:
-        return 255 if value else 0
-
-    difference = ImageChops.lighter(values.point(above).convert("L"), values.point(below).convert("L"))
-    return difference.point(opaque)
-
-
-def scale_16_to_8_bits(value: float) -> float:
-    """16 ビットの画素の値を、8 ビットの範囲 (0〜255) に縮める。"""
-    return value / 256
 
 
 def make_grid(images: list[Image.Image]) -> Image.Image:
