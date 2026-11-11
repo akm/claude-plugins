@@ -447,6 +447,27 @@ describe("関数 bullets", () => {
     ]);
   });
 
+  test("末尾に改行があり breakLine も持つ部分の空行の段落は、その部分の書式と bullet を持つ", () => {
+    const s = slide("k");
+    text(s, bullets(["a\n", "b"], { fontSize: 13 }), 0, 0, 1, 1);
+    text(s, [{ text: "a\n", fontSize: 20, breakLine: true }, { text: "b", fontSize: 20 }], 0, 0, 1, 1);
+    const summaries = s.elements.map((e) =>
+      e.kind === "textBox" ? e.text.paragraphs.map((p) => [p.bullet, p.runs.map((r) => [r.text, r.fontSize])]) : [],
+    );
+    assert.deepEqual(summaries, [
+      [
+        [true, [["a", 13]]],
+        [true, [["", 13]]],
+        [true, [["b", 13]]],
+      ],
+      [
+        [false, [["a", 20]]],
+        [false, [["", 20]]],
+        [false, [["b", 20]]],
+      ],
+    ]);
+  });
+
   test("文字の末尾の改行で作られた段落だけを除き、その前の空行は残る", () => {
     const s = slide("k");
     text(s, "a\n\n", 0, 0, 1, 1);

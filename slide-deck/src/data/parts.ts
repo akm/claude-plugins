@@ -172,8 +172,9 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
     const lines = input.text.split("\n");
     lines.forEach((line, i) => {
       if (i > 0) breakParagraph();
-      // 文字の末尾の改行の後の空の行は、部分として段落に入れない
-      if (i > 0 && i === lines.length - 1 && line === "") return;
+      // 文字の末尾の改行の後の空の行は、部分として段落に入れない。
+      // ただし部分が breakLine を持つときは、この段落は区切りの後も残るので、部分の書式と bullet を持たせる
+      if (i > 0 && i === lines.length - 1 && line === "" && input.breakLine !== true) return;
       state.fromBreakOnly = false;
       if (input.bullet === true) current.bullet = true;
       const run = {
