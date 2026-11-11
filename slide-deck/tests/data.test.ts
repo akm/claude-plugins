@@ -303,6 +303,29 @@ describe("text", () => {
     );
   });
 
+  test("空行の段落も、文字が空の部分を 1 つ持ち、文字の大きさ・太字・色を持つ", () => {
+    const s = slide("k");
+    text(s, "a\n\nb", 0, 0, 1, 1, { fontSize: 12, bold: true, color: "dk2" });
+    const [e] = s.elements;
+    assert.ok(e?.kind === "textBox");
+    assert.deepEqual(e.text.paragraphs, [
+      { runs: [{ text: "a", fontSize: 12, bold: true, color: "dk2", link: null }], bullet: false },
+      { runs: [{ text: "", fontSize: 12, bold: true, color: "dk2", link: null }], bullet: false },
+      { runs: [{ text: "b", fontSize: 12, bold: true, color: "dk2", link: null }], bullet: false },
+    ]);
+  });
+
+  test("書式を表す空の部分は、同じ段落に空でない部分を足すときに除く", () => {
+    const s = slide("k");
+    text(s, [{ text: "a\n" }, { text: "b", bold: true }, { text: "" }], 0, 0, 1, 1);
+    const [e] = s.elements;
+    assert.ok(e?.kind === "textBox");
+    assert.deepEqual(
+      e.text.paragraphs.map((p) => p.runs.map((r) => [r.text, r.bold])),
+      [[["a", false]], [["b", true]]],
+    );
+  });
+
   test("一部ずつ書式の違う文字は、部分ごとに書式を持ち、省略した書式は部品のものになる", () => {
     const s = slide("k");
     text(

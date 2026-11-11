@@ -146,6 +146,7 @@ function toMargin(m: MarginInput): Margin {
 /**
  * 文字の入力を段落に分ける。
  * 部分の breakLine と文字の中の改行で段落を分け、部分の bullet はその部分を含む段落に付ける。
+ * 空行の段落にも、文字が空の部分を 1 つ足す。段落の文字の大きさ・太字・色を、空行でも書き出しの処理に渡すため。
  * 最後の段落が空なら (最後の部分の breakLine や、末尾の改行で作られたもの) 除く。
  */
 function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
@@ -161,24 +162,36 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
     lines.forEach((line, i) => {
       if (i > 0) breakParagraph();
       if (input.bullet === true) current.bullet = true;
-      if (line === "") return;
-      current.runs.push({
+      const run = {
         text: line,
         fontSize: input.fontSize ?? d.fontSize,
         bold: input.bold ?? d.bold,
         color: input.color ?? d.color,
         link: input.link ?? null,
-      });
+      };
+      if (line === "") {
+        // 書式を表すための空の部分は、段落に部分がまだ無いときだけ足す
+        if (current.runs.length === 0) current.runs.push(run);
+        return;
+      }
+      // 空でない部分を足すときは、書式を表すために足した空の部分を除く
+      current.runs = current.runs.filter((r) => r.text !== "");
+      current.runs.push(run);
     });
     if (input.breakLine === true) breakParagraph();
   }
   const last = paragraphs[paragraphs.length - 1];
-  if (paragraphs.length > 1 && last !== undefined && last.runs.length === 0) paragraphs.pop();
+  if (paragraphs.length > 1 && last !== undefined && isBlank(last)) paragraphs.pop();
   return paragraphs;
 }
 
+/** 段落に、空でない文字の部分が無いか。 */
+function isBlank(p: Paragraph): boolean {
+  return p.runs.every((r) => r.text === "");
+}
+
 function hasText(paragraphs: Paragraph[]): boolean {
-  return paragraphs.some((p) => p.runs.length > 0);
+  return paragraphs.some((p) => !isBlank(p));
 }
 
 /** 資料ごとのスクリプトが、キーごとの空の図を作る。部品の関数は、この図に要素を足す。 */

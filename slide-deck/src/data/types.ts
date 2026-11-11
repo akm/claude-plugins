@@ -49,7 +49,10 @@ export interface TextRun {
   link: string | null;
 }
 
-/** 段落。bullet が true なら箇条書きの項目にする。 */
+/**
+ * 段落。bullet が true なら箇条書きの項目にする。
+ * 空行の段落も、文字が空の部分を 1 つ持ち、その部分が段落の文字の大きさ・太字・色を表す。
+ */
 export interface Paragraph {
   runs: TextRun[];
   bullet: boolean;
