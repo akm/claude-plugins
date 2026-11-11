@@ -190,7 +190,7 @@ class ThumbsGridTest(unittest.TestCase):
         self.assertFalse(out.exists(), "取得に失敗したのに画像を書いた")
 
     def test_output_with_an_unknown_extension_fails_with_the_path(self) -> None:
-        # 拡張子から画像の形式を決められないと、Image.save が ValueError を送出する
+        # 拡張子から画像の形式を決められないと、write_image が Image.save を呼び出す前に誤りにする
         out = self.dir / "grid.unknown"
         urls = [self.write_image("1.png", (40, 30), RED)]
 
