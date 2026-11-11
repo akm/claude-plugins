@@ -175,6 +175,21 @@ class ThumbsGridTest(unittest.TestCase):
         (pixel,) = self.read_pixels(out, [(20, 15)])
         self.assertEqual(pixel, WHITE, "透明な画素が背景の色で描かれていない")
 
+    def test_failed_write_keeps_the_existing_output(self) -> None:
+        # 形式 XBM は RGB の画像を書けないので、Image.save が書き込みの途中で失敗する
+        out = self.dir / "grid.xbm"
+        out.write_bytes(b"previous image")
+        urls = [self.write_image("1.png", (40, 30), RED)]
+
+        result = run_tool(str(out), *urls)
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(str(out), result.stderr, "書けなかった OUTPUT を示していない")
+        self.assertEqual(out.read_bytes(), b"previous image", "書けなかったのに OUTPUT にあったファイルが変わった")
+        names: list[str] = sorted(path.name for path in self.dir.iterdir())
+        expected: list[str] = ["1.png", "grid.xbm"]
+        self.assertEqual(names, expected, "一時ファイルが残った")
+
     def test_help_shows_arguments_output_and_exit_codes(self) -> None:
         result = run_tool("--help")
 

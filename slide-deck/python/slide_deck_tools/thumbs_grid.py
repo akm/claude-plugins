@@ -8,7 +8,9 @@
 import argparse
 import http.client
 import io
+import os
 import sys
+import tempfile
 import urllib.request
 from pathlib import Path
 from typing import IO
@@ -33,7 +35,7 @@ EPILOG = f"""\
   大きさの違う画像は、最初の画像の大きさにそろえる。枚数が奇数なら、最後の行の右を空ける。
   透過のある画像は、白 RGB{TRANSPARENT_BACKGROUND} の背景に合成してから並べる。
   画像の間と空いたマスは、色 RGB{BACKGROUND} で塗る。標準出力には何も書かない。
-  1 つでも取得できない URL があれば、画像を書かない。
+  1 つでも取得できない URL があれば、画像を書かない。画像を書けなかったときは、OUTPUT にあったファイルを変えない。
 
 終了コード:
   {EXIT_OK}  画像を書いた
@@ -112,11 +114,29 @@ def run(arguments: Arguments) -> None:
     # すべての URL を取得できてから書く。取得できた画像だけで書くと、確認の対象から外れたスライドがあることに気づけないため
     images = [fetch_image(url) for url in arguments.urls]
     grid = make_grid(images)
+    write_image(grid, Path(arguments.output))
+
+
+def write_image(grid: Image.Image, output: Path) -> None:
+    """画像を、OUTPUT と同じディレクトリの一時ファイルに書いてから、OUTPUT に置き換える。
+
+    メソッド Image.save は、既にあるファイルを切り詰めてから書き、途中で失敗しても元に戻さない。
+    OUTPUT に直接書くと、書き込みに失敗したときに前の実行の画像が壊れたまま残るため。
+    一時ファイルの拡張子を OUTPUT と同じにするのは、Image.save が拡張子から画像の形式を決めるため。
+    """
     try:
-        grid.save(Path(arguments.output))
+        fd, name = tempfile.mkstemp(dir=output.parent, prefix=f".{output.name}.", suffix=output.suffix)
+    except OSError as e:
+        raise ToolError(f"画像を書けない: {output}: {e}") from e
+    os.close(fd)
+    temporary = Path(name)
+    try:
+        grid.save(temporary)
+        os.replace(temporary, output)
     except (OSError, ValueError) as e:
         # 引数 OUTPUT の拡張子から画像の形式を決められないと、メソッド Image.save は例外 ValueError を送出する
-        raise ToolError(f"画像を書けない: {arguments.output}: {e}") from e
+        temporary.unlink(missing_ok=True)
+        raise ToolError(f"画像を書けない: {output}: {e}") from e
 
 
 def main(argv: list[str]) -> int:
