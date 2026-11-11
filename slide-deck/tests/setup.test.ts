@@ -226,6 +226,15 @@ describe("setup install", () => {
     assert.deepEqual(sandbox.calls(), []);
   });
 
+  test("Node.js のバージョンを読めない (先頭に v が付いた) ときは、24 未満とも以上とも決めずに誤りにする", () => {
+    assert.throws(
+      () => inspect({ env: sandbox.env(), nodeVersion: "v18.0.0" }),
+      (e: unknown) => e instanceof SetupError && e.message.includes("Node.js のバージョン v18.0.0 を読めない"),
+    );
+    assert.throws(() => { install({ env: sandbox.env(), nodeVersion: "v18.0.0", log: silent }); }, SetupError);
+    assert.deepEqual(sandbox.calls(), []);
+  });
+
   test("npm ci が失敗すると、一時的なディレクトリが残らず、node-<ハッシュ値>/ も作られない", () => {
     const env = sandbox.env({ FAKE_NPM_FAIL: "1" });
     assert.throws(() => { install({ env, log: silent }); }, (e: unknown) => e instanceof SetupError && /npm ci が失敗した[\s\S]*偽の npm: 失敗/.test(e.message));

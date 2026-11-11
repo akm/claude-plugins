@@ -54,7 +54,10 @@ export interface SetupOptions {
   readonly pluginDir?: string;
   /** 環境変数 (キャッシュのディレクトリと PATH を読み、uv と npm に渡す)。省略すると process.env */
   readonly env?: NodeJS.ProcessEnv;
-  /** 実行している Node.js のバージョン。省略すると process.versions.node */
+  /**
+   * 実行している Node.js のバージョン。省略すると process.versions.node。
+   * process.versions.node と同じ「24.1.0」の形 (先頭に v を付けない) で渡す。読めなければ inspect が SetupError を送出する
+   */
   readonly nodeVersion?: string;
 }
 
@@ -282,7 +285,12 @@ export function inspect(options: SetupOptions = {}): SetupReport {
   const venv = venvState(paths);
   const node = nodeState(paths);
   const problems: string[] = [];
-  if (Number(nodeVersion.split(".")[0]) < REQUIRED_NODE_MAJOR) {
+  const major = /^(\d+)\.\d+\.\d+/.exec(nodeVersion)?.[1];
+  if (major === undefined) {
+    // 読めない値を 24 以上とも 24 未満とも決めずに、実行の誤りにする
+    throw new SetupError(`Node.js のバージョン ${nodeVersion} を読めない (process.versions.node と同じ「24.1.0」の形で渡す)`);
+  }
+  if (Number(major) < REQUIRED_NODE_MAJOR) {
     problems.push(
       `Node.js ${String(REQUIRED_NODE_MAJOR)} 以上が要る (実行している Node.js は ${nodeVersion})。入れ方: ${NODE_INSTALL_URL}`,
     );
