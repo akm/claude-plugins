@@ -274,15 +274,20 @@ class ThumbsGridTest(unittest.TestCase):
         self.assertEqual(pixel, expected, "16 ビットの値が 8 ビットに縮められていない")
 
     def test_transparent_color_of_16_bit_grayscale_is_composited_on_the_background(self) -> None:
+        # 左半分を透過色 (30000)、右半分を透過色でない値 (10000) にして、透過色の画素だけが白になることを確認する
         path = self.dir / "gray16-transparent.png"
-        Image.new("I;16", (40, 30), 30000).save(path, transparency=30000)
+        image = Image.new("I;16", (40, 30), 30000)
+        image.paste(Image.new("I;16", (20, 30), 10000), (20, 0))
+        image.save(path, transparency=30000)
         out = self.dir / "grid.png"
 
         result = run_tool(str(out), path.as_uri())
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        (pixel,) = self.read_pixels(out, [(20, 15)])
-        self.assertEqual(pixel, WHITE, "16 ビットの画像の透過色が白に合成されていない")
+        transparent, opaque = self.read_pixels(out, [(10, 15), (30, 15)])
+        self.assertEqual(transparent, WHITE, "16 ビットの画像の透過色が白に合成されていない")
+        expected = (10000 // 256,) * 3
+        self.assertEqual(opaque, expected, "16 ビットの画像の透過色でない画素が、8 ビットに縮めた値で並んでいない")
 
     def test_help_shows_arguments_output_and_exit_codes(self) -> None:
         result = run_tool("--help")
