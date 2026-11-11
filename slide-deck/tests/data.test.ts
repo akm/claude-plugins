@@ -17,7 +17,7 @@ import {
   text,
 } from "../src/data/parts.ts";
 import { checkTheme, schemeColorValues, type Theme } from "../src/data/theme.ts";
-import type { DeckScript } from "../src/index.ts";
+import type { DeckScript, RunInput } from "../src/index.ts";
 
 const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -517,6 +517,109 @@ describe("関数 bullets", () => {
       e.text.paragraphs.map((p) => p.runs.map((r) => r.text)),
       [["a"], [""]],
     );
+  });
+});
+
+describe("段落の分け方の規則 (型 RunInput の説明の 1〜6)", () => {
+  // 期待値は、段落ごとの [箇条書きか, [型 TextRun の値の文字, 文字の大きさ] の配列]
+  type Expected = [boolean, [string, number][]][];
+  const cases: { name: string; input: RunInput[]; expected: Expected }[] = [
+    {
+      name: "規則 1: breakLine が true の入力の部分の後で段落を区切る",
+      input: [{ text: "a", breakLine: true }, { text: "b" }],
+      expected: [[false, [["a", 14]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "規則 2: 入力の部分の文字の改行ごとに段落を区切る",
+      input: [{ text: "a\nb" }],
+      expected: [[false, [["a", 14]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "規則 2: breakLine の無い入力の部分の最後の改行の後の空の行は段落に入れず、次の入力の部分は新しい段落に入る",
+      input: [{ text: "a\n" }, { text: "b" }],
+      expected: [[false, [["a", 14]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "規則 2 と 4: breakLine を持つ入力の部分の最後の改行の後の空の行は、空行の段落になる",
+      input: [{ text: "a\n", breakLine: true }, { text: "b" }],
+      expected: [[false, [["a", 14]]], [false, [["", 14]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "規則 2 と 4: 文字の最初の改行の前の空の行は、空行の段落になる",
+      input: [{ text: "\na" }],
+      expected: [[false, [["", 14]]], [false, [["a", 14]]]],
+    },
+    {
+      name: "規則 3: bullet が true の入力の部分は、いまの段落に行があれば、その前で段落を区切る",
+      input: [{ text: "h" }, { text: "a", bullet: true }],
+      expected: [[false, [["h", 14]]], [true, [["a", 14]]]],
+    },
+    {
+      name: "規則 3 と 4: 空の行だけの段落の後に bullet が true の入力の部分が続くと、空行の段落が残る",
+      input: [{ text: "" }, { text: "a", bullet: true }],
+      expected: [[false, [["", 14]]], [true, [["a", 14]]]],
+    },
+    {
+      name: "規則 4: 空の行の後に、同じ段落に空でない行が入ると、空の行の TextRun は除かれる",
+      input: [{ text: "a", breakLine: true }, { text: "" }, { text: "b" }],
+      expected: [[false, [["a", 14]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "規則 4: 空でない行の後に、同じ段落に入った空の行の TextRun も除かれる",
+      input: [{ text: "a" }, { text: "" }],
+      expected: [[false, [["a", 14]]]],
+    },
+    {
+      name: "規則 4: 空の行が 2 つ入った空行の段落は、最初の空の行の書式を持つ",
+      input: [{ text: "a", breakLine: true }, { text: "", fontSize: 30 }, { text: "", fontSize: 20 }],
+      expected: [[false, [["a", 14]]], [false, [["", 30]]]],
+    },
+    {
+      name: "規則 3 と 4: 空行の段落の書式と bullet は、空の行を持つ入力の部分のものになる",
+      input: [{ text: "a\n", bullet: true, breakLine: true, fontSize: 30 }, { text: "b" }],
+      expected: [[true, [["a", 30]]], [true, [["", 30]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "規則 5: 最後の入力の部分の breakLine で作られた段落は除く",
+      input: [{ text: "a", breakLine: true }],
+      expected: [[false, [["a", 14]]]],
+    },
+    {
+      name: "規則 6: 入力の部分の配列が空なら、部品の関数の書式の、文字が空の TextRun を持つ段落が 1 つできる",
+      input: [],
+      expected: [[false, [["", 14]]]],
+    },
+    {
+      name: "空行の入れ方: 前の入力の部分と文字が空の入力の部分の両方に breakLine を付けると、空行の段落になる",
+      input: [{ text: "a", breakLine: true }, { text: "", breakLine: true }, { text: "b" }],
+      expected: [[false, [["a", 14]]], [false, [["", 14]]], [false, [["b", 14]]]],
+    },
+    {
+      name: "空行の入れ方: 文字が空の入力の部分が前の入力の部分と同じ段落に入ると、breakLine を付けても空行の段落にならない",
+      input: [{ text: "a" }, { text: "", breakLine: true }, { text: "b" }],
+      expected: [[false, [["a", 14]]], [false, [["b", 14]]]],
+    },
+  ];
+  for (const c of cases) {
+    test(c.name, () => {
+      const s = slide("k");
+      text(s, c.input, 0, 0, 1, 1);
+      const [e] = s.elements;
+      assert.ok(e?.kind === "textBox");
+      assert.deepEqual(
+        e.text.paragraphs.map((p) => [p.bullet, p.runs.map((r) => [r.text, r.fontSize])]),
+        c.expected,
+      );
+    });
+  }
+
+  test("部品の関数に渡した文字列は、1 つの入力の部分として扱う", () => {
+    const s = slide("k");
+    text(s, "a\nb", 0, 0, 1, 1);
+    text(s, [{ text: "a\nb" }], 0, 0, 1, 1);
+    const [fromString, fromArray] = s.elements;
+    assert.ok(fromString?.kind === "textBox" && fromArray?.kind === "textBox");
+    assert.deepEqual(fromString.text.paragraphs, fromArray.text.paragraphs);
   });
 });
 

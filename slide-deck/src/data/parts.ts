@@ -15,11 +15,25 @@ import type {
 } from "./types.ts";
 
 /**
- * 文字の一部分の入力。省略した書式は、その文字を渡した部品の関数の書式を使う。
- * breakLine が true なら、この部分の後で段落を分ける。
- * bullet が true なら、いまの段落に部分が 1 つでもあれば (明示した空の部分を含む) この部分の前で段落を分け (pptxgenjs と同じ)、
- * この部分を含む段落を箇条書きの項目にする。
- * 文字の中の改行 ("\n") でも、段落を分ける。
+ * 部品の関数 (text・box) に渡す文字の一部分の入力 (以下「入力の部分」)。省略した書式は、その文字を渡した部品の関数の書式を使う。
+ * 部品の関数に文字列を渡したときは、その文字列を 1 つの入力の部分として扱う。
+ *
+ * 部品の関数は、入力の部分の配列を、次の規則で段落に分ける。
+ * 入力の部分の文字を改行 ("\n") で分けたものを「行」、文字が空の行を「空の行」と呼ぶ。
+ * 文字が空の入力の部分 (text が "") は、空の行を 1 つ持つ。段落に入った行は、その行の入力の部分の書式を持つ型 TextRun の値になる。
+ * 1. breakLine が true の入力の部分の後で、段落を区切る。
+ * 2. 入力の部分の文字の改行ごとに、段落を区切る。ただし、文字の最後が改行で、その入力の部分の breakLine が true でなければ、
+ *    最後の改行の後の空の行は、どの段落にも入れない。次の入力の部分の行は、区切られた新しい段落に入る。
+ * 3. bullet が true の入力の部分は、いまの段落に行が 1 つでも入っていれば (空の行を含む)、その入力の部分の前で段落を区切る。
+ *    その入力の部分の行が入った段落は、箇条書きの項目になる。
+ * 4. 空でない行が 1 つでも入った段落は、空でない行の TextRun だけを持つ。
+ *    空の行だけが入った段落は「空行の段落」になり、最初に入った空の行の TextRun を 1 つだけ持つ。
+ * 5. 1 か 2 の区切りで作られた最後の段落に、行が 1 つも入っていなければ、その段落を除く。
+ * 6. 行が 1 つも入っていない段落 (入力の部分の配列が空のとき) は、部品の関数の書式の、文字が空の TextRun を 1 つ持つ。
+ * 空行の段落にも TextRun を持たせるのは、段落の文字の大きさ・太字・色を書き出しの処理に渡すためである。
+ * 空行を入れたいときは、前の入力の部分と、文字が空の入力の部分の両方に breakLine を付ける
+ * (例: [{ text: "a", breakLine: true }, { text: "", breakLine: true }, { text: "b" }])。
+ * この分け方は pptxgenjs の段落の分け方と同じではなく、改行や pptxgenjs のオプション align の扱いで結果が違う入力がある。
  */
 export interface RunInput {
   text: string;
@@ -150,19 +164,13 @@ function toMargin(m: MarginInput): Margin {
 }
 
 /**
- * 文字の入力を段落に分ける。
- * 部分の breakLine と文字の中の改行で段落を分ける。bullet を持つ部分は、いまの段落に部分が 1 つでもあれば、その前でも段落を分ける。
- * 部分の bullet は、その部分を含む段落に付ける。
- * 空行の段落と、入力が空 (空の配列など) のときの段落にも、文字が空の部分を 1 つ足す。
- * 段落の文字の大きさ・太字・色を、文字が無い段落でも書き出しの処理に渡すため。
- * 最後の段落が、区切り (最後の部分の breakLine か、文字の末尾の改行) で作られ、その後に部分が入っていなければ除く。
- * 明示した空の部分 (text が "" の部分) が入った段落は除かない。
+ * 入力の部分の配列を段落に分ける。分け方は、型 RunInput の説明の規則 1〜6 のとおり。
  */
 function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
   const inputs: RunInput[] = typeof t === "string" ? [{ text: t }] : t;
   let current: Paragraph = { runs: [], bullet: false };
   const paragraphs: Paragraph[] = [current];
-  // fromBreakOnly は、最後の段落が区切りで作られ、まだ部分が入っていないか。
+  // fromBreakOnly は、最後の段落が区切りで作られ、まだ行が入っていないか (規則 5 で使う)。
   // 関数 breakParagraph の中でも書き換えるので、変数ではなくオブジェクトのプロパティに持つ
   // (変数にすると、TypeScript の型の検査がクロージャの中の書き換えを考慮せず、常に false と見なす)
   const state = { fromBreakOnly: false };
@@ -172,14 +180,12 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
     state.fromBreakOnly = true;
   };
   for (const input of inputs) {
-    // 見出しなどの部分の後に箇条書きの項目が続いても、見出しを箇条書きにしないため
-    // 明示した空の部分 (空行) だけの段落も、箇条書きの項目に取り込まずに残す
+    // 規則 3
     if (input.bullet === true && current.runs.length > 0) breakParagraph();
     const lines = input.text.split("\n");
     lines.forEach((line, i) => {
+      // 規則 2
       if (i > 0) breakParagraph();
-      // 文字の末尾の改行の後の空の行は、部分として段落に入れない。
-      // ただし部分が breakLine を持つときは、この段落は区切りの後も残るので、部分の書式と bullet を持たせる
       if (i > 0 && i === lines.length - 1 && line === "" && input.breakLine !== true) return;
       state.fromBreakOnly = false;
       if (input.bullet === true) current.bullet = true;
@@ -191,18 +197,20 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
         link: input.link ?? null,
       };
       if (line === "") {
-        // 書式を表すための空の部分は、段落に部分がまだ無いときだけ足す
+        // 規則 4。空の行の TextRun は、段落にまだ TextRun が無いときだけ足す (最初の空の行だけを持つため)
         if (current.runs.length === 0) current.runs.push(run);
         return;
       }
-      // 空でない部分を足すときは、書式を表すために足した空の部分を除く
+      // 規則 4。空でない行の TextRun を足すときは、空の行の TextRun を除く
       current.runs = current.runs.filter((r) => r.text !== "");
       current.runs.push(run);
     });
+    // 規則 1
     if (input.breakLine === true) breakParagraph();
   }
+  // 規則 5
   if (paragraphs.length > 1 && state.fromBreakOnly) paragraphs.pop();
-  // 入力が空の配列のときは、最初の段落に部分が入っていないので、部品の関数の書式の空の部分を足す
+  // 規則 6
   for (const p of paragraphs) {
     if (p.runs.length === 0) {
       p.runs.push({ text: "", fontSize: d.fontSize, bold: d.bold, color: d.color, link: null });
