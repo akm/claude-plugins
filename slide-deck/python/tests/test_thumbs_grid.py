@@ -4,6 +4,8 @@
 URL には、テストで作った画像のファイルの URL (file://) を渡す。
 """
 
+import os
+import stat
 import struct
 import subprocess
 import sys
@@ -214,6 +216,26 @@ class ThumbsGridTest(unittest.TestCase):
         names: list[str] = sorted(path.name for path in self.dir.iterdir())
         expected: list[str] = ["1.png", "grid.xbm"]
         self.assertEqual(names, expected, "一時ファイルが残った")
+
+    def test_new_output_gets_the_permissions_of_the_umask(self) -> None:
+        mask = os.umask(0)
+        os.umask(mask)
+        out = self.dir / "grid.png"
+
+        result = run_tool(str(out), self.write_image("1.png", (40, 30), RED))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(stat.S_IMODE(out.stat().st_mode), 0o666 & ~mask, "新しい OUTPUT の権限が umask に従っていない")
+
+    def test_existing_output_keeps_its_permissions(self) -> None:
+        out = self.dir / "grid.png"
+        out.write_bytes(b"previous image")
+        out.chmod(0o640)
+
+        result = run_tool(str(out), self.write_image("1.png", (40, 30), RED))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(stat.S_IMODE(out.stat().st_mode), 0o640, "既にある OUTPUT の権限が変わった")
 
     def test_help_shows_arguments_output_and_exit_codes(self) -> None:
         result = run_tool("--help")

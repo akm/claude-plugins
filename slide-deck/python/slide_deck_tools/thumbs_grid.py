@@ -9,6 +9,7 @@ import argparse
 import http.client
 import io
 import os
+import stat
 import sys
 import tempfile
 import urllib.request
@@ -132,11 +133,21 @@ def write_image(grid: Image.Image, output: Path) -> None:
     temporary = Path(name)
     try:
         grid.save(temporary)
+        # mkstemp は権限 0600 でファイルを作るので、OUTPUT に直接書いたときと同じ権限にしてから置き換える。
+        # 既にある OUTPUT ならその権限を、無ければ 0666 から umask を除いた権限にする
+        temporary.chmod(stat.S_IMODE(output.stat().st_mode) if output.exists() else 0o666 & ~current_umask())
         os.replace(temporary, output)
     except (OSError, ValueError) as e:
         # 引数 OUTPUT の拡張子から画像の形式を決められないと、メソッド Image.save は例外 ValueError を送出する
         temporary.unlink(missing_ok=True)
         raise ToolError(f"画像を書けない: {output}: {e}") from e
+
+
+def current_umask() -> int:
+    """プロセスの umask を返す。os.umask は設定しないと読めないので、設定してすぐに戻す。"""
+    mask = os.umask(0)
+    os.umask(mask)
+    return mask
 
 
 def main(argv: list[str]) -> int:
