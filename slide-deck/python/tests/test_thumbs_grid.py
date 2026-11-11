@@ -4,10 +4,12 @@
 URL には、テストで作った画像のファイルの URL (file://) を渡す。
 """
 
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 from PIL import Image
@@ -128,6 +130,38 @@ class ThumbsGridTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn(text.as_uri(), result.stderr, "画像として読めなかった URL を示していない")
+        self.assertFalse(out.exists(), "画像として読めなかったのに画像を書いた")
+
+    def test_url_with_a_port_that_is_not_a_number_fails_with_the_url(self) -> None:
+        # ポートが数字でない URL は、接続する前に http.client.InvalidURL で失敗するので、ネットワークを使わない
+        bad = "http://example.com:abc/x.png"
+        urls = [self.write_image("1.png", (40, 30), RED), bad]
+        out = self.dir / "grid.png"
+
+        result = run_tool(str(out), *urls)
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(bad, result.stderr, "取得できなかった URL を示していない")
+        self.assertFalse(out.exists(), "取得に失敗したのに画像を書いた")
+
+    def test_image_with_too_many_pixels_fails_with_the_url(self) -> None:
+        # 1x1 の PNG の IHDR の幅と高さだけを 20000 に書き換える。Pillow は開いた時点で画素数を上限と比べるので、
+        # 画素のデータを展開せずに DecompressionBombError になる
+        small = self.dir / "small.png"
+        Image.new("RGB", (1, 1), RED).save(small)
+        data = bytearray(small.read_bytes())
+        ihdr = struct.pack(">II", 20000, 20000) + bytes(data[24:29])
+        data[16:29] = ihdr
+        data[29:33] = struct.pack(">I", zlib.crc32(b"IHDR" + ihdr))
+        huge = self.dir / "huge.png"
+        huge.write_bytes(bytes(data))
+        urls = [self.write_image("1.png", (40, 30), RED), huge.as_uri()]
+        out = self.dir / "grid.png"
+
+        result = run_tool(str(out), *urls)
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(huge.as_uri(), result.stderr, "画像として読めなかった URL を示していない")
         self.assertFalse(out.exists(), "画像として読めなかったのに画像を書いた")
 
     def test_transparent_pixels_are_composited_on_the_background(self) -> None:

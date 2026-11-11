@@ -6,6 +6,7 @@
 """
 
 import argparse
+import http.client
 import io
 import sys
 import urllib.request
@@ -71,15 +72,19 @@ def fetch_image(url: str) -> Image.Image:
         response: IO[bytes] = urllib.request.urlopen(url, timeout=TIMEOUT_SECONDS)
         with response:
             data = response.read()
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, http.client.HTTPException) as e:
         # urlopen が送出する例外 URLError・HTTPError と、応答まで待機する時間の上限を超えたときの例外 TimeoutError は、
-        # どれも例外 OSError の派生クラス。URL の形が誤っていると、urlopen は例外 ValueError を送出する
+        # どれも例外 OSError の派生クラス。URL の形が誤っていると、urlopen は例外 ValueError を送出する。
+        # ポートが数字でない URL (InvalidURL) と、本文が途中で切れた応答 (IncompleteRead) は、
+        # 例外 http.client.HTTPException の派生クラスで、OSError でも ValueError でもない
         raise ToolError(f"URL を取得できない: {url}: {e}") from e
     try:
         with Image.open(io.BytesIO(data)) as image:
             return to_rgb(image)
-    except OSError as e:
-        # Pillow が画像の形式を判別できないときに送出する例外 UnidentifiedImageError も、OSError の派生クラス
+    except (OSError, Image.DecompressionBombError) as e:
+        # Pillow が画像の形式を判別できないときに送出する例外 UnidentifiedImageError も、OSError の派生クラス。
+        # 画素数が Pillow の上限 (Image.MAX_IMAGE_PIXELS) の 2 倍を超える画像の例外 DecompressionBombError は、
+        # OSError の派生クラスではない
         raise ToolError(f"URL のデータを画像として読めない: {url}: {e}") from e
 
 
