@@ -420,6 +420,32 @@ describe("bullets", () => {
     assert.ok(e?.kind === "textBox");
     assert.equal(e.text.paragraphs.length, 1);
   });
+
+  test("明示した空の項目と空の部分は、最後にあっても先頭にあっても残る", () => {
+    const s = slide("k");
+    text(s, bullets(["a", ""]), 0, 0, 1, 1);
+    text(s, bullets(["", "a"]), 0, 0, 1, 1);
+    text(s, [{ text: "a", breakLine: true }, { text: "" }], 0, 0, 1, 1);
+    const texts = s.elements.map((e) =>
+      e.kind === "textBox" ? e.text.paragraphs.map((p) => p.runs.map((r) => r.text)) : [],
+    );
+    assert.deepEqual(texts, [
+      [["a"], [""]],
+      [[""], ["a"]],
+      [["a"], [""]],
+    ]);
+  });
+
+  test("文字の末尾の改行で作られた段落だけを除き、その前の空行は残る", () => {
+    const s = slide("k");
+    text(s, "a\n\n", 0, 0, 1, 1);
+    const [e] = s.elements;
+    assert.ok(e?.kind === "textBox");
+    assert.deepEqual(
+      e.text.paragraphs.map((p) => p.runs.map((r) => r.text)),
+      [["a"], [""]],
+    );
+  });
 });
 
 describe("card", () => {

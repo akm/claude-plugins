@@ -150,20 +150,29 @@ function toMargin(m: MarginInput): Margin {
  * 文字の入力を段落に分ける。
  * 部分の breakLine と文字の中の改行で段落を分け、部分の bullet はその部分を含む段落に付ける。
  * 空行の段落にも、文字が空の部分を 1 つ足す。段落の文字の大きさ・太字・色を、空行でも書き出しの処理に渡すため。
- * 最後の段落が空なら (最後の部分の breakLine や、末尾の改行で作られたもの) 除く。
+ * 最後の段落が、区切り (最後の部分の breakLine か、文字の末尾の改行) で作られ、その後に部分が入っていなければ除く。
+ * 明示した空の部分 (text が "" の部分) が入った段落は除かない。
  */
 function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
   const inputs: RunInput[] = typeof t === "string" ? [{ text: t }] : t;
   let current: Paragraph = { runs: [], bullet: false };
   const paragraphs: Paragraph[] = [current];
+  // fromBreakOnly は、最後の段落が区切りで作られ、まだ部分が入っていないか。
+  // 関数 breakParagraph の中でも書き換えるので、変数ではなくオブジェクトのプロパティに持つ
+  // (変数にすると、TypeScript の型の検査がクロージャの中の書き換えを考慮せず、常に false と見なす)
+  const state = { fromBreakOnly: false };
   const breakParagraph = (): void => {
     current = { runs: [], bullet: false };
     paragraphs.push(current);
+    state.fromBreakOnly = true;
   };
   for (const input of inputs) {
     const lines = input.text.split("\n");
     lines.forEach((line, i) => {
       if (i > 0) breakParagraph();
+      // 文字の末尾の改行の後の空の行は、部分として段落に入れない
+      if (i > 0 && i === lines.length - 1 && line === "") return;
+      state.fromBreakOnly = false;
       if (input.bullet === true) current.bullet = true;
       const run = {
         text: line,
@@ -183,8 +192,7 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
     });
     if (input.breakLine === true) breakParagraph();
   }
-  const last = paragraphs[paragraphs.length - 1];
-  if (paragraphs.length > 1 && last !== undefined && isBlank(last)) paragraphs.pop();
+  if (paragraphs.length > 1 && state.fromBreakOnly) paragraphs.pop();
   return paragraphs;
 }
 
