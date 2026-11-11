@@ -42,7 +42,7 @@ const THEME: Theme = {
   },
 };
 
-describe("box", () => {
+describe("関数 box", () => {
   test("位置・大きさ・文字・テーマの色を渡すと、同じ値を持つ要素が 1 つ作られる", () => {
     const s = slide("cutover");
     box(s, 0.5, 1.4, 9.0, 0.6, "新旧が同じデータを読み書きする", {
@@ -86,7 +86,7 @@ describe("box", () => {
     ]);
   });
 
-  test("オプションを省略すると、元の build.js のデフォルト値になる (白の塗りつぶし・枠線なし)", () => {
+  test("オプションを省略すると、元のファイル build.js のデフォルト値になる (白の塗りつぶし・枠線なし)", () => {
     const s = slide("k");
     box(s, 0, 0, 1, 1, "x");
     const [e] = s.elements;
@@ -131,7 +131,7 @@ describe("box", () => {
   });
 });
 
-describe("arrow", () => {
+describe("関数 arrow", () => {
   test("左から右・上から下の矢印は、反転のフラグを持たず、終点にだけ矢じりがある", () => {
     const s = slide("k");
     arrow(s, 1, 2, 3, 2.5);
@@ -176,7 +176,7 @@ describe("arrow", () => {
     assert.deepEqual([e.x, e.y, e.w, e.h], [2, 1, 0, 2]);
   });
 
-  test("noHead で矢じりを無くし、both で始点にも付ける", () => {
+  test("オプション noHead で矢じりを無くし、オプション both で始点にも付ける", () => {
     const s = slide("k");
     arrow(s, 0, 0, 1, 0, { noHead: true, dash: true, color: "accent3", width: 2 });
     arrow(s, 0, 0, 1, 0, { both: true });
@@ -190,7 +190,7 @@ describe("arrow", () => {
   });
 });
 
-describe("badge", () => {
+describe("関数 badge", () => {
   test("番号の入った円は、文字の大きさ・太字・中央揃えのデフォルト値を持つ", () => {
     const s = slide("k");
     badge(s, 1, 0.7, 1.75, 0.5);
@@ -231,7 +231,7 @@ describe("badge", () => {
   });
 });
 
-describe("takeaway", () => {
+describe("関数 takeaway", () => {
   test("一言の部品は、スライドの下の決まった位置の文字の箱になる", () => {
     const s = slide("k");
     takeaway(s, "具体的な注意は DB ごとに違う");
@@ -280,7 +280,7 @@ describe("takeaway", () => {
   });
 });
 
-describe("text", () => {
+describe("関数 text", () => {
   test("オプションを省略すると、左上揃え・余白 0・14 ポイントの文字の箱になる", () => {
     const s = slide("k");
     text(s, "時間", 8.9, 3.6, 0.6, 0.3);
@@ -379,7 +379,7 @@ describe("text", () => {
   });
 });
 
-describe("bullets", () => {
+describe("関数 bullets", () => {
   test("項目ごとに、箇条書きの段落になる", () => {
     const s = slide("k");
     text(s, bullets(["表と列を DB に定義する", "migration で定義を変える"], { fontSize: 13 }), 0, 0, 4, 1);
@@ -459,7 +459,7 @@ describe("bullets", () => {
   });
 });
 
-describe("card", () => {
+describe("関数 card", () => {
   test("背景のカードは、文字と枠線の無い、角の丸い四角になる", () => {
     const s = slide("k");
     card(s, 0.5, 1.45, 4.3, 2.95);
