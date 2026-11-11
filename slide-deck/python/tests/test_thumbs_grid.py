@@ -175,6 +175,31 @@ class ThumbsGridTest(unittest.TestCase):
         (pixel,) = self.read_pixels(out, [(20, 15)])
         self.assertEqual(pixel, WHITE, "透明な画素が背景の色で描かれていない")
 
+    def test_url_without_a_scheme_fails_with_the_url(self) -> None:
+        # スキームの無い URL では、urlopen が ValueError を送出する
+        bad = "not-a-url"
+        urls = [self.write_image("1.png", (40, 30), RED), bad]
+        out = self.dir / "grid.png"
+
+        result = run_tool(str(out), *urls)
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(bad, result.stderr, "取得できなかった URL を示していない")
+        self.assertFalse(out.exists(), "取得に失敗したのに画像を書いた")
+
+    def test_output_with_an_unknown_extension_fails_with_the_path(self) -> None:
+        # 拡張子から画像の形式を決められないと、Image.save が ValueError を送出する
+        out = self.dir / "grid.unknown"
+        urls = [self.write_image("1.png", (40, 30), RED)]
+
+        result = run_tool(str(out), *urls)
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(str(out), result.stderr, "書けなかった OUTPUT を示していない")
+        names: list[str] = sorted(path.name for path in self.dir.iterdir())
+        expected: list[str] = ["1.png"]
+        self.assertEqual(names, expected, "書けなかったのに OUTPUT か一時ファイルが残った")
+
     def test_failed_write_keeps_the_existing_output(self) -> None:
         # 形式 XBM は RGB の画像を書けないので、Image.save が書き込みの途中で失敗する
         out = self.dir / "grid.xbm"
