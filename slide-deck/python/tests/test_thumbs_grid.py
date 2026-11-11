@@ -202,6 +202,17 @@ class ThumbsGridTest(unittest.TestCase):
         expected: list[str] = ["1.png"]
         self.assertEqual(names, expected, "書けなかったのに OUTPUT が残った")
 
+    def test_output_with_a_format_that_cannot_be_written_fails_with_the_path(self) -> None:
+        # 形式 PSD は、Pillow が読めるが書き出せない
+        out = self.dir / "grid.psd"
+        urls = [self.write_image("1.png", (40, 30), RED)]
+
+        result = run_tool(str(out), *urls)
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(str(out), result.stderr, "書けなかった OUTPUT を示していない")
+        self.assertFalse(out.exists(), "書けなかったのに OUTPUT を書いた")
+
     def test_failed_write_keeps_the_existing_output(self) -> None:
         # 形式 XBM は RGB の画像を書けないので、Image.save が書き込みの途中で失敗する
         out = self.dir / "grid.xbm"

@@ -138,6 +138,10 @@ def write_image(grid: Image.Image, output: Path) -> None:
     image_format = Image.registered_extensions().get(output.suffix.lower())
     if image_format is None:
         raise ToolError(f"画像を書けない: {output}: 拡張子 {output.suffix!r} から画像の形式を決められない")
+    # registered_extensions は読めるだけの形式 (PSD など) の拡張子も含む。書き出せない形式を Image.save に渡すと、
+    # OSError でも ValueError でもない例外 KeyError を送出するので、呼び出す前に確認する
+    if image_format not in Image.SAVE:
+        raise ToolError(f"画像を書けない: {output}: 画像の形式 {image_format} は書き出せない")
     buffer = io.BytesIO()
     try:
         grid.save(buffer, format=image_format)
