@@ -361,8 +361,8 @@ export function arrow(
     color: o.color ?? "dk2",
     width: o.width ?? 1.5,
     dashed: o.dash ?? false,
-    headEnd: o.noHead !== true,
-    headStart: o.both === true,
+    endArrow: o.noHead !== true,
+    startArrow: o.both === true,
   });
 }
 

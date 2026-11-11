@@ -147,8 +147,8 @@ describe("関数 arrow", () => {
         color: "dk2",
         width: 1.5,
         dashed: false,
-        headEnd: true,
-        headStart: false,
+        endArrow: true,
+        startArrow: false,
       },
     ]);
   });
@@ -183,10 +183,10 @@ describe("関数 arrow", () => {
     const [plain, both] = s.elements;
     assert.ok(plain?.kind === "line" && both?.kind === "line");
     assert.deepEqual(
-      [plain.headStart, plain.headEnd, plain.dashed, plain.color, plain.width],
+      [plain.startArrow, plain.endArrow, plain.dashed, plain.color, plain.width],
       [false, false, true, "accent3", 2],
     );
-    assert.deepEqual([both.headStart, both.headEnd], [true, true]);
+    assert.deepEqual([both.startArrow, both.endArrow], [true, true]);
   });
 });
 

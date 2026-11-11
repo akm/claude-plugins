@@ -106,7 +106,10 @@ export type TextBoxElement = Rect & {
 /**
  * 線。位置と大きさは、始点と終点を囲む四角で持つ。
  * 始点が終点より右なら flipH、下なら flipV を true にして、向きを表す。
- * headEnd は終点に、headStart は始点に、矢じりを付けるか。width はポイント。
+ * endArrow は終点に、startArrow は始点に、矢じりを付けるか。width はポイント。
+ * 名前は Google スライドの API の線のプロパティ (endArrow・startArrow) に合わせた。
+ * PowerPoint のファイルの形式では、要素 a:headEnd が始点の、a:tailEnd が終点の矢じりを表すので、
+ * PowerPoint の書き出しでは endArrow を a:tailEnd に、startArrow を a:headEnd に対応させる。
  */
 export type LineElement = Rect & {
   kind: "line";
@@ -115,8 +118,8 @@ export type LineElement = Rect & {
   color: ThemeColorName;
   width: number;
   dashed: boolean;
-  headEnd: boolean;
-  headStart: boolean;
+  endArrow: boolean;
+  startArrow: boolean;
 };
 
 /** スライドの要素。 */
