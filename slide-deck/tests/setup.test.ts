@@ -82,9 +82,13 @@ function makeSandbox(tools: readonly ("uv" | "npm")[] = ["uv", "npm"]): Sandbox 
   };
 }
 
-/** 入口を、偽の uv と npm のディレクトリだけを PATH に指定して実行する */
-function runCli(sandbox: Sandbox, args: readonly string[]): { status: number | null; stdout: string; stderr: string } {
-  const r = spawnSync(process.execPath, [CLI, ...args], { env: sandbox.env(), encoding: "utf8" });
+/** 入口を、偽の uv と npm のディレクトリだけを PATH に指定して実行する。extra で環境変数を足すか置き換える */
+function runCli(
+  sandbox: Sandbox,
+  args: readonly string[],
+  extra: Record<string, string> = {},
+): { status: number | null; stdout: string; stderr: string } {
+  const r = spawnSync(process.execPath, [CLI, ...args], { env: sandbox.env(extra), encoding: "utf8" });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
@@ -180,6 +184,25 @@ describe("setup install", () => {
     const second = runCli(sandbox, ["setup", "install"]);
     assert.equal(second.status, 0, second.stderr);
     assert.match(second.stdout, /venv と node_modules は入っている/);
+    assert.deepEqual(sandbox.calls(), callsAfterFirst);
+  });
+
+  test("入っている状態では、uv と npm が PATH に無くても、入れられない理由にせず終了コード 0 を返す", () => {
+    assert.equal(runCli(sandbox, ["setup", "install"]).status, 0);
+    const callsAfterFirst = sandbox.calls();
+    // 偽の uv と npm を作っていない空のディレクトリだけを PATH にする
+    const empty = join(sandbox.root, "empty-bin");
+    mkdirSync(empty);
+
+    const status = runCli(sandbox, ["setup", "status"], { PATH: empty });
+    assert.equal(status.status, 0, status.stdout + status.stderr);
+    assert.match(status.stdout, /^uv: 無い$/m);
+    assert.match(status.stdout, /^npm: 無い$/m);
+    assert.doesNotMatch(status.stdout, /入れられない理由/);
+
+    const install = runCli(sandbox, ["setup", "install"], { PATH: empty });
+    assert.equal(install.status, 0, install.stderr);
+    assert.match(install.stdout, /venv と node_modules は入っている/);
     assert.deepEqual(sandbox.calls(), callsAfterFirst);
   });
 
