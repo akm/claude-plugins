@@ -10,6 +10,7 @@ import {
   type OutlineError,
 } from "../src/outline/parse.ts";
 import { hasMismatch, matchKeys } from "../src/outline/match.ts";
+import { writeGoogleSlidesUrl, writePluginVersion, type WriteInfoResult } from "../src/outline/url.ts";
 import { parts } from "../src/data/parts.ts";
 import { checkTheme } from "../src/data/theme.ts";
 import sampleDeck from "../examples/sample/deck.ts";
@@ -285,6 +286,96 @@ describe("関数 matchKeys", () => {
     const m = matchKeys(["a", "b", "c"], ["c", "a", "b"]);
     assert.deepEqual(m, { outlineOnly: [], deckOnly: [], deckDuplicates: [] });
     assert.equal(hasMismatch(m), false);
+  });
+});
+
+/** 書き込みが成功したことを確認して、書き込んだテキストを返す。 */
+function written(r: WriteInfoResult): string {
+  if (!r.ok) assert.fail(`書き込みが成功するはずが、誤りになった:\n${r.errors.join("\n")}`);
+  return r.text;
+}
+
+/** テキストの行の配列の、位置 index に行 line を挿入したテキストを返す (改行は \n)。 */
+function insertLine(text: string, index: number, line: string): string {
+  const lines = text.split("\n");
+  lines.splice(index, 0, line);
+  return lines.join("\n");
+}
+
+const NEW_URL = "https://docs.google.com/presentation/d/new-id/edit";
+
+describe("関数 writeGoogleSlidesUrl と writePluginVersion", () => {
+  test("Google スライドの URL の行が無い構成案に URL を書き込むと、資料の情報の最後に 1 行が足され、ほかの行は変わらない", () => {
+    const before = fixture("no-url.md");
+    const after = written(writeGoogleSlidesUrl(before, NEW_URL));
+    // 資料の情報の最後の行 (6 行目の固有名) の次に足す
+    assert.equal(after, insertLine(before, 6, `- Google スライド: ${NEW_URL}`));
+    assert.deepEqual(parseOk(after).info.googleSlides, { url: NEW_URL, presentationId: "new-id" });
+  });
+
+  test("Google スライドの URL の行が既にあれば、その行だけが置き換わる", () => {
+    const before = fixture("with-url.md");
+    const after = written(writeGoogleSlidesUrl(before, NEW_URL));
+    const lines = before.split("\n");
+    lines[3] = `- Google スライド: ${NEW_URL}`;
+    assert.equal(after, lines.join("\n"));
+  });
+
+  test("slide-deck の版の行も、無ければ資料の情報の最後に足し、あれば置き換える", () => {
+    const noVersion = fixture("no-url.md");
+    assert.equal(written(writePluginVersion(noVersion, "0.2.0")), insertLine(noVersion, 6, "- slide-deck の版: 0.2.0"));
+    const withVersion = fixture("with-url.md");
+    const lines = withVersion.split("\n");
+    lines[5] = "- slide-deck の版: 0.2.0";
+    assert.equal(written(writePluginVersion(withVersion, "0.2.0")), lines.join("\n"));
+  });
+
+  test("URL と版を続けて書き込むと、資料の情報の最後に、書き込んだ順に並ぶ", () => {
+    const before = fixture("no-url.md");
+    const after = written(writePluginVersion(written(writeGoogleSlidesUrl(before, NEW_URL)), "0.2.0"));
+    assert.equal(after, insertLine(insertLine(before, 6, `- Google スライド: ${NEW_URL}`), 7, "- slide-deck の版: 0.2.0"));
+  });
+
+  test("改行が CRLF の構成案と、最後に改行の無い構成案は、その形のまま書き込む", () => {
+    const lf = fixture("no-url.md");
+    const expected = insertLine(lf, 6, `- Google スライド: ${NEW_URL}`);
+    const crlf = lf.replaceAll("\n", "\r\n");
+    assert.equal(written(writeGoogleSlidesUrl(crlf, NEW_URL)), expected.replaceAll("\n", "\r\n"));
+    // 資料の情報の最後の行が、ファイルの最後の行で、改行が無い
+    const headerOnly = ["# 題名", "", "- 読者: 開発者", "- ねらい: 確認する", "- 形: 図"].join("\n");
+    assert.equal(written(writeGoogleSlidesUrl(headerOnly, NEW_URL)), `${headerOnly}\n- Google スライド: ${NEW_URL}`);
+    assert.equal(
+      written(writeGoogleSlidesUrl(headerOnly.replaceAll("\n", "\r\n"), NEW_URL)),
+      `${headerOnly.replaceAll("\n", "\r\n")}\r\n- Google スライド: ${NEW_URL}`,
+    );
+  });
+
+  test("スライドの部分に誤りがあっても書き込み、資料の情報に誤りがあれば書き込まない", () => {
+    const slideError = fixture("no-url.md").replace("### first: 1 枚目", "### First: 1 枚目");
+    assert.equal(parseOutline(slideError).ok, false);
+    assert.equal(
+      written(writeGoogleSlidesUrl(slideError, NEW_URL)),
+      insertLine(slideError, 6, `- Google スライド: ${NEW_URL}`),
+    );
+    const headerError = fixture("no-url.md").replace("- 形: 図を中心にする\n", "");
+    assert.deepEqual(writeGoogleSlidesUrl(headerError, NEW_URL), {
+      ok: false,
+      errors: ["1 行目: 資料の情報に、項目 形 の行が無い"],
+    });
+  });
+
+  test("書き込む値の形が違えば、誤りになる", () => {
+    const before = fixture("no-url.md");
+    assert.deepEqual(writeGoogleSlidesUrl(before, "https://example.com/d/x"), {
+      ok: false,
+      errors: [
+        'Google スライドの値 "https://example.com/d/x" が、https://docs.google.com/presentation/d/<資料の ID> で始まる URL ではない',
+      ],
+    });
+    assert.deepEqual(writePluginVersion(before, "1.0"), {
+      ok: false,
+      errors: ['slide-deck の版の値 "1.0" が、数.数.数 (例: 0.1.0) の形ではない'],
+    });
   });
 });
 
