@@ -4,6 +4,7 @@
 
 import { parseArgs } from "node:util";
 import { checkDeck, ExecutionError, formatCheckReport } from "./check/deck.ts";
+import { buildPptx } from "./pptx/build.ts";
 import { formatStatus, inspect, install, REQUIRED_NODE_MAJOR, SetupError, statusExitCode } from "./setup/setup.ts";
 
 const USAGE_PREFIX = "使い方: node <プラグインのディレクトリ>/src/cli.ts";
@@ -168,7 +169,70 @@ ${CHECK_OUTPUT}
       return report.deck === null ? 1 : 0;
     },
   },
+  pptx: {
+    summary: "check に合格したときだけ PowerPoint のファイルを書き、テーマの色を書き込み、形式を検査する",
+    help: `${USAGE_PREFIX} pptx <資料のディレクトリ> --pptx-skill <pptx のスキルのディレクトリ>
+
+サブコマンド check と同じ検査をし、指摘が無いときだけ、PowerPoint のファイル build/deck.pptx を書く。続けて、
+  1. テーマ (名前・フォント・12 色) を build/theme.json に書き、pptx のスキルの scripts/apply_theme.js を
+     「node scripts/apply_theme.js build/deck.pptx build/theme.json」の形で実行して、テーマの色と名前を build/deck.pptx に書き込む。
+     環境変数 NODE_PATH に、キャッシュの node_modules を指定する (apply_theme.js が pptxgenjs に同梱の jszip を探すため)
+  2. pptx のスキルの scripts/office/validate.py を、キャッシュの venv の Python で
+     「python scripts/office/validate.py build/deck.pptx」の形で実行し、build/deck.pptx の形式を検査する
+前に書いた build/deck.pptx は、最初に消す。check の検査の内容と順序:
+${CHECK_STEPS}
+pptx のスキルは、Claude のデスクトップアプリが配るもの (スキルの一覧での名前は anthropic-skills:pptx) を使う。
+スキル build は、そのスキルを読み込んで示されるディレクトリ (Base directory) を --pptx-skill に渡す。
+スライドの大きさは 10×5.625 インチ。題名は、レイアウトの題名のプレースホルダーに入れる。
+
+${CACHE_DIR_HELP}
+
+引数:
+  <資料のディレクトリ>        outline.md と deck.ts があるディレクトリ
+  --pptx-skill <ディレクトリ>  pptx のスキルのディレクトリ (scripts/apply_theme.js と scripts/office/validate.py を持つ)。省略できない
+  --help (-h) でこの説明を示す。
+
+出力 (標準出力):
+  check に指摘があれば、check と同じ出力:
+${CHECK_OUTPUT}
+  指摘が無ければ、check の出力・書いたファイルのパス・apply_theme.js の出力・validate.py の出力を、この順に示す。
+  実行の誤りは、標準エラー出力に理由を示す。apply_theme.js と validate.py が失敗したときは、その出力も示す。
+
+終了コード:
+  0  build/deck.pptx を書き、validate.py が形式の誤りを出さなかった
+  1  check の指摘がある (build/deck.pptx を書かない)。または validate.py が形式の誤りを見つけた
+     (validate.py の終了コード 1。調べられるよう build/deck.pptx を残す)
+  2  実行の誤り。check の終了コード 2 の条件に加えて、次のどれか。--pptx-skill が無い。
+     pptx のスキルのディレクトリに scripts/apply_theme.js か scripts/office/validate.py が無い (無いファイルのパスを示す)。
+     Python の venv がキャッシュのディレクトリに入っていない。apply_theme.js が失敗した (build/deck.pptx を消す)。
+     validate.py を実行できないか、0 と 1 以外の終了コードで終了した
+`,
+    run: async (args) => {
+      expectArgs(args, ["<資料のディレクトリ>"], true);
+      const [deckDir = ""] = args.positionals;
+      if (args.pptxSkill === undefined || args.pptxSkill === "") {
+        throw new UsageError("--pptx-skill <pptx のスキルのディレクトリ> を指定する");
+      }
+      const report = await buildPptx(deckDir, { skillDir: args.pptxSkill });
+      process.stdout.write(formatCheckReport(report.check));
+      if (report.pptx === null || report.validate === null) return 1;
+      const lines = [`PowerPoint のファイルを書いた: ${report.pptx}`];
+      if (report.applyThemeOutput !== "") lines.push(`apply_theme.js の出力:\n${indent(report.applyThemeOutput)}`);
+      lines.push(`validate.py の出力:\n${indent(report.validate.output)}`);
+      if (!report.validate.ok) lines.push("validate.py が形式の誤りを見つけた");
+      process.stdout.write(`${lines.join("\n")}\n`);
+      return report.validate.ok ? 0 : 1;
+    },
+  },
 };
+
+/** 複数行の文字列の各行を、2 文字字下げする */
+function indent(text: string): string {
+  return text
+    .split("\n")
+    .map((l) => `  ${l}`)
+    .join("\n");
+}
 
 const TOP_HELP = `${USAGE_PREFIX} <サブコマンド> [--help]
 

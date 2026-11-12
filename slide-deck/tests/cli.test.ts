@@ -4,10 +4,10 @@
 
 import assert from "node:assert/strict";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { existsSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { makeSandbox, type TestSandbox } from "./helpers/cache.ts";
+import { FAKE_PPTX_SKILL, FAKE_PYTHON_EXIT_ENV, makeSandbox, type TestSandbox } from "./helpers/cache.ts";
 
 let sandbox: TestSandbox;
 
@@ -189,8 +189,123 @@ describe("check", () => {
   });
 });
 
+describe("pptx", () => {
+  test("見本の資料で、PowerPoint のファイルを書き、apply_theme.js を NODE_PATH 付きで、validate.py を venv の Python で実行する", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const pptx = join(deck, "build", "deck.pptx");
+    const theme = join(deck, "build", "theme.json");
+    // PowerPoint のファイルは ZIP なので、先頭の 2 バイトは ZIP のシグネチャ "PK"
+    assert.equal(readFileSync(pptx).subarray(0, 2).toString("latin1"), "PK");
+    assert.equal(readFileSync(join(deck, "build", ".gitignore"), "utf8"), "*\n");
+    assert.deepEqual(sandbox.applyThemeCalls(), [
+      { argv: [pptx, theme], nodePath: sandbox.cache.nodeModulesDir },
+    ]);
+    const input = JSON.parse(readFileSync(theme, "utf8")) as { name: string; colors: Record<string, string> };
+    assert.equal(input.name, "Cache");
+    assert.equal(Object.keys(input.colors).length, 12);
+    assert.deepEqual(sandbox.pythonCalls(), [`${join(FAKE_PPTX_SKILL, "scripts", "office", "validate.py")} ${pptx}`]);
+    assert.equal(
+      r.stdout,
+      [
+        "検査の指摘は無い (スライド 4 枚)",
+        `PowerPoint のファイルを書いた: ${pptx}`,
+        "apply_theme.js の出力:",
+        `  Theme written to ${pptx}`,
+        "validate.py の出力:",
+        `  偽の python: ${join(FAKE_PPTX_SKILL, "scripts", "office", "validate.py")} ${pptx}`,
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("プラグインのディレクトリに node_modules が無く、ライブラリがキャッシュのディレクトリにだけあっても成功する", () => {
+    assert.equal(existsSync(join(sandbox.pluginDir, "node_modules")), false);
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  });
+
+  test("deck.ts に any を書くと、eslint の指摘を示して終了コード 1 になり、PowerPoint のファイルを書かず、前に書いたファイルも消す", () => {
+    const deck = sandbox.copySample();
+    const pptx = join(deck, "build", "deck.pptx");
+    mkdirSync(join(deck, "build"));
+    writeFileSync(pptx, "前に書いたファイル");
+    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL]);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /@typescript-eslint\/no-explicit-any/);
+    assert.equal(existsSync(pptx), false);
+    assert.deepEqual(sandbox.applyThemeCalls(), []);
+    assert.deepEqual(sandbox.pythonCalls(), []);
+  });
+
+  test("pptx のスキルのディレクトリに scripts/apply_theme.js が無いと、無いファイルのパスを示して終了コード 2 になる", () => {
+    const skill = join(sandbox.root, "marketplace-pptx");
+    mkdirSync(join(skill, "scripts", "office"), { recursive: true });
+    cpSync(join(FAKE_PPTX_SKILL, "scripts", "office", "validate.py"), join(skill, "scripts", "office", "validate.py"));
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck, "--pptx-skill", skill]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, new RegExp(`次のファイルが無い:\n {2}${join(skill, "scripts", "apply_theme.js").replace(/[.]/g, "\\.")}\n`));
+    assert.doesNotMatch(r.stderr, /validate\.py\n/);
+    assert.equal(existsSync(join(deck, "build", "deck.pptx")), false);
+  });
+
+  test("--pptx-skill が無いと、説明を示して終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck]);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /--pptx-skill <pptx のスキルのディレクトリ> を指定する/);
+    const check = runCli(["check", deck, "--pptx-skill", FAKE_PPTX_SKILL]);
+    assert.equal(check.status, 2);
+    assert.match(check.stderr, /--pptx-skill は、サブコマンド pptx だけで使う/);
+  });
+
+  test("apply_theme.js が失敗すると、その出力を示して終了コード 2 になり、書いたファイルを消す", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL], { FAKE_APPLY_THEME_FAIL: "1" });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /apply_theme\.js が失敗した \(終了コード 1\):\nError: 偽の apply_theme\.js の失敗/);
+    assert.match(r.stderr, /PowerPoint のファイル .*deck\.pptx は消した/);
+    assert.equal(existsSync(join(deck, "build", "deck.pptx")), false);
+    assert.deepEqual(sandbox.pythonCalls(), []);
+  });
+
+  test("validate.py が形式の誤りを見つけると (終了コード 1)、終了コード 1 になり、ファイルを残す", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL], { [FAKE_PYTHON_EXIT_ENV]: "1" });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /validate\.py が形式の誤りを見つけた\n$/);
+    assert.ok(existsSync(join(deck, "build", "deck.pptx")));
+  });
+
+  test("validate.py が 0 と 1 以外で終了すると、終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL], { [FAKE_PYTHON_EXIT_ENV]: "2" });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /validate\.py を、.*bin\/python で実行できなかった \(終了コード 2\)/);
+  });
+
+  test("Python の venv がキャッシュのディレクトリに入っていないと、終了コード 2 になる", () => {
+    const noVenv = makeSandbox({ venv: false });
+    try {
+      const deck = noVenv.copySample();
+      const r = spawnSync(process.execPath, [noVenv.cli, "pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL], {
+        env: noVenv.env,
+        encoding: "utf8",
+      });
+      assert.equal(r.status, 2, r.stdout + r.stderr);
+      assert.match(r.stderr, /Python の venv\) が、キャッシュのディレクトリ .* に入っていない/);
+    } finally {
+      noVenv.cleanup();
+    }
+  });
+});
+
 describe("--help", () => {
-  for (const name of ["check"]) {
+  for (const name of ["check", "pptx"]) {
     test(`${name} --help が、引数・出力・終了コードを示す`, () => {
       const r = runCli([name, "--help"]);
       assert.equal(r.status, 0, r.stderr);
