@@ -110,6 +110,9 @@ export interface PptxReport {
  * テーマの色の書き込みが失敗したら、書いたファイルも消す。validate.py が形式の誤りを見つけたときは、調べられるようファイルを残す
  */
 export async function buildPptx(deckDir: string, options: PptxOptions): Promise<PptxReport> {
+  // 終了コード 2 で終了しうる確認 (pptx のスキル・ライブラリ・資料のディレクトリ) より前に消す。
+  // 確認の後に消すと、確認で終了した実行の後に、前の実行のファイルが残る。資料のディレクトリが無ければ、消すものも無い
+  rmSync(join(resolve(deckDir), "build", "deck.pptx"), { force: true });
   const env = options.env ?? process.env;
   const skill = pptxSkill(options.skillDir);
   const cache = installedCache(options);
@@ -122,7 +125,6 @@ export async function buildPptx(deckDir: string, options: PptxOptions): Promise<
   const paths = deckPaths(deckDir);
   const pptxPath = join(paths.buildDir, "deck.pptx");
   const themePath = join(paths.buildDir, "theme.json");
-  rmSync(pptxPath, { force: true });
 
   const check = await checkDeck(deckDir, options);
   if (check.deck === null) return { check, pptx: null, applyThemeOutput: "", validate: null };

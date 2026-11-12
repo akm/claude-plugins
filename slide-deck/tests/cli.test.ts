@@ -241,16 +241,20 @@ describe("pptx", () => {
     assert.deepEqual(sandbox.pythonCalls(), []);
   });
 
-  test("pptx のスキルのディレクトリに scripts/apply_theme.js が無いと、無いファイルのパスを示して終了コード 2 になる", () => {
+  test("pptx のスキルのディレクトリに scripts/apply_theme.js が無いと、無いファイルのパスを示して終了コード 2 になり、前に書いたファイルを消す", () => {
     const skill = join(sandbox.root, "marketplace-pptx");
     mkdirSync(join(skill, "scripts", "office"), { recursive: true });
     cpSync(join(FAKE_PPTX_SKILL, "scripts", "office", "validate.py"), join(skill, "scripts", "office", "validate.py"));
     const deck = sandbox.copySample();
+    const pptx = join(deck, "build", "deck.pptx");
+    mkdirSync(join(deck, "build"));
+    writeFileSync(pptx, "前に書いたファイル");
     const r = runCli(["pptx", deck, "--pptx-skill", skill]);
     assert.equal(r.status, 2, r.stdout + r.stderr);
     assert.match(r.stderr, new RegExp(`次のファイルが無い:\n {2}${join(skill, "scripts", "apply_theme.js").replace(/[.]/g, "\\.")}\n`));
     assert.doesNotMatch(r.stderr, /validate\.py\n/);
-    assert.equal(existsSync(join(deck, "build", "deck.pptx")), false);
+    // 前に書いたファイルは、スキルのディレクトリの確認で終了する前に消す
+    assert.equal(existsSync(pptx), false);
   });
 
   test("--pptx-skill が無いと、説明を示して終了コード 2 になる", () => {
@@ -288,16 +292,20 @@ describe("pptx", () => {
     assert.match(r.stderr, /validate\.py を、.*bin\/python で実行できなかった \(終了コード 2\)/);
   });
 
-  test("Python の venv がキャッシュのディレクトリに入っていないと、終了コード 2 になる", () => {
+  test("Python の venv がキャッシュのディレクトリに入っていないと、終了コード 2 になり、前に書いたファイルを消す", () => {
     const noVenv = makeSandbox({ venv: false });
     try {
       const deck = noVenv.copySample();
+      const pptx = join(deck, "build", "deck.pptx");
+      mkdirSync(join(deck, "build"));
+      writeFileSync(pptx, "前に書いたファイル");
       const r = spawnSync(process.execPath, [noVenv.cli, "pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL], {
         env: noVenv.env,
         encoding: "utf8",
       });
       assert.equal(r.status, 2, r.stdout + r.stderr);
       assert.match(r.stderr, /Python の venv\) が、キャッシュのディレクトリ .* に入っていない/);
+      assert.equal(existsSync(pptx), false);
     } finally {
       noVenv.cleanup();
     }
