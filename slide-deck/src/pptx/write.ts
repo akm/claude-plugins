@@ -171,6 +171,9 @@ function defineContentLayout(pres: Presentation): void {
   if (run === undefined) throw new Error("題名の部品の関数が、文字の部分を作らなかった");
   pres.defineSlideMaster({
     title: CONTENT_LAYOUT,
+    // 背景をテーマの lt1 (背景の色) で塗る。背景を書かないと、PowerPoint のファイルを表示するソフトによって背景の色が違う
+    // (macOS の Quick Look では灰色になった)
+    background: { color: schemeColor("lt1") },
     objects: [
       {
         placeholder: {

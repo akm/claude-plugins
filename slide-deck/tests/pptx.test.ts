@@ -139,6 +139,14 @@ describe("見本の資料の PowerPoint のファイル", () => {
     assert.match(layout, new RegExp(`<p:ph\\s[^>]*type="title".*<a:off x="${x}" y="${y}"/><a:ext cx="${String(9 * EMU_PER_INCH)}"`, "s"));
     assert.match(layout, /<a:defRPr [^>]*sz="2400" b="1"/);
   });
+
+  test("レイアウトの背景を、テーマの lt1 (PowerPoint のファイルでは bg1) で塗る", async () => {
+    const read = await render(sample());
+    assert.match(
+      await read("ppt/slideLayouts/slideLayout2.xml"),
+      /<p:bg><p:bgPr><a:solidFill><a:schemeClr val="bg1"\/><\/a:solidFill>/,
+    );
+  });
 });
 
 describe("要素の書き出し", () => {
