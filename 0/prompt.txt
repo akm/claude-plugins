@@ -1,0 +1,582 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221。sub-issue 1 (#193)・2 (#194)・3 (#195) はマージ済み、適用 A1 (#214) は実際のプロジェクトで確かめて閉じた (形式を変える問題は無く、PR #235 で 0.3.1 を公開)。最新のタグは doc-structured--v0.3.1。4a (#196) の後に 4b (#197)・4c (#198)・4d (#199) が続き、どれも 4a に依存する。5 (#200) と 11a (#206) も着手できるが、利用者は 4a だけを先に進めると決めた。ツールは Python 3.12 以上 + ruamel.yaml で、サブコマンド generate・check (検査 a・h・i) とスキル doc-structured:generate・doc-structured:check、生成したファイルの編集を拒否する hook がある。未追跡の `.claude/settings.json` と `.entire/` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#196 (sub-issue 4a「文書の参照を ID の reference-style のリンクで書き、リンクの誤りを検査したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 196` (ゴール・入力・この sub-issue で決める形式・成果物と機能・クローズ条件)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順。種類を足す sub-issue が前の機能を広げる共通の手順も含む)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧。問 15 の文書の一部のコピーは 4d (#199) で扱うので、この sub-issue では作らない)
+- 形式の SSOT であるファイル `doc-structured/rules/doc-structured-docs.md`・`doc-structured/rules/doc-structured-domains.md`、ツール `doc-structured/tool/`、スキル `doc-structured/skills/`
+- 前の sub-issue で決めたこと: Issue #194 のコメント https://github.com/akm/claude-plugins/issues/194#issuecomment-6716205386 、Issue #195 のコメントと PR #232 の本文、Issue #214 のコメント (適用 A1 の結果: https://github.com/akm/claude-plugins/issues/214#issuecomment-6728080753)
+- 共有ノートの引き継ぎのメモ `193-doc-structured-versioned-run.md`・`194-doc-structured-generate-check.md`・`214-a1-apply.md` があれば読む
+
+進め方:
+- Issue の「この sub-issue で決める形式」(定義の行の形、手書きの節のアンカーの書き方、ファイルの種類の記号、100 行を超えた手書きの Markdown を分ける先の形、検査 k の 50・100 という値が実際の文書に合うか) と、実装の中で出る判断は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #196 に書く。
+- 検査 k の値を実際の文書で確かめるときは、実際のプロジェクトのチェックアウト `/Users/akima/techno/ikinari-order-v2` の文書を読んでよい (読むだけで変えない)。公開の場 (Issue・PR・ファイル・コミットメッセージ) には、そのプロジェクトの名前・リポジトリ名・Issue 番号・リンク・ファイルのパスを書かず、「実際のプロジェクト」と書く。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。規則の文書には手順を書かない。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットと PR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、Issue #196 が閉じている。終わったら、呼び出し元のセッション (local_a14f3497-5f91-4f16-aa39-ed64303c4522) に結果 (PR 番号・決めたこと・別の Issue に分けたもの・次の sub-issue) を報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+案 A (推奨)
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+案 A
+
+---
+
+推奨で
+
+---
+
+推奨で
+
+---
+
+推奨で
+
+---
+
+推奨で
+
+---
+
+投稿して始める
+
+---
+
+案のとおり書く
+
+---
+
+push して PR
+
+---
+
+review-rally で回す
+
+---
+
+<cross-session-message from="local_dc217c56-848e-478b-8ace-7a3c4cc7d8b1" from-name="review-rally 20261109-1340-claude-doc-structured-links-196-2ae4…">
+review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d 20261109-1341-claude-doc-structured-links-196-2ae41d-1-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-f4a05e/tmp/review-rally/20261109-1340-claude-doc-structured-links-196-2ae41d/review-20261109-1341-claude-doc-structured-links-196-2ae41d-1-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数「high 08382c31..92988d12」)。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルを渡す引数は無い)
+- 指摘 7 件 (P1 1・P2 3・P3 3)、residual 4 件。確認は、サンプルのプロジェクトをスクラッチパッドの一時ディレクトリにコピーして、関数をプロセス内で呼ぶ形で行った。作業ツリーの中には何も作っていない。CLI を子プロセスで呼ぶテストは、bin/doc-structured の実行環境がこのセッションに無いため失敗した。確認には使っていない
+- HEAD と作業ツリー: レビューの前後とも HEAD は 92988d12f069283b38167b27fe040e842bf8a69e (ブランチ claude/review-rally-f4a05e)。git status --porcelain の出力は空 (出力先は tmp/ の下で、.gitignore の対象)。出力先の外に変更は無い
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_dc217c56-848e-478b-8ace-7a3c4cc7d8b1" from-name="review-rally 20261109-1340-claude-doc-structured-links-196-2ae4…">
+review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d 20261109-1403-claude-doc-structured-links-196-2ae41d-2-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-f4a05e/tmp/review-rally/20261109-1340-claude-doc-structured-links-196-2ae41d/review-20261109-1403-claude-doc-structured-links-196-2ae41d-2-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high 92988d12..1d9fc242")。effort は high を渡した。モデルはこのセッションのモデル claude-opus-5-5 で、skill の引数でモデルは渡していない (code-review はモデルの引数を受け取らない)。
+- 結果: 指摘 3 件 (P2 1 件・P3 2 件)・residual 3 件。
+- HEAD と作業ツリー: 開始時は git status --porcelain が空で、git checkout -B claude/review-rally-f4a05e 1d9fc242... で切り替えた。終了時も HEAD は 1d9fc242527f9dea8c015a490b82933294c2eab7、ブランチは claude/review-rally-f4a05e で、git status --porcelain は空。確認で python3 -I -c から関数 parse を呼んだときに、無視されるディレクトリ doc-structured/tool/src/doc_structured/__pycache__/ が作られた (14:04 に作成) ので消した。git status --porcelain --ignored に残るのは、開始前からあった doc-structured.egg-info/ と、出力先のディレクトリ tmp/ だけ。
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>b8jy2rxrf</task-id>
+<tool-use-id>toolu_01CjAv8W7tZd827jy3kmgUBT</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-doc-structured-links-196-2ae41d/b50d20a0-f9ef-4300-baa4-bed76ada00c0/tasks/b8jy2rxrf.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d (20261109-1341-claude-doc-structured-links-196-2ae41d-1-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<cross-session-message from="local_dc217c56-848e-478b-8ace-7a3c4cc7d8b1" from-name="review-rally 20261109-1340-claude-doc-structured-links-196-2ae4…">
+review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d 20261109-1410-claude-doc-structured-links-196-2ae41d-3-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-f4a05e/tmp/review-rally/20261109-1340-claude-doc-structured-links-196-2ae41d/review-20261109-1410-claude-doc-structured-links-196-2ae41d-3-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high 1d9fc242..39559d52")。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 で、skill にモデルの引数は渡していない (code-review はモデルの引数を受け取らない)
+- 指摘 1 件 (markdown.py:430 の関数 scan_images が「<」を読み飛ばさず、リンクの文の中の HTML コメント・属性値・autolink の中の ![a][b] を画像のラベルとして拾う)、residual 3 件
+- HEAD と作業ツリー: レビューの前後とも HEAD は 39559d52 (ブランチ claude/review-rally-f4a05e)、git status --porcelain の出力は空 (出力先は tmp/ の下で .gitignore の対象)。プローブは PYTHONDONTWRITEBYTECODE=1 で markdown.parse を直接呼んだだけで、ファイルを作っていない
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_dc217c56-848e-478b-8ace-7a3c4cc7d8b1" from-name="review-rally 20261109-1340-claude-doc-structured-links-196-2ae4…">
+review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d 20261109-1415-claude-doc-structured-links-196-2ae41d-4-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-f4a05e/tmp/review-rally/20261109-1340-claude-doc-structured-links-196-2ae41d/review-20261109-1415-claude-doc-structured-links-196-2ae41d-4-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ。引数は "high 39559d52..07ea2eef" (effort は high)。モデルはこのセッションのモデル claude-opus-5-5 で、skill にモデルを渡す引数は無い。
+- 指摘 2 件 (P2 が 1 件・P3 が 1 件)、residual 2 件。
+- HEAD は作業の前も後も 07ea2eefd8ed74ed778154cba45bbffe49cb9339 で変わっていない。git status --porcelain は前後とも空 (出力先は git が無視するディレクトリ tmp/ の下にある)。プローブとテストは PYTHONPATH=src の python3 で実行し、ファイルの編集はしていない。Python の実行で __pycache__ が作られた可能性はあるが、git は無視するので status には出ていない。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<task-notification>
+<task-id>ba2dnrhcx</task-id>
+<tool-use-id>toolu_013Aw3BmD5X1dDzdpLAAMbG2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-doc-structured-links-196-2ae41d/b50d20a0-f9ef-4300-baa4-bed76ada00c0/tasks/ba2dnrhcx.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d (20261109-1403-claude-doc-structured-links-196-2ae41d-2-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b0lkm8350</task-id>
+<tool-use-id>toolu_01HxquoGZHzeTG61i9NRgdJG</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-doc-structured-links-196-2ae41d/b50d20a0-f9ef-4300-baa4-bed76ada00c0/tasks/b0lkm8350.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d (20261109-1410-claude-doc-structured-links-196-2ae41d-3-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzuzd465e</task-id>
+<tool-use-id>toolu_018iY1sK7dT3ZckKVrdwqJr6</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-doc-structured-links-196-2ae41d/b50d20a0-f9ef-4300-baa4-bed76ada00c0/tasks/bzuzd465e.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261109-1340-claude-doc-structured-links-196-2ae41d (20261109-1415-claude-doc-structured-links-196-2ae41d-4-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+B: 範囲から外す
+
+---
+
+push して本文を足す
+
+---
+
+確認して結果を伝える
+
+---
+
+<bash-input>cd /Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-links-196-2ae41d/tmp/doc-structured-196-skills</bash-input><bash-stdout>[No output was captured. The command ran in the terminal pane (tab 0); if it should have printed something, use read_terminal with tab_id "0" to check.]</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+<bash-input>XDG_CACHE_HOME=/Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-links-196-2ae41d/tmp/cache DOC_STRUCTURED_CHECKOUT=/Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-links-196-2ae41d claude --plugin-dir /Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-links-196-2ae41d/doc-structured</bash-input><bash-stdout>────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /Users/akima/workspace/claude-plugins/.claude/worktree
+ s/doc-structured-links-196-2ae41d/tmp/doc-structured-1
+ 96-skills
+
+ Quick safety check: Is this a project you created or
+ one you trust? (Like your own code, a well-known open
+ source project, or work from your team). If not, take
+ a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute
+ files here.
+
+ Security guide
+
+ ❯ No, 
+[The user typed into the terminal pane (tab 0) while this command was running, so output after that point is not included; it may still be running there, or they may have stopped it. Use read_terminal with tab_id "0" to check on it.]</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+<!-- attach: ターミナル | tab:0 -->
+> ❯ doc-structured:links-fix を実行して                   
+> 
+> ⏺ Skill(doc-structured:links-fix)
+>   ⎿  Successfully loaded skill
+> 
+> ⏺ Bash(python3 "/Users/akima/workspace/claude-plugins/.c
+>       laude/worktrees/doc-structured-links-196-2ae41d/do
+>       c-structured/scripts/plugin-version-notice"; echo
+>       "exit=$?";…)
+>   ⎿  exit=0
+>      書き換えた: docs/domains/02-loans/concept.md
+>      書き換えた: docs/domains/02-loans/design.md
+>      … +13 lines (ctrl+o to expand)
+>   ⎿  Updated docs/domains/02-loans/concept.md (+8 
+>      -0)
+>       15  ## 予約の順番
+>       16  
+>       17  同じ図書の[予約]は[属性「前の予約」]で
+>           つなぎ、先に予約した利用者から借りる。
+>           予約の一覧は [`models.md`] にあり、取り
+>           置きの期限は [取り置き期限] で決める。
+>       18 +                                       
+>       19 +[モデル「貸出」]: models.md#d-loans-m-l
+>          +oan "ドメイン `loans` のモデル「貸出」"
+>       20 +[ドメイン `catalog` のモデル「図書」]: 
+>          +../01-catalog/models.md#d-catalog-m-boo
+>          +k "ドメイン `catalog` のモデル「図書」"
+>       21 +[d-members-m-member]: ../03-members/mod
+>          +els.md#d-members-m-member "ドメイン `me
+>          +mbers` のモデル「利用者」"             
+>       22 +[開館日]: unclassified_app_terms.md#d-l
+>          +oans-ut-business_day "ドメイン `loans` 
+>          +の未分類のアプリケーション用語「開館日 
+>          +」"                                    
+>       23 +[d-loans-design-f-overdue_notice]: desi
+>          +gn/overdue_notice.md#d-loans-design-f-o
+>          +verdue_notice "ドメイン `loans` のファ 
+>          +イル `design/overdue_notice.md`"       
+>       24 +[予約]: models.md#d-loans-m-reservation
+>          + "ドメイン `loans` のモデル「予約」"   
+>       25 +[属性「前の予約」]: models.md#d-loans-m
+>          +-reservation-a-previous "ドメイン `loan
+>          +s` のモデル「予約」の属性「前の予約」" 
+>   ⎿  Updated docs/domains/02-loans/design.md (+1
+>      -1)
+>       12  
+>       13  [属性「貸出状態」]: models.md#d-loans-m
+>           -loan-a-status "ドメイン `loans` のモデ
+>           ル「貸出」の属性「貸出状態」"
+>       14  [貸出中]: models.md#d-loans-m-loan-a-st
+>           atus-v-on_loan "ドメイン `loans` のモデ
+>           ル「貸出」の属性「貸出状態」の値「貸出
+>           中」"
+>       15 -[返却済み]: models.md#d-loans-m-loan-a-
+>          -status-v-returned "ドメイン `loans` の 
+>          -モデル「貸出」の属性「貸出状態」の値「 
+>          -返却ずみ」"                            
+>       15 +[返却済み]: models.md#d-loans-m-loan-a-
+> 
+>   ⎿  Updated docs/domains/02-loans/design.md (+1 -1)
+>       12  
+>       13  [属性「貸出状態」]: models.md#d-loans-m-loan-a-status "ド
+>           メイン `loans` のモデル「貸出」の属性「貸出状態」"
+>   ⎿  Updated docs/domains/02-loans/design.md (+1 -1)
+>       12  
+>       13  [属性「貸出状態」]: models.md#d-loans-m-loan-a-status "ドメイン
+>           `loans` のモデル「貸出」の属性「貸出状態」"
+>       14  [貸出中]: models.md#d-loans-m-loan-a-status-v-on_loan "ドメイン
+>           `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」"
+>       15 -[返却済み]: models.md#d-loans-m-loan-a-status-v-returned "ドメイ
+>          -ン `loans` のモデル「貸出」の属性「貸出状態」の値「返却ずみ」"  
+>       15 +[返却済み]: models.md#d-loans-m-loan-a-status-v-returned "ドメイ
+>          +ン `loans` のモデル「貸出」の属性「貸出状態」の値「返却済み」"  
+>       16  [節「返却期限」]: concept.md#d-loans-concept-h-return_deadline "
+>           ドメイン `loans` のファイル `concept.md` の節「返却期限」"
+>       17  [`design/overdue_notice.md`]: design/overdue_notice.md#d-loans-d
+>           esign-f-overdue_notice "ドメイン `loans` のファイル `design/over
+>           due_notice.md`"
+>   ⎿  (files that changed while this command ran, by the command or by
+>      another process; a convenience view, not a review or audit of the
+>      command)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ Bash(cat -n docs/domains/02-loans/concept.md; git diff --stat)
+>   ⎿       1  <a name="d-loans-concept"></a>
+>      2
+>           3  # ドメイン `loans` の概念
+>      … +27 lines (ctrl+o to expand)
+> 
+>   Searched for 1 pattern (ctrl+o to expand)
+> 
+> ⏺ User answered Claude's questions:
+>   ⎿  · docs/domains/02-loans/concept.md の 17 行目のラベル [`models.md`] 
+>      (「予約の一覧は [`models.md`] にあり」) は、どのファイルを指しますか? → 
+>      d-loans-models (推奨)
+>      · 同じ 17 行目のラベル [取り置き期限] は、参照先の候補がありません (YAML 
+>      にも文書にも「取り置き」の定義がありません)。どうしますか? → 
+>      本文のリンクを外す
+>    
+> ⏺ Update(docs/domains/02-loans/concept.md)
+>   ⎿  Added 1 line, removed 1 line
+>       14  
+>       15  ## 予約の順番
+>       16  
+>       17 -同じ図書の[予約]は[属性「前の予約」]でつなぎ、先に予約した利用者
+>          -から借りる。予約の一覧は [`models.md`] にあり、取り置きの期限は 
+>          -[取り置き期限] で決める。                                       
+>       17 +同じ図書の[予約]は[属性「前の予約」]でつなぎ、先に予約した利用者
+>          +から借りる。予約の一覧は [`models.md`] にあり、取り置きの期限は 
+>          +取り置き期限で決める。                                          
+>       18  
+>       19  [モデル「貸出」]: models.md#d-loans-m-loan "ドメイン `loans` の
+>           モデル「貸出」"
+>       20  [ドメイン `catalog` のモデル「図書」]: ../01-catalog/models.md#d
+>           -catalog-m-book "ドメイン `catalog` のモデル「図書」"
+> 
+> ⏺ Bash(bin/doc-structured links-fix --choose docs/domains/02-loans/concept.md
+>       '`models.md`' d-loans-models; echo "exit=$?")
+>   ⎿  書き換えた: docs/domains/02-loans/concept.md
+>      exit=0
+>   ⎿  Updated docs/domains/02-loans/concept.md (+1 -0)
+>       23  [d-loans-design-f-overdue_notice]: design/overdue_notice.md#d-lo
+>           ans-design-f-overdue_notice "ドメイン `loans` のファイル `design
+>           /overdue_notice.md`"
+>       24  [予約]: models.md#d-loans-m-reservation "ドメイン `loans` のモデ
+>           ル「予約」"
+>       25  [属性「前の予約」]: models.md#d-loans-m-reservation-a-previous "
+>           ドメイン `loans` のモデル「予約」の属性「前の予約」"
+>       26 +[`models.md`]: models.md#d-loans-models "ドメイン `loans` のファ
+>          +イル `models.md`"                                               
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ Step 6: run check.
+> 
+> ⏺ Skill(doc-structured:check)
+>   ⎿  Successfully loaded skill
+> 
+> ⏺ Bash(bin/doc-structured check --only b; echo "exit=$?"; git diff --stat)
+>   ⎿  検査 b: 問題は無かった
+>      exit=0
+>       docs/domains/02-loans/concept.md | 11 ++++++++++-
+>      … +2 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ コマンド bin/doc-structured links-fix
+>   を実行し、定義の行を直しました。そのあと検査 b を実行し、「検査 b:
+>   問題は無かった」となりました。
+> 
+>   ツールが直したもの
+>   - docs/domains/02-loans/concept.md
+>   - docs/domains/02-loans/design.md
+> 
+>   回答をもとに直したもの (どちらも docs/domains/02-loans/concept.md の 17 行目)
+>   - ラベル [models.md]: 参照先をドメイン loans のファイル models.md (ID
+>     d-loans-models) にし、定義の行を足しました。
+>   - ラベル [取り置き期限]:
+>     参照先が無いため、本文のリンクを外して文字の「取り置き期限」にしました。
+> 
+>   変更はまだコミットしていません。コミットしてよいか教えてください。
+> 
+> ✻ Baked for 26s · done 22:42
+> 
+> ❯ doc-structured:check を実行して                                                
+> 
+> ⏺ Bash(python3 "/Users/akima/workspace/claude-plugins/.claude/worktrees/doc-struc
+>       tured-links-196-2ae41d/doc-structured/scripts/plugin-version-notice"; echo
+>       "exit=$?";…)
+>   ⎿  exit=0
+>      docs/domains/02-loans/design/overdue_notice.md: 検査 k: 手書きの Markdo
+>      wn が 109 行ある (上限は 100 行)。話題ごとにファイルを分けるか、「#」の
+>      … +4 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+>   Listed 1 directory (ctrl+o to expand)
+> 
+> ⏺ Bash(cat -n docs/domains/02-loans/design/overdue_notice.md | sed -n 1,40p; echo
+>       ...; tail -15 docs/domains/02-loans/design/overdue_notice.md)
+>   ⎿       1  <a name="d-loans-design-f-overdue_notice"></a>
+>      2
+>           3  # 延滞の通知
+>      … +53 lines (ctrl+o to expand)
+> 
+> ⏺ User answered Claude's questions:
+>   ⎿  · 検査 k が失敗しました。ファイル 
+>      docs/domains/02-loans/design/overdue_notice.md が 109 行あり、上限の 100 
+>      行を超えています。中身は節「通知する日」と、「通知の文面の例 1〜99」の 99 
+>      行です。どうしますか? → 文面の例を子のファイルに分ける
+> 
+> ⏺ Bash(R=/Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-l
+>       inks-196-2ae41d/doc-structured/rules; grep -n -A3
+>       "子のファイル\|-f-\|ファイルの ID" $R/doc-struc…)
+>   ⎿  19:- ファイルの ID は、親の ID にファイルの種類の記号を足したもの。ファ
+>      イルの種類の記号は名前を取らない (例 `d-loans-models`)。
+>      20:- 手書きのファイルの節の ID は、ファイルの ID に `-h-<名前>` を 1 回
+>      … +25 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ Bash(R=/Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-l
+>       inks-196-2ae41d/doc-structured/rules; grep -n -B2 -A12 "## 手書きの
+>       Markdown" $R/doc-struc…)
+>   ⎿  79-- 分けるときは、下の節「参照の向き」に従う。
+>      80-
+>      81:## 手書きの Markdown
+>      … +19 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ サブディレクトリは1階層までという制約があるため、子ファイルは
+>   design/overdue_notice/ ではなく、同じ階層の
+>   design/overdue_notice_message_examples.md に置きます。
+>   
+> ⏺ Bash(cd docs/domains/02-loans/design && python3 - <<'EOF'
+>       src = open("overdue_notice.md").read().split("\n")…)
+>   ⎿       1  <a name="d-loans-design-f-overdue_notice"></a>
+>      2
+>           3  # 延滞の通知
+>      … +23 lines (ctrl+o to expand)
+>   ⎿  Updated overdue_notice.md (+1 -99)
+>         8  
+>         9  返却期限の次の[開館日]の朝に、[借りた利用者]へ通知する。休館日
+>            には通知しない。
+>        10  
+>        11 -通知の文面の例 1。                                             
+>        12 -通知の文面の例 2。                                             
+>        13 -通知の文面の例 3。                                             
+>        14 -通知の文面の例 4。                                             
+>        15 -通知の文面の例 5。                                             
+>        16 -通知の文面の例 6。                                             
+>        17 -通知の文面の例 7。                                             
+>        18 -通知の文面の例 8。                                             
+>        19 -通知の文面の例 9。                                             
+>        20 -通知の文面の例 10。                                            
+>        21 -通知の文面の例 11。                                            
+>        22 -通知の文面の例 12。                                            
+>        23 -通知の文面の例 13。                                            
+>        24 -通知の文面の例 14。                                            
+>        25 -通知の文面の例 15。                                            
+>        26 -通知の文面の例 16。                                            
+>        27 -通知の文面の例 17。                                            
+>        28 -通知の文面の例 18。                                            
+>        29 -通知の文面の例 19。                                            
+>        30 -通知の文面の例 20。                                            
+>        31 -通知の文面の例 21。                                            
+>        32 -通知の文面の例 22。                                            
+>        33 -通知の文面の例 23。                                            
+>        34 -通知の文面の例 24。                                            
+>        35 -通知の文面の例 25。                                            
+>        36 -通知の文面の例 26。                                            
+>        37 -通知の文面の例 27。                                            
+>        38 -通知の文面の例 28。                                            
+>        39 -通知の文面の例 29。                                            
+>        40 -通知の文面の例 30。                                            
+>        41 -通知の文面の例 31。                                            
+>        42 -通知の文面の例 32。                                            
+>        43 -通知の文面の例 33。                                            
+>        44 -通知の文面の例 34。                                            
+>        45 -通知の文面の例 35。                                            
+>        46 -通知の文面の例 36。                                            
+>        47 -通知の文面の例 37。                                            
+>      … 66 more lines (ctrl+o to expand)
+>   ⎿  Created overdue_notice_message_examples.md (+103 -0)
+>         1 +<a name="d-loans-design-f-overdue_notice_message_examples"></a>
+>         2 +                                                               
+>         3 +# 通知の文面の例                                               
+>         4 +                                                               
+>         5 +通知の文面の例 1。                                             
+>         6 +通知の文面の例 2。                                             
+>         7 +通知の文面の例 3。                                             
+>         8 +通知の文面の例 4。                                             
+>         9 +通知の文面の例 5。                                             
+>        10 +通知の文面の例 6。                                             
+>        11 +通知の文面の例 7。                                             
+>        12 +通知の文面の例 8。                                             
+>        13 +通知の文面の例 9。                                             
+>        14 +通知の文面の例 10。                                            
+>        15 +通知の文面の例 11。                                            
+>        16 +通知の文面の例 12。                                            
+>        17 +通知の文面の例 13。                                            
+>        18 +通知の文面の例 14。                                            
+>        19 +通知の文面の例 15。                                            
+>        20 +通知の文面の例 16。                                            
+>        21 +通知の文面の例 17。                                            
+>        22 +通知の文面の例 18。                                            
+>        23 +通知の文面の例 19。                                            
+>        24 +通知の文面の例 20。                                            
+>        25 +通知の文面の例 21。                                            
+>        26 +通知の文面の例 22。                                            
+>        27 +通知の文面の例 23。                                            
+>        28 +通知の文面の例 24。                                            
+>        29 +通知の文面の例 25。                                            
+>        30 +通知の文面の例 26。                                            
+>        31 +通知の文面の例 27。                                            
+>        32 +通知の文面の例 28。                                            
+>        33 +通知の文面の例 29。                                            
+>        34 +通知の文面の例 30。                                            
+>        35 +通知の文面の例 31。                                            
+>        36 +通知の文面の例 32。                                            
+>        37 +通知の文面の例 33。                                            
+>        38 +通知の文面の例 34。                                            
+>        39 +通知の文面の例 35。                                            
+>        40 +通知の文面の例 36。                                            
+>      … 63 more lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ Bash(cd /Users/akima/workspace/claude-plugins/.claude/worktrees/doc-structured-
+>       links-196-2ae41d/tmp/doc-structured-196-skills && bin/doc-structured
+>       links-fix; echo "…)
+>   ⎿  docs/domains/02-loans/design/overdue_notice.md:11:9: ラベル
+>      通知の文面の
+>      例 の参照先の候補が無い。参照先の ID か外部の URL を --choose で渡す
+>      判断の要るものが 1 件ある (参照先を --choose で渡して、もう一度実行する
+>      … +10 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ The new child file's ID is the obvious target, so I pass it with --choose.
+> 
+> ⏺ Bash(bin/doc-structured links-fix --choose
+>       docs/domains/02-loans/design/overdue_notice.md 通知の文面の例
+>       d-loans-design-f-overdue_notice_message_examples; echo "exit=$?"; t…)
+>   ⎿  書き換えた: docs/domains/02-loans/design/overdue_notice.md
+>      exit=0
+>      [借りた利用者]: ../models.md#d-loans-m-loan-a-member "ドメイン `loans`
+>      … +4 lines (ctrl+o to expand)
+>   ⎿  Updated docs/domains/02-loans/design/overdue_notice.md (+1 -0)
+>       12  
+>       13  [開館日]: ../unclassified_app_terms.md#d-loans-ut-business_day "
+>           ドメイン `loans` の未分類のアプリケーション用語「開館日」"
+>       14  [借りた利用者]: ../models.md#d-loans-m-loan-a-member "ドメイン `
+>           loans` のモデル「貸出」の属性「借りた利用者」"
+>       15 +[通知の文面の例]: overdue_notice_message_examples.md#d-loans-des
+>          +ign-f-overdue_notice_message_examples "ドメイン `loans` のファイ
+>          +ル `design/overdue_notice_message_examples.md`"                 
+>   ⎿  Allowed by auto mode classifier
+> ─────────────────────────────────────────────────────────────────────────────────
+>  ☐ 検査 k 
+> 
+> │ 文面の例を子のファイル 
+> │ docs/domains/02-loans/design/overdue_notice_message_examples.md 
+> │ に移しましたが、例だけで 99 行あるため、子のファイルが 103 行になり、検査 k 
+> │ がまだ失敗します。どうしますか?
+> 
+> ❯ 1. 理由のコメントを書く
+>      子のファイルの「#」の見出しの次の行に <!-- 行数が上限を超える理由: <理由>
+>      --> を書く。理由の文面を Other で教えてください
+>      (省略時は「文面の例を一覧で比べられるように 1 つのファイルにまとめるため」)
+>   2. 例を 2 つのファイルに分ける
+>      例 1〜50 と 51〜99 のように分ける。分け方とファイル名は Other で指定できます
+>   3. 分けるのをやめて元に理由を書く
+>      子のファイルを消して overdue_notice.md を元に戻し、理由のコメントを書く
+>   4. Type something.
+> ─────────────────────────────────────────────────────────────────────────────────
+>   5. Chat about this
+
+---
+
+間違えて最後の質問に答えないで閉じてしまいました
+
+---
+
+マージしてタグを付ける
+
+---
+
+手動で実行する
+
+---
+
+進めてください
+
+---
+
+呼び出し元セッションに進捗状況を報告してください
