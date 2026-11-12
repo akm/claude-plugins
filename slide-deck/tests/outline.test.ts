@@ -9,6 +9,10 @@ import {
   type DeckOutline,
   type OutlineError,
 } from "../src/outline/parse.ts";
+import { hasMismatch, matchKeys } from "../src/outline/match.ts";
+import { parts } from "../src/data/parts.ts";
+import { checkTheme } from "../src/data/theme.ts";
+import sampleDeck from "../examples/sample/deck.ts";
 
 const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(PLUGIN_DIR, "tests", "fixtures", "outline");
@@ -261,5 +265,57 @@ describe("関数 parseOutline", () => {
         [11, "見出しは #・##・### だけにする"],
       ],
     );
+  });
+});
+
+describe("関数 matchKeys", () => {
+  test("構成案にだけあるキーと、資料ごとのスクリプトにだけあるキーが、別々の一覧になる", () => {
+    const m = matchKeys(["intro", "flow", "summary", "extra"], ["flow", "intro", "detail", "summary", "more"]);
+    assert.deepEqual(m, { outlineOnly: ["extra"], deckOnly: ["detail", "more"], deckDuplicates: [] });
+    assert.equal(hasMismatch(m), true);
+  });
+
+  test("資料ごとのスクリプトで同じキーの図を 2 回作ると、重複の一覧に 1 回だけ入る", () => {
+    const m = matchKeys(["a", "b"], ["a", "b", "a", "a"]);
+    assert.deepEqual(m, { outlineOnly: [], deckOnly: [], deckDuplicates: ["a"] });
+    assert.equal(hasMismatch(m), true);
+  });
+
+  test("キーが一致すれば、どの一覧も空になる。順序の違いは不一致にしない", () => {
+    const m = matchKeys(["a", "b", "c"], ["c", "a", "b"]);
+    assert.deepEqual(m, { outlineOnly: [], deckOnly: [], deckDuplicates: [] });
+    assert.equal(hasMismatch(m), false);
+  });
+});
+
+describe("見本の資料", () => {
+  test("見本の資料の構成案と資料ごとのスクリプトのキーが一致する", () => {
+    const outline = parseOk(readFileSync(join(SAMPLE_DIR, "outline.md"), "utf8"));
+    const result = sampleDeck(parts);
+    const m = matchKeys(
+      outline.slides.map((s) => s.key),
+      result.slides.map((s) => s.key),
+    );
+    assert.deepEqual(m, { outlineOnly: [], deckOnly: [], deckDuplicates: [] });
+    assert.deepEqual(checkTheme(result.theme), []);
+  });
+
+  test("見本の資料ごとのスクリプトは、部品の関数をすべて使い、6 つの形をすべて使う", () => {
+    const used = new Set<string>();
+    const tracked = Object.fromEntries(
+      Object.entries(parts).map(([name, fn]) => [
+        name,
+        (...args: unknown[]): unknown => {
+          used.add(name);
+          return (fn as (...a: unknown[]) => unknown)(...args);
+        },
+      ]),
+    ) as unknown as typeof parts;
+    const result = sampleDeck(tracked);
+    assert.deepEqual([...used].sort(), Object.keys(parts).sort());
+    const shapes = new Set(
+      result.slides.flatMap((s) => s.elements.flatMap((e) => (e.kind === "shape" ? [e.shape] : []))),
+    );
+    assert.deepEqual([...shapes].sort(), ["can", "chevron", "ellipse", "homePlate", "rect", "roundRect"]);
   });
 });
