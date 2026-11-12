@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
-import { box, bullets, card, arrow, slide, text } from "../src/data/parts.ts";
+import { fileURLToPath } from "node:url";
+import sampleDeck from "../examples/sample/deck.ts";
+import { arrow, box, bullets, card, parts, slide, text } from "../src/data/parts.ts";
 import type { SlideElement, TextBoxElement } from "../src/data/types.ts";
-import { charWidth, estimateSlides, type FitIssue } from "../src/fit/estimate.ts";
+import { charWidth, estimateSlides, type FitIssue, type FitTarget } from "../src/fit/estimate.ts";
+import { parseOutline } from "../src/outline/parse.ts";
+
+const SAMPLE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "examples", "sample");
 
 // 14 ポイントの 1 行の高さ (インチ)。行の高さは文字の大きさの 1.25 倍 (計画の KTD6)
 const LINE_14 = (14 * 1.25) / 72;
@@ -219,6 +226,38 @@ describe("関数 estimateSlides の対象と結果", () => {
     text(s, ["あ".repeat(30), "い".repeat(30)].join("\n"), 0, 0, 0.15, 0.1);
     const [issue] = estimate(s.elements);
     assert.equal(issue?.head, `${"あ".repeat(30)}\n${"い".repeat(9)}`);
+  });
+});
+
+/** 見本の資料の構成案の一言と、資料ごとのスクリプトの図を、構成案の順序で組み合わせる。 */
+function sampleTargets(): FitTarget[] {
+  const r = parseOutline(readFileSync(join(SAMPLE_DIR, "outline.md"), "utf8"));
+  if (!r.ok) assert.fail("見本の資料の構成案に誤りがある");
+  const figures = sampleDeck(parts).slides;
+  return r.outline.slides.map((s) => {
+    const figure = figures.find((f) => f.key === s.key);
+    if (figure === undefined) assert.fail(`見本の資料ごとのスクリプトに、キー ${s.key} の図が無い`);
+    return { key: s.key, takeaway: s.takeaway, elements: figure.elements };
+  });
+}
+
+describe("見本の資料", () => {
+  test("見本の資料では、一覧が空になる", () => {
+    assert.deepEqual(estimateSlides(sampleTargets()), []);
+  });
+
+  test("見本の資料の文字の箱をわざと狭くすると、その箱が一覧に出る", () => {
+    const targets = sampleTargets();
+    const [first] = targets;
+    assert.ok(first !== undefined);
+    const index = first.elements.findIndex((e) => e.kind !== "line" && e.text !== null);
+    const element = first.elements[index];
+    assert.ok(element !== undefined && element.kind !== "line");
+    first.elements[index] = { ...element, w: 0.5 };
+    assert.deepEqual(
+      estimateSlides(targets).map((i) => [i.key, i.element]),
+      [[first.key, index]],
+    );
   });
 });
 
