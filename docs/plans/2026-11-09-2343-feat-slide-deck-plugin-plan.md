@@ -139,7 +139,7 @@ deepened: 2026-11-09
 - KTD3. **TypeScript は Node.js 24 で変換せずに実行し、`tsc --noEmit` で検査する** (session-settled: user-directed; chosen over JavaScript のまま書くこと: 型の検査で誤りを実行の前に見つけるため)。`tsconfig.json` は、`module: preserve`・`moduleResolution: bundler`・`strict`・`noEmit`・`allowImportingTsExtensions`・`erasableSyntaxOnly`・`verbatimModuleSyntax`・`noUncheckedIndexedAccess`・`exactOptionalPropertyTypes`・`noImplicitOverride`・`noPropertyAccessFromIndexSignature` にする。`module: nodenext` では、`import pptxgen from "pptxgenjs"` が型エラーになる (実験で確認した)。`package.json` に `"type": "module"` を書き、相対 import には拡張子 `.ts` を付け、型だけの import は `import type` にする。
 - KTD4. **TypeScript の明示の `any` を typescript-eslint で禁止する** (session-settled: user-approved; chosen over `tsc` の strict だけにすること)。設定は flat config で `tseslint.configs.strictTypeChecked` と `projectService`。プラグインのコードは CI で、資料ごとのスクリプトは `build` で、同じ規則で検査する。資料ごとのスクリプトを検査するときだけ、`projectService` の代わりに `parserOptions.project` で資料のディレクトリの `build/tsconfig.json` を指定する (`projectService` は検査するファイルから上のディレクトリの `tsconfig.json` を使うので、下にある `build/tsconfig.json` を使わない) (session-settled: user-approved; chosen over 資料ごとのスクリプトは `tsc` だけにすること)。
 - KTD5. **Python は、画像をまとめるツールと、`pptx:office/validate.py` の実行環境だけに使う**。Python のコードは mypy strict で検査し、`Any` を使わない (session-settled: user-directed; chosen over 型を検査しない Python: 利用者の要望)。mypy の設定は `strict` に加えて `disallow_any_explicit`・`disallow_any_expr`・`disallow_any_decorated`・`disallow_any_unimported`。Pillow は、この設定を通ることを実験で確認した。
-- KTD6. **はみ出しの見積もりは、TypeScript でスライドのデータに対して行う** (session-settled: user-approved; chosen over Python で PowerPoint のファイルを読むこと: python-pptx 1.0.2 の `prs.slides` などが `Any` になり、KTD5 の設定を通らないため)。見積もりの式は元の `fitcheck.py` のもの (全角の文字を 1、半角の文字を 0.58、空白を 0.3 文字分の幅とし、行の高さを文字の大きさの 1.25 倍とする)。
+- KTD6. **はみ出しの見積もりは、TypeScript でスライドのデータに対して行う** (session-settled: user-approved; chosen over Python で PowerPoint のファイルを読むこと: python-pptx 1.0.2 の `prs.slides` などが `Any` になり、KTD5 の設定を通らないため)。見積もりの式は元の `fitcheck.py` のもの (全角の文字を 1、半角の文字を 0.58、空白を 0.3 文字分の幅とし、行の高さを文字の大きさの 1.25 倍とする)。要る高さが文字を置ける高さ (箱の高さから上下の内側の余白を引いた高さ) の 1.02 倍を超えるか、文字を置ける幅 (箱の幅から左右の内側の余白を引いた幅) が 0 以下なら一覧に出す (元の式と同じ)。全角の文字は、元の式と同じく、Python の関数 `unicodedata.east_asian_width` が W・F・A を返す文字とする。Node.js には同じ機能が無いので、範囲の表を Python で生成して持つ (session-settled: user-approved; chosen over 主な文字のブロックだけで近似すること: 元の式と結果が違う文字を残さないため)。段落の後の間隔は、段落の間にだけ足す (session-settled: user-approved; chosen over 元の式のまま数えないこと・最後の段落の後にも足すこと: 最後の段落の後の間隔は、文字が箱からはみ出すかどうかに影響しないため)。箇条書きの項目は、文字を置ける幅から、Google スライドの字下げ 16 ポイント (KTD14) を引いて見積もる (session-settled: user-approved; chosen over 元の式のまま字下げを数えないこと: 箇条書きの要る高さを少なく見積もらないため)。
 - KTD7. **ライブラリのバージョンは `uv.lock` と `package-lock.json` で決め、`uv sync --frozen --no-dev` と `npm ci --omit=dev` で入れる** (session-settled: user-directed; chosen over pip と `requirements.txt`・利用者が手で入れること: `uv.lock` を配布する案は利用者の提案で、間接的に使うライブラリまでバージョンが決まるため)。npm の実行時の依存は pptxgenjs・typescript・eslint・`@eslint/js`・typescript-eslint (`build` が資料ごとのスクリプトを検査するので、typescript と eslint も実行時に要る)。Python の実行時の依存は Pillow・lxml・defusedxml (lxml と defusedxml は `pptx:office/validate.py` が使う)。開発のときだけ使う依存は `@types/node` と mypy。Python のバージョンはファイル `.python-version` で決め、uv が用意する (指定しないと uv は最新の 3.14 を選ぶ)。
 - KTD8. **キャッシュのディレクトリを、ロックファイルのハッシュ値ごとに分ける** (session-settled: user-approved; chosen over プラグインのバージョンごとに分けること・1 つだけにすること: ライブラリを変えない細かな修正でも入れ直さないため)。venv は `venv-<uv.lock と .python-version のハッシュ値>/` にその場で作り、作り終えたらフラグファイルを作る (uv の venv は、中のスクリプトが作ったときの絶対パスを持つので改名しない。同時の実行は uv が環境の中の `.lock` で排他する)。ファイル `.python-version` もハッシュ値に含めるのは、`uv.lock` に含まれず、Python のバージョンだけを変えたときにも別の venv にするため (session-settled: user-approved; chosen over `uv.lock` だけにすること)。`uv sync` が失敗したら、venv をフラグファイルを作らずに残し、次の実行が `uv sync` をやり直す (session-settled: user-approved; chosen over 失敗したら消すこと: 消すと、同じ venv を同時に入れている別の実行の venv も消えるため)。`node_modules` は wording-guard と同じく、一時的な名前のディレクトリで `npm ci` してから `node-<package-lock.json のハッシュ値>/` に改名する (`.bin` のリンクは相対パスで、改名しても動く)。ハッシュ値は、wording-guard と同じく SHA-256 の先頭 16 文字 (venv は、2 つのファイルの内容を続けたものから求める)。キャッシュのディレクトリは、wording-guard と doc-structured と同じく、環境変数 `XDG_CACHE_HOME` があれば `~/.cache` の代わりにその下を使う (session-settled: user-approved; chosen over 常に `~/.cache` の下にすること)。プラグインのコードは展開先にあり、Node.js は読み込むファイルの位置から `node_modules` を探すので、キャッシュのライブラリは場所を明示して読み込む: pptxgenjs はキャッシュの `node_modules` を起点にした `createRequire` で読み込み、`tsc` と eslint はキャッシュの `node_modules/.bin` のものを、プラグインの設定ファイルを指定して実行し、`pptx[desktop]:apply_theme.js` は環境変数 `NODE_PATH` にキャッシュの `node_modules` を指定した子プロセスで実行する (session-settled: user-approved; chosen over 実行のたびにプラグインのコードをキャッシュにコピーすること: 版の違うセッションが同時に動くと、コピーしたコードを上書きし合うため)。この作り方も利用者が選んだ (session-settled: user-approved; chosen over 両方をその場に作ること)。
 - KTD9. **Google スライドのスライドの ID は `sd_<キー>_<内容のハッシュ値>`** (session-settled: user-approved; chosen over `<キー>_<作り直した回数>`: 作り直すスライドと、途中で失敗した後に残る作業が、資料を読むだけで機械的に決まるため)。内容のハッシュ値は、そのスライドのデータ (図形・線・文字・題名・一言) から計算し、ID・位置・発表者ノートを含めない (session-settled: user-approved; chosen over 指示の配列から計算すること: ノートだけの修正・前へのスライドの挿入・指示の作り方の修正で、変えていないスライドまで作り直しにならないため)。発表者ノートは ID に含めず、KTD10 のとおり文を比べて入れ直す。接頭辞 `sd_` は、キーの無いスライドと判別するためと、ID の長さの下限 (5 文字) を満たすため。図形の ID は `<スライドの ID>_<番号>`。キーは `[a-z0-9-]` の 1〜32 文字、ハッシュ値は 16 進数の 10 文字、図形の番号は 3 桁まで (Google スライドの objectId の上限 50 文字に収まる: 3+32+1+10+1+3=50)。
@@ -369,19 +369,24 @@ slide-deck/
 - **Goal**: スライドのデータから、文字が箱からはみ出しそうな箇所を一覧にする。
 - **Requirements**: R13, KTD6
 - **Dependencies**: U2
-- **Files**: `slide-deck/src/fit/estimate.ts`・`slide-deck/tests/fit.test.ts`
+- **Files**: `slide-deck/src/fit/estimate.ts`・`slide-deck/src/fit/east-asian-width.ts` (全角として数える文字の範囲の表。Python で生成する。KTD6)・`slide-deck/tests/fit.test.ts`
 - **Approach**:
   1. 元の `fitcheck.py` の式 (KTD6) を、文字の箱・図形の中の文字・重ねた文字の箱に当てる。
-  2. 内側の余白は、PowerPoint と Google スライドの大きい方 (左右 0.1 インチ・上下 0.05 インチ) で見積もる。
-  3. 結果は、スライドのキー・要素の番号・要る高さ・箱の高さ・文字の先頭を持つ一覧にする。
+  2. 内側の余白は、各辺で、データの余白と Google スライドの余白 (左右 0.1 インチ・上下 0.05 インチ。API で変えられない) の大きい方で見積もる。
+  3. 一言も、部品の関数 `takeaway` が作る箱で見積もる (session-settled: user-approved; chosen over 図の要素だけを対象にすること)。題名は、U5 で題名の箱を決めるときに対象に足す。
+  4. 結果は、スライドのキー・要素の番号 (一言は `takeaway`)・要る高さ・文字を置ける高さ (箱の高さから上下の余白を引いた高さ)・文字の先頭を持つ一覧にする。
 - **Patterns to follow**: 元の `fitcheck.py`。
 - **Test scenarios**:
-  - 全角 10 文字・14 ポイントの文字が幅 2 インチの箱に 1 行で入るとき、一覧は空になる。
-  - 同じ文字が幅 1 インチの箱で 2 行になり、高さが 1 行分しか無いとき、一覧に 1 件出る。
+  - 全角 10 文字・14 ポイントの文字が、文字を置ける幅 (箱の幅から左右の余白を引いた幅) 2 インチの箱に 1 行で入るとき、一覧は空になる。
+  - 同じ文字が、文字を置ける幅 1 インチの箱で 2 行になり、高さが 1 行分しか無いとき、一覧に 1 件出る。
   - 改行を含む文字は、行ごとに見積もる。
   - 半角の英数字は 0.58 文字分の幅で数える。
   - 一部ずつ大きさの違う文字は、行ごとに最も大きい文字で見積もる。
   - 幅が余白より狭い箱は、一覧に出る。
+  - データの余白が Google スライドの余白より大きいときは、データの余白で見積もる。
+  - 段落の後の間隔は、段落の間にだけ足す。
+  - 箇条書きの項目は、文字を置ける幅から字下げの 16 ポイントを引いて見積もる。
+  - 一言は、部品の関数 `takeaway` が作る箱で見積もる。
 - **Verification**: 見本の資料で一覧が空になる。わざと狭くした箱で一覧に出る。
 
 ### U8. キャッシュのディレクトリへのインストール

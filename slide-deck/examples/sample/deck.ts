@@ -1,6 +1,8 @@
 // 見本の資料「キャッシュのしくみ」の資料ごとのスクリプト。
 // 構成案 outline.md のキーごとの図を、部品の関数だけで作る。題名・一言・発表者ノートは構成案から読むので、ここには書かない。
 // スライドの大きさは 10×5.625 インチ。図は、題名の下 (y が 1.2 インチ) から、一言の上 (y が 4.6 インチ) までに置く。
+// 文字を持つ要素の大きさは、はみ出しの見積もり (ファイル src/fit/estimate.ts) の一覧が空になるように決めた。
+// 番号の円の直径を 0.32 インチにしたのは、0.3 インチでは、Google スライドの上下の余白 (0.05 インチずつ) を引くと 12 ポイントの 1 行が収まらないため。
 
 import type { DeckScript, Theme } from "slide-deck";
 
@@ -35,10 +37,10 @@ const deck: DeckScript = (p) => {
   p.arrow(readPath, 6.1, 2.35, 7.3, 2.35, { dash: true });
   p.arrow(readPath, 7.3, 2.85, 6.1, 2.85, { dash: true });
   p.arrow(readPath, 3.9, 2.85, 2.7, 2.85);
-  p.badge(readPath, 1, 3.15, 1.85, 0.3);
-  p.badge(readPath, 2, 6.55, 1.85, 0.3, { fill: "accent5" });
-  p.badge(readPath, 3, 6.55, 2.95, 0.3, { fill: "accent5" });
-  p.badge(readPath, 4, 3.15, 2.95, 0.3);
+  p.badge(readPath, 1, 3.14, 1.84, 0.32);
+  p.badge(readPath, 2, 6.54, 1.84, 0.32, { fill: "accent5" });
+  p.badge(readPath, 3, 6.54, 2.94, 0.32, { fill: "accent5" });
+  p.badge(readPath, 4, 3.14, 2.94, 0.32);
   p.text(readPath, "破線の ② と ③ は、キャッシュに値が無いときだけ", 0.5, 3.8, 9.0, 0.4, {
     fontSize: 12,
     color: "dk2",
@@ -49,8 +51,8 @@ const deck: DeckScript = (p) => {
   const hitMiss = p.slide("hit-miss");
   p.card(hitMiss, 0.5, 1.3, 4.3, 3.2);
   p.card(hitMiss, 5.2, 1.3, 4.3, 3.2);
-  p.text(hitMiss, [{ text: "ヒット", bold: true, color: "accent4" }], 0.8, 1.5, 3.7, 0.4, { fontSize: 18 });
-  p.text(hitMiss, [{ text: "ミス", bold: true, color: "accent5" }], 5.5, 1.5, 3.7, 0.4, { fontSize: 18 });
+  p.text(hitMiss, [{ text: "ヒット", bold: true, color: "accent4" }], 0.8, 1.5, 3.7, 0.42, { fontSize: 18 });
+  p.text(hitMiss, [{ text: "ミス", bold: true, color: "accent5" }], 5.5, 1.5, 3.7, 0.42, { fontSize: 18 });
   p.text(
     hitMiss,
     p.bullets(["キャッシュの値をそのまま返す", "DB に問い合わせない"]),
