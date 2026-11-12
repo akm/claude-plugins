@@ -157,6 +157,8 @@ export const SLIDE_SIZE = { w: 10, h: 5.625 } as const;
  * どのスライドも、大きさは SLIDE_SIZE。
  */
 export interface Deck {
+  /** 資料の題名。構成案の先頭の # の行から取る。PowerPoint のファイルの文書のプロパティ (タイトル) に書く。 */
+  title: string;
   theme: Theme;
   slides: Slide[];
 }
