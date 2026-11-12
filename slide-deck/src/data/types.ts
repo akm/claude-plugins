@@ -145,7 +145,17 @@ export interface Slide {
   elements: SlideElement[];
 }
 
-/** 1 つの資料のデータ。2 つの書き出しの処理は、これだけを読む。slides の順序は構成案のスライドの順序。 */
+/**
+ * スライドの大きさ (インチ)。幅 10・高さ 5.625 (横と縦の比が 16:9)。
+ * pptxgenjs のレイアウト LAYOUT_16x9 と、Google スライドの新しい資料のデフォルトの大きさと同じ。
+ * 部品の関数 title と takeaway の位置と、資料ごとのスクリプトが置く図の位置は、この大きさを前提にする。
+ */
+export const SLIDE_SIZE = { w: 10, h: 5.625 } as const;
+
+/**
+ * 1 つの資料のデータ。2 つの書き出しの処理は、これだけを読む。slides の順序は構成案のスライドの順序。
+ * どのスライドも、大きさは SLIDE_SIZE。
+ */
 export interface Deck {
   theme: Theme;
   slides: Slide[];

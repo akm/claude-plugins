@@ -422,8 +422,25 @@ export function badge(
 }
 
 /**
+ * 題名を、スライドの上の決まった位置の文字の箱として足す。位置と書式は、元にした build.js の題名のプレースホルダーと同じ。
+ * PowerPoint の書き出しは、この箱の位置と書式で題名のプレースホルダーを作り、そこに題名を入れる。
+ * はみ出しの見積もりは、この箱で題名を見積もる。題名は構成案から読むので、資料ごとのスクリプトには渡さない (型 Parts に含めない)。
+ * 位置は、スライドの大きさ (型 Deck の説明) を前提にする。
+ */
+export function title(s: SlideFigure, t: string): void {
+  text(s, t, 0.5, 0.58, 9.0, 0.62, {
+    fontSize: 24,
+    bold: true,
+    color: "dk1",
+    valign: "middle",
+    name: "title",
+  });
+}
+
+/**
  * 一言 (そのスライドで伝えたいことの 1 文) を、スライドの下の決まった位置の文字の箱として足す。
  * 一言は構成案から読むので、資料ごとのスクリプトには渡さない (型 Parts に含めない)。
+ * 位置は、スライドの大きさ (型 Deck の説明) を前提にする。
  */
 export function takeaway(s: SlideFigure, t: string): void {
   text(s, t, 0.5, 4.78, 8.5, 0.42, {
