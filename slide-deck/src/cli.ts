@@ -4,7 +4,7 @@
 
 import { parseArgs } from "node:util";
 import { checkDeck, ExecutionError, formatCheckReport } from "./check/deck.ts";
-import { buildPptx } from "./pptx/build.ts";
+import { buildPptx, removePreviousPptx } from "./pptx/build.ts";
 import { formatStatus, inspect, install, REQUIRED_NODE_MAJOR, SetupError, statusExitCode } from "./setup/setup.ts";
 
 const USAGE_PREFIX = "使い方: node <プラグインのディレクトリ>/src/cli.ts";
@@ -208,6 +208,10 @@ ${CHECK_OUTPUT}
      validate.py を実行できないか、0 と 1 以外の終了コードで終了した
 `,
     run: async (args) => {
+      // 引数の誤りで終了するときも、前に書いた build/deck.pptx を残さないよう、引数の確認より前に消す。
+      // 位置で決まる引数の数が違っても、最初の引数を資料のディレクトリとして扱う (消すのは生成したファイルだけ)
+      const [first] = args.positionals;
+      if (first !== undefined) removePreviousPptx(first);
       expectArgs(args, ["<資料のディレクトリ>"], true);
       const [deckDir = ""] = args.positionals;
       if (args.pptxSkill === undefined || args.pptxSkill === "") {

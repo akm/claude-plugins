@@ -105,12 +105,13 @@ export interface PptxReport {
 }
 
 /**
- * 前に書いた build/deck.pptx を消す。終了コード 2 で終了しうる確認 (pptx のスキル・ライブラリ・資料のディレクトリ) より前に呼ぶ。
+ * 前に書いた build/deck.pptx を消す。終了コード 2 で終了しうる確認 (入口の引数・pptx のスキル・ライブラリ・資料のディレクトリ) より前に呼ぶ。
+ * 入口のサブコマンド pptx は引数の確認より前に、関数 buildPptx は最初に呼ぶ (入口を通らない呼び出しのため)。
  * 確認の後に消すと、確認で終了した実行の後に、前の実行のファイルが残る。
  * 資料のディレクトリのパスがディレクトリでなければ (無い・通常のファイル)、消すものは無く、後の関数 deckPaths が実行の誤りにする。
  * 消せないとき (build/deck.pptx がディレクトリのときなど) は、パスと理由を示す ExecutionError を送出する
  */
-function removePreviousPptx(deckDir: string): void {
+export function removePreviousPptx(deckDir: string): void {
   const dir = resolve(deckDir);
   if (!existsSync(dir) || !statSync(dir).isDirectory()) return;
   const pptxPath = join(dir, "build", "deck.pptx");

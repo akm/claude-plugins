@@ -275,6 +275,18 @@ describe("pptx", () => {
     assert.doesNotMatch(r.stderr, /\n {4}at /);
   });
 
+  test("引数の誤りで終了するときも、前に書いた build/deck.pptx を消す", () => {
+    const deck = sandbox.copySample();
+    const pptx = join(deck, "build", "deck.pptx");
+    mkdirSync(join(deck, "build"));
+    for (const args of [["pptx", deck], ["pptx", deck, "extra", "--pptx-skill", FAKE_PPTX_SKILL]]) {
+      writeFileSync(pptx, "前に書いたファイル");
+      const r = runCli(args);
+      assert.equal(r.status, 2, r.stdout + r.stderr);
+      assert.equal(existsSync(pptx), false, args.join(" "));
+    }
+  });
+
   test("--pptx-skill が無いと、説明を示して終了コード 2 になる", () => {
     const deck = sandbox.copySample();
     const r = runCli(["pptx", deck]);
