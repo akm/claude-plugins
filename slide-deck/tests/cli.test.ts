@@ -257,6 +257,24 @@ describe("pptx", () => {
     assert.equal(existsSync(pptx), false);
   });
 
+  test("資料のディレクトリとして通常のファイルを渡すと、説明を示して終了コード 2 になり、スタックトレースを出さない", () => {
+    const deck = sandbox.copySample();
+    const file = join(deck, "outline.md");
+    const r = runCli(["pptx", file, "--pptx-skill", FAKE_PPTX_SKILL]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.equal(r.stderr, `資料のディレクトリ ${file} が無い\n`);
+  });
+
+  test("前に書いた build/deck.pptx を消せないと、パスと理由を示して終了コード 2 になり、スタックトレースを出さない", () => {
+    const deck = sandbox.copySample();
+    const pptx = join(deck, "build", "deck.pptx");
+    mkdirSync(pptx, { recursive: true });
+    const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, new RegExp(`^前に書いた ${pptx.replace(/[.]/g, "\\.")} を消せない: `));
+    assert.doesNotMatch(r.stderr, /\n {4}at /);
+  });
+
   test("--pptx-skill が無いと、説明を示して終了コード 2 になる", () => {
     const deck = sandbox.copySample();
     const r = runCli(["pptx", deck]);

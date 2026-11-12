@@ -5,7 +5,7 @@
 // 入口のサブコマンド pptx の引数・出力・終了コードの SSOT は、ファイル src/cli.ts の --help。
 
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type CheckOptions, type CheckReport, checkDeck, deckPaths, ExecutionError, installedCache } from "../check/deck.ts";
 import { type CachePaths, venvState } from "../setup/setup.ts";
@@ -105,14 +105,29 @@ export interface PptxReport {
 }
 
 /**
+ * 前に書いた build/deck.pptx を消す。終了コード 2 で終了しうる確認 (pptx のスキル・ライブラリ・資料のディレクトリ) より前に呼ぶ。
+ * 確認の後に消すと、確認で終了した実行の後に、前の実行のファイルが残る。
+ * 資料のディレクトリのパスがディレクトリでなければ (無い・通常のファイル)、消すものは無く、後の関数 deckPaths が実行の誤りにする。
+ * 消せないとき (build/deck.pptx がディレクトリのときなど) は、パスと理由を示す ExecutionError を送出する
+ */
+function removePreviousPptx(deckDir: string): void {
+  const dir = resolve(deckDir);
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) return;
+  const pptxPath = join(dir, "build", "deck.pptx");
+  try {
+    rmSync(pptxPath, { force: true });
+  } catch (e) {
+    throw new ExecutionError(`前に書いた ${pptxPath} を消せない: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/**
  * 資料のディレクトリを検査し、指摘が無ければ build/deck.pptx を書き、テーマの色を書き込み、形式を検査する。
  * 前に書いた build/deck.pptx は、最初に消す (ファイルがあることと、最後の実行が書いたことを一致させるため)。
  * テーマの色の書き込みが失敗したら、書いたファイルも消す。validate.py が形式の誤りを見つけたときは、調べられるようファイルを残す
  */
 export async function buildPptx(deckDir: string, options: PptxOptions): Promise<PptxReport> {
-  // 終了コード 2 で終了しうる確認 (pptx のスキル・ライブラリ・資料のディレクトリ) より前に消す。
-  // 確認の後に消すと、確認で終了した実行の後に、前の実行のファイルが残る。資料のディレクトリが無ければ、消すものも無い
-  rmSync(join(resolve(deckDir), "build", "deck.pptx"), { force: true });
+  removePreviousPptx(deckDir);
   const env = options.env ?? process.env;
   const skill = pptxSkill(options.skillDir);
   const cache = installedCache(options);
