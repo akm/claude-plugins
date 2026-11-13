@@ -17,6 +17,8 @@
   records list --issue <参照> [--kind <種類>]    Issue の記録のコメントを集める
   checkboxes list --issue <参照>                 節「クローズ条件」のチェックボックスを、根拠のリンクの有無で分ける
   release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
+  issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
+  issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -34,7 +36,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, checkboxes, draft, gh, records, refs, releaseplan  # noqa: E402
+from issue_practice import bodies, checkboxes, draft, gh, issues, records, refs, releaseplan  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -245,6 +247,41 @@ def cmd_release_current(args):
     return EXIT_OK if status == "ok" else EXIT_UNSATISFIED
 
 
+# --- issues -------------------------------------------------------------------------------------------------------
+
+def _emit_issues(result):
+    status = result.pop("status")
+    if status == "gh_failed":
+        result["gh_error"] = gh.describe_failure(result["gh_error"])
+        _emit(result)
+        return EXIT_EXTERNAL_FAILED
+    _emit(result)
+    return EXIT_OK if status == "ok" else EXIT_UNSATISFIED
+
+
+def _issues_repo(args):
+    repo = refs.parse_repo(args.repo)
+    if "error" in repo:
+        _emit({"draft": os.path.basename(args.file), "repo": args.repo, "errors": [{"line": None, "message": repo["error"]}]})
+        return None
+    return repo["repo_key"]
+
+
+def cmd_issues_plan(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    result, _ = issues.plan(args.file, repo)
+    return _emit_issues(result)
+
+
+def cmd_issues_create(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_issues(issues.create(args.file, repo, record_approval=args.record_approval))
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -409,6 +446,41 @@ def build_parser():
     p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)")
     p.add_argument("--target", help="リリース対象の名前 (ラベル release-target:<名前> の <名前>)")
     p.add_argument("--carve-out", action="store_true", help="後で行う作業を切り出すときに付ける。実行中の今のリリースを選べないものとして返す")
+
+    g = groups.add_parser("issues", help="計画案の節「作る Issue」から Issue を作る").add_subparsers(
+        dest="command", required=True)
+    issues_output = (
+        "  draft             計画案のファイル名\n"
+        "  repo              リポジトリ (owner/repo)\n"
+        "  labels_to_create  作るラベル {name, color, description} の配列 (スキルが作るラベルで、リポジトリに無いもの)\n"
+        "  items             作る Issue {key, title, line, issue, actions} の配列 (計画案の順)。issue は作り済みなら\n"
+        "                    {number, url}、無ければ null。actions は行う書き込み {action, ...} の配列で、action は\n"
+        "                    create (title・milestone・labels)・set-milestone (milestone)・add-labels (labels)・\n"
+        "                    set-parent (parent)・add-blocked-by (issues) のどれか。作り済みで足りないものが無ければ空\n"
+        "  errors            誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
+        "  gh_error          gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "plan", cmd_issues_plan,
+             "計画案 (先頭の書式と節「作る Issue」。書式は文書 references/issue-bodies.md) と GitHub の今の状態から、\n"
+             "行う書き込みの一覧を返す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない。\n"
+             "本文の末尾に同じ created-from の行を持つ開いた Issue は作り済みとして扱い、足りない設定だけを返す",
+             issues_output,
+             _exit_help("一覧を作れた", "計画案の形が違う・GitHub の状態が計画案と合わない", "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    p = _add(g, "create", cmd_issues_create,
+             "plan と同じ一覧を作り、誤りが無ければ書き込む (実行する)。ラベルを作り、Issue を上から順に作って、\n"
+             "マイルストーン・ラベル・親 Issue・blocked by を設定する。途中で失敗したら、同じ計画案でやり直せる\n"
+             "(作り済みの Issue は作らず、足りない設定だけを行う)",
+             issues_output + "\n"
+             "  done              行った書き込み {key, action, url} の配列 (action は create-label・record-approval と\n"
+             "                    actions の action)。gh が失敗したときは、失敗する前までのもの\n"
+             "  issues            作った (か作り済みの) Issue {key, url} の配列",
+             _exit_help("すべて書き込んだ", "計画案の形が違う・GitHub の状態が計画案と合わない (何も書き込まない)",
+                        "gh が失敗した (done までは書き込んだ)"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    p.add_argument("--record-approval", action="store_true",
+                   help="Issue ごとに、記録のコメント approval (draft=<計画案のファイル名>) が無ければ書く")
 
     return parser
 
