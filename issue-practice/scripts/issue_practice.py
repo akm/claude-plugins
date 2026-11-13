@@ -16,6 +16,7 @@
   records parse <行>                             記録のコメントの 1 行目を解析する
   records list --issue <参照> [--kind <種類>]    Issue の記録のコメントを集める
   checkboxes list --issue <参照>                 節「クローズ条件」のチェックボックスを、根拠のリンクの有無で分ける
+  checkboxes check --issue <参照> --line <行番号> (--evidence <URL> | --carved-out <URL>) --expect-sha256 <値>   チェックを入れてリンクを足す
   checkboxes common --issue <管理 Issue>         開いている作業 Issue のうち、共通の条件のコピーが古いものを一覧にする
   release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
@@ -234,6 +235,37 @@ def cmd_checkboxes_list(args):
         payload["errors"] = ["節「クローズ条件」にチェックボックスが無い"]
     _emit(payload)
     return EXIT_UNSATISFIED if payload["errors"] or parsed["summary"]["unsatisfied"] else EXIT_OK
+
+
+def cmd_checkboxes_check(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "changed": False, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "line": args.line, "changed": False, "item": None,
+               "sha256": issue["sha256"], "errors": []}
+    if issue["sha256"] != args.expect_sha256:
+        payload["errors"] = ["本文が、読んだとき (--expect-sha256) から変わった。checkboxes list で本文を再度読み込んでからやり直す"]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    result = checkboxes.check_line(issue["body"], args.line, evidence=args.evidence, carved_out=args.carved_out)
+    if "error" in result:
+        payload["errors"] = [result["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload["item"] = result["item"]
+    if result["changed"]:
+        written = bodies.write_body(issue["url"], result["body"])
+        if gh.failed(written):
+            _emit({**payload, "gh_error": gh.describe_failure(written)})
+            return EXIT_EXTERNAL_FAILED
+        payload.update(changed=True, sha256=bodies.body_sha256(result["body"]))
+    _emit(payload)
+    return EXIT_OK
 
 
 # --- release ------------------------------------------------------------------------------------------------------
@@ -624,6 +656,25 @@ def build_parser():
     p.add_argument("--record-approval", action="store_true",
                    help="Issue ごとに、記録のコメント approval (draft=<計画案のファイル名>) が無ければ書く")
 
+    p = _add(g_checkboxes, "check", cmd_checkboxes_check,
+             "節「クローズ条件」の項目 (--line) にチェックを入れ、末尾に (根拠: <URL>) か (切り出し: <URL>) を足して、本文を書き換える。\n"
+             "本文が --expect-sha256 (checkboxes list の sha256) から変わっていれば書かない。既に同じリンクがあれば書かない。\n"
+             "別のリンクがあれば書かない (上書きしない)",
+             "  issue・url  Issue の参照と URL\n"
+             "  line        --line の値\n"
+             "  changed     本文を書き換えたか\n"
+             "  item        書いた後の項目 (checkboxes list の items の要素と同じ形)。書けなかったら null\n"
+             "  sha256      書いた後の本文のハッシュ値 (書かなかったときは今の本文のハッシュ値)\n"
+             "  errors      本文が変わった・項目ではない行・既に別のリンクがある・URL ではないなどの理由の配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("書いた (か、既に同じリンクがあった)", "本文が変わった・項目ではない・別のリンクがある (何も書かない)",
+                        "gh が失敗した"))
+    _add_issue_args(p)
+    p.add_argument("--line", required=True, type=int, help="項目の行番号 (checkboxes list の items の line)")
+    link = p.add_mutually_exclusive_group(required=True)
+    link.add_argument("--evidence", help="根拠の URL (テストを実行した PR・確認を記録したコメントなど)")
+    link.add_argument("--carved-out", help="切り出した Issue の URL")
+    p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (checkboxes list の sha256)")
     p = _add(g_checkboxes, "common", cmd_checkboxes_common,
              "管理 Issue の節「すべての作業 Issue に共通するクローズ条件」の項目と、PR マージ計画の表の開いている作業 Issue の\n"
              "共通の条件のコピーを比べる。読むだけ。項目の文と「期待する状態」「確認するポイント」の分類を、上から順に比べる",
