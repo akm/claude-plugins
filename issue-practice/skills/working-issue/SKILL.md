@@ -18,7 +18,7 @@ description: 管理セッションから受け持った作業 Issue 1 つを進�
 | 4 | `gh` か `git` が失敗した。出力の `gh_error` か `git_error` を利用者に示して中断する |
 | 1・2 | スクリプトの不具合。出力をそのまま利用者に示して中断する |
 
-Issue の番号・URL は、文から読み取らず、スクリプトの出力の値をそのまま使う (計画の R52)。
+Issue の番号・URL は、文から読み取らず、スクリプトの出力の値をそのまま使う (計画の R52)。記録のコメントの 1 行目は `issue_practice.py records format <種類> <キー>=<値> ...` で作り、出力の JSON の `line` の値だけを書く (JSON をそのまま書かない)。
 
 ## 報告の送り方
 
@@ -31,8 +31,8 @@ Issue の番号・URL は、文から読み取らず、スクリプトの出力�
 ## 手順
 
 1. **受け持ちを読む**: 最初の指示から、作業 Issue・管理 Issue・報告先の管理セッションの名前と ID・ブランチと作る元・PR のマージ先・PR をマージする人を読む。最初の指示が見当たらないとき (会話が要約されたときなど) は、`issue_practice.py records list --issue <作業 Issue> --kind session` の最後の記録を読む (KTD6)。報告先の管理セッションが替わったというメッセージを受け取ったら、それ以降はその名前に宛てる。
-2. **条件を確認する**: `issue_practice.py checkboxes list --issue <作業 Issue>` でクローズ条件を読み、`issue_practice.py records list --issue <作業 Issue> --kind approval` で承認の記録があることを確認する。条件が足りない・作業の形で書かれている・承認の記録が無いときは、着手せずに報告 (`condition-change`) を送り、管理セッションの判断があるまで待機する (R17・R24)。
-3. **ブランチを作る**: `git fetch origin` の後、`git switch -c <ブランチ> origin/<作る元>` でブランチを作る。
+2. **条件を確認する**: `issue_practice.py checkboxes list --issue <作業 Issue>` でクローズ条件を読み (着手する前は項目が未チェックなので、終了コードは 3 になる。`errors` が空なら、冒頭の表の 3 として扱わずに続ける)、`issue_practice.py records list --issue <作業 Issue> --kind approval` で承認の記録があることを確認する。条件が足りない・作業の形で書かれている・承認の記録が無いときは、着手せずに報告 (`condition-change`) を送り、管理セッションの判断があるまで待機する (R17・R24)。
+3. **ブランチを作る**: `git fetch origin` の後、`git switch -c <ブランチ> origin/<作る元>` でブランチを作る。push は `git push -u origin <ブランチ>` で行う (上流が `origin/<作る元>` になっているので、`git push` だけでは push できないことがある)。
 4. **作業する**: プロジェクトの規約 (`CLAUDE.md` やほかのスキル) に従って作業する。作業の途中で次のことが分かったら、作業を中断して報告を送り、管理セッションの判断があるまで待機する。
    - 1 つの PR では大きすぎて、分けたい (`split`。R31)
    - クローズ条件を変えたい (`condition-change`。R24)
