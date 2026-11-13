@@ -16,6 +16,7 @@
   records parse <行>                             記録のコメントの 1 行目を解析する
   records list --issue <参照> [--kind <種類>]    Issue の記録のコメントを集める
   checkboxes list --issue <参照>                 節「クローズ条件」のチェックボックスを、根拠のリンクの有無で分ける
+  release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -33,7 +34,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, checkboxes, draft, gh, records, refs  # noqa: E402
+from issue_practice import bodies, checkboxes, draft, gh, records, refs, releaseplan  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -227,6 +228,23 @@ def cmd_checkboxes_list(args):
     return EXIT_UNSATISFIED if payload["errors"] or parsed["summary"]["unsatisfied"] else EXIT_OK
 
 
+# --- release ------------------------------------------------------------------------------------------------------
+
+def cmd_release_current(args):
+    repo = refs.parse_repo(args.repo)
+    if "error" in repo:
+        _emit({"repo": args.repo, "errors": [repo["error"]]})
+        return EXIT_UNSATISFIED
+    result = releaseplan.current_and_next(repo["repo_key"], target=args.target, carve_out=args.carve_out)
+    status = result.pop("status")
+    if status == "gh_failed":
+        result["gh_error"] = gh.describe_failure(result["gh_error"])
+        _emit(result)
+        return EXIT_EXTERNAL_FAILED
+    _emit(result)
+    return EXIT_OK if status == "ok" else EXIT_UNSATISFIED
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -367,6 +385,30 @@ def build_parser():
              "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
              _exit_help("すべての項目が checked か carved_out", "満たさない項目がある・範囲や項目が無い", "gh が失敗した"))
     _add_issue_args(p)
+
+    g = groups.add_parser("release", help="リリース計画 Issue とリリース Issue を読む").add_subparsers(
+        dest="command", required=True)
+    release_item = ("{order, number, url, title, subject, draft, running, milestone {number, title, url}, selectable, reason}")
+    p = _add(g, "current", cmd_release_current,
+             "ラベル current の付いたリリース計画 Issue の節「リリースの順番」の表から、今のリリースと次のリリースを決める。読むだけ。\n"
+             "規則は文書 references/release-plan-table.md。決めたリリース Issue とリリースマイルストーンのお互いの URL と、\n"
+             "今のリリースの記録のコメント draft-removed も確認する",
+             "  repo       リポジトリ (owner/repo)\n"
+             "  target     --target の値 (指定しなければ null)\n"
+             "  targets    リポジトリのラベル release-target:<名前> から集めたリリース対象の名前の配列\n"
+             "  plan       表を読んだリリース計画 Issue {number, url, title, created_at}。計画が無ければ null\n"
+             "  swapping   ラベル current の付いた計画が 2 つある (付け替えの途中) なら true\n"
+             f"  current    今のリリース {release_item}。無ければ null。\n"
+             "             running は記録のコメント release-start があるか。--carve-out を付けて running なら selectable が false\n"
+             f"  next       次のリリース (current と同じ形)。無ければ null\n"
+             "  errors     満たさない理由の配列 (リリース対象の指定が要る・計画が 3 つ以上・表の形・お互いの URL・\n"
+             "             draft-removed が無い など)。誤りがあれば current と next は null\n"
+             "  gh_error   gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("決められた (今と次が無い場合も含む)", "決めた形が崩れている・リリース対象の指定が要る",
+                        "gh が失敗した"))
+    p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)")
+    p.add_argument("--target", help="リリース対象の名前 (ラベル release-target:<名前> の <名前>)")
+    p.add_argument("--carve-out", action="store_true", help="後で行う作業を切り出すときに付ける。実行中の今のリリースを選べないものとして返す")
 
     return parser
 
