@@ -21,6 +21,7 @@
   release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
+  sessions active --issue <管理 Issue>           管理セッションと、動いている作業セッションを記録のコメントから集める
   merge-plan show --issue <参照>                 管理 Issue の PR マージ計画の表を読み、表から作った図と本文の図を比べる
   close check --issue <参照> --role <種類> [--managing <管理 Issue>]   閉じる前の検査をする
   dependents plan --issue <参照>                 閉じる Issue を依存先とする Issue への書き込みを示す (示す)
@@ -456,6 +457,33 @@ def cmd_dependents_resolve(args):
     return _emit_status(result)
 
 
+# --- sessions -----------------------------------------------------------------------------------------------------
+
+def cmd_sessions_active(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "managing": None, "sessions": [], "excluded": [], "errors": []}
+    plan = mergeplan.read_region(issue["body"])
+    if "error" in plan or plan["errors"]:
+        payload["errors"] = [plan["error"]] if "error" in plan else _errors_text(plan["errors"])
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    numbers = [row["work"]["number"] for row in plan["rows"] if row["work"]["number"] != ref["number"]]
+    found, failure = records.active_sessions(ref, numbers)
+    if failure:
+        _emit({**payload, "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload.update(found)
+    _emit(payload)
+    return EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -730,6 +758,22 @@ def build_parser():
              "消した項目は書かない",
              dependents_output + "\n  done        行った書き込み {number, action, url} の配列",
              _exit_help("書き込んだ", "Issue が閉じていない", "gh が失敗した (done までは書き込んだ)"))
+    _add_issue_args(p)
+
+    g = groups.add_parser("sessions", help="記録のコメントからセッションを集める").add_subparsers(dest="command", required=True)
+    p = _add(g, "active", cmd_sessions_active,
+             "管理 Issue の管理セッションと、PR マージ計画の表の作業 Issue の動いている作業セッションを、記録のコメント session\n"
+             "から集める。読むだけ。作業 Issue ごとに最後の session の記録を使い、閉じた作業 Issue・session の記録が無い\n"
+             "作業 Issue・そのセッションの abandon の記録がある作業 Issue を除く。名前は記録の本文の「- 作業セッションの名前: 」の行",
+             "  issue・url  管理 Issue の参照と URL\n"
+             "  managing    管理 Issue の最後の session の記録 (role=managing) {session, previous, branch, name, record_url}。\n"
+             "              無ければ null\n"
+             "  sessions    動いている作業セッション {number, url, session, previous, branch, name, record_url} の配列。\n"
+             "              name は記録に名前の行が無ければ null\n"
+             "  excluded    除いた作業 Issue {number, url, reason (closed・no-session・abandoned)} の配列\n"
+             "  errors      PR マージ計画が無い・形の誤りの配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("集められた", "PR マージ計画が無いか形が違う", "gh が失敗した"))
     _add_issue_args(p)
 
     g = groups.add_parser("merge-plan", help="管理 Issue の PR マージ計画を読む・書く").add_subparsers(
