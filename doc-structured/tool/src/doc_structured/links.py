@@ -119,9 +119,20 @@ def target_uses(handwritten: HandwrittenFile, document: markdown.Document, index
     return uses
 
 
+def collapse_spaces(text: str) -> str:
+    """連続する空白 (改行を含む) を空白 1 つにし、前後の空白を除いたもの。"""
+    return " ".join(text.split())
+
+
 def display_text(reference: markdown.Reference) -> str:
     """表示の文を、連続する空白 (改行を含む) を空白 1 つにし、前後の空白を除いた形にしたもの。"""
-    return " ".join(reference.text.split())
+    return collapse_spaces(reference.text)
+
+
+def is_writable(display: str, target: Target) -> bool:
+    """表示の文 display (display_text の形) が、参照先の書ける形のどれかと同じか。書ける形の側も、連続する空白を
+    空白 1 つにして比べる (見出しの文や日本語名に、全角空白や連続する空白があるため)。"""
+    return display in {collapse_spaces(form) for form in target.writable_forms()}
 
 
 def form_lines(forms: list[str]) -> str:
@@ -269,13 +280,12 @@ class _FileChecker:
         for use in target_uses(self.file, self.document, self.index):
             if not use.first:
                 continue
-            forms = use.target.writable_forms()
             display = display_text(use.reference)
-            if display in forms:
+            if is_writable(display, use.target):
                 continue
             self.problem(
                 f"参照先 {use.target.id} を最初に指す箇所の表示の文「{display}」が、書ける形のどれとも違う。書ける形:",
-                use.reference.line, use.reference.column, form_lines(forms),
+                use.reference.line, use.reference.column, form_lines(use.target.writable_forms()),
             )
 
 

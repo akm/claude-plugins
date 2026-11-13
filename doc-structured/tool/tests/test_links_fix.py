@@ -395,6 +395,20 @@ class FirstUseTest(ScratchTestCase):
         self.assertEqual(body, "[モデル「貸出」][貸出] と [貸出][モデル「貸出」]")
         self.assertCheckPasses()
 
+    def test_heading_with_spaces_passes_check_after_links_fix(self):
+        # 見出しの文に全角空白と連続する空白がある節を指すリンクも、links-fix の後に検査 b が成功する
+        self.write(
+            CONCEPT,
+            f'{HEAD}<a name="d-loans-concept-h-due"></a>\n\n## 返却　期限  の数え方\n\n[期限] と [節「返却 期限 の数え方」][期限]\n\n'
+            '[期限]: #d-loans-concept-h-due "x"\n',
+        )
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[節「返却　期限  の数え方」][期限] と [返却　期限  の数え方][期限]", self.read(CONCEPT))
+        self.assertCheckPasses()
+        again = self.run_tool("links-fix")
+        self.assertEqual((again.returncode, again.stdout), (0, "直すものは無かった\n"))
+
     def test_documents_with_invalid_first_uses_pass_check_after_links_fix(self):
         # クローズ条件: links-fix を実行すると、検査 b (初出) が成功する (定義の行が無い状態から)
         for path in (CONCEPT, CHILD):

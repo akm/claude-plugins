@@ -300,6 +300,16 @@ class FirstUseTest(LinksTestCase):
             ],
         )
 
+    def test_spaces_in_heading_are_collapsed_on_both_sides(self):
+        # 見出しの文に全角空白や連続する空白があっても、書ける形の側も空白をまとめて比べる
+        text = (
+            f'{HEAD}<a name="d-loans-concept-h-due"></a>\n\n## 返却　期限  の数え方\n\n'
+            "[節「返却　期限  の数え方」][期限] と [節「返却 期限 の数え方」][期限2]\n\n"
+            '[期限]: #d-loans-concept-h-due "ドメイン `loans` のファイル `concept.md` の節「返却　期限  の数え方」"\n'
+        )
+        self.assertPasses(text.replace(" と [節「返却 期限 の数え方」][期限2]", ""))
+        self.assertEqual(self.first_use_problems(text.replace("[節「返却　期限  の数え方」][期限] と ", "").replace("[期限2]", "[期限]")), [])
+
     def test_shortcut_label_that_is_a_writable_form_passes(self):
         self.assertPasses(f"{HEAD}[モデル「貸出」]\n\n{LOAN_DEFINITION}")
 

@@ -35,6 +35,7 @@ from .links import (
     form_lines,
     image_only_labels,
     is_external,
+    is_writable,
     resolve,
     strip_angle,
     target_uses,
@@ -297,10 +298,9 @@ def fix_texts(handwritten: HandwrittenFile, lines: list[str], index: Index) -> t
     for use in target_uses(handwritten, document, index):
         reference, target = use.reference, use.target
         display = display_text(reference)
-        forms = target.writable_forms()
         label = _label_text(reference.label)
         if use.first:
-            if display in forms:
+            if is_writable(display, target):
                 continue
             if reference.form == "shortcut":
                 replacements.append((reference, f"[{target.form_for(from_parts)}][{label}]"))
@@ -309,12 +309,12 @@ def fix_texts(handwritten: HandwrittenFile, lines: list[str], index: Index) -> t
                     handwritten.path, reference.line, reference.column,
                     f"参照先 {target.id} を最初に指す箇所の表示の文「{display}」が、書ける形のどれとも違う。"
                     "書ける形に置き換えるか、文を修正する。書ける形:",
-                    form_lines(forms),
+                    form_lines(target.writable_forms()),
                 ))
             continue
         if target.name is None:
             continue
-        if display not in forms and markdown.normalize_label(display) != markdown.normalize_label(target.id):
+        if not is_writable(display, target) and markdown.normalize_label(display) != markdown.normalize_label(target.id):
             continue
         if markdown.normalize_label(label) == markdown.normalize_label(target.name):
             short = f"[{label}]"
