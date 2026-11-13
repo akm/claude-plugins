@@ -157,6 +157,14 @@ def find_section(body, title, level=2):
     return {"title": title, "heading_line": start + 1, "end_line": end, "content": content, "lines": inner}
 
 
+def write_body(url, body):
+    """Issue の本文を body に書き換える (`gh issue edit <URL> --body-file -`)。返り値は gh.run の結果。
+
+    書く前に本文が読んだときから変わっていないかを確認するのは、呼び出し元 (計画の KTD7)。
+    """
+    return gh.run(["issue", "edit", url, "--body-file", "-"], mutation=True, stdin=body)
+
+
 ISSUE_FIELDS = "number,url,state,title,body,updatedAt"
 
 

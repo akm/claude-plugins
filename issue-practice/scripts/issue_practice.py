@@ -19,6 +19,8 @@
   release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
+  merge-plan show --issue <参照>                 管理 Issue の PR マージ計画の表を読み、表から作った図と本文の図を比べる
+  merge-plan set-pr --issue <参照> --work <作業 Issue> --pr <URL> --expect-sha256 <値>   表の列「PR」に PR の URL を書く
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -36,7 +38,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, checkboxes, draft, gh, issues, records, refs, releaseplan  # noqa: E402
+from issue_practice import bodies, checkboxes, draft, gh, issues, mergeplan, records, refs, releaseplan  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -282,6 +284,86 @@ def cmd_issues_create(args):
     return _emit_issues(issues.create(args.file, repo, record_approval=args.record_approval))
 
 
+# --- merge-plan ---------------------------------------------------------------------------------------------------
+
+def _errors_text(errors):
+    return [f"行 {e['line']}: {e['message']}" if e["line"] else e["message"] for e in errors]
+
+
+def cmd_merge_plan_show(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "sha256": issue["sha256"], "settings": None, "rows": [],
+               "graph": None, "graph_matches": None, "managing_pr_notice": None, "errors": []}
+    plan = mergeplan.read_region(issue["body"])
+    if "error" in plan:
+        payload["errors"] = [plan["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload.update(settings=plan["settings"], rows=mergeplan.rows_output(plan, ref["owner"], ref["repo"]))
+    if plan["errors"]:
+        payload["errors"] = _errors_text(plan["errors"])
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload["graph"] = mergeplan.graph(plan)
+    payload["graph_matches"] = mergeplan.extract_graph(plan["content"]) == payload["graph"]
+    if plan["settings"]["config"] == "2":
+        payload["managing_pr_notice"] = mergeplan.DRAFT_PR_NOTICE.format(url=issue["url"])
+    _emit(payload)
+    return EXIT_OK if payload["graph_matches"] else EXIT_UNSATISFIED
+
+
+def cmd_merge_plan_set_pr(args):
+    ref, error = _issue_ref(args)
+    work = refs.parse_ref(args.work, default_repo=ref["key"].split("#")[0]) if ref else None
+    if error or "error" in work:
+        _emit({"issue": ref["key"] if ref else None, "changed": False, "errors": [error or work["error"]]})
+        return EXIT_UNSATISFIED
+    payload = {"issue": ref["key"], "work": work["key"], "pr": args.pr, "changed": False, "previous": None, "sha256": None,
+               "errors": []}
+    if f"{work['owner']}/{work['repo']}".lower() != f"{ref['owner']}/{ref['repo']}".lower():
+        payload["errors"] = ["作業 Issue は、管理 Issue と同じリポジトリの Issue にする"]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({**payload, "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload["sha256"] = issue["sha256"]
+    if issue["sha256"] != args.expect_sha256:
+        payload["errors"] = ["本文が、読んだとき (--expect-sha256) から変わった。本文を再度読み込んでからやり直す"]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    plan = mergeplan.read_region(issue["body"])
+    if "error" in plan or plan["errors"]:
+        payload["errors"] = [plan["error"]] if "error" in plan else _errors_text(plan["errors"])
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    changed = mergeplan.set_pr(plan, work["number"], args.pr)
+    if "error" in changed:
+        payload["errors"] = [changed["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload["previous"] = changed["previous"]
+    if changed["previous"] == args.pr:
+        _emit(payload)
+        return EXIT_OK
+    new_body = bodies.replace_region(issue["body"], mergeplan.REGION, mergeplan.render(changed["plan"]))["body"]
+    result = bodies.write_body(issue["url"], new_body)
+    if gh.failed(result):
+        _emit({**payload, "gh_error": gh.describe_failure(result)})
+        return EXIT_EXTERNAL_FAILED
+    payload.update(changed=True, sha256=bodies.body_sha256(new_body))
+    _emit(payload)
+    return EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -481,6 +563,43 @@ def build_parser():
     p.add_argument("--repo", required=True, help="Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
     p.add_argument("--record-approval", action="store_true",
                    help="Issue ごとに、記録のコメント approval (draft=<計画案のファイル名>) が無ければ書く")
+
+    g = groups.add_parser("merge-plan", help="管理 Issue の PR マージ計画を読む・書く").add_subparsers(
+        dest="command", required=True)
+    rows_help = ("  rows      表の行 {order, work {number, key, description, url}, branch, base, requires (番号の配列), pr,\n"
+                 "            pr_url, line} の配列 (表の順)")
+    p = _add(g, "show", cmd_merge_plan_show,
+             "管理 Issue の本文のマーク merge-plan の範囲から、設定と PR マージ計画の表を読み、表から gitGraph の図を作って、\n"
+             "本文の図と比べる。読むだけ。書式は文書 skills/managing-issue-plan/references/merge-plan.md",
+             "  issue・url  管理 Issue の参照 (owner/repo#番号) と URL\n"
+             "  sha256    本文の全体のハッシュ値 (set-pr の --expect-sha256 に渡す)\n"
+             "  settings  設定 {config (1・2・3), merger (利用者・管理セッション), managing_branch, managing_base, managing_pr}\n"
+             f"{rows_help}\n"
+             "  graph     表から作った図 (mermaid の gitGraph)。表に誤りがあれば null\n"
+             "  graph_matches       本文の図が graph と同じか。表に誤りがあれば null\n"
+             "  managing_pr_notice  構成 2 のとき、管理 Issue の PR の本文の先頭に書く注意書き。ほかの構成では null\n"
+             "  errors    範囲が無い・表や設定の形の誤りの配列\n"
+             "  gh_error  gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("表が形どおりで、本文の図が表から作った図と同じ", "範囲が無い・表や設定の形の誤り・図が表と違う",
+                        "gh が失敗した"))
+    _add_issue_args(p)
+    p = _add(g, "set-pr", cmd_merge_plan_set_pr,
+             "管理 Issue の PR マージ計画の表で、作業 Issue の行の、列「PR」に PR の URL を書き、図を作り直して本文を書き換える。\n"
+             "本文が --expect-sha256 (show の sha256) から変わっていれば書かない。列が既に同じ URL なら書かない",
+             "  issue     管理 Issue の参照\n"
+             "  work      作業 Issue の参照\n"
+             "  pr        書いた PR の URL\n"
+             "  changed   本文を書き換えたか\n"
+             "  previous  列「PR」の書き換える前の値 (空なら null)\n"
+             "  sha256    書いた後の本文のハッシュ値 (書かなかったときは今の本文のハッシュ値)\n"
+             "  errors    本文が変わった・行が無い・URL が PR ではない・表の形の誤りの配列\n"
+             "  gh_error  gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("書いた (か、既に同じ URL だった)", "本文が変わった・行が無い・形の誤り (何も書かない)", "gh が失敗した"))
+    _add_issue_args(p)
+    p.add_argument("--work", required=True, help="作業 Issue の参照 (#番号・番号・URL。リポジトリは管理 Issue と同じ)")
+    p.add_argument("--pr", required=True, help="PR の URL (https://github.com/<owner>/<repo>/pull/<番号>)")
+    p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (merge-plan show の sha256)")
+
 
     return parser
 
