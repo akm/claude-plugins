@@ -5,13 +5,17 @@
 - 文書 `issue-practice/references/closing-conditions.md` の範囲の名前とチェックボックスの状態が、モジュール bodies と
   checkboxes の定数と一致する
 - 文書 `issue-practice/references/draft-plan.md` の書式の行が、モジュール draft の定数と一致する
+- 入口 (ファイル `issue-practice/scripts/issue_practice.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの --help が、
+  引数・出力・終了コードを示す (計画の KTD2・KTD10)
 """
 
 import os
 import re
+import subprocess
+import sys
 import unittest
 
-from fakegh_case import HERE
+from fakegh_case import ENTRY, HERE
 
 from issue_practice import bodies, checkboxes, draft, records  # noqa: E402
 
@@ -109,6 +113,57 @@ class DraftPlanDocTest(unittest.TestCase):
         self.assertIn(f"{draft.NONE_ITEM}", doc)
         self.assertIn("本文の SHA-256: <64 桁の 16 進数>", doc)
         self.assertIn("# 計画案: <題>", doc)
+
+
+def entry_subcommands():
+    """入口の docstring の「サブコマンドの一覧」に書いた (グループ, コマンド) の配列。"""
+    with open(ENTRY, encoding="utf-8") as f:
+        text = f.read()
+    doc = text.split('"""')[1]
+    listing = doc.split("サブコマンドの一覧:\n", 1)[1].split("\n\n", 1)[0]
+    return [tuple(line.split()[:2]) for line in listing.splitlines() if line.startswith("  ")]
+
+
+def run_entry(*args):
+    return subprocess.run([sys.executable, ENTRY, *args], capture_output=True, text=True)
+
+
+class EntryHelpTest(unittest.TestCase):
+
+    def test_docstring_lists_every_subcommand(self):
+        listed = entry_subcommands()
+        self.assertTrue(listed)
+        groups = sorted({group for group, _ in listed})
+        top = run_entry("--help").stdout
+        for group in groups:
+            with self.subTest(group=group):
+                self.assertIn(group, top)
+                help_text = run_entry(group, "--help").stdout
+                choices = re.search(r"\{([a-z,-]+)\}", help_text).group(1).split(",")
+                self.assertEqual(sorted(choices), sorted(cmd for g, cmd in listed if g == group),
+                                 f"docstring の一覧と argparse のサブコマンドが一致すること ({group})")
+
+    def test_each_help_shows_arguments_output_and_exit_codes(self):
+        for group, command in entry_subcommands():
+            with self.subTest(command=f"{group} {command}"):
+                completed = run_entry(group, command, "--help")
+                self.assertEqual(completed.returncode, 0)
+                text = completed.stdout
+                self.assertIn("usage:", text)
+                self.assertIn("出力 (標準出力の JSON):", text)
+                self.assertIn("終了コード:", text)
+                codes = re.findall(r"^  ([0-9])  ", text.split("終了コード:", 1)[1], re.MULTILINE)
+                self.assertEqual(codes, ["0", "3", "4"], "終了コードは 0・3・4 の 3 つを示すこと")
+
+    def test_docstring_exit_codes(self):
+        with open(ENTRY, encoding="utf-8") as f:
+            doc = f.read().split('"""')[1]
+        exit_section = doc.split("終了コード (計画の KTD10):\n", 1)[1]
+        self.assertEqual(re.findall(r"^  ([0-9])  ", exit_section, re.MULTILINE), ["0", "3", "4"])
+
+    def test_argument_error_is_exit_2(self):
+        self.assertEqual(run_entry("records", "list").returncode, 2, "引数の誤りは argparse の 2 のまま")
+        self.assertEqual(run_entry("no-such").returncode, 2)
 
 
 if __name__ == "__main__":
