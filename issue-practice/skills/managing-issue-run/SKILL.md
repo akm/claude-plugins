@@ -67,6 +67,7 @@ PR をマージする人が管理セッションのときは、PR のマージ�
 2. このセッションに、規則どおりの名前を `set_session_title` で付ける。
 3. 管理 Issue に、記録のコメント `session` (`role=managing`・`previous=<前の ID>`。本文に前の管理セッションの名前と替えた理由) を書く。
 4. `issue_practice.py sessions active --issue <管理 Issue>` で動いている作業セッションを集め、それぞれの名前 (`sessions[].name`) に宛てて、新しい管理セッションの名前と ID を `SendMessage` で送る。名前が null の作業セッションは、利用者に質問する。
+5. 交代の途中に届いた報告と、宛先の名前が見つからずに届かなかった報告を処理する。手順 4 の作業セッションの作業 Issue ごとに、`issue_practice.py records list --issue <作業 Issue> --kind report` で報告を読み、まだ処理していないもの (PR マージ計画の表に無い PR など) を節「C. 報告を受ける」で処理する。手順 2 の後に届いたメッセージも、手順 4 を終えてから処理する。
 
 作業セッションが替わったときは、新しい作業セッションの記録のコメント `session` に、前の作業セッションの ID (`previous=`) と名前と替えた理由を書く。作業 Issue を閉じずに作業セッションを終えるときは、理由を記録のコメント `abandon` に書く (R29)。
 
