@@ -12,6 +12,9 @@
   draft path --root <ルート> --skill <スキル> --target <対象>   新しい計画案のパスを決め、ディレクトリを作る
   draft parse <ファイル>                         計画案の先頭の書式を解析する
   draft compare <ファイル>                       計画案の元にした Issue の本文が、計画案を作ったときから変わったかを比べる
+  records format <種類> [<キー>=<値> ...] [--body-line]   記録のコメントの 1 行目 (か作る Issue の本文の末尾の行) を作る
+  records parse <行>                             記録のコメントの 1 行目を解析する
+  records list --issue <参照> [--kind <種類>]    Issue の記録のコメントを集める
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -29,7 +32,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, draft, gh, refs  # noqa: E402
+from issue_practice import bodies, draft, gh, records, refs  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -160,6 +163,44 @@ def cmd_draft_compare(args):
     return EXIT_UNSATISFIED if payload["errors"] else EXIT_OK
 
 
+# --- records ------------------------------------------------------------------------------------------------------
+
+def cmd_records_format(args):
+    values, errors = records.parse_assignments(args.values)
+    if not errors:
+        made = records.format_line(args.kind, values, where="body" if args.body_line else "comment")
+        if "line" in made:
+            _emit({"line": made["line"], "errors": []})
+            return EXIT_OK
+        errors = made["errors"]
+    _emit({"line": None, "errors": errors})
+    return EXIT_UNSATISFIED
+
+
+def cmd_records_parse(args):
+    parsed = records.parse_line(args.line, where="body" if args.body_line else "comment")
+    if "errors" in parsed:
+        _emit({"kind": None, "values": None, "errors": parsed["errors"]})
+        return EXIT_UNSATISFIED
+    _emit({**parsed, "errors": []})
+    return EXIT_OK
+
+
+def cmd_records_list(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    listed, failure = records.list_records(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    if args.kind:
+        listed["records"] = [r for r in listed["records"] if r["kind"] == args.kind]
+    _emit({"issue": ref["key"], **listed, "errors": []})
+    return EXIT_UNSATISFIED if listed["invalid"] else EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -251,6 +292,40 @@ def build_parser():
              "  gh_error   gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
              _exit_help("どの本文も変わっていない", "変わった本文がある・計画案の形が違う", "gh が失敗した"))
     p.add_argument("file", help="計画案のファイルのパス")
+
+    g = groups.add_parser("records", help="記録のコメントを作る・読む").add_subparsers(dest="command", required=True)
+    comment_kinds = [k for k, spec in records.KINDS.items() if spec["where"] == "comment"]
+    p = _add(g, "format", cmd_records_format,
+             "記録のコメントの 1 行目を作る。キーは文書 references/record-comments.md の表の順に並べる。gh は実行しない。\n"
+             "--body-line を付けると、作る Issue の本文の末尾の行 (種類 created-from) を作る",
+             "  line    作った行。誤りがあれば null\n"
+             "  errors  知らない種類・知らないキー・必須のキーが無い・値の形の誤りの配列",
+             _exit_help("作れた", "種類・キー・値が形どおりではない"))
+    p.add_argument("kind", choices=list(records.KINDS), help="種類")
+    p.add_argument("values", nargs="*", metavar="<キー>=<値>", help="キーと値の組")
+    p.add_argument("--body-line", action="store_true", help="作る Issue の本文の末尾の行を作る")
+    p = _add(g, "parse", cmd_records_parse,
+             "記録のコメントの 1 行目を解析する。gh は実行しない。--body-line を付けると、作る Issue の本文の末尾の行として解析する",
+             "  kind    種類。誤りがあれば null\n"
+             "  values  キーと値の辞書。誤りがあれば null\n"
+             "  errors  形の誤りの配列",
+             _exit_help("形どおり", "形が違う"))
+    p.add_argument("line", help="1 行目")
+    p.add_argument("--body-line", action="store_true", help="作る Issue の本文の末尾の行として解析する")
+    p = _add(g, "list", cmd_records_list,
+             "Issue のコメントを投稿の順に全部読み、記録を集める。読むだけ。\n"
+             "投稿者が gh の認証のログインと違うコメントと、1 行目が issue-practice: で始まらないコメントは除く",
+             "  issue                  Issue の参照 (owner/repo#番号)\n"
+             "  login                  gh の認証のログイン\n"
+             "  records                記録 {kind, values, id, url, created_at, updated_at, body} の配列 (投稿の順)。\n"
+             "                         body は 1 行目と続く空行を除いた本文\n"
+             "  invalid                1 行目が issue-practice: で始まるのに形が違うコメント {id, url, line, errors} の配列\n"
+             "  skipped_other_authors  投稿者が違うので除いた、1 行目が issue-practice: で始まるコメントの数\n"
+             "  errors                 参照が決まらないときの理由の配列\n"
+             "  gh_error               gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("読めて、形の違う記録が無い", "形の違う記録がある・参照が決まらない", "gh が失敗した"))
+    _add_issue_args(p)
+    p.add_argument("--kind", choices=comment_kinds, help="この種類の記録だけを返す")
 
     return parser
 
