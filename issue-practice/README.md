@@ -7,8 +7,12 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | スキル | すること |
 | --- | --- |
 | [new-issue](skills/new-issue/SKILL.md) | 要望・バグ・切り出しの Issue を、決めた本文の形で作り、入れるリリース (今のリリース・次のリリース・未定) のマイルストーンと、親 Issue・blocked by を設定する |
+| [managing-issue-plan](skills/managing-issue-plan/SKILL.md) | 管理 Issue を作業 Issue に分ける計画 (クローズ条件・ブランチの構成・PR マージ計画の表と図) を計画案で調整し、承認を得てから作業 Issue を作って管理 Issue の本文に書く。PR 1 つで済む Issue は自己管理 Issue として計画する |
+| [managing-issue-run](skills/managing-issue-run/SKILL.md) | 管理セッションとして、作業セッションを最初の指示を渡して起動し、報告を受けて PR マージ計画の表を書き換え、管理セッションの交代を扱う |
+| [managing-issue-close](skills/managing-issue-close/SKILL.md) | 作業 Issue・管理 Issue・自己管理 Issue を、閉じる前の検査をしてから閉じ、依存先とする Issue に片付いたことを書く |
+| [working-issue](skills/working-issue/SKILL.md) | 作業セッションとして作業 Issue を進め、PR を作り、チェックと根拠のリンクを入れて、管理セッションに報告する |
 
-ほかのスキル (管理 Issue と作業 Issue・リリース) は、計画の実装単位 U3・U4 で足します。
+リリースのスキルは、計画の実装単位 U4 で足します。
 
 ## 今あるもの
 
@@ -17,7 +21,7 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | [skills/](skills/) | スキル (上の表) |
 | [references/](references/) | すべてのスキルが参照する、用語と書式の文書 (下の表) |
 | [scripts/issue_practice.py](scripts/issue_practice.py) | 検査のスクリプトの入口。GitHub の状態を読み、決めた形になっているかを判定する。サブコマンドの引数・出力・終了コードは `--help` で確認する |
-| [scripts/issue_practice/](scripts/issue_practice/) | 検査のスクリプトのパッケージ (`gh` の実行・識別子・記録のコメント・計画案・本文の範囲・クローズ条件のチェックボックス・リリース計画 Issue の順番の表・Issue の作成) |
+| [scripts/issue_practice/](scripts/issue_practice/) | 検査のスクリプトのパッケージ (`gh` の実行・識別子・記録のコメント・計画案・本文の範囲・クローズ条件のチェックボックス・リリース計画 Issue の順番の表・Issue の作成・PR マージ計画・管理 Issue の計画案の書き込み・閉じる前の検査) |
 | [tests/](tests/) | 検査のスクリプトの自動テスト。偽の `gh` と固定データで実行する |
 
 共有の references:
@@ -31,6 +35,12 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | [references/start-instruction.md](references/start-instruction.md) | 管理セッションが作業セッションに渡す最初の指示の形 |
 | [references/issue-bodies.md](references/issue-bodies.md) | 要望・バグ・切り出しの Issue の本文の形・計画案の節「作る Issue」の書式・スキルが作るラベル |
 | [references/release-plan-table.md](references/release-plan-table.md) | リリース計画 Issue の順番の表の書式と、今のリリースと次のリリースの決め方 |
+
+スキル固有の references:
+
+| 文書 | 中身 |
+| --- | --- |
+| [skills/managing-issue-plan/references/merge-plan.md](skills/managing-issue-plan/references/merge-plan.md) | ブランチの構成・PR マージ計画の表と図の書式・管理 Issue の計画案の書式 |
 
 ## テスト
 
