@@ -1,0 +1,95 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7BMFBT0JQT63HG86KFNJE3E",
+  "session_id": "ab964a41-96cf-43ce-a58d-de676bf7f395",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-13T23:39:22.274232Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    ".github/test-targets.txt",
+    ".github/workflows/doc-structured-bin.yml",
+    ".github/workflows/test.yml",
+    "README.md",
+    "slide-deck/.claude-plugin/plugin.json",
+    "slide-deck/.gitignore",
+    "slide-deck/.python-version",
+    "slide-deck/package-lock.json",
+    "slide-deck/package.json",
+    "slide-deck/pyproject.toml",
+    "slide-deck/python/slide_deck_tools/thumbs_grid.py",
+    "slide-deck/python/tests/test_smoke.py",
+    "slide-deck/python/tests/test_thumbs_grid.py",
+    "slide-deck/src/cli.ts",
+    "slide-deck/src/data/theme.ts",
+    "slide-deck/src/data/types.ts",
+    "slide-deck/src/index.ts",
+    "slide-deck/src/setup/setup.ts",
+    "slide-deck/tests/setup.test.ts",
+    "slide-deck/tests/smoke.test.ts",
+    "slide-deck/uv.lock"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5-5",
+  "turn_id": "2088ef6fc44a",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 105914,
+    "cache_read_tokens": 2659451,
+    "output_tokens": 17732,
+    "api_call_count": 21
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 12,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01JRdXR6MNRoerwUpjBiWfpw",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "code-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2088ef6fc44a",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 83,
+        "end": 84,
+        "entry_ids": [
+          "3008b233-276e-4a45-8d6e-025689ec4e1e"
+        ],
+        "tool_use_id": "toolu_01JRdXR6MNRoerwUpjBiWfpw"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01JRdXR6MNRoerwUpjBiWfpw"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: code-review",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  }
+}
