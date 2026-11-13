@@ -1,8 +1,8 @@
-# PR マージ計画の書式
+# PR マージ計画と、管理 Issue の計画案の書式
 
-管理 Issue の本文に書く PR マージ計画 (どの作業 Issue の PR を・どの順で・どのブランチにマージするかの表と図) の書式を決めます。用語 (管理 Issue・作業 Issue・自己管理 Issue・計画案など) は [terms.md](../../../references/terms.md) にあります。
+管理 Issue の本文に書く PR マージ計画 (どの作業 Issue の PR を・どの順で・どのブランチにマージするかの表と図) の書式と、スキル `managing-issue-plan` が作る計画案の書式を決めます。用語 (管理 Issue・作業 Issue・自己管理 Issue・計画案など) は [terms.md](../../../references/terms.md) にあります。
 
-この文書と、モジュール `issue-practice/scripts/issue_practice/mergeplan.py` が、書式の [SSOT](../../../../CONCEPTS.md#ssot) です。テスト (ファイル `issue-practice/tests/test_mergeplan.py`) が、この文書の項目の名前と表の見出しの行が、モジュールの定数と一致することを確認します。
+この文書と、モジュール `issue-practice/scripts/issue_practice/mergeplan.py` (PR マージ計画) と `issue-practice/scripts/issue_practice/managing.py` (計画案) が、書式の [SSOT](../../../../CONCEPTS.md#ssot) です。テスト (ファイル `issue-practice/tests/test_mergeplan.py` と `issue-practice/tests/test_managing.py`) が、この文書の項目の名前と表の見出しの行が、モジュールの定数と一致することを確認します。
 
 ## ブランチの構成
 
@@ -103,3 +103,89 @@ PR の本文には `Closes #<番号>` を書かず、対応する Issue への�
 - 作業 Issue のブランチは、先にマージが要る作業 Issue がすべてマージされた時点で、マージ先のブランチから作ります。コミットの ID は、作業 Issue の番号です。先にマージが要る作業 Issue が無い行のブランチは、最初に作ります。
 - 作業 Issue のブランチは、表の順にマージ先のブランチにマージします。
 - 構成 2・3 では、最後に管理 Issue のブランチをデフォルトのブランチにマージします。
+
+## 管理 Issue の計画案
+
+スキル `managing-issue-plan` は、管理 Issue (か自己管理 Issue) の計画を、計画案のファイルに書いてから GitHub に書き込みます。計画案の保存先・ファイル名・先頭の書式 (題と節「元にした Issue」) は [draft-plan.md](../../../references/draft-plan.md) にあります。節「元にした Issue」には、計画する Issue の URL と、本文のハッシュ値を書きます。
+
+節「元にした Issue」の後に、次の節をこの順に書きます。
+
+````markdown
+## 対象
+
+- Issue: https://github.com/<owner>/<repo>/issues/239
+- 種類: 管理 Issue
+
+## クローズ条件
+
+### 管理 Issue (#239) 自身のクローズ条件
+
+期待する状態:
+
+- [ ] 作業 Issue がすべて閉じている
+
+### すべての作業 Issue に共通するクローズ条件
+
+期待する状態:
+
+- [ ] 単位の機能を確認する自動テストがあり、CI で成功する
+
+## PR マージ計画
+
+- ブランチの構成: 1
+- PR をマージする人: 利用者
+
+| 順 | 作業 Issue | ブランチ | マージ先 | 先にマージが要る作業 Issue | PR |
+| --- | --- | --- | --- | --- | --- |
+| 1 | a 一覧の絞り込み | `feat/<番号>-filter` | main | なし | |
+| 2 | b 一覧の並べ替え | `feat/<番号>-sort` | main | a | |
+
+## 作る Issue
+
+### a: 一覧の絞り込みで、閉じた Issue が残る
+
+(書式は issue-bodies.md の節「計画案の節「作る Issue」」)
+````
+
+| 節 | 書くこと |
+| --- | --- |
+| 対象 | 項目「Issue」に計画する Issue の URL (節「元にした Issue」にある URL)、項目「種類」に `管理 Issue` か `自己管理 Issue` |
+| クローズ条件 | 計画する Issue の節「クローズ条件」の中身。管理 Issue では、サブコマンドがマーク `closing-conditions` で囲んで書く |
+| PR マージ計画 | 上の節「管理 Issue の本文の PR マージ計画」の設定の箇条書きと表。図は書かない (サブコマンドが作る) |
+| 作る Issue | 作業 Issue。書式は [issue-bodies.md](../../../references/issue-bodies.md) の節「計画案の節「作る Issue」」。管理 Issue だけに書き、自己管理 Issue では書かない。計画を変えるときに新しく作る作業 Issue が無ければ、書かない |
+
+- 作業 Issue のマイルストーンは、管理 Issue のマイルストーンと同じにします (R49)。管理 Issue にマイルストーンが無ければ、`なし` と書きます。違うと、サブコマンドは誤りを返します。
+- 作業 Issue の本文の節「クローズ条件」には、節「クローズ条件」の `### すべての作業 Issue に共通するクローズ条件` の項目をコピーします (R19。見出しは [closing-conditions.md](../../../references/closing-conditions.md) の節「見出し」)。
+- 節「クローズ条件」の中には、マーク (`<!-- issue-practice:… -->`) を書きません。マークはサブコマンドが書きます。
+
+### 計画案の表の書き方
+
+計画案を書くときは、作業 Issue はまだ無いので番号が分かりません。計画案の表では、次のように書きます。
+
+- 列「作業 Issue」と「先にマージが要る作業 Issue」には、`#<番号>` の代わりに、節「作る Issue」のキーを書けます。既にある Issue (計画を変えるときの、作り済みの作業 Issue など) は `#<番号>` で書きます。
+- 列「ブランチ」には、`<番号>` を書けます。作業 Issue を作った後に、その行の作業 Issue の番号に置き換えます。
+
+サブコマンド `managing apply` は、作業 Issue を作った後に、キーを作った Issue の番号に置き換えて (作った Issue は、本文の末尾の `created-from` の行で探す)、表と図を管理 Issue の本文に書きます。
+
+### 管理 Issue の本文への書き方
+
+サブコマンド `managing apply` は、計画する Issue の本文の次の場所を書き換えます。ほかの場所は変えません。
+
+| 書く中身 | 本文にマークがあるとき | マークが無く、見出しの節があるとき | マークも見出しの節も無いとき |
+| --- | --- | --- | --- |
+| クローズ条件 (管理 Issue) | マーク `closing-conditions` の中を書き換える | 節「クローズ条件」の中をマークで囲んで書き換える | 本文の最後に節「クローズ条件」を足し、中をマークで囲む |
+| クローズ条件 (自己管理 Issue) | 誤り (自己管理 Issue の節「クローズ条件」にはマークを書かない) | 節「クローズ条件」の中を書き換える | 本文の最後に節「クローズ条件」を足す |
+| PR マージ計画 | マーク `merge-plan` の中を書き換える | 節「PR マージ計画」の中をマークで囲んで書き換える | 本文の最後に節「PR マージ計画」を足し、中をマークで囲む |
+
+### 示すと実行する
+
+計画案を GitHub に書く書き込みは、検査のスクリプトの 2 つのサブコマンドに分けます (計画の KTD3)。
+
+- **`managing plan` (示す)**: 計画案と GitHub の今の状態から、作る作業 Issue と、計画する Issue の本文に書く中身を示します。GitHub には書き込みません。計画する Issue の本文が計画案を作ったときから変わっていれば、誤りを返します (R6)。
+- **`managing apply` (実行する)**: 次の順に書き込みます。
+  1. 節「作る Issue」の作業 Issue を作り、作業 Issue ごとに記録のコメント `approval` を書く
+  2. 表のキーを作った Issue の番号に置き換え、表から図を作る
+  3. 計画する Issue の本文の節「クローズ条件」と「PR マージ計画」を書き換える (上の表)
+  4. 計画する Issue に、記録のコメント `approval` を書く
+
+書き込みが途中で失敗したときは、同じ計画案で `managing apply` をやり直せます (R7)。作り済みの作業 Issue は作らず、本文が既に計画案のとおりに書かれていれば書かず、`approval` の記録が既にあれば書きません。

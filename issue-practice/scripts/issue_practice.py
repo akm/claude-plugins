@@ -22,6 +22,8 @@
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
   sessions active --issue <管理 Issue>           管理セッションと、動いている作業セッションを記録のコメントから集める
+  managing plan <ファイル> --repo <owner/repo>   管理 Issue の計画案から、作業 Issue の作成と本文の書き換えを示す (示す)
+  managing apply <ファイル> --repo <owner/repo>  管理 Issue の計画案の作業 Issue を作り、本文を書き換える (実行する)
   merge-plan show --issue <参照>                 管理 Issue の PR マージ計画の表を読み、表から作った図と本文の図を比べる
   close check --issue <参照> --role <種類> [--managing <管理 Issue>]   閉じる前の検査をする
   dependents plan --issue <参照>                 閉じる Issue を依存先とする Issue への書き込みを示す (示す)
@@ -44,7 +46,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, checkboxes, closecheck, draft, gh, issues, mergeplan, records, refs, releaseplan  # noqa: E402
+from issue_practice import bodies, checkboxes, closecheck, draft, gh, issues, managing, mergeplan, records, refs, releaseplan  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -484,6 +486,22 @@ def cmd_sessions_active(args):
     return EXIT_OK
 
 
+# --- managing -----------------------------------------------------------------------------------------------------
+
+def cmd_managing_plan(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(managing.plan(args.file, repo))
+
+
+def cmd_managing_apply(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(managing.apply(args.file, repo))
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -775,6 +793,40 @@ def build_parser():
              "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
              _exit_help("集められた", "PR マージ計画が無いか形が違う", "gh が失敗した"))
     _add_issue_args(p)
+
+    g = groups.add_parser("managing", help="管理 Issue (か自己管理 Issue) の計画案を GitHub に書く").add_subparsers(
+        dest="command", required=True)
+    managing_output = (
+        "  draft・repo  計画案のファイル名とリポジトリ\n"
+        "  target      計画する Issue {issue, url, kind (管理 Issue・自己管理 Issue)}\n"
+        "  body_state  計画する Issue の本文の状態。pending (これから書く)・applied (書き込み済み)・changed (計画案を\n"
+        "              作ったときから変わった)\n"
+        "  issues      作業 Issue の書き込み {labels_to_create, items} (issues plan と同じ形)。作業 Issue を作らなければ null\n"
+        "  merge_plan  {settings, rows, content}。content は本文のマーク merge-plan の中に書く中身 (作業 Issue を作る前は、\n"
+        "              キーと <番号> のまま)\n"
+        "  closing_conditions  本文の節「クローズ条件」に書く中身\n"
+        "  approval_recorded   計画する Issue に、この計画案の approval の記録があるか\n"
+        "  errors      誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "plan", cmd_managing_plan,
+             "管理 Issue (か自己管理 Issue) の計画案 (書式は文書 skills/managing-issue-plan/references/merge-plan.md) と GitHub の\n"
+             "今の状態から、行う書き込みを示す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない",
+             managing_output,
+             _exit_help("示せた", "計画案の形が違う・本文が変わった・マイルストーンが違う・GitHub の状態が計画案と合わない",
+                        "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="作業 Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    p = _add(g, "apply", cmd_managing_apply,
+             "plan と同じ確認をし、誤りが無ければ書き込む (実行する)。作業 Issue を作り (作業 Issue ごとに approval の記録も書く)、\n"
+             "表のキーを作った Issue の番号に置き換えて、計画する Issue の本文の節「クローズ条件」と「PR マージ計画」を書き換え、\n"
+             "計画する Issue に approval の記録を書く。途中で失敗したら、同じ計画案でやり直せる",
+             managing_output + "\n"
+             "  done        行った書き込み {key, action, url} の配列 (action は issues create の action と、write-body・\n"
+             "              record-approval)。gh が失敗したときは、失敗する前までのもの",
+             _exit_help("すべて書き込んだ (か、書き込み済みだった)", "plan で満たさない (何も書き込まない)",
+                        "gh が失敗した (done までは書き込んだ)"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="作業 Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
 
     g = groups.add_parser("merge-plan", help="管理 Issue の PR マージ計画を読む・書く").add_subparsers(
         dest="command", required=True)
