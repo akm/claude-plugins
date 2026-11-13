@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7ABZ22W0FBNK5CVGQ7WEZ6Y",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 29,
+  "files_touched": [
+    ".github/test-targets.txt",
+    ".github/workflows/doc-structured-bin.yml",
+    ".github/workflows/test.yml",
+    "README.md",
+    "slide-deck/.claude-plugin/plugin.json",
+    "slide-deck/.gitignore",
+    "slide-deck/.python-version",
+    "slide-deck/eslint.config.mjs",
+    "slide-deck/package-lock.json",
+    "slide-deck/package.json",
+    "slide-deck/pyproject.toml",
+    "slide-deck/python/tests/test_smoke.py",
+    "slide-deck/tests/smoke.test.ts",
+    "slide-deck/tsconfig.json",
+    "slide-deck/uv.lock"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 804,
+    "cache_creation_tokens": 4038893,
+    "cache_read_tokens": 153391031,
+    "output_tokens": 292891,
+    "api_call_count": 348
+  },
+  "redaction": {
+    "replacements": 16,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 16,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
