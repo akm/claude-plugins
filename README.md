@@ -232,6 +232,7 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   └── README.md
 ├── issue-practice/               # skill 型 + 同梱スクリプト (作成中)
 │   ├── .claude-plugin/plugin.json
+│   ├── skills/new-issue/         # 要望・バグ・切り出しの Issue を作る
 │   ├── references/               # すべてのスキルが参照する用語と書式の文書
 │   ├── scripts/                  # 検査のスクリプト (issue_practice.py とパッケージ issue_practice/)
 │   ├── tests/                    # python3 -m unittest discover -s issue-practice/tests
