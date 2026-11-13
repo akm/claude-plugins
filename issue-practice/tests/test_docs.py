@@ -4,6 +4,7 @@
 - 文書 `issue-practice/references/record-comments.md` の種類とキーの表が、モジュール records の定数と一致する (計画の KTD4)
 - 文書 `issue-practice/references/closing-conditions.md` の範囲の名前とチェックボックスの状態が、モジュール bodies と
   checkboxes の定数と一致する
+- 文書 `issue-practice/references/draft-plan.md` の書式の行が、モジュール draft の定数と一致する
 """
 
 import os
@@ -12,7 +13,7 @@ import unittest
 
 from fakegh_case import HERE
 
-from issue_practice import bodies, checkboxes, records  # noqa: E402
+from issue_practice import bodies, checkboxes, draft, records  # noqa: E402
 
 REFERENCES = os.path.join(HERE, "..", "references")
 
@@ -97,6 +98,17 @@ class ClosingConditionsDocTest(unittest.TestCase):
         self.assertIn("`(根拠: <URL>)`", self.doc)
         self.assertIn("`(切り出し: <URL>)`", self.doc)
         self.assertIn(f"## {checkboxes.SECTION_TITLE}", self.doc)
+
+
+class DraftPlanDocTest(unittest.TestCase):
+
+    def test_format_lines(self):
+        doc = read_reference("draft-plan.md")
+        self.assertIn(f"`{draft.DRAFT_DIR}/`", doc)
+        self.assertIn(f"## {draft.SOURCES_HEADING}", doc)
+        self.assertIn(f"{draft.NONE_ITEM}", doc)
+        self.assertIn("本文の SHA-256: <64 桁の 16 進数>", doc)
+        self.assertIn("# 計画案: <題>", doc)
 
 
 if __name__ == "__main__":
