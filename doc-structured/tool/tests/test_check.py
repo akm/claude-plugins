@@ -27,12 +27,12 @@ class CheckTest(ProjectTestCase):
         )
 
     def test_sample_project_passes_all_light_checks(self):
-        for args in ((), ("--light",), ("--all",), ("--only", "a"), ("--only", "b"), ("--only", "h"), ("--only", "i"), ("--only", "k")):
+        for args in ((), ("--light",), ("--all",), ("--only", "a"), ("--only", "b"), ("--only", "c-2"), ("--only", "h"), ("--only", "i"), ("--only", "k")):
             with self.subTest(args=args):
                 result = self.run_check(*args)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertTrue(result.stdout.endswith(": 問題は無かった\n"), result.stdout)
-        self.assertEqual(self.run_check().stdout, "検査 a・b・h・i・k: 問題は無かった\n")
+        self.assertEqual(self.run_check().stdout, "検査 a・b・c-2・h・i・k: 問題は無かった\n")
 
     def test_check_a_reports_hand_edited_file_with_source_and_command(self):
         path = self.project / MODELS
@@ -46,7 +46,7 @@ class CheckTest(ProjectTestCase):
         )
         self.assertIn("-貸し出した本。", result.stdout)
         self.assertIn("+貸し出した図書。", result.stdout)
-        self.assertIn("検査 a・b・h・i・k: 問題が 1 件あった", result.stdout)
+        self.assertIn("検査 a・b・c-2・h・i・k: 問題が 1 件あった", result.stdout)
 
     def test_check_a_reports_missing_generated_file(self):
         (self.project / "docs/glossary.md").unlink()
@@ -122,12 +122,12 @@ class CheckTest(ProjectTestCase):
         self.assertEqual(generate.returncode, 0, generate.stderr)
         self.assertEqual(self.run_check("--only", "a").returncode, 0)
 
-    def test_check_h_failure_skips_a_b_and_i(self):
+    def test_check_h_failure_skips_a_b_c2_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")
         result = self.run_check()
         self.assertEqual(result.returncode, 1)
         self.assertIn("docs/domains/03-members/domain.yaml:3:1: 検査 h: YAML として読めない", result.stdout)
-        self.assertIn("YAML に誤りがあるので、検査 a・b・i を実行しなかった (誤りは検査 h で確認する)", result.stdout)
+        self.assertIn("YAML に誤りがあるので、検査 a・b・c-2・i を実行しなかった (誤りは検査 h で確認する)", result.stdout)
 
     def test_check_b_reports_with_path_line_and_column(self):
         path = self.project / "docs/domains/02-loans/concept.md"
@@ -157,6 +157,33 @@ class CheckTest(ProjectTestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("docs/domains/02-loans/reservations/hold.yaml:9:20: 検査 i:", result.stdout)
 
+    def test_check_i_failure_in_markdown(self):
+        self.write(
+            "docs/domains/02-loans/design/overdue_notice.md",
+            '<a name="d-loans-design-f-overdue_notice"></a>\n\n# 延滞の通知\n\n[節「返却期限」]を過ぎたら通知する。\n\n'
+            '[節「返却期限」]: ../concept.md#d-loans-concept-h-return_deadline "ドメイン `loans` のファイル `concept.md` の節「返却期限」"\n',
+        )
+        result = self.run_check("--only", "i")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("docs/domains/02-loans/design/overdue_notice.md:5:1: 検査 i: リンク [節「返却期限」]", result.stdout)
+
+    def test_check_c2_failure(self):
+        # サンプルでは design.md の節が concept.md の節「返却期限」を参照している。逆の参照を足すと循環になる
+        path = self.project / "docs/domains/02-loans/concept.md"
+        text = path.read_text(encoding="utf-8").replace(
+            "[延滞の通知][d-loans-design-f-overdue_notice]に書く。",
+            "[延滞の通知][d-loans-design-f-overdue_notice]に書く。[節「貸出状態を 2 つの値に限る」]も参照。",
+        )
+        text += '[節「貸出状態を 2 つの値に限る」]: design.md#d-loans-design-h-status_values "ドメイン `loans` のファイル `design.md` の節「貸出状態を 2 つの値に限る」"\n'
+        path.write_text(text, encoding="utf-8")
+        result = self.run_check("--only", "c-2")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("docs/domains/02-loans/concept.md:11:", result.stdout)
+        self.assertIn(
+            "検査 c-2: 参照が循環している: d-loans-concept-h-return_deadline → d-loans-design-h-status_values", result.stdout
+        )
+        self.assertIn("検査 c-2: 問題が 1 件あった", result.stdout)
+
     def test_heavy_has_no_checks_in_this_version(self):
         result = self.run_check("--heavy")
         self.assertEqual(result.returncode, 0)
@@ -165,7 +192,7 @@ class CheckTest(ProjectTestCase):
     def test_unknown_check_is_usage_error(self):
         result = self.run_check("--only", "j")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・h・i・k)", result.stderr)
+        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・c-2・h・i・k)", result.stderr)
 
     def test_options_are_mutually_exclusive(self):
         result = self.run_check("--light", "--all")

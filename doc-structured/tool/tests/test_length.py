@@ -86,4 +86,4 @@ class LengthTest(ProjectTestCase):
         )
         self.assertEqual(result.returncode, 1)
         self.assertIn(f"{CONCEPT}: 検査 k: 手書きの Markdown が 101 行ある", result.stdout)
-        self.assertIn("YAML に誤りがあるので、検査 a・b・i を実行しなかった", result.stdout)
+        self.assertIn("YAML に誤りがあるので、検査 a・b・c-2・i を実行しなかった", result.stdout)
