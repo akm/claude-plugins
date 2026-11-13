@@ -1,7 +1,7 @@
 {
   "name": "doc-structured",
   "description": "Claude Code で作るアプリケーションの文書を、定義が 1 か所だけにあり、参照が機械的に検査される構成で書くための規則・生成と検査のツール・スキル・hook (作成中)",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": {
     "name": "akm"
   },
