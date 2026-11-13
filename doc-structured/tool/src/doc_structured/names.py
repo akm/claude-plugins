@@ -55,6 +55,9 @@ HANDWRITTEN_FILE_KINDS: dict[str, str] = {
 }
 FILE_KIND_LABEL = "ファイル"
 
+# 種類の名前の略称。本文の最初の箇所では、略称で書いた形も書ける (完全な名前には正式名称を書く)
+ABBREVIATIONS: dict[str, str] = {"ut": "未分類の用語"}
+
 # 手書きのファイルの節。名前は書く人が決める snake_case で、限定付きの名前には見出しの文を書く
 SECTION = Kind("h", "節", True, ())
 # 手書きのファイルの子のファイル (100 行を超えたファイルを分けた先)。限定付きの名前には、ドメインのディレクトリからのパスを書く
@@ -133,17 +136,19 @@ def kind_of(text: str) -> str:
     return parse_id(text)[-1].symbol
 
 
-def format_part(symbol: str, display: str) -> str:
+def format_part(symbol: str, display: str, abbreviated: bool = False) -> str:
     """「種類 + 名前」の 1 つ。display は、ユーザーレベルなら日本語名、開発レベルなら英語名、ファイルならファイル名、
-    子のファイルならドメインのディレクトリからのパス、節なら見出しの文。"""
+    子のファイルならドメインのディレクトリからのパス、節なら見出しの文。
+    abbreviated が True なら、種類の名前を略称 (ABBREVIATIONS) で書く。略称の無い種類は、正式名称で書く。"""
     if symbol in FILE_KINDS or symbol in HANDWRITTEN_FILE_KINDS or symbol == CHILD_FILE_SYMBOL:
         return f"{FILE_KIND_LABEL} `{display}`"
     if symbol == SECTION.symbol:
         return f"{SECTION.label}「{display}」"
     kind = KINDS[symbol]
+    label = ABBREVIATIONS.get(symbol, kind.label) if abbreviated else kind.label
     if kind.user_level:
-        return f"{kind.label}「{display}」"
-    return f"{kind.label} `{display}`"
+        return f"{label}「{display}」"
+    return f"{label} `{display}`"
 
 
 def join_parts(formatted: list[str]) -> str:

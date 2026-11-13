@@ -8,7 +8,8 @@ doc-structured/rules/doc-structured-domains.md)。要点:
   - ほかの名前・場所の .md は、検査 b のエラーにする
   - 参照先のアンカーは、今のファイルの内容から読む (生成したファイルが古いことは検査 a が報告する)。YAML から決まる参照先
     (ドメイン・定義・生成したファイル) のファイルは、生成する側の対応で決め、そのファイルにアンカーがあるときだけ参照先にする
-  - 参照先のラベルの候補は、ID・名前・限定付きの名前 (「種類 + 名前」に、親を直近から 0 個以上足した形)
+  - 参照先のラベルの候補は、ID・名前・書ける形 (「種類 + 名前」に、親を直近から 0 個以上足した形。略称のある種類は、
+    略称で書いた形も含む)
 """
 
 import posixpath
@@ -65,18 +66,34 @@ class Target:
     id: str
     path: str  # アンカーを書いたファイルの、リポジトリのルートからの相対パス
     parts: list[str]  # ドメインから自分までの「種類 + 名前」
-    name: str | None  # ラベルの候補にする名前 (日本語名・見出しの文・コードの書式のファイル名)
+    name: str | None  # ラベルの候補にする名前 (日本語名・見出しの文・コードの書式のファイル名)。ドメインは名前を持たない
+    abbreviated: str | None = None  # 自分の「種類 + 名前」を略称で書いたもの。種類に略称が無ければ None
 
     def full_name(self) -> str:
         return names.join_parts(self.parts)
 
-    def qualified_names(self) -> list[str]:
-        """限定付きの名前。自分だけの「種類 + 名前」から、すべての親を書いた完全な名前まで。"""
-        return [names.join_parts(self.parts[i:]) for i in range(len(self.parts) - 1, -1, -1)]
+    def writable_forms(self) -> list[str]:
+        """本文で最初に指す箇所に書ける形。完全な名前の先頭から親を 0 個以上省いた形で、短い順に並べる。
+        略称のある種類は、同じ親の数の形を、略称で書いた形・正式名称で書いた形の順に並べる。"""
+        forms: list[str] = []
+        for i in range(len(self.parts) - 1, -1, -1):
+            if self.abbreviated is not None:
+                forms.append(names.join_parts(self.parts[i:-1] + [self.abbreviated]))
+            forms.append(names.join_parts(self.parts[i:]))
+        return forms
+
+    def form_for(self, from_parts: list[str]) -> str:
+        """from_parts (参照するファイルの「種類 + 名前」の並び) のファイルから最初に指す箇所に、サブコマンド links-fix が
+        書く形。参照するファイルと共通の親を省き、自分の「種類 + 名前」は略称があれば略称で書く。"""
+        common = 0
+        while common < len(self.parts) - 1 and common < len(from_parts) and self.parts[common] == from_parts[common]:
+            common += 1
+        own = self.abbreviated if self.abbreviated is not None else self.parts[-1]
+        return names.join_parts(self.parts[common:-1] + [own])
 
     def labels(self) -> set[str]:
         """ラベルの候補を、比べる形 (markdown.normalize_label) にしたもの。"""
-        found = {self.id, *self.qualified_names()}
+        found = {self.id, *self.writable_forms()}
         if self.name:
             found.add(self.name)
         return {markdown.normalize_label(label) for label in found}
@@ -203,10 +220,12 @@ class _Finder:
             for anchor in document.anchors:
                 self.index.anchors.setdefault(anchor.name, []).append((path_rel, anchor))
 
-    def add_target(self, target_id: str, parts: list[str], name: str | None, path: str) -> None:
+    def add_target(
+        self, target_id: str, parts: list[str], name: str | None, path: str, abbreviated: str | None = None
+    ) -> None:
         """path のファイルに target_id のアンカーがあれば、参照先にする。"""
         if any(found == path for found, _ in self.index.anchors.get(target_id, [])):
-            self.index.targets[target_id] = Target(target_id, path, parts, name)
+            self.index.targets[target_id] = Target(target_id, path, parts, name, abbreviated)
 
     def add_targets(self) -> None:
         for domain in self.project.domains:
@@ -218,7 +237,10 @@ class _Finder:
                 self.add_target(file_id, parts, f"`{file_name}`", file_path(domain, symbol))
             for entry in domain.entries():
                 parts = [domain.full_name()] + [names.format_part(e.symbol, e.name_ja) for e in entry.lineage()]
-                self.add_target(entry.id, parts, entry.name_ja, entry_file(entry))
+                abbreviated = None
+                if entry.symbol in names.ABBREVIATIONS:
+                    abbreviated = names.format_part(entry.symbol, entry.name_ja, abbreviated=True)
+                self.add_target(entry.id, parts, entry.name_ja, entry_file(entry), abbreviated)
         for handwritten in self.index.files:
             document = handwritten.document
             first = document.first_nonblank()

@@ -157,6 +157,77 @@ class TargetTest(DocumentsTestCase):
         self.assertEqual([t.id for t in index.candidates("D-LOANS-M-LOAN")], ["d-loans-m-loan"])
         self.assertEqual(index.candidates("無い名前"), [])
 
+    def test_abbreviated_forms_are_label_candidates(self):
+        index, _ = self.load()
+        for label in (
+            "未分類の用語「開館日」",
+            "ドメイン `loans` の未分類の用語「開館日」",
+            "未分類のアプリケーション用語「開館日」",
+        ):
+            with self.subTest(label=label):
+                self.assertEqual([t.id for t in index.candidates(label)], ["d-loans-ut-business_day"])
+
+    def test_writable_forms(self):
+        self.write("docs/domains/02-loans/concept.md", CONCEPT)
+        self.write("docs/domains/02-loans/design/overdue_notice.md", CHILD)
+        index, _ = self.load()
+        cases = {
+            "d-loans": ["ドメイン `loans`"],
+            "d-loans-m-loan-a-status-v-on_loan": [
+                "値「貸出中」",
+                "属性「貸出状態」の値「貸出中」",
+                "モデル「貸出」の属性「貸出状態」の値「貸出中」",
+                "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」",
+            ],
+            "d-loans-ut-business_day": [
+                "未分類の用語「開館日」",
+                "未分類のアプリケーション用語「開館日」",
+                "ドメイン `loans` の未分類の用語「開館日」",
+                "ドメイン `loans` の未分類のアプリケーション用語「開館日」",
+            ],
+            "d-loans-concept-h-return_deadline": [
+                "節「返却期限」",
+                "ファイル `concept.md` の節「返却期限」",
+                "ドメイン `loans` のファイル `concept.md` の節「返却期限」",
+            ],
+            "d-loans-design-f-overdue_notice": [
+                "ファイル `design/overdue_notice.md`",
+                "ドメイン `loans` のファイル `design/overdue_notice.md`",
+            ],
+        }
+        for target_id, forms in cases.items():
+            with self.subTest(target=target_id):
+                self.assertEqual(index.targets[target_id].writable_forms(), forms)
+
+    def test_form_for_omits_parents_shared_with_the_referencing_file(self):
+        self.write("docs/domains/02-loans/concept.md", CONCEPT)
+        self.write("docs/domains/02-loans/design/overdue_notice.md", CHILD)
+        index, _ = self.load()
+        concept = index.file("docs/domains/02-loans/concept.md").parts()
+        child = index.file("docs/domains/02-loans/design/overdue_notice.md").parts()
+        cases = [
+            (concept, "d-loans-ut-business_day", "未分類の用語「開館日」"),
+            (concept, "d-loans-m-loan-a-status", "モデル「貸出」の属性「貸出状態」"),
+            (concept, "d-catalog-m-book", "ドメイン `catalog` のモデル「図書」"),
+            (concept, "d-loans-concept-h-return_deadline", "節「返却期限」"),
+            (concept, "d-loans-concept", "ファイル `concept.md`"),
+            (concept, "d-loans", "ドメイン `loans`"),
+            (concept, "d-loans-design-f-overdue_notice-h-retry", "ファイル `design/overdue_notice.md` の節「再送 `retry`」"),
+            (child, "d-loans-concept-h-return_deadline", "ファイル `concept.md` の節「返却期限」"),
+            (child, "d-loans-design-f-overdue_notice-h-retry", "節「再送 `retry`」"),
+        ]
+        for from_parts, target_id, form in cases:
+            with self.subTest(from_parts=from_parts, target=target_id):
+                self.assertEqual(index.targets[target_id].form_for(from_parts), form)
+
+    def test_names_for_the_short_form(self):
+        self.write("docs/domains/02-loans/concept.md", CONCEPT)
+        index, _ = self.load()
+        self.assertEqual(index.targets["d-loans-m-loan"].name, "貸出")
+        self.assertEqual(index.targets["d-loans-concept-h-return_deadline"].name, "返却期限")
+        self.assertEqual(index.targets["d-loans-concept"].name, "`concept.md`")
+        self.assertIsNone(index.targets["d-loans"].name)
+
     def test_same_name_in_two_domains_gives_two_candidates(self):
         index, _ = self.load()
         ids = [t.id for t in index.candidates("`models.md`")]
