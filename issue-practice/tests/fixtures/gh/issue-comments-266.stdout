@@ -1,0 +1,15 @@
+[
+  [
+    {
+      "id": 6857140375,
+      "html_url": "https://github.com/akm/claude-plugins/issues/266#issuecomment-6857140375",
+      "created_at": "2026-11-13T15:16:30Z",
+      "updated_at": "2026-11-13T15:16:30Z",
+      "body": "issue-practice: session role=working session=local_89aab7c6-87c8-432f-97dc-4de4f3bc345d branch=feat/266-issue-practice-base\n\nこの作業 Issue の作業セッションを起動した。\n\n- 作業セッションの名前: claude-plugins#266 作業: issue-practice の共通部分\n- 作業セッションの ID: local_89aab7c6-87c8-432f-97dc-4de4f3bc345d\n- ブランチ: `feat/266-issue-practice-base` (origin/main から作る。PR のマージ先は main)\n- 報告先の管理セッション: claude-plugins#239 管理: Issue の使い方のスキル (local_7eefe131-5f84-4c43-b029-e14eb2449d29)\n\n記録のコメントの形 (1 行目) はこの作業 Issue (U1) で決める。決めた後に、このコメントを決めた形に書き換える。\n",
+      "user": {
+        "login": "akm",
+        "type": "User"
+      }
+    }
+  ]
+]
