@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01HV1oTzDLqXGNyvmFDKQpa9",
+  "agent_id": "aed8a31c6549b3a18",
+  "subagent_type": "general-purpose",
+  "task_description": "Review paragraph-rule fix options",
+  "token_usage": {
+    "input_tokens": 80,
+    "cache_creation_tokens": 620483,
+    "cache_read_tokens": 4151866,
+    "output_tokens": 56720,
+    "api_call_count": 37
+  },
+  "started_at": "2026-11-12T00:35:11.232483+09:00",
+  "completed_at": "2026-11-12T00:40:27.805339+09:00"
+}

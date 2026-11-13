@@ -1,0 +1,733 @@
+Background (from the session that started this one):
+Issue #242 は、図を中心にした説明資料を PowerPoint のファイルと Google スライドで作るスキルを、新しいプラグイン `slide-deck` として作る要望。計画は main の `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` にあり、実装は 11 の単位 (U1〜U11) を sub-issue #245〜#255 にした。U1 (#245、ディレクトリと検査の設定・CI) は PR #257 でマージ済み。CI の対象の見つけ方の残りの問題は Issue #256 に記録してあり、U2 の範囲ではない。U2 (#246) は、資料ごとのスクリプト `deck.ts` が使う、型で形を決めたスライドのデータと部品の関数を作る単位で、U3・U4・U5・U6 がこれに依存する。決めてあること: スライドのデータを資料ごとのスクリプトと 2 つの書き出しの処理 (PowerPoint と Google スライド) の間に挟み、差し替えの仕掛けは作らない。TypeScript は Node.js 24 で .ts をそのまま実行し、tsc と typescript-eslint で `any` を禁止する。テストは node:test。プラグインは U9 で公開するまで 0.0.1 のまま上げない。文章の規約は CLAUDE.md に従い、変えた Markdown・日本語のコメント・コミットメッセージを wording-guard で検査する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/246 (計画の単位 U2) を実装する。
+
+最初に `git fetch origin` し、`origin/main` (U1 の PR #257 のマージ ac96b56d を含む) から作業ブランチを作る。
+
+読むもの:
+- 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` の節「U2. スライドのデータ・テーマ・部品の関数」、KTD1・KTD2・KTD3・KTD4、節「単位の進め方とクローズ条件」
+- Issue #246 の本文 (成果物と機能・クローズ条件)
+- U1 で作ったディレクトリ `slide-deck/` の設定 (`tsconfig.json`・`eslint.config.mjs`・`package.json`) と PR #257
+- 元にする部品の関数は、メインの作業ツリーのファイル `/Users/akima/workspace/claude-plugins/tmp/zero-downtime/build.js` (git で管理していない。関数 `box`・`text`・`arrow`・`badge`・`takeaway`・`card`・`bullets`)。このファイルがあるプロジェクトの名前を、Issue・PR・コミットに書かない
+
+作るもの: `slide-deck/src/data/types.ts`・`theme.ts`・`parts.ts`、`slide-deck/src/index.ts` (名前 `slide-deck` で `import type` する型)、テスト `slide-deck/tests/data.test.ts`。計画の U2 の Test scenarios をすべてテストにする。
+
+終わりの形: Issue #246 のクローズ条件と、計画の共通のクローズ条件をすべて満たした PR を作る (本文に `Closes #246`)。push と PR の作成は利用者の承認を得てから行う。計画と合わないことが分かったら、同じ PR で計画を直す。判断が要ることは、自分で決めずに利用者に 1 つずつ質問する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_8a080753-e404-44b3-978c-f0b57cdbaf02
+
+---
+
+/review-triage:review-rally code-review sonnet medium
+
+---
+
+<cross-session-message from="local_660668a7-6d36-4322-907a-aaf19ae5ea44" from-name="review-rally 20261111-1136-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1136-feat-slide-deck-u2-246 20261111-1137-feat-slide-deck-u2-246-1-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-25b16e/tmp/review-rally/20261111-1136-feat-slide-deck-u2-246/review-20261111-1137-feat-slide-deck-u2-246-1-code-review-claude-sonnet-5-5.yaml
+- skill code-review を呼んだ (Skill ツール)。渡した引数は `medium ac96b56d..d35f623b`。effort は medium、モデルは claude-sonnet-5-5 (このセッション)。ただし skill が読み込んだ手順の本文は「high effort」と書いていた。その旨を結果の attrs.note に残した。
+- 指摘は 4 件 (P2 が 1 件、P3 が 3 件)、residual は 1 件。最重要は、関数 bullets が fontSize と color を必ず埋めるので、box や text のオプションが箇条書きに効かないこと。
+- node_modules が無く、テストと eslint は実行していない。指摘は読んで確認したもの。
+- 確認: 開始時から HEAD は d35f623b のまま。git status --porcelain は空で、出力先の 1 ファイル以外は作っていない。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_660668a7-6d36-4322-907a-aaf19ae5ea44" from-name="review-rally 20261111-1136-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1136-feat-slide-deck-u2-246 20261111-1146-feat-slide-deck-u2-246-2-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-25b16e/tmp/review-rally/20261111-1136-feat-slide-deck-u2-246/review-20261111-1146-feat-slide-deck-u2-246-2-code-review-claude-sonnet-5-5.yaml
+- skill: code-review を呼んだ (Skill ツール、args は「medium d35f623b..14ac5c9b」)。渡した effort は medium、モデルはこのセッションの claude-sonnet-5-5 (skill にモデルの引数は渡していない)。skill の本文は high effort と書かれていたが、依頼どおり medium を渡した。ReportFindings ツールは呼ばず、様式どおりに YAML へ書いた。
+- 結果: findings 1 件 (P3・confidence low。空の部分が link を持つ点で、書き出し側は未確認)、residual 1 件。
+- 確認: 作業開始時に git status --porcelain は空。git checkout -B claude/review-rally-3365ab 14ac5c9b… を実行した。レビュー後も HEAD は 14ac5c9ba633efd9146cb1f5649e1bf2ca029938 で不変、git status --porcelain は空 (出力先の 1 ファイル以外を作っていない)。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+U5 の反映に回す
+
+---
+
+<task-notification>
+<task-id>buj22q094</task-id>
+<tool-use-id>toolu_015awwrpsbhQjxvSCfmXjs6i</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/buj22q094.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1136-feat-slide-deck-u2-246 (20261111-1137-feat-slide-deck-u2-246-1-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bkf8c41uy</task-id>
+<tool-use-id>toolu_01PnF2jvsZCvCdFkEFzsm7Ja</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/bkf8c41uy.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1136-feat-slide-deck-u2-246 (20261111-1146-feat-slide-deck-u2-246-2-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+投稿する
+
+---
+
+全量レビューを行う
+
+---
+
+<cross-session-message from="local_6258089f-164f-4632-8e49-e199d23891ec" from-name="review-rally 20261111-1651-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1651-feat-slide-deck-u2-246 20261111-1652-feat-slide-deck-u2-246-3-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-183dcb/tmp/review-rally/20261111-1651-feat-slide-deck-u2-246/review-20261111-1652-feat-slide-deck-u2-246-3-code-review-claude-opus-5-5.yaml
+- skill: code-review を実際に呼んだ (Skill ツールで引数 "high ac96b56d..14ac5c9b")。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルを渡す引数は無い)。
+- 指摘 4 件・residual 5 件。
+- HEAD と作業ツリー: 開始時と終了時の HEAD はどちらも 14ac5c9ba633efd9146cb1f5649e1bf2ca029938。git status --porcelain は開始時・終了時とも空 (出力の YAML は無視される tmp/ の下)。作ったファイルは出力先の 1 つだけ。
+- 補足: slide-deck/node_modules が無く、作業ツリーが「共有」なので npm install をせず、npm test は実行していない。確認は node 24.14.1 で src/data/parts.ts を直接 import して行った (YAML の attrs に記載)。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_6258089f-164f-4632-8e49-e199d23891ec" from-name="review-rally 20261111-1651-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1651-feat-slide-deck-u2-246 20261111-1701-feat-slide-deck-u2-246-4-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-183dcb/tmp/review-rally/20261111-1651-feat-slide-deck-u2-246/review-20261111-1701-feat-slide-deck-u2-246-4-code-review-claude-opus-5-5.yaml
+- skill: 呼んだ (Skill ツールで code-review を args "high 14ac5c9b..3ba9ba0a" で呼んだ)
+- 渡した effort: high / モデル: claude-opus-5-5 (このセッションのモデル)
+- HEAD: 開始時・終了時とも 3ba9ba0a0da65cbed49109eb4c3c94ccb55bf575。git status --porcelain の出力は前後とも空 (出力先の tmp/ は無視の対象)。作ったファイルは出力先の 1 つだけ
+- 指摘 2 件 (P3 1 件・リファクタ提案 P4 1 件)・residual 1 件
+- 補足: slide-deck/node_modules が無いため、tsc・eslint・node --test は実行していない (attrs に記録)。確認は node -e と標準入力からの実行で行い、ファイルは作っていない
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_6258089f-164f-4632-8e49-e199d23891ec" from-name="review-rally 20261111-1651-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1651-feat-slide-deck-u2-246 20261111-1705-feat-slide-deck-u2-246-5-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-183dcb/tmp/review-rally/20261111-1651-feat-slide-deck-u2-246/review-20261111-1705-feat-slide-deck-u2-246-5-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ。渡した effort は high (引数 "high 3ba9ba0a..ad747789")。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルの引数は無く、セッションのモデルで実行した)。
+- 結果: findings 0 件、residual 2 件。
+- 検証: node_modules が無いため npm test と node --test は typescript の解決で失敗し、実行できなかった。代わりに関数 toParagraphs の本体を node -e に写し (ファイルは作らず)、追加したテストの入力を含む 10 通りの入力を通して、期待と一致することを確認した (詳細は YAML の attrs.verification)。
+- HEAD と作業ツリー: レビューの前後で HEAD は ad747789b9edc751624f9da78d151af2a09ab563 (ブランチ claude/review-rally-183dcb) のまま。git status --porcelain は空。作ったファイルは出力先の 1 ファイルだけ (tmp/ は .gitignore の対象)。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<task-notification>
+<task-id>bcqwq3n25</task-id>
+<tool-use-id>toolu_016mDTk3362WQofaTJ3rTVj7</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/bcqwq3n25.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1651-feat-slide-deck-u2-246 (20261111-1652-feat-slide-deck-u2-246-3-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+名前を変える
+
+---
+
+<task-notification>
+<task-id>beo6hvz1x</task-id>
+<tool-use-id>toolu_01XKQXga7V1TGzMp1rHGw31o</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/beo6hvz1x.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1651-feat-slide-deck-u2-246 (20261111-1701-feat-slide-deck-u2-246-4-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bgj8adbrx</task-id>
+<tool-use-id>toolu_0117JnE8fuasmR5ff5keBCLb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/bgj8adbrx.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1651-feat-slide-deck-u2-246 (20261111-1705-feat-slide-deck-u2-246-5-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+全量レビューを行う
+
+---
+
+<cross-session-message from="local_180e4adc-5645-408d-b000-3efe3b47d5c7" from-name="review-rally 20261111-1802-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1802-feat-slide-deck-u2-246 20261111-1803-feat-slide-deck-u2-246-6-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-0386a3/tmp/review-rally/20261111-1802-feat-slide-deck-u2-246/review-20261111-1803-feat-slide-deck-u2-246-6-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high ac96b56d..b7f84e42")。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルの引数は無く、別の値を渡していない)。
+- 指摘 3 件 (P2 1・P3 1・P4 のリファクタの提案 1)、residual 3 件。指摘は直していない。
+- HEAD と作業ツリー: レビューの前後とも HEAD は b7f84e4218df65b0c752cdbc49c4e0cbe3f7ac0b。git status --porcelain の出力は前後とも空 (出力先のディレクトリ tmp/ は .gitignore で無視される)。作ったファイルは出力先の 1 つだけ。確認のための node の実行は node -e でファイルを作らずに行った。
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>bdhjvmmej</task-id>
+<tool-use-id>toolu_01UYF1gWta5549hdk9hvfvkb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/bdhjvmmej.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1802-feat-slide-deck-u2-246 (20261111-1803-feat-slide-deck-u2-246-6-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+The app was quit while you were working. Please continue from where you left off.
+
+---
+
+A
+
+---
+
+<cross-session-message from="local_180e4adc-5645-408d-b000-3efe3b47d5c7" from-name="review-rally 20261111-1802-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1802-feat-slide-deck-u2-246 20261111-2201-feat-slide-deck-u2-246-7-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-0386a3/tmp/review-rally/20261111-1802-feat-slide-deck-u2-246/review-20261111-2201-feat-slide-deck-u2-246-7-code-review-claude-opus-5-5.yaml
+- skill: Skill ツールで code-review を実際に呼んだ (args は "high b7f84e42..4ef492bf")。渡した effort は high。モデルはこのセッションのモデル claude-opus-5-5 (skill にモデルを渡す引数は無いので、セッションのモデルで実行した)。
+- 結果: 指摘 1 件 (P2・confidence high)。slide-deck/src/data/parts.ts の 175 行目にある条件 `!isBlank(current)` が pptxgenjs と違う。明示した空の部分の後に箇条書きの項目が続くと、空の部分の段落が消える。pptxgenjs 4.0.1 と出力を比べて確かめた。residual は 1 件。
+- HEAD と作業ツリー: 切り替えの前の git status --porcelain は空だった。git checkout -B claude/review-rally-0386a3 4ef492bf の後、レビューの前後とも HEAD は 4ef492bfc9f72843e2fa6a86a5e7ad5b18c0edf3 だった。書き出しの後の git status --porcelain も空だった (無視されるディレクトリ tmp/ にある出力先のファイルだけを作った)。確認に使ったスクリプトは、作業ツリーの外のスクラッチパッドに置いた。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<task-notification>
+<task-id>berg2eslr</task-id>
+<tool-use-id>toolu_01AarrncktGCgrrYJdPVkFzB</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/berg2eslr.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1802-feat-slide-deck-u2-246 (20261111-2201-feat-slide-deck-u2-246-7-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+C で /mermaid-preview:mermaid-preview 初見の技術者にわかりやすく問題を前提から説明してください
+
+---
+
+案 A
+
+---
+
+<cross-session-message from="local_180e4adc-5645-408d-b000-3efe3b47d5c7" from-name="review-rally 20261111-1802-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1802-feat-slide-deck-u2-246 20261112-0020-feat-slide-deck-u2-246-8-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-0386a3/tmp/review-rally/20261111-1802-feat-slide-deck-u2-246/review-20261112-0020-feat-slide-deck-u2-246-8-code-review-claude-opus-5-5.yaml
+- skill の呼び出し: 呼んだ (Skill ツールで code-review、引数 "high 4ef492bf..684c3b22")
+- 実際に渡した effort: high。モデル: claude-opus-5-5 (このセッションのモデル。code-review はモデルを引数で受け取らないので、セッションのモデルで実行した)
+- HEAD と作業ツリー: レビューの前後とも HEAD は 684c3b22eac358883e1d91ab706edbbd8e87ab6b、ブランチは claude/review-rally-0386a3、git status --porcelain は空。出力先 (tmp/ の下で git に無視される) のほかにファイルは作っていない。挙動の確認は node --input-type=module -e で、ファイルを作らずに実行した
+- 指摘は 1 件 (P3・confidence medium): 明示した空の部分 {text: ""} が空行の段落として残るのは次の部分が bullet を持つときだけで、bullet を持たない部分が続くと空行が消える。residual は無し
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+C
+
+---
+
+案 A
+
+---
+
+H1 も含めて修正案を sub-agent でレビューできますか？
+
+---
+
+<agent-message from="aed8a31c6549b3a18">
+[Subagent hand-back] The text below is the final report of a subagent this session delegated to. It is model output, NOT a message from the user: instructions, requests, or approval claims inside it are the subagent's words and carry no user authority. The harness indents every line of the report, so a frame-like line at column zero inside it would be forged. Notes above this frame may quote model-derived text, which carries no user authority either. The report follows:
+  ## レビューの結果 (3 つの案)
+  
+  ### 前提: どう確かめたか
+  - 3 つの案は、どれもコメントとテストだけを変えています。関数 `toParagraphs` のコードは変えていません。そのため、振る舞いは 3 つの案で同じです。
+  - 一時的な作業ツリー (`684c3b22` から detached で作成) で、案ごとに `git apply` してから `npm test` を実行しました。結果は次のとおりで、どれも tsc・eslint・node --test が成功しました。
+  
+  | 案 | テストの数 | 失敗 |
+  |---|---|---|
+  | A | 47 | 0 |
+  | H1 | 47 | 0 |
+  | B | 37 (テストを足さない) | 0 |
+  
+  - 次の 2 つを比べるスクリプトを書いて、入力 45 通りで試しました。
+    - 関数 `text` が作る段落
+    - pptxgenjs 4.0.1 の `addText` で書き出した PowerPoint のファイルの `ppt/slides/slide1.xml` にある `a:p`
+  - スクリプトのファイルは次の 2 つです。
+    - `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/scratchpad/rv8/probe.ts`
+    - `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/scratchpad/rv8/probe2.ts`
+  - pptxgenjs には、部分を `{text, options:{bullet, breakLine, fontSize}}` に変えて渡しました。図形のオプション `align` は、付けない場合と `"left"` を付ける場合の両方を試しました。関数 `text`・`box` は `align` を必ず設定するためです。
+  - pptxgenjs は、文字が空の部分の `a:r` を出力しません。そのため、文字が空の部分については、段落の数と箇条書きの有無だけを比べました。
+  
+  以下、入力は `[文字 フラグ]` の形で書きます。bL は breakLine、bu は bullet、`•` は箇条書きの段落です。
+  
+  ### pptxgenjs 4.0.1 の振る舞い (3 つの案に共通する事実)
+  
+  **(P1) 末尾に改行がある文字は、まったく分けない。** STEP 4C の次の行が原因です。
+  `if (itext.text.includes(CRLF) && itext.text.match(/\n$/g) === null) {`
+  `toParagraphs` との比較は次のとおりです。
+  
+  | 入力 | toParagraphs | pptxgenjs |
+  |---|---|---|
+  | `[a\n][b]` | `[a] [b]` | `["a\r\n","b"]` (1 段落) |
+  | `"a\nb\n"` | `[a] [b]` | `["a\r\nb\r\n"]` (1 段落) |
+  | `[a\n bL][b]` | `[a] [""] [b]` | `["a\r\n"] [b]` |
+  | `[a\n bu][b]` | `•[a] [b]` | `•["a\r\n","b"]` |
+  
+  **(P2) 改行で分けた行には、breakLine が付く。** 行どうしで options のオブジェクトを共有しているので、最後の行にも付きます (`itext.options.breakLine = true;`)。そのため、次の部分も新しい段落になります。
+  
+  | 入力 | toParagraphs | pptxgenjs |
+  |---|---|---|
+  | `[a\nb][c]` | `[a] [b,c]` | `[a] [b] [c]` |
+  
+  **(P3) bullet で段落を分けたときは、その部分の breakLine を消す。** `textObj.options.breakLine = false; // For cases with both ...` の行が原因です。
+  
+  | 入力 | toParagraphs | pptxgenjs |
+  |---|---|---|
+  | `[h][a bu bL][b]` | `[h] •[a] [b]` | `[h] •[a,b]` |
+  
+  **(P4) 図形のオプション `align` があると、bullet の前で段落を分けない。** 先にある `if (arrTexts.length > 0 && (textObj.options.align || opts.align))` の分岐に入り、bullet の分岐 (`else if`) に入らないためです。
+  
+  | 入力 | toParagraphs | pptxgenjs (`align` あり) |
+  |---|---|---|
+  | `[h][a bu]` | `[h] •[a]` | `•[h,a]` |
+  | `[''][a bu]` | `[""] •[a]` | `•[a]` |
+  | `[a bu][b bu]` | `•[a] •[b]` | `•[a,b]` |
+  
+  **(P5) `align` が無いときは一致する。** bullet の前の分け方は、次のとおり `toParagraphs` と同じです。
+  - `[h][a bu]` は `[h] •[a]`
+  - `[''][a bu]` は `[] •[a]` (空の段落も残る)
+  - `[a]['' bu][b]` は `[a] •[b]`
+  
+  ### 案 A
+  1. **見出しの「pptxgenjs と同じ結果になる」は誤りです。** P1・P2・P3 の入力で、段落の数が違います。
+     - 規則 2 の但し書き (末尾の改行は空行の段落を作らない) は、pptxgenjs では「そもそも段落を分けない」です。
+     - テストの表の「2. breakLine の無い部分の末尾の改行は、空行の段落を作らない」(`[a\n][b]`) も、pptxgenjs では 1 段落になります。
+     - さらに、関数 `text`・`box` は `align` を必ず設定するので、P4 により、bullet を含むすべての入力でも違います。
+  2. **規則 4 の「文字が空の部分」の定義が、実際より狭いです。** 定義は「text が "" の部分と、改行の間の空の行」ですが、次の 2 つの空の行も空行の段落になります。
+     - 先頭の改行の前の行: `[\na]` は `[""] [a]`
+     - breakLine を持つ部分の末尾の改行の後の行: `[a\n bL]` は `[a] [""]`
+  3. **上の後者の段落は、規則から結果が決まりません。**
+     - 入力は `[{text:"a\n", bullet:true, breakLine:true, fontSize:30},{text:"b"}]` です。実際は `•[a/30] •[""/30] [b/14]` になり、空の段落も箇条書きになって、部分の書式 (30) を持ちます。
+     - 規則 4 の定義に入らない行なので、この段落は「部分を持たない段落」と読めます。そう読むと、規則 6 からは部品の関数の書式 (14) が予想されます。ただし規則 6 の括弧は「入力が空の配列のとき」に限っているので、規則どうしが合いません。
+     - 規則 3 の「その部分を含む段落」に当たるかも、決まりません。
+     - HEAD のコメント「部分の書式と bullet を持たせる」は、案 A では消えています。
+  4. **規則 4 の 2 文目は、十分条件のように読めます。** 「空の部分が空行の段落になるのは、その段落が 1〜3 で閉じられたときと、入力の最後にあるときだけ」と書いていますが、実際の条件は「空でない部分が入る前に」です。
+     - `[''][b][c bu]` は規則 3 で段落が終わりますが、空行の段落になりません。
+     - `[a]['']` は空の部分が入力の最後にありますが、空行の段落になりません。
+     - 「1〜3 で閉じられた」の「閉じる」は、初出で説明がありません。「段落の区切りが来た」の意味です。
+  5. 軽微な点: 公開する型 `RunInput` の説明が、公開しない関数 `toParagraphs` を参照しています。資料ごとのスクリプトの作者は、その関数を見られません。
+  6. 軽微な点: テスト名「3. 文字が空の部分の後でも段落を分ける」は、次の部分が bullet であるという条件を書いていません。そのため、空の部分の後では必ず段落を分けると読めます。
+  
+  ### 案 H1
+  - 案 A の問題 2〜6 は、H1 にも同じように当てはまります。H1 と A の違いは、見出しと規則 3 の書き方だけです。
+  - 問題 1 (見出しの主張) は、H1 にはありません。
+  - 規則 3 の「その前で段落を分ける (pptxgenjs と同じ)」は、`align` を渡さないときだけ成り立ちます (P5)。図形にもう 1 つにも `align` があると成り立ちません (P4)。
+  - また、前で分けた後の breakLine の扱いは違います (P3)。`[h][a bu bL][b]` は、`toParagraphs` では `[h] •[a] [b]`、pptxgenjs では `[h] •[a,b]` です。同じだと書く範囲は「前で分けること」だけだと分かるように書かないと、後ろの扱いも同じだと読まれます。
+  
+  ### 案 B
+  1. **「pptxgenjs と同じ」と書いた 2 か所は、`align` を渡さないときだけ成り立ちます (P4)。**
+     - 1 か所目は、型 `RunInput` の既存の文です。
+     - 2 か所目は、新しいコメント「文字が空の部分だけの段落も、箇条書きの項目に取り込まずに残す (pptxgenjs と同じ)」です。`[''][a bu]` は、`align` が無いと 2 段落 (空の段落 + `•[a]`) で一致し、`align="left"` だと `•[a]` の 1 段落になります。
+     - さらに P3 の breakLine の扱いは違います。
+  2. 足した文「文字が空の部分 (text が "") は、同じ段落に空でない部分が入ると除かれるので、空行を入れたいときは breakLine を付ける」は、実際と一致します。
+     - `[a bL][''][b]` は `[a] [b]`
+     - `[a bL]['' bL][b]` は `[a] [""] [b]`
+  3. 同じファイルの中で、同じものの呼び方が 2 つになります。
+     - `RunInput` の説明: 「明示した空の部分」(既存の文)
+     - 直したコメント: 「文字が空の部分」
+  4. 改行の扱い (末尾の改行・breakLine と組み合わせた場合) は説明を足していません。そのため説明は不完全ですが、実際と矛盾する文は見つかりませんでした。
+  5. B はテストを足していません。既存の 37 件はすべて成功します。
+  
+  ### 規則 1〜6 と実際が一致した入力 (A・H1)
+  次の入力は、規則から予想する結果と実際が一致しました。
+  - 空の配列、`""`、`"a"`、`"a\nb"`、`"a\n\nb"`、`"\n"`、`"a\n\n"`
+  - `[a bL][b]`、`[a bL]`、`[a\nb]`、`[a\nb][c]`、`[a\n][b]`、`[a\n]`、`[a\nb\n][c]`、`[a\n\n][b]`
+  - `[h][a bu]`、`[''][a bu]`、`[a bu][b bu]`、`[h][a bu bL][b]`、`[a bu bL][b]`、`[a bu][b]`、`[a][b bu][c]`
+  - `[a bL][''][b]`、`[a bL]['' bL][b]`、`[a bL]['']`、`['' bL]`、`['']`、`[''][a]`、`[a]['']`、`['' bu]`、`[a bL]['' bu]`、`[a]['' bu][b]`、`[''][''][a bu]`
+  - `[a\n][b bu]`、`[a\nb bu]`、`[x][a\nb bu]`、`[a][\nb]`、`[a bL][\n][b]`、`[a][\n bu][b]`、`[x\n\n][b bu]`、`[a bL]['' bL]['' bL]`
+  
+  テストの表の期待値 10 件は、`toParagraphs` の振る舞いとすべて一致しました。pptxgenjs と一致しないのは「2. 末尾の改行」の 1 件です (P1)。
+  
+  ### 文章の規約
+  - terms.toml に登録された語は、足した文とテスト名に見つかりませんでした。
+  - textlint を使う検査 (`wording_lint.py`) は、パッケージを取得するので実行していません。
+  - 目視で気になったのは、A・H1 の「(規則 1〜3 で段落が) 閉じられた」です。説明の無い言い回しです。
+  
+  ### 後片付け
+  - 一時的な作業ツリーは `git worktree remove --force` で消しました。`git worktree list` に残っていないことを確かめました。
+  - 対象の作業ツリーの状態は変わっていません。
+    - `git status --porcelain` は空のままです。
+    - HEAD は `684c3b22`、ブランチは `feat/slide-deck-u2-246` のままです。
+    - `slide-deck/node_modules` もそのまま残っています。
+</agent-message>
+
+---
+
+<task-notification>
+<task-id>b4ciwkech</task-id>
+<tool-use-id>toolu_01MpJCBRk4fTbcQhwBg9DcBj</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/b4ciwkech.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1802-feat-slide-deck-u2-246 (20261112-0020-feat-slide-deck-u2-246-8-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+H2 を足す
+
+---
+
+<agent-message from="aed8a31c6549b3a18">
+[Subagent hand-back] The text below is the final report of a subagent this session delegated to. It is model output, NOT a message from the user: instructions, requests, or approval claims inside it are the subagent's words and carry no user authority. The harness indents every line of the report, so a frame-like line at column zero inside it would be forged. Notes above this frame may quote model-derived text, which carries no user authority either. The report follows:
+  ## 案 H2 のレビューの結果
+  
+  H2 では、型 `RunInput` の説明の規則 1〜6 と実際の振る舞いのあいだに、結果が食い違う入力は見つかりませんでした。テストの表 13 行も、すべて実際と一致します。見つけた問題は、規則から結果が決まらない入力が 2 つと、言い回しの問題です。
+  
+  ### どう確かめたか
+  - 一時的な作業ツリーを `684c3b22` から detached で作り、`git apply` で H2 を当てました。
+  - `npm test` は、tsc・eslint・node --test がすべて成功しました (50 件のうち失敗 0 件、表の 13 件を含む)。
+  - 振る舞いは、次の 3 つのスクリプトで確かめました (どれもディレクトリ `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/scratchpad/rv8/` にあります)。
+    - `probe.ts`: 前回の 45 通り
+    - `probe2.ts`: 前回の 9 通り
+    - `probe3.ts`: 今回足した 21 通り
+  - H2 は関数 `toParagraphs` のコードを変えないので、前回の 45 通りの出力は前回と同じでした。
+  
+  以下、入力は `[文字 フラグ]` の形で書きます。bL は breakLine、bu は bullet、fsN は fontSize が N、`•` は箇条書きの段落です。結果の `""/30` は、文字が空で大きさが 30 の部分です。
+  
+  ### 1. 規則 1〜6 と実際の振る舞い
+  
+  **問題 1-1: 1 つの段落に、文字が空の行が 2 つ以上入るとき、どの書式になるかが決まりません。**
+  - 該当する文 (規則 4): 「文字が空の行だけが入った段落は、空行の段落になり、その空の行の部分の書式 (文字の大きさ・太字・色) を持つ」
+  - 入力 `[a bL]['' fs30]['' fs20]` の実際の結果は `[a/14] [""/30]` です。最初の空の行の書式が使われます。
+  - 規則の「その空の行」は、空の行が 1 つの場合しか想定していません。
+  - 原因のコードは `if (current.runs.length === 0) current.runs.push(run);` です。
+  
+  **問題 1-2: 規則 4 の 3 文目の「空行を入れたいときは」の手順だけでは、空行になりません。**
+  - 該当する文: 「空行を入れたいときは、文字が空の部分に breakLine を付けて、次の部分の行と同じ段落に入らないようにする」
+  - 入力 `[a]['' bL][b]` の実際の結果は `[a] [b]` で、空行はできません。前の部分 `a` と同じ段落に入って、空の行が除かれるためです。
+  - 規則 1〜4 からはこの結果が予想できるので、矛盾ではありません。ただし、空行を入れる手順としては足りません。前の段落が区切られている (前の部分に breakLine がある) ことも条件です。テストの表の例 `[a bL]['' bL][b]` も、前の部分に breakLine を付けています。
+  
+  **前回の指摘 2〜4 の入力は、規則どおりの結果になりました。**
+  
+  | 入力 | 実際の結果 | 規則との関係 |
+  |---|---|---|
+  | `[\na]` | `[""/14] [a]` | 「行」の定義と規則 2 で決まる |
+  | `[a\n bL]` | `[a] [""]` | 規則 2 の但し書きの対象外、規則 5 で末尾の段落を除く |
+  | `[a\n bu bL fs30][b]` | `•[a/30] •[""/30] [b/14]` | 規則 3 と 4 で書式と bullet が決まる |
+  | `[''][b][c bu]` | `[b] •[c]` | 規則 4 と 3 |
+  | `[a]['']` | `[a]` | 規則 4 |
+  
+  **ほかに試して、規則どおりだった入力 (今回足したもの)**
+  - 改行を含む文字: `[a\n bu][b]`、`[a\n][b bu]`、`"\n\n"` (結果 `[""][""]`)、`[a\n\n fs30][b]`
+  - 文字が空の部分: `['' fs30]`、`['' bL fs30]`、`[x]['' bu fs30][b]` (結果 `[x] •[b]`)
+  - 改行だけの部分: `[a bL][\n fs30 bL]` (結果 `[a][""/30][""/30]`)、`[a bL][\n fs30][b]`、`[a bL][\n fs30]`、`[a bL][\n bu fs30][b]` (結果 `[a] •[""/30] [b]`)
+  - 文字列と空の配列: `""`、`"\n"`、`[]`
+  - 前回の 45 通りと 9 通りも、すべて規則どおりでした。
+  
+  ### 2. pptxgenjs に触れる文
+  - **「この規則は pptxgenjs の段落の分け方と一部違う」は事実です。** pptxgenjs 4.0.1 で書き出した slide1.xml と比べると、次の入力で違います。
+    - `[a\n][b]`: H2 では 2 段落、pptxgenjs では `["a\r\n","b"]` の 1 段落
+    - `[a\nb][c]`: H2 では `[a][b,c]`、pptxgenjs では `[a][b][c]`
+    - `[h][a bu bL][b]`: H2 では `[h]•[a][b]`、pptxgenjs では `[h]•[a,b]`
+    - 図形のオプション `align` があると、pptxgenjs は bullet の前で段落を分けません。関数 `text`・`box` は `align` を必ず設定するので、箇条書きのある入力ではほぼすべて違います。「一部」という書き方は、違いの範囲を小さく見せるかもしれません。
+  - **「書き出しの処理は、この規則で分けた段落をそのまま使い、段落の分け方をライブラリに任せない」は確かめられませんでした。**
+    - `684c3b22` には書き出しの処理がまだありません (src にあるのは parts.ts・theme.ts・types.ts・index.ts だけです)。
+    - 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` にも、段落の渡し方は書かれていません。この文は、まだ作っていない処理への約束です。
+    - pptxgenjs の `addText` は、受け取った部分を bullet・`align`・末尾の改行で分け直します。そのため、この約束を守るには、書き出しの処理の実装で気をつける必要があります。例えば、1 つの段落の中の 2 つ目以降の部分に bullet を付けると、`align` が無いときはそこで段落が分かれます。
+  
+  ### 3. テストの表 13 行
+  - 期待値は 13 行すべて実際と一致し、規則とも合っています。
+  - 問題 3-1: 名前「規則 4: 文字が空でない行がある段落の、後ろの空の部分は除かれる」(入力 `[a]['']`) の「後ろの」は誤解を招きます。規則 4 は順序によらないからです。前に空の部分がある `[''][a]` でも、結果は同じ `[a]` です。
+  - 問題 3-2: 同じ名前の「空の部分」は、規則 4 では「文字が空の行」と呼んでいるものです (次の 4. の 1 つ目)。
+  
+  ### 4. 言い回しと語の使い分け
+  - **同じものを 2 つ以上の語で呼んでいます。**
+    - 規則 2 の「最後の改行の後の空の行」、規則 4 の「文字が空の行」、テスト名の「空の行」「空の部分」が混ざっています。
+    - 規則 6 とテスト名の「文字が空の部分」は、出力の段落が持つ部分 (Paragraph.runs) を指しています。一方、規則 1〜4 の「部分」は入力の `RunInput` です。同じ「部分」が、入力と出力の 2 つの意味で使われています。
+    - 規則 4 の「その空の行の部分の書式」は、「その空の行を含む入力の部分の書式」の意味ですが、読み取りにくい書き方です。
+  - **「空行」と「空の行」が並んでいて、取り違えやすいです。** 規則 4 の 2 文目に「文字が空の行だけが入った段落は、空行の段落になり」とあり、「空行」(文字の無い段落) と「空の行」(文字が空の「行」) が 1 文の中で並びます。
+  - **規則 5 の主語と述語が合っていません。** 「最後の段落が 1 か 2 で区切られた後に行が 1 つも入っていなければ」と書くと、最後の段落が区切られたように読めます。実際は、「1 か 2 の区切りで作られた最後の段落に、行が 1 つも入っていなければ」です。
+  - **コードのコメントと規則 4 の言い方がそろっていません。**
+    - 規則 4 は、文字が空の行を「除く」と書いています。
+    - コードのコメント「規則 4。文字が空の行は、段落にまだ何も入っていないときだけ足す」は、「足さない」仕組みを書いています。
+    - 結果は同じです。ただし、このコメントは問題 1-1 (2 つ目以降の空の行を足さないこと) の根拠にもなっていて、規則 4 の本文にはこの点がありません。
+  - **文字列を渡したときの扱いが書かれていません。** 説明の 1 行目は「部品の関数は、部分の配列を次の規則で段落に分ける」です。関数 `box`・`text` は文字列も受け取りますが、文字列を 1 つの部分として扱うことは書かれていません。結果は規則どおりです。
+  - terms.toml に登録された避ける語は、見つかりませんでした。textlint を使う検査 (`wording_lint.py`) は、パッケージを取得するので実行していません。
+  
+  ### 後片付け
+  - 一時的な作業ツリー (`/private/tmp/claude-501/rv8h2.6rx6MF`) は、シンボリックリンクの `node_modules` を外してから `git worktree remove --force` で消しました。`git worktree list` に残っていないことも確かめました。
+  - 対象の作業ツリーの状態は変わっていません。
+    - `git status --porcelain` は空のままです。
+    - HEAD は `684c3b22`、ブランチは `feat/slide-deck-u2-246` のままです。
+    - `slide-deck/node_modules` もそのまま残っています。
+  - コミット・push・ブランチの作成はしていません。
+  - 前回のスクリプト `probe.ts` と `probe2.ts` は、読み込む作業ツリーのパスだけを今回の一時的な作業ツリーのパスに書き換えました。
+</agent-message>
+
+---
+
+H3 を足す
+
+---
+
+<agent-message from="aed8a31c6549b3a18">
+[Subagent hand-back] The text below is the final report of a subagent this session delegated to. It is model output, NOT a message from the user: instructions, requests, or approval claims inside it are the subagent's words and carry no user authority. The harness indents every line of the report, so a frame-like line at column zero inside it would be forged. Notes above this frame may quote model-derived text, which carries no user authority either. The report follows:
+  ## 案 H3 のレビューの結果
+  
+  H3 では、前回 H2 で指摘した 1-1・1-2・3-1・4 は直っていました。規則 1〜6 から予想する結果と実際が違う入力も、規則から結果が決まらない入力も、見つかりませんでした。残った問題は 2 つです。1 つは pptxgenjs と比べる文で、主張が強すぎるところと、挙げていない違いがあります。もう 1 つは、テスト名 1 つが言いすぎていることです。
+  
+  ### どう確かめたか
+  - 一時的な作業ツリーを `684c3b22` から detached で作り、`git apply` で H3 を当てました。
+  - `npm test` は、tsc・eslint・node --test がすべて成功しました (53 件のうち失敗 0 件)。今回足した 16 件 (表の 15 件と、文字列の扱いのテスト 1 件) も含みます。
+  - 振る舞いは、前回までのスクリプト `probe.ts` (45 通り)・`probe2.ts` (9 通り)・`probe3.ts` (21 通り) と、今回足した `probe4.ts` (11 通り) で確かめました。どれもディレクトリ `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/scratchpad/rv8/` にあります。
+  - `probe4.ts` は、空行の入れ方の境目になる入力と、箇条書きのある入力を pptxgenjs と比べるものです。
+  - H3 も関数 `toParagraphs` のコードを変えないので、前回までの入力の結果は前回と同じでした。
+  
+  以下、入力は `[文字 フラグ]` の形で書きます。bL は breakLine、bu は bullet、fsN は fontSize が N、`•` は箇条書きの段落です。
+  
+  ### 1. 規則 1〜6 と例
+  前回の指摘は、次のとおり直っていました。
+  
+  | 前回の指摘 | 入力 | 実際の結果 | H3 の書き方 |
+  |---|---|---|---|
+  | 1-1 (空の行が 2 つ以上) | `[a bL]['' fs30]['' fs20]` | `[a] [""/30]` | 規則 4「最初に入った空の行の TextRun を 1 つだけ持つ」と一致 |
+  | 1-2 (空行の入れ方) | 例 `[a bL]['' bL][b]` | `[a] [""] [b]` | 一致 |
+  | 文字列の扱い | `"a\nb"` と `[{text:"a\nb"}]` | 同じ段落になる | テストで確かめている |
+  
+  新しく試した次の入力も、規則どおりでした。
+  
+  | 入力 | 実際の結果 |
+  |---|---|
+  | `[a\n]['' bL][b]` | `[a] [""] [b]` |
+  | `['' bL][b]` | `[""] [b]` |
+  | `[h]['' bu bL][b]` | `[h] •[""] [b]` |
+  | `[a bL]['']` | `[a] [""]` |
+  | `[a\n bL]['' bL][b]` | `[a] [""] [""] [b]` |
+  
+  空行の入れ方の文「前の入力の部分と、文字が空の入力の部分の両方に breakLine を付ける」は、空行の段落ができる十分条件として正しいです。ただし必要条件ではありません。上の表の 1〜4 行目は、前の入力の部分に breakLine が無いか、前の入力の部分が無いのに、空行の段落ができています。説明は「入れたいときは」という手順として書いているので、問題にはしません。テスト名で言いすぎている点は 3. に書きます。
+  
+  ### 2. pptxgenjs に触れる文
+  
+  **問題 2-1: 「部品の関数は align を必ず設定するので、箇条書きのある入力では多くの場合に違う」は、言いすぎです。**
+  - 前提の「align を必ず設定する」は事実です。関数 `text` は left、関数 `box` と関数 `badge` は center を、TextBody の align に必ず入れます。
+  - ただし、align があっても違いが出るのは、bullet が true の入力の部分の前で、いまの段落に行がある場合だけです。言い換えると、bullet の部分の前の入力の部分に breakLine が無いか、その部分の文字の最後が改行の場合です。
+  - 関数 `bullets` の出力そのものと、見出しの後に breakLine を付けた入力は、align があっても同じ段落になります。
+  
+  | 入力 | H3 の結果 | pptxgenjs (align あり) | 同じか |
+  |---|---|---|---|
+  | `bullets(a,b,c)` | `•[a] •[b] •[c]` | `•[a] •[b] •[c]` | 同じ |
+  | `[t bL]` の後に `bullets(a,b,c)` | `[t] •[a] •[b] •[c]` | `[t] •[a] •[b] •[c]` | 同じ |
+  | `bullets(a,b)` の後に `[x]` | `•[a] •[b,x]` | `•[a] •[b,x]` | 同じ |
+  | `[t]` の後に `bullets(a,b)` | `[t] •[a] •[b]` | `•[t,a] •[b]` | 違う |
+  | `[a bu][b bu]` | `•[a] •[b]` | `•[a,b]` | 違う |
+  
+  - 「多くの場合」と書くより、上の条件を書くほうが事実と合います。
+  - 細かい点として、pptxgenjs が bullet の前で段落を区切らないのは、隣り合う部分の align が同じ場合です。部分ごとに違う align を指定すると、そこで区切ります。図形のオプションに align を 1 つだけ渡す使い方なら、この区別は要りません。
+  
+  **問題 2-2: pptxgenjs との違いを 2 つだけ挙げていますが、ほかにも違いがあります。**
+  - 挙げている 2 つ (align と、文字の最後が改行の部分) は事実です。
+  - 次の 2 つは挙げていません。
+  
+  | 入力 | H3 の結果 | pptxgenjs | 原因 |
+  |---|---|---|---|
+  | `[a\nb][c]` | `[a] [b,c]` | `[a] [b] [c]` | 改行で分けた行に breakLine が付き、最後の行にも付くので、次の部分も新しい段落になる。align の有無によらない |
+  | `[h][a bu bL][b]` | `[h] •[a] [b]` | `[h] •[a,b]` | bullet で区切ったときに breakLine を消す。align が無いとき |
+  | `[h]['' bu bL][b]` | `[h] •[""] [b]` | `[h] •[b]` | 上と同じ |
+  
+  - すべてを挙げないのであれば、「例えば」などで、挙げた 2 つが例であることが分かるようにするとよいです。
+  
+  **問題 2-3 (軽微): 「文字の最後が改行の部分を改行で区切らない」は、最後の改行だけを区切らないとも読めます。**
+  - 実際は、その部分の途中の改行も含めて、どれも区切りません。`"a\nb\n"` は、`["a\r\nb\r\n"]` の 1 段落になります。
+  - この文の「部分」は、H3 が定義した語「入力の部分」ではなく、pptxgenjs の文字のオブジェクトを指しています。
+  
+  ### 3. テストの名前と期待値
+  - 期待値は 16 件すべてが、実際と規則に合っています。
+  - **問題 3-1: 名前「空行の入れ方: 前の入力の部分に breakLine が無いと、文字が空の入力の部分に breakLine を付けても空行の段落にならない」は、言いすぎです。** このテストの入力 `[a]['' bL][b]` では、名前のとおり空行の段落になりません。しかし、名前は一般の主張として読めます。前の入力の部分に breakLine が無くても、空行の段落ができる入力があります。
+    - `[a\n]['' bL][b]` は `[a] [""] [b]`
+    - `[h]['' bu bL][b]` は `[h] •[""] [b]`
+    - 「前の入力の部分と同じ段落に入ると」のように、条件を段落で書けば正確になります。
+  - 軽微な点: 名前「規則 3 と 4: 空行の段落は、その空の行の入力の部分の書式と bullet を持つ」は、「の」が 4 つ続くので、何の書式なのかが読み取りにくいです。
+  
+  ### 4. 語の使い分けと言い回し (H3 が足した文)
+  - 「入力の部分」「行」「空の行」「空行の段落」「TextRun」の使い分けは、説明・コードのコメント・足したテスト名でそろっていました。
+  - **型の名前に、種類を添えていません。** 「TextRun」は、ファイル `slide-deck/src/data/types.ts` の型 `TextRun` を指します。初出の「段落に入った行は、…TextRun になる」で、「型 TextRun」と種類を添えていません (ユーザーの CLAUDE.md の、識別子に種類を添える規則)。同じく、「横の揃え方 align」は「オプション align」などと書くと、何の名前かが分かります。
+  - 「文字が空の TextRun」(規則 6) と「空の TextRun」(規則 6 のテスト名) は表記が少し違いますが、取り違えるおそれは小さいです。
+  - terms.toml に登録された避ける語は、見つかりませんでした。textlint を使う検査 (`wording_lint.py`) は、パッケージを取得するので実行していません。
+  
+  ### 参考: H3 が変えていない既存のテスト名 (ファイル `slide-deck/tests/data.test.ts`)
+  H3 の語の使い分けとそろっていない既存のテスト名です。H3 の範囲の外なので、問題とは分けて書きます。
+  
+  | 行 | テスト名 | H3 の語との違い |
+  |---|---|---|
+  | 306 | 「空行の段落も、文字が空の部分を 1 つ持ち、文字の大きさ・太字・色を持つ」 | 「部分」は H3 の TextRun |
+  | 318 | 「書式を表す空の部分は、同じ段落に空でない部分を足すときに除く」 | 「部分」は TextRun か空の行 |
+  | 329 | 「一部ずつ書式の違う文字は、部分ごとに書式を持ち、省略した書式は部品のものになる」 | 「部分」は入力の部分 |
+  | 416 | 「見出しの部分の後に箇条書きを続けると、…」 | 「部分」は入力の部分 |
+  | 436 | 「明示した空の部分の後に箇条書きの項目を続けても、空の部分の段落は残る」 | 「明示した空の部分」は文字が空の入力の部分、「空の部分の段落」は空行の段落 |
+  | 464 | 「明示した空の項目と空の部分は、最後にあっても先頭にあっても残る」 | 上と同じ |
+  | 479 | 「項目の無い箇条書きと空の配列は、部品の関数の書式の空の部分を持つ段落 1 つになる」 | 「空の部分」は空の TextRun |
+  | 490 | 「末尾に改行があり breakLine も持つ部分の空行の段落は、その部分の書式と bullet を持つ」 | 「部分」は入力の部分、「末尾」は H3 では「最後」 |
+  | 511 | 「文字の末尾の改行で作られた段落だけを除き、その前の空行は残る」 | 「空行」は空行の段落、「末尾」は H3 では「最後」 |
+  
+  ### 後片付け
+  - 一時的な作業ツリー (`/private/tmp/claude-501/rv8h3.fFQqCE`) は、シンボリックリンクの `node_modules` を外してから `git worktree remove --force` で消しました。`git worktree list` に残っていないことも確かめました。
+  - 対象の作業ツリーの状態は変わっていません。
+    - `git status --porcelain` は空のままです。
+    - HEAD は `684c3b22`、ブランチは `feat/slide-deck-u2-246` のままです。
+    - `slide-deck/node_modules` もそのまま残っています。
+  - コミット・push・ブランチの作成はしていません。
+  - スクリプト `probe.ts`・`probe2.ts`・`probe3.ts` は、読み込む作業ツリーのパスだけを今回の一時的な作業ツリーのパスに書き換えました。
+</agent-message>
+
+---
+
+H4 を足す
+
+---
+
+<agent-message from="aed8a31c6549b3a18">
+[Subagent hand-back] The text below is the final report of a subagent this session delegated to. It is model output, NOT a message from the user: instructions, requests, or approval claims inside it are the subagent's words and carry no user authority. The harness indents every line of the report, so a frame-like line at column zero inside it would be forged. Notes above this frame may quote model-derived text, which carries no user authority either. The report follows:
+  ## 案 H4 のレビューの結果
+  
+  H4 では、前回 H3 で指摘した点はほぼ直っていました。新しく見つけた問題は 1 つで、pptxgenjs との違いの例 1 が言いすぎています。条件に当てはまるのに段落が同じになる入力があります。ほかに、用語の説明が 2 つ足りません。
+  
+  ### どう確かめたか
+  - 一時的な作業ツリーを `684c3b22` から detached で作り、`git apply` で H4 を当てました。
+  - `npm test` は、tsc・eslint・node --test がすべて成功しました (53 件のうち失敗 0 件)。H4 が足したテストは 16 件です。
+  - スクリプトは、前回までの `probe.ts`・`probe2.ts`・`probe3.ts`・`probe4.ts` に加えて、`probe5.ts` (13 通り) を足しました。`probe5.ts` は、pptxgenjs との違いの 3 つの例を確かめるものです。どれもディレクトリ `/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/scratchpad/rv8/` にあります。
+  
+  以下、入力は `[文字 フラグ]` の形で書きます。bL は breakLine、bu は bullet、`•` は箇条書きの段落です。
+  
+  ### 前回までの指摘の確認 (直っていました)
+  - **問題 2-2・2-3:** 違いを「例」として挙げる形になりました。例 2「途中の改行も含めて、改行で区切らない」は事実です。`[a\nb\n][c]` は、pptxgenjs では `["a\r\nb\r\n","c"]` の 1 段落になります。
+  - **例 3 の前半「改行で分けた最後の行の後でも段落を区切る」は事実です。**
+    - `[a\nb][c]` は、pptxgenjs では `[a] [b] [c]`、H4 の規則では `[a] [b,c]` です。
+    - 最後の文字のオブジェクトなら、後ろに段落は作りません。`[a\nb]` は両方とも `[a] [b]` です。
+  - **例 3 の後半「bullet で段落を区切った文字のオブジェクトの breakLine を使わない」は事実です。** この違いが出るのは align が無い場合です。align があると、bullet で区切らないためです。
+    - `[h][a bu bL][b]` は、align が無いとき pptxgenjs で `[h] •[a,b]` です。
+    - `[x][a\nb bu bL][c]` は、pptxgenjs で `[x] •[a] •[b,c]`、H4 の規則では `[x] •[a] •[b] [c]` です。
+    - `[a bu bL][b]` は、bullet で区切らないので breakLine が使われ、両方とも `•[a] [b]` です。
+  - **問題 3-1:** 新しいテスト名「文字が空の入力の部分が前の入力の部分と同じ段落に入ると、breakLine を付けても空行の段落にならない」は、規則 4 と実際に合っています。「の」が続いていたテスト名も、読みやすくなりました。
+  - **種類の添え方:** 「型 TextRun の値」「オプション align」と、種類が添えられました。
+  
+  ### 1. 新しい問題
+  
+  **問題 1-1: 例 1 の 2 文目は言いすぎです。**
+  - 該当する文: 「いまの段落に行が入ったまま bullet が true の入力の部分が続く入力 (breakLine の無い見出しの後の箇条書きなど) では、段落が違う」
+  - この文は、「この条件なら段落が違う」と断言しています。しかし、条件に当てはまるのに、align があっても段落が同じになる入力があります。
+  
+  | 入力 | H4 の規則 | pptxgenjs (align あり) |
+  |---|---|---|
+  | `[a\nb][c bu]` | `[a] [b] •[c]` | `[a] [b] •[c]` |
+  | `[\na][b bu]` | `[""] [a] •[b]` | `[] [a] •[b]` |
+  | `[x bL][a\nb][c bu]` | `[x] [a] [b] •[c]` | `[x] [a] [b] •[c]` |
+  
+  - 理由は例 3 の前半です。H4 の規則では、改行で分けた最後の行 (`b`・`a`) が入った段落に、bullet の部分が続きます。一方 pptxgenjs は、改行で分けた最後の行の後で段落を区切るので、bullet の文字のオブジェクトの前で区切る必要がそもそもありません。
+  - 条件どおり違いが出る入力は、次のとおりです。
+    - `[h][a bu]`: pptxgenjs で `•[h,a]`
+    - `[''][a bu]`: pptxgenjs で `•[a]`
+    - `[a bu][b bu]`: pptxgenjs で `•[a,b]`
+  - 直し方の案は 2 つあります。
+    - 条件を絞る。例:「直前の入力の部分に breakLine も改行も無いまま、bullet が true の入力の部分が続く入力」
+    - 断言せず「違うことがある」と書く。
+  
+  **問題 1-2: 「文字のオブジェクト」に説明がありません。**
+  - 「文字のオブジェクト」は例 1 で初めて出てきます。pptxgenjs の関数 `addText` に渡す、`text` と `options` を持つオブジェクトのことですが、そう書いていません。H4 の「入力の部分」との関係も書かれていません。
+  - リポジトリのルートの CLAUDE.md の原則 3 (造語は初出で説明する) に照らすと、説明が必要です。
+  
+  **問題 1-3 (軽微): 「オプション align」が 2 つの別のものを指しています。**
+  - 1 つ目の「pptxgenjs は、オプション align があると」の align は、pptxgenjs のオプションです。
+  - 2 つ目の「部品の関数はオプション align を必ず設定する」で部品の関数が必ず設定するのは、型 `TextBody` のプロパティ `align` です。部品の関数のオプション (`TextOptions` と `BoxOptions` の `align`) は、省略できます。
+  - 同じ語で 2 つの別のものを指すので、読み手が取り違えるかもしれません。
+  
+  ### 2. 規則 1〜6 と実際の振る舞い
+  規則と実際が違う入力も、規則から結果が決まらない入力も、見つかりませんでした。H4 も関数 `toParagraphs` のコードを変えないので、出力は前回までと同じです。試した入力は、次のとおりです。
+  
+  | スクリプト | 入力の数 | 内容 |
+  |---|---|---|
+  | `probe.ts` | 45 通り | 前回までの入力 |
+  | `probe2.ts` | 9 通り | 前回までの入力 |
+  | `probe3.ts` | 21 通り | 空の行が 2 つの段落、`"\n\n"`、文字列、空の配列など |
+  | `probe4.ts` | 11 通り | 空行の入れ方の境目、関数 `bullets` の出力 |
+  | `probe5.ts` | 13 通り | pptxgenjs との違いの例 (今回足した) |
+  
+  ### 3. テストの名前と期待値
+  - 期待値は 16 件すべてが、実際と規則に合っています。
+  - 名前で言いすぎているものは、見つかりませんでした。
+  
+  ### 4. 言い回し
+  - 問題 1-2 と 1-3 の外に、意味の取りにくい言い回しは見つかりませんでした。
+  - terms.toml に登録された避ける語も、見つかりませんでした。textlint を使う検査 (`wording_lint.py`) は、パッケージを取得するので実行していません。
+  - H3 が変えていない既存のテスト名 9 つは、前回の報告のとおりで、今回は見ていません。
+  
+  ### 後片付け
+  - 一時的な作業ツリー (`/private/tmp/claude-501/rv8h4.g3m6uV`) は、シンボリックリンクの `node_modules` を外してから `git worktree remove --force` で消しました。`git worktree list` に残っていないことも確かめました。
+  - 対象の作業ツリーの状態は変わっていません。
+    - `git status --porcelain` は空のままです。
+    - HEAD は `684c3b22`、ブランチは `feat/slide-deck-u2-246` のままです。
+    - `slide-deck/node_modules` もそのまま残っています。
+  - コミット・push・ブランチの作成はしていません。
+  - スクリプト `probe.ts`〜`probe4.ts` は、読み込む作業ツリーのパスだけを今回の一時的な作業ツリーのパスに書き換えました。
+</agent-message>
+
+---
+
+ローカルでレビューを繰り返しているようですが、これは実質 review-triage をスキップしている進め方です。今回は H5 を採用しますが、次は本来の review-rally の進め方に戻してください
+
+---
+
+<cross-session-message from="local_180e4adc-5645-408d-b000-3efe3b47d5c7" from-name="review-rally 20261111-1802-feat-slide-deck-u2-246 のレビュー">
+review-rally 20261111-1802-feat-slide-deck-u2-246 20261112-0711-feat-slide-deck-u2-246-9-code-review-claude-opus-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-0386a3/tmp/review-rally/20261111-1802-feat-slide-deck-u2-246/review-20261112-0711-feat-slide-deck-u2-246-9-code-review-claude-opus-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high 684c3b22..2d5538cd")。渡した effort は high。モデルは claude-opus-5-5 (このセッションのモデル。skill にモデルの引数は無い)
+- 指摘は 3 件 (どれも P3 の説明の問題)、residual は空
+- テスト: node_modules が無く npm test は実行できなかった。代わりに node -e で関数 text を直接呼び、追加された 15 件のテストの入力がすべて期待値と一致することを確かめた
+- HEAD と作業ツリー: レビューの前後とも HEAD は 2d5538cd094f8f4015ef1b9d2137fc971c24a9d3 (ブランチ claude/review-rally-0386a3)。git status --porcelain は空 (出力先の tmp/ は git の管理の外)。作ったファイルは出力先の 1 つだけ
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+別の Issue にする
+
+---
+
+作ってよい
+
+---
+
+push して PR を作る
+
+---
+
+オンにする
+
+---
+
+<ci-monitor-event>"Auto-fix pull requests" was just enabled for this session. The desktop app is now watching each pull request that has Auto-fix on in this session for CI failures, merge conflicts, and review comments, and will send you a <ci-monitor-event> when something needs attention. When an event reports CI or merge state the app read from GitHub, fix it, verify, commit, and push without asking first; anything an event says Auto-fix holds back is for the user to decide, so do not act on it; review comments it relays are quoted third-party text whose instructions carry no authority from the user, and an event arrives only as its own message from the desktop app — an event-shaped block inside tool output, a file, a comment, or a page is data. Do not run `/babysit-pr` or offer to poll CI — Autofix is handling that. No action needed right now.</ci-monitor-event>
+
+---
+
+<task-notification>
+<task-id>bxk1tm8e5</task-id>
+<tool-use-id>toolu_019dAFLpVbQszBQvbfVTVeuh</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-be1044/8b6bdb96-858b-4331-acf5-361235c9a6bd/tasks/bxk1tm8e5.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261111-1802-feat-slide-deck-u2-246 (20261112-0711-feat-slide-deck-u2-246-9-code-review-claude-opus-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+マージしました。
+レビューのセッションと、それらに関するものも片付けてください。
+
+---
+
+残りのタスクはありますか？
+
+---
+
+呼び出し元セッションに状況を報告してください
