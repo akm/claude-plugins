@@ -209,7 +209,7 @@ def check(ref, role, managing_ref=None):
     """閉じる前の検査。role は ROLES のどれか。role が working なら managing_ref (管理 Issue の参照) が要る。
 
     返り値は {"status" (ok・unsatisfied・gh_failed), "issue", "url", "role", "managing", "satisfied", "unsatisfied"
-    ({"kind", "message", "line", "url"} の配列), "evidence" (根拠の URL の配列), "pr", "checkboxes", "work_issues",
+    ({"kind", "message", "line", "url"} の配列), "evidence" (根拠の URL の配列。同じ URL は現れた順に 1 回だけ), "pr", "checkboxes", "work_issues",
     "blocking", "errors"} (gh_failed では "gh_error" も持つ)。
     """
     result = _new_result(ref, role, managing_ref)
@@ -227,6 +227,7 @@ def check(ref, role, managing_ref=None):
             _check_self(result, ref, issue)
     except _GhFailed as e:
         return {**result, "status": "gh_failed", "gh_error": e.result}
+    result["evidence"] = list(dict.fromkeys(result["evidence"]))
     result["satisfied"] = not result["unsatisfied"] and not result["errors"]
     result["status"] = "ok" if result["satisfied"] else "unsatisfied"
     return result

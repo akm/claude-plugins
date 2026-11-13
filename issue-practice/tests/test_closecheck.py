@@ -103,6 +103,15 @@ class WorkingCheckTest(CloseCase):
         self.assertIn("https://github.com/o/r/issues/30", out["evidence"], "切り出し済みの項目は満たすとして数える")
         self.assertEqual([b["number"] for b in out["blocking"]], [40], "閉じる Issue を依存先とする開いた Issue を返す")
 
+    def test_evidence_has_no_duplicates(self):
+        same = "https://github.com/o/r/issues/12#issuecomment-5"
+        body = working_body(common_items=(f"- [x] 自動テストが CI で成功する (根拠: {same})",
+                                          f"- [x] 確認用のリポジトリで実行した (根拠: {same})"),
+                            own=f"- [x] 図を作る (根拠: {same})")
+        code, out, err = self.working(work_body=body)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out["evidence"], [same, pr_url(20)], "同じ根拠の URL は 1 回だけ返す (現れた順)")
+
     def test_unchecked_and_without_evidence(self):
         cases = {
             "チェックが無い": working_body(own="- [ ] 図を作る"),
