@@ -155,6 +155,21 @@
         "ref": "main"
       },
       "tags": ["documentation", "yaml", "skills"]
+    },
+    {
+      "name": "issue-practice",
+      "description": "GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱うスキルと、検査と書き込みのスクリプト (作成中)",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "issue-practice",
+        "ref": "main"
+      },
+      "tags": ["github", "issue", "release", "workflow", "skills"]
     }
   ]
 }
