@@ -13,7 +13,7 @@ import { estimateSlides, type FitIssue } from "../fit/estimate.ts";
 import type { DeckScript, DeckScriptResult } from "../index.ts";
 import { hasMismatch, matchKeys } from "../outline/match.ts";
 import { type DeckOutline, formatOutlineError, parseOutline } from "../outline/parse.ts";
-import { type CachePaths, cachePaths, nodeState, PLUGIN_DIR } from "../setup/setup.ts";
+import { type CachePaths, cachePaths, nodeState, PLUGIN_DIR, SPAWN_MAX_BUFFER } from "../setup/setup.ts";
 
 /** 実行の誤り (資料のディレクトリやファイルが無い・ライブラリが入っていない・ツールを実行できないなど)。入口は終了コード 2 にする */
 export class ExecutionError extends Error {
@@ -146,7 +146,7 @@ function runBin(
   findingCodes: readonly number[],
 ): ToolResult {
   const bin = join(cache.nodeModulesDir, ".bin", name);
-  const r = spawnSync(process.execPath, [bin, ...args], { cwd, env, encoding: "utf8" });
+  const r = spawnSync(process.execPath, [bin, ...args], { cwd, env, encoding: "utf8", maxBuffer: SPAWN_MAX_BUFFER });
   if (r.error !== undefined) {
     throw new ExecutionError(`${name} を実行できない (${bin}): ${r.error.message}`);
   }

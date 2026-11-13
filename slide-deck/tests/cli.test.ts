@@ -8,6 +8,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, write
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { FAKE_PPTX_SKILL, FAKE_PYTHON_EXIT_ENV, makeSandbox, type TestSandbox } from "./helpers/cache.ts";
+import { SPAWN_MAX_BUFFER } from "../src/setup/setup.ts";
 
 let sandbox: TestSandbox;
 
@@ -20,7 +21,11 @@ afterEach(() => {
 });
 
 function runCli(args: readonly string[], extra: Record<string, string> = {}): SpawnSyncReturns<string> {
-  return spawnSync(process.execPath, [sandbox.cli, ...args], { env: { ...sandbox.env, ...extra }, encoding: "utf8" });
+  return spawnSync(process.execPath, [sandbox.cli, ...args], {
+    env: { ...sandbox.env, ...extra },
+    encoding: "utf8",
+    maxBuffer: SPAWN_MAX_BUFFER,
+  });
 }
 
 /** 資料のディレクトリのファイルの文字を置き換える。置き換える文字が無ければ失敗する */
@@ -88,6 +93,19 @@ describe("check", () => {
     const r = runCli(["check", link]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /@typescript-eslint\/no-explicit-any/);
+  });
+
+  test("tsc の出力が 1 MiB を超えても、実行の誤りにせず、tsc の指摘を示して終了コード 1 になる", () => {
+    // 300 文字の名前の未定義の変数を 4000 行書くと、tsc の指摘 (TS2304) は 1 行 350 バイト程度で、出力は 1 MiB を超える
+    // (spawnSync の出力の上限のデフォルト値は 1 MiB で、超えると誤り ENOBUFS になる)
+    const deck = sandbox.copySample();
+    const name = "u".repeat(300);
+    const lines = Array.from({ length: 4000 }, () => `  void ${name};`).join("\n");
+    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n${lines}`);
+    const r = runCli(["check", deck]);
+    assert.equal(r.status, 1, r.stderr);
+    assert.ok(r.stdout.length > 1024 * 1024, String(r.stdout.length));
+    assert.match(r.stdout, /^tsc の指摘:$/m);
   });
 
   test("部品の関数の引数の誤りで、tsc の指摘を示して終了コード 1 になる", () => {

@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type CheckOptions, type CheckReport, checkDeck, deckPaths, ExecutionError, installedCache } from "../check/deck.ts";
-import { type CachePaths, venvState } from "../setup/setup.ts";
+import { type CachePaths, SPAWN_MAX_BUFFER, venvState } from "../setup/setup.ts";
 import { applyThemeInput, loadPptxGen, renderPptx } from "./write.ts";
 
 /** pptx のスキルのディレクトリと、使う 2 つのスクリプトのパス */
@@ -54,6 +54,7 @@ export function skillApplyTheme(skill: PptxSkill, cache: CachePaths, env: NodeJS
     const r = spawnSync(process.execPath, [skill.applyTheme, pptxPath, themePath], {
       env: { ...env, NODE_PATH: cache.nodeModulesDir },
       encoding: "utf8",
+      maxBuffer: SPAWN_MAX_BUFFER,
     });
     const output = `${r.stdout}${r.stderr}`.trimEnd();
     if (r.error !== undefined || r.status !== 0) {
@@ -76,7 +77,7 @@ export interface ValidateResult {
  * 終了コード 0 は誤りなし、1 は形式の誤りあり。それ以外は ExecutionError にする
  */
 export function skillValidate(skill: PptxSkill, cache: CachePaths, pptxPath: string, env: NodeJS.ProcessEnv): ValidateResult {
-  const r = spawnSync(cache.venvPython, [skill.validate, pptxPath], { env, encoding: "utf8" });
+  const r = spawnSync(cache.venvPython, [skill.validate, pptxPath], { env, encoding: "utf8", maxBuffer: SPAWN_MAX_BUFFER });
   const output = `${r.stdout}${r.stderr}`.trimEnd();
   if (r.error === undefined && (r.status === 0 || r.status === 1)) return { ok: r.status === 0, output };
   throw new ExecutionError(
