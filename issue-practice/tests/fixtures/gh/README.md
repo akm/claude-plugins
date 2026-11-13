@@ -21,6 +21,8 @@
 | `issue-view-239` | `gh issue view 239 -R akm/claude-plugins --json number,url,state,title,body,updatedAt` (節「クローズ条件」と「PR マージ計画」をマークで囲んだ管理 Issue) | 0 | このプラグインで取った |
 | `issue-comments-266` | `gh api repos/akm/claude-plugins/issues/266/comments --paginate --slurp` (ページの配列の中にコメントの配列)。コメントのキーを `id`・`html_url`・`created_at`・`updated_at`・`body`・`user` (`login`・`type`) だけに切り詰めた | 0 | このプラグインで取ったものを切り詰めた |
 | `issue-view-pr-271` | `gh issue view 271 -R akm/claude-plugins --json number,url,state` (PR の番号を `gh issue view` に渡す。PR として応答し、`url` が `/pull/` になる) | 0 | このプラグインで取った |
+| `pr-view-273` | `gh pr view 273 -R akm/claude-plugins --json number,url,state,mergedAt,baseRefName,isDraft` (main にマージした PR) | 0 | このプラグインで取った |
+| `pr-view-48` | `gh pr view 48 -R akm/claude-plugins --json number,url,state,mergedAt,baseRefName,isDraft` (マージせずに閉じた PR。`state` が `CLOSED` で `mergedAt` が null) | 0 | このプラグインで取った |
 | `sandbox-issue-create` | `gh issue create -R akm/issue-practice-sandbox --title … --body …` (標準出力は作った Issue の URL) | 0 | 確認用のリポジトリで取った |
 | `sandbox-issue-view-sub-issues` | `gh issue view 1 --json number,url,subIssues,subIssuesSummary` (`gh issue edit 1 --add-sub-issue <#2 の URL>` の後の親 Issue) | 0 | 確認用のリポジトリで取った |
 | `sandbox-issue-view-parent` | `gh issue view 2 --json number,url,parent` (同じ操作の後の sub-issue) | 0 | 確認用のリポジトリで取った |
