@@ -8,6 +8,10 @@
   refs parse <参照> [--repo <owner/repo>]       Issue か PR の参照を解析する
   refs milestone <名前>                          リリースマイルストーンの名前を解析する
   body show --issue <参照> [--region <名前>]     Issue の本文 (かマークで囲んだ範囲) と本文のハッシュ値を返す
+  draft dir-check --root <ルート>                計画案のディレクトリが git に無視されているかを確認する
+  draft path --root <ルート> --skill <スキル> --target <対象>   新しい計画案のパスを決め、ディレクトリを作る
+  draft parse <ファイル>                         計画案の先頭の書式を解析する
+  draft compare <ファイル>                       計画案の元にした Issue の本文が、計画案を作ったときから変わったかを比べる
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -18,13 +22,14 @@
 """
 
 import argparse
+import datetime
 import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, gh, refs  # noqa: E402
+from issue_practice import bodies, draft, gh, refs  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -109,6 +114,52 @@ def cmd_body_show(args):
     return EXIT_OK
 
 
+# --- draft --------------------------------------------------------------------------------------------------------
+
+def _emit_dir_result(result, extra=None):
+    status = result["status"]
+    payload = {**(extra or {}), **{k: v for k, v in result.items() if k != "status"}}
+    payload.setdefault("errors", [])
+    _emit(payload)
+    if status == "ok":
+        return EXIT_OK
+    if status == "git_failed":
+        return EXIT_EXTERNAL_FAILED
+    return EXIT_UNSATISFIED
+
+
+def cmd_draft_dir_check(args):
+    return _emit_dir_result(draft.check_dir(args.root))
+
+
+def cmd_draft_path(args):
+    stamp = args.stamp or datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    return _emit_dir_result(draft.new_path(args.root, args.skill, args.target, stamp))
+
+
+def cmd_draft_parse(args):
+    parsed = draft.read(args.file)
+    _emit(parsed)
+    return EXIT_UNSATISFIED if parsed["errors"] else EXIT_OK
+
+
+def cmd_draft_compare(args):
+    parsed = draft.read(args.file)
+    if parsed["errors"]:
+        _emit({"file_name": parsed["file_name"], "results": [], "errors": [
+            f"行 {e['line']}: {e['message']}" if e["line"] else e["message"] for e in parsed["errors"]]})
+        return EXIT_UNSATISFIED
+    compared = draft.compare(parsed["sources"])
+    payload = {"file_name": parsed["file_name"], "results": compared["results"], "errors": []}
+    if compared["gh_error"]:
+        payload["gh_error"] = gh.describe_failure(compared["gh_error"])
+        _emit(payload)
+        return EXIT_EXTERNAL_FAILED
+    payload["errors"] = [f"{r['issue']} の本文が、計画案を作ったときから変わった" for r in compared["results"] if r["changed"]]
+    _emit(payload)
+    return EXIT_UNSATISFIED if payload["errors"] else EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -158,6 +209,48 @@ def build_parser():
                         "gh が失敗した"))
     _add_issue_args(p)
     p.add_argument("--region", choices=bodies.REGIONS, help="返す範囲の名前")
+
+    g = groups.add_parser("draft", help="計画案のファイルを扱う").add_subparsers(dest="command", required=True)
+    dir_output = ("  dir       計画案のディレクトリの絶対パス (確認できたときだけ)\n"
+                  "  errors    満たさない理由の配列 (--root がルートでない・ディレクトリが git に無視されていない)\n"
+                  "  git_error git が失敗したときだけ {args, exit_code, stdout, stderr}")
+    dir_exit = _exit_help("ディレクトリが git に無視されている", "--root がリポジトリのルートでない・無視されていない",
+                          "git が失敗した (--root がリポジトリでないなど)")
+    p = _add(g, "dir-check", cmd_draft_dir_check,
+             "計画案のディレクトリ (<ルート>/tmp/issue-practice/) が git に無視されているかを、git check-ignore で確認する。\n"
+             "書き込みはしない", dir_output, dir_exit)
+    p.add_argument("--root", required=True, help="リポジトリのルートの絶対パス (git rev-parse --show-toplevel の出力)")
+    p = _add(g, "path", cmd_draft_path,
+             "新しい計画案のパスを決める。dir-check と同じ確認をし、ファイル名が既にあれば返さない (上書きしない)。\n"
+             "確認できたら、ディレクトリを作る (ファイルは作らない)",
+             "  path       計画案の絶対パス\n"
+             "  relative   リポジトリのルートからの相対パス\n"
+             "  file_name  ファイル名 (<YYYYMMDD>-<hhmm>-<スキル名>-<対象>.md)\n"
+             "  errors     満たさない理由の配列 (dir-check の理由と、スキルの名前・対象の形の誤り・ファイルが既にある)\n"
+             "  git_error  git が失敗したときだけ {args, exit_code, stdout, stderr}",
+             _exit_help("パスを決めた", "dir-check で満たさない・名前の形の誤り・ファイルが既にある", "git が失敗した"))
+    p.add_argument("--root", required=True, help="リポジトリのルートの絶対パス (git rev-parse --show-toplevel の出力)")
+    p.add_argument("--skill", required=True, help="計画案を作るスキルの名前")
+    p.add_argument("--target", required=True, help="計画の対象 (管理 Issue の番号か、英小文字・数字・ハイフンの短い名前)")
+    p.add_argument("--stamp", help="ファイル名の日時 (YYYYMMDD-hhmm)。省略すると今のローカル時刻")
+    p = _add(g, "parse", cmd_draft_parse,
+             "計画案の先頭の書式 (題と節「元にした Issue」) とファイル名を解析する。gh は実行しない。\n"
+             "ファイルを開けないときは、例外で終了する (終了コード 1)",
+             "  file_name・title・skill・target・created   ファイル名・題・スキルの名前・対象・作った日時\n"
+             "  sources   節「元にした Issue」の項目 {issue, url, sha256, line} の配列\n"
+             "  sections  節「元にした Issue」の後のレベル 2 の節 {title, line} の配列\n"
+             "  errors    形の誤り {line (行番号。行に結び付かないものは null), message} の配列",
+             _exit_help("形どおり", "形が違う"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p = _add(g, "compare", cmd_draft_compare,
+             "計画案の節「元にした Issue」のすべての Issue の本文を再度読み込み、計画案に書いたハッシュ値と比べる。\n"
+             "Issue の updatedAt は比べない (コメントが付くだけでも変わるため)。計画案の形が違えば gh を実行しない",
+             "  file_name  計画案のファイル名\n"
+             "  results    {issue, url, sha256_draft, sha256_now, changed, updated_at} の配列\n"
+             "  errors     本文が変わった Issue か、計画案の形の誤りの配列\n"
+             "  gh_error   gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("どの本文も変わっていない", "変わった本文がある・計画案の形が違う", "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
 
     return parser
 
