@@ -9,7 +9,7 @@ Claude Code で作るアプリケーションの文書を、定義が 1 か所�
 | [bin/doc-structured](bin/doc-structured) | プロジェクトに置くスクリプト (ツールの入口)。プロジェクトが設定したバージョンのツールを取得して実行する |
 | [tool/](tool/) | ツール `doc-structured` の Python パッケージ (コマンド `doc-structured`) とテスト |
 | [rules/](rules/) | 規則の文書。プロジェクトのディレクトリ `.claude/rules/` に置くコピーの元 |
-| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix` |
+| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs` |
 | [hooks/hooks.json](hooks/hooks.json)・[hook-scripts/](hook-scripts/) | 生成したファイルの直接の編集を拒否する hook (下の節「hook」) |
 | [scripts/plugin-version-notice](scripts/plugin-version-notice) | スキルの前置きで、プラグインと設定のバージョンの違いを 1 行で伝えるスクリプト |
 | [docs/decisions.md](docs/decisions.md) | 文書の構成の決定の一覧 |
@@ -40,10 +40,11 @@ bin/doc-structured version
 | `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する |
 | `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
 | `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行とファイルのアンカーのうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベルなど) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
+| `doc-structured refs <ID>` | その ID と子孫の ID を参照している、手書きの Markdown の箇所を「パス:行:列: <参照している ID> <リンク> (<行が属する ID>)」の形で出力する。生成したファイルと記録は探さない。見つからなくても終了コード 0。ID の形が違えば終了コード 1。YAML に誤りがあっても実行する |
 
-生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・h (YAML の形式と参照先)・i (YAML の参照の向き)・k (手書きの Markdown の行数) です。リンクとアンカーと行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
+生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
 
-スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
+スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
 
 ## hook
 

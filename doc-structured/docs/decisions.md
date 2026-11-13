@@ -216,7 +216,7 @@ docs/
 
 ### 参照の向き
 
-- Markdown のリンクも、YAML の名前の参照も、祖先のディレクトリのファイルを指さない。同じディレクトリ・子孫・別のサブツリーは指してよい。判定は参照先の場所で行う。
+- Markdown のリンクも、YAML の名前の参照も、祖先のディレクトリのファイルを指さない。同じディレクトリ・子孫・別のサブツリーは指してよい。判定は参照先の場所で行う。生成したファイルを指す Markdown のリンクは対象にしない (sub-issue 4c で決めた。生成したファイルの場所はツールが決め、参照される定義を移して直せないため。経緯は [#198](https://github.com/akm/claude-plugins/issues/198)。規則は [rules/doc-structured-docs.md](../rules/doc-structured-docs.md) の「参照の向き」)。
 - 複数のサブディレクトリから参照される定義は、親に置かない。この規則の読み方として、規則の文書に「依存関係を整理するときに重要なのは、参照される定義をサブディレクトリに移すことであって、参照しているファイルを移すことではない」と説明する (新しい規則ではない。文面はそのときに確認する)。
 - 記録は対象にしない。コードとテストの ID は、向きの対象にしない (存在だけを検査 l で確認する)。
 
@@ -369,6 +369,7 @@ docs/
 | 問 3: 複雑な遷移はファイル `state-machines/<属性>.yaml` | 同じディレクトリの `state-machines-<属性>.yaml`。YAML はサブディレクトリに分けてもよい | 指摘 9 |
 | 問 12: スクリプト `bin/doc-structured` は `setup` が作る | 生成したファイルにし、`generate` が生成し直す | 指摘 C1 |
 | 問 12 (1): 生成したファイルに、git の組み込みの merge driver `ours` を設定する (`.gitattributes` を誰が書くかは sub-issue 3) | 組み込みの merge driver `binary` にし、`generate` がファイル `docs/.gitattributes` を生成する (`ours` は組み込みではなかった) | sub-issue 3 ([#195](https://github.com/akm/claude-plugins/issues/195)) |
+| 問 12: Markdown のリンクは、祖先のディレクトリのファイルを指さない (生成したファイルも含む) | 生成したファイルを指す Markdown のリンクは、検査 i の対象にしない | sub-issue 4c ([#198](https://github.com/akm/claude-plugins/issues/198)) |
 
 ## 計画で決めること・確認したこと
 

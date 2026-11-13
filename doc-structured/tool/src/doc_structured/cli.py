@@ -7,6 +7,8 @@
                                    検査を実行する。指定が無ければ軽い群 (--light)
   doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...
                                    手書きの Markdown の定義の行とファイルのアンカーを直す。判断の要るものが残れば終了コード 1
+  doc-structured refs <ID>         その ID と子孫の ID を参照している、手書きの Markdown の箇所を出力する。
+                                   見つからなくても終了コード 0。ID の形が違えば終了コード 1
   doc-structured <知らない名前>     使い方を標準エラー出力に書き、終了コード 2 で終了する
 
 サブコマンドは、起動時に設定ファイルを読み、形が違えばエラーの文を標準エラー出力に書いて終了コード 1 で終了する。
@@ -24,6 +26,8 @@ from .documents import load_documents
 from .domains import load_project
 from .generate import HANDWRITTEN_MESSAGE, HandwrittenFilesError, handwritten_fix, render_project, write_outputs
 from .links_fix import Choice, ChoiceError, fix_files
+from .names import IdError
+from .refs import find_refs
 
 VERSION_TEXT = f"doc-structured {__version__}"
 
@@ -54,6 +58,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--choose", nargs=3, action="append", default=[], metavar=("<ファイル>", "<ラベル>", "<ID か URL>"),
         help="ファイルのラベルの参照先を、参照先の ID か外部の URL で指定する (何度でも指定できる)",
     )
+    refs_parser = subparsers.add_parser(
+        "refs", help="その ID と子孫の ID を参照している、手書きの Markdown の箇所を出力する"
+    )
+    refs_parser.add_argument("id", metavar="<ID>", help="参照している箇所を探す ID (例 d-loans-m-loan)")
     return parser
 
 
@@ -169,6 +177,21 @@ def run_links_fix(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def run_refs(config: Config, args: argparse.Namespace) -> int:
+    # YAML に誤りがあっても実行する (手書きのファイルの見つけ方と行が属する ID は、YAML の内容を使わないため。
+    # 決めた経緯は Issue #198 のコメントの 6)
+    project, _ = load_project(config.root)
+    index, _ = load_documents(config.root, project)
+    try:
+        result = find_refs(index, args.id)
+    except IdError as e:
+        print(f"doc-structured: ID {args.id} の形が違う: {e}", file=sys.stderr)
+        return 1
+    for line in result.lines():
+        print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -186,5 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(config, args)
     if args.command == "links-fix":
         return run_links_fix(config, args)
+    if args.command == "refs":
+        return run_refs(config, args)
     # argparse が知らないサブコマンドを拒否するので、ここには来ない
     raise AssertionError(f"知らないサブコマンド: {args.command} (設定: {config.path})")

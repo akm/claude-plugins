@@ -1,10 +1,11 @@
 """サブコマンド check が実行する検査と、検査 a (生成し直して差分が無い)。
 
 検査の群 (決定の一覧の問 12 (3)):
-  軽い群 (--light。デフォルト)  文書と YAML だけで実行できる検査。この版では a・b・h・i・k
+  軽い群 (--light。デフォルト)  文書と YAML だけで実行できる検査。この版では a・b・c-2・h・i・k
   重い群 (--heavy)              データベースなどが要る検査。この版には無い
 --all は両方、--only <検査> は 1 つだけを実行する。
 検査 h (YAML の形式) に誤りがあると、定義の一覧と完全な名前が正しく作れないので、検査 a・b・i は実行せず、そのことを報告する。
+検査 c-2 も、検査 b が確認するリンクの上で数えるので、検査 b と同じく実行しない (決めた経緯は Issue #198 のコメントの 6)。
 検査 k (手書きの Markdown の行数) は YAML を使わないので、いつも実行する。
 """
 
@@ -13,7 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import generated_header
-from .direction import check_direction
+from .cycles import check_cycles
+from .direction import check_direction, check_markdown_direction
 from .documents import load_documents
 from .domains import Project, load_project
 from .generate import GITATTRIBUTES_PATH, HANDWRITTEN_MESSAGE, generated_files, handwritten_fix, is_handwritten, render_project
@@ -21,7 +23,7 @@ from .length import check_length
 from .links import check_links
 from .problems import Problem
 
-LIGHT = ("a", "b", "h", "i", "k")
+LIGHT = ("a", "b", "c-2", "h", "i", "k")
 HEAVY: tuple[str, ...] = ()
 ALL = LIGHT + HEAVY
 
@@ -99,18 +101,20 @@ def run_checks(root: Path, checks: tuple[str, ...]) -> CheckResult:
     project, yaml_problems = load_project(root)
     if "h" in checks:
         result.problems += yaml_problems
-    if "b" in checks or "k" in checks:
+    if "b" in checks or "k" in checks or "i" in checks or "c-2" in checks:
         # ドメインの一覧はディレクトリ名から作るので、YAML に誤りがあっても手書きの Markdown を見つけられる
         index, document_problems = load_documents(root, project)
     if "k" in checks:
         result.problems += check_length(index)
     if yaml_problems:
-        result.skipped = [c for c in checks if c in ("a", "b", "i")]
+        result.skipped = [c for c in checks if c in ("a", "b", "c-2", "i")]
         return result
     if "b" in checks:
         result.problems += document_problems + check_links(index)
     if "i" in checks:
-        result.problems += check_direction(project)
+        result.problems += check_direction(project) + check_markdown_direction(index)
+    if "c-2" in checks:
+        result.problems += check_cycles(index)
     if "a" in checks:
         result.problems += check_generated(root, project)
     return result
