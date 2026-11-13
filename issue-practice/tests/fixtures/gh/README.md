@@ -45,6 +45,7 @@
 | `sandbox-label-create-duplicate` | `gh label create no-release --color cfd3d7` (既にあるラベル) | 1 | 確認用のリポジトリで取った |
 | `sandbox-issue-edit-label-missing` | `gh issue edit 4 --add-label 無いラベル` | 1 | 確認用のリポジトリで取った |
 | `sandbox-issues-open` | `gh api 'repos/…/issues?state=open&per_page=100' --paginate --slurp` (ページの配列。キーを `html_url`・`number`・`title`・`state`・`body`・`created_at`・`updated_at`・`user.login`・`labels[].name`・`milestone` の `number` と `title`・`pull_request.html_url` に切り詰めた) | 0 | 確認用のリポジトリで取った |
+| `sandbox-issue-list-current` | `gh issue list -R akm/issue-practice-sandbox --state open --label current --json number,url,title,body,createdAt --limit 100` (文書 `issue-practice/references/release-plan-table.md` の書式で手で作ったリリース計画 Issue) | 0 | 確認用のリポジトリで取った |
 
 ### 確認用のリポジトリで分かった振る舞い
 
@@ -54,6 +55,7 @@
 - 同じ親に同じ sub-issue をもう一度足すと、エラーになる (`sandbox-issue-edit-add-sub-issue-duplicate`・`sandbox-issue-edit-parent-same`)。同じ blocked by をもう一度足しても、エラーになる (`sandbox-issue-edit-add-blocked-by-duplicate`)。やり直しのときは、今の状態と比べて足りないものだけを設定する。
 - `gh issue create` に `--blocked-by` を付けて、その設定が失敗すると、終了コードは 1 でも Issue は作られている (`sandbox-issue-create-blocked-by-missing`)。`--milestone` の名前が無いときや閉じているときは、Issue は作られない。そのため、Issue は親と blocked by を付けずに作り、別の `gh issue edit` で設定する。
 - 閉じた Issue も、親 Issue にできる (`gh issue edit 4 --parent 5` で #5 が閉じていても終了コード 0)。
+- Issue を作った直後に `gh issue list --label <ラベル>` を実行すると、作った Issue が一覧に入らないことがあった (数秒後に実行し直すと入った)。
 - マイルストーンの作成・名前の変更・閉じること・一覧の取得は、`gh api` の REST の API (`repos/<owner>/<repo>/milestones`) でできる。`gh` にはマイルストーンのサブコマンドが無い。
 
 後の単位が固定データを足すときは、同じ名前の付け方でこの表に行を足す。

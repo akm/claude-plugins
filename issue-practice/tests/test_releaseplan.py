@@ -253,6 +253,14 @@ class SandboxFixtureTest(unittest.TestCase):
                          "https://github.com/akm/issue-practice-sandbox/milestone/1")
 
 
+    def test_plan_list_shape(self):
+        plans = fixture_json("sandbox-issue-list-current")
+        self.assertEqual([p["number"] for p in plans], [8])
+        self.assertTrue(plans[0]["createdAt"])
+        rows = releaseplan.parse_table(plans[0]["body"])["rows"]
+        self.assertEqual([(r["order"], r["number"]) for r in rows], [(1, 6), (2, 7)])
+
+
 class DocTest(unittest.TestCase):
     """文書 `issue-practice/references/release-plan-table.md` の書式と、モジュールの定数が一致すること。"""
 
