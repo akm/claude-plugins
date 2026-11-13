@@ -7,6 +7,7 @@
 サブコマンドの一覧:
   refs parse <参照> [--repo <owner/repo>]       Issue か PR の参照を解析する
   refs milestone <名前>                          リリースマイルストーンの名前を解析する
+  body show --issue <参照> [--region <名前>]     Issue の本文 (かマークで囲んだ範囲) と本文のハッシュ値を返す
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -23,7 +24,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import refs  # noqa: E402
+from issue_practice import bodies, gh, refs  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -65,6 +66,49 @@ def cmd_refs_milestone(args):
     return EXIT_OK
 
 
+# --- 共通 -------------------------------------------------------------------------------------------------------
+
+def _issue_ref(args):
+    """引数 --issue と --repo から、リポジトリまで決まった参照を作る。決まらなければ (None, 理由)。"""
+    ref = refs.parse_ref(args.issue, default_repo=args.repo)
+    if "error" in ref:
+        return None, ref["error"]
+    if ref["key"] is None:
+        return None, f"リポジトリが分からない: {args.issue!r} (--repo <owner/repo> を付けるか、owner/repo#番号 か URL で書く)"
+    return ref, None
+
+
+def _add_issue_args(parser):
+    parser.add_argument("--issue", required=True, help="Issue の参照 (owner/repo#番号・URL・#番号)")
+    parser.add_argument("--repo", help="--issue が #番号 か番号だけのときのリポジトリ (owner/repo)")
+
+
+# --- body ---------------------------------------------------------------------------------------------------------
+
+def cmd_body_show(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "title": issue["title"], "state": issue["state"],
+               "updated_at": issue["updated_at"], "sha256": issue["sha256"], "content": issue["body"], "region": None,
+               "errors": []}
+    if args.region:
+        region = bodies.find_region(issue["body"], args.region)
+        if "error" in region:
+            payload["errors"] = [region["error"]]
+            _emit(payload)
+            return EXIT_UNSATISFIED
+        payload["region"] = {"name": region["name"], "start_line": region["start_line"], "end_line": region["end_line"],
+                             "content": region["content"]}
+    _emit(payload)
+    return EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -98,6 +142,22 @@ def build_parser():
              "  errors     解析できなかった理由の配列",
              _exit_help("解析できた", "名前の形ではない"))
     p.add_argument("name", help="マイルストーンの名前")
+
+    g = groups.add_parser("body", help="Issue の本文を読む").add_subparsers(dest="command", required=True)
+    p = _add(g, "show", cmd_body_show,
+             "Issue の本文と、本文のハッシュ値 (計画案に書く値。UTF-8 の SHA-256) を返す。読むだけ。\n"
+             "--region を付けると、マークで囲んだ範囲 (closing-conditions・merge-plan) も返す",
+             "  issue       Issue の参照 (owner/repo#番号)\n"
+             "  url・title・state・updated_at   Issue の URL・題名・状態・更新日時\n"
+             "  sha256      本文の全体のハッシュ値 (--region を付けても全体のもの)\n"
+             "  content     本文の全体\n"
+             "  region      --region の範囲 {name, start_line, end_line, content}。付けていなければ null\n"
+             "  errors      参照が決まらない・範囲が無いなどの理由の配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("読めた (--region の範囲もあった)", "参照が決まらない・範囲が無いか形が崩れている",
+                        "gh が失敗した"))
+    _add_issue_args(p)
+    p.add_argument("--region", choices=bodies.REGIONS, help="返す範囲の名前")
 
     return parser
 
