@@ -2,6 +2,8 @@
 """文書とコードの定数・入口の --help が一致することのテスト。
 
 - 文書 `issue-practice/references/record-comments.md` の種類とキーの表が、モジュール records の定数と一致する (計画の KTD4)
+- 文書 `issue-practice/references/closing-conditions.md` の範囲の名前とチェックボックスの状態が、モジュール bodies と
+  checkboxes の定数と一致する
 """
 
 import os
@@ -10,7 +12,7 @@ import unittest
 
 from fakegh_case import HERE
 
-from issue_practice import records  # noqa: E402
+from issue_practice import bodies, checkboxes, records  # noqa: E402
 
 REFERENCES = os.path.join(HERE, "..", "references")
 
@@ -70,6 +72,31 @@ class RecordCommentsDocTest(unittest.TestCase):
         self.assertIn(f"{records.PREFIX} created-from draft=<計画案のファイル名> key=<計画案の中のキー>", self.doc)
         body_kinds = [k for k, spec in records.KINDS.items() if spec["where"] == "body"]
         self.assertEqual(body_kinds, ["created-from"])
+
+
+class ClosingConditionsDocTest(unittest.TestCase):
+
+    def setUp(self):
+        self.doc = read_reference("closing-conditions.md")
+
+    def test_regions(self):
+        for name in bodies.REGIONS:
+            with self.subTest(name=name):
+                self.assertIn(f"`{bodies.start_mark(name)}`", self.doc)
+                self.assertIn(f"`{bodies.end_mark(name)}`", self.doc)
+        names = re.findall(r"`<!-- issue-practice:([a-z-]+) -->`", self.doc)
+        self.assertEqual(sorted(set(names)), sorted(bodies.REGIONS), "文書に書いた範囲の名前が bodies.REGIONS と一致すること")
+
+    def test_states(self):
+        rows = table_rows(self.doc, "| 状態 | 項目の形 | 満たすか |")
+        documented = {re.fullmatch(r"`([a-z_]+)`", cells[0]).group(1): cells[2] for cells in rows}
+        self.assertEqual(list(documented), list(checkboxes.STATES))
+        self.assertEqual([s for s, v in documented.items() if v == "満たす"], list(checkboxes.SATISFIED))
+
+    def test_link_forms(self):
+        self.assertIn("`(根拠: <URL>)`", self.doc)
+        self.assertIn("`(切り出し: <URL>)`", self.doc)
+        self.assertIn(f"## {checkboxes.SECTION_TITLE}", self.doc)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@
   records format <種類> [<キー>=<値> ...] [--body-line]   記録のコメントの 1 行目 (か作る Issue の本文の末尾の行) を作る
   records parse <行>                             記録のコメントの 1 行目を解析する
   records list --issue <参照> [--kind <種類>]    Issue の記録のコメントを集める
+  checkboxes list --issue <参照>                 節「クローズ条件」のチェックボックスを、根拠のリンクの有無で分ける
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -32,7 +33,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, draft, gh, records, refs  # noqa: E402
+from issue_practice import bodies, checkboxes, draft, gh, records, refs  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -201,6 +202,31 @@ def cmd_records_list(args):
     return EXIT_UNSATISFIED if listed["invalid"] else EXIT_OK
 
 
+# --- checkboxes ---------------------------------------------------------------------------------------------------
+
+def cmd_checkboxes_list(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    parsed = checkboxes.parse(issue["body"])
+    payload = {"issue": ref["key"], "url": issue["url"], "sha256": issue["sha256"], "source": None, "items": [],
+               "summary": None, "errors": []}
+    if "error" in parsed:
+        payload["errors"] = [parsed["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload.update(source=parsed["source"], items=parsed["items"], summary=parsed["summary"])
+    if not parsed["items"]:
+        payload["errors"] = ["節「クローズ条件」にチェックボックスが無い"]
+    _emit(payload)
+    return EXIT_UNSATISFIED if payload["errors"] or parsed["summary"]["unsatisfied"] else EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -326,6 +352,21 @@ def build_parser():
              _exit_help("読めて、形の違う記録が無い", "形の違う記録がある・参照が決まらない", "gh が失敗した"))
     _add_issue_args(p)
     p.add_argument("--kind", choices=comment_kinds, help="この種類の記録だけを返す")
+
+    g = groups.add_parser("checkboxes", help="節「クローズ条件」のチェックボックスを読む").add_subparsers(
+        dest="command", required=True)
+    p = _add(g, "list", cmd_checkboxes_list,
+             "Issue の本文の節「クローズ条件」のチェックボックスを読み、状態 (unchecked・checked・checked_without_evidence・\n"
+             "carved_out) に分ける。読むだけ。範囲は、マーク closing-conditions があればマークの中、無ければ見出しの節",
+             "  issue・url  Issue の参照 (owner/repo#番号) と URL\n"
+             "  sha256      本文の全体のハッシュ値 (チェックを入れる前の照合に使う)\n"
+             "  source      範囲の決め方 (region: マーク、section: 見出し)。範囲が無ければ null\n"
+             "  items       項目 {line, text, raw, checked, state, evidence, carved_out, group, heading, indent, details} の配列\n"
+             "  summary     {counts (状態ごとの数), unsatisfied (満たさない項目の行番号の配列)}\n"
+             "  errors      範囲が無い・マークの形が崩れている・項目が無いときの理由の配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("すべての項目が checked か carved_out", "満たさない項目がある・範囲や項目が無い", "gh が失敗した"))
+    _add_issue_args(p)
 
     return parser
 
