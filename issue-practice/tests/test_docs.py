@@ -5,6 +5,7 @@
 - 文書 `issue-practice/references/closing-conditions.md` の範囲の名前とチェックボックスの状態が、モジュール bodies と
   checkboxes の定数と一致する
 - 文書 `issue-practice/references/draft-plan.md` の書式の行が、モジュール draft の定数と一致する
+- 文書 `issue-practice/references/terms.md` が、計画の R1 の用語をすべて定義している
 - 入口 (ファイル `issue-practice/scripts/issue_practice.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの --help が、
   引数・出力・終了コードを示す (計画の KTD2・KTD10)
 """
@@ -113,6 +114,21 @@ class DraftPlanDocTest(unittest.TestCase):
         self.assertIn(f"{draft.NONE_ITEM}", doc)
         self.assertIn("本文の SHA-256: <64 桁の 16 進数>", doc)
         self.assertIn("# 計画案: <題>", doc)
+
+
+class TermsDocTest(unittest.TestCase):
+
+    # 計画 docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md の R1 の用語
+    R1_TERMS = ("管理 Issue", "作業 Issue", "管理セッション", "作業セッション", "自己管理 Issue", "リリース計画 Issue",
+                "リリース Issue", "リリース対象", "計画案", "記録のコメント", "最初の指示")
+
+    def test_r1_terms_are_defined(self):
+        rows = table_rows(read_reference("terms.md"), "| 語 | 意味 |")
+        defined = [re.sub(r" \(.*\)$", "", cells[0]) for cells in rows]
+        for term in self.R1_TERMS:
+            with self.subTest(term=term):
+                self.assertIn(term, defined)
+        self.assertEqual(len(defined), len(set(defined)), "同じ語を 2 回定義しないこと")
 
 
 def entry_subcommands():
