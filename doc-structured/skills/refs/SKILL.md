@@ -1,6 +1,6 @@
 ---
 name: refs
-description: プラグイン doc-structured の構成の手書きの Markdown (docs/domains/ の下の concept.md・problem.md・design.md と子のファイル) から、ある ID とその子孫の ID を参照している箇所を探して示す。生成したファイルと記録は探さない。ID ではなく名前で頼まれたら、用語の索引と手書きのファイルの見出しから ID の候補を探し、複数なら利用者に選んでもらう。「モデル「貸出」を参照している箇所を探して」「この節がどこから参照されているか調べて」「doc-structured:refs を実行して」のような依頼や、名前を変えた後に古いラベルを探すとき・節のコピー先を知りたいときに使う。引数で ID か名前を指定する。
+description: プラグイン doc-structured の構成の手書きの Markdown (docs/domains/ の下の concept.md・problem.md・design.md と子のファイル) から、ある ID とその子孫の ID を参照している箇所を探して示す。生成したファイルと記録は探さない。ID ではなく名前で頼まれたら、用語の索引と手書きのファイルの見出しから ID の候補を探し、複数なら利用者に選んでもらう。「モデル「貸出」を参照している箇所を探して」「この節がどこから参照されているか調べて」「doc-structured:refs を実行して」のような依頼や、名前を変えた後に古いラベルを探すときに使う。引数で ID か名前を指定する。
 ---
 
 # doc-structured:refs: ある ID を参照している箇所を探す
