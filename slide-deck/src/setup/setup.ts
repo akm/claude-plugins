@@ -35,6 +35,13 @@ export const VENV_FLAG_FILE = "installed";
  */
 export const NODE_MODULES_MARKER_FILE = ".package-lock.json";
 
+/**
+ * 子プロセスの出力 (標準出力と標準エラー出力のそれぞれ) を spawnSync で受け取るときの上限 (バイト)。
+ * spawnSync のデフォルト値は 1 MiB で、超えると出力を受け取れず誤り (ENOBUFS) になる。
+ * tsc や eslint は指摘が多いと 1 MiB を超えるので、このプラグインの子プロセスはどれもこの値を指定する
+ */
+export const SPAWN_MAX_BUFFER = 64 * 1024 * 1024;
+
 /** 必要な Node.js のメジャーバージョン (.ts のファイルを変換せずに実行する。計画の KTD3) */
 export const REQUIRED_NODE_MAJOR = 24;
 
@@ -432,7 +439,7 @@ interface RunResult {
 }
 
 function run(command: string, args: readonly string[], cwd: string, env: NodeJS.ProcessEnv): RunResult {
-  const r = spawnSync(command, args, { cwd, env, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(command, args, { cwd, env, encoding: "utf8", maxBuffer: SPAWN_MAX_BUFFER });
   if (r.error !== undefined) {
     throw new SetupError(`${command} を実行できない: ${r.error.message}`);
   }

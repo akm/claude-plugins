@@ -3,6 +3,8 @@
 // 終了コードは、どのサブコマンドも、成功 0・検査の指摘あり 1・実行の誤り (ライブラリが無い・入力の形が違うなど) 2 に分ける。
 
 import { parseArgs } from "node:util";
+import { checkDeck, ExecutionError, formatCheckReport } from "./check/deck.ts";
+import { buildPptx } from "./pptx/build.ts";
 import { formatStatus, inspect, install, REQUIRED_NODE_MAJOR, SetupError, statusExitCode } from "./setup/setup.ts";
 
 const USAGE_PREFIX = "使い方: node <プラグインのディレクトリ>/src/cli.ts";
@@ -14,11 +16,54 @@ const CACHE_DIR_HELP = `キャッシュのディレクトリ:
   プラグインの uv.lock と .python-version の内容から、node_modules が package-lock.json の内容から求めた SHA-256 の先頭 16 文字。
   ロックファイルを変えないバージョンのプラグインどうしは、同じものを使う。`;
 
+/** サブコマンドの名前の後の引数 */
+interface CommandArgs {
+  /** サブコマンドの名前の後の、位置で決まる引数 */
+  readonly positionals: readonly string[];
+  /** --pptx-skill の値 (サブコマンド pptx だけが使う) */
+  readonly pptxSkill: string | undefined;
+}
+
 interface Command {
   readonly summary: string;
   readonly help: string;
-  readonly run: () => number;
+  readonly run: (args: CommandArgs) => number | Promise<number>;
 }
+
+/** 引数の誤り。入口は、誤りとサブコマンドの説明を示して終了コード 2 にする */
+class UsageError extends Error {
+  override name = "UsageError";
+}
+
+/** 位置で決まる引数の数と、使えないオプションを検査する */
+function expectArgs(args: CommandArgs, names: readonly string[], allowPptxSkill = false): void {
+  if (args.positionals.length !== names.length) {
+    throw new UsageError(
+      names.length === 0
+        ? `引数は要らない (渡された引数: ${args.positionals.join(" ")})`
+        : `引数 ${names.join(" ")} を指定する (渡された引数の数: ${String(args.positionals.length)})`,
+    );
+  }
+  if (!allowPptxSkill && args.pptxSkill !== undefined) {
+    throw new UsageError("--pptx-skill は、サブコマンド pptx だけで使う");
+  }
+}
+
+const CHECK_STEPS = `  1. 構成案の書式の誤りと、【提案】が付いたままのスライド
+  2. deck.ts を tsc と eslint で検査する。規則はプラグインのコードと同じ tseslint.configs.strictTypeChecked で、
+     明示の any を禁止する。tsc は build/tsconfig.json を使い、資料のディレクトリより上の tsconfig.json は使わない。
+     deck.ts が関数を default export していないか、その関数が型 DeckScript に合わないときも、tsc が指摘する。
+     指摘があれば、3 以降を行わない
+  3. deck.ts を実行し、テーマの値 (色の値の形・空の名前) を検査する
+  4. 構成案と deck.ts のキーの突き合わせ (構成案にだけあるキー・deck.ts にだけあるキー・deck.ts で 2 回以上図を作ったキー)。
+     構成案に書式の誤りがあれば行わない
+  5. 文字が箱からはみ出しそうな箇所の見積もり (題名・deck.ts の要素の文字・一言)。キーが一致し、テーマに誤りが無いときだけ行う
+検査の前に、資料のディレクトリに build/ を作り、.gitignore (内容は *。生成したファイルをコミットに入れない)・tsconfig.json・
+deck-type.ts を書く。tsc と eslint は、キャッシュのディレクトリの node_modules のものを使う (setup install で入れる)。`;
+
+const CHECK_OUTPUT = `  指摘が無ければ「検査の指摘は無い (スライド <枚数> 枚)」。
+  指摘があれば、種類ごとに、見出しの行と、字下げした指摘の行を示す。tsc と eslint の指摘は、ツールの出力をそのまま示す。
+  はみ出しそうな箇所は、キー・要素 (題名・一言・deck.ts の要素の添字)・要る高さ・文字を置ける高さ (インチ)・文字の先頭 40 文字を示す。`;
 
 const COMMANDS: Readonly<Record<string, Command>> = {
   "setup status": {
@@ -52,7 +97,8 @@ ${CACHE_DIR_HELP}
   2  入れられない。Node.js が ${String(REQUIRED_NODE_MAJOR)} 未満、入れるのに要る uv か npm が PATH に無い、node_modules のディレクトリが壊れている、
      のどれか。出力の「入れられない理由:」に直し方を示す
 `,
-    run: () => {
+    run: (args) => {
+      expectArgs(args, []);
       const report = inspect();
       process.stdout.write(formatStatus(report));
       return statusExitCode(report);
@@ -85,12 +131,109 @@ ${CACHE_DIR_HELP}
      npm ci の失敗では一時的な名前のディレクトリを消す。uv sync の失敗では、venv のディレクトリができていれば、
      フラグファイルを作らずに残す (失敗の文が、残したか、作る前に失敗したかを示す)
 `,
-    run: () => {
+    run: (args) => {
+      expectArgs(args, []);
       install({ log: (line) => process.stdout.write(`${line}\n`) });
       return 0;
     },
   },
+  check: {
+    summary: "資料のディレクトリの構成案と deck.ts を検査する (PowerPoint のファイルは書かない)",
+    help: `${USAGE_PREFIX} check <資料のディレクトリ>
+
+資料のディレクトリの構成案 outline.md と資料ごとのスクリプト deck.ts を、次の順に検査する。PowerPoint のファイルは書かない。
+${CHECK_STEPS}
+
+${CACHE_DIR_HELP}
+
+引数:
+  <資料のディレクトリ>  outline.md と deck.ts があるディレクトリ
+  --help (-h) でこの説明を示す。
+
+出力 (標準出力):
+${CHECK_OUTPUT}
+  実行の誤りは、標準エラー出力に理由を示す。
+
+終了コード:
+  0  指摘が無い
+  1  指摘がある (構成案の書式の誤り・【提案】の残り・tsc か eslint の指摘・deck.ts の実行の誤り・テーマの誤り・キーの不一致・
+     はみ出しそうな箇所)
+  2  実行の誤り。資料のディレクトリか、outline.md・deck.ts が無い。node_modules がキャッシュのディレクトリに入っていない
+     (setup status で確認する)。tsc か eslint を実行できないか、指摘以外の理由で失敗した。引数が違う
+`,
+    run: async (args) => {
+      expectArgs(args, ["<資料のディレクトリ>"]);
+      const [deckDir = ""] = args.positionals;
+      const report = await checkDeck(deckDir);
+      process.stdout.write(formatCheckReport(report));
+      return report.deck === null ? 1 : 0;
+    },
+  },
+  pptx: {
+    summary: "check に合格したときだけ PowerPoint のファイルを書き、テーマの色を書き込み、形式を検査する",
+    help: `${USAGE_PREFIX} pptx <資料のディレクトリ> --pptx-skill <pptx のスキルのディレクトリ>
+
+サブコマンド check と同じ検査をし、指摘が無いときだけ、PowerPoint のファイル build/deck.pptx を書く。続けて、
+  1. テーマ (名前・フォント・12 色) を build/theme.json に書き、pptx のスキルの scripts/apply_theme.js を
+     「node scripts/apply_theme.js build/deck.pptx build/theme.json」の形で実行して、テーマの色と名前を build/deck.pptx に書き込む。
+     環境変数 NODE_PATH に、キャッシュの node_modules を指定する (apply_theme.js が pptxgenjs に同梱の jszip を探すため)
+  2. pptx のスキルの scripts/office/validate.py を、キャッシュの venv の Python で
+     「python scripts/office/validate.py build/deck.pptx」の形で実行し、build/deck.pptx の形式を検査する
+引数を確認した後、ほかの確認より前に、前に書いた build/deck.pptx を消す。引数の誤りで終了するときは、
+資料のディレクトリが決まらないので消さない。check の検査の内容と順序:
+${CHECK_STEPS}
+pptx のスキルは、Claude のデスクトップアプリが配るもの (スキルの一覧での名前は anthropic-skills:pptx) を使う。
+スキル build は、そのスキルを読み込んで示されるディレクトリ (Base directory) を --pptx-skill に渡す。
+スライドの大きさは 10×5.625 インチ。題名は、レイアウトの題名のプレースホルダーに入れる。
+
+${CACHE_DIR_HELP}
+
+引数:
+  <資料のディレクトリ>        outline.md と deck.ts があるディレクトリ
+  --pptx-skill <ディレクトリ>  pptx のスキルのディレクトリ (scripts/apply_theme.js と scripts/office/validate.py を持つ)。省略できない
+  --help (-h) でこの説明を示す。
+
+出力 (標準出力):
+  check に指摘があれば、check と同じ出力:
+${CHECK_OUTPUT}
+  指摘が無ければ、check の出力・書いたファイルのパス・apply_theme.js の出力・validate.py の出力を、この順に示す。
+  実行の誤りは、標準エラー出力に理由を示す。apply_theme.js と validate.py が失敗したときは、その出力も示す。
+
+終了コード:
+  0  build/deck.pptx を書き、validate.py が形式の誤りを出さなかった
+  1  check の指摘がある (build/deck.pptx を書かない)。または validate.py が形式の誤りを見つけた
+     (validate.py の終了コード 1。調べられるよう build/deck.pptx を残す)
+  2  実行の誤り。check の終了コード 2 の条件に加えて、次のどれか。--pptx-skill が無い。
+     pptx のスキルのディレクトリに scripts/apply_theme.js か scripts/office/validate.py が無い (無いファイルのパスを示す)。
+     Python の venv がキャッシュのディレクトリに入っていない。apply_theme.js が失敗した (build/deck.pptx を消す)。
+     validate.py を実行できないか、0 と 1 以外の終了コードで終了した
+`,
+    run: async (args) => {
+      expectArgs(args, ["<資料のディレクトリ>"], true);
+      const [deckDir = ""] = args.positionals;
+      if (args.pptxSkill === undefined || args.pptxSkill === "") {
+        throw new UsageError("--pptx-skill <pptx のスキルのディレクトリ> を指定する");
+      }
+      const report = await buildPptx(deckDir, { skillDir: args.pptxSkill });
+      process.stdout.write(formatCheckReport(report.check));
+      if (report.pptx === null || report.validate === null) return 1;
+      const lines = [`PowerPoint のファイルを書いた: ${report.pptx}`];
+      if (report.applyThemeOutput !== "") lines.push(`apply_theme.js の出力:\n${indent(report.applyThemeOutput)}`);
+      lines.push(`validate.py の出力:\n${indent(report.validate.output)}`);
+      if (!report.validate.ok) lines.push("validate.py が形式の誤りを見つけた");
+      process.stdout.write(`${lines.join("\n")}\n`);
+      return report.validate.ok ? 0 : 1;
+    },
+  },
 };
+
+/** 複数行の文字列の各行を、2 文字字下げする */
+function indent(text: string): string {
+  return text
+    .split("\n")
+    .map((l) => `  ${l}`)
+    .join("\n");
+}
 
 const TOP_HELP = `${USAGE_PREFIX} <サブコマンド> [--help]
 
@@ -102,25 +245,37 @@ ${Object.entries(COMMANDS)
 サブコマンドごとの引数・出力・終了コードは、<サブコマンド> --help で示す。
 `;
 
-function main(argv: readonly string[]): number {
+/** 位置で決まる引数の先頭から、サブコマンドの名前を探す。名前の語の数が多いものを優先する */
+function findCommand(positionals: readonly string[]): { name: string; command: Command; rest: string[] } | undefined {
+  for (let n = Math.min(2, positionals.length); n >= 1; n--) {
+    const name = positionals.slice(0, n).join(" ");
+    const command = COMMANDS[name];
+    if (command !== undefined) return { name, command, rest: positionals.slice(n) };
+  }
+  return undefined;
+}
+
+async function main(argv: readonly string[]): Promise<number> {
   let help: boolean;
   let positionals: string[];
+  let pptxSkill: string | undefined;
   try {
     const parsed = parseArgs({
       args: [...argv],
-      options: { help: { type: "boolean", short: "h" } },
+      options: { help: { type: "boolean", short: "h" }, "pptx-skill": { type: "string" } },
       allowPositionals: true,
       strict: true,
     });
     help = parsed.values.help ?? false;
     positionals = parsed.positionals;
+    pptxSkill = parsed.values["pptx-skill"];
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n\n${TOP_HELP}`);
     return 2;
   }
-  const name = positionals.join(" ");
-  const command = COMMANDS[name];
-  if (command === undefined) {
+  const found = findCommand(positionals);
+  if (found === undefined) {
+    const name = positionals.join(" ");
     if (help && (name === "" || name === "setup")) {
       process.stdout.write(TOP_HELP);
       return 0;
@@ -128,17 +283,23 @@ function main(argv: readonly string[]): number {
     process.stderr.write(`${name === "" ? "サブコマンドを指定する" : `存在しないサブコマンド: ${name}`}\n\n${TOP_HELP}`);
     return 2;
   }
+  const { command } = found;
   if (help) {
     process.stdout.write(command.help);
     return 0;
   }
   try {
-    return command.run();
+    return await command.run({ positionals: found.rest, pptxSkill });
   } catch (e) {
+    if (e instanceof UsageError) {
+      process.stderr.write(`${e.message}\n\n${command.help}`);
+      return 2;
+    }
     // 想定していない誤りも、終了コード 1 (検査の指摘あり) と区別できるよう、実行の誤り 2 にする
-    process.stderr.write(`${e instanceof SetupError ? e.message : e instanceof Error ? (e.stack ?? e.message) : String(e)}\n`);
+    const known = e instanceof SetupError || e instanceof ExecutionError;
+    process.stderr.write(`${known ? e.message : e instanceof Error ? (e.stack ?? e.message) : String(e)}\n`);
     return 2;
   }
 }
 
-process.exitCode = main(process.argv.slice(2));
+process.exitCode = await main(process.argv.slice(2));

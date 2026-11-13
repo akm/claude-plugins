@@ -15,8 +15,10 @@ import {
   slide,
   takeaway,
   text,
+  title,
 } from "../src/data/parts.ts";
 import { checkTheme, schemeColorValues, type Theme } from "../src/data/theme.ts";
+import { SLIDE_SIZE } from "../src/data/types.ts";
 import type { DeckScript, RunInput } from "../src/index.ts";
 
 const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -267,7 +269,7 @@ describe("関数 takeaway", () => {
     ]);
   });
 
-  test("資料ごとのスクリプトに渡す部品の関数の集まりに、一言の部品は入らない", () => {
+  test("資料ごとのスクリプトに渡す部品の関数の集まりに、題名と一言の部品は入らない", () => {
     assert.deepEqual(Object.keys(parts).sort(), [
       "arrow",
       "badge",
@@ -277,6 +279,35 @@ describe("関数 takeaway", () => {
       "slide",
       "text",
     ]);
+  });
+});
+
+describe("関数 title", () => {
+  test("題名の部品は、スライドの上の決まった位置の、24 ポイントの太字の文字の箱になる", () => {
+    const s = slide("k");
+    title(s, "読み出しの流れ");
+    const [e] = s.elements;
+    assert.ok(e?.kind === "textBox");
+    assert.deepEqual(
+      { x: e.x, y: e.y, w: e.w, h: e.h, name: e.name },
+      { x: 0.5, y: 0.58, w: 9.0, h: 0.62, name: "title" },
+    );
+    assert.deepEqual(e.text.paragraphs, [
+      { runs: [{ text: "読み出しの流れ", fontSize: 24, bold: true, color: "dk1", link: null }], bullet: false },
+    ]);
+    assert.equal(e.text.align, "left");
+    assert.equal(e.text.valign, "middle");
+    assert.deepEqual(e.text.margin, { top: 0, right: 0, bottom: 0, left: 0 });
+  });
+
+  test("題名と一言の箱は、スライドの大きさ 10×5.625 インチの中に収まる", () => {
+    assert.deepEqual(SLIDE_SIZE, { w: 10, h: 5.625 });
+    const s = slide("k");
+    title(s, "題名");
+    takeaway(s, "一言");
+    for (const e of s.elements) {
+      assert.ok(e.x >= 0 && e.y >= 0 && e.x + e.w <= SLIDE_SIZE.w && e.y + e.h <= SLIDE_SIZE.h);
+    }
   });
 });
 

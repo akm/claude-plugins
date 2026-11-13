@@ -20,7 +20,8 @@ import type {
  *
  * 部品の関数は、入力の部分の配列を、次の規則で段落に分ける。
  * 入力の部分の文字を改行 ("\n") で分けたものを「行」、文字が空の行を「空の行」と呼ぶ。
- * 文字が空の入力の部分 (text が "") は、空の行を 1 つ持つ。段落に入った行は、その行の入力の部分の書式を持つ型 TextRun の値になる。
+ * 文字が空の入力の部分 (text が "") は、空の行を 1 つ持つ。行が段落に入ると、行の文字と、その行の入力の部分の書式から、
+ * 型 TextRun の値を作る。段落がどの TextRun を持つかは、規則 4 で決める。
  * 1. breakLine が true の入力の部分の後で、段落を区切る。
  * 2. 入力の部分の文字の改行ごとに、段落を区切る。ただし、文字の最後が改行で、その入力の部分の breakLine が true でなければ、
  *    最後の改行の後の空の行は、どの段落にも入れない。次の入力の部分の行は、区切られた新しい段落に入る。
@@ -34,6 +35,8 @@ import type {
  * 空行を入れたいときは、前の入力の部分と、文字が空の入力の部分の両方に breakLine を付ける
  * (例: [{ text: "a", breakLine: true }, { text: "", breakLine: true }, { text: "b" }])。
  * この分け方は pptxgenjs の段落の分け方と同じではなく、改行や pptxgenjs のオプション align の扱いで結果が違う入力がある。
+ * PowerPoint の書き出しは、この規則で分けた段落をそのまま pptxgenjs に渡し、段落の分け方を pptxgenjs に任せない。
+ * はみ出しの見積もりと Google スライドの指示の作成も、同じ段落を使う。
  */
 export interface RunInput {
   text: string;
@@ -180,12 +183,17 @@ function toParagraphs(t: TextInput, d: RunDefaults): Paragraph[] {
     state.fromBreakOnly = true;
   };
   for (const input of inputs) {
-    // 規則 3
+    // 規則 3。見出しなど bullet の無い入力の部分の後に、関数 bullets の項目を breakLine なしで続けたときに、
+    // 見出しまで箇条書きの段落にしないため (pptxgenjs も、オプション align を指定しなければ、bullet の部分の前で段落を区切る)
     if (input.bullet === true && current.runs.length > 0) breakParagraph();
     const lines = input.text.split("\n");
     lines.forEach((line, i) => {
       // 規則 2
       if (i > 0) breakParagraph();
+      // 文字の最後の改行は、breakLine と同じく「この後で段落を区切る」ことだけを表すので、改行の後の空の行は段落に入れない
+      // ("a\n" の次の入力の部分が "b" なら、段落は a と b の 2 つで、間に空行の段落を作らない)。
+      // ただし入力の部分が breakLine も持つときは、改行と breakLine で 2 回区切るので、間の空行の段落は区切りの後も残る。
+      // その段落が入力の部分の書式と bullet を持つように、空の行を入れる
       if (i > 0 && i === lines.length - 1 && line === "" && input.breakLine !== true) return;
       state.fromBreakOnly = false;
       if (input.bullet === true) current.bullet = true;
@@ -414,8 +422,25 @@ export function badge(
 }
 
 /**
+ * 題名を、スライドの上の決まった位置の文字の箱として足す。位置と書式は、元にした build.js の題名のプレースホルダーと同じ。
+ * PowerPoint の書き出しは、この箱の位置と書式で題名のプレースホルダーを作り、そこに題名を入れる。
+ * はみ出しの見積もりは、この箱で題名を見積もる。題名は構成案から読むので、資料ごとのスクリプトには渡さない (型 Parts に含めない)。
+ * 位置は、スライドの大きさ (型 Deck の説明) を前提にする。
+ */
+export function title(s: SlideFigure, t: string): void {
+  text(s, t, 0.5, 0.58, 9.0, 0.62, {
+    fontSize: 24,
+    bold: true,
+    color: "dk1",
+    valign: "middle",
+    name: "title",
+  });
+}
+
+/**
  * 一言 (そのスライドで伝えたいことの 1 文) を、スライドの下の決まった位置の文字の箱として足す。
  * 一言は構成案から読むので、資料ごとのスクリプトには渡さない (型 Parts に含めない)。
+ * 位置は、スライドの大きさ (型 Deck の説明) を前提にする。
  */
 export function takeaway(s: SlideFigure, t: string): void {
   text(s, t, 0.5, 4.78, 8.5, 0.42, {

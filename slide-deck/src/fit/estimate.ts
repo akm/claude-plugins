@@ -2,19 +2,19 @@
 // 式は、元にしたツール fitcheck.py のもの。全角の文字を 1、半角の文字を 0.58、半角の空白を 0.3 文字分の幅とし、
 // 行の高さを文字の大きさの 1.25 倍とする。見積もりは目安で、最終の判断は Google スライドの画像の確認 (計画の R21) で行う。
 
-import { slide, takeaway } from "../data/parts.ts";
-import type { Margin, Paragraph, Rect, Slide, SlideElement, TextBody } from "../data/types.ts";
+import { slide, takeaway, title } from "../data/parts.ts";
+import type { Margin, Paragraph, Rect, Slide, SlideElement, SlideFigure, TextBody } from "../data/types.ts";
 import { WIDE_RANGES } from "./east-asian-width.ts";
 
-/** 見積もる 1 枚のスライド。型 Slide のうち、キー・一言・図の要素。 */
-export type FitTarget = Pick<Slide, "key" | "takeaway" | "elements">;
+/** 見積もる 1 枚のスライド。型 Slide のうち、キー・題名・一言・図の要素。 */
+export type FitTarget = Pick<Slide, "key" | "title" | "takeaway" | "elements">;
 
 /** はみ出しそうな箇所。長さはインチ。 */
 export interface FitIssue {
   /** スライドのキー。 */
   key: string;
-  /** スライドの要素の配列 (elements) の添字。一言のときは "takeaway"。 */
-  element: number | "takeaway";
+  /** スライドの要素の配列 (elements) の添字。題名のときは "title"、一言のときは "takeaway"。 */
+  element: number | "title" | "takeaway";
   /** 文字をすべて収めるのに要る高さ。 */
   need: number;
   /** 箱の高さから上下の内側の余白を引いた、文字を置ける高さ。 */
@@ -139,28 +139,40 @@ function textOf(e: SlideElement): TextBody | null {
   }
 }
 
+/** 部品の関数 title か takeaway が作る文字の箱で、題名か一言を見積もる。 */
+function estimateFixedBox(
+  key: string,
+  element: "title" | "takeaway",
+  add: (s: SlideFigure, t: string) => void,
+  t: string,
+): FitIssue | null {
+  const fig = slide(key);
+  add(fig, t);
+  const [box] = fig.elements;
+  if (box?.kind !== "textBox") {
+    throw new Error(`関数 ${element} が文字の箱を作らなかった (キー ${key})`);
+  }
+  return estimateBody(key, element, box, box.text);
+}
+
 /**
- * スライドの図の要素の文字と一言を見積もり、はみ出しそうな箇所を一覧にする。
- * 一言は、部品の関数 takeaway が作る箱で見積もる。題名の箱は PowerPoint の書き出し (計画の U5) で決めるので、まだ見積もらない。
- * 一覧は、スライドの順序、スライドの中では要素の順序に並び、一言はそのスライドの最後に並ぶ。
+ * スライドの題名・図の要素の文字・一言を見積もり、はみ出しそうな箇所を一覧にする。
+ * 題名は部品の関数 title が、一言は部品の関数 takeaway が作る箱で見積もる。
+ * 一覧は、スライドの順序に並ぶ。スライドの中では、題名・要素の順序の図の要素・一言の順に並ぶ。
  */
 export function estimateSlides(slides: readonly FitTarget[]): FitIssue[] {
   const issues: FitIssue[] = [];
   for (const s of slides) {
+    const titleIssue = estimateFixedBox(s.key, "title", title, s.title);
+    if (titleIssue !== null) issues.push(titleIssue);
     s.elements.forEach((e, i) => {
       const body = textOf(e);
       if (body === null) return;
       const issue = estimateBody(s.key, i, e, body);
       if (issue !== null) issues.push(issue);
     });
-    const fig = slide(s.key);
-    takeaway(fig, s.takeaway);
-    const [box] = fig.elements;
-    if (box?.kind !== "textBox") {
-      throw new Error(`関数 takeaway が文字の箱を作らなかった (キー ${s.key})`);
-    }
-    const issue = estimateBody(s.key, "takeaway", box, box.text);
-    if (issue !== null) issues.push(issue);
+    const takeawayIssue = estimateFixedBox(s.key, "takeaway", takeaway, s.takeaway);
+    if (takeawayIssue !== null) issues.push(takeawayIssue);
   }
   return issues;
 }

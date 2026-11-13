@@ -16,9 +16,9 @@ const LINE_14 = (14 * 1.25) / 72;
 // 全角 10 文字・14 ポイントの文字の幅 (インチ)。1.94 インチ
 const ZENKAKU_10 = "あいうえおかきくけこ";
 
-/** 要素だけのスライド 1 枚 (一言は空) を見積もる。 */
+/** 要素だけのスライド 1 枚 (題名と一言は空) を見積もる。 */
 function estimate(elements: SlideElement[], key = "k"): FitIssue[] {
-  return estimateSlides([{ key, takeaway: "", elements }]);
+  return estimateSlides([{ key, title: "", takeaway: "", elements }]);
 }
 
 /** 実数を、丸めの誤差を許して比べる。 */
@@ -191,28 +191,40 @@ describe("関数 estimateSlides の対象と結果", () => {
 
   test("一言は、部品の関数 takeaway が作る箱で見積もり、要素の番号を takeaway にする", () => {
     // 一言の箱は幅 8.5 インチ・高さ 0.42 インチ・14 ポイントの太字
-    assert.deepEqual(estimateSlides([{ key: "k", takeaway: ZENKAKU_10, elements: [] }]), []);
+    assert.deepEqual(estimateSlides([{ key: "k", title: "", takeaway: ZENKAKU_10, elements: [] }]), []);
     const long = ZENKAKU_10.repeat(5);
-    const [issue] = estimateSlides([{ key: "k", takeaway: long, elements: [] }]);
+    const [issue] = estimateSlides([{ key: "k", title: "", takeaway: long, elements: [] }]);
     assert.ok(issue !== undefined);
     assert.equal(issue.element, "takeaway");
     assertClose(issue.need, 2 * LINE_14);
     assertClose(issue.height, 0.42 - 0.1);
   });
 
-  test("一覧は、スライドの順序、スライドの中では要素の順序で、一言は最後に並ぶ", () => {
+  test("題名は、部品の関数 title が作る箱で見積もり、要素の番号を title にする", () => {
+    // 題名の箱は幅 9 インチ・高さ 0.62 インチ・24 ポイントの太字。文字を置ける幅は 8.8 インチで、全角 26 文字まで 1 行に入る
+    const line24 = (24 * 1.25) / 72;
+    assert.deepEqual(estimateSlides([{ key: "k", title: "あ".repeat(26), takeaway: "", elements: [] }]), []);
+    const [issue] = estimateSlides([{ key: "k", title: "あ".repeat(27), takeaway: "", elements: [] }]);
+    assert.ok(issue !== undefined);
+    assert.equal(issue.element, "title");
+    assertClose(issue.need, 2 * line24);
+    assertClose(issue.height, 0.62 - 0.1);
+  });
+
+  test("一覧は、スライドの順序、スライドの中では題名・要素の順序・一言の順に並ぶ", () => {
     const a = slide("a");
     text(a, ZENKAKU_10, 0, 0, 1.2, LINE_14 + 0.1);
     text(a, ZENKAKU_10, 0, 0, 1.2, LINE_14 + 0.1);
     const b = slide("b");
     text(b, ZENKAKU_10, 0, 0, 1.2, LINE_14 + 0.1);
     const issues = estimateSlides([
-      { key: "a", takeaway: ZENKAKU_10.repeat(5), elements: a.elements },
-      { key: "b", takeaway: "", elements: b.elements },
+      { key: "a", title: ZENKAKU_10.repeat(3), takeaway: ZENKAKU_10.repeat(5), elements: a.elements },
+      { key: "b", title: "", takeaway: "", elements: b.elements },
     ]);
     assert.deepEqual(
       issues.map((i) => [i.key, i.element]),
       [
+        ["a", "title"],
         ["a", 0],
         ["a", 1],
         ["a", "takeaway"],
@@ -229,7 +241,7 @@ describe("関数 estimateSlides の対象と結果", () => {
   });
 });
 
-/** 見本の資料の構成案の一言と、資料ごとのスクリプトの図を、構成案の順序で組み合わせる。 */
+/** 見本の資料の構成案の題名と一言と、資料ごとのスクリプトの図を、構成案の順序で組み合わせる。 */
 function sampleTargets(): FitTarget[] {
   const r = parseOutline(readFileSync(join(SAMPLE_DIR, "outline.md"), "utf8"));
   if (!r.ok) assert.fail("見本の資料の構成案に誤りがある");
@@ -237,7 +249,7 @@ function sampleTargets(): FitTarget[] {
   return r.outline.slides.map((s) => {
     const figure = figures.find((f) => f.key === s.key);
     if (figure === undefined) assert.fail(`見本の資料ごとのスクリプトに、キー ${s.key} の図が無い`);
-    return { key: s.key, takeaway: s.takeaway, elements: figure.elements };
+    return { key: s.key, title: s.title, takeaway: s.takeaway, elements: figure.elements };
   });
 }
 
