@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import generated_header
-from .direction import check_direction
+from .direction import check_direction, check_markdown_direction
 from .documents import load_documents
 from .domains import Project, load_project
 from .generate import GITATTRIBUTES_PATH, HANDWRITTEN_MESSAGE, generated_files, handwritten_fix, is_handwritten, render_project
@@ -99,7 +99,7 @@ def run_checks(root: Path, checks: tuple[str, ...]) -> CheckResult:
     project, yaml_problems = load_project(root)
     if "h" in checks:
         result.problems += yaml_problems
-    if "b" in checks or "k" in checks:
+    if "b" in checks or "k" in checks or "i" in checks:
         # ドメインの一覧はディレクトリ名から作るので、YAML に誤りがあっても手書きの Markdown を見つけられる
         index, document_problems = load_documents(root, project)
     if "k" in checks:
@@ -110,7 +110,7 @@ def run_checks(root: Path, checks: tuple[str, ...]) -> CheckResult:
     if "b" in checks:
         result.problems += document_problems + check_links(index)
     if "i" in checks:
-        result.problems += check_direction(project)
+        result.problems += check_direction(project) + check_markdown_direction(index)
     if "a" in checks:
         result.problems += check_generated(root, project)
     return result
