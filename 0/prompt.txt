@@ -1,0 +1,44 @@
+Background (from the session that started this one):
+Issue #242 は、図を中心にした説明資料を PowerPoint のファイルと Google スライドで作るスキルを、新しいプラグイン `slide-deck` として作る要望。計画は main の `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` にあり、実装の単位 U1〜U11 を sub-issue #245〜#255 にした。U11 (#251) は、Google スライドの指示を作る U6 (#252) の前に、計画が前提にしているコネクタの使い方が本物の Google スライドで動くかを確かめる単位で、PR を作らず結果を sub-issue のコメントに書いて閉じる (計画の節「単位の進め方とクローズ条件」で決めた)。スキル `publish` は、資料を読み込んで差を求め、スライドの ID (`sd_<キー>_<ハッシュ値>`) で作る・作り直す・消す・並べ替えるを決め、`revisionId` 付きで 2 枚ずつ書き込み、マスターの配色を `updatePageProperties` の `colorScheme` で変える設計になっている。元の資料を作ったセッションではマスターの配色の変更が動いたが、公式の文書では確認していない。文章の規約は CLAUDE.md に従い、Issue のコメントは wording-guard で検査してから投稿する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/251 (計画の単位 U11) の確認を行う。コードは書かず、PR も作らない。
+
+利用者は、別のセッションでの質問「U11 は、許可をいただけるなら、U3 と U4 とは別に始めます」に「U11 もOKです」と回答した。これは、この確認のために本物の Google スライドに空の資料を 1 つ作って書き込むことへの許可。資料を作る前に、作る資料の名前を利用者に示してから進める。
+
+読むもの:
+- 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` の節「U11. Google スライドの API の前提の確認」、R15・R16、KTD9・KTD10・KTD14、Goal Capsule の「利用者に判断を求める条件」、節「単位の進め方とクローズ条件」
+- Issue #251 の本文 (確認すること・クローズ条件)
+- スキル `anthropic-skills:google-workspace` (Google ドライブと Google スライドのコネクタの使い方と書き込みの規則)。最初にこのスキルを読み込む
+
+行うこと:
+1. Google ドライブと Google スライドのコネクタがこのセッションで使えるかを確かめる。使えなければ、有効にするよう利用者に求めて止まる。
+2. 空の資料を 1 つ作り、次の 3 つを 1 回ずつ行う: 項目を指定した読み込み (スライドの ID の順序・ノートの欄の ID と文・マスターの ID・`revisionId`)、`writeControl.requiredRevisionId` 付きの書き込み、マスターの `colorScheme` の変更 (`updatePageProperties`)。
+3. 3 つの使い方ごとに、送った内容と結果 (読み込みの結果の例を含む) を Issue #251 のコメントの下書きにし、利用者に示して承認を得てから投稿する。読み込みの結果の例は、U6 の `build/presentation.json` の型の元になる。
+4. どれかが動かなければ、計画の Goal Capsule に従い、別の方法を試さずに利用者に判断を求める。見つかった問題は、新しい Issue の下書きを示し、承認を得てから作って #242 の sub-issue に足す。
+5. 確認に使った資料を消すかを利用者に質問し、回答のとおりにする。
+6. クローズ条件をすべて満たしたら、利用者の承認を得て Issue #251 を閉じる。
+
+Issue のコメントには、Google スライドの資料の URL や、利用者の個人の情報を書かない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_8a080753-e404-44b3-978c-f0b57cdbaf02
+
+---
+
+接続した
+
+---
+
+この名前で作る
+
+---
+
+投稿してよい
+
+---
+
+ゴミ箱に移す
+
+---
+
+投稿して閉じる
