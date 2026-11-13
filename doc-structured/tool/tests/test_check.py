@@ -131,7 +131,7 @@ class CheckTest(ProjectTestCase):
 
     def test_check_b_reports_with_path_line_and_column(self):
         path = self.project / "docs/domains/02-loans/concept.md"
-        path.write_text(path.read_text(encoding="utf-8").replace("[開館日]とする", "[休館日]とする"), encoding="utf-8")
+        path.write_text(path.read_text(encoding="utf-8").replace("[未分類の用語「開館日」][開館日]とする", "[休館日]とする"), encoding="utf-8")
         result = self.run_check("--only", "b")
         self.assertEqual(result.returncode, 1)
         self.assertIn(
@@ -171,8 +171,8 @@ class CheckTest(ProjectTestCase):
         # サンプルでは design.md の節が concept.md の節「返却期限」を参照している。逆の参照を足すと循環になる
         path = self.project / "docs/domains/02-loans/concept.md"
         text = path.read_text(encoding="utf-8").replace(
-            "[延滞の通知][d-loans-design-f-overdue_notice]に書く。",
-            "[延滞の通知][d-loans-design-f-overdue_notice]に書く。[節「貸出状態を 2 つの値に限る」]も参照。",
+            "[ファイル `design/overdue_notice.md`][d-loans-design-f-overdue_notice]に書く。",
+            "[ファイル `design/overdue_notice.md`][d-loans-design-f-overdue_notice]に書く。[節「貸出状態を 2 つの値に限る」]も参照。",
         )
         text += '[節「貸出状態を 2 つの値に限る」]: design.md#d-loans-design-h-status_values "ドメイン `loans` のファイル `design.md` の節「貸出状態を 2 つの値に限る」"\n'
         path.write_text(text, encoding="utf-8")

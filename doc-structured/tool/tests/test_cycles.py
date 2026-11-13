@@ -61,7 +61,7 @@ class CyclesTest(ProjectTestCase):
     def test_cycle_across_files(self):
         found = self.problems({CONCEPT: concept(deadline="[節「貸出状態を 2 つの値に限る」]", definitions=DEF_S)})
         self.assertEqual(found, [
-            f"{CONCEPT}:11:6: 検査 c-2: 参照が循環している: {R} → {S} ({CONCEPT}:11:6)、{S} → {R} ({DESIGN}:9:46)。"
+            f"{CONCEPT}:11:6: 検査 c-2: 参照が循環している: {R} → {S} ({CONCEPT}:11:6)、{S} → {R} ({DESIGN}:9:63)。"
             "循環のどれかのリンクを外すか、参照される内容を別の節に移す"
         ])
 

@@ -11,6 +11,8 @@
   - 定義の行を末尾のまとまりに書き、段落の一部になっていない
   - 定義の行の href が、ID の形で、参照先のアンカーのあるファイルを指し、title が参照先の完全な名前と同じ
     (外部の URL の定義の行は、title を検査しない)
+  - 初出: 各参照先を最初に指す箇所の表示の文が、参照先の書ける形 (完全な名前の先頭から親を 0 個以上省いた形) のどれかと同じ。
+    参照先ごとに数え、外部の URL・参照先を求められないラベル・[ラベル][] は数えない
 画像は規則の対象にしないので、本文のリンクで使われず、reference-style の画像だけが使うラベルの定義の行は、
 href・title・使われていないことを検査しない。
 """
@@ -83,6 +85,50 @@ def image_only_labels(document: markdown.Document) -> set[str]:
     return {markdown.normalize_label(label) for label in document.image_labels} - used
 
 
+@dataclass(frozen=True)
+class Use:
+    """本文のリンクが、参照先を指す箇所。first は、そのファイルでその参照先を最初に指す箇所なら True。"""
+
+    reference: markdown.Reference
+    target: Target
+    first: bool
+
+
+def target_uses(handwritten: HandwrittenFile, document: markdown.Document, index: Index) -> list[Use]:
+    """document (handwritten のファイルの内容) の本文のリンクのうち、参照先を求められるものを、行と列の順に並べる。
+
+    [ラベル][] の形・外部の URL を指すラベル・定義の行の無いラベル・href から参照先を求められないラベルは含めない。
+    同じラベルの定義の行が 2 つ以上あれば、最初の行で参照先を求める。
+    """
+    definitions: dict[str, markdown.Definition] = {}
+    for definition in document.definitions:
+        definitions.setdefault(markdown.normalize_label(definition.label), definition)
+    uses: list[Use] = []
+    seen: set[str] = set()
+    for reference in document.references:
+        if reference.form == "collapsed":
+            continue
+        definition = definitions.get(markdown.normalize_label(reference.label))
+        if definition is None or is_external(definition.destination):
+            continue
+        target = resolve(handwritten, definition, index).target
+        if target is None:
+            continue
+        uses.append(Use(reference, target, target.id not in seen))
+        seen.add(target.id)
+    return uses
+
+
+def display_text(reference: markdown.Reference) -> str:
+    """表示の文を、連続する空白 (改行を含む) を空白 1 つにし、前後の空白を除いた形にしたもの。"""
+    return " ".join(reference.text.split())
+
+
+def form_lines(forms: list[str]) -> str:
+    """メッセージの後に続ける、書ける形の行。"""
+    return "\n".join(f"  {form}" for form in forms)
+
+
 def candidate_text(targets: list[Target]) -> str:
     return "、".join(f"{t.id} ({t.full_name()})" for t in targets)
 
@@ -94,13 +140,14 @@ class _FileChecker:
         self.index = index
         self.problems: list[Problem] = []
 
-    def problem(self, message: str, line: int | None = None, column: int | None = None) -> None:
-        self.problems.append(Problem("b", self.file.path, message, line, column))
+    def problem(self, message: str, line: int | None = None, column: int | None = None, detail: str = "") -> None:
+        self.problems.append(Problem("b", self.file.path, message, line, column, detail))
 
     def check(self) -> list[Problem]:
         self.check_anchors()
         self.check_link_forms()
         self.check_definitions()
+        self.check_first_uses()
         return self.problems
 
     def check_anchors(self) -> None:
@@ -217,6 +264,19 @@ class _FileChecker:
             self.problem(f"定義の行に title が無い。参照先の完全な名前「{full_name}」を書く", *where)
         elif definition.title_text != full_name:
             self.problem(f"定義の行の title が、参照先の完全な名前「{full_name}」と違う", *where)
+
+    def check_first_uses(self) -> None:
+        for use in target_uses(self.file, self.document, self.index):
+            if not use.first:
+                continue
+            forms = use.target.writable_forms()
+            display = display_text(use.reference)
+            if display in forms:
+                continue
+            self.problem(
+                f"参照先 {use.target.id} を最初に指す箇所の表示の文「{display}」が、書ける形のどれとも違う。書ける形:",
+                use.reference.line, use.reference.column, form_lines(forms),
+            )
 
 
 def check_links(index: Index) -> list[Problem]:
