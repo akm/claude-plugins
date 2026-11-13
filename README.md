@@ -16,6 +16,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な表現を、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに作業を継続したいときに使う) |
 | [doc-structured](doc-structured/README.md) | アプリケーションの文書を、列挙できる事実は YAML に書いて人が読む Markdown を生成し、生成物と参照を検査する構成で書く (作成中) |
+| [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う (作成中) |
 
 ## 使い方
 
@@ -228,6 +229,12 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── scripts/                  # スキルの前置き (プラグインと設定のバージョンの比較)
 │   ├── bin/doc-structured        # プロジェクトに置く、ツールの入口のスクリプト
 │   ├── tool/                     # 生成と検査のツール (Python)。テストは tool/tests/
+│   └── README.md
+├── issue-practice/               # skill 型 + 同梱スクリプト (作成中)
+│   ├── .claude-plugin/plugin.json
+│   ├── references/               # すべてのスキルが参照する用語と書式の文書
+│   ├── scripts/                  # 検査のスクリプト (issue_practice.py とパッケージ issue_practice/)
+│   ├── tests/                    # python3 -m unittest discover -s issue-practice/tests
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json
