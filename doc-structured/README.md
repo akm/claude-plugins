@@ -39,7 +39,7 @@ bin/doc-structured version
 | `doc-structured --version` | 同じ。設定ファイルは読まない |
 | `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する |
 | `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
-| `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行とファイルのアンカーのうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベルなど) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
+| `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文のうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベル・参照先を最初に指す `[文][ラベル]` の文など) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
 | `doc-structured refs <ID>` | その ID と子孫の ID を参照している、手書きの Markdown の箇所を「パス:行:列: <参照している ID> <リンク> (<行が属する ID>)」の形で出力する。生成したファイルと記録は探さない。見つからなくても終了コード 0。ID の形が違えば終了コード 1。YAML に誤りがあっても実行する |
 
 生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
