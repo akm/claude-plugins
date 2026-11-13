@@ -239,3 +239,76 @@ def list_records(ref):
     if failure:
         return None, failure
     return {"login": login, **collect(comments, login)}, None
+
+
+# --- 動いている作業セッション (計画の R29・KTD17) -------------------------------------------------------------
+
+STATE_FIELDS = "number,url,state"
+
+# 記録のコメント session の本文で、セッションの名前を書く行 (形は文書 references/start-instruction.md の節「起動の後の記録」)
+SESSION_NAME_RE = re.compile(r"^- (?:作業|管理)セッションの名前: (?P<name>\S.*)$", re.MULTILINE)
+
+
+def session_name(body):
+    """記録のコメント session の本文から、セッションの名前を読む。名前の行が無ければ None。"""
+    m = SESSION_NAME_RE.search(body or "")
+    return m.group("name").strip() if m else None
+
+
+def fetch_state(ref):
+    """Issue の番号・URL・状態を読む。返り値は (辞書, None) か (None, 失敗した gh の結果)。"""
+    result = gh.run(["issue", "view", str(ref["number"]), "-R", f"{ref['owner']}/{ref['repo']}", "--json", STATE_FIELDS],
+                    expect_json=True)
+    if gh.failed(result):
+        return None, result
+    data = result["json"]
+    if not isinstance(data, dict) or not isinstance(data.get("state"), str):
+        return None, {**result, "json_error": "応答に state が無い"}
+    return data, None
+
+
+def _session_entry(record):
+    return {"session": record["values"]["session"], "previous": record["values"].get("previous"),
+            "branch": record["values"].get("branch"), "name": session_name(record["body"]), "record_url": record["url"]}
+
+
+def active_sessions(managing_ref, work_numbers):
+    """管理 Issue の管理セッションと、作業 Issue (番号の配列) の動いている作業セッションを、記録のコメントから集める。
+
+    作業 Issue ごとに、最後の session の記録 (role=working) を使う。閉じた作業 Issue・session の記録が無い作業 Issue・
+    最後の session の記録と同じセッションの abandon の記録がある作業 Issue は除く。
+    返り値は ({"managing", "sessions", "excluded"}, None) か (None, 失敗した gh の結果)。managing は管理 Issue の最後の
+    session の記録 (role=managing) {"session", "previous", "branch", "name", "record_url"} か None。sessions の要素は
+    {"number", "url", "session", "previous", "branch", "name", "record_url"}、excluded の要素は {"number", "url", "reason"}
+    (reason は closed・no-session・abandoned)。
+    """
+    result = {"managing": None, "sessions": [], "excluded": []}
+    listed, failure = list_records(managing_ref)
+    if failure:
+        return None, failure
+    managing = [r for r in listed["records"] if r["kind"] == "session" and r["values"]["role"] == "managing"]
+    if managing:
+        result["managing"] = _session_entry(managing[-1])
+    repo = f"{managing_ref['owner']}/{managing_ref['repo']}"
+    for number in work_numbers:
+        ref = refs.parse_ref(f"#{number}", default_repo=repo)
+        state, failure = fetch_state(ref)
+        if failure:
+            return None, failure
+        base = {"number": number, "url": state.get("url")}
+        if state["state"] != "OPEN":
+            result["excluded"].append({**base, "reason": "closed"})
+            continue
+        listed, failure = list_records(ref)
+        if failure:
+            return None, failure
+        sessions = [r for r in listed["records"] if r["kind"] == "session" and r["values"]["role"] == "working"]
+        if not sessions:
+            result["excluded"].append({**base, "reason": "no-session"})
+            continue
+        latest = _session_entry(sessions[-1])
+        if any(r["kind"] == "abandon" and r["values"]["session"] == latest["session"] for r in listed["records"]):
+            result["excluded"].append({**base, "reason": "abandoned"})
+            continue
+        result["sessions"].append({**base, **latest})
+    return result, None

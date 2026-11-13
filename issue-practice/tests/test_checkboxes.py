@@ -6,7 +6,7 @@ import unittest
 
 from fakegh_case import FakeGhCase, fixture_json
 
-from issue_practice import checkboxes  # noqa: E402
+from issue_practice import bodies, checkboxes  # noqa: E402
 
 BODY_239 = fixture_json("issue-view-239")["body"]
 BODY_266 = fixture_json("issue-view-266")["body"]
@@ -133,6 +133,76 @@ class CheckboxesCliTest(FakeGhCase):
         code, out, _ = self.cli("checkboxes", "list", "--issue", "akm/claude-plugins#266")
         self.assertEqual(code, 4)
         self.assertEqual(out["gh_error"]["failure"], "rate_limit")
+
+
+class CheckLineTest(unittest.TestCase):
+    """チェックを入れて根拠のリンクを足すこと (checkboxes.check_line)。"""
+
+    BODY = ("本文\n\n## クローズ条件\n\n期待する状態:\n\n- [ ] 未チェックの項目\n- [x] 根拠の無い項目\n"
+            "- [x] 根拠のある項目 (根拠: https://github.com/o/r/pull/1)\n\n## 経緯\n\n- [ ] 節の外\n")
+
+    def test_checks_and_appends_evidence(self):
+        result = checkboxes.check_line(self.BODY, 7, evidence="https://github.com/o/r/pull/5")
+        self.assertTrue(result["changed"])
+        lines = result["body"].split("\n")
+        self.assertEqual(lines[6], "- [x] 未チェックの項目 (根拠: https://github.com/o/r/pull/5)")
+        self.assertEqual(result["body"].replace(lines[6], "- [ ] 未チェックの項目"), self.BODY, "ほかの行は変えない")
+
+    def test_adds_evidence_to_checked_item(self):
+        result = checkboxes.check_line(self.BODY, 8, evidence="https://github.com/o/r/pull/5")
+        self.assertEqual(result["body"].split("\n")[7], "- [x] 根拠の無い項目 (根拠: https://github.com/o/r/pull/5)")
+
+    def test_carved_out(self):
+        result = checkboxes.check_line(self.BODY, 7, carved_out="https://github.com/o/r/issues/9")
+        self.assertEqual(result["body"].split("\n")[6], "- [x] 未チェックの項目 (切り出し: https://github.com/o/r/issues/9)")
+
+    def test_same_link_is_no_change_and_other_link_is_error(self):
+        same = checkboxes.check_line(self.BODY, 9, evidence="https://github.com/o/r/pull/1")
+        self.assertEqual((same["changed"], same["body"]), (False, self.BODY))
+        self.assertIn("error", checkboxes.check_line(self.BODY, 9, evidence="https://github.com/o/r/pull/2"))
+
+    def test_errors(self):
+        self.assertIn("error", checkboxes.check_line(self.BODY, 1, evidence="https://github.com/o/r/pull/5"),
+                      "チェックボックスの項目ではない行")
+        self.assertIn("error", checkboxes.check_line(self.BODY, 13, evidence="https://github.com/o/r/pull/5"),
+                      "節「クローズ条件」の外の項目")
+        self.assertIn("error", checkboxes.check_line(self.BODY, 7, evidence="このコメント"), "URL ではない根拠")
+        self.assertIn("error", checkboxes.check_line(self.BODY, 7), "根拠も切り出しも無い")
+
+
+class CheckCliTest(FakeGhCase):
+
+    def setup(self, body):
+        data = fixture_json("issue-view-266")
+        data["body"] = body
+        self.responses([{"prefix": ["issue", "view"], "stdout": data}, {"prefix": ["issue", "edit"], "stdout": ""}])
+        return data["url"]
+
+    def test_writes_when_body_is_unchanged(self):
+        url = self.setup(CheckLineTest.BODY)
+        sha = bodies.body_sha256(CheckLineTest.BODY)
+        code, out, err = self.cli("checkboxes", "check", "--issue", "akm/claude-plugins#266", "--line", "7",
+                                  "--evidence", "https://github.com/o/r/pull/5", "--expect-sha256", sha)
+        self.assertEqual(code, 0, err)
+        self.assertTrue(out["changed"])
+        edits = [r for r in self.recorded_full() if r["args"][:2] == ["issue", "edit"]]
+        self.assertEqual(edits[0]["args"], ["issue", "edit", url, "--body-file", "-"])
+        self.assertIn("- [x] 未チェックの項目 (根拠: https://github.com/o/r/pull/5)", edits[0]["stdin"])
+        self.assertEqual(out["sha256"], bodies.body_sha256(edits[0]["stdin"]))
+        self.assertEqual(out["item"]["state"], "checked")
+
+    def test_refuses_changed_body(self):
+        self.setup(CheckLineTest.BODY)
+        code, out, _ = self.cli("checkboxes", "check", "--issue", "akm/claude-plugins#266", "--line", "7",
+                                "--evidence", "https://github.com/o/r/pull/5", "--expect-sha256", "0" * 64)
+        self.assertEqual(code, 3)
+        self.assertFalse([a for a in self.recorded() if a[:2] == ["issue", "edit"]])
+
+    def test_needs_exactly_one_link(self):
+        self.setup(CheckLineTest.BODY)
+        completed = self.cli("checkboxes", "check", "--issue", "akm/claude-plugins#266", "--line", "7",
+                             "--expect-sha256", "0" * 64)
+        self.assertEqual(completed[0], 2, "--evidence か --carved-out のどちらかが要る (引数の誤り)")
 
 
 if __name__ == "__main__":

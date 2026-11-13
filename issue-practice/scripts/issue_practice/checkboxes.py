@@ -120,3 +120,45 @@ def parse(body):
         return found
     items = parse_lines(found["lines"])
     return {"source": found["source"], "items": items, "summary": summarize(items)}
+
+
+_CHECKBOX_RE = re.compile(r"^(?P<head>[ \t]*[-*+] \[)(?P<mark>[ xX])(?P<tail>\] .*)$")
+_URL_RE = re.compile(r"^https://\S+$")
+
+
+def check_line(body, line, evidence=None, carved_out=None):
+    """本文の line 行目 (1 から数える) のチェックボックスにチェックを入れ、末尾に `(根拠: <URL>)` か `(切り出し: <URL>)` を足す。
+
+    evidence と carved_out のどちらか 1 つを渡す。行は節「クローズ条件」の範囲 (parse と同じ決め方) の項目であること。
+    既に同じリンクがあれば本文を変えない。別のリンクがあれば誤りにする (上書きしない)。
+    返り値は {"body", "changed", "item" (書いた後の項目)} か {"error"}。
+    """
+    if (evidence is None) == (carved_out is None):
+        return {"error": "根拠 (evidence) か切り出し (carved_out) のどちらか 1 つを渡す"}
+    label, url = ("根拠", evidence) if evidence is not None else ("切り出し", carved_out)
+    if not _URL_RE.match(url or ""):
+        return {"error": f"{label}のリンクは https:// で始まる URL にする: {url!r}"}
+    parsed = parse(body)
+    if "error" in parsed:
+        return parsed
+    item = next((i for i in parsed["items"] if i["line"] == line), None)
+    if item is None:
+        return {"error": f"行 {line} は、節「{SECTION_TITLE}」のチェックボックスの項目ではない"}
+    current = item["evidence"] or item["carved_out"]
+    current_label = "根拠" if item["evidence"] else "切り出し"
+    if current and (current_label, current) != (label, url):
+        return {"error": f"行 {line} には、既にリンク ({current_label}: {current}) がある (上書きしない)"}
+    lines = bodies.split_lines(body)
+    text = lines[line - 1]
+    cr = "\r" if text.endswith("\r") else ""
+    text = text.rstrip("\r")
+    m = _CHECKBOX_RE.match(text)
+    new_text = f"{m.group('head')}x{m.group('tail')}"
+    if not current:
+        new_text = f"{new_text.rstrip()} ({label}: {url})"
+    if new_text == text:
+        return {"body": body, "changed": False, "item": item}
+    lines[line - 1] = new_text + cr
+    new_body = "\n".join(lines)
+    new_item = next(i for i in parse(new_body)["items"] if i["line"] == line)
+    return {"body": new_body, "changed": True, "item": new_item}

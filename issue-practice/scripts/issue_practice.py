@@ -16,9 +16,19 @@
   records parse <行>                             記録のコメントの 1 行目を解析する
   records list --issue <参照> [--kind <種類>]    Issue の記録のコメントを集める
   checkboxes list --issue <参照>                 節「クローズ条件」のチェックボックスを、根拠のリンクの有無で分ける
+  checkboxes check --issue <参照> --line <行番号> (--evidence <URL> | --carved-out <URL>) --expect-sha256 <値>   チェックを入れてリンクを足す
+  checkboxes common --issue <管理 Issue>         開いている作業 Issue のうち、共通の条件のコピーが古いものを一覧にする
   release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
+  sessions active --issue <管理 Issue>           管理セッションと、動いている作業セッションを記録のコメントから集める
+  managing plan <ファイル> --repo <owner/repo>   管理 Issue の計画案から、作業 Issue の作成と本文の書き換えを示す (示す)
+  managing apply <ファイル> --repo <owner/repo>  管理 Issue の計画案の作業 Issue を作り、本文を書き換える (実行する)
+  merge-plan show --issue <参照>                 管理 Issue の PR マージ計画の表を読み、表から作った図と本文の図を比べる
+  close check --issue <参照> --role <種類> [--managing <管理 Issue>]   閉じる前の検査をする
+  dependents plan --issue <参照>                 閉じる Issue を依存先とする Issue への書き込みを示す (示す)
+  dependents resolve --issue <参照>              閉じた Issue を依存先とする Issue に記録を書き、節「依存先」から消す (実行する)
+  merge-plan set-pr --issue <参照> [--work <作業 Issue>] --pr <URL> --expect-sha256 <値>   表の列「PR」か、管理 Issue の PR を書く
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -36,7 +46,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, checkboxes, draft, gh, issues, records, refs, releaseplan  # noqa: E402
+from issue_practice import bodies, checkboxes, closecheck, draft, gh, issues, managing, mergeplan, records, refs, releaseplan  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -230,6 +240,37 @@ def cmd_checkboxes_list(args):
     return EXIT_UNSATISFIED if payload["errors"] or parsed["summary"]["unsatisfied"] else EXIT_OK
 
 
+def cmd_checkboxes_check(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "changed": False, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "line": args.line, "changed": False, "item": None,
+               "sha256": issue["sha256"], "errors": []}
+    if issue["sha256"] != args.expect_sha256:
+        payload["errors"] = ["本文が、読んだとき (--expect-sha256) から変わった。checkboxes list で本文を再度読み込んでからやり直す"]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    result = checkboxes.check_line(issue["body"], args.line, evidence=args.evidence, carved_out=args.carved_out)
+    if "error" in result:
+        payload["errors"] = [result["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload["item"] = result["item"]
+    if result["changed"]:
+        written = bodies.write_body(issue["url"], result["body"])
+        if gh.failed(written):
+            _emit({**payload, "gh_error": gh.describe_failure(written)})
+            return EXIT_EXTERNAL_FAILED
+        payload.update(changed=True, sha256=bodies.body_sha256(result["body"]))
+    _emit(payload)
+    return EXIT_OK
+
+
 # --- release ------------------------------------------------------------------------------------------------------
 
 def cmd_release_current(args):
@@ -280,6 +321,185 @@ def cmd_issues_create(args):
     if repo is None:
         return EXIT_UNSATISFIED
     return _emit_issues(issues.create(args.file, repo, record_approval=args.record_approval))
+
+
+# --- merge-plan ---------------------------------------------------------------------------------------------------
+
+def _errors_text(errors):
+    return [f"行 {e['line']}: {e['message']}" if e["line"] else e["message"] for e in errors]
+
+
+def cmd_merge_plan_show(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "sha256": issue["sha256"], "settings": None, "rows": [],
+               "graph": None, "graph_matches": None, "managing_pr_notice": None, "errors": []}
+    plan = mergeplan.read_region(issue["body"])
+    if "error" in plan:
+        payload["errors"] = [plan["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload.update(settings=plan["settings"], rows=mergeplan.rows_output(plan, ref["owner"], ref["repo"]))
+    if plan["errors"]:
+        payload["errors"] = _errors_text(plan["errors"])
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload["graph"] = mergeplan.graph(plan)
+    payload["graph_matches"] = mergeplan.extract_graph(plan["content"]) == payload["graph"]
+    if plan["settings"]["config"] == "2":
+        payload["managing_pr_notice"] = mergeplan.DRAFT_PR_NOTICE.format(url=issue["url"])
+    _emit(payload)
+    return EXIT_OK if payload["graph_matches"] else EXIT_UNSATISFIED
+
+
+def cmd_merge_plan_set_pr(args):
+    ref, error = _issue_ref(args)
+    work = refs.parse_ref(args.work, default_repo=ref["key"].split("#")[0]) if ref and args.work else None
+    if error or (work and "error" in work):
+        _emit({"issue": ref["key"] if ref else None, "changed": False, "errors": [error or work["error"]]})
+        return EXIT_UNSATISFIED
+    payload = {"issue": ref["key"], "work": work["key"] if work else None, "pr": args.pr, "changed": False, "previous": None,
+               "sha256": None, "errors": []}
+    if work and f"{work['owner']}/{work['repo']}".lower() != f"{ref['owner']}/{ref['repo']}".lower():
+        payload["errors"] = ["作業 Issue は、管理 Issue と同じリポジトリの Issue にする"]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({**payload, "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload["sha256"] = issue["sha256"]
+    if issue["sha256"] != args.expect_sha256:
+        payload["errors"] = ["本文が、読んだとき (--expect-sha256) から変わった。本文を再度読み込んでからやり直す"]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    plan = mergeplan.read_region(issue["body"])
+    if "error" in plan or plan["errors"]:
+        payload["errors"] = [plan["error"]] if "error" in plan else _errors_text(plan["errors"])
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    changed = mergeplan.set_pr(plan, work["number"], args.pr) if work else mergeplan.set_managing_pr(plan, args.pr)
+    if "error" in changed:
+        payload["errors"] = [changed["error"]]
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    payload["previous"] = changed["previous"]
+    if changed["previous"] == args.pr:
+        _emit(payload)
+        return EXIT_OK
+    new_body = bodies.replace_region(issue["body"], mergeplan.REGION, mergeplan.render(changed["plan"]))["body"]
+    result = bodies.write_body(issue["url"], new_body)
+    if gh.failed(result):
+        _emit({**payload, "gh_error": gh.describe_failure(result)})
+        return EXIT_EXTERNAL_FAILED
+    payload.update(changed=True, sha256=bodies.body_sha256(new_body))
+    _emit(payload)
+    return EXIT_OK
+
+
+# --- close・dependents --------------------------------------------------------------------------------------------
+
+def _emit_status(result):
+    status = result.pop("status")
+    if status == "gh_failed":
+        result["gh_error"] = gh.describe_failure(result["gh_error"])
+        _emit(result)
+        return EXIT_EXTERNAL_FAILED
+    _emit(result)
+    return EXIT_OK if status == "ok" else EXIT_UNSATISFIED
+
+
+def cmd_checkboxes_common(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    return _emit_status(closecheck.common_copies(ref))
+
+
+def cmd_close_check(args):
+    ref, error = _issue_ref(args)
+    managing = None
+    if not error and args.managing:
+        managing = refs.parse_ref(args.managing, default_repo=f"{ref['owner']}/{ref['repo']}")
+        error = managing.get("error")
+    if not error and args.role == "working" and managing is None:
+        error = "--role working では、--managing <管理 Issue> が要る"
+    if error:
+        _emit({"issue": ref["key"] if ref else None, "satisfied": False, "errors": [error]})
+        return EXIT_UNSATISFIED
+    return _emit_status(closecheck.check(ref, args.role, managing))
+
+
+def cmd_dependents_plan(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    result = closecheck.dependents_plan(ref)
+    for dependent in result["dependents"]:
+        dependent.pop("new_body")
+    return _emit_status(result)
+
+
+def cmd_dependents_resolve(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    result = closecheck.dependents_resolve(ref)
+    for dependent in result["dependents"]:
+        dependent.pop("new_body")
+    return _emit_status(result)
+
+
+# --- sessions -----------------------------------------------------------------------------------------------------
+
+def cmd_sessions_active(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    issue, failure = bodies.fetch_issue(ref)
+    if failure:
+        _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload = {"issue": ref["key"], "url": issue["url"], "managing": None, "sessions": [], "excluded": [], "errors": []}
+    plan = mergeplan.read_region(issue["body"])
+    if "error" in plan or plan["errors"]:
+        payload["errors"] = [plan["error"]] if "error" in plan else _errors_text(plan["errors"])
+        _emit(payload)
+        return EXIT_UNSATISFIED
+    numbers = [row["work"]["number"] for row in plan["rows"] if row["work"]["number"] != ref["number"]]
+    found, failure = records.active_sessions(ref, numbers)
+    if failure:
+        _emit({**payload, "gh_error": gh.describe_failure(failure)})
+        return EXIT_EXTERNAL_FAILED
+    payload.update(found)
+    _emit(payload)
+    return EXIT_OK
+
+
+# --- managing -----------------------------------------------------------------------------------------------------
+
+def cmd_managing_plan(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(managing.plan(args.file, repo))
+
+
+def cmd_managing_apply(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(managing.apply(args.file, repo))
 
 
 # --- 引数 ---------------------------------------------------------------------------------------------------------
@@ -408,7 +628,7 @@ def build_parser():
     _add_issue_args(p)
     p.add_argument("--kind", choices=comment_kinds, help="この種類の記録だけを返す")
 
-    g = groups.add_parser("checkboxes", help="節「クローズ条件」のチェックボックスを読む").add_subparsers(
+    g = g_checkboxes = groups.add_parser("checkboxes", help="節「クローズ条件」のチェックボックスを読む・書く").add_subparsers(
         dest="command", required=True)
     p = _add(g, "list", cmd_checkboxes_list,
              "Issue の本文の節「クローズ条件」のチェックボックスを読み、状態 (unchecked・checked・checked_without_evidence・\n"
@@ -481,6 +701,170 @@ def build_parser():
     p.add_argument("--repo", required=True, help="Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
     p.add_argument("--record-approval", action="store_true",
                    help="Issue ごとに、記録のコメント approval (draft=<計画案のファイル名>) が無ければ書く")
+
+    p = _add(g_checkboxes, "check", cmd_checkboxes_check,
+             "節「クローズ条件」の項目 (--line) にチェックを入れ、末尾に (根拠: <URL>) か (切り出し: <URL>) を足して、本文を書き換える。\n"
+             "本文が --expect-sha256 (checkboxes list の sha256) から変わっていれば書かない。既に同じリンクがあれば書かない。\n"
+             "別のリンクがあれば書かない (上書きしない)",
+             "  issue・url  Issue の参照と URL\n"
+             "  line        --line の値\n"
+             "  changed     本文を書き換えたか\n"
+             "  item        書いた後の項目 (checkboxes list の items の要素と同じ形)。書けなかったら null\n"
+             "  sha256      書いた後の本文のハッシュ値 (書かなかったときは今の本文のハッシュ値)\n"
+             "  errors      本文が変わった・項目ではない行・既に別のリンクがある・URL ではないなどの理由の配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("書いた (か、既に同じリンクがあった)", "本文が変わった・項目ではない・別のリンクがある (何も書かない)",
+                        "gh が失敗した"))
+    _add_issue_args(p)
+    p.add_argument("--line", required=True, type=int, help="項目の行番号 (checkboxes list の items の line)")
+    link = p.add_mutually_exclusive_group(required=True)
+    link.add_argument("--evidence", help="根拠の URL (テストを実行した PR・確認を記録したコメントなど)")
+    link.add_argument("--carved-out", help="切り出した Issue の URL")
+    p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (checkboxes list の sha256)")
+    p = _add(g_checkboxes, "common", cmd_checkboxes_common,
+             "管理 Issue の節「すべての作業 Issue に共通するクローズ条件」の項目と、PR マージ計画の表の開いている作業 Issue の\n"
+             "共通の条件のコピーを比べる。読むだけ。項目の文と「期待する状態」「確認するポイント」の分類を、上から順に比べる",
+             "  issue・url  管理 Issue の参照と URL\n"
+             "  common      管理 Issue の共通の項目 {group, text} の配列\n"
+             "  outdated    コピーが古い作業 Issue {number, url, expected, actual} の配列\n"
+             "  up_to_date  コピーが同じ作業 Issue {number, url} の配列\n"
+             "  skipped     閉じているので比べなかった作業 Issue {number, url} の配列\n"
+             "  errors      PR マージ計画やクローズ条件の形の誤りの配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("どの開いている作業 Issue のコピーも同じ", "コピーが古い作業 Issue がある・形の誤り", "gh が失敗した"))
+    _add_issue_args(p)
+
+    g = groups.add_parser("close", help="閉じる前の検査をする").add_subparsers(dest="command", required=True)
+    p = _add(g, "check", cmd_close_check,
+             "Issue を閉じる前の検査をする。読むだけ。検査することは文書 references/closing-conditions.md の節「閉じる前の検査」。\n"
+             "--role working は作業 Issue (--managing に管理 Issue)、managing は管理 Issue、self-managing は自己管理 Issue",
+             "  issue・url  Issue の参照と URL\n"
+             "  role        --role の値\n"
+             "  managing    --managing の参照 (owner/repo#番号)。無ければ null\n"
+             "  satisfied   満たすか\n"
+             "  unsatisfied 満たさない項目 {kind, message, line, url} の配列。kind は checkbox (line は本文の行番号)・pr・\n"
+             "              common・milestone・work-issue・managing-pr のどれか\n"
+             "  evidence    根拠の URL (チェックの根拠・切り出し・マージされた PR) の配列\n"
+             "  pr          作業 Issue か自己管理 Issue の PR {url, state, merged, base}。読まなかったら null\n"
+             "  managing_pr 管理 Issue の PR (構成 2・3 の managing のときだけ)\n"
+             "  checkboxes  チェックボックスの {counts, unsatisfied}。managing では共通の条件の項目を数えない\n"
+             "  work_issues 作業 Issue {number, url, state} の配列 (managing のときだけ)\n"
+             "  blocking    この Issue を依存先とする、開いている Issue {number, url, title, state} の配列\n"
+             "  errors      クローズ条件や PR マージ計画の形の誤り・表に行が無いなどの配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("満たす", "満たさない項目がある・形の誤り", "gh が失敗した (検査できなかった)"))
+    _add_issue_args(p)
+    p.add_argument("--role", required=True, choices=closecheck.ROLES, help="閉じる Issue の種類")
+    p.add_argument("--managing", help="管理 Issue の参照 (--role working のとき)")
+
+    g = groups.add_parser("dependents", help="閉じる Issue を依存先とする Issue に、片付いたことを書く").add_subparsers(
+        dest="command", required=True)
+    dependents_output = (
+        "  issue・url・state  閉じる Issue の参照・URL・状態\n"
+        "  dependents  この Issue を依存先とする開いた Issue {number, url, sha256, actions} の配列。actions は\n"
+        "              {action: comment, line (記録のコメントの 1 行目)} と {action: edit-dependencies, removed (消す行),\n"
+        "              section_removed (節ごと消すか)}。記録が既にあり、消す項目も無ければ空\n"
+        "  errors      満たさない理由の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "plan", cmd_dependents_plan,
+             "閉じる Issue を依存先とする開いた Issue (blocking) に行う書き込みを示す (示す)。書き込まない。\n"
+             "書き込みは、記録のコメント dependency-resolved と、節「依存先」から閉じる Issue の項目を消すこと",
+             dependents_output, _exit_help("示せた", "使わない", "gh が失敗した"))
+    _add_issue_args(p)
+    p = _add(g, "resolve", cmd_dependents_resolve,
+             "plan の書き込みを行う (実行する)。Issue が閉じていなければ書かない。もう一度実行しても、書いた記録と\n"
+             "消した項目は書かない",
+             dependents_output + "\n  done        行った書き込み {number, action, url} の配列",
+             _exit_help("書き込んだ", "Issue が閉じていない", "gh が失敗した (done までは書き込んだ)"))
+    _add_issue_args(p)
+
+    g = groups.add_parser("sessions", help="記録のコメントからセッションを集める").add_subparsers(dest="command", required=True)
+    p = _add(g, "active", cmd_sessions_active,
+             "管理 Issue の管理セッションと、PR マージ計画の表の作業 Issue の動いている作業セッションを、記録のコメント session\n"
+             "から集める。読むだけ。作業 Issue ごとに最後の session の記録を使い、閉じた作業 Issue・session の記録が無い\n"
+             "作業 Issue・そのセッションの abandon の記録がある作業 Issue を除く。名前は記録の本文の「- 作業セッションの名前: 」の行",
+             "  issue・url  管理 Issue の参照と URL\n"
+             "  managing    管理 Issue の最後の session の記録 (role=managing) {session, previous, branch, name, record_url}。\n"
+             "              無ければ null\n"
+             "  sessions    動いている作業セッション {number, url, session, previous, branch, name, record_url} の配列。\n"
+             "              name は記録に名前の行が無ければ null\n"
+             "  excluded    除いた作業 Issue {number, url, reason (closed・no-session・abandoned)} の配列\n"
+             "  errors      PR マージ計画が無い・形の誤りの配列\n"
+             "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("集められた", "PR マージ計画が無いか形が違う", "gh が失敗した"))
+    _add_issue_args(p)
+
+    g = groups.add_parser("managing", help="管理 Issue (か自己管理 Issue) の計画案を GitHub に書く").add_subparsers(
+        dest="command", required=True)
+    managing_output = (
+        "  draft・repo  計画案のファイル名とリポジトリ\n"
+        "  target      計画する Issue {issue, url, kind (管理 Issue・自己管理 Issue)}\n"
+        "  body_state  計画する Issue の本文の状態。pending (これから書く)・applied (書き込み済み)・changed (計画案を\n"
+        "              作ったときから変わった)\n"
+        "  issues      作業 Issue の書き込み {labels_to_create, items} (issues plan と同じ形)。作業 Issue を作らなければ null\n"
+        "  merge_plan  {settings, rows, content}。content は本文のマーク merge-plan の中に書く中身 (作業 Issue を作る前は、\n"
+        "              キーと <番号> のまま)\n"
+        "  closing_conditions  本文の節「クローズ条件」に書く中身\n"
+        "  approval_recorded   計画する Issue に、この計画案の approval の記録があるか\n"
+        "  errors      誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "plan", cmd_managing_plan,
+             "管理 Issue (か自己管理 Issue) の計画案 (書式は文書 skills/managing-issue-plan/references/merge-plan.md) と GitHub の\n"
+             "今の状態から、行う書き込みを示す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない",
+             managing_output,
+             _exit_help("示せた", "計画案の形が違う・本文が変わった・マイルストーンが違う・GitHub の状態が計画案と合わない",
+                        "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="作業 Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    p = _add(g, "apply", cmd_managing_apply,
+             "plan と同じ確認をし、誤りが無ければ書き込む (実行する)。作業 Issue を作り (作業 Issue ごとに approval の記録も書く)、\n"
+             "表のキーを作った Issue の番号に置き換えて、計画する Issue の本文の節「クローズ条件」と「PR マージ計画」を書き換え、\n"
+             "計画する Issue に approval の記録を書く。途中で失敗したら、同じ計画案でやり直せる",
+             managing_output + "\n"
+             "  done        行った書き込み {key, action, url} の配列 (action は issues create の action と、write-body・\n"
+             "              record-approval)。gh が失敗したときは、失敗する前までのもの",
+             _exit_help("すべて書き込んだ (か、書き込み済みだった)", "plan で満たさない (何も書き込まない)",
+                        "gh が失敗した (done までは書き込んだ)"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="作業 Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+
+    g = groups.add_parser("merge-plan", help="管理 Issue の PR マージ計画を読む・書く").add_subparsers(
+        dest="command", required=True)
+    rows_help = ("  rows      表の行 {order, work {number, key, description, url}, branch, base, requires (番号の配列), pr,\n"
+                 "            pr_url, line} の配列 (表の順)")
+    p = _add(g, "show", cmd_merge_plan_show,
+             "管理 Issue の本文のマーク merge-plan の範囲から、設定と PR マージ計画の表を読み、表から gitGraph の図を作って、\n"
+             "本文の図と比べる。読むだけ。書式は文書 skills/managing-issue-plan/references/merge-plan.md",
+             "  issue・url  管理 Issue の参照 (owner/repo#番号) と URL\n"
+             "  sha256    本文の全体のハッシュ値 (set-pr の --expect-sha256 に渡す)\n"
+             "  settings  設定 {config (1・2・3), merger (利用者・管理セッション), managing_branch, managing_base, managing_pr}\n"
+             f"{rows_help}\n"
+             "  graph     表から作った図 (mermaid の gitGraph)。表に誤りがあれば null\n"
+             "  graph_matches       本文の図が graph と同じか。表に誤りがあれば null\n"
+             "  managing_pr_notice  構成 2 のとき、管理 Issue の PR の本文の先頭に書く注意書き。ほかの構成では null\n"
+             "  errors    範囲が無い・表や設定の形の誤りの配列\n"
+             "  gh_error  gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("表が形どおりで、本文の図が表から作った図と同じ", "範囲が無い・表や設定の形の誤り・図が表と違う",
+                        "gh が失敗した"))
+    _add_issue_args(p)
+    p = _add(g, "set-pr", cmd_merge_plan_set_pr,
+             "管理 Issue の PR マージ計画の表で、作業 Issue (--work) の行の、列「PR」に PR の URL を書き、図を作り直して本文を\n"
+             "書き換える。--work を付けなければ、設定「管理 Issue の PR」に書く (ブランチの構成 2・3 だけ)。\n"
+             "本文が --expect-sha256 (show の sha256) から変わっていれば書かない。列が既に同じ URL なら書かない",
+             "  issue     管理 Issue の参照\n"
+             "  work      作業 Issue の参照 (--work を付けなければ null)\n"
+             "  pr        書いた PR の URL\n"
+             "  changed   本文を書き換えたか\n"
+             "  previous  列「PR」の書き換える前の値 (空なら null)\n"
+             "  sha256    書いた後の本文のハッシュ値 (書かなかったときは今の本文のハッシュ値)\n"
+             "  errors    本文が変わった・行が無い・URL が PR ではない・表の形の誤りの配列\n"
+             "  gh_error  gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("書いた (か、既に同じ URL だった)", "本文が変わった・行が無い・形の誤り (何も書かない)", "gh が失敗した"))
+    _add_issue_args(p)
+    p.add_argument("--work", help="作業 Issue の参照 (#番号・番号・URL。リポジトリは管理 Issue と同じ)。付けなければ管理 Issue の PR")
+    p.add_argument("--pr", required=True, help="PR の URL (https://github.com/<owner>/<repo>/pull/<番号>)")
+    p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (merge-plan show の sha256)")
+
 
     return parser
 
