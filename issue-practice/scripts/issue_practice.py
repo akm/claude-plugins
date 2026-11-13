@@ -28,7 +28,7 @@
   close check --issue <参照> --role <種類> [--managing <管理 Issue>]   閉じる前の検査をする
   dependents plan --issue <参照>                 閉じる Issue を依存先とする Issue への書き込みを示す (示す)
   dependents resolve --issue <参照>              閉じた Issue を依存先とする Issue に記録を書き、節「依存先」から消す (実行する)
-  merge-plan set-pr --issue <参照> --work <作業 Issue> --pr <URL> --expect-sha256 <値>   表の列「PR」に PR の URL を書く
+  merge-plan set-pr --issue <参照> [--work <作業 Issue>] --pr <URL> --expect-sha256 <値>   表の列「PR」か、管理 Issue の PR を書く
 
 終了コード (計画の KTD10):
   0  検査して満たす (解析できた・決めた形になっている)
@@ -360,13 +360,13 @@ def cmd_merge_plan_show(args):
 
 def cmd_merge_plan_set_pr(args):
     ref, error = _issue_ref(args)
-    work = refs.parse_ref(args.work, default_repo=ref["key"].split("#")[0]) if ref else None
-    if error or "error" in work:
+    work = refs.parse_ref(args.work, default_repo=ref["key"].split("#")[0]) if ref and args.work else None
+    if error or (work and "error" in work):
         _emit({"issue": ref["key"] if ref else None, "changed": False, "errors": [error or work["error"]]})
         return EXIT_UNSATISFIED
-    payload = {"issue": ref["key"], "work": work["key"], "pr": args.pr, "changed": False, "previous": None, "sha256": None,
-               "errors": []}
-    if f"{work['owner']}/{work['repo']}".lower() != f"{ref['owner']}/{ref['repo']}".lower():
+    payload = {"issue": ref["key"], "work": work["key"] if work else None, "pr": args.pr, "changed": False, "previous": None,
+               "sha256": None, "errors": []}
+    if work and f"{work['owner']}/{work['repo']}".lower() != f"{ref['owner']}/{ref['repo']}".lower():
         payload["errors"] = ["作業 Issue は、管理 Issue と同じリポジトリの Issue にする"]
         _emit(payload)
         return EXIT_UNSATISFIED
@@ -384,7 +384,7 @@ def cmd_merge_plan_set_pr(args):
         payload["errors"] = [plan["error"]] if "error" in plan else _errors_text(plan["errors"])
         _emit(payload)
         return EXIT_UNSATISFIED
-    changed = mergeplan.set_pr(plan, work["number"], args.pr)
+    changed = mergeplan.set_pr(plan, work["number"], args.pr) if work else mergeplan.set_managing_pr(plan, args.pr)
     if "error" in changed:
         payload["errors"] = [changed["error"]]
         _emit(payload)
@@ -848,10 +848,11 @@ def build_parser():
                         "gh が失敗した"))
     _add_issue_args(p)
     p = _add(g, "set-pr", cmd_merge_plan_set_pr,
-             "管理 Issue の PR マージ計画の表で、作業 Issue の行の、列「PR」に PR の URL を書き、図を作り直して本文を書き換える。\n"
+             "管理 Issue の PR マージ計画の表で、作業 Issue (--work) の行の、列「PR」に PR の URL を書き、図を作り直して本文を\n"
+             "書き換える。--work を付けなければ、設定「管理 Issue の PR」に書く (ブランチの構成 2・3 だけ)。\n"
              "本文が --expect-sha256 (show の sha256) から変わっていれば書かない。列が既に同じ URL なら書かない",
              "  issue     管理 Issue の参照\n"
-             "  work      作業 Issue の参照\n"
+             "  work      作業 Issue の参照 (--work を付けなければ null)\n"
              "  pr        書いた PR の URL\n"
              "  changed   本文を書き換えたか\n"
              "  previous  列「PR」の書き換える前の値 (空なら null)\n"
@@ -860,7 +861,7 @@ def build_parser():
              "  gh_error  gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
              _exit_help("書いた (か、既に同じ URL だった)", "本文が変わった・行が無い・形の誤り (何も書かない)", "gh が失敗した"))
     _add_issue_args(p)
-    p.add_argument("--work", required=True, help="作業 Issue の参照 (#番号・番号・URL。リポジトリは管理 Issue と同じ)")
+    p.add_argument("--work", help="作業 Issue の参照 (#番号・番号・URL。リポジトリは管理 Issue と同じ)。付けなければ管理 Issue の PR")
     p.add_argument("--pr", required=True, help="PR の URL (https://github.com/<owner>/<repo>/pull/<番号>)")
     p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (merge-plan show の sha256)")
 

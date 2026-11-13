@@ -180,6 +180,20 @@ class GraphTest(unittest.TestCase):
         self.assertIn("error", mergeplan.set_pr(plan, 13, "https://github.com/o/r/issues/20"))
 
 
+    def test_set_managing_pr(self):
+        plan = mergeplan.parse(plan_text(*MANAGED_ROWS, settings=managed_settings("2")))
+        changed = mergeplan.set_managing_pr(plan, "https://github.com/o/r/pull/30")
+        self.assertEqual(changed["previous"], None)
+        self.assertIn("- 管理 Issue の PR: https://github.com/o/r/pull/30", changed["plan"]["prefix"])
+        reread = mergeplan.parse(mergeplan.render(changed["plan"]))
+        self.assertEqual(reread["settings"]["managing_pr"], "https://github.com/o/r/pull/30")
+        no_line = mergeplan.parse(plan_text(*MANAGED_ROWS, settings=managed_settings("3")[:4]))
+        self.assertIn("- 管理 Issue の PR: https://github.com/o/r/pull/30",
+                      mergeplan.set_managing_pr(no_line, "https://github.com/o/r/pull/30")["plan"]["prefix"],
+                      "設定の行が無ければ足す")
+        self.assertIn("error", mergeplan.set_managing_pr(mergeplan.parse(plan_text(*THREE_ROWS)), "https://github.com/o/r/pull/30"),
+                      "構成 1 には管理 Issue の PR が無い")
+
 def region_body(content, before="## 問題\n\n本文\n\n## PR マージ計画\n\n"):
     return f"{before}{bodies.start_mark(mergeplan.REGION)}\n\n{content}\n\n{bodies.end_mark(mergeplan.REGION)}\n"
 
@@ -261,6 +275,16 @@ class MergePlanCliTest(FakeGhCase):
         self.assertFalse(out["changed"])
         self.assertFalse([a for a in self.recorded() if a[:2] == ["issue", "edit"]], "同じ URL なら書かない")
 
+
+    def test_set_managing_pr_cli(self):
+        body = region_body(mergeplan.render(mergeplan.parse(plan_text(*MANAGED_ROWS, settings=managed_settings("2")))))
+        self.responses([self.view(body), {"prefix": ["issue", "edit"], "stdout": ""}])
+        code, out, err = self.cli("merge-plan", "set-pr", "--issue", f"{REPO}#10", "--pr", "https://github.com/o/r/pull/30",
+                                  "--expect-sha256", bodies.body_sha256(body))
+        self.assertEqual(code, 0, err)
+        self.assertEqual((out["work"], out["changed"]), (None, True))
+        edits = [r for r in self.recorded_full() if r["args"][:2] == ["issue", "edit"]]
+        self.assertIn("- 管理 Issue の PR: https://github.com/o/r/pull/30", edits[0]["stdin"])
 
 class DocTest(unittest.TestCase):
     """文書 `issue-practice/skills/managing-issue-plan/references/merge-plan.md` の書式が、モジュールの定数と一致すること。"""

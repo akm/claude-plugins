@@ -382,6 +382,29 @@ def set_pr(plan, number, pr):
     return {"error": f"作業 Issue #{number} の行が、PR マージ計画の表に無い"}
 
 
+def set_managing_pr(plan, pr):
+    """設定「管理 Issue の PR」を pr にした plan を返す (構成 2・3 だけ)。設定の行が無ければ、表の前の行の最後に足す。
+
+    返り値は {"plan", "previous"} か {"error"}。
+    """
+    ref = refs.parse_ref(pr)
+    if "error" in ref or ref["kind"] != "pull":
+        return {"error": f"PR の URL ではない: {pr!r}"}
+    if plan["settings"]["config"] not in ("2", "3"):
+        return {"error": "ブランチの構成 1 には、管理 Issue の PR が無い"}
+    changed = copy.deepcopy(plan)
+    line = f"- {SETTINGS[4]}: {pr}"
+    for i, text in enumerate(changed["prefix"]):
+        m = _SETTING_RE.match(text)
+        if m and m.group("name") == SETTINGS[4]:
+            changed["prefix"][i] = line
+            break
+    else:
+        changed["prefix"].append(line)
+    changed["settings"] = {**changed["settings"], "managing_pr": pr}
+    return {"plan": changed, "previous": plan["settings"]["managing_pr"]}
+
+
 def read_region(body):
     """本文のマーク merge-plan の範囲を読んで parse する。返り値は parse の結果に {"content"} を足したものか、{"error"}。"""
     region = bodies.find_region(body, REGION)
