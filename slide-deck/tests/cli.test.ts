@@ -275,15 +275,21 @@ describe("pptx", () => {
     assert.doesNotMatch(r.stderr, /\n {4}at /);
   });
 
-  test("引数の誤りで終了するときも、前に書いた build/deck.pptx を消す", () => {
+  test("引数の誤りで終了するときは、資料のディレクトリが決まらないので、前に書いた build/deck.pptx を消さない", () => {
     const deck = sandbox.copySample();
     const pptx = join(deck, "build", "deck.pptx");
     mkdirSync(join(deck, "build"));
-    for (const args of [["pptx", deck], ["pptx", deck, "extra", "--pptx-skill", FAKE_PPTX_SKILL]]) {
-      writeFileSync(pptx, "前に書いたファイル");
+    writeFileSync(pptx, "前に書いたファイル");
+    const cases: [string[], RegExp][] = [
+      [["pptx", deck], /^--pptx-skill <pptx のスキルのディレクトリ> を指定する$/m],
+      [["pptx", deck, "extra", "--pptx-skill", FAKE_PPTX_SKILL], /^引数 <資料のディレクトリ> を指定する/m],
+      [["pptx", "extra", deck, "--pptx-skill", FAKE_PPTX_SKILL], /^引数 <資料のディレクトリ> を指定する/m],
+    ];
+    for (const [args, message] of cases) {
       const r = runCli(args);
       assert.equal(r.status, 2, r.stdout + r.stderr);
-      assert.equal(existsSync(pptx), false, args.join(" "));
+      assert.match(r.stderr, message, args.join(" "));
+      assert.ok(existsSync(pptx), args.join(" "));
     }
   });
 
