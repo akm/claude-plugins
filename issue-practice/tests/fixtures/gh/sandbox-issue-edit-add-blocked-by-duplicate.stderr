@@ -1,0 +1,3 @@
+failed to update https://github.com/akm/issue-practice-sandbox/issues/2:
+GraphQL: An error occurred while adding the blocking issue to the issue. Validation failed: Target issue has already been taken (addBlockedBy)
+failed to update 1 issue

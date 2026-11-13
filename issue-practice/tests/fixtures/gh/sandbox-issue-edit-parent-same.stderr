@@ -1,0 +1,3 @@
+failed to update https://github.com/akm/issue-practice-sandbox/issues/2:
+GraphQL: Failed to add sub-issue #2 to parent #1. Issue may not contain duplicate sub-issues (addSubIssue)
+failed to update 1 issue
