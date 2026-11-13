@@ -74,6 +74,9 @@ class QualifiedNameTest(unittest.TestCase):
 
     def test_unclassified_app_term_and_file(self):
         self.assertEqual(names.format_part("ut", "開館日"), "未分類のアプリケーション用語「開館日」")
+        # 略称は、本文の最初の箇所に書く形だけに使う。略称の無い種類は正式名称のまま
+        self.assertEqual(names.format_part("ut", "開館日", abbreviated=True), "未分類の用語「開館日」")
+        self.assertEqual(names.format_part("m", "貸出", abbreviated=True), "モデル「貸出」")
         self.assertEqual(names.format_part("models", "models.md"), "ファイル `models.md`")
 
     def test_handwritten_file_child_file_and_section(self):

@@ -22,10 +22,13 @@ class ReferenceTest(unittest.TestCase):
         )
         self.assertEqual(doc.references[1].text, "返却")
         self.assertEqual((doc.references[1].label_line, doc.references[1].label_column), (1, 21))
+        # リンクの最後の「]」の位置
+        self.assertEqual([(r.end_line, r.end_column) for r in doc.references], [(1, 13), (1, 36), (1, 46)])
 
     def test_label_spanning_lines(self):
         doc = markdown.parse("前の文 [ドメイン `loans` の\nモデル「貸出」] の後\n")
         self.assertEqual(labels(doc), [("shortcut", "ドメイン `loans` の\nモデル「貸出」", 1, 5)])
+        self.assertEqual((doc.references[0].end_line, doc.references[0].end_column), (2, 8))
 
     def test_inline_code_hides_brackets(self):
         doc = markdown.parse("`[a]` と ``[b] ` c`` と [`concept.md`]\n")

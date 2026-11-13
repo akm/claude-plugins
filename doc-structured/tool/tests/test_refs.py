@@ -39,9 +39,9 @@ class RefsTest(ProjectTestCase):
             [
                 f"{CONCEPT}:5:1: d-loans-m-loan [モデル「貸出」] (d-loans-concept)",
                 f"{DESIGN}:9:1: d-loans-m-loan-a-status [属性「貸出状態」] (d-loans-design-h-status_values)",
-                f"{DESIGN}:9:14: d-loans-m-loan-a-status-v-on_loan [貸出中] (d-loans-design-h-status_values)",
-                f"{DESIGN}:9:20: d-loans-m-loan-a-status-v-returned [返却済み] (d-loans-design-h-status_values)",
-                f"{CHILD}:9:17: d-loans-m-loan-a-member [借りた利用者] (d-loans-design-f-overdue_notice-h-timing)",
+                f"{DESIGN}:9:14: d-loans-m-loan-a-status-v-on_loan [値「貸出中」][貸出中] (d-loans-design-h-status_values)",
+                f"{DESIGN}:9:28: d-loans-m-loan-a-status-v-returned [値「返却済み」][返却済み] (d-loans-design-h-status_values)",
+                f"{CHILD}:9:30: d-loans-m-loan-a-member [モデル「貸出」の属性「借りた利用者」][借りた利用者] (d-loans-design-f-overdue_notice-h-timing)",
                 "d-loans-m-loan とその子孫を参照している箇所: 5 件 (3 ファイル)",
             ],
         )
@@ -75,7 +75,7 @@ class RefsTest(ProjectTestCase):
         result = self.run_refs("d-loans-design-f-overdue_notice")
         self.assertEqual(
             result.stdout.splitlines()[0],
-            f"{CONCEPT}:11:41: d-loans-design-f-overdue_notice [延滞の通知][d-loans-design-f-overdue_notice] "
+            f"{CONCEPT}:11:54: d-loans-design-f-overdue_notice [ファイル `design/overdue_notice.md`][d-loans-design-f-overdue_notice] "
             "(d-loans-concept-h-return_deadline)",
         )
 

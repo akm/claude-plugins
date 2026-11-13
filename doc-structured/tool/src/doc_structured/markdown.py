@@ -59,6 +59,8 @@ class Reference:
     column: int  # 最初の「[」の列
     label_line: int  # ラベルの「[」の行 (shortcut と collapsed では line と同じ)
     label_column: int
+    end_line: int  # リンクの最後の「]」がある行
+    end_column: int  # リンクの最後の「]」がある列
 
 
 @dataclass(frozen=True)
@@ -480,14 +482,17 @@ class _InlineScanner:
             if label_close is not None:
                 label = text[after + 1 : label_close]
                 label_line, label_column = self.position(after)
+                end = self.position(label_close)
                 if label.strip():
                     self.document.references.append(
-                        Reference("full", inner, label, line, column, label_line, label_column)
+                        Reference("full", inner, label, line, column, label_line, label_column, *end)
                     )
                 else:
                     self.document.references.append(
-                        Reference("collapsed", inner, inner, line, column, line, column)
+                        Reference("collapsed", inner, inner, line, column, line, column, *end)
                     )
                 return label_close + 1
-        self.document.references.append(Reference("shortcut", inner, inner, line, column, line, column))
+        self.document.references.append(
+            Reference("shortcut", inner, inner, line, column, line, column, *self.position(close))
+        )
         return after

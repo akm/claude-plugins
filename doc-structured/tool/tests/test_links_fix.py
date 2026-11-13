@@ -75,16 +75,25 @@ class RenameTest(LinksFixTestCase):
         self.assertIn(f"{CONCEPT}:25:1: 検査 b: 定義の行の title が、参照先の完全な名前", check.stdout)
 
         result = self.run_tool("links-fix")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout, f"書き換えた: {CONCEPT}\n")
+        # 最初の箇所 [モデル「予約」][予約] の文は [文][ラベル] の形なので、書き換えずに報告する
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            f"{CONCEPT}:17:6: 参照先 d-loans-m-reservation を最初に指す箇所の表示の文「モデル「予約」」が、"
+            "書ける形のどれとも違う。書ける形に置き換えるか、文を修正する。書ける形:\n"
+            "  モデル「取り置き」\n"
+            "  ドメイン `loans` のモデル「取り置き」\n",
+            result.stdout,
+        )
         text = self.read(CONCEPT)
-        # 引用符の種類は変えない。本文 (ラベル [予約]) は変えない
+        # 引用符の種類は変えない
         self.assertIn("[予約]: models.md#d-loans-m-reservation 'ドメイン `loans` のモデル「取り置き」'", text)
         self.assertIn(
             '[属性「前の予約」]: models.md#d-loans-m-reservation-a-previous "ドメイン `loans` のモデル「取り置き」の属性「前の予約」"',
             text,
         )
-        self.assertIn("同じ図書の[予約]は", text)
+        self.assertIn("同じ図書の[モデル「予約」][予約]は", text)
+        # 利用者が選んだ書ける形に、文を手で直す
+        self.write(CONCEPT, text.replace("[モデル「予約」][予約]", "[モデル「取り置き」][予約]"))
         self.assertCheckPasses()
 
     def test_heading_change_rewrites_section_title(self):
@@ -265,7 +274,7 @@ class DefinitionBlockTest(ScratchTestCase):
         self.assertEqual(self.run_tool("links-fix").returncode, 0)
         self.assertEqual(
             self.read(CONCEPT),
-            f"{HEAD}[モデル「貸出」]\n\n後の段落 [開館日]\n\n{LOAN_DEFINITION}\n"
+            f"{HEAD}[モデル「貸出」]\n\n後の段落 [未分類の用語「開館日」][開館日]\n\n{LOAN_DEFINITION}\n"
             '[開館日]: unclassified_app_terms.md#d-loans-ut-business_day "ドメイン `loans` の未分類のアプリケーション用語「開館日」"\n',
         )
         self.assertCheckPasses()
@@ -278,7 +287,7 @@ class DefinitionBlockTest(ScratchTestCase):
 
     def test_keeps_order_and_blank_lines_written_by_people(self):
         text = (
-            f"{HEAD}[開館日] と [モデル「貸出」]\n\n{LOAN_DEFINITION}\n\n"
+            f"{HEAD}[未分類の用語「開館日」][開館日] と [モデル「貸出」]\n\n{LOAN_DEFINITION}\n\n"
             '[開館日]: unclassified_app_terms.md#d-loans-ut-business_day "ドメイン `loans` の未分類のアプリケーション用語「開館日」"\n'
         )
         self.write(CONCEPT, text)
@@ -294,6 +303,122 @@ class DefinitionBlockTest(ScratchTestCase):
             (self.project / CONCEPT).read_bytes().decode("utf-8"),
             f"{HEAD}[モデル「貸出」]\n\n{LOAN_DEFINITION}\n".replace("\n", "\r\n"),
         )
+
+
+class FirstUseTest(ScratchTestCase):
+    """リンクの表示の文の書き換え: 最初の箇所は書ける形に、2 回目以降は名前が見える形に。"""
+
+    BUSINESS_DAY = (
+        '[開館日]: unclassified_app_terms.md#d-loans-ut-business_day "ドメイン `loans` の未分類のアプリケーション用語「開館日」"'
+    )
+
+    def fix(self, body: str, definitions: str = "") -> tuple[subprocess.CompletedProcess, str]:
+        self.write(CONCEPT, f"{HEAD}{body}\n" + (f"\n{definitions}\n" if definitions else ""))
+        result = self.run_tool("links-fix")
+        text = self.read(CONCEPT)
+        return result, text[len(HEAD) :].split("\n\n")[0]
+
+    def test_first_shortcut_is_rewritten_omitting_shared_parents(self):
+        result, body = self.fix(
+            "[開館日]・[貸出状態]・[d-catalog-m-book]・[通知する日]・[`design/overdue_notice.md`]・[d-loans]"
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            body,
+            "[未分類の用語「開館日」][開館日]・"
+            "[モデル「貸出」の属性「貸出状態」][貸出状態]・"
+            "[ドメイン `catalog` のモデル「図書」][d-catalog-m-book]・"
+            "[ファイル `design/overdue_notice.md` の節「通知する日」][通知する日]・"
+            "[ファイル `design/overdue_notice.md`][`design/overdue_notice.md`]・"
+            "[ドメイン `loans`][d-loans]",
+        )
+        self.assertCheckPasses()
+        again = self.run_tool("links-fix")
+        self.assertEqual((again.returncode, again.stdout), (0, "直すものは無かった\n"))
+
+    def test_shortcut_spanning_lines_is_rewritten(self):
+        result, body = self.fix("前の文 [開館\n日] の後", self.BUSINESS_DAY.replace("[開館日]", "[開館 日]"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(body, "前の文 [未分類の用語「開館日」][開館 日] の後")
+        self.assertCheckPasses()
+
+    def test_writable_first_use_is_kept(self):
+        body = "[ドメイン `loans` の未分類のアプリケーション用語「開館日」][開館日] と [ドメイン `loans`\nのモデル「貸出」][貸出]"
+        result, fixed = self.fix(body, self.BUSINESS_DAY + "\n" + LOAN_DEFINITION.replace("[モデル「貸出」]", "[貸出]"))
+        self.assertEqual((result.returncode, result.stdout), (0, "直すものは無かった\n"))
+        self.assertEqual(fixed, body)
+
+    def test_first_full_reference_is_reported_not_rewritten(self):
+        body = "[延滞した貸出][貸出]に通知を送る。[モデル「貸出」][貸出]は 1 回の記録。"
+        result, fixed = self.fix(body)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            f"{CONCEPT}:5:1: 参照先 d-loans-m-loan を最初に指す箇所の表示の文「延滞した貸出」が、書ける形のどれとも違う。"
+            "書ける形に置き換えるか、文を修正する。書ける形:\n"
+            "  モデル「貸出」\n"
+            "  ドメイン `loans` のモデル「貸出」\n"
+            "判断の要るものが 1 件ある (参照先を --choose で渡すか、本文を直して、もう一度実行する)\n",
+            result.stdout,
+        )
+        # 定義の行は足し、2 回目以降の箇所は書き換える。最初の箇所の文は変えない
+        self.assertEqual(fixed, "[延滞した貸出][貸出]に通知を送る。[貸出]は 1 回の記録。")
+        self.write(CONCEPT, self.read(CONCEPT).replace("[延滞した貸出][貸出]に", "[モデル「貸出」][貸出]のうち、延滞したものに"))
+        self.assertCheckPasses()
+
+    def test_later_uses_show_the_name(self):
+        definitions = "\n".join([
+            LOAN_DEFINITION.replace("[モデル「貸出」]", "[貸出]"),
+            LOAN_DEFINITION,
+            LOAN_DEFINITION.replace("[モデル「貸出」]", "[d-loans-m-loan]"),
+            LOAN_DEFINITION.replace("[モデル「貸出」]", "[貸出の記録]"),
+            '[d-loans]: README.md#d-loans "ドメイン `loans`"',
+        ])
+        result, body = self.fix(
+            "[モデル「貸出」][貸出] [d-loans]。"
+            "[モデル「貸出」][貸出] [モデル「貸出」] [d-loans-m-loan] [D-Loans-M-Loan] [ドメイン `loans` のモデル「貸出」][d-loans-m-loan] "
+            "[延滞した貸出][貸出] [貸出の記録] [d-loans] [ドメイン `loans`][d-loans]",
+            definitions,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            body,
+            "[モデル「貸出」][貸出] [ドメイン `loans`][d-loans]。"
+            "[貸出] [貸出][モデル「貸出」] [貸出][d-loans-m-loan] [貸出][D-Loans-M-Loan] [貸出][d-loans-m-loan] "
+            "[延滞した貸出][貸出] [貸出の記録] [d-loans] [ドメイン `loans`][d-loans]",
+        )
+
+    def test_first_use_is_counted_per_target(self):
+        definitions = LOAN_DEFINITION + "\n" + LOAN_DEFINITION.replace("[モデル「貸出」]", "[貸出]")
+        result, body = self.fix("[貸出] と [モデル「貸出」]", definitions)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 参照先を最初に指すのは [貸出]。ラベル モデル「貸出」 を最初に使う箇所は 2 回目以降として扱う
+        self.assertEqual(body, "[モデル「貸出」][貸出] と [貸出][モデル「貸出」]")
+        self.assertCheckPasses()
+
+    def test_heading_with_spaces_passes_check_after_links_fix(self):
+        # 見出しの文に全角空白と連続する空白がある節を指すリンクも、links-fix の後に検査 b が成功する
+        self.write(
+            CONCEPT,
+            f'{HEAD}<a name="d-loans-concept-h-due"></a>\n\n## 返却　期限  の数え方\n\n[期限] と [節「返却 期限 の数え方」][期限]\n\n'
+            '[期限]: #d-loans-concept-h-due "x"\n',
+        )
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[節「返却　期限  の数え方」][期限] と [返却　期限  の数え方][期限]", self.read(CONCEPT))
+        self.assertCheckPasses()
+        again = self.run_tool("links-fix")
+        self.assertEqual((again.returncode, again.stdout), (0, "直すものは無かった\n"))
+
+    def test_documents_with_invalid_first_uses_pass_check_after_links_fix(self):
+        # クローズ条件: links-fix を実行すると、検査 b (初出) が成功する (定義の行が無い状態から)
+        for path in (CONCEPT, CHILD):
+            text = self.read(path)
+            text = re.sub(r"\[([^\[\]]+)\]\[([^\[\]]+)\]", r"[\2]", DEFINITION_RE.sub("", text)).rstrip("\n") + "\n"
+            self.write(path, text)
+        self.assertEqual(self.run_tool("check", "--only", "b").returncode, 1)
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertCheckPasses()
 
 
 class ArgumentsTest(LinksFixTestCase):

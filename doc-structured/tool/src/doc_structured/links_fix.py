@@ -1,6 +1,7 @@
-"""サブコマンド links-fix (手書きの Markdown の定義の行とファイルのアンカーを直す)。
+"""サブコマンド links-fix (手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文を直す)。
 
-直し方が 1 通りに決まるものだけを書き換え、判断の要るものは「パス:行:列: メッセージ」の形で報告する。本文の文は変えない。
+直し方が 1 通りに決まるものだけを書き換え、判断の要るものは「パス:行:列: メッセージ」の形で報告する。
+1 回の実行で、先に定義の行とファイルのアンカーを直し、その後にリンクの表示の文を直す。
   - 先頭の行 (空行を除く) がアンカーでなければ、ファイルの ID のアンカーを足す。先頭のアンカーの ID が違うときは、
     書き換えるか残すかの判断が要るので、足さずに報告する
   - 定義の無いラベルのうち、参照先の候補が 1 件のものに、定義の行を足す (本文で最初に使った順に、末尾のまとまりの後ろへ)
@@ -11,8 +12,14 @@
   - 定義の行の href の ID が参照先にあり、パスだけが違えば、href を正しい値に書き換える
   - 同じラベルの定義の行のうち、参照先が同じものは後の行を消す。参照先が違えば報告する
 reference-style の画像だけが使うラベルの定義の行は、画像が規則の対象でないので、消さず書き換えない (末尾のまとまりへは移す)。
+リンクの表示の文 (参照先を求められるリンクだけ。数え方は検査 b の初出と同じ):
+  - 各参照先を最初に指す箇所の表示の文が書ける形と違い、[ラベル] の形なら、[<書ける形>][ラベル] に書き換える。
+    書ける形は、参照するファイルと共通の親を省き、略称のある種類は略称で書く
+  - 2 回目以降の箇所の表示の文が参照先の ID か書ける形なら、名前が見える形 ([ラベル] か [名前][ラベル]) に書き換える。
+    ドメインは名前を持たないので書き換えない。書いた人が選んだ文 (名前でも ID でも書ける形でもない文) は書き換えない
 判断の要るもの: 参照先の候補が 0 件か複数のラベル・消さなかった使われていない定義の行・参照先の違う同じラベルの定義の行・
-href から参照先を求められない、本文で使われている定義の行・ファイルの ID と違う先頭のアンカー。
+href から参照先を求められない、本文で使われている定義の行・ファイルの ID と違う先頭のアンカー・
+最初の箇所の表示の文が書ける形と違う [文][ラベル] (文の意味が変わることがあるので、書き換えない)。
 利用者が選んだ参照先は、Choice (オプション --choose) で受け取り、定義の行の href と title はツールが作る。
 """
 
@@ -21,7 +28,18 @@ from pathlib import Path
 
 from . import markdown
 from .documents import HandwrittenFile, Index
-from .links import candidate_text, definition_line, image_only_labels, is_external, resolve, strip_angle
+from .links import (
+    candidate_text,
+    definition_line,
+    display_text,
+    form_lines,
+    image_only_labels,
+    is_external,
+    is_writable,
+    resolve,
+    strip_angle,
+    target_uses,
+)
 
 
 @dataclass(frozen=True)
@@ -45,9 +63,13 @@ class Report:
     line: int
     column: int
     message: str
+    detail: str = ""  # メッセージの後に続ける複数行 (書ける形の一覧)
 
     def format(self) -> str:
-        return f"{self.path}:{self.line}:{self.column}: {self.message}"
+        text = f"{self.path}:{self.line}:{self.column}: {self.message}"
+        if self.detail:
+            text += "\n" + self.detail
+        return text
 
 
 @dataclass
@@ -262,6 +284,56 @@ class _FileFixer:
         return result
 
 
+def _offset(lines: list[str], line: int, column: int) -> int:
+    """行と列 (どちらも 1 から数える) の、行を「\\n」でつないだ文の中の位置。"""
+    return sum(len(text) + 1 for text in lines[: line - 1]) + column - 1
+
+
+def fix_texts(handwritten: HandwrittenFile, lines: list[str], index: Index) -> tuple[list[str] | None, list[Report]]:
+    """リンクの表示の文を直す。lines は、定義の行を直した後の行。直すものが無ければ、行の代わりに None を返す。"""
+    document = markdown.parse("\n".join(lines))
+    from_parts = handwritten.parts()
+    replacements: list[tuple[markdown.Reference, str]] = []
+    reports: list[Report] = []
+    for use in target_uses(handwritten, document, index):
+        reference, target = use.reference, use.target
+        display = display_text(reference)
+        label = _label_text(reference.label)
+        if use.first:
+            if is_writable(display, target):
+                continue
+            if reference.form == "shortcut":
+                replacements.append((reference, f"[{target.form_for(from_parts)}][{label}]"))
+            else:
+                reports.append(Report(
+                    handwritten.path, reference.line, reference.column,
+                    f"参照先 {target.id} を最初に指す箇所の表示の文「{display}」が、書ける形のどれとも違う。"
+                    "書ける形に置き換えるか、文を修正する。書ける形:",
+                    form_lines(target.writable_forms()),
+                ))
+            continue
+        if target.name is None:
+            continue
+        if not is_writable(display, target) and markdown.normalize_label(display) != markdown.normalize_label(target.id):
+            continue
+        if markdown.normalize_label(label) == markdown.normalize_label(target.name):
+            short = f"[{label}]"
+        else:
+            short = f"[{target.name}][{label}]"
+        replacements.append((reference, short))
+    if not replacements:
+        return None, reports
+    text = "\n".join(lines)
+    changed = False
+    for reference, new in sorted(replacements, key=lambda r: (r[0].line, r[0].column), reverse=True):
+        start = _offset(lines, reference.line, reference.column)
+        end = _offset(lines, reference.end_line, reference.end_column) + 1
+        if text[start:end] != new:
+            text = text[:start] + new + text[end:]
+            changed = True
+    return (text.split("\n") if changed else None), reports
+
+
 def fix_files(root: Path, index: Index, paths: list[str] | None, choices: list[Choice]) -> FixResult:
     """paths (リポジトリのルートからの相対パス) の手書きの Markdown を直す。paths が None なら、すべての手書きの Markdown。
 
@@ -280,6 +352,10 @@ def fix_files(root: Path, index: Index, paths: list[str] | None, choices: list[C
         fixer = _FileFixer(handwritten, index, [c for c in choices if c.path == handwritten.path])
         fixed = fixer.fix()
         result.reports += fixer.reports
+        texts, reports = fix_texts(handwritten, fixed if fixed is not None else list(handwritten.document.lines), index)
+        result.reports += reports
+        if texts is not None:
+            fixed = texts
         if fixed is not None:
             outputs[handwritten.path] = fixed
     for path, fixed in outputs.items():

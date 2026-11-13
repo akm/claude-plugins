@@ -6,7 +6,8 @@
   doc-structured check [--light|--heavy|--all|--only <検査>]
                                    検査を実行する。指定が無ければ軽い群 (--light)
   doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...
-                                   手書きの Markdown の定義の行とファイルのアンカーを直す。判断の要るものが残れば終了コード 1
+                                   手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文を直す。
+                                   判断の要るものが残れば終了コード 1
   doc-structured refs <ID>         その ID と子孫の ID を参照している、手書きの Markdown の箇所を出力する。
                                    見つからなくても終了コード 0。ID の形が違えば終了コード 1
   doc-structured <知らない名前>     使い方を標準エラー出力に書き、終了コード 2 で終了する
@@ -49,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--only", metavar="<検査>", help="1 つの検査だけを実行する (例 --only a)")
     fix_parser = subparsers.add_parser(
         "links-fix",
-        help="手書きの Markdown の定義の行とファイルのアンカーを直す。判断の要るものが残れば終了コード 1",
+        help="手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文を直す。判断の要るものが残れば終了コード 1",
     )
     fix_parser.add_argument(
         "paths", nargs="*", metavar="<ファイル>", help="直す手書きの Markdown。指定が無ければ、すべての手書きの Markdown"
@@ -170,7 +171,7 @@ def run_links_fix(config: Config, args: argparse.Namespace) -> int:
     for report in result.reports:
         print(report.format())
     if result.reports:
-        print(f"判断の要るものが {len(result.reports)} 件ある (参照先を --choose で渡して、もう一度実行する)")
+        print(f"判断の要るものが {len(result.reports)} 件ある (参照先を --choose で渡すか、本文を直して、もう一度実行する)")
         return 1
     if not result.changed:
         print("直すものは無かった")
