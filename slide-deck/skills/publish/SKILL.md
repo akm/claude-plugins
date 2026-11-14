@@ -85,5 +85,5 @@ description: 構成案 (outline.md) と資料ごとのスクリプト deck.ts �
 - コネクタが無いときに、PowerPoint のファイルを Google ドライブにアップロードして変換するなど、別の方法で作ること。
 - 構成案に URL があるのに、新しい資料を作ること。資料をゴミ箱に移すこと。
 - スライド番号を API で付けること。
-- 構成案の Google スライドの URL と slide-deck の版の行を、サブコマンド `write-info` を使わずに書くこと。
+- 構成案の Google スライドの URL と slide-deck の版の行を、サブコマンド `write-info` を使わずに書くこと。ただし、その行の値が誤っているときは、ファイル [references/outline-format.md](../../references/outline-format.md) の節「資料の題名と資料の情報」のとおりに、利用者の回答で直す。
 - `deck.ts` を書くこと、PowerPoint のファイルを作ること。スキル `build` が行う。
