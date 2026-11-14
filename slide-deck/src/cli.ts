@@ -371,7 +371,7 @@ slide-deck の版の行 (- slide-deck の版: <版>) を書き込む。行が無
   <資料のディレクトリ>   outline.md があるディレクトリ
   --google-slides <URL>  Google スライドの資料の URL。https://docs.google.com/presentation/d/<資料の ID> で始まる
   --plugin-version       このプラグインの版 (プラグインの .claude-plugin/plugin.json の version) を書き込む。
-                         スキル publish は、指示をすべて送り、確認を終えた後に指定する
+                         スキル publish は、指示をすべて送り、発表者ノートの確認を終えた後に指定する
   --google-slides と --plugin-version の少なくとも 1 つを指定する。--help (-h) でこの説明を示す。
 
 出力 (標準出力):
