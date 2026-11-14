@@ -161,7 +161,7 @@ sequenceDiagram
 | --- | --- |
 | `state.json` | 配信のセッションの ID と名前・状態 (動いている / 止めた。期限切れは書かずに期限から判定する。KTD9)・定期の予定 (ジョブの ID・cron の式・作った時刻・期限・出した確認)・取得の位置・前回の `Last-Modified`・自分のログイン名と所属するチームと、それらを取得した時刻 (改めて取得する時機は KTD4) |
 | `subscriptions.json` | 登録 (登録の ID・リポジトリ・種類・受信のセッションの ID と名前・権限モード・登録日時・続けて届かなかった回数) |
-| `snapshots/<セッションの ID>.json` | 配信のセッションが一覧を表示したときの、一覧の番号と登録の ID の対応と、表示した時刻 (R6) |
+| `snapshots/<セッションの ID>.json` | 配信のセッションが一覧を表示したときの、一覧の番号と登録の ID の対応と、表示した時刻 (R6)。受信のセッションの対応も同じ様式で、保存先だけが記録のディレクトリの外になる (R6) |
 | `tracked.json` | 追跡する PR (リポジトリ・番号・最後に依頼を届けた時刻)。閉じたとき・そのリポジトリに `merged` の登録が無くなったとき・最後に依頼を届けてから 30 日を過ぎたときに消す (KTD4) |
 | `delivered.json` | 届けた出来事 (レビューの依頼の出来事の ID・マージした PR) と届けた登録。送信待ちに入れた時点で足す (KTD6)。30 日より前のものは消す |
 | `outbox.json` | 送信待ち (登録・出来事・送り直しの回数)。送信待ちに入れてから 30 日を過ぎた出来事は消す |
@@ -276,7 +276,7 @@ gh-notification-dispatch/
 - 変える: `.claude-plugin/marketplace.json`・`README.md`・`.github/test-targets.txt`
 
 **Approach:**
-1. 用意する: `references/messages.md` に、`subscribe`・`unsubscribe`・`subscribed`・`unsubscribed`・`removed` の様式を書く。`references/records.md` に、`state.json` (配信のセッションの部分)・`subscriptions.json`・`snapshots/` の様式を書く。`gh.py` と `fake-gh` は issue-practice からコピーして名前を変える。
+1. 用意する: `references/messages.md` に、`subscribe`・`unsubscribe`・`subscribed`・`unsubscribed`・`removed` の様式を書く。`references/records.md` に、`state.json` (配信のセッションの部分)・`subscriptions.json`・`snapshots/` と、受信のセッションの一時ディレクトリの `snapshot.json` (中身は `snapshots/` のファイルと同じ様式) の様式を書く。`gh.py` と `fake-gh` は issue-practice からコピーして名前を変える。
 2. テストを書く: Test scenarios のとおり。
 3. 実装する: `store.py` (ロックと書き込み)・`messages.py` (様式の生成と解析)・`subscriptions.py` (追加・一覧・番号の対応の記録・削除・番号から登録の ID を引く)。サブコマンドは `subscriptions add --message-file`・`subscriptions list --viewer <セッションの ID> [--mine]`・`subscriptions remove --viewer <セッションの ID> <番号>...`・`subscriptions resolve --viewer <セッションの ID> <番号>...` (受信のセッションが削除を申し込む前に、番号を登録の ID に変える)・`subscriptions unsubscribe --message-file`。
 4. スキル `subscribe` に、登録 (`<配信のセッションの名前> [--repo owner/repo] [--kind review_requested,merged]`)・一覧 (`--list`)・削除 (`--remove <番号>...`) の手順を書く。スキル `dispatch` に、登録と削除のメッセージを受けたときの手順と、一覧 (`list`)・削除 (`remove <番号>...`) を書く。
