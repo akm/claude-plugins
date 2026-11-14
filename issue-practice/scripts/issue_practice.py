@@ -812,8 +812,8 @@ def build_parser():
              "管理 Issue (か自己管理 Issue) の計画案 (書式は文書 skills/managing-issue-plan/references/merge-plan.md) と GitHub の\n"
              "今の状態から、行う書き込みを示す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない",
              managing_output,
-             _exit_help("示せた", "計画案の形が違う・本文が変わった・マイルストーンが違う・GitHub の状態が計画案と合わない",
-                        "gh が失敗した"))
+             _exit_help("示せた", "計画案の形が違う・本文が変わった・本文に書き込めない (同じ見出しの節が複数あるなど)・\n"
+                                  "     マイルストーンが違う・GitHub の状態が計画案と合わない", "gh が失敗した"))
     p.add_argument("file", help="計画案のファイルのパス")
     p.add_argument("--repo", required=True, help="作業 Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
     p = _add(g, "apply", cmd_managing_apply,
@@ -822,8 +822,11 @@ def build_parser():
              "計画する Issue に approval の記録を書く。途中で失敗したら、同じ計画案でやり直せる",
              managing_output + "\n"
              "  done        行った書き込み {key, action, url} の配列 (action は issues create の action と、write-body・\n"
-             "              record-approval)。gh が失敗したときは、失敗する前までのもの",
-             _exit_help("すべて書き込んだ (か、書き込み済みだった)", "plan で満たさない (何も書き込まない)",
+             "              record-approval)。gh が失敗したときと、作業 Issue を作った後に本文が変わったと分かったときは、\n"
+             "              中断する前までのもの",
+             _exit_help("すべて書き込んだ (か、書き込み済みだった)",
+                        "plan で満たさない (何も書き込まない)。plan で読んだ後から計画する Issue の本文が変わったと、\n"
+                        "     作業 Issue を作った後に分かったときも 3 (done までは書き込んだ)",
                         "gh が失敗した (done までは書き込んだ)"))
     p.add_argument("file", help="計画案のファイルのパス")
     p.add_argument("--repo", required=True, help="作業 Issue を作るリポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")

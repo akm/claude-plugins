@@ -205,6 +205,16 @@ class ManagingPlanTest(ManagingCliCase):
         self.assertEqual(code, 3)
         self.assertEqual(out["body_state"], "changed")
 
+    def test_body_that_cannot_be_composed_is_unsatisfied(self):
+        """本文が計画案を作ったときと同じでも、書き込む本文を組み立てられなければ、示すときに満たさない (#278)。"""
+        body = TARGET_BODY + "\n## クローズ条件\n\n二つ目。\n"
+        path = self.write_draft(draft_text(target_body=body))
+        self.github(body=body)
+        code, out, _ = self.cli("managing", "plan", path, "--repo", REPO)
+        self.assertEqual(code, 3)
+        self.assertEqual(out["body_state"], "pending")
+        self.assertTrue(any("節「クローズ条件」が複数ある" in e["message"] for e in out["errors"]), out["errors"])
+
     def test_milestone_must_match_target(self):
         path = self.write_draft(draft_text())
         self.github(milestone="R5 (a)")
@@ -265,6 +275,69 @@ class ManagingApplyTest(ManagingCliCase):
         code, out, _ = self.cli("managing", "apply", path, "--repo", REPO)
         self.assertEqual(code, 3)
         self.assertEqual(self.writes(), [], "本文が変わっていれば、作業 Issue も作らない")
+
+    def test_body_that_cannot_be_composed_writes_nothing(self):
+        """managing plan が満たさない本文 (見出し「## クローズ条件」が 2 つある) では、作業 Issue も作らない (#278)。"""
+        body = TARGET_BODY + "\n## クローズ条件\n\n二つ目。\n"
+        path = self.write_draft(draft_text(target_body=body))
+        self.github(body=body)
+        code, out, _ = self.cli("managing", "apply", path, "--repo", REPO)
+        self.assertEqual(code, 3)
+        self.assertEqual(out["done"], [])
+        self.assertEqual(self.writes(), [], "書き込む本文を組み立てられなければ、作業 Issue も作らない")
+
+    def test_body_changed_after_plan_reports_done(self):
+        """示した後 (作業 Issue を作っている間) に本文が変わったら、作業 Issue を作った後に終了コード 3 で中断し、done に入れる。"""
+        path = self.write_draft(draft_text())
+        before = {"prefix": ["issue", "view", "10", "-R", REPO, "--json", bodies.ISSUE_FIELDS], "once": True,
+                  "stdout": {"number": 10, "url": url(10), "state": "OPEN", "title": "対象", "body": TARGET_BODY,
+                             "updatedAt": "x"}}
+        self.github(body=TARGET_BODY + "\n追記\n", extra=[before])
+        code, out, _ = self.cli("managing", "apply", path, "--repo", REPO)
+        self.assertEqual(code, 3)
+        self.assertTrue(any("本文が、計画案を作ったときから変わった" in e["message"] for e in out["errors"]), out["errors"])
+        self.assertEqual([d["action"] for d in out["done"] if d["action"] == "create"], ["create", "create"])
+        self.assertFalse([r for r in self.writes() if r["args"][:3] in (["issue", "edit", url(10)], ["issue", "comment", url(10)])],
+                         "計画する Issue の本文も approval の記録も書かない")
+
+    def test_gh_failure_stops_with_done(self):
+        """本文の書き込みで gh が失敗したら終了コード 4 で中断し、それまでの書き込みを done に入れる。"""
+        path = self.write_draft(draft_text())
+        self.github(extra=[{"prefix": ["issue", "edit", url(10), "--body-file", "-"], "exit": 1,
+                            "stderr": "HTTP 502: Bad Gateway\n"}])
+        code, out, _ = self.cli("managing", "apply", path, "--repo", REPO)
+        self.assertEqual(code, 4)
+        self.assertEqual(out["gh_error"]["args"][:3], ["issue", "edit", url(10)])
+        self.assertEqual([(d["action"], d["url"]) for d in out["done"]],
+                         [("create", url(21)), ("set-parent", url(21)), ("record-approval", url(21)),
+                          ("create", url(22)), ("set-parent", url(22)), ("record-approval", url(22))],
+                         "作業 Issue の作成までを done に入れ、本文の書き込みは入れない")
+        self.assertEqual([r["args"][2] for r in self.writes() if r["args"][:2] == ["issue", "comment"]], [url(21), url(22)],
+                         "本文を書けなければ、計画した Issue に approval の記録を書かない")
+
+    def test_retry_after_approval_failed(self):
+        """本文を書いた後に approval の記録の書き込みで失敗したら、やり直しでは approval の記録だけを書く。"""
+        path = self.write_draft(draft_text())
+        self.github(extra=[{"prefix": ["issue", "comment", url(10)], "exit": 1, "stderr": "HTTP 502: Bad Gateway\n"}])
+        code, out, _ = self.cli("managing", "apply", path, "--repo", REPO)
+        self.assertEqual(code, 4)
+        self.assertEqual(out["gh_error"]["args"][:3], ["issue", "comment", url(10)])
+        self.assertEqual(out["done"][-1]["action"], "write-body")
+        written = [r for r in self.writes() if r["args"] == ["issue", "edit", url(10), "--body-file", "-"]][0]["stdin"]
+        os.remove(self.args_file)
+        approval = {"id": 1, "html_url": url(10) + "#issuecomment-1", "created_at": "x", "updated_at": "x",
+                    "body": f"issue-practice: approval draft={NAME}\n\n承認", "user": {"login": LOGIN}}
+        work_approval = lambda n: {"prefix": ["api", f"repos/{REPO}/issues/{n}/comments"], "stdout": [[  # noqa: E731
+            {**approval, "html_url": url(n) + "#issuecomment-2"}]]}
+        self.github(body=written, open_issues=[(21, "a"), (22, "b")],
+                    relations={21: {"parent": {"url": url(10)}}, 22: {"parent": {"url": url(10)}}},
+                    extra=[work_approval(21), work_approval(22)])
+        code, out, err = self.cli("managing", "apply", path, "--repo", REPO)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out["body_state"], "applied")
+        self.assertEqual([d["action"] for d in out["done"]], ["record-approval"])
+        self.assertEqual([r["args"][:3] for r in self.writes()], [["issue", "comment", url(10)]],
+                         "作業 Issue も本文も書かず、計画した Issue の approval の記録だけを書く")
 
     def test_self_managing(self):
         merge = MERGE.split("| 1 |")[0] + "| 1 | #12 誤字 | `fix/12-typo` | main | なし | |"
