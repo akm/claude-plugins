@@ -14,7 +14,8 @@
 reference-style の画像だけが使うラベルの定義の行は、画像が規則の対象でないので、消さず書き換えない (末尾のまとまりへは移す)。
 リンクの表示の文 (参照先を求められるリンクだけ。数え方は検査 b の初出と同じ):
   - 各参照先を最初に指す箇所の表示の文が書ける形と違い、[ラベル] の形なら、[<書ける形>][ラベル] に書き換える。
-    書ける形は、参照するファイルと共通の親を省き、略称のある種類は略称で書く
+    書ける形は、同じドメインの参照先なら、「種類 + 名前」がドメインの中で 1 つに決まるまで先頭の親を省いた形、
+    ほかのドメインの参照先ならドメインから書いた形で、略称のある種類は略称で書く
   - 2 回目以降の箇所の表示の文が参照先の ID か書ける形なら、名前が見える形 ([ラベル] か [名前][ラベル]) に書き換える。
     ドメインは名前を持たないので書き換えない。書いた人が選んだ文 (名前でも ID でも書ける形でもない文) は書き換えない
 判断の要るもの: 参照先の候補が 0 件か複数のラベル・消さなかった使われていない定義の行・参照先の違う同じラベルの定義の行・
@@ -303,7 +304,7 @@ def fix_texts(handwritten: HandwrittenFile, lines: list[str], index: Index) -> t
             if is_writable(display, target):
                 continue
             if reference.form == "shortcut":
-                replacements.append((reference, f"[{target.form_for(from_parts)}][{label}]"))
+                replacements.append((reference, f"[{target.form_for(from_parts, index.targets.values())}][{label}]"))
             else:
                 reports.append(Report(
                     handwritten.path, reference.line, reference.column,
@@ -346,6 +347,13 @@ def fix_files(root: Path, index: Index, paths: list[str] | None, choices: list[C
         handwritten = index.file(choice.path)
         if handwritten not in targets:
             targets.append(handwritten)
+    # 先頭の行がアンカーでないファイルには、下の _FileFixer がファイルのアンカーを足す。足すアンカーの ID を先に参照先にして、
+    # 同じ実行で、ほかのファイルのそのアンカーを指す定義の行を、参照先を求められないと報告しないようにする
+    for handwritten in targets:
+        document = handwritten.document
+        first = document.first_nonblank()
+        if handwritten.id not in index.targets and not any(a.line == first for a in document.anchors):
+            index.add_file_target(handwritten)
     result = FixResult()
     outputs: dict[str, list[str]] = {}
     for handwritten in targets:

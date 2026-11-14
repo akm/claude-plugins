@@ -133,6 +133,14 @@ class FileAnchorTest(LinksFixTestCase):
         self.assertTrue(self.read(CONCEPT).startswith('<a name="d-loans-concept"></a>\n\n# ドメイン `loans` の概念\n'))
         self.assertCheckPasses()
 
+    def test_definitions_pointing_to_the_added_file_anchor_are_not_reported(self):
+        # 同じ実行で足したファイルのアンカーを指す、ほかのファイルの定義の行を、参照先を求められないと報告しない (A2 (#215))
+        self.write(CHILD, self.read(CHILD).replace('<a name="d-loans-design-f-overdue_notice"></a>\n\n', "", 1))
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.read(CHILD).startswith('<a name="d-loans-design-f-overdue_notice"></a>\n\n# 延滞の通知\n'))
+        self.assertCheckPasses()
+
 
 class ScratchTestCase(LinksFixTestCase):
     """concept.md を書き換えるテスト。concept.md の節を参照する design.md は、リンクの無い内容にしておく。"""
@@ -318,7 +326,7 @@ class FirstUseTest(ScratchTestCase):
         text = self.read(CONCEPT)
         return result, text[len(HEAD) :].split("\n\n")[0]
 
-    def test_first_shortcut_is_rewritten_omitting_shared_parents(self):
+    def test_first_shortcut_is_rewritten_omitting_parents_while_unique_in_the_domain(self):
         result, body = self.fix(
             "[開館日]・[貸出状態]・[d-catalog-m-book]・[通知する日]・[`design/overdue_notice.md`]・[d-loans]"
         )
@@ -326,15 +334,33 @@ class FirstUseTest(ScratchTestCase):
         self.assertEqual(
             body,
             "[未分類の用語「開館日」][開館日]・"
-            "[モデル「貸出」の属性「貸出状態」][貸出状態]・"
+            "[属性「貸出状態」][貸出状態]・"
             "[ドメイン `catalog` のモデル「図書」][d-catalog-m-book]・"
-            "[ファイル `design/overdue_notice.md` の節「通知する日」][通知する日]・"
+            "[節「通知する日」][通知する日]・"
             "[ファイル `design/overdue_notice.md`][`design/overdue_notice.md`]・"
             "[ドメイン `loans`][d-loans]",
         )
         self.assertCheckPasses()
         again = self.run_tool("links-fix")
         self.assertEqual((again.returncode, again.stdout), (0, "直すものは無かった\n"))
+
+    def test_first_shortcut_keeps_the_model_when_the_attribute_name_is_shared_in_the_domain(self):
+        # 予約にも「貸出状態」という名前の属性を足すと、属性「貸出状態」だけではどちらか分からないので、モデルを書く
+        path = f"{LOANS}/reservations/reservation.yaml"
+        self.write(
+            path,
+            self.read(path)
+            + "      status:\n        name_ja: 貸出状態\n        definition: 予約した図書の貸出が今どの段階にあるか。\n",
+        )
+        self.assertEqual(self.run_tool("generate").returncode, 0)
+        result, body = self.fix("[d-loans-m-loan-a-status]・[d-loans-m-reservation-a-status]")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            body,
+            "[モデル「貸出」の属性「貸出状態」][d-loans-m-loan-a-status]・"
+            "[モデル「予約」の属性「貸出状態」][d-loans-m-reservation-a-status]",
+        )
+        self.assertCheckPasses()
 
     def test_shortcut_spanning_lines_is_rewritten(self):
         result, body = self.fix("前の文 [開館\n日] の後", self.BUSINESS_DAY.replace("[開館日]", "[開館 日]"))
