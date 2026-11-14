@@ -383,6 +383,11 @@ function sameScheme(master: PresentationMaster, theme: Theme): boolean {
   });
 }
 
+/** 読み込んだ配色がテーマの 12 色と違う、マスターの ID */
+export function mastersToRecolor(presentation: Presentation, theme: Theme): string[] {
+  return presentation.masters.filter((m) => !sameScheme(m, theme)).map((m) => m.objectId);
+}
+
 /**
  * マスターの配色を、テーマの 12 色に変える指示。読み込んだ配色がテーマと違うマスターだけについて作る。
  * 図形の色はテーマの色で指定するので、配色を変えると、すべてのスライドの色が変わる (計画の R11)。
@@ -394,11 +399,9 @@ export function colorSchemeRequests(presentation: Presentation, theme: Theme): R
     const [red, green, blue] = rgb255(values[name as SchemeColorName]);
     return { type, color: { red: round(red / 255, 8), green: round(green / 255, 8), blue: round(blue / 255, 8) } };
   });
-  return presentation.masters
-    .filter((m) => !sameScheme(m, theme))
-    .map((m) => ({
-      updatePageProperties: { objectId: m.objectId, pageProperties: { colorScheme: { colors } }, fields: "colorScheme" },
-    }));
+  return mastersToRecolor(presentation, theme).map((objectId) => ({
+    updatePageProperties: { objectId, pageProperties: { colorScheme: { colors } }, fields: "colorScheme" },
+  }));
 }
 
 /** 1 つの操作の指示 */

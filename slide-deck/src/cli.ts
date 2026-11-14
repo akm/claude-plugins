@@ -4,6 +4,9 @@
 
 import { parseArgs } from "node:util";
 import { checkDeck, ExecutionError, formatCheckReport } from "./check/deck.ts";
+import { buildRequests, formatRequestsReport } from "./gslides/build.ts";
+import { PRESENTATION_FIELDS, PRESENTATION_SHAPE } from "./gslides/presentation.ts";
+import { MAX_FILE_CHARS, MAX_OBJECTS_PER_SLIDE } from "./gslides/requests.ts";
 import { buildPptx } from "./pptx/build.ts";
 import { formatStatus, inspect, install, REQUIRED_NODE_MAJOR, SetupError, statusExitCode } from "./setup/setup.ts";
 
@@ -22,6 +25,8 @@ interface CommandArgs {
   readonly positionals: readonly string[];
   /** --pptx-skill の値 (サブコマンド pptx だけが使う) */
   readonly pptxSkill: string | undefined;
+  /** --recreate-all を指定したか (サブコマンド requests だけが使う) */
+  readonly recreateAll: boolean;
 }
 
 interface Command {
@@ -36,7 +41,11 @@ class UsageError extends Error {
 }
 
 /** 位置で決まる引数の数と、使えないオプションを検査する */
-function expectArgs(args: CommandArgs, names: readonly string[], allowPptxSkill = false): void {
+function expectArgs(
+  args: CommandArgs,
+  names: readonly string[],
+  allow: { pptxSkill?: boolean; recreateAll?: boolean } = {},
+): void {
   if (args.positionals.length !== names.length) {
     throw new UsageError(
       names.length === 0
@@ -44,8 +53,11 @@ function expectArgs(args: CommandArgs, names: readonly string[], allowPptxSkill 
         : `引数 ${names.join(" ")} を指定する (渡された引数の数: ${String(args.positionals.length)})`,
     );
   }
-  if (!allowPptxSkill && args.pptxSkill !== undefined) {
+  if (allow.pptxSkill !== true && args.pptxSkill !== undefined) {
     throw new UsageError("--pptx-skill は、サブコマンド pptx だけで使う");
+  }
+  if (allow.recreateAll !== true && args.recreateAll) {
+    throw new UsageError("--recreate-all は、サブコマンド requests だけで使う");
   }
 }
 
@@ -209,7 +221,7 @@ ${CHECK_OUTPUT}
      validate.py を実行できないか、0 と 1 以外の終了コードで終了した
 `,
     run: async (args) => {
-      expectArgs(args, ["<資料のディレクトリ>"], true);
+      expectArgs(args, ["<資料のディレクトリ>"], { pptxSkill: true });
       const [deckDir = ""] = args.positionals;
       if (args.pptxSkill === undefined || args.pptxSkill === "") {
         throw new UsageError("--pptx-skill <pptx のスキルのディレクトリ> を指定する");
@@ -223,6 +235,76 @@ ${CHECK_OUTPUT}
       if (!report.validate.ok) lines.push("validate.py が形式の誤りを見つけた");
       process.stdout.write(`${lines.join("\n")}\n`);
       return report.validate.ok ? 0 : 1;
+    },
+  },
+  requests: {
+    summary: "check に合格したときだけ、build/presentation.json と比べて、Google スライドの指示のファイルを書く",
+    help: `${USAGE_PREFIX} requests <資料のディレクトリ> [--recreate-all]
+
+サブコマンド check と同じ検査をし、指摘が無いときだけ、Google スライドの資料の読み込みの結果 build/presentation.json と比べて、
+Google スライドの API のメソッド presentations.batchUpdate に渡す指示 (requests の配列) のファイルを build/ に書く。
+Google スライドには書き込まない。指示を送るのは、Claude がコネクタで行う。
+引数を確認した後、ほかの確認より前に、前に書いた指示のファイル (build/requests-<番号>.json と build/requests-notes-<番号>.json) を消す。
+check の検査の内容と順序:
+${CHECK_STEPS}
+check の検査に加えて、図形が ${String(MAX_OBJECTS_PER_SLIDE)} 個を超えるスライドを指摘する (題名・一言と、円などの中の文字の箱を含めて数える)。
+
+読み込みで指定する項目 (Google スライドのコネクタで資料を読み込むときの fields):
+  ${PRESENTATION_FIELDS}
+読み込みの結果は、加工せずに build/presentation.json に書く。期待する形:
+${indent(PRESENTATION_SHAPE)}
+
+作業の決め方:
+  スライドの ID は sd_<キー>_<ハッシュ値>。ハッシュ値は、題名・一言・図の要素とテーマのフォントから求め、
+  位置と発表者ノートを含めない。資料のスライドの ID と構成案のキーを比べ、キーごとに次のどれかにする。
+    作る      資料にそのキーのスライドが無い。構成案で 1 つ前のキーのスライドの後ろ (キーの無いスライドが続けば、その後ろ) に作る
+    作り直す  ハッシュ値が違う。新しい ID で同じ位置に作り、古いスライドを消す
+    そのまま  ハッシュ値が同じ
+  資料にあって構成案に無いキーのスライドは消す。キーの無いスライド (ID が sd_<キー>_<ハッシュ値> の形でない) には触れず、
+  直前のキーのあるスライドと一緒に動かす。資料のキーのスライドの順序が構成案と違えば、並べ替える。
+  読み込んだスライドが、キーの形でない ID の 1 枚だけなら、新しく作った資料として、そのスライドを消す。
+  マスターの配色がテーマの 12 色と違えば、そのマスターの配色を変える。
+  発表者ノートは、「そのまま」のキーのうち、ノートの欄の文 (末尾の改行を除く) が構成案と違うものだけ入れ直す。
+  作る・作り直すスライドのノートは、指示を送った後に資料を再度読み込み、もう一度 requests を実行すると作られる。
+
+指示のファイル:
+  build/requests-<番号>.json        スライドの指示。最初のファイルに、配色・消す・並べ替える指示を入れる
+  build/requests-notes-<番号>.json  ノートの指示
+  どのファイルも、${String(MAX_FILE_CHARS)} 字以下になるように分ける (1 枚のスライドで超えるときは、その 1 枚だけのファイルにする)。
+  作り直しの、作る指示と古いスライドを消す指示は、同じファイルに入る。
+  ファイルに資料の版の ID (revisionId) は書かない。送るときは、送る直前に読み込んだ資料の revisionId を
+  writeControl.requiredRevisionId に付ける。スキル publish は、資料を読み込んで build/presentation.json に書き、
+  requests を実行して、先頭のファイルだけを送る、を、送るファイルが無くなるまで繰り返す。
+
+${CACHE_DIR_HELP}
+
+引数:
+  <資料のディレクトリ>  outline.md と deck.ts と build/presentation.json があるディレクトリ
+  --recreate-all        ハッシュ値が同じスライドも作り直す。構成案に記録したプラグインの版が今の版と違い、
+                        利用者がすべてのスライドを作り直すことを選んだときに指定する。ID が同じスライドは、
+                        古いスライドを消してから、同じ ID で同じ位置に作る
+  --help (-h) でこの説明を示す。
+
+出力 (標準出力):
+  check に指摘があれば、check と同じ出力:
+${CHECK_OUTPUT}
+  指摘が無ければ、キーごとの作業 (作る・作り直すは ID も示す)、消すスライド、最初からあるスライドを消すか、
+  キーの無いスライド、並べ替えの回数、配色を変えるマスター、ノートを入れ直すキーと、
+  書いた指示のファイルのパス・指示の数・字数を、送る順に示す。送る指示が無ければ「送る指示は無い」。
+  実行の誤りは、標準エラー出力に理由を示す。
+
+終了コード:
+  0  指示のファイルを書いた (送る指示が無く、ファイルを書かなかったときを含む)
+  1  check の指摘がある、または図形が多すぎるスライドがある (指示のファイルを書かない)
+  2  実行の誤り。check の終了コード 2 の条件に加えて、次のどれか。build/presentation.json が無い、JSON として読めない、
+     期待する形でない (場所と期待する形を示す)。資料に同じキーのスライドが 2 枚ある
+`,
+    run: async (args) => {
+      expectArgs(args, ["<資料のディレクトリ>"], { recreateAll: true });
+      const [deckDir = ""] = args.positionals;
+      const report = await buildRequests(deckDir, { recreateAll: args.recreateAll });
+      process.stdout.write(formatRequestsReport(report));
+      return report.plan === null ? 1 : 0;
     },
   },
 };
@@ -259,16 +341,22 @@ async function main(argv: readonly string[]): Promise<number> {
   let help: boolean;
   let positionals: string[];
   let pptxSkill: string | undefined;
+  let recreateAll: boolean;
   try {
     const parsed = parseArgs({
       args: [...argv],
-      options: { help: { type: "boolean", short: "h" }, "pptx-skill": { type: "string" } },
+      options: {
+        help: { type: "boolean", short: "h" },
+        "pptx-skill": { type: "string" },
+        "recreate-all": { type: "boolean" },
+      },
       allowPositionals: true,
       strict: true,
     });
     help = parsed.values.help ?? false;
     positionals = parsed.positionals;
     pptxSkill = parsed.values["pptx-skill"];
+    recreateAll = parsed.values["recreate-all"] ?? false;
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n\n${TOP_HELP}`);
     return 2;
@@ -289,7 +377,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   try {
-    return await command.run({ positionals: found.rest, pptxSkill });
+    return await command.run({ positionals: found.rest, pptxSkill, recreateAll });
   } catch (e) {
     if (e instanceof UsageError) {
       process.stderr.write(`${e.message}\n\n${command.help}`);
