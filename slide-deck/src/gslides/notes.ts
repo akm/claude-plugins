@@ -31,10 +31,13 @@ export function notesChanges(slides: readonly Slide[], keys: readonly KeyPlan[],
     const slide = slides[i];
     const read = byId.get(k.newId);
     if (k.action !== "keep" || slide === undefined || read === undefined) return;
-    if (normalize(read.notesText) === slide.notes) return;
+    const current = normalize(read.notesText);
+    if (current === slide.notes) return;
     const requests: Request[] = [];
-    // 欄に文があれば、消してから入れる。空の欄の文を消す指示は失敗するので、空なら消さない (計画の KTD10)
-    if (read.notesText !== null) {
+    // 欄に文があれば、消してから入れる。空の欄の文を消す指示は失敗するので、空なら消さない (計画の KTD10)。
+    // 空かどうかは、text の有無ではなく、末尾の改行を除いた文で決める。text があっても、文を持たない
+    // (段落の始まりだけか、改行だけの) 欄があるため
+    if (current !== "") {
       requests.push({ deleteText: { objectId: read.notesObjectId, textRange: { type: "ALL" } } });
     }
     if (slide.notes !== "") {

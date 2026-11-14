@@ -650,6 +650,32 @@ describe("ノートの指示", () => {
     assert.deepEqual(notesChanges(slides, plan({ ...deck, slides }, same).keys, same), []);
   });
 
+  test("ノートの欄に text があっても文を持たない (段落の始まりだけか、改行だけの) ときは、消す指示を作らずに入れる", () => {
+    const deck = sample();
+    const [a] = deck.slides;
+    if (a === undefined) assert.fail();
+    const element = (text: unknown): unknown => ({
+      revisionId: "rev",
+      masters: [{ objectId: "m", pageProperties: { colorScheme: { colors: [] } } }],
+      slides: [
+        {
+          objectId: idOf(a, deck.theme),
+          slideProperties: {
+            notesPage: { notesProperties: { speakerNotesObjectId: "n0" }, pageElements: [{ objectId: "n0", shape: { text } }] },
+          },
+        },
+      ],
+    });
+    for (const text of [{ textElements: [{}] }, { textElements: [{}, { textRun: { content: "\n" } }] }]) {
+      const r = parsePresentation(element(text));
+      if (!r.ok) assert.fail(r.errors.join("\n"));
+      const one: Slide[] = [a];
+      assert.deepEqual(notesChanges(one, plan({ ...deck, slides: one }, r.presentation).keys, r.presentation), [
+        { key: a.key, requests: [{ insertText: { objectId: "n0", insertionIndex: 0, text: a.notes } }] },
+      ]);
+    }
+  });
+
   test("ノートの指示は、字数の上限以下のファイルに分け、1 枚のスライドの指示は分けない", () => {
     const changes = Array.from({ length: 5 }, (_, i) => ({
       key: `k${String(i)}`,

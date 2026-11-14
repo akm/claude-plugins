@@ -46,7 +46,8 @@ export interface PresentationMaster {
 
 /**
  * 読み込んだスライド。notesText はノートの欄の文 (textRun の content をつないだもの。Google スライドは末尾に改行を付ける)。
- * 欄が空 (要素に text が無い) なら null。空の欄の文を消す指示は失敗するので、空かどうかを区別する (計画の KTD10)
+ * 要素に text が無ければ null。text があっても文を持たない (段落の始まりだけか、改行だけの) ことがあるので、
+ * 欄が空かどうかは、この値ではなく末尾の改行を除いた文で決める (ファイル src/gslides/notes.ts。計画の KTD10)
  */
 export interface PresentationSlide {
   objectId: string;
