@@ -9,7 +9,7 @@
 
 import re
 
-from issue_practice import bodies, checkboxes, gh, mergeplan, records, refs
+from issue_practice import bodies, checkboxes, gh, mergeplan, records, refs, releaseplan
 
 ROLES = ("working", "managing", "self-managing")
 COMMON_HEADING = "すべての作業 Issue に共通するクローズ条件"
@@ -389,4 +389,120 @@ def dependents_resolve(ref):
             if gh.failed(r):
                 return {**result, "status": "gh_failed", "gh_error": r}
             result["done"].append({"number": dependent["number"], "action": action["action"], "url": dependent["url"]})
+    return result
+
+
+# --- リリース Issue の閉じる前の検査 (R48) -------------------------------------------------------------------------
+
+# どのリリースにも共通する条件 (文書 skills/release-issue-plan/references/release-issue.md の節「項目「完了の条件」」)。
+# 1 と 4 は GitHub の状態から判定できないので、スキル release-close が利用者に確認し、記録のコメント close-check に書く
+RELEASE_COMMON = (
+    "行うと決めたリリースの手順を、最後まで行った",
+    "リリースに PR が要るなら、その PR がマージされた",
+    "リリースマイルストーンを設定した Issue が、すべて閉じている",
+    "実行の中で見つかった、このリリースでは直さない問題を、Issue に切り出した",
+)
+RELEASE_MANUAL = (RELEASE_COMMON[0], RELEASE_COMMON[3])
+DONE_SECTION = "完了の条件"
+RELEASE_PR_FIELDS = PR_FIELDS + ",body"
+
+
+def fetch_milestone_issues(repo, number):
+    """マイルストーンを設定した Issue (PR を除く。開いたものも閉じたものも) を読む。REST の issue の配列を返す。"""
+    result = gh.run(["api", f"repos/{repo}/issues?milestone={number}&state=all&per_page=100", "--paginate", "--slurp"],
+                    expect_json=True)
+    if gh.failed(result):
+        return None, result
+    pages = result["json"]
+    if not isinstance(pages, list) or not all(isinstance(p, list) for p in pages):
+        return None, {**result, "json_error": "応答がページの配列 (--slurp の形) ではない"}
+    return [i for page in pages for i in page if isinstance(i, dict) and "pull_request" not in i], None
+
+
+def release_check(ref):
+    """リリース Issue を閉じる前の検査 (R48)。読むだけ。
+
+    返り値は {"status", "issue", "url", "state", "satisfied", "unsatisfied" ({"kind", "message", "line", "url"} の配列。kind は
+    draft・release-start・pr・pr-link・milestone-issue・checkbox のどれか), "evidence", "manual" (利用者に確認する共通の条件),
+    "milestone" ({number, title, url, state}), "prs" ({url, state, merged, base} の配列), "issues_total", "issues_open",
+    "checkboxes", "close_check" (記録のコメント close-check result=pass の URL か None), "blocking", "errors"}。
+    """
+    result = {"status": "ok", "issue": ref["key"], "url": None, "state": None, "satisfied": False, "unsatisfied": [],
+              "evidence": [], "manual": list(RELEASE_MANUAL), "milestone": None, "prs": [], "issues_total": None,
+              "issues_open": [], "checkboxes": None, "close_check": None, "blocking": [], "errors": []}
+    repo = f"{ref['owner']}/{ref['repo']}"
+    try:
+        issue = _need(bodies.fetch_issue(ref))
+        result.update(url=issue["url"], state=issue["state"])
+        meta = _need(fetch_meta(ref))
+        result["blocking"] = open_blocking(meta)
+        title = releaseplan.parse_release_title(issue["title"])
+        if "/pull/" in (issue["url"] or "") or title is None or title["number"] != issue["number"]:
+            result["errors"].append(f"題名が、リリース Issue の形ではない: {issue['title']!r}")
+            result["status"] = "unsatisfied"
+            return result
+        listed = _need(records.list_records(ref))
+        kinds = {r["kind"] for r in listed["records"]}
+        if listed["invalid"]:
+            result["errors"].append("1 行目の形が違う記録のコメントがある")
+        if title["draft"]:
+            _unsatisfied(result, "draft", f"題名に {releaseplan.DRAFT_MARK} がある (計画が承認されていない)")
+        elif "draft-removed" not in kinds:
+            result["errors"].append(f"題名に {releaseplan.DRAFT_MARK} が無いのに、記録のコメント draft-removed が無い (R8)")
+        if "release-start" not in kinds:
+            _unsatisfied(result, "release-start", "記録のコメント release-start が無い (実行を始めていない)")
+        passed = [r for r in listed["records"] if r["kind"] == "close-check" and r["values"].get("result") == "pass"]
+        result["close_check"] = passed[-1]["url"] if passed else None
+        milestones = _need(releaseplan.fetch_open_milestones(repo, state="all"))
+        found = [m for m in milestones if refs.parse_milestone_name(m.get("title")).get("number") == issue["number"]
+                 and refs.parse_milestone_name(m.get("title")).get("target") == title["target"]]
+        if len(found) != 1:
+            result["errors"].append(f"リリースマイルストーンが {len(found)} つある")
+        else:
+            milestone = found[0]
+            result["milestone"] = {"number": milestone.get("number"), "title": milestone.get("title"),
+                                   "url": milestone.get("html_url"), "state": milestone.get("state")}
+            result["errors"] += releaseplan.check_links(issue, milestone)
+            items = _need(fetch_milestone_issues(repo, milestone.get("number")))
+            result["issues_total"] = len(items)
+            for item in items:
+                if item.get("state") != "closed":
+                    result["issues_open"].append({"number": item.get("number"), "url": item.get("html_url"),
+                                                  "title": item.get("title")})
+                    _unsatisfied(result, "milestone-issue", f"マイルストーンの Issue #{item.get('number')} が閉じていない",
+                                 url=item.get("html_url"))
+        for url in releaseplan.references(issue["body"])["prs"]:
+            pr = refs.parse_ref(url)
+            if "error" in pr or pr["kind"] != "pull":
+                result["errors"].append(f"節「参照」の PR の URL が PR の URL ではない: {url!r}")
+                continue
+            data = gh.run(["pr", "view", pr["url"], "--json", RELEASE_PR_FIELDS], expect_json=True)
+            if gh.failed(data):
+                raise _GhFailed(data)
+            data = data["json"] or {}
+            merged = pr_merged(data)
+            result["prs"].append({"url": data.get("url"), "state": data.get("state"), "merged": merged,
+                                  "base": data.get("baseRefName")})
+            if not merged:
+                _unsatisfied(result, "pr", f"PR がマージされていない (状態: {data.get('state')})", url=data.get("url"))
+            else:
+                result["evidence"].append(data.get("url"))
+            if issue["url"] not in (data.get("body") or ""):
+                _unsatisfied(result, "pr-link", "PR の本文に、リリース Issue の URL が無い (R47)", url=data.get("url"))
+        section = bodies.find_section(issue["body"], DONE_SECTION)
+        if "error" in section:
+            result["errors"].append(f"本文の{section['error']}")
+        else:
+            items = checkboxes.parse_lines(section["lines"])
+            for item in items:
+                if item["state"] in checkboxes.SATISFIED:
+                    result["evidence"].append(item["evidence"] or item["carved_out"])
+                else:
+                    _unsatisfied(result, "checkbox", f"{item['state']}: {item['text']}", line=item["line"])
+            result["checkboxes"] = checkboxes.summarize(items)
+    except _GhFailed as e:
+        return {**result, "status": "gh_failed", "gh_error": e.result}
+    result["evidence"] = list(dict.fromkeys(result["evidence"]))
+    result["satisfied"] = not result["unsatisfied"] and not result["errors"]
+    result["status"] = "ok" if result["satisfied"] else "unsatisfied"
     return result

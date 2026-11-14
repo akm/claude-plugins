@@ -12,6 +12,8 @@ import re
 from issue_practice import bodies
 
 SECTION_TITLE = "クローズ条件"
+# 見出しの節として読める節。完了の条件は、リリース Issue の本文の項目 (文書 skills/release-issue-plan/references/release-issue.md)
+SECTIONS = (SECTION_TITLE, "完了の条件")
 REGION = "closing-conditions"
 
 STATES = ("unchecked", "checked", "checked_without_evidence", "carved_out")
@@ -22,13 +24,16 @@ _LINK_RE = re.compile(r"\s*\((?P<label>根拠|切り出し): (?P<url>https://\S+
 _GROUPS = (("expected", "期待する状態"), ("verification", "確認するポイント"))
 
 
-def find(body):
-    """クローズ条件の範囲を決める。返り値は {"source" (region・section), "lines" ([(行番号, 行)])} か {"error"}。"""
-    if bodies.has_region_mark(body, REGION):
+def find(body, section=SECTION_TITLE):
+    """クローズ条件の範囲を決める。返り値は {"source" (region・section), "lines" ([(行番号, 行)])} か {"error"}。
+
+    section が SECTION_TITLE 以外 (完了の条件) なら、マークは見ずに、その見出しの節を範囲にする。
+    """
+    if section == SECTION_TITLE and bodies.has_region_mark(body, REGION):
         found = bodies.find_region(body, REGION)
         source = "region"
     else:
-        found = bodies.find_section(body, SECTION_TITLE)
+        found = bodies.find_section(body, section)
         source = "section"
     if "error" in found:
         return found
@@ -113,9 +118,9 @@ def summarize(items):
     return {"counts": counts, "unsatisfied": [item["line"] for item in items if item["state"] not in SATISFIED]}
 
 
-def parse(body):
-    """本文のクローズ条件を読む。返り値は {"source", "items", "summary"} か {"error"}。"""
-    found = find(body)
+def parse(body, section=SECTION_TITLE):
+    """本文のクローズ条件 (か section の節) を読む。返り値は {"source", "items", "summary"} か {"error"}。"""
+    found = find(body, section)
     if "error" in found:
         return found
     items = parse_lines(found["lines"])
@@ -126,7 +131,7 @@ _CHECKBOX_RE = re.compile(r"^(?P<head>[ \t]*[-*+] \[)(?P<mark>[ xX])(?P<tail>\] 
 _URL_RE = re.compile(r"^https://\S+$")
 
 
-def check_line(body, line, evidence=None, carved_out=None):
+def check_line(body, line, evidence=None, carved_out=None, section=SECTION_TITLE):
     """本文の line 行目 (1 から数える) のチェックボックスにチェックを入れ、末尾に `(根拠: <URL>)` か `(切り出し: <URL>)` を足す。
 
     evidence と carved_out のどちらか 1 つを渡す。行は節「クローズ条件」の範囲 (parse と同じ決め方) の項目であること。
@@ -138,12 +143,12 @@ def check_line(body, line, evidence=None, carved_out=None):
     label, url = ("根拠", evidence) if evidence is not None else ("切り出し", carved_out)
     if not _URL_RE.match(url or ""):
         return {"error": f"{label}のリンクは https:// で始まる URL にする: {url!r}"}
-    parsed = parse(body)
+    parsed = parse(body, section)
     if "error" in parsed:
         return parsed
     item = next((i for i in parsed["items"] if i["line"] == line), None)
     if item is None:
-        return {"error": f"行 {line} は、節「{SECTION_TITLE}」のチェックボックスの項目ではない"}
+        return {"error": f"行 {line} は、節「{section}」のチェックボックスの項目ではない"}
     current = item["evidence"] or item["carved_out"]
     current_label = "根拠" if item["evidence"] else "切り出し"
     if current and (current_label, current) != (label, url):
@@ -160,5 +165,5 @@ def check_line(body, line, evidence=None, carved_out=None):
         return {"body": body, "changed": False, "item": item}
     lines[line - 1] = new_text + cr
     new_body = "\n".join(lines)
-    new_item = next(i for i in parse(new_body)["items"] if i["line"] == line)
+    new_item = next(i for i in parse(new_body, section)["items"] if i["line"] == line)
     return {"body": new_body, "changed": True, "item": new_item}

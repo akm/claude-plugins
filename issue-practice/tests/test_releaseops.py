@@ -468,6 +468,77 @@ class IssuePlanTest(ReleaseOpsCase):
         self.assertEqual(self.writes(), [])
 
 
+class CloseTest(ReleaseOpsCase):
+
+    def setUp(self):
+        super().setUp()
+        self.r, self.m = self.released("絞り込み", done=True)
+        self.url = self.gh.url(self.r)
+        self.pr = self.gh.add_pr(body=f"リリース Issue: {self.url}")
+        self.gh.issues[self.r]["body"] += (f"- PR: {self.gh.url(self.pr, 'pull')}\n\n## 完了の条件\n\n"
+                                           "- [x] 本番で一覧が表示される (根拠: https://github.com/o/r/issues/1#issuecomment-9)\n")
+        self.gh.add_comment(self.r, "issue-practice: draft-removed date=2026-11-10\n\n承認")
+        self.gh.add_comment(self.r, "issue-practice: release-start\n\n始めた")
+        self.work = self.gh.add_issue("作業", milestone=self.m, state="CLOSED")
+        self.ref = releaseplan.refs.parse_ref(self.url)
+
+    def test_satisfied_and_closes_both(self):
+        shown = releaseops.close_plan(self.ref)
+        self.assertEqual(shown["status"], "ok", (shown["unsatisfied"], shown["errors"]))
+        self.assertEqual(shown["issues_total"], 1)
+        self.assertEqual([a["action"] for a in shown["actions"]], ["record-close-check", "close-release", "close-milestone"])
+        self.assertEqual(self.writes(), [])
+        result = releaseops.close_apply(self.ref, "手順はすべて行った (実行の記録: https://github.com/o/r/pull/9#issuecomment-1)。"
+                                                  "切り出した問題は無い。")
+        self.assertEqual(result["status"], "ok", result["errors"])
+        self.assertEqual(self.gh.issues[self.r]["state"], "CLOSED")
+        self.assertEqual(self.gh.milestones[self.m]["state"], "closed")
+        record = self.gh.comments[self.r][-1]["body"]
+        self.assertTrue(record.startswith("issue-practice: close-check result=pass\n"), record)
+        self.assertIn("## 会話で確認したこと\n\n手順はすべて行った", record)
+
+    def test_retry_after_only_issue_closed(self):
+        self.gh.fail_when = lambda args: args[0] == "api" and "state=closed" in args
+        self.assertEqual(releaseops.close_apply(self.ref, "確認した")["status"], "gh_failed")
+        self.assertEqual((self.gh.issues[self.r]["state"], self.gh.milestones[self.m]["state"]), ("CLOSED", "open"))
+        result = releaseops.close_apply(self.ref, "")
+        self.assertEqual(result["status"], "ok", result["errors"])
+        self.assertEqual([d["action"] for d in result["done"]], ["close-milestone"], "残りだけを閉じる")
+
+    def test_unsatisfied(self):
+        self.gh.add_issue("残り", milestone=self.m)
+        self.gh.prs[self.pr]["state"] = "OPEN"
+        self.gh.prs[self.pr]["body"] = "本文"
+        self.gh.issues[self.r]["body"] = self.gh.issues[self.r]["body"].replace("- [x] 本番で一覧が表示される (根拠: https://github.com/o/r/issues/1#issuecomment-9)",
+                                                                              "- [ ] 本番で一覧が表示される")
+        result = releaseops.close_apply(self.ref, "確認した")
+        self.assertEqual(result["status"], "unsatisfied")
+        self.assertEqual(sorted(u["kind"] for u in result["unsatisfied"]), ["checkbox", "milestone-issue", "pr", "pr-link"])
+        self.assertEqual(self.writes(), [], "満たさなければ何も書かない")
+
+    def test_zero_issues_and_no_pr(self):
+        self.gh.issues[self.work]["milestone"] = None
+        self.gh.issues[self.r]["body"] = self.gh.issues[self.r]["body"].replace(f"- PR: {self.gh.url(self.pr, 'pull')}\n", "")
+        result = releaseops.close_plan(self.ref)
+        self.assertEqual(result["status"], "ok", (result["unsatisfied"], result["errors"]))
+        self.assertEqual((result["issues_total"], result["prs"]), (0, []), "含める Issue が 0 件であることを返す")
+
+    def test_check_done_condition_with_cli_function(self):
+        """リリース Issue の項目「完了の条件」にも、checkboxes check と同じ形でチェックと根拠を入れられる。"""
+        from issue_practice import checkboxes
+        body = "## 参照\n\nx\n\n## 完了の条件\n\n- [ ] 告知した\n"
+        parsed = checkboxes.parse(body, "完了の条件")
+        self.assertEqual([i["line"] for i in parsed["items"]], [7])
+        checked = checkboxes.check_line(body, 7, evidence="https://github.com/o/r/issues/1#issuecomment-2", section="完了の条件")
+        self.assertIn("- [x] 告知した (根拠: https://github.com/o/r/issues/1#issuecomment-2)", checked["body"])
+        self.assertIn("error", checkboxes.check_line(body, 7, evidence="https://x.example/a"), "クローズ条件の節は無い")
+
+    def test_notes_required(self):
+        result = releaseops.close_apply(self.ref, " ")
+        self.assertEqual(result["status"], "unsatisfied")
+        self.assertEqual(self.writes(), [])
+
+
 class CliTest(FakeGhCase):
     """入口 (issue_practice.py) の終了コード。書き込みの中身は、上のテストで関数を直接呼んで確認する。"""
 

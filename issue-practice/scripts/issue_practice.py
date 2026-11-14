@@ -25,6 +25,8 @@
   release apply <ファイル> --repo <owner/repo>   リリース計画の計画案を GitHub に書く (実行する)
   release issue-plan <ファイル>                 リリース Issue の計画案から、行う書き込みの一覧を示す (示す)
   release issue-apply <ファイル>                リリース Issue の計画案を書き、承認なら題名の [DRAFT] を外す (実行する)
+  release close-plan --issue <リリース Issue>    リリース Issue を閉じる前の検査をし、行う書き込みを示す (示す)
+  release close --issue <リリース Issue> --notes-file <ファイル>   検査を満たせば、記録を書いてリリース Issue とマイルストーンを閉じる (実行する)
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
   sessions active --issue <管理 Issue>           管理セッションと、動いている作業セッションを記録のコメントから集める
@@ -233,7 +235,7 @@ def cmd_checkboxes_list(args):
     if failure:
         _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
         return EXIT_EXTERNAL_FAILED
-    parsed = checkboxes.parse(issue["body"])
+    parsed = checkboxes.parse(issue["body"], args.section)
     payload = {"issue": ref["key"], "url": issue["url"], "sha256": issue["sha256"], "source": None, "items": [],
                "summary": None, "errors": []}
     if "error" in parsed:
@@ -242,7 +244,7 @@ def cmd_checkboxes_list(args):
         return EXIT_UNSATISFIED
     payload.update(source=parsed["source"], items=parsed["items"], summary=parsed["summary"])
     if not parsed["items"]:
-        payload["errors"] = ["節「クローズ条件」にチェックボックスが無い"]
+        payload["errors"] = [f"節「{args.section}」にチェックボックスが無い"]
     _emit(payload)
     return EXIT_UNSATISFIED if payload["errors"] or parsed["summary"]["unsatisfied"] else EXIT_OK
 
@@ -262,7 +264,8 @@ def cmd_checkboxes_check(args):
         payload["errors"] = ["本文が、読んだとき (--expect-sha256) から変わった。checkboxes list で本文を再度読み込んでからやり直す"]
         _emit(payload)
         return EXIT_UNSATISFIED
-    result = checkboxes.check_line(issue["body"], args.line, evidence=args.evidence, carved_out=args.carved_out)
+    result = checkboxes.check_line(issue["body"], args.line, evidence=args.evidence, carved_out=args.carved_out,
+                                   section=args.section)
     if "error" in result:
         payload["errors"] = [result["error"]]
         _emit(payload)
@@ -338,6 +341,24 @@ def cmd_release_issue_plan(args):
 
 def cmd_release_issue_apply(args):
     return _emit_status(releaseops.issue_apply(args.file))
+
+
+def cmd_release_close_plan(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    return _emit_status(releaseops.close_plan(ref))
+
+
+def cmd_release_close(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    with open(args.notes_file, encoding="utf-8") as f:
+        notes = f.read()
+    return _emit_status(releaseops.close_apply(ref, notes))
 
 
 # --- issues -------------------------------------------------------------------------------------------------------
@@ -694,6 +715,8 @@ def build_parser():
              "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
              _exit_help("すべての項目が checked か carved_out", "満たさない項目がある・範囲や項目が無い", "gh が失敗した"))
     _add_issue_args(p)
+    p.add_argument("--section", choices=checkboxes.SECTIONS, default=checkboxes.SECTION_TITLE,
+                   help="読む節。完了の条件はリリース Issue の本文の項目 (マークは見ずに見出しの節を読む)")
 
     g = groups.add_parser("release", help="リリース計画 Issue とリリース Issue を読む").add_subparsers(
         dest="command", required=True)
@@ -814,6 +837,39 @@ def build_parser():
              issue_output + "\n  done        行った書き込み (actions と同じ形) の配列。gh が失敗したときは、失敗する前までのもの",
              _exit_help("すべて書き込んだ (か、書き込み済みだった)", issue_unsatisfied, "gh が失敗した (done までは書き込んだ)"))
     p.add_argument("file", help="計画案のファイルのパス")
+    close_output = (
+        "  issue・url・state  リリース Issue の参照・URL・状態\n"
+        "  satisfied   検査を満たすか\n"
+        "  unsatisfied 満たさない項目 {kind, message, line, url} の配列。kind は draft ([DRAFT] がある)・release-start\n"
+        "              (実行を始めた記録が無い)・pr (PR がマージされていない)・pr-link (PR の本文にリリース Issue の URL が無い)・\n"
+        "              milestone-issue (マイルストーンの Issue が閉じていない)・checkbox (項目「完了の条件」) のどれか\n"
+        "  evidence    根拠の URL (マージされた PR・完了の条件のチェックの根拠) の配列\n"
+        "  manual      スクリプトでは判定できず、利用者に確認する共通の条件 (1 と 4) の文の配列\n"
+        "  milestone   リリースマイルストーン {number, title, url, state}\n"
+        "  prs         本文の節「参照」の PR {url, state, merged, base} の配列\n"
+        "  issues_total・issues_open  マイルストーンを設定した Issue の数 (PR を除く) と、閉じていない Issue {number, url, title}\n"
+        "  checkboxes  項目「完了の条件」のチェックボックスの {counts, unsatisfied}\n"
+        "  close_check 記録のコメント close-check result=pass の URL (無ければ null)\n"
+        "  blocking    このリリース Issue を依存先とする、開いている Issue {number, url, title, state} の配列\n"
+        "  actions     行う書き込み {step, action, url} の配列。action は record-close-check・close-release・close-milestone\n"
+        "  errors      決めた形の崩れ (題名・draft-removed の記録・マイルストーン・お互いの URL・項目「完了の条件」が無い) の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "close-plan", cmd_release_close_plan,
+             "リリース Issue を閉じる前の検査 (計画の R48 の共通の条件のうち 2・3 と、本文の項目「完了の条件」のチェックと根拠) をし、\n"
+             "行う書き込みを示す (示す)。書き込まない。共通の条件の 1・4 は判定せず、manual で返す",
+             close_output, _exit_help("検査を満たす", "満たさない項目がある・決めた形の崩れ", "gh が失敗した (検査できなかった)"))
+    _add_issue_args(p)
+    p = _add(g, "close", cmd_release_close,
+             "close-plan と同じ検査をし、満たせば書き込む (実行する)。記録のコメント close-check result=pass (本文に確認の結果と、\n"
+             "--notes-file の中身を節「会話で確認したこと」として書く) を書き、リリース Issue (completed) とリリースマイルストーンを\n"
+             "閉じる。済んだ書き込みは行わないので、片方だけ閉じた状態からやり直すと、残りだけを閉じる。--notes-file を開けない\n"
+             "ときは、例外で終了する (終了コード 1)",
+             close_output + "\n  done        行った書き込み (actions と同じ形) の配列。gh が失敗したときは、失敗する前までのもの",
+             _exit_help("書き込んだ (か、書き込み済みだった)", "満たさない項目がある・決めた形の崩れ・close-check を書くのに\n"
+                                                         "     --notes-file が空 (何も書き込まない)", "gh が失敗した (done までは書き込んだ)"))
+    _add_issue_args(p)
+    p.add_argument("--notes-file", required=True,
+                   help="利用者に確認した共通の条件 1・4 の結果と根拠の URL を書いたファイル (close-check を書き済みなら中身は使わない)")
 
     g = groups.add_parser("issues", help="計画案の節「作る Issue」から Issue を作る").add_subparsers(
         dest="command", required=True)
@@ -869,6 +925,8 @@ def build_parser():
     link.add_argument("--evidence", help="根拠の URL (テストを実行した PR・確認を記録したコメントなど)")
     link.add_argument("--carved-out", help="切り出した Issue の URL")
     p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (checkboxes list の sha256)")
+    p.add_argument("--section", choices=checkboxes.SECTIONS, default=checkboxes.SECTION_TITLE,
+                   help="項目のある節。完了の条件はリリース Issue の本文の項目 (checkboxes list と同じ値を渡す)")
     p = _add(g_checkboxes, "common", cmd_checkboxes_common,
              "管理 Issue の節「すべての作業 Issue に共通するクローズ条件」の項目と、PR マージ計画の表の開いている作業 Issue の\n"
              "共通の条件のコピーを比べる。読むだけ。項目の文と「期待する状態」「確認するポイント」の分類を、上から順に比べる",

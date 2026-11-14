@@ -1257,3 +1257,78 @@ def issue_plan(path):
 def issue_apply(path):
     """「実行する」。issue_plan と同じ確認をし、誤りが無ければ書き込む。返り値は issue_plan の辞書に {"done"} を足したもの。"""
     return _issue_plan_run(path, dry=False)
+
+
+# --- リリース Issue とリリースマイルストーンを閉じる (R48) ---------------------------------------------------------
+
+CLOSE_TEXT = "閉じる前の確認の結果。すべての条件を満たした。"
+
+
+def _close_body(check, notes):
+    prs = ", ".join(p["url"] for p in check["prs"]) or "PR は無い"
+    total = check["issues_total"]
+    issues_text = f"{total} 件。すべて閉じている" if total else "0 件 (このリリースに含める Issue は無かった)"
+    done = check["checkboxes"]
+    done_text = ("、".join(u for u in check["evidence"] if u not in {p["url"] for p in check["prs"]}) or "なし") if done else "なし"
+    lines = [CLOSE_TEXT, "",
+             f"- 共通の条件 1 ({closecheck.RELEASE_COMMON[0]}): 下の「会話で確認したこと」",
+             f"- 共通の条件 2 ({closecheck.RELEASE_COMMON[1]}): {prs}",
+             f"- 共通の条件 3 ({closecheck.RELEASE_COMMON[2]}): {issues_text}",
+             f"- 共通の条件 4 ({closecheck.RELEASE_COMMON[3]}): 下の「会話で確認したこと」",
+             f"- 項目「完了の条件」の根拠: {done_text}", "", "## 会話で確認したこと", "", notes.strip()]
+    return "\n".join(lines)
+
+
+def _close_run(ref, notes, dry):
+    check = closecheck.release_check(ref)
+    result = {**check, "actions": []}
+    if not dry:
+        result["done"] = []
+    if check["status"] != "ok":
+        return result
+    repo = f"{ref['owner']}/{ref['repo']}"
+    milestone = check["milestone"]
+
+    def write(writer):
+        if check["close_check"] is None:
+            line = records.format_line("close-check", {"result": "pass"}, where="comment")["line"]
+            body = _close_body(check, notes or "")
+            writer.act(1, "record-close-check", lambda: _comment(check["url"], f"{line}\n\n{body}\n"), url=check["url"])
+        if check["state"] == "OPEN":
+            writer.act(2, "close-release", lambda: gh.run(["issue", "close", check["url"], "--reason", "completed"], mutation=True),
+                       url=check["url"])
+        if milestone["state"] == "open":
+            writer.act(2, "close-milestone", lambda: gh.run(
+                ["api", f"repos/{repo}/milestones/{milestone['number']}", "-X", "PATCH", "-f", "state=closed"],
+                mutation=True, expect_json=True), url=milestone["url"])
+
+    writer = _Writer(dry=True)
+    write(writer)
+    result["actions"] = writer.actions
+    if dry:
+        return result
+    if check["close_check"] is None and not (notes or "").strip():
+        result["errors"].append("記録のコメント close-check に書く、会話で確認したこと (--notes-file) が空")
+        return {**result, "status": "unsatisfied"}
+    writer = _Writer(dry=False)
+    try:
+        write(writer)
+    except _GhFailed as e:
+        result["done"] = writer.done
+        return {**result, "status": "gh_failed", "gh_error": e.result}
+    result["done"] = writer.done
+    return result
+
+
+def close_plan(ref):
+    """「示す」。リリース Issue を閉じる前の検査 (closecheck.release_check) と、行う書き込みの一覧を返す。書き込まない。"""
+    return _close_run(ref, None, dry=True)
+
+
+def close_apply(ref, notes):
+    """「実行する」。検査を満たせば、記録のコメント close-check を書き、リリース Issue とリリースマイルストーンを閉じる。
+
+    notes は、利用者に確認した共通の条件 1・4 の結果 (記録のコメントの節「会話で確認したこと」に書く)。済んだ書き込みは
+    行わないので、片方だけ閉じた状態からやり直すと、残りだけを閉じる。
+    """
+    return _close_run(ref, notes, dry=False)
