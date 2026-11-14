@@ -23,6 +23,8 @@
   release show --issue <リリース Issue>          リリース Issue の状態 (題名・マイルストーン・記録・メモ・PR) を返す
   release plan <ファイル> --repo <owner/repo>    リリース計画の計画案から、行う書き込みの一覧を示す (示す)
   release apply <ファイル> --repo <owner/repo>   リリース計画の計画案を GitHub に書く (実行する)
+  release issue-plan <ファイル>                 リリース Issue の計画案から、行う書き込みの一覧を示す (示す)
+  release issue-apply <ファイル>                リリース Issue の計画案を書き、承認なら題名の [DRAFT] を外す (実行する)
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
   sessions active --issue <管理 Issue>           管理セッションと、動いている作業セッションを記録のコメントから集める
@@ -328,6 +330,14 @@ def cmd_release_apply(args):
     if repo is None:
         return EXIT_UNSATISFIED
     return _emit_status(releaseops.apply(args.file, repo))
+
+
+def cmd_release_issue_plan(args):
+    return _emit_status(releaseops.issue_plan(args.file))
+
+
+def cmd_release_issue_apply(args):
+    return _emit_status(releaseops.issue_apply(args.file))
 
 
 # --- issues -------------------------------------------------------------------------------------------------------
@@ -778,6 +788,32 @@ def build_parser():
                         "     分かったときも 3 (done までは書き込んだ)", "gh が失敗した (done までは書き込んだ)"))
     p.add_argument("file", help="計画案のファイルのパス")
     p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    issue_output = (
+        "  draft       計画案のファイル名\n"
+        "  issue       リリース Issue {number, url, title}\n"
+        "  mode        approve (計画の承認。題名に [DRAFT] がある・この計画案の draft-removed の記録がある) か\n"
+        "              change (承認の後の変更)\n"
+        "  body_state  リリース Issue の本文の状態。pending (これから書く)・applied (書き込み済み)・changed (計画案を\n"
+        "              作ったときから変わった)\n"
+        "  actions     行う書き込み {step, action, ...} の配列 (済んだものは含まない)。action は write-body・\n"
+        "              record-draft-removed・remove-draft-title (approve) か write-body・record-plan-change (change)\n"
+        "  errors      誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    issue_unsatisfied = ("計画案の形が違う・本文が変わった・マイルストーンの URL が違う・承認の後なのに節「変えたこと」が無い\n"
+                         "     など (何も書き込まない)")
+    p = _add(g, "issue-plan", cmd_release_issue_plan,
+             "リリース Issue の計画案 (書式は文書 skills/release-issue-plan/references/release-issue.md) と GitHub の今の状態から、\n"
+             "行う書き込みを示す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない",
+             issue_output, _exit_help("示せた", issue_unsatisfied, "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p = _add(g, "issue-apply", cmd_release_issue_apply,
+             "issue-plan と同じ確認をし、誤りが無ければ書き込む (実行する)。approve では、本文を書き、記録のコメント\n"
+             "draft-removed (date は書いた日) を書いて、題名の [DRAFT] を外す。change では、本文を書き、記録のコメント\n"
+             "plan-change (本文は節「変えたこと」) を書く。本文の最後の created-from の行は残す。途中で失敗したら、\n"
+             "同じ計画案でやり直せる",
+             issue_output + "\n  done        行った書き込み (actions と同じ形) の配列。gh が失敗したときは、失敗する前までのもの",
+             _exit_help("すべて書き込んだ (か、書き込み済みだった)", issue_unsatisfied, "gh が失敗した (done までは書き込んだ)"))
+    p.add_argument("file", help="計画案のファイルのパス")
 
     g = groups.add_parser("issues", help="計画案の節「作る Issue」から Issue を作る").add_subparsers(
         dest="command", required=True)

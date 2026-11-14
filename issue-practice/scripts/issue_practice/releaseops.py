@@ -28,7 +28,7 @@ import datetime
 import os
 import re
 
-from issue_practice import bodies, closecheck, draft, gh, issues, records, refs, releaseplan
+from issue_practice import bodies, checkboxes, closecheck, draft, gh, issues, records, refs, releaseplan
 
 PLAN_SECTIONS = ("対象", "リリースの順番", "Issue の入れ先", "取りやめるリリース")
 TARGET_FIELDS = ("種類", "リリース対象", "今の計画")
@@ -1055,3 +1055,222 @@ def show(ref):
         return {**out, "status": "gh_failed", "gh_error": e.result}
     out["status"] = "unsatisfied" if out["errors"] else "ok"
     return out
+
+
+# --- リリース Issue の計画 (R44〜R46) ------------------------------------------------------------------------------
+
+ISSUE_SECTIONS = ("対象", "参照", "目的", "範囲の判断", "順序", "メモの扱い", "リリースの手順", "完了の条件")
+CHANGE_SECTION = "変えたこと"
+ISSUE_TARGET_FIELD = "リリース Issue"
+STEPS_SECTION = "リリースの手順"
+DONE_SECTION = "完了の条件"
+STEPS_HEADER = ("手順", "行う / 省く", "理由")
+STEP_VALUES = ("行う", "省く")
+STEPS_DOC_LINE_RE = re.compile(r"^- 手順の文書: (?P<value>\S+)$")
+COMMIT_URL_RE = re.compile(r"^https://github\.com/[^/\s]+/[^/\s]+/blob/[0-9a-f]{40}/\S+$")
+DRAFT_REMOVED_TEXT = "利用者が {date} に計画案 {file_name} を承認した。本文に計画を書き、題名の [DRAFT] を外した。"
+CHANGE_TEXT = "計画案 {file_name} を利用者が承認し、本文の計画を書き換えた。\n\n{change}"
+
+
+def _check_steps(section, errors):
+    lines = [(n, t) for n, t in section["lines"] if t.strip()]
+    first = STEPS_DOC_LINE_RE.match(lines[0][1].strip()) if lines else None
+    if not first:
+        errors.append({"line": section["heading_line"], "message": f"節「{STEPS_SECTION}」の最初の行が「- 手順の文書: <URL か なし>」ではない"})
+        return
+    value = first.group("value")
+    rest = lines[1:]
+    if value == NONE_VALUE:
+        if not rest:
+            errors.append({"line": section["heading_line"], "message": f"手順の文書が無いときは、節「{STEPS_SECTION}」に手順を直接書く"})
+        return
+    if not COMMIT_URL_RE.match(value):
+        errors.append({"line": lines[0][0], "message": "手順の文書の URL が、コミットを指定した URL "
+                                                       "(https://github.com/<owner>/<repo>/blob/<40 桁のコミット>/<パス>) ではない"})
+    table = [(n, releaseplan._cells(t)) for n, t in rest if releaseplan._cells(t) is not None]
+    if not table or tuple(table[0][1]) != STEPS_HEADER:
+        errors.append({"line": section["heading_line"], "message": f"手順ごとの表 (見出しの行は「| {' | '.join(STEPS_HEADER)} |」) が無い"})
+        return
+    rows = table[2:]
+    if not rows:
+        errors.append({"line": table[0][0], "message": "手順ごとの表に行が無い"})
+    for number, cells in rows:
+        if len(cells) != len(STEPS_HEADER) or not cells[0] or cells[1] not in STEP_VALUES or not cells[2]:
+            errors.append({"line": number, "message": f"手順ごとの表の行は、手順・{'か'.join(STEP_VALUES)}・理由を書く"})
+
+
+def _check_done(section, errors):
+    lines = [(n, t) for n, t in section["lines"] if t.strip()]
+    if len(lines) == 1 and lines[0][1].strip() == "- " + NONE_VALUE:
+        return
+    if not checkboxes.parse_lines(section["lines"]):
+        errors.append({"line": section["heading_line"], "message": f"節「{DONE_SECTION}」は、チェックボックスか「- {NONE_VALUE}」で書く"})
+
+
+def parse_issue_plan(text, name):
+    """リリース Issue の計画案を解析する。返り値は {"file_name", "ref", "sha256", "change" (節「変えたこと」の中身か None),
+    "body" (本文に書く部分。節「参照」から最後まで), "milestone" (節「参照」のマイルストーンの URL), "prs", "errors"}。"""
+    head = draft.parse(text, name)
+    errors = list(head["errors"])
+    result = {"file_name": name, "ref": None, "sha256": None, "change": None, "body": None, "milestone": None, "prs": [],
+              "errors": errors}
+    titles = tuple(s["title"] for s in head["sections"])
+    if titles not in (ISSUE_SECTIONS, ISSUE_SECTIONS[:1] + (CHANGE_SECTION,) + ISSUE_SECTIONS[1:]):
+        errors.append({"line": None, "message": "節「元にした Issue」の後に、節「" + "」「".join(ISSUE_SECTIONS)
+                       + f"」をこの順に書く (承認の後に変えるときは、節「対象」の後に節「{CHANGE_SECTION}」)"})
+        return result
+    fields = _fields(bodies.find_section(text, "対象"), (ISSUE_TARGET_FIELD,), errors)
+    if fields:
+        line, value = fields[ISSUE_TARGET_FIELD]
+        ref = refs.parse_ref(value)
+        source = next((s for s in head["sources"] if "error" not in ref and refs.same_issue(refs.parse_ref(s["url"]), ref)), None)
+        if "error" in ref or ref["kind"] != "issue":
+            errors.append({"line": line, "message": f"項目「{ISSUE_TARGET_FIELD}」が Issue の URL ではない: {value!r}"})
+        elif source is None:
+            errors.append({"line": line, "message": f"項目「{ISSUE_TARGET_FIELD}」の Issue が、節「元にした Issue」に無い"})
+        else:
+            result.update(ref=ref, sha256=source["sha256"])
+    if CHANGE_SECTION in titles:
+        change = bodies.find_section(text, CHANGE_SECTION)
+        if not change["content"].strip():
+            errors.append({"line": change["heading_line"], "message": f"節「{CHANGE_SECTION}」が空 (何を変えたか・理由・決めた人を書く)"})
+        result["change"] = change["content"]
+    sections = {title: bodies.find_section(text, title) for title in ISSUE_SECTIONS[1:]}
+    for title, section in sections.items():
+        if not section["content"].strip():
+            errors.append({"line": section["heading_line"], "message": f"節「{title}」が空"})
+    found = references(text)
+    if not found["milestone"]:
+        errors.append({"line": sections[REFERENCE_SECTION]["heading_line"], "message": f"節「{REFERENCE_SECTION}」に「{MILESTONE_LINE}<URL>」が無い"})
+    for url in found["prs"]:
+        parsed = refs.parse_ref(url)
+        if "error" in parsed or parsed["kind"] != "pull":
+            errors.append({"line": sections[REFERENCE_SECTION]["heading_line"], "message": f"「- PR: 」の URL が PR の URL ではない: {url!r}"})
+    result.update(milestone=found["milestone"], prs=found["prs"])
+    if sections[STEPS_SECTION]["content"].strip():
+        _check_steps(sections[STEPS_SECTION], errors)
+    if sections[DONE_SECTION]["content"].strip():
+        _check_done(sections[DONE_SECTION], errors)
+    lines = bodies.split_lines(text)
+    result["body"] = "\n".join(lines[sections[REFERENCE_SECTION]["heading_line"] - 1:]).strip("\n")
+    errors.sort(key=lambda e: (e["line"] is not None, e["line"] or 0))
+    return result
+
+
+def _issue_plan_run(path, dry):
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    parsed = parse_issue_plan(text, os.path.basename(path))
+    result = {"status": "ok", "draft": parsed["file_name"], "issue": None, "mode": None, "body_state": None, "actions": [],
+              "errors": list(parsed["errors"])}
+    if not dry:
+        result["done"] = []
+    if result["errors"]:
+        return {**result, "status": "unsatisfied"}
+    ref = parsed["ref"]
+    repo = f"{ref['owner']}/{ref['repo']}"
+    writer = _Writer(dry=True)
+    errors = result["errors"]
+    try:
+        login = _need(gh.viewer_login())
+        issue = _need(bodies.fetch_issue(ref))
+        result["issue"] = {"number": issue["number"], "url": issue["url"], "title": issue["title"]}
+        title = releaseplan.parse_release_title(issue["title"])
+        if "/pull/" in (issue["url"] or "") or title is None or title["number"] != issue["number"]:
+            errors.append({"line": None, "message": f"{ref['key']} の題名が、リリース Issue の形ではない: {issue['title']!r}"})
+            return {**result, "status": "unsatisfied"}
+        if issue["state"] != "OPEN":
+            errors.append({"line": None, "message": f"{ref['key']} が閉じている"})
+        milestones = _need(releaseplan.fetch_open_milestones(repo, state="all"))
+        found = _milestones_of(milestones, issue["number"], title["target"])
+        if len(found) != 1:
+            errors.append({"line": None, "message": f"{ref['key']} のリリースマイルストーンが {len(found)} つある"})
+        elif found[0].get("html_url") != parsed["milestone"]:
+            errors.append({"line": None, "message": f"節「{REFERENCE_SECTION}」のマイルストーンの URL が、{ref['key']} のリリースマイルストーン "
+                                                    f"({found[0].get('html_url')}) と違う"})
+        elif issue["url"] not in (found[0].get("description") or ""):
+            errors.append({"line": None, "message": f"マイルストーン {found[0].get('title')!r} の説明に、リリース Issue の URL が無い"})
+        for url in parsed["prs"]:
+            pr = refs.parse_ref(url)
+            _need(closecheck.fetch_pr(pr["url"]))
+        _, listed = _comments_and_records(ref, login)
+        removed = [r for r in listed["records"] if r["kind"] == "draft-removed"]
+        mine = [r for r in removed if r["values"].get("draft") == parsed["file_name"]]
+        # この計画案の draft-removed の記録があれば、承認を書いている途中か書き終えたところ (やり直し)
+        approve = title["draft"] or bool(mine)
+        result["mode"] = "approve" if approve else "change"
+        if approve:
+            if parsed["change"] is not None:
+                errors.append({"line": None, "message": f"計画の承認の前 (題名に {releaseplan.DRAFT_MARK} がある) は、節「{CHANGE_SECTION}」を書かない"})
+            if removed and not mine:
+                errors.append({"line": None, "message": f"別の計画案の draft-removed の記録があるのに、題名に {releaseplan.DRAFT_MARK} がある (R8)"})
+        else:
+            if parsed["change"] is None:
+                errors.append({"line": None, "message": f"計画を承認した後 (題名に {releaseplan.DRAFT_MARK} が無い) に変えるときは、"
+                                                        f"節「{CHANGE_SECTION}」に何を変えたか・理由・決めた人を書く (R46)"})
+            if not removed:
+                errors.append({"line": None, "message": f"題名に {releaseplan.DRAFT_MARK} が無いのに、記録のコメント draft-removed が無い (R8)"})
+        created_from = next((line for line in reversed((issue["body"] or "").splitlines())
+                             if line.strip() and issues.created_from(line)), None)
+        new_body = parsed["body"] + (f"\n\n{created_from.strip()}" if created_from else "") + "\n"
+        if same_body(issue["body"], new_body):
+            result["body_state"] = "applied"
+        elif issue["sha256"] == parsed["sha256"]:
+            result["body_state"] = "pending"
+        else:
+            result["body_state"] = "changed"
+            errors.append({"line": None, "message": f"{ref['key']} の本文が、計画案を作ったときから変わった (計画案を直す)"})
+        if approve and not title["draft"] and result["body_state"] == "pending":
+            errors.append({"line": None, "message": f"この計画案で承認を書き終えた後に、本文が計画案と違う。承認の後に変えるときは、"
+                                                    f"新しい計画案に節「{CHANGE_SECTION}」を書く (R46)"})
+        if errors:
+            return {**result, "status": "unsatisfied"}
+        file_name = parsed["file_name"]
+
+        def write(writer):
+            if result["body_state"] == "pending":
+                writer.act(1, "write-body", lambda: bodies.write_body(issue["url"], new_body), url=issue["url"])
+            if approve:
+                if not mine:
+                    date = today().isoformat()
+                    line = records.format_line("draft-removed", {"date": date, "draft": file_name}, where="comment")["line"]
+                    text = DRAFT_REMOVED_TEXT.format(date=date, file_name=file_name)
+                    writer.act(2, "record-draft-removed", lambda: _comment(issue["url"], f"{line}\n\n{text}\n"),
+                               url=issue["url"], date=date)
+                new_title = releaseplan.release_title(issue["number"], title["subject"], title["target"], draft=False)
+                if title["draft"]:
+                    writer.act(3, "remove-draft-title", lambda: _edit(issue["url"], "--title", new_title), url=issue["url"],
+                               title=new_title)
+            elif not any(r["kind"] == "plan-change" and r["values"].get("draft") == file_name for r in listed["records"]):
+                line = records.format_line("plan-change", {"draft": file_name}, where="comment")["line"]
+                text = CHANGE_TEXT.format(file_name=file_name, change=parsed["change"].strip())
+                writer.act(2, "record-plan-change", lambda: _comment(issue["url"], f"{line}\n\n{text}\n"), url=issue["url"])
+
+        write(writer)
+        result["actions"] = writer.actions
+        if dry:
+            return result
+        writer = _Writer(dry=False)
+        write(writer)
+        result["done"] = writer.done
+        if writer.done:
+            result["body_state"] = "applied"
+    except _GhFailed as e:
+        if not dry:
+            result["done"] = writer.done
+        return {**result, "status": "gh_failed", "gh_error": e.result}
+    return result
+
+
+def issue_plan(path):
+    """「示す」。リリース Issue の計画案と GitHub の今の状態から、行う書き込みの一覧を返す。GitHub には書き込まない。
+
+    返り値は {"status", "draft", "issue" ({number, url, title}), "mode" (approve: 計画の承認・change: 承認の後の変更),
+    "body_state" (pending・applied・changed), "actions", "errors"}。
+    """
+    return _issue_plan_run(path, dry=True)
+
+
+def issue_apply(path):
+    """「実行する」。issue_plan と同じ確認をし、誤りが無ければ書き込む。返り値は issue_plan の辞書に {"done"} を足したもの。"""
+    return _issue_plan_run(path, dry=False)

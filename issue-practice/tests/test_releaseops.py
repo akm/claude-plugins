@@ -366,6 +366,108 @@ class ShowTest(ReleaseOpsCase):
         self.assertEqual(result["prs"], ["https://github.com/o/r/pull/9"])
 
 
+COMMIT = "0123456789abcdef0123456789abcdef01234567"
+ISSUE_NAME = "20261114-1300-release-issue-plan-1.md"
+
+
+def issue_draft(url, body, milestone_url, change=None, steps=None, done="- [ ] 本番で一覧が表示される"):
+    steps = steps or (f"- 手順の文書: https://github.com/o/r/blob/{COMMIT}/docs/release.md\n\n"
+                      "| 手順 | 行う / 省く | 理由 |\n| --- | --- | --- |\n| タグを打つ | 行う | 版を上げる |\n"
+                      "| 告知する | 省く | 内部向けの変更だけ |")
+    change_section = f"## 変えたこと\n\n{change}\n\n" if change else ""
+    return (f"# 計画案: リリース Issue の計画\n\n## 元にした Issue\n\n- {url} 本文の SHA-256: {bodies.body_sha256(body)}\n\n"
+            f"## 対象\n\n- リリース Issue: {url}\n\n{change_section}"
+            f"## 参照\n\n- リリースマイルストーン: {milestone_url}\n\n## 目的\n\n一覧を絞り込める。\n\n"
+            "## 範囲の判断\n\n絞り込みだけを含める。\n\n## 順序\n\n| 順 | Issue | 理由 |\n| --- | --- | --- |\n| 1 | #5 | 先に要る |\n\n"
+            "## メモの扱い\n\nメモは無い。\n\n"
+            f"## リリースの手順\n\n{steps}\n\n## 完了の条件\n\n{done}\n")
+
+
+class IssuePlanTest(ReleaseOpsCase):
+
+    def setUp(self):
+        super().setUp()
+        self.r, self.m = self.released("絞り込み")
+        self.gh.issues[self.r]["body"] += "\nissue-practice: created-from draft=20261101-1200-release-plan-next.md key=a\n"
+        self.url = self.gh.url(self.r)
+        self.ms_url = self.gh.milestones[self.m]["html_url"]
+
+    def write_issue_draft(self, **kwargs):
+        return self.write_draft(issue_draft(self.url, self.gh.issues[self.r]["body"], self.ms_url, **kwargs), name=ISSUE_NAME)
+
+    def test_approve_writes_body_record_and_title(self):
+        path = self.write_issue_draft()
+        shown = releaseops.issue_plan(path)
+        self.assertEqual(shown["status"], "ok", shown["errors"])
+        self.assertEqual((shown["mode"], shown["body_state"]), ("approve", "pending"))
+        self.assertEqual([a["action"] for a in shown["actions"]], ["write-body", "record-draft-removed", "remove-draft-title"])
+        self.assertEqual(self.writes(), [])
+        result = releaseops.issue_apply(path)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        issue = self.gh.issues[self.r]
+        self.assertEqual(issue["title"], f"🔖 リリース R{self.r} (絞り込み)")
+        self.assertTrue(issue["body"].startswith("## 参照\n\n- リリースマイルストーン: "))
+        self.assertTrue(issue["body"].rstrip().endswith("key=a"), "created-from の行を残す")
+        self.assertEqual(self.gh.comments[self.r][-1]["body"].split("\n")[0],
+                         f"issue-practice: draft-removed date=2026-11-14 draft={ISSUE_NAME}")
+        self.assertEqual(releaseops.show(releaseplan.refs.parse_ref(self.url))["errors"], [])
+        again = releaseops.issue_apply(path)
+        self.assertEqual((again["status"], again["body_state"], again["done"]), ("ok", "applied", []))
+
+    def test_retry_after_title_failed(self):
+        path = self.write_issue_draft()
+        self.gh.fail_when = lambda args: args[:2] == ["issue", "edit"] and "--title" in args
+        self.assertEqual(releaseops.issue_apply(path)["status"], "gh_failed")
+        shown = releaseops.issue_plan(path)
+        self.assertEqual(shown["status"], "ok", shown["errors"])
+        self.assertEqual([a["action"] for a in shown["actions"]], ["remove-draft-title"],
+                         "本文と draft-removed の記録は書き済みなので、題名だけを書き換える")
+
+    def test_change_after_approval(self):
+        releaseops.issue_apply(self.write_issue_draft())
+        edited = self.write_issue_draft(done="- [ ] 本番で一覧が表示される\n- [ ] 告知した")
+        self.assertEqual(releaseops.issue_plan(edited)["status"], "unsatisfied",
+                         "承認に使った計画案を直して、もう一度書くことはできない (変更の記録が残らないため)")
+        name = "20261115-1300-release-issue-plan-1.md"
+        text = issue_draft(self.url, self.gh.issues[self.r]["body"], self.ms_url, done="- [ ] 本番で一覧が表示される\n- [ ] 告知した")
+        self.assertEqual(releaseops.issue_plan(self.write_draft(text, name=name))["status"], "unsatisfied",
+                         "承認の後は節「変えたこと」が要る")
+        path = self.write_draft(issue_draft(self.url, self.gh.issues[self.r]["body"], self.ms_url,
+                                            done="- [ ] 本番で一覧が表示される\n- [ ] 告知した",
+                                            change="完了の条件に告知を足した。理由: 利用者が告知すると決めた。決めた人: 利用者"),
+                                name=name)
+        result = releaseops.issue_apply(path)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        self.assertEqual([d["action"] for d in result["done"]], ["write-body", "record-plan-change"])
+        self.assertNotIn("[DRAFT]", self.gh.issues[self.r]["title"], "承認の後の変更でも [DRAFT] を付け直さない")
+
+    def test_errors(self):
+        cases = {
+            "手順の文書がコミットの URL ではない": dict(steps="- 手順の文書: https://github.com/o/r/blob/main/docs/release.md\n\n"
+                                                    "| 手順 | 行う / 省く | 理由 |\n| --- | --- | --- |\n| a | 行う | b |"),
+            "行う / 省く 以外": dict(steps=f"- 手順の文書: https://github.com/o/r/blob/{COMMIT}/d.md\n\n"
+                                        "| 手順 | 行う / 省く | 理由 |\n| --- | --- | --- |\n| a | たぶん | b |"),
+            "手順の文書が無いのに手順が無い": dict(steps="- 手順の文書: なし"),
+            "完了の条件がチェックボックスではない": dict(done="本番で確認する"),
+        }
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                text = issue_draft(self.url, self.gh.issues[self.r]["body"], self.ms_url, **kwargs)
+                self.assertTrue(releaseops.parse_issue_plan(text, ISSUE_NAME)["errors"], name)
+        self.assertEqual(releaseops.parse_issue_plan(issue_draft(self.url, "b", self.ms_url, steps="- 手順の文書: なし\n\n1. タグを打つ",
+                                                                 done="- なし"), ISSUE_NAME)["errors"], [])
+
+    def test_state_errors(self):
+        path = self.write_draft(issue_draft(self.url, self.gh.issues[self.r]["body"], "https://github.com/o/r/milestone/99"),
+                                name=ISSUE_NAME)
+        self.assertEqual(releaseops.issue_plan(path)["status"], "unsatisfied", "マイルストーンの URL が違う")
+        path = self.write_issue_draft()
+        self.gh.issues[self.r]["body"] += "追記\n"
+        result = releaseops.issue_apply(path)
+        self.assertEqual((result["status"], result["body_state"]), ("unsatisfied", "changed"))
+        self.assertEqual(self.writes(), [])
+
+
 class CliTest(FakeGhCase):
     """入口 (issue_practice.py) の終了コード。書き込みの中身は、上のテストで関数を直接呼んで確認する。"""
 
@@ -402,6 +504,18 @@ class DocTest(unittest.TestCase):
         self.assertIn(f"`| {' | '.join(releaseops.CANCEL_HEADER)} |`", doc)
         self.assertIn(f"`{releaseplan.plan_title('YYYYMMDD')}`", doc)
         self.assertIn(f"`{releaseplan.release_title('<番号>', '主題')}`", doc)
+
+    def test_release_issue_sections(self):
+        path = os.path.join(HERE, "..", "skills", "release-issue-plan", "references", "release-issue.md")
+        with open(path, encoding="utf-8") as f:
+            doc = f.read()
+        table_text = doc.split("| 節 | 書くこと |\n| --- | --- |\n")[1].split("\n\n")[0]
+        self.assertEqual(tuple(line.split("|")[1].strip() for line in table_text.splitlines()),
+                         releaseops.ISSUE_SECTIONS[:1] + (releaseops.CHANGE_SECTION,) + releaseops.ISSUE_SECTIONS[1:])
+        self.assertIn(f"項目「{releaseops.ISSUE_TARGET_FIELD}」", table_text)
+        items = doc.split("| 項目 | 書くこと |\n| --- | --- |\n")[1].split("\n\n")[0]
+        self.assertEqual(tuple(line.split("|")[1].strip() for line in items.splitlines()), releaseops.ISSUE_SECTIONS[1:])
+        self.assertIn(f"`| {' | '.join(releaseops.STEPS_HEADER)} |`", doc)
 
 
 if __name__ == "__main__":
