@@ -134,6 +134,15 @@ class FileAnchorTest(LinksFixTestCase):
         self.assertCheckPasses()
 
 
+    def test_definitions_pointing_to_the_added_file_anchor_are_not_reported(self):
+        # 同じ実行で足したファイルのアンカーを指す、ほかのファイルの定義の行を、参照先を求められないと報告しない (A2 (#215))
+        self.write(CHILD, self.read(CHILD).replace('<a name="d-loans-design-f-overdue_notice"></a>\n\n', "", 1))
+        result = self.run_tool("links-fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.read(CHILD).startswith('<a name="d-loans-design-f-overdue_notice"></a>\n\n# 延滞の通知\n'))
+        self.assertCheckPasses()
+
+
 class ScratchTestCase(LinksFixTestCase):
     """concept.md を書き換えるテスト。concept.md の節を参照する design.md は、リンクの無い内容にしておく。"""
 

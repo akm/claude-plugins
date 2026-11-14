@@ -346,6 +346,13 @@ def fix_files(root: Path, index: Index, paths: list[str] | None, choices: list[C
         handwritten = index.file(choice.path)
         if handwritten not in targets:
             targets.append(handwritten)
+    # 先頭の行がアンカーでないファイルには、下の _FileFixer がファイルのアンカーを足す。足すアンカーの ID を先に参照先にして、
+    # 同じ実行で、ほかのファイルのそのアンカーを指す定義の行を、参照先を求められないと報告しないようにする
+    for handwritten in targets:
+        document = handwritten.document
+        first = document.first_nonblank()
+        if handwritten.id not in index.targets and not any(a.line == first for a in document.anchors):
+            index.add_file_target(handwritten)
     result = FixResult()
     outputs: dict[str, list[str]] = {}
     for handwritten in targets:

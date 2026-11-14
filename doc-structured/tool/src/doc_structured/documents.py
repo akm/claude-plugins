@@ -124,6 +124,12 @@ class Index:
                     self._by_label.setdefault(key, []).append(target)
         return list(self._by_label.get(markdown.normalize_label(label), []))
 
+    def add_file_target(self, handwritten: HandwrittenFile) -> None:
+        """手書きのファイルの ID を参照先にする。サブコマンド links-fix が、ファイルのアンカーを足すファイルについて、
+        足す前に使う (同じ実行で、ほかのファイルの定義の行の href から参照先を求められるように。A2 (#215))。"""
+        self.targets[handwritten.id] = Target(handwritten.id, handwritten.path, handwritten.parts(), f"`{handwritten.display}`")
+        self._by_label = None
+
     def file(self, path: str) -> HandwrittenFile | None:
         for handwritten in self.files:
             if handwritten.path == path:
