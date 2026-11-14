@@ -1,0 +1,163 @@
+{
+  "masters": [
+    {
+      "objectId": "simple-light-2",
+      "pageProperties": {
+        "colorScheme": {
+          "colors": [
+            {
+              "color": {},
+              "type": "DARK1"
+            },
+            {
+              "color": {
+                "blue": 1,
+                "green": 1,
+                "red": 1
+              },
+              "type": "LIGHT1"
+            },
+            {
+              "color": {
+                "blue": 0.34901962,
+                "green": 0.34901962,
+                "red": 0.34901962
+              },
+              "type": "DARK2"
+            },
+            {
+              "color": {
+                "blue": 0.93333334,
+                "green": 0.93333334,
+                "red": 0.93333334
+              },
+              "type": "LIGHT2"
+            },
+            {
+              "color": {
+                "blue": 0.95686275,
+                "green": 0.52156866,
+                "red": 0.25882354
+              },
+              "type": "ACCENT1"
+            },
+            {
+              "color": {
+                "blue": 0.12941177,
+                "green": 0.12941177,
+                "red": 0.12941177
+              },
+              "type": "ACCENT2"
+            },
+            {
+              "color": {
+                "blue": 0.6117647,
+                "green": 0.5647059,
+                "red": 0.47058824
+              },
+              "type": "ACCENT3"
+            },
+            {
+              "color": {
+                "blue": 0.2509804,
+                "green": 0.67058825,
+                "red": 1
+              },
+              "type": "ACCENT4"
+            },
+            {
+              "color": {
+                "blue": 0.654902,
+                "green": 0.5921569
+              },
+              "type": "ACCENT5"
+            },
+            {
+              "color": {
+                "blue": 0.25490198,
+                "green": 1,
+                "red": 0.93333334
+              },
+              "type": "ACCENT6"
+            },
+            {
+              "color": {
+                "blue": 0.654902,
+                "green": 0.5921569
+              },
+              "type": "HYPERLINK"
+            },
+            {
+              "color": {
+                "blue": 0.654902,
+                "green": 0.5921569
+              },
+              "type": "FOLLOWED_HYPERLINK"
+            },
+            {
+              "color": {},
+              "type": "TEXT1"
+            },
+            {
+              "color": {
+                "blue": 1,
+                "green": 1,
+                "red": 1
+              },
+              "type": "BACKGROUND1"
+            },
+            {
+              "color": {
+                "blue": 0.93333334,
+                "green": 0.93333334,
+                "red": 0.93333334
+              },
+              "type": "TEXT2"
+            },
+            {
+              "color": {
+                "blue": 0.34901962,
+                "green": 0.34901962,
+                "red": 0.34901962
+              },
+              "type": "BACKGROUND2"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "revisionId": "NgKgVfE08vT0eA",
+  "slides": [
+    {
+      "objectId": "p",
+      "slideProperties": {
+        "masterObjectId": "simple-light-2",
+        "notesPage": {
+          "notesProperties": {
+            "speakerNotesObjectId": "i3"
+          },
+          "pageElements": [
+            {
+              "objectId": "i2",
+              "shape": {
+                "placeholder": {
+                  "type": "SLIDE_IMAGE"
+                }
+              }
+            },
+            {
+              "objectId": "i3",
+              "shape": {
+                "placeholder": {
+                  "type": "BODY"
+                },
+                "shapeType": "TEXT_BOX"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

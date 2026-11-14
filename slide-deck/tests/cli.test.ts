@@ -1,4 +1,4 @@
-// 入口 src/cli.ts のサブコマンド check と pptx のテスト (計画の U5 の Test scenarios)。
+// 入口 src/cli.ts のサブコマンド check・pptx・requests のテスト (計画の U5 と U6 の Test scenarios)。
 // プラグインのディレクトリのコピー (node_modules を持たない) の入口を、一時的なキャッシュのディレクトリを指定して実行する
 // (補助はファイル tests/helpers/cache.ts)。
 
@@ -8,7 +8,9 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, write
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { FAKE_PPTX_SKILL, FAKE_PYTHON_EXIT_ENV, makeSandbox, type TestSandbox } from "./helpers/cache.ts";
-import { SPAWN_MAX_BUFFER } from "../src/setup/setup.ts";
+import { PRESENTATION_FIELDS } from "../src/gslides/presentation.ts";
+import { MAX_FILE_CHARS } from "../src/gslides/requests.ts";
+import { PLUGIN_DIR, SPAWN_MAX_BUFFER } from "../src/setup/setup.ts";
 
 let sandbox: TestSandbox;
 
@@ -366,8 +368,83 @@ describe("pptx", () => {
   });
 });
 
+describe("requests", () => {
+  const FIXTURES = join(PLUGIN_DIR, "tests", "fixtures", "gslides");
+
+  /** 資料のディレクトリの build/ に、読み込みの結果を書く */
+  function writePresentation(deck: string, fixture: string): void {
+    mkdirSync(join(deck, "build"), { recursive: true });
+    cpSync(join(FIXTURES, fixture), join(deck, "build", "presentation.json"));
+  }
+
+  test("新しく作った資料の読み込みの結果から、見本の資料を作る指示のファイルを書き、終了コード 0 になる", () => {
+    const deck = sandbox.copySample();
+    writePresentation(deck, "u11-new.json");
+    const r = runCli(["requests", deck]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const expected = JSON.parse(readFileSync(join(FIXTURES, "create.json"), "utf8")) as { files: unknown[] };
+    expected.files.forEach((file, i) => {
+      const path = join(deck, "build", `requests-${String(i + 1)}.json`);
+      assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), file);
+      assert.match(r.stdout, new RegExp(`^  ${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\(指示 \\d+ 個、\\d+ 字\\)$`, "m"));
+    });
+    assert.equal(existsSync(join(deck, "build", `requests-${String(expected.files.length + 1)}.json`)), false);
+    assert.match(r.stdout, /^ {2}read-path: 作る \(sd_read-path_[0-9a-f]{10}\)$/m);
+    assert.match(r.stdout, /^新しく作った資料の、最初からあるスライドを消す: p$/m);
+    assert.match(r.stdout, /^配色を変えるマスター: simple-light-2$/m);
+  });
+
+  test("前の実行が書いた指示のファイルは、build/presentation.json が無く終了コード 2 になるときも消し、読み込む項目を示す", () => {
+    const deck = sandbox.copySample();
+    mkdirSync(join(deck, "build"), { recursive: true });
+    const stale = [join(deck, "build", "requests-1.json"), join(deck, "build", "requests-notes-1.json")];
+    for (const f of stale) writeFileSync(f, "[]");
+    const r = runCli(["requests", deck]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /presentation\.json が無い/);
+    assert.match(r.stderr, /revisionId,masters\(objectId,pageProperties\.colorScheme\)/);
+    for (const f of stale) assert.equal(existsSync(f), false, f);
+  });
+
+  test("build/presentation.json の形が違うと、場所と期待する形を示して終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    mkdirSync(join(deck, "build"), { recursive: true });
+    writeFileSync(join(deck, "build", "presentation.json"), JSON.stringify({ revisionId: "rev", masters: [] }));
+    const r = runCli(["requests", deck]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /^ {2}masters: 空 \(マスターが 1 つ以上要る\)$/m);
+    assert.match(r.stderr, /^ {2}slides: 無い$/m);
+    assert.match(r.stderr, /^期待する形:$/m);
+  });
+
+  test("check の指摘があれば、指摘を示して終了コード 1 になり、指示のファイルを書かない", () => {
+    const deck = sandbox.copySample();
+    writePresentation(deck, "u11-new.json");
+    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
+    const r = runCli(["requests", deck]);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /@typescript-eslint\/no-explicit-any/);
+    assert.equal(existsSync(join(deck, "build", "requests-1.json")), false);
+  });
+
+  test("--recreate-all はサブコマンド requests だけで使え、ほかのサブコマンドでは終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["check", deck, "--recreate-all"]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /--recreate-all は、サブコマンド requests だけで使う/);
+  });
+});
+
 describe("--help", () => {
-  for (const name of ["check", "pptx"]) {
+  test("requests --help が、読み込みで指定する項目と、指示のファイルの字数の上限を示す", () => {
+    const r = runCli(["requests", "--help"]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.includes(PRESENTATION_FIELDS));
+    assert.match(r.stdout, /--recreate-all/);
+    assert.ok(r.stdout.includes(`${String(MAX_FILE_CHARS)} 字以下`));
+  });
+
+  for (const name of ["check", "pptx", "requests"]) {
     test(`${name} --help が、引数・出力・終了コードを示す`, () => {
       const r = runCli([name, "--help"]);
       assert.equal(r.status, 0, r.stderr);
