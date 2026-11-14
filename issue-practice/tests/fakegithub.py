@@ -1,6 +1,6 @@
 """テストで、関数 `issue_practice.gh.run` を差し替える、状態を持つ偽の GitHub。
 
-偽の `gh` (ファイル `issue-practice/tests/fake-gh`) は応答を前もって決めておく形なので、書き込みの後の状態を読み直す
+偽の `gh` (ファイル `issue-practice/tests/fake-gh`) は応答を前もって決めておく形なので、書き込みの後の状態を再度読み込む
 手順 (途中で失敗させてから、同じ計画案でやり直す) を表しにくい。この偽物は、Issue・ラベル・マイルストーン・コメントを
 メモリに持ち、リリースの書き込み (モジュール `issue_practice.releaseops` と `issue_practice.closecheck`) が使う `gh` の
 コマンドだけを解釈する。知らないコマンドは、例外 `AssertionError` で知らせる (指定の漏れを、成功した応答と取り違えないため)。

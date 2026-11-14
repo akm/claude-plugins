@@ -474,7 +474,7 @@ def _observe(parsed, repo):
 
 
 def _known_release(issue, row, state, target, errors):
-    """表の #番号 の行のリリース Issue を確かめる。返り値は {"issue", "milestone", "closed"}。"""
+    """表の #番号 の行のリリース Issue を確認する。返り値は {"issue", "milestone", "closed"}。"""
     where = f"表の行 {row['line']} の #{row['number']}"
     out = {"issue": issue, "milestone": None, "closed": issue["state"] != "OPEN"}
     title = releaseplan.parse_release_title(issue["title"])
@@ -915,7 +915,7 @@ def _resolved_dependencies(repo, open_issues):
 
 
 def _release_state(issue, target, milestones, listed, errors, where):
-    """リリース Issue の題名・マイルストーン・お互いの URL・記録を確かめる。返り値は {"draft", "running", "milestone", ...}。"""
+    """リリース Issue の題名・マイルストーン・お互いの URL・記録を確認する。返り値は {"draft", "running", "milestone", ...}。"""
     out = {"number": issue["number"], "url": issue["url"], "title": issue["title"], "state": issue["state"], "draft": None,
            "running": False, "draft_removed": None, "release_start": None, "milestone": None, "errors": []}
 

@@ -343,7 +343,7 @@ class ReviewTest(ReleaseOpsCase):
     def test_dependencies_left_after_blocker_closed(self):
         blocker = self.gh.add_issue("依存先", state="CLOSED")
         other = self.gh.add_issue("別の依存先")
-        waiting = self.gh.add_issue("待つ", body=f"## 問題\n\nx\n\n## 依存先\n\n- #{blocker} が閉じるのを待つ\n- #{other}\n")
+        waiting = self.gh.add_issue("依存先の完了待ち", body=f"## 問題\n\nx\n\n## 依存先\n\n- #{blocker} (完了待ち)\n- #{other}\n")
         self.gh.issues[waiting]["blocked_by"] = [blocker, other]
         result = releaseops.review(REPO)
         self.assertEqual([(d["number"], [r["number"] for r in d["resolved"]]) for d in result["dependencies"]],
