@@ -1,0 +1,3291 @@
+{
+ "files": [
+  [
+   {
+    "updatePageProperties": {
+     "objectId": "simple-light-2",
+     "pageProperties": {
+      "colorScheme": {
+       "colors": [
+        {
+         "type": "DARK1",
+         "color": {
+          "red": 0.12156863,
+          "green": 0.16078431,
+          "blue": 0.2
+         }
+        },
+        {
+         "type": "LIGHT1",
+         "color": {
+          "red": 1,
+          "green": 1,
+          "blue": 1
+         }
+        },
+        {
+         "type": "DARK2",
+         "color": {
+          "red": 0.32156863,
+          "green": 0.37647059,
+          "blue": 0.42745098
+         }
+        },
+        {
+         "type": "LIGHT2",
+         "color": {
+          "red": 0.94901961,
+          "green": 0.95686275,
+          "blue": 0.96862745
+         }
+        },
+        {
+         "type": "ACCENT1",
+         "color": {
+          "red": 0.05882353,
+          "green": 0.43137255,
+          "blue": 0.54901961
+         }
+        },
+        {
+         "type": "ACCENT2",
+         "color": {
+          "red": 0.05882353,
+          "green": 0.54509804,
+          "blue": 0.55294118
+         }
+        },
+        {
+         "type": "ACCENT3",
+         "color": {
+          "red": 0.10980392,
+          "green": 0.23921569,
+          "blue": 0.35294118
+         }
+        },
+        {
+         "type": "ACCENT4",
+         "color": {
+          "red": 0.18431373,
+          "green": 0.61960784,
+          "blue": 0.26666667
+         }
+        },
+        {
+         "type": "ACCENT5",
+         "color": {
+          "red": 0.85098039,
+          "green": 0.28235294,
+          "blue": 0.05882353
+         }
+        },
+        {
+         "type": "ACCENT6",
+         "color": {
+          "red": 0.94117647,
+          "green": 0.63529412,
+          "blue": 0.00784314
+         }
+        },
+        {
+         "type": "HYPERLINK",
+         "color": {
+          "red": 0.05882353,
+          "green": 0.43137255,
+          "blue": 0.54901961
+         }
+        },
+        {
+         "type": "FOLLOWED_HYPERLINK",
+         "color": {
+          "red": 0.41960784,
+          "green": 0.30980392,
+          "blue": 0.61960784
+         }
+        }
+       ]
+      }
+     },
+     "fields": "colorScheme"
+    }
+   },
+   {
+    "deleteObject": {
+     "objectId": "p"
+    }
+   },
+   {
+    "createSlide": {
+     "objectId": "sd_read-path_6a6952b508",
+     "insertionIndex": 0,
+     "slideLayoutReference": {
+      "predefinedLayout": "BLANK"
+     }
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_0",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.80416,
+       "scaleY": 0.219456,
+       "translateX": 365760,
+       "translateY": 484632,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_0",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_0",
+     "text": "読み出しの流れ"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_0",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 24,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_1",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.67056,
+       "scaleY": 0.36576,
+       "translateX": 457200,
+       "translateY": 1828800,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_1",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT1"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      },
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "shapeBackgroundFill,outline,contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_1",
+     "text": "アプリケーション"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_1",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_1",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_2",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.67056,
+       "scaleY": 0.36576,
+       "translateX": 3566160,
+       "translateY": 1828800,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_2",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT2"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      },
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "shapeBackgroundFill,outline,contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_2",
+     "text": "キャッシュ"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_2",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_2",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_3",
+     "shapeType": "CAN",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.6096,
+       "scaleY": 0.48768,
+       "translateX": 6675120,
+       "translateY": 1645920,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_3",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT3"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_4",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.61976,
+       "scaleY": 0.46736,
+       "translateX": 6659880,
+       "translateY": 1676400,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_4",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_4",
+     "text": "DB"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_read-path_6a6952b508_5",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 0,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.36576,
+       "scaleY": 1,
+       "translateX": 2468880,
+       "translateY": 2148840,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_read-path_6a6952b508_5",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "DARK2"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 1.5,
+       "unit": "PT"
+      },
+      "dashStyle": "SOLID",
+      "endArrow": "FILL_ARROW",
+      "startArrow": "NONE"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_read-path_6a6952b508_6",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 0,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.36576,
+       "scaleY": 1,
+       "translateX": 5577840,
+       "translateY": 2148840,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_read-path_6a6952b508_6",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "DARK2"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 1.5,
+       "unit": "PT"
+      },
+      "dashStyle": "DASH",
+      "endArrow": "FILL_ARROW",
+      "startArrow": "NONE"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_read-path_6a6952b508_7",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 0,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": -0.36576,
+       "scaleY": 1,
+       "translateX": 6675120,
+       "translateY": 2606040,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_read-path_6a6952b508_7",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "DARK2"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 1.5,
+       "unit": "PT"
+      },
+      "dashStyle": "DASH",
+      "endArrow": "FILL_ARROW",
+      "startArrow": "NONE"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_read-path_6a6952b508_8",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 0,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": -0.36576,
+       "scaleY": 1,
+       "translateX": 3566160,
+       "translateY": 2606040,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_read-path_6a6952b508_8",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "DARK2"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 1.5,
+       "unit": "PT"
+      },
+      "dashStyle": "SOLID",
+      "endArrow": "FILL_ARROW",
+      "startArrow": "NONE"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_9",
+     "shapeType": "ELLIPSE",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.097536,
+       "scaleY": 0.097536,
+       "translateX": 2871216,
+       "translateY": 1682496,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_9",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT1"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_10",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.158496,
+       "scaleY": 0.128016,
+       "translateX": 2779776,
+       "translateY": 1636776,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_10",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_10",
+     "text": "1"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_10",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_10",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_11",
+     "shapeType": "ELLIPSE",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.097536,
+       "scaleY": 0.097536,
+       "translateX": 5980176,
+       "translateY": 1682496,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_11",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT5"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_12",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.158496,
+       "scaleY": 0.128016,
+       "translateX": 5888736,
+       "translateY": 1636776,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_12",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_12",
+     "text": "2"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_12",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_12",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_13",
+     "shapeType": "ELLIPSE",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.097536,
+       "scaleY": 0.097536,
+       "translateX": 5980176,
+       "translateY": 2688336,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_13",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT5"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_14",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.158496,
+       "scaleY": 0.128016,
+       "translateX": 5888736,
+       "translateY": 2642616,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_14",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_14",
+     "text": "3"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_14",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_14",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_15",
+     "shapeType": "ELLIPSE",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.097536,
+       "scaleY": 0.097536,
+       "translateX": 2871216,
+       "translateY": 2688336,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_15",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT1"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_16",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.158496,
+       "scaleY": 0.128016,
+       "translateX": 2779776,
+       "translateY": 2642616,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_16",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_16",
+     "text": "4"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_16",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_16",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_17",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.80416,
+       "scaleY": 0.1524,
+       "translateX": 365760,
+       "translateY": 3429000,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_17",
+     "text": "破線の ② と ③ は、キャッシュに値が無いときだけ"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_17",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK2"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_read-path_6a6952b508_17",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_read-path_6a6952b508_18",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_read-path_6a6952b508",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.65176,
+       "scaleY": 0.158496,
+       "translateX": 365760,
+       "translateY": 4325112,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_read-path_6a6952b508_18",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_read-path_6a6952b508_18",
+     "text": "2 回目からは、DB まで読みに行かずに済む"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_read-path_6a6952b508_18",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   }
+  ],
+  [
+   {
+    "createSlide": {
+     "objectId": "sd_hit-miss_fe17e34a97",
+     "insertionIndex": 1,
+     "slideLayoutReference": {
+      "predefinedLayout": "BLANK"
+     }
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_0",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.80416,
+       "scaleY": 0.219456,
+       "translateX": 365760,
+       "translateY": 484632,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_0",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_0",
+     "text": "ヒットとミス"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_0",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 24,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_1",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.31064,
+       "scaleY": 0.97536,
+       "translateX": 457200,
+       "translateY": 1188720,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_1",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "LIGHT2"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_2",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.31064,
+       "scaleY": 0.97536,
+       "translateX": 4754880,
+       "translateY": 1188720,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_2",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "LIGHT2"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_3",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.18872,
+       "scaleY": 0.158496,
+       "translateX": 640080,
+       "translateY": 1325880,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_3",
+     "text": "ヒット"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_3",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 18,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "ACCENT4"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_4",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.18872,
+       "scaleY": 0.158496,
+       "translateX": 4937760,
+       "translateY": 1325880,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_4",
+     "text": "ミス"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 18,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "ACCENT5"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_5",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.18872,
+       "scaleY": 0.39624,
+       "translateX": 640080,
+       "translateY": 1874520,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_5",
+     "text": "キャッシュの値をそのまま返す\nDB に問い合わせない"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_5",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_5",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "spaceBelow": {
+       "magnitude": 6,
+       "unit": "PT"
+      }
+     },
+     "fields": "spaceBelow"
+    }
+   },
+   {
+    "createParagraphBullets": {
+     "objectId": "sd_hit-miss_fe17e34a97_5",
+     "textRange": {
+      "type": "ALL"
+     },
+     "bulletPreset": "BULLET_DISC_CIRCLE_SQUARE"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_5",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "indentFirstLine": {
+       "magnitude": 0,
+       "unit": "PT"
+      },
+      "indentStart": {
+       "magnitude": 16,
+       "unit": "PT"
+      }
+     },
+     "fields": "indentFirstLine,indentStart"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_6",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.18872,
+       "scaleY": 0.39624,
+       "translateX": 4937760,
+       "translateY": 1874520,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_6",
+     "text": "DB から読む\n読んだ値をキャッシュに残す"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_6",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_6",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "spaceBelow": {
+       "magnitude": 6,
+       "unit": "PT"
+      }
+     },
+     "fields": "spaceBelow"
+    }
+   },
+   {
+    "createParagraphBullets": {
+     "objectId": "sd_hit-miss_fe17e34a97_6",
+     "textRange": {
+      "type": "ALL"
+     },
+     "bulletPreset": "BULLET_DISC_CIRCLE_SQUARE"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_6",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "indentFirstLine": {
+       "magnitude": 0,
+       "unit": "PT"
+      },
+      "indentStart": {
+       "magnitude": 16,
+       "unit": "PT"
+      }
+     },
+     "fields": "indentFirstLine,indentStart"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_7",
+     "shapeType": "ELLIPSE",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.39624,
+       "scaleY": 0.24384,
+       "translateX": 1828800,
+       "translateY": 3200400,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_7",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT4"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_8",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.4064,
+       "scaleY": 0.22352,
+       "translateX": 1813560,
+       "translateY": 3230880,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_8",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_8",
+     "text": "速い"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_8",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_8",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_9",
+     "shapeType": "ELLIPSE",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.39624,
+       "scaleY": 0.24384,
+       "translateX": 6126480,
+       "translateY": 3200400,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_9",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT5"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_10",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.4064,
+       "scaleY": 0.22352,
+       "translateX": 6111240,
+       "translateY": 3230880,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_10",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_10",
+     "text": "遅い"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_10",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_10",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_hit-miss_fe17e34a97_11",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_hit-miss_fe17e34a97",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.65176,
+       "scaleY": 0.158496,
+       "translateX": 365760,
+       "translateY": 4325112,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_hit-miss_fe17e34a97_11",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_hit-miss_fe17e34a97_11",
+     "text": "ヒットの割合が高いほど、DB の負荷が下がる"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_hit-miss_fe17e34a97_11",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createSlide": {
+     "objectId": "sd_stale_5206d1f52b",
+     "insertionIndex": 2,
+     "slideLayoutReference": {
+      "predefinedLayout": "BLANK"
+     }
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_0",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.80416,
+       "scaleY": 0.219456,
+       "translateX": 365760,
+       "translateY": 484632,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_0",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_stale_5206d1f52b_0",
+     "text": "古い値が残る"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_stale_5206d1f52b_0",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 24,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_1",
+     "shapeType": "HOME_PLATE",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.9144,
+       "scaleY": 0.24384,
+       "translateX": 457200,
+       "translateY": 1463040,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_1",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT3"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_2",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.92456,
+       "scaleY": 0.22352,
+       "translateX": 441960,
+       "translateY": 1493520,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_2",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_stale_5206d1f52b_2",
+     "text": "DB の値を更新する"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_stale_5206d1f52b_2",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_stale_5206d1f52b_2",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_3",
+     "shapeType": "CHEVRON",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.9144,
+       "scaleY": 0.24384,
+       "translateX": 3108960,
+       "translateY": 1463040,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_3",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT6"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_4",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.92456,
+       "scaleY": 0.22352,
+       "translateX": 3093720,
+       "translateY": 1493520,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_4",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_stale_5206d1f52b_4",
+     "text": "キャッシュは古い値のまま"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_stale_5206d1f52b_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_stale_5206d1f52b_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_5",
+     "shapeType": "CHEVRON",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.9144,
+       "scaleY": 0.24384,
+       "translateX": 5760720,
+       "translateY": 1463040,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_5",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT5"
+        }
+       }
+      },
+      "outline": {
+       "propertyState": "NOT_RENDERED"
+      }
+     },
+     "fields": "shapeBackgroundFill,outline"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_6",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.92456,
+       "scaleY": 0.22352,
+       "translateX": 5745480,
+       "translateY": 1493520,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_6",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_stale_5206d1f52b_6",
+     "text": "古い値を返す"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_stale_5206d1f52b_6",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "LIGHT1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_stale_5206d1f52b_6",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_stale_5206d1f52b_7",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 0,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1,
+       "scaleY": -0.18288,
+       "translateX": 5852160,
+       "translateY": 2743200,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_stale_5206d1f52b_7",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT5"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 1.5,
+       "unit": "PT"
+      },
+      "dashStyle": "DASH",
+      "endArrow": "FILL_ARROW",
+      "startArrow": "NONE"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_8",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.1336,
+       "scaleY": 0.3048,
+       "translateX": 1371600,
+       "translateY": 2743200,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_8",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "LIGHT1"
+        }
+       }
+      },
+      "outline": {
+       "outlineFill": {
+        "solidFill": {
+         "color": {
+          "themeColor": "ACCENT5"
+         }
+        }
+       },
+       "weight": {
+        "magnitude": 1.5,
+        "unit": "PT"
+       },
+       "dashStyle": "DASH"
+      },
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "shapeBackgroundFill,outline,contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_stale_5206d1f52b_8",
+     "text": "期限が切れるか、消すまで、古い値が残る"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_stale_5206d1f52b_8",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_stale_5206d1f52b_8",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_stale_5206d1f52b_9",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_stale_5206d1f52b",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.65176,
+       "scaleY": 0.158496,
+       "translateX": 365760,
+       "translateY": 4325112,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_stale_5206d1f52b_9",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_stale_5206d1f52b_9",
+     "text": "DB を更新しても、キャッシュの値は自動では変わらない"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_stale_5206d1f52b_9",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   }
+  ],
+  [
+   {
+    "createSlide": {
+     "objectId": "sd_expire_271e967d07",
+     "insertionIndex": 3,
+     "slideLayoutReference": {
+      "predefinedLayout": "BLANK"
+     }
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_expire_271e967d07_0",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.80416,
+       "scaleY": 0.219456,
+       "translateX": 365760,
+       "translateY": 484632,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_expire_271e967d07_0",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_expire_271e967d07_0",
+     "text": "期限と消し方"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_0",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 24,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_expire_271e967d07_1",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.09728,
+       "scaleY": 0.48768,
+       "translateX": 457200,
+       "translateY": 1280160,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_expire_271e967d07_1",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "LIGHT2"
+        }
+       }
+      },
+      "outline": {
+       "outlineFill": {
+        "solidFill": {
+         "color": {
+          "themeColor": "ACCENT2"
+         }
+        }
+       },
+       "weight": {
+        "magnitude": 1,
+        "unit": "PT"
+       }
+      },
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "shapeBackgroundFill,outline,contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_expire_271e967d07_1",
+     "text": "有効期限\n決めた時間が過ぎたら消す"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_1",
+     "textRange": {
+      "type": "FIXED_RANGE",
+      "startIndex": 0,
+      "endIndex": 5
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 16,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_1",
+     "textRange": {
+      "type": "FIXED_RANGE",
+      "startIndex": 5,
+      "endIndex": 17
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_expire_271e967d07_1",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_expire_271e967d07_2",
+     "shapeType": "RECTANGLE",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 1.09728,
+       "scaleY": 0.48768,
+       "translateX": 5394960,
+       "translateY": 1280160,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_expire_271e967d07_2",
+     "shapeProperties": {
+      "shapeBackgroundFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "LIGHT2"
+        }
+       }
+      },
+      "outline": {
+       "outlineFill": {
+        "solidFill": {
+         "color": {
+          "themeColor": "ACCENT2"
+         }
+        }
+       },
+       "weight": {
+        "magnitude": 1,
+        "unit": "PT"
+       }
+      },
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "shapeBackgroundFill,outline,contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_expire_271e967d07_2",
+     "text": "更新するときに消す\nDB を更新したら、キャッシュの値を消す"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_2",
+     "textRange": {
+      "type": "FIXED_RANGE",
+      "startIndex": 0,
+      "endIndex": 10
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 16,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_2",
+     "textRange": {
+      "type": "FIXED_RANGE",
+      "startIndex": 10,
+      "endIndex": 30
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_expire_271e967d07_2",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_expire_271e967d07_3",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 0,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.48768,
+       "scaleY": 1,
+       "translateX": 3840480,
+       "translateY": 2011680,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_expire_271e967d07_3",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "ACCENT2"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 1.5,
+       "unit": "PT"
+      },
+      "dashStyle": "SOLID",
+      "endArrow": "FILL_ARROW",
+      "startArrow": "FILL_ARROW"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_expire_271e967d07_4",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 0.6096,
+       "scaleY": 0.13716,
+       "translateX": 3657600,
+       "translateY": 2103120,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_expire_271e967d07_4",
+     "text": "組み合わせる"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 11,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK2"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateParagraphStyle": {
+     "objectId": "sd_expire_271e967d07_4",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "alignment": "CENTER"
+     },
+     "fields": "alignment"
+    }
+   },
+   {
+    "createLine": {
+     "objectId": "sd_expire_271e967d07_5",
+     "category": "STRAIGHT",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 0,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.7432,
+       "scaleY": 1,
+       "translateX": 457200,
+       "translateY": 3200400,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateLineProperties": {
+     "objectId": "sd_expire_271e967d07_5",
+     "lineProperties": {
+      "lineFill": {
+       "solidFill": {
+        "color": {
+         "themeColor": "DARK2"
+        }
+       }
+      },
+      "weight": {
+       "magnitude": 0.75,
+       "unit": "PT"
+      },
+      "dashStyle": "SOLID",
+      "endArrow": "NONE",
+      "startArrow": "NONE"
+     },
+     "fields": "lineFill,weight,dashStyle,endArrow,startArrow"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_expire_271e967d07_6",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.80416,
+       "scaleY": 0.1524,
+       "translateX": 365760,
+       "translateY": 3337560,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_expire_271e967d07_6",
+     "text": "HTTP のキャッシュの規則: RFC 9111"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_6",
+     "textRange": {
+      "type": "FIXED_RANGE",
+      "startIndex": 0,
+      "endIndex": 16
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK2"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_6",
+     "textRange": {
+      "type": "FIXED_RANGE",
+      "startIndex": 16,
+      "endIndex": 24
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 12,
+       "unit": "PT"
+      },
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK2"
+       }
+      },
+      "link": {
+       "url": "https://www.rfc-editor.org/rfc/rfc9111"
+      }
+     },
+     "fields": "fontFamily,fontSize,foregroundColor,link"
+    }
+   },
+   {
+    "createShape": {
+     "objectId": "sd_expire_271e967d07_7",
+     "shapeType": "TEXT_BOX",
+     "elementProperties": {
+      "pageObjectId": "sd_expire_271e967d07",
+      "size": {
+       "width": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       },
+       "height": {
+        "magnitude": 3000000,
+        "unit": "EMU"
+       }
+      },
+      "transform": {
+       "scaleX": 2.65176,
+       "scaleY": 0.158496,
+       "translateX": 365760,
+       "translateY": 4325112,
+       "unit": "EMU"
+      }
+     }
+    }
+   },
+   {
+    "updateShapeProperties": {
+     "objectId": "sd_expire_271e967d07_7",
+     "shapeProperties": {
+      "contentAlignment": "MIDDLE"
+     },
+     "fields": "contentAlignment"
+    }
+   },
+   {
+    "insertText": {
+     "objectId": "sd_expire_271e967d07_7",
+     "text": "期限と消し方を組み合わせて、古い値が残る時間を短くする"
+    }
+   },
+   {
+    "updateTextStyle": {
+     "objectId": "sd_expire_271e967d07_7",
+     "textRange": {
+      "type": "ALL"
+     },
+     "style": {
+      "fontFamily": "Noto Sans JP",
+      "fontSize": {
+       "magnitude": 14,
+       "unit": "PT"
+      },
+      "bold": true,
+      "foregroundColor": {
+       "opaqueColor": {
+        "themeColor": "DARK1"
+       }
+      }
+     },
+     "fields": "fontFamily,fontSize,bold,foregroundColor"
+    }
+   }
+  ]
+ ],
+ "notes": []
+}
