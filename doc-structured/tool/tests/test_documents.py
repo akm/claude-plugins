@@ -199,7 +199,9 @@ class TargetTest(DocumentsTestCase):
             with self.subTest(target=target_id):
                 self.assertEqual(index.targets[target_id].writable_forms(), forms)
 
-    def test_form_for_omits_parents_shared_with_the_referencing_file(self):
+    def test_form_for_omits_parents_while_the_name_is_unique_in_the_domain(self):
+        # 同じドメインの参照先は、「種類 + 名前」がドメインの中で 1 つに決まるまで親を省く (A2 (#215))。
+        # ほかのドメインの参照先は、ドメインから書く
         self.write("docs/domains/02-loans/concept.md", CONCEPT)
         self.write("docs/domains/02-loans/design/overdue_notice.md", CHILD)
         index, _ = self.load()
@@ -207,18 +209,53 @@ class TargetTest(DocumentsTestCase):
         child = index.file("docs/domains/02-loans/design/overdue_notice.md").parts()
         cases = [
             (concept, "d-loans-ut-business_day", "未分類の用語「開館日」"),
-            (concept, "d-loans-m-loan-a-status", "モデル「貸出」の属性「貸出状態」"),
+            (concept, "d-loans-m-loan-a-status", "属性「貸出状態」"),
+            (concept, "d-loans-m-loan-a-status-v-on_loan", "値「貸出中」"),
             (concept, "d-catalog-m-book", "ドメイン `catalog` のモデル「図書」"),
+            (concept, "d-catalog-m-book-a-title", "ドメイン `catalog` のモデル「図書」の属性「書名」"),
             (concept, "d-loans-concept-h-return_deadline", "節「返却期限」"),
             (concept, "d-loans-concept", "ファイル `concept.md`"),
             (concept, "d-loans", "ドメイン `loans`"),
-            (concept, "d-loans-design-f-overdue_notice-h-retry", "ファイル `design/overdue_notice.md` の節「再送 `retry`」"),
-            (child, "d-loans-concept-h-return_deadline", "ファイル `concept.md` の節「返却期限」"),
+            (concept, "d-loans-design-f-overdue_notice-h-retry", "節「再送 `retry`」"),
+            (child, "d-loans-concept-h-return_deadline", "節「返却期限」"),
             (child, "d-loans-design-f-overdue_notice-h-retry", "節「再送 `retry`」"),
         ]
         for from_parts, target_id, form in cases:
             with self.subTest(from_parts=from_parts, target=target_id):
-                self.assertEqual(index.targets[target_id].form_for(from_parts), form)
+                target = index.targets[target_id]
+                self.assertEqual(target.form_for(from_parts, index.targets.values()), form)
+
+    def test_form_for_keeps_parents_when_the_name_is_shared_in_the_domain(self):
+        # 同じ見出しの節が 2 つのファイルにあると、節「返却期限」だけではどちらか分からないので、ファイルを書く
+        self.write("docs/domains/02-loans/concept.md", CONCEPT)
+        self.write(
+            "docs/domains/02-loans/design/overdue_notice.md",
+            CHILD + '\n<a name="d-loans-design-f-overdue_notice-h-return_deadline"></a>\n\n## 返却期限\n',
+        )
+        index, _ = self.load()
+        concept = index.file("docs/domains/02-loans/concept.md").parts()
+        child = index.file("docs/domains/02-loans/design/overdue_notice.md").parts()
+        cases = [
+            (concept, "d-loans-concept-h-return_deadline", "節「返却期限」"),
+            (child, "d-loans-concept-h-return_deadline", "ファイル `concept.md` の節「返却期限」"),
+            (concept, "d-loans-design-f-overdue_notice-h-return_deadline", "ファイル `design/overdue_notice.md` の節「返却期限」"),
+        ]
+        for from_parts, target_id, form in cases:
+            with self.subTest(from_parts=from_parts, target=target_id):
+                target = index.targets[target_id]
+                self.assertEqual(target.form_for(from_parts, index.targets.values()), form)
+
+    def test_form_for_ignores_the_same_name_in_other_domains(self):
+        # ほかのドメインに同じ見出しの節があっても、同じドメインの中で 1 つに決まれば親を省く
+        self.write("docs/domains/02-loans/concept.md", CONCEPT)
+        self.write(
+            "docs/domains/01-catalog/concept.md",
+            '<a name="d-catalog-concept"></a>\n\n# 蔵書の概念\n\n<a name="d-catalog-concept-h-return_deadline"></a>\n\n## 返却期限\n',
+        )
+        index, _ = self.load()
+        design = ["ドメイン `loans`", "ファイル `design.md`"]
+        target = index.targets["d-loans-concept-h-return_deadline"]
+        self.assertEqual(target.form_for(design, index.targets.values()), "節「返却期限」")
 
     def test_names_for_the_short_form(self):
         self.write("docs/domains/02-loans/concept.md", CONCEPT)

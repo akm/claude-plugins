@@ -13,6 +13,7 @@ doc-structured/rules/doc-structured-domains.md)。要点:
 """
 
 import posixpath
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -82,14 +83,28 @@ class Target:
             forms.append(names.join_parts(self.parts[i:]))
         return forms
 
-    def form_for(self, from_parts: list[str]) -> str:
+    def form_for(self, from_parts: list[str], targets: Iterable["Target"]) -> str:
         """from_parts (参照するファイルの「種類 + 名前」の並び) のファイルから最初に指す箇所に、サブコマンド links-fix が
-        書く形。参照するファイルと共通の親を省き、自分の「種類 + 名前」は略称があれば略称で書く。"""
+        書く形。自分の「種類 + 名前」は略称があれば略称で書く。
+          - ほかのドメインの参照先は、ドメインから書く (途中の親だけを省いた形は書けないため)
+          - 同じドメインの参照先は、参照するファイルと共通の親を省いたうえで、さらに先頭の親を、残りの形が
+            ドメインの中のほかの参照先 (targets のうち同じドメインのもの) の、末尾から同じ数の「種類 + 名前」の形と
+            同じにならないあいだ省く (A2 (#215))。例: 属性「貸出状態」。同じ名前の属性がほかのモデルにもあれば、
+            モデル「貸出」の属性「貸出状態」"""
         common = 0
         while common < len(self.parts) - 1 and common < len(from_parts) and self.parts[common] == from_parts[common]:
             common += 1
+        start = common
+        if common > 0:
+            others = [t.parts for t in targets if t.id != self.id and t.parts[0] == self.parts[0]]
+            start = len(self.parts) - 1
+            while start > common and any(
+                len(parts) >= len(self.parts) - start and parts[-(len(self.parts) - start) :] == self.parts[start:]
+                for parts in others
+            ):
+                start -= 1
         own = self.abbreviated if self.abbreviated is not None else self.parts[-1]
-        return names.join_parts(self.parts[common:-1] + [own])
+        return names.join_parts(self.parts[start:-1] + [own])
 
     def labels(self) -> set[str]:
         """ラベルの候補を、比べる形 (markdown.normalize_label) にしたもの。"""
