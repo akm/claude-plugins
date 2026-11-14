@@ -876,9 +876,8 @@ def apply(path, repo):
 
 # --- 見直し (R8・R37・R50) とリリース Issue の状態 -------------------------------------------------------------
 
-REFERENCE_SECTION = "参照"
-PR_LINE_RE = re.compile(r"^- PR: (?P<url>\S+)$")
-MILESTONE_LINE_RE = re.compile(r"^- リリースマイルストーン: (?P<url>\S+)$")
+REFERENCE_SECTION = releaseplan.REFERENCE_SECTION
+references = releaseplan.references
 
 
 def is_release_or_plan(title):
@@ -1009,22 +1008,6 @@ def review(repo, target=None):
         return {**out, "status": "gh_failed", "gh_error": e.result}
     out["status"] = "unsatisfied" if errors else "ok"
     return out
-
-
-def references(body):
-    """本文の節「参照」の、リリースマイルストーンの URL と PR の URL の配列。返り値は {"milestone", "prs"}。"""
-    section = bodies.find_section(body, REFERENCE_SECTION)
-    if "error" in section:
-        return {"milestone": None, "prs": []}
-    milestone, prs = None, []
-    for _, line in section["lines"]:
-        m = MILESTONE_LINE_RE.match(line.strip())
-        if m:
-            milestone = m.group("url")
-        m = PR_LINE_RE.match(line.strip())
-        if m:
-            prs.append(m.group("url"))
-    return {"milestone": milestone, "prs": prs}
 
 
 def show(ref):

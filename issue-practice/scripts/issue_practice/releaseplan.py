@@ -221,6 +221,27 @@ def check_links(issue, milestone):
     return errors
 
 
+REFERENCE_SECTION = "参照"
+_PR_LINE_RE = re.compile(r"^- PR: (?P<url>\S+)$")
+_MILESTONE_LINE_RE = re.compile(r"^- リリースマイルストーン: (?P<url>\S+)$")
+
+
+def references(body):
+    """リリース Issue の本文の節「参照」の、リリースマイルストーンの URL と PR の URL の配列。返り値は {"milestone", "prs"}。"""
+    section = bodies.find_section(body, REFERENCE_SECTION)
+    if "error" in section:
+        return {"milestone": None, "prs": []}
+    milestone, prs = None, []
+    for _, line in section["lines"]:
+        m = _MILESTONE_LINE_RE.match(line.strip())
+        if m:
+            milestone = m.group("url")
+        m = _PR_LINE_RE.match(line.strip())
+        if m:
+            prs.append(m.group("url"))
+    return {"milestone": milestone, "prs": prs}
+
+
 # --- GitHub から読む -------------------------------------------------------------------------------------------
 
 def fetch_targets(repo):
