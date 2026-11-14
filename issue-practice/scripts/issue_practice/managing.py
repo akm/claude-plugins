@@ -229,11 +229,17 @@ def _plan(path, repo):
                             "content": content}
     if issue["sha256"] == target["sha256"]:
         result["body_state"] = "pending"
+        # 「実行する」は作業 Issue を作った後に本文を組み立てる。組み立てで見つかる誤り (同じ見出しの節が複数あるなど) は
+        # 本文と計画案のクローズ条件だけで決まり、表の中身 (キーのままか番号か) によらないので、ここで見つけて作業 Issue を
+        # 作る前に誤りとして返す (#278)
+        composed = compose_checked(issue["body"], target["kind"], parsed["closing"], content)
+        if "error" in composed:
+            result["errors"].append({"line": None, "message": f"{ref['key']} の本文に書き込めない: {composed['error']}"})
     else:
         composed = None if unresolved else compose(issue["body"], target["kind"], parsed["closing"], content)
         result["body_state"] = "applied" if composed == issue["body"] else "changed"
     if result["body_state"] == "changed":
-        result["errors"].append({"line": None, "message": f"{ref['key']} の本文が、計画案を作ったときから変わった (計画案を作り直す)"})
+        result["errors"].append({"line": None, "message": f"{ref['key']} の本文が、計画案を作ったときから変わった (計画案を直す)"})
     listed, failure = records.list_records(ref)
     if failure:
         return {**result, "status": "gh_failed", "gh_error": failure}, parsed, numbers
@@ -258,6 +264,8 @@ def apply(path, repo):
 
     done は行った書き込み {"key", "action", "url"} の配列 (action は issues create の action と、write-body・record-approval)。
     gh が失敗したら、そこで止めて status を gh_failed にし、それまでの書き込みを done に入れる。
+    plan で誤りが見つかれば、何も書き込まずに status を unsatisfied にする。作業 Issue を作った後に、plan で読んだ後から
+    計画する Issue の本文が変わったと分かったときも unsatisfied にし、それまでの書き込みを done に入れる。
     """
     result, parsed, numbers = _plan(path, repo)
     result["done"] = []
@@ -289,17 +297,20 @@ def apply(path, repo):
     if failure:
         return failed(failure)
     composed = compose_checked(issue["body"], target["kind"], parsed["closing"], content)
-    if "error" in composed:
-        result["errors"].append({"line": None, "message": composed["error"]})
+    if issue["sha256"] != target["sha256"]:
+        # 本文が計画案を作ったときと違うのは、書き込み済みのときか、_plan で本文を読んだ後に本文が変わったとき
+        if "error" in composed or composed["body"] != issue["body"]:
+            result["errors"].append({"line": None, "message": f"{ref['key']} の本文が、計画案を作ったときから変わった (計画案を直す)"})
+            return {**result, "status": "unsatisfied"}
+    elif "error" in composed:
+        # _plan が同じ本文で組み立てられることを確認しているので、この分岐は実行されない
+        result["errors"].append({"line": None, "message": f"{ref['key']} の本文に書き込めない: {composed['error']}"})
         return {**result, "status": "unsatisfied"}
-    if issue["sha256"] == target["sha256"]:
+    else:
         written = bodies.write_body(issue["url"], composed["body"])
         if gh.failed(written):
             return failed(written)
         result["done"].append({"key": None, "action": "write-body", "url": issue["url"]})
-    elif composed["body"] != issue["body"]:
-        result["errors"].append({"line": None, "message": f"{ref['key']} の本文が、計画案を作ったときから変わった (計画案を作り直す)"})
-        return {**result, "status": "unsatisfied"}
     result["body_state"] = "applied"
     if not result["approval_recorded"]:
         line = records.format_line("approval", {"draft": parsed["file_name"]}, where="comment")["line"]
