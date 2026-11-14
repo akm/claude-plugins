@@ -373,7 +373,7 @@ gh-notification-dispatch/
 
 **Requirements:** R16〜R18。KD6〜KD8。KTD9, KTD10。
 
-**Dependencies:** U3 (U4 とは並行してよい)。
+**Dependencies:** U4。
 
 **Files:**
 - 作る: `gh-notification-dispatch/scripts/gh_notification_dispatch/{schedule,hook}.py`・`gh-notification-dispatch/hooks/hooks.json`
