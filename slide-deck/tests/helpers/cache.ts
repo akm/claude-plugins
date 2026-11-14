@@ -32,8 +32,8 @@ export const FAKE_APPLY_THEME_LOG_ENV = "FAKE_APPLY_THEME_LOG";
 /** 偽の bin/python の終了コードを指定する環境変数 (無ければ 0) */
 export const FAKE_PYTHON_EXIT_ENV = "FAKE_PYTHON_EXIT";
 
-// プラグインのディレクトリのうち、サブコマンド check と pptx が読むファイル
-const PLUGIN_FILES = ["src", "tsconfig.json", "package.json", "package-lock.json", "uv.lock", ".python-version"];
+// プラグインのディレクトリのうち、入口のサブコマンドが読むファイル (.claude-plugin/plugin.json は、check-outline と write-info が版を読む)
+const PLUGIN_FILES = [".claude-plugin", "src", "tsconfig.json", "package.json", "package-lock.json", "uv.lock", ".python-version"];
 
 export interface TestSandbox {
   readonly root: string;

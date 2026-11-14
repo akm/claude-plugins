@@ -5,6 +5,7 @@
 import { parseArgs } from "node:util";
 import { checkDeck, ExecutionError, formatCheckReport } from "./check/deck.ts";
 import { buildRequests, formatRequestsReport } from "./gslides/build.ts";
+import { checkOutlineFile, formatOutlineCheckReport, writeOutlineInfo } from "./outline/file.ts";
 import { PRESENTATION_FIELDS, PRESENTATION_SHAPE } from "./gslides/presentation.ts";
 import { MAX_FILE_CHARS, MAX_OBJECTS_PER_SLIDE } from "./gslides/requests.ts";
 import { buildPptx } from "./pptx/build.ts";
@@ -27,6 +28,10 @@ interface CommandArgs {
   readonly pptxSkill: string | undefined;
   /** --recreate-all を指定したか (サブコマンド requests だけが使う) */
   readonly recreateAll: boolean;
+  /** --google-slides の値 (サブコマンド write-info だけが使う) */
+  readonly googleSlides: string | undefined;
+  /** --plugin-version を指定したか (サブコマンド write-info だけが使う) */
+  readonly pluginVersion: boolean;
 }
 
 interface Command {
@@ -44,7 +49,7 @@ class UsageError extends Error {
 function expectArgs(
   args: CommandArgs,
   names: readonly string[],
-  allow: { pptxSkill?: boolean; recreateAll?: boolean } = {},
+  allow: { pptxSkill?: boolean; recreateAll?: boolean; writeInfo?: boolean } = {},
 ): void {
   if (args.positionals.length !== names.length) {
     throw new UsageError(
@@ -58,6 +63,9 @@ function expectArgs(
   }
   if (allow.recreateAll !== true && args.recreateAll) {
     throw new UsageError("--recreate-all は、サブコマンド requests だけで使う");
+  }
+  if (allow.writeInfo !== true && (args.googleSlides !== undefined || args.pluginVersion)) {
+    throw new UsageError("--google-slides と --plugin-version は、サブコマンド write-info だけで使う");
   }
 }
 
@@ -147,6 +155,43 @@ ${CACHE_DIR_HELP}
       expectArgs(args, []);
       install({ log: (line) => process.stdout.write(`${line}\n`) });
       return 0;
+    },
+  },
+  "check-outline": {
+    summary: "構成案 outline.md の書式だけを検査し、資料の情報と【提案】のスライドを示す (deck.ts とライブラリは要らない)",
+    help: `${USAGE_PREFIX} check-outline <資料のディレクトリ>
+
+資料のディレクトリの構成案 outline.md の書式だけを検査する。deck.ts と、キャッシュのディレクトリのライブラリは要らない。
+スキル outline が構成案を書いた後に、スキル publish が Google スライドの URL と slide-deck の版を読むときに使う。
+【提案】が付いたスライドは、指摘にせずに一覧を示す (採否を利用者に質問するのはスキル outline。
+【提案】が残っていると、サブコマンド check は指摘にする)。
+
+引数:
+  <資料のディレクトリ>  outline.md があるディレクトリ
+  --help (-h) でこの説明を示す。
+
+出力 (標準出力):
+  書式の誤りがあれば、「構成案 outline.md の書式の誤り:」の後に、誤りを「<行番号> 行目: <内容>」の形ですべて示す。
+  誤りが無ければ、次の行を示す。
+    構成案の書式の誤りは無い (スライド <枚数> 枚)
+    Google スライド: <URL> (資料の ID: <資料の ID>)        行が無ければ「Google スライド: 無い」
+    slide-deck の版: <構成案に書いた版> (今の版: <このプラグインの版>)  行が無ければ版の代わりに「無い」
+    固有名: <一般化する か そのまま書く>                       行が無ければ「固有名: 無い」
+    【提案】が付いたスライド (採否を利用者に質問する):        【提案】のスライドがあるときだけ。続けて字下げした
+                                                                「<行番号> 行目: <キー>: <題名>」の行を示す
+  実行の誤りは、標準エラー出力に理由を示す。
+
+終了コード:
+  0  書式の誤りが無い (【提案】のスライドがあっても 0)
+  1  書式の誤りがある
+  2  実行の誤り。資料のディレクトリか outline.md が無い。プラグインの .claude-plugin/plugin.json の版を読めない。引数が違う
+`,
+    run: (args) => {
+      expectArgs(args, ["<資料のディレクトリ>"]);
+      const [deckDir = ""] = args.positionals;
+      const report = checkOutlineFile(deckDir);
+      process.stdout.write(formatOutlineCheckReport(report));
+      return report.outline === null ? 1 : 0;
     },
   },
   check: {
@@ -307,6 +352,56 @@ ${CHECK_OUTPUT}
       return report.plan === null ? 1 : 0;
     },
   },
+  "write-info": {
+    summary: "構成案 outline.md の資料の情報に、Google スライドの URL の行と slide-deck の版の行を書き込む",
+    help: `${USAGE_PREFIX} write-info <資料のディレクトリ> [--google-slides <URL>] [--plugin-version]
+
+資料のディレクトリの構成案 outline.md の資料の情報に、Google スライドの URL の行 (- Google スライド: <URL>) と
+slide-deck の版の行 (- slide-deck の版: <版>) を書き込む。行が無ければ資料の情報の最後に 1 行を足し、あれば、その行だけを置き換える。
+書き込む行のほかは、1 文字も変えない (改行の文字と、最後の改行の有無も変えない)。
+題名の行と資料の情報の行だけを検査し、スライドの部分に書式の誤りがあっても書き込む。スキル publish は、
+空の資料を作った直後に URL を書き込むので、書き込めないと、作った資料の URL が構成案に残らないため。
+2 つの行を両方書き込むときは、両方の行を作り終えてから 1 回だけ書く (片方だけを書き込んだ状態を残さない)。
+
+引数:
+  <資料のディレクトリ>   outline.md があるディレクトリ
+  --google-slides <URL>  Google スライドの資料の URL。https://docs.google.com/presentation/d/<資料の ID> で始まる
+  --plugin-version       このプラグインの版 (プラグインの .claude-plugin/plugin.json の version) を書き込む。
+                         スキル publish は、指示をすべて送り、確認を終えた後に指定する
+  --google-slides と --plugin-version の少なくとも 1 つを指定する。--help (-h) でこの説明を示す。
+
+出力 (標準出力):
+  書き込んだら、「書き込んだ:」の後に、書き込んだ行を示す。
+  題名の行か資料の情報の行に誤りがあれば、「構成案 outline.md の資料の情報の誤り (書き込んでいない):」の後に、
+  誤りを「<行番号> 行目: <内容>」の形ですべて示す。
+  実行の誤りは、標準エラー出力に理由を示す。
+
+終了コード:
+  0  書き込んだ
+  1  題名の行か資料の情報の行に誤りがある (ファイルを変えない)
+  2  実行の誤り。資料のディレクトリか outline.md が無い。--google-slides の URL の形が違う。
+     プラグインの .claude-plugin/plugin.json の版を読めない。--google-slides と --plugin-version のどちらも無い。引数が違う
+`,
+    run: (args) => {
+      expectArgs(args, ["<資料のディレクトリ>"], { writeInfo: true });
+      const [deckDir = ""] = args.positionals;
+      if (args.googleSlides === undefined && !args.pluginVersion) {
+        throw new UsageError("--google-slides <URL> と --plugin-version の少なくとも 1 つを指定する");
+      }
+      const report = writeOutlineInfo(deckDir, {
+        ...(args.googleSlides === undefined ? {} : { googleSlides: args.googleSlides }),
+        pluginVersion: args.pluginVersion,
+      });
+      if (!report.ok) {
+        process.stdout.write(
+          `構成案 outline.md の資料の情報の誤り (書き込んでいない):\n${report.errors.map((e) => `  ${e}`).join("\n")}\n`,
+        );
+        return 1;
+      }
+      process.stdout.write(`書き込んだ:\n${report.written.map((l) => `  ${l}`).join("\n")}\n`);
+      return 0;
+    },
+  },
 };
 
 /** 複数行の文字列の各行を、2 文字字下げする */
@@ -342,6 +437,8 @@ async function main(argv: readonly string[]): Promise<number> {
   let positionals: string[];
   let pptxSkill: string | undefined;
   let recreateAll: boolean;
+  let googleSlides: string | undefined;
+  let pluginVersion: boolean;
   try {
     const parsed = parseArgs({
       args: [...argv],
@@ -349,6 +446,8 @@ async function main(argv: readonly string[]): Promise<number> {
         help: { type: "boolean", short: "h" },
         "pptx-skill": { type: "string" },
         "recreate-all": { type: "boolean" },
+        "google-slides": { type: "string" },
+        "plugin-version": { type: "boolean" },
       },
       allowPositionals: true,
       strict: true,
@@ -357,6 +456,8 @@ async function main(argv: readonly string[]): Promise<number> {
     positionals = parsed.positionals;
     pptxSkill = parsed.values["pptx-skill"];
     recreateAll = parsed.values["recreate-all"] ?? false;
+    googleSlides = parsed.values["google-slides"];
+    pluginVersion = parsed.values["plugin-version"] ?? false;
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n\n${TOP_HELP}`);
     return 2;
@@ -377,7 +478,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   try {
-    return await command.run({ positionals: found.rest, pptxSkill, recreateAll });
+    return await command.run({ positionals: found.rest, pptxSkill, recreateAll, googleSlides, pluginVersion });
   } catch (e) {
     if (e instanceof UsageError) {
       process.stderr.write(`${e.message}\n\n${command.help}`);

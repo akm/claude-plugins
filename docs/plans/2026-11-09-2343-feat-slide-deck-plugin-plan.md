@@ -156,7 +156,7 @@ deepened: 2026-11-09
 - KTD14. **Issue の表にある Google スライドの API の挙動への対処は、Google スライドの指示を作る処理で行う**。対処ごとに、理由をコードのコメントに書き、テストで期待の指示を確認する。対象は、基準の大きさと拡大率・円などの中の文字を重ねた文字の箱に分けること・内側の余白の分だけ箱を広げること・大きな箱を四角で描くこと・箇条書きの字下げ 16 ポイント・書式の範囲に改行の文字を含めること・逆向きの線を負の拡大率で描くこと・マスターの配色を `updatePageProperties` の `colorScheme` で変えること。`createLine` には、非推奨の `lineCategory` ではなく `category` を使う。大きさが 0 の軸 (縦や横の線の幅か高さ) は、拡大率 0 にせず、元の `gslides.js` と同じく大きさ 0・拡大率 1 にする (U6 を実装するときに決めた。session-settled: user-approved; chosen over すべてを元の形にすること・拡大率 0 のままにすること: 拡大率 0 を Google スライドが受け付けるかを確認していないため)。文字の箱 (重ねる文字の箱を含む) は、データの内側の余白の分だけ狭めてから、Google スライドの余白の分だけ広げ、文字を配置する範囲をデータに合わせる (U6 を実装するときに決めた。session-settled: user-approved; chosen over 元の `gslides.js` のとおり余白 0 の文字の箱と重ねる文字の箱だけを広げること)。
 - KTD15. **資料のディレクトリの `build/` に、内容が `*` のファイル `.gitignore` を書く**。生成したファイルが、プロジェクトのコミットに入らないようにする。プロジェクトの `.gitignore` は変えない。
 - KTD16. **セットアップのツールは、Node.js の標準の機能だけで書いた TypeScript にする**。ライブラリを入れる前に動く必要があり、Node.js は前提にしているため。
-- KTD17. **入口のサブコマンドごとの `--help` を、引数・出力・終了コードの SSOT にする**。入口は、ファイル `slide-deck/src/cli.ts` のサブコマンド (`setup status`・`setup install`・`check`・`pptx`・`requests`) と、画像をまとめるファイル `slide-deck/python/slide_deck_tools/thumbs_grid.py`。終了コードは、どの入口も、成功 0・検査の指摘あり 1・実行の誤り (ライブラリが無い・入力の形が違うなど) 2 に分ける。構成案の書式の誤りは、資料ごとのスクリプトの誤りと同じく利用者が直すものなので、検査の指摘 (1) にする (U5 を実装するときに決めた。session-settled: user-approved; chosen over 実行の誤り (2) にすること)。3 つのスキルの SKILL.md と `references/` は、引数や終了コードを書かずに `--help` を参照する。サブコマンドを作る単位で `--help` も書き、テストで、`--help` が引数・出力・終了コードの 3 つを示すことを確認する。スキルは U9 で書くので、それまでの単位の間に、スキルに書く引数と入口の引数が合わなくなることを防ぐため。
+- KTD17. **入口のサブコマンドごとの `--help` を、引数・出力・終了コードの SSOT にする**。入口は、ファイル `slide-deck/src/cli.ts` のサブコマンド (`setup status`・`setup install`・`check-outline`・`check`・`pptx`・`requests`・`write-info`) と、画像をまとめるファイル `slide-deck/python/slide_deck_tools/thumbs_grid.py`。サブコマンド `check-outline` (構成案だけの書式の検査と、資料の情報・【提案】のスライドの表示) と `write-info` (Google スライドの URL の行と slide-deck の版の行の書き込み) は、U9 を実装するときに足した (session-settled: user-approved; chosen over スキル `outline` は構成案をツールで検査せず、書式の誤りを `build` の `check` で見つけること・スキル `publish` が 2 つの行を Edit で書き、ファイル `slide-deck/src/outline/url.ts` を消すこと: `check` は `deck.ts` が無いと実行の誤りになり【提案】を指摘にするので `outline` の段階で使えず、U3 で作った書き込みの関数をどのサブコマンドも呼んでいなかったため)。終了コードは、どの入口も、成功 0・検査の指摘あり 1・実行の誤り (ライブラリが無い・入力の形が違うなど) 2 に分ける。構成案の書式の誤りは、資料ごとのスクリプトの誤りと同じく利用者が直すものなので、検査の指摘 (1) にする (U5 を実装するときに決めた。session-settled: user-approved; chosen over 実行の誤り (2) にすること)。3 つのスキルの SKILL.md と `references/` は、引数や終了コードを書かずに `--help` を参照する。サブコマンドを作る単位で `--help` も書き、テストで、`--help` が引数・出力・終了コードの 3 つを示すことを確認する。スキルは U9 で書くので、それまでの単位の間に、スキルに書く引数と入口の引数が合わなくなることを防ぐため。
 
 ### High-Level Technical Design
 
@@ -543,6 +543,7 @@ slide-deck/
 - **Requirements**: R1〜R7, R14〜R22, R24, R25, R28, KD1〜KD10, KTD10, KTD11, KTD17
 - **Dependencies**: U5, U6, U7, U8
 - **Files**:
+  - `slide-deck/src/outline/file.ts`・`slide-deck/src/cli.ts` (サブコマンド `check-outline` と `write-info`。KTD17)・`slide-deck/tests/cli.test.ts`
   - `slide-deck/skills/outline/SKILL.md`・`slide-deck/skills/build/SKILL.md`・`slide-deck/skills/publish/SKILL.md`
   - `slide-deck/references/outline-format.md` (構成案の書式。KTD13 の SSOT)
   - `slide-deck/references/deck-script.md` (資料ごとのスクリプトの書き方と部品の関数)
@@ -561,7 +562,12 @@ slide-deck/
   7. プラグインのバージョンを 0.1.0 にし、`.claude-plugin/marketplace.json` とルートの `README.md` に載せる (「単位の進め方とクローズ条件」の公開の時期)。
 - **Patterns to follow**: `doc-structured/skills/generate/SKILL.md` (手順・終了コードごとの扱い・しないこと)。wording-guard の README の、セットアップの承認の書き方。
 - **Test scenarios**:
-  - Test expectation: 手順の文書なので、振る舞いのテストは無い。
+  - 手順の文書には、振る舞いのテストは無い。
+  - `check-outline` は、`deck.ts` とキャッシュのライブラリが無くても、見本の構成案を検査し、資料の情報 (Google スライドの URL と資料の ID・構成案の版と今の版・固有名) を示す。
+  - `check-outline` は、【提案】のスライドを指摘にせずに一覧を示す。書式の誤りは行番号を付けて示し、終了コード 1 になる。
+  - `write-info` は、2 つの行を資料の情報の最後に足し、ほかの行を変えない。行があれば、その行だけを置き換える。
+  - `write-info` は、スライドの部分に書式の誤りがあっても書き込む。資料の情報に誤りがあれば終了コード 1 で、URL の形が違えば終了コード 2 で、どちらもファイルを変えない。
+  - `check-outline --help` と `write-info --help` が、引数・出力・終了コードを示す。
 - **Verification**: 3 つのスキルの手順が、High-Level Technical Design の節の図と R1〜R25 を漏れなく扱っている (目で確認する)。SKILL.md と `references/` に書いたサブコマンドと引数が、`--help` の内容と一致する。
 
 ### U10. 本物の Google スライドでの通し確認
