@@ -123,6 +123,7 @@ execution: code
   - `review_requested`: 通知の対象が PR で、通知の更新時刻が取得の範囲の起点 (KTD5) より後のものについて、timeline (API `GET /repos/{owner}/{repo}/issues/{number}/timeline`) の出来事 `review_requested` のうち、時刻が取得の範囲の起点より後で、依頼先 (`requested_reviewer.login`) が自分か、依頼先のチーム (`requested_team`) が自分の所属するチーム (API `GET /user/teams`) のものを選ぶ。出来事の ID で、同じ依頼を区別する。
   - `merged`: 候補は 2 つ。(a) 追跡する PR (R9 で依頼を届けた PR) は、通知が来なくても、毎回 API `GET /repos/{owner}/{repo}/pulls/{number}` で状態を読む。マージされていたら届け、閉じていたら追跡をやめる。(b) 通知の対象が PR で、`merged_at` が取得の範囲の起点より後のものについて、`requested_reviewers`・`requested_teams` に自分か自分のチームが残っているか、API `GET /repos/{owner}/{repo}/pulls/{number}/reviews` に自分のレビューがあるかで判定する。
   - 判定に要る API の呼び出しは、(リポジトリ, 種類) の登録がある通知についてだけ行う。
+  - 一覧を返す API (通知・timeline・レビュー・所属するチーム) は、すべてのページを読む。1 ページは最大 100 件で、timeline は古い出来事から順に返るので、出来事の多い PR では新しい依頼が後のページにある。ページ送りは `gh.py` の共通の処理にし、API ごとに書かない。
 - KTD5. **取得の位置は、前回の取得が成功した時刻にし、取得の範囲の起点を、その 5 分前にする。** 起点は、API `GET /notifications` の引数 `since` に渡す値と、KTD4 で出来事の時刻と比べる値の両方に使う。時刻のずれと、GitHub の反映の遅れで取りこぼさないため。判定にも同じ起点を使うのは、遅れて現れた通知を取り直しても、出来事の時刻が取得の位置より前なので、取得の位置と比べると除かれるため。ただし、起点は最初に開始した時刻より前にしない (R8)。重なって取った通知と出来事は、届けた出来事の記録 (レビューの依頼は出来事の ID、マージは PR) で除く (R11)。API `GET /notifications` には引数 `all=true` を付け、既読の通知も取得する。この引数が無いと未読の通知だけが返り、利用者が GitHub の画面やメールで先に開いて既読にした通知の依頼とマージを届けられないため (R12 は既読の状態を変えないことを求めていて、既読の通知を読まないことは求めていない)。`since` で範囲を絞るので、既読の通知を含めても、取得する量は取得の範囲の起点より後の通知に限られる。ヘッダ `If-Modified-Since` に前回の `Last-Modified` を付け、304 なら判定を行わない。ただし、追跡する PR の状態 (KTD4 の (a)) は、304 のときも読む。最初の開始では、取得の位置を開始した時刻にする (R8)。
 - KTD6. **配信は、送信待ちを挟んだ 2 段階にする。** スクリプトのサブコマンド `tick` は、判定した出来事を送信待ちに入れ、同時に届けた出来事の記録に足す。次の回の判定で同じ出来事を除くためで、KTD5 の重なった範囲で取り直した出来事もここで除かれる。そのうえで、送信待ちから、届け先と種類ごとに 20 件までを 1 通のメッセージにまとめ、宛先と本文を JSON で出力する。Claude が `SendMessage` で送り、結果をサブコマンド `ack` (届いた。そのメッセージに入れた出来事を送信待ちから消す) か `fail` (届かなかった。理由を付ける) で記録する。送信待ちに残った出来事 (`fail` のもの・`ack` も `fail` も記録されなかったもの・20 件を超えた分) は、次の回の `tick` が出力する。送り直すメッセージには、送り直しの回数の行を足し、直前と同じ本文にしない (#114 の記録の KTD11: 同じ送り手から直前と同じ本文のメッセージが届くと捨てられる)。届かない登録 (R15) の出来事は、出力せず、新しく送信待ちにも入れない。
 - KTD7. **スキル `tick` の本文は、スクリプトを実行して出力の指示に従うことだけにする。** 10 分ごとに 7 日動かすと、定期の予定のターンが約 1,000 回になり、そのたびに会話に足される量が配信のセッションの会話の長さを決めるため。通知が無いとき (304 で、送信待ちも期限の確認も無いとき) は、1 回のツールの実行と 1 行の返事で完了する。定期の予定のプロンプトは `/gh-notification-dispatch:tick` にする (プラグインの版が変わってもパスが変わらないようにするため。スラッシュコマンドとして実行されるかは U1 で確かめる)。
@@ -198,7 +199,7 @@ gh-notification-dispatch/
     gh_notification_dispatch.py
     gh_notification_dispatch/
       __init__.py
-      gh.py               # gh の実行と失敗の種類
+      gh.py               # gh の実行・ページ送り・失敗の種類
       store.py            # 記録のディレクトリの読み書きとロック
       subscriptions.py    # 登録・一覧・削除
       messages.py         # メッセージの生成と解析
@@ -307,12 +308,12 @@ gh-notification-dispatch/
 **Files:**
 - 作る: `gh-notification-dispatch/scripts/gh_notification_dispatch/{poll,events,outbox}.py`・`gh-notification-dispatch/skills/tick/SKILL.md`
 - 作る: `gh-notification-dispatch/tests/test_{poll,events,outbox}.py`・`gh-notification-dispatch/tests/fixtures/gh/` の通知・timeline・チームの応答
-- 変える: `gh-notification-dispatch/references/messages.md` (`notify`)・`records.md` (取得の位置・`delivered.json`・`outbox.json`)・`gh-notification-dispatch/skills/dispatch/SKILL.md` (名前で届かないときの引き直し)
+- 変える: `gh-notification-dispatch/scripts/gh_notification_dispatch/gh.py` (ページ送り)・`gh-notification-dispatch/references/messages.md` (`notify`)・`records.md` (取得の位置・`delivered.json`・`outbox.json`)・`gh-notification-dispatch/skills/dispatch/SKILL.md` (名前で届かないときの引き直し)
 
 **Approach:**
 1. 用意する: `notify` の様式と、取得の位置・届けた出来事・送信待ちの様式を書く。固定データは、2026-11-14 に確かめた形 (依頼の後に push で更新された通知・チームへの依頼・依頼の取り消しと再依頼) を、公開してよい値に置き換えて作る。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: `poll.py` (取得・304・ページ送り・取得の位置)・`events.py` の `review_requested` の判定・`outbox.py` (メッセージの生成・20 件の上限・送り直しの回数・`ack`・`fail`・続けて届かなかった回数)。サブコマンドは `tick`・`ack <送信待ちの ID>`・`fail <送信待ちの ID> --reason <理由>`・`rename --session-id <ID> --name <名前>`。
+3. 実装する: U2 の `gh.py` にページ送り (KTD4) を足し、`poll.py` (取得・304・取得の位置)・`events.py` の `review_requested` の判定・`outbox.py` (メッセージの生成・20 件の上限・送り直しの回数・`ack`・`fail`・続けて届かなかった回数)。サブコマンドは `tick`・`ack <送信待ちの ID>`・`fail <送信待ちの ID> --reason <理由>`・`rename --session-id <ID> --name <名前>`。
 4. スキル `tick` に、スクリプトの出力のとおりに送り、`ack` か `fail` を記録する手順だけを書く (KTD7)。名前で届かないときの引き直し (KTD2) は、`tick` の出力に手順を書くか `dispatch` に書くかを、本文の短さで決める。
 
 **Patterns to follow:** U2 の `gh.py` と固定データ。`issue-dispatch/scripts/issue_dispatch/poll.py` (取得と差分の考え方)。
@@ -320,6 +321,7 @@ gh-notification-dispatch/
 **Test scenarios:**
 - 最初の `tick` では、開始した時刻より前の通知とレビューの依頼を届けない。
 - 304 のときは timeline を読まない。
+- timeline の 2 ページ目にある依頼も届ける。通知の一覧が 2 ページにわたるときも、2 ページ目の通知を判定する。
 - 依頼の後に push で更新された通知 (理由は `review_requested` のまま) では、新しい依頼が無いので届けない。依頼の取り消しの後の再依頼は、新しい依頼として届ける。
 - チームへの依頼は、自分の所属するチームのときだけ届ける。
 - 利用者が次の `tick` より前に既読にした通知の依頼も届ける (偽の `gh` が、引数 `all=true` の無い取得には既読の通知を返さないようにして確かめる)。
