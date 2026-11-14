@@ -19,6 +19,14 @@
   checkboxes check --issue <参照> --line <行番号> (--evidence <URL> | --carved-out <URL>) --expect-sha256 <値>   チェックを入れてリンクを足す
   checkboxes common --issue <管理 Issue>         開いている作業 Issue のうち、共通の条件のコピーが古いものを一覧にする
   release current --repo <owner/repo> [--target <名前>] [--carve-out]   今のリリースと次のリリースを決める
+  release review --repo <owner/repo> [--target <名前>]   決めた形の崩れ・マイルストーンの無い Issue・依存先の書き損ねを見直す
+  release show --issue <リリース Issue>          リリース Issue の状態 (題名・マイルストーン・記録・メモ・PR) を返す
+  release plan <ファイル> --repo <owner/repo>    リリース計画の計画案から、行う書き込みの一覧を示す (示す)
+  release apply <ファイル> --repo <owner/repo>   リリース計画の計画案を GitHub に書く (実行する)
+  release issue-plan <ファイル>                 リリース Issue の計画案から、行う書き込みの一覧を示す (示す)
+  release issue-apply <ファイル>                リリース Issue の計画案を書き、承認なら題名の [DRAFT] を外す (実行する)
+  release close-plan --issue <リリース Issue>    リリース Issue を閉じる前の検査をし、行う書き込みを示す (示す)
+  release close --issue <リリース Issue> --notes-file <ファイル>   検査を満たせば、記録を書いてリリース Issue とマイルストーンを閉じる (実行する)
   issues plan <ファイル> --repo <owner/repo>     計画案の節「作る Issue」から、行う書き込みの一覧を示す (示す)
   issues create <ファイル> --repo <owner/repo> [--record-approval]   計画案の節「作る Issue」の Issue を作る (実行する)
   sessions active --issue <管理 Issue>           管理セッションと、動いている作業セッションを記録のコメントから集める
@@ -46,7 +54,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from issue_practice import bodies, checkboxes, closecheck, draft, gh, issues, managing, mergeplan, records, refs, releaseplan  # noqa: E402
+from issue_practice import (bodies, checkboxes, closecheck, draft, gh, issues, managing, mergeplan, records, refs,  # noqa: E402
+                            releaseops, releaseplan)
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -226,7 +235,7 @@ def cmd_checkboxes_list(args):
     if failure:
         _emit({"issue": ref["key"], "gh_error": gh.describe_failure(failure)})
         return EXIT_EXTERNAL_FAILED
-    parsed = checkboxes.parse(issue["body"])
+    parsed = checkboxes.parse(issue["body"], args.section)
     payload = {"issue": ref["key"], "url": issue["url"], "sha256": issue["sha256"], "source": None, "items": [],
                "summary": None, "errors": []}
     if "error" in parsed:
@@ -235,7 +244,7 @@ def cmd_checkboxes_list(args):
         return EXIT_UNSATISFIED
     payload.update(source=parsed["source"], items=parsed["items"], summary=parsed["summary"])
     if not parsed["items"]:
-        payload["errors"] = ["節「クローズ条件」にチェックボックスが無い"]
+        payload["errors"] = [f"節「{args.section}」にチェックボックスが無い"]
     _emit(payload)
     return EXIT_UNSATISFIED if payload["errors"] or parsed["summary"]["unsatisfied"] else EXIT_OK
 
@@ -255,7 +264,8 @@ def cmd_checkboxes_check(args):
         payload["errors"] = ["本文が、読んだとき (--expect-sha256) から変わった。checkboxes list で本文を再度読み込んでからやり直す"]
         _emit(payload)
         return EXIT_UNSATISFIED
-    result = checkboxes.check_line(issue["body"], args.line, evidence=args.evidence, carved_out=args.carved_out)
+    result = checkboxes.check_line(issue["body"], args.line, evidence=args.evidence, carved_out=args.carved_out,
+                                   section=args.section)
     if "error" in result:
         payload["errors"] = [result["error"]]
         _emit(payload)
@@ -286,6 +296,69 @@ def cmd_release_current(args):
         return EXIT_EXTERNAL_FAILED
     _emit(result)
     return EXIT_OK if status == "ok" else EXIT_UNSATISFIED
+
+
+def _release_repo(args):
+    repo = refs.parse_repo(args.repo)
+    if "error" in repo:
+        _emit({"repo": args.repo, "errors": [repo["error"]]})
+        return None
+    return repo["repo_key"]
+
+
+def cmd_release_review(args):
+    repo = _release_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(releaseops.review(repo, target=args.target))
+
+
+def cmd_release_show(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    return _emit_status(releaseops.show(ref))
+
+
+def cmd_release_plan(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(releaseops.plan(args.file, repo))
+
+
+def cmd_release_apply(args):
+    repo = _issues_repo(args)
+    if repo is None:
+        return EXIT_UNSATISFIED
+    return _emit_status(releaseops.apply(args.file, repo))
+
+
+def cmd_release_issue_plan(args):
+    return _emit_status(releaseops.issue_plan(args.file))
+
+
+def cmd_release_issue_apply(args):
+    return _emit_status(releaseops.issue_apply(args.file))
+
+
+def cmd_release_close_plan(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    return _emit_status(releaseops.close_plan(ref))
+
+
+def cmd_release_close(args):
+    ref, error = _issue_ref(args)
+    if error:
+        _emit({"issue": None, "errors": [error]})
+        return EXIT_UNSATISFIED
+    with open(args.notes_file, encoding="utf-8") as f:
+        notes = f.read()
+    return _emit_status(releaseops.close_apply(ref, notes))
 
 
 # --- issues -------------------------------------------------------------------------------------------------------
@@ -642,6 +715,8 @@ def build_parser():
              "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
              _exit_help("すべての項目が checked か carved_out", "満たさない項目がある・範囲や項目が無い", "gh が失敗した"))
     _add_issue_args(p)
+    p.add_argument("--section", choices=checkboxes.SECTIONS, default=checkboxes.SECTION_TITLE,
+                   help="読む節。完了の条件はリリース Issue の本文の項目 (マークは見ずに見出しの節を読む)")
 
     g = groups.add_parser("release", help="リリース計画 Issue とリリース Issue を読む").add_subparsers(
         dest="command", required=True)
@@ -666,6 +741,135 @@ def build_parser():
     p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)")
     p.add_argument("--target", help="リリース対象の名前 (ラベル release-target:<名前> の <名前>)")
     p.add_argument("--carve-out", action="store_true", help="後で行う作業を切り出すときに付ける。実行中の今のリリースを選べないものとして返す")
+    release_state = ("{number, url, title, state, draft, running, draft_removed (記録の URL か null), release_start (記録の URL か\n"
+                     "             null), milestone {number, title, url, state}, errors}")
+    p = _add(g, "review", cmd_release_review,
+             "リリースを見直す。読むだけ。決めた形の崩れ (計画の R8: ラベル current の付いた計画が 3 つ以上・表の形・題名の形・\n"
+             "リリースマイルストーンが無い・お互いの URL が無い・draft-removed の記録が無いのに [DRAFT] が無い) と、\n"
+             "マイルストーンの無い開いた Issue (R37。リリース計画 Issue・リリース Issue・ラベル no-release の付いた Issue を除く) と、\n"
+             "本文の節「依存先」に閉じた blocked by の Issue が残っている開いた Issue (R50) を返す",
+             "  repo・target・targets  リポジトリ・--target の値・リリース対象の名前の配列\n"
+             "  plans      ラベル current の付いたリリース計画 Issue {number, url, title, created_at} の配列\n"
+             "  plan       表を読んだリリース計画 Issue {number, url, title} (2 つあれば後に作られたほう)。無ければ null\n"
+             "  swapping   ラベル current の付いた計画が 2 つある (付け替えの途中) なら true\n"
+             f"  releases   表のリリース Issue の状態 {{order, {release_state[1:]}\n"
+             "  unassigned マイルストーンの無い開いた Issue {number, url, title} の配列\n"
+             "  dependencies  節「依存先」に閉じた Issue が残っている開いた Issue {number, url, title, resolved [{number, url}]}\n"
+             "  errors     決めた形の崩れの配列\n"
+             "  gh_error   gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("決めた形の崩れが無い (unassigned と dependencies はあってもよい)",
+                        "決めた形の崩れがある・リリース対象の指定が要る", "gh が失敗した"))
+    p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)")
+    p.add_argument("--target", help="リリース対象の名前 (ラベル release-target:<名前> の <名前>)")
+    p = _add(g, "show", cmd_release_show,
+             "リリース Issue 1 つの状態を返す。読むだけ。題名の形・リリースマイルストーンとお互いの URL・記録のコメント\n"
+             "(draft-removed・release-start)・メモ (記録ではないコメント)・本文の節「参照」の PR を読む",
+             "  issue・url・title・state・sha256  リリース Issue の参照・URL・題名・状態・本文のハッシュ値\n"
+             "  target・subject  題名のリリース対象 (無ければ null) と主題\n"
+             "  draft・running   題名に [DRAFT] があるか・記録のコメント release-start があるか\n"
+             "  draft_removed・release_start  記録のコメントの URL (無ければ null)\n"
+             "  milestone  リリースマイルストーン {number, title, url, state}。見つからなければ null\n"
+             "  prs        本文の節「参照」の「- PR: <URL>」の URL の配列\n"
+             "  memos      メモ {url, author, created_at, first_line} の配列 (投稿の順)\n"
+             "  errors     決めた形の崩れの配列\n"
+             "  gh_error   gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("決めた形どおり", "決めた形の崩れがある", "gh が失敗した"))
+    _add_issue_args(p)
+    release_output = (
+        "  draft・repo・kind・target  計画案のファイル名・リポジトリ・種類 (新しい計画・急ぎのリリースの追加)・リリース対象\n"
+        "  current      今の計画 {number, url} (計画案の項目「今の計画」)。無ければ null\n"
+        "  plan         新しいリリース計画 Issue {number, url} (作り済みのとき)。無ければ null\n"
+        "  current_plans  ラベル current の付いた計画の番号の配列\n"
+        "  labels_to_create  作るラベル {name, color, description} の配列\n"
+        "  actions      行う書き込み {step, action, ...} の配列 (済んだものは含まない)。step は計画の R38 の手順の番号\n"
+        "               (0 はラベルの作成、7 は取りやめたリリース)。急ぎのリリースの追加では、1 が approval の記録、2 が\n"
+        "               リリース Issue とマイルストーン、3 が表の書き換え、4 が plan-change の記録。action は\n"
+        "               create-label・create-plan・record-approval・create-release・set-release-number・create-milestone・\n"
+        "               set-milestone-description・write-release-body・set-milestone・remove-milestone・add-label・\n"
+        "               write-plan-table・add-current・remove-current・record-current-swap・close-old-plan・copy-memo・\n"
+        "               record-cancel・close-cancelled-release・close-cancelled-milestone・record-plan-change のどれか\n"
+        "  errors       誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
+        "  gh_error     gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "plan", cmd_release_plan,
+             "リリース計画の計画案 (書式は文書 skills/release-plan/references/release-plan-issue.md) と GitHub の今の状態から、\n"
+             "行う書き込みの一覧を返す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない。\n"
+             "途中で中断した状態 (ラベル current が 2 つ・古い計画が開いているなど) を読み、済んでいない書き込みだけを返す",
+             release_output,
+             _exit_help("示せた", "計画案の形が違う・GitHub の状態が計画案と合わない (今の計画の本文が変わった・ラベル current の\n"
+                                  "     付いた計画が違うなど)", "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    p = _add(g, "apply", cmd_release_apply,
+             "plan と同じ確認をし、誤りが無ければ書き込む (実行する)。途中で失敗したら、同じ計画案でやり直せる\n"
+             "(作り済みの Issue とマイルストーンは作らず、済んでいない書き込みだけを行う)",
+             release_output + "\n"
+             "  done         行った書き込み (actions と同じ形。作ったものは url を持つ) の配列。gh が失敗したときは、\n"
+             "               失敗する前までのもの\n"
+             "  releases     表のキーの行のリリース Issue {key, number, url, milestone, milestone_url} の配列",
+             _exit_help("すべて書き込んだ (か、書き込み済みだった)",
+                        "plan で満たさない (何も書き込まない)。書き込みの途中で、作り済みの Issue の本文が変わっていると\n"
+                        "     分かったときも 3 (done までは書き込んだ)", "gh が失敗した (done までは書き込んだ)"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p.add_argument("--repo", required=True, help="リポジトリ (owner/repo)。#番号 の参照もこのリポジトリで解決する")
+    issue_output = (
+        "  draft       計画案のファイル名\n"
+        "  issue       リリース Issue {number, url, title}\n"
+        "  mode        approve (計画の承認。題名に [DRAFT] がある・この計画案の draft-removed の記録がある) か\n"
+        "              change (承認の後の変更)\n"
+        "  body_state  リリース Issue の本文の状態。pending (これから書く)・applied (書き込み済み)・changed (計画案を\n"
+        "              作ったときから変わった)\n"
+        "  actions     行う書き込み {step, action, ...} の配列 (済んだものは含まない)。action は write-body・\n"
+        "              record-draft-removed・remove-draft-title (approve) か write-body・record-plan-change (change)\n"
+        "  errors      誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    issue_unsatisfied = ("計画案の形が違う・本文が変わった・マイルストーンの URL が違う・承認の後なのに節「変えたこと」が無い\n"
+                         "     など (何も書き込まない)")
+    p = _add(g, "issue-plan", cmd_release_issue_plan,
+             "リリース Issue の計画案 (書式は文書 skills/release-issue-plan/references/release-issue.md) と GitHub の今の状態から、\n"
+             "行う書き込みを示す (示す)。GitHub には書き込まない。計画案の形が違えば gh を実行しない",
+             issue_output, _exit_help("示せた", issue_unsatisfied, "gh が失敗した"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    p = _add(g, "issue-apply", cmd_release_issue_apply,
+             "issue-plan と同じ確認をし、誤りが無ければ書き込む (実行する)。approve では、本文を書き、記録のコメント\n"
+             "draft-removed (date は書いた日) を書いて、題名の [DRAFT] を外す。change では、本文を書き、記録のコメント\n"
+             "plan-change (本文は節「変えたこと」) を書く。本文の最後の created-from の行は残す。途中で失敗したら、\n"
+             "同じ計画案でやり直せる",
+             issue_output + "\n  done        行った書き込み (actions と同じ形) の配列。gh が失敗したときは、失敗する前までのもの",
+             _exit_help("すべて書き込んだ (か、書き込み済みだった)", issue_unsatisfied, "gh が失敗した (done までは書き込んだ)"))
+    p.add_argument("file", help="計画案のファイルのパス")
+    close_output = (
+        "  issue・url・state  リリース Issue の参照・URL・状態\n"
+        "  satisfied   検査を満たすか\n"
+        "  unsatisfied 満たさない項目 {kind, message, line, url} の配列。kind は draft ([DRAFT] がある)・release-start\n"
+        "              (実行を始めた記録が無い)・pr (PR がマージされていない)・pr-link (PR の本文にリリース Issue の URL が無い)・\n"
+        "              milestone-issue (マイルストーンの Issue が閉じていない)・checkbox (項目「完了の条件」) のどれか\n"
+        "  evidence    根拠の URL (マージされた PR・完了の条件のチェックの根拠) の配列\n"
+        "  manual      スクリプトでは判定できず、利用者に確認する共通の条件 (1 と 4) の文の配列\n"
+        "  milestone   リリースマイルストーン {number, title, url, state}\n"
+        "  prs         本文の節「参照」の PR {url, state, merged, base} の配列\n"
+        "  issues_total・issues_open  マイルストーンを設定した Issue の数 (PR を除く) と、閉じていない Issue {number, url, title}\n"
+        "  checkboxes  項目「完了の条件」のチェックボックスの {counts, unsatisfied}\n"
+        "  close_check 記録のコメント close-check result=pass の URL (無ければ null)\n"
+        "  blocking    このリリース Issue を依存先とする、開いている Issue {number, url, title, state} の配列\n"
+        "  actions     行う書き込み {step, action, url} の配列。action は record-close-check・close-release・close-milestone\n"
+        "  errors      決めた形の崩れ (題名・draft-removed の記録・マイルストーン・お互いの URL・項目「完了の条件」が無い) の配列\n"
+        "  gh_error    gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
+    p = _add(g, "close-plan", cmd_release_close_plan,
+             "リリース Issue を閉じる前の検査 (計画の R48 の共通の条件のうち 2・3 と、本文の項目「完了の条件」のチェックと根拠) をし、\n"
+             "行う書き込みを示す (示す)。書き込まない。共通の条件の 1・4 は判定せず、manual で返す",
+             close_output, _exit_help("検査を満たす", "満たさない項目がある・決めた形の崩れ", "gh が失敗した (検査できなかった)"))
+    _add_issue_args(p)
+    p = _add(g, "close", cmd_release_close,
+             "close-plan と同じ検査をし、満たせば書き込む (実行する)。記録のコメント close-check result=pass (本文に確認の結果と、\n"
+             "--notes-file の中身を節「会話で確認したこと」として書く) を書き、リリース Issue (completed) とリリースマイルストーンを\n"
+             "閉じる。済んだ書き込みは行わないので、片方だけ閉じた状態からやり直すと、残りだけを閉じる。--notes-file を開けない\n"
+             "ときは、例外で終了する (終了コード 1)",
+             close_output + "\n  done        行った書き込み (actions と同じ形) の配列。gh が失敗したときは、失敗する前までのもの",
+             _exit_help("書き込んだ (か、書き込み済みだった)", "満たさない項目がある・決めた形の崩れ・close-check を書くのに\n"
+                                                         "     --notes-file が空 (何も書き込まない)", "gh が失敗した (done までは書き込んだ)"))
+    _add_issue_args(p)
+    p.add_argument("--notes-file", required=True,
+                   help="利用者に確認した共通の条件 1・4 の結果と根拠の URL を書いたファイル (close-check を書き済みなら中身は使わない)")
 
     g = groups.add_parser("issues", help="計画案の節「作る Issue」から Issue を作る").add_subparsers(
         dest="command", required=True)
@@ -721,6 +925,8 @@ def build_parser():
     link.add_argument("--evidence", help="根拠の URL (テストを実行した PR・確認を記録したコメントなど)")
     link.add_argument("--carved-out", help="切り出した Issue の URL")
     p.add_argument("--expect-sha256", required=True, help="読んだときの本文のハッシュ値 (checkboxes list の sha256)")
+    p.add_argument("--section", choices=checkboxes.SECTIONS, default=checkboxes.SECTION_TITLE,
+                   help="項目のある節。完了の条件はリリース Issue の本文の項目 (checkboxes list と同じ値を渡す)")
     p = _add(g_checkboxes, "common", cmd_checkboxes_common,
              "管理 Issue の節「すべての作業 Issue に共通するクローズ条件」の項目と、PR マージ計画の表の開いている作業 Issue の\n"
              "共通の条件のコピーを比べる。読むだけ。項目の文と「期待する状態」「確認するポイント」の分類を、上から順に比べる",

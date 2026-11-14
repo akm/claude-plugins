@@ -11,8 +11,10 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | [managing-issue-run](skills/managing-issue-run/SKILL.md) | 管理セッションとして、作業セッションを最初の指示を渡して起動し、報告を受けて PR マージ計画の表を書き換え、管理セッションの交代を扱う |
 | [managing-issue-close](skills/managing-issue-close/SKILL.md) | 作業 Issue・管理 Issue・自己管理 Issue を、閉じる前の検査をしてから閉じ、依存先とする Issue に片付いたことを書く |
 | [working-issue](skills/working-issue/SKILL.md) | 作業セッションとして作業 Issue を進め、PR を作り、チェックと根拠のリンクを入れて、管理セッションに報告する |
-
-リリースのスキルは、計画の実装単位 U4 で足します。
+| [release-plan](skills/release-plan/SKILL.md) | リリースの順番と各リリースに含める Issue を計画案で調整し、承認を得てから、リリース計画 Issue・リリース Issue・リリースマイルストーンを作って、ラベル `current` を付け替える。取りやめたリリースと急ぎのリリースの追加も扱う |
+| [release-issue-plan](skills/release-issue-plan/SKILL.md) | リリース Issue 1 つの計画 (7 つの項目) を計画案で調整し、承認を得てから本文に書いて、題名の `[DRAFT]` を外す |
+| [release-run](skills/release-run/SKILL.md) | リリースの実行を始めたことと実行の記録を書き、リリースの PR とリリース Issue にお互いの URL を書く。実行中の計画の変更と切り出しも扱う |
+| [release-close](skills/release-close/SKILL.md) | リリース Issue を、閉じる前の条件を確認してから、利用者の承認を得てリリースマイルストーンと同時に閉じる |
 
 ## 今あるもの
 
@@ -21,7 +23,7 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | [skills/](skills/) | スキル (上の表) |
 | [references/](references/) | すべてのスキルが参照する、用語と書式の文書 (下の表) |
 | [scripts/issue_practice.py](scripts/issue_practice.py) | 検査のスクリプトの入口。GitHub の状態を読み、決めた形になっているかを判定する。サブコマンドの引数・出力・終了コードは `--help` で確認する |
-| [scripts/issue_practice/](scripts/issue_practice/) | 検査のスクリプトのパッケージ (`gh` の実行・識別子・記録のコメント・計画案・本文の範囲・クローズ条件のチェックボックス・リリース計画 Issue の順番の表・Issue の作成・PR マージ計画・管理 Issue の計画案の書き込み・閉じる前の検査) |
+| [scripts/issue_practice/](scripts/issue_practice/) | 検査のスクリプトのパッケージ (`gh` の実行・識別子・記録のコメント・計画案・本文の範囲・クローズ条件のチェックボックス・リリース計画 Issue の順番の表・Issue の作成・PR マージ計画・管理 Issue の計画案の書き込み・閉じる前の検査・リリースの書き込み) |
 | [tests/](tests/) | 検査のスクリプトの自動テスト。偽の `gh` と固定データで実行する |
 
 共有の references:
@@ -41,6 +43,8 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | 文書 | 中身 |
 | --- | --- |
 | [skills/managing-issue-plan/references/merge-plan.md](skills/managing-issue-plan/references/merge-plan.md) | ブランチの構成・PR マージ計画の表と図の書式・管理 Issue の計画案の書式 |
+| [skills/release-plan/references/release-plan-issue.md](skills/release-plan/references/release-plan-issue.md) | リリース計画 Issue・リリース Issue・リリースマイルストーンの名前と本文の形・リリース計画の計画案の書式・書く順とやり直し |
+| [skills/release-issue-plan/references/release-issue.md](skills/release-issue-plan/references/release-issue.md) | リリース Issue の本文の 7 つの項目・リリース Issue の計画案の書式・共通の完了の条件 |
 
 ## テスト
 

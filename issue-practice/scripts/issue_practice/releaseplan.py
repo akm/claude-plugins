@@ -20,6 +20,16 @@ _ROW_RE = re.compile(r"^\s*\|(?P<cells>.*)\|\s*$")
 _DELIMITER_RE = re.compile(r"^\s*:?-{3,}:?\s*$")
 _ORDER_RE = re.compile(r"^[1-9][0-9]*$")
 _ISSUE_RE = re.compile(r"^#(?P<number>[1-9][0-9]*)$")
+# 計画案の表で、まだ無いリリース Issue を表すキー (文書 skills/release-plan/references/release-plan-issue.md)
+KEY_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+
+# 名前の形 (計画の R35・R41)。リリース対象の名前は、ラベル release-target:<名前> の <名前>
+PLAN_TITLE_WORD = "📅 リリース計画"
+RELEASE_TITLE_WORD = "🔖 リリース"
+TARGET_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_PLAN_TITLE_RE = re.compile(r"^📅 リリース計画 (?:(?P<target>[A-Za-z0-9][A-Za-z0-9._-]*) )?(?P<date>[0-9]{8})$")
+_RELEASE_TITLE_RE = re.compile(r"^(?P<draft>\[DRAFT\] )?🔖 リリース (?:R(?P<number>[1-9][0-9]*) )?"
+                               r"(?:(?P<target>[A-Za-z0-9][A-Za-z0-9._-]*) )?\((?P<subject>.+)\)$")
 
 
 def _cells(line):
@@ -29,10 +39,50 @@ def _cells(line):
     return [cell.strip() for cell in m.group("cells").split("|")]
 
 
-def parse_table(body):
+def plan_title(date, target=None):
+    """リリース計画 Issue の題名。date は YYYYMMDD。"""
+    return f"{PLAN_TITLE_WORD} {target + ' ' if target else ''}{date}"
+
+
+def parse_plan_title(title):
+    """リリース計画 Issue の題名なら {"target", "date"}、そうでなければ None。"""
+    m = _PLAN_TITLE_RE.match(title or "")
+    return {"target": m.group("target"), "date": m.group("date")} if m else None
+
+
+def release_title(number, subject, target=None, draft=True):
+    """リリース Issue の題名。number が None なら、番号を書き足す前の題名 (作った直後の題名)。"""
+    parts = [RELEASE_TITLE_WORD] + ([f"R{number}"] if number else []) + ([target] if target else []) + [f"({subject})"]
+    return (DRAFT_MARK + " " if draft else "") + " ".join(parts)
+
+
+def parse_release_title(title):
+    """リリース Issue の題名なら {"draft", "number" (番号を書き足す前は None), "target", "subject"}、そうでなければ None。"""
+    m = _RELEASE_TITLE_RE.match(title or "")
+    if not m:
+        return None
+    return {"draft": bool(m.group("draft")), "number": int(m.group("number")) if m.group("number") else None,
+            "target": m.group("target"), "subject": m.group("subject").strip()}
+
+
+def milestone_title(number, subject, target=None):
+    """リリースマイルストーンの名前 (R<番号> (主題) か R<番号> <リリース対象> (主題))。"""
+    return f"R{number} {target + ' ' if target else ''}({subject})"
+
+
+def render_table(rows):
+    """表の行 ({"number", "subject"} の配列。上から順) から、節「リリースの順番」の表を作る。"""
+    lines = [f"| {' | '.join(HEADER)} |", "| --- | --- | --- |"]
+    lines += [f"| {order} | #{row['number']} | {row['subject']} |" for order, row in enumerate(rows, start=1)]
+    return "\n".join(lines)
+
+
+def parse_table(body, allow_keys=False):
     """本文の節「リリースの順番」の表を読む。
 
-    返り値は {"rows": [{"order", "number", "subject", "line"}]} か {"errors": [<理由>]}。行番号は本文の 1 行目を 1 とする。
+    返り値は {"rows": [{"order", "number", "key", "subject", "line"}]} か {"errors": [<理由>]}。行番号は本文の 1 行目を 1 とする。
+    allow_keys が真なら、列「リリース Issue」に、まだ無いリリース Issue のキー (KEY_RE の形) も書ける (計画案の表)。
+    キーの行は number が None、#番号 の行は key が None。
     """
     section = bodies.find_section(body, SECTION_TITLE)
     if "error" in section:
@@ -68,18 +118,22 @@ def parse_table(body):
             errors.append(f"行 {number}: 列「順」が 1 以上の整数ではない: {order!r}")
             continue
         m = _ISSUE_RE.match(issue)
-        if not m:
-            errors.append(f"行 {number}: 列「リリース Issue」が #<番号> の形ではない: {issue!r}")
+        key = issue if allow_keys and KEY_RE.match(issue) else None
+        if not m and key is None:
+            expected = "#<番号> かキー (英小文字で始まり、英小文字・数字・- が続く)" if allow_keys else "#<番号>"
+            errors.append(f"行 {number}: 列「リリース Issue」が {expected} の形ではない: {issue!r}")
             continue
         if not subject:
             errors.append(f"行 {number}: 列「主題」が空")
             continue
-        issue_number = int(m.group("number"))
-        if issue_number in seen:
-            errors.append(f"行 {number}: リリース Issue #{issue_number} が 2 回ある (行 {seen[issue_number]})")
+        identity = int(m.group("number")) if m else key
+        if identity in seen:
+            label = f"#{identity}" if m else f"キー {identity}"
+            errors.append(f"行 {number}: リリース Issue {label} が 2 回ある (行 {seen[identity]})")
             continue
-        seen[issue_number] = number
-        rows.append({"order": int(order), "number": issue_number, "subject": subject, "line": number})
+        seen[identity] = number
+        rows.append({"order": int(order), "number": identity if m else None, "key": key, "subject": subject,
+                     "line": number})
     if not errors and not rows:
         errors.append(f"節「{SECTION_TITLE}」の表に行が無い")
     if not errors:
@@ -167,6 +221,27 @@ def check_links(issue, milestone):
     return errors
 
 
+REFERENCE_SECTION = "参照"
+_PR_LINE_RE = re.compile(r"^- PR: (?P<url>\S+)$")
+_MILESTONE_LINE_RE = re.compile(r"^- リリースマイルストーン: (?P<url>\S+)$")
+
+
+def references(body):
+    """リリース Issue の本文の節「参照」の、リリースマイルストーンの URL と PR の URL の配列。返り値は {"milestone", "prs"}。"""
+    section = bodies.find_section(body, REFERENCE_SECTION)
+    if "error" in section:
+        return {"milestone": None, "prs": []}
+    milestone, prs = None, []
+    for _, line in section["lines"]:
+        m = _MILESTONE_LINE_RE.match(line.strip())
+        if m:
+            milestone = m.group("url")
+        m = _PR_LINE_RE.match(line.strip())
+        if m:
+            prs.append(m.group("url"))
+    return {"milestone": milestone, "prs": prs}
+
+
 # --- GitHub から読む -------------------------------------------------------------------------------------------
 
 def fetch_targets(repo):
@@ -208,8 +283,10 @@ def fetch_release_issue(repo, number):
             "body": data.get("body") or ""}, None
 
 
-def fetch_open_milestones(repo):
-    result = gh.run(["api", f"repos/{repo}/milestones?state=open&per_page=100", "--paginate", "--slurp"], expect_json=True)
+def fetch_open_milestones(repo, state="open"):
+    """マイルストーンを読む。state は open か all。返り値は (REST の milestone の配列, None) か (None, 失敗)。"""
+    result = gh.run(["api", f"repos/{repo}/milestones?state={state}&per_page=100", "--paginate", "--slurp"],
+                    expect_json=True)
     if gh.failed(result):
         return None, result
     pages = result["json"]
