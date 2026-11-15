@@ -360,3 +360,21 @@ class FirstUseTest(LinksTestCase):
 class UnacceptedFileTest(LinksTestCase):
     def test_unaccepted_file_is_reported_as_check_b(self):
         self.assertReports("# メモ\n", "concept.md・problem.md・design.md だけ", path="docs/domains/02-loans/notes.md")
+
+
+ROLE_DEFINITION = '[ロール「司書」]: ../../system/permissions.md#r-librarian "ロール「司書」"\n'
+
+
+class RoleLinkTest(LinksTestCase):
+    """ロール (ドメインの外の生成したファイル docs/system/permissions.md にアンカーがある) へのリンク。"""
+
+    def test_link_to_role_passes(self):
+        self.assertPasses(HEAD + "[ロール「司書」] が貸し出す。\n\n" + ROLE_DEFINITION)
+
+    def test_first_use_of_role_needs_kind(self):
+        definition = '[司書]: ../../system/permissions.md#r-librarian "ロール「司書」"\n'
+        self.assertReports(HEAD + "[司書] が貸し出す。\n\n" + definition, "参照先 r-librarian を最初に指す箇所の表示の文「司書」が、書ける形のどれとも違う")
+
+    def test_wrong_href_to_role_is_reported(self):
+        definition = '[ロール「司書」]: ../system/permissions.md#r-librarian "ロール「司書」"\n'
+        self.assertReports(HEAD + "[ロール「司書」] が貸し出す。\n\n" + definition, "r-librarian")

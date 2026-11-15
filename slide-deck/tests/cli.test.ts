@@ -1,4 +1,4 @@
-// 入口 src/cli.ts のサブコマンド check・pptx・requests のテスト (計画の U5 と U6 の Test scenarios)。
+// 入口 src/cli.ts のサブコマンド check-outline・check・pptx・requests・write-info のテスト (計画の U5・U6・U9)。
 // プラグインのディレクトリのコピー (node_modules を持たない) の入口を、一時的なキャッシュのディレクトリを指定して実行する
 // (補助はファイル tests/helpers/cache.ts)。
 
@@ -435,6 +435,137 @@ describe("requests", () => {
   });
 });
 
+/** プラグインのファイル .claude-plugin/plugin.json の版 */
+const PLUGIN_VERSION = (JSON.parse(readFileSync(join(PLUGIN_DIR, ".claude-plugin", "plugin.json"), "utf8")) as { version: string })
+  .version;
+
+const SLIDES_URL = "https://docs.google.com/presentation/d/abc_DEF-123/edit";
+
+describe("check-outline", () => {
+  test("deck.ts とキャッシュのライブラリが無くても、見本の構成案を検査して資料の情報を示し、終了コード 0 になる", () => {
+    const empty = makeSandbox({ nodeModules: false });
+    try {
+      const deck = empty.copySample();
+      rmSync(join(deck, "deck.ts"));
+      const r = spawnSync(process.execPath, [empty.cli, "check-outline", deck], { env: empty.env, encoding: "utf8" });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.equal(
+        r.stdout,
+        [
+          "構成案の書式の誤りは無い (スライド 4 枚)",
+          "Google スライド: 無い",
+          `slide-deck の版: 無い (今の版: ${PLUGIN_VERSION})`,
+          "固有名: 一般化する",
+          "",
+        ].join("\n"),
+      );
+      assert.equal(existsSync(join(deck, "build")), false);
+    } finally {
+      empty.cleanup();
+    }
+  });
+
+  test("Google スライドの URL と slide-deck の版の行があれば、資料の ID と、構成案の版と今の版を示す", () => {
+    const deck = sandbox.copySample();
+    edit(deck, "outline.md", "- 固有名: 一般化する\n", `- 固有名: 一般化する\n- Google スライド: ${SLIDES_URL}\n- slide-deck の版: 0.0.9\n`);
+    const r = runCli(["check-outline", deck]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, new RegExp(`^Google スライド: ${SLIDES_URL} \\(資料の ID: abc_DEF-123\\)$`, "m"));
+    assert.match(r.stdout, new RegExp(`^slide-deck の版: 0\\.0\\.9 \\(今の版: ${PLUGIN_VERSION.replaceAll(".", "\\.")}\\)$`, "m"));
+  });
+
+  test("【提案】が付いたスライドは、指摘にせずに一覧を示し、終了コード 0 になる", () => {
+    const deck = sandbox.copySample();
+    edit(deck, "outline.md", "### stale: 古い値が残る", "### 【提案】stale: 古い値が残る");
+    const r = runCli(["check-outline", deck]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^【提案】が付いたスライド \(採否を利用者に質問する\):\n {2}\d+ 行目: stale: 古い値が残る$/m);
+  });
+
+  test("書式の誤りは、行番号を付けてすべて示し、終了コード 1 になる", () => {
+    const deck = sandbox.copySample();
+    edit(deck, "outline.md", "- 一言: 2 回目からは", "- ひとこと: 2 回目からは");
+    edit(deck, "outline.md", "### expire: 期限と消し方", "### Expire: 期限と消し方");
+    const r = runCli(["check-outline", deck]);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /^構成案 outline\.md の書式の誤り:\n/);
+    assert.equal(r.stdout.split("\n").filter((l) => /^ {2}\d+ 行目: /.test(l)).length >= 2, true, r.stdout);
+  });
+
+  test("outline.md が無いと、終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    rmSync(join(deck, "outline.md"));
+    const r = runCli(["check-outline", deck]);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /構成案 .*outline\.md が無い/);
+  });
+});
+
+describe("write-info", () => {
+  test("--google-slides と --plugin-version で、資料の情報の最後に 2 行を足し、ほかの行を変えない", () => {
+    const deck = sandbox.copySample();
+    const before = readFileSync(join(deck, "outline.md"), "utf8");
+    const r = runCli(["write-info", deck, "--google-slides", SLIDES_URL, "--plugin-version"]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(r.stdout, `書き込んだ:\n  - Google スライド: ${SLIDES_URL}\n  - slide-deck の版: ${PLUGIN_VERSION}\n`);
+    const added = `- 固有名: 一般化する\n- Google スライド: ${SLIDES_URL}\n- slide-deck の版: ${PLUGIN_VERSION}\n`;
+    assert.equal(readFileSync(join(deck, "outline.md"), "utf8"), before.replace("- 固有名: 一般化する\n", added));
+  });
+
+  test("行が既にあれば、その行だけを置き換える", () => {
+    const deck = sandbox.copySample();
+    edit(deck, "outline.md", "- 固有名: 一般化する\n", "- 固有名: 一般化する\n- slide-deck の版: 0.0.9\n");
+    const before = readFileSync(join(deck, "outline.md"), "utf8");
+    const r = runCli(["write-info", deck, "--plugin-version"]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(
+      readFileSync(join(deck, "outline.md"), "utf8"),
+      before.replace("- slide-deck の版: 0.0.9", `- slide-deck の版: ${PLUGIN_VERSION}`),
+    );
+  });
+
+  test("スライドの部分に書式の誤りがあっても書き込む", () => {
+    const deck = sandbox.copySample();
+    edit(deck, "outline.md", "- 一言: 2 回目からは", "- ひとこと: 2 回目からは");
+    const r = runCli(["write-info", deck, "--google-slides", SLIDES_URL]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(readFileSync(join(deck, "outline.md"), "utf8").includes(`- Google スライド: ${SLIDES_URL}\n`));
+  });
+
+  test("資料の情報に誤りがあると、誤りを示して終了コード 1 になり、ファイルを変えない", () => {
+    const deck = sandbox.copySample();
+    edit(deck, "outline.md", "- 読者: キャッシュを使ったことが少ない開発者\n", "");
+    const before = readFileSync(join(deck, "outline.md"), "utf8");
+    const r = runCli(["write-info", deck, "--google-slides", SLIDES_URL, "--plugin-version"]);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /^構成案 outline\.md の資料の情報の誤り \(書き込んでいない\):\n {2}\d+ 行目: /);
+    assert.equal(readFileSync(join(deck, "outline.md"), "utf8"), before);
+  });
+
+  test("URL の形が違うと、終了コード 2 になり、ファイルを変えない", () => {
+    const deck = sandbox.copySample();
+    const before = readFileSync(join(deck, "outline.md"), "utf8");
+    const r = runCli(["write-info", deck, "--google-slides", "https://example.com/d/x", "--plugin-version"]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /https:\/\/docs\.google\.com\/presentation\/d\/<資料の ID> で始まる URL ではない/);
+    assert.equal(readFileSync(join(deck, "outline.md"), "utf8"), before);
+  });
+
+  test("--google-slides と --plugin-version のどちらも無いと、説明を示して終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["write-info", deck]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /少なくとも 1 つを指定する/);
+  });
+
+  test("--google-slides と --plugin-version は、ほかのサブコマンドでは終了コード 2 になる", () => {
+    const deck = sandbox.copySample();
+    const r = runCli(["check-outline", deck, "--plugin-version"]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /サブコマンド write-info だけで使う/);
+  });
+});
+
 describe("--help", () => {
   test("requests --help が、読み込みで指定する項目と、指示のファイルの字数の上限を示す", () => {
     const r = runCli(["requests", "--help"]);
@@ -444,7 +575,7 @@ describe("--help", () => {
     assert.ok(r.stdout.includes(`${String(MAX_FILE_CHARS)} 字以下`));
   });
 
-  for (const name of ["check", "pptx", "requests"]) {
+  for (const name of ["check-outline", "check", "pptx", "requests", "write-info"]) {
     test(`${name} --help が、引数・出力・終了コードを示す`, () => {
       const r = runCli([name, "--help"]);
       assert.equal(r.status, 0, r.stderr);

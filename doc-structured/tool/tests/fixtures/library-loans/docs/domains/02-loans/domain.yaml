@@ -32,3 +32,50 @@ unclassified_app_terms:
   business_day:
     name_ja: 開館日
     definition: 図書館が利用者に開いている日。休館日を除く。
+operations:
+  lend:
+    name_ja: 貸し出す
+    definition: 利用者に図書を貸し出し、貸出を作る。
+    targets:
+      - d-loans-m-loan
+      - d-catalog-m-book-a-shelf_status
+    preconditions:
+      - d-loans-pre-book_shelved
+    events:
+      - d-loans-ev-book_lent
+    roles:
+      - r-librarian
+  return_book:
+    name_ja: 返却を受け付ける
+    definition: 返された図書を受け取り、貸出を返却済みにする。
+    targets:
+      - d-loans-m-loan-a-status
+    preconditions:
+      - d-loans-pre-loan_on_loan
+    events:
+      - d-loans-ev-book_returned
+    roles:
+      - r-librarian
+  notify_overdue:
+    name_ja: 延滞を通知する
+    definition: 返却期限を過ぎた貸出の利用者に、毎朝まとめて知らせる。どのロールも行わず、アプリケーションが自分で行う。
+    targets:
+      - d-loans-m-loan
+preconditions:
+  book_shelved:
+    name_ja: 図書が配架中
+    definition: 貸し出す図書が書架にある。
+    targets:
+      - d-catalog-m-book-a-shelf_status-v-shelved
+  loan_on_loan:
+    name_ja: 貸出が貸出中
+    definition: 返す図書の貸出が、まだ返却されていない。
+    targets:
+      - d-loans-m-loan-a-status-v-on_loan
+events:
+  book_lent:
+    name_ja: 図書を貸し出した
+    definition: 図書が利用者の手元に移った。
+  book_returned:
+    name_ja: 図書が返却された
+    definition: 図書が図書館に戻った。

@@ -79,6 +79,139 @@ class GenerateTest(ProjectTestCase):
         names = sorted(generated_files(self.project))
         self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
 
+    def test_functions_md_lists_preconditions_then_events(self):
+        self.write(
+            "docs/domains/01-loans/domain.yaml",
+            MINIMAL
+            + "events:\n  lent:\n    name_ja: 貸し出した\n    definition: 手元に移った。\n"
+            + "preconditions:\n  loan_exists:\n    name_ja: 貸出がある\n    definition: 貸出がある。\n"
+            + "    targets: [d-loans-m-loan]\n"
+            + "  free:\n    name_ja: 空いている\n    definition: 空いている。\n",
+        )
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        outputs = render_project(project)
+        functions = outputs["docs/domains/01-loans/functions.md"]
+        body = functions.split("\n", 1)[1]
+        self.assertEqual(body, (
+            '<a name="d-loans-functions"></a>\n\n'
+            "# ドメイン `loans` の操作・前提・イベント\n\n"
+            '<a name="d-loans-pre-loan_exists"></a>\n\n## 前提「貸出がある」 `loan_exists`\n\n貸出がある。\n\n'
+            "- 対象: [モデル「貸出」][d-loans-m-loan]\n\n"
+            '<a name="d-loans-pre-free"></a>\n\n## 前提「空いている」 `free`\n\n空いている。\n\n'
+            '<a name="d-loans-ev-lent"></a>\n\n## イベント「貸し出した」 `lent`\n\n手元に移った。\n\n'
+            '[d-loans-m-loan]: models.md#d-loans-m-loan "ドメイン `loans` のモデル「貸出」"\n'
+        ))
+        self.assertIn("| [`functions.md`][d-loans-functions] | 操作・前提・イベントの定義 |", outputs["docs/domains/01-loans/README.md"])
+        self.assertIn("| [貸出がある][d-loans-pre-loan_exists] | 前提 | `loan_exists` |", outputs["docs/domains/01-loans/terms.md"])
+        self.assertIn(
+            "| [貸し出した][d-loans-ev-lent] | イベント | `lent` | [`loans`][d-loans] |", outputs["docs/glossary.md"]
+        )
+
+    def test_functions_md_is_not_generated_without_preconditions_and_events(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        project, _ = load_project(self.project)
+        self.assertNotIn("docs/domains/01-loans/functions.md", render_project(project))
+
+    def test_roles_are_written_to_permissions_md_and_glossary(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        self.write(
+            "docs/system/roles.yaml",
+            "roles:\n  member:\n    name_ja: 利用者\n    definition: 予約する人。\n"
+            "  librarian:\n    name_ja: 司書\n    definition: 窓口の職員。\n",
+        )
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        outputs = render_project(project)
+        permissions = outputs["docs/system/permissions.md"]
+        self.assertTrue(permissions.startswith("<!-- doc-structured:generated 生成元: docs/ コマンド:"))
+        # ファイルのアンカーは無い。ロールは roles.yaml に書いた順
+        self.assertEqual(permissions.split("\n", 1)[1], (
+            "\n# ロールと操作\n\n"
+            '<a name="r-member"></a>\n\n## ロール「利用者」 `member`\n\n予約する人。\n\n'
+            '<a name="r-librarian"></a>\n\n## ロール「司書」 `librarian`\n\n窓口の職員。\n'
+        ))
+        glossary = outputs["docs/glossary.md"]
+        self.assertTrue(glossary.startswith("<!-- doc-structured:generated 生成元: docs/ コマンド:"))
+        self.assertIn("| [司書][r-librarian] | ロール | `librarian` | |\n", glossary)
+        self.assertIn('[r-librarian]: system/permissions.md#r-librarian "ロール「司書」"', glossary)
+        self.assertNotIn("r-librarian", outputs["docs/domains/01-loans/terms.md"])
+        self.assertIn("/system/permissions.md merge=binary", outputs["docs/.gitattributes"])
+        self.assertTrue(outputs["docs/.gitattributes"].startswith("# doc-structured:generated 生成元: docs/ "))
+
+    def test_without_roles_the_source_of_glossary_stays_domains(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        project, _ = load_project(self.project)
+        outputs = render_project(project)
+        self.assertNotIn("docs/system/permissions.md", outputs)
+        self.assertTrue(outputs["docs/glossary.md"].startswith("<!-- doc-structured:generated 生成元: docs/domains/ "))
+
+    def test_operations_in_functions_md_and_permissions_md(self):
+        self.write(
+            "docs/domains/01-loans/domain.yaml",
+            MINIMAL
+            + "preconditions:\n  loan_exists:\n    name_ja: 貸出がある\n    definition: 貸出がある。\n"
+            + "operations:\n"
+            + "  lend:\n    name_ja: 貸し出す\n    definition: 貸し出す。\n"
+            + "    targets: [d-loans-m-loan]\n    preconditions: [d-loans-pre-loan_exists]\n    roles: [r-librarian]\n"
+            + "  notify:\n    name_ja: 通知する\n    definition: 毎朝知らせる。\n",
+        )
+        self.write(
+            "docs/domains/02-members/domain.yaml",
+            "domain:\n  description: 利用者。\n"
+            "operations:\n  register:\n    name_ja: 登録する\n    definition: 登録する。\n"
+            "    roles: [r-member, r-librarian]\n",
+        )
+        self.write(
+            "docs/system/roles.yaml",
+            "roles:\n  librarian:\n    name_ja: 司書\n    definition: 職員。\n"
+            "  member:\n    name_ja: 利用者\n    definition: 予約する人。\n",
+        )
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        outputs = render_project(project)
+        functions = outputs["docs/domains/01-loans/functions.md"]
+        # 操作が前提より先。roles を省いた操作には「行えるロール: 無し」
+        self.assertIn(
+            '<a name="d-loans-op-lend"></a>\n\n## 操作「貸し出す」 `lend`\n\n貸し出す。\n\n'
+            "- 対象: [モデル「貸出」][d-loans-m-loan]\n"
+            "- 前提: [前提「貸出がある」][d-loans-pre-loan_exists]\n"
+            "- 行えるロール: [ロール「司書」][r-librarian]\n\n"
+            '<a name="d-loans-op-notify"></a>\n\n## 操作「通知する」 `notify`\n\n毎朝知らせる。\n\n'
+            "- 行えるロール: 無し\n\n"
+            '<a name="d-loans-pre-loan_exists"></a>',
+            functions,
+        )
+        self.assertIn('[r-librarian]: ../../system/permissions.md#r-librarian "ロール「司書」"', functions)
+        permissions = outputs["docs/system/permissions.md"]
+        # すべてのロールと操作の組み合わせが出る (クローズ条件)。列はロールを roles.yaml に書いた順
+        self.assertIn(
+            "## 操作ごとの、行えるロール\n\n"
+            "| 操作 | ドメイン | [司書][r-librarian] | [利用者][r-member] |\n"
+            "|---|---|---|---|\n"
+            "| [貸し出す][d-loans-op-lend] | [`loans`][d-loans] | ○ | |\n"
+            "| [通知する][d-loans-op-notify] | [`loans`][d-loans] | | |\n"
+            "| [登録する][d-members-op-register] | [`members`][d-members] | ○ | ○ |\n",
+            permissions,
+        )
+        self.assertIn('[d-loans-op-lend]: ../domains/01-loans/functions.md#d-loans-op-lend "ドメイン `loans` の操作「貸し出す」"', permissions)
+        self.assertIn("| [貸し出す][d-loans-op-lend] | 操作 | `lend` |", outputs["docs/domains/01-loans/terms.md"])
+
+    def test_permissions_md_without_operations_has_no_table(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        self.write("docs/system/roles.yaml", "roles:\n  librarian:\n    name_ja: 司書\n    definition: 職員。\n")
+        project, _ = load_project(self.project)
+        self.assertNotIn("操作ごとの、行えるロール", render_project(project)["docs/system/permissions.md"])
+
+    def test_permissions_md_with_operations_and_without_roles(self):
+        self.write(
+            "docs/domains/01-loans/domain.yaml",
+            MINIMAL + "operations:\n  notify:\n    name_ja: 通知する\n    definition: 毎朝知らせる。\n",
+        )
+        project, _ = load_project(self.project)
+        permissions = render_project(project)["docs/system/permissions.md"]
+        self.assertIn("| 操作 | ドメイン |\n|---|---|\n| [通知する][d-loans-op-notify] | [`loans`][d-loans] |\n", permissions)
+
     def test_readme_lists_handwritten_files_first(self):
         self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")
         self.write("docs/domains/01-loans/domain.yaml", MINIMAL)

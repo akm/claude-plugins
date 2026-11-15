@@ -170,6 +170,21 @@
         "ref": "main"
       },
       "tags": ["github", "issue", "release", "workflow", "skills"]
+    },
+    {
+      "name": "slide-deck",
+      "description": "図を中心にした説明資料を、構成案から PowerPoint のファイルと Google スライドの両方に作り、内容が変わったスライドだけを直す skill 3 つ (構成案・PowerPoint のファイル・Google スライド) と、TypeScript と Python のツール",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "slide-deck",
+        "ref": "main"
+      },
+      "tags": ["slides", "powerpoint", "google-slides", "diagram", "skills"]
     }
   ]
 }

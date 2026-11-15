@@ -9,3 +9,11 @@ models:
       name:
         name_ja: 氏名
         definition: 利用者の名前。
+operations:
+  register:
+    name_ja: 利用者を登録する
+    definition: 図書館に新しい利用者を登録する。
+    targets:
+      - d-members-m-member
+    roles:
+      - r-librarian

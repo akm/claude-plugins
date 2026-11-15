@@ -1,11 +1,11 @@
 ---
 name: generate
-description: プラグイン doc-structured の構成で、ドメインの YAML (docs/domains/ の下) から、モデルの文書・未分類のアプリケーション用語の文書・用語の索引を生成し直す。「文書を生成して」「YAML を直したので生成し直して」「doc-structured:generate を実行して」のような依頼や、スキル doc-structured:check の検査 a が失敗したときに使う。
+description: プラグイン doc-structured の構成で、ドメインの YAML (docs/domains/ の下) とロールの YAML (docs/system/roles.yaml) から、モデルの文書・未分類のアプリケーション用語の文書・操作と前提とイベントの文書・用語の索引・ロールと操作の表を生成し直す。「文書を生成して」「YAML を直したので生成し直して」「doc-structured:generate を実行して」のような依頼や、スキル doc-structured:check の検査 a が失敗したときに使う。
 ---
 
 # doc-structured:generate: 生成したファイルを作り直す
 
-ドメインの YAML から、生成したファイル (ドメインごとの `README.md`・`models.md`・`unclassified_app_terms.md`・`terms.md` と、全体の `docs/glossary.md`) を作り直す。形式と規則の SSOT (single source of truth。ある事実を定めている唯一の記述) は、プラグインの規則の文書 [doc-structured-domains.md](../../rules/doc-structured-domains.md) と [doc-structured-docs.md](../../rules/doc-structured-docs.md)。
+ドメインの YAML とロールの YAML から、生成したファイル (ドメインごとの `README.md`・`models.md`・`unclassified_app_terms.md`・`functions.md`・`terms.md` と、全体の `docs/glossary.md`・`docs/system/permissions.md`) を作り直す。形式と規則の SSOT (single source of truth。ある事実を定めている唯一の記述) は、プラグインの規則の文書 [doc-structured-domains.md](../../rules/doc-structured-domains.md) と [doc-structured-docs.md](../../rules/doc-structured-docs.md)。
 
 生成したファイルは手で直さない。直すときは生成元の YAML を直してから、このスキルを実行する。
 
