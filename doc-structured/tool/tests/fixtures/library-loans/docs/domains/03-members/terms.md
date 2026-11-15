@@ -6,7 +6,9 @@
 | 用語 | 種類 | 英語名 |
 |---|---|---|
 | [利用者][d-members-m-member] | モデル | `member` |
+| [利用者を登録する][d-members-op-register] | 操作 | `register` |
 | [氏名][d-members-m-member-a-name] | モデル「利用者」の属性 | `name` |
 
 [d-members-m-member]: models.md#d-members-m-member "ドメイン `members` のモデル「利用者」"
 [d-members-m-member-a-name]: models.md#d-members-m-member-a-name "ドメイン `members` のモデル「利用者」の属性「氏名」"
+[d-members-op-register]: functions.md#d-members-op-register "ドメイン `members` の操作「利用者を登録する」"

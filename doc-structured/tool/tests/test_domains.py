@@ -106,8 +106,9 @@ class CheckHTest(ProjectTestCase):
 
     def test_unknown_keys(self):
         self.assert_problem(
-            {"docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN + "operations: {}\n"},
-            "docs/domains/01-loans/domain.yaml:7:1: 検査 h: 知らないキー operations",
+            {"docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN + "screens: {}\n"},
+            "docs/domains/01-loans/domain.yaml:7:1: 検査 h: 知らないキー screens (書けるキー: domain, models, "
+            "unclassified_app_terms, operations, preconditions, events)",
         )
         self.setUp()
         # 値は属性の下にだけ書ける
@@ -366,6 +367,131 @@ class RoleTest(CheckHTest):
             with self.subTest(text=text):
                 self.setUp()
                 self.assert_problem({"docs/system/roles.yaml": text}, f"docs/system/roles.yaml:{expected}")
+
+
+OPERATION_DOMAIN = MINIMAL_DOMAIN + """\
+preconditions:
+  loan_exists:
+    name_ja: 貸出がある
+    definition: 返す図書の貸出がある。
+events:
+  lent:
+    name_ja: 貸し出した
+    definition: 図書が手元に移った。
+operations:
+  lend:
+    name_ja: 貸し出す
+    definition: 図書を貸し出す。
+"""
+# OPERATION_DOMAIN の操作 lend の行。OPERATION_DOMAIN の後に足した行は、この 3 行後になる
+OPERATION_KEY_LINE = 16
+
+
+class OperationTest(CheckHTest):
+    """操作。成功する例と、検査 h が失敗する例。"""
+
+    def files(self, extra: str = "") -> dict[str, str]:
+        return {"docs/domains/01-loans/domain.yaml": OPERATION_DOMAIN + extra, "docs/system/roles.yaml": ROLES}
+
+    def test_sample_operations(self):
+        project, problems = load_project(self.copy_sample())
+        self.assertEqual([p.format() for p in problems], [])
+        loans = project.domains[1]
+        self.assertEqual(
+            [e.id for e in loans.operations],
+            ["d-loans-op-lend", "d-loans-op-return_book", "d-loans-op-notify_overdue", "d-loans-op-reserve"],
+        )
+        lend = project.entries["d-loans-op-lend"]
+        self.assertEqual(lend.full_name(), "ドメイン `loans` の操作「貸し出す」")
+        self.assertEqual(
+            [(r.key, r.target) for r in lend.references],
+            [
+                ("targets", "d-loans-m-loan"),
+                ("targets", "d-catalog-m-book-a-shelf_status"),
+                ("preconditions", "d-loans-pre-book_shelved"),
+                ("events", "d-loans-ev-book_lent"),
+                ("roles", "r-librarian"),
+            ],
+        )
+        self.assertEqual(project.entries["d-loans-op-notify_overdue"].references[0].key, "targets")
+
+    def test_operation_with_every_key_is_valid(self):
+        extra = (
+            "    targets: [d-loans-m-loan]\n    preconditions: [d-loans-pre-loan_exists]\n"
+            "    events: [d-loans-ev-lent]\n    roles: [r-librarian]\n"
+        )
+        self.assertEqual(self.problems_for(self.files(extra)), [])
+
+    def test_operation_without_optional_keys_is_valid(self):
+        self.assertEqual(self.problems_for(self.files()), [])
+
+    def test_reference_to_missing_role_fails(self):
+        # クローズ条件: 存在しないロールを参照する操作で、検査 h が失敗する
+        self.assert_problem(
+            self.files("    roles: [r-clerk]\n"),
+            f"docs/domains/01-loans/domain.yaml:{OPERATION_KEY_LINE + 3}:13: 検査 h: 操作 lend の roles の参照先 r-clerk が無い",
+        )
+        self.setUp()
+        # ファイル roles.yaml が無いときも、参照先が無い
+        self.assert_problem(
+            {"docs/domains/01-loans/domain.yaml": OPERATION_DOMAIN + "    roles: [r-librarian]\n"},
+            "検査 h: 操作 lend の roles の参照先 r-librarian が無い",
+        )
+
+    def test_reference_errors(self):
+        line = OPERATION_KEY_LINE + 3
+        prefix = f"docs/domains/01-loans/domain.yaml:{line}"
+        for extra, expected in (
+            ("    roles: []\n", ":12: 検査 h: 操作 lend の roles は、空の配列にできない (行えるロールが無い操作は、roles を省く)"),
+            ("    roles: r-librarian\n", ":12: 検査 h: 操作 lend の roles は、ID の文字列の配列でなければならない"),
+            ("    roles: [r-librarian, r-librarian]\n", ":26: 検査 h: 操作 lend の roles に r-librarian が 2 回ある"),
+            ("    roles: [d-loans-m-loan]\n", ":13: 検査 h: 操作 lend の roles の参照先 d-loans-m-loan はロールでない (参照できるのはロールだけ)"),
+            ("    targets: []\n", ":14: 検査 h: 操作 lend の targets は、空の配列にできない (参照が無いときは、targets を省く)"),
+            ("    targets: [d-loans-m-book]\n", ":15: 検査 h: 操作 lend の targets の参照先 d-loans-m-book が無い"),
+            (
+                "    targets: [d-loans-pre-loan_exists]\n",
+                ":15: 検査 h: 操作 lend の targets の参照先 d-loans-pre-loan_exists はモデルか属性でない (参照できるのはモデルか属性だけ)",
+            ),
+            ("    preconditions: [d-loans-ev-lent]\n", ":21: 検査 h: 操作 lend の preconditions の参照先 d-loans-ev-lent は前提でない (参照できるのは前提だけ)"),
+            ("    preconditions: [d-loans-pre-free]\n", ":21: 検査 h: 操作 lend の preconditions の参照先 d-loans-pre-free が無い"),
+            ("    events: [d-loans-pre-loan_exists]\n", ":14: 検査 h: 操作 lend の events の参照先 d-loans-pre-loan_exists はイベントでない (参照できるのはイベントだけ)"),
+            ("    events: [lent]\n", ":14: 検査 h: 操作 lend の events の値が ID の形でない"),
+        ):
+            with self.subTest(extra=extra):
+                self.setUp()
+                self.assert_problem(self.files(extra), prefix + expected)
+
+    def test_targets_of_operation_cannot_refer_to_values(self):
+        text = MINIMAL_DOMAIN + (
+            "    attributes:\n      status:\n        name_ja: 貸出状態\n        definition: 段階。\n"
+            "        values:\n          on_loan:\n            name_ja: 貸出中\n            definition: 手元にある。\n"
+            "operations:\n  lend:\n    name_ja: 貸し出す\n    definition: 貸し出す。\n"
+            "    targets: [d-loans-m-loan-a-status, d-loans-m-loan-a-status-v-on_loan]\n"
+        )
+        self.assertEqual(
+            self.problems_for({"docs/domains/01-loans/domain.yaml": text}),
+            [
+                "docs/domains/01-loans/domain.yaml:19:40: 検査 h: 操作 lend の targets の参照先 "
+                "d-loans-m-loan-a-status-v-on_loan はモデルか属性でない (参照できるのはモデルか属性だけ)"
+            ],
+        )
+
+    def test_duplicate_operation_in_two_files(self):
+        self.assert_problem(
+            {
+                **self.files(),
+                "docs/domains/01-loans/sub/more.yaml": "operations:\n  lend:\n    name_ja: 貸し出す\n    definition: x。\n",
+            },
+            f"docs/domains/01-loans/sub/more.yaml:2:3: 検査 h: 操作 lend は、docs/domains/01-loans/domain.yaml:{OPERATION_KEY_LINE} にもある",
+        )
+
+    def test_operation_can_refer_to_other_domains(self):
+        files = self.files("    preconditions: [d-members-pre-registered]\n")
+        files["docs/domains/02-members/domain.yaml"] = (
+            "domain:\n  description: 利用者。\n"
+            "preconditions:\n  registered:\n    name_ja: 登録済み\n    definition: 登録している。\n"
+        )
+        self.assertEqual(self.problems_for(files), [])
 
 
 if __name__ == "__main__":

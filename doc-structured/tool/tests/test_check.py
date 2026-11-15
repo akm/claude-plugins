@@ -34,6 +34,16 @@ class CheckTest(ProjectTestCase):
                 self.assertTrue(result.stdout.endswith(": 問題は無かった\n"), result.stdout)
         self.assertEqual(self.run_check().stdout, "検査 a・b・c-2・h・i・k: 問題は無かった\n")
 
+    def test_operation_referring_to_missing_role_fails_check_h(self):
+        # クローズ条件: 存在しないロールを参照する操作で、検査 h が失敗する
+        path = self.project / "docs/domains/02-loans/domain.yaml"
+        path.write_text(path.read_text(encoding="utf-8").replace("- r-librarian", "- r-clerk", 1), encoding="utf-8")
+        result = self.run_check()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertRegex(
+            result.stdout, r"docs/domains/02-loans/domain\.yaml:\d+:9: 検査 h: 操作 lend の roles の参照先 r-clerk が無い"
+        )
+
     def test_check_a_reports_hand_edited_file_with_source_and_command(self):
         path = self.project / MODELS
         path.write_text(path.read_text(encoding="utf-8").replace("貸し出した図書。", "貸し出した本。"), encoding="utf-8")

@@ -4,9 +4,11 @@
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 直下の domain.yaml にだけ、キー domain (説明 description) を書く
   - どのファイルにも、キー models (モデル・属性・値)・unclassified_app_terms (未分類のアプリケーション用語)・
-    preconditions (前提)・events (イベント) を書ける
+    operations (操作)・preconditions (前提)・events (イベント) を書ける
   - 英語名をマッピングのキーにし、日本語名を name_ja、定義を definition に書く
   - 属性は、ほかのモデルへの参照 refers_to (完全な ID) と、値 values を持てる
+  - 操作は、モデルか属性への参照 targets・前提への参照 preconditions・イベントへの参照 events・行えるロールへの参照 roles
+    (どれも完全な ID の配列) を持てる。roles を省いた操作は、どのロールも行わない操作 (アプリケーションが自分で行う処理)
   - 前提は、モデル・属性・値への参照 targets (完全な ID の配列) を持てる
 ロールは、ドメインの外のファイル docs/system/roles.yaml のキー roles に書く。ロールは親を持たない (ID は r-<英語名>)。
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
@@ -28,20 +30,27 @@ DOMAIN_FILE = "domain.yaml"
 DOMAIN_DIR_RE = re.compile(r"^(\d{2,})-(.+)$")
 ROLES_FILE = Path("docs/system/roles.yaml")
 
-TOP_KEYS = ("domain", "models", "unclassified_app_terms", "preconditions", "events")
+TOP_KEYS = ("domain", "models", "unclassified_app_terms", "operations", "preconditions", "events")
 DOMAIN_KEYS = ("description",)
 MODEL_KEYS = ("name_ja", "definition", "attributes")
 ATTRIBUTE_KEYS = ("name_ja", "definition", "values", "refers_to")
 VALUE_KEYS = ("name_ja", "definition")
 TERM_KEYS = ("name_ja", "definition")
+OPERATION_KEYS = ("name_ja", "definition", "targets", "preconditions", "events", "roles")
 PRECONDITION_KEYS = ("name_ja", "definition", "targets")
 EVENT_KEYS = ("name_ja", "definition")
 ROLES_TOP_KEYS = ("roles",)
 ROLE_KEYS = ("name_ja", "definition")
 # 完全な ID の配列で書く参照。定義の種類の記号とキーから、参照できる種類の記号と、メッセージに書くその名前への対応
 LIST_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
+    ("op", "targets"): (("m", "a"), "モデルか属性"),
+    ("op", "preconditions"): (("pre",), "前提"),
+    ("op", "events"): (("ev",), "イベント"),
+    ("op", "roles"): (("r",), "ロール"),
     ("pre", "targets"): (("m", "a", "v"), "モデル・属性・値"),
 }
+# 空の配列を書いたときに、メッセージに添える直し方。書いていないキーは「参照が無いときは、<キー> を省く」
+EMPTY_LIST_HINTS = {"roles": "行えるロールが無い操作は、roles を省く"}
 REQUIRED_KEYS = ("name_ja", "definition")
 # read_yaml が、YAML として読めないファイルに返す値 (空のファイルの None と区別する)
 _UNREADABLE = object()
@@ -66,7 +75,7 @@ class Reference:
 
 @dataclass
 class Entry:
-    """名前と定義を持つ 1 つの定義 (モデル・属性・値・未分類のアプリケーション用語・前提・イベント・ロール)。"""
+    """名前と定義を持つ 1 つの定義 (モデル・属性・値・未分類のアプリケーション用語・操作・前提・イベント・ロール)。"""
 
     id: str
     symbol: str
@@ -121,6 +130,7 @@ class Domain:
     description: str = ""
     models: list[Entry] = field(default_factory=list)
     terms: list[Entry] = field(default_factory=list)  # 未分類のアプリケーション用語
+    operations: list[Entry] = field(default_factory=list)
     preconditions: list[Entry] = field(default_factory=list)
     events: list[Entry] = field(default_factory=list)
     yaml_files: list[str] = field(default_factory=list)
@@ -133,10 +143,11 @@ class Domain:
         return names.format_part("d", self.name)
 
     def entries(self):
-        """モデル (その属性と値を含む)・未分類のアプリケーション用語・前提・イベントを、定義の並び順に返す。"""
+        """モデル (その属性と値を含む)・未分類のアプリケーション用語・操作・前提・イベントを、定義の並び順に返す。"""
         for model in self.models:
             yield from model.walk()
         yield from self.terms
+        yield from self.operations
         yield from self.preconditions
         yield from self.events
 
@@ -232,6 +243,7 @@ class _Loader:
             self.problem(domain.dir, f"ドメインのディレクトリの直下に {DOMAIN_FILE} が無い")
         model_names: dict[str, Entry] = {}
         term_names: dict[str, Entry] = {}
+        operation_names: dict[str, Entry] = {}
         precondition_names: dict[str, Entry] = {}
         event_names: dict[str, Entry] = {}
         for path in files:
@@ -258,6 +270,8 @@ class _Loader:
                     self.load_models(domain, data, path_rel, model_names)
                 elif key == "unclassified_app_terms":
                     self.load_terms(domain, data, path_rel, term_names)
+                elif key == "operations":
+                    self.load_list(domain, data, key, "op", OPERATION_KEYS, path_rel, operation_names, domain.operations)
                 elif key == "preconditions":
                     self.load_list(domain, data, key, "pre", PRECONDITION_KEYS, path_rel, precondition_names, domain.preconditions)
                 elif key == "events":
@@ -439,7 +453,7 @@ class _Loader:
         seen: dict[str, Entry],
         found: list[Entry],
     ) -> None:
-        """ドメインの下に並べる種類 (未分類のアプリケーション用語・前提・イベント) と、ロール (domain は None) の定義を読み、
+        """ドメインの下に並べる種類 (未分類のアプリケーション用語・操作・前提・イベント) と、ロール (domain は None) の定義を読み、
         found に足す。"""
         mapping = self.mapping_of(data, key, path_rel)
         if mapping is None:
@@ -468,10 +482,8 @@ class _Loader:
             self.problem(path_rel, not_list, *_value_position(mapping, key))
             return
         if not value:
-            self.problem(
-                path_rel, f"{entry.owner} の {key} は、空の配列にできない (参照が無いときは、{key} を省く)",
-                *_value_position(mapping, key),
-            )
+            hint = EMPTY_LIST_HINTS.get(key, f"参照が無いときは、{key} を省く")
+            self.problem(path_rel, f"{entry.owner} の {key} は、空の配列にできない ({hint})", *_value_position(mapping, key))
             return
         seen: set[str] = set()
         for i, item in enumerate(value):

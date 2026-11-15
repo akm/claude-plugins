@@ -11,6 +11,7 @@
 /domains/02-loans/terms.md merge=binary
 /domains/02-loans/unclassified_app_terms.md merge=binary
 /domains/03-members/README.md merge=binary
+/domains/03-members/functions.md merge=binary
 /domains/03-members/models.md merge=binary
 /domains/03-members/terms.md merge=binary
 /glossary.md merge=binary

@@ -38,6 +38,7 @@ KINDS: dict[str, Kind] = {
         Kind("a", "属性", True, ("m",)),
         Kind("v", "値", True, ("a",)),
         Kind("ut", "未分類のアプリケーション用語", True, ("d",)),
+        Kind("op", "操作", True, ("d",)),
         Kind("pre", "前提", True, ("d",)),
         Kind("ev", "イベント", True, ("d",)),
         Kind("r", "ロール", True, ()),
