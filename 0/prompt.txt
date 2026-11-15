@@ -1,0 +1,28 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins のプラグイン issue-practice (GitHub の Issue の使い方をスキルにしたもの) の実装は、管理 Issue #239 の作業 Issue に分けて進めている。U1〜U3 (#266〜#268) は PR #271・#273・#274 でマージ済み。計画はファイル docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md。#278 は、PR #274 で足したモジュール issue-practice/scripts/issue_practice/managing.py のバグで、管理セッションが sub-agent に確認させて見つけた。PR マージ計画では、#278 は #269 (U4) の前にマージする。文書と日本語の文章は、リポジトリの CLAUDE.md の規則と wording-guard の検査に従う。
+
+Task:
+あなたは作業 Issue https://github.com/akm/claude-plugins/issues/278 の作業セッションです。スキル issue-practice:working-issue を使って進めてください。
+
+- 作業 Issue: https://github.com/akm/claude-plugins/issues/278 (managing apply が、managing plan の成功の後に、作業 Issue を作ってから終了コード 3 で終了する)
+- 管理 Issue: https://github.com/akm/claude-plugins/issues/239
+- 報告先の管理セッション: claude-plugins#239 管理: Issue の使い方のスキル (ID: local_7eefe131-5f84-4c43-b029-e14eb2449d29)
+- ブランチ: fix/278-managing-apply-compose を origin/main から作る
+- PR のマージ先: main
+- PR をマージする人: 利用者
+
+報告 (PR を作った・チェックを入れた・分けたい・条件を変えたい・切り出したい・中断する) は、作業 Issue に記録のコメントとして書き、そのコメントの URL を報告先の管理セッションにメッセージで知らせてください。
+
+補足 (管理セッションから):
+
+- このセッションの名前は「claude-plugins#278 作業: managing apply のバグ」です。名前が違っていたら、set_session_title (session_id は self) でこの名前にしてください。
+- 手元の `main` は古いことがあります。`git fetch origin` の後に `git switch -c fix/278-managing-apply-compose origin/main` でブランチを作ってください。
+- 作業 Issue の本文の節「問題」にある再現の手順は、コードを読んで推論したものです。偽の `gh` のテストで再現してから直してください。本文には解決策を書いていません。直し方はあなたが決め、PR に理由を書いてください。
+- この単位の版は 0.3.1 です (作業 Issue のクローズ条件の共通の条件の下の箇条書き)。#269 (U4、0.4.0) は、この Issue を閉じた後に起動します。
+- CI の完了では、このセッションは自分では動き出しません。CI が終わったら利用者か管理セッションが知らせます。チェックは、CI のジョブがすべて成功してから入れてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+マージしました
