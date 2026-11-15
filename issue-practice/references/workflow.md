@@ -145,7 +145,7 @@ sequenceDiagram
   S->>RPI: 新しいリリース計画 Issue を作り、approval の記録のコメントを書く
   S->>RI: [DRAFT] のリリース Issue を作る
   S->>MS: マイルストーンを作り、含める Issue に設定する
-  S->>RPI: ラベル current を付け替え、current-swap の記録のコメントを書き、古い計画を閉じる
+  S->>RPI: ラベル current を付け、current-swap の記録のコメントを書く (古い計画があれば、current を外して閉じる)
   U->>RI: メモをコメントに書く
   U->>S: リリース Issue の計画を依頼する (release-issue-plan)
   S->>F: 計画案 (7 つの項目とメモの扱い) を書く
@@ -161,5 +161,5 @@ sequenceDiagram
 ```
 
 - リリース計画 Issue の書き込みは、ラベル `current` の付け替えの途中で失敗しても、同じ計画案でやり直せる順に行います。書く順と、途中で中断したときに残る状態は、[release-plan-issue.md](../skills/release-plan/references/release-plan-issue.md) の節「書く順と、やり直し」にあります。
-- 「今のリリース」と「次のリリース」は、ラベル `current` の付いたリリース計画 Issue の表から、検査のスクリプト (サブコマンド `release current`) が決めます。決め方は [release-plan-table.md](release-plan-table.md) にあります。
+- 「今のリリース」と「次のリリース」は、ラベル `current` の付いたリリース計画 Issue の表から、検査のスクリプト (サブコマンド `release current`) が決めます。題名に `[DRAFT]` があるリリース Issue は、計画を承認するまで「今のリリース」になりません。決め方は [release-plan-table.md](release-plan-table.md) にあります。
 - リリースの手順 (タグ・デプロイ・告知など) は、プロジェクトのものです。スキル `release-issue-plan` は、プロジェクトの手順の文書のどの手順を行うか・省くかと理由を、リリース Issue に記録します。
