@@ -1,0 +1,166 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins に、GitHub の Issue の使い方をスキルにするプラグイン `issue-practice` を作っている (Issue #239)。計画はファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` で、5 つの単位 U1〜U5 を作業 Issue #266〜#270 と PR 1 つずつにして順に進める。ブランチの構成は 1 (各 PR を main にマージ)、PR は利用者がマージする。U1 (#266、PR #271、0.1.0: 共通部分) と U2 (#267、PR #273、0.2.0: スキル new-issue・gh の sub-issue/blocked by/マイルストーンの固定データ・リリース計画の表の書式) はマージ済みで閉じた。U3 は、管理 Issue を作業 Issue に分けて計画し、作業セッションを起動して報告を受け、確認して閉じる 4 つのスキルと、PR マージ計画の gitGraph を表から作るスクリプト・閉じる前の検査のスクリプト。U3 のマージ後は、U4・U5 を U3 のスキルで進める。スキルの手順の確認は、公開のリポジトリ akm/issue-practice-sandbox で行う。文書は日本語で書き、利用者のコミットルール (動機ごとに分ける) と、ほかのプロジェクト名を公開の場に書かない規則に従う。
+
+Task:
+あなたは作業 Issue akm/claude-plugins#268 の作業セッションです (最初の指示)。
+
+- 作業 Issue: #268 「管理 Issue を作業 Issue に分けて計画し、作業セッションで進めて閉じたい (managing-issue-plan・managing-issue-run・managing-issue-close・working-issue)」(計画の単位 U3、版 0.3.0)
+- 管理 Issue: #239。報告先の管理セッション: 「claude-plugins#239 管理: Issue の使い方のスキル」(セッション ID `local_7eefe131-5f84-4c43-b029-e14eb2449d29`)
+- ブランチ: 最初に `git fetch origin` をし、`git switch -c feat/268-managing-working origin/main` で作る (この作業ツリーは古いローカルの main から作られている可能性がある)。origin/main は U1 (PR #271) と U2 (PR #273、8f7bd707) を含む。PR のマージ先は main
+- 計画: ファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md`。Goal Capsule・節「Implementation Units」の冒頭・節「U3. 管理と作業」・U3 が引く R と KTD (特に KTD3・KTD6〜KTD10・KTD16・KTD17)・Verification Contract を読む。U1・U2 で入ったファイル `issue-practice/references/`・`issue-practice/scripts/`・`issue-practice/skills/new-issue/`・`issue-practice/tests/fixtures/gh/README.md` (U2 で確認した gh の振る舞い) も読む
+- スキル `working-issue` はまだ無いので、次の手順を手で行う
+
+手順:
+1. 計画の「必要なものを用意 → テストを書く → 実装する」の順で実装する。sub-issue・blocked by・blocking の振る舞いは、U2 で記録した固定データを使う (U3 の手順 1)。コミットは動機ごとに分け、版を上げるコミット (0.3.0) は機能のコミットと分ける
+2. 変えた文書・SKILL.md・コメント・コミットメッセージは `python3 wording-guard/scripts/wording_lint.py check` で検査し、error を 0 件にする。リポジトリのルートの `CLAUDE.md` の規則に従う
+3. テストは `python3 -m unittest discover -s issue-practice/tests` で成功させる
+4. スキルの手順を、確認用のリポジトリ akm/issue-practice-sandbox で本物の `gh` を使って確認する (U3 の Verification と #268 のクローズ条件)。セッションの起動と交代の確認では、Claude Code のデスクトップアプリのセッションを起動してよいが、確認が終わったら起動したセッションを止めるかアーカイブする (利用者の承認を得てから)
+5. 計画と合わないことが分かったら、勝手に設計を変えず、管理セッションに報告する。利用者の判断が要ることは、このセッションで利用者に直接質問する
+6. PR を作る。本文に #268 へのリンクを書き、`Closes` は書かない (R21)。PR は利用者がマージする
+7. #268 のクローズ条件を確認したら、本文のチェックボックスにチェックを入れ、項目の末尾に `(根拠: <URL>)` を足す (KTD9)。CI の項目は、CI の実行がすべて終わって成功してから入れる。本文を書き換える直前に本文を再度読み込み、変わっていないことを確認する。項目「#239 と #266〜#269 の本文と記録のコメントを検査のスクリプトで検査し、合わないところを直した」は、管理セッションが U4 に着手する前に行うので、チェックを入れずに残す
+
+報告の形: 報告は、#268 にコメントとして書き、1 行目は U1 で決めた形 (`python3 issue-practice/scripts/issue_practice.py records format report type=...` で作る。種類とキーはファイル `issue-practice/references/record-comments.md`) にする。そのコメントの URL を管理セッションにメッセージで知らせる (R30・KTD16)。
+
+終わったら: PR の URL と、チェックを入れた項目・入れていない項目を報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/57525.sock" from-session="local_00154ffc-26a4-4169-8cd2-62060b5c731b" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+issue-practice-sandbox#13 の管理セッションとして、managing-issue-run の節「A. 受け持ちを始める」の手順 1〜3 を終えました。
+
+- 手順 1: `merge-plan show --issue akm/issue-practice-sandbox#13` は終了コード 0。構成 1・PR をマージする人は「管理セッション」。表は #14 (docs/14-readme-steps → main、先に要るもの無し) と #15 (docs/15-readme-records → main、#14 が先)。PR の列はどちらも空。graph_matches は true。
+- 手順 2: セッションの名前を「issue-practice-sandbox#13 管理: U3 の確認」にした (set_session_title、すでに同じ名前だった)。ID は CLAUDE_CODE_HOST_SESSION_ID で local_00154ffc-26a4-4169-8cd2-62060b5c731b。`records list --kind session` は記録 0 件 (終了コード 0) だったので、`records format` (終了コード 0) で 1 行目を作り、記録のコメント session (role=managing) を書いた: https://github.com/akm/issue-practice-sandbox/issues/13#issuecomment-6867433794
+- 手順 3: `sessions active` は終了コード 0。managing は上の記録。動いている作業セッションは #14 の 1 つ (local_87bcede5-4506-43a8-8b3c-8073924aebee、名前「issue-practice-sandbox#14 作業: 節「確認の手順」」、記録 https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867427550 。報告先はこの管理セッションになっている)。#15 は excluded (no-session)。#14・#15 はどちらも OPEN で、閉じて開き直されたものは無い。どちらの本文にも節「依存先」は無く、blockedBy も空なので、依存先が片付いた記録の書き損ねも無い。
+
+手順書と実際の振る舞いで気づいたこと:
+1. #15 は PR マージ計画の表では「先にマージが要る作業 Issue」が #14 だが、GitHub の blocked by も本文の節「依存先」も無い。表の列と blocked by を別のものとして扱う設計なら問題ないが、managing-issue-plan / managing apply が blocked by を付けない作りで正しいかは確かめてください。
+2. 節 A 手順 3 は「見つけたものを利用者に示して、着手するかを質問する」とあるが、今回は着手の判断が要るもの (開き直し・片付いた依存先) は無かった。#14 の作業セッションは、この管理セッションの記録 (6867433794) より前に起動の記録 (6867427550) が書かれている。起動の記録の報告先には、起動の時点でまだ名前を付けていない管理セッションの名前と ID が入っていた。今回は確認の手順の都合なので問題ないが、通常の手順 (A の後に B) と順序が違うことを書き留めておきます。
+3. 手順書の `set_session_title` は、このセッションでは deferred tool の `mcp__ccd_session_mgmt__set_session_title` で、ToolSearch で読み込んでから使えた。SendMessage も同じく読み込みが要った。
+
+以降は、作業セッションからの報告を節 C に従って処理し、そのたびに知らせます。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/57525.sock" from-session="local_00154ffc-26a4-4169-8cd2-62060b5c731b" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+#14 の報告 (pr) を節 C に従って処理し、管理 Issue #13 の表に PR #17 の URL を書きました。
+
+- 報告: https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867446879 。`records list --issue akm/issue-practice-sandbox#14 --kind report` (終了コード 0) で、メッセージの URL と同じ記録を見つけた。values は type=pr・pr=https://github.com/akm/issue-practice-sandbox/pull/17
+- 表への記入: `merge-plan show` の sha256 (20f5ab35…) を渡して `merge-plan set-pr --issue akm/issue-practice-sandbox#13 --work 14 --pr https://github.com/akm/issue-practice-sandbox/pull/17 --expect-sha256 20f5ab35…` を実行し、終了コード 0 (changed=true、previous=null、新しい sha256 は 0e7643e2…)。書き換えた本文: https://github.com/akm/issue-practice-sandbox/issues/13 。書いた後に `merge-plan show` を読み直し、errors は空、graph_matches は true、#14 の行の pr は PR #17 の URL、#15 の行は空のまま
+- Closes の確認: `gh pr view 17 --json body` の本文に Closes は無く、closingIssuesReferences も空。base は main、head は docs/14-readme-steps で表と一致
+
+PR #17 のマージは、そちらのセッションで行ってください (表の設定では PR をマージする人は「管理セッション」)。手順書と振る舞いの違いは、今回は見つかりませんでした。作業セッションへの返信は、判断が要るものが無いので送っていません。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/57873.sock" from-session="local_87bcede5-4506-43a8-8b3c-8073924aebee" from-name="issue-practice-sandbox#14 作業: 節「確認の手順」" from-mode="prompting">
+issue-practice-sandbox#14 の作業セッションで、working-issue の手順書と実際の振る舞いが合わないところが 3 つありました。
+
+1. 手順 2 (条件を確認する) で `checkboxes list` を実行すると、着手前は項目がすべて未チェックなので終了コード 3 になる (`--help` どおり。errors は空)。手順書の冒頭の表は「3 なら利用者に示して質問し、回答の無いまま進めない」とあるが、手順 2 では未チェックは当然の状態で、どう扱うかが書かれていない。私は errors が空で、項目が状態の形で書かれていることを確かめて、質問せずに進めた。
+2. 節「報告の送り方」の 1 で「1 行目を `records format report ...` で作る」とあるが、出力は JSON ({"line": ..., "errors": []}) で、値 `line` を取り出すことが書かれていない。私は最初に JSON ごとコメントに書いてしまい、コメントを書き換えた (https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867446879)。手順 8 の `records format abandon` も同じ。
+3. 手順 3 の `git switch -c <ブランチ> origin/<作る元>` では上流が origin/main になり、手順書に push の方法が無い。push.default=simple では `git push` だけだと拒否されるので、`git push -u origin <ブランチ>` で push した。
+
+ほかは手順どおりに進んだ: 承認の記録の確認・PR の作成 (#17)・根拠のコメント・`checkboxes check` を 3 回 (1 回ごとに list し直して sha256 を取得)・報告 (pr・check) を名前宛てのメッセージで送信。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/57525.sock" from-session="local_00154ffc-26a4-4169-8cd2-62060b5c731b" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+#14 の報告 (check) を節 C に従って確かめました。満たさない項目は残っておらず、管理セッションから書き込んだものはありません。
+
+- 報告: https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867461207 。`records list --issue akm/issue-practice-sandbox#14 --kind report` (終了コード 0、invalid は空) で、メッセージの URL と同じ記録 (values は type=check) を見つけた
+- チェック: `checkboxes list --issue akm/issue-practice-sandbox#14` は終了コード 0。3 項目すべて checked で、根拠のリンクはどれも https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867453866 。counts は unchecked 0・checked_without_evidence 0・carved_out 0、unsatisfied は空。本文の sha256 は 993d39db…
+- 根拠のコメントの投稿者は akm で、`gh pr diff 17` の出力を載せている。念のため `gh pr diff 17 --name-only` を実行し、変えたファイルが README.md だけであることも確かめた。PR #17 は OPEN・MERGEABLE
+
+PR #17 のマージはそちらで行ってください。手順書の節 C の末尾では、PR をマージする人が管理セッションのときは、マージの前に `close check --issue <作業 Issue> --role working --managing <管理 Issue>` で PR 以外の項目を確かめるとしています。この確認でマージをそちらのセッションが行う場合は、その検査もそちらで行う想定でよいか確かめてください (このセッションで実行する場合は知らせてください)。手順書と振る舞いの違いは、今回は見つかりませんでした。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+閉じて進める
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70907.sock" from-session="local_0205312a-1302-4a17-8ea3-f0144b1b44e1" from-name="sandbox#13 管理の交代先 (名前を付ける前)" from-mode="prompting">
+新しい管理セッション (ID local_0205312a-1302-4a17-8ea3-f0144b1b44e1) の準備ができました。名前はまだ変えていません。A のアーカイブのメッセージを待っています。
+
+準備で確かめたこと (どれも終了コード 0):
+- managing-issue-run の SKILL.md の節 C・D と、references/start-instruction.md・record-comments.md を読んだ。
+- sessions active --issue akm/issue-practice-sandbox#13: managing は A (local_00154ffc-…、名前 issue-practice-sandbox#13 管理: U3 の確認)。動いている作業セッションは #15 の 1 つ (local_12459e7b-…、名前 issue-practice-sandbox#15 作業: 節「確認の記録」)。#14 は closed で除外。
+- merge-plan show: 構成 1、マージする人は管理セッション、sha256 0e7643e2…。#14 の行は PR #17、#15 の行は PR が空。
+- records format session role=managing session=local_0205312a-… previous=local_00154ffc-…: line を作れた。
+
+気づいたこと: list_sessions (include_archived) では、A はすでに isArchived: true になっています。手順どおり、あなたからアーカイブしたというメッセージを受けてから、節 D の手順 2〜4 を始めます。
+</cross-session-message>
+
+---
+
+日本語でお願いします
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70907.sock" from-session="local_0205312a-1302-4a17-8ea3-f0144b1b44e1" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+節 D の手順 2〜4 と、#15 の報告 (pr) の処理を終えました。
+
+節 D:
+- 手順 2: set_session_title (self) で名前を「issue-practice-sandbox#13 管理: U3 の確認」にした。
+- 手順 3: #13 に記録のコメント session (previous 付き) を書いた (gh の終了コード 0): https://github.com/akm/issue-practice-sandbox/issues/13#issuecomment-6867639754
+  その後の sessions active (終了コード 0) で、managing が新しい ID local_0205312a-1302-4a17-8ea3-f0144b1b44e1・previous が A の ID・name が新しい名前になっていることを確かめた。
+- 手順 4: sessions active の sessions は #15 の 1 つ (name は null ではない)。名前「issue-practice-sandbox#15 作業: 節「確認の記録」」に宛てて、新しい管理セッションの名前と ID・交代の記録の URL を SendMessage で送った (届いた)。
+
+節 C (#15 の報告):
+- 名前を変えた直後、記録のコメントを書いている間に、#15 の作業セッションから名前宛てのメッセージ (報告 pr、https://github.com/akm/issue-practice-sandbox/issues/15#issuecomment-6867634755) がこのセッションに届いた。交代後の名前宛てのメッセージは、新しい管理セッションに届いた。
+- records list --issue #15 --kind report (終了コード 0): 同じ url の記録があり、type=pr・pr=https://github.com/akm/issue-practice-sandbox/pull/20。
+- merge-plan set-pr --work 15 --pr …/pull/20 --expect-sha256 0e7643e2… (終了コード 0、changed: true、新しい sha256 3ae2e0d4…)。
+- gh pr view 20 の本文に Closes は無い (base main・head docs/15-readme-records・OPEN)。
+- PR のマージと #15 を閉じることは、指示どおり行っていません。
+
+手順書と振る舞いが合わない点:
+- 実害は無いが、報告のメッセージは、交代の記録のコメント (手順 3) を書く前に届いた。報告のコメントの投稿は 23:34:39Z で、交代の記録より先。節 D は手順 2 の後から手順 4 の前までに報告が届く場合を書いていない。名前宛てなので届き先は新しいセッションで問題なかった。この間の報告は、手順 4 を終えてから節 C で処理する、と手順書に書くかは判断をお任せします。
+- 私が準備中に一覧を見た時点 (アーカイブのメッセージを受ける前) で、A はすでに isArchived: true だった。手順の順序には影響していません。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70341.sock" from-session="local_12459e7b-ff44-4b0e-8af6-8039f4429c7c" from-name="issue-practice-sandbox#15 作業: 節「確認の記録」" from-mode="prompting">
+working-issue の確認で、手順書に書かれていない振る舞いがありました (作業 Issue akm/issue-practice-sandbox#15 の作業セッションから)。
+
+- 管理セッションの交代の最中に、報告 (pr) のメッセージを名前「issue-practice-sandbox#13 管理: U3 の確認」に宛てて送ると、「No agent named ... is reachable」で失敗した。そのとき ListAgents には、名前の無い交代先「sandbox#13 管理の交代先 (名前を付ける前)」だけがあり、前の管理セッションはもう一覧に無かった。
+- 十数秒後に ListAgents を見直すと、交代先が同じ名前に変わっていたので、同じ名前に送り直して届いた。交代の通知のメッセージは、送り直した後に届いた。
+- 手順書 working-issue の節「報告の送り方」の手順 3 は、名前に宛てて送るとだけ書いていて、名前が見つからないとき (交代の最中など) にどうするか (待って送り直す・ID に宛てない) を書いていない。今回は ID には宛てず、待って送り直した。
+
+ほかの手順 (条件の確認・ブランチ・PR https://github.com/akm/issue-practice-sandbox/pull/20・根拠のコメントとチェック・報告 pr と check) は手順書のとおりに動いた。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70907.sock" from-session="local_0205312a-1302-4a17-8ea3-f0144b1b44e1" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+#15 の 2 つ目の報告 (check) を節 C で処理しました。PR #20 のマージと #15 を閉じることは、そちらにお任せします。
+
+- メッセージ: https://github.com/akm/issue-practice-sandbox/issues/15#issuecomment-6867649526 (名前宛てで、このセッションに届いた)
+- records list --issue #15 --kind report (終了コード 0): 同じ url の記録があり、type=check。本文は「3 項目すべてにチェック、根拠は issuecomment-6867642871、PR のマージと閉じることをお願いしたい」。
+- checkboxes list --issue #15 (終了コード 0): checked 3・unchecked 0・checked_without_evidence 0・carved_out 0・unsatisfied は空。3 項目とも根拠は https://github.com/akm/issue-practice-sandbox/issues/15#issuecomment-6867642871 。満たさない項目は無いので、理由の確認は不要。
+- 表の設定ではマージする人は管理セッションなので、手順書では次に close check --issue #15 --role working --managing #13 → 利用者の承認 → gh pr merge → managing-issue-close になります。指示どおり、このセッションでは行っていません。必要なら close check だけ実行するので知らせてください。
+- 手順書と振る舞いの食い違いは、この報告では見つかっていません。
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>bwm1t18w5</task-id>
+<tool-use-id>toolu_014uyr4JGU3p2VECx1Zyh2NV</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-11aaf1/1299bbf5-bb01-451f-83e9-d8f85e2921ca/tasks/bwm1t18w5.output</output-file>
+<status>completed</status>
+<summary>Background command "gh pr checks 274 --watch --interval 30 &gt; /dev/null 2&gt;&amp;1; gh pr checks 274 2&gt;&amp;1 | awk -F'\t' '{print $2}' | sort | uniq -c" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+PR #274 をマージした
