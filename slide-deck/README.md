@@ -28,13 +28,14 @@ Google スライドへの反映の方法 (コネクタの使い方・指示の�
 
 | もの | 使うスキル | 無いとき |
 | --- | --- | --- |
-| Node.js 24 以上・npm | `build`・`publish` | 中断して、入れ方を示します |
+| Node.js 24 以上 | `outline`・`build`・`publish` | 中断して、入れ方を示します |
+| npm | `build`・`publish` | 中断して、入れ方を示します |
 | uv | `build`・`publish` | 中断して、入れ方を示します |
 | スキル `anthropic-skills:pptx` (Claude のデスクトップアプリが配るもの) | `build` | 中断します。マーケットプレイスで配る版にはファイル `scripts/apply_theme.js` が無いので使えません |
 | スキル `anthropic-skills:google-workspace` | `publish` | 中断します |
 | Google スライドと Google ドライブのコネクタ | `publish` | 中断して、有効にするよう求めます。Claude のデスクトップアプリ以外 (Claude Code の CLI など) では使えないことがあります |
 
-スキル `outline` は、どれも使いません。
+スキル `outline` は、Node.js のほかは使いません (ライブラリも要りません)。
 
 ## ライブラリのインストール
 
