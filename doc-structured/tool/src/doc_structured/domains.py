@@ -8,6 +8,7 @@
   - 英語名をマッピングのキーにし、日本語名を name_ja、定義を definition に書く
   - 属性は、ほかのモデルへの参照 refers_to (完全な ID) と、値 values を持てる
   - 前提は、モデル・属性・値への参照 targets (完全な ID の配列) を持てる
+ロールは、ドメインの外のファイル docs/system/roles.yaml のキー roles に書く。ロールは親を持たない (ID は r-<英語名>)。
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
 """
 
@@ -25,6 +26,7 @@ from .problems import Problem
 DOMAINS_DIR = Path("docs/domains")
 DOMAIN_FILE = "domain.yaml"
 DOMAIN_DIR_RE = re.compile(r"^(\d{2,})-(.+)$")
+ROLES_FILE = Path("docs/system/roles.yaml")
 
 TOP_KEYS = ("domain", "models", "unclassified_app_terms", "preconditions", "events")
 DOMAIN_KEYS = ("description",)
@@ -34,6 +36,8 @@ VALUE_KEYS = ("name_ja", "definition")
 TERM_KEYS = ("name_ja", "definition")
 PRECONDITION_KEYS = ("name_ja", "definition", "targets")
 EVENT_KEYS = ("name_ja", "definition")
+ROLES_TOP_KEYS = ("roles",)
+ROLE_KEYS = ("name_ja", "definition")
 # 完全な ID の配列で書く参照。定義の種類の記号とキーから、参照できる種類の記号と、メッセージに書くその名前への対応
 LIST_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
     ("pre", "targets"): (("m", "a", "v"), "モデル・属性・値"),
@@ -62,7 +66,7 @@ class Reference:
 
 @dataclass
 class Entry:
-    """名前と定義を持つ 1 つの定義 (モデル・属性・値・未分類のアプリケーション用語・前提・イベント)。"""
+    """名前と定義を持つ 1 つの定義 (モデル・属性・値・未分類のアプリケーション用語・前提・イベント・ロール)。"""
 
     id: str
     symbol: str
@@ -72,7 +76,7 @@ class Entry:
     path: str  # 定義を書いた YAML の、リポジトリのルートからの相対パス
     line: int
     column: int
-    domain: "Domain"
+    domain: "Domain | None"  # ロールは None
     parent: "Entry | None" = None
     children: list["Entry"] = field(default_factory=list)
     refers_to: str | None = None
@@ -99,7 +103,7 @@ class Entry:
         return list(reversed(chain))
 
     def full_name(self) -> str:
-        parts = [names.format_part("d", self.domain.name)]
+        parts = [names.format_part("d", self.domain.name)] if self.domain is not None else []
         parts += [names.format_part(e.symbol, e.name_ja) for e in self.lineage()]
         return names.join_parts(parts)
 
@@ -141,6 +145,7 @@ class Domain:
 class Project:
     root: Path
     domains: list[Domain] = field(default_factory=list)
+    roles: list[Entry] = field(default_factory=list)  # ファイル docs/system/roles.yaml に書いた順
     entries: dict[str, Entry] = field(default_factory=dict)
 
 
@@ -158,8 +163,10 @@ class _Loader:
         self.problems.append(Problem("h", path, message, line, column))
 
     def load(self) -> None:
+        self.load_roles()
         domains_dir = self.root / DOMAINS_DIR
         if not domains_dir.is_dir():
+            self.resolve_references()
             return
         numbers: dict[str, str] = {}
         domain_names: dict[str, str] = {}
@@ -188,6 +195,21 @@ class _Loader:
             self.project.domains.append(domain)
             self.load_domain(domain, child)
         self.resolve_references()
+
+    def load_roles(self) -> None:
+        """ファイル docs/system/roles.yaml のロールを読む。ファイルが無ければ、ロールは無い。"""
+        path = self.root / ROLES_FILE
+        if not path.is_file():
+            return
+        path_rel = ROLES_FILE.as_posix()
+        data = self.read_yaml(path, path_rel)
+        if data is _UNREADABLE or data is None:
+            return
+        for key in data:
+            if key == "roles":
+                self.load_list(None, data, key, "r", ROLE_KEYS, path_rel, {}, self.project.roles)
+            else:
+                self.unknown_key(path_rel, key, ROLES_TOP_KEYS, *_key_position(data, key))
 
     def yaml_files(self, domain: Domain, directory: Path) -> list[Path]:
         """ドメインのディレクトリの下の YAML を、直下の domain.yaml を先にし、残りはパスの文字コードの順に返す。"""
@@ -310,7 +332,7 @@ class _Loader:
 
     def entry(
         self,
-        domain: Domain,
+        domain: Domain | None,
         parent_map: CommentedMap,
         name,
         symbol: str,
@@ -341,7 +363,10 @@ class _Loader:
                 path_rel, f'{owner} の name_ja に、改行と " は使えない', *_value_position(mapping, "name_ja")
             )
             name_ja = None
-        parent_parts = names.parse_id(parent.id) if parent else [Part("d", domain.name)]
+        if parent is not None:
+            parent_parts = names.parse_id(parent.id)
+        else:
+            parent_parts = [Part("d", domain.name)] if domain is not None else []
         entry = Entry(
             id=names.build_id([*parent_parts, Part(symbol, name)]),
             symbol=symbol,
@@ -405,7 +430,7 @@ class _Loader:
 
     def load_list(
         self,
-        domain: Domain,
+        domain: Domain | None,
         data: CommentedMap,
         key: str,
         symbol: str,
@@ -414,7 +439,8 @@ class _Loader:
         seen: dict[str, Entry],
         found: list[Entry],
     ) -> None:
-        """ドメインの下に並べる種類 (未分類のアプリケーション用語・前提・イベント) の定義を読み、found に足す。"""
+        """ドメインの下に並べる種類 (未分類のアプリケーション用語・前提・イベント) と、ロール (domain は None) の定義を読み、
+        found に足す。"""
         mapping = self.mapping_of(data, key, path_rel)
         if mapping is None:
             return
@@ -462,6 +488,8 @@ class _Loader:
 
     def resolve_references(self) -> None:
         entries = self.project.entries
+        for role in self.project.roles:
+            entries[role.id] = role
         for domain in self.project.domains:
             for entry in domain.entries():
                 entries[entry.id] = entry
@@ -516,7 +544,7 @@ def _item_position(sequence: CommentedSeq, index: int) -> tuple[int, int]:
 
 
 def load_project(root: Path) -> tuple[Project, list[Problem]]:
-    """リポジトリのルートからドメインの YAML を読む。検査 h の問題も返す。"""
+    """リポジトリのルートからドメインの YAML とロールの YAML を読む。検査 h の問題も返す。"""
     loader = _Loader(root)
     loader.load()
     return loader.project, loader.problems

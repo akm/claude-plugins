@@ -15,7 +15,7 @@ ID は、定義のアンカーの名前であり、リンクのフラグメン�
 
 - 種類の記号と名前をハイフンで交互につなぎ、親から子の順に並べる (例 `d-loans-m-loan-a-status-v-on_loan`)。
 - 名前は英語名で、snake_case (英小文字で始まり、英小文字・数字を 1 つの `_` で区切る。正規表現 `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`) にする。
-- 親になれる種類は決まっている: モデル・未分類の用語・前提・イベントはドメインの下、属性はモデルの下、値は属性の下。
+- 親になれる種類は決まっている: モデル・未分類の用語・前提・イベントはドメインの下、属性はモデルの下、値は属性の下。ロールは親を持たない (例 `r-librarian`)。
 - ファイルの ID は、親の ID にファイルの種類の記号を足したもの。ファイルの種類の記号は名前を取らない (例 `d-loans-models`)。
 - 手書きのファイルの節の ID は、ファイルの ID に `-h-<名前>` を 1 回だけ足したもの (例 `d-loans-concept-h-return_deadline`)。名前は書く人が決める。
 - 子のファイル (100 行を超えたファイルを分けた先。[doc-structured-domains.md](doc-structured-domains.md) の節「手書きの Markdown」) の ID は、親のファイルの ID に `-f-<名前>` を足したもの (例 `d-loans-design-f-overdue_notice`)。ファイルの種類の記号は名前を取らないので、記号 `f` を挟んで節の `-h-` と区別する。子のファイルの節の ID は `d-loans-design-f-overdue_notice-h-<名前>`。
@@ -29,6 +29,7 @@ ID は、定義のアンカーの名前であり、リンクのフラグメン�
 | `d-loans-ut-business_day` | 未分類の用語 |
 | `d-loans-pre-book_shelved` | 前提 |
 | `d-loans-ev-book_lent` | イベント |
+| `r-librarian` | ロール |
 | `d-loans-models` | ファイル `models.md` |
 | `d-loans-concept` | ファイル `concept.md` |
 | `d-loans-concept-h-return_deadline` | ファイル `concept.md` の節 |
@@ -47,6 +48,7 @@ ID は、定義のアンカーの名前であり、リンクのフラグメン�
 | 未分類のアプリケーション用語 | `ut` | 未分類のアプリケーション用語「<日本語名>」 | 未分類のアプリケーション用語「開館日」 |
 | 前提 | `pre` | 前提「<日本語名>」 | 前提「図書が配架中」 |
 | イベント | `ev` | イベント「<日本語名>」 | イベント「図書を貸し出した」 |
+| ロール | `r` | ロール「<日本語名>」 | ロール「司書」 |
 | 節 | `h` | 節「<見出しの文>」 | 節「返却期限」 |
 | ファイル | `models`・`terms`・`unclassified_app_terms`・`functions`・`concept`・`problem`・`design` | ファイル `<ファイル名>` | ファイル `models.md` |
 | 子のファイル | `f` | ファイル `<ドメインのディレクトリからのパス>` | ファイル `design/overdue_notice.md` |

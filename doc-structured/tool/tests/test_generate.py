@@ -113,6 +113,39 @@ class GenerateTest(ProjectTestCase):
         project, _ = load_project(self.project)
         self.assertNotIn("docs/domains/01-loans/functions.md", render_project(project))
 
+    def test_roles_are_written_to_permissions_md_and_glossary(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        self.write(
+            "docs/system/roles.yaml",
+            "roles:\n  member:\n    name_ja: 利用者\n    definition: 予約する人。\n"
+            "  librarian:\n    name_ja: 司書\n    definition: 窓口の職員。\n",
+        )
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        outputs = render_project(project)
+        permissions = outputs["docs/system/permissions.md"]
+        self.assertTrue(permissions.startswith("<!-- doc-structured:generated 生成元: docs/ コマンド:"))
+        # ファイルのアンカーは無い。ロールは roles.yaml に書いた順
+        self.assertEqual(permissions.split("\n", 1)[1], (
+            "\n# ロールと操作\n\n"
+            '<a name="r-member"></a>\n\n## ロール「利用者」 `member`\n\n予約する人。\n\n'
+            '<a name="r-librarian"></a>\n\n## ロール「司書」 `librarian`\n\n窓口の職員。\n'
+        ))
+        glossary = outputs["docs/glossary.md"]
+        self.assertTrue(glossary.startswith("<!-- doc-structured:generated 生成元: docs/ コマンド:"))
+        self.assertIn("| [司書][r-librarian] | ロール | `librarian` | |\n", glossary)
+        self.assertIn('[r-librarian]: system/permissions.md#r-librarian "ロール「司書」"', glossary)
+        self.assertNotIn("r-librarian", outputs["docs/domains/01-loans/terms.md"])
+        self.assertIn("/system/permissions.md merge=binary", outputs["docs/.gitattributes"])
+        self.assertTrue(outputs["docs/.gitattributes"].startswith("# doc-structured:generated 生成元: docs/ "))
+
+    def test_without_roles_the_source_of_glossary_stays_domains(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        project, _ = load_project(self.project)
+        outputs = render_project(project)
+        self.assertNotIn("docs/system/permissions.md", outputs)
+        self.assertTrue(outputs["docs/glossary.md"].startswith("<!-- doc-structured:generated 生成元: docs/domains/ "))
+
     def test_readme_lists_handwritten_files_first(self):
         self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")
         self.write("docs/domains/01-loans/domain.yaml", MINIMAL)

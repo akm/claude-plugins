@@ -1,7 +1,7 @@
 """ドメインの YAML から、人が読む Markdown を生成する。
 
 ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・terms.md を、全体の用語の索引
-docs/glossary.md を生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
+docs/glossary.md を、ロールの定義を docs/system/permissions.md に生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 先頭に、生成したファイルの先頭の記述 (モジュール generated_header) を書く
   - 定義ごとに <a name="ID"></a> と見出しを書く。見出しは「種類 + 日本語名」の後に英語名をコードの書式で書く
@@ -21,6 +21,7 @@ from . import generated_header, names
 from .domains import DOMAINS_DIR, Domain, Entry, Project
 
 GLOSSARY_PATH = "docs/glossary.md"
+PERMISSIONS_PATH = "docs/system/permissions.md"
 GITATTRIBUTES_PATH = "docs/.gitattributes"
 # 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し、
 # 競合のマークを入れない (ファイルは競合の状態のまま)。どの側が ours になるかは git のコマンドによって違い、
@@ -39,8 +40,8 @@ FILE_DESCRIPTIONS = {
     "functions": "操作・前提・イベントの定義",
     "terms": "このドメインの用語の索引",
 }
-# 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語・前提・イベントは 2
-HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2, "pre": 2, "ev": 2}
+# 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語・前提・イベント・ロールは 2
+HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2, "pre": 2, "ev": 2, "r": 2}
 # 定義を書く生成したファイルの種類の記号。書いていない種類 (モデル・属性・値) は models
 ENTRY_FILES = {"ut": "unclassified_app_terms", "pre": "functions", "ev": "functions"}
 # 前提・イベントの参照を、定義の文の後の箇条書きに出すときの、キーと項目の名前
@@ -92,6 +93,8 @@ def _file_title(domain: Domain, symbol: str) -> str:
 
 
 def entry_file(entry: Entry) -> str:
+    if entry.domain is None:
+        return PERMISSIONS_PATH  # ロール
     return file_path(entry.domain, ENTRY_FILES.get(entry.symbol, "models"))
 
 
@@ -101,8 +104,8 @@ def _entry_link(links: _Links, entry: Entry, text: str) -> str:
 
 def _reference_text(entry: Entry, from_domain: Domain) -> str:
     """ほかの定義を指すリンクの表示の文。同じドメインなら、完全な名前からドメインを省いたもの
-    (「モデル「貸出」の属性「貸出状態」」)。ほかのドメインなら完全な名前。"""
-    if entry.domain is from_domain:
+    (「モデル「貸出」の属性「貸出状態」」)。ほかのドメインの定義とロールなら完全な名前。"""
+    if entry.domain is not None and entry.domain is from_domain:
         return names.join_parts([names.format_part(e.symbol, e.name_ja) for e in entry.lineage()])
     return entry.full_name()
 
@@ -212,17 +215,33 @@ def render_terms(domain: Domain) -> str:
     return _document(f"{domain.dir}/", _file_id(domain, "terms"), blocks, links)
 
 
+def _project_source(project: Project) -> str:
+    """プロジェクトの全体から作るファイルの生成元。ロールがあれば、ドメインの外の YAML も読むので docs/。"""
+    return "docs/" if project.roles else f"{DOMAINS_DIR.as_posix()}/"
+
+
 def render_glossary(project: Project) -> str:
     links = _Links(GLOSSARY_PATH)
     rows = ["| 用語 | 種類 | 英語名 | ドメイン |", "|---|---|---|---|"]
-    all_entries = [e for d in project.domains for e in d.entries()]
+    all_entries = [e for d in project.domains for e in d.entries()] + project.roles
     for entry in _sorted_terms(all_entries):
         domain = entry.domain
         term = escape_cell(_entry_link(links, entry, entry.name_ja))
-        domain_link = links.link(f"`{domain.name}`", domain.id, f"{domain.dir}/{README}", domain.full_name())
-        rows.append(f"| {term} | {escape_cell(_kind_text(entry))} | `{entry.name}` | {domain_link} |")
+        domain_cell = " "  # ロールはドメインを持たないので、セルを空にする
+        if domain is not None:
+            domain_link = links.link(f"`{domain.name}`", domain.id, f"{domain.dir}/{README}", domain.full_name())
+            domain_cell = f" {domain_link} "
+        rows.append(f"| {term} | {escape_cell(_kind_text(entry))} | `{entry.name}` |{domain_cell}|")
     blocks = ["# 用語の索引", "\n".join(rows)]
-    return _document(f"{DOMAINS_DIR.as_posix()}/", None, blocks, links)
+    return _document(_project_source(project), None, blocks, links)
+
+
+def render_permissions(project: Project) -> str:
+    """ロールの定義の節と、操作ごとの行えるロールの表。"""
+    links = _Links(PERMISSIONS_PATH)
+    blocks = ["# ロールと操作"]
+    blocks += [_definition_block(role) for role in project.roles]
+    return _document("docs/", None, blocks, links)
 
 
 def render_readme(domain: Domain, files: list[str]) -> str:
@@ -245,10 +264,11 @@ def render_readme(domain: Domain, files: list[str]) -> str:
     return _document(f"{domain.dir}/", domain.id, blocks, links)
 
 
-def render_gitattributes(paths: list[str]) -> str:
-    """paths は、ディレクトリ docs/ の下の生成するファイルの、リポジトリのルートからの相対パス (docs/.gitattributes を除く)。"""
+def render_gitattributes(paths: list[str], source: str = f"{DOMAINS_DIR.as_posix()}/") -> str:
+    """paths は、ディレクトリ docs/ の下の生成するファイルの、リポジトリのルートからの相対パス (docs/.gitattributes を除く)。
+    source は先頭の記述に書く生成元。"""
     base = posixpath.dirname(GITATTRIBUTES_PATH)
-    lines = [generated_header.hash_line(f"{DOMAINS_DIR.as_posix()}/"), GITATTRIBUTES_COMMENT]
+    lines = [generated_header.hash_line(source), GITATTRIBUTES_COMMENT]
     for path in sorted([*paths, GITATTRIBUTES_PATH]):
         if not path.startswith(f"{base}/"):
             raise ValueError(f"ディレクトリ {base}/ の外のファイルは {GITATTRIBUTES_PATH} に書けない: {path}")
@@ -276,10 +296,12 @@ def render_project(project: Project) -> dict[str, str]:
             outputs[file_path(domain, "terms")] = render_terms(domain)
             files.append("terms")
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
-    if any(True for d in project.domains for _ in d.entries()):
+    if project.roles:
+        outputs[PERMISSIONS_PATH] = render_permissions(project)
+    if project.roles or any(True for d in project.domains for _ in d.entries()):
         outputs[GLOSSARY_PATH] = render_glossary(project)
     if outputs:
-        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs))
+        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs), _project_source(project))
     return dict(sorted(outputs.items()))
 
 

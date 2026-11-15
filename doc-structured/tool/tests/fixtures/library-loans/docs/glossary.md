@@ -1,4 +1,4 @@
-<!-- doc-structured:generated 生成元: docs/domains/ コマンド: bin/doc-structured generate (このファイルを直接編集せず、生成元を直して生成し直す) -->
+<!-- doc-structured:generated 生成元: docs/ コマンド: bin/doc-structured generate (このファイルを直接編集せず、生成元を直して生成し直す) -->
 
 # 用語の索引
 
@@ -10,7 +10,9 @@
 | [元の予約][d-loans-m-loan-a-reservation] | モデル「貸出」の属性 | `reservation` | [`loans`][d-loans] |
 | [先の予約が無い][d-loans-pre-no_previous_reservation] | 前提 | `no_previous_reservation` | [`loans`][d-loans] |
 | [利用者][d-members-m-member] | モデル | `member` | [`members`][d-members] |
+| [利用者][r-member] | ロール | `member` | |
 | [前の予約][d-loans-m-reservation-a-previous] | モデル「予約」の属性 | `previous` | [`loans`][d-loans] |
+| [司書][r-librarian] | ロール | `librarian` | |
 | [図書][d-catalog-m-book] | モデル | `book` | [`catalog`][d-catalog] |
 | [図書が返却された][d-loans-ev-book_returned] | イベント | `book_returned` | [`loans`][d-loans] |
 | [図書が配架中][d-loans-pre-book_shelved] | 前提 | `book_shelved` | [`loans`][d-loans] |
@@ -56,3 +58,5 @@
 [d-members]: domains/03-members/README.md#d-members "ドメイン `members`"
 [d-members-m-member]: domains/03-members/models.md#d-members-m-member "ドメイン `members` のモデル「利用者」"
 [d-members-m-member-a-name]: domains/03-members/models.md#d-members-m-member-a-name "ドメイン `members` のモデル「利用者」の属性「氏名」"
+[r-librarian]: system/permissions.md#r-librarian "ロール「司書」"
+[r-member]: system/permissions.md#r-member "ロール「利用者」"

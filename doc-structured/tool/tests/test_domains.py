@@ -326,5 +326,47 @@ class PreconditionAndEventTest(CheckHTest):
         self.assertEqual(self.problems_for({"docs/domains/01-loans/domain.yaml": text}), [])
 
 
+ROLES = """\
+roles:
+  librarian:
+    name_ja: 司書
+    definition: 窓口で貸出と返却を扱う職員。
+"""
+
+
+class RoleTest(CheckHTest):
+    """ロール (ファイル docs/system/roles.yaml)。成功する例と、検査 h が失敗する例。"""
+
+    def test_sample_roles(self):
+        project, problems = load_project(self.copy_sample())
+        self.assertEqual([p.format() for p in problems], [])
+        self.assertEqual([r.id for r in project.roles], ["r-librarian", "r-member"])
+        role = project.entries["r-librarian"]
+        self.assertIsNone(role.domain)
+        self.assertEqual(role.full_name(), "ロール「司書」")
+        self.assertEqual(role.path, "docs/system/roles.yaml")
+
+    def test_roles_without_domains(self):
+        self.assertEqual(self.problems_for({"docs/system/roles.yaml": ROLES}), [])
+        project, _ = load_project(self.project)
+        self.assertEqual([r.id for r in project.roles], ["r-librarian"])
+
+    def test_no_roles_file_is_not_an_error(self):
+        self.assertEqual(self.problems_for({"docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN}), [])
+
+    def test_role_errors(self):
+        for text, expected in (
+            ("members: {}\n", "1:1: 検査 h: 知らないキー members (書けるキー: roles)"),
+            ("roles: []\n", "1:8: 検査 h: roles の値は、キーと値のマッピングでなければならない"),
+            ("roles:\n  Librarian:\n    name_ja: 司書\n    definition: x。\n", "2:3: 検査 h: ロールの名前 Librarian が snake_case でない"),
+            ("roles:\n  librarian:\n    definition: x。\n", "2:3: 検査 h: ロール librarian に必須の項目 name_ja が無い"),
+            (ROLES + "    parent: r-member\n", "5:5: 検査 h: 知らないキー parent (書けるキー: name_ja, definition)"),
+            ("roles: [\n", "2:1: 検査 h: YAML として読めない"),
+        ):
+            with self.subTest(text=text):
+                self.setUp()
+                self.assert_problem({"docs/system/roles.yaml": text}, f"docs/system/roles.yaml:{expected}")
+
+
 if __name__ == "__main__":
     unittest.main()

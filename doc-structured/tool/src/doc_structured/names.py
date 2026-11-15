@@ -40,6 +40,7 @@ KINDS: dict[str, Kind] = {
         Kind("ut", "未分類のアプリケーション用語", True, ("d",)),
         Kind("pre", "前提", True, ("d",)),
         Kind("ev", "イベント", True, ("d",)),
+        Kind("r", "ロール", True, ()),
     )
 }
 
