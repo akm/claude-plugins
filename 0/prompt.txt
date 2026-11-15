@@ -1,0 +1,36 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins で、GitHub の Issue の使い方をスキルにするプラグイン issue-practice を作っている (管理 Issue #239、計画 docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md)。単位 U3 (作業 Issue #268、PR #274) で、管理 Issue を作業 Issue に分けて計画し、作業セッションで進めて閉じる 4 つのスキル (managing-issue-plan・managing-issue-run・managing-issue-close・working-issue) を作った。その手順を、公開の確認用のリポジトリ akm/issue-practice-sandbox で本物の gh を使って確認している。確認用の管理 Issue #13 と作業 Issue #14・#15 は、確認を進めるセッションが managing apply で作った。PR をマージする人は管理セッションで、マージは確認を進めるセッションが行う。後で、管理セッションの交代 (このセッションをアーカイブして、新しいセッションに同じ名前を付ける) も確認する。
+
+Task:
+あなたは、確認用のリポジトリ akm/issue-practice-sandbox の管理 Issue https://github.com/akm/issue-practice-sandbox/issues/13 の管理セッションです。プラグイン issue-practice の計画の単位 U3 (https://github.com/akm/claude-plugins/issues/268) のスキルの手順を確認するために起動されました。
+
+- スキル managing-issue-run の手順書 `/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/skills/managing-issue-run/SKILL.md` を読んで従ってください (プラグインとしてはまだ配られていないので、ファイルを直接読む)。検査のスクリプトは `python3 /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/scripts/issue_practice.py <サブコマンド>` で実行します。このファイルとその作業ツリーは変えないでください。
+- 最初に、節「A. 受け持ちを始める」の手順 2 を行ってください: このセッションの名前を `issue-practice-sandbox#13 管理: U3 の確認` にし (`set_session_title`、session_id は self)、#13 に記録のコメント `session` (role=managing) を書く。手順 1 と 3 も行い、結果を下の確認を進めるセッションに知らせてください。
+- その後は、作業セッションからの報告のメッセージを受けたら、節「C. 報告を受ける」に従って処理してください (報告 pr なら merge-plan set-pr で表に PR の URL を書く、など)。
+- 節「B」の作業セッションの起動・PR のマージ・Issue を閉じることは、このセッションでは行いません。それは確認を進めるセッション (名前 `claude-plugins#268 作業: 管理と作業のスキル`) が行います。
+- 報告を処理するたびに、何をしたか (書いたコメントや本文の変更の URL・スクリプトの終了コード) を、確認を進めるセッションに、その名前に宛てて SendMessage で知らせてください。利用者の判断が要る報告 (split・condition-change・carve-out・suspend) が来たら、処理せずに知らせてください。
+- 手順書と実際の振る舞いが合わないところ (ツールが無い・スクリプトの出力が手順書と違うなど) を見つけたら、それも知らせてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_dbc9e93e-00f3-4669-bfd9-1254031ebb74
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/57873.sock" from-session="local_87bcede5-4506-43a8-8b3c-8073924aebee" from-name="issue-practice-sandbox#14 作業: 節「確認の手順」" from-mode="prompting">
+https://github.com/akm/issue-practice-sandbox/issues/14 の報告 (pr): https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867446879
+
+PR https://github.com/akm/issue-practice-sandbox/pull/17 を作りました (docs/14-readme-steps → main、Closes なし)。続けてクローズ条件にチェックを入れ、報告 (check) を送ります。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/57873.sock" from-session="local_87bcede5-4506-43a8-8b3c-8073924aebee" from-name="issue-practice-sandbox#14 作業: 節「確認の手順」" from-mode="prompting">
+https://github.com/akm/issue-practice-sandbox/issues/14 の報告 (check): https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867461207
+
+クローズ条件の 3 項目すべてに、根拠 (https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867453866) を付けてチェックを入れました。残りの項目はありません。PR https://github.com/akm/issue-practice-sandbox/pull/17 のマージを待ちます。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/99669.sock" from-session="local_dbc9e93e-00f3-4669-bfd9-1254031ebb74" from-name="claude-plugins#268 作業: 管理と作業のスキル" from-mode="prompting">
+確認を進めるセッションから: PR #17 のマージ前の close check もこちらで実行し (PR 以外は満たす)、#17 をマージして #14 を閉じました (close-check の記録 https://github.com/akm/issue-practice-sandbox/issues/14#issuecomment-6867480205)。表の列と blocked by は別のもの (表の「先にマージが要る作業 Issue」はマージの順、blocked by は切り出しの依存先) として扱う設計です。ToolSearch の件は手順書に足しました。次は #15 の作業セッションの起動と、管理セッションの交代の確認です。交代のときは、利用者の承認を得てこのセッションをアーカイブします。それまでは、報告が来たら今までどおり処理してください。
+</cross-session-message>
