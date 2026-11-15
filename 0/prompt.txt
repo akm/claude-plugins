@@ -1,0 +1,29 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins で、GitHub の Issue の使い方をスキルにするプラグイン issue-practice を作っている (計画の単位 U3、作業 Issue akm/claude-plugins#268、PR #274)。U3 で作った作業セッションのスキル working-issue の手順を、公開の確認用のリポジトリ akm/issue-practice-sandbox で本物の gh を使って確認している。確認用の管理 Issue #13 は、README に節「確認の手順」(#14) と「確認の記録」(#15) を足す計画で、ブランチの構成 1 (作業 Issue の PR を main にマージ)。このセッションは #14 を受け持つ。
+
+Task:
+あなたは作業 Issue https://github.com/akm/issue-practice-sandbox/issues/14 の作業セッションです。スキル issue-practice:working-issue を使って進めてください。
+
+- 作業 Issue: https://github.com/akm/issue-practice-sandbox/issues/14 (README に節「確認の手順」を足したい (U3 の確認))
+- 管理 Issue: https://github.com/akm/issue-practice-sandbox/issues/13
+- 報告先の管理セッション: issue-practice-sandbox#13 管理: U3 の確認 (ID: local_00154ffc-26a4-4169-8cd2-62060b5c731b)
+- ブランチ: docs/14-readme-steps を origin/main から作る
+- PR のマージ先: main
+- PR をマージする人: 管理セッション
+
+報告 (PR を作った・チェックを入れた・分けたい・条件を変えたい・切り出したい・中断する) は、作業 Issue に記録のコメントとして書き、そのコメントの URL を報告先の管理セッションにメッセージで知らせてください。
+
+確認のための補足 (スキルがまだプラグインとして配られていないため):
+- スキル working-issue の手順書は `/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/skills/working-issue/SKILL.md` にあります。ファイルを直接読んで従ってください。検査のスクリプトは `python3 /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/scripts/issue_practice.py <サブコマンド>` で実行します。その作業ツリーのファイルは変えないでください。
+- この作業ツリーは akm/claude-plugins のものです。作業 Issue のリポジトリ akm/issue-practice-sandbox は、`gh repo clone akm/issue-practice-sandbox` で、このセッションのスクラッチパッドのディレクトリに clone して作業してください。変えるのは README.md だけです。
+- チェックは、根拠を作業 Issue のコメントに書いてから入れてください (CI はありません)。
+- 報告のメッセージは、報告先の管理セッションの名前に宛ててください。手順書と実際の振る舞いが合わないところを見つけたら、作業 Issue にコメントを書かず、確認を進めるセッション (名前 `claude-plugins#268 作業: 管理と作業のスキル`) にメッセージで知らせてください。
+- PR を作ってチェックを入れ、報告を送ったら、マージまで待機してください (マージは管理セッションの役の別のセッションが行います)。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_dbc9e93e-00f3-4669-bfd9-1254031ebb74
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/99669.sock" from-session="local_dbc9e93e-00f3-4669-bfd9-1254031ebb74" from-name="claude-plugins#268 作業: 管理と作業のスキル" from-mode="prompting">
+確認を進めるセッションから: 報告ありがとうございます。PR #17 をマージし、#14 を閉じました。手順書と合わなかった 3 点は、手順書を直しました (akm/claude-plugins のコミット 129ea9bd)。このセッションの作業はこれで完了です。後で利用者の承認を得てアーカイブするので、それまで待機してください。
+</cross-session-message>
