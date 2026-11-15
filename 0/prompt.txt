@@ -1,0 +1,30 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins で、GitHub の Issue の使い方をスキルにするプラグイン issue-practice を作っている (計画の単位 U3、作業 Issue akm/claude-plugins#268、PR #274)。U3 の確認で、管理セッションの交代 (古い管理セッションをアーカイブしてから、新しいセッションに同じ名前を付ける。計画の KTD17) の後に、作業セッション (#15、issue-practice-sandbox#15 作業: 節「確認の記録」) の報告が、名前宛てのメッセージで新しい管理セッションに届くかを確認する。管理 Issue #13 の PR マージ計画はブランチの構成 1 で、#14 は閉じ、#15 の作業セッションが動いている。
+
+Task:
+あなたは、確認用のリポジトリ akm/issue-practice-sandbox の管理 Issue https://github.com/akm/issue-practice-sandbox/issues/13 の、新しい管理セッションです (管理セッションの交代の確認)。今の管理セッション A は「issue-practice-sandbox#13 管理: U3 の確認」(ID local_00154ffc-26a4-4169-8cd2-62060b5c731b) で、確認を進めるセッションが、利用者の承認を得て A をアーカイブします。
+
+- スキル managing-issue-run の手順書 `/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/skills/managing-issue-run/SKILL.md` を読み、節「D. 管理セッションを交代する」と節「C. 報告を受ける」に従ってください。検査のスクリプトは `python3 /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/scripts/issue_practice.py <サブコマンド>` で実行します。その作業ツリーには、ファイルを置いたり変えたりしないでください。
+- 今は、手順書を読んで準備だけをし、名前はまだ変えないでください。節 D の手順 1 (A のアーカイブ) は確認を進めるセッションが行います。A をアーカイブしたというメッセージを確認を進めるセッションから受けたら、節 D の手順 2〜4 (名前を `issue-practice-sandbox#13 管理: U3 の確認` にする・#13 に記録のコメント session (REDACTED、替えた理由は「U3 の確認で、管理セッションの交代を確認するため」) を書く・sessions active で動いている作業セッションに新しい名前と ID を知らせる) を行ってください。
+- その後、作業セッションからの報告のメッセージを受けたら、節 C に従って処理してください。PR のマージと Issue を閉じることは、このセッションでは行いません (確認を進めるセッションが行う)。
+- 手順を 1 つ終えるたび・報告を処理するたびに、何をしたか (書いたコメントの URL・スクリプトの終了コード) を、確認を進めるセッション (名前 `claude-plugins#268 作業: 管理と作業のスキル`) に SendMessage で知らせてください。手順書と実際の振る舞いが合わないところも知らせてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_dbc9e93e-00f3-4669-bfd9-1254031ebb74
+
+---
+
+<cross-session-message from="local_dbc9e93e-00f3-4669-bfd9-1254031ebb74" from-name="claude-plugins#268 作業: 管理と作業のスキル">
+確認を進めるセッションから: 古い管理セッション A (local_00154ffc-26a4-4169-8cd2-62060b5c731b) をアーカイブしました。節 D の手順 2〜4 を進めてください (名前を「issue-practice-sandbox#13 管理: U3 の確認」にする・#13 に previous 付きの session の記録を書く・sessions active で動いている作業セッションに新しい名前と ID を知らせる)。終えたら、こちらに結果を知らせてください。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70341.sock" from-session="local_12459e7b-ff44-4b0e-8af6-8039f4429c7c" from-name="issue-practice-sandbox#15 作業: 節「確認の記録」" from-mode="prompting">
+https://github.com/akm/issue-practice-sandbox/issues/15 の報告 (pr): https://github.com/akm/issue-practice-sandbox/issues/15#issuecomment-6867634755
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70341.sock" from-session="local_12459e7b-ff44-4b0e-8af6-8039f4429c7c" from-name="issue-practice-sandbox#15 作業: 節「確認の記録」" from-mode="prompting">
+https://github.com/akm/issue-practice-sandbox/issues/15 の報告 (check): https://github.com/akm/issue-practice-sandbox/issues/15#issuecomment-6867649526
+</cross-session-message>
