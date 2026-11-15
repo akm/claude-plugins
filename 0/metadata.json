@@ -1,0 +1,114 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7FNEYT7WD1VSZCK45897GHT",
+  "session_id": "3dd15850-676a-4ece-a633-236bf378b194",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-15T13:13:35.310684Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    ".github/test-targets.txt",
+    ".github/workflows/doc-structured-bin.yml",
+    ".github/workflows/test.yml",
+    "README.md",
+    "docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md",
+    "slide-deck/.claude-plugin/plugin.json",
+    "slide-deck/.gitignore",
+    "slide-deck/.python-version",
+    "slide-deck/eslint.config.mjs",
+    "slide-deck/examples/sample/deck.ts",
+    "slide-deck/examples/sample/outline.md",
+    "slide-deck/package-lock.json",
+    "slide-deck/package.json",
+    "slide-deck/pyproject.toml",
+    "slide-deck/python/slide_deck_tools/thumbs_grid.py",
+    "slide-deck/python/tests/test_smoke.py",
+    "slide-deck/python/tests/test_thumbs_grid.py",
+    "slide-deck/src/cli.ts",
+    "slide-deck/src/data/parts.ts",
+    "slide-deck/src/data/theme.ts",
+    "slide-deck/src/data/types.ts",
+    "slide-deck/src/fit/east-asian-width.ts",
+    "slide-deck/src/fit/estimate.ts",
+    "slide-deck/src/index.ts",
+    "slide-deck/src/outline/match.ts",
+    "slide-deck/src/outline/parse.ts",
+    "slide-deck/src/outline/url.ts",
+    "slide-deck/src/setup/setup.ts",
+    "slide-deck/tests/data.test.ts",
+    "slide-deck/tests/fit.test.ts",
+    "slide-deck/tests/fixtures/outline/errors.md",
+    "slide-deck/tests/fixtures/outline/no-url.md",
+    "slide-deck/tests/fixtures/outline/notes.md",
+    "slide-deck/tests/fixtures/outline/proposals.md",
+    "slide-deck/tests/fixtures/outline/with-url.md",
+    "slide-deck/tests/outline.test.ts",
+    "slide-deck/tests/setup.test.ts",
+    "slide-deck/tests/smoke.test.ts",
+    "slide-deck/tsconfig.json",
+    "slide-deck/uv.lock"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5-5",
+  "turn_id": "609b1ab0ca34",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 84,
+    "cache_creation_tokens": 142357,
+    "cache_read_tokens": 5751578,
+    "output_tokens": 36110,
+    "api_call_count": 40
+  },
+  "redaction": {
+    "replacements": 13,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 12,
+      "key_context": 1,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01HAFS4iaFZ7vTbcKFedTq6U",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "code-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "609b1ab0ca34",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 72,
+        "end": 73,
+        "entry_ids": [
+          "0c80c91e-d0e6-45d5-90b9-ba9d24c46e5b"
+        ],
+        "tool_use_id": "toolu_01HAFS4iaFZ7vTbcKFedTq6U"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01HAFS4iaFZ7vTbcKFedTq6U"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: code-review",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  }
+}
