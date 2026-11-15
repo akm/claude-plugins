@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01BRWjjMujX1xpcPUEdSc4Mm",
+  "agent_id": "a33210b2d8836c8bc",
+  "subagent_type": "general-purpose",
+  "task_description": "Doc review: scope guardian",
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 107265,
+    "cache_read_tokens": 67311,
+    "output_tokens": 2484,
+    "api_call_count": 2
+  },
+  "started_at": "2026-11-09T23:48:53.235097+09:00",
+  "completed_at": "2026-11-09T23:49:17.028552+09:00"
+}

@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01D5RVT3YiUD7KWw5iKGtXRu",
+  "agent_id": "a9097c706991b89f0",
+  "subagent_type": "general-purpose",
+  "task_description": "Doc review: feasibility",
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 158023,
+    "cache_read_tokens": 2275977,
+    "output_tokens": 32848,
+    "api_call_count": 20
+  },
+  "started_at": "2026-11-09T23:48:53.229605+09:00",
+  "completed_at": "2026-11-09T23:54:53.217437+09:00"
+}

@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01U5mubWpqDWCckieh8Ap4D4",
+  "agent_id": "ad7ef6b4e643a75e8",
+  "subagent_type": "general-purpose",
+  "task_description": "Doc review: coherence",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 123116,
+    "cache_read_tokens": 176930,
+    "output_tokens": 26382,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-09T23:48:53.229599+09:00",
+  "completed_at": "2026-11-09T23:50:53.081975+09:00"
+}

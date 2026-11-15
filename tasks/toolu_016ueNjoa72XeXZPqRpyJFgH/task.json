@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_016ueNjoa72XeXZPqRpyJFgH",
+  "agent_id": "ad6d72e7d497d892e",
+  "subagent_type": "general-purpose",
+  "task_description": "Research TS/mypy/uv tooling facts",
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 95570,
+    "cache_read_tokens": 1681799,
+    "output_tokens": 18114,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-09T22:02:33.046315+09:00",
+  "completed_at": "2026-11-09T22:06:31.536117+09:00"
+}

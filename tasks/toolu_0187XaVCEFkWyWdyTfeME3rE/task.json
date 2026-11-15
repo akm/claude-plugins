@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_0187XaVCEFkWyWdyTfeME3rE",
+  "agent_id": "a465dc756cc2f517d",
+  "subagent_type": "general-purpose",
+  "task_description": "Doc review: adversarial",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 113776,
+    "cache_read_tokens": 425243,
+    "output_tokens": 22213,
+    "api_call_count": 6
+  },
+  "started_at": "2026-11-09T23:48:53.370107+09:00",
+  "completed_at": "2026-11-09T23:52:29.001535+09:00"
+}
