@@ -1,7 +1,7 @@
 """ドメインの YAML から、人が読む Markdown を生成する。
 
-ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・terms.md を、全体の用語の索引
-docs/glossary.md を生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
+ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・terms.md を、全体の用語の索引
+docs/glossary.md を、ロールの定義と操作ごとの行えるロールの表を docs/system/permissions.md に生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 先頭に、生成したファイルの先頭の記述 (モジュール generated_header) を書く
   - 定義ごとに <a name="ID"></a> と見出しを書く。見出しは「種類 + 日本語名」の後に英語名をコードの書式で書く
@@ -21,6 +21,7 @@ from . import generated_header, names
 from .domains import DOMAINS_DIR, Domain, Entry, Project
 
 GLOSSARY_PATH = "docs/glossary.md"
+PERMISSIONS_PATH = "docs/system/permissions.md"
 GITATTRIBUTES_PATH = "docs/.gitattributes"
 # 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し、
 # 競合のマークを入れない (ファイルは競合の状態のまま)。どの側が ours になるかは git のコマンドによって違い、
@@ -36,10 +37,19 @@ FILE_DESCRIPTIONS = {
     "design": "設計の判断と短い理由",
     "models": "モデル・属性・値の定義",
     "unclassified_app_terms": "未分類のアプリケーション用語の定義",
+    "functions": "操作・前提・イベントの定義",
     "terms": "このドメインの用語の索引",
 }
-# 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語は 2
-HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2}
+# 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語・操作・前提・イベント・ロールは 2
+HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2, "op": 2, "pre": 2, "ev": 2, "r": 2}
+# 定義を書く生成したファイルの種類の記号。書いていない種類 (モデル・属性・値) は models
+ENTRY_FILES = {"ut": "unclassified_app_terms", "op": "functions", "pre": "functions", "ev": "functions"}
+# 操作・前提の参照を、定義の文の後の箇条書きに出すときの、キーと項目の名前。この順に出す
+FUNCTION_ITEMS = {"targets": "対象", "preconditions": "前提", "events": "イベント", "roles": "行えるロール"}
+# roles を省いた操作に出す箇条書きの項目 (省いたことに、どのロールも行わないという意味があるため)
+NO_ROLES_ITEM = "- 行えるロール: 無し"
+PERMISSIONS_TABLE_HEADING = "## 操作ごとの、行えるロール"
+PERMITTED = "○"
 
 
 def escape_link_text(text: str) -> str:
@@ -87,8 +97,9 @@ def _file_title(domain: Domain, symbol: str) -> str:
 
 
 def entry_file(entry: Entry) -> str:
-    symbol = "unclassified_app_terms" if entry.symbol == "ut" else "models"
-    return file_path(entry.domain, symbol)
+    if entry.domain is None:
+        return PERMISSIONS_PATH  # ロール
+    return file_path(entry.domain, ENTRY_FILES.get(entry.symbol, "models"))
 
 
 def _entry_link(links: _Links, entry: Entry, text: str) -> str:
@@ -96,9 +107,10 @@ def _entry_link(links: _Links, entry: Entry, text: str) -> str:
 
 
 def _reference_text(entry: Entry, from_domain: Domain) -> str:
-    """ほかの定義を指すリンクの表示の文。同じドメインなら「種類 + 名前」、ほかのドメインなら完全な名前。"""
-    if entry.domain is from_domain:
-        return names.format_part(entry.symbol, entry.name_ja)
+    """ほかの定義を指すリンクの表示の文。同じドメインなら、完全な名前からドメインを省いたもの
+    (「モデル「貸出」の属性「貸出状態」」)。ほかのドメインの定義とロールなら完全な名前。"""
+    if entry.domain is not None and entry.domain is from_domain:
+        return names.join_parts([names.format_part(e.symbol, e.name_ja) for e in entry.lineage()])
     return entry.full_name()
 
 
@@ -163,6 +175,31 @@ def render_unclassified_app_terms(domain: Domain) -> str:
     return _document(f"{domain.dir}/", _file_id(domain, "unclassified_app_terms"), blocks, links)
 
 
+def _function_items(project: Project, domain: Domain, entry: Entry, links: _Links) -> str | None:
+    """定義の文の後に出す、参照の箇条書き。参照が無ければ None。roles を省いた操作には「行えるロール: 無し」を出す。"""
+    lines = []
+    for key, label in FUNCTION_ITEMS.items():
+        targets = [project.entries[r.target] for r in entry.references if r.key == key]
+        if targets:
+            listed = "・".join(_entry_link(links, t, _reference_text(t, domain)) for t in targets)
+            lines.append(f"- {label}: {listed}")
+        elif key == "roles" and entry.symbol == "op":
+            lines.append(NO_ROLES_ITEM)
+    return "\n".join(lines) if lines else None
+
+
+def render_functions(project: Project, domain: Domain) -> str:
+    path = file_path(domain, "functions")
+    links = _Links(path)
+    blocks = [f"# {domain.full_name()} の操作・前提・イベント"]
+    for entry in [*domain.operations, *domain.preconditions, *domain.events]:
+        blocks.append(_definition_block(entry))
+        items = _function_items(project, domain, entry, links)
+        if items:
+            blocks.append(items)
+    return _document(f"{domain.dir}/", _file_id(domain, "functions"), blocks, links)
+
+
 def _kind_text(entry: Entry) -> str:
     """用語の索引の「種類」の列。ドメインの中の親の「種類 + 名前」と、自分の種類の名前。"""
     parents = [names.format_part(e.symbol, e.name_ja) for e in entry.lineage()[:-1]]
@@ -184,22 +221,53 @@ def render_terms(domain: Domain) -> str:
     return _document(f"{domain.dir}/", _file_id(domain, "terms"), blocks, links)
 
 
+def _project_source(project: Project) -> str:
+    """プロジェクトの全体から作るファイルの生成元。ロールがあれば、ドメインの外の YAML も読むので docs/。"""
+    return "docs/" if project.roles else f"{DOMAINS_DIR.as_posix()}/"
+
+
 def render_glossary(project: Project) -> str:
     links = _Links(GLOSSARY_PATH)
     rows = ["| 用語 | 種類 | 英語名 | ドメイン |", "|---|---|---|---|"]
-    all_entries = [e for d in project.domains for e in d.entries()]
+    all_entries = [e for d in project.domains for e in d.entries()] + project.roles
     for entry in _sorted_terms(all_entries):
         domain = entry.domain
         term = escape_cell(_entry_link(links, entry, entry.name_ja))
-        domain_link = links.link(f"`{domain.name}`", domain.id, f"{domain.dir}/{README}", domain.full_name())
-        rows.append(f"| {term} | {escape_cell(_kind_text(entry))} | `{entry.name}` | {domain_link} |")
+        domain_cell = " "  # ロールはドメインを持たないので、セルを空にする
+        if domain is not None:
+            domain_link = links.link(f"`{domain.name}`", domain.id, f"{domain.dir}/{README}", domain.full_name())
+            domain_cell = f" {domain_link} "
+        rows.append(f"| {term} | {escape_cell(_kind_text(entry))} | `{entry.name}` |{domain_cell}|")
     blocks = ["# 用語の索引", "\n".join(rows)]
-    return _document(f"{DOMAINS_DIR.as_posix()}/", None, blocks, links)
+    return _document(_project_source(project), None, blocks, links)
+
+
+def render_permissions(project: Project) -> str:
+    """ロールの定義の節と、操作ごとの行えるロールの表。操作が無ければ表を出さない。"""
+    links = _Links(PERMISSIONS_PATH)
+    blocks = ["# ロールと操作"]
+    blocks += [_definition_block(role) for role in project.roles]
+    operations = [op for domain in project.domains for op in domain.operations]
+    if operations:
+        header = ["操作", "ドメイン"]
+        header += [_entry_link(links, role, role.name_ja) for role in project.roles]
+        rows = ["| " + " | ".join(escape_cell(h) for h in header) + " |", "|" + "---|" * len(header)]
+        for op in operations:
+            permitted = {r.target for r in op.references if r.key == "roles"}
+            domain = op.domain
+            cells = [
+                escape_cell(_entry_link(links, op, op.name_ja)),
+                links.link(f"`{domain.name}`", domain.id, f"{domain.dir}/{README}", domain.full_name()),
+            ]
+            cells += [PERMITTED if role.id in permitted else "" for role in project.roles]
+            rows.append("|" + "|".join(f" {c} " if c else " " for c in cells) + "|")
+        blocks += [PERMISSIONS_TABLE_HEADING, "\n".join(rows)]
+    return _document("docs/", None, blocks, links)
 
 
 def render_readme(domain: Domain, files: list[str]) -> str:
     """files は、表に載せるファイルの種類の記号。ドメインのディレクトリの直下にある手書きのファイル (concept・problem・design)
-    を先に、このドメインで生成するファイル (models・unclassified_app_terms・terms) を後に並べる。"""
+    を先に、このドメインで生成するファイル (models・unclassified_app_terms・functions・terms) を後に並べる。"""
     path = f"{domain.dir}/{README}"
     links = _Links(path)
     blocks = [f"# {domain.full_name()}"]
@@ -217,10 +285,11 @@ def render_readme(domain: Domain, files: list[str]) -> str:
     return _document(f"{domain.dir}/", domain.id, blocks, links)
 
 
-def render_gitattributes(paths: list[str]) -> str:
-    """paths は、ディレクトリ docs/ の下の生成するファイルの、リポジトリのルートからの相対パス (docs/.gitattributes を除く)。"""
+def render_gitattributes(paths: list[str], source: str = f"{DOMAINS_DIR.as_posix()}/") -> str:
+    """paths は、ディレクトリ docs/ の下の生成するファイルの、リポジトリのルートからの相対パス (docs/.gitattributes を除く)。
+    source は先頭の記述に書く生成元。"""
     base = posixpath.dirname(GITATTRIBUTES_PATH)
-    lines = [generated_header.hash_line(f"{DOMAINS_DIR.as_posix()}/"), GITATTRIBUTES_COMMENT]
+    lines = [generated_header.hash_line(source), GITATTRIBUTES_COMMENT]
     for path in sorted([*paths, GITATTRIBUTES_PATH]):
         if not path.startswith(f"{base}/"):
             raise ValueError(f"ディレクトリ {base}/ の外のファイルは {GITATTRIBUTES_PATH} に書けない: {path}")
@@ -241,14 +310,19 @@ def render_project(project: Project) -> dict[str, str]:
         if domain.terms:
             outputs[file_path(domain, "unclassified_app_terms")] = render_unclassified_app_terms(domain)
             files.append("unclassified_app_terms")
-        if domain.models or domain.terms:
+        if domain.operations or domain.preconditions or domain.events:
+            outputs[file_path(domain, "functions")] = render_functions(project, domain)
+            files.append("functions")
+        if any(True for _ in domain.entries()):
             outputs[file_path(domain, "terms")] = render_terms(domain)
             files.append("terms")
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
-    if any(d.models or d.terms for d in project.domains):
+    if project.roles or any(d.operations for d in project.domains):
+        outputs[PERMISSIONS_PATH] = render_permissions(project)
+    if project.roles or any(True for d in project.domains for _ in d.entries()):
         outputs[GLOSSARY_PATH] = render_glossary(project)
     if outputs:
-        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs))
+        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs), _project_source(project))
     return dict(sorted(outputs.items()))
 
 

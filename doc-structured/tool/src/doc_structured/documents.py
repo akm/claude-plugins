@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import generated_header, markdown, names
 from .domains import DOMAINS_DIR, Domain, Project, rel
-from .generate import entry_file, file_path
+from .generate import PERMISSIONS_PATH, entry_file, file_path
 from .names import Part
 from .problems import Problem
 
@@ -226,13 +226,18 @@ class _Finder:
         self.index.files.append(HandwrittenFile(path_rel, domain, symbol, child, document))
 
     def read_anchors(self) -> None:
+        """ドメインのディレクトリの下のすべての Markdown と、ロールの定義を書く生成したファイルのアンカーを読む。"""
+        paths: list[Path] = []
         domains_dir = self.root / DOMAINS_DIR
-        if not domains_dir.is_dir():
-            return
-        for path in sorted(domains_dir.rglob("*.md")):
-            relative = path.relative_to(domains_dir)
-            if any(part.startswith(".") for part in relative.parts) or not path.is_file():
-                continue
+        if domains_dir.is_dir():
+            for path in sorted(domains_dir.rglob("*.md")):
+                relative = path.relative_to(domains_dir)
+                if any(part.startswith(".") for part in relative.parts) or not path.is_file():
+                    continue
+                paths.append(path)
+        if (self.root / PERMISSIONS_PATH).is_file():
+            paths.append(self.root / PERMISSIONS_PATH)
+        for path in paths:
             path_rel = rel(self.root, path)
             document = self.index.documents.get(path_rel)
             if document is None:
@@ -249,6 +254,8 @@ class _Finder:
             self.index.targets[target_id] = Target(target_id, path, parts, name, abbreviated)
 
     def add_targets(self) -> None:
+        for role in self.project.roles:
+            self.add_target(role.id, [names.format_part(role.symbol, role.name_ja)], role.name_ja, entry_file(role))
         for domain in self.project.domains:
             # ファイルは、生成する側 (モジュール generate) の対応で決める
             self.add_target(domain.id, [domain.full_name()], None, f"{domain.dir}/{README}")

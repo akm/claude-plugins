@@ -47,14 +47,16 @@ class GitattributesTest(ProjectTestCase):
         outputs = render_project(project)
         content = outputs[GITATTRIBUTES_PATH]
         lines = content.splitlines()
-        self.assertEqual(lines[0], gh.hash_line("docs/domains/"))
-        self.assertEqual(gh.read_header(content), gh.Header(source="docs/domains/", command=gh.GENERATE_COMMAND))
+        # サンプルのプロジェクトはロールを持ち、ドメインの外の YAML も読むので、生成元は docs/
+        self.assertEqual(lines[0], gh.hash_line("docs/"))
+        self.assertEqual(gh.read_header(content), gh.Header(source="docs/", command=gh.GENERATE_COMMAND))
         patterns = [line for line in lines if not line.startswith("#")]
         # docs/.gitattributes 自身を含む、すべての生成したファイル。パスは docs/ からの相対で、先頭に「/」を付ける
         expected = [f"/{path.removeprefix('docs/')} merge=binary" for path in sorted(outputs)]
         self.assertEqual(patterns, expected)
         self.assertIn("/.gitattributes merge=binary", patterns)
         self.assertIn("/glossary.md merge=binary", patterns)
+        self.assertIn("/system/permissions.md merge=binary", patterns)
 
     def test_is_treated_as_generated_file(self):
         self.assertIn(GITATTRIBUTES_PATH, generated_files(SAMPLE_PROJECT))

@@ -1,4 +1,22 @@
-# 予約のモデル。貸出 (親のディレクトリの domain.yaml) から参照されるので、サブディレクトリに置く
+# 予約のモデルと、予約に関わる操作と前提。予約のモデルは、貸出 (親のディレクトリの domain.yaml) から参照されるので、サブディレクトリに置く
+operations:
+  reserve:
+    name_ja: 予約する
+    definition: 貸出中の図書を、返ったときに次に借りられるよう予約する。
+    targets:
+      - d-loans-m-reservation
+    preconditions:
+      - d-loans-pre-no_previous_reservation
+    roles:
+      - r-librarian
+      - r-member
+preconditions:
+  no_previous_reservation:
+    name_ja: 先の予約が無い
+    definition: 同じ図書に、ほかの利用者の予約が無い。
+    targets:
+      - d-loans-m-reservation
+      - d-loans-m-reservation-a-previous
 models:
   reservation:
     name_ja: 予約

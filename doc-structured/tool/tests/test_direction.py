@@ -69,6 +69,57 @@ class DirectionTest(ProjectTestCase):
         })
         self.assertEqual(found, [])
 
+    def test_precondition_targets_to_ancestor_directory_fails(self):
+        found = self.problems_for({
+            "docs/domains/01-loans/domain.yaml": ROOT,
+            "docs/domains/01-loans/sub/pre.yaml": (
+                "preconditions:\n  loan_exists:\n    name_ja: 貸出がある\n    definition: x。\n"
+                "    targets:\n      - d-loans-m-loan\n"
+            ),
+        })
+        self.assertEqual(found, [
+            "docs/domains/01-loans/sub/pre.yaml:6:9: 検査 i: 前提 loan_exists の targets の参照先 d-loans-m-loan は、"
+            "祖先のディレクトリの docs/domains/01-loans/domain.yaml にある。"
+            "参照される定義 (d-loans-m-loan) を、参照するファイルと同じディレクトリかその下に移す"
+        ])
+
+    def test_precondition_targets_in_allowed_directions(self):
+        found = self.problems_for({
+            "docs/domains/01-loans/domain.yaml": ROOT
+            + "preconditions:\n  child_exists:\n    name_ja: 子がある\n    definition: x。\n"
+            + "    targets: [d-loans-m-child, d-loans-m-loan]\n",
+            "docs/domains/01-loans/sub/child.yaml": model("child"),
+        })
+        self.assertEqual(found, [])
+
+    def test_operation_references_to_ancestor_directory_fail(self):
+        found = self.problems_for({
+            "docs/domains/01-loans/domain.yaml": ROOT
+            + "preconditions:\n  loan_exists:\n    name_ja: 貸出がある\n    definition: x。\n"
+            + "events:\n  lent:\n    name_ja: 貸し出した\n    definition: y。\n",
+            "docs/domains/01-loans/sub/op.yaml": (
+                "operations:\n  lend:\n    name_ja: 貸し出す\n    definition: z。\n"
+                "    targets: [d-loans-m-loan]\n    preconditions: [d-loans-pre-loan_exists]\n    events: [d-loans-ev-lent]\n"
+            ),
+            "docs/system/roles.yaml": "roles:\n  librarian:\n    name_ja: 司書\n    definition: 職員。\n",
+        })
+        self.assertEqual(
+            [p.split(" の参照先 ")[0] for p in found],
+            [
+                "docs/domains/01-loans/sub/op.yaml:5:15: 検査 i: 操作 lend の targets",
+                "docs/domains/01-loans/sub/op.yaml:6:21: 検査 i: 操作 lend の preconditions",
+                "docs/domains/01-loans/sub/op.yaml:7:14: 検査 i: 操作 lend の events",
+            ],
+        )
+
+    def test_roles_are_not_in_an_ancestor_directory(self):
+        found = self.problems_for({
+            "docs/domains/01-loans/domain.yaml": ROOT,
+            "docs/domains/01-loans/sub/op.yaml": "operations:\n  lend:\n    name_ja: 貸し出す\n    definition: z。\n    roles: [r-librarian]\n",
+            "docs/system/roles.yaml": "roles:\n  librarian:\n    name_ja: 司書\n    definition: 職員。\n",
+        })
+        self.assertEqual(found, [])
+
     def test_self_reference_is_allowed(self):
         found = self.problems_for({
             "docs/domains/01-loans/domain.yaml": ROOT,

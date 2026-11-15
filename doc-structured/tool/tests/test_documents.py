@@ -126,6 +126,31 @@ class TargetTest(DocumentsTestCase):
             "ドメイン `loans` のファイル `design/overdue_notice.md` の節「再送 `retry`」",
         )
 
+    def test_targets_of_preconditions_and_events_are_in_functions_md(self):
+        index, _ = self.load()
+        for target_id, full_name in (
+            ("d-loans-functions", "ドメイン `loans` のファイル `functions.md`"),
+            ("d-loans-pre-book_shelved", "ドメイン `loans` の前提「図書が配架中」"),
+            ("d-loans-ev-book_lent", "ドメイン `loans` のイベント「図書を貸し出した」"),
+        ):
+            with self.subTest(target=target_id):
+                self.assertEqual(index.targets[target_id].path, "docs/domains/02-loans/functions.md")
+                self.assertEqual(index.targets[target_id].full_name(), full_name)
+        self.assertEqual(index.candidates("前提「図書が配架中」"), [index.targets["d-loans-pre-book_shelved"]])
+
+    def test_targets_of_roles_are_in_permissions_md(self):
+        index, _ = self.load()
+        target = index.targets["r-librarian"]
+        self.assertEqual(target.path, "docs/system/permissions.md")
+        self.assertEqual(target.full_name(), "ロール「司書」")
+        self.assertEqual(target.writable_forms(), ["ロール「司書」"])
+        self.assertEqual(target.href("docs/domains/02-loans/concept.md"), "../../system/permissions.md#r-librarian")
+        # 同じ日本語名のモデルとロールは、名前だけでは 2 つの候補になる
+        self.assertEqual(
+            [t.id for t in index.candidates("利用者")], ["d-members-m-member", "r-member"]
+        )
+        self.assertEqual(index.candidates("ロール「利用者」"), [index.targets["r-member"]])
+
     def test_href(self):
         self.write("docs/domains/02-loans/concept.md", CONCEPT)
         self.write("docs/domains/02-loans/design/overdue_notice.md", CHILD)

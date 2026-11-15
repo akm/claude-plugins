@@ -38,6 +38,10 @@ KINDS: dict[str, Kind] = {
         Kind("a", "属性", True, ("m",)),
         Kind("v", "値", True, ("a",)),
         Kind("ut", "未分類のアプリケーション用語", True, ("d",)),
+        Kind("op", "操作", True, ("d",)),
+        Kind("pre", "前提", True, ("d",)),
+        Kind("ev", "イベント", True, ("d",)),
+        Kind("r", "ロール", True, ()),
     )
 }
 
@@ -46,6 +50,7 @@ FILE_KINDS: dict[str, str] = {
     "models": "models.md",
     "terms": "terms.md",
     "unclassified_app_terms": "unclassified_app_terms.md",
+    "functions": "functions.md",
 }
 # 手書きのファイルの種類の記号と、そのファイル名。親はドメイン。ドメインの README.md の表に、この順に載せる
 HANDWRITTEN_FILE_KINDS: dict[str, str] = {
