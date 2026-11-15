@@ -234,5 +234,97 @@ class CheckHTest(ProjectTestCase):
                 )
 
 
+PRECONDITION = """\
+preconditions:
+  loan_exists:
+    name_ja: 貸出がある
+    definition: 返す図書の貸出がある。
+"""
+
+
+class PreconditionAndEventTest(CheckHTest):
+    """前提とイベント。成功する例と、検査 h が失敗する例。"""
+
+    def test_sample_preconditions_and_events(self):
+        project, problems = load_project(self.copy_sample())
+        self.assertEqual([p.format() for p in problems], [])
+        loans = project.domains[1]
+        # 直下の domain.yaml の定義が先、サブディレクトリの定義が後
+        self.assertEqual(
+            [e.id for e in loans.preconditions],
+            ["d-loans-pre-book_shelved", "d-loans-pre-loan_on_loan", "d-loans-pre-no_previous_reservation"],
+        )
+        self.assertEqual([e.id for e in loans.events], ["d-loans-ev-book_lent", "d-loans-ev-book_returned"])
+        precondition = project.entries["d-loans-pre-no_previous_reservation"]
+        self.assertEqual(precondition.full_name(), "ドメイン `loans` の前提「先の予約が無い」")
+        self.assertEqual(
+            [(r.key, r.target) for r in precondition.references],
+            [("targets", "d-loans-m-reservation"), ("targets", "d-loans-m-reservation-a-previous")],
+        )
+        event = project.entries["d-loans-ev-book_lent"]
+        self.assertEqual(event.full_name(), "ドメイン `loans` のイベント「図書を貸し出した」")
+
+    def with_targets(self, targets: str) -> dict[str, str]:
+        return {"docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN + PRECONDITION + f"    targets: {targets}\n"}
+
+    def test_targets_can_refer_to_models_attributes_and_values(self):
+        text = (
+            MINIMAL_DOMAIN
+            + "    attributes:\n      status:\n        name_ja: 貸出状態\n        definition: 段階。\n"
+            + "        values:\n          on_loan:\n            name_ja: 貸出中\n            definition: 手元にある。\n"
+            + PRECONDITION
+            + "    targets:\n      - d-loans-m-loan\n      - d-loans-m-loan-a-status\n      - d-loans-m-loan-a-status-v-on_loan\n"
+        )
+        self.assertEqual(self.problems_for({"docs/domains/01-loans/domain.yaml": text}), [])
+
+    def test_targets_errors(self):
+        prefix = "docs/domains/01-loans/domain.yaml"
+        for targets, expected in (
+            ("d-loans-m-loan", "11:14: 検査 h: 前提 loan_exists の targets は、ID の文字列の配列でなければならない"),
+            ("[]", "11:14: 検査 h: 前提 loan_exists の targets は、空の配列にできない (参照が無いときは、targets を省く)"),
+            ("[d-loans-m-loan, 1]", "11:31: 検査 h: 前提 loan_exists の targets は、ID の文字列の配列でなければならない"),
+            ("[m-loan]", "11:15: 検査 h: 前提 loan_exists の targets の値が ID の形でない"),
+            (
+                "[d-loans-ut-x]",
+                "11:15: 検査 h: 前提 loan_exists の targets の参照先 d-loans-ut-x はモデル・属性・値でない "
+                "(参照できるのはモデル・属性・値だけ)",
+            ),
+            ("[d-loans-m-book]", "11:15: 検査 h: 前提 loan_exists の targets の参照先 d-loans-m-book が無い"),
+            ("[d-loans-m-loan, d-loans-m-loan]", "11:31: 検査 h: 前提 loan_exists の targets に d-loans-m-loan が 2 回ある"),
+        ):
+            with self.subTest(targets=targets):
+                self.setUp()
+                self.assert_problem(self.with_targets(targets), f"{prefix}:{expected}")
+
+    def test_event_has_no_targets(self):
+        self.assert_problem(
+            {
+                "docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN
+                + "events:\n  lent:\n    name_ja: 貸し出した\n    definition: 手元に移った。\n    targets: [d-loans-m-loan]\n"
+            },
+            "docs/domains/01-loans/domain.yaml:11:5: 検査 h: 知らないキー targets (書けるキー: name_ja, definition)",
+        )
+
+    def test_required_fields_of_precondition_and_event(self):
+        self.assert_problem(
+            {"docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN + "events:\n  lent:\n    definition: 手元に移った。\n"},
+            "docs/domains/01-loans/domain.yaml:8:3: 検査 h: イベント lent に必須の項目 name_ja が無い",
+        )
+
+    def test_duplicate_precondition_in_two_files(self):
+        self.assert_problem(
+            {
+                "docs/domains/01-loans/domain.yaml": MINIMAL_DOMAIN + PRECONDITION,
+                "docs/domains/01-loans/sub/more.yaml": PRECONDITION,
+            },
+            "docs/domains/01-loans/sub/more.yaml:2:3: 検査 h: 前提 loan_exists は、docs/domains/01-loans/domain.yaml:8 にもある",
+        )
+
+    def test_same_name_in_different_kinds_is_allowed(self):
+        text = MINIMAL_DOMAIN + "preconditions:\n  loan:\n    name_ja: 貸出がある\n    definition: x。\n"
+        text += "events:\n  loan:\n    name_ja: 貸し出した\n    definition: y。\n"
+        self.assertEqual(self.problems_for({"docs/domains/01-loans/domain.yaml": text}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

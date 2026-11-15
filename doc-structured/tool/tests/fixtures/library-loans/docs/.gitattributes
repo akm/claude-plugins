@@ -6,6 +6,7 @@
 /domains/01-catalog/terms.md merge=binary
 /domains/01-catalog/unclassified_app_terms.md merge=binary
 /domains/02-loans/README.md merge=binary
+/domains/02-loans/functions.md merge=binary
 /domains/02-loans/models.md merge=binary
 /domains/02-loans/terms.md merge=binary
 /domains/02-loans/unclassified_app_terms.md merge=binary

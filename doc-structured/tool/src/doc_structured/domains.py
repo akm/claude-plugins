@@ -3,9 +3,11 @@
 ディレクトリ docs/domains/ の直下のディレクトリ NN-<名前> がドメインで、その下のどの深さの .yaml も読む。
 形式の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 直下の domain.yaml にだけ、キー domain (説明 description) を書く
-  - どのファイルにも、キー models (モデル・属性・値) と unclassified_app_terms (未分類のアプリケーション用語) を書ける
+  - どのファイルにも、キー models (モデル・属性・値)・unclassified_app_terms (未分類のアプリケーション用語)・
+    preconditions (前提)・events (イベント) を書ける
   - 英語名をマッピングのキーにし、日本語名を name_ja、定義を definition に書く
   - 属性は、ほかのモデルへの参照 refers_to (完全な ID) と、値 values を持てる
+  - 前提は、モデル・属性・値への参照 targets (完全な ID の配列) を持てる
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
 """
 
@@ -14,7 +16,7 @@ from pathlib import Path
 import re
 
 from ruamel.yaml import YAMLError
-from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from . import names, yamlio
 from .names import IdError, Part
@@ -24,12 +26,18 @@ DOMAINS_DIR = Path("docs/domains")
 DOMAIN_FILE = "domain.yaml"
 DOMAIN_DIR_RE = re.compile(r"^(\d{2,})-(.+)$")
 
-TOP_KEYS = ("domain", "models", "unclassified_app_terms")
+TOP_KEYS = ("domain", "models", "unclassified_app_terms", "preconditions", "events")
 DOMAIN_KEYS = ("description",)
 MODEL_KEYS = ("name_ja", "definition", "attributes")
 ATTRIBUTE_KEYS = ("name_ja", "definition", "values", "refers_to")
 VALUE_KEYS = ("name_ja", "definition")
 TERM_KEYS = ("name_ja", "definition")
+PRECONDITION_KEYS = ("name_ja", "definition", "targets")
+EVENT_KEYS = ("name_ja", "definition")
+# 完全な ID の配列で書く参照。定義の種類の記号とキーから、参照できる種類の記号と、メッセージに書くその名前への対応
+LIST_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
+    ("pre", "targets"): (("m", "a", "v"), "モデル・属性・値"),
+}
 REQUIRED_KEYS = ("name_ja", "definition")
 # read_yaml が、YAML として読めないファイルに返す値 (空のファイルの None と区別する)
 _UNREADABLE = object()
@@ -42,9 +50,19 @@ NAME_JA_FORBIDDEN = ("\n", "\r", '"')
 CR = "\r"
 
 
+@dataclass(frozen=True)
+class Reference:
+    """完全な ID の配列で書いた参照の 1 つ (前提の targets など)。"""
+
+    key: str  # 参照を書いたキー
+    target: str  # 参照先の ID
+    line: int
+    column: int
+
+
 @dataclass
 class Entry:
-    """名前と定義を持つ 1 つの定義 (モデル・属性・値・未分類のアプリケーション用語)。"""
+    """名前と定義を持つ 1 つの定義 (モデル・属性・値・未分類のアプリケーション用語・前提・イベント)。"""
 
     id: str
     symbol: str
@@ -60,10 +78,16 @@ class Entry:
     refers_to: str | None = None
     refers_to_line: int = 0
     refers_to_column: int = 0
+    references: list[Reference] = field(default_factory=list)  # 完全な ID の配列で書いた参照。書いた順
 
     @property
     def kind_label(self) -> str:
         return names.KINDS[self.symbol].label
+
+    @property
+    def owner(self) -> str:
+        """検査 h・i のメッセージに書く、定義の種類と英語名 (「前提 book_shelved」)。"""
+        return f"{self.kind_label} {self.name}"
 
     def lineage(self) -> list["Entry"]:
         """親から自分までの定義 (ドメインは含まない)。"""
@@ -93,6 +117,8 @@ class Domain:
     description: str = ""
     models: list[Entry] = field(default_factory=list)
     terms: list[Entry] = field(default_factory=list)  # 未分類のアプリケーション用語
+    preconditions: list[Entry] = field(default_factory=list)
+    events: list[Entry] = field(default_factory=list)
     yaml_files: list[str] = field(default_factory=list)
 
     @property
@@ -103,10 +129,12 @@ class Domain:
         return names.format_part("d", self.name)
 
     def entries(self):
-        """モデル (その属性と値を含む) と未分類のアプリケーション用語を、定義の並び順に返す。"""
+        """モデル (その属性と値を含む)・未分類のアプリケーション用語・前提・イベントを、定義の並び順に返す。"""
         for model in self.models:
             yield from model.walk()
         yield from self.terms
+        yield from self.preconditions
+        yield from self.events
 
 
 @dataclass
@@ -182,6 +210,8 @@ class _Loader:
             self.problem(domain.dir, f"ドメインのディレクトリの直下に {DOMAIN_FILE} が無い")
         model_names: dict[str, Entry] = {}
         term_names: dict[str, Entry] = {}
+        precondition_names: dict[str, Entry] = {}
+        event_names: dict[str, Entry] = {}
         for path in files:
             path_rel = rel(self.root, path)
             domain.yaml_files.append(path_rel)
@@ -206,6 +236,10 @@ class _Loader:
                     self.load_models(domain, data, path_rel, model_names)
                 elif key == "unclassified_app_terms":
                     self.load_terms(domain, data, path_rel, term_names)
+                elif key == "preconditions":
+                    self.load_list(domain, data, key, "pre", PRECONDITION_KEYS, path_rel, precondition_names, domain.preconditions)
+                elif key == "events":
+                    self.load_list(domain, data, key, "ev", EVENT_KEYS, path_rel, event_names, domain.events)
                 else:
                     self.unknown_key(path_rel, key, TOP_KEYS, line, column)
             if path == root_file and "domain" not in data:
@@ -367,24 +401,64 @@ class _Loader:
                     self.entry(domain, values, value_name, "v", VALUE_KEYS, path_rel, attribute)
 
     def load_terms(self, domain: Domain, data: CommentedMap, path_rel: str, seen: dict[str, Entry]) -> None:
-        terms = self.mapping_of(data, "unclassified_app_terms", path_rel)
-        if terms is None:
+        self.load_list(domain, data, "unclassified_app_terms", "ut", TERM_KEYS, path_rel, seen, domain.terms)
+
+    def load_list(
+        self,
+        domain: Domain,
+        data: CommentedMap,
+        key: str,
+        symbol: str,
+        allowed: tuple[str, ...],
+        path_rel: str,
+        seen: dict[str, Entry],
+        found: list[Entry],
+    ) -> None:
+        """ドメインの下に並べる種類 (未分類のアプリケーション用語・前提・イベント) の定義を読み、found に足す。"""
+        mapping = self.mapping_of(data, key, path_rel)
+        if mapping is None:
             return
-        for name in terms:
-            term, _ = self.entry(domain, terms, name, "ut", TERM_KEYS, path_rel, None)
-            if term is None:
+        for name in mapping:
+            entry, entry_map = self.entry(domain, mapping, name, symbol, allowed, path_rel, None)
+            if entry is None:
                 continue
             if name in seen:
                 other = seen[name]
                 self.problem(
-                    path_rel,
-                    f"未分類のアプリケーション用語 {name} は、{other.path}:{other.line} にもある",
-                    term.line,
-                    term.column,
+                    path_rel, f"{entry.owner} は、{other.path}:{other.line} にもある", entry.line, entry.column
                 )
                 continue
-            seen[name] = term
-            domain.terms.append(term)
+            seen[name] = entry
+            found.append(entry)
+            for list_key in allowed:
+                if (symbol, list_key) in LIST_REFERENCES and list_key in entry_map:
+                    self.load_id_list(entry, entry_map, list_key, path_rel)
+
+    def load_id_list(self, entry: Entry, mapping: CommentedMap, key: str, path_rel: str) -> None:
+        """完全な ID の配列で書いた参照を読む。配列でない・空・文字列でない値・同じ ID が 2 回は、問題を足す。"""
+        value = mapping[key]
+        not_list = f"{entry.owner} の {key} は、ID の文字列の配列でなければならない"
+        if not isinstance(value, CommentedSeq):
+            self.problem(path_rel, not_list, *_value_position(mapping, key))
+            return
+        if not value:
+            self.problem(
+                path_rel, f"{entry.owner} の {key} は、空の配列にできない (参照が無いときは、{key} を省く)",
+                *_value_position(mapping, key),
+            )
+            return
+        seen: set[str] = set()
+        for i, item in enumerate(value):
+            line, column = _item_position(value, i)
+            if not isinstance(item, str) or not item.strip():
+                self.problem(path_rel, not_list, line, column)
+                continue
+            target = item.strip()
+            if target in seen:
+                self.problem(path_rel, f"{entry.owner} の {key} に {target} が 2 回ある", line, column)
+                continue
+            seen.add(target)
+            entry.references.append(Reference(key, target, line, column))
 
     def resolve_references(self) -> None:
         entries = self.project.entries
@@ -405,6 +479,25 @@ class _Loader:
                     self.problem(where[0], f"refers_to の参照先 {entry.refers_to} はモデルでない (参照できるのはモデルだけ)", *where[1:])
                 elif entry.refers_to not in entries:
                     self.problem(where[0], f"refers_to の参照先 {entry.refers_to} が無い", *where[1:])
+            for entry in domain.entries():
+                for reference in entry.references:
+                    self.resolve_list_reference(entry, reference)
+
+    def resolve_list_reference(self, entry: Entry, reference: Reference) -> None:
+        kinds, kinds_text = LIST_REFERENCES[(entry.symbol, reference.key)]
+        prefix = f"{entry.owner} の {reference.key}"
+        where = (entry.path, reference.line, reference.column)
+        try:
+            kind = names.kind_of(reference.target)
+        except IdError as e:
+            self.problem(where[0], f"{prefix} の値が ID の形でない: {e}", *where[1:])
+            return
+        if kind not in kinds:
+            self.problem(
+                where[0], f"{prefix} の参照先 {reference.target} は{kinds_text}でない (参照できるのは{kinds_text}だけ)", *where[1:]
+            )
+        elif reference.target not in self.project.entries:
+            self.problem(where[0], f"{prefix} の参照先 {reference.target} が無い", *where[1:])
 
 
 def _key_position(mapping: CommentedMap, key) -> tuple[int, int]:
@@ -414,6 +507,11 @@ def _key_position(mapping: CommentedMap, key) -> tuple[int, int]:
 
 def _value_position(mapping: CommentedMap, key) -> tuple[int, int]:
     line, column = mapping.lc.value(key)
+    return line + 1, column + 1
+
+
+def _item_position(sequence: CommentedSeq, index: int) -> tuple[int, int]:
+    line, column = sequence.lc.item(index)
     return line + 1, column + 1
 
 

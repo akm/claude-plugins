@@ -1,6 +1,6 @@
 """ドメインの YAML から、人が読む Markdown を生成する。
 
-ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・terms.md を、全体の用語の索引
+ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・terms.md を、全体の用語の索引
 docs/glossary.md を生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 先頭に、生成したファイルの先頭の記述 (モジュール generated_header) を書く
@@ -36,10 +36,15 @@ FILE_DESCRIPTIONS = {
     "design": "設計の判断と短い理由",
     "models": "モデル・属性・値の定義",
     "unclassified_app_terms": "未分類のアプリケーション用語の定義",
+    "functions": "操作・前提・イベントの定義",
     "terms": "このドメインの用語の索引",
 }
-# 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語は 2
-HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2}
+# 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語・前提・イベントは 2
+HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2, "pre": 2, "ev": 2}
+# 定義を書く生成したファイルの種類の記号。書いていない種類 (モデル・属性・値) は models
+ENTRY_FILES = {"ut": "unclassified_app_terms", "pre": "functions", "ev": "functions"}
+# 前提・イベントの参照を、定義の文の後の箇条書きに出すときの、キーと項目の名前
+FUNCTION_ITEMS = {"targets": "対象"}
 
 
 def escape_link_text(text: str) -> str:
@@ -87,8 +92,7 @@ def _file_title(domain: Domain, symbol: str) -> str:
 
 
 def entry_file(entry: Entry) -> str:
-    symbol = "unclassified_app_terms" if entry.symbol == "ut" else "models"
-    return file_path(entry.domain, symbol)
+    return file_path(entry.domain, ENTRY_FILES.get(entry.symbol, "models"))
 
 
 def _entry_link(links: _Links, entry: Entry, text: str) -> str:
@@ -96,9 +100,10 @@ def _entry_link(links: _Links, entry: Entry, text: str) -> str:
 
 
 def _reference_text(entry: Entry, from_domain: Domain) -> str:
-    """ほかの定義を指すリンクの表示の文。同じドメインなら「種類 + 名前」、ほかのドメインなら完全な名前。"""
+    """ほかの定義を指すリンクの表示の文。同じドメインなら、完全な名前からドメインを省いたもの
+    (「モデル「貸出」の属性「貸出状態」」)。ほかのドメインなら完全な名前。"""
     if entry.domain is from_domain:
-        return names.format_part(entry.symbol, entry.name_ja)
+        return names.join_parts([names.format_part(e.symbol, e.name_ja) for e in entry.lineage()])
     return entry.full_name()
 
 
@@ -163,6 +168,29 @@ def render_unclassified_app_terms(domain: Domain) -> str:
     return _document(f"{domain.dir}/", _file_id(domain, "unclassified_app_terms"), blocks, links)
 
 
+def _function_items(project: Project, domain: Domain, entry: Entry, links: _Links) -> str | None:
+    """定義の文の後に出す、参照の箇条書き。参照が無ければ None。"""
+    lines = []
+    for key, label in FUNCTION_ITEMS.items():
+        targets = [project.entries[r.target] for r in entry.references if r.key == key]
+        if targets:
+            listed = "・".join(_entry_link(links, t, _reference_text(t, domain)) for t in targets)
+            lines.append(f"- {label}: {listed}")
+    return "\n".join(lines) if lines else None
+
+
+def render_functions(project: Project, domain: Domain) -> str:
+    path = file_path(domain, "functions")
+    links = _Links(path)
+    blocks = [f"# {domain.full_name()} の操作・前提・イベント"]
+    for entry in [*domain.preconditions, *domain.events]:
+        blocks.append(_definition_block(entry))
+        items = _function_items(project, domain, entry, links)
+        if items:
+            blocks.append(items)
+    return _document(f"{domain.dir}/", _file_id(domain, "functions"), blocks, links)
+
+
 def _kind_text(entry: Entry) -> str:
     """用語の索引の「種類」の列。ドメインの中の親の「種類 + 名前」と、自分の種類の名前。"""
     parents = [names.format_part(e.symbol, e.name_ja) for e in entry.lineage()[:-1]]
@@ -199,7 +227,7 @@ def render_glossary(project: Project) -> str:
 
 def render_readme(domain: Domain, files: list[str]) -> str:
     """files は、表に載せるファイルの種類の記号。ドメインのディレクトリの直下にある手書きのファイル (concept・problem・design)
-    を先に、このドメインで生成するファイル (models・unclassified_app_terms・terms) を後に並べる。"""
+    を先に、このドメインで生成するファイル (models・unclassified_app_terms・functions・terms) を後に並べる。"""
     path = f"{domain.dir}/{README}"
     links = _Links(path)
     blocks = [f"# {domain.full_name()}"]
@@ -241,11 +269,14 @@ def render_project(project: Project) -> dict[str, str]:
         if domain.terms:
             outputs[file_path(domain, "unclassified_app_terms")] = render_unclassified_app_terms(domain)
             files.append("unclassified_app_terms")
-        if domain.models or domain.terms:
+        if domain.preconditions or domain.events:
+            outputs[file_path(domain, "functions")] = render_functions(project, domain)
+            files.append("functions")
+        if any(True for _ in domain.entries()):
             outputs[file_path(domain, "terms")] = render_terms(domain)
             files.append("terms")
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
-    if any(d.models or d.terms for d in project.domains):
+    if any(True for d in project.domains for _ in d.entries()):
         outputs[GLOSSARY_PATH] = render_glossary(project)
     if outputs:
         outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs))

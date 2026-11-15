@@ -1,6 +1,7 @@
 """検査 i (参照の向き)。
 
-YAML の参照 (属性の refers_to) は、参照する YAML のディレクトリの祖先のディレクトリにある YAML の定義を指さない。
+YAML の参照 (属性の refers_to と、前提の targets などの完全な ID の配列) は、参照する YAML のディレクトリの祖先の
+ディレクトリにある YAML の定義を指さない。
 同じディレクトリ・子孫のディレクトリ・別のサブツリー・ほかのドメインは指してよい。判定は参照先の定義を書いた場所で行う。
 違反したときの直し方は、参照される定義をサブディレクトリの YAML に移すこと (参照しているファイルを移すことではない)。
 
@@ -24,26 +25,35 @@ def _is_ancestor(target_dir: PurePosixPath, source_dir: PurePosixPath) -> bool:
     return target_dir != source_dir and target_dir in source_dir.parents
 
 
-def check_direction(project: Project) -> list[Problem]:
-    problems: list[Problem] = []
+def _yaml_references(project: Project):
+    """YAML の参照ごとに、参照する定義・メッセージの先頭に書く参照の名前・参照先の ID・位置を返す。"""
     for domain in project.domains:
         for entry in domain.entries():
-            if entry.refers_to is None or entry.refers_to not in project.entries:
-                continue  # 参照先が無いことは検査 h が報告する
-            target = project.entries[entry.refers_to]
-            source_dir = PurePosixPath(entry.path).parent
-            target_dir = PurePosixPath(target.path).parent
-            if _is_ancestor(target_dir, source_dir):
-                problems.append(
-                    Problem(
-                        "i",
-                        entry.path,
-                        f"refers_to の参照先 {target.id} は、祖先のディレクトリの {target.path} にある。"
-                        f"参照される定義 ({target.id}) を、参照するファイルと同じディレクトリかその下に移す",
-                        entry.refers_to_line,
-                        entry.refers_to_column,
-                    )
+            if entry.refers_to is not None:
+                yield entry, "refers_to", entry.refers_to, entry.refers_to_line, entry.refers_to_column
+            for reference in entry.references:
+                yield entry, f"{entry.owner} の {reference.key}", reference.target, reference.line, reference.column
+
+
+def check_direction(project: Project) -> list[Problem]:
+    problems: list[Problem] = []
+    for entry, prefix, target_id, line, column in _yaml_references(project):
+        if target_id not in project.entries:
+            continue  # 参照先が無いことは検査 h が報告する
+        target = project.entries[target_id]
+        source_dir = PurePosixPath(entry.path).parent
+        target_dir = PurePosixPath(target.path).parent
+        if _is_ancestor(target_dir, source_dir):
+            problems.append(
+                Problem(
+                    "i",
+                    entry.path,
+                    f"{prefix} の参照先 {target.id} は、祖先のディレクトリの {target.path} にある。"
+                    f"参照される定義 ({target.id}) を、参照するファイルと同じディレクトリかその下に移す",
+                    line,
+                    column,
                 )
+            )
     return problems
 
 

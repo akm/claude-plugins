@@ -79,6 +79,40 @@ class GenerateTest(ProjectTestCase):
         names = sorted(generated_files(self.project))
         self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
 
+    def test_functions_md_lists_preconditions_then_events(self):
+        self.write(
+            "docs/domains/01-loans/domain.yaml",
+            MINIMAL
+            + "events:\n  lent:\n    name_ja: 貸し出した\n    definition: 手元に移った。\n"
+            + "preconditions:\n  loan_exists:\n    name_ja: 貸出がある\n    definition: 貸出がある。\n"
+            + "    targets: [d-loans-m-loan]\n"
+            + "  free:\n    name_ja: 空いている\n    definition: 空いている。\n",
+        )
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        outputs = render_project(project)
+        functions = outputs["docs/domains/01-loans/functions.md"]
+        body = functions.split("\n", 1)[1]
+        self.assertEqual(body, (
+            '<a name="d-loans-functions"></a>\n\n'
+            "# ドメイン `loans` の操作・前提・イベント\n\n"
+            '<a name="d-loans-pre-loan_exists"></a>\n\n## 前提「貸出がある」 `loan_exists`\n\n貸出がある。\n\n'
+            "- 対象: [モデル「貸出」][d-loans-m-loan]\n\n"
+            '<a name="d-loans-pre-free"></a>\n\n## 前提「空いている」 `free`\n\n空いている。\n\n'
+            '<a name="d-loans-ev-lent"></a>\n\n## イベント「貸し出した」 `lent`\n\n手元に移った。\n\n'
+            '[d-loans-m-loan]: models.md#d-loans-m-loan "ドメイン `loans` のモデル「貸出」"\n'
+        ))
+        self.assertIn("| [`functions.md`][d-loans-functions] | 操作・前提・イベントの定義 |", outputs["docs/domains/01-loans/README.md"])
+        self.assertIn("| [貸出がある][d-loans-pre-loan_exists] | 前提 | `loan_exists` |", outputs["docs/domains/01-loans/terms.md"])
+        self.assertIn(
+            "| [貸し出した][d-loans-ev-lent] | イベント | `lent` | [`loans`][d-loans] |", outputs["docs/glossary.md"]
+        )
+
+    def test_functions_md_is_not_generated_without_preconditions_and_events(self):
+        self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
+        project, _ = load_project(self.project)
+        self.assertNotIn("docs/domains/01-loans/functions.md", render_project(project))
+
     def test_readme_lists_handwritten_files_first(self):
         self.write(".claude/akm-claude-plugins/doc-structured/config.yaml", "version: 0.2.0\n")
         self.write("docs/domains/01-loans/domain.yaml", MINIMAL)
