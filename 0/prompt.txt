@@ -1,0 +1,52 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins に、GitHub の Issue の使い方をスキルにするプラグイン `issue-practice` を作っている (Issue #239)。計画はファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` で、5 つの単位 U1〜U5 を作業 Issue #266〜#270 と PR 1 つずつにして順に進める。ブランチの構成は 1 (各 PR を main にマージ)、PR は利用者がマージする。U1 (#266) は PR #271 でマージ済みで閉じた (共通部分: 用語と書式の references・gh の実行・記録のコメント・識別子・計画案・本文の範囲・チェックボックスのスクリプト、版 0.1.0)。U2 はスキル `new-issue` と、gh の sub-issue・blocked by・マイルストーンの振る舞いの確認と固定データ、リリース計画 Issue の表の書式 (共有の references) と「今」「次」のリリースの判定。スキルの手順の確認は、公開のリポジトリ akm/issue-practice-sandbox で行う。文書は日本語で書き、利用者のコミットルール (動機ごとに分ける) と、ほかのプロジェクト名を公開の場に書かない規則に従う。
+
+Task:
+あなたは作業 Issue akm/claude-plugins#267 の作業セッションです (最初の指示)。
+
+- 作業 Issue: #267 「要望・バグ・切り出しの Issue を、決めた本文の形で作り、入れるリリースを設定したい (new-issue)」(計画の単位 U2、版 0.2.0)
+- 管理 Issue: #239。報告先の管理セッション: 「claude-plugins#239 管理: Issue の使い方のスキル」(セッション ID `local_7eefe131-5f84-4c43-b029-e14eb2449d29`)
+- ブランチ: 最初に `git fetch origin` をし、`git switch -c feat/267-new-issue origin/main` で作る (この作業ツリーは古いローカルの main から作られている可能性がある)。origin/main は U1 (PR #271、cb315b95) を含む。PR のマージ先は main
+- 計画: ファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md`。Goal Capsule・節「U2. Issue を作る」・U2 が引く R と KTD・Verification Contract を読む。U1 で入ったファイル `issue-practice/references/` と `issue-practice/scripts/` も読む
+- スキル `working-issue` はまだ無いので、次の手順を手で行う
+
+手順:
+1. 計画の U2 の手順 1 のとおり、最初に、確認用のリポジトリ akm/issue-practice-sandbox (公開。まだコミットが無い) で、`gh` による sub-issue の追加・blocked by の設定・blocking の一覧の取得と、`gh api` によるマイルストーンの作成・名前の変更・閉じること・一覧の取得を実際に行い、固定データに記録する。確認用のリポジトリでの Issue・マイルストーン・ラベルの作成は、この作業の範囲として行ってよい。前提と違う振る舞いが分かったら、実装の前に管理セッションに報告する
+2. 計画の「必要なものを用意 → テストを書く → 実装する」の順で実装する。コミットは動機ごとに分け、版を上げるコミット (0.2.0) は機能のコミットと分ける
+3. 変えた文書・SKILL.md・コメント・コミットメッセージは `python3 wording-guard/scripts/wording_lint.py check` で検査し、error を 0 件にする。リポジトリのルートの `CLAUDE.md` の規則に従う
+4. テストは `python3 -m unittest discover -s issue-practice/tests` で成功させる
+5. 計画と合わないことが分かったら、勝手に設計を変えず、管理セッションに報告する。利用者の判断が要ることは、このセッションで利用者に直接質問する
+6. PR を作る。本文に #267 へのリンクを書き、`Closes` は書かない (R21)。PR は利用者がマージする
+7. #267 のクローズ条件を確認したら、本文のチェックボックスにチェックを入れ、項目の末尾に `(根拠: <URL>)` を足す (KTD9)。CI の項目は、CI の実行がすべて終わって成功してから入れる。本文を書き換える直前に、`issue_practice.py body show` などで本文を再度読み込み、変わっていないことを確認する
+
+報告の形: 報告は、#267 にコメントとして書き、1 行目は U1 で決めた形 (`python3 issue-practice/scripts/issue_practice.py records format report type=...` で作る。種類とキーはファイル `issue-practice/references/record-comments.md`) にする。そのコメントの URL を管理セッションにメッセージで知らせる (R30・KTD16)。
+
+終わったら: PR の URL と、チェックを入れた項目・入れていない項目を報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+<cross-session-message from="local_7eefe131-5f84-4c43-b029-e14eb2449d29" from-name="claude-plugins#239 管理: Issue の使い方のスキル">
+U2 の PR に、計画の KTD10 の修正を 1 つ含めてください (利用者が管理セッションで承認済み)。
+U1 では、git が失敗したときも終了コード 4 にしました (入口の `issue_practice.py` の `--help` もそう説明しています)。計画 `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` の KTD10 は「4 は `gh` が失敗して検査できなかった」とだけ書いているので、「4 は `gh` か `git` が失敗して検査できなかった」に直してください。利用者の回答は「直してよい」です。計画の修正は、機能のコミットとは別のコミットにしてください。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_7eefe131-5f84-4c43-b029-e14eb2449d29" from-name="claude-plugins#239 管理: Issue の使い方のスキル">
+PR #273 に、計画の KTD10 の修正のコミットがまだ入っていません。追加してください (前のメッセージで依頼したもの)。
+計画 `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` の KTD10 の「4 は `gh` が失敗して検査できなかった」を、「4 は `gh` か `git` が失敗して検査できなかった」に直す。U1 で git の失敗も終了コード 4 にしたため。利用者は管理セッションで「直してよい」と回答済み。機能のコミットとは別のコミットにし、push したら #267 に記録のコメントを書いて知らせてください。
+</cross-session-message>
+
+---
+
+CI を確認して
+
+---
+
+もう一度確認して
+
+---
+
+PR をマージした
