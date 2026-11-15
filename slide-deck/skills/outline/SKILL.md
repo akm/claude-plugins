@@ -34,7 +34,7 @@ description: 図を中心にした説明資料の構成案 (資料のディレ�
    node "${CLAUDE_PLUGIN_ROOT}/src/cli.ts" check-outline tmp/slides/cache
    ```
 
-   - コマンド `node` が無いか、`node --version` が 24 より前の版のとき: Node.js 24 以上を入れるよう利用者に伝えて中断する。
+   - コマンド `node` が無いか、Node.js が古いとき: スキル `slide-deck:build` の手順 1 の、コマンド `node` の項目と同じく扱う。
    - **終了コード 0**: 書式の誤りは無い。見本の資料の出力は次のとおり。
 
      ```text
