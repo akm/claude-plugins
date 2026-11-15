@@ -16,7 +16,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な表現を、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに作業を継続したいときに使う) |
 | [doc-structured](doc-structured/README.md) | アプリケーションの文書を、列挙できる事実は YAML に書いて人が読む Markdown を生成し、生成物と参照を検査する構成で書く (作成中) |
-| [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う (作成中) |
+| [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う |
 
 ## 使い方
 
@@ -230,10 +230,10 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── bin/doc-structured        # プロジェクトに置く、ツールの入口のスクリプト
 │   ├── tool/                     # 生成と検査のツール (Python)。テストは tool/tests/
 │   └── README.md
-├── issue-practice/               # skill 型 + 同梱スクリプト (作成中)
+├── issue-practice/               # skill 型 + 同梱スクリプト
 │   ├── .claude-plugin/plugin.json
-│   ├── skills/new-issue/         # 要望・バグ・切り出しの Issue を作る
-│   ├── references/               # すべてのスキルが参照する用語と書式の文書
+│   ├── skills/                   # 9 つのスキル (Issue の作成・管理 Issue と作業 Issue・リリース)
+│   ├── references/               # 使い方の文書と、すべてのスキルが参照する用語と書式の文書
 │   ├── scripts/                  # 検査のスクリプト (issue_practice.py とパッケージ issue_practice/)
 │   ├── tests/                    # python3 -m unittest discover -s issue-practice/tests
 │   └── README.md
