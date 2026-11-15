@@ -11,7 +11,7 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | [managing-issue-run](skills/managing-issue-run/SKILL.md) | 管理セッションとして、作業セッションを最初の指示を渡して起動し、報告を受けて PR マージ計画の表を書き換え、管理セッションの交代を扱う |
 | [managing-issue-close](skills/managing-issue-close/SKILL.md) | 作業 Issue・管理 Issue・自己管理 Issue を、閉じる前の検査をしてから閉じ、依存先とする Issue に片付いたことを書く |
 | [working-issue](skills/working-issue/SKILL.md) | 作業セッションとして作業 Issue を進め、PR を作り、チェックと根拠のリンクを入れて、管理セッションに報告する |
-| [release-plan](skills/release-plan/SKILL.md) | リリースの順番と各リリースに含める Issue を計画案で調整し、承認を得てから、リリース計画 Issue・リリース Issue・リリースマイルストーンを作って、ラベル `current` を付け替える。取りやめたリリースと急ぎのリリースの追加も扱う |
+| [release-plan](skills/release-plan/SKILL.md) | リリースの順番と各リリースに含める Issue を計画案で調整し、承認を得てから、リリース計画 Issue・リリース Issue・リリースマイルストーンを作って、ラベル `current` を付け替える。取りやめたリリース・急ぎのリリースの追加・2 つ目のリリース対象の追加も扱う |
 | [release-issue-plan](skills/release-issue-plan/SKILL.md) | リリース Issue 1 つの計画 (7 つの項目) を計画案で調整し、承認を得てから本文に書いて、題名の `[DRAFT]` を外す |
 | [release-run](skills/release-run/SKILL.md) | リリースの実行を始めたことと実行の記録を書き、リリースの PR とリリース Issue にお互いの URL を書く。実行中の計画の変更と切り出しも扱う |
 | [release-close](skills/release-close/SKILL.md) | リリース Issue を、閉じる前の条件を確認してから、利用者の承認を得てリリースマイルストーンと同時に閉じる |

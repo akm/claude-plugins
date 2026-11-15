@@ -43,7 +43,7 @@ issue-practice: session role=working session=local_89aab7c6-87c8-432f-97dc-4de4f
 | --- | --- | --- | --- |
 | `session` | `role`・`session` | `branch`・`previous` | セッションを起動した・受け持った・交代した (計画の R27〜R29)。セッションの名前は本文に書く |
 | `approval` | `draft` | なし | 利用者が計画案を承認した (R2) |
-| `plan-change` | なし | `draft` | 計画・クローズ条件・PR マージ計画を変えた (R24・R34・R46)。何を変えたか・理由・決めた人は本文に書く |
+| `plan-change` | なし | `draft` | 計画・クローズ条件・PR マージ計画を変えた・既にあるリリース対象に名前を付けた (R24・R34・R41・R46)。何を変えたか・理由・決めた人は本文に書く |
 | `report` | `type` | `pr` | 作業セッションが報告する (R30)。報告の中身は本文に書く |
 | `draft-removed` | `date` | `draft` | リリース Issue の計画を承認して、題名の `[DRAFT]` を外した (R44) |
 | `current-swap` | `date` | `old` | ラベル `current` を新しいリリース計画 Issue に付け替えた (R38)。新しく作ったリリース Issue とマイルストーンは本文に書く |

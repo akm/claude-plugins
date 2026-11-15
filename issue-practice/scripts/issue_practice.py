@@ -776,18 +776,22 @@ def build_parser():
              _exit_help("決めた形どおり", "決めた形の崩れがある", "gh が失敗した"))
     _add_issue_args(p)
     release_output = (
-        "  draft・repo・kind・target  計画案のファイル名・リポジトリ・種類 (新しい計画・急ぎのリリースの追加)・リリース対象\n"
+        "  draft・repo・kind・target  計画案のファイル名・リポジトリ・種類 (新しい計画・急ぎのリリースの追加・リリース対象の\n"
+        "               追加)・リリース対象\n"
+        "  existing_target  既にあるリリース対象に付ける名前 (リリース対象の追加のとき)。ほかの種類では null\n"
         "  current      今の計画 {number, url} (計画案の項目「今の計画」)。無ければ null\n"
         "  plan         新しいリリース計画 Issue {number, url} (作り済みのとき)。無ければ null\n"
         "  current_plans  ラベル current の付いた計画の番号の配列\n"
         "  labels_to_create  作るラベル {name, color, description} の配列\n"
         "  actions      行う書き込み {step, action, ...} の配列 (済んだものは含まない)。step は計画の R38 の手順の番号\n"
         "               (0 はラベルの作成、7 は取りやめたリリース)。急ぎのリリースの追加では、1 が approval の記録、2 が\n"
-        "               リリース Issue とマイルストーン、3 が表の書き換え、4 が plan-change の記録。action は\n"
+        "               リリース Issue とマイルストーン、3 が表の書き換え、4 が plan-change の記録。リリース対象の追加では、\n"
+        "               1 が approval の記録、2 がラベルを付けることと名前を変えること、3 が plan-change の記録。action は\n"
         "               create-label・create-plan・record-approval・create-release・set-release-number・create-milestone・\n"
         "               set-milestone-description・write-release-body・set-milestone・remove-milestone・add-label・\n"
         "               write-plan-table・add-current・remove-current・record-current-swap・close-old-plan・copy-memo・\n"
-        "               record-cancel・close-cancelled-release・close-cancelled-milestone・record-plan-change のどれか\n"
+        "               record-cancel・close-cancelled-release・close-cancelled-milestone・record-plan-change・\n"
+        "               rename-issue・rename-milestone のどれか\n"
         "  errors       誤り {line (計画案の行番号。行に結び付かないものは null), message} の配列\n"
         "  gh_error     gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}")
     p = _add(g, "plan", cmd_release_plan,
