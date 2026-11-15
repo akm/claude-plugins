@@ -1,0 +1,47 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins に、GitHub の Issue の使い方をスキルにするプラグイン `issue-practice` を作っている (Issue #239)。計画はファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` (PR #265 でマージ済み) で、5 つの単位 U1〜U5 をそれぞれ作業 Issue #266〜#270 と PR 1 つずつにして順に進める。ブランチの構成は 1 (各 PR を main にマージ)、PR は利用者がマージする。U1 は共通部分 (プラグインの枠・共有の references・gh の実行・記録のコメント・識別子・計画案・本文の節とチェックボックスの読み書き) で、スキルはまだ作らない。スキルの手順の確認は、公開のリポジトリ akm/issue-practice-sandbox で行う (U1 はスキルを含まないので対象外)。文書は日本語で書き、利用者のコミットルール (動機ごとに分ける) と、ほかのプロジェクト名を公開の場に書かない規則に従う。
+
+Task:
+あなたは作業 Issue akm/claude-plugins#266 の作業セッションです (最初の指示)。
+
+- 作業 Issue: #266 「issue-practice のスキルが共通で使う用語と書式、gh・記録のコメント・計画案を扱うスクリプトの共通部分を用意したい」(計画の単位 U1)
+- 管理 Issue: #239。報告先の管理セッション: 「claude-plugins#239 管理: Issue の使い方のスキル」(セッション ID `local_7eefe131-5f84-4c43-b029-e14eb2449d29`)
+- ブランチ: `feat/266-issue-practice-base` を main の最新から作り、そのブランチで作業する (この worktree のブランチの名前が違えば、最初に `git switch -c feat/266-issue-practice-base origin/main` で作り直す)。PR のマージ先は main
+- 計画: ファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md`。まず Goal Capsule・節「Implementation Units」の冒頭・節「U1. 共通部分」・U1 が引く R と KTD・Verification Contract を読む
+- スキル `working-issue` はまだ無いので、次の手順を手で行う
+
+手順:
+1. #266 の本文 (クローズ条件) と計画の U1 を読み、計画の「実装計画の立て方」(必要なものを用意 → テストを書く → 実装する) で実装する。コミットは動機ごとに分け、版を上げるコミット (0.1.0) は機能のコミットと分ける
+2. 変えた文書・SKILL.md・コメント・コミットメッセージは、`python3 wording-guard/scripts/wording_lint.py check` で検査し、error を 0 件にする。リポジトリのルートの `CLAUDE.md` の文書の規則に従う
+3. テストは `python3 -m unittest discover -s issue-practice/tests` で成功させる。`.github/test-targets.txt` への登録も U1 の範囲
+4. 計画と合わないことが分かったら、勝手に設計を変えず、まず管理セッションに報告する (下の報告の形)。利用者の判断が要ることは、このセッションで利用者に直接質問する
+5. PR を作る。本文には #266 へのリンクを書き、`Closes` は書かない (計画の R21)。PR は利用者がマージするので、マージしない
+6. 確認したクローズ条件の項目に、#266 の本文でチェックを入れ、項目の末尾に `(根拠: <URL>)` を足す (計画の KTD9)。本文を書き換える直前に再度読み込み、変わっていないことを確認する
+
+報告の形: 報告 (PR を作った・チェックを入れた・計画と合わない・中断する) は、#266 にコメントとして書き、そのコメントの URL を管理セッションにメッセージで知らせる (計画の R30・KTD16)。記録のコメントの 1 行目の形は U1 で決めるので、決めた後はその形で書く。
+
+終わったら: PR の URL と、チェックを入れた項目・入れていない項目を報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+<cross-session-message from="local_7eefe131-5f84-4c43-b029-e14eb2449d29" from-name="claude-plugins#239 管理: Issue の使い方のスキル">
+作業ツリーの元のブランチが古い可能性があるので、着手の前に origin/main (f2714da7 以降) から作り直してください。
+この作業ツリーは、ローカルの main から作られました。ローカルの main は、計画の PR #265 をマージする前のものの可能性があり、計画のファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` を含まないことがあります。最初に `git fetch origin` をし、`git switch -c feat/266-issue-practice-base origin/main` でブランチを作ってから作業してください (同じ名前のブランチがあれば、それが origin/main を含むことを確認してください)。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_7eefe131-5f84-4c43-b029-e14eb2449d29" from-name="claude-plugins#239 管理: Issue の使い方のスキル">
+#266 の「単位の機能を確認する自動テストがあり、CI で成功する」のチェックは、CI がまだ終わっていない時点で入っています。
+根拠の run 43454203462 では、python (review-triage/tests) と python (issue-dispatch/tests) がまだ実行中です。run がすべて終わってから `gh pr checks 271` で成功を確認し、失敗や取り消しがあればチェックを外して報告してください。成功していれば、このままでかまいません (報告は要りません)。
+</cross-session-message>
+
+---
+
+マージしました
+
+---
+
+インストールして README が作成中なのを確認しました
