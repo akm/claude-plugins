@@ -1,0 +1,46 @@
+Background (from the session that started this one):
+リポジトリ akm/claude-plugins で、GitHub の Issue の使い方をスキルにするプラグイン issue-practice を作っている (計画の単位 U3、作業 Issue akm/claude-plugins#268、PR #274)。U3 で作った作業セッションのスキル working-issue の手順を、公開の確認用のリポジトリ akm/issue-practice-sandbox で本物の gh を使って確認している。確認用の管理 Issue #13 は、README に節「確認の手順」(#14、PR #17 でマージ済み) と「確認の記録」(#15) を足す計画で、ブランチの構成 1。このセッションは #15 を受け持つ。途中で管理セッションの交代を確認する。
+
+Task:
+あなたは作業 Issue https://github.com/akm/issue-practice-sandbox/issues/15 の作業セッションです。スキル issue-practice:working-issue を使って進めてください。
+
+- 作業 Issue: https://github.com/akm/issue-practice-sandbox/issues/15 (README に節「確認の記録」を足したい (U3 の確認))
+- 管理 Issue: https://github.com/akm/issue-practice-sandbox/issues/13
+- 報告先の管理セッション: issue-practice-sandbox#13 管理: U3 の確認 (ID: local_00154ffc-26a4-4169-8cd2-62060b5c731b)
+- ブランチ: docs/15-readme-records を origin/main から作る
+- PR のマージ先: main
+- PR をマージする人: 管理セッション
+
+報告 (PR を作った・チェックを入れた・分けたい・条件を変えたい・切り出したい・中断する) は、作業 Issue に記録のコメントとして書き、そのコメントの URL を報告先の管理セッションにメッセージで知らせてください。
+
+確認のための補足 (スキルがまだプラグインとして配られていないため):
+- スキル working-issue の手順書は `/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/skills/working-issue/SKILL.md` にあります。ファイルを直接読んで従ってください。検査のスクリプトは `python3 /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/issue-practice/scripts/issue_practice.py <サブコマンド>` で実行します。その作業ツリーには、ファイルを置いたり変えたりしないでください (一時ファイルはこのセッションのスクラッチパッドに置く)。
+- この作業ツリーは akm/claude-plugins のものです。akm/issue-practice-sandbox は、`gh repo clone akm/issue-practice-sandbox` で、このセッションのスクラッチパッドのディレクトリに clone して作業してください。変えるのは README.md だけです (main には、#14 で足した節「確認の手順」があります)。
+- チェックは、根拠を作業 Issue のコメントに書いてから入れてください (CI はありません)。
+- 報告のメッセージは、報告先の管理セッションの名前に宛ててください。管理セッションが替わったというメッセージを受け取ったら、それ以降は新しい管理セッションに報告してください (名前は同じです)。手順書と実際の振る舞いが合わないところを見つけたら、作業 Issue にコメントを書かず、確認を進めるセッション (名前 `claude-plugins#268 作業: 管理と作業のスキル`) にメッセージで知らせてください。
+- PR を作ってチェックを入れ、報告を送ったら、マージまで待機してください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_dbc9e93e-00f3-4669-bfd9-1254031ebb74
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70907.sock" from-session="local_0205312a-1302-4a17-8ea3-f0144b1b44e1" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+管理 Issue akm/issue-practice-sandbox#13 の管理セッションが交代しました。報告先は、新しい管理セッションです。
+
+- 新しい管理セッションの名前: issue-practice-sandbox#13 管理: U3 の確認 (名前は前と同じ)
+- 新しい管理セッションの ID: local_0205312a-1302-4a17-8ea3-f0144b1b44e1
+- 前の管理セッションの ID: local_00154ffc-26a4-4169-8cd2-62060b5c731b (アーカイブ済み)
+- 交代の記録: https://github.com/akm/issue-practice-sandbox/issues/13#issuecomment-6867639754
+
+#15 の報告 (pr、https://github.com/akm/issue-practice-sandbox/issues/15#issuecomment-6867634755) は、新しい管理セッションが受け取りました。これから処理します。
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/70907.sock" from-session="local_0205312a-1302-4a17-8ea3-f0144b1b44e1" from-name="issue-practice-sandbox#13 管理: U3 の確認" from-mode="prompting">
+#15 の報告 2 つ (pr・check) を、新しい管理セッションが処理しました。
+
+- pr: PR マージ計画の表 (#13) の #15 の行に https://github.com/akm/issue-practice-sandbox/pull/20 を書いた。PR の本文に Closes が無いことも確かめた。
+- check: checkboxes list で 3 項目すべてにチェックと根拠があることを確かめた。
+- PR #20 のマージと #15 を閉じることは、確認を進めるセッションが行います。それまで待ってください。
+</cross-session-message>
