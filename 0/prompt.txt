@@ -1,0 +1,122 @@
+Background (from the session that started this one):
+Issue #242 は、図を中心にした説明資料を PowerPoint のファイルと Google スライドで作るスキルを、新しいプラグイン `slide-deck` として作る要望。計画は main の `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` にあり、実装の単位 U1〜U11 を sub-issue #245〜#255 にした。U1〜U5・U7・U8 はマージ済みで、U11 (Google スライドの API の前提の確認) は 3 つの使い方 (項目を指定した読み込み・revisionId 付きの書き込み・マスターの colorScheme の変更) がすべて成功して閉じた。U6 (#252) は、スライドのデータと、Claude がコネクタで読み込んで保存した `build/presentation.json` から、キーごとに作る・作り直す・消す・そのまま・並べ替えを求め、batchUpdate の指示を 2 枚ずつのファイルに書く単位。決めてあること: スライドの ID は `sd_<キー>_<ハッシュ値>` (ハッシュ値はスライドのデータから計算し、ID・位置・発表者ノートを含めない。上限 50 文字)。発表者ノートは文を比べて違うキーだけ入れ直す。キーの無いスライドは触れず、直前のキーのあるスライドに続けて置く。指示のファイルに revisionId は書かない。新しい資料では最初のタイトルのスライドを消す。API の挙動への対処 (KTD14) をすべて入れる。終了コードは成功 0・検査の指摘 1・実行の誤り 2。TypeScript は strict で `any` を禁止し、テストは node:test。プラグインは U9 で公開するまで 0.0.1 のまま上げない。文章の規約は CLAUDE.md に従い、変えた Markdown・日本語のコメント・コミットメッセージを wording-guard で検査する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/252 (計画の単位 U6) を実装する。
+
+最初に `git fetch origin` し、`origin/main` (U5 の PR #277 のマージ 56aa648b を含む) から作業ブランチを作る。
+
+読むもの:
+- 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` の節「U6. Google スライドの指示の作成」、R11・R15〜R17・R19・R20、KTD1・KTD9・KTD10・KTD14・KTD17、節「単位の進め方とクローズ条件」
+- Issue #252 の本文 (成果物と機能・クローズ条件)
+- U11 の確認の結果: [#251 のコメント](https://github.com/akm/claude-plugins/issues/251#issuecomment-6822125088)。読み込みの結果の例を、`build/presentation.json` の型 (`slide-deck/src/gslides/presentation.ts`) と、読み込みで指定する項目 (field mask) の元にする
+- これまでの単位で作ったもの: `slide-deck/src/data/` (U2。スライドのデータの型・部品の関数)、`slide-deck/src/outline/` と見本の資料 `slide-deck/examples/sample/` (U3)、`slide-deck/src/cli.ts`・`slide-deck/src/pptx/`・`slide-deck/src/check/` (U5、PR #277)
+- U5 で決まったこと: スライドの大きさは定数 `SLIDE_SIZE` (10×5.625 インチ)。題名は題名のプレースホルダーを持つレイアウトに入れ、章の名前はスライドに書かない。題名の箱は部品の関数 `title` (`slide-deck/src/data/parts.ts`) が決める。型 `Deck` に資料の題名 `title` がある。段落の分け方は #260 で規則 1〜6 に確定した (#260 のコメントと計画の KTD1)
+- 元にする変換は、メインの作業ツリーのファイル `/Users/akima/workspace/claude-plugins/tmp/zero-downtime/gslides.js` (git で管理していない。関数 `slideRequests`・`lineRequests`・`textRequests`・`colorSchemeRequest`)。このファイルがあるプロジェクトの名前を、Issue・PR・コミットに書かない。記録の仕掛け (`Module._load` の書き換え) は引き継がない
+
+作るもの: `slide-deck/src/gslides/presentation.ts`・`plan.ts`・`requests.ts`・`notes.ts`、入口のサブコマンド `requests` とその `--help`、テスト `slide-deck/tests/gslides.test.ts` と期待の指示の配列 `slide-deck/tests/fixtures/gslides/`。計画の U6 の Test scenarios をすべてテストにする。KTD14 の対処ごとに、理由をコメントに書く。
+
+注意: 本物の Google スライドには書き込まない (通し確認は U10)。U5 で決まった題名のレイアウトを Google スライドでどう表すかなど、計画に無い判断が要ったら、自分で決めずに利用者に質問する。
+
+終わりの形: Issue #252 のクローズ条件と、計画の共通のクローズ条件をすべて満たした PR を作る (本文に `Closes #252`)。push と PR の作成は利用者の承認を得てから行う。判断が要ることは、自分で決めずに利用者に 1 つずつ質問する。レビューのループの外で、sub-agent に案のレビューを何度も重ねない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_8a080753-e404-44b3-978c-f0b57cdbaf02
+
+---
+
+先に review-rally
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<cross-session-message from="local_d8430ff1-d85d-4e6c-9bf0-cc8bdf5b6efe" from-name="review-rally 20261114-1135-feat-slide-deck-u6-252 のレビュー">
+review-rally 20261114-1135-feat-slide-deck-u6-252 20261114-1136-feat-slide-deck-u6-252-1-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-b66991/tmp/review-rally/20261114-1135-feat-slide-deck-u6-252/review-20261114-1136-feat-slide-deck-u6-252-1-code-review-claude-sonnet-5-5.yaml
+skill: スキル code-review を実際に呼んだ (Skill ツールで、引数 "high f558c6a2..3f64542e")。渡した effort は high。モデルは claude-sonnet-5-5 (このセッションのモデル。別に渡していない)。
+指摘は 4 件 (P2 が 1 件、P3 が 3 件)、residual は 2 件。YAML を python の yaml.safe_load で読めることを確認した。
+HEAD は 3f64542ef63d10651f4cf4f78268d2eb94c4a9f5 のまま。レビューの前後とも git status --porcelain の出力は空。依頼文の出力先の 1 ファイルだけを作った。
+確認で、プローブのファイルを自分のスクラッチのディレクトリに書き、node --test tests/gslides.test.ts (40 件すべて成功) を実行した。リポジトリのファイルは変えていない。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_d8430ff1-d85d-4e6c-9bf0-cc8bdf5b6efe" from-name="review-rally 20261114-1135-feat-slide-deck-u6-252 のレビュー">
+review-rally 20261114-1135-feat-slide-deck-u6-252 20261114-1142-feat-slide-deck-u6-252-2-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-b66991/tmp/review-rally/20261114-1135-feat-slide-deck-u6-252/review-20261114-1142-feat-slide-deck-u6-252-2-code-review-claude-sonnet-5-5.yaml
+skill: スキル code-review を実際に呼んだ (引数は「high 3f64542e..2d9cc6be」)。effort は high を渡した。モデルは、このセッションが動いている claude-sonnet-5-5 (スキルにモデルを渡す引数は無く、セッションのモデルで実行した)。
+結果: 指摘 1 件 (P3・confidence medium)。ファイル slide-deck/src/gslides/presentation.ts の 31 行目の、検査の形の説明「ノートの欄が空なら、その要素に text が無い」が、同じコミットで直した notesText の説明 (48〜50 行目) と食い違う。コードの不具合は見つからなかった。residual は 1 件。
+確認: 作業ツリーの扱いは「共有」。レビューの前後で HEAD は 2d9cc6beda48237de7b4935f0b01569688849615 のまま、git status --porcelain の出力は空 (出力先の tmp/ は git の無視の対象)。ファイルは出力先の 1 つだけを作り、コミットしていない。テストは node --test tests/gslides.test.ts を実行して、すべて成功した。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<task-notification>
+<task-id>bnut9g6hy</task-id>
+<tool-use-id>toolu_01KFpPhuLr7sPDc4gMJdC2fy</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-4a8d48/08c7807b-7a3e-47d9-b00f-c83896bd75d1/tasks/bnut9g6hy.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261114-1135-feat-slide-deck-u6-252 (20261114-1136-feat-slide-deck-u6-252-1-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b9bkmc91g</task-id>
+<tool-use-id>toolu_01HzDDsSSkXcx1P1s5MWzSNG</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-4a8d48/08c7807b-7a3e-47d9-b00f-c83896bd75d1/tasks/b9bkmc91g.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261114-1135-feat-slide-deck-u6-252 (20261114-1142-feat-slide-deck-u6-252-2-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+全量で見直す
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<cross-session-message from="local_c0e71c02-37b9-49f3-ba22-4dacc8ff0a3d" from-name="review-rally 20261114-1254-feat-slide-deck-u6-252 のレビュー">
+review-rally 20261114-1254-feat-slide-deck-u6-252 20261114-1255-feat-slide-deck-u6-252-3-code-review-claude-sonnet-5-5: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-cf657b/tmp/review-rally/20261114-1254-feat-slide-deck-u6-252/review-20261114-1255-feat-slide-deck-u6-252-3-code-review-claude-sonnet-5-5.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high f558c6a2..2d9cc6be")。渡した effort は high で、モデルは claude-sonnet-5-5 (このセッションのモデル)。
+- 指摘は 3 件 (P2 が 1 件・P3 が 2 件)、residual は 2 件。YAML は python の yaml.safe_load で読めることを確認した。
+- 作業ツリーの扱いは「共有」。HEAD は開始時も終了時も 2d9cc6beda48237de7b4935f0b01569688849615 で、git status --porcelain の出力は開始前も終了後も空 (出力先の tmp/ は git の管理外)。ファイルの編集やコミットはしていない。
+</cross-session-message>
+
+---
+
+push して PR を作る
+
+---
+
+<bash-input>git branch -D claude/review-rally-6e68a2 claude/review-rally-60cc49</bash-input><bash-stdout>Deleted branch claude/review-rally-6e68a2 (was 2d9cc6be).
+Deleted branch claude/review-rally-60cc49 (was 2d9cc6be).</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+マージしました
+
+---
+
+アーカイブしました
+
+---
+
+<task-notification>
+<task-id>btvki61as</task-id>
+<tool-use-id>toolu_01PkFUKC8rHArEixejFPifRr</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-4a8d48/08c7807b-7a3e-47d9-b00f-c83896bd75d1/tasks/btvki61as.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261114-1254-feat-slide-deck-u6-252 (20261114-1255-feat-slide-deck-u6-252-3-code-review-claude-sonnet-5-5): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+呼び出し元セッションに状況を報告してください
