@@ -1,0 +1,56 @@
+Background (from the session that started this one):
+プラグイン issue-practice (Issue の使い方をスキルにするプラグイン) を、管理 Issue #239 の作業 Issue 6 件 (U1〜U5 とバグの修正 #278) に分けて実装している。U1〜U3 と #278 はマージ済みで閉じた。この作業セッションは U4 (リリースのスキル 4 つと、それが使う検査のスクリプトのサブコマンド) を受け持つ。PR はマージ先 main、Closes を書かず、利用者がマージする。
+
+Task:
+あなたは作業 Issue https://github.com/akm/claude-plugins/issues/269 の作業セッションです。スキル issue-practice:working-issue を使って進めてください。
+
+- 作業 Issue: https://github.com/akm/claude-plugins/issues/269 (リリースの順番を計画し、1 回のリリースを計画・記録して閉じたい (release-plan・release-issue-plan・release-run・release-close))
+- 管理 Issue: https://github.com/akm/claude-plugins/issues/239
+- 報告先の管理セッション: claude-plugins#239 管理: Issue の使い方のスキル (ID: local_7eefe131-5f84-4c43-b029-e14eb2449d29)
+- ブランチ: feat/269-release を origin/main から作る
+- PR のマージ先: main
+- PR をマージする人: 利用者
+
+報告 (PR を作った・チェックを入れた・分けたい・条件を変えたい・切り出したい・中断する) は、作業 Issue に記録のコメントとして書き、そのコメントの URL を報告先の管理セッションにメッセージで知らせてください。
+
+補足 (管理セッションから):
+
+- このセッションの名前は「claude-plugins#269 作業: リリースのスキル」です。名前が違っていたら、set_session_title (session_id は self) でこの名前にしてください。
+- 手元の `main` は古いことがあります。`git fetch origin` の後に `git switch -c feat/269-release origin/main` でブランチを作ってください。
+- 計画のファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` の節「U4」の Patterns to follow に「U3 の `issues.py`」とありますが、これは誤りです。書き込みを「示す」サブコマンドと「実行する」サブコマンドの手本は、U2 (#267) で足したファイル `issue-practice/scripts/issue_practice/issues.py` と、U3 (#268) で足したファイル `issue-practice/scripts/issue_practice/managing.py` です。計画の節「Output Structure」と節「U3」の Files にも `managing.py` が書かれていませんが、計画のファイルは直さないと利用者が決めました。
+- `managing.py` には、示した後に実行すると、作業 Issue を作ってから終了コード 3 で終了するバグがありました。#278 (PR #279、main の 9a66beae) で直しています。示すサブコマンドで、書き込む内容の誤りをすべて見つける形にしてください。
+- U2 の確認で、作ったばかりの Issue が `gh issue list --label` にすぐには出ないことがありました。ラベルで Issue を探す処理を確認用のリポジトリで試すときは、このことに注意してください。
+- この単位の版は 0.4.0 です (作業 Issue のクローズ条件の共通の条件の下の箇条書き)。#270 (U5、0.4.1) は、この Issue を閉じた後に起動します。
+- CI の完了では、このセッションは自分では動き出しません。CI が完了したら利用者か管理セッションが知らせます。チェックは、CI のジョブがすべて成功してから入れてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+<task-notification>
+<task-id>b8t5jmrrc</task-id>
+<tool-use-id>toolu_01XhjuSvrD1DtXeyJt34rzdt</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-11aaf1/aae45fd8-ee2c-47f8-ac6e-1820a7e79eff/tasks/b8t5jmrrc.output</output-file>
+<status>completed</status>
+<summary>Background command "issue-practice のテストをすべて実行する" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく問題と選択肢を前提から説明してください。特に使っている用語は網羅的に前提で説明してください。
+
+---
+
+日本語でお願いします
+
+---
+
+#8 のタイトルに `📅 `を付けるだけではダメなのですか？
+
+---
+
+案 D で進めてください
+
+---
+
+マージしました
