@@ -6,7 +6,10 @@
 |---|---|---|---|
 | [予約][d-loans-m-reservation] | モデル | `reservation` | [`loans`][d-loans] |
 | [予約する][d-loans-op-reserve] | 操作 | `reserve` | [`loans`][d-loans] |
+| [予約の順番が先頭][d-loans-pre-first_in_line] | 前提 | `first_in_line` | [`loans`][d-loans] |
+| [予約を取り消す][d-loans-op-cancel_reservation] | 操作 | `cancel_reservation` | [`loans`][d-loans] |
 | [予約図書][d-loans-m-reservation-a-book] | モデル「予約」の属性 | `book` | [`loans`][d-loans] |
+| [予約状態][d-loans-m-reservation-a-status] | モデル「予約」の属性 | `status` | [`loans`][d-loans] |
 | [借りた利用者][d-loans-m-loan-a-member] | モデル「貸出」の属性 | `member` | [`loans`][d-loans] |
 | [元の予約][d-loans-m-loan-a-reservation] | モデル「貸出」の属性 | `reservation` | [`loans`][d-loans] |
 | [先の予約が無い][d-loans-pre-no_previous_reservation] | 前提 | `no_previous_reservation` | [`loans`][d-loans] |
@@ -14,6 +17,9 @@
 | [利用者][r-member] | ロール | `member` | |
 | [利用者を登録する][d-members-op-register] | 操作 | `register` | [`members`][d-members] |
 | [前の予約][d-loans-m-reservation-a-previous] | モデル「予約」の属性 | `previous` | [`loans`][d-loans] |
+| [取り置きの期限を過ぎた][d-loans-pre-hold_expired] | 前提 | `hold_expired` | [`loans`][d-loans] |
+| [取り置き中][d-loans-m-reservation-a-status-v-on_hold] | モデル「予約」の属性「予約状態」の値 | `on_hold` | [`loans`][d-loans] |
+| [取消][d-loans-m-reservation-a-status-v-cancelled] | モデル「予約」の属性「予約状態」の値 | `cancelled` | [`loans`][d-loans] |
 | [司書][r-librarian] | ロール | `librarian` | |
 | [図書][d-catalog-m-book] | モデル | `book` | [`catalog`][d-catalog] |
 | [図書が返却された][d-loans-ev-book_returned] | イベント | `book_returned` | [`loans`][d-loans] |
@@ -29,6 +35,7 @@
 | [貸出が貸出中][d-loans-pre-loan_on_loan] | 前提 | `loan_on_loan` | [`loans`][d-loans] |
 | [貸出中][d-loans-m-loan-a-status-v-on_loan] | モデル「貸出」の属性「貸出状態」の値 | `on_loan` | [`loans`][d-loans] |
 | [貸出図書][d-loans-m-loan-a-book] | モデル「貸出」の属性 | `book` | [`loans`][d-loans] |
+| [貸出済み][d-loans-m-reservation-a-status-v-fulfilled] | モデル「予約」の属性「予約状態」の値 | `fulfilled` | [`loans`][d-loans] |
 | [貸出状態][d-loans-m-loan-a-status] | モデル「貸出」の属性 | `status` | [`loans`][d-loans] |
 | [返却を受け付ける][d-loans-op-return_book] | 操作 | `return_book` | [`loans`][d-loans] |
 | [返却済み][d-loans-m-loan-a-status-v-returned] | モデル「貸出」の属性「貸出状態」の値 | `returned` | [`loans`][d-loans] |
@@ -36,6 +43,7 @@
 | [配架状態][d-catalog-m-book-a-shelf_status] | モデル「図書」の属性 | `shelf_status` | [`catalog`][d-catalog] |
 | [開館日][d-loans-ut-business_day] | 未分類のアプリケーション用語 | `business_day` | [`loans`][d-loans] |
 | [除籍][d-catalog-m-book-a-shelf_status-v-withdrawn] | モデル「図書」の属性「配架状態」の値 | `withdrawn` | [`catalog`][d-catalog] |
+| [順番待ち][d-loans-m-reservation-a-status-v-waiting] | モデル「予約」の属性「予約状態」の値 | `waiting` | [`loans`][d-loans] |
 
 [d-catalog]: domains/01-catalog/README.md#d-catalog "ドメイン `catalog`"
 [d-catalog-m-book]: domains/01-catalog/models.md#d-catalog-m-book "ドメイン `catalog` のモデル「図書」"
@@ -58,11 +66,19 @@
 [d-loans-m-reservation]: domains/02-loans/models.md#d-loans-m-reservation "ドメイン `loans` のモデル「予約」"
 [d-loans-m-reservation-a-book]: domains/02-loans/models.md#d-loans-m-reservation-a-book "ドメイン `loans` のモデル「予約」の属性「予約図書」"
 [d-loans-m-reservation-a-previous]: domains/02-loans/models.md#d-loans-m-reservation-a-previous "ドメイン `loans` のモデル「予約」の属性「前の予約」"
+[d-loans-m-reservation-a-status]: domains/02-loans/models.md#d-loans-m-reservation-a-status "ドメイン `loans` のモデル「予約」の属性「予約状態」"
+[d-loans-m-reservation-a-status-v-cancelled]: domains/02-loans/models.md#d-loans-m-reservation-a-status-v-cancelled "ドメイン `loans` のモデル「予約」の属性「予約状態」の値「取消」"
+[d-loans-m-reservation-a-status-v-fulfilled]: domains/02-loans/models.md#d-loans-m-reservation-a-status-v-fulfilled "ドメイン `loans` のモデル「予約」の属性「予約状態」の値「貸出済み」"
+[d-loans-m-reservation-a-status-v-on_hold]: domains/02-loans/models.md#d-loans-m-reservation-a-status-v-on_hold "ドメイン `loans` のモデル「予約」の属性「予約状態」の値「取り置き中」"
+[d-loans-m-reservation-a-status-v-waiting]: domains/02-loans/models.md#d-loans-m-reservation-a-status-v-waiting "ドメイン `loans` のモデル「予約」の属性「予約状態」の値「順番待ち」"
+[d-loans-op-cancel_reservation]: domains/02-loans/functions.md#d-loans-op-cancel_reservation "ドメイン `loans` の操作「予約を取り消す」"
 [d-loans-op-lend]: domains/02-loans/functions.md#d-loans-op-lend "ドメイン `loans` の操作「貸し出す」"
 [d-loans-op-notify_overdue]: domains/02-loans/functions.md#d-loans-op-notify_overdue "ドメイン `loans` の操作「延滞を通知する」"
 [d-loans-op-reserve]: domains/02-loans/functions.md#d-loans-op-reserve "ドメイン `loans` の操作「予約する」"
 [d-loans-op-return_book]: domains/02-loans/functions.md#d-loans-op-return_book "ドメイン `loans` の操作「返却を受け付ける」"
 [d-loans-pre-book_shelved]: domains/02-loans/functions.md#d-loans-pre-book_shelved "ドメイン `loans` の前提「図書が配架中」"
+[d-loans-pre-first_in_line]: domains/02-loans/functions.md#d-loans-pre-first_in_line "ドメイン `loans` の前提「予約の順番が先頭」"
+[d-loans-pre-hold_expired]: domains/02-loans/functions.md#d-loans-pre-hold_expired "ドメイン `loans` の前提「取り置きの期限を過ぎた」"
 [d-loans-pre-loan_on_loan]: domains/02-loans/functions.md#d-loans-pre-loan_on_loan "ドメイン `loans` の前提「貸出が貸出中」"
 [d-loans-pre-no_previous_reservation]: domains/02-loans/functions.md#d-loans-pre-no_previous_reservation "ドメイン `loans` の前提「先の予約が無い」"
 [d-loans-ut-business_day]: domains/02-loans/unclassified_app_terms.md#d-loans-ut-business_day "ドメイン `loans` の未分類のアプリケーション用語「開館日」"

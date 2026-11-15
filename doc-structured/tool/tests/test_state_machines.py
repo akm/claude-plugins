@@ -324,5 +324,176 @@ stateDiagram-v2
         self.assertNotIn("```mermaid", text)
 
 
+FILE_PATH = "docs/domains/01-loans/state-machines-status.yaml"
+# STATE_MACHINE と同じ状態の遷移を、ファイルに書く形で書いたもの
+STATE_MACHINE_FILE = """\
+state_machine:
+  attribute: d-loans-m-loan-a-status
+  initial: on_loan
+  transitions:
+    - from: [on_loan]
+      to: overdue
+      operations: [d-loans-op-notify_overdue]
+    - from: [on_loan, overdue]
+      to: returned
+      operations: [d-loans-op-return_book]
+"""
+
+
+class FileFormTest(ProjectTestCase):
+    """ファイル名が state-machines- で始まる YAML に書く状態の遷移。"""
+
+    def load(self, files: dict[str, str]):
+        for relative, text in files.items():
+            self.write(relative, text)
+        return load_project(self.project)
+
+    def problems(self, files: dict[str, str]) -> list[str]:
+        _, problems = self.load(files)
+        self.assertTrue(all(p.check == "h" for p in problems))
+        return [p.format() for p in problems]
+
+    def files(self, state_machine: str = STATE_MACHINE_FILE, domain: str = DOMAIN + OPERATIONS) -> dict[str, str]:
+        return {PATH: domain, FILE_PATH: state_machine}
+
+    def test_valid_state_machine(self):
+        project, problems = self.load(self.files())
+        self.assertEqual([p.format() for p in problems], [])
+        machine = project.state_machines["d-loans-m-loan-a-status"]
+        self.assertEqual((machine.owner, machine.path, machine.in_file), ("属性 status の状態の遷移", FILE_PATH, True))
+        self.assertIs(machine.attribute, project.entries["d-loans-m-loan-a-status"])
+
+    def test_more_than_three_values_and_preconditions_are_allowed(self):
+        domain = DOMAIN + "          lost:\n            name_ja: 紛失\n            definition: 無くした。\n" + OPERATIONS
+        text = STATE_MACHINE_FILE + "    - from: [overdue]\n      to: lost\n      preconditions: [d-loans-pre-past_due]\n"
+        self.assertEqual(self.problems(self.files(text, domain)), [])
+
+    def test_sample_project(self):
+        project, problems = load_project(self.copy_sample())
+        self.assertEqual([p.format() for p in problems], [])
+        self.assertEqual(
+            {k: (m.path, m.in_file) for k, m in project.state_machines.items()},
+            {
+                "d-loans-m-loan-a-status": ("docs/domains/02-loans/domain.yaml", False),
+                "d-loans-m-reservation-a-status": ("docs/domains/02-loans/state-machines-status.yaml", True),
+            },
+        )
+
+    def test_transition_to_missing_value_fails(self):
+        # クローズ条件: 存在しない値への遷移で、検査 h が失敗する (ファイルに書く形)
+        text = STATE_MACHINE_FILE.replace("to: returned", "to: lost")
+        self.assertEqual(
+            self.problems(self.files(text)),
+            [f"{FILE_PATH}:9:11: 検査 h: 属性 status の状態の遷移の to の値 lost は、属性 status の値に無い"],
+        )
+
+    def test_state_machine_key_only_in_state_machines_file(self):
+        found = self.problems({
+            PATH: DOMAIN + OPERATIONS,
+            "docs/domains/01-loans/status.yaml": STATE_MACHINE_FILE,
+        })
+        self.assertEqual(
+            found,
+            [
+                "docs/domains/01-loans/status.yaml:1:1: 検査 h: キー state_machine は、ファイル名が state-machines- で始まる "
+                "YAML にだけ書ける (属性の下に書くときは、属性の下に書く)"
+            ],
+        )
+
+    def test_other_keys_in_state_machines_file(self):
+        found = self.problems(self.files(STATE_MACHINE_FILE + OPERATIONS.replace("return_book", "renew")))
+        self.assertIn(
+            f"{FILE_PATH}:11:1: 検査 h: ファイル名が state-machines- で始まる YAML には、キー state_machine だけを書ける", found
+        )
+        self.assertIn(
+            f"{FILE_PATH}:18:1: 検査 h: ファイル名が state-machines- で始まる YAML には、キー state_machine だけを書ける", found
+        )
+
+    def test_attribute_errors(self):
+        for attribute, expected in (
+            (None, "1:1: 検査 h: 状態の遷移に必須の項目 attribute が無い"),
+            ("[d-loans-m-loan-a-status]", "2:14: 検査 h: 状態の遷移の attribute は、属性の ID の文字列でなければならない"),
+            ("status", "2:14: 検査 h: 状態の遷移の attribute の値が ID の形でない"),
+            ("d-loans-m-loan", "2:14: 検査 h: 状態の遷移の attribute の参照先 d-loans-m-loan は属性でない (参照できるのは属性だけ)"),
+            ("d-loans-m-loan-a-state", "2:14: 検査 h: 状態の遷移の attribute の参照先 d-loans-m-loan-a-state が無い"),
+            (
+                "d-catalog-m-book-a-shelf_status",
+                "2:14: 検査 h: 状態の遷移の attribute の参照先 d-catalog-m-book-a-shelf_status は、ほかのドメインの属性 "
+                "(状態の遷移は、属性と同じドメインに書く)",
+            ),
+        ):
+            with self.subTest(attribute=attribute):
+                self.setUp()
+                self.write(
+                    "docs/domains/02-catalog/domain.yaml",
+                    "domain:\n  description: 図書。\nmodels:\n  book:\n    name_ja: 図書\n    definition: 本。\n"
+                    "    attributes:\n      shelf_status:\n        name_ja: 配架状態\n        definition: 書架にあるか。\n"
+                    "        values:\n          on_loan:\n            name_ja: 貸出中\n            definition: x。\n"
+                    "          returned:\n            name_ja: 返却済み\n            definition: y。\n",
+                )
+                line = "  attribute: d-loans-m-loan-a-status\n"
+                text = STATE_MACHINE_FILE.replace(line, "" if attribute is None else f"  attribute: {attribute}\n")
+                found = self.problems(self.files(text))
+                self.assertTrue(any(p.startswith(f"{FILE_PATH}:{expected}") for p in found), found)
+
+    def test_unknown_key(self):
+        self.assertIn(
+            f"{FILE_PATH}:3:3: 検査 h: 知らないキー final (書けるキー: attribute, initial, transitions)",
+            self.problems(self.files(STATE_MACHINE_FILE.replace("  initial:", "  final:"))),
+        )
+
+    def test_state_machine_in_two_places_fails(self):
+        found = self.problems(self.files(domain=DOMAIN + STATE_MACHINE + OPERATIONS))
+        self.assertEqual(
+            found, [f"{FILE_PATH}:2:14: 検査 h: 属性 status の状態の遷移は、{PATH}:{DOMAIN_LINES + 1} にもある"]
+        )
+        self.setUp()
+        found = self.problems({**self.files(), "docs/domains/01-loans/state-machines-loan-status.yaml": STATE_MACHINE_FILE})
+        self.assertEqual(
+            found, [f"{FILE_PATH}:2:14: 検査 h: 属性 status の状態の遷移は、docs/domains/01-loans/state-machines-loan-status.yaml:2 にもある"]
+        )
+
+    def test_direction(self):
+        # 属性より下のディレクトリに置くと、祖先のディレクトリの属性を指すので検査 i の誤り。祖先のディレクトリに置くのはよい
+        project, problems = self.load({PATH: DOMAIN + OPERATIONS, "docs/domains/01-loans/sub/state-machines-status.yaml": STATE_MACHINE_FILE})
+        self.assertEqual([p.format() for p in problems], [])
+        self.assertEqual(
+            [p.format().split(" は、祖先")[0] for p in check_direction(project)],
+            [
+                "docs/domains/01-loans/sub/state-machines-status.yaml:2:14: 検査 i: 状態の遷移の attribute の参照先 d-loans-m-loan-a-status",
+                "docs/domains/01-loans/sub/state-machines-status.yaml:7:20: 検査 i: 属性 status の状態の遷移の operations の参照先 d-loans-op-notify_overdue",
+                "docs/domains/01-loans/sub/state-machines-status.yaml:10:20: 検査 i: 属性 status の状態の遷移の operations の参照先 d-loans-op-return_book",
+            ],
+        )
+        self.setUp()
+        sub = DOMAIN.split("models:\n", 1)[1]
+        project, problems = self.load({
+            PATH: "domain:\n  description: 貸出。\n" + OPERATIONS,
+            "docs/domains/01-loans/sub/loan.yaml": "models:\n" + sub,
+            FILE_PATH: STATE_MACHINE_FILE,
+        })
+        self.assertEqual([p.format() for p in problems], [])
+        self.assertEqual(check_direction(project), [])
+
+
+class BothFormsTest(ProjectTestCase):
+    """クローズ条件: 2 つの書き方のどちらからも、同じ列を持つ表と、同じ状態と遷移を持つ図が生成される。"""
+
+    def models_md(self, files: dict[str, str]) -> str:
+        for relative, text in files.items():
+            self.write(relative, text)
+        project, problems = load_project(self.project)
+        self.assertEqual([p.format() for p in problems], [])
+        return render_project(project)["docs/domains/01-loans/models.md"]
+
+    def test_same_output_from_both_forms(self):
+        under_attribute = self.models_md({PATH: DOMAIN + STATE_MACHINE + OPERATIONS})
+        self.setUp()
+        in_file = self.models_md({PATH: DOMAIN + OPERATIONS, FILE_PATH: STATE_MACHINE_FILE})
+        self.assertIn("| 前の状態 | 後の状態 | 操作 | 前提 |", in_file)
+        self.assertIn("stateDiagram-v2", in_file)
+        self.assertEqual(under_attribute, in_file)
+
+
 if __name__ == "__main__":
     unittest.main()

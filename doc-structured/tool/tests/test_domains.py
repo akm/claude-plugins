@@ -253,7 +253,13 @@ class PreconditionAndEventTest(CheckHTest):
         # 直下の domain.yaml の定義が先、サブディレクトリの定義が後
         self.assertEqual(
             [e.id for e in loans.preconditions],
-            ["d-loans-pre-book_shelved", "d-loans-pre-loan_on_loan", "d-loans-pre-no_previous_reservation"],
+            [
+                "d-loans-pre-book_shelved",
+                "d-loans-pre-loan_on_loan",
+                "d-loans-pre-no_previous_reservation",
+                "d-loans-pre-first_in_line",
+                "d-loans-pre-hold_expired",
+            ],
         )
         self.assertEqual([e.id for e in loans.events], ["d-loans-ev-book_lent", "d-loans-ev-book_returned"])
         precondition = project.entries["d-loans-pre-no_previous_reservation"]
@@ -399,7 +405,13 @@ class OperationTest(CheckHTest):
         loans = project.domains[1]
         self.assertEqual(
             [e.id for e in loans.operations],
-            ["d-loans-op-lend", "d-loans-op-return_book", "d-loans-op-notify_overdue", "d-loans-op-reserve"],
+            [
+                "d-loans-op-lend",
+                "d-loans-op-return_book",
+                "d-loans-op-notify_overdue",
+                "d-loans-op-reserve",
+                "d-loans-op-cancel_reservation",
+            ],
         )
         lend = project.entries["d-loans-op-lend"]
         self.assertEqual(lend.full_name(), "ドメイン `loans` の操作「貸し出す」")

@@ -1,6 +1,7 @@
 """検査 i (参照の向き)。
 
-YAML の参照 (属性の refers_to と、前提の targets・状態の遷移の operations などの完全な ID の配列) は、参照する YAML のディレクトリの祖先の
+YAML の参照 (属性の refers_to・ファイルに書く状態の遷移の attribute と、前提の targets・状態の遷移の operations などの
+完全な ID の配列) は、参照する YAML のディレクトリの祖先の
 ディレクトリにある YAML の定義を指さない。
 同じディレクトリ・子孫のディレクトリ・別のサブツリー・ほかのドメインは指してよい。判定は参照先の定義を書いた場所で行う。
 違反したときの直し方は、参照される定義をサブディレクトリの YAML に移すこと (参照しているファイルを移すことではない)。
@@ -15,7 +16,7 @@ doc-structured/rules/doc-structured-domains.md)。
 from pathlib import PurePosixPath
 
 from .documents import Index
-from .domains import Project, spaced
+from .domains import STATE_MACHINE_OWNER, Project, spaced
 from .links import resolve
 from .problems import Problem
 from .references import all_references
@@ -34,6 +35,9 @@ def _yaml_references(project: Project):
             for reference in entry.references:
                 yield entry.path, f"{entry.owner} の {reference.key}", reference.target, reference.line, reference.column
         for machine in domain.state_machines:
+            reference = machine.attribute_reference
+            if reference is not None:
+                yield machine.path, f"{STATE_MACHINE_OWNER}の attribute", reference.target, reference.line, reference.column
             for transition in machine.transitions:
                 for reference in transition.references:
                     yield machine.path, f"{spaced(machine.owner)}の {reference.key}", reference.target, reference.line, reference.column

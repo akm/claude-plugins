@@ -13,7 +13,8 @@
   - 値を持つ属性は、状態の遷移 state_machine (最初の状態 initial と、遷移の配列 transitions) を持てる。状態は属性の値で、
     遷移の前の状態 from・後の状態 to・initial には値の英語名を書く。遷移は、操作への参照 operations と前提への参照
     preconditions (どちらも完全な ID の配列) を持てる。属性の下に書けるのは、値が 3 つ以下で、どの遷移にも preconditions が
-    無いときだけ
+    無いときだけ。それを超えるものは、ファイル名が state-machines- で始まる YAML のトップのキー state_machine に書き、
+    属性を attribute (完全な ID。同じドメインの属性だけ) で指す。このファイルには、ほかのトップのキーを書けない
 ロールは、ドメインの外のファイル docs/system/roles.yaml のキー roles に書く。ロールは親を持たない (ID は r-<英語名>)。
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
 """
@@ -59,6 +60,11 @@ REQUIRED_KEYS = ("name_ja", "definition")
 STATE_MACHINE_KEY = "state_machine"
 # 属性の下に書く状態の遷移のキー
 STATE_MACHINE_KEYS = ("initial", "transitions")
+# ファイルに書く状態の遷移の、ファイル名の始まりとキー
+STATE_MACHINE_FILE_PREFIX = "state-machines-"
+STATE_MACHINE_FILE_KEYS = ("attribute", "initial", "transitions")
+# ファイルに書く状態の遷移で、属性を指す前の、メッセージに書く名前
+STATE_MACHINE_OWNER = "状態の遷移"
 TRANSITION_KEYS = ("from", "to", "operations", "preconditions")
 # 遷移の、完全な ID の配列で書く参照。キーから、参照できる種類の記号と、メッセージに書くその名前への対応
 TRANSITION_REFERENCES: dict[str, tuple[tuple[str, ...], str]] = {
@@ -123,8 +129,9 @@ class StateMachine:
     path: str  # 状態の遷移を書いた YAML の、リポジトリのルートからの相対パス
     line: int  # 位置。属性の下に書く形ではキー state_machine
     column: int
-    attribute: "Entry | None"  # 状態の遷移を持つ属性
+    attribute: "Entry | None"  # 状態の遷移を持つ属性。ファイルに書く形では、参照先を確認するまで None
     in_file: bool = False  # ファイルに書く形なら True、属性の下に書く形なら False
+    attribute_reference: Reference | None = None  # ファイルに書く形の attribute
     initial: StateName | None = None
     transitions: list[Transition] = field(default_factory=list)
 
@@ -331,6 +338,9 @@ class _Loader:
                 if path == root_file:
                     self.problem(path_rel, "キー domain (ドメインの説明) が無い")
                 continue
+            if path.name.startswith(STATE_MACHINE_FILE_PREFIX):
+                self.load_state_machine_file(domain, data, path_rel)
+                continue
             for key in data:
                 line, column = _key_position(data, key)
                 if key == "domain":
@@ -350,6 +360,14 @@ class _Loader:
                     self.load_list(domain, data, key, "pre", PRECONDITION_KEYS, path_rel, precondition_names, domain.preconditions)
                 elif key == "events":
                     self.load_list(domain, data, key, "ev", EVENT_KEYS, path_rel, event_names, domain.events)
+                elif key == STATE_MACHINE_KEY:
+                    self.problem(
+                        path_rel,
+                        f"キー {STATE_MACHINE_KEY} は、ファイル名が {STATE_MACHINE_FILE_PREFIX} で始まる YAML にだけ書ける "
+                        "(属性の下に書くときは、属性の下に書く)",
+                        line,
+                        column,
+                    )
                 else:
                     self.unknown_key(path_rel, key, TOP_KEYS, line, column)
             if path == root_file and "domain" not in data:
@@ -598,6 +616,46 @@ class _Loader:
         self.load_transitions(machine, mapping, path_rel)
         domain.state_machines.append(machine)
 
+    def load_state_machine_file(self, domain: Domain, data: CommentedMap, path_rel: str) -> None:
+        """ファイル名が state-machines- で始まる YAML の、トップのキー state_machine を読む。ほかのキーは誤りにする。"""
+        for key in data:
+            if key != STATE_MACHINE_KEY:
+                self.problem(
+                    path_rel,
+                    f"ファイル名が {STATE_MACHINE_FILE_PREFIX} で始まる YAML には、キー {STATE_MACHINE_KEY} だけを書ける",
+                    *_key_position(data, key),
+                )
+        if STATE_MACHINE_KEY not in data:
+            return
+        mapping = self.mapping_of(data, STATE_MACHINE_KEY, path_rel)
+        if mapping is None:
+            return
+        for key in mapping:
+            if key not in STATE_MACHINE_FILE_KEYS:
+                self.unknown_key(path_rel, key, STATE_MACHINE_FILE_KEYS, *_key_position(mapping, key))
+        line, column = _key_position(data, STATE_MACHINE_KEY)
+        reference = None
+        owner = STATE_MACHINE_OWNER
+        if "attribute" not in mapping:
+            self.problem(path_rel, f"{owner}に必須の項目 attribute が無い", line, column)
+        else:
+            value = mapping["attribute"]
+            vline, vcolumn = _value_position(mapping, "attribute")
+            if isinstance(value, str) and value.strip():
+                reference = Reference("attribute", value.strip(), vline, vcolumn)
+                line, column = vline, vcolumn
+                owner = _owner_of_attribute_id(reference.target)
+            else:
+                self.problem(path_rel, f"{owner}の attribute は、属性の ID の文字列でなければならない", vline, vcolumn)
+        machine = StateMachine(
+            owner=owner, domain=domain, path=path_rel, line=line, column=column, attribute=None, in_file=True,
+            attribute_reference=reference,
+        )
+        if "initial" in mapping:
+            machine.initial = self.state_name(machine.owner, mapping, "initial", path_rel)
+        self.load_transitions(machine, mapping, path_rel)
+        domain.state_machines.append(machine)
+
     def state_name(self, owner: str, mapping: CommentedMap, key: str, path_rel: str) -> StateName | None:
         value = mapping[key]
         line, column = _value_position(mapping, key)
@@ -718,6 +776,8 @@ class _Loader:
         found = self.project.state_machines
         for domain in self.project.domains:
             for machine in domain.state_machines:
+                if machine.attribute_reference is not None:
+                    machine.attribute = self.resolve_attribute(machine, machine.attribute_reference)
                 for transition in machine.transitions:
                     for reference in transition.references:
                         self.resolve_reference(machine.owner, machine.path, reference, *TRANSITION_REFERENCES[reference.key])
@@ -730,6 +790,24 @@ class _Loader:
                     continue
                 found[attribute.id] = machine
                 self.check_states(machine, attribute)
+
+    def resolve_attribute(self, machine: StateMachine, reference: Reference) -> Entry | None:
+        """ファイルに書く状態の遷移の attribute の参照先を確認し、同じドメインの属性なら返す。"""
+        before = len(self.problems)
+        self.resolve_reference(STATE_MACHINE_OWNER, machine.path, reference, ("a",), "属性")
+        if len(self.problems) != before:
+            return None
+        attribute = self.project.entries[reference.target]
+        if attribute.domain is not machine.domain:
+            self.problem(
+                machine.path,
+                f"{STATE_MACHINE_OWNER}の attribute の参照先 {reference.target} は、ほかのドメインの属性 "
+                "(状態の遷移は、属性と同じドメインに書く)",
+                reference.line,
+                reference.column,
+            )
+            return None
+        return attribute
 
     def check_states(self, machine: StateMachine, attribute: Entry) -> None:
         """from・to・initial が属性の値か、属性の下に書く形なら値の数が上限以下かを確認する。"""
@@ -750,6 +828,17 @@ class _Loader:
                     machine.path, f"{spaced(machine.owner)}の {state.key} の値 {state.name} は、{attribute.owner} の値に無い",
                     state.line, state.column,
                 )
+
+
+def _owner_of_attribute_id(text: str) -> str:
+    """ファイルに書く状態の遷移の、メッセージに書く名前。attribute が属性の ID の形なら「属性 status の状態の遷移」。"""
+    try:
+        last = names.parse_id(text)[-1]
+    except IdError:
+        return STATE_MACHINE_OWNER
+    if last.symbol != "a":
+        return STATE_MACHINE_OWNER
+    return f"{names.KINDS['a'].label} {last.name} の{STATE_MACHINE_OWNER}"
 
 
 def _key_position(mapping: CommentedMap, key) -> tuple[int, int]:
