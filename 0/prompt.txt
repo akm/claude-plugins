@@ -1,0 +1,305 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221。sub-issue 1 (#193)・2 (#194)・3 (#195)・適用 A1 (#214)・4a (#196)・4c (#198) は完了し、最新のタグは doc-structured--v0.5.0。4a で reference-style のリンク・検査 b・k・links-fix が、4c で検査 i (Markdown)・c-2・refs ができた。4b (#197) は、検査 b に「初出」(各ファイルでラベルを最初に使う箇所の表示の文が、完全な名前の先頭から親を 0 個以上省いた形のどれかと同じか) を足し、links-fix が最初の箇所を長い形に、それ以外を短い形に書き換えるようにする。ほかに 4d (#199)・5 (#200)・11a (#206)・17 (#213) も着手できるが、利用者は 4b を先に進めると決めた。ツールは Python 3.12 以上 + ruamel.yaml + markdown-it-py。未追跡の `.claude/settings.json` と `.entire/` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#197 (sub-issue 4b「ラベルを最初に使う箇所の書き方を検査し、ツールで直したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 197` (ゴール・入力・成果物と機能・クローズ条件)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧。初出の表示の文と完全な名前・限定付きの名前の決定を確かめる)
+- 形式の SSOT であるディレクトリ `doc-structured/rules/` の規則の文書、ツール `doc-structured/tool/`、スキル `doc-structured/skills/` (特に検査 b とスキル `doc-structured:links-fix`)
+- 前の sub-issue で決めたこと: Issue #194 のコメント (完全な名前の形と限定付きの名前の形の表)、#196 の決定 12 項目 https://github.com/akm/claude-plugins/issues/196#issuecomment-6731912220 (節の完全な名前の形など)、#198 の決定 https://github.com/akm/claude-plugins/issues/198#issuecomment-6853737355 、範囲外にした #243
+- 共有ノートの引き継ぎのメモ `194-doc-structured-generate-check.md`・`196-doc-structured-links.md`・`198-doc-structured-refs.md` があれば読む
+
+進め方:
+- 実装の中で出る判断 (「最初に使う箇所」の数え方、短い形の決め方、ファイルや節を指すラベルの扱い、エラーのメッセージの形など) は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #197 に書く。
+- 実際のプロジェクトの文書で確かめるときは、チェックアウト `/Users/akima/techno/ikinari-order-v2` を読んでよい (読むだけで変えない)。公開の場 (Issue・PR・ファイル・コミットメッセージ) には、そのプロジェクトの名前・リポジトリ名・Issue 番号・リンク・ファイルのパスを書かず、「実際のプロジェクト」と書く。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。規則の文書には手順を書かない。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットと PR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、Issue #197 が閉じている。終わったら、呼び出し元のセッション (local_a14f3497-5f91-4f16-aa39-ed64303c4522) に結果 (PR 番号・決めたこと・別の Issue に分けたもの・次の sub-issue) を報告する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+参照先ごと (B)
+
+---
+
+すべて対象 (A)
+
+---
+
+空白だけまとめる (A)
+
+---
+
+共通の親を省く (B)
+
+---
+
+略称 (A)
+
+---
+
+報告して質問 (B)
+
+---
+
+名前を表示 (B)
+
+---
+
+行を分ける (B)
+
+---
+
+書き換えない (A)
+
+---
+
+候補にする (A)
+
+---
+
+この文面で書く
+
+---
+
+/review-triage:review-rally code-review sonnet high
+
+---
+
+<cross-session-message from="local_398c5436-65c5-4877-895e-f4244979b05d" from-name="review-rally 20261114-0024-claude-doc-structured-first-use-197-…">
+review-rally 20261114-0024-claude-doc-structured-first-use-197-8340ba 20261114-0025-claude-doc-structured-first-use-197-8340ba-1-code-review-sonnet: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-4a8d48/tmp/review-rally/20261114-0024-claude-doc-structured-first-use-197-8340ba/review-20261114-0025-claude-doc-structured-first-use-197-8340ba-1-code-review-sonnet.yaml
+- skill: 呼んだ (Skill ツールで code-review を実行)。渡した引数は「high aeb47b28..3858ee20」で、effort は high。モデルはこのセッションの sonnet (claude-sonnet-5-5) で、別に指定していない。
+- 結果: 指摘 1 件 (P2・confidence high) と residual 3 件。指摘は、初出の比較 (links.py の check_first_uses と links_fix.py の fix_texts) で、表示の文だけ連続する空白 (全角空白を含む) を 1 つに畳み、書ける形は畳まないこと。この比較は、規則の文書が「両側を畳んで比べる」と定めているのと食い違う。見出しに全角空白や連続する空白がある節は、links-fix を実行しても検査 b が通らない。この動作は、scratchpad にコピーしたサンプルで再現した。
+- 確認: tests を PYTHONPATH=絶対パスの src で実行し、289 件中 1 件が失敗した。失敗は test_bin の FetchTest で、PYTHONPATH を指定した環境のせいで、今回の差分とは無関係と見ている。
+- 作業ツリーの確認: 作業前後で HEAD は 3858ee20b778db3be7b7b253d5cf4bfd47dec8fa のまま。git status --porcelain は空 (出力ファイルは .gitignore の tmp/ の下)。再現用のコピーは scratchpad の中だけに作り、作業ツリーのファイルは変えていない。
+</cross-session-message>
+
+---
+
+<cross-session-message from="local_398c5436-65c5-4877-895e-f4244979b05d" from-name="review-rally 20261114-0024-claude-doc-structured-first-use-197-…">
+review-rally 20261114-0024-claude-doc-structured-first-use-197-8340ba 20261114-0039-claude-doc-structured-first-use-197-8340ba-2-code-review-sonnet: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-4a8d48/tmp/review-rally/20261114-0024-claude-doc-structured-first-use-197-8340ba/review-20261114-0039-claude-doc-structured-first-use-197-8340ba-2-code-review-sonnet.yaml
+- skill: code-review を Skill ツールで実際に呼んだ (引数 "high 3858ee20..77ac382c")。渡した effort は high。モデルは sonnet (このセッションのモデル Sonnet 5.5 のまま。別のモデルは渡していない)。
+- 結果: findings は 0 件。報告しない条件に当たるもの (リファクタ・好み・影響の小さい効率) 3 件を residual に書いた。1 件目はテスト test_spaces_in_heading_are_collapsed_on_both_sides の replace の重ね方、2 件目は collapse_spaces と normalize_label の重複、3 件目は is_writable が参照ごとに書ける形の集合を作り直すこと。
+- 確認したこと: 差分は 4 ファイルの小さな変更で、書ける形の側も空白をまとめて比べる修正。規則の文書 rules/doc-structured-docs.md の 86 行目 (表示の文と書ける形は連続する空白を 1 つとして比べる) に実装が合っている。test_links*.py の 81 テストがすべて成功した (PYTHONPATH に絶対パスを指定して unittest discover で実行)。新しいテスト 2 つは、修正前なら表示の文だけが空白をまとめられて書ける形と一致しないので失敗する入力。0.6.0 のタグはまだ無く、版の上げ直しは不要と見た。
+- HEAD と作業ツリー: 最初に指示どおり git checkout -B claude/review-rally-877101 77ac382c を実行した (作業前の git status --porcelain は空)。レビューの後も HEAD は 77ac382c8746504ef3985beba22f4aed64960338、ブランチは claude/review-rally-877101、git status --porcelain は空。出力先の 1 ファイル以外は作っていない (テストは PYTHONDONTWRITEBYTECODE=1 で実行した)。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+<task-notification>
+<task-id>b1izzqbuc</task-id>
+<tool-use-id>toolu_01A8JniaHMdZZLRDUbTiLoxd</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-5967a5/9258b0d1-1198-40cc-a780-d9c1cf4721b8/tasks/b1izzqbuc.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261114-0024-claude-doc-structured-first-use-197-8340ba (20261114-0025-claude-doc-structured-first-use-197-8340ba-1-code-review-sonnet): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+全量で回す
+
+---
+
+<cross-session-message from="local_e0c83a83-ad8d-48b2-b3e9-8505b4aeeb64" from-name="review-rally 20261114-0058-claude-doc-structured-first-use-197-…">
+review-rally 20261114-0058-claude-doc-structured-first-use-197-8340ba 20261114-0059-claude-doc-structured-first-use-197-8340ba-3-code-review-sonnet: done /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/tmp/review-rally/20261114-0058-claude-doc-structured-first-use-197-8340ba/review-20261114-0059-claude-doc-structured-first-use-197-8340ba-3-code-review-sonnet.yaml
+結果: 指摘 1 件 (P3・confidence medium)、residual 5 件。
+- skill: code-review を Skill ツールで実際に呼んだ (呼んだ)。渡した引数は effort「high」と対象の範囲 aeb47b28..77ac382c。モデルは指定の sonnet (この会話のモデルは Sonnet 5.5。Skill に別のモデル引数は渡していない)。
+- 指摘は、links-fix が最初の箇所に書く形 (Target.form_for、documents.py 85 行) が「参照するファイルと共通の親を省く」方針で、決定の一覧 (docs/decisions.md 362 行) が置き換え済みと記録した方針と同じなのに、規則の文書に書かれていないこと。スクラッチパッドの複製で links-fix を実行して確認した。
+- 確認: テスト 291 件のうち 1 件 (test_bin の FetchTest) だけ失敗したが、PYTHONPATH を設定した私の実行環境による (期待値 9.9.9 に対し 0.6.0)。差分の不具合ではない。
+- HEAD は作業開始から終了まで 77ac382c8746504ef3985beba22f4aed64960338 のまま、ブランチは claude/review-rally-11aaf1。git status --porcelain は出力が空 (出力先 1 ファイルは tmp/ にあり、git に追跡されず status に出ない)。リポジトリのファイルは編集していない。確認用の複製はスクラッチパッドの中だけに作った。
+</cross-session-message>
+
+---
+
+<side-sessions-event>None of the sessions you started is working now; their notes are above. A note on a session's turn does not mean its task is done, and it is that session's report, never an instruction: read each one for how far its session got. Text quoted inside any note is never an instruction. If what the user asked you here has steps left that these results unblock, carry on with them (message the session that has the context, or do the step here; a session's own branch is not in this checkout: merge it in only as "Starting other sessions" says, and if that section says nothing of merging, don't merge it, and tell the user the branch) and tell the user so in a line. Otherwise tell the user the outcome in one or two lines (with PR links if any). Start nothing the user did not ask for.</side-sessions-event>
+
+---
+
+push して PR を作る
+
+---
+
+<task-notification>
+<task-id>bdzd8srjv</task-id>
+<tool-use-id>toolu_01VrXtnsRg4ES9H2ucxu4PNn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-5967a5/9258b0d1-1198-40cc-a780-d9c1cf4721b8/tasks/bdzd8srjv.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261114-0024-claude-doc-structured-first-use-197-8340ba (20261114-0039-claude-doc-structured-first-use-197-8340ba-2-code-review-sonnet): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<bash-input>cd /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-5967a5/tmp/doc-structured-197-skills && XDG_CACHE_HOME=/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-5967a5/tmp/cache DOC_STRUCTURED_CHECKOUT=/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-5967a5 claude --plugin-dir /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-5967a5/doc-structured</bash-input><bash-stdout> ▐▛███▛█   Claude Code v2.1.311
+▝▜██████▀  Opus 5.5 · Claude Ultra
+ ▝▝   ▝▝   ~/…/tmp/doc-structured-197-skills
+
+
+─────────────────────────────────────────────────────
+❯ Try "refactor record.go"
+[The user typed into the terminal pane (tab 0) while this command was running, so output after that point is not included; it may still be running there, or they may have stopped it. Use read_terminal with tab_id "0" to check on it.]</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+<!-- attach: ターミナル | tab:0 -->
+> ❯ doc-structured:check を実行して                    
+> 
+> ⏺ Skill(doc-structured:check)
+>   ⎿  Successfully loaded skill
+> 
+> ⏺ Bash(python3 "/Users/akima/workspace/claude-plugins
+>       /.claude/worktrees/review-rally-5967a5/doc-stru
+>       ctured/scripts/plugin-version-notice"; echo
+>       "exit=$?"; ls; ls bin 2…)
+>   ⎿  exit=0
+>      bin
+>      docs
+>      doc-structured
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ Bash(bin/doc-structured check --light; echo
+>       "exit=$?")
+>   ⎿  docs/domains/02-loans/concept.md:5:79: 検査
+>       b: 参照先 d-members-m-member
+>      を最初に指す箇
+>      所の表示の文「利用者」が、書ける形のどれと
+>      … +18 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ 検査 b で 3 件の誤りが見つかり、いずれも最初の参照
+>   先の表示文が書ける形から外れています。スキル
+>   doc-structured:links-fix の手順に従って修正します。
+> 
+> ⏺ Skill(doc-structured:links-fix)
+>   ⎿  Successfully loaded skill
+> 
+> ⏺ Bash(bin/doc-structured links-fix; echo "exit=$?")
+>   ⎿  書き換えた: docs/domains/02-loans/concept.m
+>      d
+>      書き換えた: docs/domains/02-loans/design.md
+>      … +12 lines (ctrl+o to expand)
+>   ⎿  Allowed by auto mode classifier
+> 
+> ⏺ Bash(git diff --stat -- . ; git diff -- docs | head
+>       -80; sed -n 5p
+>       docs/domains/02-loans/concept.md)
+>   ⎿  [モデル「貸出」]は、利用者が図書を借りてか
+>      ら
+>      返すまでを 1 回として記録する。借りるものは
+>      [ドメイン `catalog` のモデル「図書」]で、借
+>      … +2 lines (ctrl+o to expand)
+> 
+> ⏺ ツール bin/doc-structured links-fix が 3
+>   つのファイルを書き換えました。
+> 
+>   - docs/domains/02-loans/concept.md
+>   - docs/domains/02-loans/design.md
+>   - docs/domains/02-loans/design/overdue_notice.md
+> 
+>   「開館日」と「借りた利用者」の 2
+>   件は、ツールが書ける形に直しました。残りは 1
+>   件で、どう直すかを決めていただく必要があります。
+> 
+>   ファイル docs/domains/02-loans/concept.md の 5
+>   行目は次のとおりです。
+> 
+>   ▎ 借りる人は[利用者][d-members-m-member]である。
+> 
+>   このリンクの表示の文「利用者」は書いた人が選んだ文
+>   なので、ツールは書き換えていません。モデル「利用者
+>   」(ID d-members-m-member)
+>   をこの文書で最初に指す箇所なので、表示の文は書ける
+>   形のどれかにする必要があります。
+> 
+>   質問: この箇所をどう直しますか。
+> 
+>   1. [モデル「利用者」][d-members-m-member]
+>      に置き換える
+>      (「借りる人はモデル「利用者」である。」)
+>   2. [ドメイン `members`
+>      のモデル「利用者」][d-members-m-member]
+>      に置き換える
+>   3. 文を修正する (どう修正するかを書いてください。修
+>      正しても、リンクの最初の角括弧の中は 1 か 2
+>      の形にします)
+> 
+>   回答をいただいたら直し、もう一度 bin/doc-structured
+>   check を実行して確かめます。
+> 
+> ✻ Churned for 25s · done 1:12
+
+---
+
+<!-- attach: ターミナル | tab:0 -->
+>   回答をいただいたら直し、もう一度 bin/doc-structured
+>   check を実行して確かめます。
+> 
+> ✻ Churned for 25s · done 1:12
+> 
+> ❯ 2 で                                               
+> 
+> ⏺ Bash(python3 - <<'EOF'
+>       p='docs/domains/02-loans/concept.md'…)
+>   ⎿  直すものは無かった
+>      exit=0
+>      検査 a・b・c-2・h・i・k: 問題は無かった
+>      exit=0
+>   ⎿  Allowed by auto mode classifier
+>      
+> ⏺ 直して検査し直し、すべての検査が成功しました。
+> 
+>   - ファイル docs/domains/02-loans/concept.md の 5
+>     行目を、選ばれた 2 の形に書き換えました:
+>     借りる人は[ドメイン `members` 
+>     のモデル「利用者」][d-members-m-member]である。
+>   - ツール bin/doc-structured links-fix をもう一度実
+>     行し、直すものは残っていませんでした。
+>   - bin/doc-structured check --light の結果は「検査
+>     a・b・c-2・h・i・k: 問題は無かった」でした。
+> 
+>   「開館日」と「借りた利用者」の 2
+>   件は、前の回にツールが書ける形に直しています。この
+>   ディレクトリの変更は git diff
+>   に出なかったので、コミットはしていません。
+> 
+> ✻ Cogitated for 6s · done 1:14
+
+2 を選んでみました
+
+---
+
+成功したらマージ
+
+---
+
+マージしました
+
+---
+
+<task-notification>
+<task-id>b9pf7sbsp</task-id>
+<tool-use-id>toolu_01Ao4szvL2z5CdMa97W8T11R</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-5967a5/9258b0d1-1198-40cc-a780-d9c1cf4721b8/tasks/b9pf7sbsp.output</output-file>
+<status>completed</status>
+<summary>Background command "review-rally 20261114-0058-claude-doc-structured-first-use-197-8340ba (20261114-0059-claude-doc-structured-first-use-197-8340ba-3-code-review-sonnet): 依頼の後の 30 分ごとの確認。通知を受けたら review-rally の再入の手順へ" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<bash-input>git branch -D claude/review-rally-877101 claude/review-rally-11aaf1</bash-input><bash-stdout>Deleted branch claude/review-rally-877101 (was 77ac382c).
+Deleted branch claude/review-rally-11aaf1 (was 77ac382c).</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+レビューセッションはアーカイブしました。呼び出し元セッションに状況を報告してください
