@@ -5,6 +5,7 @@ docs/glossary.md を、ロールの定義と操作ごとの行えるロールの
 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 先頭に、生成したファイルの先頭の記述 (モジュール generated_header) を書く
   - 定義ごとに <a name="ID"></a> と見出しを書く。見出しは「種類 + 日本語名」の後に英語名をコードの書式で書く
+  - 状態の遷移を持つ属性には、models.md の属性の定義の文の後 (値の節の前) に、遷移の表と mermaid の stateDiagram-v2 の図を書く
   - リンクは reference-style で、ラベルを ID にし、定義の行 [ID]: 相対パス#ID "完全な名前" をファイルの末尾に書く
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
@@ -18,7 +19,7 @@ import posixpath
 from pathlib import Path
 
 from . import generated_header, names
-from .domains import DOMAINS_DIR, Domain, Entry, Project
+from .domains import DOMAINS_DIR, Domain, Entry, Project, StateMachine
 
 GLOSSARY_PATH = "docs/glossary.md"
 PERMISSIONS_PATH = "docs/system/permissions.md"
@@ -50,6 +51,9 @@ FUNCTION_ITEMS = {"targets": "対象", "preconditions": "前提", "events": "イ
 NO_ROLES_ITEM = "- 行えるロール: 無し"
 PERMISSIONS_TABLE_HEADING = "## 操作ごとの、行えるロール"
 PERMITTED = "○"
+STATE_MACHINE_HEADER = ["前の状態", "後の状態", "操作", "前提"]
+# 図の状態の識別子に、値の英語名に付ける接頭辞。end・note・state などの英語名を識別子にすると、mermaid が図を読めないため
+STATE_ID_PREFIX = "v_"
 
 
 def escape_link_text(text: str) -> str:
@@ -162,9 +166,53 @@ def render_models(project: Project, domain: Domain, referencing: dict[str, list[
                 target = project.entries[attribute.refers_to]
                 extra = "参照先: " + _entry_link(links, target, _reference_text(target, domain))
             blocks.append(_definition_block(attribute, extra))
+            machine = project.state_machines.get(attribute.id)
+            if machine is not None:
+                blocks += _state_machine_blocks(project, machine, attribute, links)
             for value in attribute.children:
                 blocks.append(_definition_block(value))
     return _document(f"{domain.dir}/", _file_id(domain, "models"), blocks, links)
+
+
+def _table_row(cells: list[str]) -> str:
+    """表の 1 行。空のセルは空白 1 つにする。"""
+    return "|" + "|".join(f" {c} " if c else " " for c in cells) + "|"
+
+
+def _state_machine_blocks(project: Project, machine: StateMachine, attribute: Entry, links: _Links) -> list[str]:
+    """属性の状態の遷移の、最初の状態を書いた文・遷移の表・図。"""
+    values = {value.name: value for value in attribute.children}
+
+    def link(entry: Entry) -> str:
+        return escape_cell(_entry_link(links, entry, entry.name_ja))
+
+    intro = "状態の遷移:"
+    if machine.initial is not None:
+        initial = values[machine.initial.name]
+        text = names.format_part(initial.symbol, initial.name_ja)
+        intro = f"状態の遷移 (最初の状態: {_entry_link(links, initial, text)}):"
+    rows = [_table_row(STATE_MACHINE_HEADER), "|" + "---|" * len(STATE_MACHINE_HEADER)]
+    diagram = ["```mermaid", "stateDiagram-v2"]
+    diagram += [f'  state "{value.name_ja}" as {STATE_ID_PREFIX}{value.name}' for value in attribute.children]
+    if machine.initial is not None:
+        diagram.append(f"  [*] --> {STATE_ID_PREFIX}{machine.initial.name}")
+    for transition in machine.transitions:
+        operations = [project.entries[t] for t in transition.targets("operations")]
+        preconditions = [project.entries[t] for t in transition.targets("preconditions")]
+        rows.append(_table_row([
+            "・".join(link(values[s.name]) for s in transition.from_values),
+            link(values[transition.to.name]),
+            "・".join(link(e) for e in operations),
+            "・".join(link(e) for e in preconditions),
+        ]))
+        label = "・".join(e.name_ja for e in operations)
+        if preconditions:
+            label = (label + " " if label else "") + "[" + "・".join(e.name_ja for e in preconditions) + "]"
+        for state in transition.from_values:
+            arrow = f"  {STATE_ID_PREFIX}{state.name} --> {STATE_ID_PREFIX}{transition.to.name}"
+            diagram.append(f"{arrow} : {label}" if label else arrow)
+    diagram.append("```")
+    return [intro, "\n".join(rows), "\n".join(diagram)]
 
 
 def render_unclassified_app_terms(domain: Domain) -> str:
@@ -260,7 +308,7 @@ def render_permissions(project: Project) -> str:
                 links.link(f"`{domain.name}`", domain.id, f"{domain.dir}/{README}", domain.full_name()),
             ]
             cells += [PERMITTED if role.id in permitted else "" for role in project.roles]
-            rows.append("|" + "|".join(f" {c} " if c else " " for c in cells) + "|")
+            rows.append(_table_row(cells))
         blocks += [PERMISSIONS_TABLE_HEADING, "\n".join(rows)]
     return _document("docs/", None, blocks, links)
 

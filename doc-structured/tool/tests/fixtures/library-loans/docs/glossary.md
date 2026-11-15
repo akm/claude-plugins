@@ -19,6 +19,7 @@
 | [図書が返却された][d-loans-ev-book_returned] | イベント | `book_returned` | [`loans`][d-loans] |
 | [図書が配架中][d-loans-pre-book_shelved] | 前提 | `book_shelved` | [`loans`][d-loans] |
 | [図書を貸し出した][d-loans-ev-book_lent] | イベント | `book_lent` | [`loans`][d-loans] |
+| [延滞][d-loans-m-loan-a-status-v-overdue] | モデル「貸出」の属性「貸出状態」の値 | `overdue` | [`loans`][d-loans] |
 | [延滞を通知する][d-loans-op-notify_overdue] | 操作 | `notify_overdue` | [`loans`][d-loans] |
 | [書名][d-catalog-m-book-a-title] | モデル「図書」の属性 | `title` | [`catalog`][d-catalog] |
 | [氏名][d-members-m-member-a-name] | モデル「利用者」の属性 | `name` | [`members`][d-members] |
@@ -52,6 +53,7 @@
 [d-loans-m-loan-a-reservation]: domains/02-loans/models.md#d-loans-m-loan-a-reservation "ドメイン `loans` のモデル「貸出」の属性「元の予約」"
 [d-loans-m-loan-a-status]: domains/02-loans/models.md#d-loans-m-loan-a-status "ドメイン `loans` のモデル「貸出」の属性「貸出状態」"
 [d-loans-m-loan-a-status-v-on_loan]: domains/02-loans/models.md#d-loans-m-loan-a-status-v-on_loan "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」"
+[d-loans-m-loan-a-status-v-overdue]: domains/02-loans/models.md#d-loans-m-loan-a-status-v-overdue "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「延滞」"
 [d-loans-m-loan-a-status-v-returned]: domains/02-loans/models.md#d-loans-m-loan-a-status-v-returned "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「返却済み」"
 [d-loans-m-reservation]: domains/02-loans/models.md#d-loans-m-reservation "ドメイン `loans` のモデル「予約」"
 [d-loans-m-reservation-a-book]: domains/02-loans/models.md#d-loans-m-reservation-a-book "ドメイン `loans` のモデル「予約」の属性「予約図書」"

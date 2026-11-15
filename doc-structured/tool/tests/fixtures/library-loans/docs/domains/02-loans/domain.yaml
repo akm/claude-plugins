@@ -25,9 +25,21 @@ models:
           on_loan:
             name_ja: 貸出中
             definition: 図書が利用者の手元にある。
+          overdue:
+            name_ja: 延滞
+            definition: 返却期限を過ぎても、図書が利用者の手元にある。
           returned:
             name_ja: 返却済み
             definition: 図書が図書館に戻った。
+        state_machine:
+          initial: on_loan
+          transitions:
+            - from: [on_loan]
+              to: overdue
+              operations: [d-loans-op-notify_overdue]
+            - from: [on_loan, overdue]
+              to: returned
+              operations: [d-loans-op-return_book]
 unclassified_app_terms:
   business_day:
     name_ja: 開館日

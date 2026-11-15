@@ -33,11 +33,35 @@
 
 貸出が今どの段階にあるか。
 
+状態の遷移 (最初の状態: [値「貸出中」][d-loans-m-loan-a-status-v-on_loan]):
+
+| 前の状態 | 後の状態 | 操作 | 前提 |
+|---|---|---|---|
+| [貸出中][d-loans-m-loan-a-status-v-on_loan] | [延滞][d-loans-m-loan-a-status-v-overdue] | [延滞を通知する][d-loans-op-notify_overdue] | |
+| [貸出中][d-loans-m-loan-a-status-v-on_loan]・[延滞][d-loans-m-loan-a-status-v-overdue] | [返却済み][d-loans-m-loan-a-status-v-returned] | [返却を受け付ける][d-loans-op-return_book] | |
+
+```mermaid
+stateDiagram-v2
+  state "貸出中" as v_on_loan
+  state "延滞" as v_overdue
+  state "返却済み" as v_returned
+  [*] --> v_on_loan
+  v_on_loan --> v_overdue : 延滞を通知する
+  v_on_loan --> v_returned : 返却を受け付ける
+  v_overdue --> v_returned : 返却を受け付ける
+```
+
 <a name="d-loans-m-loan-a-status-v-on_loan"></a>
 
 #### 値「貸出中」 `on_loan`
 
 図書が利用者の手元にある。
+
+<a name="d-loans-m-loan-a-status-v-overdue"></a>
+
+#### 値「延滞」 `overdue`
+
+返却期限を過ぎても、図書が利用者の手元にある。
 
 <a name="d-loans-m-loan-a-status-v-returned"></a>
 
@@ -67,5 +91,10 @@
 
 [d-catalog-m-book]: ../01-catalog/models.md#d-catalog-m-book "ドメイン `catalog` のモデル「図書」"
 [d-loans-m-loan]: #d-loans-m-loan "ドメイン `loans` のモデル「貸出」"
+[d-loans-m-loan-a-status-v-on_loan]: #d-loans-m-loan-a-status-v-on_loan "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」"
+[d-loans-m-loan-a-status-v-overdue]: #d-loans-m-loan-a-status-v-overdue "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「延滞」"
+[d-loans-m-loan-a-status-v-returned]: #d-loans-m-loan-a-status-v-returned "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「返却済み」"
 [d-loans-m-reservation]: #d-loans-m-reservation "ドメイン `loans` のモデル「予約」"
+[d-loans-op-notify_overdue]: functions.md#d-loans-op-notify_overdue "ドメイン `loans` の操作「延滞を通知する」"
+[d-loans-op-return_book]: functions.md#d-loans-op-return_book "ドメイン `loans` の操作「返却を受け付ける」"
 [d-members-m-member]: ../03-members/models.md#d-members-m-member "ドメイン `members` のモデル「利用者」"

@@ -10,6 +10,10 @@
   - 操作は、モデルか属性への参照 targets・前提への参照 preconditions・イベントへの参照 events・行えるロールへの参照 roles
     (どれも完全な ID の配列) を持てる。roles を省いた操作は、どのロールも行わない操作 (アプリケーションが自分で行う処理)
   - 前提は、モデル・属性・値への参照 targets (完全な ID の配列) を持てる
+  - 値を持つ属性は、状態の遷移 state_machine (最初の状態 initial と、遷移の配列 transitions) を持てる。状態は属性の値で、
+    遷移の前の状態 from・後の状態 to・initial には値の英語名を書く。遷移は、操作への参照 operations と前提への参照
+    preconditions (どちらも完全な ID の配列) を持てる。属性の下に書けるのは、値が 3 つ以下で、どの遷移にも preconditions が
+    無いときだけ
 ロールは、ドメインの外のファイル docs/system/roles.yaml のキー roles に書く。ロールは親を持たない (ID は r-<英語名>)。
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
 """
@@ -33,7 +37,7 @@ ROLES_FILE = Path("docs/system/roles.yaml")
 TOP_KEYS = ("domain", "models", "unclassified_app_terms", "operations", "preconditions", "events")
 DOMAIN_KEYS = ("description",)
 MODEL_KEYS = ("name_ja", "definition", "attributes")
-ATTRIBUTE_KEYS = ("name_ja", "definition", "values", "refers_to")
+ATTRIBUTE_KEYS = ("name_ja", "definition", "values", "refers_to", "state_machine")
 VALUE_KEYS = ("name_ja", "definition")
 TERM_KEYS = ("name_ja", "definition")
 OPERATION_KEYS = ("name_ja", "definition", "targets", "preconditions", "events", "roles")
@@ -52,6 +56,19 @@ LIST_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
 # 空の配列を書いたときに、メッセージに添える直し方。書いていないキーは「参照が無いときは、<キー> を省く」
 EMPTY_LIST_HINTS = {"roles": "行えるロールが無い操作は、roles を省く"}
 REQUIRED_KEYS = ("name_ja", "definition")
+STATE_MACHINE_KEY = "state_machine"
+# 属性の下に書く状態の遷移のキー
+STATE_MACHINE_KEYS = ("initial", "transitions")
+TRANSITION_KEYS = ("from", "to", "operations", "preconditions")
+# 遷移の、完全な ID の配列で書く参照。キーから、参照できる種類の記号と、メッセージに書くその名前への対応
+TRANSITION_REFERENCES: dict[str, tuple[tuple[str, ...], str]] = {
+    "operations": (("op",), "操作"),
+    "preconditions": (("pre",), "前提"),
+}
+# 状態の遷移を属性の下に書ける、属性の値の数の上限。超えたら、ファイルに書く形に移す
+ATTRIBUTE_FORM_MAX_VALUES = 3
+# 状態の遷移を属性の下に書けないときに、メッセージに添える直し方
+MOVE_TO_FILE_HINT = "state-machines- で始まる名前のファイルに移す"
 # read_yaml が、YAML として読めないファイルに返す値 (空のファイルの None と区別する)
 _UNREADABLE = object()
 
@@ -71,6 +88,54 @@ class Reference:
     target: str  # 参照先の ID
     line: int
     column: int
+
+
+@dataclass(frozen=True)
+class StateName:
+    """状態の遷移の from・to・initial に書いた、値の英語名の 1 つ。"""
+
+    key: str  # 名前を書いたキー
+    name: str
+    line: int
+    column: int
+
+
+@dataclass
+class Transition:
+    """状態の遷移の、遷移の 1 つ。"""
+
+    from_values: list[StateName]
+    to: StateName | None
+    line: int
+    column: int
+    references: list[Reference] = field(default_factory=list)  # operations と preconditions。書いた順
+
+    def targets(self, key: str) -> list[str]:
+        return [r.target for r in self.references if r.key == key]
+
+
+@dataclass
+class StateMachine:
+    """1 つの属性の状態の遷移。"""
+
+    owner: str  # 検査 h・i のメッセージに書く名前 (「属性 status の状態の遷移」)
+    domain: "Domain"
+    path: str  # 状態の遷移を書いた YAML の、リポジトリのルートからの相対パス
+    line: int  # 位置。属性の下に書く形ではキー state_machine
+    column: int
+    attribute: "Entry | None"  # 状態の遷移を持つ属性
+    in_file: bool = False  # ファイルに書く形なら True、属性の下に書く形なら False
+    initial: StateName | None = None
+    transitions: list[Transition] = field(default_factory=list)
+
+    def state_names(self):
+        """書いた順の、initial・from・to の値の英語名。"""
+        if self.initial is not None:
+            yield self.initial
+        for transition in self.transitions:
+            yield from transition.from_values
+            if transition.to is not None:
+                yield transition.to
 
 
 @dataclass
@@ -133,6 +198,7 @@ class Domain:
     operations: list[Entry] = field(default_factory=list)
     preconditions: list[Entry] = field(default_factory=list)
     events: list[Entry] = field(default_factory=list)
+    state_machines: list[StateMachine] = field(default_factory=list)  # 読んだ順
     yaml_files: list[str] = field(default_factory=list)
 
     @property
@@ -158,6 +224,14 @@ class Project:
     domains: list[Domain] = field(default_factory=list)
     roles: list[Entry] = field(default_factory=list)  # ファイル docs/system/roles.yaml に書いた順
     entries: dict[str, Entry] = field(default_factory=dict)
+    # 属性の ID から、その属性の状態の遷移への対応。同じ属性に 2 つあれば先に読んだ方。検査 h の誤りがあるときは生成に使わない
+    state_machines: dict[str, StateMachine] = field(default_factory=dict)
+
+
+def spaced(owner: str) -> str:
+    """メッセージで、定義の名前の後に「の」「に」を続けるときの形。英語名で終わる名前 (「操作 lend」) には空白を足し、
+    日本語で終わる名前 (「属性 status の状態の遷移」) には足さない。"""
+    return f"{owner} " if owner[-1].isascii() else owner
 
 
 def rel(root: Path, path: Path) -> str:
@@ -438,6 +512,9 @@ class _Loader:
                     continue
                 for value_name in values:
                     self.entry(domain, values, value_name, "v", VALUE_KEYS, path_rel, attribute)
+            # 状態の遷移は属性の値を指すので、値を読んだ後に読む
+            if STATE_MACHINE_KEY in mapping:
+                self.load_state_machine(domain, mapping, path_rel, attribute)
 
     def load_terms(self, domain: Domain, data: CommentedMap, path_rel: str, seen: dict[str, Entry]) -> None:
         self.load_list(domain, data, "unclassified_app_terms", "ut", TERM_KEYS, path_rel, seen, domain.terms)
@@ -475,16 +552,20 @@ class _Loader:
                     self.load_id_list(entry, entry_map, list_key, path_rel)
 
     def load_id_list(self, entry: Entry, mapping: CommentedMap, key: str, path_rel: str) -> None:
+        entry.references += self.read_id_list(entry.owner, mapping, key, path_rel)
+
+    def read_id_list(self, owner: str, mapping: CommentedMap, key: str, path_rel: str) -> list[Reference]:
         """完全な ID の配列で書いた参照を読む。配列でない・空・文字列でない値・同じ ID が 2 回は、問題を足す。"""
         value = mapping[key]
-        not_list = f"{entry.owner} の {key} は、ID の文字列の配列でなければならない"
+        not_list = f"{spaced(owner)}の {key} は、ID の文字列の配列でなければならない"
         if not isinstance(value, CommentedSeq):
             self.problem(path_rel, not_list, *_value_position(mapping, key))
-            return
+            return []
         if not value:
             hint = EMPTY_LIST_HINTS.get(key, f"参照が無いときは、{key} を省く")
-            self.problem(path_rel, f"{entry.owner} の {key} は、空の配列にできない ({hint})", *_value_position(mapping, key))
-            return
+            self.problem(path_rel, f"{spaced(owner)}の {key} は、空の配列にできない ({hint})", *_value_position(mapping, key))
+            return []
+        references: list[Reference] = []
         seen: set[str] = set()
         for i, item in enumerate(value):
             line, column = _item_position(value, i)
@@ -493,10 +574,98 @@ class _Loader:
                 continue
             target = item.strip()
             if target in seen:
-                self.problem(path_rel, f"{entry.owner} の {key} に {target} が 2 回ある", line, column)
+                self.problem(path_rel, f"{spaced(owner)}の {key} に {target} が 2 回ある", line, column)
                 continue
             seen.add(target)
-            entry.references.append(Reference(key, target, line, column))
+            references.append(Reference(key, target, line, column))
+        return references
+
+    def load_state_machine(self, domain: Domain, parent_map: CommentedMap, path_rel: str, attribute: Entry) -> None:
+        """属性の下の状態の遷移を読む。形式の誤りを報告する。値・参照先は、すべての定義を読んだ後に確認する。"""
+        mapping = self.mapping_of(parent_map, STATE_MACHINE_KEY, path_rel)
+        if mapping is None:
+            return
+        for key in mapping:
+            if key not in STATE_MACHINE_KEYS:
+                self.unknown_key(path_rel, key, STATE_MACHINE_KEYS, *_key_position(mapping, key))
+        line, column = _key_position(parent_map, STATE_MACHINE_KEY)
+        machine = StateMachine(
+            owner=f"{attribute.owner} の状態の遷移", domain=domain, path=path_rel, line=line, column=column,
+            attribute=attribute,
+        )
+        if "initial" in mapping:
+            machine.initial = self.state_name(machine.owner, mapping, "initial", path_rel)
+        self.load_transitions(machine, mapping, path_rel)
+        domain.state_machines.append(machine)
+
+    def state_name(self, owner: str, mapping: CommentedMap, key: str, path_rel: str) -> StateName | None:
+        value = mapping[key]
+        line, column = _value_position(mapping, key)
+        if not isinstance(value, str) or not value.strip():
+            self.problem(path_rel, f"{spaced(owner)}の {key} は、値の英語名の文字列でなければならない", line, column)
+            return None
+        return StateName(key, value.strip(), line, column)
+
+    def load_transitions(self, machine: StateMachine, mapping: CommentedMap, path_rel: str) -> None:
+        owner = machine.owner
+        if "transitions" not in mapping:
+            self.problem(path_rel, f"{spaced(owner)}に必須の項目 transitions が無い", machine.line, machine.column)
+            return
+        value = mapping["transitions"]
+        not_list = f"{spaced(owner)}の transitions は、遷移のマッピングの配列でなければならない"
+        if not isinstance(value, CommentedSeq):
+            self.problem(path_rel, not_list, *_value_position(mapping, "transitions"))
+            return
+        if not value:
+            self.problem(path_rel, f"{spaced(owner)}の transitions は、空の配列にできない", *_value_position(mapping, "transitions"))
+            return
+        for i, item in enumerate(value):
+            line, column = _item_position(value, i)
+            if not isinstance(item, CommentedMap):
+                self.problem(path_rel, not_list, line, column)
+                continue
+            for key in item:
+                if key not in TRANSITION_KEYS:
+                    self.unknown_key(path_rel, key, TRANSITION_KEYS, *_key_position(item, key))
+            transition = Transition(from_values=self.from_values(owner, item, path_rel, line, column), to=None, line=line, column=column)
+            if "to" in item:
+                transition.to = self.state_name(owner, item, "to", path_rel)
+            else:
+                self.problem(path_rel, f"{spaced(owner)}に必須の項目 to が無い", line, column)
+            for key in TRANSITION_REFERENCES:
+                if key in item:
+                    transition.references += self.read_id_list(owner, item, key, path_rel)
+            if not machine.in_file and "preconditions" in item:
+                self.problem(
+                    path_rel,
+                    f"{spaced(owner)}に preconditions があるので、状態の遷移を属性の下に書けない ({MOVE_TO_FILE_HINT})",
+                    *_key_position(item, "preconditions"),
+                )
+            machine.transitions.append(transition)
+
+    def from_values(self, owner: str, item: CommentedMap, path_rel: str, line: int, column: int) -> list[StateName]:
+        if "from" not in item:
+            self.problem(path_rel, f"{spaced(owner)}に必須の項目 from が無い", line, column)
+            return []
+        value = item["from"]
+        not_list = f"{spaced(owner)}の from は、値の英語名の配列でなければならない"
+        if not isinstance(value, CommentedSeq):
+            self.problem(path_rel, not_list, *_value_position(item, "from"))
+            return []
+        if not value:
+            self.problem(path_rel, f"{spaced(owner)}の from は、空の配列にできない", *_value_position(item, "from"))
+            return []
+        found: list[StateName] = []
+        for i, name in enumerate(value):
+            nline, ncolumn = _item_position(value, i)
+            if not isinstance(name, str) or not name.strip():
+                self.problem(path_rel, not_list, nline, ncolumn)
+                continue
+            if any(n.name == name.strip() for n in found):
+                self.problem(path_rel, f"{spaced(owner)}の from に {name.strip()} が 2 回ある", nline, ncolumn)
+                continue
+            found.append(StateName("from", name.strip(), nline, ncolumn))
+        return found
 
     def resolve_references(self) -> None:
         entries = self.project.entries
@@ -522,11 +691,15 @@ class _Loader:
             for entry in domain.entries():
                 for reference in entry.references:
                     self.resolve_list_reference(entry, reference)
+        self.resolve_state_machines()
 
     def resolve_list_reference(self, entry: Entry, reference: Reference) -> None:
         kinds, kinds_text = LIST_REFERENCES[(entry.symbol, reference.key)]
-        prefix = f"{entry.owner} の {reference.key}"
-        where = (entry.path, reference.line, reference.column)
+        self.resolve_reference(entry.owner, entry.path, reference, kinds, kinds_text)
+
+    def resolve_reference(self, owner: str, path: str, reference: Reference, kinds: tuple[str, ...], kinds_text: str) -> None:
+        prefix = f"{spaced(owner)}の {reference.key}"
+        where = (path, reference.line, reference.column)
         try:
             kind = names.kind_of(reference.target)
         except IdError as e:
@@ -538,6 +711,45 @@ class _Loader:
             )
         elif reference.target not in self.project.entries:
             self.problem(where[0], f"{prefix} の参照先 {reference.target} が無い", *where[1:])
+
+    def resolve_state_machines(self) -> None:
+        """状態の遷移の参照先と、from・to・initial が属性の値であることを確認する。同じ属性の状態の遷移が 2 つあれば
+        後の方を報告する。状態の遷移を、属性の ID で Project.state_machines に入れる。"""
+        found = self.project.state_machines
+        for domain in self.project.domains:
+            for machine in domain.state_machines:
+                for transition in machine.transitions:
+                    for reference in transition.references:
+                        self.resolve_reference(machine.owner, machine.path, reference, *TRANSITION_REFERENCES[reference.key])
+                attribute = machine.attribute
+                if attribute is None:
+                    continue
+                if attribute.id in found:
+                    other = found[attribute.id]
+                    self.problem(machine.path, f"{spaced(machine.owner)}は、{other.path}:{other.line} にもある", machine.line, machine.column)
+                    continue
+                found[attribute.id] = machine
+                self.check_states(machine, attribute)
+
+    def check_states(self, machine: StateMachine, attribute: Entry) -> None:
+        """from・to・initial が属性の値か、属性の下に書く形なら値の数が上限以下かを確認する。"""
+        values = {value.name for value in attribute.children}
+        if not values:
+            self.problem(machine.path, f"{attribute.owner} は値を持たないので、状態の遷移を書けない", machine.line, machine.column)
+            return
+        if not machine.in_file and len(values) > ATTRIBUTE_FORM_MAX_VALUES:
+            self.problem(
+                machine.path,
+                f"{attribute.owner} は値が {len(values)} つあるので、状態の遷移を属性の下に書けない ({MOVE_TO_FILE_HINT})",
+                machine.line,
+                machine.column,
+            )
+        for state in machine.state_names():
+            if state.name not in values:
+                self.problem(
+                    machine.path, f"{spaced(machine.owner)}の {state.key} の値 {state.name} は、{attribute.owner} の値に無い",
+                    state.line, state.column,
+                )
 
 
 def _key_position(mapping: CommentedMap, key) -> tuple[int, int]:
