@@ -283,6 +283,193 @@ class UrgentTest(ReleaseOpsCase):
         self.assertEqual((again["status"], again["done"]), ("ok", []), again["errors"])
 
 
+def add_target_text(current=None, new="mobile", existing="platform", extra=""):
+    """種類「リリース対象の追加」の計画案。current は (URL, 本文) か None。"""
+    sources = f"- {current[0]} 本文の SHA-256: {bodies.body_sha256(current[1])}" if current else "- なし"
+    return (f"# 計画案: リリース対象 {new} を足す\n\n## 元にした Issue\n\n{sources}\n\n"
+            f"## 対象\n\n- 種類: リリース対象の追加\n- リリース対象: {new}\n- 今の計画: {current[0] if current else 'なし'}\n"
+            f"- 既にあるリリース対象: {existing}\n{extra}")
+
+
+ADD_NAME = "20261115-1300-release-plan-add-mobile.md"
+
+
+class AddTargetParseTest(unittest.TestCase):
+
+    def parse(self, text):
+        return releaseops.parse_plan(text, ADD_NAME, REPO)
+
+    def test_reads_draft(self):
+        parsed = self.parse(add_target_text())
+        self.assertEqual(parsed["errors"], [])
+        self.assertEqual((parsed["kind"], parsed["target"], parsed["existing_target"]), ("リリース対象の追加", "mobile", "platform"))
+        self.assertEqual((parsed["rows"], parsed["dests"], parsed["cancels"]), ([], [], []))
+
+    def test_errors(self):
+        cases = {
+            "既にあるリリース対象が無い": add_target_text().replace("- 既にあるリリース対象: platform\n", ""),
+            "足すリリース対象と同じ名前": add_target_text(existing="mobile"),
+            "名前の形ではない": add_target_text(existing="プラットフォーム"),
+            "足すリリース対象が無い": add_target_text(new="なし"),
+            "ほかの節がある": add_target_text(extra="\n## リリースの順番\n\nなし\n"),
+            "ほかの種類で節が対象だけ": add_target_text().replace("リリース対象の追加", "新しい計画"),
+            "ほかの種類に既にあるリリース対象": draft_text([("a", "x")]).replace("- 今の計画: なし\n",
+                                                                         "- 今の計画: なし\n- 既にあるリリース対象: platform\n"),
+        }
+        for name, text in cases.items():
+            with self.subTest(name):
+                self.assertTrue(self.parse(text)["errors"], name)
+
+
+class AddTargetTest(ReleaseOpsCase):
+    """リリース対象が 1 つのリポジトリに、2 つ目のリリース対象 mobile を足し、既にあるリリース対象に名前 platform を付ける (R41)。"""
+
+    def setUp(self):
+        super().setUp()
+        self.old_plan = self.gh.add_issue(releaseplan.plan_title("20261001"), state="CLOSED")  # 表に無い閉じた計画
+        self.r0, self.m0 = self.released("前の計画で閉じた", done=True)  # 今の計画の表に無い閉じたリリース
+        self.gh.issues[self.r0]["state"] = "CLOSED"
+        self.gh.milestones[self.m0]["state"] = "closed"
+        self.r1, self.m1 = self.released("バックアップ", done=True)
+        self.gh.add_comment(self.r1, "issue-practice: draft-removed date=2026-11-01\n\n承認した。")
+        self.gh.issues[self.r1]["state"] = "CLOSED"
+        self.gh.milestones[self.m1]["state"] = "closed"
+        self.r2, self.m2 = self.released("絞り込み")
+        self.wish = self.gh.add_issue("要望", milestone=self.m2)
+        self.plan, self.plan_body = self.current_plan([(self.r1, "バックアップ"), (self.r2, "絞り込み")])
+        self.path = self.write_draft(add_target_text(current=(self.gh.url(self.plan), self.plan_body)), name=ADD_NAME)
+
+    def test_plan_shows_labels_titles_and_milestones(self):
+        result = releaseops.plan(self.path, REPO)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        self.assertEqual(self.writes(), [], "示すときは書き込まない")
+        self.assertEqual((result["kind"], result["target"], result["existing_target"]), ("リリース対象の追加", "mobile", "platform"))
+        self.assertEqual([l["name"] for l in result["labels_to_create"]], ["release-target:platform", "release-target:mobile"])
+        label = "release-target:platform"
+        expected = [
+            (0, "create-label", "release-target:platform"), (0, "create-label", "release-target:mobile"),
+            (1, "record-approval", self.gh.url(self.plan)),
+            (2, "add-label", self.gh.url(self.r1)),
+            (2, "rename-issue", f"🔖 リリース R{self.r1} platform (バックアップ)"),
+            (2, "add-label", self.gh.url(self.r2)),
+            (2, "rename-issue", f"[DRAFT] 🔖 リリース R{self.r2} platform (絞り込み)"),
+            (2, "add-label", self.gh.url(self.plan)),
+            (2, "rename-issue", "📅 リリース計画 platform 20261101"),
+            (2, "rename-milestone", f"R{self.r1} platform (バックアップ)"),
+            (2, "rename-milestone", f"R{self.r2} platform (絞り込み)"),
+            (3, "record-plan-change", self.gh.url(self.plan)),
+        ]
+        self.assertEqual([(a["step"], a["action"], a.get("title") or a.get("label") if a["action"] in ("rename-issue", "rename-milestone", "create-label")
+                           else a["url"]) for a in result["actions"]], expected)
+        self.assertTrue(all(a["label"] == label for a in result["actions"] if a["action"] == "add-label"))
+
+    def test_apply_names_existing_target(self):
+        result = releaseops.apply(self.path, REPO)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        label = "release-target:platform"
+        plan = self.gh.issues[self.plan]
+        self.assertEqual((plan["title"], plan["labels"]), ("📅 リリース計画 platform 20261101", ["current", label]))
+        self.assertEqual(self.gh.issues[self.r1]["title"], f"🔖 リリース R{self.r1} platform (バックアップ)", "表の閉じたリリースも変える")
+        self.assertEqual(self.gh.issues[self.r2]["title"], f"[DRAFT] 🔖 リリース R{self.r2} platform (絞り込み)")
+        for number in (self.r1, self.r2):
+            self.assertEqual(self.gh.issues[number]["labels"], [label])
+        self.assertEqual(self.gh.milestones[self.m1]["title"], f"R{self.r1} platform (バックアップ)")
+        self.assertEqual(self.gh.milestones[self.m2]["title"], f"R{self.r2} platform (絞り込み)")
+        self.assertEqual(self.gh.issues[self.wish]["milestone"], self.m2, "マイルストーンの名前を変えても、Issue の設定は残る")
+        # 表に無い閉じた Issue とマイルストーンは変えない
+        self.assertEqual((self.gh.issues[self.old_plan]["title"], self.gh.issues[self.old_plan]["labels"]),
+                         (releaseplan.plan_title("20261001"), []))
+        self.assertEqual(self.gh.issues[self.r0]["title"], releaseplan.release_title(self.r0, "前の計画で閉じた", draft=False))
+        self.assertEqual(self.gh.milestones[self.m0]["title"], releaseplan.milestone_title(self.r0, "前の計画で閉じた"))
+        comments = [c["body"] for c in self.gh.comments[self.plan]]
+        self.assertEqual([c.split("\n")[0] for c in comments],
+                         [f"issue-practice: approval draft={ADD_NAME}", f"issue-practice: plan-change draft={ADD_NAME}"])
+        self.assertIn(f"#{self.r1} 🔖 リリース R{self.r1} platform (バックアップ)", comments[1])
+        self.assertIn(f"R{self.r2} platform (絞り込み)", comments[1])
+        # やり直しても、何も書かない
+        again = releaseops.apply(self.path, REPO)
+        self.assertEqual((again["status"], again["done"]), ("ok", []), again["errors"])
+        # 名前を付けた後は、リリース対象ごとに今と次を決められ、見直しも形どおり
+        decided = releaseplan.current_and_next(REPO, target="platform")
+        self.assertEqual(decided["errors"], [])
+        self.assertEqual(decided["next"]["number"], self.r2)
+        self.assertEqual(releaseplan.current_and_next(REPO)["status"], "unsatisfied", "リリース対象の指定が要る")
+        self.assertEqual(releaseops.review(REPO, target="platform")["errors"], [])
+        self.assertEqual(releaseops.review(REPO, target="mobile")["errors"], [])
+
+    def test_first_plan_of_new_target_after_naming(self):
+        """名前を付けた後に、足すリリース対象の最初の計画を、種類「新しい計画」で立てられる。"""
+        self.assertEqual(releaseops.apply(self.path, REPO)["status"], "ok")
+        path = self.write_draft(draft_text([("app", "アプリ")], target="mobile"), name="20261115-1400-release-plan-mobile.md")
+        result = releaseops.apply(path, REPO)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        plan = self.gh.issues[self.find("^📅 リリース計画 mobile 20261114$")[0]]
+        self.assertEqual(sorted(plan["labels"]), ["current", "release-target:mobile"])
+        app = self.find("アプリ")[0]
+        self.assertEqual(self.gh.issues[app]["title"], f"[DRAFT] 🔖 リリース R{app} mobile (アプリ)")
+        self.assertEqual(releaseops.review(REPO, target="mobile")["errors"], [])
+        self.assertEqual(releaseops.review(REPO, target="platform")["errors"], [])
+        # 足すリリース対象の計画があっても、名前を付ける計画案をやり直せる (足すリリース対象のものは変えない)
+        again = releaseops.plan(self.path, REPO)
+        self.assertEqual((again["status"], again["actions"]), ("ok", []), again["errors"])
+
+    def test_third_target_needs_no_naming(self):
+        """3 つ目のリリース対象は、種類「新しい計画」の計画案だけで足せる。"""
+        self.assertEqual(releaseops.apply(self.path, REPO)["status"], "ok")
+        path = self.write_draft(draft_text([("web", "ウェブ")], target="web"), name="20261115-1400-release-plan-web.md")
+        result = releaseops.apply(path, REPO)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        self.assertEqual(releaseplan.fetch_targets(REPO)[0], ["mobile", "platform", "web"])
+
+    def test_retry_after_failure(self):
+        """マイルストーンの名前を変えるところで失敗させ、同じ計画案でやり直すと、残りだけを行う。"""
+        self.gh.fail_when = lambda args: args[0] == "api" and "PATCH" in args and f"milestones/{self.m2}" in args[1]
+        result = releaseops.apply(self.path, REPO)
+        self.assertEqual(result["status"], "gh_failed")
+        self.assertEqual(result["done"][-1]["action"], "rename-milestone")
+        shown = releaseops.plan(self.path, REPO)
+        self.assertEqual(shown["status"], "ok", shown["errors"])
+        self.assertEqual([(a["action"], a.get("title")) for a in shown["actions"]],
+                         [("rename-milestone", f"R{self.r2} platform (絞り込み)"), ("record-plan-change", None)],
+                         "名前を付け終えたものは、名前を付けたものとして扱う")
+        result = releaseops.apply(self.path, REPO)
+        self.assertEqual(result["status"], "ok", result["errors"])
+        self.assertEqual(self.gh.milestones[self.m2]["title"], f"R{self.r2} platform (絞り込み)")
+        self.assertIn(f"#{self.r1} 🔖 リリース R{self.r1} platform (バックアップ)", self.gh.comments[self.plan][-1]["body"],
+                      "やり直した後の記録にも、前の実行で名前を変えたものを書く")
+
+    def test_new_target_plan_without_naming_is_unsatisfied(self):
+        path = self.write_draft(draft_text([("app", "アプリ")], target="mobile"), name="20261115-1400-release-plan-mobile.md")
+        result = releaseops.plan(path, REPO)
+        self.assertEqual(result["status"], "unsatisfied")
+        self.assertTrue(any("リリース対象の追加" in e["message"] and f"#{self.plan}" in e["message"] for e in result["errors"]),
+                        result["errors"])
+
+    def test_state_errors(self):
+        """示すときに、書き込む内容の誤りをすべて見つけ、何も書き込まない。"""
+        self.gh.add_label("release-target:web")  # ほかのリリース対象
+        self.gh.issues[self.plan]["body"] += "\n追記\n"  # 計画案を作った後に本文が変わった
+        pending = self.gh.add_issue(releaseplan.release_title(None, "番号の前"))  # 番号を書き足す前のリリース Issue
+        self.gh.milestones[self.m2]["title"] = "名前の形ではない"  # マイルストーンが見つからない
+        result = releaseops.apply(self.path, REPO)
+        self.assertEqual(result["status"], "unsatisfied")
+        self.assertEqual(self.writes(), [])
+        messages = "\n".join(e["message"] for e in result["errors"])
+        for expected in ("release-target:web", "本文が、計画案を作ったときから変わった", f"#{pending}",
+                         f"リリース Issue #{self.r2} のリリースマイルストーンが 0 つ"):
+            self.assertIn(expected, messages)
+
+    def test_current_plan_mismatch(self):
+        path = self.write_draft(add_target_text(), name="20261115-1400-release-plan-add-mobile.md")
+        result = releaseops.plan(path, REPO)
+        self.assertEqual(result["status"], "unsatisfied")
+        self.assertTrue(any(f"#{self.plan}" in e["message"] for e in result["errors"]), result["errors"])
+        self.current_plan([], date="20261102")
+        result = releaseops.plan(self.path, REPO)
+        self.assertEqual(result["status"], "unsatisfied")
+        self.assertTrue(any("2 つある" in e["message"] for e in result["errors"]), result["errors"])
+
+
 class StateErrorTest(ReleaseOpsCase):
 
     def test_other_current_plan_is_unsatisfied(self):
@@ -574,6 +761,10 @@ class DocTest(unittest.TestCase):
         self.assertIn(f"`| {' | '.join(releaseops.DEST_HEADER)} |`", doc)
         self.assertIn(f"`| {' | '.join(releaseops.CANCEL_HEADER)} |`", doc)
         self.assertIn(f"`{releaseplan.plan_title('YYYYMMDD')}`", doc)
+        add_target = doc.split("\n## リリース対象を足すとき\n")[1].split("\n## 記録のコメント\n")[0]
+        self.assertIn(f"- 種類: {releaseops.ADD_TARGET}\n", add_target)
+        self.assertIn(f"- {releaseops.EXISTING_TARGET_FIELD}: ", add_target)
+        self.assertIn(f"項目「{releaseops.EXISTING_TARGET_FIELD}」", add_target)
         self.assertIn(f"`{releaseplan.release_title('<番号>', '主題')}`", doc)
 
     def test_release_issue_sections(self):

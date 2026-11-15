@@ -31,9 +31,11 @@ import re
 from issue_practice import bodies, checkboxes, closecheck, draft, gh, issues, records, refs, releaseplan
 
 PLAN_SECTIONS = ("対象", "リリースの順番", "Issue の入れ先", "取りやめるリリース")
+ADD_TARGET_SECTIONS = ("対象",)  # 種類「リリース対象の追加」の計画案の節
 TARGET_FIELDS = ("種類", "リリース対象", "今の計画")
-KINDS = ("新しい計画", "急ぎのリリースの追加")
-NEW_PLAN, URGENT = KINDS
+EXISTING_TARGET_FIELD = "既にあるリリース対象"  # 種類「リリース対象の追加」だけに書く項目
+KINDS = ("新しい計画", "急ぎのリリースの追加", "リリース対象の追加")
+NEW_PLAN, URGENT, ADD_TARGET = KINDS
 DEST_HEADER = ("Issue", "入れるリリース")
 CANCEL_HEADER = ("リリース Issue", "理由", "メモの移し先")
 UNDECIDED = "未定"
@@ -57,6 +59,10 @@ URGENT_CHANGE_TEXT = "計画案 {file_name} (利用者が承認した) で、表
 CANCEL_TEXT = ("新しいリリース計画 {plan} で、このリリースを取りやめた。決めた人: 利用者 (計画案 {file_name} を承認した)。\n\n"
                "- 理由: {reason}\n- メモの移し先: {memo}")
 MEMO_TEXT = "取りやめたリリース Issue {issue} のメモ ({url}) を、新しいリリース計画 {plan} で、この Issue に移した。\n\n---\n\n{body}"
+APPROVAL_ADD_TARGET = ("計画案 {file_name} を利用者が承認し、既にあるリリース対象に名前 {existing} を付けて、"
+                       "リリース対象 {new} を足す。")
+ADD_TARGET_CHANGE_TEXT = ("計画案 {file_name} (利用者が承認した) で、既にあるリリース対象に名前 {existing} を付け、"
+                          "リリース対象 {new} を足した。決めた人: 利用者。")
 
 _FIELD_RE = re.compile(r"^- (?P<name>[^:]+): (?P<value>\S.*)$")
 _ISSUE_CELL_RE = re.compile(r"^#(?P<number>[1-9][0-9]*)$")
@@ -139,14 +145,16 @@ def _table(section, header, errors):
     return rows
 
 
-def _fields(section, names, errors):
+def _fields(section, names, errors, optional=()):
+    """節の「- <項目>: <値>」の行を読む。names の項目は必須、optional の項目は書かなくてもよい。"""
     fields = {}
+    allowed = tuple(names) + tuple(optional)
     for number, line in section["lines"]:
         if not line.strip():
             continue
         m = _FIELD_RE.match(line)
-        if not m or m.group("name") not in names or m.group("name") in fields:
-            errors.append({"line": number, "message": f"節「{section['title']}」の行は「- <項目>: <値>」(項目: {'・'.join(names)})"})
+        if not m or m.group("name") not in allowed or m.group("name") in fields:
+            errors.append({"line": number, "message": f"節「{section['title']}」の行は「- <項目>: <値>」(項目: {'・'.join(allowed)})"})
             continue
         fields[m.group("name")] = (number, m.group("value").strip())
     missing = [n for n in names if n not in fields]
@@ -167,20 +175,24 @@ def _release_ref(cell, rows_by_number, rows_by_key):
 def parse_plan(text, name, repo):
     """リリース計画の計画案を解析する。name はファイル名、repo は #番号 の参照を解決するリポジトリ (owner/repo)。
 
-    返り値は {"file_name", "kind", "target", "current" ({"ref", "url", "sha256"} か None), "rows" (表の行),
+    返り値は {"file_name", "kind", "target", "existing_target" (種類「リリース対象の追加」で名前を付ける既にあるリリース対象。
+    ほかの種類では None), "current" ({"ref", "url", "sha256"} か None), "rows" (表の行),
     "dests" ({"line", "number", "release" (表の行か None), "value" (#番号・キー・未定・入れない)} の配列),
     "cancels" ({"line", "number", "reason", "memo" (表の行か None)} の配列), "errors"}。
+    種類「リリース対象の追加」の計画案は節「対象」だけなので、rows・dests・cancels は空。
     """
     head = draft.parse(text, name)
     errors = list(head["errors"])
-    result = {"file_name": name, "kind": None, "target": None, "current": None, "rows": [], "dests": [], "cancels": [],
-              "errors": errors}
+    result = {"file_name": name, "kind": None, "target": None, "existing_target": None, "current": None, "rows": [],
+              "dests": [], "cancels": [], "errors": errors}
+    sections_message = ("節「元にした Issue」の後に、節「" + "」「".join(PLAN_SECTIONS) + "」をこの順に書く (種類「"
+                        + ADD_TARGET + "」では、節「" + "」「".join(ADD_TARGET_SECTIONS) + "」だけを書く)")
     titles = tuple(s["title"] for s in head["sections"])
-    if titles != PLAN_SECTIONS:
-        errors.append({"line": None, "message": "節「元にした Issue」の後に、節「" + "」「".join(PLAN_SECTIONS) + "」をこの順に書く"})
+    if titles not in (PLAN_SECTIONS, ADD_TARGET_SECTIONS):
+        errors.append({"line": None, "message": sections_message})
         return result
-    sections = {title: bodies.find_section(text, title) for title in PLAN_SECTIONS}
-    fields = _fields(sections["対象"], TARGET_FIELDS, errors)
+    sections = {title: bodies.find_section(text, title) for title in titles}
+    fields = _fields(sections["対象"], TARGET_FIELDS, errors, optional=(EXISTING_TARGET_FIELD,))
     if fields:
         line, kind = fields["種類"]
         if kind not in KINDS:
@@ -207,6 +219,13 @@ def parse_plan(text, name, repo):
             errors.append({"line": line, "message": "項目「今の計画」が「なし」なのに、節「元にした Issue」に Issue がある"})
         if result["kind"] == URGENT and result["current"] is None and current == NONE_VALUE:
             errors.append({"line": line, "message": "急ぎのリリースの追加では、項目「今の計画」に、行を足すリリース計画 Issue を書く"})
+    if titles == ADD_TARGET_SECTIONS or result["kind"] == ADD_TARGET:
+        _parse_add_target(fields, titles, sections_message, result, errors)
+        errors.sort(key=lambda e: (e["line"] is not None, e["line"] or 0))
+        return result
+    if fields and EXISTING_TARGET_FIELD in fields:
+        errors.append({"line": fields[EXISTING_TARGET_FIELD][0],
+                       "message": f"項目「{EXISTING_TARGET_FIELD}」は、種類「{ADD_TARGET}」の計画案だけに書く"})
     table = releaseplan.parse_table(text, allow_keys=True)
     if "errors" in table:
         errors += [{"line": int(e.split(":")[0][2:]) if e.startswith("行 ") else None, "message": e} for e in table["errors"]]
@@ -270,6 +289,28 @@ def parse_plan(text, name, repo):
             errors.append({"line": sections["リリースの順番"]["heading_line"], "message": "急ぎのリリースの追加なのに、表にキーの行 (足すリリース) が無い"})
     errors.sort(key=lambda e: (e["line"] is not None, e["line"] or 0))
     return result
+
+
+def _parse_add_target(fields, titles, sections_message, result, errors):
+    """種類「リリース対象の追加」の計画案の節と項目を確認し、result["existing_target"] を決める。"""
+    if titles != ADD_TARGET_SECTIONS or result["kind"] not in (None, ADD_TARGET):
+        errors.append({"line": None, "message": sections_message})
+    if not fields or result["kind"] != ADD_TARGET:
+        return
+    line, target = fields["リリース対象"]
+    if target == NONE_VALUE:
+        errors.append({"line": line, "message": f"種類「{ADD_TARGET}」では、項目「リリース対象」に、足すリリース対象の名前を書く"})
+    if EXISTING_TARGET_FIELD not in fields:
+        errors.append({"line": fields["種類"][0], "message": f"種類「{ADD_TARGET}」では、項目「{EXISTING_TARGET_FIELD}」に、"
+                                                            "既にあるリリース対象に付ける名前を書く"})
+        return
+    line, existing = fields[EXISTING_TARGET_FIELD]
+    if not releaseplan.TARGET_NAME_RE.match(existing):
+        errors.append({"line": line, "message": f"項目「{EXISTING_TARGET_FIELD}」の名前の形ではない: {existing!r}"})
+    elif existing == target:
+        errors.append({"line": line, "message": f"項目「{EXISTING_TARGET_FIELD}」が、項目「リリース対象」(足すリリース対象) と同じ名前"})
+    else:
+        result["existing_target"] = existing
 
 
 def read_plan(path, repo):
@@ -371,6 +412,13 @@ def _observe(parsed, repo):
         errors.append({"line": None, "message": f"リリース対象が複数ある ({', '.join(targets)})。項目「リリース対象」に書く"})
     state["milestones"] = _need(releaseplan.fetch_open_milestones(repo, state="all"))
     state["open_issues"] = _need(issues.fetch_open_issues(repo))
+    if target and not targets:
+        unnamed = [i.get("number") for i in state["open_issues"] if _title_target(i.get("title")) == (True, None)]
+        if unnamed:
+            errors.append({"line": None, "message": f"リリース対象が 1 つ (名前が無い) のリポジトリに、リリース対象 {target} の計画を書けない。"
+                                                    f"先に種類「{ADD_TARGET}」の計画案で、既にあるリリース対象に名前を付ける "
+                                                    f"(名前の無いリリース計画 Issue・リリース Issue: "
+                                                    f"{', '.join(f'#{n}' for n in unnamed)})"})
     state["current_plans"] = {p["number"]: p for p in _need(releaseplan.fetch_plans(repo, target))}
     # 今の計画
     current = None
@@ -574,6 +622,8 @@ def _check_plans(parsed, state, errors, repo):
 
 def _labels_to_create(parsed, state):
     names = [releaseplan.CURRENT_LABEL] if parsed["kind"] == NEW_PLAN else []
+    if parsed["existing_target"]:
+        names.append(releaseplan.TARGET_LABEL_PREFIX + parsed["existing_target"])
     if parsed["target"]:
         names.append(releaseplan.TARGET_LABEL_PREFIX + parsed["target"])
     if any(d["value"] == EXCLUDED for d in parsed["dests"]):
@@ -812,10 +862,195 @@ def _write_cancel(cancel, state, parsed, plan_url, writer, made):
             mutation=True, expect_json=True), url=milestone.get("html_url"), title=milestone.get("title"))
 
 
+# --- 示す・実行する (リリース対象の追加。計画の R41) ---------------------------------------------------------------
+#
+# リリース対象が 1 つ (ラベル release-target:<名前> が無い) のリポジトリに 2 つ目のリリース対象を足すとき、既にある
+# リリース対象に名前を付ける。名前を付けるのは、開いているリリース計画 Issue とリリース Issue のすべてと、今の計画の表の
+# 閉じたリリース Issue と、それらのリリースマイルストーン (閉じたものも含む)。表に無い閉じた Issue (前の計画など) は変えない。
+
+def _title_target(title):
+    """題名がリリース計画 Issue かリリース Issue の形なら (True, リリース対象の名前か None)、そうでなければ (False, None)。"""
+    parsed = releaseplan.parse_plan_title(title) or releaseplan.parse_release_title(title)
+    return (True, parsed["target"]) if parsed else (False, None)
+
+
+def _rename_title(title, existing):
+    """リリース計画 Issue かリリース Issue の題名に、リリース対象の名前 existing を入れた題名。"""
+    plan_title = releaseplan.parse_plan_title(title)
+    if plan_title:
+        return releaseplan.plan_title(plan_title["date"], existing)
+    release = releaseplan.parse_release_title(title)
+    return releaseplan.release_title(release["number"], release["subject"], existing, draft=release["draft"])
+
+
+def _observe_add_target(parsed, repo):
+    """種類「リリース対象の追加」の計画案に関わる GitHub の今の状態を読む。gh が失敗したら _GhFailed を送出する。
+
+    返り値の items は、名前を付ける Issue {number, url, title, state, labels, kind (plan か release)} の配列 (番号の順)、
+    milestones は、名前を付けるマイルストーン (REST の milestone) の配列。
+    """
+    new, existing = parsed["target"], parsed["existing_target"]
+    errors = []
+    state = {"errors": errors, "login": _need(gh.viewer_login()), "labels": _need(issues.fetch_labels(repo))}
+    targets = _need(releaseplan.fetch_targets(repo))
+    others = [t for t in targets if t not in (existing, new)]
+    if others:
+        names = ", ".join(releaseplan.TARGET_LABEL_PREFIX + t for t in others)
+        errors.append({"line": None, "message": f"リポジトリに、ほかのリリース対象のラベル ({names}) がある。種類「{ADD_TARGET}」は、"
+                                                "リリース対象が 1 つのリポジトリに 2 つ目のリリース対象を足すときに使う。3 つ目からは、"
+                                                "足すリリース対象の計画案を種類「新しい計画」で書く"})
+    milestones = _need(releaseplan.fetch_open_milestones(repo, state="all"))
+    items = {}
+    new_label = releaseplan.TARGET_LABEL_PREFIX + new
+
+    def add(issue, labels):
+        number, title = issue["number"], issue["title"]
+        where = f"#{number} ({title!r})"
+        if releaseplan.parse_plan_title(title):
+            kind = "plan"
+        else:
+            kind = "release"
+            release = releaseplan.parse_release_title(title)
+            if release["number"] is None:
+                errors.append({"line": None, "message": f"{where} は、番号を書き足す前のリリース Issue。前のリリース計画の書き込みを、"
+                                                        "同じ計画案でやり直して終えてから足す"})
+                return
+            if release["number"] != number:
+                errors.append({"line": None, "message": f"{where} の題名の番号が、Issue の番号と違う"})
+                return
+        if new_label in labels:
+            errors.append({"line": None, "message": f"{where} に、足すリリース対象のラベル {new_label} が付いている"})
+            return
+        items[number] = {"number": number, "url": issue["url"], "title": title, "state": issue["state"], "labels": labels,
+                         "kind": kind}
+
+    current_plans, open_named = [], set()
+    for issue in _need(issues.fetch_open_issues(repo)):
+        is_named, target = _title_target(issue.get("title"))
+        if is_named:
+            open_named.add(issue.get("number"))
+        if not is_named or target == new:
+            continue  # 足すリリース対象のもの (名前を付けた後に、足すリリース対象の計画を書いた) は変えない
+        labels = [label.get("name") for label in issue.get("labels") or [] if isinstance(label, dict)]
+        if target not in (None, existing):
+            errors.append({"line": None, "message": f"#{issue.get('number')} の題名に、ほかのリリース対象の名前 {target} がある: "
+                                                    f"{issue.get('title')!r}"})
+            continue
+        add({"number": issue.get("number"), "url": issue.get("html_url"), "title": issue.get("title"), "state": "OPEN"}, labels)
+        if releaseplan.CURRENT_LABEL in labels and releaseplan.parse_plan_title(issue.get("title")):
+            current_plans.append(issue.get("number"))
+    state["current_plans"] = current_plans
+    # 今の計画
+    current = None
+    if len(current_plans) > 1:
+        errors.append({"line": None, "message": f"ラベル current の付いた計画が {len(current_plans)} つある "
+                                                f"({', '.join(f'#{n}' for n in current_plans)})。前のリリース計画の書き込みを、"
+                                                "同じ計画案でやり直して終えてから足す"})
+    elif parsed["current"] is None and current_plans:
+        errors.append({"line": None, "message": f"項目「今の計画」が「{NONE_VALUE}」なのに、ラベル current の付いた計画 "
+                                                f"#{current_plans[0]} がある"})
+    elif parsed["current"] is not None:
+        ref = parsed["current"]["ref"]
+        if current_plans != [ref["number"]]:
+            errors.append({"line": None, "message": f"今の計画 {ref['key']} が、ラベル current の付いた開いた計画ではない "
+                                                    f"(ラベル current の付いた計画: {', '.join(f'#{n}' for n in current_plans) or NONE_VALUE})"})
+        else:
+            issue = _need(bodies.fetch_issue(ref))
+            current = {**issue, "ref": ref}
+            if issue["sha256"] != parsed["current"]["sha256"]:
+                errors.append({"line": None, "message": f"今の計画 {ref['key']} の本文が、計画案を作ったときから変わった (計画案を直す)"})
+            table = releaseplan.parse_table(issue["body"])
+            if "errors" in table:
+                errors.append({"line": None, "message": f"今の計画 {ref['key']} の表: " + "・".join(table["errors"])})
+            else:
+                # 表の閉じたリリース Issue にも名前を付ける (今のリリースと次のリリースを決めるときに、表のすべての行を読むため)
+                for row in table["rows"]:
+                    if row["number"] in items or row["number"] in open_named:
+                        continue  # 開いているものは、上で確認した
+                    found = _need(_fetch_dest(repo, row["number"]))
+                    is_named, target = _title_target(found["title"])
+                    where = f"今の計画の表の #{row['number']}"
+                    if "/pull/" in found["url"] or not is_named or releaseplan.parse_plan_title(found["title"]):
+                        errors.append({"line": None, "message": f"{where} の題名が、リリース Issue の形ではない: {found['title']!r}"})
+                    elif found["state"] == "OPEN":
+                        errors.append({"line": None, "message": f"{where} が開いているのに、名前を付けられない"})
+                    elif target not in (None, existing):
+                        errors.append({"line": None, "message": f"{where} の題名に、ほかのリリース対象の名前 {target} がある: "
+                                                                f"{found['title']!r}"})
+                    else:
+                        add(found, found["labels"])
+            _, current["records"] = _comments_and_records(ref, state["login"])
+    state["current"] = current
+    # リリースマイルストーン
+    state["milestones"] = []
+    for number, item in sorted(items.items()):
+        if item["kind"] != "release":
+            continue
+        found = [m for m in milestones if _milestone_number_and_target(m) in ((number, None), (number, existing))]
+        if len(found) != 1:
+            errors.append({"line": None, "message": f"リリース Issue #{number} のリリースマイルストーンが {len(found)} つある"})
+            continue
+        state["milestones"].append(found[0])
+    state["items"] = [items[n] for n in sorted(items)]
+    return state
+
+
+def _milestone_number_and_target(milestone):
+    parsed = refs.parse_milestone_name(milestone.get("title"))
+    return None if "error" in parsed else (parsed["number"], parsed["target"])
+
+
+def _write_add_target(parsed, state, repo, writer):
+    """既にあるリリース対象に名前を付ける書き込みを順に行う (writer.dry なら一覧を作るだけ)。
+
+    手順 0 はラベルの作成、1 は今の計画への approval の記録、2 はラベルを付けることと名前を変えること、3 は今の計画への
+    plan-change の記録。
+    """
+    file_name, new, existing = parsed["file_name"], parsed["target"], parsed["existing_target"]
+    label = releaseplan.TARGET_LABEL_PREFIX + existing
+    for made in _labels_to_create(parsed, state):
+        writer.act(0, "create-label", lambda made=made: gh.run(
+            ["label", "create", made["name"], "-R", repo, "--color", made["color"], "--description", made["description"]],
+            mutation=True), label=made["name"])
+    current = state["current"]
+    current_url = current["url"] if current else None
+    if current and _approval_date(current["records"], file_name) is None:
+        line = records.format_line("approval", {"draft": file_name}, where="comment")["line"]
+        text = APPROVAL_ADD_TARGET.format(file_name=file_name, existing=existing, new=new)
+        writer.act(1, "record-approval", lambda: _comment(current_url, f"{line}\n\n{text}\n"), url=current_url)
+    renamed_issues, renamed_milestones = [], []
+    for item in state["items"]:
+        title = _rename_title(item["title"], existing)
+        renamed_issues.append(f"#{item['number']} {title}")
+        if label not in item["labels"]:
+            writer.act(2, "add-label", lambda url=item["url"]: _edit(url, "--add-label", label), url=item["url"], label=label)
+        if item["title"] != title:
+            writer.act(2, "rename-issue", lambda url=item["url"], title=title: _edit(url, "--title", title),
+                       url=item["url"], previous=item["title"], title=title)
+    for milestone in state["milestones"]:
+        name = refs.parse_milestone_name(milestone["title"])
+        title = releaseplan.milestone_title(name["number"], name["subject"], existing)
+        renamed_milestones.append(f"{title} ({milestone.get('html_url')})")
+        if milestone["title"] != title:
+            writer.act(2, "rename-milestone", lambda milestone=milestone, title=title: gh.run(
+                ["api", f"repos/{repo}/milestones/{milestone['number']}", "-X", "PATCH", "-f", f"title={title}"],
+                mutation=True, expect_json=True), url=milestone.get("html_url"), previous=milestone["title"], title=title)
+    if current and not any(r["kind"] == "plan-change" and r["values"].get("draft") == file_name
+                           for r in current["records"]["records"]):
+        line = records.format_line("plan-change", {"draft": file_name}, where="comment")["line"]
+        text = ADD_TARGET_CHANGE_TEXT.format(file_name=file_name, existing=existing, new=new) + "\n\n"
+        text += f"- ラベル {label} を付け、題名にリリース対象の名前を入れた Issue:"
+        text += "".join(f"\n  - {r}" for r in renamed_issues) if renamed_issues else f" {NONE_VALUE}"
+        text += "\n- 名前にリリース対象の名前を入れたリリースマイルストーン:"
+        text += "".join(f"\n  - {r}" for r in renamed_milestones) if renamed_milestones else f" {NONE_VALUE}"
+        writer.act(3, "record-plan-change", lambda: _comment(current_url, f"{line}\n\n{text}\n"), url=current_url)
+    return {"plan": None, "releases": []}
+
+
 def _plan_result(parsed, repo):
     return {"status": "ok", "draft": parsed["file_name"], "repo": repo, "kind": parsed["kind"], "target": parsed["target"],
-            "current": None, "plan": None, "current_plans": [], "labels_to_create": [], "actions": [],
-            "errors": list(parsed["errors"])}
+            "existing_target": parsed["existing_target"], "current": None, "plan": None, "current_plans": [],
+            "labels_to_create": [], "actions": [], "errors": list(parsed["errors"])}
 
 
 def _run(path, repo, dry):
@@ -826,21 +1061,22 @@ def _run(path, repo, dry):
     if result["errors"]:
         return {**result, "status": "unsatisfied"}
     writer = _Writer(dry=True)
+    observe, write = (_observe_add_target, _write_add_target) if parsed["kind"] == ADD_TARGET else (_observe, _write)
     try:
-        state = _observe(parsed, repo)
+        state = observe(parsed, repo)
         result["current"] = {"number": state["current"]["number"], "url": state["current"]["url"]} if state["current"] else None
-        result["plan"] = {"number": state["plan"]["number"], "url": state["plan"]["url"]} if state["plan"] else None
+        result["plan"] = {"number": state["plan"]["number"], "url": state["plan"]["url"]} if state.get("plan") else None
         result["current_plans"] = sorted(state["current_plans"])
         result["labels_to_create"] = _labels_to_create(parsed, state)
         result["errors"] += state["errors"]
         if result["errors"]:
             return {**result, "status": "unsatisfied"}
-        _write(parsed, state, repo, writer)
+        write(parsed, state, repo, writer)
         result["actions"] = writer.actions
         if dry:
             return result
         writer = _Writer(dry=False)
-        written = _write(parsed, state, repo, writer)
+        written = write(parsed, state, repo, writer)
         result["done"] = writer.done
         result["plan"] = written["plan"] if written["plan"] else result["plan"]
         result["releases"] = written["releases"]
