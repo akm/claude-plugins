@@ -6,6 +6,8 @@
   checkboxes の定数と一致する
 - 文書 `issue-practice/references/draft-plan.md` の書式の行が、モジュール draft の定数と一致する
 - 文書 `issue-practice/references/terms.md` が、計画の R1 の用語をすべて定義している
+- ファイル `issue-practice/README.md` のスキルの表と、文書 `issue-practice/references/workflow.md` の呼び出しの表が、
+  ディレクトリ `issue-practice/skills/` のスキルをすべて挙げている (計画の U5)
 - 入口 (ファイル `issue-practice/scripts/issue_practice.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの --help が、
   引数・出力・終了コードを示す (計画の KTD2・KTD10)
 """
@@ -129,6 +131,29 @@ class TermsDocTest(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, defined)
         self.assertEqual(len(defined), len(set(defined)), "同じ語を 2 回定義しないこと")
+
+
+SKILLS = os.path.join(HERE, "..", "skills")
+README = os.path.join(HERE, "..", "README.md")
+
+
+class SkillListingDocTest(unittest.TestCase):
+    """スキルを足したときに、README と全体の流れの文書に書き損ねないこと。"""
+
+    def setUp(self):
+        self.skills = sorted(name for name in os.listdir(SKILLS)
+                             if os.path.isfile(os.path.join(SKILLS, name, "SKILL.md")))
+
+    def test_readme_lists_every_skill(self):
+        with open(README, encoding="utf-8") as f:
+            rows = table_rows(f.read(), "| スキル | すること |")
+        listed = sorted(re.match(r"\[([a-z-]+)\]", cells[0]).group(1) for cells in rows)
+        self.assertEqual(listed, self.skills)
+
+    def test_workflow_lists_every_skill(self):
+        rows = table_rows(read_reference("workflow.md"), "| スキル | 呼び出すセッション | きっかけ |")
+        listed = sorted(name for cells in rows for name in re.findall(r"`([a-z-]+)`", cells[0]))
+        self.assertEqual(listed, self.skills)
 
 
 def entry_subcommands():

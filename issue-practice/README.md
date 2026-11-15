@@ -1,6 +1,21 @@
 # issue-practice
 
-GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って、Claude Code のセッションが Issue を扱うためのプラグインです。**作成中**です。何を作るかは管理 Issue [#239](https://github.com/akm/claude-plugins/issues/239) と、計画 [docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md](../docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md) にあります。
+GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って、Claude Code のセッションが Issue を扱うためのプラグインです。作った経緯と決めたことは、管理 Issue [#239](https://github.com/akm/claude-plugins/issues/239) と、計画 [docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md](../docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md) にあります。
+
+## 使い方
+
+| 文書 | 中身 |
+| --- | --- |
+| [references/workflow.md](references/workflow.md) | スキルを呼び出すセッションときっかけ・全体の流れの図・GitHub に書くもの・管理 Issue と作業 Issue の流れの図・リリースの流れの図 |
+| [references/scenarios.md](references/scenarios.md) | 架空のプロジェクトで、最初のリリース計画から 2 回目のリリースまでを、6 つのシナリオで順に示した例 |
+
+スキルは、どれも依頼の文で呼び出せます (例: 「リリースの計画を立てて」「#12 を作業 Issue に分けて計画して」)。依頼の文の例は、それぞれのスキルの SKILL.md の `description` と、[references/scenarios.md](references/scenarios.md) の「依頼の例」にあります。
+
+前提:
+
+- `gh` が認証済みで、Issue・ラベル・マイルストーンを書く権限がある
+- 計画案のファイルを書くディレクトリ `tmp/` が、`.gitignore` で git に無視されている
+- スキル `managing-issue-run` (作業セッションの起動とセッション間のメッセージ) は、Claude Code のデスクトップアプリのセッションで使う
 
 ## 使えるスキル
 
@@ -21,7 +36,7 @@ GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と
 | 場所 | 中身 |
 | --- | --- |
 | [skills/](skills/) | スキル (上の表) |
-| [references/](references/) | すべてのスキルが参照する、用語と書式の文書 (下の表) |
+| [references/](references/) | 使い方の文書 (上の節「使い方」) と、すべてのスキルが参照する、用語と書式の文書 (下の表) |
 | [scripts/issue_practice.py](scripts/issue_practice.py) | 検査のスクリプトの入口。GitHub の状態を読み、決めた形になっているかを判定する。サブコマンドの引数・出力・終了コードは `--help` で確認する |
 | [scripts/issue_practice/](scripts/issue_practice/) | 検査のスクリプトのパッケージ (`gh` の実行・識別子・記録のコメント・計画案・本文の範囲・クローズ条件のチェックボックス・リリース計画 Issue の順番の表・Issue の作成・PR マージ計画・管理 Issue の計画案の書き込み・閉じる前の検査・リリースの書き込み) |
 | [tests/](tests/) | 検査のスクリプトの自動テスト。偽の `gh` と固定データで実行する |
