@@ -17,6 +17,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに作業を継続したいときに使う) |
 | [doc-structured](doc-structured/README.md) | アプリケーションの文書を、列挙できる事実は YAML に書いて人が読む Markdown を生成し、生成物と参照を検査する構成で書く (作成中) |
 | [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う (作成中) |
+| [slide-deck](slide-deck/README.md) | 図を中心にした説明資料を、構成案から PowerPoint のファイルと Google スライドの両方に作り、内容が変わったスライドだけを直す。構成案・PowerPoint のファイル・Google スライドの 3 つのフェーズのスキルと、TypeScript と Python のツールを同梱する (Node.js 24 以上と uv が必要。Google スライドには、Claude のデスクトップアプリの Google スライドのコネクタが必要) |
 
 ## 使い方
 
@@ -236,6 +237,16 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── references/               # すべてのスキルが参照する用語と書式の文書
 │   ├── scripts/                  # 検査のスクリプト (issue_practice.py とパッケージ issue_practice/)
 │   ├── tests/                    # python3 -m unittest discover -s issue-practice/tests
+│   └── README.md
+├── slide-deck/                   # skill 型 + 同梱ツール
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/outline/           # 構成案を作る・直す
+│   ├── skills/build/             # deck.ts を書き、PowerPoint のファイルを作る
+│   ├── skills/publish/           # Google スライドに反映する
+│   ├── references/               # 3 つのスキルが参照する説明 (構成案の書式・deck.ts の書き方・Google スライドの扱い)
+│   ├── src/                      # TypeScript のツール (入口は src/cli.ts)。テストは tests/ (npm ci の後に npm test)
+│   ├── python/                   # 画像をまとめるツール。テストは python/tests/ (uv sync --frozen の後に uv run python -m unittest discover -s python/tests)
+│   ├── examples/sample/          # 見本の資料 (outline.md と deck.ts)
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json
