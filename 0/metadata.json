@@ -1,0 +1,1070 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7FNF8C8ZBDDY02SR3YKYCGG",
+  "session_id": "eb793245-dd4a-4894-8e10-1d492e46949c",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-15T13:13:45.764834Z",
+  "branch": "main",
+  "checkpoints_count": 38,
+  "save_step_count": 29,
+  "files_touched": [
+    ".github/test-targets.txt",
+    ".github/workflows/doc-structured-bin.yml",
+    ".github/workflows/test.yml",
+    "README.md",
+    "slide-deck/.claude-plugin/plugin.json",
+    "slide-deck/.gitignore",
+    "slide-deck/.python-version",
+    "slide-deck/eslint.config.mjs",
+    "slide-deck/examples/sample/deck.ts",
+    "slide-deck/examples/sample/outline.md",
+    "slide-deck/package-lock.json",
+    "slide-deck/package.json",
+    "slide-deck/pyproject.toml",
+    "slide-deck/python/slide_deck_tools/thumbs_grid.py",
+    "slide-deck/python/tests/test_smoke.py",
+    "slide-deck/python/tests/test_thumbs_grid.py",
+    "slide-deck/src/check/deck.ts",
+    "slide-deck/src/check/eslint.deck.config.mjs",
+    "slide-deck/src/cli.ts",
+    "slide-deck/src/data/parts.ts",
+    "slide-deck/src/data/theme.ts",
+    "slide-deck/src/data/types.ts",
+    "slide-deck/src/fit/east-asian-width.ts",
+    "slide-deck/src/fit/estimate.ts",
+    "slide-deck/src/index.ts",
+    "slide-deck/src/outline/match.ts",
+    "slide-deck/src/outline/parse.ts",
+    "slide-deck/src/outline/url.ts",
+    "slide-deck/src/pptx/write.ts",
+    "slide-deck/src/setup/setup.ts",
+    "slide-deck/tests/data.test.ts",
+    "slide-deck/tests/fit.test.ts",
+    "slide-deck/tests/fixtures/outline/errors.md",
+    "slide-deck/tests/fixtures/outline/no-url.md",
+    "slide-deck/tests/fixtures/outline/notes.md",
+    "slide-deck/tests/fixtures/outline/proposals.md",
+    "slide-deck/tests/fixtures/outline/with-url.md",
+    "slide-deck/tests/helpers/cache.ts",
+    "slide-deck/tests/outline.test.ts",
+    "slide-deck/tests/pptx.test.ts",
+    "slide-deck/tests/setup.test.ts",
+    "slide-deck/tests/smoke.test.ts",
+    "slide-deck/tsconfig.json",
+    "slide-deck/uv.lock"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "a839c308875c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 996,
+    "cache_creation_tokens": 3861629,
+    "cache_read_tokens": 231356173,
+    "output_tokens": 361331,
+    "api_call_count": 429
+  },
+  "redaction": {
+    "replacements": 49,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 28,
+      "key_context": 21,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-review-triage:review-rally-2026-11-12T22:41:00.231695Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "8e92f5499ed2",
+      "timestamp": "2026-11-12T22:41:00.231695Z",
+      "native": {
+        "command": "/review-triage:review-rally"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01HbaLcLjRaCK2pMs9Z2KoSL",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "anthropic-skills:pptx"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 172,
+        "end": 173,
+        "entry_ids": [
+          "b7439899-4289-466d-9064-a2c5013f59c3"
+        ],
+        "tool_use_id": "toolu_01HbaLcLjRaCK2pMs9Z2KoSL"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01HbaLcLjRaCK2pMs9Z2KoSL"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: anthropic-skills:pptx",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_018iZpCgW3Y8qWvmxJqdNdbT",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1194,
+        "end": 1195,
+        "entry_ids": [
+          "4b52da38-e424-46b1-a6e2-b42ffe2c46ea"
+        ],
+        "tool_use_id": "toolu_018iZpCgW3Y8qWvmxJqdNdbT"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_018iZpCgW3Y8qWvmxJqdNdbT"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Gno4T98N1GBFsrnjD9UdM7",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1289,
+        "end": 1290,
+        "entry_ids": [
+          "53d18ab5-3ba4-4853-ac19-16651a9d62f1"
+        ],
+        "tool_use_id": "toolu_01Gno4T98N1GBFsrnjD9UdM7"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Gno4T98N1GBFsrnjD9UdM7"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01V3TGUzYfU4jeUBtpz1XqKx",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1394,
+        "end": 1395,
+        "entry_ids": [
+          "efcb8264-1129-49f1-abab-f2fd957e6075"
+        ],
+        "tool_use_id": "toolu_01V3TGUzYfU4jeUBtpz1XqKx"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01V3TGUzYfU4jeUBtpz1XqKx"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_0148wNHewsK5usM66TecT25n",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1501,
+        "end": 1502,
+        "entry_ids": [
+          "929825a9-273f-4769-96c7-49339061f5e3"
+        ],
+        "tool_use_id": "toolu_0148wNHewsK5usM66TecT25n"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_0148wNHewsK5usM66TecT25n"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Jw3fzXJNLKFJdjoG4iWBkW",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1597,
+        "end": 1598,
+        "entry_ids": [
+          "b8f369b0-a58f-47ae-b002-777fe936a995"
+        ],
+        "tool_use_id": "toolu_01Jw3fzXJNLKFJdjoG4iWBkW"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Jw3fzXJNLKFJdjoG4iWBkW"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01ENjjUVgoVJJFmGjMQHEs5B",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1617,
+        "end": 1618,
+        "entry_ids": [
+          "1678bed0-bfad-4103-88e0-4afe3d1de527"
+        ],
+        "tool_use_id": "toolu_01ENjjUVgoVJJFmGjMQHEs5B"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01ENjjUVgoVJJFmGjMQHEs5B"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Arc67DZFZmPWJJbeMnyxHG",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1702,
+        "end": 1703,
+        "entry_ids": [
+          "16bb177c-cc0f-4f5e-9154-1ed04ed70b6a"
+        ],
+        "tool_use_id": "toolu_01Arc67DZFZmPWJJbeMnyxHG"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Arc67DZFZmPWJJbeMnyxHG"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_013vjQSSbvSAxTATaBSyncof",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1756,
+        "end": 1757,
+        "entry_ids": [
+          "4d92fbcc-ea79-4664-958e-df891a974022"
+        ],
+        "tool_use_id": "toolu_013vjQSSbvSAxTATaBSyncof"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_013vjQSSbvSAxTATaBSyncof"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01VUHXRXP286kRdUKaKHVgw2",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1863,
+        "end": 1864,
+        "entry_ids": [
+          "ed46a68a-7fef-49a8-ad4d-c9636d3db843"
+        ],
+        "tool_use_id": "toolu_01VUHXRXP286kRdUKaKHVgw2"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01VUHXRXP286kRdUKaKHVgw2"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01EBrWzt1Rs4hXVyC2bPsj76",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1906,
+        "end": 1907,
+        "entry_ids": [
+          "9ddbf323-9500-4ac2-b321-5b5711538c7e"
+        ],
+        "tool_use_id": "toolu_01EBrWzt1Rs4hXVyC2bPsj76"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01EBrWzt1Rs4hXVyC2bPsj76"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01WPXL6ChsSVUX5dFrZy7wPE",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1995,
+        "end": 1996,
+        "entry_ids": [
+          "6c84c0ee-b49c-43ed-b0c9-8c394a3bfb90"
+        ],
+        "tool_use_id": "toolu_01WPXL6ChsSVUX5dFrZy7wPE"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01WPXL6ChsSVUX5dFrZy7wPE"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01SiLPdRPLEXhtyscRGUSam3",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2030,
+        "end": 2031,
+        "entry_ids": [
+          "0f405790-b5ec-4aad-9adb-36fb43d50d0c"
+        ],
+        "tool_use_id": "toolu_01SiLPdRPLEXhtyscRGUSam3"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01SiLPdRPLEXhtyscRGUSam3"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01L2ksip539R7taUV6nvZHjq",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "doc-dag:doc-dag"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2131,
+        "end": 2132,
+        "entry_ids": [
+          "4f4f9211-8f5d-4369-825d-20b25ebc6fe4"
+        ],
+        "tool_use_id": "toolu_01L2ksip539R7taUV6nvZHjq"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01L2ksip539R7taUV6nvZHjq"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: doc-dag:doc-dag",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01LbBNTHr42gfaaMtqAgvRrE",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mermaid-preview:mermaid-preview"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2150,
+        "end": 2151,
+        "entry_ids": [
+          "4cf8d063-3cd5-4108-9672-686dda88e3db"
+        ],
+        "tool_use_id": "toolu_01LbBNTHr42gfaaMtqAgvRrE"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01LbBNTHr42gfaaMtqAgvRrE"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mermaid-preview:mermaid-preview",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Xn9qe5hK4ywRcp7JtKCVwT",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2189,
+        "end": 2190,
+        "entry_ids": [
+          "bf066ec6-eb91-4037-8fd4-34e645bd98f0"
+        ],
+        "tool_use_id": "toolu_01Xn9qe5hK4ywRcp7JtKCVwT"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Xn9qe5hK4ywRcp7JtKCVwT"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_015XfkRHWeV4iacXTGdJ41RU",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2270,
+        "end": 2271,
+        "entry_ids": [
+          "90101ed2-3ed7-4cbe-a2f9-fd6f98700479"
+        ],
+        "tool_use_id": "toolu_015XfkRHWeV4iacXTGdJ41RU"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_015XfkRHWeV4iacXTGdJ41RU"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Wmc8WuqcYYEgVEuckkr6U2",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2290,
+        "end": 2291,
+        "entry_ids": [
+          "dfca3a9f-bfd4-4056-ad8a-ef36f8a04265"
+        ],
+        "tool_use_id": "toolu_01Wmc8WuqcYYEgVEuckkr6U2"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Wmc8WuqcYYEgVEuckkr6U2"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Rohdf8CU7GbfU3Yr9HZpVZ",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2433,
+        "end": 2434,
+        "entry_ids": [
+          "5d1138d8-1d61-46b9-bf37-ed2b540533fd"
+        ],
+        "tool_use_id": "toolu_01Rohdf8CU7GbfU3Yr9HZpVZ"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Rohdf8CU7GbfU3Yr9HZpVZ"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_016dYiLo95kiLFBohccuLnC5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2499,
+        "end": 2500,
+        "entry_ids": [
+          "9b39b6a6-90dd-401c-9b99-67c229118496"
+        ],
+        "tool_use_id": "toolu_016dYiLo95kiLFBohccuLnC5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_016dYiLo95kiLFBohccuLnC5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01ELsa5TFL23sgUYZMvq8nUb",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2534,
+        "end": 2535,
+        "entry_ids": [
+          "637d7ea1-4386-4575-9fdc-933d6fd5ce75"
+        ],
+        "tool_use_id": "toolu_01ELsa5TFL23sgUYZMvq8nUb"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01ELsa5TFL23sgUYZMvq8nUb"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01XkmvgRove5LJwAwCEr26GM",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2586,
+        "end": 2587,
+        "entry_ids": [
+          "b6fda888-131d-45c8-93ca-ef67996ab6ec"
+        ],
+        "tool_use_id": "toolu_01XkmvgRove5LJwAwCEr26GM"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01XkmvgRove5LJwAwCEr26GM"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_017jA9Tpm5vW14VpGHs6aqj9",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2673,
+        "end": 2674,
+        "entry_ids": [
+          "a15d49c7-1bdb-46f4-b0cf-9b07dc2c468a"
+        ],
+        "tool_use_id": "toolu_017jA9Tpm5vW14VpGHs6aqj9"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_017jA9Tpm5vW14VpGHs6aqj9"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01H9mXGZAqQR8NPcASStCbBG",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2746,
+        "end": 2747,
+        "entry_ids": [
+          "d5d3a4b1-03d1-43cb-8279-5e3a585a4d2d"
+        ],
+        "tool_use_id": "toolu_01H9mXGZAqQR8NPcASStCbBG"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01H9mXGZAqQR8NPcASStCbBG"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_011sTMp383xt9py87bfDdkjo",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2851,
+        "end": 2852,
+        "entry_ids": [
+          "ff5ae3a3-1fb5-428f-a8f4-e7c7e9df2afe"
+        ],
+        "tool_use_id": "toolu_011sTMp383xt9py87bfDdkjo"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_011sTMp383xt9py87bfDdkjo"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_014WQdMCBFyDR4JXyqGzhLxC",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2898,
+        "end": 2899,
+        "entry_ids": [
+          "eb6cfc5e-e104-4f34-a2a1-b29243b0481e"
+        ],
+        "tool_use_id": "toolu_014WQdMCBFyDR4JXyqGzhLxC"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_014WQdMCBFyDR4JXyqGzhLxC"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_011eBhgaASQYV85gN1LGvpdN",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2971,
+        "end": 2972,
+        "entry_ids": [
+          "b4cb19a8-1ca8-4ec8-8b44-1712840feb4a"
+        ],
+        "tool_use_id": "toolu_011eBhgaASQYV85gN1LGvpdN"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_011eBhgaASQYV85gN1LGvpdN"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01YRvdBH96N7eAkzMTPMPWAs",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2995,
+        "end": 2996,
+        "entry_ids": [
+          "e1bbcaee-75e5-407d-a636-5af42e1ee363"
+        ],
+        "tool_use_id": "toolu_01YRvdBH96N7eAkzMTPMPWAs"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01YRvdBH96N7eAkzMTPMPWAs"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01GpAbuAeaFf5WztZWcc1ahr",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 3100,
+        "end": 3101,
+        "entry_ids": [
+          "4240059e-fab8-42c8-8518-833fba15ff48"
+        ],
+        "tool_use_id": "toolu_01GpAbuAeaFf5WztZWcc1ahr"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GpAbuAeaFf5WztZWcc1ahr"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01FBiorckpWJFS5guipijnjg",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 3163,
+        "end": 3164,
+        "entry_ids": [
+          "b4486f10-d2ca-4d69-9f4b-b74f1f121c78"
+        ],
+        "tool_use_id": "toolu_01FBiorckpWJFS5guipijnjg"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01FBiorckpWJFS5guipijnjg"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01H5Yx5nSjPCsDueixoZyWxH",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "issue-practice:new-issue"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a839c308875c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 3234,
+        "end": 3235,
+        "entry_ids": [
+          "7ee55240-c9b4-40ce-a3cf-e8f2b2a0ee68"
+        ],
+        "tool_use_id": "toolu_01H5Yx5nSjPCsDueixoZyWxH"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01H5Yx5nSjPCsDueixoZyWxH"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: issue-practice:new-issue",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 38
+  }
+}
