@@ -264,7 +264,7 @@ gh-notification-dispatch/
 
 **Goal:** プラグインを配れる形にし、受信のセッションが登録を申し込み、どちらのセッションでも一覧して番号で削除できるようにする。
 
-**Requirements:** R1〜R7, R19。KD1, KD4, KD5, KD9, KD10。KTD1〜KTD3, KTD8, KTD11。
+**Requirements:** R1〜R7, R16, R19。KD1, KD4, KD5, KD9, KD10。KTD1〜KTD3, KTD8, KTD11。
 
 **Dependencies:** U1。
 
@@ -279,8 +279,8 @@ gh-notification-dispatch/
 **Approach:**
 1. 用意する: `references/messages.md` に、`subscribe`・`unsubscribe`・`subscribed`・`unsubscribed`・`removed` の様式を書く。`references/records.md` に、`state.json` (配信のセッションの部分)・`subscriptions.json`・ディレクトリ `snapshots/` のファイルと、受信のセッションの一時ディレクトリの `snapshot.json` (中身は `snapshots/` のファイルと同じ様式) の様式を書く。`gh.py` と `fake-gh` は issue-practice からコピーして名前を変える。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/store.py` (ロックと書き込み)・ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/messages.py` (様式の生成と解析)・ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/subscriptions.py` (追加・一覧・番号の対応の記録・削除・番号から登録の ID を引く)。サブコマンドは `subscriptions add --message-file`・`subscriptions list --viewer <セッションの ID> [--mine]`・`subscriptions remove --viewer <セッションの ID> <番号>...`・`dispatcher set --session-id <ID> --name <名前> --permission-mode <モード>` (state.json の配信のセッションの部分を書く)・`subscriptions resolve --viewer <セッションの ID> <番号>...` (受信のセッションが削除を申し込む前に、番号を登録の ID に変える)・`subscriptions unsubscribe --message-file`。
-4. スキル `subscribe` に、登録 (`<配信のセッションの名前> [--repo owner/repo] [--kind review_requested,merged]`)・一覧 (`--list`)・削除 (`--remove <番号>...`) の手順を書く。スキル `dispatch` に、登録と削除のメッセージを受けたときの手順と、一覧 (`list`)・削除 (`remove <番号>...`) と、`start` の最初の手順 (自分のセッションの ID・名前・権限モードを `dispatcher set` で記録する) を書く。`start` の残りの手順 (定期の予定を作る) は U5 で足す。
+3. 実装する: ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/store.py` (ロックと書き込み)・ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/messages.py` (様式の生成と解析)・ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/subscriptions.py` (追加・一覧・番号の対応の記録・削除・番号から登録の ID を引く)。サブコマンドは `subscriptions add --message-file`・`subscriptions list --viewer <セッションの ID> [--mine]`・`subscriptions remove --viewer <セッションの ID> <番号>...`・`dispatcher set --session-id <ID> --name <名前> --permission-mode <モード> [--switch]` (state.json の配信のセッションの部分を書く。記録と違う配信のセッションの ID を受けたら、書き換えずに終了コード 3 で返し、引数 `--switch` を付けたときだけ書き換える。R16)・`subscriptions resolve --viewer <セッションの ID> <番号>...` (受信のセッションが削除を申し込む前に、番号を登録の ID に変える)・`subscriptions unsubscribe --message-file`。
+4. スキル `subscribe` に、登録 (`<配信のセッションの名前> [--repo owner/repo] [--kind review_requested,merged]`)・一覧 (`--list`)・削除 (`--remove <番号>...`) の手順を書く。スキル `dispatch` に、登録と削除のメッセージを受けたときの手順と、一覧 (`list`)・削除 (`remove <番号>...`) と、`start` の最初の手順 (自分のセッションの ID・名前・権限モードを `dispatcher set` で記録する。終了コード 3 のときは、切り替えるかを利用者に確かめ、切り替えるなら、記録の配信のセッションで `stop` を実行するよう案内してから `--switch` を付けて実行し直す) を書く。`start` の残りの手順 (定期の予定を作る) は U5 で足す。
 5. README に作成中であることを書き、マーケットプレイスとルートの README と `test-targets.txt` に登録する。
 
 **Patterns to follow:** `issue-practice/scripts/issue_practice/gh.py`・`issue-practice/tests/fake-gh`・`issue-practice/tests/fakegh_case.py`・`issue-practice/tests/test_docs.py`・`review-triage/skills/review-rally/SKILL.md` (セッション間のメッセージの送り方)。
@@ -291,6 +291,7 @@ gh-notification-dispatch/
 - 読めないリポジトリ (偽の `gh` が 404 を返す) は登録せず、理由を返す。`gh` の認証切れは終了コード 4。
 - 権限モードが記録の配信のセッションと違う登録は、登録したうえで、返事に承認待ちになることを書く。
 - `dispatcher set` で配信のセッションを記録していないときの登録は、記録せずに終了コード 3 で理由を返す。
+- `dispatcher set` は、記録の配信のセッションと違う ID を受けると、記録を変えずに終了コード 3 で、記録の配信のセッションの名前と ID を返す。引数 `--switch` を付けると書き換える。記録と同じ ID なら、名前と権限モードを書き換える。
 - 一覧は登録日時の順に 1 から番号を振る。引数 `--mine` を付けた一覧では、そのセッションの登録だけに番号を振る。一覧を表示するたびに、番号と登録の ID の対応を記録する。配信のセッションでは記録のディレクトリの `snapshots/` に、受信のセッションでは記録のディレクトリの外の一時ディレクトリに書き、受信のセッションの一覧は記録のディレクトリのファイルを変えない (R6・R19)。
 - 番号で削除すると、記録した対応の登録が消える。一覧の後に別の登録が増えても、指定した番号の登録だけが消える。対応する登録が既に無い番号・一覧を表示していないセッションの番号・範囲の外の番号は、何も消さずに理由を返す。
 - 受信のセッションが実行するサブコマンド `subscriptions resolve` は、一時ディレクトリに記録した自分の一覧の番号を登録の ID に変え、記録のディレクトリのファイルを変えない。`unsubscribe` のメッセージにある ID が、送ったセッションの登録でないときは消さない。
@@ -393,8 +394,8 @@ gh-notification-dispatch/
 **Approach:**
 1. 用意する: `state.json` の定期の予定の部分の様式。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: サブコマンド `schedule record --job-id <ID> --cron <式>`・`schedule clear`・`status`。`tick` の出力に期限の確認を足す。`hook session-start`。
-4. スキル `dispatch` に、`start` (U2 の `dispatcher set` による配信のセッションの記録の後に、前提の確認・`CronCreate`・`schedule record`)・`resume` (`CronList` で予定が無いことを確かめてから作り直す)・`renew` (`CronDelete` と `CronCreate`)・`stop`・`status` の手順を書く。開始のときに、スクリプトの実行と `SendMessage` で権限の確認が出ないかを確かめる手順を入れる。期限の確認のデスクトップの通知は、ツール `PushNotification` で送る。
+3. 実装する: サブコマンド `schedule record --job-id <ID> --cron <式>`・`schedule clear`・`status`。`tick` の出力に期限の確認を足す。`tick` の始めに、実行しているセッションの ID (環境変数 `CLAUDE_CODE_HOST_SESSION_ID`) と記録の配信のセッションの ID を比べ、違えば取得も出力もせずに終了コード 3 で、そのセッションの定期の予定を消す (ツール `CronDelete`) よう示す確認を足す (R16。切り替えた後に前の配信のセッションに残った予定が配信しないため)。`hook session-start`。
+4. スキル `dispatch` に、`start` (U2 の `dispatcher set` による配信のセッションの記録と切り替えの確認の後に、前提の確認・`CronCreate`・`schedule record`)・`resume` (`CronList` で予定が無いことを確かめてから作り直す)・`renew` (`CronDelete` と `CronCreate`)・`stop`・`status` の手順を書く。開始のときに、スクリプトの実行と `SendMessage` で権限の確認が出ないかを確かめる手順を入れる。期限の確認のデスクトップの通知は、ツール `PushNotification` で送る。
 
 **Patterns to follow:** `commit-rules-guard/hooks/` (hook の置き方)。
 
@@ -402,7 +403,8 @@ gh-notification-dispatch/
 - 予定を作ってから 6 日と 1 時間後の `tick` は、24 時間の確認を 1 回だけ出す。次の回では出さない。6 時間・1 時間も同じ。
 - `renew` の後は、出した確認の記録を消し、期限を 7 日後にする。
 - 期限より前に最後の `tick` が実行され、その後に `tick` が無いまま期限を過ぎたとき、`status` は期限切れと再開の手順を出力する。期限を過ぎた `tick` は、取得と配信を通常どおり行ったうえで、同じく出力する。
-- 記録の配信のセッションと違うセッションで `start` すると、終了コード 3 で、切り替えるかの確認を求める。
+- 記録の配信のセッションと違うセッションで `start` すると、`dispatcher set` が記録を書き換える前に終了コード 3 で返し、切り替えるかの確認を求める。
+- 記録の配信のセッションと違うセッションで `tick` を実行すると、取得も出力もせずに終了コード 3 で、そのセッションの定期の予定を消すよう示す。
 - hook は、起動したセッションの ID が配信のセッションの ID と同じで、状態が「動いている」ときだけ、`additionalContext` を出力する。期限を過ぎていれば、期限切れであることも出力する。`compact` と `clear` では何も出力しない。記録のディレクトリが無いときも何も出力しない。
 - 止めていた間の通知は、`resume` の後の最初の `tick` で、止める前の取得の位置から取得する。
 
