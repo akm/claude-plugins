@@ -20,7 +20,7 @@ description: 構成案 (outline.md) と資料ごとのスクリプト deck.ts �
 例は、プラグインに同梱した見本の資料 (ディレクトリ [examples/sample/](../../examples/sample/)。題材は「キャッシュのしくみ」) を、資料のディレクトリ `tmp/slides/cache` で、新しい Google スライドの資料に作る場合で示す。
 
 1. **前提を確認する**:
-   - スキル `slide-deck:build` の手順 1 と同じく `setup status` を実行し、ライブラリが入っていなければ、承認を得てから入れる。
+   - スキル `slide-deck:build` の手順 1 と同じく、Node.js 24 以上があることを確認してから `setup status` を実行し、ライブラリが入っていなければ、承認を得てから入れる。
    - 資料のディレクトリは、この会話で使ったものを使い、無ければ利用者に質問する。
    - スキル `anthropic-skills:google-workspace` を読み込み、その書き込みの規則 (読み込んでから書く・`revisionId` を付けて送る・書いた後に読み込んで確認する・利用者が頼んでいないファイルをゴミ箱に移さない) に従う。そのスキルの、資料のデザインの規則と補助のスクリプトは使わない (デザインは `deck.ts` が決める)。スキルが無ければ、何が無いかを伝えて中断する。
 2. **コネクタを確認する**: ファイル [references/google-slides.md](../../references/google-slides.md) の節「使うツール」のとおりに、Google スライドと Google ドライブのコネクタのツールがあるかを確認する。Google スライドのコネクタが無ければ中断し、有効にするよう利用者に求める。Google スライドの代わりに PowerPoint のファイル `build/deck.pptx` を使うかは、利用者が選ぶ。利用者が選んだときだけ、スキル `slide-deck:build` で作ったファイルを渡す。
