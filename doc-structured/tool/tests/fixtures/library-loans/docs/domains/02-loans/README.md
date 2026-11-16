@@ -12,9 +12,11 @@
 | [`models.md`][d-loans-models] | モデル・属性・値の定義 |
 | [`unclassified_app_terms.md`][d-loans-unclassified_app_terms] | 未分類のアプリケーション用語の定義 |
 | [`functions.md`][d-loans-functions] | 操作・前提・イベントの定義 |
+| [`dependencies.md`][d-loans-dependencies] | ほかのドメインへの依存の元になった参照 |
 | [`terms.md`][d-loans-terms] | このドメインの用語の索引 |
 
 [d-loans-concept]: concept.md#d-loans-concept "ドメイン `loans` のファイル `concept.md`"
+[d-loans-dependencies]: dependencies.md#d-loans-dependencies "ドメイン `loans` のファイル `dependencies.md`"
 [d-loans-design]: design.md#d-loans-design "ドメイン `loans` のファイル `design.md`"
 [d-loans-functions]: functions.md#d-loans-functions "ドメイン `loans` のファイル `functions.md`"
 [d-loans-models]: models.md#d-loans-models "ドメイン `loans` のファイル `models.md`"
