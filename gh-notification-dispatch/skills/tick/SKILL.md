@@ -13,7 +13,7 @@ description: 配信のセッションで GitHub の通知を 1 回取得し、�
    2. `messages` が 1 通以上なら、すべてを記録した後に `gh_notification_dispatch.py settle` を実行する。
    3. 出力の `summary` を 1 行で返す。`expired`・`became_unreachable` か、`settle` の出力の `settled.became_unreachable` があれば、その登録 (リポジトリ・種類・届け先のセッション) も示す。
    4. 節「定期の予定の確認」を行う。
-3. 終了コードが 3 なら、出力の `errors` を利用者に示す。`not_dispatcher` が true なら、このセッションは記録の配信のセッションでない (配信のセッションを切り替えた後に残った予定など)。ツール `CronList` で、プロンプトが `/gh-notification-dispatch:tick` の予定を探し、ツール `CronDelete` ですべて消して、消した予定を示す (ツールが読み込まれていなければ、ツール `ToolSearch` で `select:CronList,CronDelete` を読み込む)。それ以外なら、どうするかを質問する。
+3. 終了コードが 3 なら、出力の `errors` を利用者に示す。`not_dispatcher` が true なら、このセッションは記録と違うセッションである (配信のセッションを切り替えた後に残った予定など)。ツール `CronList` で、プロンプトが `/gh-notification-dispatch:tick` の予定を探し、ツール `CronDelete` ですべて消して、消した予定を示す (ツールが読み込まれていなければ、ツール `ToolSearch` で `select:CronList,CronDelete` を読み込む)。それ以外なら、どうするかを質問する。
 4. 終了コードが 4 なら、節「定期の予定の確認」を行い、出力の `failed_call` と `gh_error` を利用者に示す。`became_unreachable` があれば、その登録 (リポジトリ・種類・届け先のセッション) も示す (始めの集計は、`gh` が失敗する前に記録に書いてあり、次の回の出力には出ない)。取得の位置は変わっていないので、直れば次の回に同じ範囲を取得する。`failed_call` にリポジトリがあり、`gh_error.failure` が `not_found` なら、そのリポジトリの登録を、種類を問わずすべて削除するか、`gh` の認証を直すよう伝える。
 5. 終了コードが 1 か 2 なら、出力をそのまま利用者に示して中断する。
 

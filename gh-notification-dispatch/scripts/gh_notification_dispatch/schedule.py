@@ -44,7 +44,7 @@ def record(job_id, cron):
     """作り直した定期の予定を記録する。期限を 7 日後にし、出した確認の記録を消す (R17)。"""
     errors = [e for e in (check_job_id(job_id), check_cron(cron)) if e]
     if errors:
-        return {"status": "unsatisfied", "schedule": None, "previous": None, "errors": errors}
+        return {"status": "unsatisfied", "schedule": None, "previous": None, "not_dispatcher": False, "errors": errors}
     now = store.now()
     schedule = {"state": RUNNING, "job_id": job_id, "cron": cron, "created_at": store.format_time(now),
                 "expires_at": store.format_time(now + LIFETIME), "reminders": [], "stopped_at": None}
@@ -68,8 +68,9 @@ def _write(schedule, action):
             tx.append_log({"time": store.format_time(store.now()), "action": action, "job_id": schedule["job_id"],
                            "expires_at": schedule["expires_at"]})
     except store.NotDispatcher as e:
-        return {"status": "unsatisfied", "schedule": None, "previous": None, "errors": [str(e)]}
-    return {"status": "ok", "schedule": schedule, "previous": previous, "errors": []}
+        return {"status": "unsatisfied", "schedule": None, "previous": None, "not_dispatcher": e.other_session,
+                "errors": [str(e)]}
+    return {"status": "ok", "schedule": schedule, "previous": previous, "not_dispatcher": False, "errors": []}
 
 
 # --- 期限 ---------------------------------------------------------------------------------------------------------

@@ -58,6 +58,7 @@ class RecordTest(ScheduleCase):
                     "expires_at": "2026-11-23T06:00:00Z", "reminders": [], "stopped_at": None}
         self.assertEqual(out["schedule"], expected)
         self.assertIsNone(out["previous"])
+        self.assertFalse(out["not_dispatcher"])
         self.assertEqual(self.schedule(), expected)
 
     def test_renew_clears_reminders_and_moves_expiry(self):
@@ -90,14 +91,25 @@ class RecordTest(ScheduleCase):
                 code, out, _ = self.cli("schedule", *args)
                 self.assertEqual(code, 3, out)
                 self.assertIsNone(out["schedule"])
+                self.assertTrue(out["not_dispatcher"], "記録と違うセッションなので、スキルは作った予定を消す")
                 self.assertTrue(out["errors"])
         self.assertEqual(self.home_files(), before)
 
-    def test_without_session_id_changes_nothing(self):
-        self.as_session(None)
-        before = self.home_files()
-        self.assertEqual(self.record()[0], 3)
-        self.assertEqual(self.home_files(), before)
+    def test_unconfirmed_session_changes_nothing_and_is_not_flagged(self):
+        """環境変数が無い・配信のセッションが記録されていないときは、記録と違うセッションとは示さない (スキルは予定を消さずに質問する)。"""
+        for label, session, state in (("環境変数が無い", None, None),
+                                      ("配信のセッションが記録されていない", DISPATCHER, {"version": 1})):
+            with self.subTest(label):
+                self.as_session(session)
+                if state is not None:
+                    self.write_home("state.json", state)
+                before = self.home_files()
+                for args in (("record", "--job-id", "ffff0000", "--cron", CRON), ("clear",)):
+                    code, out, _ = self.cli("schedule", *args)
+                    self.assertEqual(code, 3, out)
+                    self.assertFalse(out["not_dispatcher"])
+                    self.assertTrue(out["errors"])
+                self.assertEqual(self.home_files(), before)
 
     def test_invalid_values_are_refused(self):
         before = self.home_files()
@@ -106,6 +118,7 @@ class RecordTest(ScheduleCase):
             with self.subTest(job_id=job_id, cron=cron):
                 code, out = self.record(job_id=job_id, cron=cron)
                 self.assertEqual(code, 3, out)
+                self.assertFalse(out["not_dispatcher"], "形の誤りは、記録と違うセッションではない")
                 self.assertTrue(out["errors"])
         self.assertEqual(self.home_files(), before)
 
@@ -295,6 +308,24 @@ class NotDispatcherTickTest(TickScheduleCase):
         self.assertTrue(out["errors"])
         self.assertEqual(len(self.recorded()), calls, "gh を実行しない")
         self.assertEqual(self.home_files(), before)
+
+    def test_unconfirmed_session_is_not_flagged(self):
+        """環境変数が無い・配信のセッションが記録されていないときは、取得も出力もしないが、予定を消すよう示さない (KTD11 の質問)。"""
+        state = self.read_home("state.json")
+        for label, session, written in (("環境変数が無い", None, state),
+                                        ("配信のセッションが記録されていない", DISPATCHER,
+                                         {k: v for k, v in state.items() if k != "dispatcher"})):
+            with self.subTest(label):
+                self.as_session(session)
+                self.write_home("state.json", written)
+                calls = len(self.recorded())
+                before = self.home_files()
+                code, out = self.tick("2026-11-16T06:10:00Z")
+                self.assertEqual(code, 3, out)
+                self.assertFalse(out["not_dispatcher"])
+                self.assertTrue(out["errors"])
+                self.assertEqual(len(self.recorded()), calls, "gh を実行しない")
+                self.assertEqual(self.home_files(), before)
 
     def test_dispatcher_tick_is_not_flagged(self):
         code, out = self.tick("2026-11-16T06:10:00Z")

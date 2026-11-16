@@ -2,9 +2,10 @@
 の R8・R10〜R17・KTD4〜KTD6・KTD9)。
 
 1 回の取得は、次の順に行う。すべて、記録のディレクトリのロックを取った間に行う。実行しているセッションが記録の配信の
-セッションでなければ、ロックを取る前に (記録のディレクトリの共通の確認で) 中断し、取得も出力もしない。出力の
-`not_dispatcher` で、そのセッションの定期の予定を消すよう示す (R16。切り替えた後に、前の配信のセッションに残った予定が
-配信しないため)。
+セッションでなければ、ロックを取る前に (記録のディレクトリの共通の確認で) 中断し、取得も出力もしない。記録と違う
+セッションだと分かったときだけ、出力の `not_dispatcher` で、そのセッションの定期の予定を消すよう示す (R16。切り替えた
+後に、前の配信のセッションに残った予定が配信しないため)。環境変数が無く確認できないときと、配信のセッションが記録されて
+いないときは示さない (KTD11 のとおり、出力の `errors` で利用者に判断を求める)。
 
 0. 定期の予定の期限までの残りが、まだ確認を出していない閾値を切っていれば、確認を出力し、出したことを記録する。
    後の手順で gh が失敗しても、この記録は残す。期限を過ぎていれば、期限切れと再開の手順を出力する。どちらの回も、
@@ -158,7 +159,7 @@ def tick():
                            "found": payload["found"], "messages": len(payload["messages"]), "waiting": payload["waiting"],
                            "expired": sum(e["count"] for e in payload["expired"])})
     except store.NotDispatcher as e:
-        return {"status": "unsatisfied", **payload, "not_dispatcher": True, "errors": [str(e)]}
+        return {"status": "unsatisfied", **payload, "not_dispatcher": e.other_session, "errors": [str(e)]}
     return {"status": "ok", **payload}
 
 

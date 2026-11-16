@@ -47,11 +47,15 @@ class NotDispatcher(Exception):
     """実行しているセッションが記録の配信のセッションでないので、記録のディレクトリに書けない。
 
     属性 dispatcher は、記録の配信のセッション (state.json の dispatcher。記録が無ければ None)。
+    属性 other_session は、記録と違うセッションだと分かったか (配信のセッションが記録されていて、環境変数の ID がそれと
+    違う)。環境変数が無く確認できないときと、配信のセッションが記録されていないときは偽。偽のときに、そのセッションの
+    定期の予定を消すよう示さないため (計画の U5 が予定を消すとしたのは、記録と違うセッションのときだけ)。
     """
 
-    def __init__(self, message, dispatcher=None):
+    def __init__(self, message, dispatcher=None, other_session=False):
         super().__init__(message)
         self.dispatcher = dispatcher
+        self.other_session = other_session
 
 
 def home():
@@ -112,7 +116,7 @@ def check_dispatcher(state):
         raise NotDispatcher("配信のセッションが記録されていない (配信のセッションで、スキル dispatch の start を先に行う)")
     if recorded.get("session_id") != current:
         raise NotDispatcher(f"このセッション ({current}) は、記録の配信のセッション ({recorded.get('name')}、"
-                            f"{recorded.get('session_id')}) ではない", recorded)
+                            f"{recorded.get('session_id')}) ではない", recorded, other_session=True)
 
 
 def _write_atomic(path, data):

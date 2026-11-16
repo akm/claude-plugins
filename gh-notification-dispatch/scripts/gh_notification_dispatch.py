@@ -313,11 +313,12 @@ def build_parser():
              "  failed_call         gh が失敗した呼び出し {api, repo, number}。失敗しなければ null\n"
              "  schedule_notice     定期の予定の期限の確認か期限切れ {kind (reminder・expired), hours (24・6・1。expired は null),\n"
              "                      text}。どちらも無ければ null。確認は、閾値ごとに 1 回だけ出す (gh が失敗した回も)\n"
-             "  not_dispatcher      このセッションが記録の配信のセッションでないか。true なら、このセッションの定期の予定を消す\n"
+             "  not_dispatcher      このセッションが記録と違うセッションだと分かったか。true なら、このセッションの定期の予定を消す。\n"
+             "                      環境変数が無いときと、配信のセッションが記録されていないときは false\n"
              "  summary             利用者に示す 1 行の要約\n"
              "  errors              取得しなかった理由の配列\n"
              "  gh_error            gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
-             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER + "。取得も出力もしない (not_dispatcher が true)",
+             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER + "。取得も出力もしない",
                         "gh が失敗した (認証切れ・読めないリポジトリ・rate limit など)。failed_call の呼び出しを示す"))
 
     p = _add(groups, "ack", cmd_ack,
@@ -357,19 +358,23 @@ def build_parser():
     p = _add(g, "record", cmd_schedule_record,
              "配信のセッションが、ツール CronCreate で作り直した定期の予定 (プロンプト " + schedule.TICK_PROMPT + ") を、\n"
              "記録のディレクトリの state.json に記録する。期限を今の時刻の 7 日後にし、出した確認の記録を消す。gh は実行しない",
-             "  schedule  記録した定期の予定 {state (running), job_id, cron, created_at, expires_at, reminders, stopped_at}。\n"
-             "            記録しなかったときは null\n"
-             "  previous  記録する前の定期の予定。無ければ null\n"
-             "  errors    記録しなかった理由の配列",
+             "  schedule        記録した定期の予定 {state (running), job_id, cron, created_at, expires_at, reminders,\n"
+             "                  stopped_at}。記録しなかったときは null\n"
+             "  previous        記録する前の定期の予定。無ければ null\n"
+             "  not_dispatcher  このセッションが記録と違うセッションだと分かったか (形の誤り・環境変数が無い・\n"
+             "                  配信のセッションが記録されていないときは false)\n"
+             "  errors          記録しなかった理由の配列",
              _exit_help("記録した", "ジョブの ID か cron の式の形が違う・" + _NOT_DISPATCHER))
     p.add_argument("--job-id", required=True, help="ツール CronCreate が返したジョブの ID")
     p.add_argument("--cron", required=True, help="ツール CronCreate に渡した cron の式 (5 つの欄)")
 
     p = _add(g, "clear", cmd_schedule_clear,
              "配信のセッションが、定期の予定を停止したこと (ツール CronDelete で消したこと) を、state.json に記録する。gh は実行しない",
-             "  schedule  記録した定期の予定 {state (stopped), stopped_at, ...}。記録しなかったときは null\n"
-             "  previous  記録する前の定期の予定。無ければ null\n"
-             "  errors    記録しなかった理由の配列",
+             "  schedule        記録した定期の予定 {state (stopped), stopped_at, ...}。記録しなかったときは null\n"
+             "  previous        記録する前の定期の予定。無ければ null\n"
+             "  not_dispatcher  このセッションが記録と違うセッションだと分かったか (環境変数が無い・\n"
+             "                  配信のセッションが記録されていないときは false)\n"
+             "  errors          記録しなかった理由の配列",
              _exit_help("記録した", _NOT_DISPATCHER))
 
     _add(groups, "status", cmd_status,
