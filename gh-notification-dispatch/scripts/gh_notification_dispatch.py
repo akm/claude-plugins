@@ -20,6 +20,7 @@
   settle                                         この回のメッセージの結果を集計し、続けて届かなかった回数を更新する
   schedule record --job-id <ID> --cron <式>      配信のセッションが、作り直した定期の予定を記録する
   schedule clear                                 配信のセッションが、定期の予定を停止したことを記録する
+  status                                         配信のセッション・定期の予定とその期限・届かない登録を表示する
 
 終了コード (計画の KTD11):
   0  続ける
@@ -130,6 +131,10 @@ def cmd_schedule_record(args):
 
 def cmd_schedule_clear(args):
     return _emit_status(schedule.clear())
+
+
+def cmd_status(args):
+    return _emit_status(schedule.status())
 
 
 # --- 引数 ---------------------------------------------------------------------------------------------------------
@@ -357,6 +362,25 @@ def build_parser():
              "  previous  記録する前の定期の予定。無ければ null\n"
              "  errors    記録しなかった理由の配列",
              _exit_help("記録した", _NOT_DISPATCHER))
+
+    _add(groups, "status", cmd_status,
+         "配信のセッション・定期の予定とその期限・届かない登録を表示する。記録のディレクトリを読むだけで、どのセッションでも\n"
+         "実行できる。期限切れは、記録の期限と今の時刻を比べて判定する。gh は実行しない",
+         "  dispatcher      記録の配信のセッション。記録が無ければ null\n"
+         "  is_dispatcher   このセッションが記録の配信のセッションか\n"
+         "  schedule        記録の定期の予定 (schedule record の出力と同じ形)。定期の予定を作る前は null\n"
+         "  expired         定期の予定が動いていて、期限を過ぎたか\n"
+         "  remaining       期限までの残り (例: 5 日 21 時間)。動いていない・期限を過ぎたときは null\n"
+         "  started_at      最初に開始した時刻。まだ tick を実行していなければ null\n"
+         "  position        取得の位置。まだ tick を実行していなければ null\n"
+         "  subscriptions   登録の数\n"
+         "  waiting         送信待ちの数\n"
+         f"  unreachable     届かない登録 {{subscription_id, repo, kind, session_id, session_name, consecutive_failures}} の配列\n"
+         "  expired_events  30 日を過ぎて消した出来事がある登録 {subscription_id, ..., expired_events (累計),\n"
+         "                  last_expired_at (最後に消した時刻)} の配列\n"
+         "  notice          利用者に示す、定期の予定の状態と次に行う手順の文\n"
+         "  errors          常に空の配列",
+         _exit_help("表示した", "使わない"))
     return parser
 
 

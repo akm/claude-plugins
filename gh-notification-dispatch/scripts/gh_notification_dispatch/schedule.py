@@ -12,7 +12,7 @@ state.json のキー `schedule` に書き、`schedule clear` で停止したこ�
 import datetime
 import re
 
-from . import store
+from . import outbox, store
 
 RUNNING = "running"
 STOPPED = "stopped"
@@ -21,6 +21,7 @@ REMINDER_HOURS = (24, 6, 1)  # 期限までの残りがこれを切った回に�
 TICK_PROMPT = "/gh-notification-dispatch:tick"
 RENEW_COMMAND = "/gh-notification-dispatch:dispatch renew"
 RESUME_COMMAND = "/gh-notification-dispatch:dispatch resume"
+START_COMMAND = "/gh-notification-dispatch:dispatch start"
 
 _JOB_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _CRON_FIELD = re.compile(r"[0-9A-Za-z*/,-]+")
@@ -102,6 +103,9 @@ def take_reminder(schedule, now):
 def remaining_text(delta):
     minutes = max(0, int(delta.total_seconds() // 60))
     hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    if days:
+        return f"{days} 日 {hours} 時間"
     return f"{hours} 時間 {minutes} 分" if hours else f"{minutes} 分"
 
 
@@ -121,3 +125,47 @@ def expired_notice(schedule):
     return {"kind": "expired", "hours": None,
             "text": f"定期の予定は期限 ({local_text(schedule['expires_at'])}) を過ぎたので、これより後は実行されない。"
                     f"配信を続けるなら、配信のセッションで {RESUME_COMMAND} を実行して、定期の予定を作り直す。"}
+
+
+# --- 状態の表示 -------------------------------------------------------------------------------------------------------
+
+def status():
+    """配信のセッション・定期の予定・届かない登録を返す (サブコマンド status)。記録を読むだけで、どのセッションでも実行できる。
+
+    期限切れは、期限を過ぎた後の tick に頼らずに、記録の期限と今の時刻を比べて判定する (R17・KTD9)。
+    """
+    now = store.now()
+    state = store.read(store.STATE) or {}
+    recorded = store.dispatcher(state)
+    current = store.current_session_id()
+    schedule = state.get("schedule")
+    subscriptions = (store.read(store.SUBSCRIPTIONS) or {}).get("subscriptions", [])
+    pending = (store.read(store.OUTBOX) or {}).get("pending", [])
+    expired = is_expired(schedule, now)
+    running = is_running(schedule) and not expired
+    unreachable = [{**outbox.summary(s), "consecutive_failures": outbox.failures(s)}
+                   for s in subscriptions if outbox.is_unreachable(s)]
+    expired_events = [{**outbox.summary(s), "expired_events": s["expired_events"], "last_expired_at": s.get("last_expired_at")}
+                      for s in subscriptions if s.get("expired_events", 0) > 0]
+    return {"status": "ok", "dispatcher": recorded,
+            "is_dispatcher": bool(recorded) and current is not None and recorded.get("session_id") == current,
+            "schedule": schedule, "expired": expired,
+            "remaining": remaining_text(store.parse_time(schedule["expires_at"]) - now) if running else None,
+            "started_at": state.get("started_at"), "position": state.get("position"),
+            "subscriptions": len(subscriptions), "waiting": len(pending), "unreachable": unreachable,
+            "expired_events": expired_events, "notice": _status_notice(recorded, schedule, now), "errors": []}
+
+
+def _status_notice(recorded, schedule, now):
+    if not recorded:
+        return f"配信のセッションが記録されていない。配信のセッションにするセッションで {START_COMMAND} を実行する。"
+    if not schedule:
+        return f"定期の予定は、まだ作っていない。配信のセッションで {START_COMMAND} を実行する。"
+    if schedule.get("state") == STOPPED:
+        return (f"定期の予定は {local_text(schedule['stopped_at'])} に停止した。配信を続けるなら、配信のセッションで "
+                f"{RESUME_COMMAND} を実行する。")
+    if is_expired(schedule, now):
+        return expired_notice(schedule)["text"]
+    remaining = remaining_text(store.parse_time(schedule["expires_at"]) - now)
+    return (f"定期の予定は動いている。期限は {local_text(schedule['expires_at'])} (残り {remaining})。"
+            f"延長するなら、配信のセッションで {RENEW_COMMAND} を実行する。")

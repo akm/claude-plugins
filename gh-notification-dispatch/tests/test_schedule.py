@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """定期の予定の記録 (サブコマンド schedule record・schedule clear。ファイル
-`gh-notification-dispatch/scripts/gh_notification_dispatch/schedule.py`) と、サブコマンド tick の期限の確認・
-配信のセッションの確認・再開の後の取得のテスト (計画の U5 のテストの項目)。
+`gh-notification-dispatch/scripts/gh_notification_dispatch/schedule.py`) と状態の表示 (サブコマンド status)、
+サブコマンド tick の期限の確認・配信のセッションの確認・再開の後の取得のテスト (計画の U5 のテストの項目)。
 
 CLI の入口をサブプロセスで実行し、偽の `gh` が通知・timeline・所属するチームを返す。
 
@@ -109,6 +109,76 @@ class RecordTest(ScheduleCase):
                 self.assertTrue(out["errors"])
         self.assertEqual(self.home_files(), before)
 
+
+
+class StatusTest(ScheduleCase):
+    """状態の表示は読むだけで、どのセッションでも実行でき、記録のディレクトリに書かない。"""
+
+    def status(self, at=None):
+        if at:
+            self.at(at)
+        before = self.home_files() if os.path.isdir(self.home) else None
+        code, out, err = self.cli("status")
+        self.assertEqual(code, 0, (out, err))
+        self.assertEqual(self.home_files() if os.path.isdir(self.home) else None, before, "記録のディレクトリに書かない")
+        return out
+
+    def test_running(self):
+        self.record()
+        out = self.status("2026-11-17T08:30:00Z")
+        self.assertTrue(out["is_dispatcher"])
+        self.assertEqual((out["schedule"]["state"], out["expired"], out["remaining"]), ("running", False, "5 日 21 時間"))
+        self.assertIn("/gh-notification-dispatch:dispatch renew", out["notice"])
+
+    def test_expired_without_tick(self):
+        """期限より前に最後の tick が実行され、その後に tick が無いまま期限を過ぎたときも、期限切れと再開の手順を示す (R17)。"""
+        self.record()
+        out = self.status("2026-11-23T06:00:00Z")
+        self.assertEqual((out["expired"], out["remaining"]), (True, None))
+        self.assertIn("/gh-notification-dispatch:dispatch resume", out["notice"])
+        self.assertEqual(self.schedule()["state"], "running", "期限切れは記録に書かない (KTD9)")
+
+    def test_stopped(self):
+        self.record()
+        self.clear(at="2026-11-17T06:00:00Z")
+        out = self.status("2026-11-30T06:00:00Z")
+        self.assertEqual((out["schedule"]["state"], out["expired"], out["remaining"]), ("stopped", False, None))
+        self.assertIn("/gh-notification-dispatch:dispatch resume", out["notice"])
+
+    def test_before_schedule_and_other_session(self):
+        self.as_session(OTHER)
+        out = self.status()
+        self.assertFalse(out["is_dispatcher"])
+        self.assertEqual(out["dispatcher"]["session_id"], DISPATCHER)
+        self.assertIsNone(out["schedule"])
+        self.assertIn("/gh-notification-dispatch:dispatch start", out["notice"])
+
+    def test_without_record_directory(self):
+        os.remove(os.path.join(self.home, "state.json"))
+        os.rmdir(self.home)
+        out = self.status()
+        self.assertEqual((out["dispatcher"], out["is_dispatcher"], out["schedule"]), (None, False, None))
+        self.assertIn("/gh-notification-dispatch:dispatch start", out["notice"])
+        self.assertFalse(os.path.exists(self.home), "記録のディレクトリを作らない")
+
+    def test_unreachable_and_expired_events(self):
+        """届かない登録と、30 日を過ぎて消した出来事の、登録ごとの累計と最後に消した時刻を示す (R15)。"""
+        base = {"repo": REPO, "kind": "review_requested", "session_id": RECEIVER, "session_name": "受信",
+                "permission_mode": "auto", "created_at": T0}
+        self.write_home("subscriptions.json", {"version": 1, "subscriptions": [
+            {**base, "id": "aaaaaaaaaaaa", "consecutive_failures": 3, "expired_events": 0, "last_expired_at": None},
+            {**base, "id": "bbbbbbbbbbbb", "kind": "merged", "consecutive_failures": 2, "expired_events": 4,
+             "last_expired_at": "2026-11-16T05:00:00Z"},
+            {**base, "id": "cccccccccccc", "repo": "akm/other"}]})
+        self.write_home("outbox.json", {"version": 1, "pending": [
+            {"subscription_id": "aaaaaaaaaaaa", "event": {"key": "review_requested:1"}, "enqueued_at": T0, "outputs": 1}],
+            "round": None})
+        out = self.status()
+        self.assertEqual((out["subscriptions"], out["waiting"]), (3, 1))
+        self.assertEqual([(u["subscription_id"], u["consecutive_failures"]) for u in out["unreachable"]],
+                         [("aaaaaaaaaaaa", 3)])
+        self.assertEqual([(e["subscription_id"], e["expired_events"], e["last_expired_at"]) for e in out["expired_events"]],
+                         [("bbbbbbbbbbbb", 4, "2026-11-16T05:00:00Z")])
 
 
 class TickScheduleCase(ScheduleCase):
