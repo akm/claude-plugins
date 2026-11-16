@@ -93,7 +93,7 @@ class MessagesDocTest(unittest.TestCase):
 
     def test_examples_parse(self):
         examples = code_blocks(self.doc, "例")
-        self.assertEqual(len(examples), 6)
+        self.assertEqual(len(examples), 7)
         types = []
         for text in examples:
             with self.subTest(head=text.splitlines()[0]):
@@ -117,6 +117,12 @@ class MessagesDocTest(unittest.TestCase):
             messages.unsubscribe(["0123456789ab", "ba9876543210"], session, "claude-plugins のレビュー"),
             messages.unsubscribed_accepted([{"repo": "akm/claude-plugins", "kind": "review_requested"},
                                             {"repo": "akm/claude-plugins", "kind": "merged"}]),
+            messages.notify("akm/claude-plugins", "review_requested", [
+                {"kind": "review_requested", "number": 301, "time": "2026-11-16T07:00:00Z", "requested": "akm",
+                 "url": "https://github.com/akm/claude-plugins/pull/301", "title": "✨ feat: 通知を届ける"},
+                {"kind": "review_requested", "number": 302, "time": "2026-11-16T07:05:00Z", "requested": "akm/reviewers",
+                 "url": "https://github.com/akm/claude-plugins/pull/302", "title": "🐛 fix: 名前の引き直し"},
+            ], resend=2),
             messages.removed([{"repo": "akm/claude-plugins", "kind": "merged"}]),
         ]
         self.assertEqual(examples, composed)
