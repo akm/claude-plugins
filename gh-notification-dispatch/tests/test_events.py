@@ -228,6 +228,25 @@ class MergesTest(FakeGhCase):
         self.assertEqual((failure["api"], failure["repo"], failure["number"]), ("pull", REPO, 16))
         self.assertEqual(failure["result"]["failure"], "not_found")
 
+    def test_notification_pull_failure_names_repo_and_number(self):
+        """(b) 通知の PR の読み取りが失敗したら、その PR を判定から除かずに、失敗した呼び出しを返す (KTD11)。"""
+        self.responses([{"prefix": ["api", "-i", pull_path(REPO, 17)], "stdout": http(404, {"message": "Not Found"}),
+                         "stderr": fixture("repo-not-found", "stderr"), "exit": 1}])
+        found, stopped, failure = self.judge(notifications=[notification(REPO, 17, "2026-11-16T06:06:00Z")])
+        self.assertEqual((found, stopped), (None, None))
+        self.assertEqual((failure["api"], failure["repo"], failure["number"]), ("pull", REPO, 17))
+        self.assertEqual(failure["result"]["failure"], "not_found")
+
+    def test_reviews_failure_names_repo_and_number(self):
+        """(b) レビューの一覧の読み取りが失敗したら、その PR を判定から除かずに、失敗した呼び出しを返す (KTD11)。"""
+        self.responses([{"prefix": ["api", "-i", pull_path(REPO, 18)], "stdout": http(200, pull(REPO, 18, merged_at=MERGED_AT))},
+                        {"prefix": ["api", "-i", reviews_path(REPO, 18)], "stdout": http(404, {"message": "Not Found"}),
+                         "stderr": fixture("repo-not-found", "stderr"), "exit": 1}])
+        found, stopped, failure = self.judge(notifications=[notification(REPO, 18, "2026-11-16T06:06:00Z")])
+        self.assertEqual((found, stopped), (None, None))
+        self.assertEqual((failure["api"], failure["repo"], failure["number"]), ("reviews", REPO, 18))
+        self.assertEqual(failure["result"]["failure"], "not_found")
+
 
 if __name__ == "__main__":
     unittest.main()

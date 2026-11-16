@@ -368,6 +368,20 @@ class MergedTest(StartedTickCase):
         self.assertEqual((code, self.merged_messages(out), self.tracked()), (0, [], []))
         self.assertEqual(len(self.calls(f"repos/{REPO}/pulls/1")), before, "状態を読まないこと")
 
+    def test_pull_failure_keeps_position_etag_and_tracked(self):
+        """追跡する PR の読み取りが失敗した回は、終了コード 4 で失敗した呼び出しを示し、取得の位置・前回の ETag・追跡する
+        PR を変えない (KTD5・KTD11)。"""
+        self.request()
+        before = self.state()
+        self.serve(not_modified_for='W/"e10"', etag='W/"e10"', extra=[
+            {"prefix": ["api", "-i", f"repos/{REPO}/pulls/1"], "stdout": http(404, {"message": "Not Found"}),
+             "stderr": fixture("repo-not-found", "stderr"), "exit": 1}])
+        code, out = self.tick("2026-11-16T06:20:00Z")
+        self.assertEqual((code, out["failed_call"]), (4, {"api": "pull", "repo": REPO, "number": 1}))
+        after = self.state()
+        self.assertEqual((after["position"], after["etag"]), (before["position"], before["etag"]))
+        self.assertEqual(self.tracked(), [(REPO, 1, self.T1)])
+
     def test_start_stays_at_enqueue_time_while_unacked(self):
         """届かない登録で ack が遅れても、追跡する期間の起点は送信待ちに入れた時刻のままである (R10)。"""
         self.serve([notification(REPO, 1, self.T1)], {(REPO, 1): [timeline_event(10, self.T1, login="akm")]}, pulls=[pull(REPO, 1)])
