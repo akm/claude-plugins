@@ -18,6 +18,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [doc-structured](doc-structured/README.md) | アプリケーションの文書を、列挙できる事実は YAML に書いて人が読む Markdown を生成し、生成物と参照を検査する構成で書く (作成中) |
 | [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う |
 | [slide-deck](slide-deck/README.md) | 図を中心にした説明資料を、構成案から PowerPoint のファイルと Google スライドの両方に作り、内容が変わったスライドだけを直す。構成案・PowerPoint のファイル・Google スライドの 3 つのフェーズのスキルと、TypeScript と Python のツールを同梱する (Node.js 24 以上と uv が必要。Google スライドには、Claude のデスクトップアプリの Google スライドのコネクタが必要) |
+| [gh-notification-dispatch](gh-notification-dispatch/README.md) | GitHub の通知から PR のレビューの依頼とマージを判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへ届ける (作成中) |
 
 ## 使い方
 
@@ -247,6 +248,13 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── src/                      # TypeScript のツール (入口は src/cli.ts)。テストは tests/ (npm ci の後に npm test)
 │   ├── python/                   # 画像をまとめるツール。テストは python/tests/ (uv sync --frozen の後に uv run python -m unittest discover -s python/tests)
 │   ├── examples/sample/          # 見本の資料 (outline.md と deck.ts)
+│   └── README.md
+├── gh-notification-dispatch/     # skill 型 + 同梱スクリプト (作成中)
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/                   # 2 つのスキル (配信のセッションの dispatch・受信のセッションの subscribe)
+│   ├── references/               # メッセージと記録のファイルの様式
+│   ├── scripts/                  # スクリプト (gh_notification_dispatch.py とパッケージ gh_notification_dispatch/)
+│   ├── tests/                    # python3 -m unittest discover -s gh-notification-dispatch/tests
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json

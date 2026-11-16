@@ -185,6 +185,21 @@
         "ref": "main"
       },
       "tags": ["slides", "powerpoint", "google-slides", "diagram", "skills"]
+    },
+    {
+      "name": "gh-notification-dispatch",
+      "description": "GitHub の通知から PR のレビューの依頼とマージを判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへ届けるスキルと、通知の取得と判定のスクリプト (作成中)",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "gh-notification-dispatch",
+        "ref": "main"
+      },
+      "tags": ["github", "notifications", "pull-request", "sessions", "skills"]
     }
   ]
 }
