@@ -96,7 +96,7 @@ class RecordTest(ScheduleCase):
         self.assertEqual(self.home_files(), before)
 
     def test_unconfirmed_session_changes_nothing_and_is_not_flagged(self):
-        """環境変数が無い・配信のセッションが記録されていないときは、記録と違うセッションとは示さない (スキルは予定を消さずに質問する)。"""
+        """環境変数が無い・配信のセッションが記録されていないときは、記録と違うセッションとは示さない (スキルは、記録と違うセッションとは伝えずに質問する)。"""
         for label, session, state in (("環境変数が無い", None, None),
                                       ("配信のセッションが記録されていない", DISPATCHER, {"version": 1})):
             with self.subTest(label):
