@@ -23,13 +23,13 @@ RENEW_COMMAND = "/gh-notification-dispatch:dispatch renew"
 RESUME_COMMAND = "/gh-notification-dispatch:dispatch resume"
 START_COMMAND = "/gh-notification-dispatch:dispatch start"
 
-_JOB_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_JOB_ID = re.compile(r"[^\s\x00-\x1f\x7f]+")  # 空白と制御文字を含まない 1 文字以上 (CronCreate の ID の形は決めつけない)
 _CRON_FIELD = re.compile(r"[0-9A-Za-z*/,-]+")
 
 
 def check_job_id(value):
     if not _JOB_ID.fullmatch(value or ""):
-        return f"ジョブの ID {value!r} が、英数字・_・- の 1〜64 文字でない"
+        return f"ジョブの ID {value!r} が、空か、空白か制御文字を含む"
     return None
 
 

@@ -61,6 +61,14 @@ class RecordTest(ScheduleCase):
         self.assertFalse(out["not_dispatcher"])
         self.assertEqual(self.schedule(), expected)
 
+    def test_job_id_of_any_printable_form_is_recorded(self):
+        """ジョブの ID の形は、ツール CronCreate が決めるので、空白と制御文字を含まなければ記録する。"""
+        for job_id in ("2a505916", "cron_1.a:b", "x" * 100):
+            with self.subTest(job_id=job_id):
+                code, out = self.record(job_id=job_id)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.schedule()["job_id"], job_id)
+
     def test_renew_clears_reminders_and_moves_expiry(self):
         """renew (作り直して記録し直す) の後は、出した確認の記録を消し、期限を 7 日後にする。"""
         self.record()
@@ -113,7 +121,7 @@ class RecordTest(ScheduleCase):
 
     def test_invalid_values_are_refused(self):
         before = self.home_files()
-        for job_id, cron in (("", CRON), ("a b", CRON), ("a1b2c3d4", "*/10 * * *"), ("a1b2c3d4", "*/10 * * * * *"),
+        for job_id, cron in (("", CRON), ("a b", CRON), ("a\tb", CRON), ("a1b2c3d4", "*/10 * * *"), ("a1b2c3d4", "*/10 * * * * *"),
                              ("a1b2c3d4", "*/10 * * * ;")):
             with self.subTest(job_id=job_id, cron=cron):
                 code, out = self.record(job_id=job_id, cron=cron)
