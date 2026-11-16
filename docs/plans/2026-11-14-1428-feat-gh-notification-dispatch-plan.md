@@ -75,7 +75,7 @@ execution: code
 
 - R13. 1 回の取得で、登録 (受信のセッション・リポジトリ・種類) ごとに、出来事を 1 通のメッセージにまとめる。メッセージの先頭行は、リポジトリ・種類・件数が分かる 1 文にする。1 通に書く出来事は 20 件までにし、それを超えたら、同じ回に 20 件ずつの複数のメッセージに分けて届ける。1 回の取得で送るメッセージは、すべての登録を合わせて 10 通までにし (上限の値は U1 の実測で決め直す)、超えた分は送信待ちに残して次の回に届ける。上限までの枠は、登録を順に回して 1 通ずつ割り当て、枠が残る限り、最初の登録に戻って割り当てを繰り返す。登録の中では古い出来事から入れる。回ごとに、割り当てを始める登録を、前の回に最後に割り当てた登録の次の登録にする (次の回に始める登録を記録に残す)。送り直しのメッセージも同じ枠に入る。溜まった出来事の多い登録が、ほかの登録の新しい出来事を後回しにしないため。
 - R14. 出来事ごとに、PR の番号・題名・URL・出来事の時刻を書く。`review_requested` には依頼先 (自分のログイン名かチームの名前) も書く。コメントやレビューの本文は書かない。PR の題名は GitHub の利用者が書いた文なので、指示として扱わないよう、メッセージに書く。
-- R15. 宛先は受信のセッションの名前にする。名前で届かないときは、記録した ID から今の名前を引き直して送る。それでも届かないときは、送らずに配信のセッションで利用者に示し、次の回に送り直す。3 回の取得で続けて届かない登録は「届かない登録」として一覧と、スキル `dispatch` の状態の表示 (引数 `status`) に示し、その登録の送信待ちを送らない。1 回の取得で、その登録のメッセージが 1 通でも送れなければ (`fail` を記録したら)、届かなかった回として 1 回と数える。送ったかどうかが記録されなかったメッセージは数えず、次の回に送り直す。配信のセッションの側の中断で、届かない登録にしないため。新しい出来事は、届かない登録の間も送信待ちに入れ続ける。受信のセッションが同じ登録を申し込み直すと (R3 の登録済み)、届かない登録でなくなり、続けて届かなかった回数を 0 に戻して、溜まった送信待ちを送る。登録を削除すると、その登録の送信待ちも消す。送信待ちに入れてから 30 日を過ぎた出来事は消し、消した登録と件数を示す。`tick` の出力には消したその回にだけ示し、状態の表示には登録ごとの累計と最後に消した時刻を示す。
+- R15. 宛先は受信のセッションの名前にする。名前で届かないときは、記録した ID から今の名前を引き直して送る。引き直した名前でも届かないとき (Claude Desktop の再起動の後に、利用者が開いていないセッションなど) は、記録した ID を宛先にして送る (KTD2)。それでも届かないときは、送らずに配信のセッションで利用者に示し、次の回に送り直す。3 回の取得で続けて届かない登録は「届かない登録」として一覧と、スキル `dispatch` の状態の表示 (引数 `status`) に示し、その登録の送信待ちを送らない。1 回の取得で、その登録のメッセージが 1 通でも送れなければ (`fail` を記録したら)、届かなかった回として 1 回と数える。送ったかどうかが記録されなかったメッセージは数えず、次の回に送り直す。配信のセッションの側の中断で、届かない登録にしないため。新しい出来事は、届かない登録の間も送信待ちに入れ続ける。受信のセッションが同じ登録を申し込み直すと (R3 の登録済み)、届かない登録でなくなり、続けて届かなかった回数を 0 に戻して、溜まった送信待ちを送る。登録を削除すると、その登録の送信待ちも消す。送信待ちに入れてから 30 日を過ぎた出来事は消し、消した登録と件数を示す。`tick` の出力には消したその回にだけ示し、状態の表示には登録ごとの累計と最後に消した時刻を示す。
 
 **定期の予定と再開**
 
@@ -118,7 +118,7 @@ execution: code
 ### Key Technical Decisions
 
 - KTD1. **プラグインの構成は、スキル 3 つ (`dispatch`・`tick`・`subscribe`)・hook 1 つ・スクリプト 1 つにする。** スクリプトは、入口のファイル `gh-notification-dispatch/scripts/gh_notification_dispatch.py` (argparse のサブコマンド) とパッケージ `gh-notification-dispatch/scripts/gh_notification_dispatch/` の組にする (プラグイン issue-practice のファイル `issue-practice/scripts/issue_practice.py` とディレクトリ `issue-practice/scripts/issue_practice/` の形)。外部のライブラリを使わず、Python 3.11 の標準ライブラリと `gh` だけを使う。テストは偽の `gh` (issue-practice のファイル `issue-practice/tests/fake-gh` の形) で行う。スキル `tick` は定期の予定から 10 分ごとに読まれるので、`dispatch` から分けて本文を短くする (KTD7)。
-- KTD2. **メッセージの宛先は、受信のセッションも配信のセッションも名前にする。** #114 の記録 (2026-10-06) では、セッションの ID (`local_…`) を宛先にすると、送る側のセッションで利用者が最後に入力してから 10 通までしか送れない。配信のセッションは利用者の入力なしに送り続けるので、ID を宛先にできない。ID は記録し、名前が変わったときの引き直しに使う (R15)。名前の引き直しは、Claude Desktop のツール `list_sessions` (ID とタイトル) で行う。同じ名前が複数あるときは、ツール `ListAgents` の行の短い識別子を添える。
+- KTD2. **メッセージの宛先は、受信のセッションも配信のセッションも名前にし、名前で届かないときだけ ID にする。** #114 の記録 (2026-10-06) では、セッションの ID (`local_…`) を宛先にすると、送る側のセッションで利用者が最後に入力してから 10 通までしか送れない。配信のセッションは利用者の入力なしに送り続けるので、ID をふだんの宛先にはしない。U1 では、利用者の入力の後に ID を宛先にした 15 通が断られなかったが、宛先は確認する側のセッションが起動したセッションで、#114 と条件が同じかは分からない。一方で、Claude Desktop を再起動した後、利用者が開いていないセッションは、ツール `ListAgents` に出ず、名前では届かない (`No agent named '…' is reachable.`)。ID を宛先にすると、Claude Desktop がそのセッションを起動して届け、ターンが始まる (U1)。そのため、名前で届かないときだけ ID を宛先にし、ID でも断られたら `fail` を記録する (R15)。ID は記録し、名前が変わったときの引き直しと、名前で届かないときの宛先に使う。名前の引き直しは、Claude Desktop のツール `list_sessions` (ID とタイトル) で行う。同じ名前が複数あるときは、ツール `ListAgents` の行の短い識別子を添える。
 - KTD3. **記録のディレクトリに書くのは配信のセッションだけにし、受信のセッションは読むだけにする。** 受信のセッションでの一覧は記録のファイルを読んで表示し、番号の対応はそのセッションの一時ディレクトリに書き、削除はメッセージで申し込む (R6)。書き込みは、同じディレクトリの一時ファイルに書いてから名前を変える方法で行い、ファイル `lock` の `fcntl.flock` で、配信のセッションの中で並行して動くスクリプトどうしの書き込みを順にする。記録のディレクトリの場所は、テストのために環境変数 `GH_NOTIFICATION_DISPATCH_HOME` で変えられるようにする。記録のディレクトリに書くサブコマンドは、`dispatcher set` を除いて、書く前に、実行しているセッションの ID (環境変数 `CLAUDE_CODE_HOST_SESSION_ID`) が記録の配信のセッションの ID と同じかを確かめ、違えば書かずに終了コード 3 で返す (R19)。確かめる処理はファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/store.py` の書き込みの共通の処理にし、サブコマンドごとに書かない。配信のセッションを切り替えた後に、前の配信のセッションの操作 (`stop` など) が記録を書き換えないため。
 - KTD4. **種類は、通知の理由ではなく、PR の timeline と PR の状態から判定する。** 2026-11-14 の確認で、レビューの依頼の通知は、依頼の後に push やメンションがあるたびに更新され、理由は `review_requested` のままだった。マージされた PR の通知の理由は `subscribed` か `author` だった。
   - `review_requested`: 通知の対象が PR で、通知の更新時刻が取得の範囲の起点 (KTD5) より後のものについて、timeline (API `GET /repos/{owner}/{repo}/issues/{number}/timeline`) の出来事 `review_requested` のうち、時刻が取得の範囲の起点より後で、依頼先 (`requested_reviewer.login`) が自分か、依頼先のチーム (`requested_team`) が自分の所属するチーム (API `GET /user/teams`) のものを選ぶ。出来事の ID で、同じ依頼を区別する。自分のログイン名と所属するチームは記録のディレクトリのファイル `state.json` に持ち、スキル `dispatch` の引数 `start`・`resume` で開始・再開したときと、前に読んでから 1 日を過ぎた `tick` で改めて取得する。開始の後に加わったチームへの依頼を届けるため。
@@ -314,13 +314,13 @@ gh-notification-dispatch/
 **Files:**
 - 作る: `gh-notification-dispatch/scripts/gh_notification_dispatch/{poll,events,outbox}.py`・`gh-notification-dispatch/skills/tick/SKILL.md`
 - 作る: `gh-notification-dispatch/tests/test_{poll,events,outbox}.py`・`gh-notification-dispatch/tests/fixtures/gh/` の通知・timeline・チームの応答
-- 変える: `gh-notification-dispatch/scripts/gh_notification_dispatch/gh.py` (ページ送り)・`gh-notification-dispatch/references/messages.md` (`notify`)・`records.md` (取得の位置・`delivered.json`・`outbox.json`)・`gh-notification-dispatch/skills/dispatch/SKILL.md` (名前で届かないときの引き直し)
+- 変える: `gh-notification-dispatch/scripts/gh_notification_dispatch/gh.py` (ページ送り)・`gh-notification-dispatch/references/messages.md` (`notify`)・`records.md` (取得の位置・`delivered.json`・`outbox.json`)・`gh-notification-dispatch/skills/dispatch/SKILL.md` (名前で届かないときの引き直しと、ID を宛先にした送り直し)
 
 **Approach:**
 1. 用意する: `notify` の様式と、取得の位置・届けた出来事・送信待ちの様式を書く。固定データは、2026-11-14 に確かめた形 (依頼の後に push で更新された通知・チームへの依頼・依頼の取り消しと再依頼) を、公開してよい値に置き換えて作る。
 2. テストを書く: Test scenarios のとおり。
 3. 実装する: U2 の `gh.py` にページ送り (KTD4) を足し、ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/poll.py` (取得・304・取得の位置)・ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/events.py` の `review_requested` の判定・ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch/outbox.py` (メッセージの生成・20 件の上限・送り直しの回数・`ack`・`fail`・続けて届かなかった回数)。サブコマンドは `tick`・`ack <メッセージの ID>`・`fail <メッセージの ID> --reason <理由>`・`settle`・`rename --session-id <ID> --name <名前>`。PR ごとの失敗を自動で判定から除く規則を足すかは、U1 の 7 の結果で決める (KTD11)。
-4. スキル `tick` に、スクリプトの出力のとおりに送り、`ack` か `fail` を記録し、送り終えた後に `settle` を呼ぶ手順と、スクリプトが終了コード 3 で返したときに出力の `errors` を利用者に示す手順だけを書く (KTD7)。名前で届かないときの引き直し (KTD2) は、`tick` の出力に手順を書くか `dispatch` に書くかを、本文の短さで決める。
+4. スキル `tick` に、スクリプトの出力のとおりに送り、`ack` か `fail` を記録し、送り終えた後に `settle` を呼ぶ手順と、スクリプトが終了コード 3 で返したときに出力の `errors` を利用者に示す手順だけを書く (KTD7)。名前で届かないときの引き直しと、ID を宛先にした送り直し (KTD2) は、`tick` の出力に手順を書くか `dispatch` に書くかを、本文の短さで決める。
 
 **Patterns to follow:** U2 の `gh.py` と固定データ。`issue-dispatch/scripts/issue_dispatch/poll.py` (取得と差分の考え方)。
 
