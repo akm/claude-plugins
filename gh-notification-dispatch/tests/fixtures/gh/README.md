@@ -5,6 +5,7 @@
 出所:
 
 - **issue-practice からコピーしたもの**: プラグイン issue-practice の固定データ (ディレクトリ `issue-practice/tests/fixtures/gh/`) を、そのままコピーした。issue-practice も、プラグイン issue-dispatch からコピーしている。取った日と取り方は、issue-practice の固定データの README にある。
+- **このプラグインで取ったもの**: 公開のリポジトリ akm/claude-plugins と、存在しない名前のリポジトリに対して、読むだけのコマンドで取った。取った日は 2026-11-16、`gh` は 2.103.3。
 
 | 場合 | コマンド | 終了コード | 出所 |
 | --- | --- | --- | --- |
@@ -14,3 +15,4 @@
 | `graphql-rate-limited` | GraphQL のレート制限の応答 (`errors[].type` が `RATE_LIMITED`) | 1 | issue-practice からコピー (issue-dispatch で手で作ったもの) |
 | `graphql-bad-field` | `gh api graphql` で存在しないフィールドを読む (`errors` の形) | 1 | issue-practice からコピー |
 | `api-user` | `gh api user` (REST。トークンのログイン)。`login`・`id`・`node_id`・`html_url`・`type` だけを残したもの | 0 | issue-practice からコピー |
+| `repo-not-found` | `gh api repos/akm/<存在しない名前>` (読めないリポジトリ。状態コード 404) | 1 | このプラグインで取った |

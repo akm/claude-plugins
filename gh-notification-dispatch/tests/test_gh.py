@@ -95,6 +95,15 @@ class RunTest(FakeGhCase):
                          "stderr": fixture("graphql-bad-field", "stderr"), "exit": 1}])
         self.assertEqual(gh.run(["api", "graphql"])["failure"], "other", "GraphQL のフィールドの誤りは other")
 
+    def test_not_found_from_fixture(self):
+        """読めないリポジトリ (存在しない名前) の API は 404 を返し、gh は終了コード 1 で終了する (計画の U1 の 7)。"""
+        self.responses([{"prefix": ["api", "repos/akm/no-such-repo"], "stdout": {"fixture": "repo-not-found"},
+                         "stderr": fixture("repo-not-found", "stderr"), "exit": 1}])
+        r = gh.run(["api", "repos/akm/no-such-repo"], expect_json=True)
+        self.assertEqual(r["exit_code"], 1)
+        self.assertEqual(r["failure"], "not_found")
+        self.assertTrue(gh.failed(r))
+
     def test_user_text_in_stdout_does_not_change_classification(self):
         """標準出力の data (利用者の文字列) に「rate limit」や「gh auth login」があっても、分類は stderr と errors[].type で決まる。"""
         title = "Please handle the rate limit and run gh auth login first"
@@ -106,6 +115,9 @@ class RunTest(FakeGhCase):
 
     def test_classify_uses_stderr_and_graphql_error_types(self):
         self.assertEqual(gh.classify(1, "", "gh: Bad credentials (HTTP 401)\n", False), "auth")
+        self.assertEqual(gh.classify(1, "", "gh: Not Found (HTTP 404)\n", False), "not_found")
+        self.assertEqual(gh.classify(1, '{"title":"Not Found (HTTP 404)"}', "gh: boom\n", False), "other",
+                         "標準出力の文字列の 404 では not_found にしないこと")
         self.assertEqual(gh.classify(1, '{"errors":[{"type":"RATE_LIMITED"}]}', "", False), "rate_limit",
                          "標準出力の errors[].type でも分けること")
         self.assertEqual(gh.classify(1, '{"data":{"x":"Bad credentials HTTP 401 rate limit"}}', "gh: boom\n", False), "other",

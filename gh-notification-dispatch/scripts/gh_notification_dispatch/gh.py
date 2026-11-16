@@ -19,10 +19,12 @@ import subprocess
 DEFAULT_TIMEOUT = 60
 STDERR_TAIL_LINES = 20
 
-# 失敗の種類。None は成功。`missing` は gh が PATH に無いか実行権限が無い (入れる・権限を直すのが直し方)
-FAILURES = ("auth", "rate_limit", "network", "timeout", "missing", "other")
+# 失敗の種類。None は成功。`missing` は gh が PATH に無いか実行権限が無い (入れる・権限を直すのが直し方)。
+# `not_found` は API が 404 を返した (リポジトリが無いか、読む権限が無い。GitHub は読めないリポジトリにも 404 を返す)
+FAILURES = ("auth", "not_found", "rate_limit", "network", "timeout", "missing", "other")
 
 _AUTH_RE = re.compile(r"HTTP 401|Bad credentials|gh auth login|not logged in", re.IGNORECASE)
+_NOT_FOUND_RE = re.compile(r"\(HTTP 404\)")
 _RATE_LIMIT_RE = re.compile(r"rate limit|RATE_LIMITED|secondary rate|abuse detection", re.IGNORECASE)
 _NETWORK_RE = re.compile(
     r"dial tcp|connection refused|connection reset|no such host|i/o timeout|TLS handshake|proxyconnect|"
@@ -55,6 +57,8 @@ def classify(exit_code, stdout, stderr, timed_out):
         return None
     if _AUTH_RE.search(stderr):
         return "auth"
+    if _NOT_FOUND_RE.search(stderr):
+        return "not_found"
     if _RATE_LIMIT_RE.search(stderr) or "RATE_LIMITED" in _graphql_error_types(stdout):
         return "rate_limit"
     if _NETWORK_RE.search(stderr):
