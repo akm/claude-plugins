@@ -73,11 +73,14 @@ class GenerateTest(ProjectTestCase):
         readme = (self.project / "docs/domains/01-loans/README.md").read_text(encoding="utf-8")
         self.assertNotIn("unclassified_app_terms.md", readme)
 
-        # 定義が 1 つも無いドメインは、README.md だけ (と、その merge の設定の docs/.gitattributes)
+        # 定義が 1 つも無いドメインは、README.md だけ (と、ドメインの読む順の索引と依存の表と図、merge の設定の docs/.gitattributes)
         self.write("docs/domains/01-loans/domain.yaml", "domain:\n  description: 空のドメイン。\n")
         self.assertEqual(self.run_tool("generate").returncode, 0)
         names = sorted(generated_files(self.project))
-        self.assertEqual(names, ["docs/.gitattributes", "docs/domains/01-loans/README.md"])
+        self.assertEqual(
+            names,
+            ["docs/.gitattributes", "docs/domains/01-loans/README.md", "docs/domains/README.md", "docs/domains/dependencies.md"],
+        )
 
     def test_functions_md_lists_preconditions_then_events(self):
         self.write(

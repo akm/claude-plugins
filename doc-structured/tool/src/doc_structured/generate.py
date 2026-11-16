@@ -1,7 +1,8 @@
 """ドメインの YAML から、人が読む Markdown を生成する。
 
-ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・terms.md を、全体の用語の索引
-docs/glossary.md を、ロールの定義と操作ごとの行えるロールの表を docs/system/permissions.md に生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
+ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・dependencies.md・terms.md を、
+全体の用語の索引 docs/glossary.md を、ロールの定義と操作ごとの行えるロールの表を docs/system/permissions.md に、
+ドメインの依存の表と図を docs/domains/dependencies.md に、ドメインの読む順の索引を docs/domains/README.md に生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 先頭に、生成したファイルの先頭の記述 (モジュール generated_header) を書く
   - 定義ごとに <a name="ID"></a> と見出しを書く。見出しは「種類 + 日本語名」の後に英語名をコードの書式で書く
@@ -19,11 +20,14 @@ import posixpath
 from pathlib import Path
 
 from . import generated_header, names
+from .dependencies import DomainDependency, all_dependencies, domain_order_key, reading_order
 from .domains import DOMAINS_DIR, Domain, Entry, Project, StateMachine
 
 GLOSSARY_PATH = "docs/glossary.md"
 PERMISSIONS_PATH = "docs/system/permissions.md"
 GITATTRIBUTES_PATH = "docs/.gitattributes"
+DOMAINS_README_PATH = f"{DOMAINS_DIR.as_posix()}/README.md"
+DOMAINS_DEPENDENCIES_PATH = f"{DOMAINS_DIR.as_posix()}/dependencies.md"
 # 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し、
 # 競合のマークを入れない (ファイルは競合の状態のまま)。どの側が ours になるかは git のコマンドによって違い、
 # 残った内容は古いことがあるので、生成し直してから git add する
@@ -39,6 +43,7 @@ FILE_DESCRIPTIONS = {
     "models": "モデル・属性・値の定義",
     "unclassified_app_terms": "未分類のアプリケーション用語の定義",
     "functions": "操作・前提・イベントの定義",
+    "dependencies": "ほかのドメインへの依存の元になった参照",
     "terms": "このドメインの用語の索引",
 }
 # 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語・操作・前提・イベント・ロールは 2
@@ -52,6 +57,11 @@ NO_ROLES_ITEM = "- 行えるロール: 無し"
 PERMISSIONS_TABLE_HEADING = "## 操作ごとの、行えるロール"
 PERMITTED = "○"
 STATE_MACHINE_HEADER = ["前の状態", "後の状態", "操作", "前提"]
+DEPENDENCIES_HEADER = ["依存先のドメイン", "参照する定義", "キー", "参照先"]
+DOMAINS_DEPENDENCIES_HEADER = ["ドメイン", "依存先のドメイン", "依存の元の参照"]
+DOMAINS_README_HEADER = ["順", "ドメイン", "説明"]
+# 依存の図のノードの識別子に、ドメインの英語名に付ける接頭辞。end などの英語名を識別子にすると、mermaid が図を読めないため
+DOMAIN_NODE_PREFIX = "d_"
 # 図の状態の識別子に、値の英語名に付ける接頭辞。end・note・state などの英語名を識別子にすると、mermaid が図を読めないため
 STATE_ID_PREFIX = "v_"
 
@@ -79,6 +89,12 @@ class _Links:
             href = f"{relative}#{target_id}"
         self.definitions[target_id] = (href, title)
         return f"[{escape_link_text(text)}][{target_id}]"
+
+    def file_link(self, text: str, target_file: str, title: str) -> str:
+        """ID を持たないファイル (ディレクトリ docs/domains/ の直下の生成したファイルなど) へのリンク。ラベルはファイル名。"""
+        label = posixpath.basename(target_file)
+        self.definitions[label] = (posixpath.relpath(target_file, posixpath.dirname(self.file)), title)
+        return f"[{escape_link_text(text)}][{label}]"
 
     def lines(self) -> list[str]:
         return [f'[{label}]: {href} "{title}"' for label, (href, title) in sorted(self.definitions.items())]
@@ -313,9 +329,84 @@ def render_permissions(project: Project) -> str:
     return _document("docs/", None, blocks, links)
 
 
+def _domain_link(links: _Links, domain: Domain, text: str) -> str:
+    return links.link(text, domain.id, f"{domain.dir}/{README}", domain.full_name())
+
+
+def _directory_name(domain: Domain) -> str:
+    return posixpath.basename(domain.dir)
+
+
+def render_dependencies(project: Project, domain: Domain, dependencies: list[DomainDependency]) -> str:
+    """ドメインが、ほかのドメインに依存する元になった参照の表。"""
+    path = file_path(domain, "dependencies")
+    links = _Links(path)
+    rows = [_table_row(DEPENDENCIES_HEADER), "|" + "---|" * len(DEPENDENCIES_HEADER)]
+    for dependency in dependencies:
+        target_domain = _domain_link(links, dependency.target, f"`{dependency.target.name}`")
+        for reference in dependency.references:
+            source = _entry_link(links, reference.source, _reference_text(reference.source, domain))
+            if reference.in_state_machine:
+                source += "の状態の遷移"
+            target = project.entries[reference.target]
+            rows.append(_table_row([
+                target_domain,
+                escape_cell(source),
+                f"`{reference.key}`",
+                escape_cell(_entry_link(links, target, _reference_text(target, domain))),
+            ]))
+    blocks = [f"# {domain.full_name()} の依存", "\n".join(rows)]
+    return _document(f"{domain.dir}/", _file_id(domain, "dependencies"), blocks, links)
+
+
+def render_domains_dependencies(project: Project, dependencies: dict[str, list[DomainDependency]]) -> str:
+    """ドメインの依存の表と図。表はドメインの番号の順。図は、依存するドメインから依存先のドメインへの矢印を描く。"""
+    links = _Links(DOMAINS_DEPENDENCIES_PATH)
+    domains = sorted(project.domains, key=domain_order_key)
+    rows = [_table_row(DOMAINS_DEPENDENCIES_HEADER), "|" + "---|" * len(DOMAINS_DEPENDENCIES_HEADER)]
+    diagram = ["```mermaid", "flowchart BT"]
+    diagram += [f'  {DOMAIN_NODE_PREFIX}{d.name}["{_directory_name(d)}"]' for d in domains]
+    for domain in domains:
+        targets = [dep.target for dep in dependencies[domain.name]]
+        source = ""
+        if targets:
+            source = links.link(
+                f"`{_file_name('dependencies')}`", _file_id(domain, "dependencies"), file_path(domain, "dependencies"),
+                _file_title(domain, "dependencies"),
+            )
+        rows.append(_table_row([
+            _domain_link(links, domain, f"`{_directory_name(domain)}`"),
+            "・".join(_domain_link(links, t, f"`{_directory_name(t)}`") for t in targets),
+            source,
+        ]))
+        diagram += [f"  {DOMAIN_NODE_PREFIX}{domain.name} --> {DOMAIN_NODE_PREFIX}{t.name}" for t in targets]
+    diagram.append("```")
+    blocks = ["# ドメインの依存", "\n".join(rows), "\n".join(diagram)]
+    return _document(f"{DOMAINS_DIR.as_posix()}/", None, blocks, links)
+
+
+def render_domains_readme(project: Project, order: list[Domain]) -> str:
+    """ドメインの読む順の索引。"""
+    links = _Links(DOMAINS_README_PATH)
+    dependencies_link = links.file_link(
+        f"`{posixpath.basename(DOMAINS_DEPENDENCIES_PATH)}`", DOMAINS_DEPENDENCIES_PATH, "ドメインの依存"
+    )
+    rows = [_table_row(DOMAINS_README_HEADER), "|" + "---|" * len(DOMAINS_README_HEADER)]
+    for number, domain in enumerate(order, start=1):
+        rows.append(_table_row([
+            str(number), _domain_link(links, domain, f"`{_directory_name(domain)}`"), escape_cell(domain.description),
+        ]))
+    blocks = [
+        "# ドメインの読む順",
+        f"ドメインの依存の表と図は {dependencies_link} にある。",
+        "\n".join(rows),
+    ]
+    return _document(f"{DOMAINS_DIR.as_posix()}/", None, blocks, links)
+
+
 def render_readme(domain: Domain, files: list[str]) -> str:
     """files は、表に載せるファイルの種類の記号。ドメインのディレクトリの直下にある手書きのファイル (concept・problem・design)
-    を先に、このドメインで生成するファイル (models・unclassified_app_terms・functions・terms) を後に並べる。"""
+    を先に、このドメインで生成するファイル (models・unclassified_app_terms・functions・dependencies・terms) を後に並べる。"""
     path = f"{domain.dir}/{README}"
     links = _Links(path)
     blocks = [f"# {domain.full_name()}"]
@@ -349,6 +440,7 @@ def render_project(project: Project) -> dict[str, str]:
     """生成するファイルの、リポジトリのルートからの相対パスと内容。"""
     outputs: dict[str, str] = {}
     referencing = _referencing_models(project)
+    dependencies = all_dependencies(project)
     for domain in project.domains:
         # 手書きのファイルは、今あるものを表に載せる (足したり消したりすると、検査 a が README.md の生成し直しを求める)
         files = [s for s in names.HANDWRITTEN_FILE_KINDS if (project.root / file_path(domain, s)).is_file()]
@@ -361,10 +453,16 @@ def render_project(project: Project) -> dict[str, str]:
         if domain.operations or domain.preconditions or domain.events:
             outputs[file_path(domain, "functions")] = render_functions(project, domain)
             files.append("functions")
+        if dependencies[domain.name]:
+            outputs[file_path(domain, "dependencies")] = render_dependencies(project, domain, dependencies[domain.name])
+            files.append("dependencies")
         if any(True for _ in domain.entries()):
             outputs[file_path(domain, "terms")] = render_terms(domain)
             files.append("terms")
         outputs[f"{domain.dir}/{README}"] = render_readme(domain, files)
+    if project.domains:
+        outputs[DOMAINS_DEPENDENCIES_PATH] = render_domains_dependencies(project, dependencies)
+        outputs[DOMAINS_README_PATH] = render_domains_readme(project, reading_order(project, dependencies))
     if project.roles or any(d.operations for d in project.domains):
         outputs[PERMISSIONS_PATH] = render_permissions(project)
     if project.roles or any(True for d in project.domains for _ in d.entries()):

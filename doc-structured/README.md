@@ -42,7 +42,7 @@ bin/doc-structured version
 | `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文のうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベル・参照先を最初に指す `[文][ラベル]` の文など) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
 | `doc-structured refs <ID>` | その ID と子孫の ID を参照している、手書きの Markdown の箇所を「パス:行:列: <参照している ID> <リンク> (<行が属する ID>)」の形で出力する。生成したファイルと記録は探さない。見つからなくても終了コード 0。ID の形が違えば終了コード 1。YAML に誤りがあっても実行する |
 
-生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
+生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-1 (YAML のドメインの依存とモデルの参照の循環)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
 
 スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
 

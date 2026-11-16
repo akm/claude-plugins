@@ -16,50 +16,34 @@ doc-structured/rules/doc-structured-domains.md)。
 from pathlib import PurePosixPath
 
 from .documents import Index
-from .domains import STATE_MACHINE_OWNER, Project, spaced
+from .domains import Project
 from .links import resolve
 from .problems import Problem
 from .references import all_references
+from .yaml_references import yaml_references
 
 
 def _is_ancestor(target_dir: PurePosixPath, source_dir: PurePosixPath) -> bool:
     return target_dir != source_dir and target_dir in source_dir.parents
 
 
-def _yaml_references(project: Project):
-    """YAML の参照ごとに、参照を書いた YAML のパス・メッセージの先頭に書く参照の名前・参照先の ID・位置を返す。"""
-    for domain in project.domains:
-        for entry in domain.entries():
-            if entry.refers_to is not None:
-                yield entry.path, "refers_to", entry.refers_to, entry.refers_to_line, entry.refers_to_column
-            for reference in entry.references:
-                yield entry.path, f"{entry.owner} の {reference.key}", reference.target, reference.line, reference.column
-        for machine in domain.state_machines:
-            reference = machine.attribute_reference
-            if reference is not None:
-                yield machine.path, f"{STATE_MACHINE_OWNER}の attribute", reference.target, reference.line, reference.column
-            for transition in machine.transitions:
-                for reference in transition.references:
-                    yield machine.path, f"{spaced(machine.owner)}の {reference.key}", reference.target, reference.line, reference.column
-
-
 def check_direction(project: Project) -> list[Problem]:
     problems: list[Problem] = []
-    for path, prefix, target_id, line, column in _yaml_references(project):
-        if target_id not in project.entries:
+    for reference in yaml_references(project):
+        if reference.target not in project.entries:
             continue  # 参照先が無いことは検査 h が報告する
-        target = project.entries[target_id]
-        source_dir = PurePosixPath(path).parent
+        target = project.entries[reference.target]
+        source_dir = PurePosixPath(reference.path).parent
         target_dir = PurePosixPath(target.path).parent
         if _is_ancestor(target_dir, source_dir):
             problems.append(
                 Problem(
                     "i",
-                    path,
-                    f"{prefix} の参照先 {target.id} は、祖先のディレクトリの {target.path} にある。"
+                    reference.path,
+                    f"{reference.prefix} の参照先 {target.id} は、祖先のディレクトリの {target.path} にある。"
                     f"参照される定義 ({target.id}) を、参照するファイルと同じディレクトリかその下に移す",
-                    line,
-                    column,
+                    reference.line,
+                    reference.column,
                 )
             )
     return problems

@@ -27,12 +27,12 @@ class CheckTest(ProjectTestCase):
         )
 
     def test_sample_project_passes_all_light_checks(self):
-        for args in ((), ("--light",), ("--all",), ("--only", "a"), ("--only", "b"), ("--only", "c-2"), ("--only", "h"), ("--only", "i"), ("--only", "k")):
+        for args in ((), ("--light",), ("--all",), ("--only", "a"), ("--only", "b"), ("--only", "c-1"), ("--only", "c-2"), ("--only", "h"), ("--only", "i"), ("--only", "k")):
             with self.subTest(args=args):
                 result = self.run_check(*args)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertTrue(result.stdout.endswith(": 問題は無かった\n"), result.stdout)
-        self.assertEqual(self.run_check().stdout, "検査 a・b・c-2・h・i・k: 問題は無かった\n")
+        self.assertEqual(self.run_check().stdout, "検査 a・b・c-1・c-2・h・i・k: 問題は無かった\n")
 
     def test_operation_referring_to_missing_role_fails_check_h(self):
         # クローズ条件: 存在しないロールを参照する操作で、検査 h が失敗する
@@ -56,7 +56,7 @@ class CheckTest(ProjectTestCase):
         )
         self.assertIn("-貸し出した本。", result.stdout)
         self.assertIn("+貸し出した図書。", result.stdout)
-        self.assertIn("検査 a・b・c-2・h・i・k: 問題が 1 件あった", result.stdout)
+        self.assertIn("検査 a・b・c-1・c-2・h・i・k: 問題が 1 件あった", result.stdout)
 
     def test_check_a_reports_missing_generated_file(self):
         (self.project / "docs/glossary.md").unlink()
@@ -132,12 +132,12 @@ class CheckTest(ProjectTestCase):
         self.assertEqual(generate.returncode, 0, generate.stderr)
         self.assertEqual(self.run_check("--only", "a").returncode, 0)
 
-    def test_check_h_failure_skips_a_b_c2_and_i(self):
+    def test_check_h_failure_skips_a_b_c1_c2_and_i(self):
         self.write("docs/domains/03-members/domain.yaml", "domain:\n  description: [x\n")
         result = self.run_check()
         self.assertEqual(result.returncode, 1)
         self.assertIn("docs/domains/03-members/domain.yaml:3:1: 検査 h: YAML として読めない", result.stdout)
-        self.assertIn("YAML に誤りがあるので、検査 a・b・c-2・i を実行しなかった (誤りは検査 h で確認する)", result.stdout)
+        self.assertIn("YAML に誤りがあるので、検査 a・b・c-1・c-2・i を実行しなかった (誤りは検査 h で確認する)", result.stdout)
 
     def test_check_b_reports_with_path_line_and_column(self):
         path = self.project / "docs/domains/02-loans/concept.md"
@@ -202,7 +202,7 @@ class CheckTest(ProjectTestCase):
     def test_unknown_check_is_usage_error(self):
         result = self.run_check("--only", "j")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・c-2・h・i・k)", result.stderr)
+        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・c-1・c-2・h・i・k)", result.stderr)
 
     def test_options_are_mutually_exclusive(self):
         result = self.run_check("--light", "--all")
