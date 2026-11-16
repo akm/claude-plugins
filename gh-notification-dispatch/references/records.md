@@ -57,7 +57,7 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `started_at` | 最初に開始した時刻。これより前の通知と出来事は届けない (計画の R8)。U3 では、記録が無いときの最初の `tick` が書く |
 | `position` | 取得の位置。取得と判定で `gh` が 1 度も失敗しなかった直近の回の、`tick` を始めた時刻 (計画の KTD5) |
 | `etag` | `position` を書いた回の、通知の一覧の 1 ページ目の応答のヘッダ `Etag`。次の回のヘッダ `If-None-Match` に付ける (計画の KTD5) |
-| `viewer` | 自分のログイン名 (`login`) と、所属するチーム (`teams`。チームの `id`・`slug`・Organization の `login`) と、それらを取得した時刻 (`fetched_at`)。取得してから 1 日を過ぎた回に取得し直す (計画の KTD4) |
+| `viewer` | 自分のログイン名 (`login`) と、所属するチーム (`teams`。チームの `id`・`slug`・Organization の `login`) と、それらを取得した時刻 (`fetched_at`)。取得し直す時機は計画の KTD4 にある。サブコマンド `dispatcher set` はこの値を消し、次の `tick` が取得し直す |
 | `last_allocated` | 前の回に、最後にメッセージを割り当てた登録の ID と登録日時。次の回は、登録日時の順でこの登録の次の登録から割り当てる (計画の R13)。この登録が削除されていても、登録日時で次の登録が決まる |
 
 取得の範囲の起点は、`position` の 5 分前と `started_at` の遅いほうにする。起点は、API `GET /notifications` の引数 `since` と、出来事の時刻と比べる値の両方に使う (計画の KTD5)。

@@ -76,7 +76,9 @@ def _value_errors(*errors):
 def set_dispatcher(name, permission_mode, switch=False):
     """state.json に配信のセッションを記録する。ID は環境変数 CLAUDE_CODE_HOST_SESSION_ID から読む (KTD3 の確認と同じ値)。
 
-    記録と違うセッションなら、switch が真のときだけ書き換える (R16)。
+    記録と違うセッションなら、switch が真のときだけ書き換える (R16)。記録するときは、自分のログイン名と所属するチーム
+    (viewer) を消し、次の tick で取得し直す (KTD4 の、開始したときの取得し直し)。gh のアカウントを切り替えて開始し直した
+    ときに、前のアカウントで判定し続けないため。
     """
     session_id = store.current_session_id()
     errors = _session_errors(session_id, "配信") + _value_errors(messages.check_name(name),
@@ -94,6 +96,7 @@ def set_dispatcher(name, permission_mode, switch=False):
         record = {"session_id": session_id, "name": name, "permission_mode": permission_mode,
                   "recorded_at": store.format_time(store.now())}
         state["dispatcher"] = record
+        state.pop("viewer", None)
         tx.write(store.STATE, state)
     return {"status": "ok", "dispatcher": record, "previous": recorded if other else None, "switched": other,
             "errors": []}

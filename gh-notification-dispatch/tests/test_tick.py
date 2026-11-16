@@ -238,6 +238,17 @@ class OverlapAndTimingTest(StartedTickCase):
         code, out = self.tick()
         self.assertEqual((code, out["found"]), (0, 0))
 
+    def test_dispatcher_set_makes_next_tick_refresh_viewer(self):
+        """dispatcher set (スキル dispatch の start) の後の最初の tick は、1 日を過ぎていなくても、ログイン名と所属するチームを取得し直す (KTD4)。"""
+        self.serve()
+        at_start = len(self.calls("user/teams"))
+        self.assertEqual(self.cli("dispatcher", "set", "--name", "配信", "--permission-mode", "auto")[0], 0)
+        self.assertNotIn("viewer", self.state())
+        code, out = self.tick("2026-11-16T06:10:00Z")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(self.calls("user/teams")), at_start + 1)
+        self.assertEqual(self.state()["viewer"]["fetched_at"], "2026-11-16T06:10:00Z")
+
 
 class ResultsTest(StartedTickCase):
 
