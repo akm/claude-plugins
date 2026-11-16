@@ -128,7 +128,7 @@ def check_dependency_cycles(project: Project) -> list[Problem]:
         domain_graph(project, dependencies),
         "ドメインの依存",
         lambda reference: f"{_where(reference)} の {reference.target}",
-        "循環のどれかの参照を外すか、参照される定義を別のドメインに移す",
+        "循環のどれかの参照を外すか、参照される定義を、それを参照するドメインか、新しいドメインに移す",
     )
     for domain in sorted(project.domains, key=domain_order_key):
         problems += _cycle_problems(

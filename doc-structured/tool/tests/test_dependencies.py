@@ -156,7 +156,7 @@ class DependenciesTest(ProjectTestCase):
                 "docs/domains/02-loans/domain.yaml:16:20: 検査 c-1: ドメインの依存が循環している: "
                 "d-loans → d-members (docs/domains/02-loans/domain.yaml:16:20 の d-members-m-member)、"
                 "d-members → d-loans (docs/domains/03-members/domain.yaml:15:20 の d-loans-m-loan)。"
-                "循環のどれかの参照を外すか、参照される定義を別のドメインに移す"
+                "循環のどれかの参照を外すか、参照される定義を、それを参照するドメインか、新しいドメインに移す"
             ],
         )
 
