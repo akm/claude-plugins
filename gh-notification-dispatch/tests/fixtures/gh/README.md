@@ -16,3 +16,6 @@
 | `graphql-bad-field` | `gh api graphql` で存在しないフィールドを読む (`errors` の形) | 1 | issue-practice からコピー |
 | `api-user` | `gh api user` (REST。トークンのログイン)。`login`・`id`・`node_id`・`html_url`・`type` だけを残したもの | 0 | issue-practice からコピー |
 | `repo-not-found` | `gh api repos/akm/<存在しない名前>` (読めないリポジトリ。状態コード 404) | 1 | このプラグインで取った |
+| `repo-claude-plugins` | `gh api repos/akm/claude-plugins`。`id`・`name`・`full_name`・`private`・`owner` (`login`)・`html_url` だけを残したもの。大文字と小文字の違う名前 (`repos/AKM/Claude-Plugins`) でも、`full_name` は同じ値になった | 0 | このプラグインで取ったものを切り詰めた |
+| `repo-view` | リポジトリの作業ツリーで `gh repo view --json nameWithOwner` | 0 | このプラグインで取った |
+| `repo-view-not-git` | git のリポジトリでないディレクトリ (`/tmp`) で `gh repo view --json nameWithOwner` | 1 | このプラグインで取った |
