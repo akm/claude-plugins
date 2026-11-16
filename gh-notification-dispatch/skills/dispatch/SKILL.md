@@ -36,7 +36,7 @@ description: 配信のセッションとして、GitHub の PR のレビュー�
 
 1. ツール `CronList` で、プロンプトが `/gh-notification-dispatch:tick` の予定を探し、ツール `CronDelete` ですべて消す。Claude Desktop を再起動した後も、再起動の前の予定が残っていることがあるので、消してから作り、定期の予定を 1 つにする (計画の R18)。
 2. ツール `CronCreate` で、`cron` を `7-59/10 * * * *` (毎時 7 分から 10 分ごと)、`prompt` を `/gh-notification-dispatch:tick`、`recurring` を true にして予定を作る。
-3. `gh_notification_dispatch.py schedule record --job-id <ツール CronCreate が返したジョブの ID> --cron "7-59/10 * * * *"` を実行する。終了コード 3 で、出力の `not_dispatcher` が true なら、このセッションは記録と違うセッションなので、手順 2 で作った予定をツール `CronDelete` で消し、出力の `errors` を利用者に示して中断する。`not_dispatcher` が false (ジョブの ID か cron の式の形が違う・配信のセッションを確認できない) なら、作った予定を残したまま、出力の `errors` を利用者に示し、どうするかを質問する。
+3. `gh_notification_dispatch.py schedule record --job-id <ツール CronCreate が返したジョブの ID> --cron "7-59/10 * * * *"` を実行する。終了コード 3 なら、手順 2 で作った予定をツール `CronDelete` で消し、出力の `errors` を利用者に示して中断する。出力の `not_dispatcher` が true なら、このセッションは記録と違うセッションであると伝える。false (配信のセッションが記録されていない・環境変数が無い・ジョブの ID か cron の式の形が違う) なら、手順 1 で前の予定も消したので、原因を直してからこの節をやり直すことを伝え、どうするかを質問する。
 4. `gh_notification_dispatch.py status` を実行し、出力の `notice` (期限と延長の手順) と、ツール `CronCreate` の結果が示す次に実行される時刻を利用者に示す。定期の予定は 7 日で消えること、期限の 24・6・1 時間前に確認を出すことを伝える。
 
 ## `start`
