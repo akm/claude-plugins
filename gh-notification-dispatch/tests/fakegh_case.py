@@ -68,6 +68,22 @@ def timeline_event(event_id, created_at, login=None, team_id=None, event="review
     return item
 
 
+def pull(repo, number, state="open", merged_at=None, title="題名", requested=(), teams=()):
+    """API GET /repos/{owner}/{repo}/pulls/{number} の応答のうち、判定に使うキー。キーは 2026-11-16 に公開のリポジトリで
+    確認した形。merged_at があれば、state は closed にする (マージされた PR は閉じている)。"""
+    return {"number": number, "state": "closed" if merged_at else state, "title": title,
+            "html_url": f"https://github.com/{repo}/pull/{number}", "merged": merged_at is not None, "merged_at": merged_at,
+            "requested_reviewers": [{"login": login, "id": 2, "type": "User"} for login in requested],
+            "requested_teams": [{"id": team_id, "name": f"team{team_id}", "slug": f"team{team_id}"} for team_id in teams],
+            "base": {"repo": {"full_name": repo}}}
+
+
+def review(login, review_id=1, state="APPROVED", submitted_at="2026-11-16T06:10:00Z"):
+    """API GET /repos/{owner}/{repo}/pulls/{number}/reviews の要素のうち、判定に使うキー (GitHub の文書の形)。"""
+    return {"id": review_id, "user": {"login": login, "id": 3, "type": "User"}, "state": state,
+            "submitted_at": submitted_at}
+
+
 def link_next(path, last_page=9):
     """ヘッダ Link の値 (rel="next" と rel="last")。path は API_ORIGIN を除いたパス。"""
     return f'<https://api.github.com/{path}>; rel="next", <https://api.github.com/{path}&last={last_page}>; rel="last"'
