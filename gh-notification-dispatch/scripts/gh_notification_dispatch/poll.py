@@ -1,8 +1,14 @@
 """通知の取得と取得の位置と、1 回の取得 (サブコマンド tick) の流れ (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md
-の R8・R10〜R15・KTD4〜KTD6)。
+の R8・R10〜R17・KTD4〜KTD6・KTD9)。
 
-1 回の取得は、次の順に行う。すべて、記録のディレクトリのロックを取った間に行う。
+1 回の取得は、次の順に行う。すべて、記録のディレクトリのロックを取った間に行う。実行しているセッションが記録の配信の
+セッションでなければ、ロックを取る前に (記録のディレクトリの共通の確認で) 中断し、取得も出力もしない。出力の
+`not_dispatcher` で、そのセッションの定期の予定を消すよう示す (R16。切り替えた後に、前の配信のセッションに残った予定が
+配信しないため)。
 
+0. 定期の予定の期限までの残りが、まだ確認を出していない閾値を切っていれば、確認を出力し、出したことを記録する。
+   後の手順で gh が失敗しても、この記録は残す。期限を過ぎていれば、期限切れと再開の手順を出力する。どちらの回も、
+   取得と配信は通常どおり行う (R17・KTD9)。
 1. 前の回の対応が残っていれば (settle が呼ばれないまま中断した回)、集計して消す (KTD6)。
 2. 取得の範囲の起点を決める。`position` の 5 分前と `started_at` の遅いほう。記録が無い最初の回は、今の時刻を
    `started_at` と `position` にする (R8)。
@@ -22,6 +28,7 @@ import datetime
 
 from . import events as events_module
 from . import gh, outbox, store
+from . import schedule as schedule_module
 from . import tracked as tracked_module
 
 WINDOW_MARGIN = datetime.timedelta(minutes=5)  # 取得の範囲の起点を取得の位置より前にする幅 (KTD5)
@@ -79,10 +86,11 @@ def tick():
     now_text = store.format_time(now)
     payload = {"tick_at": now_text, "window_start": None, "position": None, "not_modified": False, "found": 0,
                "messages": [], "waiting": 0, "expired": [], "previous_round": None, "became_unreachable": [],
-               "failed_call": None, "summary": None, "errors": []}
+               "failed_call": None, "schedule_notice": None, "not_dispatcher": False, "summary": None, "errors": []}
     try:
         with store.transaction() as tx:
             state = tx.read(store.STATE)
+            payload["schedule_notice"] = _schedule_notice(tx, state, now)
             subscriptions_data = tx.read(store.SUBSCRIPTIONS) or {"version": store.VERSION, "subscriptions": []}
             box, delivered = outbox.load(tx)
             tracked = tracked_module.load(tx)
@@ -150,8 +158,20 @@ def tick():
                            "found": payload["found"], "messages": len(payload["messages"]), "waiting": payload["waiting"],
                            "expired": sum(e["count"] for e in payload["expired"])})
     except store.NotDispatcher as e:
-        return {"status": "unsatisfied", **payload, "errors": [str(e)]}
+        return {"status": "unsatisfied", **payload, "not_dispatcher": True, "errors": [str(e)]}
     return {"status": "ok", **payload}
+
+
+def _schedule_notice(tx, state, now):
+    """定期の予定の期限の確認か、期限切れの出力 (R17・KTD9)。確認を出したら、その回のうちに記録する。"""
+    schedule = state.get("schedule")
+    hours = schedule_module.take_reminder(schedule, now)
+    if hours is not None:
+        tx.write(store.STATE, state)
+        return schedule_module.reminder_notice(schedule, now, hours)
+    if schedule_module.is_expired(schedule, now):
+        return schedule_module.expired_notice(schedule)
+    return None
 
 
 def _failed(tx, payload, failure):

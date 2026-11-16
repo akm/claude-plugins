@@ -280,6 +280,8 @@ def build_parser():
 
     p = _add(groups, "tick", cmd_tick,
              "通知を取得してレビューの依頼とマージを判定し、送信待ちに入れ、この回に送るメッセージを出力する (定期の予定が実行する)。\n"
+             "定期の予定の期限までの残りが 24・6・1 時間を切った回には、続けるかの確認を出力する。期限を過ぎた回も、取得と\n"
+             "配信を通常どおり行い、期限切れを出力する。\n"
              "前の回のメッセージの結果が集計されていなければ (settle が呼ばれていなければ)、始めに集計する。\n"
              "取得の範囲の起点は、取得の位置の 5 分前と、最初に開始した時刻の遅いほう。記録が無い最初の回は、今の時刻を\n"
              "開始した時刻と取得の位置にする。gh が失敗したら、取得の位置を変えずに終了コード 4 で返す",
@@ -295,10 +297,13 @@ def build_parser():
              "  previous_round      始めに集計した前の回 (settle と同じ形)。無ければ null\n"
              "  became_unreachable  前の回の集計で、届かない登録になった登録の配列\n"
              "  failed_call         gh が失敗した呼び出し {api, repo, number}。失敗しなければ null\n"
+             "  schedule_notice     定期の予定の期限の確認か期限切れ {kind (reminder・expired), hours (24・6・1。expired は null),\n"
+             "                      text}。どちらも無ければ null。確認は、閾値ごとに 1 回だけ出す (gh が失敗した回も)\n"
+             "  not_dispatcher      このセッションが記録の配信のセッションでないか。true なら、このセッションの定期の予定を消す\n"
              "  summary             利用者に示す 1 行の要約\n"
              "  errors              取得しなかった理由の配列\n"
              "  gh_error            gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
-             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER,
+             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER + "。取得も出力もしない (not_dispatcher が true)",
                         "gh が失敗した (認証切れ・読めないリポジトリ・rate limit など)。failed_call の呼び出しを示す"))
 
     p = _add(groups, "ack", cmd_ack,
