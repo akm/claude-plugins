@@ -176,7 +176,7 @@ class DependenciesTest(ProjectTestCase):
 
     def test_cycle_still_generates_reading_order_by_numbers(self):
         self.cycle_between_loans_and_members()
-        # loans と members は互いに依存するので、番号の小さい loans を先に置く
+        # loans と members は互いに依存するので、番号の小さい loans を先に並べる
         self.assertEqual(self.order(), ["01-catalog", "02-loans", "03-members"])
         self.install_bin()
         self.write_config()

@@ -4,7 +4,7 @@
 そのドメインへの依存に数える (決定の一覧の問 5)。ロールはどのドメインにも属さないので、依存に数えない。
 決めた経緯は Issue #202 のコメント。要点:
   - 読む順は、依存されるドメインを先にする。並べられるドメイン (依存先がすべて並んだドメイン) が複数あれば、番号の小さいものを
-    先にする。循環に入っていて並べられないドメインが残ったら、その中で番号の最も小さいものを先に置き、同じ規則で続ける
+    先にする。循環に入っていて並べられないドメインが残ったら、その中で番号の最も小さいものを次に並べ、同じ規則で続ける
   - 検査 c-1 は、ドメイン間の依存と、同じドメインのモデル間の参照 (属性の refers_to) に循環が無いことを確認する。
     モデルの自己参照は報告しない。報告は検査 c-2 と同じ形 (循環のまとまりごとに 1 件で、最も小さい ID から始まる
     最も短い循環を、矢印ごとにその矢印を作る最初の参照の位置と一緒に書く)
@@ -69,7 +69,7 @@ def reading_order(project: Project, dependencies: dict[str, list[DomainDependenc
     order: list[Domain] = []
     while remaining:
         ready = [d for d in remaining if all(dep.target.name in placed for dep in dependencies[d.name])]
-        # 循環のため並べられるドメインが無ければ、残りの中で番号の最も小さいものを先に置く
+        # 循環のため並べられるドメインが無ければ、残りの中で番号の最も小さいものを次に並べる
         chosen = ready[0] if ready else remaining[0]
         remaining.remove(chosen)
         placed.add(chosen.name)
