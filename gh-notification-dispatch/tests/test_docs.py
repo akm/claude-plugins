@@ -3,6 +3,8 @@
 
 - 文書 `gh-notification-dispatch/references/messages.md` の type とキーの表・値の一覧・例が、モジュール messages の
   定数と解析に一致する (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md の KTD8)
+- ファイル `gh-notification-dispatch/README.md` のスキルの表が、ディレクトリ `gh-notification-dispatch/skills/` のスキルを
+  すべて挙げている
 - 入口 (ファイル `gh-notification-dispatch/scripts/gh_notification_dispatch.py`) の docstring のサブコマンドの一覧と、
   サブコマンドごとの --help が、引数・出力・終了コードを示す (計画の KTD11)
 
@@ -118,6 +120,29 @@ class MessagesDocTest(unittest.TestCase):
             messages.removed([{"repo": "akm/claude-plugins", "kind": "merged"}]),
         ]
         self.assertEqual(examples, composed)
+
+
+SKILLS = os.path.join(HERE, "..", "skills")
+README = os.path.join(HERE, "..", "README.md")
+
+
+class SkillListingDocTest(unittest.TestCase):
+    """スキルを足したときに、README に書き損ねないこと。"""
+
+    def test_readme_lists_every_skill(self):
+        skills = sorted(name for name in os.listdir(SKILLS) if os.path.isfile(os.path.join(SKILLS, name, "SKILL.md")))
+        self.assertTrue(skills)
+        with open(README, encoding="utf-8") as f:
+            rows = table_rows(f.read(), "| スキル | すること |")
+        listed = sorted(re.match(r"\[([a-z-]+)\]", cells[0]).group(1) for cells in rows)
+        self.assertEqual(listed, skills)
+
+    def test_skill_names_match_directories(self):
+        for name in os.listdir(SKILLS):
+            with self.subTest(skill=name), open(os.path.join(SKILLS, name, "SKILL.md"), encoding="utf-8") as f:
+                front = f.read().split("---\n", 2)[1]
+                self.assertIn(f"name: {name}\n", front)
+                self.assertRegex(front, r"\ndescription: .+\n")
 
 
 def entry_subcommands():

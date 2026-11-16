@@ -1,10 +1,26 @@
 # gh-notification-dispatch
 
-GitHub の通知から PR のレビューの依頼と PR のマージを判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへ届けるプラグインです。**作成中**です。何を作るかは Issue [#284](https://github.com/akm/claude-plugins/issues/284) と、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) にあります。
+GitHub の通知から PR のレビューの依頼と PR のマージを判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへ届けるプラグインです。**作成中**です。今は、登録の申し込み・一覧・番号での削除と、配信のセッションの記録だけができます。通知の取得と配信、定期の予定はまだありません。何を作るかは Issue [#284](https://github.com/akm/claude-plugins/issues/284) と、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) にあります。
+
+GitHub の通知を定期的に取得してほかのセッションへ届けるセッションを、配信のセッションと呼びます (1 台のマシンに 1 つ)。通知を受け取るセッションを、受信のセッションと呼びます。
 
 ## 使えるスキル
 
-まだありません。スキルは、計画の実装単位 U2〜U5 で足します。
+| スキル | すること |
+| --- | --- |
+| [dispatch](skills/dispatch/SKILL.md) | 配信のセッションとして、このセッションを記録し (`start` の最初の手順)、受信のセッションから届いた登録と削除の申し込みを記録して返事を送る。登録の一覧 (`list`) と、一覧の番号での削除 (`remove`) も行う |
+| [subscribe](skills/subscribe/SKILL.md) | 受信のセッションとして、(リポジトリ, 種類) の登録を配信のセッションへのメッセージで申し込む。自分の登録の一覧 (`--list`) と、一覧の番号での削除 (`--remove`) も行う |
+
+## 今あるもの
+
+| 場所 | 中身 |
+| --- | --- |
+| [skills/](skills/) | スキル (上の表) |
+| [references/messages.md](references/messages.md) | セッション間のメッセージの様式 |
+| [references/records.md](references/records.md) | 記録のディレクトリ (`~/.claude/gh-notification-dispatch/`) と、受信のセッションの一時ディレクトリのファイルの様式 |
+| [scripts/gh_notification_dispatch.py](scripts/gh_notification_dispatch.py) | スクリプトの入口。サブコマンドの引数・出力・終了コードは `--help` で確認する |
+| [scripts/gh_notification_dispatch/](scripts/gh_notification_dispatch/) | スクリプトのパッケージ (`gh` の実行・記録の読み書き・メッセージの生成と解析・登録) |
+| [tests/](tests/) | スクリプトの自動テスト。偽の `gh` と固定データで実行する |
 
 ## テスト
 
