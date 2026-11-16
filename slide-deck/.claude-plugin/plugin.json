@@ -1,7 +1,7 @@
 {
   "name": "slide-deck",
   "description": "図を中心にした説明資料を、構成案から PowerPoint のファイルと Google スライドの両方に作り、一部のスライドだけを直せるようにするスキルとツール",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "akm"
   },

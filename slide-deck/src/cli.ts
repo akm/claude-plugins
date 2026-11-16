@@ -296,7 +296,7 @@ check の検査に加えて、図形が ${String(MAX_OBJECTS_PER_SLIDE)} 個を�
 
 読み込みで指定する項目 (Google スライドのコネクタで資料を読み込むときの fields):
   ${PRESENTATION_FIELDS}
-読み込みの結果は、加工せずに build/presentation.json に書く。期待する形:
+読み込みの結果は、加工せずに build/presentation.json に書く (資料が項目 content の中にあっても、そのまま書く)。期待する形:
 ${indent(PRESENTATION_SHAPE)}
 
 作業の決め方:
