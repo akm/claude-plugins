@@ -350,15 +350,15 @@ class FirstUseTest(ScratchTestCase):
         self.write(
             path,
             self.read(path)
-            + "      status:\n        name_ja: 貸出状態\n        definition: 予約した図書の貸出が今どの段階にあるか。\n",
+            + "      loan_status:\n        name_ja: 貸出状態\n        definition: 予約した図書の貸出が今どの段階にあるか。\n",
         )
         self.assertEqual(self.run_tool("generate").returncode, 0)
-        result, body = self.fix("[d-loans-m-loan-a-status]・[d-loans-m-reservation-a-status]")
+        result, body = self.fix("[d-loans-m-loan-a-status]・[d-loans-m-reservation-a-loan_status]")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
             body,
             "[モデル「貸出」の属性「貸出状態」][d-loans-m-loan-a-status]・"
-            "[モデル「予約」の属性「貸出状態」][d-loans-m-reservation-a-status]",
+            "[モデル「予約」の属性「貸出状態」][d-loans-m-reservation-a-loan_status]",
         )
         self.assertCheckPasses()
 

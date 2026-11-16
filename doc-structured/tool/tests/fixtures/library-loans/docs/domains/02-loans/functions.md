@@ -44,6 +44,15 @@
 - 前提: [前提「先の予約が無い」][d-loans-pre-no_previous_reservation]
 - 行えるロール: [ロール「司書」][r-librarian]・[ロール「利用者」][r-member]
 
+<a name="d-loans-op-cancel_reservation"></a>
+
+## 操作「予約を取り消す」 `cancel_reservation`
+
+利用者の申し出で、予約を取り消す。
+
+- 対象: [モデル「予約」の属性「予約状態」][d-loans-m-reservation-a-status]
+- 行えるロール: [ロール「司書」][r-librarian]・[ロール「利用者」][r-member]
+
 <a name="d-loans-pre-book_shelved"></a>
 
 ## 前提「図書が配架中」 `book_shelved`
@@ -68,6 +77,22 @@
 
 - 対象: [モデル「予約」][d-loans-m-reservation]・[モデル「予約」の属性「前の予約」][d-loans-m-reservation-a-previous]
 
+<a name="d-loans-pre-first_in_line"></a>
+
+## 前提「予約の順番が先頭」 `first_in_line`
+
+返った図書について、この予約より前の予約が無い。
+
+- 対象: [モデル「予約」の属性「前の予約」][d-loans-m-reservation-a-previous]
+
+<a name="d-loans-pre-hold_expired"></a>
+
+## 前提「取り置きの期限を過ぎた」 `hold_expired`
+
+取り置きを始めてから、決めた日数が過ぎた。
+
+- 対象: [モデル「予約」の属性「予約状態」の値「取り置き中」][d-loans-m-reservation-a-status-v-on_hold]
+
 <a name="d-loans-ev-book_lent"></a>
 
 ## イベント「図書を貸し出した」 `book_lent`
@@ -89,6 +114,8 @@
 [d-loans-m-loan-a-status-v-on_loan]: models.md#d-loans-m-loan-a-status-v-on_loan "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」"
 [d-loans-m-reservation]: models.md#d-loans-m-reservation "ドメイン `loans` のモデル「予約」"
 [d-loans-m-reservation-a-previous]: models.md#d-loans-m-reservation-a-previous "ドメイン `loans` のモデル「予約」の属性「前の予約」"
+[d-loans-m-reservation-a-status]: models.md#d-loans-m-reservation-a-status "ドメイン `loans` のモデル「予約」の属性「予約状態」"
+[d-loans-m-reservation-a-status-v-on_hold]: models.md#d-loans-m-reservation-a-status-v-on_hold "ドメイン `loans` のモデル「予約」の属性「予約状態」の値「取り置き中」"
 [d-loans-pre-book_shelved]: #d-loans-pre-book_shelved "ドメイン `loans` の前提「図書が配架中」"
 [d-loans-pre-loan_on_loan]: #d-loans-pre-loan_on_loan "ドメイン `loans` の前提「貸出が貸出中」"
 [d-loans-pre-no_previous_reservation]: #d-loans-pre-no_previous_reservation "ドメイン `loans` の前提「先の予約が無い」"

@@ -127,7 +127,7 @@ docs/
 | 操作 | `domain.yaml` → 生成 `functions.md` |
 | 設計の判断と短い理由 | `design.md` |
 
-- 状態の遷移は 1 つの YAML の形式で書く。2〜3 個の状態で条件が無ければ属性の下に書き、複雑ならファイル `state-machines-<属性>.yaml` に書く (`domain.yaml` と同じディレクトリ。サブディレクトリ `state-machines/` にはしない。遷移は操作などから参照されうるので、サブディレクトリに置くと参照の向きの規則に反しやすいため)。遷移表 (Markdown) と図 (mermaid の stateDiagram-v2) を生成する。
+- 状態の遷移は 1 つの YAML の形式で書く。属性の値が 3 つ以下で、どの遷移にも条件 (前提) が無ければ属性の下に書け (それ以外は検査 h の誤り)、そうでなければファイル名が `state-machines-` で始まる YAML (`state-machines-<属性>.yaml` など) に書く。ファイルは、属性を定義した YAML と同じディレクトリか、その祖先のディレクトリに置く (サブディレクトリ `state-machines/` にはしない。状態の遷移は属性とその値を参照するので、属性より下のディレクトリに置くと参照の向きの規則に反するため)。遷移表 (Markdown) と図 (mermaid の stateDiagram-v2) を `models.md` に生成する。決めた形は [rules/doc-structured-domains.md](../rules/doc-structured-domains.md) の「状態の遷移」 (sub-issue 6 で決めた。経緯は [#201](https://github.com/akm/claude-plugins/issues/201))。
 - 要件を別の項目として持たない。定義が要件になる。
 
 ## 問 4: スキーマ
@@ -370,6 +370,7 @@ docs/
 | 問 14: 2 回目以降は `[ラベル]` と書く | 名前が見える形 (`[ラベル]` か `[名前][ラベル]`) で書く | sub-issue 4b ([#197](https://github.com/akm/claude-plugins/issues/197)) |
 | 問 15: 手書きの節の本文を、マークで囲んでコピー先に書き、`generate` と検査 a でコピー元と同じに保つ | 取り消した。読みやすさのためにはコピーしない | sub-issue 4d ([#199](https://github.com/akm/claude-plugins/issues/199)) の検討 |
 | 問 1: 記号 `pre` の種類の名前は「操作の前提」 | 「前提」。前提の親はドメインで、完全な名前の中で「操作の前提」と書くと操作の子のように読めるため | sub-issue 5 ([#200](https://github.com/akm/claude-plugins/issues/200)) |
+| 問 3: 2〜3 個の状態で条件が無ければ属性の下に書き、複雑ならファイル `state-machines-<属性>.yaml` (`domain.yaml` と同じディレクトリ) に書く | 属性の値が 3 つ以下で、どの遷移にも前提が無いときだけ属性の下に書ける (検査 h)。ファイル名は `state-machines-` で始め、属性を定義した YAML と同じディレクトリか祖先のディレクトリに置く | sub-issue 6 ([#201](https://github.com/akm/claude-plugins/issues/201)) |
 
 ## 計画で決めること・確認したこと
 

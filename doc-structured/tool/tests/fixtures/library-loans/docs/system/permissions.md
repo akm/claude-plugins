@@ -22,9 +22,11 @@
 | [返却を受け付ける][d-loans-op-return_book] | [`loans`][d-loans] | ○ | |
 | [延滞を通知する][d-loans-op-notify_overdue] | [`loans`][d-loans] | | |
 | [予約する][d-loans-op-reserve] | [`loans`][d-loans] | ○ | ○ |
+| [予約を取り消す][d-loans-op-cancel_reservation] | [`loans`][d-loans] | ○ | ○ |
 | [利用者を登録する][d-members-op-register] | [`members`][d-members] | ○ | |
 
 [d-loans]: ../domains/02-loans/README.md#d-loans "ドメイン `loans`"
+[d-loans-op-cancel_reservation]: ../domains/02-loans/functions.md#d-loans-op-cancel_reservation "ドメイン `loans` の操作「予約を取り消す」"
 [d-loans-op-lend]: ../domains/02-loans/functions.md#d-loans-op-lend "ドメイン `loans` の操作「貸し出す」"
 [d-loans-op-notify_overdue]: ../domains/02-loans/functions.md#d-loans-op-notify_overdue "ドメイン `loans` の操作「延滞を通知する」"
 [d-loans-op-reserve]: ../domains/02-loans/functions.md#d-loans-op-reserve "ドメイン `loans` の操作「予約する」"

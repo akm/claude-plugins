@@ -1,0 +1,19 @@
+# 予約 (サブディレクトリ reservations/ の reservation.yaml) の予約状態の、状態の遷移。値が 4 つあり、前提のある遷移を
+# 持つので、属性の下ではなくこのファイルに書く。直下の domain.yaml の操作も参照するので、このディレクトリに置く
+state_machine:
+  attribute: d-loans-m-reservation-a-status
+  initial: waiting
+  transitions:
+    - from: [waiting]
+      to: on_hold
+      operations: [d-loans-op-return_book]
+      preconditions: [d-loans-pre-first_in_line]
+    - from: [on_hold]
+      to: fulfilled
+      operations: [d-loans-op-lend]
+    - from: [waiting, on_hold]
+      to: cancelled
+      operations: [d-loans-op-cancel_reservation]
+    - from: [on_hold]
+      to: cancelled
+      preconditions: [d-loans-pre-hold_expired]
