@@ -9,7 +9,7 @@ import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import PptxGen from "pptxgenjs";
-import sampleDeck from "../examples/sample/deck.ts";
+import sampleDeck from "../examples/sample/deck.mts";
 import { assembleDeck } from "../src/check/deck.ts";
 import { arrow, box, bullets, parts, slide, text } from "../src/data/parts.ts";
 import { SCHEME_COLOR_NAMES, type Theme } from "../src/data/theme.ts";
@@ -89,7 +89,7 @@ async function figureShapes(deck: Deck): Promise<string[]> {
 }
 
 describe("見本の資料の PowerPoint のファイル", () => {
-  test("スライドの数・各スライドの図形の順序と段落ごとの文字・発表者ノートが、構成案と deck.ts の図と一致する", async () => {
+  test("スライドの数・各スライドの図形の順序と段落ごとの文字・発表者ノートが、構成案と deck.mts の図と一致する", async () => {
     const deck = sample();
     const read = await render(deck);
     const presentation = await read("ppt/presentation.xml");

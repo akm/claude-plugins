@@ -9,16 +9,16 @@
 | スキル | 入力 | 出力 |
 | --- | --- | --- |
 | `slide-deck:outline` | 利用者の依頼 | 構成案 `outline.md` (資料の情報と、スライドごとのキー・題名・一言・図の説明・発表者ノート) |
-| `slide-deck:build` | 構成案 | 資料ごとのスクリプト `deck.ts` と、PowerPoint のファイル `build/deck.pptx` |
-| `slide-deck:publish` | 構成案と `deck.ts` | Google スライドの資料 (URL と、最後に反映したプラグインの版を構成案に記録する) |
+| `slide-deck:build` | 構成案 | 資料ごとのスクリプト `deck.mts` と、PowerPoint のファイル `build/deck.pptx` |
+| `slide-deck:publish` | 構成案と `deck.mts` | Google スライドの資料 (URL と、最後に反映したプラグインの版を構成案に記録する) |
 
-直すときも同じ 3 つのスキルを使います。まず構成案を直し (`outline`)、`deck.ts` と PowerPoint のファイルを作り直し (`build`)、Google スライドでは内容が変わったスライドだけを作り直します (`publish`)。
+直すときも同じ 3 つのスキルを使います。まず構成案を直し (`outline`)、`deck.mts` と PowerPoint のファイルを作り直し (`build`)、Google スライドでは内容が変わったスライドだけを作り直します (`publish`)。
 
 ## しくみ
 
 - **構成案** (ファイル `outline.md`): スライドの順序・題名・一言・発表者ノートを Markdown で書きます。文がすべて構成案にあるので、文章の規約の検査をそのままかけられます。書式は [references/outline-format.md](references/outline-format.md)。
-- **資料ごとのスクリプト** (ファイル `deck.ts`): キーごとの図だけを、部品の関数で TypeScript で書きます。書き方は [references/deck-script.md](references/deck-script.md)。
-- **スライドのデータ**: 構成案と `deck.ts` から作る、型で形を決めた値です。PowerPoint の書き出しと、Google スライドの指示の作成の両方が、同じデータを読みます。
+- **資料ごとのスクリプト** (ファイル `deck.mts`): キーごとの図だけを、部品の関数で TypeScript で書きます。書き方は [references/deck-script.md](references/deck-script.md)。
+- **スライドのデータ**: 構成案と `deck.mts` から作る、型で形を決めた値です。PowerPoint の書き出しと、Google スライドの指示の作成の両方が、同じデータを読みます。
 - **キー**: スライドを指す名前で、構成案で決めます。Google スライドのスライドの ID は `sd_<キー>_<内容のハッシュ値>` で、資料を読むだけで、どのスライドの内容が変わったかが決まります。利用者が Google スライドで足したスライド (キーの無いスライド) は、内容を変えずに残します。
 - **テーマの色**: 6 つのアクセント色に資料ごとに意味を割り当て、図形の色はテーマの色の名前で指定します。PowerPoint のファイルのテーマと、Google スライドのマスターの配色に書き込みます。
 
@@ -51,7 +51,7 @@ node <プラグインのディレクトリ>/src/cli.ts setup status
 
 ## 資料のディレクトリ
 
-1 つの資料の `outline.md` と `deck.ts` を作るディレクトリです。git で管理するかはプロジェクトごとに違うので、スキル `outline` が毎回質問します (案として `tmp/slides/<資料名>/` を添えます)。ツールは、生成したファイルを資料のディレクトリの `build/` に書き、その中に内容が `*` のファイル `.gitignore` を書きます。プロジェクトの `.gitignore` は変えません。
+1 つの資料の `outline.md` と `deck.mts` を作るディレクトリです。git で管理するかはプロジェクトごとに違うので、スキル `outline` が毎回質問します (案として `tmp/slides/<資料名>/` を添えます)。ツールは、生成したファイルを資料のディレクトリの `build/` に書き、その中に内容が `*` のファイル `.gitignore` を書きます。プロジェクトの `.gitignore` は変えません。
 
 見本の資料 (題材は「キャッシュのしくみ」、4 枚) が、ディレクトリ [examples/sample/](examples/sample/) にあります。スキルの手順の例と、テストの入力に使っています。
 
@@ -64,7 +64,7 @@ node <プラグインのディレクトリ>/src/cli.ts setup status
 | `setup status` | ライブラリが入っているかと、取得するものを示す |
 | `setup install` | 入っていないライブラリだけを入れる |
 | `check-outline` | 構成案の書式だけを検査し、資料の情報と【提案】のスライドを示す |
-| `check` | 構成案と `deck.ts` を検査する (tsc と eslint・キーの突き合わせ・文字のはみ出しの見積もり) |
+| `check` | 構成案と `deck.mts` を検査する (tsc と eslint・キーの突き合わせ・文字のはみ出しの見積もり) |
 | `pptx` | `check` に合格したときだけ PowerPoint のファイルを書き、テーマの色を書き込み、形式を検査する |
 | `requests` | `check` に合格したときだけ、Google スライドから読み込んだ結果と比べて、指示のファイルを書く |
 | `write-info` | 構成案に、Google スライドの URL の行と slide-deck の版の行を書き込む |

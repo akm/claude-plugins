@@ -1,5 +1,5 @@
 // 資料のディレクトリの構成案 outline.md だけを扱う入口の処理 (サブコマンド check-outline と write-info。計画の KTD17)。
-// check-outline は、deck.ts とライブラリが無くても、構成案の書式を検査できるようにする (スキル outline が使う)。
+// check-outline は、deck.mts とライブラリが無くても、構成案の書式を検査できるようにする (スキル outline が使う)。
 // write-info は、資料の情報に Google スライドの URL の行と slide-deck の版の行を書き込む (スキル publish が使う。計画の R15・KTD10)。
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";

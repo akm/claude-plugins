@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import sampleDeck from "../examples/sample/deck.ts";
+import sampleDeck from "../examples/sample/deck.mts";
 import { assembleDeck } from "../src/check/deck.ts";
 import { arrow, badge, box, bullets, parts, slide, text } from "../src/data/parts.ts";
 import { schemeColorValues, type Theme } from "../src/data/theme.ts";

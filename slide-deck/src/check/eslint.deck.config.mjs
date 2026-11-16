@@ -1,4 +1,4 @@
-// サブコマンド check が、資料ごとのスクリプト deck.ts を eslint で検査するときに渡す設定 (計画の KTD4・KTD8)。
+// サブコマンド check が、資料ごとのスクリプト deck.mts を eslint で検査するときに渡す設定 (計画の KTD4・KTD8)。
 // 規則は、プラグインのコードの設定 (ファイル eslint.config.mjs) と同じ tseslint.configs.strictTypeChecked にする。
 // プラグインのディレクトリには node_modules が無いので、この設定ファイルからの import では @eslint/js と typescript-eslint を読み込めない。
 // そのため、check が環境変数 SLIDE_DECK_NODE_MODULES に指定したキャッシュの node_modules から、場所を明示して読み込む。
@@ -22,7 +22,7 @@ const js = require("@eslint/js");
 const tseslint = require("typescript-eslint");
 
 export default defineConfig({
-  files: ["**/*.ts"],
+  files: ["**/*.mts"],
   extends: [js.configs.recommended, tseslint.configs.strictTypeChecked],
   languageOptions: {
     parserOptions: {

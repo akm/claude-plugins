@@ -1,5 +1,5 @@
-// 資料ごとのスクリプト deck.ts が、名前 slide-deck で import type する型 (計画の KTD2)。
-// deck.ts はプラグインのモジュールを実行時に import しないので、ここからは型だけを書き出す。
+// 資料ごとのスクリプト deck.mts が、名前 slide-deck で import type する型 (計画の KTD2)。
+// deck.mts はプラグインのモジュールを実行時に import しないので、ここからは型だけを書き出す。
 
 import type { Parts } from "./data/parts.ts";
 import type { SlideFigure } from "./data/types.ts";

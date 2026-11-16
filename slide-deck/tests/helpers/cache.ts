@@ -5,7 +5,7 @@
 // - キャッシュのディレクトリ (環境変数 SLIDE_DECK_CACHE_DIR)。node-<ハッシュ値>/node_modules は、
 //   CI が npm ci で入れたファイル slide-deck/node_modules へのシンボリックリンクにする。
 //   venv は、フラグファイルと、引数を記録するだけの bin/python を持つ偽物にする (CI には pptx のスキルが無いため)。
-// - 資料のディレクトリ。見本の資料 examples/sample/ の outline.md と deck.ts をコピーする。
+// - 資料のディレクトリ。見本の資料 examples/sample/ の outline.md と deck.mts をコピーする。
 
 import {
   chmodSync,
@@ -112,7 +112,7 @@ export function makeSandbox(options: SandboxOptions = {}): TestSandbox {
     copySample(relative = "deck") {
       const dir = join(root, relative);
       mkdirSync(dir, { recursive: true });
-      for (const f of ["outline.md", "deck.ts"]) cpSync(join(PLUGIN_DIR, "examples", "sample", f), join(dir, f));
+      for (const f of ["outline.md", "deck.mts"]) cpSync(join(PLUGIN_DIR, "examples", "sample", f), join(dir, f));
       return dir;
     },
     pythonCalls: () => readLines(pythonLog),
