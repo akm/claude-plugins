@@ -381,7 +381,9 @@ def unsubscribe(message_text, sender):
 def rename(session_id, name):
     """受信のセッションの名前が変わったときに、その ID の登録の名前を変える (R15・KTD2)。
 
-    名前は、配信のセッションがツール get_session で ID から引き直したもの。変えた登録の数を返す。
+    名前は、配信のセッションがツール get_session で ID から引き直したもの。変えた登録の数を返す。その ID の登録が
+    無ければ、何も変えずに 0 を返す。送り方の手順 (references/sending.md) は、登録を削除した後に送る通知 removed にも
+    rename を使うので、登録が無いことを誤りにすると、新しい名前での送り直しに進めないため。
     """
     payload = {"session_id": session_id, "name": name, "renamed": 0, "errors": []}
     errors = _value_errors(messages.check_session_id(session_id), messages.check_name(name))
@@ -392,7 +394,7 @@ def rename(session_id, name):
             data = _load(tx)
             targets = [s for s in data["subscriptions"] if s["session_id"] == session_id]
             if not targets:
-                return {"status": "unsatisfied", **payload, "errors": [f"セッション {session_id} の登録が無い"]}
+                return {"status": "ok", **payload}
             for s in targets:
                 s["session_name"] = name
             tx.write(store.SUBSCRIPTIONS, data)

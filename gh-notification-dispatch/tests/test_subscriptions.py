@@ -446,6 +446,26 @@ class ResolveAndUnsubscribeTest(ListTest):
         self.assertEqual(self.subscriptions(), before)
 
 
+class RenameTest(SubscriptionsCase):
+
+    def setUp(self):
+        super().setUp()
+        self.start_dispatcher()
+        for session in (RECEIVER_A, RECEIVER_B):
+            self.assertEqual(self.subscribe(session=session)[0], 0)
+
+    def rename(self, session_id, name):
+        self.as_session(DISPATCHER)
+        return self.cli("subscriptions", "rename", "--session-id", session_id, "--name", name)
+
+    def test_session_without_subscriptions_changes_nothing(self):
+        """登録の無い ID への rename は、何も変えずに終了コード 0 で返す (削除した後の通知 removed の送り直しで使う)。"""
+        before = self.subscriptions()
+        code, out, err = self.rename("local_00000000-0000-4000-8000-0000000000ff", "新しい名前")
+        self.assertEqual((code, out["renamed"], out["errors"]), (0, 0, []), err)
+        self.assertEqual(self.subscriptions(), before)
+
+
 class RequestTest(SubscriptionsCase):
 
     def test_request_body(self):

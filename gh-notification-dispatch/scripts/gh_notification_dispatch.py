@@ -262,9 +262,9 @@ def build_parser():
              "名前を宛先にしたメッセージが届かないときに、ツール get_session で ID から今の名前を引き直して使う",
              "  session_id  --session-id の値\n"
              "  name        --name の値\n"
-             "  renamed     名前を変えた登録の数\n"
+             "  renamed     名前を変えた登録の数。その ID の登録が無ければ 0 (何も変えない)\n"
              "  errors      変えなかった理由の配列",
-             _exit_help("変えた", "その ID の登録が無い・引数の形が違う・" + _NOT_DISPATCHER))
+             _exit_help("変えた (その ID の登録が無いときを含む)", "引数の形が違う・" + _NOT_DISPATCHER))
     p.add_argument("--session-id", required=True, help="受信のセッションの ID")
     p.add_argument("--name", required=True, help="受信のセッションの今の名前")
 
