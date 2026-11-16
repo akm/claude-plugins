@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """gh-notification-dispatch のスクリプトの入口。サブコマンドごとにパッケージ gh_notification_dispatch のモジュールの関数を実行する。
 
-出力は標準出力の JSON 1 つ。サブコマンドごとの引数・出力の JSON のキー・終了コードは、`<サブコマンド> --help` が SSOT。
+出力は標準出力の JSON 1 つ (hook session-start だけは、Claude Code の hook の出力の様式で、何も出力しないこともある)。
+サブコマンドごとの引数・出力の JSON のキー・終了コードは、`<サブコマンド> --help` が SSOT。
 スキルの SKILL.md は引数を書かずに `--help` を参照する。記録のファイルの様式は文書 references/records.md、メッセージの様式は
 文書 references/messages.md にある (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md の KTD3・KTD8)。
 
@@ -21,6 +22,7 @@
   schedule record --job-id <ID> --cron <式>      配信のセッションが、作り直した定期の予定を記録する
   schedule clear                                 配信のセッションが、定期の予定を停止したことを記録する
   status                                         配信のセッション・定期の予定とその期限・届かない登録を表示する
+  hook session-start                             hook SessionStart が実行する。配信のセッションを開いたときに、再開を促す
 
 終了コード (計画の KTD11):
   0  続ける
@@ -37,7 +39,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gh_notification_dispatch import gh, messages, outbox, poll, schedule, subscriptions  # noqa: E402
+from gh_notification_dispatch import gh, hook, messages, outbox, poll, schedule, subscriptions  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -135,6 +137,13 @@ def cmd_schedule_clear(args):
 
 def cmd_status(args):
     return _emit_status(schedule.status())
+
+
+def cmd_hook_session_start(args):
+    output = hook.session_start(sys.stdin.read())
+    if output is not None:
+        _emit(output)
+    return EXIT_OK
 
 
 # --- 引数 ---------------------------------------------------------------------------------------------------------
@@ -381,6 +390,15 @@ def build_parser():
          "  notice          利用者に示す、定期の予定の状態と次に行う手順の文\n"
          "  errors          常に空の配列",
          _exit_help("表示した", "使わない"))
+
+    g = groups.add_parser("hook", help="hook が実行する").add_subparsers(dest="command", required=True)
+    _add(g, "session-start", cmd_hook_session_start,
+         "hook SessionStart (ファイル hooks/hooks.json) が実行する。標準入力の hook の入力の source が startup か resume で、\n"
+         "このセッションが記録の配信のセッションで、記録の定期の予定が動いているときだけ、定期の予定を作り直すよう伝える。\n"
+         "記録の期限を過ぎていれば、期限切れであることも伝える。記録のディレクトリは読むだけ。gh は実行しない",
+         "  Claude Code の hook の出力の様式 {hookSpecificOutput: {hookEventName (SessionStart), additionalContext}}。\n"
+         "  伝えることが無いときは、何も出力しない (errors のキーは持たない)",
+         _exit_help("出力した (何も出力しないときも)", "使わない"))
     return parser
 
 
