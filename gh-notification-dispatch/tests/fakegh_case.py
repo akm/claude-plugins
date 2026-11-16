@@ -35,6 +35,20 @@ def fixture_json(name):
     return json.loads(fixture(name))
 
 
+def http(status, body=None, headers=None):
+    """`gh api -i` の標準出力の形 (状態行・ヘッダ・空の行・本文) を作る。形は、2026-11-16 に実物の gh 2.103.3 で確認したもの。"""
+    reason = {200: "OK", 304: "Not Modified", 403: "Forbidden", 404: "Not Found"}.get(status, "")
+    lines = [f"HTTP/2.0 {status} {reason}", "Content-Type: application/json; charset=utf-8"]
+    lines += [f"{name}: {value}" for name, value in (headers or {}).items()]
+    text = "" if body is None else json.dumps(body, ensure_ascii=False)
+    return "\n".join(lines) + "\n\n" + text
+
+
+def link_next(path, last_page=9):
+    """ヘッダ Link の値 (rel="next" と rel="last")。path は API_ORIGIN を除いたパス。"""
+    return f'<https://api.github.com/{path}>; rel="next", <https://api.github.com/{path}&last={last_page}>; rel="last"'
+
+
 class FakeGhCase(unittest.TestCase):
 
     def setUp(self):

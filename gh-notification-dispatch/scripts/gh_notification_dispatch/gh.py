@@ -9,6 +9,9 @@ docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md の R12)。プ�
 失敗の種類は標準エラー出力と標準出力の文言から分け、再試行はしない。失敗したときの終了コード (計画の KTD11 の 4) は
 呼び出し元 (CLI の入口) が決める。
 
+REST の GET は関数 `get` (`gh api -i`。状態コードとヘッダも返し、304 を失敗にしない) で、一覧を返す API は関数 `get_all`
+(ヘッダ Link でページを送る) で読む。
+
 テストは PATH の先頭に偽の `gh` (ファイル `gh-notification-dispatch/tests/fake-gh`) のディレクトリを加えて差し替える。
 """
 
@@ -132,6 +135,102 @@ def describe_failure(result):
     """失敗した `run` の結果を、CLI の出力の `gh_error` に入れる形にする。"""
     return {"args": result["args"], "exit_code": result["exit_code"], "failure": result["failure"],
             "stderr_tail": result["stderr_tail"], "json_error": result["json_error"]}
+
+
+API_ORIGIN = "https://api.github.com/"
+MAX_PAGES = 100  # 一覧のページ送りの上限。超えたら失敗として返す (Link が次のページを示し続けても、読み続けないため)
+_STATUS_RE = re.compile(r"HTTP/\S+ (\d{3})")
+_NEXT_RE = re.compile(r'<([^>]+)>;\s*rel="next"')
+
+
+def _split_response(stdout):
+    """`gh api -i` の標準出力を (状態コード, ヘッダ (キーは小文字), 本文) に分ける。状態行が無ければ (None, {}, 標準出力)。"""
+    text = stdout.replace("\r\n", "\n")
+    head, separator, body = text.partition("\n\n")
+    lines = head.split("\n")
+    match = _STATUS_RE.match(lines[0]) if lines else None
+    if not match or not separator:
+        return None, {}, stdout
+    headers = {}
+    for line in lines[1:]:
+        name, _, value = line.partition(":")
+        headers[name.strip().lower()] = value.strip()
+    return int(match.group(1)), headers, body
+
+
+def get(endpoint, headers=None, timeout=DEFAULT_TIMEOUT):
+    """REST の GET を `gh api -i <endpoint>` で実行し、状態コードとヘッダも返す。
+
+    返り値は `run` の結果に、"status" (状態コード。読めなければ None)・"headers" (キーは小文字) を足したもの。"json" は本文を
+    読んだ値。headers は要求のヘッダ (`If-None-Match` など) で、`-H` で渡す。
+
+    304 (Not Modified) は失敗にしない。`gh` は 304 でも終了コード 1 で終了し、標準エラー出力に「gh: HTTP 304」を出す
+    (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md の KTD5 と U1)。
+    """
+    args = ["api", "-i", endpoint]
+    for name, value in (headers or {}).items():
+        args += ["-H", f"{name}: {value}"]
+    result = run(args, timeout=timeout)
+    status, response_headers, body = _split_response(result["stdout"])
+    result = {**result, "status": status, "headers": response_headers, "json": None, "json_error": None}
+    if status == 304 and result["exit_code"] == 1:
+        result["failure"] = None
+        return result
+    if result["failure"] is not None:
+        return result
+    if status is None:
+        result["json_error"] = "gh api -i の出力に状態行が無い"
+        return result
+    try:
+        result["json"] = json.loads(body)
+    except ValueError as e:
+        result["json_error"] = f"本文を JSON として読めない: {e}"
+    return result
+
+
+def next_page(headers):
+    """ヘッダ Link の rel="next" の URL を、`gh api` に渡すパス (API_ORIGIN を除いたもの) にする。無ければ None。
+
+    API_ORIGIN 以外の URL なら ValueError (このプラグインは github.com だけを扱う)。
+    """
+    match = _NEXT_RE.search(headers.get("link", ""))
+    if not match:
+        return None
+    url = match.group(1)
+    if not url.startswith(API_ORIGIN):
+        raise ValueError(f"次のページの URL が {API_ORIGIN} で始まらない: {url}")
+    return url[len(API_ORIGIN):]
+
+
+def get_all(endpoint, headers=None, timeout=DEFAULT_TIMEOUT):
+    """一覧を返す API の全ページを読む (計画の KTD4。ページ送りは API ごとに書かず、この関数で行う)。
+
+    headers は 1 ページ目だけに付ける (`If-None-Match` で条件付きの要求をするため)。
+    返り値は (要素の配列, 1 ページ目の結果, 失敗した結果)。成功なら失敗した結果は None。1 ページ目が 304 なら要素は None。
+    どれかのページが失敗したら、(None, 1 ページ目の結果, そのページの結果) を返す。
+    """
+    first = get(endpoint, headers=headers, timeout=timeout)
+    if failed(first):
+        return None, first, first
+    if first["status"] == 304:
+        return None, first, None
+    items, page, path = [], first, endpoint
+    for count in range(1, MAX_PAGES + 1):
+        if not isinstance(page["json"], list):
+            return None, first, {**page, "json_error": f"{path} の応答が配列でない"}
+        items.extend(page["json"])
+        try:
+            path = next_page(page["headers"])
+        except ValueError as e:
+            return None, first, {**page, "json_error": str(e)}
+        if path is None:
+            return items, first, None
+        if count == MAX_PAGES:
+            return None, first, {**page, "json_error": f"{endpoint} のページが {MAX_PAGES} を超えた"}
+        page = get(path, timeout=timeout)
+        if failed(page):
+            return None, first, page
+    raise AssertionError("到達しない")
 
 
 def viewer_login(timeout=DEFAULT_TIMEOUT):

@@ -12,7 +12,7 @@ import os
 import time
 import unittest
 
-from fakegh_case import FIXTURES, FakeGhCase, fixture
+from fakegh_case import FIXTURES, FakeGhCase, fixture, http, link_next
 
 from gh_notification_dispatch import gh  # noqa: E402
 
@@ -128,6 +128,93 @@ class RunTest(FakeGhCase):
         self.assertEqual(gh.classify(None, "", "", True), "timeout")
 
 
+class GetTest(FakeGhCase):
+    """`gh api -i` での GET (状態コードとヘッダ) と、一覧のページ送り (計画の KTD4・KTD5)。"""
+
+    def test_status_headers_and_json(self):
+        self.responses([{"prefix": ["api", "-i", "user"],
+                         "stdout": http(200, {"login": "akm"}, {"Etag": 'W/"abc"', "X-Poll-Interval": "60"})}])
+        r = gh.get("user", headers={"If-None-Match": '"x"'})
+        self.assertEqual(self.recorded()[0], ["api", "-i", "user", "-H", 'If-None-Match: "x"'])
+        self.assertEqual((r["status"], r["json"], r["failure"]), (200, {"login": "akm"}, None))
+        self.assertEqual(r["headers"]["etag"], 'W/"abc"', "ヘッダのキーは小文字にすること")
+        self.assertFalse(gh.failed(r))
+
+    def test_not_modified_is_not_failure(self):
+        """gh は 304 でも終了コード 1 を返すが、失敗にしない (計画の U1)。"""
+        self.responses([{"prefix": ["api", "-i", "notifications"], "stdout": {"fixture": "notifications-not-modified"},
+                         "stderr": fixture("notifications-not-modified", "stderr"), "exit": 1}])
+        r = gh.get("notifications")
+        self.assertEqual((r["status"], r["exit_code"], r["failure"], r["json"]), (304, 1, None, None))
+        self.assertFalse(gh.failed(r))
+
+    def test_not_found(self):
+        self.responses([{"prefix": ["api", "-i"], "stdout": http(404, {"message": "Not Found"}),
+                         "stderr": fixture("repo-not-found", "stderr"), "exit": 1}])
+        r = gh.get("repos/akm/no-such-repo/issues/1/timeline")
+        self.assertEqual((r["status"], r["failure"]), (404, "not_found"))
+        self.assertTrue(gh.failed(r))
+
+    def test_missing_status_line_or_bad_json(self):
+        self.responses([{"prefix": ["api", "-i", "a"], "stdout": '{"x": 1}'},
+                        {"prefix": ["api", "-i", "b"], "stdout": "HTTP/2.0 200 OK\n\nnot json"}])
+        self.assertIn("状態行", gh.get("a")["json_error"])
+        self.assertIn("JSON", gh.get("b")["json_error"])
+
+    def test_get_all_follows_next_link(self):
+        self.responses([
+            {"prefix": ["api", "-i", "notifications?all=true&per_page=50"],
+             "stdout": http(200, [{"id": "1"}, {"id": "2"}], {"Etag": 'W/"e1"',
+                                                              "Link": link_next("notifications?all=true&per_page=50&page=2")})},
+            {"prefix": ["api", "-i", "notifications?all=true&per_page=50&page=2"], "stdout": http(200, [{"id": "3"}])},
+        ])
+        items, first, failure = gh.get_all("notifications?all=true&per_page=50", headers={"If-None-Match": 'W/"e0"'})
+        self.assertIsNone(failure)
+        self.assertEqual([i["id"] for i in items], ["1", "2", "3"])
+        self.assertEqual(first["headers"]["etag"], 'W/"e1"')
+        calls = self.recorded()
+        self.assertEqual(calls[1], ["api", "-i", "notifications?all=true&per_page=50&page=2"],
+                         "2 ページ目は、Link の URL から API_ORIGIN を除いたパスで、条件のヘッダを付けずに読むこと")
+
+    def test_get_all_not_modified(self):
+        self.responses([{"prefix": ["api", "-i"], "stdout": {"fixture": "notifications-not-modified"},
+                         "stderr": "gh: HTTP 304\n", "exit": 1}])
+        items, first, failure = gh.get_all("notifications", headers={"If-None-Match": 'W/"e"'})
+        self.assertEqual((items, first["status"], failure), (None, 304, None))
+        self.assertEqual(len(self.recorded()), 1)
+
+    def test_get_all_failure_on_later_page(self):
+        self.responses([
+            {"prefix": ["api", "-i", "x?per_page=100"], "stdout": http(200, [1], {"Link": link_next("x?per_page=100&page=2")})},
+            {"prefix": ["api", "-i", "x?per_page=100&page=2"], "stdout": "", "stderr": "gh: Bad credentials (HTTP 401)\n",
+             "exit": 1},
+        ])
+        items, first, failure = gh.get_all("x?per_page=100")
+        self.assertIsNone(items)
+        self.assertEqual(first["status"], 200)
+        self.assertEqual(failure["failure"], "auth")
+        self.assertEqual(failure["args"][2], "x?per_page=100&page=2", "失敗したページの呼び出しを返すこと")
+
+    def test_get_all_rejects_non_list_and_other_host(self):
+        self.responses([{"prefix": ["api", "-i", "a"], "stdout": http(200, {"not": "list"})},
+                        {"prefix": ["api", "-i", "b"],
+                         "stdout": http(200, [1], {"Link": '<https://example.com/b?page=2>; rel="next"'})}])
+        self.assertIn("配列でない", gh.get_all("a")[2]["json_error"])
+        self.assertIn("api.github.com", gh.get_all("b")[2]["json_error"])
+
+    def test_get_all_page_limit(self):
+        self.responses([{"prefix": ["api", "-i"], "stdout": http(200, [1], {"Link": link_next("loop?page=2")})}])
+        original = gh.MAX_PAGES
+        gh.MAX_PAGES = 3
+        try:
+            items, _, failure = gh.get_all("loop")
+        finally:
+            gh.MAX_PAGES = original
+        self.assertIsNone(items)
+        self.assertIn("3 を超えた", failure["json_error"])
+        self.assertEqual(len(self.recorded()), 3)
+
+
 class ViewerLoginTest(FakeGhCase):
 
     def test_reads_login(self):
@@ -190,6 +277,8 @@ class FixturesTest(unittest.TestCase):
         for name in names:
             with self.subTest(name=name), open(os.path.join(FIXTURES, f"{name}.stdout"), encoding="utf-8") as f:
                 text = f.read()
+                if text.startswith("HTTP/"):  # gh api -i の出力は、空の行の後の本文だけを JSON として読む
+                    text = text.split("\n\n", 1)[1]
                 if text.strip():
                     json.loads(text)
 
