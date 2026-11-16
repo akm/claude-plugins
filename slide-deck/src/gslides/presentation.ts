@@ -2,6 +2,7 @@
 // スキル publish では、Claude が Google スライドのコネクタで、項目を指定して (field mask は定数 PRESENTATION_FIELDS) 資料を読み込み、
 // 結果をそのまま build/presentation.json に書く。サブコマンド requests は、このファイルの検査を通った値だけを使う。
 // 形は、U11 の確認 (Issue #251 のコメント) で得た読み込みの結果に合わせた。
+// コネクタは、資料を項目 content の値として返すことがある (U10 の確認。Issue #296)。その形も、Claude が書き換えずに書けるように読む。
 
 /**
  * 読み込みで指定する項目 (Google スライドの API の field mask)。
@@ -29,7 +30,9 @@ export const PRESENTATION_SHAPE = `{
   ]
 }
 masters は 1 つ以上。slides は資料のスライドの順序で、空でもよい。ノートの欄が空なら、その要素に text が無い。
-色の成分が 0 なら、その成分は無くてよい。`;
+色の成分が 0 なら、その成分は無くてよい。
+コネクタが資料を項目 content の値として返したとき ({ "content": { "revisionId": …, "masters": …, "slides": … } }) は、
+その形のまま書いてよい。項目が content だけなら、その値を資料として読む。`;
 
 /** 色の 3 つの成分 (0〜1)。 */
 export interface RgbColor {
@@ -73,9 +76,11 @@ function isObject(v: unknown): v is Json {
 /** 読み込みの結果の検査。誤りは、場所 (JSON の中のパス) を付けてすべて集める */
 class Checker {
   readonly errors: string[] = [];
+  /** 誤りの場所の前に付ける文字列。資料を項目 content の中から読むときは "content." */
+  prefix = "";
 
   fail(path: string, message: string): void {
-    this.errors.push(`${path}: ${message}`);
+    this.errors.push(`${this.prefix}${path}: ${message}`);
   }
 
   object(v: unknown, path: string): Json | null {
@@ -178,11 +183,19 @@ function parseSlide(c: Checker, v: unknown, path: string): PresentationSlide | n
 
 /**
  * build/presentation.json の内容 (JSON.parse の結果) を検査する。
+ * 項目が content だけのオブジェクトなら、content の値を資料として検査する。
  * 形が違えば、場所を付けた誤りをすべて返す (表示するときは PRESENTATION_SHAPE を添える)
  */
 export function parsePresentation(json: unknown): ParsePresentationResult {
   const c = new Checker();
-  const root = c.object(json, "(全体)");
+  const outer = c.object(json, "(全体)");
+  if (outer === null) return { ok: false, errors: c.errors };
+  const keys = Object.keys(outer);
+  let root: Json | null = outer;
+  if (keys.length === 1 && keys[0] === "content") {
+    root = c.object(outer["content"], "content");
+    c.prefix = "content.";
+  }
   if (root === null) return { ok: false, errors: c.errors };
   const revisionId = c.string(root["revisionId"], "revisionId");
   const masterList = c.array(root["masters"], "masters");

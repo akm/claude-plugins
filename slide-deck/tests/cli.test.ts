@@ -429,6 +429,19 @@ describe("requests", () => {
     assert.match(r.stdout, /^配色を変えるマスター: simple-light-2$/m);
   });
 
+  test("読み込みの結果が資料を項目 content の値として持つとき (U10 の確認。Issue #296) も、同じ指示のファイルを書き、終了コード 0 になる", () => {
+    const deck = sandbox.copySample();
+    mkdirSync(join(deck, "build"), { recursive: true });
+    const content: unknown = JSON.parse(readFileSync(join(FIXTURES, "u11-new.json"), "utf8"));
+    writeFileSync(join(deck, "build", "presentation.json"), JSON.stringify({ content }));
+    const r = runCli(["requests", deck]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const expected = JSON.parse(readFileSync(join(FIXTURES, "create.json"), "utf8")) as { files: unknown[] };
+    expected.files.forEach((file, i) => {
+      assert.deepEqual(JSON.parse(readFileSync(join(deck, "build", `requests-${String(i + 1)}.json`), "utf8")), file);
+    });
+  });
+
   test("前の実行が書いた指示のファイルは、build/presentation.json が無く終了コード 2 になるときも消し、読み込む項目を示す", () => {
     const deck = sandbox.copySample();
     mkdirSync(join(deck, "build"), { recursive: true });

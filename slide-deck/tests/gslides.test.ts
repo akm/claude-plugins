@@ -708,6 +708,27 @@ describe("読み込みの結果の検査", () => {
     ]);
   });
 
+  test("コネクタが資料を項目 content の値として返した結果 (U10 の確認。Issue #296) も、そのまま検査を通り、同じ値になる", () => {
+    for (const name of ["u11-new.json", "u11-notes.json"]) {
+      const bare = parsePresentation(u11(name));
+      const wrapped = parsePresentation({ content: u11(name) });
+      assert.ok(wrapped.ok, wrapped.ok ? "" : wrapped.errors.join("\n"));
+      assert.deepEqual(wrapped, bare);
+    }
+  });
+
+  test("項目 content の中の資料の形が違えば、場所に content. を付けた誤りになる", () => {
+    const r = parsePresentation({ content: { revisionId: "rev" } });
+    assert.deepEqual(r.ok ? [] : r.errors, ["content.masters: 無い", "content.slides: 無い"]);
+    const notObject = parsePresentation({ content: [] });
+    assert.deepEqual(notObject.ok ? [] : notObject.errors, ["content: オブジェクトではない"]);
+  });
+
+  test("content のほかにも項目があれば、資料の項目から始まる形として検査する", () => {
+    const r = parsePresentation({ content: u11("u11-new.json"), revisionId: "rev" });
+    assert.deepEqual(r.ok ? [] : r.errors, ["masters: 無い", "slides: 無い"]);
+  });
+
   test("必要なキー (スライドの一覧・マスター) が無ければ、場所を示した誤りになる", () => {
     const r = parsePresentation({ revisionId: "rev" });
     assert.deepEqual(r.ok ? [] : r.errors, ["masters: 無い", "slides: 無い"]);
