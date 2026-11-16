@@ -251,8 +251,8 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   └── README.md
 ├── gh-notification-dispatch/     # skill 型 + 同梱スクリプト (作成中)
 │   ├── .claude-plugin/plugin.json
-│   ├── skills/                   # 2 つのスキル (配信のセッションの dispatch・受信のセッションの subscribe)
-│   ├── references/               # メッセージと記録のファイルの様式
+│   ├── skills/                   # 3 つのスキル (配信のセッションの dispatch と tick・受信のセッションの subscribe)
+│   ├── references/               # メッセージと記録のファイルの様式・メッセージの送り方
 │   ├── scripts/                  # スクリプト (gh_notification_dispatch.py とパッケージ gh_notification_dispatch/)
 │   ├── tests/                    # python3 -m unittest discover -s gh-notification-dispatch/tests
 │   └── README.md
