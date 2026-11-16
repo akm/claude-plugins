@@ -1,0 +1,45 @@
+Background (from the session that started this one):
+プラグイン issue-practice (Issue の使い方をスキルにするプラグイン) を、管理 Issue #239 の作業 Issue に分けて実装している。U1〜U4 (#266〜#269) とバグの修正 #278 はマージ済みで閉じた。この作業セッションは、U4 から切り出した #286 (リリース対象が 1 つのリポジトリに 2 つ目のリリース対象を足す書き込み) を受け持つ。PR はマージ先 main、Closes を書かず、利用者がマージする。
+
+Task:
+あなたは作業 Issue https://github.com/akm/claude-plugins/issues/286 の作業セッションです。スキル issue-practice:working-issue を使って進めてください。
+
+- 作業 Issue: https://github.com/akm/claude-plugins/issues/286 (リリース対象が 1 つのリポジトリに、2 つ目のリリース対象を足せない)
+- 管理 Issue: https://github.com/akm/claude-plugins/issues/239
+- 報告先の管理セッション: claude-plugins#239 管理: Issue の使い方のスキル (ID: local_7eefe131-5f84-4c43-b029-e14eb2449d29)
+- ブランチ: feat/286-release-target-add を origin/main から作る
+- PR のマージ先: main
+- PR をマージする人: 利用者
+
+報告 (PR を作った・チェックを入れた・分けたい・条件を変えたい・切り出したい・中断する) は、作業 Issue に記録のコメントとして書き、そのコメントの URL を報告先の管理セッションにメッセージで知らせてください。
+
+補足 (管理セッションから):
+
+- このセッションの名前は「claude-plugins#286 作業: 2 つ目のリリース対象」です。名前が違っていたら、set_session_title (session_id は self) でこの名前にしてください。
+- 手元の `main` は古いことがあります。`git fetch origin` の後に `git switch -c feat/286-release-target-add origin/main` でブランチを作ってください。
+- この Issue は、#269 (U4) の作業セッションの報告から切り出したものです。#269 の PR #285 (main の ea27b3fa) が、スキル release-plan (ファイル `issue-practice/skills/release-plan/SKILL.md`) と、リリース計画の書き込みを行うモジュール (ディレクトリ `issue-practice/scripts/issue_practice/` の `releaseplan.py`・`releaseops.py`) を足しました。SKILL.md の節「リリース対象を足すとき」は、今は中断する手順です。
+- 計画は、ファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` の R41 と KTD3 です。書き込みを「示す」サブコマンドと「実行する」サブコマンドの手本は、U2 のファイル `issue-practice/scripts/issue_practice/issues.py` と、U3 のファイル `issue-practice/scripts/issue_practice/managing.py` と、U4 で足したモジュールです。
+- `managing.py` には、示した後に実行すると、Issue を作ってから終了コード 3 で終了するバグがありました。#278 (PR #279) で直しています。示すサブコマンドで、書き込む内容の誤りをすべて見つける形にしてください。
+- U2 の確認で、作ったばかりの Issue が `gh issue list --label` にすぐには出ないことがありました。リリース対象の一覧はラベル `release-target:<名前>` から集めるので、確認用のリポジトリで試すときは、このことに注意してください。
+- この単位の版は 0.4.1 です (作業 Issue のクローズ条件の共通の条件の下の箇条書き)。#270 (U5、0.4.2) は、この Issue を閉じた後に起動します。
+- CI の完了では、このセッションは自分では動き出しません。CI が完了したら利用者か管理セッションが知らせます。チェックは、CI のジョブがすべて成功してから入れてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+<task-notification>
+<task-id>b03txxkdu</task-id>
+<tool-use-id>toolu_016iynnA9hn8XSPpTJmqx2sK</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-review-rally-11aaf1/03049cc0-eae2-41d4-a5a5-e9334255798a/tasks/b03txxkdu.output</output-file>
+<status>completed</status>
+<summary>Background command "管理セッションの名前が現れるまで少し待機する" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+マージしました
+
+---
+
+管理セッションを開いたので報告を送り直して
