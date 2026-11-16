@@ -2,7 +2,7 @@
 
 gh-notification-dispatch のスクリプトが読み書きするファイルの様式。どのファイルも UTF-8 の JSON で、キー `version` (今は `1`) を持つ。時刻は UTC の `YYYY-MM-DDTHH:MM:SSZ` で書く。
 
-この文書は、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) の U2〜U4 で使うファイルを書いている。定期の予定のファイルとキーは、U5 で足す。
+この文書は、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) の U2〜U5 で使うファイルを書いている。
 
 ## 記録のディレクトリ
 
@@ -45,7 +45,16 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
     "teams": [{"id": 3859946, "slug": "reviewers", "organization": "akm-org"}],
     "fetched_at": "2026-11-16T06:00:00Z"
   },
-  "last_allocated": {"subscription_id": "0123456789ab", "created_at": "2026-11-16T05:10:00Z"}
+  "last_allocated": {"subscription_id": "0123456789ab", "created_at": "2026-11-16T05:10:00Z"},
+  "schedule": {
+    "state": "running",
+    "job_id": "a1b2c3d4",
+    "cron": "7-59/10 * * * *",
+    "created_at": "2026-11-16T05:30:00Z",
+    "expires_at": "2026-11-23T05:30:00Z",
+    "reminders": [24],
+    "stopped_at": null
+  }
 }
 ```
 
@@ -60,8 +69,15 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `etag` | `position` を書いた回の、通知の一覧の 1 ページ目の応答のヘッダ `Etag`。次の回のヘッダ `If-None-Match` に付ける (計画の KTD5) |
 | `viewer` | 自分のログイン名 (`login`) と、所属するチーム (`teams`。チームの `id`・`slug`・Organization の `login`) と、それらを取得した時刻 (`fetched_at`)。取得し直す時機は計画の KTD4 にある。サブコマンド `dispatcher set` はこの値を消し、次の `tick` が取得し直す |
 | `last_allocated` | 前の回に、最後にメッセージを割り当てた登録の ID と登録日時。次の回は、登録日時の順でこの登録の次の登録から割り当てる (計画の R13)。この登録が削除されていても、登録日時で次の登録が決まる |
+| `schedule.state` | 定期の予定の状態。`running` (動いている) か `stopped` (停止した)。期限切れは書かず、`expires_at` と今の時刻を比べて判定する (計画の KTD9) |
+| `schedule.job_id`・`schedule.cron` | ツール `CronCreate` が返したジョブの ID と、渡した cron の式。`stopped` では null |
+| `schedule.created_at`・`schedule.expires_at` | 定期の予定を記録した時刻と、その 7 日後の期限 (ツール `CronCreate` の定期の予定は、作ってから 7 日で消える)。`stopped` では null |
+| `schedule.reminders` | 期限までの残りが切ったことを、続けるかの確認として出した閾値 (`24`・`6`・`1` 時間) の配列。それぞれの確認を 1 回だけ出すため (計画の R17) |
+| `schedule.stopped_at` | 停止した時刻。`running` では null |
 
 取得の範囲の起点は、`position` の 5 分前と `started_at` の遅いほうにする。起点は、API `GET /notifications` の引数 `since` と、出来事の時刻と比べる値の両方に使う (計画の KTD5)。
+
+`schedule` は、スキル `dispatch` が定期の予定を作り直したときにサブコマンド `schedule record` が書き、停止したときに `schedule clear` が書く。`schedule record` は、`created_at` を今の時刻、`expires_at` をその 7 日後にし、`reminders` を空にする。定期の予定を作る前の記録には `schedule` が無い。
 
 ### `subscriptions.json`
 

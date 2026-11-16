@@ -18,6 +18,8 @@
   ack <メッセージの ID>                          tick が出力したメッセージが届いたことを記録する
   fail <メッセージの ID> --reason <理由>         tick が出力したメッセージが届かなかったことを記録する
   settle                                         この回のメッセージの結果を集計し、続けて届かなかった回数を更新する
+  schedule record --job-id <ID> --cron <式>      配信のセッションが、作り直した定期の予定を記録する
+  schedule clear                                 配信のセッションが、定期の予定を停止したことを記録する
 
 終了コード (計画の KTD11):
   0  続ける
@@ -34,7 +36,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gh_notification_dispatch import gh, messages, outbox, poll, subscriptions  # noqa: E402
+from gh_notification_dispatch import gh, messages, outbox, poll, schedule, subscriptions  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -120,6 +122,14 @@ def cmd_fail(args):
 
 def cmd_settle(args):
     return _emit_status(outbox.settle())
+
+
+def cmd_schedule_record(args):
+    return _emit_status(schedule.record(args.job_id, args.cron))
+
+
+def cmd_schedule_clear(args):
+    return _emit_status(schedule.clear())
 
 
 # --- 引数 ---------------------------------------------------------------------------------------------------------
@@ -323,6 +333,25 @@ def build_parser():
              "           already_counted}。集計する対応が無ければ null\n"
              "  errors   集計しなかった理由の配列",
              _exit_help("集計した (集計する対応が無い回も)", _NOT_DISPATCHER))
+
+    g = groups.add_parser("schedule", help="定期の予定を記録する").add_subparsers(dest="command", required=True)
+    p = _add(g, "record", cmd_schedule_record,
+             "配信のセッションが、ツール CronCreate で作り直した定期の予定 (プロンプト " + schedule.TICK_PROMPT + ") を、\n"
+             "記録のディレクトリの state.json に記録する。期限を今の時刻の 7 日後にし、出した確認の記録を消す。gh は実行しない",
+             "  schedule  記録した定期の予定 {state (running), job_id, cron, created_at, expires_at, reminders, stopped_at}。\n"
+             "            記録しなかったときは null\n"
+             "  previous  記録する前の定期の予定。無ければ null\n"
+             "  errors    記録しなかった理由の配列",
+             _exit_help("記録した", "ジョブの ID か cron の式の形が違う・" + _NOT_DISPATCHER))
+    p.add_argument("--job-id", required=True, help="ツール CronCreate が返したジョブの ID")
+    p.add_argument("--cron", required=True, help="ツール CronCreate に渡した cron の式 (5 つの欄)")
+
+    p = _add(g, "clear", cmd_schedule_clear,
+             "配信のセッションが、定期の予定を停止したこと (ツール CronDelete で消したこと) を、state.json に記録する。gh は実行しない",
+             "  schedule  記録した定期の予定 {state (stopped), stopped_at, ...}。記録しなかったときは null\n"
+             "  previous  記録する前の定期の予定。無ければ null\n"
+             "  errors    記録しなかった理由の配列",
+             _exit_help("記録した", _NOT_DISPATCHER))
     return parser
 
 
