@@ -148,6 +148,19 @@ class AllocateTest(unittest.TestCase):
         self.assertEqual((out, box["round"]), ([], None))
         self.assertEqual(last["subscription_id"], "a", "割り当てなかった回は、last_allocated を変えないこと")
 
+    def test_resend_and_new_events_are_not_mixed(self):
+        """送り直しの出来事と初めての出来事は、別のメッセージにする。resend のあるメッセージの出来事は、どれも前に送ったもの。"""
+        box = {"version": 1, "round": None,
+               "pending": [pending("a", 1, outputs=1, time="2026-11-16T06:10:00Z"),
+                           pending("a", 2, outputs=2, time="2026-11-16T06:20:00Z"),
+                           pending("a", 3, outputs=0, time="2026-11-16T06:05:00Z")]}
+        out, _ = self.allocate(box, [sub("a")])
+        self.assertEqual([(m["resend"], m["count"]) for m in out], [(2, 2), (0, 1)],
+                         "送り直しの出来事を先に、回数は出来事ごとの回数の最大値にすること")
+        numbers = [[line.split()[0] for line in messages.parse(m["body"])["fields"]["event"]] for m in out]
+        self.assertEqual(numbers, [["#1", "#2"], ["#3"]], "初めての出来事を送り直しのメッセージに入れないこと")
+        self.assertNotIn("送り直し", out[1]["body"].splitlines()[0])
+
     def test_resend_has_count_and_different_body(self):
         box = {"version": 1, "round": None, "pending": [pending("a", 1)]}
         first, _ = self.allocate(box, [sub("a")])

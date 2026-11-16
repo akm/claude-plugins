@@ -165,10 +165,12 @@ def _sort_key(subscription):
 def allocate(outbox, subscriptions, last_allocated, now_text, limit=MAX_MESSAGES_PER_TICK):
     """送信待ちから、この回に出力するメッセージを作る (R13・KTD6)。返り値は (メッセージの配列, 次の last_allocated)。
 
-    登録ごとに、古い出来事から 20 件ずつを 1 通にまとめる。上限 (limit) までの枠は、登録日時の順に登録を回して 1 通ずつ
-    割り当て、枠が残る限り、この回に割り当てを始めた登録に戻って繰り返す。割り当てを始める登録は、前の回に最後に
-    割り当てた登録 (last_allocated) の、登録日時の順で次の登録にする。届かない登録には割り当てない。
-    出力したメッセージの対応は outbox の round に書く。メッセージが無ければ round は None のまま。
+    登録ごとに、前に出力した出来事 (送り直し) と初めて出力する出来事を分け、送り直しの出来事を先にして、それぞれを古い
+    出来事から 20 件ずつ 1 通にまとめる。送り直しの回数 (resend) は 1 通に 1 つなので、1 通の出来事がすべて送り直しか、
+    すべて初めてかのどちらかでなければ、受信のセッションは出来事ごとに区別できないため。上限 (limit) までの枠は、
+    登録日時の順に登録を回して 1 通ずつ割り当て、枠が残る限り、この回に割り当てを始めた登録に戻って繰り返す。
+    割り当てを始める登録は、前の回に最後に割り当てた登録 (last_allocated) の、登録日時の順で次の登録にする。届かない
+    登録には割り当てない。出力したメッセージの対応は outbox の round に書く。メッセージが無ければ round は None のまま。
     """
     ordered = sorted((s for s in subscriptions if not is_unreachable(s)), key=_sort_key)
     if last_allocated:
@@ -176,11 +178,13 @@ def allocate(outbox, subscriptions, last_allocated, now_text, limit=MAX_MESSAGES
         start = next((i for i, s in enumerate(ordered) if _sort_key(s) > marker), 0)
         ordered = ordered[start:] + ordered[:start]
     queues = {}
+    size = messages.MAX_EVENTS_PER_MESSAGE
     for subscription in ordered:
         items = sorted((p for p in outbox["pending"] if p["subscription_id"] == subscription["id"]),
                        key=lambda p: (p["event"]["time"], p["enqueued_at"], p["event"]["key"]))
-        size = messages.MAX_EVENTS_PER_MESSAGE
-        queues[subscription["id"]] = [items[i:i + size] for i in range(0, len(items), size)]
+        queues[subscription["id"]] = []
+        for group in ([p for p in items if p["outputs"] > 0], [p for p in items if p["outputs"] == 0]):
+            queues[subscription["id"]] += [group[i:i + size] for i in range(0, len(group), size)]
     chosen = []
     while len(chosen) < limit and any(queues[s["id"]] for s in ordered):
         for subscription in ordered:

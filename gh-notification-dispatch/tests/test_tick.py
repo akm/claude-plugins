@@ -317,7 +317,8 @@ class ResultsTest(StartedTickCase):
         self.assertEqual(self.cli("subscriptions", "add", "--message-file", path, "--sender", RECEIVER_A)[0], 0)
         self.serve(etag='W/"g"')
         code, out = self.tick("2026-11-16T06:40:00Z")
-        self.assertEqual([m["count"] for m in out["messages"]], [2], "溜まった出来事を出力すること")
+        self.assertEqual([(m["count"], m["resend"] > 0) for m in out["messages"]], [(1, True), (1, False)],
+                         "溜まった出来事を、送り直しの出来事と初めての出来事に分けて出力すること")
         self.cli("subscriptions", "list", "--viewer", DISPATCHER)
         self.cli("subscriptions", "remove", "--viewer", DISPATCHER, "1")
         box = self.read_home("outbox.json")
