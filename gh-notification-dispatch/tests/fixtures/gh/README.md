@@ -19,3 +19,4 @@
 | `repo-claude-plugins` | `gh api repos/akm/claude-plugins`。`id`・`name`・`full_name`・`private`・`owner` (`login`)・`html_url` だけを残したもの。大文字と小文字の違う名前 (`repos/AKM/Claude-Plugins`) でも、`full_name` は同じ値になった | 0 | このプラグインで取ったものを切り詰めた |
 | `repo-view` | リポジトリの作業ツリーで `gh repo view --json nameWithOwner` | 0 | このプラグインで取った |
 | `repo-view-not-git` | git のリポジトリでないディレクトリ (`/tmp`) で `gh repo view --json nameWithOwner` | 1 | このプラグインで取った |
+| `notifications-not-modified` | `gh api -i -H 'If-None-Match: <直前の応答の Etag>' 'notifications?all=true&per_page=2'` (状態コード 304)。ヘッダは、形を示すものだけを残した | 1 | このプラグインで取ったものを切り詰めた |

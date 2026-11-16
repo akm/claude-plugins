@@ -1,0 +1,12 @@
+HTTP/2.0 304 Not Modified
+Access-Control-Allow-Origin: *
+Cache-Control: private, max-age=60, s-maxage=60
+Date: Mon, 16 Nov 2026 06:13:39 GMT
+Etag: "1603b258f8836649eeae355c8d09800ce6b712606dad04662f57ad4b5d2cc71e"
+Last-Modified: Mon, 16 Nov 2026 06:03:24 GMT
+Server: github.com
+X-Poll-Interval: 60
+X-Ratelimit-Limit: 5000
+X-Ratelimit-Remaining: 4672
+X-Ratelimit-Resource: core
+

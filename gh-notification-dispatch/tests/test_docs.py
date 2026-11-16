@@ -93,7 +93,7 @@ class MessagesDocTest(unittest.TestCase):
 
     def test_examples_parse(self):
         examples = code_blocks(self.doc, "例")
-        self.assertEqual(len(examples), 6)
+        self.assertEqual(len(examples), 7)
         types = []
         for text in examples:
             with self.subTest(head=text.splitlines()[0]):
@@ -117,6 +117,12 @@ class MessagesDocTest(unittest.TestCase):
             messages.unsubscribe(["0123456789ab", "ba9876543210"], session, "claude-plugins のレビュー"),
             messages.unsubscribed_accepted([{"repo": "akm/claude-plugins", "kind": "review_requested"},
                                             {"repo": "akm/claude-plugins", "kind": "merged"}]),
+            messages.notify("akm/claude-plugins", "review_requested", [
+                {"kind": "review_requested", "number": 301, "time": "2026-11-16T07:00:00Z", "requested": "akm",
+                 "url": "https://github.com/akm/claude-plugins/pull/301", "title": "✨ feat: 通知を届ける"},
+                {"kind": "review_requested", "number": 302, "time": "2026-11-16T07:05:00Z", "requested": "akm/reviewers",
+                 "url": "https://github.com/akm/claude-plugins/pull/302", "title": "🐛 fix: 名前の引き直し"},
+            ], resend=2),
             messages.removed([{"repo": "akm/claude-plugins", "kind": "merged"}]),
         ]
         self.assertEqual(examples, composed)
@@ -145,13 +151,21 @@ class SkillListingDocTest(unittest.TestCase):
                 self.assertRegex(front, r"\ndescription: .+\n")
 
 
+GROUPS = ("dispatcher", "subscriptions")  # 下にサブコマンドを持つグループ。それ以外は入口の直下のサブコマンド
+
+
 def entry_subcommands():
-    """入口の docstring の「サブコマンドの一覧」に書いた (グループ, コマンド) の配列。"""
+    """入口の docstring の「サブコマンドの一覧」に書いたサブコマンドの配列。(グループ, コマンド) か (コマンド,)。"""
     with open(ENTRY, encoding="utf-8") as f:
         text = f.read()
     doc = text.split('"""')[1]
     listing = doc.split("サブコマンドの一覧:\n", 1)[1].split("\n\n", 1)[0]
-    return [tuple(line.split()[:2]) for line in listing.splitlines() if line.startswith("  ")]
+    result = []
+    for line in listing.splitlines():
+        if line.startswith("  "):
+            tokens = line.split()
+            result.append(tuple(tokens[:2]) if tokens[0] in GROUPS else (tokens[0],))
+    return result
 
 
 def run_entry(*args):
@@ -163,20 +177,20 @@ class EntryHelpTest(unittest.TestCase):
     def test_docstring_lists_every_subcommand(self):
         listed = entry_subcommands()
         self.assertTrue(listed)
-        groups = sorted({group for group, _ in listed})
-        top = run_entry("--help").stdout
-        for group in groups:
+        top = re.search(r"\{([a-z,-]+)\}", run_entry("--help").stdout).group(1).split(",")
+        self.assertEqual(sorted(top), sorted({entry[0] for entry in listed}),
+                         "docstring の一覧と argparse の入口の直下のサブコマンドが一致すること")
+        for group in GROUPS:
             with self.subTest(group=group):
-                self.assertIn(group, top)
                 help_text = run_entry(group, "--help").stdout
                 choices = re.search(r"\{([a-z,-]+)\}", help_text).group(1).split(",")
-                self.assertEqual(sorted(choices), sorted(cmd for g, cmd in listed if g == group),
+                self.assertEqual(sorted(choices), sorted(e[1] for e in listed if e[0] == group),
                                  f"docstring の一覧と argparse のサブコマンドが一致すること ({group})")
 
     def test_each_help_shows_arguments_output_and_exit_codes(self):
-        for group, command in entry_subcommands():
-            with self.subTest(command=f"{group} {command}"):
-                completed = run_entry(group, command, "--help")
+        for entry in entry_subcommands():
+            with self.subTest(command=" ".join(entry)):
+                completed = run_entry(*entry, "--help")
                 self.assertEqual(completed.returncode, 0)
                 text = completed.stdout
                 self.assertIn("usage:", text)

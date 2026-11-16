@@ -35,6 +35,44 @@ def fixture_json(name):
     return json.loads(fixture(name))
 
 
+def http(status, body=None, headers=None):
+    """`gh api -i` の標準出力の形 (状態行・ヘッダ・空の行・本文) を作る。形は、2026-11-16 に実物の gh 2.103.3 で確認したもの。"""
+    reason = {200: "OK", 304: "Not Modified", 403: "Forbidden", 404: "Not Found"}.get(status, "")
+    lines = [f"HTTP/2.0 {status} {reason}", "Content-Type: application/json; charset=utf-8"]
+    lines += [f"{name}: {value}" for name, value in (headers or {}).items()]
+    text = "" if body is None else json.dumps(body, ensure_ascii=False)
+    return "\n".join(lines) + "\n\n" + text
+
+
+def notification(repo, number, updated_at, title="題名", unread=True, subject_type="PullRequest", reason="review_requested"):
+    """API GET /notifications の要素。キーは 2026-11-16 に実物で確認した形で、値は公開してよいものにしている。"""
+    kind = "pulls" if subject_type == "PullRequest" else "issues"
+    return {"id": f"{number}{len(repo)}", "unread": unread, "reason": reason, "updated_at": updated_at,
+            "last_read_at": None if unread else updated_at,
+            "subject": {"title": title, "url": f"https://api.github.com/repos/{repo}/{kind}/{number}",
+                        "latest_comment_url": None, "type": subject_type},
+            "repository": {"full_name": repo, "name": repo.split("/")[1], "private": False},
+            "url": f"https://api.github.com/notifications/threads/{number}",
+            "subscription_url": f"https://api.github.com/notifications/threads/{number}/subscription"}
+
+
+def timeline_event(event_id, created_at, login=None, team_id=None, event="review_requested", team_slug="reviewers"):
+    """API GET /repos/{owner}/{repo}/issues/{number}/timeline の要素。キーは 2026-11-16 に公開のリポジトリで確認した形。"""
+    item = {"id": event_id, "event": event, "created_at": created_at,
+            "actor": {"login": "requester", "id": 1, "type": "User"},
+            "review_requester": {"login": "requester", "id": 1, "type": "User"}}
+    if login is not None:
+        item["requested_reviewer"] = {"login": login, "id": 2, "type": "User"}
+    if team_id is not None:
+        item["requested_team"] = {"id": team_id, "name": team_slug, "slug": team_slug, "organization_id": 9}
+    return item
+
+
+def link_next(path, last_page=9):
+    """ヘッダ Link の値 (rel="next" と rel="last")。path は API_ORIGIN を除いたパス。"""
+    return f'<https://api.github.com/{path}>; rel="next", <https://api.github.com/{path}&last={last_page}>; rel="last"'
+
+
 class FakeGhCase(unittest.TestCase):
 
     def setUp(self):
@@ -78,11 +116,16 @@ class FakeGhCase(unittest.TestCase):
         """今の時刻を決める (YYYY-MM-DDTHH:MM:SSZ)。"""
         os.environ["GH_NOTIFICATION_DISPATCH_NOW"] = time_text
 
-    def home_files(self):
-        """記録のディレクトリのファイルの、相対パスと中身の対応 (書き込みが無かったことを比べるため)。"""
+    def home_files(self, ignore_lock=False):
+        """記録のディレクトリのファイルの、相対パスと中身の対応 (書き込みが無かったことを比べるため)。
+
+        ignore_lock が真なら、ロックのファイル lock (中身は空で、配信のセッションの書き込みの処理が作る) を除く。
+        """
         result = {}
         for directory, _, names in os.walk(self.home):
             for name in names:
+                if ignore_lock and directory == self.home and name == "lock":
+                    continue
                 path = os.path.join(directory, name)
                 with open(path, encoding="utf-8") as f:
                     result[os.path.relpath(path, self.home)] = f.read()

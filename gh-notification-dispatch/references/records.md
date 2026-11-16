@@ -2,7 +2,7 @@
 
 gh-notification-dispatch のスクリプトが読み書きするファイルの様式。どのファイルも UTF-8 の JSON で、キー `version` (今は `1`) を持つ。時刻は UTC の `YYYY-MM-DDTHH:MM:SSZ` で書く。
 
-この文書は、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) の U2 で使うファイルだけを書いている。取得の位置・送信待ち・届けた出来事・追跡する PR・定期の予定のファイルとキーは、U3〜U5 で足す。
+この文書は、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) の U2 と U3 で使うファイルを書いている。追跡する PR と定期の予定のファイルとキーは、U4・U5 で足す。
 
 ## 記録のディレクトリ
 
@@ -13,6 +13,9 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `state.json` | 配信のセッション |
 | `subscriptions.json` | 登録 |
 | `snapshots/<セッションの ID>.json` | 配信のセッションで一覧を表示したときの、一覧の番号と登録の ID の対応 |
+| `delivered.json` | 届けた出来事 (送信待ちに入れた出来事) と、その登録 |
+| `outbox.json` | 送信待ちと、この回に出力したメッセージの対応 |
+| `log.jsonl` | 取得・判定・送信の結果の記録 (調べるときのため)。1 行に 1 つの JSON |
 | `lock` | 書き込みを順にするためのロックのファイル (中身は空) |
 
 記録のディレクトリに書くのは、配信のセッションだけにする (計画の R19・KTD3)。
@@ -32,7 +35,16 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
     "name": "GitHub の通知の配信",
     "permission_mode": "auto",
     "recorded_at": "2026-11-16T05:00:00Z"
-  }
+  },
+  "started_at": "2026-11-16T06:00:00Z",
+  "position": "2026-11-16T06:30:00Z",
+  "etag": "W/\"1603b258f8836649eeae355c8d09800ce6b712606dad04662f57ad4b5d2cc71e\"",
+  "viewer": {
+    "login": "akm",
+    "teams": [{"id": 3859946, "slug": "reviewers", "organization": "akm-org"}],
+    "fetched_at": "2026-11-16T06:00:00Z"
+  },
+  "last_allocated": {"subscription_id": "0123456789ab", "created_at": "2026-11-16T05:10:00Z"}
 }
 ```
 
@@ -42,6 +54,13 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `dispatcher.name` | 配信のセッションの名前 (サイドバーのタイトル) |
 | `dispatcher.permission_mode` | 配信のセッションの権限モード。登録の返事に、保留されることを書くかの判定に使う (計画の R4) |
 | `dispatcher.recorded_at` | 記録した時刻 |
+| `started_at` | 最初に開始した時刻。これより前の通知と出来事は届けない (計画の R8)。U3 では、記録が無いときの最初の `tick` が書く |
+| `position` | 取得の位置。取得と判定で `gh` が 1 度も失敗しなかった直近の回の、`tick` を始めた時刻 (計画の KTD5) |
+| `etag` | `position` を書いた回の、通知の一覧の 1 ページ目の応答のヘッダ `Etag`。次の回のヘッダ `If-None-Match` に付ける (計画の KTD5) |
+| `viewer` | 自分のログイン名 (`login`) と、所属するチーム (`teams`。チームの `id`・`slug`・Organization の `login`) と、それらを取得した時刻 (`fetched_at`)。取得し直す時機は計画の KTD4 にある。サブコマンド `dispatcher set` はこの値を消し、次の `tick` が取得し直す |
+| `last_allocated` | 前の回に、最後にメッセージを割り当てた登録の ID と登録日時。次の回は、登録日時の順でこの登録の次の登録から割り当てる (計画の R13)。この登録が削除されていても、登録日時で次の登録が決まる |
+
+取得の範囲の起点は、`position` の 5 分前と `started_at` の遅いほうにする。起点は、API `GET /notifications` の引数 `since` と、出来事の時刻と比べる値の両方に使う (計画の KTD5)。
 
 ### `subscriptions.json`
 
@@ -56,9 +75,13 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
       "session_id": "local_00000000-0000-4000-8000-000000000001",
       "session_name": "claude-plugins のレビュー",
       "permission_mode": "auto",
-      "created_at": "2026-11-16T05:10:00Z"
+      "created_at": "2026-11-16T05:10:00Z",
+      "consecutive_failures": 0,
+      "expired_events": 0,
+      "last_expired_at": null
     }
-  ]
+  ],
+  "last_settled_round": "fedcba987654"
 }
 ```
 
@@ -69,6 +92,11 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `kind` | 種類 (`review_requested`・`merged`)。登録 1 件に種類 1 つ |
 | `session_id`・`session_name`・`permission_mode` | 受信のセッションの ID・名前・権限モード。同じ登録を申し込み直すと、名前と権限モードを申し込みの値に変える |
 | `created_at` | 登録日時。一覧の番号は、この順に振る (同じ時刻なら、ファイルの順) |
+| `consecutive_failures` | 続けて届かなかった回数 (計画の R15)。3 以上の登録は「届かない登録」で、送信待ちを出力しない。同じ登録を申し込み直すと 0 に戻す |
+| `expired_events`・`last_expired_at` | 送信待ちに入れてから 30 日を過ぎて消した出来事の累計と、最後に消した時刻 (計画の R15) |
+| `last_settled_round` (ファイルの最上位) | 続けて届かなかった回数を最後に集計した回の ID。集計の後、`outbox.json` の対応を消す前に処理が中断しても、同じ回を 2 回数えないため |
+
+U2 で記録した登録には `consecutive_failures`・`expired_events`・`last_expired_at` が無い。無いときは、0・0・null として扱う。
 
 (`repo`, `kind`, `session_id`) が同じ登録は 1 件だけにする (計画の R3)。リポジトリの名前は、大文字と小文字を区別せずに比べる。
 
@@ -94,6 +122,64 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `entries` | 一覧の番号と登録の ID の対応 |
 
 一覧を表示するたびに、そのセッションのファイルを置き換える。番号での削除は、このファイルの対応で行い、対応する登録が既に無ければ、何も削除せずに理由を返す (計画の R6)。
+
+### `delivered.json`
+
+```json
+{
+  "version": 1,
+  "events": [
+    {"key": "review_requested:35806844747", "subscription_id": "0123456789ab",
+     "time": "2026-11-16T06:12:00Z", "recorded_at": "2026-11-16T06:20:00Z"}
+  ]
+}
+```
+
+| キー | 値 |
+| --- | --- |
+| `key` | 出来事のキー。`review_requested` は `review_requested:<timeline の出来事の ID>` |
+| `subscription_id` | 届けた登録 |
+| `time` | 出来事の時刻 (レビューの依頼の時刻) |
+| `recorded_at` | 送信待ちに入れた時刻 |
+
+(出来事, 登録) を送信待ちに入れたときに足す。次の回からは、同じ (出来事, 登録) を送信待ちに入れない (計画の R11・KTD6)。出来事の時刻が取得の範囲の起点より前になったものは消す。そのような出来事は、時刻で判定から除かれ、二度と送信待ちに入らないため。配信を停止していた期間の長さに関わらず、取得の範囲に入りうる出来事の記録は残る。
+
+### `outbox.json`
+
+```json
+{
+  "version": 1,
+  "pending": [
+    {"subscription_id": "0123456789ab",
+     "event": {"kind": "review_requested", "key": "review_requested:35806844747", "repo": "akm/claude-plugins",
+               "number": 301, "title": "✨ feat: 通知を届ける", "url": "https://github.com/akm/claude-plugins/pull/301",
+               "time": "2026-11-16T06:12:00Z", "requested": "akm"},
+     "enqueued_at": "2026-11-16T06:20:00Z", "outputs": 1}
+  ],
+  "round": {
+    "id": "fedcba987654",
+    "tick_at": "2026-11-16T06:20:00Z",
+    "messages": [
+      {"message_id": "a1b2c3d4e5f6", "subscription_id": "0123456789ab",
+       "event_keys": ["review_requested:35806844747"], "result": null, "reason": null}
+    ]
+  }
+}
+```
+
+| キー | 値 |
+| --- | --- |
+| `pending` | 送信待ち。登録と出来事の組。`outputs` は、その出来事をメッセージに入れて出力した回数で、2 回目からの出力は送り直しになる |
+| `round` | この回に出力したメッセージの対応。`result` は `ack` (届いた)・`fail` (届かなかった。理由は `reason`)・null (まだ記録されていない)。出力したメッセージが無い回は null |
+
+- `ack` で、そのメッセージの出来事を送信待ちから消す。
+- `settle` で登録ごとに集計し (`fail` があれば続けて届かなかった回数に 1 を足し、`fail` が無く `ack` があれば 0 に戻し、どちらも無ければ変えない)、`round` を null にする。`settle` が呼ばれないまま次の `tick` が始まったら、`tick` が始めに同じ集計をする (計画の KTD6)。
+- 送信待ちに入れてから 30 日を過ぎた出来事は消す (計画の R15)。
+- 登録を削除すると、その登録の送信待ちと `round` の対応を消す。同じ登録を申し込み直すと、その登録の `round` の対応を消す。
+
+### `log.jsonl`
+
+`tick`・`ack`・`fail`・`settle` が、1 回ごとに 1 行の JSON (`time`・`action` と、結果の要約) を足す。調べるときに読むもので、スクリプトは読まない。1 MB を超えたら、新しい 1,000 行だけを残す。
 
 ## 受信のセッションの一時ディレクトリ
 
