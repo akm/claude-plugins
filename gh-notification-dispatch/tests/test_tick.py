@@ -370,10 +370,10 @@ class MergedTest(StartedTickCase):
 
     def test_pull_failure_keeps_position_etag_and_tracked(self):
         """追跡する PR の読み取りが失敗した回は、終了コード 4 で失敗した呼び出しを示し、取得の位置・前回の ETag・追跡する
-        PR を変えない (KTD5・KTD11)。"""
+        PR を変えない (KTD5・KTD11)。通知の一覧は 200 で新しい ETag を返すので、成功すれば ETag が変わる回である。"""
         self.request()
         before = self.state()
-        self.serve(not_modified_for='W/"e10"', etag='W/"e10"', extra=[
+        self.serve(etag='W/"e11"', extra=[
             {"prefix": ["api", "-i", f"repos/{REPO}/pulls/1"], "stdout": http(404, {"message": "Not Found"}),
              "stderr": fixture("repo-not-found", "stderr"), "exit": 1}])
         code, out = self.tick("2026-11-16T06:20:00Z")
