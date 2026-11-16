@@ -242,12 +242,12 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 ├── slide-deck/                   # skill 型 + 同梱ツール
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/outline/           # 構成案を作る・直す
-│   ├── skills/build/             # deck.ts を書き、PowerPoint のファイルを作る
+│   ├── skills/build/             # deck.mts を書き、PowerPoint のファイルを作る
 │   ├── skills/publish/           # Google スライドに反映する
-│   ├── references/               # 3 つのスキルが参照する説明 (構成案の書式・deck.ts の書き方・Google スライドの扱い)
+│   ├── references/               # 3 つのスキルが参照する説明 (構成案の書式・deck.mts の書き方・Google スライドの扱い)
 │   ├── src/                      # TypeScript のツール (入口は src/cli.ts)。テストは tests/ (npm ci の後に npm test)
 │   ├── python/                   # 画像をまとめるツール。テストは python/tests/ (uv sync --frozen の後に uv run python -m unittest discover -s python/tests)
-│   ├── examples/sample/          # 見本の資料 (outline.md と deck.ts)
+│   ├── examples/sample/          # 見本の資料 (outline.md と deck.mts)
 │   └── README.md
 ├── gh-notification-dispatch/     # skill 型 + 同梱スクリプト (作成中)
 │   ├── .claude-plugin/plugin.json

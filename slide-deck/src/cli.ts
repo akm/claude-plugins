@@ -70,20 +70,20 @@ function expectArgs(
 }
 
 const CHECK_STEPS = `  1. 構成案の書式の誤りと、【提案】が付いたままのスライド
-  2. deck.ts を tsc と eslint で検査する。規則はプラグインのコードと同じ tseslint.configs.strictTypeChecked で、
+  2. deck.mts を tsc と eslint で検査する。規則はプラグインのコードと同じ tseslint.configs.strictTypeChecked で、
      明示の any を禁止する。tsc は build/tsconfig.json を使い、資料のディレクトリより上の tsconfig.json は使わない。
-     deck.ts が関数を default export していないか、その関数が型 DeckScript に合わないときも、tsc が指摘する。
+     deck.mts が関数を default export していないか、その関数が型 DeckScript に合わないときも、tsc が指摘する。
      指摘があれば、3 以降を行わない
-  3. deck.ts を実行し、テーマの値 (色の値の形・空の名前) を検査する
-  4. 構成案と deck.ts のキーの突き合わせ (構成案にだけあるキー・deck.ts にだけあるキー・deck.ts で 2 回以上図を作ったキー)。
+  3. deck.mts を実行し、テーマの値 (色の値の形・空の名前) を検査する
+  4. 構成案と deck.mts のキーの突き合わせ (構成案にだけあるキー・deck.mts にだけあるキー・deck.mts で 2 回以上図を作ったキー)。
      構成案に書式の誤りがあれば行わない
-  5. 文字が箱からはみ出しそうな箇所の見積もり (題名・deck.ts の要素の文字・一言)。キーが一致し、テーマに誤りが無いときだけ行う
+  5. 文字が箱からはみ出しそうな箇所の見積もり (題名・deck.mts の要素の文字・一言)。キーが一致し、テーマに誤りが無いときだけ行う
 検査の前に、資料のディレクトリに build/ を作り、.gitignore (内容は *。生成したファイルをコミットに入れない)・tsconfig.json・
 deck-type.ts を書く。tsc と eslint は、キャッシュのディレクトリの node_modules のものを使う (setup install で入れる)。`;
 
 const CHECK_OUTPUT = `  指摘が無ければ「検査の指摘は無い (スライド <枚数> 枚)」。
   指摘があれば、種類ごとに、見出しの行と、字下げした指摘の行を示す。tsc と eslint の指摘は、ツールの出力をそのまま示す。
-  はみ出しそうな箇所は、キー・要素 (題名・一言・deck.ts の要素の添字)・要る高さ・文字を置ける高さ (インチ)・文字の先頭 40 文字を示す。`;
+  はみ出しそうな箇所は、キー・要素 (題名・一言・deck.mts の要素の添字)・要る高さ・文字を置ける高さ (インチ)・文字の先頭 40 文字を示す。`;
 
 const COMMANDS: Readonly<Record<string, Command>> = {
   "setup status": {
@@ -158,10 +158,10 @@ ${CACHE_DIR_HELP}
     },
   },
   "check-outline": {
-    summary: "構成案 outline.md の書式だけを検査し、資料の情報と【提案】のスライドを示す (deck.ts とライブラリは要らない)",
+    summary: "構成案 outline.md の書式だけを検査し、資料の情報と【提案】のスライドを示す (deck.mts とライブラリは要らない)",
     help: `${USAGE_PREFIX} check-outline <資料のディレクトリ>
 
-資料のディレクトリの構成案 outline.md の書式だけを検査する。deck.ts と、キャッシュのディレクトリのライブラリは要らない。
+資料のディレクトリの構成案 outline.md の書式だけを検査する。deck.mts と、キャッシュのディレクトリのライブラリは要らない。
 スキル outline が構成案を書いた後に、スキル publish が Google スライドの URL と slide-deck の版を読むときに使う。
 【提案】が付いたスライドは、指摘にせずに一覧を示す (採否を利用者に質問するのはスキル outline。
 【提案】が残っていると、サブコマンド check は指摘にする)。
@@ -195,16 +195,16 @@ ${CACHE_DIR_HELP}
     },
   },
   check: {
-    summary: "資料のディレクトリの構成案と deck.ts を検査する (PowerPoint のファイルは書かない)",
+    summary: "資料のディレクトリの構成案と deck.mts を検査する (PowerPoint のファイルは書かない)",
     help: `${USAGE_PREFIX} check <資料のディレクトリ>
 
-資料のディレクトリの構成案 outline.md と資料ごとのスクリプト deck.ts を、次の順に検査する。PowerPoint のファイルは書かない。
+資料のディレクトリの構成案 outline.md と資料ごとのスクリプト deck.mts を、次の順に検査する。PowerPoint のファイルは書かない。
 ${CHECK_STEPS}
 
 ${CACHE_DIR_HELP}
 
 引数:
-  <資料のディレクトリ>  outline.md と deck.ts があるディレクトリ
+  <資料のディレクトリ>  outline.md と deck.mts があるディレクトリ
   --help (-h) でこの説明を示す。
 
 出力 (標準出力):
@@ -213,10 +213,11 @@ ${CHECK_OUTPUT}
 
 終了コード:
   0  指摘が無い
-  1  指摘がある (構成案の書式の誤り・【提案】の残り・tsc か eslint の指摘・deck.ts の実行の誤り・テーマの誤り・キーの不一致・
+  1  指摘がある (構成案の書式の誤り・【提案】の残り・tsc か eslint の指摘・deck.mts の実行の誤り・テーマの誤り・キーの不一致・
      はみ出しそうな箇所)
-  2  実行の誤り。資料のディレクトリか、outline.md・deck.ts が無い。node_modules がキャッシュのディレクトリに入っていない
-     (setup status で確認する)。tsc か eslint を実行できないか、指摘以外の理由で失敗した。引数が違う
+  2  実行の誤り。資料のディレクトリか、outline.md・deck.mts が無い。slide-deck の 0.1.0 のファイル名 deck.ts がある
+     (deck.mts が無ければ名前を deck.mts に変えるよう示し、両方あれば deck.ts を消すよう示す。どちらもファイルは変えない)。
+     node_modules がキャッシュのディレクトリに入っていない (setup status で確認する)。tsc か eslint を実行できないか、指摘以外の理由で失敗した。引数が違う
 `,
     run: async (args) => {
       expectArgs(args, ["<資料のディレクトリ>"]);
@@ -246,7 +247,7 @@ pptx のスキルは、Claude のデスクトップアプリが配るもの (ス
 ${CACHE_DIR_HELP}
 
 引数:
-  <資料のディレクトリ>        outline.md と deck.ts があるディレクトリ
+  <資料のディレクトリ>        outline.md と deck.mts があるディレクトリ
   --pptx-skill <ディレクトリ>  pptx のスキルのディレクトリ (scripts/apply_theme.js と scripts/office/validate.py を持つ)。省略できない
   --help (-h) でこの説明を示す。
 
@@ -324,7 +325,7 @@ ${indent(PRESENTATION_SHAPE)}
 ${CACHE_DIR_HELP}
 
 引数:
-  <資料のディレクトリ>  outline.md と deck.ts と build/presentation.json があるディレクトリ
+  <資料のディレクトリ>  outline.md と deck.mts と build/presentation.json があるディレクトリ
   --recreate-all        ハッシュ値が同じスライドも作り直す。構成案に記録したプラグインの版が今の版と違い、
                         利用者がすべてのスライドを作り直すことを選んだときに指定する。ID が同じスライドは、
                         古いスライドを消してから、同じ ID で同じ位置に作る。

@@ -13,7 +13,7 @@ import { hasMismatch, matchKeys } from "../src/outline/match.ts";
 import { writeGoogleSlidesUrl, writePluginVersion, type WriteInfoResult } from "../src/outline/url.ts";
 import { parts } from "../src/data/parts.ts";
 import { checkTheme } from "../src/data/theme.ts";
-import sampleDeck from "../examples/sample/deck.ts";
+import sampleDeck from "../examples/sample/deck.mts";
 
 const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(PLUGIN_DIR, "tests", "fixtures", "outline");

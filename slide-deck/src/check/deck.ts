@@ -1,4 +1,4 @@
-// 資料ごとのスクリプト deck.ts と構成案 outline.md を検査し、スライドのデータを作る (入口のサブコマンド check。計画の R9・R10・R13・U5)。
+// 資料ごとのスクリプト deck.mts と構成案 outline.md を検査し、スライドのデータを作る (入口のサブコマンド check。計画の R9・R10・R13・U5)。
 // tsc と eslint は、キャッシュの node_modules/.bin のものを、子プロセスで実行する (計画の KTD8)。
 // 入口のサブコマンド check の引数・出力・終了コードの SSOT は、ファイル src/cli.ts の --help。
 
@@ -33,7 +33,7 @@ export interface DeckPaths {
   readonly deckDir: string;
   /** 構成案 outline.md */
   readonly outline: string;
-  /** 資料ごとのスクリプト deck.ts */
+  /** 資料ごとのスクリプト deck.mts */
   readonly script: string;
   /** 生成したファイルを書き込むディレクトリ build/ */
   readonly buildDir: string;
@@ -41,15 +41,22 @@ export interface DeckPaths {
   readonly gitignore: string;
   /** build/tsconfig.json (計画の KTD2) */
   readonly tsconfig: string;
-  /** build/deck-type.ts (deck.ts の default export の型を tsc で検査するファイル) */
+  /** build/deck-type.ts (deck.mts の default export の型を tsc で検査するファイル) */
   readonly typeCheck: string;
 }
 
+// 0.1.0 の資料ごとのスクリプトのファイル名。拡張子 .ts のファイルを ESM と CommonJS のどちらとして読むかを、
+// Node.js は上のディレクトリの package.json の type で決めるので、type が無いと警告が出て、commonjs だと実行できなかった (#297)。
+// 拡張子 .mts のファイルは、package.json に関係なく ESM として読む
+const LEGACY_SCRIPT = "deck.ts";
+
 /**
- * 資料のディレクトリの中のファイルのパスを求める。ディレクトリか、outline.md・deck.ts が無ければ ExecutionError を送出する。
+ * 資料のディレクトリの中のファイルのパスを求める。ディレクトリか、outline.md・deck.mts が無ければ ExecutionError を送出する。
+ * 0.1.0 のファイル名 deck.ts があれば、deck.mts の有無に関わらず ExecutionError を送出し、ファイルは変えない
+ * (deck.mts が無ければ名前を変えるよう示し、両方あれば、どちらを使うか分からないので deck.ts を消すよう示す)。
  * パスは、シンボリックリンクをたどった実際のパスにする。eslint は、--config を指定すると作業ディレクトリ (実際のパス) の外の
  * ファイルを検査しないので、資料のディレクトリのパスがシンボリックリンクを含むと (macOS の /var と /private/var など)、
- * deck.ts を検査の対象の外として扱うため
+ * deck.mts を検査の対象の外として扱うため
  */
 export function deckPaths(deckDir: string): DeckPaths {
   const given = resolve(deckDir);
@@ -57,11 +64,26 @@ export function deckPaths(deckDir: string): DeckPaths {
     throw new ExecutionError(`資料のディレクトリ ${given} が無い`);
   }
   const dir = realpathSync(given);
+  const legacy = join(dir, LEGACY_SCRIPT);
+  if (existsSync(legacy)) {
+    const script = join(dir, "deck.mts");
+    if (existsSync(script)) {
+      throw new ExecutionError(
+        `資料のディレクトリに、資料ごとのスクリプトの ${legacy} と ${script} の両方がある。` +
+          `使うのは deck.mts だけなので、deck.ts の変更が deck.mts に入っていることを確認してから、deck.ts を消す`,
+      );
+    }
+    throw new ExecutionError(
+      `資料ごとのスクリプトのファイル名は deck.mts にした (slide-deck の 0.1.0 では deck.ts)。` +
+        `${legacy} の名前を deck.mts に変える。拡張子 .mts のファイルは、資料のディレクトリより上の package.json に関わらず、` +
+        "Node.js が ESM として読む",
+    );
+  }
   const buildDir = join(dir, "build");
   const paths: DeckPaths = {
     deckDir: dir,
     outline: join(dir, "outline.md"),
-    script: join(dir, "deck.ts"),
+    script: join(dir, "deck.mts"),
     buildDir,
     gitignore: join(buildDir, ".gitignore"),
     tsconfig: join(buildDir, "tsconfig.json"),
@@ -88,11 +110,11 @@ export function installedCache(options: CheckOptions = {}): CachePaths {
   return paths;
 }
 
-// build/deck-type.ts の内容。deck.ts に default export が無いときや、型 DeckScript に合わないときに、tsc が指摘する
+// build/deck-type.ts の内容。deck.mts に default export が無いときや、型 DeckScript に合わないときに、tsc が指摘する
 const TYPE_CHECK_SOURCE = `// プラグイン slide-deck のサブコマンド check が書くファイル。
-// 資料ごとのスクリプト deck.ts の default export が、型 DeckScript であることを tsc で検査する。
+// 資料ごとのスクリプト deck.mts の default export が、型 DeckScript であることを tsc で検査する。
 import type { DeckScript } from "slide-deck";
-import deck from "../deck.ts";
+import deck from "../deck.mts";
 
 deck satisfies DeckScript;
 `;
@@ -121,7 +143,7 @@ export function prepareBuildDir(paths: DeckPaths, pluginDir: string = PLUGIN_DIR
       types: [],
       paths: { "slide-deck": [join(pluginDir, "src", "index.ts")] },
     },
-    files: ["../deck.ts", "deck-type.ts"],
+    files: ["../deck.mts", "deck-type.ts"],
   };
   writeFileSync(paths.tsconfig, `${JSON.stringify(tsconfig, null, 2)}\n`);
   writeFileSync(paths.typeCheck, TYPE_CHECK_SOURCE);
@@ -190,7 +212,7 @@ export async function loadDeckScript(paths: DeckPaths): Promise<LoadResult> {
     const mod: unknown = await import(pathToFileURL(paths.script).href);
     const fn: unknown = typeof mod === "object" && mod !== null && "default" in mod ? mod.default : undefined;
     if (typeof fn !== "function") {
-      return { ok: false, message: "deck.ts が、関数を default export していない" };
+      return { ok: false, message: "deck.mts が、関数を default export していない" };
     }
     // 型は、build/deck-type.ts で tsc が DeckScript であることを検査した
     const result = (fn as DeckScript)(parts);
@@ -233,7 +255,7 @@ export interface CheckReport {
 function describeFitElement(e: FitIssue["element"]): string {
   if (e === "title") return "題名";
   if (e === "takeaway") return "一言";
-  return `deck.ts の要素 ${String(e)} (スライドの要素の配列の添字。足した順に 0 から数える)`;
+  return `deck.mts の要素 ${String(e)} (スライドの要素の配列の添字。足した順に 0 から数える)`;
 }
 
 function formatFitIssue(i: FitIssue): string {
@@ -275,11 +297,11 @@ export async function checkDeck(deckDir: string, options: CheckOptions = {}): Pr
 
   const loaded = await loadDeckScript(paths);
   if (!loaded.ok) {
-    findings.push({ heading: "deck.ts を実行できない", lines: loaded.message.split("\n") });
+    findings.push({ heading: "deck.mts を実行できない", lines: loaded.message.split("\n") });
     return { findings, deck: null };
   }
   const themeErrors = checkTheme(loaded.result.theme);
-  if (themeErrors.length > 0) findings.push({ heading: "deck.ts のテーマの誤り", lines: themeErrors });
+  if (themeErrors.length > 0) findings.push({ heading: "deck.mts のテーマの誤り", lines: themeErrors });
   if (!parsed.ok) return { findings, deck: null };
 
   const outline = parsed.outline;
@@ -290,11 +312,11 @@ export async function checkDeck(deckDir: string, options: CheckOptions = {}): Pr
   if (hasMismatch(mismatch)) {
     const lines: string[] = [];
     if (mismatch.outlineOnly.length > 0) lines.push(`構成案にだけあるキー: ${mismatch.outlineOnly.join(", ")}`);
-    if (mismatch.deckOnly.length > 0) lines.push(`deck.ts にだけあるキー: ${mismatch.deckOnly.join(", ")}`);
+    if (mismatch.deckOnly.length > 0) lines.push(`deck.mts にだけあるキー: ${mismatch.deckOnly.join(", ")}`);
     if (mismatch.deckDuplicates.length > 0) {
-      lines.push(`deck.ts で 2 回以上図を作ったキー: ${mismatch.deckDuplicates.join(", ")}`);
+      lines.push(`deck.mts で 2 回以上図を作ったキー: ${mismatch.deckDuplicates.join(", ")}`);
     }
-    findings.push({ heading: "構成案と deck.ts のキーの不一致", lines });
+    findings.push({ heading: "構成案と deck.mts のキーの不一致", lines });
     return { findings, deck: null };
   }
   if (themeErrors.length > 0) return { findings, deck: null };

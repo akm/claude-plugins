@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import sampleDeck from "../examples/sample/deck.ts";
+import sampleDeck from "../examples/sample/deck.mts";
 import { arrow, box, bullets, card, parts, slide, text } from "../src/data/parts.ts";
 import type { SlideElement, TextBoxElement } from "../src/data/types.ts";
 import { charWidth, estimateSlides, type FitIssue, type FitTarget } from "../src/fit/estimate.ts";

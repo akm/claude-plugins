@@ -1,11 +1,11 @@
 ---
 name: publish
-description: 構成案 (outline.md) と資料ごとのスクリプト deck.ts から、Google スライドの資料を作る・直す。内容が変わったスライドだけを作り直し、足したスライドを挿入し、消したスライドを消し、順序を並べ替え、発表者ノートを入れて、ノートと画像で確認する。「Google スライドに反映して」「スライドを直したので Google スライドも更新して」「slide-deck:publish を実行して」のような依頼や、スキル slide-deck:build の後に使う。Google スライドのコネクタが要る。
+description: 構成案 (outline.md) と資料ごとのスクリプト deck.mts から、Google スライドの資料を作る・直す。内容が変わったスライドだけを作り直し、足したスライドを挿入し、消したスライドを消し、順序を並べ替え、発表者ノートを入れて、ノートと画像で確認する。「Google スライドに反映して」「スライドを直したので Google スライドも更新して」「slide-deck:publish を実行して」のような依頼や、スキル slide-deck:build の後に使う。Google スライドのコネクタが要る。
 ---
 
 # slide-deck:publish: Google スライドに反映する
 
-構成案 `outline.md` と資料ごとのスクリプト `deck.ts` から、Google スライドの資料を作る、または直す。直すときは、内容が変わったスライドだけを同じ位置に作り直し、ほかのスライドと、利用者が Google スライドで足したスライドはそのまま残す。
+構成案 `outline.md` と資料ごとのスクリプト `deck.mts` から、Google スライドの資料を作る、または直す。直すときは、内容が変わったスライドだけを同じ位置に作り直し、ほかのスライドと、利用者が Google スライドで足したスライドはそのまま残す。
 
 コネクタの使い方・`build/presentation.json` の書き方・指示のファイルの送り方・ID の形・Google スライドの API への対処は、ファイル [references/google-slides.md](../../references/google-slides.md) を読んでから行う。入口のサブコマンドの引数・出力・終了コードは、`node "${CLAUDE_PLUGIN_ROOT}/src/cli.ts" <サブコマンド> --help` の出力を参照する。
 
@@ -22,7 +22,7 @@ description: 構成案 (outline.md) と資料ごとのスクリプト deck.ts �
 1. **前提を確認する**:
    - スキル `slide-deck:build` の手順 1 と同じく、Node.js 24 以上があることを確認してから `setup status` を実行し、ライブラリが入っていなければ、承認を得てから入れる。
    - 資料のディレクトリは、この会話で使ったものを使い、無ければ利用者に質問する。
-   - スキル `anthropic-skills:google-workspace` を読み込み、その書き込みの規則 (読み込んでから書く・`revisionId` を付けて送る・書いた後に読み込んで確認する・利用者が頼んでいないファイルをゴミ箱に移さない) に従う。そのスキルの、資料のデザインの規則と補助のスクリプトは使わない (デザインは `deck.ts` が決める)。スキルが無ければ、何が無いかを伝えて中断する。
+   - スキル `anthropic-skills:google-workspace` を読み込み、その書き込みの規則 (読み込んでから書く・`revisionId` を付けて送る・書いた後に読み込んで確認する・利用者が頼んでいないファイルをゴミ箱に移さない) に従う。そのスキルの、資料のデザインの規則と補助のスクリプトは使わない (デザインは `deck.mts` が決める)。スキルが無ければ、何が無いかを伝えて中断する。
 2. **コネクタを確認する**: ファイル [references/google-slides.md](../../references/google-slides.md) の節「使うツール」のとおりに、Google スライドと Google ドライブのコネクタのツールがあるかを確認する。Google スライドのコネクタが無ければ中断し、有効にするよう利用者に求める。Google スライドの代わりに PowerPoint のファイル `build/deck.pptx` を使うかは、利用者が選ぶ。利用者が選んだときだけ、スキル `slide-deck:build` で作ったファイルを渡す。
 3. **構成案の資料の情報を読む**: サブコマンド `check-outline` を実行する。
 
@@ -75,7 +75,7 @@ description: 構成案 (outline.md) と資料ごとのスクリプト deck.ts �
    node "${CLAUDE_PLUGIN_ROOT}/src/cli.ts" write-info tmp/slides/cache --plugin-version
    ```
 
-10. **画像で確認する**: 同じ文書の節「画像で確認する」のとおりに、スライドの画像を 6 枚ずつ 1 枚にまとめて見る。最後の 1 文字だけの行・はみ出し・位置のずれを見つけたら、利用者に示し、`deck.ts` か構成案を直して (構成案の文を変えるときは利用者の承認を得て)、スキル `slide-deck:build` からやり直す。
+10. **画像で確認する**: 同じ文書の節「画像で確認する」のとおりに、スライドの画像を 6 枚ずつ 1 枚にまとめて見る。最後の 1 文字だけの行・はみ出し・位置のずれを見つけたら、利用者に示し、`deck.mts` か構成案を直して (構成案の文を変えるときは利用者の承認を得て)、スキル `slide-deck:build` からやり直す。
 11. **報告する**: 資料の題名を、Google スライドの URL へのリンクにして伝え、URL は前と変わらないことを伝える。作った・作り直した・消した・並べ替えたキーを伝える。スライド番号は付けていないので、メニューの「挿入 > スライド番号」で付けるよう伝える。画像で確認できなかったことがあれば、それも伝える。
 
 ## このスキルがしないこと
@@ -86,4 +86,4 @@ description: 構成案 (outline.md) と資料ごとのスクリプト deck.ts �
 - 構成案に URL があるのに、新しい資料を作ること。資料をゴミ箱に移すこと。
 - スライド番号を API で付けること。
 - 構成案の Google スライドの URL と slide-deck の版の行を、サブコマンド `write-info` を使わずに書くこと。ただし、その行の値が誤っているときは、ファイル [references/outline-format.md](../../references/outline-format.md) の節「資料の題名と資料の情報」のとおりに、利用者の回答で直す。
-- `deck.ts` を書くこと、PowerPoint のファイルを作ること。スキル `build` が行う。
+- `deck.mts` を書くこと、PowerPoint のファイルを作ること。スキル `build` が行う。

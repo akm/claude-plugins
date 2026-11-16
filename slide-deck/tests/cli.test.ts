@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { FAKE_PPTX_SKILL, FAKE_PYTHON_EXIT_ENV, makeSandbox, type TestSandbox } from "./helpers/cache.ts";
@@ -38,7 +38,7 @@ function edit(deckDir: string, file: string, from: string, to: string): void {
   writeFileSync(path, before.replace(from, to));
 }
 
-// 見本の資料の deck.ts の、関数の最初の行。ここに行を足して、誤りを入れる
+// 見本の資料の deck.mts の、関数の最初の行。ここに行を足して、誤りを入れる
 const DECK_FIRST_LINE = "const deck: DeckScript = (p) => {";
 
 describe("check", () => {
@@ -76,9 +76,9 @@ describe("check", () => {
     assert.deepEqual(tsconfig.compilerOptions.paths["slide-deck"], [join(sandbox.pluginDir, "src", "index.ts")]);
   });
 
-  test("deck.ts に any を書くと、eslint の指摘を示して終了コード 1 になる", () => {
+  test("deck.mts に any を書くと、eslint の指摘を示して終了コード 1 になる", () => {
     const deck = sandbox.copySample();
-    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
+    edit(deck, "deck.mts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
     const r = runCli(["check", deck]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /^eslint の指摘:$/m);
@@ -86,10 +86,10 @@ describe("check", () => {
     assert.doesNotMatch(r.stdout, /tsc の指摘/);
   });
 
-  test("資料のディレクトリのパスがシンボリックリンクを含んでも、eslint が deck.ts を検査の対象の外として扱わない", () => {
+  test("資料のディレクトリのパスがシンボリックリンクを含んでも、eslint が deck.mts を検査の対象の外として扱わない", () => {
     // eslint は、--config を指定すると、作業ディレクトリ (実際のパス) の外のファイルを、警告だけを出して検査しない
     const deck = sandbox.copySample();
-    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
+    edit(deck, "deck.mts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
     const link = join(sandbox.root, "link");
     symlinkSync(deck, link, "dir");
     const r = runCli(["check", link]);
@@ -103,7 +103,7 @@ describe("check", () => {
     const deck = sandbox.copySample();
     const name = "u".repeat(300);
     const lines = Array.from({ length: 4000 }, () => `  void ${name};`).join("\n");
-    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n${lines}`);
+    edit(deck, "deck.mts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n${lines}`);
     const r = runCli(["check", deck]);
     assert.equal(r.status, 1, r.stderr);
     assert.ok(r.stdout.length > 1024 * 1024, String(r.stdout.length));
@@ -112,16 +112,16 @@ describe("check", () => {
 
   test("部品の関数の引数の誤りで、tsc の指摘を示して終了コード 1 になる", () => {
     const deck = sandbox.copySample();
-    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  p.box(p.slide("x"), 1, 2, 3, "文字");`);
+    edit(deck, "deck.mts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  p.box(p.slide("x"), 1, 2, 3, "文字");`);
     const r = runCli(["check", deck]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /^tsc の指摘:$/m);
-    assert.match(r.stdout, /deck\.ts\(\d+,\d+\): error TS2554/);
+    assert.match(r.stdout, /deck\.mts\(\d+,\d+\): error TS2554/);
   });
 
-  test("deck.ts が関数を default export していないと、tsc の指摘を示して終了コード 1 になる", () => {
+  test("deck.mts が関数を default export していないと、tsc の指摘を示して終了コード 1 になる", () => {
     const deck = sandbox.copySample();
-    edit(deck, "deck.ts", "export default deck;", "export { deck };");
+    edit(deck, "deck.mts", "export default deck;", "export { deck };");
     const r = runCli(["check", deck]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /build\/deck-type\.ts\(\d+,\d+\): error TS2613: .* has no default export/);
@@ -129,17 +129,17 @@ describe("check", () => {
 
   test("キーが一致しないと、片方にしか無いキーと重複したキーを示して終了コード 1 になる", () => {
     const deck = sandbox.copySample();
-    edit(deck, "deck.ts", 'p.slide("stale")', 'p.slide("hit-miss")');
-    edit(deck, "deck.ts", 'p.slide("expire")', 'p.slide("expiry")');
+    edit(deck, "deck.mts", 'p.slide("stale")', 'p.slide("hit-miss")');
+    edit(deck, "deck.mts", 'p.slide("expire")', 'p.slide("expiry")');
     const r = runCli(["check", deck]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.equal(
       r.stdout,
       [
-        "構成案と deck.ts のキーの不一致:",
+        "構成案と deck.mts のキーの不一致:",
         "  構成案にだけあるキー: stale, expire",
-        "  deck.ts にだけあるキー: expiry",
-        "  deck.ts で 2 回以上図を作ったキー: hit-miss",
+        "  deck.mts にだけあるキー: expiry",
+        "  deck.mts で 2 回以上図を作ったキー: hit-miss",
         "",
       ].join("\n"),
     );
@@ -171,21 +171,56 @@ describe("check", () => {
 
   test("テーマの色の値の形が違うと、テーマの誤りを示して終了コード 1 になる", () => {
     const deck = sandbox.copySample();
-    edit(deck, "deck.ts", 'dk1: "1F2933"', 'dk1: "#1F2933"');
+    edit(deck, "deck.mts", 'dk1: "1F2933"', 'dk1: "#1F2933"');
     const r = runCli(["check", deck]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
-    assert.match(r.stdout, /^deck\.ts のテーマの誤り:\n {2}テーマの色 dk1 の値 "#1F2933" が/m);
+    assert.match(r.stdout, /^deck\.mts のテーマの誤り:\n {2}テーマの色 dk1 の値 "#1F2933" が/m);
   });
 
-  test("資料のディレクトリか deck.ts が無いと、終了コード 2 になる", () => {
+  test("資料のディレクトリか deck.mts が無いと、終了コード 2 になる", () => {
     const missing = runCli(["check", join(sandbox.root, "missing")]);
     assert.equal(missing.status, 2);
     assert.match(missing.stderr, /資料のディレクトリ .*missing が無い/);
     const deck = sandbox.copySample();
-    rmSync(join(deck, "deck.ts"));
+    rmSync(join(deck, "deck.mts"));
     const noScript = runCli(["check", deck]);
     assert.equal(noScript.status, 2);
-    assert.match(noScript.stderr, /資料のディレクトリに、次のファイルが無い:\n {2}.*deck\.ts/);
+    assert.match(noScript.stderr, /資料のディレクトリに、次のファイルが無い:\n {2}.*deck\.mts/);
+  });
+
+  // 拡張子 .ts だった 0.1.0 では、type が無いと警告が出て、commonjs だと deck.ts を実行できなかった (#297)
+  for (const [name, pkg] of [
+    ["type が無い", {}],
+    ["type が commonjs の", { type: "commonjs" }],
+  ] as const) {
+    test(`資料のディレクトリより上に ${name} package.json があっても、deck.mts を実行して成功し、警告を出さない`, () => {
+      const deck = sandbox.copySample("project/slides/sample");
+      writeFileSync(join(sandbox.root, "project", "package.json"), JSON.stringify(pkg));
+      const r = runCli(["check", deck]);
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.equal(r.stdout, "検査の指摘は無い (スライド 4 枚)\n");
+      assert.equal(r.stderr, "");
+    });
+  }
+
+  test("0.1.0 の名前の deck.ts だけがあると、deck.mts に名前を変えるよう示して終了コード 2 になり、ファイルを変えない", () => {
+    const deck = sandbox.copySample();
+    renameSync(join(deck, "deck.mts"), join(deck, "deck.ts"));
+    const r = runCli(["check", deck]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /0\.1\.0 では deck\.ts\)。.*deck\.ts の名前を deck\.mts に変える/);
+    assert.ok(existsSync(join(deck, "deck.ts")));
+    assert.equal(existsSync(join(deck, "deck.mts")), false);
+  });
+
+  test("deck.ts と deck.mts の両方があると、deck.ts を消すよう示して終了コード 2 になり、ファイルを変えない", () => {
+    const deck = sandbox.copySample();
+    cpSync(join(deck, "deck.mts"), join(deck, "deck.ts"));
+    const r = runCli(["check", deck]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /deck\.ts と .*deck\.mts の両方がある。.*deck\.ts を消す/);
+    assert.ok(existsSync(join(deck, "deck.ts")));
+    assert.ok(existsSync(join(deck, "deck.mts")));
   });
 
   test("引数の数が違うと、説明を示して終了コード 2 になる", () => {
@@ -247,12 +282,12 @@ describe("pptx", () => {
     assert.equal(r.status, 0, r.stdout + r.stderr);
   });
 
-  test("deck.ts に any を書くと、eslint の指摘を示して終了コード 1 になり、PowerPoint のファイルを書かず、前に書いたファイルも消す", () => {
+  test("deck.mts に any を書くと、eslint の指摘を示して終了コード 1 になり、PowerPoint のファイルを書かず、前に書いたファイルも消す", () => {
     const deck = sandbox.copySample();
     const pptx = join(deck, "build", "deck.pptx");
     mkdirSync(join(deck, "build"));
     writeFileSync(pptx, "前に書いたファイル");
-    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
+    edit(deck, "deck.mts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
     const r = runCli(["pptx", deck, "--pptx-skill", FAKE_PPTX_SKILL]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /@typescript-eslint\/no-explicit-any/);
@@ -433,7 +468,7 @@ describe("requests", () => {
   test("check の指摘があれば、指摘を示して終了コード 1 になり、指示のファイルを書かない", () => {
     const deck = sandbox.copySample();
     writePresentation(deck, "u11-new.json");
-    edit(deck, "deck.ts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
+    edit(deck, "deck.mts", DECK_FIRST_LINE, `${DECK_FIRST_LINE}\n  const unused: any = p.slide("x");\n  void unused;`);
     const r = runCli(["requests", deck]);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /@typescript-eslint\/no-explicit-any/);
@@ -455,11 +490,11 @@ const PLUGIN_VERSION = (JSON.parse(readFileSync(join(PLUGIN_DIR, ".claude-plugin
 const SLIDES_URL = "https://docs.google.com/presentation/d/abc_DEF-123/edit";
 
 describe("check-outline", () => {
-  test("deck.ts とキャッシュのライブラリが無くても、見本の構成案を検査して資料の情報を示し、終了コード 0 になる", () => {
+  test("deck.mts とキャッシュのライブラリが無くても、見本の構成案を検査して資料の情報を示し、終了コード 0 になる", () => {
     const empty = makeSandbox({ nodeModules: false });
     try {
       const deck = empty.copySample();
-      rmSync(join(deck, "deck.ts"));
+      rmSync(join(deck, "deck.mts"));
       const r = spawnSync(process.execPath, [empty.cli, "check-outline", deck], { env: empty.env, encoding: "utf8" });
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.equal(

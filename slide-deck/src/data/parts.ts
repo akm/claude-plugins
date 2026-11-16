@@ -1,4 +1,4 @@
-// 部品の関数。資料ごとのスクリプト deck.ts が、キーごとの図 (SlideFigure) に要素を足すのに使う。
+// 部品の関数。資料ごとのスクリプト deck.mts が、キーごとの図 (SlideFigure) に要素を足すのに使う。
 // 引数とデフォルト値は、元にした資料のスクリプト build.js の関数 box・text・arrow・badge・takeaway・card・bullets から引き継いだ。
 // 元の関数は pptxgenjs のスライドに直接描いていたが、ここではスライドのデータの要素を図に足す (計画の KTD1)。
 // 元のテーマの色の定数は、テーマの色の名前に置き換えた (TEXT は dk1、MUTED は dk2、WHITE は lt1、PANEL は lt2、NEW は accent1)。
