@@ -259,7 +259,7 @@ gh-notification-dispatch/
 **Test scenarios:**
 - Test expectation: none -- 振る舞いを確かめる単位で、コードを残さない。
 
-**Verification:** 6 項目の結果 (Claude Desktop と Claude Code の版・手順・結果) を、利用者の承認を得て Issue #284 のコメントに書いた。結果が Goal Capsule の「利用者に判断を求める条件」に当たるときは、利用者の判断を得て、この計画の R と KTD を直した。
+**Verification:** Approach で挙げた項目ごとの結果 (Claude Desktop と Claude Code の版・手順・結果) を、利用者の承認を得て Issue #284 のコメントに書いた。結果が Goal Capsule の「利用者に判断を求める条件」に当たるときは、利用者の判断を得て、この計画の R と KTD を直した。
 
 ### U2. 枠と登録
 
