@@ -378,7 +378,7 @@ def unsubscribe(message_text, sender):
 def rename(session_id, name):
     """受信のセッションの名前が変わったときに、その ID の登録の名前を変える (R15・KTD2)。
 
-    名前は、配信のセッションがツール list_sessions で ID から引き直したもの。変えた登録の数を返す。
+    名前は、配信のセッションがツール get_session で ID から引き直したもの。変えた登録の数を返す。
     """
     payload = {"session_id": session_id, "name": name, "renamed": 0, "errors": []}
     errors = _value_errors(messages.check_session_id(session_id), messages.check_name(name))

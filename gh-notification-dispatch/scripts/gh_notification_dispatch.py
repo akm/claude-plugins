@@ -259,7 +259,7 @@ def build_parser():
 
     p = _add(g, "rename", cmd_subscriptions_rename,
              "配信のセッションが、受信のセッションの ID の登録の名前を変える。gh は実行しない。\n"
-             "名前を宛先にしたメッセージが届かないときに、ツール list_sessions で ID から今の名前を引き直して使う",
+             "名前を宛先にしたメッセージが届かないときに、ツール get_session で ID から今の名前を引き直して使う",
              "  session_id  --session-id の値\n"
              "  name        --name の値\n"
              "  renamed     名前を変えた登録の数\n"
