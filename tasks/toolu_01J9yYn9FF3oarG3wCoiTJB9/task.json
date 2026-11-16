@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01J9yYn9FF3oarG3wCoiTJB9",
+  "agent_id": "a6e3e6248368331a9",
+  "subagent_type": "general-purpose",
+  "task_description": "エージェントからの使い方を検討する",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 58484,
+    "cache_read_tokens": 441353,
+    "output_tokens": 8269,
+    "api_call_count": 6
+  },
+  "started_at": "2026-11-11T17:18:07.561331+09:00",
+  "completed_at": "2026-11-11T17:19:41.629361+09:00"
+}

@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_019etRo6U593KSbeWUvvo2mU",
+  "agent_id": "a24ac1d5524dd757f",
+  "subagent_type": "general-purpose",
+  "task_description": "過去の知見を調べる",
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 117980,
+    "cache_read_tokens": 543185,
+    "output_tokens": 5733,
+    "api_call_count": 7
+  },
+  "started_at": "2026-11-11T17:18:07.026625+09:00",
+  "completed_at": "2026-11-11T17:19:04.084082+09:00"
+}

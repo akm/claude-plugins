@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01C61pF7QgHi2URNyimr57uS",
+  "agent_id": "a7c3125ebe5168c0c",
+  "subagent_type": "general-purpose",
+  "task_description": "計画を敵対的にレビューする",
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 100309,
+    "cache_read_tokens": 1103362,
+    "output_tokens": 28197,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-13T22:01:10.782465+09:00",
+  "completed_at": "2026-11-13T22:05:50.02329+09:00"
+}

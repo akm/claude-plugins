@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_013MnFS3ZRgPnDrqJeo55Q26",
+  "agent_id": "ac5062ad137979991",
+  "subagent_type": "general-purpose",
+  "task_description": "計画の一貫性をレビューする",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 116174,
+    "cache_read_tokens": 178420,
+    "output_tokens": 13429,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-13T22:01:10.774701+09:00",
+  "completed_at": "2026-11-13T22:02:46.974171+09:00"
+}

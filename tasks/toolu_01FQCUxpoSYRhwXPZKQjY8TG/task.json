@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01FQCUxpoSYRhwXPZKQjY8TG",
+  "agent_id": "a867fbba119aaa63d",
+  "subagent_type": "general-purpose",
+  "task_description": "計画の範囲をレビューする",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 114720,
+    "cache_read_tokens": 176917,
+    "output_tokens": 6758,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-13T22:01:10.797944+09:00",
+  "completed_at": "2026-11-13T22:02:46.972737+09:00"
+}
