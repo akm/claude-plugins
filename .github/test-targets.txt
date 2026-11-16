@@ -16,5 +16,6 @@ python issue-dispatch/tests
 python issue-practice/tests
 python scripts/tests
 python doc-structured/tool/tests
+python gh-notification-dispatch/tests
 node slide-deck
 uv slide-deck
