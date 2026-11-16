@@ -67,7 +67,7 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `started_at` | 最初に開始した時刻。これより前の通知と出来事は届けない (計画の R8)。U3 では、記録が無いときの最初の `tick` が書く |
 | `position` | 取得の位置。取得と判定で `gh` が 1 度も失敗しなかった直近の回の、`tick` を始めた時刻 (計画の KTD5) |
 | `etag` | `position` を書いた回の、通知の一覧の 1 ページ目の応答のヘッダ `Etag`。次の回のヘッダ `If-None-Match` に付ける (計画の KTD5) |
-| `viewer` | 自分のログイン名 (`login`) と、所属するチーム (`teams`。チームの `id`・`slug`・Organization の `login`) と、それらを取得した時刻 (`fetched_at`)。取得し直す時機は計画の KTD4 にある。サブコマンド `dispatcher set` はこの値を消し、次の `tick` が取得し直す |
+| `viewer` | 自分のログイン名 (`login`) と、所属するチーム (`teams`。チームの `id`・`slug`・Organization の `login`) と、それらを取得した時刻 (`fetched_at`)。取得し直す時機は計画の KTD4 にある。サブコマンド `dispatcher set` (スキル `dispatch` の `start` と `resume` が実行する) はこの値を消し、次の `tick` が取得し直す |
 | `last_allocated` | 前の回に、最後にメッセージを割り当てた登録の ID と登録日時。次の回は、登録日時の順でこの登録の次の登録から割り当てる (計画の R13)。この登録が削除されていても、登録日時で次の登録が決まる |
 | `schedule.state` | 定期の予定の状態。`running` (動いている) か `stopped` (停止した)。期限切れは書かず、`expires_at` と今の時刻を比べて判定する (計画の KTD9) |
 | `schedule.job_id`・`schedule.cron` | ツール `CronCreate` が返したジョブの ID と、渡した cron の式。`stopped` では null |
