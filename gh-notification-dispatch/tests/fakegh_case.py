@@ -116,11 +116,16 @@ class FakeGhCase(unittest.TestCase):
         """今の時刻を決める (YYYY-MM-DDTHH:MM:SSZ)。"""
         os.environ["GH_NOTIFICATION_DISPATCH_NOW"] = time_text
 
-    def home_files(self):
-        """記録のディレクトリのファイルの、相対パスと中身の対応 (書き込みが無かったことを比べるため)。"""
+    def home_files(self, ignore_lock=False):
+        """記録のディレクトリのファイルの、相対パスと中身の対応 (書き込みが無かったことを比べるため)。
+
+        ignore_lock が真なら、ロックのファイル lock (中身は空で、配信のセッションの書き込みの処理が作る) を除く。
+        """
         result = {}
         for directory, _, names in os.walk(self.home):
             for name in names:
+                if ignore_lock and directory == self.home and name == "lock":
+                    continue
                 path = os.path.join(directory, name)
                 with open(path, encoding="utf-8") as f:
                     result[os.path.relpath(path, self.home)] = f.read()

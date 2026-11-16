@@ -13,6 +13,11 @@
   subscriptions remove --viewer <ID> <番号>...   配信のセッションが、一覧の番号の登録を削除する
   subscriptions resolve --viewer <ID> --name <名前> <番号>...   受信のセッションが、一覧の番号から削除の申し込みの本文を作る
   subscriptions unsubscribe --message-file <ファイル> --sender <ID>   配信のセッションが、削除の申し込みの登録を削除する
+  subscriptions rename --session-id <ID> --name <名前>   配信のセッションが、受信のセッションの名前を引き直した値に変える
+  tick                                           通知を取得して出来事を判定し、この回に送るメッセージを出力する
+  ack <メッセージの ID>                          tick が出力したメッセージが届いたことを記録する
+  fail <メッセージの ID> --reason <理由>         tick が出力したメッセージが届かなかったことを記録する
+  settle                                         この回のメッセージの結果を集計し、続けて届かなかった回数を更新する
 
 終了コード (計画の KTD11):
   0  続ける
@@ -29,7 +34,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gh_notification_dispatch import gh, messages, subscriptions  # noqa: E402
+from gh_notification_dispatch import gh, messages, outbox, poll, subscriptions  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -95,6 +100,26 @@ def cmd_subscriptions_resolve(args):
 
 def cmd_subscriptions_unsubscribe(args):
     return _emit_status(subscriptions.unsubscribe(_read_message(args.message_file), args.sender))
+
+
+def cmd_subscriptions_rename(args):
+    return _emit_status(subscriptions.rename(args.session_id, args.name))
+
+
+def cmd_tick(args):
+    return _emit_status(poll.tick())
+
+
+def cmd_ack(args):
+    return _emit_status(outbox.record(args.message_id, "ack"))
+
+
+def cmd_fail(args):
+    return _emit_status(outbox.record(args.message_id, "fail", args.reason))
+
+
+def cmd_settle(args):
+    return _emit_status(outbox.settle())
 
 
 # --- 引数 ---------------------------------------------------------------------------------------------------------
@@ -231,6 +256,73 @@ def build_parser():
              _exit_help("削除した", "申し込みの形が違う・送り手が本文と違う・登録が既に無い・送り手の登録でない・" + _NOT_DISPATCHER))
     p.add_argument("--message-file", required=True, help=_MESSAGE_ARGS_HELP["message_file"])
     p.add_argument("--sender", required=True, help=_MESSAGE_ARGS_HELP["sender"])
+
+    p = _add(g, "rename", cmd_subscriptions_rename,
+             "配信のセッションが、受信のセッションの ID の登録の名前を変える。gh は実行しない。\n"
+             "名前を宛先にしたメッセージが届かないときに、ツール list_sessions で ID から今の名前を引き直して使う",
+             "  session_id  --session-id の値\n"
+             "  name        --name の値\n"
+             "  renamed     名前を変えた登録の数\n"
+             "  errors      変えなかった理由の配列",
+             _exit_help("変えた", "その ID の登録が無い・引数の形が違う・" + _NOT_DISPATCHER))
+    p.add_argument("--session-id", required=True, help="受信のセッションの ID")
+    p.add_argument("--name", required=True, help="受信のセッションの今の名前")
+
+    p = _add(groups, "tick", cmd_tick,
+             "通知を取得してレビューの依頼を判定し、送信待ちに入れ、この回に送るメッセージを出力する (定期の予定が実行する)。\n"
+             "前の回のメッセージの結果が集計されていなければ (settle が呼ばれていなければ)、始めに集計する。\n"
+             "取得の範囲の起点は、取得の位置の 5 分前と、最初に開始した時刻の遅いほう。記録が無い最初の回は、今の時刻を\n"
+             "開始した時刻と取得の位置にする。gh が失敗したら、取得の位置を変えずに終了コード 4 で返す",
+             "  tick_at             この回を始めた時刻\n"
+             "  window_start        取得の範囲の起点\n"
+             "  position            更新した取得の位置。gh が失敗した回は null\n"
+             "  not_modified        通知の一覧が前の回から変わっていない (304) か\n"
+             "  found               この回に送信待ちに入れた (出来事, 登録) の数\n"
+             "  messages            送るメッセージ {message_id, subscription_id, repo, kind, session_id, session_name,\n"
+             "                      to (宛先の名前), to_session_id, count, resend, body} の配列\n"
+             "  waiting             この回に出力しなかった送信待ちの数 (次の回に出力する)\n"
+             "  expired             30 日を過ぎて消した送信待ち {subscription_id, repo, kind, session_name, count, ...} の配列\n"
+             "  previous_round      始めに集計した前の回 (settle と同じ形)。無ければ null\n"
+             "  became_unreachable  前の回の集計で、届かない登録になった登録の配列\n"
+             "  failed_call         gh が失敗した呼び出し {api, repo, number}。失敗しなければ null\n"
+             "  summary             利用者に示す 1 行の要約\n"
+             "  errors              取得しなかった理由の配列\n"
+             "  gh_error            gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
+             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER,
+                        "gh が失敗した (認証切れ・読めないリポジトリ・rate limit など)。failed_call の呼び出しを示す"))
+
+    p = _add(groups, "ack", cmd_ack,
+             "tick が出力したメッセージが届いたことを記録し、そのメッセージの出来事を送信待ちから消す。gh は実行しない。\n"
+             "この回 (最後の tick) に出力したメッセージの ID だけを受け付ける",
+             "  message_id       メッセージの ID\n"
+             "  result           記録した結果 (ack)\n"
+             "  subscription_id  メッセージの登録\n"
+             "  removed_events   送信待ちから消した出来事の数\n"
+             "  errors           記録しなかった理由の配列",
+             _exit_help("記録した", "この回のメッセージでない (前の回のメッセージ・settle の後)・既に記録した・" + _NOT_DISPATCHER))
+    p.add_argument("message_id", help="tick の出力の messages[].message_id")
+
+    p = _add(groups, "fail", cmd_fail,
+             "tick が出力したメッセージが届かなかったことを、理由と一緒に記録する。出来事は送信待ちに残り、次の tick が\n"
+             "送り直す。gh は実行しない。この回 (最後の tick) に出力したメッセージの ID だけを受け付ける",
+             "  message_id       メッセージの ID\n"
+             "  result           記録した結果 (fail)\n"
+             "  subscription_id  メッセージの登録\n"
+             "  removed_events   0\n"
+             "  errors           記録しなかった理由の配列",
+             _exit_help("記録した", "この回のメッセージでない (前の回のメッセージ・settle の後)・既に記録した・" + _NOT_DISPATCHER))
+    p.add_argument("message_id", help="tick の出力の messages[].message_id")
+    p.add_argument("--reason", required=True, help="届かなかった理由 (SendMessage の結果の文)")
+
+    p = _add(groups, "settle", cmd_settle,
+             "この回のメッセージの結果を登録ごとに集計し、対応を消す。fail が 1 通でもあれば、続けて届かなかった回数に\n"
+             "1 を足す。fail が無く ack が 1 通でもあれば 0 に戻す。どちらも記録されなかったメッセージだけなら変えない。\n"
+             "3 回続けて届かなかった登録は、届かない登録になる。gh は実行しない",
+             "  settled  集計した回 {round_id, tick_at, results (登録ごとの {subscription_id, repo, kind, session_id,\n"
+             "           session_name, result (delivered・failed・unrecorded), consecutive_failures}), became_unreachable,\n"
+             "           already_counted}。集計する対応が無ければ null\n"
+             "  errors   集計しなかった理由の配列",
+             _exit_help("集計した (集計する対応が無い回も)", _NOT_DISPATCHER))
     return parser
 
 

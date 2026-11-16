@@ -11,7 +11,7 @@ R1〜R7・R16・R19)。
 import os
 import uuid
 
-from . import gh, messages, store
+from . import gh, messages, outbox, store
 
 LIST_HEADER = "| 番号 | リポジトリ | 種類 | 登録日時 | 届け先のセッション |"
 
@@ -36,6 +36,8 @@ def _new_id(existing):
 def _row(subscription, number=None):
     row = {key: subscription[key] for key in ("id", "repo", "kind", "session_id", "session_name", "permission_mode",
                                               "created_at")}
+    row["consecutive_failures"] = outbox.failures(subscription)
+    row["unreachable"] = outbox.is_unreachable(subscription)
     if number is not None:
         row = {"number": number, **row}
     return row
@@ -52,8 +54,9 @@ def _cell(text):
 def _table(rows):
     lines = [LIST_HEADER, "| --- | --- | --- | --- | --- |"]
     for r in rows:
+        mark = " (届かない登録)" if r["unreachable"] else ""
         lines.append(f"| {r['number']} | {r['repo']} | {r['kind']} | {_display_time(r['created_at'])} | "
-                     f"{_cell(r['session_name'])} |")
+                     f"{_cell(r['session_name'])}{mark} |")
     return "\n".join(lines)
 
 
@@ -186,6 +189,7 @@ def add(message_text, sender):
     try:
         with store.transaction() as tx:
             data = _load(tx)
+            box, _ = outbox.load(tx)
             subscriptions = data["subscriptions"]
             ids = {s["id"] for s in subscriptions}
             now = store.format_time(store.now())
@@ -193,17 +197,21 @@ def add(message_text, sender):
                 match = next((s for s in subscriptions if s["repo"].lower() == full_name.lower() and s["kind"] == kind
                               and s["session_id"] == sender), None)
                 if match is not None:
+                    # 申し込み直しは、届かない登録でなくし、この回の対応を消してから回数を 0 に戻す (R15・KTD6)
                     match.update(repo=full_name, session_name=fields["session-name"],
-                                 permission_mode=fields["permission-mode"])
+                                 permission_mode=fields["permission-mode"], consecutive_failures=0)
+                    outbox.forget_subscription(box, match["id"], pending=False)
                     existing.append(match)
                     continue
                 new = {"id": _new_id(ids), "repo": full_name, "kind": kind, "session_id": sender,
                        "session_name": fields["session-name"], "permission_mode": fields["permission-mode"],
-                       "created_at": now}
+                       "created_at": now, "consecutive_failures": 0, "expired_events": 0, "last_expired_at": None}
                 ids.add(new["id"])
                 subscriptions.append(new)
                 added.append(new)
             tx.write(store.SUBSCRIPTIONS, data)
+            if existing:
+                tx.write(store.OUTBOX, box)
             dispatcher_mode = store.dispatcher(tx.read(store.STATE))["permission_mode"]
     except store.NotDispatcher as e:
         return reject([str(e)], full_name)
@@ -269,6 +277,14 @@ def _targets(snapshot, numbers, subscriptions):
     return targets, errors
 
 
+def _forget(tx, subscription_ids):
+    """削除する登録の送信待ちと、この回の対応を消す (R15)。"""
+    box, _ = outbox.load(tx)
+    for subscription_id in subscription_ids:
+        outbox.forget_subscription(box, subscription_id, pending=True)
+    tx.write(store.OUTBOX, box)
+
+
 def remove(viewer, numbers):
     """配信のセッションで、一覧の番号の登録を削除する (R6)。1 つでも指定できない番号があれば、何も削除しない。
 
@@ -286,6 +302,7 @@ def remove(viewer, numbers):
                 return {"status": "unsatisfied", **payload, "errors": errors}
             ids = {s["id"] for _, s in targets}
             data["subscriptions"] = [s for s in data["subscriptions"] if s["id"] not in ids]
+            _forget(tx, ids)
             tx.write(store.SUBSCRIPTIONS, data)
     except store.NotDispatcher as e:
         return {"status": "unsatisfied", **payload, "errors": [str(e)]}
@@ -349,9 +366,33 @@ def unsubscribe(message_text, sender):
                 return reject(errors)
             ids = {s["id"] for s in targets}
             data["subscriptions"] = [s for s in data["subscriptions"] if s["id"] not in ids]
+            _forget(tx, ids)
             tx.write(store.SUBSCRIPTIONS, data)
     except store.NotDispatcher as e:
         return reject([str(e)])
     payload.update(result="accepted", removed=[_row(s) for s in targets],
                    reply_body=messages.unsubscribed_accepted(targets))
     return {"status": "ok", **payload}
+
+
+def rename(session_id, name):
+    """受信のセッションの名前が変わったときに、その ID の登録の名前を変える (R15・KTD2)。
+
+    名前は、配信のセッションがツール list_sessions で ID から引き直したもの。変えた登録の数を返す。
+    """
+    payload = {"session_id": session_id, "name": name, "renamed": 0, "errors": []}
+    errors = _value_errors(messages.check_session_id(session_id), messages.check_name(name))
+    if errors:
+        return {"status": "unsatisfied", **payload, "errors": errors}
+    try:
+        with store.transaction() as tx:
+            data = _load(tx)
+            targets = [s for s in data["subscriptions"] if s["session_id"] == session_id]
+            if not targets:
+                return {"status": "unsatisfied", **payload, "errors": [f"セッション {session_id} の登録が無い"]}
+            for s in targets:
+                s["session_name"] = name
+            tx.write(store.SUBSCRIPTIONS, data)
+    except store.NotDispatcher as e:
+        return {"status": "unsatisfied", **payload, "errors": [str(e)]}
+    return {"status": "ok", **payload, "renamed": len(targets)}

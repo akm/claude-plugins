@@ -30,7 +30,12 @@ VERSION = 1
 STATE = "state.json"
 SUBSCRIPTIONS = "subscriptions.json"
 SNAPSHOTS = "snapshots"
+DELIVERED = "delivered.json"
+OUTBOX = "outbox.json"
+LOG = "log.jsonl"
 LOCK = "lock"
+LOG_MAX_BYTES = 1_000_000  # log.jsonl がこれを超えたら、新しい LOG_KEEP_LINES 行だけを残す
+LOG_KEEP_LINES = 1000
 RECEIVER_DIR = "gh-notification-dispatch"
 RECEIVER_SNAPSHOT = "snapshot.json"
 
@@ -138,6 +143,25 @@ class Transaction:
 
     def write(self, name, data):
         _write_atomic(os.path.join(self.directory, name), data)
+
+    def append_log(self, entry):
+        """log.jsonl に 1 行を足す。LOG_MAX_BYTES を超えたら、新しい LOG_KEEP_LINES 行だけを残す。"""
+        path = os.path.join(self.directory, LOG)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        if os.path.getsize(path) > LOG_MAX_BYTES:
+            with open(path, encoding="utf-8") as f:
+                lines = f.readlines()[-LOG_KEEP_LINES:]
+            directory = os.path.dirname(path)
+            fd, temporary = tempfile.mkstemp(prefix=f".{LOG}.", suffix=".tmp", dir=directory)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+                os.replace(temporary, path)
+            except BaseException:
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(temporary)
+                raise
 
 
 @contextlib.contextmanager
