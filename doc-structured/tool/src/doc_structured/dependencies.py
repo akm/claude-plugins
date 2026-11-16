@@ -5,8 +5,9 @@
 決めた経緯は Issue #202 のコメント。要点:
   - 読む順は、依存されるドメインを先にする。並べられるドメイン (依存先がすべて並んだドメイン) が複数あれば、番号の小さいものを
     先にする。循環に入っていて並べられないドメインが残ったら、その中で番号の最も小さいものを先に置き、同じ規則で続ける
-  - 検査 c-1 は、ドメイン間の依存に循環が無いことを確認する。報告は検査 c-2 と同じ形 (循環のまとまりごとに 1 件で、
-    最も小さい ID から始まる最も短い循環を、矢印ごとにその矢印を作る最初の参照の位置と参照先と一緒に書く)
+  - 検査 c-1 は、ドメイン間の依存と、同じドメインのモデル間の参照 (属性の refers_to) に循環が無いことを確認する。
+    モデルの自己参照は報告しない。報告は検査 c-2 と同じ形 (循環のまとまりごとに 1 件で、最も小さい ID から始まる
+    最も短い循環を、矢印ごとにその矢印を作る最初の参照の位置と一緒に書く)
 規則の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-domains.md)。
 """
 
@@ -105,12 +106,35 @@ def domain_graph(project: Project, dependencies: dict[str, list[DomainDependency
     }
 
 
+def model_graph(domain: Domain) -> dict[str, dict[str, YamlReference]]:
+    """同じドメインのモデルの ID から、属性の refers_to で参照するモデルの ID と、その最初の参照への対応。
+    自分自身への参照 (自己参照) と、ほかのドメインのモデルへの参照は含めない。"""
+    graph: dict[str, dict[str, YamlReference]] = {}
+    for model in domain.models:
+        for attribute in model.children:
+            for reference in entry_references(attribute):
+                if reference.key != "refers_to" or reference.target == model.id:
+                    continue
+                if not reference.target.startswith(f"{domain.id}-"):
+                    continue
+                graph.setdefault(model.id, {}).setdefault(reference.target, reference)
+    return graph
+
+
 def check_dependency_cycles(project: Project) -> list[Problem]:
-    """検査 c-1。"""
+    """検査 c-1。ドメインの循環を報告した後、ドメインの番号の順に、モデルの循環を報告する。"""
     dependencies = all_dependencies(project)
-    return _cycle_problems(
+    problems = _cycle_problems(
         domain_graph(project, dependencies),
         "ドメインの依存",
         lambda reference: f"{_where(reference)} の {reference.target}",
         "循環のどれかの参照を外すか、参照される定義を別のドメインに移す",
     )
+    for domain in sorted(project.domains, key=domain_order_key):
+        problems += _cycle_problems(
+            model_graph(domain),
+            "モデルの参照",
+            _where,
+            "循環のどれかの refers_to を外す (refers_to は外部キーを持つモデルの属性にだけ書く)",
+        )
+    return problems

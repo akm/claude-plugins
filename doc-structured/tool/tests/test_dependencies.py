@@ -186,3 +186,61 @@ class DependenciesTest(ProjectTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         result = run_checks(self.project, ("a", "c-1"))
         self.assertEqual([(p.check, p.path) for p in result.problems], [("c-1", "docs/domains/02-loans/domain.yaml")])
+
+
+class ModelCyclesTest(ProjectTestCase):
+    def problems(self) -> list[str]:
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        return [p.format() for p in check_dependency_cycles(project)]
+
+    def test_self_reference_does_not_fail(self):
+        # サンプルの予約は、属性「前の予約」で自分のモデルを参照している
+        self.copy_sample()
+        project, _ = load_project(self.project)
+        self.assertEqual(project.entries["d-loans-m-reservation-a-previous"].refers_to, "d-loans-m-reservation")
+        self.assertEqual(self.problems(), [])
+
+    def test_model_cycle_in_same_domain_fails_with_ids_in_order(self):
+        # サンプルの貸出は予約を参照している。予約から貸出への参照を足して、循環を作る
+        self.copy_sample()
+        path = self.project / "docs/domains/02-loans/reservations/reservation.yaml"
+        text = path.read_text(encoding="utf-8").replace(
+            "        refers_to: d-loans-m-reservation\n",
+            "        refers_to: d-loans-m-reservation\n" + refers_to("last_loan", "d-loans-m-loan"),
+        )
+        path.write_text(text, encoding="utf-8")
+        self.assertEqual(
+            self.problems(),
+            [
+                "docs/domains/02-loans/domain.yaml:20:20: 検査 c-1: モデルの参照が循環している: "
+                "d-loans-m-loan → d-loans-m-reservation (docs/domains/02-loans/domain.yaml:20:20)、"
+                "d-loans-m-reservation → d-loans-m-loan (docs/domains/02-loans/reservations/reservation.yaml:54:20)。"
+                "循環のどれかの refers_to を外す (refers_to は外部キーを持つモデルの属性にだけ書く)"
+            ],
+        )
+
+    def test_model_cycle_across_domains_is_reported_as_domain_cycle(self):
+        # ドメインをまたぐモデルの循環は、ドメインの循環として 1 件だけ報告する
+        self.write("docs/domains/01-a/domain.yaml", domain_yaml("a。", "models:\n" + model("x", "甲", refers_to("y", "d-b-m-y"))))
+        self.write("docs/domains/02-b/domain.yaml", domain_yaml("b。", "models:\n" + model("y", "乙", refers_to("x", "d-a-m-x"))))
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertIn("検査 c-1: ドメインの依存が循環している: d-a → d-b", problems[0])
+
+    def test_model_cycle_of_three_in_same_domain(self):
+        self.write(
+            "docs/domains/01-a/domain.yaml",
+            domain_yaml(
+                "a。",
+                "models:\n"
+                + model("x", "甲", refers_to("y", "d-a-m-y"))
+                + model("y", "乙", refers_to("z", "d-a-m-z"))
+                + model("z", "丙", refers_to("x", "d-a-m-x")),
+            ),
+        )
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertIn("モデルの参照が循環している: d-a-m-x → d-a-m-y (", problems[0])
+        self.assertIn("d-a-m-y → d-a-m-z (", problems[0])
+        self.assertIn("d-a-m-z → d-a-m-x (", problems[0])
