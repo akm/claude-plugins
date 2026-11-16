@@ -1,0 +1,47 @@
+Background (from the session that started this one):
+プラグイン issue-practice (Issue の使い方をスキルにするプラグイン) を、管理 Issue #239 の作業 Issue に分けて実装している。U1〜U4 (#266〜#269)、バグの修正 #278、U4 から切り出した #286 はマージ済みで閉じた。この作業セッションは最後の単位 U5 (#270、プラグインの文書と 6 つのシナリオの通し確認) を受け持つ。PR はマージ先 main、Closes を書かず、利用者がマージする。
+
+Task:
+あなたは作業 Issue https://github.com/akm/claude-plugins/issues/270 の作業セッションです。スキル issue-practice:working-issue を使って進めてください。
+
+- 作業 Issue: https://github.com/akm/claude-plugins/issues/270 (issue-practice の使い方と全体の流れを文書で示し、6 つのシナリオで通しで確認したい)
+- 管理 Issue: https://github.com/akm/claude-plugins/issues/239
+- 報告先の管理セッション: claude-plugins#239 管理: Issue の使い方のスキル (ID: local_7eefe131-5f84-4c43-b029-e14eb2449d29)
+- ブランチ: docs/270-issue-practice-docs を origin/main から作る
+- PR のマージ先: main
+- PR をマージする人: 利用者
+
+報告 (PR を作った・チェックを入れた・分けたい・条件を変えたい・切り出したい・中断する) は、作業 Issue に記録のコメントとして書き、そのコメントの URL を報告先の管理セッションにメッセージで知らせてください。
+
+補足 (管理セッションから):
+
+- このセッションの名前は「claude-plugins#270 作業: 文書と通し確認」です。名前が違っていたら、set_session_title (session_id は self) でこの名前にしてください。
+- 手元の `main` は古いことがあります。`git fetch origin` の後に `git switch -c docs/270-issue-practice-docs origin/main` でブランチを作ってください。
+- 計画は、ファイル `docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md` の節「U5. 文書と通し確認」です。計画の文書は直さないと利用者が決めたので、計画と実装には次の違いがあります。文書は、計画ではなく main の実装に合わせて書いてください。
+    - 計画の節「Output Structure」と節「U3」の Files に、U3 で足したファイル `issue-practice/scripts/issue_practice/managing.py` が書かれていない
+    - U4 (#269、PR #285) で、モジュール `releaseplan.py` と `releaseops.py` を足した
+    - U4 から切り出した #286 (PR #287) で、リリース対象が 1 つのリポジトリに 2 つ目のリリース対象を足す書き込みを足した (スキル release-plan の節「リリース対象を足すとき」)。シナリオと文書には、これも含めてください
+    - 作業 Issue #278 (PR #279) で、`managing apply` のバグを直した
+- 手順書どうしが合っていないところが 2 つあり、扱いはまだ決めていません (https://github.com/akm/claude-plugins/issues/239#issuecomment-6869880976)。1 つはスキル managing-issue-run の手順 B1 (表のマージの順を起動の条件にも使っている)、もう 1 つは手順 B2 (スキル new-issue で 1 件を作ると承認の記録が無い) です。文書やシナリオでこれに当たったら、手順書を自分で変えずに、報告 (condition-change か carve-out) で知らせてください。
+- 確認用のリポジトリ akm/issue-practice-sandbox は、前の単位の確認で状態が変わっています。#269 の確認で #8 の題名に「📅 」を付け、#286 の確認の後に、リリース対象が 1 つの状態に戻しました。シナリオを実行する前に、今の状態を確認してください。
+- U2 の確認で、作ったばかりの Issue が `gh issue list --label` にすぐには出ないことがありました。
+- この単位の版は 0.4.2 です (作業 Issue のクローズ条件の共通の条件の下の箇条書き)。main の今の版は 0.4.1 です。
+- CI の完了では、このセッションは自分では動き出しません。CI が完了したら利用者か管理セッションが知らせます。チェックは、CI のジョブがすべて成功してから入れてください。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_7eefe131-5f84-4c43-b029-e14eb2449d29
+
+---
+
+日本語でお願いします
+
+---
+
+表示した
+
+---
+
+PR #290 をマージしました
+
+---
+
+このセッションをアーカイブして
