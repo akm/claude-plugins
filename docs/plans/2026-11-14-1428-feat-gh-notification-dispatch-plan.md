@@ -385,20 +385,20 @@ gh-notification-dispatch/
 
 **Goal:** 配信のセッションで定期の予定を作り、期限の前に続けるかを確認し、再起動の後に 1 つの手順で再開できるようにする。
 
-**Requirements:** R16〜R18。KD6〜KD8。KTD9, KTD10。
+**Requirements:** R16〜R18。KD6〜KD8。KTD4, KTD9, KTD10。
 
 **Dependencies:** U4。
 
 **Files:**
 - 作る: `gh-notification-dispatch/scripts/gh_notification_dispatch/{schedule,hook}.py`・`gh-notification-dispatch/hooks/hooks.json`
 - 作る: `gh-notification-dispatch/tests/test_{schedule,hook}.py`
-- 変える: `gh-notification-dispatch/skills/dispatch/SKILL.md` (`start`・`resume`・`renew`・`stop`・`status`)・`gh-notification-dispatch/references/records.md` (`state.json` の定期の予定の部分)
+- 変える: `gh-notification-dispatch/skills/dispatch/SKILL.md` (`start`・`resume`・`renew`・`stop`・`status`)・`gh-notification-dispatch/references/records.md` (`state.json` の定期の予定の部分と `viewer` の行)
 
 **Approach:**
 1. 用意する: `state.json` の定期の予定の部分の様式。
 2. テストを書く: Test scenarios のとおり。
 3. 実装する: サブコマンド `schedule record --job-id <ID> --cron <式>`・`schedule clear`・`status`。`tick` の出力に期限の確認を足す。`tick` の始めに、実行しているセッションが記録の配信のセッションかを確かめ (KTD3)、違えば取得も出力もせずに終了コード 3 で、そのセッションの定期の予定をツール `CronList` で探して消す (ツール `CronDelete`) よう示す確認を足す (R16。切り替えた後に前の配信のセッションに残った予定が配信しないため)。`hook session-start`。
-4. スキル `dispatch` に、`start` (U2 の `dispatcher set` による配信のセッションの記録と切り替えの確認の後に、前提の確認・`CronCreate`・`schedule record`)・`resume` (`CronList` で見つけた、プロンプトが `/gh-notification-dispatch:tick` の予定をすべて `CronDelete` で消してから作り直す。R18)・`renew` (`CronDelete` と `CronCreate`)・`stop`・`status` の手順を書く。開始のときに、スクリプトの実行と `SendMessage` で権限の確認が出ないかを確かめる手順を入れる。期限の確認のデスクトップの通知は、ツール `PushNotification` で送る。
+4. スキル `dispatch` に、`start` (U2 の `dispatcher set` による配信のセッションの記録と切り替えの確認の後に、前提の確認・`CronCreate`・`schedule record`)・`resume` (`CronList` で見つけた、プロンプトが `/gh-notification-dispatch:tick` の予定をすべて `CronDelete` で消してから作り直す。R18。記録の自分のログイン名と所属するチーム (`viewer`) を消し、次の `tick` で取得し直す。KTD4)・`renew` (`CronDelete` と `CronCreate`)・`stop`・`status` の手順を書く。開始のときに、スクリプトの実行と `SendMessage` で権限の確認が出ないかを確かめる手順を入れる。期限の確認のデスクトップの通知は、ツール `PushNotification` で送る。
 
 **Patterns to follow:** `commit-rules-guard/hooks/` (hook の置き方)。
 
@@ -411,6 +411,7 @@ gh-notification-dispatch/
 - 記録の配信のセッションと違うセッションで `schedule record`・`schedule clear` を実行すると (前の配信のセッションでの `stop`・`renew`・`resume`)、記録を変えずに終了コード 3 で返す。
 - hook は、起動したセッションの ID が配信のセッションの ID と同じで、状態が「動いている」ときだけ、`additionalContext` を出力する。期限を過ぎていれば、期限切れであることも出力する。`compact` と `clear` では何も出力しない。記録のディレクトリが無いときも何も出力しない。
 - 止めていた間の通知は、`resume` の後の最初の `tick` で、止める前の取得の位置から取得する。
+- `resume` の後の最初の `tick` は、取得から 1 日を過ぎていなくても、自分のログイン名と所属するチームを取得し直す。
 
 **Verification:** テストがすべて成功する。配信のセッションで `start` し、10 分ごとに `tick` が実行される。Claude Desktop を再起動した後、配信のセッションで `resume` を実行すると、止まっていた間のレビューの依頼が届く。期限の確認は、`GH_NOTIFICATION_DISPATCH_NOW` を使ったテストで確かめる。
 
