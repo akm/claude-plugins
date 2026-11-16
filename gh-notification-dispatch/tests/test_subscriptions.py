@@ -465,6 +465,32 @@ class RenameTest(SubscriptionsCase):
         self.assertEqual((code, out["renamed"], out["errors"]), (0, 0, []), err)
         self.assertEqual(self.subscriptions(), before)
 
+    def test_renames_only_that_session(self):
+        """rename は、その ID の登録の名前だけを変え、変えた数を返す。ほかのセッションの登録は変えない (R15・KTD2)。"""
+        code, out, err = self.rename(RECEIVER_A, "新しい名前")
+        self.assertEqual((code, out["renamed"], out["errors"]), (0, 2, []), err)
+        names = {(s["session_id"], s["kind"]): s["session_name"] for s in self.subscriptions()}
+        self.assertEqual(names, {(RECEIVER_A, "review_requested"): "新しい名前", (RECEIVER_A, "merged"): "新しい名前",
+                                 (RECEIVER_B, "review_requested"): "受信 b", (RECEIVER_B, "merged"): "受信 b"})
+
+    def test_bad_values_change_nothing(self):
+        """引数の形が違えば、記録を変えずに終了コード 3 で返す。"""
+        before = self.subscriptions()
+        for session_id, name in (("local a", "新しい名前"), (RECEIVER_A, "")):
+            code, out, _ = self.rename(session_id, name)
+            self.assertEqual(code, 3, (session_id, name))
+            self.assertTrue(out["errors"])
+        self.assertEqual(self.subscriptions(), before)
+
+    def test_other_session_cannot_rename(self):
+        """記録の配信のセッションでないセッションでは、記録を変えずに終了コード 3 で返す (KTD3)。"""
+        before = self.subscriptions()
+        self.as_session(RECEIVER_A)
+        code, out, _ = self.cli("subscriptions", "rename", "--session-id", RECEIVER_A, "--name", "新しい名前")
+        self.assertEqual(code, 3)
+        self.assertTrue(out["errors"])
+        self.assertEqual(self.subscriptions(), before)
+
 
 class RequestTest(SubscriptionsCase):
 
