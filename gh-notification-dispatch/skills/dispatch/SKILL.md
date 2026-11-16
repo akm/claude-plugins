@@ -59,7 +59,7 @@ Claude Desktop を再起動した後・定期の予定の期限を過ぎた後�
 
 ## `stop`
 
-1. ツール `CronList` で、プロンプトが `/gh-notification-dispatch:tick` の予定を探し、ツール `CronDelete` ですべて消す。
+1. 節「定期の予定を作り直す」の手順 1 のとおり、このセッションの定期の予定をすべて消す。
 2. `gh_notification_dispatch.py schedule clear` を実行する。終了コード 3 なら、記録は変えていないことと、このセッションの予定は消したことを、出力の `errors` と一緒に示す。出力の `not_dispatcher` が false (配信のセッションを確認できない) なら、どうするかを質問する。
 3. 定期の予定を停止したことを示す。登録は残るので、再び始めるなら `resume` を実行することを伝える。
 
