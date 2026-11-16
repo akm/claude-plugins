@@ -32,6 +32,7 @@ SUBSCRIPTIONS = "subscriptions.json"
 SNAPSHOTS = "snapshots"
 DELIVERED = "delivered.json"
 OUTBOX = "outbox.json"
+TRACKED = "tracked.json"
 LOG = "log.jsonl"
 LOCK = "lock"
 LOG_MAX_BYTES = 1_000_000  # log.jsonl がこれを超えたら、新しい LOG_KEEP_LINES 行だけを残す
