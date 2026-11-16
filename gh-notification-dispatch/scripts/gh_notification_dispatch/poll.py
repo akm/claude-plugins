@@ -1,5 +1,5 @@
 """通知の取得と取得の位置と、1 回の取得 (サブコマンド tick) の流れ (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md
-の R8・R11〜R15・KTD4〜KTD6)。
+の R8・R10〜R15・KTD4〜KTD6)。
 
 1 回の取得は、次の順に行う。すべて、記録のディレクトリのロックを取った間に行う。
 
@@ -8,7 +8,9 @@
    `started_at` と `position` にする (R8)。
 3. 自分のログイン名と所属するチームを、取得してから 1 日を過ぎていれば取得し直す (KTD4)。
 4. 通知の一覧を、引数 `all=true` と `since` を付け、ヘッダ `If-None-Match` に前回の `ETag` を付けて読む。304 なら判定しない (KTD5)。
-5. レビューの依頼を判定し、送信待ちに入れる。30 日を過ぎた送信待ちを消す。この回に出力するメッセージを割り当てる。
+5. レビューの依頼とマージを判定し、送信待ちに入れる。追跡する PR は、304 の回も状態を読む。`merged` の登録が無くなった
+   リポジトリの PR と、最後に依頼を送信待ちに入れてから 30 日を過ぎた PR は、状態を読まずに追跡から外す。送信待ちに
+   入れたレビューの依頼の PR を追跡に足す (R10・KTD4)。30 日を過ぎた送信待ちを消す。この回に出力するメッセージを割り当てる。
 6. `gh` が 1 度も失敗しなければ、`position` を今の時刻に、`etag` をこの回の応答の値にする。失敗したら、1 の集計の
    ほかは何も書かずに、失敗した呼び出しを返す (KTD5・KTD11)。
 
@@ -21,6 +23,7 @@ import datetime
 
 from . import events as events_module
 from . import gh, outbox, store
+from . import tracked as tracked_module
 
 WINDOW_MARGIN = datetime.timedelta(minutes=5)  # 取得の範囲の起点を取得の位置より前にする幅 (KTD5)
 VIEWER_REFRESH = datetime.timedelta(days=1)  # 自分のログイン名と所属するチームを取得し直す間隔 (KTD4)
@@ -63,7 +66,7 @@ def _summary_text(payload):
     parts = []
     if payload["not_modified"]:
         parts.append("通知は前の回から変わっていない (304)")
-    else:
+    if not payload["not_modified"] or payload["found"]:
         parts.append(f"新しい出来事 {payload['found']} 件を送信待ちに入れた")
     parts.append(f"メッセージ {len(payload['messages'])} 通を出力した" if payload["messages"] else "送るメッセージは無い")
     if payload["waiting"]:
@@ -83,6 +86,7 @@ def tick():
             state = tx.read(store.STATE)
             subscriptions_data = tx.read(store.SUBSCRIPTIONS) or {"version": store.VERSION, "subscriptions": []}
             box, delivered = outbox.load(tx)
+            tracked = tracked_module.load(tx)
 
             previous = outbox.settle_round(box, subscriptions_data)
             if previous is not None:
@@ -106,6 +110,7 @@ def tick():
                     return _failed(tx, payload, failure)
             subscriptions = subscriptions_data["subscriptions"]
             repos = {s["repo"].lower() for s in subscriptions if s["kind"] == "review_requested"}
+            tracked_module.prune(tracked, subscriptions, now)
             items, first, failure = fetch_notifications(since, state.get("etag"))
             if failure is not None:
                 return _failed(tx, payload, failure)
@@ -115,8 +120,15 @@ def tick():
                 found, failure = events_module.review_requests(items, repos, viewer, since)
                 if failure is not None:
                     return _failed(tx, payload, failure)
+            merged, stopped, failure = events_module.merges(tracked["prs"], items, tracked_module.merged_repos(subscriptions),
+                                                            viewer, since)
+            if failure is not None:
+                return _failed(tx, payload, failure)
+            tracked_module.stop(tracked, stopped)
 
-            payload["found"] = outbox.enqueue(box, delivered, subscriptions, found, now_text)
+            enqueued = []
+            payload["found"] = outbox.enqueue(box, delivered, subscriptions, found + merged, now_text, enqueued=enqueued)
+            tracked_module.track(tracked, enqueued, subscriptions, now_text)
             outbox.prune_delivered(delivered, since)
             payload["expired"] = outbox.expire(box, subscriptions, now)
             payload["messages"], last_allocated = outbox.allocate(box, subscriptions, state.get("last_allocated"), now_text)
@@ -130,6 +142,7 @@ def tick():
             state["last_allocated"] = last_allocated
             tx.write(store.OUTBOX, box)
             tx.write(store.DELIVERED, delivered)
+            tx.write(store.TRACKED, tracked)
             tx.write(store.SUBSCRIPTIONS, subscriptions_data)
             tx.write(store.STATE, state)
             payload["position"] = now_text

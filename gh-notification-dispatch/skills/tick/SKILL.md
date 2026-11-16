@@ -1,6 +1,6 @@
 ---
 name: tick
-description: 配信のセッションで GitHub の通知を 1 回取得し、レビューの依頼を、登録した受信のセッションへメッセージで届ける。配信のセッションの定期の予定が、プロンプト /gh-notification-dispatch:tick で実行する。「tick を実行して」「通知を取得して届けて」のような依頼でも使う。Claude Desktop の配信のセッションで使う。
+description: 配信のセッションで GitHub の通知を 1 回取得し、レビューの依頼とマージを、登録した受信のセッションへメッセージで届ける。配信のセッションの定期の予定が、プロンプト /gh-notification-dispatch:tick で実行する。「tick を実行して」「通知を取得して届けて」のような依頼でも使う。Claude Desktop の配信のセッションで使う。
 ---
 
 # gh-notification-dispatch:tick: 通知を取得して届ける

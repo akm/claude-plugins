@@ -44,12 +44,13 @@ def _summary(subscription):
 
 # --- 送信待ちに入れる ------------------------------------------------------------------------------------------------
 
-def enqueue(outbox, delivered, subscriptions, events, now_text):
+def enqueue(outbox, delivered, subscriptions, events, now_text, enqueued=None):
     """判定した出来事を、(リポジトリ, 種類) が同じすべての登録の送信待ちに入れ、届けた出来事の記録に足す (KD4・R11)。
 
     (出来事, 登録) が届けた出来事の記録か送信待ちに既にあれば、入れない。重なった範囲で取り直した出来事と、`fail` の後の
     回で取得の範囲に入った出来事が、2 つ目の送信待ちにならないため (KTD6)。届かない登録にも入れる (R15)。
-    返り値は、入れた (出来事, 登録) の数。
+    返り値は、入れた (出来事, 登録) の数。enqueued が配列なら、1 つでも登録の送信待ちに入れた出来事を足す (追跡する PR を
+    決めるため。R10)。
     """
     done = {(d["key"], d["subscription_id"]) for d in delivered["events"]}
     done |= {(p["event"]["key"], p["subscription_id"]) for p in outbox["pending"]}
@@ -64,6 +65,8 @@ def enqueue(outbox, delivered, subscriptions, events, now_text):
             done.add(pair)
             outbox["pending"].append({"subscription_id": subscription["id"], "event": event, "enqueued_at": now_text,
                                       "outputs": 0})
+            if enqueued is not None and (not enqueued or enqueued[-1] is not event):
+                enqueued.append(event)
             delivered["events"].append({"key": event["key"], "subscription_id": subscription["id"], "time": event["time"],
                                         "recorded_at": now_text})
             added += 1

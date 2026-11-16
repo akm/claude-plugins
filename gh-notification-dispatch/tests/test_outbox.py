@@ -55,6 +55,16 @@ class EnqueueTest(unittest.TestCase):
         delivered["events"].append({"key": "review_requested:2", "subscription_id": "a", "time": NOW, "recorded_at": NOW})
         self.assertEqual(outbox.enqueue(box, delivered, subs, [event(2)], NOW), 0, "届けた出来事の記録にあれば入れない")
 
+    def test_enqueued_lists_each_event_once(self):
+        """enqueued には、1 つでも登録の送信待ちに入れた出来事を、1 回ずつ足す。どの登録にも入れなかった出来事は足さない。"""
+        box, delivered = outbox.empty_outbox(), outbox.empty_delivered()
+        subs = [sub("a"), sub("b")]
+        outbox.enqueue(box, delivered, subs, [event(1)], NOW)
+        enqueued = []
+        self.assertEqual(outbox.enqueue(box, delivered, subs, [event(1), event(2), event(3, repo="akm/other")], NOW,
+                                       enqueued=enqueued), 2)
+        self.assertEqual([e["key"] for e in enqueued], ["review_requested:2"])
+
     def test_unreachable_subscription_still_enqueued(self):
         box, delivered = outbox.empty_outbox(), outbox.empty_delivered()
         self.assertEqual(outbox.enqueue(box, delivered, [sub("a", failures=3)], [event(1)], NOW), 1)

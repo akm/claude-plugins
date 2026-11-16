@@ -9,7 +9,7 @@ CLI の入口をサブプロセスで実行し、偽の `gh` が通知・timelin
 import os
 import unittest
 
-from fakegh_case import FakeGhCase, fixture, http, link_next, notification, timeline_event
+from fakegh_case import FakeGhCase, fixture, http, link_next, notification, pull, review, timeline_event
 
 from gh_notification_dispatch import messages  # noqa: E402
 
@@ -41,8 +41,15 @@ class TickCase(FakeGhCase):
         self.write_home("subscriptions.json", {"version": 1, "subscriptions": self.subs})
 
     def serve(self, notifications=(), timelines=None, etag='W/"e1"', not_modified_for=None, extra=(), page2=None,
-              teams=TEAMS):
+              teams=TEAMS, pulls=(), reviews=None):
+        """偽の gh の応答を決める。pulls は PR の応答 (関数 pull の値)、reviews は {(リポジトリ, 番号): レビューの配列}。"""
         entries = list(extra)
+        for p in pulls:
+            entries.append({"prefix": ["api", "-i", f"repos/{p['base']['repo']['full_name']}/pulls/{p['number']}"],
+                            "stdout": http(200, p)})
+        for (repo, number), items in (reviews or {}).items():
+            entries.append({"prefix": ["api", "-i", f"repos/{repo}/pulls/{number}/reviews?per_page=100"],
+                            "stdout": http(200, items)})
         entries.append({"prefix": ["api", "user"], "stdout": {"login": "akm", "id": 1}})
         entries.append({"prefix": ["api", "-i", "user/teams?per_page=100"], "stdout": http(200, teams)})
         if not_modified_for:
@@ -158,10 +165,12 @@ class DeliveryTest(StartedTickCase):
     def test_unregistered_repo_and_kind_are_not_read(self):
         self.write_home("subscriptions.json", {"version": 1, "subscriptions": [
             {**self.subs[0], "repo": "akm/merged-only", "kind": "merged"}]})
-        self.serve([notification(REPO, 1, "2026-11-16T06:05:00Z"), notification("akm/merged-only", 2, "2026-11-16T06:05:00Z")])
+        self.serve([notification(REPO, 1, "2026-11-16T06:05:00Z"), notification("akm/merged-only", 2, "2026-11-16T06:05:00Z")],
+                   pulls=[pull("akm/merged-only", 2)])
         code, out = self.tick("2026-11-16T06:10:00Z")
         self.assertEqual((code, out["found"]), (0, 0))
         self.assertEqual(self.calls("timeline"), [], "review_requested の登録が無いリポジトリでは timeline を読まないこと")
+        self.assertEqual(self.calls(f"repos/{REPO}/pulls/1"), [], "merged の登録が無いリポジトリでは PR を読まないこと")
 
     def test_two_sessions_two_repos_and_split(self):
         """同じ (リポジトリ, 種類) の 2 つのセッションには 2 通。21 件は 20 件と 1 件。2 つのリポジトリはリポジトリごとに 1 通。"""
@@ -248,6 +257,129 @@ class OverlapAndTimingTest(StartedTickCase):
         self.assertEqual(code, 0, out)
         self.assertEqual(len(self.calls("user/teams")), at_start + 1)
         self.assertEqual(self.state()["viewer"]["fetched_at"], "2026-11-16T06:10:00Z")
+
+
+class MergedTest(StartedTickCase):
+    """種類 merged (計画の R10・R11・KTD4)。登録 a は review_requested、登録 m は同じリポジトリの merged。"""
+
+    T1 = "2026-11-16T06:10:00Z"
+    MERGED_AT = "2026-11-16T06:15:00Z"
+
+    def setUp(self):
+        super().setUp()
+        self.add_sub("mmmmmmmmmmmm", kind="merged", created_at="2026-11-16T05:01:00Z")
+
+    def request(self, at=None, event_id=10, number=1, pulls=None):
+        """PR への自分へのレビューの依頼を届ける (追跡に足す) 回。"""
+        at = at or self.T1
+        self.serve([notification(REPO, number, at)], {(REPO, number): [timeline_event(event_id, at, login="akm")]},
+                   etag=f'W/"e{event_id}"', pulls=[pull(REPO, number)] if pulls is None else pulls)
+        code, out = self.tick(at)
+        self.assertEqual(code, 0, out)
+        self.ack_all(out)
+        return out
+
+    def tracked(self):
+        return [(p["repo"], p["number"], p["enqueued_at"]) for p in (self.read_home_or_none("tracked.json") or {"prs": []})["prs"]]
+
+    def read_home_or_none(self, name):
+        return self.read_home(name) if os.path.exists(os.path.join(self.home, name)) else None
+
+    def merged_messages(self, out):
+        return [m for m in out["messages"] if m["kind"] == "merged"]
+
+    def test_tracked_pr_merged_without_notification(self):
+        """依頼を届けた PR が、通知の無いまま (自分でマージした場合など) マージされても届け、追跡をやめる。304 の回も読む。"""
+        self.request()
+        self.assertEqual(self.tracked(), [(REPO, 1, self.T1)])
+        self.serve(not_modified_for='W/"e10"', etag='W/"e10"', pulls=[pull(REPO, 1, merged_at=self.MERGED_AT, title="✨ feat")])
+        code, out = self.tick("2026-11-16T06:20:00Z")
+        self.assertTrue(out["not_modified"])
+        [message] = self.merged_messages(out)
+        self.assertEqual(message["subscription_id"], "mmmmmmmmmmmm")
+        self.assertEqual(messages.parse(message["body"])["fields"]["event"],
+                         [f"#1 {self.MERGED_AT} https://github.com/{REPO}/pull/1 ✨ feat"])
+        self.assertEqual(self.tracked(), [])
+
+    def test_closed_pr_stops_tracking(self):
+        """依頼を届けた PR が、マージされずに閉じたら、届けずに追跡をやめる。その後は状態を読まない。"""
+        self.request()
+        self.serve(pulls=[pull(REPO, 1, state="closed")])
+        code, out = self.tick("2026-11-16T06:20:00Z")
+        self.assertEqual((code, self.merged_messages(out), self.tracked()), (0, [], []))
+        before = len(self.calls(f"repos/{REPO}/pulls/1"))
+        self.serve()
+        self.tick("2026-11-16T06:30:00Z")
+        self.assertEqual(len(self.calls(f"repos/{REPO}/pulls/1")), before)
+
+    def test_same_merge_from_tracking_and_notification_once(self):
+        """同じ PR のマージを、追跡と通知の両方で見つけても、1 回だけ届ける。次の回に通知が残っていても届けない (R11)。"""
+        self.request()
+        merged = pull(REPO, 1, merged_at=self.MERGED_AT, requested=["akm"])
+        self.serve([notification(REPO, 1, "2026-11-16T06:16:00Z")], {(REPO, 1): []}, etag='W/"e11"', pulls=[merged])
+        code, out = self.tick("2026-11-16T06:20:00Z")
+        self.assertEqual((code, out["found"], len(self.merged_messages(out))), (0, 1, 1))
+        self.ack_all(out)
+        self.serve([notification(REPO, 1, "2026-11-16T06:16:00Z")], {(REPO, 1): []}, etag='W/"e12"', pulls=[merged])
+        code, out = self.tick("2026-11-16T06:21:00Z")
+        self.assertEqual((code, out["found"], out["messages"]), (0, 0, []))
+
+    def test_notification_pr_with_my_review_is_delivered(self):
+        """依頼を届けていない PR の通知では、自分のレビューがあるときだけ届ける (R10 の (b))。"""
+        self.serve([notification(REPO, 5, "2026-11-16T06:16:00Z", reason="subscribed"),
+                    notification(REPO, 6, "2026-11-16T06:16:00Z", reason="subscribed")],
+                   {(REPO, 5): [], (REPO, 6): []},
+                   pulls=[pull(REPO, 5, merged_at=self.MERGED_AT), pull(REPO, 6, merged_at=self.MERGED_AT)],
+                   reviews={(REPO, 5): [review("akm")], (REPO, 6): [review("someone")]})
+        code, out = self.tick("2026-11-16T06:20:00Z")
+        self.assertEqual([m["count"] for m in self.merged_messages(out)], [1])
+        self.assertIn("#5 ", messages.parse(self.merged_messages(out)[0]["body"])["fields"]["event"][0])
+        self.assertEqual(self.tracked(), [], "依頼を届けていない PR は追跡しない")
+
+    def test_repo_without_merged_subscription_drops_tracking(self):
+        """merged の登録が無くなったリポジトリでは PR の状態を読まず、追跡を消す。後で merged を登録し直しても、その間の
+        マージを届けない。"""
+        self.request()
+        merged_sub = self.subs.pop()
+        self.write_home("subscriptions.json", {"version": 1, "subscriptions": self.subs})
+        before = len(self.calls(f"repos/{REPO}/pulls/1"))
+        self.serve()
+        self.tick("2026-11-16T06:20:00Z")
+        self.assertEqual((self.tracked(), len(self.calls(f"repos/{REPO}/pulls/1"))), ([], before))
+        self.subs.append(merged_sub)
+        self.write_home("subscriptions.json", {"version": 1, "subscriptions": self.subs})
+        self.serve(pulls=[pull(REPO, 1, merged_at="2026-11-16T06:25:00Z")])
+        code, out = self.tick("2026-11-16T06:30:00Z")
+        self.assertEqual((code, self.merged_messages(out)), (0, []))
+
+    def test_tracking_ends_thirty_days_after_last_request(self):
+        """最後に依頼を送信待ちに入れてから 30 日を過ぎた PR は、状態を読まずに追跡をやめる。依頼のやり直しを送信待ちに
+        入れると、30 日の起点がその時刻になる (R10)。"""
+        self.request()
+        later = "2026-12-06T06:10:00Z"  # 20 日後に依頼のやり直し
+        self.request(at=later, event_id=11)
+        self.assertEqual(self.tracked(), [(REPO, 1, later)])
+        self.serve(pulls=[pull(REPO, 1)])
+        self.tick("2026-12-17T06:10:00Z")  # 最初の依頼から 31 日後、やり直しから 11 日後
+        self.assertEqual(self.tracked(), [(REPO, 1, later)])
+        before = len(self.calls(f"repos/{REPO}/pulls/1"))
+        self.serve(pulls=[pull(REPO, 1, merged_at="2027-01-06T06:00:00Z")])
+        code, out = self.tick("2027-01-06T06:11:00Z")  # やり直しから 30 日と 1 分後
+        self.assertEqual((code, self.merged_messages(out), self.tracked()), (0, [], []))
+        self.assertEqual(len(self.calls(f"repos/{REPO}/pulls/1")), before, "状態を読まないこと")
+
+    def test_start_stays_at_enqueue_time_while_unacked(self):
+        """届かない登録で ack が遅れても、追跡する期間の起点は送信待ちに入れた時刻のままである (R10)。"""
+        self.serve([notification(REPO, 1, self.T1)], {(REPO, 1): [timeline_event(10, self.T1, login="akm")]}, pulls=[pull(REPO, 1)])
+        code, out = self.tick(self.T1)
+        for i, at in enumerate(["2026-11-16T06:20:00Z", "2026-11-16T06:30:00Z", "2026-11-17T06:30:00Z"]):
+            for m in out["messages"]:
+                self.assertEqual(self.cli("fail", m["message_id"], "--reason", "届かない")[0], 0)
+            self.assertEqual(self.cli("settle")[0], 0)
+            self.serve(pulls=[pull(REPO, 1)])
+            code, out = self.tick(at)
+            self.assertEqual(code, 0, out)
+        self.assertEqual(self.tracked(), [(REPO, 1, self.T1)])
 
 
 class ResultsTest(StartedTickCase):

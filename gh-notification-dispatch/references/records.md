@@ -2,7 +2,7 @@
 
 gh-notification-dispatch のスクリプトが読み書きするファイルの様式。どのファイルも UTF-8 の JSON で、キー `version` (今は `1`) を持つ。時刻は UTC の `YYYY-MM-DDTHH:MM:SSZ` で書く。
 
-この文書は、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) の U2 と U3 で使うファイルを書いている。追跡する PR と定期の予定のファイルとキーは、U4・U5 で足す。
+この文書は、計画 [docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md](../../docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md) の U2〜U4 で使うファイルを書いている。定期の予定のファイルとキーは、U5 で足す。
 
 ## 記録のディレクトリ
 
@@ -138,12 +138,12 @@ U2 で記録した登録には `consecutive_failures`・`expired_events`・`last
 
 | キー | 値 |
 | --- | --- |
-| `key` | 出来事のキー。`review_requested` は `review_requested:<timeline の出来事の ID>` |
+| `key` | 出来事のキー。`review_requested` は `review_requested:<timeline の出来事の ID>`、`merged` は `merged:<リポジトリ (小文字)>#<PR の番号>` |
 | `subscription_id` | 届けた登録 |
-| `time` | 出来事の時刻 (レビューの依頼の時刻) |
+| `time` | 出来事の時刻 (レビューの依頼の時刻か、マージの時刻) |
 | `recorded_at` | 送信待ちに入れた時刻 |
 
-(出来事, 登録) を送信待ちに入れたときに足す。次の回からは、同じ (出来事, 登録) を送信待ちに入れない (計画の R11・KTD6)。出来事の時刻が取得の範囲の起点より前になったものは消す。そのような出来事は、時刻で判定から除かれ、二度と送信待ちに入らないため。配信を停止していた期間の長さに関わらず、取得の範囲に入りうる出来事の記録は残る。
+(出来事, 登録) を送信待ちに入れたときに足す。次の回からは、同じ (出来事, 登録) を送信待ちに入れない (計画の R11・KTD6)。出来事の時刻が取得の範囲の起点より前になったものは消す。そのような出来事は、時刻で判定から除かれ、二度と送信待ちに入らないため。追跡する PR のマージ (計画の R10 の (a)) は時刻で除かないが、マージを見つけた回に追跡から外すので、同じく二度と送信待ちに入らない。配信を停止していた期間の長さに関わらず、取得の範囲に入りうる出来事の記録は残る。
 
 ### `outbox.json`
 
