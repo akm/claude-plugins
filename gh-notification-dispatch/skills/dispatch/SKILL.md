@@ -68,10 +68,11 @@ Claude Desktop を再起動した後・定期の予定の期限を過ぎた後�
 1. `gh_notification_dispatch.py status` を実行し、利用者に次を示す。
    - `notice` (定期の予定の状態と、次に行う手順)
    - 記録の配信のセッション (`dispatcher`) と、このセッションがそれか (`is_dispatcher`)
+   - 最後に取得できた時刻 (`position`)
    - 登録の数 (`subscriptions`) と送信待ちの数 (`waiting`)
    - 届かない登録 (`unreachable`) のリポジトリ・種類・届け先のセッション
    - 30 日を過ぎて消した出来事がある登録 (`expired_events`) の、リポジトリ・種類・届け先のセッション・累計・最後に消した時刻
-2. `is_dispatcher` が true で、`schedule.state` が `running` で、`expired` が false なら、ツール `CronList` に、プロンプトが `/gh-notification-dispatch:tick` の予定があるかを見る。無ければ、このセッションで定期の予定が実行されていない (Claude Desktop の再起動の後など) ので、`resume` を実行するよう伝える。
+2. `is_dispatcher` が true で、`schedule.state` が `running` で、`expired` が false なら、ツール `CronList` に、プロンプトが `/gh-notification-dispatch:tick` の予定があるかを見る。無ければ、このセッションで定期の予定が実行されていないので、`resume` を実行するよう伝える。予定があっても、実行されているとは限らない (Claude Desktop を再起動した後は、再起動の前の予定が残っていても実行されないことがある。計画の KTD10)。定期の予定を記録してから (`schedule.created_at` から) 20 分 (定期の予定の 2 回分) を過ぎていて、`position` が無いか 20 分より前なら、定期の予定が実行されていないか `gh` が失敗し続けているので、`resume` を実行するよう伝える (失敗し続けていれば、`resume` の後の `tick` が `gh_error` を示す)。
 
 ## 申し込みのメッセージを受け取ったとき
 
