@@ -249,9 +249,10 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── python/                   # 画像をまとめるツール。テストは python/tests/ (uv sync --frozen の後に uv run python -m unittest discover -s python/tests)
 │   ├── examples/sample/          # 見本の資料 (outline.md と deck.mts)
 │   └── README.md
-├── gh-notification-dispatch/     # skill 型 + 同梱スクリプト
+├── gh-notification-dispatch/     # skill 型 + hooks 型 + 同梱スクリプト
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/                   # 3 つのスキル (配信のセッションの dispatch と tick・受信のセッションの subscribe)
+│   ├── hooks/hooks.json          # hook SessionStart (配信のセッションを開いたときに、定期の予定を作り直すよう伝える)
 │   ├── references/               # メッセージと記録のファイルの様式・メッセージの送り方
 │   ├── scripts/                  # スクリプト (gh_notification_dispatch.py とパッケージ gh_notification_dispatch/)
 │   ├── tests/                    # python3 -m unittest discover -s gh-notification-dispatch/tests
