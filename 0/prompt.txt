@@ -1,0 +1,54 @@
+Background (from the session that started this one):
+Issue #242 は、図を中心にした説明資料を PowerPoint のファイルと Google スライドで作るプラグイン `slide-deck` を作る要望。計画の 11 の単位 (#245〜#255) はすべて終わり、0.1.0 を公開した。最後の通し確認 (U10、#255) で見つかった問題のうち、#296 と #297 は #242 を閉じる前に直すと利用者が決めた。#297 は、資料ごとのスクリプト `deck.ts` (ESM で書く決まり) を Node.js 24 が変換せずに動的な import で実行するとき、資料のディレクトリから上で最も近い `package.json` の `type` で ESM か CommonJS かが決まるため、`type` が無いと利用者のホームディレクトリのファイルを変えるよう求める警告が出て、`type` が `commonjs` だと `SyntaxError: Unexpected token 'export'` で `check` が失敗する問題。資料のディレクトリは利用者が選ぶ (毎回質問する) ので、どのプロジェクトの中にも置かれうる。資料のディレクトリの `build/` には、生成したファイルと内容が `*` の `.gitignore` を書く決まり (KTD15)。プラグインのコードは TypeScript (strict、`any` を禁止) で、テストは node:test。文章の規約は CLAUDE.md に従い、変えた Markdown・日本語のコメント・コミットメッセージを wording-guard で検査する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/297 を直す。
+
+最初に `git fetch origin` し、`origin/main` から作業ブランチを作る。
+
+読むもの:
+- Issue #297 の本文 (問題・クローズ条件)
+- U10 の結果: [#255 のコメント](https://github.com/akm/claude-plugins/issues/255#issuecomment-6908278786)
+- `slide-deck/src/check/deck.ts` (関数 `loadDeckScript`) とテスト、`slide-deck/references/deck-script.md`、`slide-deck/skills/build/SKILL.md`
+- 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` の KTD2・KTD3・KTD15 と節「単位の進め方とクローズ条件」 (共通のクローズ条件)
+
+進め方:
+1. Issue のクローズ条件のとおり、方針 (資料のディレクトリの外のファイルを変えずに実現するか、資料のディレクトリの `build/` に何かを書くか、など) を、着手する前に決める。選択肢と利点・欠点を利用者に示し、回答を得てから直す。利用者のプロジェクトの `package.json` や、資料のディレクトリより上のファイルを、知らせずに書き換える方法は選択肢に入れない。決めたことは Issue #297 にコメントし、必要なら計画の KTD も直す。
+2. `type` が無い `package.json` と、`type` が `commonjs` の `package.json` の下に資料のディレクトリを置いた自動テストを足す。警告が出ないことも確かめる。
+3. プラグインのバージョンを上げる (0.1.0 から)。#296 を別のセッションが並行して直していて、そちらもバージョンを上げる。先にマージされた PR が 0.1.1 を使い、後の PR は `origin/main` を取り込んで次のパッチの版にする。どちらが先かは、PR を作るときに `origin/main` の `slide-deck/.claude-plugin/plugin.json` を見て決める。
+
+並行作業の注意: #296 (読み込みの結果の形。`slide-deck/src/gslides/presentation.ts`・`slide-deck/references/google-slides.md`・`slide-deck/skills/publish/SKILL.md` の周り) を別のセッションが直している。`slide-deck/src/gslides/` は変えない。計画のファイルを直すときは、#297 に関係する KTD だけにする。
+
+終わりの形: Issue #297 のクローズ条件と、計画の共通のクローズ条件をすべて満たした PR を作る (本文に `Closes #297`)。push・PR の作成・Issue へのコメントは利用者の承認を得てから行う。判断が要ることは、自分で決めずに利用者に 1 つずつ質問する。レビューのループの外で、sub-agent に案のレビューを何度も重ねない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_8a080753-e404-44b3-978c-f0b57cdbaf02
+
+---
+
+案 1 (誤りで案内)
+
+---
+
+下書きのとおり行う
+
+---
+
+#299 をマージしました
+
+---
+
+<cross-session-message from="local_e2cf2a7b-e074-43e2-befc-6b097434a290" from-name="slide-deck の #296: 読み込みの結果の形を直す">
+#296 の PR #299 (slide-deck 0.1.1) が main にマージされました (d5f0c1e8)。取り決めのとおり、#300 は origin/main を取り込み、slide-deck の版を 0.1.2 にする必要があります。#299 では、ファイル slide-deck/src/gslides/presentation.ts・slide-deck/src/cli.ts (requests --help の 1 行)・slide-deck/references/google-slides.md・計画の KTD10・テスト 2 ファイルを変えたので、取り込むときに競合が出るかもしれません。
+</cross-session-message>
+
+---
+
+#300 をマージしました
+
+---
+
+ワークツリーとブランチを片付けて
+
+---
+
+呼び出し元セッションに状況を報告してください
