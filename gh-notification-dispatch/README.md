@@ -77,13 +77,13 @@ GitHub の通知から PR のレビューの依頼と PR のマージを判定�
 ### 期限と延長
 
 - 定期の予定は、作ってから 7 日で消えます (ツール `CronCreate` の上限)。
-- 期限までの残りが 24・6・1 時間を切った回に、続けるかを確認する文を配信のセッションに出し、デスクトップの通知を送ります。確認の間も、取得と配信は続けます。
+- 期限までの残りが 24・6・1 時間を切った回に、続けるかを確認する文を配信のセッションに出し、ツール `PushNotification` で通知も送ります。確認の間も、取得と配信は続けます。
 - 続けるなら、配信のセッションで `/gh-notification-dispatch:dispatch renew` を実行します。定期の予定を作り直し、期限を 7 日後にします。
-- 期限を過ぎたときは、`/gh-notification-dispatch:dispatch status` と、配信のセッションを開いたときの案内が、期限切れであることを示します。`/gh-notification-dispatch:dispatch resume` で再開します。
+- 期限を過ぎたときは、`/gh-notification-dispatch:dispatch status` が期限切れであることを示します。Claude Desktop を再起動した後は、hook `SessionStart` の案内 (次の節) も期限切れであることを伝えます。`/gh-notification-dispatch:dispatch resume` で再開します。
 
 ### Claude Desktop を再起動した後
 
-- 配信のセッションを開き、`/gh-notification-dispatch:dispatch resume` を実行します。配信のセッションを開くと、hook `SessionStart` がこの手順を伝えます。
+- 配信のセッションを開き、`/gh-notification-dispatch:dispatch resume` を実行します。配信のセッションを開くと、hook `SessionStart` がこの手順を Claude に伝えます。案内は画面には出ず、配信のセッションでメッセージを送った最初のターンで、Claude が伝えます。
 - `resume` は、残った定期の予定を消してから作り直します。再起動の前の予定が、ツール `CronList` に残っていることがあるためです。
 - 取得は前回の取得の位置から行うので、停止していた間の通知も届けます。受信のセッションは登録し直さなくてよいです。
 - 再起動の後に開いていない受信のセッションにも届けます。名前で届かないときは、記録したセッションの ID を宛先にして送り、Claude Desktop がそのセッションを起動して届けます。
@@ -120,7 +120,7 @@ GitHub の通知から PR のレビューの依頼と PR のマージを判定�
 | [references/messages.md](references/messages.md) | セッション間のメッセージの様式 |
 | [references/sending.md](references/sending.md) | 配信のセッションがメッセージを送る手順 (名前で届かないときの、名前の引き直しと、ID を宛先にした送り直し) |
 | [references/records.md](references/records.md) | 記録のディレクトリ (`~/.claude/gh-notification-dispatch/`) と、受信のセッションの一時ディレクトリのファイルの様式 |
-| [hooks/hooks.json](hooks/hooks.json) | hook `SessionStart`。配信のセッションを開いたときに、定期の予定を作り直すよう伝える |
+| [hooks/hooks.json](hooks/hooks.json) | hook `SessionStart`。配信のセッションを開いたときに、定期の予定を作り直すよう Claude に伝える |
 | [scripts/gh_notification_dispatch.py](scripts/gh_notification_dispatch.py) | スクリプトの入口。サブコマンドの引数・出力・終了コードは `--help` で確認する |
 | [scripts/gh_notification_dispatch/](scripts/gh_notification_dispatch/) | スクリプトのパッケージ (`gh` の実行・記録の読み書き・メッセージの生成と解析・登録・通知の取得・種類の判定・追跡する PR・送信待ち・定期の予定と期限・hook) |
 | [tests/](tests/) | スクリプトの自動テスト。偽の `gh` と固定データで実行する |
