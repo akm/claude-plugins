@@ -1,0 +1,59 @@
+Background (from the session that started this one):
+Issue #242 は、図を中心にした説明資料を PowerPoint のファイルと Google スライドで作るスキルを、新しいプラグイン `slide-deck` として作る要望。計画は main の `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` にあり、実装の単位 U1〜U11 を sub-issue #245〜#255 にした。U1〜U9 と U11 は終わり、slide-deck 0.1.0 は PR #289 で marketplace.json に載って公開された。U10 (#255) は最後の単位で、公開した版の 3 つのスキル (`outline` が構成案、`build` が PowerPoint のファイル、`publish` が Google スライド) を、本物の Google スライドで通して使い、作る・直す・足す・途中から再開する場面で動くことを確認する。スキル `publish` は、コネクタで資料を読んで `build/presentation.json` に書き、サブコマンド `requests` で指示のファイル (20,000 字ごと) を作り、先頭のファイルを revisionId 付きで送ることを繰り返す。作り直す・消す・並べ替える前には利用者の承認を得る。U11 では、項目を指定した読み込み・revisionId 付きの書き込み・マスターの colorScheme の変更が動くことを確認済み。文章の規約は CLAUDE.md に従い、Issue のコメントは wording-guard で検査してから投稿する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/255 (計画の単位 U10) の通し確認を行う。プラグインのコードは直さず、PR も作らない。結果は Issue #255 のコメントに書く。
+
+利用者は、別のセッションでの質問「U10 (#255) を、新しいセッションで始めてよいですか。本物の Google スライドに書き込むことへの許可も含めて、回答してください」に「U10 に進めてください」と回答した。これが、確認のために本物の Google スライドに資料を作って書き込むことへの許可。資料を作る前に、資料の名前を利用者に示してから進める。利用者は slide-deck 0.1.0 を user スコープにインストール済みで、このセッションではスキル `slide-deck:outline`・`slide-deck:build`・`slide-deck:publish` が使える (マーケットプレイスから入れた版を使い、リポジトリの作業ツリーのファイルを直接使わない)。
+
+読むもの:
+- Issue #255 の本文 (確認すること・クローズ条件)
+- 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` の節「U10. 本物の Google スライドでの通し確認」、R1・R4〜R7・R14〜R22、KTD14、節「単位の進め方とクローズ条件」 (U10 は PR を作らず、結果を sub-issue のコメントに書いて閉じる。見つかった問題は新しい Issue にして #242 の sub-issue に足す)
+- U11 の結果 (Issue #251 のコメント)、U6 の PR #281 と U9 の PR #289 の本文
+
+確認すること:
+1. スキル `slide-deck:outline` で、見本の題材 (どのプロジェクトの話でもない題材) から構成案を作る。資料のディレクトリは、この作業ツリーの `tmp/` の下にする (git で管理しない)。R1・R4〜R7 の手順を確認する。
+2. スキル `slide-deck:build` と `slide-deck:publish` で、作る・直す・足す・途中から再開する、の 4 つの場面を確認する。
+3. API の挙動への対処 (KTD14) ごとに、スライドの画像で機能していることを見る。
+4. U6・U9 から残した 2 つを確認する: `--recreate-all` で同じ batchUpdate の中で消した ID を使ってスライドを作れるか、マスターの配色を足した field mask で資料を読めるか。
+
+結果の扱い:
+- 場面ごとの結果と、確認できなかったものを、Issue #255 のコメントの下書きにし、wording-guard で検査して利用者に示し、承認を得てから投稿する。コメントに、Google スライドの資料の URL や利用者の個人の情報を書かない。
+- 見つかった問題は、直さずに新しい Issue の下書きを作って利用者に示し、承認を得てから作って #242 の sub-issue に足す。問題が見つかったときに、手順を変えて別の方法を試さない。
+- 確認に使った資料を消すかを利用者に質問し、回答のとおりにする。
+- クローズ条件をすべて満たしたら、利用者の承認を得て Issue #255 を閉じる。
+- 判断が要ることは、自分で決めずに利用者に 1 つずつ質問する。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_8a080753-e404-44b3-978c-f0b57cdbaf02
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく質問の内容を前提から説明してください
+
+---
+
+日本語でお願いします
+
+---
+
+ケースバイケースなので、決めずにユーザーに確認してください
+
+---
+
+一般化して書く
+
+---
+
+日本語でお願いします
+
+---
+
+content の中身だけを書いて続けて
+
+---
+
+Claude にお願いします
+
+---
+
+呼び出し元セッションに状況を報告してください
