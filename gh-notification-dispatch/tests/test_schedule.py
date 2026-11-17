@@ -28,6 +28,7 @@ class ScheduleCase(FakeGhCase):
         super().setUp()
         self.at(T0)
         self.as_session(DISPATCHER)
+        os.environ["CLAUDE_PID"] = "40981"  # 予定を作った Claude Code のプロセス ID
         self.write_home("state.json", {"version": 1, "dispatcher": {"session_id": DISPATCHER, "name": "配信",
                                                                    "permission_mode": "auto", "recorded_at": T0}})
 
@@ -54,7 +55,7 @@ class RecordTest(ScheduleCase):
     def test_record_sets_expiry_seven_days_later(self):
         code, out = self.record()
         self.assertEqual(code, 0, out)
-        expected = {"state": "running", "job_id": "a1b2c3d4", "cron": CRON, "created_at": T0,
+        expected = {"state": "running", "job_id": "a1b2c3d4", "cron": CRON, "pid": 40981, "created_at": T0,
                     "expires_at": "2026-11-23T06:00:00Z", "reminders": [], "stopped_at": None}
         self.assertEqual(out["schedule"], expected)
         self.assertIsNone(out["previous"])
@@ -85,7 +86,7 @@ class RecordTest(ScheduleCase):
         self.record()
         code, out = self.clear(at="2026-11-17T06:00:00Z")
         self.assertEqual(code, 0, out)
-        self.assertEqual(self.schedule(), {"state": "stopped", "job_id": None, "cron": None, "created_at": None,
+        self.assertEqual(self.schedule(), {"state": "stopped", "job_id": None, "cron": None, "pid": None, "created_at": None,
                                            "expires_at": None, "reminders": [], "stopped_at": "2026-11-17T06:00:00Z"})
         self.assertEqual(out["previous"]["job_id"], "a1b2c3d4")
 
@@ -101,6 +102,15 @@ class RecordTest(ScheduleCase):
                 self.assertIsNone(out["schedule"])
                 self.assertTrue(out["not_dispatcher"], "記録と違うセッションなので、スキルは作った予定を消す")
                 self.assertTrue(out["errors"])
+        self.assertEqual(self.home_files(), before)
+
+    def test_without_claude_pid_changes_nothing(self):
+        os.environ.pop("CLAUDE_PID")
+        before = self.home_files()
+        code, out = self.record()
+        self.assertEqual(code, 3, out)
+        self.assertFalse(out["not_dispatcher"])
+        self.assertTrue(any("CLAUDE_PID" in e for e in out["errors"]))
         self.assertEqual(self.home_files(), before)
 
     def test_unconfirmed_session_changes_nothing_and_is_not_flagged(self):
@@ -150,6 +160,24 @@ class StatusTest(ScheduleCase):
         self.assertTrue(out["is_dispatcher"])
         self.assertEqual((out["schedule"]["state"], out["expired"], out["remaining"]), ("running", False, "5 日 21 時間"))
         self.assertIn("/gh-notification-dispatch:dispatch renew", out["notice"])
+
+    def test_process_changed_after_restart(self):
+        """予定を記録したプロセス ID といまのプロセス ID が違えば、再起動した後などとして resume を勧める (計画の KTD10)。"""
+        self.record()
+        out = self.status("2026-11-17T08:30:00Z")
+        self.assertFalse(out["process_changed"])
+        os.environ["CLAUDE_PID"] = "51234"  # 再起動の後の Claude Code のプロセス
+        out = self.status("2026-11-17T08:30:00Z")
+        self.assertTrue(out["process_changed"])
+        self.assertIn("/gh-notification-dispatch:dispatch resume", out["notice"])
+        self.assertFalse(self.status("2026-11-23T06:00:00Z")["process_changed"], "期限切れは期限切れとして示す")
+        self.as_session(OTHER)
+        self.assertFalse(self.status("2026-11-17T08:30:00Z")["process_changed"], "配信のセッションでなければ判定しない")
+        self.as_session(DISPATCHER)
+        state = self.read_home("state.json")
+        del state["schedule"]["pid"]
+        self.write_home("state.json", state)
+        self.assertFalse(self.status("2026-11-17T08:30:00Z")["process_changed"], "pid を記録する前の記録では判定しない")
 
     def test_expired_without_tick(self):
         """期限より前に最後の tick が実行され、その後に tick が無いまま期限を過ぎたときも、期限切れと再開の手順を示す (R17)。"""

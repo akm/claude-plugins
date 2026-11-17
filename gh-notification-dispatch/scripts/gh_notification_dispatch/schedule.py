@@ -10,6 +10,7 @@ state.json のキー `schedule` に書き、`schedule clear` で停止したこ�
 """
 
 import datetime
+import os
 import re
 
 from . import outbox, store
@@ -21,6 +22,7 @@ REMINDER_HOURS = (24, 6, 1)  # 期限までの残りがこれを切った回に�
 TICK_PROMPT = "/gh-notification-dispatch:tick"
 RENEW_COMMAND = "/gh-notification-dispatch:dispatch renew"
 RESUME_COMMAND = "/gh-notification-dispatch:dispatch resume"
+PID_ENV = "CLAUDE_PID"  # Claude Code が、Bash ツールのコマンドと hook に、自分のプロセス ID を設定する (公式の文書の環境変数)
 START_COMMAND = "/gh-notification-dispatch:dispatch start"
 
 _JOB_ID = re.compile(r"[^\s\x00-\x1f\x7f]+")  # 空白と制御文字を含まない 1 文字以上 (CronCreate の ID の形は決めつけない)
@@ -40,21 +42,34 @@ def check_cron(value):
     return None
 
 
+def current_pid():
+    """スクリプトを実行している Claude Code のプロセス ID (環境変数 CLAUDE_PID)。無いか整数でなければ None。"""
+    value = os.environ.get(PID_ENV, "").strip()
+    return int(value) if value.isdigit() else None
+
+
 def record(job_id, cron):
-    """作り直した定期の予定を記録する。期限を 7 日後にし、出した確認の記録を消す (R17)。"""
+    """作り直した定期の予定を記録する。期限を 7 日後にし、出した確認の記録を消す (R17)。
+
+    予定を作った Claude Code のプロセス ID も記録する。定期の予定はそのプロセスの中だけにあるので、後でプロセス ID が
+    違えば、予定を作ったプロセスはもう無い (Claude Desktop を再起動した後など) と判定できる (計画の KTD10)。
+    """
+    pid = current_pid()
     errors = [e for e in (check_job_id(job_id), check_cron(cron)) if e]
+    if pid is None:
+        errors.append(f"環境変数 {PID_ENV} が無いので、定期の予定を作ったプロセスを記録できない")
     if errors:
         return {"status": "unsatisfied", "schedule": None, "previous": None, "not_dispatcher": False, "errors": errors}
     now = store.now()
-    schedule = {"state": RUNNING, "job_id": job_id, "cron": cron, "created_at": store.format_time(now),
+    schedule = {"state": RUNNING, "job_id": job_id, "cron": cron, "pid": pid, "created_at": store.format_time(now),
                 "expires_at": store.format_time(now + LIFETIME), "reminders": [], "stopped_at": None}
     return _write(schedule, "schedule record")
 
 
 def clear():
     """定期の予定を停止したことを記録する。"""
-    schedule = {"state": STOPPED, "job_id": None, "cron": None, "created_at": None, "expires_at": None, "reminders": [],
-                "stopped_at": store.format_time(store.now())}
+    schedule = {"state": STOPPED, "job_id": None, "cron": None, "pid": None, "created_at": None, "expires_at": None,
+                "reminders": [], "stopped_at": store.format_time(store.now())}
     return _write(schedule, "schedule clear")
 
 
@@ -82,6 +97,14 @@ def is_running(schedule):
 def is_expired(schedule, now):
     """動いている記録の期限を過ぎたか。動いていない記録 (停止した・記録が無い) は期限切れにしない。"""
     return is_running(schedule) and now >= store.parse_time(schedule["expires_at"])
+
+
+def is_process_changed(schedule, now, pid):
+    """動いている記録の期限内で、予定を記録したプロセス ID と pid が違うか。記録か pid が無ければ判定しない (偽)。"""
+    if not is_running(schedule) or is_expired(schedule, now):
+        return False
+    recorded = schedule.get("pid")
+    return recorded is not None and pid is not None and recorded != pid
 
 
 def take_reminder(schedule, now):
@@ -144,20 +167,22 @@ def status():
     pending = (store.read(store.OUTBOX) or {}).get("pending", [])
     expired = is_expired(schedule, now)
     running = is_running(schedule) and not expired
+    is_dispatcher = bool(recorded) and current is not None and recorded.get("session_id") == current
+    process_changed = is_dispatcher and is_process_changed(schedule, now, current_pid())
     unreachable = [{**outbox.summary(s), "consecutive_failures": outbox.failures(s)}
                    for s in subscriptions if outbox.is_unreachable(s)]
     expired_events = [{**outbox.summary(s), "expired_events": s["expired_events"], "last_expired_at": s.get("last_expired_at")}
                       for s in subscriptions if s.get("expired_events", 0) > 0]
     return {"status": "ok", "dispatcher": recorded,
-            "is_dispatcher": bool(recorded) and current is not None and recorded.get("session_id") == current,
-            "schedule": schedule, "expired": expired,
+            "is_dispatcher": is_dispatcher, "schedule": schedule, "expired": expired, "process_changed": process_changed,
             "remaining": remaining_text(store.parse_time(schedule["expires_at"]) - now) if running else None,
             "started_at": state.get("started_at"), "position": state.get("position"),
             "subscriptions": len(subscriptions), "waiting": len(pending), "unreachable": unreachable,
-            "expired_events": expired_events, "notice": _status_notice(recorded, schedule, now), "errors": []}
+            "expired_events": expired_events, "notice": _status_notice(recorded, schedule, now, process_changed),
+            "errors": []}
 
 
-def _status_notice(recorded, schedule, now):
+def _status_notice(recorded, schedule, now, process_changed):
     if not recorded:
         return f"配信のセッションが記録されていない。配信のセッションにするセッションで {START_COMMAND} を実行する。"
     if not schedule:
@@ -167,6 +192,10 @@ def _status_notice(recorded, schedule, now):
                 f"{RESUME_COMMAND} を実行する。")
     if is_expired(schedule, now):
         return expired_notice(schedule)["text"]
+    if process_changed:
+        return ("定期の予定を作ったプロセスと、いまの配信のセッションのプロセスが違う (Claude Desktop を再起動した後など)。"
+                f"再起動の前の予定が実行されるかは分からないので、配信のセッションで {RESUME_COMMAND} を実行して、"
+                "定期の予定を作り直す。")
     remaining = remaining_text(store.parse_time(schedule["expires_at"]) - now)
     return (f"定期の予定は動いている。期限は {local_text(schedule['expires_at'])} (残り {remaining})。"
             f"延長するなら、配信のセッションで {RENEW_COMMAND} を実行する。")

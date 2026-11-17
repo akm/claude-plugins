@@ -71,7 +71,7 @@ Claude Desktop を再起動した後・定期の予定の期限を過ぎた後�
    - 登録の数 (`subscriptions`) と送信待ちの数 (`waiting`)
    - 届かない登録 (`unreachable`) のリポジトリ・種類・届け先のセッション
    - 30 日を過ぎて消した出来事がある登録 (`expired_events`) の、リポジトリ・種類・届け先のセッション・累計・最後に消した時刻
-2. `is_dispatcher` が true で、`schedule.state` が `running` で、`expired` が false なら、ツール `CronList` に、プロンプトが `/gh-notification-dispatch:tick` の予定があるかを見る。無ければ、このセッションで定期の予定が実行されていないので、`resume` を実行するよう伝える。予定があっても、Claude Desktop を再起動した後は、再起動の前の予定が実行されるかは分からない (計画の U1) ので、再起動の後なら `resume` を実行するよう伝える。
+2. `is_dispatcher` が true で、`schedule.state` が `running` で、`expired` が false なら、ツール `CronList` に、プロンプトが `/gh-notification-dispatch:tick` の予定があるかを見る。無ければ、このセッションで定期の予定が実行されていないので、`resume` を実行するよう伝える。予定があっても、出力の `process_changed` が true (予定を作ったプロセスと、いまのプロセスが違う。Claude Desktop を再起動した後など) なら、再起動の前の予定が実行されるかは分からない (計画の KTD10) ので、`notice` のとおり `resume` を実行するよう伝える。
 
 ## 申し込みのメッセージを受け取ったとき
 

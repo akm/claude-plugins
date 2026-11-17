@@ -357,14 +357,15 @@ def build_parser():
     g = groups.add_parser("schedule", help="定期の予定を記録する").add_subparsers(dest="command", required=True)
     p = _add(g, "record", cmd_schedule_record,
              "配信のセッションが、ツール CronCreate で作り直した定期の予定 (プロンプト " + schedule.TICK_PROMPT + ") を、\n"
-             "記録のディレクトリの state.json に記録する。期限を今の時刻の 7 日後にし、出した確認の記録を消す。gh は実行しない",
-             "  schedule        記録した定期の予定 {state (running), job_id, cron, created_at, expires_at, reminders,\n"
+             "記録のディレクトリの state.json に記録する。期限を今の時刻の 7 日後にし、出した確認の記録を消す。\n"
+             "予定を作った Claude Code のプロセス ID (環境変数 CLAUDE_PID) も記録する。gh は実行しない",
+             "  schedule        記録した定期の予定 {state (running), job_id, cron, pid, created_at, expires_at, reminders,\n"
              "                  stopped_at}。記録しなかったときは null\n"
              "  previous        記録する前の定期の予定。無ければ null\n"
              "  not_dispatcher  このセッションが記録と違うセッションだと分かったか (形の誤り・環境変数が無い・\n"
              "                  配信のセッションが記録されていないときは false)\n"
              "  errors          記録しなかった理由の配列",
-             _exit_help("記録した", "ジョブの ID か cron の式の形が違う・" + _NOT_DISPATCHER))
+             _exit_help("記録した", "ジョブの ID か cron の式の形が違う・環境変数 CLAUDE_PID が無い・" + _NOT_DISPATCHER))
     p.add_argument("--job-id", required=True, help="ツール CronCreate が返したジョブの ID")
     p.add_argument("--cron", required=True, help="ツール CronCreate に渡した cron の式 (5 つの欄)")
 
@@ -384,6 +385,8 @@ def build_parser():
          "  is_dispatcher   このセッションが記録の配信のセッションか\n"
          "  schedule        記録の定期の予定 (schedule record の出力と同じ形)。定期の予定を作る前は null\n"
          "  expired         定期の予定が動いていて、期限を過ぎたか\n"
+         "  process_changed このセッションが配信のセッションで、定期の予定が動いていて期限内で、予定を記録したプロセス ID\n"
+         "                  (schedule.pid) と、いまのプロセス ID (環境変数 CLAUDE_PID) が違うか (再起動した後など)\n"
          "  remaining       期限までの残り (例: 5 日 21 時間)。動いていない・期限を過ぎたときは null\n"
          "  started_at      最初に開始した時刻。まだ tick を実行していなければ null\n"
          "  position        取得の位置。まだ tick を実行していなければ null\n"

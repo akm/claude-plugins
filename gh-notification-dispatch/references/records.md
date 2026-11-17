@@ -50,6 +50,7 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
     "state": "running",
     "job_id": "a1b2c3d4",
     "cron": "7-59/10 * * * *",
+    "pid": 40981,
     "created_at": "2026-11-16T05:30:00Z",
     "expires_at": "2026-11-23T05:30:00Z",
     "reminders": [24],
@@ -71,6 +72,7 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `last_allocated` | 前の回に、最後にメッセージを割り当てた登録の ID と登録日時。次の回は、登録日時の順でこの登録の次の登録から割り当てる (計画の R13)。この登録が削除されていても、登録日時で次の登録が決まる |
 | `schedule.state` | 定期の予定の状態。`running` (動いている) か `stopped` (停止した)。期限切れは書かず、`expires_at` と今の時刻を比べて判定する (計画の KTD9) |
 | `schedule.job_id`・`schedule.cron` | ツール `CronCreate` が返したジョブの ID と、渡した cron の式。`stopped` では null |
+| `schedule.pid` | 予定を作った Claude Code のプロセス ID (環境変数 `CLAUDE_PID`)。定期の予定はそのプロセスの中だけにあるので、`status` は、いまのプロセス ID と違えば、予定を作ったプロセスはもう無い (再起動した後など) として `resume` を勧める (計画の KTD10)。`stopped` では null。この値を足す前の記録には無く、そのときは判定しない |
 | `schedule.created_at`・`schedule.expires_at` | 定期の予定を記録した時刻と、その 7 日後の期限 (ツール `CronCreate` の定期の予定は、作ってから 7 日で消える)。`stopped` では null |
 | `schedule.reminders` | 期限までの残りが切ったことを、続けるかの確認として出した閾値 (`24`・`6`・`1` 時間) の配列。それぞれの確認を 1 回だけ出すため (計画の R17) |
 | `schedule.stopped_at` | 停止した時刻。`running` では null |
