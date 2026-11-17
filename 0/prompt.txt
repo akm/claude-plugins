@@ -1,0 +1,62 @@
+Background (from the session that started this one):
+Issue #242 は、図を中心にした説明資料を PowerPoint のファイルと Google スライドで作るプラグイン `slide-deck` を作る要望。計画の 11 の単位 (#245〜#255) はすべて終わり、0.1.0 を公開した。最後の通し確認 (U10、#255) で見つかった問題のうち、#296 と #297 は #242 を閉じる前に直すと利用者が決めた。#296 は、スキル `publish` の手順が、コネクタの `read_presentation` の結果の JSON を加工せずに `build/presentation.json` に書くよう定めているのに、コネクタが `{"content": {...}}` の形で返すため、サブコマンド `requests` が「形が違う」として終了コード 2 で終わる問題。U10 では利用者の判断で `content` の値だけを書いて続けた。資料の ID を Claude が取り違えないように、読み込みの結果はツールに渡して処理する設計 (KTD10)。プラグインのコードは TypeScript (strict、`any` を禁止) で、テストは node:test。文章の規約は CLAUDE.md に従い、変えた Markdown・日本語のコメント・コミットメッセージを wording-guard で検査する。
+
+Task:
+Issue https://github.com/akm/claude-plugins/issues/296 を直す。
+
+最初に `git fetch origin` し、`origin/main` から作業ブランチを作る。
+
+読むもの:
+- Issue #296 の本文 (問題・再現の手順・クローズ条件)
+- U10 の結果: [#255 のコメント](https://github.com/akm/claude-plugins/issues/255#issuecomment-6908278786)
+- U11 の読み込みの結果の記録 (Issue #251 のコメント)
+- `slide-deck/references/google-slides.md` の節「資料を読み込み、`build/presentation.json` に書く」、`slide-deck/skills/publish/SKILL.md`、`slide-deck/src/gslides/presentation.ts` とテスト `slide-deck/tests/gslides.test.ts`・`slide-deck/tests/fixtures/gslides/`
+- 計画 `docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md` の KTD10 と節「単位の進め方とクローズ条件」 (共通のクローズ条件)
+
+進め方:
+1. Issue のクローズ条件のとおり、どこで合わせるか (手順の文・`requests` の読み方・その両方) を、着手する前に決める。選択肢と利点・欠点を利用者に示し、回答を得てから直す。決めたことは Issue #296 にコメントし、必要なら計画の KTD10 も直す。
+2. 項目 `content` を持つ読み込みの結果を入力にした自動テストを足す。
+3. プラグインのバージョンを上げる (0.1.0 から)。#297 を別のセッションが並行して直していて、そちらもバージョンを上げる。先にマージされた PR が 0.1.1 を使い、後の PR は `origin/main` を取り込んで次のパッチの版にする。どちらが先かは、PR を作るときに `origin/main` の `slide-deck/.claude-plugin/plugin.json` を見て決める。
+4. 本物の Google スライドでの手の確認 (Issue のクローズ条件) は、利用者の許可を得てから行い、結果を Issue #296 のコメントに書く。許可が無ければ行わず、その旨を PR に書く。
+
+並行作業の注意: #297 (`deck.ts` の実行。`slide-deck/src/check/deck.ts` の周り) を別のセッションが直している。`slide-deck/src/check/` は変えない。計画のファイルを直すときは、#296 に関係する KTD だけにする。
+
+終わりの形: Issue #296 のクローズ条件と、計画の共通のクローズ条件をすべて満たした PR を作る (本文に `Closes #296`)。push・PR の作成・Issue へのコメントは利用者の承認を得てから行う。判断が要ることは、自分で決めずに利用者に 1 つずつ質問する。レビューのループの外で、sub-agent に案のレビューを何度も重ねない。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_8a080753-e404-44b3-978c-f0b57cdbaf02
+
+---
+
+<task-notification>
+<task-id>b56s5glk6</task-id>
+<tool-use-id>toolu_01UD7rw15awzC9sNpxGqKvU8</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-doc-structured-versioned-run-193-ee8aaa/558e2573-5eca-4ee7-814c-31e246fa82ee/tasks/b56s5glk6.output</output-file>
+<status>completed</status>
+<summary>Background command "Run slide-deck tests" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bd5pa5zx0</task-id>
+<tool-use-id>toolu_01KuXxW5Q94yp6CbCi1PSxzF</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-akima-workspace-claude-plugins--claude-worktrees-doc-structured-versioned-run-193-ee8aaa/558e2573-5eca-4ee7-814c-31e246fa82ee/tasks/bd5pa5zx0.output</output-file>
+<status>completed</status>
+<summary>Background command "Install deps and run tests" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+下書きのとおり行う
+
+---
+
+#299 をマージしました
+
+---
+
+ワークツリーとブランチを片付けて
+
+---
+
+呼び出し元セッションに状況を報告してください
