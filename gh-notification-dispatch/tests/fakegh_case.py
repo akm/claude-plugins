@@ -23,7 +23,7 @@ if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
 
 _ENV_KEYS = ("PATH", "FAKE_GH_ARGS", "FAKE_GH_RESPONSES", "FAKE_GH_MODE", "FAKE_GH_SLEEP", "FAKE_GH_EXIT",
-             "GH_NOTIFICATION_DISPATCH_HOME", "GH_NOTIFICATION_DISPATCH_NOW", "CLAUDE_CODE_HOST_SESSION_ID", "TMPDIR")
+             "GH_NOTIFICATION_DISPATCH_HOME", "GH_NOTIFICATION_DISPATCH_NOW", "CLAUDE_CODE_HOST_SESSION_ID", "CLAUDE_PID", "TMPDIR")
 
 
 def fixture(name, kind="stdout"):
@@ -104,7 +104,7 @@ class FakeGhCase(unittest.TestCase):
         os.environ["FAKE_GH_ARGS"] = self.args_file
         os.environ["FAKE_GH_RESPONSES"] = self.responses_file
         for k in ("FAKE_GH_MODE", "FAKE_GH_SLEEP", "FAKE_GH_EXIT", "GH_NOTIFICATION_DISPATCH_NOW",
-                  "CLAUDE_CODE_HOST_SESSION_ID"):
+                  "CLAUDE_CODE_HOST_SESSION_ID", "CLAUDE_PID"):
             os.environ.pop(k, None)
         self.home = os.path.join(self.root, "home")  # 記録のディレクトリ。作らずに始める
         self.tmpdir = os.path.join(self.root, "tmp")

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """gh-notification-dispatch のスクリプトの入口。サブコマンドごとにパッケージ gh_notification_dispatch のモジュールの関数を実行する。
 
-出力は標準出力の JSON 1 つ。サブコマンドごとの引数・出力の JSON のキー・終了コードは、`<サブコマンド> --help` が SSOT。
+出力は標準出力の JSON 1 つ (hook session-start だけは、Claude Code の hook の出力の様式で、何も出力しないこともある)。
+サブコマンドごとの引数・出力の JSON のキー・終了コードは、`<サブコマンド> --help` が SSOT。
 スキルの SKILL.md は引数を書かずに `--help` を参照する。記録のファイルの様式は文書 references/records.md、メッセージの様式は
 文書 references/messages.md にある (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md の KTD3・KTD8)。
 
@@ -18,6 +19,10 @@
   ack <メッセージの ID>                          tick が出力したメッセージが届いたことを記録する
   fail <メッセージの ID> --reason <理由>         tick が出力したメッセージが届かなかったことを記録する
   settle                                         この回のメッセージの結果を集計し、続けて届かなかった回数を更新する
+  schedule record --job-id <ID> --cron <式>      配信のセッションが、作り直した定期の予定を記録する
+  schedule clear                                 配信のセッションが、定期の予定を停止したことを記録する
+  status                                         配信のセッション・定期の予定とその期限・届かない登録を表示する
+  hook session-start                             hook SessionStart が実行する。配信のセッションを開いたときに、再開を促す
 
 終了コード (計画の KTD11):
   0  続ける
@@ -34,7 +39,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gh_notification_dispatch import gh, messages, outbox, poll, subscriptions  # noqa: E402
+from gh_notification_dispatch import gh, hook, messages, outbox, poll, schedule, subscriptions  # noqa: E402
 
 EXIT_OK = 0
 EXIT_UNSATISFIED = 3
@@ -120,6 +125,25 @@ def cmd_fail(args):
 
 def cmd_settle(args):
     return _emit_status(outbox.settle())
+
+
+def cmd_schedule_record(args):
+    return _emit_status(schedule.record(args.job_id, args.cron))
+
+
+def cmd_schedule_clear(args):
+    return _emit_status(schedule.clear())
+
+
+def cmd_status(args):
+    return _emit_status(schedule.status())
+
+
+def cmd_hook_session_start(args):
+    output = hook.session_start(sys.stdin.read())
+    if output is not None:
+        _emit(output)
+    return EXIT_OK
 
 
 # --- 引数 ---------------------------------------------------------------------------------------------------------
@@ -270,6 +294,8 @@ def build_parser():
 
     p = _add(groups, "tick", cmd_tick,
              "通知を取得してレビューの依頼とマージを判定し、送信待ちに入れ、この回に送るメッセージを出力する (定期の予定が実行する)。\n"
+             "定期の予定の期限までの残りが 24・6・1 時間を切った回には、続けるかの確認を出力する。期限を過ぎた回も、取得と\n"
+             "配信を通常どおり行い、期限切れを出力する。\n"
              "前の回のメッセージの結果が集計されていなければ (settle が呼ばれていなければ)、始めに集計する。\n"
              "取得の範囲の起点は、取得の位置の 5 分前と、最初に開始した時刻の遅いほう。記録が無い最初の回は、今の時刻を\n"
              "開始した時刻と取得の位置にする。gh が失敗したら、取得の位置を変えずに終了コード 4 で返す",
@@ -285,10 +311,14 @@ def build_parser():
              "  previous_round      始めに集計した前の回 (settle と同じ形)。無ければ null\n"
              "  became_unreachable  前の回の集計で、届かない登録になった登録の配列\n"
              "  failed_call         gh が失敗した呼び出し {api, repo, number}。失敗しなければ null\n"
+             "  schedule_notice     定期の予定の期限の確認か期限切れ {kind (reminder・expired), hours (24・6・1。expired は null),\n"
+             "                      text}。どちらも無ければ null。確認は、閾値ごとに 1 回だけ出す (gh が失敗した回も)\n"
+             "  not_dispatcher      このセッションが記録と違うセッションだと分かったか。true なら、このセッションの定期の予定を消す。\n"
+             "                      環境変数が無いときと、配信のセッションが記録されていないときは false\n"
              "  summary             利用者に示す 1 行の要約\n"
              "  errors              取得しなかった理由の配列\n"
              "  gh_error            gh が失敗したときだけ {args, exit_code, failure, stderr_tail, json_error}",
-             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER,
+             _exit_help("取得した (送るメッセージが無い回も)", _NOT_DISPATCHER + "。取得も出力もしない",
                         "gh が失敗した (認証切れ・読めないリポジトリ・rate limit など)。failed_call の呼び出しを示す"))
 
     p = _add(groups, "ack", cmd_ack,
@@ -323,6 +353,60 @@ def build_parser():
              "           already_counted}。集計する対応が無ければ null\n"
              "  errors   集計しなかった理由の配列",
              _exit_help("集計した (集計する対応が無い回も)", _NOT_DISPATCHER))
+
+    g = groups.add_parser("schedule", help="定期の予定を記録する").add_subparsers(dest="command", required=True)
+    p = _add(g, "record", cmd_schedule_record,
+             "配信のセッションが、ツール CronCreate で作り直した定期の予定 (プロンプト " + schedule.TICK_PROMPT + ") を、\n"
+             "記録のディレクトリの state.json に記録する。期限を今の時刻の 7 日後にし、出した確認の記録を消す。\n"
+             "予定を作った Claude Code のプロセス ID (環境変数 CLAUDE_PID) も記録する。gh は実行しない",
+             "  schedule        記録した定期の予定 {state (running), job_id, cron, pid, created_at, expires_at, reminders,\n"
+             "                  stopped_at}。記録しなかったときは null\n"
+             "  previous        記録する前の定期の予定。無ければ null\n"
+             "  not_dispatcher  このセッションが記録と違うセッションだと分かったか (形の誤り・環境変数が無い・\n"
+             "                  配信のセッションが記録されていないときは false)\n"
+             "  errors          記録しなかった理由の配列",
+             _exit_help("記録した", "ジョブの ID か cron の式の形が違う・環境変数 CLAUDE_PID が無い・" + _NOT_DISPATCHER))
+    p.add_argument("--job-id", required=True, help="ツール CronCreate が返したジョブの ID")
+    p.add_argument("--cron", required=True, help="ツール CronCreate に渡した cron の式 (5 つの欄)")
+
+    p = _add(g, "clear", cmd_schedule_clear,
+             "配信のセッションが、定期の予定を停止したこと (ツール CronDelete で消したこと) を、state.json に記録する。gh は実行しない",
+             "  schedule        記録した定期の予定 {state (stopped), stopped_at, ...}。記録しなかったときは null\n"
+             "  previous        記録する前の定期の予定。無ければ null\n"
+             "  not_dispatcher  このセッションが記録と違うセッションだと分かったか (環境変数が無い・\n"
+             "                  配信のセッションが記録されていないときは false)\n"
+             "  errors          記録しなかった理由の配列",
+             _exit_help("記録した", _NOT_DISPATCHER))
+
+    _add(groups, "status", cmd_status,
+         "配信のセッション・定期の予定とその期限・届かない登録を表示する。記録のディレクトリを読むだけで、どのセッションでも\n"
+         "実行できる。期限切れは、記録の期限と今の時刻を比べて判定する。gh は実行しない",
+         "  dispatcher      記録の配信のセッション。記録が無ければ null\n"
+         "  is_dispatcher   このセッションが記録の配信のセッションか\n"
+         "  schedule        記録の定期の予定 (schedule record の出力と同じ形)。定期の予定を作る前は null\n"
+         "  expired         定期の予定が動いていて、期限を過ぎたか\n"
+         "  process_changed このセッションが配信のセッションで、定期の予定が動いていて期限内で、予定を記録したプロセス ID\n"
+         "                  (schedule.pid) と、いまのプロセス ID (環境変数 CLAUDE_PID) が違うか (再起動した後など)\n"
+         "  remaining       期限までの残り (例: 5 日 21 時間)。動いていない・期限を過ぎたときは null\n"
+         "  started_at      最初に開始した時刻。まだ tick を実行していなければ null\n"
+         "  position        取得の位置。まだ tick を実行していなければ null\n"
+         "  subscriptions   登録の数\n"
+         "  waiting         送信待ちの数\n"
+         f"  unreachable     届かない登録 {{subscription_id, repo, kind, session_id, session_name, consecutive_failures}} の配列\n"
+         "  expired_events  30 日を過ぎて消した出来事がある登録 {subscription_id, ..., expired_events (累計),\n"
+         "                  last_expired_at (最後に消した時刻)} の配列\n"
+         "  notice          利用者に示す、定期の予定の状態と次に行う手順の文\n"
+         "  errors          常に空の配列",
+         _exit_help("表示した", "使わない"))
+
+    g = groups.add_parser("hook", help="hook が実行する").add_subparsers(dest="command", required=True)
+    _add(g, "session-start", cmd_hook_session_start,
+         "hook SessionStart (ファイル hooks/hooks.json) が実行する。標準入力の hook の入力の source が startup か resume で、\n"
+         "このセッションが記録の配信のセッションで、記録の定期の予定が動いているときだけ、定期の予定を作り直すよう伝える。\n"
+         "記録の期限を過ぎていれば、期限切れであることも伝える。記録のディレクトリは読むだけ。gh は実行しない",
+         "  Claude Code の hook の出力の様式 {hookSpecificOutput: {hookEventName (SessionStart), additionalContext}}。\n"
+         "  伝えることが無いときは、何も出力しない (errors のキーは持たない)",
+         _exit_help("出力した (何も出力しないときも)", "使わない"))
     return parser
 
 

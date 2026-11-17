@@ -37,7 +37,8 @@ def is_unreachable(subscription):
     return failures(subscription) >= UNREACHABLE_AFTER
 
 
-def _summary(subscription):
+def summary(subscription):
+    """登録を出力に示すときの形 (登録の ID・リポジトリ・種類・受信のセッションの ID と名前)。"""
     return {"subscription_id": subscription["id"], "repo": subscription["repo"], "kind": subscription["kind"],
             "session_id": subscription["session_id"], "session_name": subscription["session_name"]}
 
@@ -104,7 +105,7 @@ def expire(outbox, subscriptions, now):
         if count:
             subscription["expired_events"] = subscription.get("expired_events", 0) + count
             subscription["last_expired_at"] = now_text
-            result.append({**_summary(subscription), "count": count})
+            result.append({**summary(subscription), "count": count})
     return result
 
 
@@ -141,10 +142,10 @@ def settle_round(outbox, subscriptions_data):
                 subscription["consecutive_failures"], result = 0, "delivered"
             else:
                 result = "unrecorded"
-            outcome["results"].append({**_summary(subscription), "result": result,
+            outcome["results"].append({**summary(subscription), "result": result,
                                        "consecutive_failures": failures(subscription)})
             if before < UNREACHABLE_AFTER <= failures(subscription):
-                outcome["became_unreachable"].append(_summary(subscription))
+                outcome["became_unreachable"].append(summary(subscription))
         subscriptions_data["last_settled_round"] = round_["id"]
     outbox["round"] = None
     return outcome
@@ -207,7 +208,7 @@ def allocate(outbox, subscriptions, last_allocated, now_text, limit=MAX_MESSAGES
         body = messages.notify(subscription["repo"], subscription["kind"], [item["event"] for item in items], resend)
         round_["messages"].append({"message_id": message_id, "subscription_id": subscription["id"],
                                    "event_keys": [item["event"]["key"] for item in items], "result": None, "reason": None})
-        output.append({"message_id": message_id, **_summary(subscription), "to": subscription["session_name"],
+        output.append({"message_id": message_id, **summary(subscription), "to": subscription["session_name"],
                        "to_session_id": subscription["session_id"], "count": len(items), "resend": resend, "body": body})
     outbox["round"] = round_
     last = chosen[-1][0]

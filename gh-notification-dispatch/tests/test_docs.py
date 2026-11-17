@@ -151,7 +151,7 @@ class SkillListingDocTest(unittest.TestCase):
                 self.assertRegex(front, r"\ndescription: .+\n")
 
 
-GROUPS = ("dispatcher", "subscriptions")  # 下にサブコマンドを持つグループ。それ以外は入口の直下のサブコマンド
+GROUPS = ("dispatcher", "subscriptions", "schedule", "hook")  # 下にサブコマンドを持つグループ。それ以外は入口の直下のサブコマンド
 
 
 def entry_subcommands():
