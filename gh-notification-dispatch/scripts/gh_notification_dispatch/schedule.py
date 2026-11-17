@@ -57,7 +57,8 @@ def record(job_id, cron):
     pid = current_pid()
     errors = [e for e in (check_job_id(job_id), check_cron(cron)) if e]
     if pid is None:
-        errors.append(f"環境変数 {PID_ENV} が無いので、定期の予定を作ったプロセスを記録できない")
+        errors.append(f"環境変数 {PID_ENV} が無いので、定期の予定を作ったプロセスを記録できない ({PID_ENV} は "
+                      "Claude Code v2.1.214 以降が設定する。Claude Desktop を更新してから、やり直す)")
     if errors:
         return {"status": "unsatisfied", "schedule": None, "previous": None, "not_dispatcher": False, "errors": errors}
     now = store.now()

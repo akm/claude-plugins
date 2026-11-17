@@ -110,7 +110,7 @@ class RecordTest(ScheduleCase):
         code, out = self.record()
         self.assertEqual(code, 3, out)
         self.assertFalse(out["not_dispatcher"])
-        self.assertTrue(any("CLAUDE_PID" in e for e in out["errors"]))
+        self.assertTrue(any("CLAUDE_PID" in e and "v2.1.214" in e for e in out["errors"]), "必要な Claude Code の版を示す")
         self.assertEqual(self.home_files(), before)
 
     def test_unconfirmed_session_changes_nothing_and_is_not_flagged(self):
