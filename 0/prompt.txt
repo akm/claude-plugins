@@ -1,0 +1,178 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221。1 (#193)・2 (#194)・3 (#195)・A1 (#214)・4a (#196)・4c (#198)・4b (#197)・A2 (#215)・5 (#200)・6 (#201) は完了し、4d (#199) は作らないと決めて閉じた。最新のタグは doc-structured--v0.8.0。2 でモデル・属性・値の YAML と `refers_to`・検査 a・h・i が、5 で操作・前提・イベント・ロールが、6 で状態の遷移ができた。7 (#202) は、これらの YAML のほかのドメインへの参照からドメインとモデルの依存を求め、`dependencies.md`・`docs/domains/README.md` (読む順の索引)・`models.md` の「このモデルを参照するモデル」を生成し、検査 c-1 で循環を検査する。7 の後に A3 (#216) が続く。ほかに 11a (#206)・17 (#213)・8 (#203)・9 (#204)・10 (#205)・13 (#210) も着手できるが、利用者は 7 を先に進めると決めた。ツールは Python 3.12 以上 + ruamel.yaml + markdown-it-py。未追跡の `.claude/settings.json` と `.entire/` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#202 (sub-issue 7「YAML の参照からドメインの依存を求め、読む順の索引を生成し、循環を検査したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 202` (ゴール・入力・この sub-issue で決める形式・成果物と機能・クローズ条件)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順。種類を足す sub-issue が前の機能を広げる共通の手順も含む)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧。ドメインの依存・読む順・ドメインの番号・検査 c-1・モデルの参照の決定を確かめる)
+- 形式の SSOT であるディレクトリ `doc-structured/rules/` の規則の文書、ツール `doc-structured/tool/` (generate・検査 a・h・i・c-2)、スキル `doc-structured/skills/`
+- 前の sub-issue で決めたこと: Issue #194 のコメント https://github.com/akm/claude-plugins/issues/194#issuecomment-6716205386 (YAML の形式・ID の形・`refers_to`)、#198 の決定 https://github.com/akm/claude-plugins/issues/198#issuecomment-6853737355 (検査 i・c-2。c-2 は手書きの Markdown の節の単位の循環で、c-1 とは別)、#200 の決定 https://github.com/akm/claude-plugins/issues/200#issuecomment-6895117233 (操作・前提・イベント)、#201 の決定 https://github.com/akm/claude-plugins/issues/201#issuecomment-6902673789 (状態の遷移。from・to・initial は値の英語名で書く)、A1 (#214) と A2 (#215) の適用の結果
+- 共有ノートの引き継ぎのメモ `194-doc-structured-generate-check.md`・`198-doc-structured-refs.md`・`200-doc-structured-functions.md`・`201-doc-structured-state-machines.md`・`214-a1-apply.md`・`215-a2-apply.md` があれば読む
+
+注意: Issue の入力にある `schema.yaml` (テーブルの外部キー) は、まだ実装されていない 11a (#206) で作る。この sub-issue で `schema.yaml` をどう扱うか (11a で依存に足すか、今は対象にしないか) は、利用者に尋ねる。
+
+進め方:
+- Issue の「この sub-issue で決める形式」(モデルの参照の YAML の項目。外部キーを持つモデルから 1 方向だけ書く。既存の `refers_to` との関係) と、実装の中で出る判断 (生成するファイルの形、依存の図の形、読む順が 1 つに決まらないときの並べ方、ドメインの番号と読む順が合わないときの扱い、循環のエラーのメッセージの形、検査 c-1 を軽い群と重い群のどちらに入れるかなど) は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #202 に書く。
+- 実際のプロジェクトの文書で形式を確かめるときは、チェックアウト `/Users/akima/techno/ikinari-order-v2` を読んでよい (読むだけで変えない。A2 の動作確認のブランチ `claude/doc-structured-a2-215-9cdff4` も読んでよい)。公開の場 (Issue・PR・ファイル・コミットメッセージ) には、そのプロジェクトの名前・リポジトリ名・Issue 番号・リンク・ファイルのパスを書かず、「実際のプロジェクト」と書く。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。規則の文書には手順を書かない。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットと PR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。スキルの対話の確認は、タグを公開する前に行う。タグはファイル `doc-structured/docs/release.md` の手順のとおりに付ける。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、タグが公開され、Issue #202 が閉じている。終わったら、呼び出し元のセッション (local_a14f3497-5f91-4f16-aa39-ed64303c4522) に、SendMessage で結果 (PR 番号・決めたこと・別の Issue に分けたもの・片付けの状況・次の sub-issue) を送る。ターンの終わりの自動の通知は報告の代わりにならない (先頭の 400 文字しか届かない)。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+案 A (11a で足す)
+
+---
+
+案 A (refers_to)
+
+---
+
+案 A (番号の順)
+
+---
+
+案 A (報告しない)
+
+---
+
+案 A (生成する)
+
+---
+
+案 A (参照の表)
+
+---
+
+案 A (ドメインごとの行)
+
+---
+
+案 A (順・説明)
+
+---
+
+案 A (c-2 と同じ形)
+
+---
+
+案 A (軽い群・実行しない)
+
+---
+
+案 A のとおり
+
+---
+
+案 A (ファイル名のラベル)
+
+---
+
+一つ一つインタビューしてください
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく項目を前提から説明してください
+
+---
+
+説明のHTMLに直し方の前後の例をいくつか追加してください
+
+---
+
+例はOKそうです。現時点の直し方に修正するべき点はありませんか？
+
+---
+
+案 1 (移し先を書く)
+
+---
+
+この文面でよい
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく項目を前提から説明してください
+
+---
+
+この文面でよい
+
+---
+
+この文面でよい
+
+---
+
+push して PR を作る
+
+---
+
+<bash-input>cd /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/tmp/doc-structured-202-skills</bash-input><bash-stdout>[No output was captured. The command ran in the terminal pane (tab 0); if it should have printed something, use read_terminal with tab_id "0" to check.]</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+<bash-input>DOC_STRUCTURED_CHECKOUT=/Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1 claude --plugin-dir /Users/akima/workspace/claude-plugins/.claude/worktrees/review-rally-11aaf1/doc-structured</bash-input><bash-stdout> ▐▛███▛█   Claude Code v2.1.311
+▝▜██████▀  Opus 5.5 · Claude Ultra
+ ▝▝   ▝▝   …/doc-structured-202-skills
+
+  Fable 5.2 is here for your longest and
+  toughest coding tasks. It draws down
+  usage faster than Opus 5.5. Switch with
+  /model.
+
+───────────────────────────────────────────
+❯ Try "fix typecheck errors"
+[The user typed into the terminal pane (tab 0) while this command was running, so output after that point is not included; it may still be running there, or they may have stopped it. Use read_terminal with tab_id "0" to check on it.]</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+確認した
+
+---
+
+マージして公開
+
+---
+
+片付けできるものは全部片付けしてください
