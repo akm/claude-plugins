@@ -478,9 +478,10 @@ def _er_column(column: Entry) -> str:
 
 
 def _er_entity(table: Entry, columns: list[Entry]) -> list[str]:
+    """ER 図の 1 テーブル。テーブル名は二重引用符で囲む (end・style・class などの名前を、mermaid が読めないため)。"""
     if not columns:
-        return [f"  {table.name}"]
-    return [f"  {table.name} {{", *[_er_column(c) for c in columns], "  }"]
+        return [f'  "{table.name}"']
+    return [f'  "{table.name}" {{', *[_er_column(c) for c in columns], "  }"]
 
 
 def _er_relationship(project: Project, column: Entry) -> str | None:
@@ -490,7 +491,8 @@ def _er_relationship(project: Project, column: Entry) -> str | None:
         return None
     left = "|o" if tables.column_spec(column).nullable else "||"
     right = "o|" if tables.is_unique_alone(column) else "o{"
-    return f"  {target.parent.name} {left}--{right} {column.parent.name} : {column.name}"
+    # テーブル名と線の文字 (カラム名) は二重引用符で囲む (end などの名前を、mermaid が読めないため)
+    return f'  "{target.parent.name}" {left}--{right} "{column.parent.name}" : "{column.name}"'
 
 
 def _er_diagram(project: Project, entities: list[tuple[Entry, list[Entry]]], relationships: list[Entry]) -> str:

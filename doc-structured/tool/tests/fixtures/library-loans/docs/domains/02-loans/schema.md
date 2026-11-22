@@ -5,13 +5,13 @@
 
 ```mermaid
 erDiagram
-  reservations {
+  "reservations" {
     text id PK
     text book_id FK
     text previous_id FK
     text status
   }
-  loans {
+  "loans" {
     text id PK
     text book_id FK
     text member_id FK
@@ -19,17 +19,17 @@ erDiagram
     text status
     integer returned_at "未実装"
   }
-  books {
+  "books" {
     text id PK
   }
-  members {
+  "members" {
     text id PK
   }
-  books ||--o{ reservations : book_id
-  reservations |o--o{ reservations : previous_id
-  books ||--o{ loans : book_id
-  members ||--o{ loans : member_id
-  reservations |o--o| loans : reservation_id
+  "books" ||--o{ "reservations" : "book_id"
+  "reservations" |o--o{ "reservations" : "previous_id"
+  "books" ||--o{ "loans" : "book_id"
+  "members" ||--o{ "loans" : "member_id"
+  "reservations" |o--o| "loans" : "reservation_id"
 ```
 
 <a name="d-loans-t-reservations"></a>

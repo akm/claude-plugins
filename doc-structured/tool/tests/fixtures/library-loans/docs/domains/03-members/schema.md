@@ -5,15 +5,15 @@
 
 ```mermaid
 erDiagram
-  members {
+  "members" {
     text id PK
     text name
   }
-  member_cards {
+  "member_cards" {
     text id PK "未実装"
     text member_id FK "未実装"
   }
-  members ||--o{ member_cards : member_id
+  "members" ||--o{ "member_cards" : "member_id"
 ```
 
 <a name="d-members-t-members"></a>

@@ -5,23 +5,23 @@
 
 ```mermaid
 erDiagram
-  books {
+  "books" {
     text id PK
     text title
     text shelf_status
     text call_number
     integer created_at
   }
-  categories {
+  "categories" {
     text id PK
     text name UK
   }
-  book_categories {
+  "book_categories" {
     text book_id PK, FK
     text category_id PK, FK
   }
-  books ||--o{ book_categories : book_id
-  categories ||--o{ book_categories : category_id
+  "books" ||--o{ "book_categories" : "book_id"
+  "categories" ||--o{ "book_categories" : "category_id"
 ```
 
 <a name="d-catalog-t-books"></a>

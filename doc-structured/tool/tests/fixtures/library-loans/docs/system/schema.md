@@ -14,46 +14,46 @@
 
 ```mermaid
 erDiagram
-  books {
+  "books" {
     text id PK
     text call_number
   }
-  categories {
+  "categories" {
     text id PK
     text name UK
   }
-  book_categories {
+  "book_categories" {
     text book_id PK, FK
     text category_id PK, FK
   }
-  reservations {
+  "reservations" {
     text id PK
     text book_id FK
     text previous_id FK
     text status
   }
-  loans {
+  "loans" {
     text id PK
     text book_id FK
     text member_id FK
     text reservation_id FK, UK
     text status
   }
-  members {
+  "members" {
     text id PK
   }
-  member_cards {
+  "member_cards" {
     text id PK "未実装"
     text member_id FK "未実装"
   }
-  books ||--o{ book_categories : book_id
-  categories ||--o{ book_categories : category_id
-  books ||--o{ reservations : book_id
-  reservations |o--o{ reservations : previous_id
-  books ||--o{ loans : book_id
-  members ||--o{ loans : member_id
-  reservations |o--o| loans : reservation_id
-  members ||--o{ member_cards : member_id
+  "books" ||--o{ "book_categories" : "book_id"
+  "categories" ||--o{ "book_categories" : "category_id"
+  "books" ||--o{ "reservations" : "book_id"
+  "reservations" |o--o{ "reservations" : "previous_id"
+  "books" ||--o{ "loans" : "book_id"
+  "members" ||--o{ "loans" : "member_id"
+  "reservations" |o--o| "loans" : "reservation_id"
+  "members" ||--o{ "member_cards" : "member_id"
 ```
 
 [d-catalog]: ../domains/01-catalog/README.md#d-catalog "ドメイン `catalog`"

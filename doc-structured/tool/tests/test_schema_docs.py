@@ -47,10 +47,10 @@ class DomainSchemaTest(SchemaDocsTestCase):
         # このドメインのテーブルはすべてのカラムを、ほかのドメインのテーブルは参照されるカラムだけを描く
         self.assertEqual(
             [line.strip() for line in diagram if line.endswith("{")],
-            ["reservations {", "loans {", "books {", "members {"],
+            ['"reservations" {', '"loans" {', '"books" {', '"members" {'],
         )
         text = "\n".join(diagram)
-        self.assertIn("  books {\n    text id PK\n  }", text)
+        self.assertIn('  "books" {\n    text id PK\n  }', text)
         self.assertNotIn("title", text)
         self.assertIn('    integer returned_at "未実装"', text)
         self.assertIn("    text reservation_id FK, UK", text)
@@ -59,13 +59,13 @@ class DomainSchemaTest(SchemaDocsTestCase):
         diagram = mermaid_block(self.outputs()[LOANS_SCHEMA_MD])
         relationships = [line.strip() for line in diagram if "--" in line]
         self.assertEqual(relationships, [
-            "books ||--o{ reservations : book_id",
+            '"books" ||--o{ "reservations" : "book_id"',
             # NULL を許可する外部キーは、参照される側が 0 か 1 つ。自己参照も描く
-            "reservations |o--o{ reservations : previous_id",
-            "books ||--o{ loans : book_id",
-            "members ||--o{ loans : member_id",
+            '"reservations" |o--o{ "reservations" : "previous_id"',
+            '"books" ||--o{ "loans" : "book_id"',
+            '"members" ||--o{ "loans" : "member_id"',
             # そのカラムだけの一意のインデックスを持つ外部キーは、参照する側も 0 か 1 つ
-            "reservations |o--o| loans : reservation_id",
+            '"reservations" |o--o| "loans" : "reservation_id"',
         ])
 
     def test_table_sections_and_columns(self):
@@ -106,6 +106,21 @@ class DomainSchemaTest(SchemaDocsTestCase):
         self.assertIn("## テーブル `member_cards`\n\n利用者に発行する利用者カード 1 枚の行。\n\n未実装\n\n主キー: `id`\n", members)
         # 未実装のテーブルのカラムは、図ではすべて未実装の注記を付ける
         self.assertIn('    text member_id FK "未実装"\n', members)
+
+    def test_table_and_column_names_are_quoted_in_er_diagram(self):
+        # mermaid は、引用符で囲まないエンティティ名と線の文字の end・style・class を読めない
+        path = self.project / "docs/domains/03-members/schema.yaml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("  member_cards:\n", "  end:\n").replace(
+                "      member_id:\n        type: text\n        definition: カードを持つ利用者。\n",
+                "      style:\n        type: text\n        definition: カードを持つ利用者。\n",
+            ).replace("      - columns: [member_id]\n", "      - columns: [style]\n"),
+            encoding="utf-8",
+        )
+        diagram = mermaid_block(self.outputs()[MEMBERS_SCHEMA_MD])
+        self.assertIn('  "end" {', diagram)
+        self.assertIn('    text style FK "未実装"', diagram)
+        self.assertIn('  "members" ||--o{ "end" : "style"', diagram)
 
     def test_type_with_characters_mermaid_cannot_read(self):
         path = self.project / "docs/domains/03-members/schema.yaml"
@@ -196,16 +211,16 @@ class SystemSchemaTest(SchemaDocsTestCase):
     def test_overview_diagram_draws_keys_states_and_in_overview(self):
         text = "\n".join(mermaid_block(self.outputs()[SYSTEM_SCHEMA_MD]))
         # キーのカラム・状態の遷移を持つ属性に対応するカラム (loans.status)・in_overview を書いたカラム (books.call_number)
-        self.assertIn("  books {\n    text id PK\n    text call_number\n  }", text)
+        self.assertIn('  "books" {\n    text id PK\n    text call_number\n  }', text)
         self.assertIn(
-            "  loans {\n    text id PK\n    text book_id FK\n    text member_id FK\n    text reservation_id FK, UK\n"
+            '  "loans" {\n    text id PK\n    text book_id FK\n    text member_id FK\n    text reservation_id FK, UK\n'
             "    text status\n  }",
             text,
         )
         # 状態の遷移を持たない属性に対応するカラム (books.title)・対応する属性が無いカラム (loans.returned_at) は描かない
         self.assertNotIn("title", text)
         self.assertNotIn("returned_at", text)
-        self.assertIn("  members ||--o{ member_cards : member_id", text)
+        self.assertIn('  "members" ||--o{ "member_cards" : "member_id"', text)
 
 
 class ModelsReferencingTablesTest(SchemaDocsTestCase):
