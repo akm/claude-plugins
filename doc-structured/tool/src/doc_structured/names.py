@@ -53,6 +53,7 @@ FILE_KINDS: dict[str, str] = {
     "terms": "terms.md",
     "unclassified_app_terms": "unclassified_app_terms.md",
     "functions": "functions.md",
+    "schema": "schema.md",
     "dependencies": "dependencies.md",
 }
 # 手書きのファイルの種類の記号と、そのファイル名。親はドメイン。ドメインの README.md の表に、この順に載せる

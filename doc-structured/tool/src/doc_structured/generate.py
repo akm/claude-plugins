@@ -1,12 +1,15 @@
 """ドメインの YAML から、人が読む Markdown を生成する。
 
-ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・dependencies.md・terms.md を、
+ドメインのディレクトリの直下に README.md・models.md・unclassified_app_terms.md・functions.md・schema.md・dependencies.md・terms.md を、
 全体の用語の索引 docs/glossary.md を、ロールの定義と操作ごとの行えるロールの表を docs/system/permissions.md に、
-ドメインの依存の表と図を docs/domains/dependencies.md に、ドメインの読む順の索引を docs/domains/README.md に生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
+ドメインの依存の表と図を docs/domains/dependencies.md に、ドメインの読む順の索引を docs/domains/README.md に、
+全体のテーブルの表と ER 図を docs/system/schema.md に生成する。生成するファイルの中身の SSOT はプラグインの規則の文書
 (ファイル doc-structured/rules/doc-structured-domains.md)。要点:
   - 先頭に、生成したファイルの先頭の記述 (モジュール generated_header) を書く
   - 定義ごとに <a name="ID"></a> と見出しを書く。見出しは「種類 + 日本語名」の後に英語名をコードの書式で書く
   - 状態の遷移を持つ属性には、models.md の属性の定義の文の後 (値の節の前) に、遷移の表と mermaid の stateDiagram-v2 の図を書く
+  - schema.md には、mermaid の erDiagram の ER 図と、テーブルごとの節を書く。カラムは表にし、カラムのアンカーを表の行の
+    最初のセルの先頭に書く
   - リンクは reference-style で、ラベルを ID にし、定義の行 [ID]: 相対パス#ID "完全な名前" をファイルの末尾に書く
   - 用語の索引は定義の文を持たず、日本語名の文字コードの順 (同じなら ID の順) に、定義へのリンクを並べる
   - 定義が 1 つも無い種類のファイルは作らない
@@ -19,7 +22,9 @@
 import posixpath
 from pathlib import Path
 
-from . import generated_header, names
+import re
+
+from . import generated_header, names, tables
 from .dependencies import DomainDependency, all_dependencies, domain_order_key, reading_order
 from .domains import DOMAINS_DIR, Domain, Entry, Project, StateMachine
 
@@ -28,6 +33,7 @@ PERMISSIONS_PATH = "docs/system/permissions.md"
 GITATTRIBUTES_PATH = "docs/.gitattributes"
 DOMAINS_README_PATH = f"{DOMAINS_DIR.as_posix()}/README.md"
 DOMAINS_DEPENDENCIES_PATH = f"{DOMAINS_DIR.as_posix()}/dependencies.md"
+SYSTEM_SCHEMA_PATH = "docs/system/schema.md"
 # 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し、
 # 競合のマークを入れない (ファイルは競合の状態のまま)。どの側が ours になるかは git のコマンドによって違い、
 # 残った内容は古いことがあるので、生成し直してから git add する
@@ -43,13 +49,14 @@ FILE_DESCRIPTIONS = {
     "models": "モデル・属性・値の定義",
     "unclassified_app_terms": "未分類のアプリケーション用語の定義",
     "functions": "操作・前提・イベントの定義",
+    "schema": "テーブルとカラムの設計と ER 図",
     "dependencies": "ほかのドメインへの依存の元になった参照",
     "terms": "このドメインの用語の索引",
 }
 # 見出しの深さ。モデル 2・属性 3・値 4。未分類のアプリケーション用語・操作・前提・イベント・ロールは 2
 HEADING_LEVELS = {"m": 2, "a": 3, "v": 4, "ut": 2, "op": 2, "pre": 2, "ev": 2, "r": 2}
 # 定義を書く生成したファイルの種類の記号。書いていない種類 (モデル・属性・値) は models
-ENTRY_FILES = {"ut": "unclassified_app_terms", "op": "functions", "pre": "functions", "ev": "functions"}
+ENTRY_FILES = {"ut": "unclassified_app_terms", "op": "functions", "pre": "functions", "ev": "functions", "t": "schema", "c": "schema"}
 # 操作・前提の参照を、定義の文の後の箇条書きに出すときの、キーと項目の名前。この順に出す
 FUNCTION_ITEMS = {"targets": "対象", "preconditions": "前提", "events": "イベント", "roles": "行えるロール"}
 # roles を省いた操作に出す箇条書きの項目 (省いたことに、どのロールも行わないという意味があるため)
@@ -60,6 +67,12 @@ STATE_MACHINE_HEADER = ["前の状態", "後の状態", "操作", "前提"]
 DEPENDENCIES_HEADER = ["依存先のドメイン", "参照する定義", "キー", "参照先"]
 DOMAINS_DEPENDENCIES_HEADER = ["ドメイン", "依存先のドメイン", "依存の元の参照"]
 DOMAINS_README_HEADER = ["順", "ドメイン", "説明"]
+COLUMNS_HEADER = ["カラム", "型", "NULL", "デフォルト値", "参照先", "属性・定義"]
+SYSTEM_SCHEMA_HEADER = ["テーブル", "ドメイン", "対応するモデル・属性・定義"]
+NULLABLE = "許可"
+PLANNED = "未実装"
+# ER 図のカラムの型に書けない文字。mermaid の erDiagram は、型に英数字・「_」・「-」・括弧だけを書ける
+ER_TYPE_FORBIDDEN_RE = re.compile(r"[^A-Za-z0-9_\-()\[\]]")
 # 依存の図のノードの識別子に、ドメインの英語名に付ける接頭辞。end などの英語名を識別子にすると、mermaid が図を読めないため
 DOMAIN_NODE_PREFIX = "d_"
 # 図の状態の識別子に、値の英語名に付ける接頭辞。end・note・state などの英語名を識別子にすると、mermaid が図を読めないため
@@ -126,7 +139,7 @@ def _entry_link(links: _Links, entry: Entry, text: str) -> str:
     return links.link(text, entry.id, entry_file(entry), entry.full_name())
 
 
-def _reference_text(entry: Entry, from_domain: Domain) -> str:
+def _reference_text(entry: Entry, from_domain: Domain | None) -> str:
     """ほかの定義を指すリンクの表示の文。同じドメインなら、完全な名前からドメインを省いたもの
     (「モデル「貸出」の属性「貸出状態」」)。ほかのドメインの定義とロールなら完全な名前。"""
     if entry.domain is not None and entry.domain is from_domain:
@@ -404,9 +417,171 @@ def render_domains_readme(project: Project, order: list[Domain]) -> str:
     return _document(f"{DOMAINS_DIR.as_posix()}/", None, blocks, links)
 
 
+def _mapping_text(project: Project, table: Entry, links: _Links, from_domain: Domain | None) -> str:
+    """テーブルの対応するモデルか属性へのリンク (「対応するモデル: …」)。どちらも無ければ定義の文。"""
+    for key, label in (("model", "対応するモデル"), ("attribute", "対応する属性")):
+        target = tables.target_of(project, table, key)
+        if target is not None:
+            return f"{label}: {_entry_link(links, target, _reference_text(target, from_domain or target.domain))}"
+    return table.definition
+
+
+def _code(text: str) -> str:
+    return f"`{text}`"
+
+
+def _er_type(text: str) -> str:
+    return ER_TYPE_FORBIDDEN_RE.sub("_", text)
+
+
+def _er_column(column: Entry) -> str:
+    """ER 図の 1 カラム (「型 名前 キー "未実装"」)。"""
+    parts = [_er_type(tables.column_spec(column).type), column.name]
+    marks = tables.key_marks(column)
+    if marks:
+        parts.append(", ".join(marks))
+    if tables.is_planned(column):
+        parts.append(f'"{PLANNED}"')
+    return "    " + " ".join(parts)
+
+
+def _er_entity(table: Entry, columns: list[Entry]) -> list[str]:
+    if not columns:
+        return [f"  {table.name}"]
+    return [f"  {table.name} {{", *[_er_column(c) for c in columns], "  }"]
+
+
+def _er_relationship(project: Project, column: Entry) -> str | None:
+    """外部キー 1 つの線。参照される側の端は NULL を許可するかで、参照する側の端はそのカラムだけで行が決まるかで決める。"""
+    target = tables.target_of(project, column, "references")
+    if target is None or target.symbol != "c":
+        return None
+    left = "|o" if tables.column_spec(column).nullable else "||"
+    right = "o|" if tables.is_unique_alone(column) else "o{"
+    return f"  {target.parent.name} {left}--{right} {column.parent.name} : {column.name}"
+
+
+def _er_diagram(project: Project, entities: list[tuple[Entry, list[Entry]]], relationships: list[Entry]) -> str:
+    lines = ["```mermaid", "erDiagram"]
+    for table, columns in entities:
+        lines += _er_entity(table, columns)
+    lines += [r for r in (_er_relationship(project, c) for c in relationships) if r is not None]
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _foreign_tables(project: Project, domain: Domain) -> list[tuple[Entry, list[Entry]]]:
+    """ドメインの外部キーが参照する、ほかのドメインのテーブルと、参照されるカラム。ドメインの番号の順、ドメインの中は
+    テーブルの順、テーブルの中はカラムの順。"""
+    referenced: set[str] = set()
+    for table in domain.tables:
+        for column in table.children:
+            target = tables.target_of(project, column, "references")
+            if target is not None and target.symbol == "c" and target.domain is not domain:
+                referenced.add(target.id)
+    found: list[tuple[Entry, list[Entry]]] = []
+    for other in sorted(project.domains, key=domain_order_key):
+        if other is domain:
+            continue
+        for table in other.tables:
+            columns = [c for c in table.children if c.id in referenced]
+            if columns:
+                found.append((table, columns))
+    return found
+
+
+def _index_text(table: Entry, index) -> str:
+    notes = []
+    if index.unique:
+        notes.append("一意")
+    if index.planned:
+        notes.append(PLANNED)
+    text = "・".join(_code(c) for c in index.columns)
+    return f"- {text} ({'・'.join(notes)})" if notes else f"- {text}"
+
+
+def _table_blocks(project: Project, domain: Domain, table: Entry, links: _Links) -> list[str]:
+    spec = tables.table_spec(table)
+    blocks = [f'<a name="{table.id}"></a>\n\n## {names.format_part("t", table.name)}']
+    first = _mapping_text(project, table, links, domain)
+    blocks.append(first)
+    if spec.planned:
+        blocks.append(PLANNED)
+    if spec.primary_key:
+        blocks.append("主キー: " + "・".join(_code(c) for c in spec.primary_key))
+    rows = [_table_row(COLUMNS_HEADER), "|" + "---|" * len(COLUMNS_HEADER)]
+    for column in table.children:
+        cspec = tables.column_spec(column)
+        name = f'<a name="{column.id}"></a>{_code(column.name)}'
+        if cspec.planned:
+            name += f" ({PLANNED})"
+        foreign = tables.target_of(project, column, "references")
+        attribute = tables.target_of(project, column, "attribute")
+        rows.append(_table_row([
+            name,
+            escape_cell(_code(cspec.type)),
+            NULLABLE if cspec.nullable else "",
+            escape_cell(_code(cspec.default)) if cspec.default is not None else "",
+            escape_cell(_entry_link(links, foreign, _reference_text(foreign, domain))) if foreign is not None else "",
+            escape_cell(_entry_link(links, attribute, _reference_text(attribute, domain)))
+            if attribute is not None else escape_cell(column.definition),
+        ]))
+    blocks.append("\n".join(rows))
+    if spec.indexes:
+        blocks.append("インデックス:")
+        blocks.append("\n".join(_index_text(table, index) for index in spec.indexes))
+    return blocks
+
+
+def render_schema(project: Project, domain: Domain) -> str:
+    """ドメインの ER 図と、テーブルごとのカラムの表。ER 図には、このドメインの外部キーが参照するほかのドメインのテーブルを、
+    参照されるカラムだけで描く。"""
+    path = file_path(domain, "schema")
+    links = _Links(path)
+    entities = [(table, list(table.children)) for table in domain.tables]
+    entities += _foreign_tables(project, domain)
+    relationships = [c for table in domain.tables for c in table.children]
+    blocks = [f"# {domain.full_name()} のスキーマ", _er_diagram(project, entities, relationships)]
+    for table in domain.tables:
+        blocks += _table_blocks(project, domain, table, links)
+    return _document(f"{domain.dir}/", _file_id(domain, "schema"), blocks, links)
+
+
+def _overview_column(project: Project, column: Entry) -> bool:
+    """全体の ER 図に描くカラムか。キーのカラムと、状態の遷移を持つ属性に対応するカラムと、in_overview を書いたカラム。"""
+    return (
+        bool(tables.key_marks(column))
+        or tables.state_machine_column(project, column)
+        or tables.column_spec(column).in_overview
+    )
+
+
+def render_system_schema(project: Project) -> str:
+    """全体のテーブルの表と、ER 図。表と図のテーブルは、ドメインの番号の順、ドメインの中は schema.md の順。"""
+    links = _Links(SYSTEM_SCHEMA_PATH)
+    domains = sorted(project.domains, key=domain_order_key)
+    rows = [_table_row(SYSTEM_SCHEMA_HEADER), "|" + "---|" * len(SYSTEM_SCHEMA_HEADER)]
+    entities: list[tuple[Entry, list[Entry]]] = []
+    relationships: list[Entry] = []
+    for domain in domains:
+        for table in domain.tables:
+            name = _entry_link(links, table, _code(table.name))
+            if tables.table_spec(table).planned:
+                name += f" ({PLANNED})"
+            rows.append(_table_row([
+                escape_cell(name),
+                _domain_link(links, domain, _code(domain.name)),
+                escape_cell(_mapping_text(project, table, links, None)),
+            ]))
+            entities.append((table, [c for c in table.children if _overview_column(project, c)]))
+            relationships += table.children
+    blocks = ["# スキーマ", "\n".join(rows), _er_diagram(project, entities, relationships)]
+    return _document(f"{DOMAINS_DIR.as_posix()}/", None, blocks, links)
+
+
 def render_readme(domain: Domain, files: list[str]) -> str:
     """files は、表に載せるファイルの種類の記号。ドメインのディレクトリの直下にある手書きのファイル (concept・problem・design)
-    を先に、このドメインで生成するファイル (models・unclassified_app_terms・functions・dependencies・terms) を後に並べる。"""
+    を先に、このドメインで生成するファイル (models・unclassified_app_terms・functions・schema・dependencies・terms) を後に並べる。"""
     path = f"{domain.dir}/{README}"
     links = _Links(path)
     blocks = [f"# {domain.full_name()}"]
@@ -453,6 +628,9 @@ def render_project(project: Project) -> dict[str, str]:
         if domain.operations or domain.preconditions or domain.events:
             outputs[file_path(domain, "functions")] = render_functions(project, domain)
             files.append("functions")
+        if domain.tables:
+            outputs[file_path(domain, "schema")] = render_schema(project, domain)
+            files.append("schema")
         if dependencies[domain.name]:
             outputs[file_path(domain, "dependencies")] = render_dependencies(project, domain, dependencies[domain.name])
             files.append("dependencies")
@@ -465,6 +643,8 @@ def render_project(project: Project) -> dict[str, str]:
         outputs[DOMAINS_README_PATH] = render_domains_readme(project, reading_order(project, dependencies))
     if project.roles or any(d.operations for d in project.domains):
         outputs[PERMISSIONS_PATH] = render_permissions(project)
+    if any(d.tables for d in project.domains):
+        outputs[SYSTEM_SCHEMA_PATH] = render_system_schema(project)
     if project.roles or any(True for d in project.domains for _ in d.entries()):
         outputs[GLOSSARY_PATH] = render_glossary(project)
     if outputs:

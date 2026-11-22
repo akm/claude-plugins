@@ -12,6 +12,7 @@
 | [`models.md`][d-loans-models] | モデル・属性・値の定義 |
 | [`unclassified_app_terms.md`][d-loans-unclassified_app_terms] | 未分類のアプリケーション用語の定義 |
 | [`functions.md`][d-loans-functions] | 操作・前提・イベントの定義 |
+| [`schema.md`][d-loans-schema] | テーブルとカラムの設計と ER 図 |
 | [`dependencies.md`][d-loans-dependencies] | ほかのドメインへの依存の元になった参照 |
 | [`terms.md`][d-loans-terms] | このドメインの用語の索引 |
 
@@ -20,5 +21,6 @@
 [d-loans-design]: design.md#d-loans-design "ドメイン `loans` のファイル `design.md`"
 [d-loans-functions]: functions.md#d-loans-functions "ドメイン `loans` のファイル `functions.md`"
 [d-loans-models]: models.md#d-loans-models "ドメイン `loans` のファイル `models.md`"
+[d-loans-schema]: schema.md#d-loans-schema "ドメイン `loans` のファイル `schema.md`"
 [d-loans-terms]: terms.md#d-loans-terms "ドメイン `loans` のファイル `terms.md`"
 [d-loans-unclassified_app_terms]: unclassified_app_terms.md#d-loans-unclassified_app_terms "ドメイン `loans` のファイル `unclassified_app_terms.md`"

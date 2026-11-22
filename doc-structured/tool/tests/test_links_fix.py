@@ -99,7 +99,7 @@ class RenameTest(LinksFixTestCase):
     def test_heading_change_rewrites_section_title(self):
         self.write(CONCEPT, self.read(CONCEPT).replace("## 返却期限", "## 返す期限"))
         check = self.run_tool("check")
-        self.assertIn(f"{DESIGN}:16:1: 検査 b: 定義の行の title が、参照先の完全な名前", check.stdout)
+        self.assertIn(f"{DESIGN}:22:1: 検査 b: 定義の行の title が、参照先の完全な名前", check.stdout)
         self.assertEqual(self.run_tool("links-fix").returncode, 0)
         self.assertIn(
             '[節「返却期限」]: concept.md#d-loans-concept-h-return_deadline "ドメイン `loans` のファイル `concept.md` の節「返す期限」"',

@@ -226,7 +226,8 @@ class _Finder:
         self.index.files.append(HandwrittenFile(path_rel, domain, symbol, child, document))
 
     def read_anchors(self) -> None:
-        """ドメインのディレクトリの下のすべての Markdown と、ロールの定義を書く生成したファイルのアンカーを読む。"""
+        """ドメインのディレクトリの下のすべての Markdown と、ロールの定義を書く生成したファイルのアンカーを読む。
+        生成したファイルは、表の行の最初のセルの先頭のアンカーも読む。"""
         paths: list[Path] = []
         domains_dir = self.root / DOMAINS_DIR
         if domains_dir.is_dir():
@@ -240,10 +241,15 @@ class _Finder:
         for path in paths:
             path_rel = rel(self.root, path)
             document = self.index.documents.get(path_rel)
+            anchors: list[markdown.Anchor] = []
             if document is None:
-                document = read_markdown(path)
+                content = generated_header.read_file(path)
+                document = markdown.parse(content.text)
                 self.index.documents[path_rel] = document
-            for anchor in document.anchors:
+                if content.header is not None:
+                    # 生成したファイルは、表のセルの先頭のアンカー (schema.md のカラム) も読む
+                    anchors = markdown.table_cell_anchors(document)
+            for anchor in [*document.anchors, *anchors]:
                 self.index.anchors.setdefault(anchor.name, []).append((path_rel, anchor))
 
     def add_target(
@@ -263,6 +269,9 @@ class _Finder:
                 file_id = names.build_id([Part("d", domain.name), Part(symbol, None)])
                 parts = [domain.full_name(), names.format_part(symbol, file_name)]
                 self.add_target(file_id, parts, f"`{file_name}`", file_path(domain, symbol))
+            for entry in domain.table_entries():
+                parts = [domain.full_name()] + [names.format_part(e.symbol, e.name) for e in entry.lineage()]
+                self.add_target(entry.id, parts, f"`{entry.name}`", entry_file(entry))
             for entry in domain.entries():
                 parts = [domain.full_name()] + [names.format_part(e.symbol, e.name_ja) for e in entry.lineage()]
                 abbreviated = None

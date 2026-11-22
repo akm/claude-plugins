@@ -54,7 +54,7 @@ ID は、定義のアンカーの名前であり、リンクのフラグメン�
 | テーブル | `t` | テーブル `<英語名>` | テーブル `loans` |
 | カラム | `c` | カラム `<英語名>` | カラム `book_id` |
 | 節 | `h` | 節「<見出しの文>」 | 節「返却期限」 |
-| ファイル | `models`・`terms`・`unclassified_app_terms`・`functions`・`dependencies`・`concept`・`problem`・`design` | ファイル `<ファイル名>` | ファイル `models.md` |
+| ファイル | `models`・`terms`・`unclassified_app_terms`・`functions`・`schema`・`dependencies`・`concept`・`problem`・`design` | ファイル `<ファイル名>` | ファイル `models.md` |
 | 子のファイル | `f` | ファイル `<ドメインのディレクトリからのパス>` | ファイル `design/overdue_notice.md` |
 
 - すべての親を書いた名前を、完全な名前と呼ぶ。例: `d-loans-m-loan-a-status-v-on_loan` の完全な名前は「ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」」。

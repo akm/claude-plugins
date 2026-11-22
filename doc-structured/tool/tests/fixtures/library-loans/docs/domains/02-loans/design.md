@@ -10,8 +10,15 @@
 
 延滞した貸出の通知は、[ファイル `design/overdue_notice.md`][`design/overdue_notice.md`] に書く。
 
+<a name="d-loans-design-h-returned_at"></a>
+
+## 返却の時刻
+
+図書が返った時刻は、[テーブル `loans` のカラム `returned_at`]に書く。返却を受け付ける画面を作るまでは、未実装のままにする。
+
 [属性「貸出状態」]: models.md#d-loans-m-loan-a-status "ドメイン `loans` のモデル「貸出」の属性「貸出状態」"
 [貸出中]: models.md#d-loans-m-loan-a-status-v-on_loan "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「貸出中」"
 [返却済み]: models.md#d-loans-m-loan-a-status-v-returned "ドメイン `loans` のモデル「貸出」の属性「貸出状態」の値「返却済み」"
 [節「返却期限」]: concept.md#d-loans-concept-h-return_deadline "ドメイン `loans` のファイル `concept.md` の節「返却期限」"
 [`design/overdue_notice.md`]: design/overdue_notice.md#d-loans-design-f-overdue_notice "ドメイン `loans` のファイル `design/overdue_notice.md`"
+[テーブル `loans` のカラム `returned_at`]: schema.md#d-loans-t-loans-c-returned_at "ドメイン `loans` のテーブル `loans` のカラム `returned_at`"
