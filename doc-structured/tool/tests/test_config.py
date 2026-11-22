@@ -64,5 +64,84 @@ class LoadConfigTest(ProjectTestCase):
         self.assert_error("version: 0.1.0\n# 旧:\nversion: 0.0.9\n", "YAML として読めない", "duplicate key")
 
 
+class DatabaseConfigTest(ProjectTestCase):
+    """設定の paths.migrations と database (sub-issue 11b。決めた経緯は Issue #207 のコメントの 4・10)。"""
+
+    def load(self, text: str):
+        return load_config(self.write_config(SAMPLE_CONFIG + text))
+
+    def assert_error(self, text: str, *fragments: str):
+        with self.assertRaises(ConfigError) as cm:
+            self.load(text)
+        for fragment in fragments:
+            self.assertIn(fragment, str(cm.exception))
+
+    def test_without_database(self):
+        self.assertIsNone(self.load("").database)
+
+    def test_sqlite(self):
+        database = self.load("paths:\n  migrations: migrations/**/*.sql\ndatabase:\n  kind: sqlite\n").database
+        self.assertEqual(database.kind, "sqlite")
+        self.assertEqual(database.migrations, "migrations/**/*.sql")
+        self.assertIsNone(database.image)
+        self.assertFalse(database.schema_actual)
+        # SAMPLE_CONFIG は 2 行。paths は 3 行目、migrations の値は 4 行目の 15 列目
+        self.assertEqual(database.migrations_at, (4, 15))
+
+    def test_postgresql(self):
+        database = self.load(
+            "paths:\n  migrations: db/*.up.sql\ndatabase:\n  kind: postgresql\n  image: postgres:17\n  schema_actual: true\n"
+        ).database
+        self.assertEqual(database.kind, "postgresql")
+        self.assertEqual(database.image, "postgres:17")
+        self.assertTrue(database.schema_actual)
+
+    def test_paths_without_migrations_and_no_database(self):
+        # paths のほかのキーは後の sub-issue で足す。migrations が無ければ database も要らない
+        self.assertIsNone(self.load("paths: {}\n").database)
+
+    def test_database_without_migrations(self):
+        self.assert_error("database:\n  kind: sqlite\n", "paths.migrations が無い", "どちらも書く")
+
+    def test_migrations_without_database(self):
+        self.assert_error("paths:\n  migrations: m/*.sql\n", "database が無い", "どちらも書く")
+
+    def test_unknown_key_in_paths(self):
+        self.assert_error("paths:\n  routes: src/\n", "paths に知らないキー", "routes")
+
+    def test_unknown_key_in_database(self):
+        self.assert_error(
+            "paths:\n  migrations: m/*.sql\ndatabase:\n  kind: sqlite\n  url: x\n", "database に知らないキー", "url"
+        )
+
+    def test_paths_not_mapping(self):
+        self.assert_error("paths: m/*.sql\n", "paths は、キーと値のマッピング")
+
+    def test_migrations_not_string(self):
+        self.assert_error("paths:\n  migrations: [a, b]\ndatabase:\n  kind: sqlite\n", "paths.migrations は、空でない文字列")
+
+    def test_migrations_absolute(self):
+        self.assert_error("paths:\n  migrations: /m/*.sql\ndatabase:\n  kind: sqlite\n", "相対パス")
+
+    def test_missing_kind(self):
+        self.assert_error("paths:\n  migrations: m/*.sql\ndatabase:\n  schema_actual: true\n", "kind が無い")
+
+    def test_unknown_kind(self):
+        self.assert_error("paths:\n  migrations: m/*.sql\ndatabase:\n  kind: mysql\n", "sqlite か postgresql", "mysql")
+
+    def test_postgresql_without_image(self):
+        self.assert_error("paths:\n  migrations: m/*.sql\ndatabase:\n  kind: postgresql\n", "image が無い")
+
+    def test_image_for_sqlite(self):
+        self.assert_error(
+            "paths:\n  migrations: m/*.sql\ndatabase:\n  kind: sqlite\n  image: postgres:17\n", "postgresql のときだけ"
+        )
+
+    def test_schema_actual_false(self):
+        self.assert_error(
+            "paths:\n  migrations: m/*.sql\ndatabase:\n  kind: sqlite\n  schema_actual: false\n", "true だけ"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
