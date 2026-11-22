@@ -1,0 +1,14 @@
+{
+  "tool_use_id": "toolu_01RsuRe7SHKU78x37n7eL3dk",
+  "agent_id": "abc608007d7b34bff",
+  "task_description": "計画の実現性のレビューの再実行",
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 162779,
+    "cache_read_tokens": 1218772,
+    "output_tokens": 54165,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-22T16:59:46.603923+09:00",
+  "completed_at": "2026-11-22T17:07:59.024016+09:00"
+}

@@ -1,0 +1,14 @@
+{
+  "tool_use_id": "toolu_01Fr1JH1Me3TRib4w9yx9B3J",
+  "agent_id": "acc7096f96222fd04",
+  "task_description": "計画への反論のレビュー",
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 127510,
+    "cache_read_tokens": 964297,
+    "output_tokens": 62521,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-22T16:37:06.980616+09:00",
+  "completed_at": "2026-11-22T16:46:57.022605+09:00"
+}

@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01Pcr97vPhoYvJ4YWaoSxzbh",
+  "agent_id": "a19dbccec4f895b51",
+  "subagent_type": "general-purpose",
+  "task_description": "リポジトリのパターンの調査",
+  "token_usage": {
+    "input_tokens": 108,
+    "cache_creation_tokens": 208597,
+    "cache_read_tokens": 9852404,
+    "output_tokens": 32716,
+    "api_call_count": 53
+  },
+  "started_at": "2026-11-22T12:41:03.527574+09:00",
+  "completed_at": "2026-11-22T12:46:34.076735+09:00"
+}

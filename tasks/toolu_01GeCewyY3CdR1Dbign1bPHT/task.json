@@ -1,0 +1,14 @@
+{
+  "tool_use_id": "toolu_01GeCewyY3CdR1Dbign1bPHT",
+  "agent_id": "a84747a753c688dff",
+  "task_description": "計画の整合性のレビュー",
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 138732,
+    "cache_read_tokens": 314803,
+    "output_tokens": 15806,
+    "api_call_count": 4
+  },
+  "started_at": "2026-11-22T16:37:06.766243+09:00",
+  "completed_at": "2026-11-22T16:39:06.943465+09:00"
+}
