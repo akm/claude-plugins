@@ -33,6 +33,7 @@ class ImplDiffCommandTest(ProjectTestCase):
         self.assertEqual(result.stdout, "設計と実装に差分は無かった\n")
 
     def test_shows_unified_diff_and_instructions(self):
+        self.disable_schema_actual()
         self.replace(LOANS_MIGRATION, "reservation_id text REFERENCES", "reservation_id integer REFERENCES")
         result = self.run_impl_diff()
         self.assertEqual(result.returncode, 1, result.stderr)

@@ -7,8 +7,18 @@ CI (Linux) でもこのテストが成功することで、手元 (macOS) で生
 import subprocess
 import unittest
 
+from doc_structured.config import find_config, load_config
 from doc_structured.domains import load_project
-from doc_structured.generate import HandwrittenFilesError, generated_files, render_project, write_outputs
+from doc_structured.generate import (
+    SCHEMA_ACTUAL_PATH,
+    HandwrittenFilesError,
+    generated_files,
+    kept_paths,
+    render_project,
+    write_outputs,
+)
+from doc_structured.schema_actual import read_schema
+from doc_structured.schema_diff import render_schema_actual
 from tooltest import PYTHON, SAMPLE_PROJECT, ProjectTestCase, clean_env
 
 MINIMAL = """\
@@ -37,7 +47,10 @@ class GenerateTest(ProjectTestCase):
     def test_committed_sample_outputs_are_up_to_date(self):
         project, problems = load_project(SAMPLE_PROJECT)
         self.assertEqual(problems, [])
-        outputs = render_project(project)
+        # サンプルの設定は database.schema_actual: true なので、generate --all と同じく schema-actual.md も比べる
+        database = load_config(find_config(SAMPLE_PROJECT)).database
+        outputs = render_project(project, kept_paths(database))
+        outputs[SCHEMA_ACTUAL_PATH] = render_schema_actual(read_schema(SAMPLE_PROJECT, database), database)
         self.assertEqual(sorted(outputs), sorted(generated_files(SAMPLE_PROJECT)))
         for relative, content in outputs.items():
             with self.subTest(file=relative):

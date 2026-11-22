@@ -203,6 +203,7 @@ class CheckTest(ProjectTestCase):
         self.assertEqual(self.run_check("--all").stdout, "検査 a・b・c-1・c-2・h・i・k・j: 問題は無かった\n")
 
     def test_check_j_failure_points_to_impl_diff(self):
+        self.disable_schema_actual()
         path = self.project / "migrations/0002_create_loans.sql"
         path.write_text(path.read_text(encoding="utf-8").replace("reservation_id text REFERENCES", "reservation_id integer REFERENCES"), encoding="utf-8")
         result = self.run_check("--heavy")

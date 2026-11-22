@@ -57,6 +57,19 @@ class ProjectTestCase(unittest.TestCase):
         shutil.copytree(SAMPLE_PROJECT, self.project)
         return self.project
 
+    def disable_schema_actual(self) -> None:
+        """コピーしたサンプルの設定から database.schema_actual を外し、docs/system/schema-actual.md を消す。マイグレーションを
+        変えて設計との差分だけを確認するテストで、schema-actual.md が古いことの報告を出さないために使う。"""
+        config = self.project / CONFIG_RELATIVE_PATH
+        text = config.read_text(encoding="utf-8")
+        assert "  schema_actual: true\n" in text
+        config.write_text(text.replace("  schema_actual: true\n", ""), encoding="utf-8")
+        (self.project / "docs/system/schema-actual.md").unlink()
+        gitattributes = self.project / "docs/.gitattributes"
+        gitattributes.write_text(
+            gitattributes.read_text(encoding="utf-8").replace("/system/schema-actual.md merge=binary\n", ""), encoding="utf-8"
+        )
+
     def write(self, relative: str, text: str) -> Path:
         """self.project の下にファイルを書く。"""
         path = self.project / relative

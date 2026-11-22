@@ -24,12 +24,21 @@ from .direction import check_direction, check_markdown_direction
 from .documents import load_documents
 from .domains import Project, load_project
 from .impl_diff import CHECK as IMPL_CHECK, ImplementationUnavailable, Location, judge, unified
-from .generate import GITATTRIBUTES_PATH, HANDWRITTEN_MESSAGE, generated_files, handwritten_fix, is_handwritten, render_project
+from .generate import (
+    GITATTRIBUTES_PATH,
+    HANDWRITTEN_MESSAGE,
+    SCHEMA_ACTUAL_PATH,
+    generated_files,
+    handwritten_fix,
+    is_handwritten,
+    kept_paths,
+    render_project,
+)
 from .length import check_length
 from .links import check_links
 from .problems import Problem
 from .schema_actual import MigrationError, read_schema
-from .schema_diff import LABELS as SCHEMA_LABELS, compare as compare_schema
+from .schema_diff import GENERATE_ALL_COMMAND, LABELS as SCHEMA_LABELS, compare as compare_schema, render_schema_actual
 
 LIGHT = ("a", "b", "c-1", "c-2", "h", "i", "k")
 HEAVY = ("j",)
@@ -54,7 +63,7 @@ class CheckResult:
 
 @dataclass
 class ImplDiffResult:
-    problems: list[Problem]  # 指示の行。設定やマイグレーションの誤りも含む
+    problems: list[Problem]  # 指示の行。設定やマイグレーションの誤りと、schema-actual.md が古いことも含む
     diff: str  # 正規化した形どうしの unified diff。差分が無ければ空
 
 
@@ -72,6 +81,11 @@ def implementation_diff(config: Config, project: Project) -> ImplDiffResult:
         return ImplDiffResult([Problem(IMPL_CHECK, e.path or config_path, str(e), line, column)], "")
     result = compare_schema(project, actual)
     problems = judge(result.items, SCHEMA_LABELS, Location(config_path, *database.migrations_at))
+    if database.schema_actual:
+        how = f"このファイルを直接編集せず、{GENERATE_ALL_COMMAND} を実行する"
+        problem = compare_generated(config.root, SCHEMA_ACTUAL_PATH, render_schema_actual(actual, database), how, IMPL_CHECK)
+        if problem is not None:
+            problems.append(problem)
     diff = unified(
         result.design_lines,
         result.actual_lines,
@@ -81,53 +95,59 @@ def implementation_diff(config: Config, project: Project) -> ImplDiffResult:
     return ImplDiffResult(problems, diff)
 
 
-def check_generated(root: Path, project: Project) -> list[Problem]:
-    """検査 a: 生成し直した内容と、今のファイルを比べる。"""
+def compare_generated(root: Path, relative: str, expected: str, how: str, check: str = "a") -> Problem | None:
+    """生成し直した内容 expected と、今のファイル relative を比べる。how は、内容が違うときの直し方。"""
+    header = generated_header.read_header(expected)
+    path = root / relative
+    if not path.is_file():
+        return Problem(check, relative, f"生成するはずのファイルが無い。{header.command} を実行する")
+    content = generated_header.read_file(path)
+    if is_handwritten(content):
+        return Problem(check, relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}")
+    if content.matches(expected):
+        return None
+    if content.header is None:
+        # 先頭の記述が無く、手で書いたファイルでもない (空白と BOM だけの) ファイル。生成元の修正は要らない
+        return Problem(check, relative, f"生成したファイルの中身が無い。{header.command} を実行する")
+    actual = content.text
+    if actual == expected:
+        # 読んだ内容は同じで、BOM か UTF-8 として読めないバイトだけが違う。生成元の修正は要らない
+        return Problem(
+            check, relative, f"生成し直した内容と違う (BOM か、UTF-8 として読めないバイトがある)。{header.command} を実行する"
+        )
+    diff = "".join(
+        difflib.unified_diff(
+            actual.splitlines(keepends=True),
+            expected.splitlines(keepends=True),
+            fromfile=f"{relative} (今のファイル)",
+            tofile=f"{relative} (生成し直した内容)",
+        )
+    )
+    return Problem(check, relative, f"生成し直した内容と違う。{how}", detail=diff)
+
+
+def check_generated(root: Path, project: Project, kept: tuple[str, ...] = ()) -> list[Problem]:
+    """検査 a: 生成し直した内容と、今のファイルを比べる。kept (generate --all だけが生成し直すファイル) は比べない。"""
     problems: list[Problem] = []
-    outputs = render_project(project)
+    outputs = render_project(project, kept)
     for relative, expected in outputs.items():
         header = generated_header.read_header(expected)
         if relative == GITATTRIBUTES_PATH:
             how = f"このファイルを直接編集せず、{header.command} を実行する。{generated_header.GITATTRIBUTES_GUIDE}"
         else:
             how = f"このファイルを直接編集せず、生成元 {header.source} の YAML を直して {header.command} を実行する"
-        path = root / relative
-        if not path.is_file():
-            problems.append(Problem("a", relative, f"生成するはずのファイルが無い。{header.command} を実行する"))
-            continue
-        content = generated_header.read_file(path)
-        if is_handwritten(content):
-            problems.append(Problem("a", relative, f"{HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}"))
-            continue
-        if content.matches(expected):
-            continue
-        if content.header is None:
-            # 先頭の記述が無く、手で書いたファイルでもない (空白と BOM だけの) ファイル。YAML の修正は要らない
-            problems.append(Problem("a", relative, f"生成したファイルの中身が無い。{header.command} を実行する"))
-            continue
-        actual = content.text
-        if actual == expected:
-            # 読んだ内容は同じで、BOM か UTF-8 として読めないバイトだけが違う。YAML の修正は要らない
-            problems.append(
-                Problem(
-                    "a", relative,
-                    f"生成し直した内容と違う (BOM か、UTF-8 として読めないバイトがある)。{header.command} を実行する",
-                )
-            )
-            continue
-        diff = "".join(
-            difflib.unified_diff(
-                actual.splitlines(keepends=True),
-                expected.splitlines(keepends=True),
-                fromfile=f"{relative} (今のファイル)",
-                tofile=f"{relative} (生成し直した内容)",
-            )
-        )
-        problems.append(Problem("a", relative, f"生成し直した内容と違う。{how}", detail=diff))
+        problem = compare_generated(root, relative, expected, how)
+        if problem is not None:
+            problems.append(problem)
     for relative, header in generated_files(root).items():
-        if relative in outputs:
+        if relative in outputs or relative in kept:
             continue
-        if header.source and not (root / header.source).exists():
+        if relative == SCHEMA_ACTUAL_PATH:
+            message = (
+                "設定に database.schema_actual: true が無いので、生成し直すと消えるファイルが残っている。"
+                f"{generated_header.GENERATE_COMMAND} を実行して消す (残すなら、設定に database.schema_actual: true を書く)"
+            )
+        elif header.source and not (root / header.source).exists():
             message = f"生成元 {header.source} が無い。このファイルを消すか、生成元を戻す"
         else:
             command = header.command or generated_header.GENERATE_COMMAND
@@ -161,7 +181,7 @@ def run_checks(root: Path, checks: tuple[str, ...], config: Config | None = None
     if "c-2" in checks:
         result.problems += check_cycles(index)
     if "a" in checks:
-        result.problems += check_generated(root, project)
+        result.problems += check_generated(root, project, kept_paths(config.database if config else None))
     if "j" in checks:
         assert config is not None, "検査 j には設定が要る"
         try:

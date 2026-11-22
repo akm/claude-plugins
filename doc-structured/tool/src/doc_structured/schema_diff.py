@@ -10,6 +10,9 @@
 import re
 from dataclasses import dataclass
 
+from . import generated_header
+from .config import DatabaseConfig
+from .generate import ER_TYPE_FORBIDDEN_RE, _table_row, escape_cell
 from .domains import Entry, Project
 from .impl_diff import Item, Location
 from .schema_actual import ActualSchema, ActualTable
@@ -331,3 +334,124 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
 
 def _yes(value: bool) -> str:
     return "一意" if value else "一意でない"
+
+
+# ---------------------------------------------------------------- 実際のスキーマのファイル docs/system/schema-actual.md
+
+GENERATE_ALL_COMMAND = "bin/doc-structured generate --all"
+ACTUAL_COLUMNS_HEADER = ["カラム", "型", "NULL", "デフォルト値", "参照先"]
+DATABASE_NAMES = {"sqlite": "SQLite", "postgresql": "PostgreSQL"}
+
+
+def _code_span(text: str) -> str:
+    """インラインコード。中に「`」があれば、それより長い「`」の並びで囲む。"""
+    longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    fence = "`" * (longest + 1)
+    padded = f" {text} " if longest or text.startswith("`") or text.endswith("`") else text
+    return f"{fence}{padded}{fence}"
+
+
+def _actual_key_marks(table: ActualTable, column: str) -> list[str]:
+    marks = []
+    if column in table.primary_key:
+        marks.append("PK")
+    if any(column in key.columns for key in table.foreign_keys):
+        marks.append("FK")
+    if any(index.unique and not index.has_expression and index.columns == [column] for index in table.indexes):
+        marks.append("UK")
+    return marks
+
+
+def _actual_unique_alone(table: ActualTable, columns: list[str]) -> bool:
+    return table.primary_key == columns or any(
+        index.unique and not index.has_expression and index.columns == columns for index in table.indexes
+    )
+
+
+def _actual_er_diagram(actual: ActualSchema) -> str:
+    lines = ["```mermaid", "erDiagram"]
+    for table in actual.tables.values():
+        if not table.columns:
+            lines.append(f'  "{table.name}"')
+            continue
+        lines.append(f'  "{table.name}" {{')
+        for column in table.columns:
+            parts = [ER_TYPE_FORBIDDEN_RE.sub("_", column.type) or "_", column.name]
+            marks = _actual_key_marks(table, column.name)
+            if marks:
+                parts.append(", ".join(marks))
+            lines.append("    " + " ".join(parts))
+        lines.append("  }")
+    for table in actual.tables.values():
+        for key in table.foreign_keys:
+            nullable = any(not (table.column(c) and table.column(c).not_null) for c in key.columns)
+            left = "|o" if nullable else "||"
+            right = "o|" if _actual_unique_alone(table, key.columns) else "o{"
+            lines.append(f'  "{key.ref_table}" {left}--{right} "{table.name}" : "{", ".join(key.columns)}"')
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _actual_table_blocks(table: ActualTable) -> list[str]:
+    blocks = [f"## テーブル {_code_span(table.name)}"]
+    if table.primary_key:
+        blocks.append("主キー: " + "・".join(_code_span(c) for c in table.primary_key))
+    references: dict[str, list[str]] = {}
+    multi = []
+    for key in table.foreign_keys:
+        if len(key.columns) == 1:
+            ref = key.ref_columns[0] if key.ref_columns else ""
+            references.setdefault(key.columns[0], []).append(f"{_code_span(key.ref_table)}.{_code_span(ref)}")
+        else:
+            multi.append(key)
+    if table.columns:
+        rows = [_table_row(ACTUAL_COLUMNS_HEADER), "|" + "---|" * len(ACTUAL_COLUMNS_HEADER)]
+        for column in table.columns:
+            rows.append(_table_row([
+                escape_cell(_code_span(column.name)),
+                escape_cell(_code_span(column.type)) if column.type else "",
+                "" if column.not_null else "許可",
+                escape_cell(_code_span(column.default)) if column.default is not None else "",
+                escape_cell("・".join(references.get(column.name, []))),
+            ]))
+        blocks.append("\n".join(rows))
+    if multi:
+        blocks.append("複数のカラムからなる外部キー:")
+        blocks.append("\n".join(
+            f"- {'・'.join(_code_span(c) for c in key.columns)} → "
+            + "・".join(f"{_code_span(key.ref_table)}.{_code_span(c)}" for c in key.ref_columns)
+            for key in multi
+        ))
+    if table.indexes:
+        blocks.append("インデックス:")
+        items = []
+        for index in table.indexes:
+            notes = []
+            if index.unique:
+                notes.append("一意")
+            if index.where:
+                notes.append(f"条件: {_code_span(index.where)}")
+            text = "・".join(_code_span(c) for c in index.columns)
+            items.append(f"- {text} ({'。'.join(notes)})" if notes else f"- {text}")
+        blocks.append("\n".join(items))
+    if table.checks:
+        blocks.append("CHECK 制約:")
+        blocks.append("\n".join(f"- {_code_span(check)}" for check in table.checks))
+    return blocks
+
+
+def render_schema_actual(actual: ActualSchema, database: DatabaseConfig) -> str:
+    """実際のスキーマのファイル。中身はマイグレーションだけで決まり、設計へのリンク・ID・アンカーを持たない。"""
+    name = DATABASE_NAMES[database.kind]
+    if database.image:
+        name += f" (イメージ {_code_span(database.image)})"
+    blocks = [
+        "# 実際のスキーマ",
+        f"マイグレーション {_code_span(database.migrations)} を {name} に適用したスキーマ。",
+    ]
+    if actual.tables:
+        blocks.append(_actual_er_diagram(actual))
+    for table in actual.tables.values():
+        blocks += _actual_table_blocks(table)
+    header = generated_header.markdown_line(database.migrations, GENERATE_ALL_COMMAND)
+    return header + "\n\n" + "\n\n".join(blocks) + "\n"

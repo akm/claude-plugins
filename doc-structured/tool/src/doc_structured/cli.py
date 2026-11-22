@@ -2,7 +2,9 @@
 
   doc-structured --version         ツールのバージョンを表示する (設定ファイルは読まない)
   doc-structured version           ツールのバージョンを表示する
-  doc-structured generate          ドメインの YAML から、人が読む Markdown を生成する
+  doc-structured generate [--all]  ドメインの YAML から、人が読む Markdown を生成する。--all は、設定に
+                                   database.schema_actual: true があれば、実際のスキーマの docs/system/schema-actual.md も
+                                   生成し直す (データベースが無ければ終了コード 3)
   doc-structured check [--light|--heavy|--all|--only <検査>]
                                    検査を実行する。指定が無ければ軽い群 (--light)。データベースが無くて検査 j を
                                    実行できなければ終了コード 3
@@ -25,14 +27,24 @@ from pathlib import Path
 
 from . import __version__
 from . import check
-from .config import Config, ConfigError, find_config, load_config
+from .config import CONFIG_RELATIVE_PATH, Config, ConfigError, find_config, load_config
 from .documents import load_documents
 from .domains import load_project
 from .impl_diff import UNAVAILABLE_EXIT_CODE, ImplementationUnavailable
-from .generate import HANDWRITTEN_MESSAGE, HandwrittenFilesError, handwritten_fix, render_project, write_outputs
+from .generate import (
+    HANDWRITTEN_MESSAGE,
+    SCHEMA_ACTUAL_PATH,
+    HandwrittenFilesError,
+    handwritten_fix,
+    kept_paths,
+    render_project,
+    write_outputs,
+)
 from .links_fix import Choice, ChoiceError, fix_files
 from .names import IdError
 from .refs import find_refs
+from .schema_actual import MigrationError, read_schema
+from .schema_diff import render_schema_actual
 
 VERSION_TEXT = f"doc-structured {__version__}"
 
@@ -45,7 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=VERSION_TEXT)
     subparsers = parser.add_subparsers(dest="command", metavar="<サブコマンド>", required=True)
     subparsers.add_parser("version", help="ツールのバージョンを表示する")
-    subparsers.add_parser("generate", help="ドメインの YAML から、人が読む Markdown を生成する")
+    generate_parser = subparsers.add_parser("generate", help="ドメインの YAML から、人が読む Markdown を生成する")
+    generate_parser.add_argument(
+        "--all", action="store_true",
+        help="設定に database.schema_actual: true があれば、実際のスキーマの docs/system/schema-actual.md も生成し直す",
+    )
     check_parser = subparsers.add_parser("check", help="検査を実行する。指定が無ければ軽い群 (--light)")
     group = check_parser.add_mutually_exclusive_group()
     group.add_argument("--light", action="store_true", help=f"軽い群の検査 ({'・'.join(check.LIGHT)}) を実行する")
@@ -113,15 +129,31 @@ def run_check(config: Config, args: argparse.Namespace) -> int:
     return 1
 
 
-def run_generate(config: Config) -> int:
+def run_generate(config: Config, args: argparse.Namespace) -> int:
     project, problems = load_project(config.root)
     if problems:
         for problem in problems:
             print(problem.format(), file=sys.stderr)
         print(f"doc-structured: YAML に {len(problems)} 件の誤りがあるので、何も生成しなかった", file=sys.stderr)
         return 1
+    kept = kept_paths(config.database)
+    outputs = render_project(project, kept)
+    if args.all and kept:
+        # docs/system/schema-actual.md も生成し直す (決めた経緯は Issue #207 のコメントの 10)
+        database = config.database
+        try:
+            outputs[SCHEMA_ACTUAL_PATH] = render_schema_actual(read_schema(config.root, database), database)
+        except ImplementationUnavailable as e:
+            print(f"doc-structured: 実際のスキーマを読めないので、何も生成しなかった: {e}", file=sys.stderr)
+            return UNAVAILABLE_EXIT_CODE
+        except MigrationError as e:
+            where = e.path or CONFIG_RELATIVE_PATH.as_posix()
+            print(f"{where}: {e}", file=sys.stderr)
+            print("doc-structured: マイグレーションを適用できないので、何も生成しなかった", file=sys.stderr)
+            return 1
+        kept = ()
     try:
-        written, deleted = write_outputs(config.root, render_project(project))
+        written, deleted = write_outputs(config.root, outputs, kept)
     except HandwrittenFilesError as e:
         for relative in e.paths:
             print(f"{relative}: {HANDWRITTEN_MESSAGE}。{handwritten_fix(relative)}", file=sys.stderr)
@@ -243,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
         print(VERSION_TEXT)
         return 0
     if args.command == "generate":
-        return run_generate(config)
+        return run_generate(config, args)
     if args.command == "check":
         return run_check(config, args)
     if args.command == "links-fix":
