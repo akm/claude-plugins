@@ -26,7 +26,7 @@
 | `design.md` | 手書き。設計の判断と短い理由 |
 | `<種類>/<名前>.md` | 手書き。`concept.md`・`problem.md`・`design.md` を話題ごとに分けた子のファイル (下の節「手書きの Markdown」) |
 
-全ドメインの用語の索引 `docs/glossary.md`、ロールと操作の表 `docs/system/permissions.md` (下の節「ロール」)、ドメインの依存の表と図 `docs/domains/dependencies.md`、ドメインの読む順の索引 `docs/domains/README.md` (下の節「ドメインの依存」)、全体のテーブルの表と ER 図 `docs/system/schema.md` (下の節「テーブルとカラム」) も生成します。
+全ドメインの用語の索引 `docs/glossary.md`、ロールと操作の表 `docs/system/permissions.md` (下の節「ロール」)、ドメインの依存の表と図 `docs/domains/dependencies.md`、ドメインの読む順の索引 `docs/domains/README.md` (下の節「ドメインの依存」)、全体のテーブルの表と ER 図 `docs/system/schema.md` (下の節「テーブルとカラム」) も生成します。設定で選んだプロジェクトでは、実際のスキーマのファイル `docs/system/schema-actual.md` も生成します ([doc-structured-impl.md](doc-structured-impl.md) の節「実際のスキーマのファイル」)。
 
 ## YAML の形式
 
@@ -320,7 +320,7 @@ YAML の参照 (`refers_to`・状態の遷移の `attribute`・完全な ID の�
 
 ## 検査
 
-スキル `doc-structured:check` (コマンド `bin/doc-structured check`) が、次の 7 つを検査します。誤りは「パス:行:列: 検査 <記号>: メッセージ」の形で出ます。
+スキル `doc-structured:check` (コマンド `bin/doc-structured check`) が、次の 8 つを検査します。誤りは「パス:行:列: 検査 <記号>: メッセージ」の形で出ます。検査 j はデータベースが要る重い群で、ほかは文書と YAML だけで実行できる軽い群です。
 
 | 検査 | 確認すること | 直し方 |
 |---|---|---|
@@ -330,6 +330,7 @@ YAML の参照 (`refers_to`・状態の遷移の `attribute`・完全な ID の�
 | c-2 | 手書きの Markdown の参照に、節の単位で循環が無い。規則は [doc-structured-docs.md](doc-structured-docs.md) の節「参照の循環」 | 循環のどれかのリンクを外すか、参照される内容を別の節に移す |
 | h | YAML の形式と、参照 (`refers_to`・状態の遷移の `attribute`・完全な ID の配列・テーブルとカラムの `references`・`model`・`attribute`) の参照先が、そのキーで参照できる種類の定義としてある。状態の遷移の `from`・`to`・`initial` が、その属性の値にある。テーブルとカラムが、上の節「テーブルとカラム」の規則に従う | YAML を直す。属性の下に書けない状態の遷移は、ファイル名が `state-machines-` で始まる YAML に移す |
 | i | YAML の参照が祖先のディレクトリの YAML の定義を指していない。手書きの Markdown のリンクが、祖先のディレクトリの手書きのファイルを指していない (規則は [doc-structured-docs.md](doc-structured-docs.md) の節「参照の向き」) | 参照される定義をサブディレクトリに移す。状態の遷移のファイルの `attribute` では、属性をサブディレクトリに移すか、状態の遷移のファイルを属性と同じディレクトリに移す。手書きの Markdown では、参照される内容をサブディレクトリの子のファイルに移す |
+| j | 設計 (ファイル名が `schema` で始まる YAML) と実際のスキーマに、比べる項目の差分が無い。規則は [doc-structured-impl.md](doc-structured-impl.md) | YAML か実装 (マイグレーション) を直す。未実装のものには `planned: true` を付け、実装したら外す。実際のスキーマのファイルが古ければ、`bin/doc-structured generate --all` を実行する |
 | k | 手書きの Markdown が 100 行を超えていない。超えていれば、理由のコメントがある | 話題ごとに子のファイルに分けるか、理由のコメントを書く |
 
-検査 h に誤りがあると、検査 a・b・c-1・c-2・i は実行しません (検査 a・b・i は定義の一覧と完全な名前を作れないため、検査 c-1 は参照先が無い参照があると依存を正しく求められないため、検査 c-2 は検査 b が確認するリンクの上で数えるため)。検査 k は YAML を使わないので、いつも実行します。
+検査 h に誤りがあると、検査 a・b・c-1・c-2・i・j は実行しません (検査 a・b・i・j は定義の一覧と完全な名前を作れないため、検査 c-1 は参照先が無い参照があると依存を正しく求められないため、検査 c-2 は検査 b が確認するリンクの上で数えるため)。検査 k は YAML を使わないので、いつも実行します。
