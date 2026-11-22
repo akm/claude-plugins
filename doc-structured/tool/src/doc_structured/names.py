@@ -42,6 +42,8 @@ KINDS: dict[str, Kind] = {
         Kind("pre", "前提", True, ("d",)),
         Kind("ev", "イベント", True, ("d",)),
         Kind("r", "ロール", True, ()),
+        Kind("t", "テーブル", False, ("d",)),
+        Kind("c", "カラム", False, ("t",)),
     )
 }
 

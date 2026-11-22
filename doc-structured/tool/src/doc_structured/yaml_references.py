@@ -1,7 +1,7 @@
 """ドメインの YAML に書いた参照の一覧。検査 i (参照の向き) と、ドメインの依存 (モジュール dependencies) が使う。
 
 参照は、属性の refers_to、完全な ID の配列で書く参照 (操作の targets・preconditions・events・roles と、前提の targets)、
-ファイルに書く状態の遷移の attribute、遷移の operations・preconditions。状態の遷移の from・to・initial は値の英語名で、
+ファイルに書く状態の遷移の attribute、遷移の operations・preconditions、カラムの references。状態の遷移の from・to・initial は値の英語名で、
 参照ではないので含めない。
 """
 
@@ -57,9 +57,12 @@ def state_machine_references(machine: StateMachine, with_attribute: bool = True)
 
 
 def yaml_references(project: Project):
-    """すべてのドメインの YAML の参照を返す。ドメインごとに、定義の参照を定義の並び順に返した後、状態の遷移の参照を読んだ順に返す。"""
+    """すべてのドメインの YAML の参照を返す。ドメインごとに、定義の参照を定義の並び順に返した後、状態の遷移の参照を読んだ順に、
+    テーブルとカラムの参照を定義の並び順に返す。"""
     for domain in project.domains:
         for entry in domain.entries():
             yield from entry_references(entry)
         for machine in domain.state_machines:
             yield from state_machine_references(machine)
+        for entry in domain.table_entries():
+            yield from entry_references(entry)
