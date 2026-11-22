@@ -8,6 +8,12 @@
 INTEGER PRIMARY KEY のカラム (行の識別子の別名) は NULL を入れられないので、NULL を許可しないカラムとして読む。
 """
 
+import json
+import shutil
+import signal
+import subprocess
+import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -85,6 +91,8 @@ def read_schema(root: Path, database: DatabaseConfig) -> ActualSchema:
     """
     if database.kind == "sqlite":
         return _read_sqlite(root, database)
+    if database.kind == "postgresql":
+        return _read_postgresql(root, database)
     raise AssertionError(f"知らないデータベースの種類: {database.kind}")
 
 
@@ -174,6 +182,165 @@ def _sqlite_indexes(connection, table: str) -> list[ActualIndex]:
         indexes.append(ActualIndex(name=name, columns=columns, unique=bool(unique), has_expression=has_expression, where=where))
     indexes.sort(key=lambda index: index.name)
     return indexes
+
+
+# ---------------------------------------------------------------- PostgreSQL (Docker のコンテナ)
+
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "doc-structured"
+POSTGRES_DB = "doc_structured"
+# コンテナの名前の接頭辞。後ろに、重ならない文字列を付ける
+CONTAINER_PREFIX = "doc-structured-"
+# コンテナの起動 (イメージの取得を含む) と、PostgreSQL が接続を受け付けるまでの時間の上限 (秒)
+START_TIMEOUT = 600
+READY_TIMEOUT = 60
+# psql をコンテナの中で実行するときの引数。初期化の途中の一時的なサーバーは TCP を受け付けないので、127.0.0.1 に接続する
+_PSQL = ["psql", "-h", "127.0.0.1", "-U", POSTGRES_USER, "-d", POSTGRES_DB, "-X", "-q", "-v", "ON_ERROR_STOP=1"]
+
+# 実際のスキーマを、スキーマ public のテーブルについて、JSON の 1 つの値で返す問い合わせ
+_SCHEMA_QUERY = """
+SELECT COALESCE(json_agg(t ORDER BY t->>'name'), '[]'::json) FROM (
+  SELECT json_build_object(
+    'name', c.relname,
+    'columns', (
+      SELECT COALESCE(json_agg(json_build_object(
+        'name', a.attname,
+        'type', format_type(a.atttypid, a.atttypmod),
+        'not_null', a.attnotnull,
+        'default', pg_get_expr(d.adbin, d.adrelid),
+        'owned_sequence', d.adbin IS NOT NULL AND pg_get_expr(d.adbin, d.adrelid) LIKE 'nextval(%' AND EXISTS (
+          SELECT 1 FROM pg_depend dep JOIN pg_class s ON s.oid = dep.objid AND s.relkind = 'S'
+          WHERE dep.refobjid = c.oid AND dep.refobjsubid = a.attnum AND dep.deptype = 'a')
+      ) ORDER BY a.attnum), '[]'::json)
+      FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+      WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
+    'primary_key', (
+      SELECT COALESCE(json_agg(a.attname ORDER BY k.ord), '[]'::json)
+      FROM pg_constraint con CROSS JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+      JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+      WHERE con.conrelid = c.oid AND con.contype = 'p'),
+    'foreign_keys', (
+      SELECT COALESCE(json_agg(json_build_object(
+        'columns', (SELECT json_agg(a.attname ORDER BY k.ord) FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum),
+        'ref_table', rc.relname,
+        'ref_columns', (SELECT json_agg(a.attname ORDER BY k.ord) FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord)
+                        JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum)
+      ) ORDER BY con.conname), '[]'::json)
+      FROM pg_constraint con JOIN pg_class rc ON rc.oid = con.confrelid
+      WHERE con.conrelid = c.oid AND con.contype = 'f'),
+    'indexes', (
+      SELECT COALESCE(json_agg(json_build_object(
+        'name', ic.relname,
+        'unique', i.indisunique,
+        'columns', (SELECT json_agg(pg_get_indexdef(i.indexrelid, k.ord, true) ORDER BY k.ord)
+                    FROM generate_series(1, i.indnkeyatts::int) AS k(ord)),
+        'has_expression', i.indexprs IS NOT NULL,
+        'where', pg_get_expr(i.indpred, i.indrelid, true)
+      ) ORDER BY ic.relname), '[]'::json)
+      FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid
+      WHERE i.indrelid = c.oid AND NOT i.indisprimary),
+    'checks', (
+      SELECT COALESCE(json_agg(pg_get_expr(con.conbin, con.conrelid, true) ORDER BY con.conname), '[]'::json)
+      FROM pg_constraint con WHERE con.conrelid = c.oid AND con.contype = 'c')
+  ) AS t
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition
+) AS tables
+"""
+
+
+def _docker(*args: str, input: str | None = None, timeout: float = 120) -> subprocess.CompletedProcess:
+    return subprocess.run(["docker", *args], input=input, capture_output=True, text=True, timeout=timeout)
+
+
+def _check_docker() -> None:
+    """Docker が使えなければ ImplementationUnavailable を投げる。"""
+    if shutil.which("docker") is None:
+        raise ImplementationUnavailable(
+            "コマンド docker が無い (設定の database.kind が postgresql なので、PostgreSQL のコンテナを Docker で起動する)。"
+            "Docker をインストールして起動する"
+        )
+    try:
+        result = _docker("info", "--format", "{{.ServerVersion}}", timeout=60)
+    except subprocess.TimeoutExpired as e:
+        raise ImplementationUnavailable("Docker のデーモンに接続できない (docker info が 60 秒で終了しなかった)。Docker を起動する") from e
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise ImplementationUnavailable(f"Docker のデーモンに接続できない ({detail})。Docker を起動する")
+
+
+def _raise_interrupt(signum, frame):
+    raise KeyboardInterrupt(f"シグナル {signum} を受けた")
+
+
+def _read_postgresql(root: Path, database: DatabaseConfig) -> ActualSchema:
+    files = migration_files(root, database.migrations)
+    _check_docker()
+    name = CONTAINER_PREFIX + uuid.uuid4().hex[:12]
+    # 終了のシグナル (SIGTERM) を受けても、コンテナを消してから終了する。Ctrl+C (KeyboardInterrupt) も同じ
+    previous = signal.signal(signal.SIGTERM, _raise_interrupt)
+    try:
+        started = _docker(
+            "run", "--detach", "--rm", "--name", name,
+            "--env", f"POSTGRES_USER={POSTGRES_USER}", "--env", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
+            "--env", f"POSTGRES_DB={POSTGRES_DB}",
+            database.image or "", timeout=START_TIMEOUT,
+        )
+        if started.returncode != 0:
+            raise MigrationError(
+                f"PostgreSQL のコンテナを起動できない (イメージ {database.image}): {started.stderr.strip()}"
+            )
+        _wait_ready(name)
+        for relative in files:
+            text = (root / relative).read_text(encoding="utf-8")
+            applied = _docker("exec", "-i", "--env", f"PGPASSWORD={POSTGRES_PASSWORD}", name, *_PSQL, "-f", "-", input=text)
+            if applied.returncode != 0:
+                raise MigrationError(f"マイグレーションを PostgreSQL に適用できない: {applied.stderr.strip()}", relative)
+        queried = _docker(
+            "exec", "--env", f"PGPASSWORD={POSTGRES_PASSWORD}", name, *_PSQL, "-A", "-t", "-c", _SCHEMA_QUERY
+        )
+        if queried.returncode != 0:
+            raise MigrationError(f"PostgreSQL から実際のスキーマを読めない: {queried.stderr.strip()}")
+        return _postgresql_schema(json.loads(queried.stdout))
+    finally:
+        # 起動に失敗したときもコンテナが残っていないかを確認して消す (無ければ docker rm が失敗するだけ)
+        _docker("rm", "--force", name, timeout=120)
+        signal.signal(signal.SIGTERM, previous)
+
+
+def _wait_ready(name: str) -> None:
+    deadline = time.monotonic() + READY_TIMEOUT
+    while True:
+        ready = _docker("exec", name, "pg_isready", "-h", "127.0.0.1", "-U", POSTGRES_USER, "-d", POSTGRES_DB, timeout=30)
+        if ready.returncode == 0:
+            return
+        if time.monotonic() > deadline:
+            raise MigrationError(
+                f"PostgreSQL のコンテナが {READY_TIMEOUT} 秒たっても接続を受け付けない: {(ready.stdout + ready.stderr).strip()}"
+            )
+        time.sleep(0.5)
+
+
+def _postgresql_schema(rows: list[dict]) -> ActualSchema:
+    tables: dict[str, ActualTable] = {}
+    for row in rows:
+        table = ActualTable(name=row["name"])
+        table.columns = [
+            ActualColumn(c["name"], c["type"], bool(c["not_null"]), c["default"], bool(c["owned_sequence"]))
+            for c in row["columns"]
+        ]
+        table.primary_key = list(row["primary_key"])
+        table.foreign_keys = [
+            ActualForeignKey(list(k["columns"]), k["ref_table"], list(k["ref_columns"])) for k in row["foreign_keys"]
+        ]
+        table.indexes = [
+            ActualIndex(i["name"], list(i["columns"]), bool(i["unique"]), bool(i["has_expression"]), i["where"])
+            for i in row["indexes"]
+        ]
+        table.checks = list(row["checks"])
+        tables[table.name] = table
+    return ActualSchema(kind="postgresql", tables=dict(sorted(tables.items())))
 
 
 # ---------------------------------------------------------------- SQL の文字列を読む
