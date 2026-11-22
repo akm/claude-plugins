@@ -27,14 +27,14 @@
     }
   },
   "redaction": {
-    "replacements": 227,
+    "replacements": 230,
     "layers": {
       "betterleaks": 0,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 2,
       "credentialed_uri": 0,
-      "entropy": 185,
+      "entropy": 188,
       "key_context": 40,
       "provider_token": 0,
       "shell_stdin": 0
@@ -867,6 +867,37 @@
       "collapse": {
         "target": "tool_pair",
         "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01A9om7QtZkGaTUcNrdAtza7",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "51a13b27933a",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 5219,
+        "end": 5220,
+        "entry_ids": [
+          "647c1072-d182-471f-8feb-fb8e33fa9754"
+        ],
+        "tool_use_id": "toolu_01A9om7QtZkGaTUcNrdAtza7"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01A9om7QtZkGaTUcNrdAtza7"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
         "default_collapsed": true
       }
     }
