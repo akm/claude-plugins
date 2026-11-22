@@ -5,8 +5,9 @@
 決めた経緯は Issue #202 のコメント。要点:
   - 読む順は、依存されるドメインを先にする。並べられるドメイン (依存先がすべて並んだドメイン) が複数あれば、番号の小さいものを
     先にする。循環に入っていて並べられないドメインが残ったら、その中で番号の最も小さいものを次に並べ、同じ規則で続ける
-  - 検査 c-1 は、ドメイン間の依存と、同じドメインのモデル間の参照 (属性の refers_to) に循環が無いことを確認する。
-    モデルの自己参照は報告しない。報告は検査 c-2 と同じ形 (循環のまとまりごとに 1 件で、最も小さい ID から始まる
+  - 検査 c-1 は、ドメイン間の依存と、同じドメインのモデル間の参照 (属性の refers_to) と、同じドメインのテーブル間の外部キー
+    (カラムの references) に循環が無いことを確認する。モデルとテーブルの自己参照は報告しない (外部キーについて決めた経緯は
+    Issue #206 のコメントの 13)。報告は検査 c-2 と同じ形 (循環のまとまりごとに 1 件で、最も小さい ID から始まる
     最も短い循環を、矢印ごとにその矢印を作る最初の参照の位置と一緒に書く)
 規則の SSOT はプラグインの規則の文書 (ファイル doc-structured/rules/doc-structured-domains.md)。
 """
@@ -36,12 +37,15 @@ class DomainDependency:
 
 def references_in_definition_order(project: Project, domain: Domain):
     """ドメインの YAML の参照を、定義の並び順 (models.md・functions.md と同じ) に返す。状態の遷移の参照は、
-    状態の遷移を持つ属性の参照の後に返す。ファイルに書く状態の遷移の attribute は、同じドメインの属性だけを指すので返さない。"""
+    状態の遷移を持つ属性の参照の後に返す。ファイルに書く状態の遷移の attribute は、同じドメインの属性だけを指すので返さない。
+    テーブルとカラムの参照は、その後に schema.md の順で返す。"""
     for entry in domain.entries():
         yield from entry_references(entry)
         machine = project.state_machines.get(entry.id)
         if machine is not None:
             yield from state_machine_references(machine, with_attribute=False)
+    for entry in domain.table_entries():
+        yield from entry_references(entry)
 
 
 def domain_dependencies(project: Project, domain: Domain) -> list[DomainDependency]:
@@ -121,8 +125,24 @@ def model_graph(domain: Domain) -> dict[str, dict[str, YamlReference]]:
     return graph
 
 
+def table_graph(domain: Domain) -> dict[str, dict[str, YamlReference]]:
+    """同じドメインのテーブルの ID から、カラムの references で参照するテーブルの ID と、その最初の参照への対応。
+    自分自身のテーブルへの参照 (自己参照) と、ほかのドメインのテーブルへの参照は含めない。"""
+    graph: dict[str, dict[str, YamlReference]] = {}
+    for table in domain.tables:
+        for column in table.children:
+            for reference in entry_references(column):
+                if reference.key != "references" or not reference.target.startswith(f"{domain.id}-t-"):
+                    continue
+                target_table = reference.target.rsplit("-c-", 1)[0]
+                if target_table == table.id:
+                    continue
+                graph.setdefault(table.id, {}).setdefault(target_table, reference)
+    return graph
+
+
 def check_dependency_cycles(project: Project) -> list[Problem]:
-    """検査 c-1。ドメインの循環を報告した後、ドメインの番号の順に、モデルの循環を報告する。"""
+    """検査 c-1。ドメインの循環を報告した後、ドメインの番号の順に、モデルの循環、テーブルの循環を報告する。"""
     dependencies = all_dependencies(project)
     problems = _cycle_problems(
         domain_graph(project, dependencies),
@@ -136,5 +156,11 @@ def check_dependency_cycles(project: Project) -> list[Problem]:
             "モデルの参照",
             _where,
             "循環のどれかの refers_to を外す (refers_to は外部キーを持つモデルの属性にだけ書く)",
+        )
+        problems += _cycle_problems(
+            table_graph(domain),
+            "テーブルの外部キー",
+            _where,
+            "循環のどれかの外部キーの references を外す (外部キーの制約を付けずに、カラムを残してもよい)",
         )
     return problems
