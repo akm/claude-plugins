@@ -466,6 +466,37 @@
         "label": "Skill: review-triage:review-triage-fix",
         "default_collapsed": true
       }
+    },
+    {
+      "id": "claude-skill-toolu_01BTLjsyS68PEUBa8DLNnBn2",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a41d368c682b",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 3391,
+        "end": 3392,
+        "entry_ids": [
+          "898b3cff-6695-467d-96c8-d3b79294b309"
+        ],
+        "tool_use_id": "toolu_01BTLjsyS68PEUBa8DLNnBn2"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01BTLjsyS68PEUBa8DLNnBn2"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
     }
   ],
   "session_metrics": {
