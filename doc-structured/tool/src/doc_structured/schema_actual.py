@@ -25,6 +25,7 @@ class ActualColumn:
     type: str  # データベースから読んだ型 (SQLite では書いた文字列のまま)
     not_null: bool
     default: str | None  # データベースから読んだデフォルト値の式
+    owned_sequence: bool = False  # PostgreSQL で、デフォルト値が、このカラムが持つシーケンスの nextval (serial 系の型)
 
 
 @dataclass
