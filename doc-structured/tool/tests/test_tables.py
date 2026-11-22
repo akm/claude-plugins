@@ -256,6 +256,20 @@ class ColumnTest(SchemaTestCase):
             self.problems_for(self.files(LOANS_TABLE + "        planned: true\n") | {CATALOG_SCHEMA: planned_books}), []
         )
 
+    def test_implemented_column_cannot_reference_column_unique_only_by_planned_index(self):
+        planned_index = BOOKS.replace("        unique: true\n", "        unique: true\n        planned: true\n")
+        isbn_reference = "        type: text\n        definition: 余り。\n        references: d-catalog-t-books-c-isbn\n"
+        self.assert_problem(
+            self.column(isbn_reference) | {CATALOG_SCHEMA: planned_index},
+            "テーブル loans のカラム extra は実装済みなので、未実装のインデックスだけで一意になるカラム d-catalog-t-books-c-isbn を "
+            "references で参照できない (参照先のインデックスの planned を外すか、このカラムにも planned を書く)",
+        )
+        self.setUp()
+        # 参照するカラムも未実装なら成功する
+        self.assertEqual(
+            self.problems_for(self.column(isbn_reference + "        planned: true\n") | {CATALOG_SCHEMA: planned_index}), []
+        )
+
     def test_in_overview(self):
         self.assert_problem(
             self.files(LOANS_TABLE + "        in_overview: true\n"),

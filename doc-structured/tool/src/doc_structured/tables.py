@@ -3,7 +3,8 @@
 テーブルとカラムの読み込みと、1 つのテーブルの中で決まる形の確認は、モジュール domains が行う。このモジュールは、
 すべての定義と参照先を読んだ後に、次を確認する (決めた経緯は Issue #206 のコメントの 3〜7・11)。
   - カラムの references の参照先が、そのテーブルの 1 カラムの主キーか、そのカラムだけの一意のインデックスを持つカラム
-  - 実装済みのカラムの references が、未実装のカラム (未実装のテーブルのカラムを含む) を指さない
+  - 実装済みのカラムの references が、未実装のカラム (未実装のテーブルのカラムを含む) と、未実装のインデックスだけで一意になる
+    カラムを指さない
   - テーブルの model・attribute とカラムの attribute (対応) は、同じドメインの定義を指す。カラムの attribute は、model を書いた
     テーブルのカラムにだけ書け、そのモデルの属性を指す
   - カラムに attribute と references があり、その属性に refers_to があれば、references が指すテーブルの model が refers_to と同じ
@@ -49,14 +50,20 @@ def is_foreign_key(column: Entry) -> bool:
     return column.reference("references") is not None
 
 
-def has_single_unique(column: Entry) -> bool:
-    """そのカラムだけの一意のインデックスを持つか。"""
-    return any(index.unique and index.columns == [column.name] for index in table_spec(column.parent).indexes)
+def has_single_unique(column: Entry, implemented_only: bool = False) -> bool:
+    """そのカラムだけの一意のインデックスを持つか。implemented_only が真なら、未実装のインデックスを数えない。"""
+    table = column.parent
+    return any(
+        index.unique and index.columns == [column.name] and not (implemented_only and index_is_planned(table, index))
+        for index in table_spec(table).indexes
+    )
 
 
-def is_unique_alone(column: Entry) -> bool:
-    """そのカラムだけで行が 1 つに決まるか (1 カラムの主キーか、そのカラムだけの一意のインデックスを持つ)。"""
-    return table_spec(column.parent).primary_key == [column.name] or has_single_unique(column)
+def is_unique_alone(column: Entry, implemented_only: bool = False) -> bool:
+    """そのカラムだけで行が 1 つに決まるか (1 カラムの主キーか、そのカラムだけの一意のインデックスを持つ)。
+    implemented_only が真なら、未実装のインデックスを数えない (主キーは、テーブルが未実装なら未実装だが、そのときは
+    カラムも未実装なので、呼び出し元が別に確認する)。ER 図は未実装のものを含む設計を描くので、偽で呼ぶ。"""
+    return table_spec(column.parent).primary_key == [column.name] or has_single_unique(column, implemented_only)
 
 
 def key_marks(column: Entry) -> list[str]:
@@ -117,6 +124,13 @@ def check_tables(project: Project) -> list[Problem]:
                             column,
                             f"{column.owner} は実装済みなので、未実装のカラム {target.id} を references で参照できない "
                             "(このカラムにも planned を書くか、参照先の planned を外す)",
+                            reference.line, reference.column,
+                        )
+                    elif not is_planned(column) and is_unique_alone(target) and not is_unique_alone(target, True):
+                        problem(
+                            column,
+                            f"{column.owner} は実装済みなので、未実装のインデックスだけで一意になるカラム {target.id} を "
+                            "references で参照できない (参照先のインデックスの planned を外すか、このカラムにも planned を書く)",
                             reference.line, reference.column,
                         )
                 spec = column_spec(column)
