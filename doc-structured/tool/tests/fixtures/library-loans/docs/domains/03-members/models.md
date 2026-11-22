@@ -11,6 +11,8 @@
 
 このモデルを参照するモデル: [ドメイン `loans` のモデル「貸出」][d-loans-m-loan]
 
+このモデルを参照するテーブル: [テーブル `members`][d-members-t-members]
+
 <a name="d-members-m-member-a-name"></a>
 
 ### 属性「氏名」 `name`
@@ -18,3 +20,4 @@
 利用者の名前。
 
 [d-loans-m-loan]: ../02-loans/models.md#d-loans-m-loan "ドメイン `loans` のモデル「貸出」"
+[d-members-t-members]: schema.md#d-members-t-members "ドメイン `members` のテーブル `members`"

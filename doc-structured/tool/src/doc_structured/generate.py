@@ -179,7 +179,25 @@ def _referencing_models(project: Project) -> dict[str, list[Entry]]:
     return result
 
 
-def render_models(project: Project, domain: Domain, referencing: dict[str, list[Entry]]) -> str:
+def _referencing_tables(project: Project) -> dict[str, list[tuple[Entry, Entry | None]]]:
+    """モデルの ID から、そのモデルを参照するテーブルへの対応。model でモデルを指すテーブル (属性は None) と、attribute で
+    モデルの属性を指すテーブル (中間テーブル。属性はその属性) を、schema.md の順に並べる。"""
+    result: dict[str, list[tuple[Entry, Entry | None]]] = {}
+    for domain in project.domains:
+        for table in domain.tables:
+            model = tables.table_model(project, table)
+            if model is not None:
+                result.setdefault(model.id, []).append((table, None))
+            attribute = tables.target_of(project, table, "attribute")
+            if attribute is not None and attribute.symbol == "a":
+                result.setdefault(attribute.parent.id, []).append((table, attribute))
+    return result
+
+
+def render_models(
+    project: Project, domain: Domain, referencing: dict[str, list[Entry]],
+    referencing_tables: dict[str, list[tuple[Entry, Entry | None]]],
+) -> str:
     path = file_path(domain, "models")
     links = _Links(path)
     blocks = [f"# {domain.full_name()} のモデル"]
@@ -189,6 +207,14 @@ def render_models(project: Project, domain: Domain, referencing: dict[str, list[
         if users:
             listed = "・".join(_entry_link(links, m, _reference_text(m, domain)) for m in users)
             blocks.append(f"このモデルを参照するモデル: {listed}")
+        table_users = referencing_tables.get(model.id, [])
+        if table_users:
+            listed = "・".join(
+                _entry_link(links, table, _reference_text(table, domain))
+                + (f" ({names.format_part('a', attribute.name_ja)}を参照)" if attribute is not None else "")
+                for table, attribute in table_users
+            )
+            blocks.append(f"このモデルを参照するテーブル: {listed}")
         for attribute in model.children:
             extra = ""
             if attribute.refers_to in project.entries:
@@ -615,12 +641,13 @@ def render_project(project: Project) -> dict[str, str]:
     """生成するファイルの、リポジトリのルートからの相対パスと内容。"""
     outputs: dict[str, str] = {}
     referencing = _referencing_models(project)
+    referencing_tables = _referencing_tables(project)
     dependencies = all_dependencies(project)
     for domain in project.domains:
         # 手書きのファイルは、今あるものを表に載せる (足したり消したりすると、検査 a が README.md の生成し直しを求める)
         files = [s for s in names.HANDWRITTEN_FILE_KINDS if (project.root / file_path(domain, s)).is_file()]
         if domain.models:
-            outputs[file_path(domain, "models")] = render_models(project, domain, referencing)
+            outputs[file_path(domain, "models")] = render_models(project, domain, referencing, referencing_tables)
             files.append("models")
         if domain.terms:
             outputs[file_path(domain, "unclassified_app_terms")] = render_unclassified_app_terms(domain)

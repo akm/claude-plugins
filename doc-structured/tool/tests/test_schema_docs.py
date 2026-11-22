@@ -177,6 +177,31 @@ class SystemSchemaTest(SchemaDocsTestCase):
         self.assertIn("  members ||--o{ member_cards : member_id", text)
 
 
+class ModelsReferencingTablesTest(SchemaDocsTestCase):
+    """models.md の、モデルの定義の後の「このモデルを参照するテーブル」。"""
+
+    def test_tables_with_model_and_intermediate_tables(self):
+        catalog = self.outputs()["docs/domains/01-catalog/models.md"]
+        self.assertIn(
+            "このモデルを参照するモデル: [ドメイン `loans` のモデル「貸出」][d-loans-m-loan]・"
+            "[ドメイン `loans` のモデル「予約」][d-loans-m-reservation]\n\n"
+            "このモデルを参照するテーブル: [テーブル `books`][d-catalog-t-books]・"
+            "[テーブル `book_categories`][d-catalog-t-book_categories] (属性「分類」を参照)\n",
+            catalog,
+        )
+        self.assertIn('[d-catalog-t-books]: schema.md#d-catalog-t-books "ドメイン `catalog` のテーブル `books`"', catalog)
+
+    def test_line_is_written_without_referencing_models(self):
+        loans = self.outputs()["docs/domains/02-loans/models.md"]
+        self.assertIn("## モデル「貸出」 `loan`\n\n利用者が図書を借りてから返すまでの 1 回の記録。\n\n"
+                      "このモデルを参照するテーブル: [テーブル `loans`][d-loans-t-loans]\n", loans)
+
+    def test_no_line_without_tables(self):
+        for path in self.project.glob("docs/domains/**/schema.yaml"):
+            path.unlink()
+        self.assertNotIn("このモデルを参照するテーブル", self.outputs()["docs/domains/03-members/models.md"])
+
+
 class LinksToTablesTest(SchemaDocsTestCase):
     """手書きの Markdown からテーブルとカラムへのリンク。サンプルの design.md は、カラム returned_at を指している。"""
 
