@@ -284,6 +284,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
 - KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差と R47 の案内で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` が縮んだときにだけ増えるため。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
 - KTD14. **Python のスクリプトは、標準出力に JSON を 1 つ出し、必ずキー `errors` を持たせる。** 終了コードは gh-notification-dispatch と同じく、0 は続ける、3 は `errors` を利用者に示して判断を求める、4 は外部のコマンドが失敗した、1・2 はスクリプトの不具合と引数の誤り。サブコマンドの引数・出力のキー・終了コードの SSOT は、各サブコマンドの `--help` にする。
+- KTD15. **スキルは、時間の上限のある外部のコマンドを実行するサブコマンドを、Bash ツールのバックグラウンド (引数 `run_in_background`) で実行し、完了の通知を受けてから出力を読む** (R4)。Bash ツールの時間の上限 (指定しなければ 120 秒、最大 600 秒) は、調べるディレクトリごとの上限 (R4) の合計より短いことがあり、打ち切られると一覧が出ないため。どのサブコマンドが当たるかは、各サブコマンドの `--help` に書く (KTD14)。
 
 ### High-Level Technical Design
 
@@ -466,7 +467,7 @@ disk-usage-triage/
 
 **Goal:** プラグインを配れる形にし、調べるディレクトリとプロジェクトのディレクトリを設定できるようにする。
 
-**Requirements:** R1〜R4。KD16。KTD1〜KTD3, KTD14。
+**Requirements:** R1〜R4。KD16。KTD1〜KTD3, KTD14, KTD15。
 
 **Dependencies:** U1。
 
@@ -480,7 +481,7 @@ disk-usage-triage/
 **Approach:**
 1. 用意する: `references/files.md` に、`config.json` の様式と、Claude が入力のファイルを書き込むディレクトリ `inputs/` を書く。`proc.py` と `store.py` は gh-notification-dispatch の `gh.py` と `store.py` を元に、外部のコマンドの実行と書き込みの部分だけを持つ形にする。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: サブコマンド `config show`・`config set --input-file`。スキル `triage` に、設定が無いときに調べるディレクトリとプロジェクトのディレクトリを質問し、Write ツールで JSON を書いて `config set` に渡す手順を書く。
+3. 実装する: サブコマンド `config show`・`config set --input-file`。スキル `triage` に、設定が無いときに調べるディレクトリとプロジェクトのディレクトリを質問し、Write ツールで JSON を書いて `config set` に渡す手順を書く。KTD15 のサブコマンドの呼び方も書く。
 4. README に作成中であることを書き、マーケットプレイスとルートの README と `test-targets.txt` に登録する。マーケットプレイスの説明の末尾に「(作成中)」を付ける。
 
 **Patterns to follow:** `gh-notification-dispatch/scripts/gh_notification_dispatch/store.py`・`gh-notification-dispatch/scripts/gh_notification_dispatch/gh.py`・`gh-notification-dispatch/tests/test_docs.py`。
