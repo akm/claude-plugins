@@ -168,7 +168,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 
   asdf の shim を経由するツールのコマンドで、`~/.tool-versions` に版が無いものには、消さずに残る版を環境変数で指定する。残る版が無いときは、消す版の 1 つを指定する (このために、ツールのコマンドを `asdf uninstall` より前に置く)。
 - R44. 削除のシェルスクリプトは、プラグインのファイルに依存せず、macOS の `/bin/bash` (版 3.2) で動く。
-- R45. Claude が削除のシェルスクリプトを実行することを、スキルの指示・R38 の環境変数の検査・hook で拒否する。hook は、トリアージのディレクトリ `runs` のパスか、削除のシェルスクリプトのファイル名を含むコマンドを、実行か読み取りかを問わずに拒否する。
+- R45. Claude が削除のシェルスクリプトを実行することを、スキルの指示・R38 の環境変数の検査・hook で拒否する。hook は、トリアージのディレクトリ `runs` のパスか、削除のシェルスクリプトのファイル名を含むコマンドを、実行か読み取りかを問わずに拒否する。Claude が Write・Edit ツールなどで削除のシェルスクリプトを書き換えることも、hook で拒否する。
 
 **比較**
 
@@ -272,7 +272,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 
   デバイス番号と inode 番号は、`uname` が `Darwin` なら `stat -f '%d:%i'`、それ以外なら `stat -c '%d:%i'` で読む。macOS で使う前提だが、CI (Ubuntu) で同じ削除のシェルスクリプトを実行してテストするため。Python のスクリプトは、作るときに `os.stat` で同じ値を求めて書く。結果のファイル `results.tsv` は、1 行に、項目の ID・結果 (`ok`・`failed`・`skipped`・`interrupted`)・終了コード・時刻・理由をタブで区切って書く。コマンドの出力は、ファイル `log.txt` に書く。
 - KTD8. **hook は、文字列 `disk-usage-triage/runs`・環境変数 `DISK_USAGE_TRIAGE_HOME` で変えたときの `runs` のパス・ファイル名 `disk-usage-triage-delete.sh` のどれかを含むコマンドを拒否する** (session-settled: user-directed; chosen over hook を使わないこと)。R45 と KD14 を実現する。hook の形は、プラグイン review-triage のファイル `review-triage/scripts/review-loop-worker/deny_tmp_hook.py` にならう。このリポジトリで開発するときのコマンド (例: `python3 -m unittest discover -s disk-usage-triage/tests`) を拒否しないように、テストの固定データのディレクトリに `runs` という名前を使わない。このリポジトリの開発では、ファイル名や `runs` のパスを含む文はファイルにして渡し (`git commit -F <ファイル>`・`gh pr create --body-file <ファイル>`)、検索には Bash ツールの `grep` ではなく Grep ツールを使う。Grep ツールは hook が検査する対象 (KTD9) に入らないため。
-- KTD9. **hook は、Bash ツールに加えて、アプリの Terminal パネルにコマンドを送る MCP ツール `mcp__terminal__run_in_terminal` の入力も検査する。** Terminal パネルで実行したコマンドには環境変数 `CLAUDECODE` が付かないことがあり (U1 で確認する)、Bash ツールだけを検査すると、Claude が Terminal パネルから実行するのを拒否できないため。
+- KTD9. **hook は、Bash ツールに加えて、アプリの Terminal パネルにコマンドを送る MCP ツール `mcp__terminal__run_in_terminal` の入力も検査する。** Terminal パネルで実行したコマンドには環境変数 `CLAUDECODE` が付かないことがあり (U1 で確認する)、Bash ツールだけを検査すると、Claude が Terminal パネルから実行するのを拒否できないため。 あわせて、Write・Edit・MultiEdit・NotebookEdit ツールの入力のファイルのパスも検査し、KTD8 の文字列を含むパスへの書き込みを拒否する。利用者に要約を示した後に、Claude が削除のシェルスクリプトの中身を書き換えないようにするため (R45)。
 - KTD10. **asdf は、データの場所と参照を Python のスクリプトが読む** (R23〜R27)。
   - データの場所は、環境変数 `ASDF_DATA_DIR`、無ければ `~/.asdf`。版は `installs/<ツール>/<版>` のディレクトリで、使用量は `installs` で `du -k -d 2` を実行して求める。
   - `.tool-versions` は、`#` から行末をコメントとし、行の最初の語をツール、残りを版として読む。プロジェクトのディレクトリは `os.walk` で探し、`.git` と `node_modules` の下を探さない。`pyvenv.cfg` を見つけたディレクトリ (仮想環境) の下も探さない。
@@ -354,7 +354,7 @@ flowchart TB
 
 - macOS の `du` の振る舞い (プライバシーの保護で読めないディレクトリ・`~/Library/Containers` の下)、Docker Desktop の出力の形、Claude Desktop の MCP ツールの振る舞いは、版で変わりうる。U1 で確認し、変わっていたら R と KTD を直す。
 - CI は Ubuntu の bash (版 5) で削除のシェルスクリプトを実行するので、macOS の `/bin/bash` (版 3.2) で動くこと (R44) は CI では確認できない。U7 と U13 で、macOS で実行して確認する。
-- hook はコマンドの文字列しか見ないので、パスを別の形で書いたコマンドは検出できない (KD14 で受け入れた)。Bash ツールの経路は、R38 の環境変数の検査で補う。Terminal パネルの経路では、コマンドが利用者のログインシェルで実行されるので、環境変数では利用者と Claude を区別できない。そのため、R38 の端末からの入力の確認で補う。疑似端末を作るコマンド (`script` など) を経由すれば入力を送れる余地は残る。
+- hook はコマンドの文字列しか見ないので、パスを別の形で書いたコマンドは検出できない (KD14 で受け入れた)。Write・Edit ツールなどで削除のシェルスクリプトを書き換える経路は、hook がファイルのパスで拒否する (KTD9)。Bash ツールの経路は、R38 の環境変数の検査で補う。Terminal パネルの経路では、コマンドが利用者のログインシェルで実行されるので、環境変数では利用者と Claude を区別できない。そのため、R38 の端末からの入力の確認で補う。疑似端末を作るコマンド (`script` など) を経由すれば入力を送れる余地は残る。
 - Python のスクリプトが asdf の shim を見つけるときの環境変数 `PATH` は、Claude のセッションのもので、利用者の端末のものと違うことがある (KTD10)。
 - 判定表の消すコマンドは、ツールの版で変わりうる。判定表の行ごとに、確認した文書と日付を残す (U3)。
 - Claude が書いたコマンドは、R16 の検査に合っても、選んだ項目の外のものを消すことがある (例: `brew cleanup` は、キャッシュに加えて古い版の formula も消す)。削除のシェルスクリプトを作るときの要約で、Claude が書いたコマンドとその影響を利用者に示す (U7)。
@@ -496,7 +496,7 @@ disk-usage-triage/
 
 ### U8. Claude による実行の拒否
 
-**Goal:** Claude が Bash ツールと Terminal パネルから削除のシェルスクリプトを実行することを、hook で拒否する。
+**Goal:** Claude が Bash ツールと Terminal パネルから削除のシェルスクリプトを実行することと、Write・Edit ツールなどで書き換えることを、hook で拒否する。
 
 **Requirements:** R45。KD14。KTD8, KTD9。
 
@@ -508,7 +508,7 @@ disk-usage-triage/
 **Approach:**
 1. 用意する: U1 で確認した `mcp__terminal__run_in_terminal` の入力の形を、テストの固定データにする。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: サブコマンド `hook pre-tool-use`。`hooks.json` の matcher は `Bash|mcp__terminal__run_in_terminal`。
+3. 実装する: サブコマンド `hook pre-tool-use`。`hooks.json` の matcher は `Bash|mcp__terminal__run_in_terminal|Write|Edit|MultiEdit|NotebookEdit`。
 
 **Patterns to follow:** `review-triage/scripts/review-loop-worker/deny_tmp_hook.py`・`gh-notification-dispatch/hooks/hooks.json`。
 
@@ -519,6 +519,7 @@ disk-usage-triage/
 - このリポジトリの開発のコマンド (`python3 -m unittest discover -s disk-usage-triage/tests`・`python3 disk-usage-triage/scripts/disk_usage_triage.py scan --run <ID>`) は拒否しない。
 - サブコマンド `config set`・`records add`・`judge set` に、`inputs/` のファイルを渡すコマンドは拒否しない。
 - `git commit -F <ファイル>`・`gh pr create --body-file <ファイル>` は拒否しない (KTD8)。
+- Edit ツールで `runs` の下の削除のシェルスクリプトを書き換える入力と、Write ツールで同じパスに書く入力は拒否する。`inputs/` の下のファイルへの Write は拒否しない。
 - 入力の JSON が壊れているときは、拒否も許可もせず、誤りを標準エラー出力に書く。
 
 **Verification:** テストがすべて成功する。Claude Desktop で、Claude に削除のシェルスクリプトの実行を Bash ツールで試させると、hook が拒否する (削除のシェルスクリプトは、何もしない内容のものを使う)。
