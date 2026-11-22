@@ -20,14 +20,14 @@
     "api_call_count": 1
   },
   "redaction": {
-    "replacements": 166,
+    "replacements": 169,
     "layers": {
       "betterleaks": 0,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 2,
       "credentialed_uri": 0,
-      "entropy": 133,
+      "entropy": 136,
       "key_context": 31,
       "provider_token": 0,
       "shell_stdin": 0
@@ -271,6 +271,37 @@
       "collapse": {
         "target": "tool_pair",
         "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01FTF7PWKMNPitbF1dGX4JeP",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "doc-dag:doc-dag"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "4b55d831aee4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2961,
+        "end": 2962,
+        "entry_ids": [
+          "87093428-90fc-4e16-89ed-d248a40271cd"
+        ],
+        "tool_use_id": "toolu_01FTF7PWKMNPitbF1dGX4JeP"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01FTF7PWKMNPitbF1dGX4JeP"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: doc-dag:doc-dag",
         "default_collapsed": true
       }
     }
