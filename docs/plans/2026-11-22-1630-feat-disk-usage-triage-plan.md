@@ -267,8 +267,8 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - シェルの特殊文字は、`;`・`|`・`&`・`$`・バッククォート・`<`・`>`・改行。
 - KTD7. **削除のシェルスクリプトは、1 つのファイルにする** (R37〜R44)。Python のスクリプトが、トリアージのディレクトリに書く。
   1. 冒頭: 作った時刻 (Unix 時刻)・トリアージの ID・項目の数を変数に書く。R38 の検査をし、引数 `--dry-run` を解析する。`--dry-run` でなければ、R38 の端末からの入力の確認をする。ホームディレクトリに移動する。`--dry-run` でなければ、`trap` で中断 (INT・TERM) を結果に書くようにし (中断の行)、ディスクの空き (`df -k "$HOME"`) を結果に書く (開始の行)。`--dry-run` のときは、結果のファイルに何も書かない。
-  2. 項目ごとに、1 つの関数の呼び出しを書く。関数は、再確認 (R39) をし、コマンドを実行し、結果を 1 行追記する。項目は R43 の順に並べる。
-  3. 末尾: `--dry-run` でなければ、ディスクの空きを結果に書き (終了の行)、R40 の数と失敗した項目を表示する。
+  2. 項目ごとに、1 つの関数の呼び出しを書く。関数は、再確認 (R39) をし、コマンドを実行し、結果を 1 行追記する。`--dry-run` のときは、再確認の結果と実行するコマンドを表示するだけで、コマンドを実行せず、結果も追記しない。項目は R43 の順に並べる。
+  3. 末尾: `--dry-run` でなければ、ディスクの空きを結果に書き (終了の行)、R40 の数と失敗した項目を表示する。`--dry-run` のときは、再確認に合った項目と合わなかった項目の数を表示する。
 
   デバイス番号と inode 番号は、`uname` が `Darwin` なら `stat -f '%d:%i'`、それ以外なら `stat -c '%d:%i'` で読む。macOS で使う前提だが、CI (Ubuntu) で同じ削除のシェルスクリプトを実行してテストするため。Python のスクリプトは、作るときに `os.stat` で同じ値を求めて書く。結果のファイル `results.tsv` には、タブで区切った行を追記し、1 列目で行の種類を分ける。開始の行 (`run-start`)・終了の行 (`run-end`)・中断の行 (`interrupted`) は、種類・時刻・ディスクの空きを書く。項目の行 (`item`) は、種類・項目の ID・結果 (`ok`・`failed`・`skipped`)・終了コード・時刻・理由を書く。コマンドの出力は、ファイル `log.txt` に書く。
 - KTD8. **hook は、文字列 `disk-usage-triage/runs`・環境変数 `DISK_USAGE_TRIAGE_HOME` で変えたときの `runs` のパス・ファイル名 `disk-usage-triage-delete.sh` のどれかを含むコマンドを拒否する** (session-settled: user-directed; chosen over hook を使わないこと)。R45 と KD14 を実現する。hook の形は、プラグイン review-triage のファイル `review-triage/scripts/review-loop-worker/deny_tmp_hook.py` にならう。このリポジトリで開発するときのコマンド (例: `python3 -m unittest discover -s disk-usage-triage/tests`) を拒否しないように、テストの固定データのディレクトリに `runs` という名前を使わない。このリポジトリの開発では、ファイル名や `runs` のパスを含む文はファイルにして渡し (`git commit -F <ファイル>`・`gh pr create --body-file <ファイル>`)、検索には Bash ツールの `grep` ではなく Grep ツールを使う。Grep ツールは hook が検査する対象 (KTD9) に入らないため。
