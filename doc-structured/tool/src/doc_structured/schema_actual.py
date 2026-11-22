@@ -16,7 +16,14 @@ from .impl_diff import ImplementationUnavailable
 
 
 class MigrationError(Exception):
-    """マイグレーションを適用できなかった (SQL の誤り・ファイルが無いなど)。メッセージは利用者に見せる文。"""
+    """マイグレーションを適用できなかった (SQL の誤り・ファイルが無いなど)。メッセージは利用者に見せる文。
+
+    path は、失敗したマイグレーションのファイルの、リポジトリのルートからの相対パス。ファイルに依らない失敗では None。
+    """
+
+    def __init__(self, message: str, path: str | None = None):
+        super().__init__(message)
+        self.path = path
 
 
 @dataclass
@@ -99,7 +106,7 @@ def _read_sqlite(root: Path, database: DatabaseConfig) -> ActualSchema:
             try:
                 connection.executescript(text)
             except sqlite3.Error as e:
-                raise MigrationError(f"{relative}: マイグレーションを SQLite に適用できない: {e}") from e
+                raise MigrationError(f"マイグレーションを SQLite に適用できない: {e}", relative) from e
         return _sqlite_schema(connection)
     finally:
         connection.close()

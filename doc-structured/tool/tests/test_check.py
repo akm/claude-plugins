@@ -194,15 +194,56 @@ class CheckTest(ProjectTestCase):
         )
         self.assertIn("検査 c-2: 問題が 1 件あった", result.stdout)
 
-    def test_heavy_has_no_checks_in_this_version(self):
+    def test_heavy_runs_check_j(self):
+        for args in (("--heavy",), ("--only", "j")):
+            with self.subTest(args=args):
+                result = self.run_check(*args)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.stdout, "検査 j: 問題は無かった\n")
+        self.assertEqual(self.run_check("--all").stdout, "検査 a・b・c-1・c-2・h・i・k・j: 問題は無かった\n")
+
+    def test_check_j_failure_points_to_impl_diff(self):
+        path = self.project / "migrations/0002_create_loans.sql"
+        path.write_text(path.read_text(encoding="utf-8").replace("reservation_id text REFERENCES", "reservation_id integer REFERENCES"), encoding="utf-8")
         result = self.run_check("--heavy")
-        self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout, "重い群の検査は、このバージョンのツールには無い\n")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(
+            result.stdout,
+            "docs/domains/02-loans/schema.yaml:18:7: 検査 j: カラム d-loans-t-loans-c-reservation_id の型が違う "
+            "(設計 text、実装 integer)。YAML か実装を直す\n"
+            "差分は bin/doc-structured impl-diff で見る\n"
+            "検査 j: 問題が 1 件あった\n",
+        )
+        # 軽い群 (デフォルト) は検査 j を実行しない
+        self.assertEqual(self.run_check().returncode, 0)
+
+    def test_check_j_is_skipped_when_yaml_has_errors(self):
+        path = self.project / "docs/domains/02-loans/schema.yaml"
+        path.write_text(path.read_text(encoding="utf-8").replace("type: integer", "type: ''", 1), encoding="utf-8")
+        result = self.run_check("--heavy")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("YAML に誤りがあるので、検査 j を実行しなかった", result.stdout)
+
+    def test_check_j_without_database_config(self):
+        self.write_config()
+        result = self.run_check("--heavy")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            ".claude/akm-claude-plugins/doc-structured/config.yaml: 検査 j: 設定に paths.migrations と database が無いので、"
+            "設計と実装を比べられない。設定に paths.migrations と database を書く",
+            result.stdout,
+        )
+
+    def test_check_j_reports_migration_error(self):
+        (self.project / "migrations/0003_broken.sql").write_text("ALTER TABLE missing ADD x text;\n", encoding="utf-8")
+        result = self.run_check("--heavy")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("migrations/0003_broken.sql: 検査 j: マイグレーションを SQLite に適用できない: no such table: missing", result.stdout)
 
     def test_unknown_check_is_usage_error(self):
-        result = self.run_check("--only", "j")
+        result = self.run_check("--only", "z")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("このバージョンのツールに検査 j は無い (ある検査: a・b・c-1・c-2・h・i・k)", result.stderr)
+        self.assertIn("このバージョンのツールに検査 z は無い (ある検査: a・b・c-1・c-2・h・i・k・j)", result.stderr)
 
     def test_options_are_mutually_exclusive(self):
         result = self.run_check("--light", "--all")

@@ -142,7 +142,7 @@ class ReadSqliteTest(ProjectTestCase):
     def test_migration_error_names_file(self):
         with self.assertRaises(MigrationError) as cm:
             self.read("CREATE TABLE books (id text);", "ALTER TABLE missing ADD x text;")
-        self.assertIn("migrations/0002.sql", str(cm.exception))
+        self.assertEqual(cm.exception.path, "migrations/0002.sql")
         self.assertIn("missing", str(cm.exception))
 
 
