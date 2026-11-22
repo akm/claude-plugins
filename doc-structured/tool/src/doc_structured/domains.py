@@ -1041,6 +1041,13 @@ class _Loader:
                     self.problem(
                         path_rel, f"{column.owner} は主キーのカラムなので、nullable: true を書けない", *column.spec.nullable_at
                     )
+                if column.name in spec.primary_key and column.spec.planned and not spec.planned:
+                    self.problem(
+                        path_rel,
+                        f"{owner} は実装済みなので、primary_key に未実装のカラム {column.name} を含められない "
+                        "(カラムの planned を外すか、テーブルに planned を書く)",
+                        *_value_position(mapping, "primary_key"),
+                    )
         if "indexes" in mapping:
             self.load_indexes(table, mapping, path_rel)
 

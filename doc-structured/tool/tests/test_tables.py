@@ -304,6 +304,18 @@ class KeyAndIndexTest(SchemaTestCase):
             "テーブル loans のカラム id は主キーのカラムなので、nullable: true を書けない",
         )
 
+    def test_implemented_primary_key_cannot_include_planned_column(self):
+        planned_id = LOANS_TABLE.replace("        definition: 貸出を識別する値。\n", "        definition: 貸出を識別する値。\n        planned: true\n")
+        self.assert_problem(
+            self.files(planned_id),
+            f"{LOANS_SCHEMA}:4:18: 検査 h: テーブル loans は実装済みなので、primary_key に未実装のカラム id を含められない "
+            "(カラムの planned を外すか、テーブルに planned を書く)",
+        )
+        self.setUp()
+        # テーブルも未実装なら成功する
+        planned_table = LOANS_TABLE.replace("    definition: 貸出の行。\n", "    definition: 貸出の行。\n    planned: true\n")
+        self.assertEqual(self.problems_for(self.files(planned_table)), [])
+
     def test_indexes(self):
         cases = {
             "    indexes: []\n": "テーブル loans の indexes は、空の配列にできない (インデックスが無いテーブルは、indexes を省く)",
