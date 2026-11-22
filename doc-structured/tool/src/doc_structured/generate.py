@@ -83,8 +83,14 @@ def escape_link_text(text: str) -> str:
     return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 
+# 表のセルの文の、改行と前後の空白
+CELL_NEWLINE_RE = re.compile(r"[ \t]*\n[ \t\n]*")
+
+
 def escape_cell(text: str) -> str:
-    return text.replace("|", "\\|")
+    """表のセルに書く文。「|」をエスケープし、改行 (と前後の空白) を空白 1 つにする。Markdown の表は 1 行が表の 1 行なので、
+    改行を残すと表が崩れる。段落の中の改行が空白として描画されるのと同じ見え方にする。"""
+    return CELL_NEWLINE_RE.sub(" ", text).replace("|", "\\|")
 
 
 class _Links:

@@ -144,6 +144,37 @@ class DomainSchemaTest(SchemaDocsTestCase):
         self.assertNotIn("-t-", outputs["docs/glossary.md"])
 
 
+class MultilineTextInCellTest(SchemaDocsTestCase):
+    """改行を書ける文 (テーブルとカラムの definition・ドメインの description) を、表のセルでは 1 行にする。"""
+
+    def test_multiline_definitions_stay_in_one_table_row(self):
+        path = self.project / "docs/domains/03-members/schema.yaml"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "    definition: 利用者に発行する利用者カード 1 枚の行。\n",
+            "    definition: |\n      利用者に発行する\n      利用者カード 1 枚の行。\n",
+        ).replace(
+            "        definition: カードを持つ利用者。\n", "        definition: |\n          カードを持つ\n\n          利用者。\n"
+        )
+        path.write_text(text, encoding="utf-8")
+        outputs = self.outputs()
+        self.assertIn("`member_id` | `text` | | | [テーブル `members` のカラム `id`][d-members-t-members-c-id] | カードを持つ 利用者。 |",
+                      outputs[MEMBERS_SCHEMA_MD])
+        self.assertIn("| [`member_cards`][d-members-t-member_cards] (未実装) | [`members`][d-members] | 利用者に発行する 利用者カード 1 枚の行。 |",
+                      outputs[SYSTEM_SCHEMA_MD])
+
+    def test_multiline_domain_description_stays_in_one_table_row(self):
+        path = self.project / "docs/domains/03-members/domain.yaml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "  description: 図書館に登録した利用者を扱う。\n", "  description: |\n    図書館に登録した\n    利用者を扱う。\n"
+            ),
+            encoding="utf-8",
+        )
+        readme = self.outputs()["docs/domains/README.md"]
+        self.assertIn("| [`03-members`][d-members] | 図書館に登録した 利用者を扱う。 |", readme)
+
+
 class SystemSchemaTest(SchemaDocsTestCase):
     def test_table_of_all_tables(self):
         text = self.outputs()[SYSTEM_SCHEMA_MD]
