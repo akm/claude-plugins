@@ -310,7 +310,7 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
         for column_name, actual_column in actual_columns.items():
             if not any(column.name == column_name for column in entry.children):
                 item.children.append(Item(f"テーブル {entry.id} のカラム {column_name}", None, _column_values(actual_column)))
-        # 未実装のインデックスは、実装にあるかを確かめるために組にする (実装にあれば planned を外す指示を出す)
+        # 未実装のインデックスも、実装にあるかを確認するために組にする (実装にあれば planned を外す指示を出す)
         all_design = [(index, _Index(tuple(index.columns), index.unique)) for index in spec.indexes]
         pairs, _ = _pair_indexes([d for _, d in all_design], actual_indexes)
         for design_index, actual_index in pairs:
