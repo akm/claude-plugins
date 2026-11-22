@@ -1,0 +1,57 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221。1 (#193)・2 (#194)・3 (#195)・A1 (#214)・4a (#196)・4c (#198)・4b (#197)・A2 (#215)・5 (#200)・6 (#201)・7 (#202)・A3 (#216)・11a (#206) は完了し、4d (#199) は作らないと決めて閉じた。最新のタグは doc-structured--v0.10.0。11a で、テーブルとカラムの設計をファイル名が `schema` で始まる YAML (トップのキー `tables`) に書けるようになり、ドメインごとの `schema.md`・全体の `docs/system/schema.md`・ER 図が生成され、外部キーがドメインの依存と検査 c-1 に入った。11b (#207) は、マイグレーションを一時的なデータベースに適用して実際のスキーマを読み、`docs/system/schema-actual.md` を生成し、設計との差分を検査 j とサブコマンド・スキル `impl-diff` で示す。判定と差分の表示の共通部分は、後の 12 (#209) の画面のルートでも使う。11b の後に 12 (#209) が、その後に B2 (#218) が続く。参考のワークフロー (CI) は 10 (#205) でまだ作っていない。ツールは Python 3.12 以上 + ruamel.yaml + markdown-it-py。未追跡の `.claude/settings.json`・`.entire/`・`docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#207 (sub-issue 11b「設計と実際のスキーマの差分を検査したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 207 --comments` (ゴール・入力・この sub-issue で決める形式・成果物と機能・クローズ条件)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧。問 12 の結果の表 (6 つの行) と、比べる項目・比べない項目、検査 j・`impl-diff`・重い群・検査の群の決定を確かめる)
+- 形式の SSOT であるディレクトリ `doc-structured/rules/` の規則の文書、ツール `doc-structured/tool/` (generate・検査 a・c-1・h・i と、11a で作ったスキーマの読み込み)、スキル `doc-structured/skills/`
+- 前の sub-issue で決めたこと: Issue #194 のコメント https://github.com/akm/claude-plugins/issues/194#issuecomment-6716205386 (YAML の形式・設定ファイル)、#202 の決定 https://github.com/akm/claude-plugins/issues/202#issuecomment-6919324832 (検査の群・報告の形)、#206 の決定 https://github.com/akm/claude-plugins/issues/206#issuecomment-7073968595 (`schema` で始まる YAML・カラムの項目・`planned`・`schema.md` の形) と実際のプロジェクトでの確認 https://github.com/akm/claude-plugins/issues/206#issuecomment-7074395898 。#206 から分けた #306 (複数カラムの外部キー)・#307 (1 対 1 でない属性とカラムの対応)・#312 (共通のカラム) は、この sub-issue の範囲かどうかを利用者に確かめる。
+- 共有ノートの引き継ぎのメモ `194-doc-structured-generate-check.md`・`202-doc-structured-dependencies.md`・`206-doc-structured-schema.md`・`216-a3-apply.md` があれば読む
+
+進め方:
+- Issue の「この sub-issue で決める形式」(設定の項目・対応するデータベースの種類) と、実装の中で出る判断 (一時的なデータベースの用意の仕方 (コンテナ・手元のサーバー・SQLite など)、マイグレーションのツールの扱い、実際のスキーマの読み方、正規化の形、`schema-actual.md` の形、差分の表示の形と指示の行、12 (#209) と共有する部分の切り出し方、`planned` のテーブルの扱い、手元にデータベースが無いときの伝え方、参考のワークフローがまだ無いときの「重い群のジョブに足す」の扱いなど) は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #207 に書く。
+- 実際のプロジェクトのマイグレーションとデータベースで形式を確かめるときは、チェックアウト `/Users/akima/techno/ikinari-order-v2` を読んでよい (読むだけで変えない。A3 の動作確認のブランチ `claude/doc-structured-a3-216-0a6cd2` も読んでよい)。データベースを起動するなど、手元の環境を変える操作は利用者に確かめてから行う。公開の場 (Issue・PR・ファイル・コミットメッセージ) には、そのプロジェクトの名前・リポジトリ名・Issue 番号・リンク・ファイルのパスを書かず、「実際のプロジェクト」と書く。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。規則の文書には手順を書かない。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットと PR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。スキルの対話の確認は、タグを公開する前に行う。タグはファイル `doc-structured/docs/release.md` の手順のとおりに付ける。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、タグが公開され、Issue #207 が閉じている。終わったら、呼び出し元のセッション (local_a14f3497-5f91-4f16-aa39-ed64303c4522) に、SendMessage で結果 (PR 番号・決めたこと・別の Issue に分けたもの・片付けの状況・次の sub-issue) を送る。ターンの終わりの自動の通知は報告の代わりにならない (先頭の 400 文字しか届かない)。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+B: PostgreSQL も
+
+---
+
+B: Docker で起動
+
+---
+
+A: docker exec で psql
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
+
+---
+
+推奨の案で
