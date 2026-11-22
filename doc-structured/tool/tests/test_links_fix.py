@@ -352,6 +352,10 @@ class FirstUseTest(ScratchTestCase):
             self.read(path)
             + "      loan_status:\n        name_ja: 貸出状態\n        definition: 予約した図書の貸出が今どの段階にあるか。\n",
         )
+        self.add_mapped_column(
+            f"{LOANS}/reservations/schema.yaml", "        attribute: d-loans-m-reservation-a-status\n", "loan_status",
+            "d-loans-m-reservation-a-loan_status",
+        )
         self.assertEqual(self.run_tool("generate").returncode, 0)
         result, body = self.fix("[d-loans-m-loan-a-status]・[d-loans-m-reservation-a-loan_status]")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

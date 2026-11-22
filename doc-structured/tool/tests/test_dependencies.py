@@ -147,6 +147,10 @@ class DependenciesTest(ProjectTestCase):
             "        definition: 利用者の名前。\n" + refers_to("current_loan", "d-loans-m-loan"),
         )
         path.write_text(text, encoding="utf-8")
+        self.add_mapped_column(
+            "docs/domains/03-members/schema.yaml", "        attribute: d-members-m-member-a-name\n", "current_loan_id",
+            "d-members-m-member-a-current_loan",
+        )
 
     def test_domain_cycle_fails_with_ids_in_order(self):
         self.cycle_between_loans_and_members()
@@ -210,6 +214,10 @@ class ModelCyclesTest(ProjectTestCase):
             "        refers_to: d-loans-m-reservation\n" + refers_to("last_loan", "d-loans-m-loan"),
         )
         path.write_text(text, encoding="utf-8")
+        self.add_mapped_column(
+            "docs/domains/02-loans/reservations/schema.yaml", "        attribute: d-loans-m-reservation-a-status\n",
+            "last_loan_id", "d-loans-m-reservation-a-last_loan",
+        )
         self.assertEqual(
             self.problems(),
             [

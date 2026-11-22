@@ -18,7 +18,8 @@
   - テーブルとカラムは、ファイル名が schema で始まる YAML のトップのキー tables に書く。このファイルには、ほかのトップのキーを
     書けない。テーブルとカラムは開発レベルの種類で、日本語名を持たない。テーブルは、カラム columns・主キー primary_key
     (カラム名の配列)・インデックス indexes を持つ。カラムは、型 type・NULL を許可するか nullable・デフォルト値 default
-    (SQL の式の文字列)・外部キー references (参照先のカラムの完全な ID) を持つ。テーブル・カラム・インデックスは、
+    (SQL の式の文字列)・外部キー references (参照先のカラムの完全な ID) を持つ。テーブルは対応するモデル model か属性
+    attribute (中間テーブル) を、カラムは対応する属性 attribute を、完全な ID で持てる。テーブル・カラム・インデックスは、
     未実装を表すフラグ planned を持てる。テーブルをまたぐ確認 (外部キーの参照先など) は、モジュール tables が行う
 ロールは、ドメインの外のファイル docs/system/roles.yaml のキー roles に書く。ロールは親を持たない (ID は r-<英語名>)。
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
@@ -61,7 +62,10 @@ LIST_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
 }
 # テーブルとカラムの参照 (1 つの完全な ID で書く)。参照できる種類の記号と、メッセージに書くその名前は LIST_REFERENCES と同じ形
 SCHEMA_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
+    ("t", "model"): (("m",), "モデル"),
+    ("t", "attribute"): (("a",), "属性"),
     ("c", "references"): (("c",), "カラム"),
+    ("c", "attribute"): (("a",), "属性"),
 }
 # 空の配列を書いたときに、メッセージに添える直し方。書いていないキーは「参照が無いときは、<キー> を省く」
 EMPTY_LIST_HINTS = {"roles": "行えるロールが無い操作は、roles を省く"}
@@ -83,8 +87,8 @@ TRANSITION_REFERENCES: dict[str, tuple[tuple[str, ...], str]] = {
 # テーブルとカラムを書く YAML の、ファイル名の始まりとトップのキー
 SCHEMA_FILE_PREFIX = "schema"
 TABLES_KEY = "tables"
-TABLE_KEYS = ("definition", "primary_key", "columns", "indexes", "planned")
-COLUMN_KEYS = ("type", "nullable", "default", "references", "definition", "planned", "in_overview")
+TABLE_KEYS = ("model", "attribute", "definition", "primary_key", "columns", "indexes", "planned")
+COLUMN_KEYS = ("type", "nullable", "default", "references", "attribute", "definition", "planned", "in_overview")
 INDEX_KEYS = ("columns", "unique", "planned")
 # true だけを書けるフラグに false を書いたときに、メッセージに添える直し方
 FLAG_HINTS = {
@@ -1010,6 +1014,15 @@ class _Loader:
         table.spec = spec
         owner = table.owner
         spec.definition_at = self.read_definition(table, mapping, path_rel)
+        if "model" in mapping and "attribute" in mapping:
+            self.problem(
+                path_rel, f"{owner} には、model と attribute のどちらか 1 つだけを書ける", *_key_position(mapping, "attribute")
+            )
+        for key, kinds_text in (("model", "モデル"), ("attribute", "属性")):
+            if key in mapping:
+                reference = self.single_id(owner, mapping, key, kinds_text, path_rel)
+                if reference is not None:
+                    table.references.append(reference)
         if "planned" in mapping:
             spec.planned = self.true_flag(owner, mapping, "planned", path_rel)
         if "columns" not in mapping:
@@ -1045,10 +1058,11 @@ class _Loader:
             spec.nullable_at = _value_position(mapping, "nullable")
         if "default" in mapping:
             spec.default = self.default_value(owner, mapping, path_rel)
-        if "references" in mapping:
-            reference = self.single_id(owner, mapping, "references", "カラム", path_rel)
-            if reference is not None:
-                column.references.append(reference)
+        for key, kinds_text in (("references", "カラム"), ("attribute", "属性")):
+            if key in mapping:
+                reference = self.single_id(owner, mapping, key, kinds_text, path_rel)
+                if reference is not None:
+                    column.references.append(reference)
         if "planned" in mapping:
             if table.spec.planned:
                 self.problem(

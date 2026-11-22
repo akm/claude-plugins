@@ -160,7 +160,7 @@ class FileAndTableTest(SchemaTestCase):
         self.assert_problem(
             self.files(LOANS_TABLE + "        unique: true\n"),
             f"{LOANS_SCHEMA}:{LOANS_TABLE_LINES + 1}:9: 検査 h: 知らないキー unique (書けるキー: type, nullable, default, "
-            "references, definition, planned, in_overview)",
+            "references, attribute, definition, planned, in_overview)",
         )
 
 
@@ -323,6 +323,183 @@ class KeyAndIndexTest(SchemaTestCase):
         self.assertEqual(
             self.problems_for(self.files(planned + "    indexes:\n      - columns: [book_id]\n        planned: true\n")), []
         )
+
+
+# モデルとの対応のテストの、ドメイン loans のモデル。貸出は、図書 (ドメイン catalog) と予約を参照し、状態の遷移を持つ
+MAPPED_LOANS_DOMAIN = """\
+domain:
+  description: 貸出を扱う。
+models:
+  loan:
+    name_ja: 貸出
+    definition: 1 回の貸出。
+    attributes:
+      book:
+        name_ja: 貸出図書
+        definition: 貸し出した図書。
+        refers_to: d-catalog-m-book
+      status:
+        name_ja: 貸出状態
+        definition: 貸出の段階。
+        values:
+          on_loan:
+            name_ja: 貸出中
+            definition: 手元にある。
+          returned:
+            name_ja: 返却済み
+            definition: 戻った。
+        state_machine:
+          transitions:
+            - from: [on_loan]
+              to: returned
+      holds:
+        name_ja: 取り置き
+        definition: この貸出に付けた取り置き。
+        refers_to: d-loans-m-hold
+  hold:
+    name_ja: 取り置き
+    definition: 図書の取り置き。
+"""
+MAPPED_CATALOG_DOMAIN = """\
+domain:
+  description: 図書を扱う。
+models:
+  book:
+    name_ja: 図書
+    definition: 1 冊の本。
+"""
+MAPPED_BOOKS = BOOKS.replace("    definition: 図書の行。\n", "    model: d-catalog-m-book\n")
+MAPPED_LOANS = """\
+tables:
+  loans:
+    model: d-loans-m-loan
+    primary_key: [id]
+    columns:
+      id:
+        type: text
+        definition: 貸出を識別する値。
+      book_id:
+        type: text
+        references: d-catalog-t-books-c-id
+        attribute: d-loans-m-loan-a-book
+      status:
+        type: text
+        attribute: d-loans-m-loan-a-status
+  loan_holds:
+    attribute: d-loans-m-loan-a-holds
+    columns:
+      loan_id:
+        type: text
+        definition: 貸出。
+        references: d-loans-t-loans-c-id
+"""
+
+
+class MappingTest(SchemaTestCase):
+    """モデルと属性との対応 (テーブルの model・attribute、カラムの attribute) の、成功する例と失敗する例。"""
+
+    def mapped(self, loans_schema: str = MAPPED_LOANS) -> dict[str, str]:
+        return {
+            CATALOG: MAPPED_CATALOG_DOMAIN, CATALOG_SCHEMA: MAPPED_BOOKS, LOANS: MAPPED_LOANS_DOMAIN, LOANS_SCHEMA: loans_schema,
+        }
+
+    def test_valid_mapping_has_no_problems(self):
+        self.assertEqual(self.problems_for(self.mapped()), [])
+
+    def test_model_and_attribute_kinds(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("model: d-loans-m-loan\n", "model: d-loans-m-loan-a-book\n")),
+            "テーブル loans の model の参照先 d-loans-m-loan-a-book はモデルでない (参照できるのはモデルだけ)",
+        )
+        self.setUp()
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("attribute: d-loans-m-loan-a-status", "attribute: d-loans-m-loan")),
+            "テーブル loans のカラム status の attribute の参照先 d-loans-m-loan は属性でない (参照できるのは属性だけ)",
+        )
+
+    def test_model_and_attribute_together(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("    model: d-loans-m-loan\n", "    model: d-loans-m-loan\n    attribute: d-loans-m-loan-a-holds\n")),
+            f"{LOANS_SCHEMA}:4:5: 検査 h: テーブル loans には、model と attribute のどちらか 1 つだけを書ける",
+        )
+
+    def test_mapping_to_other_domain(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("model: d-loans-m-loan\n", "model: d-catalog-m-book\n")),
+            "テーブル loans の model の参照先 d-catalog-m-book は、ほかのドメインの定義 "
+            "(テーブルとカラムは、対応するモデルと属性と同じドメインに書く)",
+        )
+
+    def test_column_attribute_needs_table_model(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("        definition: 貸出。\n", "        attribute: d-loans-m-loan-a-book\n")),
+            "テーブル loan_holds のカラム loan_id の attribute は、model を書いたテーブルのカラムにだけ書ける "
+            "(中間テーブルと、対応するモデルが無いテーブルのカラムには書けない)",
+        )
+
+    def test_column_attribute_must_belong_to_table_model(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace(
+                "  loan_holds:\n", "  holds:\n    model: d-loans-m-hold\n    columns:\n      x:\n        type: text\n"
+                "        attribute: d-loans-m-loan-a-book\n  loan_holds:\n"
+            )),
+            "テーブル holds のカラム x の attribute の参照先 d-loans-m-loan-a-book は、テーブル holds の model (d-loans-m-hold) の属性でない",
+        )
+
+    def test_references_must_match_refers_to(self):
+        unmapped_books = MAPPED_BOOKS.replace("    model: d-catalog-m-book\n", "    definition: 図書の行。\n")
+        self.assert_problem(
+            self.mapped() | {CATALOG_SCHEMA: unmapped_books},
+            "テーブル loans のカラム book_id の references が指すテーブル books の model (無し) が、attribute の参照先 "
+            "d-loans-m-loan-a-book の refers_to (d-catalog-m-book) と違う",
+        )
+
+    def test_definition_with_mapping(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("    model: d-loans-m-loan\n", "    model: d-loans-m-loan\n    definition: 貸出の行。\n")),
+            f"{LOANS_SCHEMA}:4:5: 検査 h: テーブル loans には対応するモデルか属性を書いたので、definition を書けない "
+            "(定義は、対応するモデルか属性にある)",
+        )
+        self.setUp()
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("        attribute: d-loans-m-loan-a-status\n",
+                                             "        attribute: d-loans-m-loan-a-status\n        definition: 状態。\n")),
+            "テーブル loans のカラム status には対応する属性を書いたので、definition を書けない",
+        )
+
+    def test_definition_without_mapping(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("        definition: 貸出を識別する値。\n", "")),
+            f"{LOANS_SCHEMA}:6:7: 検査 h: テーブル loans のカラム id に definition が無い (対応する属性を書かないカラムには、definition が必須)",
+        )
+        self.setUp()
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("    attribute: d-loans-m-loan-a-holds\n", "")),
+            "テーブル loan_holds に definition が無い (対応するモデルか属性を書かないテーブルには、definition が必須)",
+        )
+
+    def test_every_attribute_of_mapped_model_has_column(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("  loan_holds:\n    attribute: d-loans-m-loan-a-holds\n",
+                                             "  loan_holds:\n    definition: 中間テーブルの行。\n")),
+            f"{LOANS_SCHEMA}:3:12: 検査 h: モデル loan の属性 holds (d-loans-m-loan-a-holds) に対応するカラムが無い "
+            "(テーブル loans が model でこのモデルを指すので、属性ごとに、カラムの attribute か中間テーブルの attribute で対応を書く)",
+        )
+
+    def test_in_overview_on_state_machine_column(self):
+        self.assert_problem(
+            self.mapped(MAPPED_LOANS.replace("        attribute: d-loans-m-loan-a-status\n",
+                                             "        attribute: d-loans-m-loan-a-status\n        in_overview: true\n")),
+            "テーブル loans のカラム status は状態の遷移を持つ属性 d-loans-m-loan-a-status に対応し、全体の図にいつも描かれるので、"
+            "in_overview を書けない",
+        )
+
+    def test_mapping_direction(self):
+        for relative, text in (self.mapped() | {"docs/domains/02-loans/sub/hold.yaml": "models: {}\n"}).items():
+            self.write(relative, text)
+        project, problems = load_project(self.project)
+        self.assertEqual(problems, [])
+        self.assertEqual(check_direction(project), [])
 
 
 class DirectionTest(SchemaTestCase):

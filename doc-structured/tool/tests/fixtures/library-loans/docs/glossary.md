@@ -13,6 +13,9 @@
 | [借りた利用者][d-loans-m-loan-a-member] | モデル「貸出」の属性 | `member` | [`loans`][d-loans] |
 | [元の予約][d-loans-m-loan-a-reservation] | モデル「貸出」の属性 | `reservation` | [`loans`][d-loans] |
 | [先の予約が無い][d-loans-pre-no_previous_reservation] | 前提 | `no_previous_reservation` | [`loans`][d-loans] |
+| [分類][d-catalog-m-book-a-categories] | モデル「図書」の属性 | `categories` | [`catalog`][d-catalog] |
+| [分類][d-catalog-m-category] | モデル | `category` | [`catalog`][d-catalog] |
+| [分類名][d-catalog-m-category-a-name] | モデル「分類」の属性 | `name` | [`catalog`][d-catalog] |
 | [利用者][d-members-m-member] | モデル | `member` | [`members`][d-members] |
 | [利用者][r-member] | ロール | `member` | |
 | [利用者を登録する][d-members-op-register] | 操作 | `register` | [`members`][d-members] |
@@ -47,10 +50,13 @@
 
 [d-catalog]: domains/01-catalog/README.md#d-catalog "ドメイン `catalog`"
 [d-catalog-m-book]: domains/01-catalog/models.md#d-catalog-m-book "ドメイン `catalog` のモデル「図書」"
+[d-catalog-m-book-a-categories]: domains/01-catalog/models.md#d-catalog-m-book-a-categories "ドメイン `catalog` のモデル「図書」の属性「分類」"
 [d-catalog-m-book-a-shelf_status]: domains/01-catalog/models.md#d-catalog-m-book-a-shelf_status "ドメイン `catalog` のモデル「図書」の属性「配架状態」"
 [d-catalog-m-book-a-shelf_status-v-shelved]: domains/01-catalog/models.md#d-catalog-m-book-a-shelf_status-v-shelved "ドメイン `catalog` のモデル「図書」の属性「配架状態」の値「配架中」"
 [d-catalog-m-book-a-shelf_status-v-withdrawn]: domains/01-catalog/models.md#d-catalog-m-book-a-shelf_status-v-withdrawn "ドメイン `catalog` のモデル「図書」の属性「配架状態」の値「除籍」"
 [d-catalog-m-book-a-title]: domains/01-catalog/models.md#d-catalog-m-book-a-title "ドメイン `catalog` のモデル「図書」の属性「書名」"
+[d-catalog-m-category]: domains/01-catalog/models.md#d-catalog-m-category "ドメイン `catalog` のモデル「分類」"
+[d-catalog-m-category-a-name]: domains/01-catalog/models.md#d-catalog-m-category-a-name "ドメイン `catalog` のモデル「分類」の属性「分類名」"
 [d-catalog-ut-call_number]: domains/01-catalog/unclassified_app_terms.md#d-catalog-ut-call_number "ドメイン `catalog` の未分類のアプリケーション用語「請求記号」"
 [d-loans]: domains/02-loans/README.md#d-loans "ドメイン `loans`"
 [d-loans-ev-book_lent]: domains/02-loans/functions.md#d-loans-ev-book_lent "ドメイン `loans` のイベント「図書を貸し出した」"

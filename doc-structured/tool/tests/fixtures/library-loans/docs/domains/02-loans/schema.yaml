@@ -1,0 +1,35 @@
+# 架空の題材「図書館の貸出」の、貸出のドメインのテーブル。予約のテーブルは、予約のモデルと同じサブディレクトリ reservations/ にある
+tables:
+  loans:
+    model: d-loans-m-loan
+    primary_key: [id]
+    columns:
+      id:
+        type: text
+        definition: 貸出を識別する値。
+      book_id:
+        type: text
+        references: d-catalog-t-books-c-id
+        attribute: d-loans-m-loan-a-book
+      member_id:
+        type: text
+        references: d-members-t-members-c-id
+        attribute: d-loans-m-loan-a-member
+      reservation_id:
+        type: text
+        nullable: true
+        references: d-loans-t-reservations-c-id
+        attribute: d-loans-m-loan-a-reservation
+      status:
+        type: text
+        default: "'on_loan'"
+        attribute: d-loans-m-loan-a-status
+      returned_at:
+        type: integer
+        nullable: true
+        planned: true
+        definition: 図書が返った時刻 (UNIX 時刻のミリ秒)。
+    indexes:
+      - columns: [member_id]
+      - columns: [reservation_id]
+        unique: true

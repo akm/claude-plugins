@@ -35,5 +35,27 @@
 
 蔵書から除き、貸し出さない。
 
+<a name="d-catalog-m-book-a-categories"></a>
+
+### 属性「分類」 `categories`
+
+図書に付けた分類。1 冊に複数の分類を付けられる。参照先: [モデル「分類」][d-catalog-m-category]
+
+<a name="d-catalog-m-category"></a>
+
+## モデル「分類」 `category`
+
+図書を主題で分ける区分。
+
+このモデルを参照するモデル: [モデル「図書」][d-catalog-m-book]
+
+<a name="d-catalog-m-category-a-name"></a>
+
+### 属性「分類名」 `name`
+
+分類の名前。
+
+[d-catalog-m-book]: #d-catalog-m-book "ドメイン `catalog` のモデル「図書」"
+[d-catalog-m-category]: #d-catalog-m-category "ドメイン `catalog` のモデル「分類」"
 [d-loans-m-loan]: ../02-loans/models.md#d-loans-m-loan "ドメイン `loans` のモデル「貸出」"
 [d-loans-m-reservation]: ../02-loans/models.md#d-loans-m-reservation "ドメイン `loans` のモデル「予約」"

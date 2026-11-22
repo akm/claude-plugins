@@ -64,6 +64,15 @@ class ProjectTestCase(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
+    def add_mapped_column(self, schema: str, after: str, column: str, attribute: str) -> None:
+        """サンプルの YAML (schema) の行 after の後に、属性 attribute に対応するカラム column を足す。サンプルのモデルに属性を足す
+        テストは、テーブルを持つモデルのすべての属性にカラムの対応が要る (検査 h) ので、このカラムも足す。"""
+        path = self.project / schema
+        text = path.read_text(encoding="utf-8")
+        assert after in text, after
+        lines = f"      {column}:\n        type: text\n        attribute: {attribute}\n"
+        path.write_text(text.replace(after, after + lines, 1), encoding="utf-8")
+
     def install_bin(self, project: Path | None = None, script: Path = BIN_SCRIPT) -> Path:
         """プロジェクトに bin/doc-structured を置く (実際のプロジェクトでは生成したファイル)。"""
         dest = (project or self.project) / "bin" / "doc-structured"
