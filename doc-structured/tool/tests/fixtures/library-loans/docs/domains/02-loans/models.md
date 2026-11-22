@@ -9,6 +9,8 @@
 
 利用者が図書を借りてから返すまでの 1 回の記録。
 
+このモデルを参照するテーブル: [テーブル `loans`][d-loans-t-loans]
+
 <a name="d-loans-m-loan-a-book"></a>
 
 ### 属性「貸出図書」 `book`
@@ -76,6 +78,8 @@ stateDiagram-v2
 貸出中の図書が返ったときに、次に借りる権利を取っておく記録。
 
 このモデルを参照するモデル: [モデル「貸出」][d-loans-m-loan]・[モデル「予約」][d-loans-m-reservation]
+
+このモデルを参照するテーブル: [テーブル `reservations`][d-loans-t-reservations]
 
 <a name="d-loans-m-reservation-a-book"></a>
 
@@ -158,4 +162,6 @@ stateDiagram-v2
 [d-loans-op-return_book]: functions.md#d-loans-op-return_book "ドメイン `loans` の操作「返却を受け付ける」"
 [d-loans-pre-first_in_line]: functions.md#d-loans-pre-first_in_line "ドメイン `loans` の前提「予約の順番が先頭」"
 [d-loans-pre-hold_expired]: functions.md#d-loans-pre-hold_expired "ドメイン `loans` の前提「取り置きの期限を過ぎた」"
+[d-loans-t-loans]: schema.md#d-loans-t-loans "ドメイン `loans` のテーブル `loans`"
+[d-loans-t-reservations]: schema.md#d-loans-t-reservations "ドメイン `loans` のテーブル `reservations`"
 [d-members-m-member]: ../03-members/models.md#d-members-m-member "ドメイン `members` のモデル「利用者」"

@@ -32,6 +32,8 @@ DEFINITION_RE = re.compile(
 )
 # 行の全体に書いたアンカー
 ANCHOR_RE = re.compile(r'^\s*<a name="(?P<name>[^"]*)"></a>\s*$')
+# 表の行の最初のセルの先頭に書いたアンカー。生成したファイル (schema.md のカラムの表) だけで読む (関数 table_cell_anchors)
+TABLE_CELL_ANCHOR_RE = re.compile(r'^\|[ \t]*<a name="(?P<name>[^"]*)"></a>')
 # 行頭のタスクリストのチェックボックス。引用とリストの記号の後の [ ]・[x]・[X]
 TASK_RE = re.compile(r"^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+(?P<box>\[[ xX]\])(?=[ \t]|$)")
 # 引用の先頭の GitHub の注記 ([!NOTE] など)
@@ -496,3 +498,14 @@ class _InlineScanner:
             Reference("shortcut", inner, inner, line, column, line, column, *self.position(close))
         )
         return after
+
+
+def table_cell_anchors(document: Document) -> list[Anchor]:
+    """表の行の最初のセルの先頭に書いたアンカー。生成したファイルだけに使う (手書きのファイルのアンカーは、行の全体に書いたものだけ)。
+    生成したファイルは、コードブロックと mermaid の図の中に「|」で始まる行を書かないので、行の先頭だけで判定する。"""
+    found: list[Anchor] = []
+    for index, line in enumerate(document.lines):
+        match = TABLE_CELL_ANCHOR_RE.match(line)
+        if match:
+            found.append(Anchor(match.group("name"), index + 1, match.start("name") - len('<a name="') + 1))
+    return found

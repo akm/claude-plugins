@@ -5,6 +5,9 @@
 
 | 用語 | 種類 | 英語名 |
 |---|---|---|
+| [分類][d-catalog-m-book-a-categories] | モデル「図書」の属性 | `categories` |
+| [分類][d-catalog-m-category] | モデル | `category` |
+| [分類名][d-catalog-m-category-a-name] | モデル「分類」の属性 | `name` |
 | [図書][d-catalog-m-book] | モデル | `book` |
 | [書名][d-catalog-m-book-a-title] | モデル「図書」の属性 | `title` |
 | [請求記号][d-catalog-ut-call_number] | 未分類のアプリケーション用語 | `call_number` |
@@ -13,8 +16,11 @@
 | [除籍][d-catalog-m-book-a-shelf_status-v-withdrawn] | モデル「図書」の属性「配架状態」の値 | `withdrawn` |
 
 [d-catalog-m-book]: models.md#d-catalog-m-book "ドメイン `catalog` のモデル「図書」"
+[d-catalog-m-book-a-categories]: models.md#d-catalog-m-book-a-categories "ドメイン `catalog` のモデル「図書」の属性「分類」"
 [d-catalog-m-book-a-shelf_status]: models.md#d-catalog-m-book-a-shelf_status "ドメイン `catalog` のモデル「図書」の属性「配架状態」"
 [d-catalog-m-book-a-shelf_status-v-shelved]: models.md#d-catalog-m-book-a-shelf_status-v-shelved "ドメイン `catalog` のモデル「図書」の属性「配架状態」の値「配架中」"
 [d-catalog-m-book-a-shelf_status-v-withdrawn]: models.md#d-catalog-m-book-a-shelf_status-v-withdrawn "ドメイン `catalog` のモデル「図書」の属性「配架状態」の値「除籍」"
 [d-catalog-m-book-a-title]: models.md#d-catalog-m-book-a-title "ドメイン `catalog` のモデル「図書」の属性「書名」"
+[d-catalog-m-category]: models.md#d-catalog-m-category "ドメイン `catalog` のモデル「分類」"
+[d-catalog-m-category-a-name]: models.md#d-catalog-m-category-a-name "ドメイン `catalog` のモデル「分類」の属性「分類名」"
 [d-catalog-ut-call_number]: unclassified_app_terms.md#d-catalog-ut-call_number "ドメイン `catalog` の未分類のアプリケーション用語「請求記号」"

@@ -136,13 +136,14 @@ docs/
 - ドメインごとに、対応表と ER 図を `schema.md` として生成する。ほかのドメインのテーブルは、参照するカラムだけを書いてリンクにする。
 - 全体のスキーマと ER 図 (`docs/system/schema.md`) と、実際のスキーマの ER 図 (`docs/system/schema-actual.md`) も生成する。`schema-actual.md` をコミットするかどうかは、プロジェクトごとに決める。
 - 設計と実装の違いは、検査 j で確認する (問 12)。
+- YAML の形式 (ファイル名が `schema` で始まる YAML のトップのキー `tables`・カラムの項目・キーとインデックス・属性との対応・フラグ `planned` と `in_overview`) と、`schema.md`・`docs/system/schema.md` の中身と、検査 h の確認は、sub-issue 11a で決めた (規則の文書 [rules/doc-structured-domains.md](../rules/doc-structured-domains.md) の「テーブルとカラム」と「生成するファイルの中身」。経緯は [#206](https://github.com/akm/claude-plugins/issues/206))。複数のカラムからなる外部キーは [#306](https://github.com/akm/claude-plugins/issues/306)、1 対 1 でない属性とカラムの対応は [#307](https://github.com/akm/claude-plugins/issues/307) で扱う。
 
 ## 問 5: ドメインの番号と名前
 
 - ドメインの番号は作った順で、後から変えない。ディレクトリ名 `NN-<name>` が番号の SSOT。
 - 改名はサブコマンドとスキル `rename` で行う (問 12)。ドメインの改名では、ディレクトリ名も変え、以前の名前を `former_names` に残す。
 - 読む順は依存から求めて、生成する索引 `docs/domains/README.md` に書く。依存の表と図は `docs/domains/dependencies.md` に生成する。
-- **ドメインの依存に数える参照**: あるドメインの YAML (`domain.yaml`・`state-machines-<属性>.yaml`・`schema.yaml`) がほかのドメインの ID を参照していれば、参照の種類を問わず (モデルの参照・操作・操作の前提・状態の定義と遷移・テーブルの外部キー)、そのドメインへの依存に数える。手書きの Markdown のリンクは対象外 (検査 c-2 が扱う)。検査 c-1 と読む順は、この依存から求める。読む順の並べ方・生成するファイルの中身・検査 c-1 の形は [rules/doc-structured-domains.md](../rules/doc-structured-domains.md) の「ドメインの依存」(sub-issue 7 で決めた。経緯は [#202](https://github.com/akm/claude-plugins/issues/202))。`schema.yaml` のテーブルの外部キーは、`schema.yaml` を作る sub-issue 11a ([#206](https://github.com/akm/claude-plugins/issues/206)) で依存に加える。適用 A3 で循環が出たら、その例を元に解消の方法 (定義を別のドメインへ移す・循環を許可する関係を決めるなど) を利用者と決める。
+- **ドメインの依存に数える参照**: あるドメインの YAML (`domain.yaml`・`state-machines-<属性>.yaml`・`schema.yaml`) がほかのドメインの ID を参照していれば、参照の種類を問わず (モデルの参照・操作・操作の前提・状態の定義と遷移・テーブルの外部キー)、そのドメインへの依存に数える。手書きの Markdown のリンクは対象外 (検査 c-2 が扱う)。検査 c-1 と読む順は、この依存から求める。読む順の並べ方・生成するファイルの中身・検査 c-1 の形は [rules/doc-structured-domains.md](../rules/doc-structured-domains.md) の「ドメインの依存」(sub-issue 7 で決めた。経緯は [#202](https://github.com/akm/claude-plugins/issues/202))。テーブルの外部キー (カラムの `references`) は、sub-issue 11a ([#206](https://github.com/akm/claude-plugins/issues/206)) で依存に加えた。適用 A3 で循環が出たら、その例を元に解消の方法 (定義を別のドメインへ移す・循環を許可する関係を決めるなど) を利用者と決める。
 
 ## 問 6: README と画面
 
@@ -206,7 +207,7 @@ docs/
 - 生成の出力は、同じ入力からいつも同じにする。プロジェクトの整形ツール (prettier など) には合わせず、**生成したファイルは整形ツールの対象から外す** (`setup` が設定する。問 12 (4))。
 - 生成したファイルの競合の規則は「ツールで生成したファイルの競合を手動で解決せず生成し直す」の 1 文だけ (規則に手順を含めない)。生成したファイルには、git の組み込みの merge driver `binary` を設定する (利用者ごとの git の設定は要らない。競合したときに残る内容は、規則の文書 [rules/doc-structured-docs.md](../rules/doc-structured-docs.md) の「生成したファイル」)。設定は `generate` がファイル `docs/.gitattributes` に生成する (sub-issue 3 で決めた。経緯は [#195](https://github.com/akm/claude-plugins/issues/195))。`docs/.gitattributes` が設定するのはディレクトリ `docs/` の下の生成したファイルだけで、`docs/` の外の生成したファイル (`bin/doc-structured`・`.claude/rules/doc-structured*.md` など) には、それを生成する sub-issue で、同じ形のファイル `.gitattributes` をそのディレクトリに足す。それ以外のファイルの競合を、競合のマークが入ったまま一度コミットし、解決するコミットを別に足し、その後 `generate` してコミットする流れも使える (規則・hook・CI はこれを妨げない。競合のマークが入った YAML で `generate` がエラーになるのは意図どおり)。
 - 被参照の一覧のファイル `backlinks.md` は作らない。ある ID を参照しているファイルと節は、サブコマンド `refs <ID>` がその場で出力する。
-- 参照される定義に「これを参照するもの」の一覧を生成するのは 1 か所だけ: `models.md` の各モデルの「このモデルを参照するモデルとテーブル」。
+- 参照される定義に「これを参照するもの」の一覧を生成するのは 1 か所だけ: `models.md` の各モデルの「このモデルを参照するモデルとテーブル」。テーブルの行の形は sub-issue 11a ([#206](https://github.com/akm/claude-plugins/issues/206)) で決めた (規則の文書 [rules/doc-structured-domains.md](../rules/doc-structured-domains.md) の「生成するファイルの中身」)。
 
 ### 参照の書き方
 
@@ -226,7 +227,7 @@ docs/
 |---|---|
 | a | 生成し直して差分が無い |
 | b | リンク: ID がある・明示のアンカーを指す・ID の形式・定義の無いラベルが無い・使われていない定義が無い・`[文](URL)` の形が無い・定義の行の title が完全な名前と同じ・各ファイルで参照先を最初に指す箇所の書き方 (問 14)。コードブロック・インラインコード・mermaid の図の中の `[` と `]` はラベルとして扱わない |
-| c-1 | YAML の依存に循環が無い: ドメイン間 (問 5 の数え方)・同じドメインのモデル間・テーブルの外部キー。モデル間とテーブル間の自己参照だけ例外 |
+| c-1 | YAML の依存に循環が無い: ドメイン間 (問 5 の数え方)・同じドメインのモデル間・テーブルの外部キー。モデル間とテーブル間の自己参照だけ例外。テーブルの外部キーは同じドメインのテーブルの間だけを数える (ドメインをまたぐ循環はドメイン間の循環になる。sub-issue 11a ([#206](https://github.com/akm/claude-plugins/issues/206)) で決めた) |
 | c-2 | 手書きの Markdown の参照に、節 (ID) の単位で循環が無い (生成するファイル・記録・画面から画面へのリンクは除く) |
 | d | 画面が使う操作のそれぞれについて、その画面を使えるロールの中に、その操作を行えるロールが 1 つ以上ある |
 | e | 受け入れシーンとテストが、両方から対応している |

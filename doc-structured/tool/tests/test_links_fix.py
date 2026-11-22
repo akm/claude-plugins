@@ -99,7 +99,7 @@ class RenameTest(LinksFixTestCase):
     def test_heading_change_rewrites_section_title(self):
         self.write(CONCEPT, self.read(CONCEPT).replace("## 返却期限", "## 返す期限"))
         check = self.run_tool("check")
-        self.assertIn(f"{DESIGN}:16:1: 検査 b: 定義の行の title が、参照先の完全な名前", check.stdout)
+        self.assertIn(f"{DESIGN}:22:1: 検査 b: 定義の行の title が、参照先の完全な名前", check.stdout)
         self.assertEqual(self.run_tool("links-fix").returncode, 0)
         self.assertIn(
             '[節「返却期限」]: concept.md#d-loans-concept-h-return_deadline "ドメイン `loans` のファイル `concept.md` の節「返す期限」"',
@@ -351,6 +351,10 @@ class FirstUseTest(ScratchTestCase):
             path,
             self.read(path)
             + "      loan_status:\n        name_ja: 貸出状態\n        definition: 予約した図書の貸出が今どの段階にあるか。\n",
+        )
+        self.add_mapped_column(
+            f"{LOANS}/reservations/schema.yaml", "        attribute: d-loans-m-reservation-a-status\n", "loan_status",
+            "d-loans-m-reservation-a-loan_status",
         )
         self.assertEqual(self.run_tool("generate").returncode, 0)
         result, body = self.fix("[d-loans-m-loan-a-status]・[d-loans-m-reservation-a-loan_status]")

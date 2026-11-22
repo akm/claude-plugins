@@ -1,0 +1,23 @@
+# 予約 (このディレクトリの reservation.yaml) のテーブル。貸出のテーブル (親のディレクトリの schema.yaml) から参照されるので、
+# サブディレクトリに置く
+tables:
+  reservations:
+    model: d-loans-m-reservation
+    primary_key: [id]
+    columns:
+      id:
+        type: text
+        definition: 予約を識別する値。
+      book_id:
+        type: text
+        references: d-catalog-t-books-c-id
+        attribute: d-loans-m-reservation-a-book
+      previous_id:
+        type: text
+        nullable: true
+        references: d-loans-t-reservations-c-id
+        attribute: d-loans-m-reservation-a-previous
+      status:
+        type: text
+        default: "'waiting'"
+        attribute: d-loans-m-reservation-a-status

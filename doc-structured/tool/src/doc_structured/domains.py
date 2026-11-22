@@ -15,6 +15,12 @@
     preconditions (どちらも完全な ID の配列) を持てる。属性の下に書けるのは、値が 3 つ以下で、どの遷移にも preconditions が
     無いときだけ。それを超えるものは、ファイル名が state-machines- で始まる YAML のトップのキー state_machine に書き、
     属性を attribute (完全な ID。同じドメインの属性だけ) で指す。このファイルには、ほかのトップのキーを書けない
+  - テーブルとカラムは、ファイル名が schema で始まる YAML のトップのキー tables に書く。このファイルには、ほかのトップのキーを
+    書けない。テーブルとカラムは開発レベルの種類で、日本語名を持たない。テーブルは、カラム columns・主キー primary_key
+    (カラム名の配列)・インデックス indexes を持つ。カラムは、型 type・NULL を許可するか nullable・デフォルト値 default
+    (SQL の式の文字列)・外部キー references (参照先のカラムの完全な ID) を持つ。テーブルは対応するモデル model か属性
+    attribute (中間テーブル) を、カラムは対応する属性 attribute を、完全な ID で持てる。テーブル・カラム・インデックスは、
+    未実装を表すフラグ planned を持てる。テーブルをまたぐ確認 (外部キーの参照先など) は、モジュール tables が行う
 ロールは、ドメインの外のファイル docs/system/roles.yaml のキー roles に書く。ロールは親を持たない (ID は r-<英語名>)。
 誤りは読み飛ばさず、すべて Problem (検査 h) として返す。誤りがあっても、読めた部分の定義は返す。
 """
@@ -54,6 +60,13 @@ LIST_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
     ("op", "roles"): (("r",), "ロール"),
     ("pre", "targets"): (("m", "a", "v"), "モデル・属性・値"),
 }
+# テーブルとカラムの参照 (1 つの完全な ID で書く)。参照できる種類の記号と、メッセージに書くその名前は LIST_REFERENCES と同じ形
+SCHEMA_REFERENCES: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
+    ("t", "model"): (("m",), "モデル"),
+    ("t", "attribute"): (("a",), "属性"),
+    ("c", "references"): (("c",), "カラム"),
+    ("c", "attribute"): (("a",), "属性"),
+}
 # 空の配列を書いたときに、メッセージに添える直し方。書いていないキーは「参照が無いときは、<キー> を省く」
 EMPTY_LIST_HINTS = {"roles": "行えるロールが無い操作は、roles を省く"}
 REQUIRED_KEYS = ("name_ja", "definition")
@@ -70,6 +83,19 @@ TRANSITION_KEYS = ("from", "to", "operations", "preconditions")
 TRANSITION_REFERENCES: dict[str, tuple[tuple[str, ...], str]] = {
     "operations": (("op",), "操作"),
     "preconditions": (("pre",), "前提"),
+}
+# テーブルとカラムを書く YAML の、ファイル名の始まりとトップのキー
+SCHEMA_FILE_PREFIX = "schema"
+TABLES_KEY = "tables"
+TABLE_KEYS = ("model", "attribute", "definition", "primary_key", "columns", "indexes", "planned")
+COLUMN_KEYS = ("type", "nullable", "default", "references", "attribute", "definition", "planned", "in_overview")
+INDEX_KEYS = ("columns", "unique", "planned")
+# true だけを書けるフラグに false を書いたときに、メッセージに添える直し方
+FLAG_HINTS = {
+    "nullable": "NOT NULL のカラムは、nullable を省く",
+    "planned": "実装済みなら、planned を省く",
+    "in_overview": "全体の図に描かないカラムは、in_overview を省く",
+    "unique": "一意でないインデックスは、unique を省く",
 }
 # 状態の遷移を属性の下に書ける、属性の値の数の上限。超えたら、ファイルに書く形に移す
 ATTRIBUTE_FORM_MAX_VALUES = 3
@@ -94,6 +120,41 @@ class Reference:
     target: str  # 参照先の ID
     line: int
     column: int
+
+
+@dataclass
+class ColumnSpec:
+    """カラムの、名前と定義のほかの項目。"""
+
+    type: str = ""
+    nullable: bool = False
+    nullable_at: tuple[int, int] | None = None  # nullable を書いた位置 (値)
+    default: str | None = None
+    planned: bool = False  # このカラムに書いた planned。テーブルの planned は含まない (関数 tables.is_planned が両方を見る)
+    in_overview: bool = False
+    in_overview_at: tuple[int, int] | None = None  # in_overview を書いた位置 (値)
+    definition_at: tuple[int, int] | None = None  # definition を書いた位置 (キー)
+
+
+@dataclass
+class IndexSpec:
+    """テーブルのインデックスの 1 つ。"""
+
+    columns: list[str]
+    unique: bool
+    planned: bool
+    line: int
+    column: int
+
+
+@dataclass
+class TableSpec:
+    """テーブルの、名前と定義とカラムのほかの項目。"""
+
+    primary_key: list[str] = field(default_factory=list)
+    indexes: list[IndexSpec] = field(default_factory=list)
+    planned: bool = False
+    definition_at: tuple[int, int] | None = None  # definition を書いた位置 (キー)
 
 
 @dataclass(frozen=True)
@@ -164,6 +225,8 @@ class Entry:
     refers_to_line: int = 0
     refers_to_column: int = 0
     references: list[Reference] = field(default_factory=list)  # 完全な ID の配列で書いた参照。書いた順
+    # テーブルとカラムの、名前と定義のほかの項目。ほかの種類は None
+    spec: "TableSpec | ColumnSpec | None" = None
 
     @property
     def kind_label(self) -> str:
@@ -171,8 +234,15 @@ class Entry:
 
     @property
     def owner(self) -> str:
-        """検査 h・i のメッセージに書く、定義の種類と英語名 (「前提 book_shelved」)。"""
+        """検査 h・i のメッセージに書く、定義の種類と英語名 (「前提 book_shelved」)。カラムはテーブルも書く
+        (「テーブル loans のカラム book_id」)。"""
+        if self.symbol == "c" and self.parent is not None:
+            return f"{self.parent.owner} の{self.kind_label} {self.name}"
         return f"{self.kind_label} {self.name}"
+
+    def reference(self, key: str) -> "Reference | None":
+        """1 つの完全な ID で書いた参照 (カラムの references など) のうち、キーが key のもの。"""
+        return next((r for r in self.references if r.key == key), None)
 
     def lineage(self) -> list["Entry"]:
         """親から自分までの定義 (ドメインは含まない)。"""
@@ -206,6 +276,7 @@ class Domain:
     preconditions: list[Entry] = field(default_factory=list)
     events: list[Entry] = field(default_factory=list)
     state_machines: list[StateMachine] = field(default_factory=list)  # 読んだ順
+    tables: list[Entry] = field(default_factory=list)  # ファイル名が schema で始まる YAML の、パスの文字コードの順・書いた順
     yaml_files: list[str] = field(default_factory=list)
 
     @property
@@ -223,6 +294,11 @@ class Domain:
         yield from self.operations
         yield from self.preconditions
         yield from self.events
+
+    def table_entries(self):
+        """テーブルと、その下のカラムを、定義の並び順に返す。用語の索引には載せないので、entries とは分けている。"""
+        for table in self.tables:
+            yield from table.walk()
 
 
 @dataclass
@@ -250,6 +326,7 @@ class _Loader:
         self.root = root
         self.problems: list[Problem] = []
         self.project = Project(root=root)
+        self.table_names: dict[str, Entry] = {}  # テーブル名から、その名前で最初に読んだテーブル (ドメインをまたいで重ねない)
 
     def problem(self, path: str, message: str, line: int | None = None, column: int | None = None) -> None:
         self.problems.append(Problem("h", path, message, line, column))
@@ -341,6 +418,9 @@ class _Loader:
             if path.name.startswith(STATE_MACHINE_FILE_PREFIX):
                 self.load_state_machine_file(domain, data, path_rel)
                 continue
+            if path.name.startswith(SCHEMA_FILE_PREFIX):
+                self.load_schema_file(domain, data, path_rel)
+                continue
             for key in data:
                 line, column = _key_position(data, key)
                 if key == "domain":
@@ -367,6 +447,10 @@ class _Loader:
                         "(属性の下に書くときは、属性の下に書く)",
                         line,
                         column,
+                    )
+                elif key == TABLES_KEY:
+                    self.problem(
+                        path_rel, f"キー {TABLES_KEY} は、ファイル名が {SCHEMA_FILE_PREFIX} で始まる YAML にだけ書ける", line, column
                     )
                 else:
                     self.unknown_key(path_rel, key, TOP_KEYS, line, column)
@@ -732,6 +816,8 @@ class _Loader:
         for domain in self.project.domains:
             for entry in domain.entries():
                 entries[entry.id] = entry
+            for entry in domain.table_entries():
+                entries[entry.id] = entry
         for domain in self.project.domains:
             for entry in domain.entries():
                 if entry.refers_to is None:
@@ -749,6 +835,9 @@ class _Loader:
             for entry in domain.entries():
                 for reference in entry.references:
                     self.resolve_list_reference(entry, reference)
+            for entry in domain.table_entries():
+                for reference in entry.references:
+                    self.resolve_reference(entry.owner, entry.path, reference, *SCHEMA_REFERENCES[(entry.symbol, reference.key)])
         self.resolve_state_machines()
 
     def resolve_list_reference(self, entry: Entry, reference: Reference) -> None:
@@ -830,6 +919,282 @@ class _Loader:
                 )
 
 
+    # ---- テーブルとカラム (ファイル名が schema で始まる YAML) ----
+
+    def load_schema_file(self, domain: Domain, data: CommentedMap, path_rel: str) -> None:
+        """ファイル名が schema で始まる YAML の、トップのキー tables を読む。ほかのキーは誤りにする。"""
+        for key in data:
+            if key != TABLES_KEY:
+                self.problem(
+                    path_rel, f"ファイル名が {SCHEMA_FILE_PREFIX} で始まる YAML には、キー {TABLES_KEY} だけを書ける",
+                    *_key_position(data, key),
+                )
+        if TABLES_KEY not in data:
+            return
+        tables = self.mapping_of(data, TABLES_KEY, path_rel)
+        if tables is None:
+            return
+        for name in tables:
+            table, mapping = self.dev_entry(domain, tables, name, "t", TABLE_KEYS, path_rel, None)
+            if table is None:
+                continue
+            if name in self.table_names:
+                other = self.table_names[name]
+                self.problem(
+                    path_rel,
+                    f"テーブル {name} は、{other.path}:{other.line} にもある (テーブル名は、ドメインが違っても同じにできない)",
+                    table.line, table.column,
+                )
+                continue
+            self.table_names[name] = table
+            domain.tables.append(table)
+            self.load_table(table, mapping, path_rel)
+
+    def dev_entry(
+        self, domain: Domain, parent_map: CommentedMap, name, symbol: str, allowed: tuple[str, ...], path_rel: str,
+        parent: Entry | None,
+    ) -> tuple[Entry | None, CommentedMap | None]:
+        """開発レベルの種類 (テーブル・カラム) の定義を 1 つ読む。日本語名を持たないので、name_ja には英語名を入れる。
+        definition は省ける (書けるかどうかは、モジュール tables が対応の有無で確認する)。"""
+        line, column = _key_position(parent_map, name)
+        label = names.KINDS[symbol].label
+        if not isinstance(name, str) or not names.is_name(name):
+            self.problem(path_rel, f"{label}の名前 {name} が snake_case でない", line, column)
+            return None, None
+        mapping = parent_map[name]
+        parent_parts = names.parse_id(parent.id) if parent is not None else [Part("d", domain.name)]
+        entry = Entry(
+            id=names.build_id([*parent_parts, Part(symbol, name)]), symbol=symbol, name=name, name_ja=name,
+            definition="", path=path_rel, line=line, column=column, domain=domain, parent=parent,
+        )
+        if not isinstance(mapping, CommentedMap):
+            self.problem(path_rel, f"{entry.owner} の値は、キーと値のマッピングでなければならない", line, column)
+            return None, None
+        for key in mapping:
+            if key not in allowed:
+                self.unknown_key(path_rel, key, allowed, *_key_position(mapping, key))
+        if parent is not None:
+            parent.children.append(entry)
+        return entry, mapping
+
+    def read_definition(self, entry: Entry, mapping: CommentedMap, path_rel: str) -> tuple[int, int] | None:
+        """テーブルとカラムの definition を読み、書いた位置 (キー) を返す。書いていなければ None。"""
+        if "definition" not in mapping:
+            return None
+        owner = entry.owner
+        definition = self.without_cr(
+            mapping, "definition", self.text(mapping, "definition", path_rel, entry.line, entry.column, owner), path_rel, owner
+        )
+        entry.definition = definition or ""
+        return _key_position(mapping, "definition")
+
+    def true_flag(self, owner: str, mapping: CommentedMap, key: str, path_rel: str) -> bool:
+        """true だけを書けるフラグ (nullable・planned・in_overview・unique) を読む。false と真偽値でない値は誤り。"""
+        value = mapping[key]
+        if value is True:
+            return True
+        where = _value_position(mapping, key)
+        if value is False:
+            self.problem(path_rel, f"{spaced(owner)}の {key} に false は書けない ({FLAG_HINTS[key]})", *where)
+        else:
+            self.problem(path_rel, f"{spaced(owner)}の {key} は、true だけを書ける", *where)
+        return False
+
+    def single_id(self, owner: str, mapping: CommentedMap, key: str, kinds_text: str, path_rel: str) -> Reference | None:
+        """1 つの完全な ID で書く参照 (カラムの references など) を読む。文字列でなければ誤り。"""
+        value = mapping[key]
+        line, column = _value_position(mapping, key)
+        if isinstance(value, str) and value.strip():
+            return Reference(key, value.strip(), line, column)
+        self.problem(path_rel, f"{spaced(owner)}の {key} は、{kinds_text}の ID の文字列でなければならない", line, column)
+        return None
+
+    def load_table(self, table: Entry, mapping: CommentedMap, path_rel: str) -> None:
+        spec = TableSpec()
+        table.spec = spec
+        owner = table.owner
+        spec.definition_at = self.read_definition(table, mapping, path_rel)
+        if "model" in mapping and "attribute" in mapping:
+            self.problem(
+                path_rel, f"{owner} には、model と attribute のどちらか 1 つだけを書ける", *_key_position(mapping, "attribute")
+            )
+        for key, kinds_text in (("model", "モデル"), ("attribute", "属性")):
+            if key in mapping:
+                reference = self.single_id(owner, mapping, key, kinds_text, path_rel)
+                if reference is not None:
+                    table.references.append(reference)
+        if "planned" in mapping:
+            spec.planned = self.true_flag(owner, mapping, "planned", path_rel)
+        if "columns" not in mapping:
+            self.problem(path_rel, f"{owner} に必須の項目 columns が無い", table.line, table.column)
+        else:
+            columns = self.mapping_of(mapping, "columns", path_rel)
+            if columns is not None and not columns:
+                self.problem(path_rel, f"{owner} の columns は、空にできない", *_value_position(mapping, "columns"))
+            elif columns is not None:
+                for name in columns:
+                    self.load_column(table, columns, name, path_rel)
+        if "primary_key" in mapping:
+            spec.primary_key = self.column_names(table, owner, mapping, "primary_key", path_rel, "主キーが無いテーブルは、primary_key を省く")
+            for column in table.children:
+                if column.name in spec.primary_key and column.spec.nullable:
+                    self.problem(
+                        path_rel, f"{column.owner} は主キーのカラムなので、nullable: true を書けない", *column.spec.nullable_at
+                    )
+                if column.name in spec.primary_key and column.spec.planned and not spec.planned:
+                    self.problem(
+                        path_rel,
+                        f"{owner} は実装済みなので、primary_key に未実装のカラム {column.name} を含められない "
+                        "(カラムの planned を外すか、テーブルに planned を書く)",
+                        *_value_position(mapping, "primary_key"),
+                    )
+        if "indexes" in mapping:
+            self.load_indexes(table, mapping, path_rel)
+
+    def load_column(self, table: Entry, columns: CommentedMap, name, path_rel: str) -> None:
+        column, mapping = self.dev_entry(table.domain, columns, name, "c", COLUMN_KEYS, path_rel, table)
+        if column is None:
+            return
+        spec = ColumnSpec()
+        column.spec = spec
+        owner = column.owner
+        spec.definition_at = self.read_definition(column, mapping, path_rel)
+        spec.type = self.text(mapping, "type", path_rel, column.line, column.column, owner) or ""
+        if "nullable" in mapping:
+            spec.nullable = self.true_flag(owner, mapping, "nullable", path_rel)
+            spec.nullable_at = _value_position(mapping, "nullable")
+        if "default" in mapping:
+            spec.default = self.default_value(owner, mapping, path_rel)
+        for key, kinds_text in (("references", "カラム"), ("attribute", "属性")):
+            if key in mapping:
+                reference = self.single_id(owner, mapping, key, kinds_text, path_rel)
+                if reference is not None:
+                    column.references.append(reference)
+        if "planned" in mapping:
+            if table.spec.planned:
+                self.problem(
+                    path_rel,
+                    f"{table.owner} に planned があるので、{column.owner} に planned を書けない "
+                    "(未実装のテーブルのカラムとインデックスは、すべて未実装として扱う)",
+                    *_key_position(mapping, "planned"),
+                )
+            else:
+                spec.planned = self.true_flag(owner, mapping, "planned", path_rel)
+        if "in_overview" in mapping:
+            spec.in_overview = self.true_flag(owner, mapping, "in_overview", path_rel)
+            spec.in_overview_at = _value_position(mapping, "in_overview")
+
+    def default_value(self, owner: str, mapping: CommentedMap, path_rel: str) -> str | None:
+        """デフォルト値 (SQL の式の文字列) を読む。YAML の数値と真偽値は、引用符で囲む直し方を添えて誤りにする。"""
+        value = mapping["default"]
+        where = _value_position(mapping, "default")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, bool):
+            written = "true" if value else "false"
+            self.problem(
+                path_rel,
+                f'{spaced(owner)}の default は、SQL の式の文字列で書く (YAML の真偽値は引用符で囲む。例 default: "{written}")',
+                *where,
+            )
+        elif isinstance(value, (int, float)):
+            self.problem(
+                path_rel,
+                f'{spaced(owner)}の default は、SQL の式の文字列で書く (YAML の数値は引用符で囲む。例 default: "{value}")',
+                *where,
+            )
+        else:
+            self.problem(path_rel, f"{spaced(owner)}の default は、SQL の式の空でない文字列でなければならない", *where)
+        return None
+
+    def column_names(
+        self, table: Entry, owner: str, mapping: CommentedMap, key: str, path_rel: str, empty_hint: str
+    ) -> list[str]:
+        """カラム名の配列 (primary_key・インデックスの columns) を読む。読めたカラム名を返す。"""
+        value = mapping[key]
+        not_list = f"{spaced(owner)}の {key} は、カラム名の配列でなければならない"
+        if not isinstance(value, CommentedSeq):
+            self.problem(path_rel, not_list, *_value_position(mapping, key))
+            return []
+        if not value:
+            self.problem(path_rel, f"{spaced(owner)}の {key} は、空の配列にできない ({empty_hint})", *_value_position(mapping, key))
+            return []
+        existing = {column.name for column in table.children}
+        found: list[str] = []
+        for i, item in enumerate(value):
+            line, column = _item_position(value, i)
+            if not isinstance(item, str) or not item.strip():
+                self.problem(path_rel, not_list, line, column)
+                continue
+            name = item.strip()
+            if name in found:
+                self.problem(path_rel, f"{spaced(owner)}の {key} に {name} が 2 回ある", line, column)
+                continue
+            if name not in existing:
+                self.problem(path_rel, f"{spaced(owner)}の {key} のカラム {name} は、{table.owner} に無い", line, column)
+                continue
+            found.append(name)
+        return found
+
+    def load_indexes(self, table: Entry, mapping: CommentedMap, path_rel: str) -> None:
+        value = mapping["indexes"]
+        owner = table.owner
+        not_list = f"{owner} の indexes は、インデックスのマッピングの配列でなければならない"
+        if not isinstance(value, CommentedSeq):
+            self.problem(path_rel, not_list, *_value_position(mapping, "indexes"))
+            return
+        if not value:
+            self.problem(
+                path_rel, f"{owner} の indexes は、空の配列にできない (インデックスが無いテーブルは、indexes を省く)",
+                *_value_position(mapping, "indexes"),
+            )
+            return
+        planned_columns = {c.name for c in table.children if c.spec.planned}
+        seen: dict[tuple[tuple[str, ...], bool], int] = {}
+        for i, item in enumerate(value):
+            line, column = _item_position(value, i)
+            if not isinstance(item, CommentedMap):
+                self.problem(path_rel, not_list, line, column)
+                continue
+            for key in item:
+                if key not in INDEX_KEYS:
+                    self.unknown_key(path_rel, key, INDEX_KEYS, *_key_position(item, key))
+            index_owner = f"{owner} の indexes の {i + 1} 番目"
+            if "columns" not in item:
+                self.problem(path_rel, f"{index_owner}に必須の項目 columns が無い", line, column)
+                continue
+            columns = self.column_names(table, index_owner, item, "columns", path_rel, "インデックスのカラムを書く")
+            unique = "unique" in item and self.true_flag(index_owner, item, "unique", path_rel)
+            planned = False
+            if "planned" in item:
+                if table.spec.planned:
+                    self.problem(
+                        path_rel,
+                        f"{owner} に planned があるので、{index_owner}に planned を書けない "
+                        "(未実装のテーブルのカラムとインデックスは、すべて未実装として扱う)",
+                        *_key_position(item, "planned"),
+                    )
+                else:
+                    planned = self.true_flag(index_owner, item, "planned", path_rel)
+            if not columns:
+                continue
+            if not planned and not table.spec.planned:
+                for name in columns:
+                    if name in planned_columns:
+                        self.problem(
+                            path_rel,
+                            f"{index_owner}は実装済みなので、未実装のカラム {name} を含められない "
+                            "(インデックスにも planned を書くか、カラムの planned を外す)",
+                            line, column,
+                        )
+            signature = (tuple(columns), unique)
+            if signature in seen:
+                self.problem(path_rel, f"{index_owner}は、{seen[signature]} 番目と columns と unique が同じ", line, column)
+                continue
+            seen[signature] = i + 1
+            table.spec.indexes.append(IndexSpec(columns, unique, planned, line, column))
+
+
 def _owner_of_attribute_id(text: str) -> str:
     """ファイルに書く状態の遷移の、メッセージに書く名前。attribute が属性の ID の形なら「属性 status の状態の遷移」。"""
     try:
@@ -858,6 +1223,8 @@ def _item_position(sequence: CommentedSeq, index: int) -> tuple[int, int]:
 
 def load_project(root: Path) -> tuple[Project, list[Problem]]:
     """リポジトリのルートからドメインの YAML とロールの YAML を読む。検査 h の問題も返す。"""
+    from .tables import check_tables  # モジュール tables はこのモジュールを使うので、ここで読み込む
+
     loader = _Loader(root)
     loader.load()
-    return loader.project, loader.problems
+    return loader.project, loader.problems + check_tables(loader.project)

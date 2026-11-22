@@ -56,9 +56,15 @@ class DependenciesTest(ProjectTestCase):
                 ("d-loans-m-reservation-a-book", "refers_to", "d-catalog-m-book"),
                 ("d-loans-op-lend", "targets", "d-catalog-m-book-a-shelf_status"),
                 ("d-loans-pre-book_shelved", "targets", "d-catalog-m-book-a-shelf_status-v-shelved"),
+                # テーブルのカラムの外部キーは、ほかの定義の後に、schema.md の順で並べる
+                ("d-loans-t-reservations-c-book_id", "references", "d-catalog-t-books-c-id"),
+                ("d-loans-t-loans-c-book_id", "references", "d-catalog-t-books-c-id"),
             ],
         )
-        self.assertEqual([(r.source.id, r.target) for r in loans[1].references], [("d-loans-m-loan-a-member", "d-members-m-member")])
+        self.assertEqual(
+            [(r.source.id, r.target) for r in loans[1].references],
+            [("d-loans-m-loan-a-member", "d-members-m-member"), ("d-loans-t-loans-c-member_id", "d-members-t-members-c-id")],
+        )
 
     def test_reading_order_puts_depended_domains_first(self):
         self.copy_sample()
@@ -147,6 +153,10 @@ class DependenciesTest(ProjectTestCase):
             "        definition: 利用者の名前。\n" + refers_to("current_loan", "d-loans-m-loan"),
         )
         path.write_text(text, encoding="utf-8")
+        self.add_mapped_column(
+            "docs/domains/03-members/schema.yaml", "        attribute: d-members-m-member-a-name\n", "current_loan_id",
+            "d-members-m-member-a-current_loan",
+        )
 
     def test_domain_cycle_fails_with_ids_in_order(self):
         self.cycle_between_loans_and_members()
@@ -210,6 +220,10 @@ class ModelCyclesTest(ProjectTestCase):
             "        refers_to: d-loans-m-reservation\n" + refers_to("last_loan", "d-loans-m-loan"),
         )
         path.write_text(text, encoding="utf-8")
+        self.add_mapped_column(
+            "docs/domains/02-loans/reservations/schema.yaml", "        attribute: d-loans-m-reservation-a-status\n",
+            "last_loan_id", "d-loans-m-reservation-a-last_loan",
+        )
         self.assertEqual(
             self.problems(),
             [
@@ -244,3 +258,81 @@ class ModelCyclesTest(ProjectTestCase):
         self.assertIn("モデルの参照が循環している: d-a-m-x → d-a-m-y (", problems[0])
         self.assertIn("d-a-m-y → d-a-m-z (", problems[0])
         self.assertIn("d-a-m-z → d-a-m-x (", problems[0])
+
+
+def table(name: str, references: dict[str, str] | None = None) -> str:
+    """テーブル 1 つの YAML (キー tables の下に書く形)。主キーは id。references はカラム名から参照先のカラムの ID への対応。"""
+    text = f"  {name}:\n    definition: {name} の行。\n    primary_key: [id]\n    columns:\n"
+    text += "      id:\n        type: text\n        definition: 行を識別する値。\n"
+    for column, target in (references or {}).items():
+        text += f"      {column}:\n        type: text\n        definition: 参照する行。\n        references: {target}\n"
+    return text
+
+
+class TableDependenciesTest(ProjectTestCase):
+    """テーブルの外部キーのドメインの依存と、検査 c-1 の外部キーの循環。"""
+
+    def write_domains(self, schemas: dict[str, str]) -> None:
+        for directory, tables in schemas.items():
+            self.write(f"docs/domains/{directory}/domain.yaml", domain_yaml(f"{directory}。"))
+            self.write(f"docs/domains/{directory}/schema.yaml", "tables:\n" + tables)
+
+    def load(self):
+        project, problems = load_project(self.project)
+        self.assertEqual([p.format() for p in problems], [])
+        return project
+
+    def problems(self) -> list[str]:
+        return [p.format() for p in check_dependency_cycles(self.load())]
+
+    def test_foreign_key_to_other_domain_is_a_dependency(self):
+        # モデルの参照が無く、外部キーだけがほかのドメインを参照していても、依存に数える
+        self.write_domains({"01-a": table("xs", {"y_id": "d-b-t-ys-c-id"}), "02-b": table("ys")})
+        project = self.load()
+        dependencies = all_dependencies(project)["a"]
+        self.assertEqual([d.target.name for d in dependencies], ["b"])
+        self.assertEqual([r.key for r in dependencies[0].references], ["references"])
+        self.assertEqual([d.dir.rsplit("/", 1)[1] for d in reading_order(project)], ["02-b", "01-a"])
+        dependencies_md = render_project(project)["docs/domains/01-a/dependencies.md"]
+        self.assertIn(
+            "| [`b`][d-b] | [テーブル `xs` のカラム `y_id`][d-a-t-xs-c-y_id] | `references` | "
+            "[ドメイン `b` のテーブル `ys` のカラム `id`][d-b-t-ys-c-id] |",
+            dependencies_md,
+        )
+        self.assertIn('[d-a-t-xs-c-y_id]: schema.md#d-a-t-xs-c-y_id "ドメイン `a` のテーブル `xs` のカラム `y_id`"', dependencies_md)
+
+    def test_table_cycle_in_same_domain_fails_with_ids_in_order(self):
+        self.write_domains({"01-a": table("xs", {"y_id": "d-a-t-ys-c-id"}) + table("ys", {"x_id": "d-a-t-xs-c-id"})})
+        self.assertEqual(self.problems(), [
+            "docs/domains/01-a/schema.yaml:12:21: 検査 c-1: テーブルの外部キーが循環している: "
+            "d-a-t-xs → d-a-t-ys (docs/domains/01-a/schema.yaml:12:21)、"
+            "d-a-t-ys → d-a-t-xs (docs/domains/01-a/schema.yaml:23:21)。"
+            "循環のどれかの外部キーの references を外す (外部キーの制約を付けずに、カラムを残してもよい)"
+        ])
+
+    def test_table_cycle_of_three_lists_other_ids(self):
+        self.write_domains({"01-a": table("xs", {"y_id": "d-a-t-ys-c-id"}) + table("ys", {"z_id": "d-a-t-zs-c-id", "x_id": "d-a-t-xs-c-id"})
+                            + table("zs", {"x_id": "d-a-t-xs-c-id"})})
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertIn("テーブルの外部キーが循環している: d-a-t-xs → d-a-t-ys (", problems[0])
+        self.assertIn("ほかに循環に関わる ID: d-a-t-zs。", problems[0])
+
+    def test_self_reference_does_not_fail(self):
+        self.write_domains({"01-a": table("xs", {"parent_id": "d-a-t-xs-c-id"})})
+        self.assertEqual(self.problems(), [])
+
+    def test_table_cycle_across_domains_is_reported_as_domain_cycle(self):
+        self.write_domains({"01-a": table("xs", {"y_id": "d-b-t-ys-c-id"}), "02-b": table("ys", {"x_id": "d-a-t-xs-c-id"})})
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertIn("検査 c-1: ドメインの依存が循環している: d-a → d-b", problems[0])
+
+    def test_planned_tables_are_counted(self):
+        tables = table("xs", {"y_id": "d-a-t-ys-c-id"}).replace("    definition: xs の行。\n", "    definition: xs の行。\n    planned: true\n")
+        tables += table("ys", {"x_id": "d-a-t-xs-c-id"}).replace("        references: d-a-t-xs-c-id\n",
+                                                                 "        references: d-a-t-xs-c-id\n        planned: true\n")
+        self.write_domains({"01-a": tables})
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertIn("テーブルの外部キーが循環している", problems[0])
