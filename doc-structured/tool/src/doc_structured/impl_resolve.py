@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import names
+from .documents import load_documents
 from .domains import Project, load_project
 from .impl_diff import (
     MISMATCH,
@@ -25,6 +26,7 @@ from .impl_diff import (
     differences,
     messages,
 )
+from .refs import DEFINITION_ONLY, find_refs
 from .schema_actual import ActualColumn, ActualSchema, ActualTable
 from .schema_diff import (
     DOMAIN_PLACEHOLDER,
@@ -32,6 +34,7 @@ from .schema_diff import (
     PRIMARY_KEY_NULL_FIX,
     SchemaTarget,
     compare,
+    index_id,
     normalize_default,
     normalize_type,
 )
@@ -162,12 +165,14 @@ GENERATE_HINT = "生成したファイルを YAML に合わせるには bin/doc-
 class Result:
     written: list[str] = field(default_factory=list)  # 書き換えた YAML (リポジトリのルートからの相対パス)
     created: list[str] = field(default_factory=list)  # 作った YAML
+    removed: list[str] = field(default_factory=list)  # 消した YAML (最後のテーブルを消したファイル)
     notes: list[str] = field(default_factory=list)  # 書き換えた後に伝えること (YAML に書けなかったもの・消した ID を指すリンク)
 
     def lines(self) -> list[str]:
         return (
             [f"書き換えた: {path}" for path in self.written]
             + [f"作った: {path}" for path in self.created]
+            + [f"消した: {path}" for path in self.removed]
             + self.notes
             + [GENERATE_HINT]
         )
@@ -186,6 +191,7 @@ class _Files:
         self.root = root
         self.documents: dict[str, Document] = {}
         self.originals: dict[str, str | None] = {}  # 書き換える前の中身。作ったファイルは None
+        self.deleted: set[str] = set()  # 消すファイル
 
     def document(self, relative: str) -> Document:
         if relative not in self.documents:
@@ -198,17 +204,25 @@ class _Files:
         self.originals[relative] = None
         self.documents[relative] = document
 
-    def write(self) -> tuple[list[str], list[str]]:
-        written, created = [], []
+    def delete(self, relative: str) -> None:
+        self.document(relative)
+        self.deleted.add(relative)
+
+    def write(self) -> tuple[list[str], list[str], list[str]]:
+        written, created, removed = [], [], []
         for relative, document in self.documents.items():
             original = self.originals[relative]
+            if relative in self.deleted:
+                (self.root / relative).unlink()
+                removed.append(relative)
+                continue
             if original == document.text:
                 continue
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(document.text, encoding="utf-8")
             (created if original is None else written).append(relative)
-        return sorted(written), sorted(created)
+        return sorted(written), sorted(created), sorted(removed)
 
     def restore(self) -> None:
         for relative, original in self.originals.items():
@@ -395,12 +409,63 @@ def _match_index(files: _Files, case: Case) -> None:
         _set_or_delete(document, path, "unique", True if target.actual_index.unique else None, INDEX_KEY_ORDER)
 
 
+def _delete(files: _Files, case: Case) -> list[str]:
+    """YAML から項目を消す。消した ID (手書きの Markdown のリンクを探すため) を返す。インデックスは ID を持たないので返さない。"""
+    target = case.target
+    table = target.table_entry
+    relative = _yaml_file(target)
+    document = files.document(relative)
+    if target.kind == "table":
+        if len(document.node(("tables",))) == 1:
+            # ファイルの最後のテーブルなら、ファイルを消す (ファイル名が schema で始まる YAML には tables だけを書けるため)
+            files.delete(relative)
+        else:
+            document.delete_key(("tables",), target.table)
+        return [table.id]
+    if target.kind == "column":
+        column = target.column_entry
+        first = []
+        if column.name in table_spec(table).primary_key:
+            first.append(table.id)
+        first += [index_id(table.id, index.columns) for index in table_spec(table).indexes if column.name in index.columns]
+        if first:
+            raise ResolveError(f"{column.id} は、YAML の主キーかインデックスに含まれている。" + _first(first))
+        document.delete_key(("tables", target.table, "columns"), column.name)
+        return [column.id]
+    path = _index_path(document, target)
+    if len(document.node(path[:-1])) == 1:
+        document.delete_key(path[:-2], "indexes")
+    else:
+        document.delete_item(path[:-1], path[-1])
+    return []
+
+
+def _link_notes(root: Path, deleted: list[str]) -> list[str]:
+    """消した ID (と、その下の ID) を指す、手書きの Markdown のリンクの箇所。"""
+    if not deleted:
+        return []
+    project, _ = load_project(root)
+    index, _ = load_documents(root, project)
+    notes = []
+    for deleted_id in deleted:
+        result = find_refs(index, deleted_id)
+        if not result.references:
+            continue
+        notes.append(f"消した {deleted_id} (とその下の ID) を指すリンクがある。リンクを直す:")
+        notes += [
+            f"{r.path}:{r.line}:{r.column}: {r.target_id} {r.written} ({r.owner_id if r.in_body else DEFINITION_ONLY})"
+            for r in result.references
+        ]
+    return notes
+
+
 def resolve(root: Path, project: Project, actual: ActualSchema, request: Request) -> Result:
     """件を 1 つ解消する。解消できなければ、何も書き換えずに ResolveError を投げる。"""
     cases = list_cases(project, actual)
     case, domain = find_case(project, cases, request.id)
     check_flag(case, request.flag)
     files = _Files(root)
+    deleted: list[str] = []
     try:
         if request.flag == PLANNED:
             _set_planned(files, case)
@@ -413,11 +478,13 @@ def resolve(root: Path, project: Project, actual: ActualSchema, request: Request
                 _match_column(files, case, project, actual)
             else:
                 _match_index(files, case)
+        elif case.case == MISSING_IMPLEMENTATION:
+            deleted = _delete(files, case)
         else:
             raise NotImplementedError(case.case)
     except YamlEditError as e:
         raise ResolveError(f"{_yaml_file(case.target)}: {e}") from e
-    written, created = files.write()
+    written, created, removed = files.write()
     _, problems = load_project(root)
     if problems:
         files.restore()
@@ -425,4 +492,4 @@ def resolve(root: Path, project: Project, actual: ActualSchema, request: Request
             *[problem.format() for problem in problems],
             f"書き換えた後の YAML に {len(problems)} 件の誤り (検査 h) があるので、元に戻した",
         )
-    return Result(written, created)
+    return Result(written, created, removed, _link_notes(root, deleted))
