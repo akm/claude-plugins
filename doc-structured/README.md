@@ -9,7 +9,7 @@ Claude Code で作るアプリケーションの文書を、定義が 1 か所�
 | [bin/doc-structured](bin/doc-structured) | プロジェクトに置くスクリプト (ツールの入口)。プロジェクトが設定したバージョンのツールを取得して実行する |
 | [tool/](tool/) | ツール `doc-structured` の Python パッケージ (コマンド `doc-structured`) とテスト |
 | [rules/](rules/) | 規則の文書。プロジェクトのディレクトリ `.claude/rules/` に置くコピーの元 |
-| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs`・`doc-structured:impl-diff` |
+| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs`・`doc-structured:impl-diff`・`doc-structured:impl-diff-resolve` |
 | [hooks/hooks.json](hooks/hooks.json)・[hook-scripts/](hook-scripts/) | 生成したファイルの直接の編集を拒否する hook (下の節「hook」) |
 | [scripts/plugin-version-notice](scripts/plugin-version-notice) | スキルの前置きで、プラグインと設定のバージョンの違いを 1 行で伝えるスクリプト |
 | [docs/decisions.md](docs/decisions.md) | 文書の構成の決定の一覧 |
@@ -31,7 +31,7 @@ bin/doc-structured version
 
 必要なもの: Python 3.12 以上の `python3`、初回の取得に `git` と GitHub・PyPI への接続。GitHub Actions のランナー `ubuntu-slim` にはどちらもあります (Python 3.12.3)。
 
-ツール `doc-structured` は、起動時に設定ファイルをカレントディレクトリから親へ向かって探し、全体を YAML として読み、形が違えばエラーの文を標準エラー出力に書いて終了コード 1 で終了します。知らないサブコマンドを受け取ったときは、使い方を標準エラー出力に書いて終了コード 2 で終了します (プラグインのバージョンが新しく、ツールが古いときに起きます)。データベースが要るコマンド (検査 j・`impl-diff`・`generate --all`) は、データベースが無いとき、何が無いかと用意の仕方を標準エラー出力に書いて終了コード 3 で終了します。
+ツール `doc-structured` は、起動時に設定ファイルをカレントディレクトリから親へ向かって探し、全体を YAML として読み、形が違えばエラーの文を標準エラー出力に書いて終了コード 1 で終了します。知らないサブコマンドを受け取ったときは、使い方を標準エラー出力に書いて終了コード 2 で終了します (プラグインのバージョンが新しく、ツールが古いときに起きます)。データベースが要るコマンド (検査 j・`impl-diff`・`impl-diff-resolve`・`generate --all`) は、データベースが無いとき、何が無いかと用意の仕方を標準エラー出力に書いて終了コード 3 で終了します。
 
 | コマンド | すること |
 | --- | --- |
@@ -40,12 +40,14 @@ bin/doc-structured version
 | `doc-structured generate [--all]` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する。`--all` は、設定に `database.schema_actual: true` があれば、実際のスキーマのファイル `docs/system/schema-actual.md` も生成し直す |
 | `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2、データベースが無くて検査 j を実行できなければ終了コード 3 |
 | `doc-structured impl-diff` | 検査 j だけを実行し、設計と実装の正規化した形どうしの unified diff と、指示の行を出力する。何も変えない。差分があれば終了コード 1、YAML に誤りがあれば何もせずに終了コード 1 |
+| `doc-structured impl-diff-resolve --list` | 検査 j の差分の件を、1 行に 1 件「`<ID>` \| 使えるフラグ \| 指示の行のメッセージ」の形で、解消する順に出力する。何も変えない |
+| `doc-structured impl-diff-resolve <ID> --planned\|--unplanned\|--match-impl [--file <パス>] [--definition <ID> <文>]... [--model <テーブルの ID> <モデルの ID>]... [--attribute <テーブルかカラムの ID> <属性の ID>]...` | 差分の 1 件を、YAML を書き換えて解消する (`planned` を付ける・外す、YAML を実装に合わせる)。マイグレーションは書き換えない。解消できない (使えないフラグ・先に解消する件がある・書き換えた後の YAML に検査 h の誤りがある など) ときは、何も書き換えずに終了コード 1。YAML に誤りがあれば何もせずに終了コード 1 |
 | `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文のうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベル・参照先を最初に指す `[文][ラベル]` の文など) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
 | `doc-structured refs <ID>` | その ID と子孫の ID を参照している、手書きの Markdown の箇所を「パス:行:列: <参照している ID> <リンク> (<行が属する ID>)」の形で出力する。生成したファイルと記録は探さない。見つからなくても終了コード 0。ID の形が違えば終了コード 1。YAML に誤りがあっても実行する |
 
-生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-1 (YAML のドメインの依存とモデルの参照の循環)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) と、重い群の j (設計と実際のスキーマの差分) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) に、検査 j と実際のスキーマのファイルの規則は、規則の文書 [rules/doc-structured-impl.md](rules/doc-structured-impl.md) にあります。ほかのサブコマンドは、sub-issue ごとに足します。
+生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-1 (YAML のドメインの依存とモデルの参照の循環)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) と、重い群の j (設計と実際のスキーマの差分) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) に、検査 j・差分の解消・実際のスキーマのファイルの規則は、規則の文書 [rules/doc-structured-impl.md](rules/doc-structured-impl.md) にあります。ほかのサブコマンドは、sub-issue ごとに足します。
 
-スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs`・`doc-structured:impl-diff` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
+スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs`・`doc-structured:impl-diff`・`doc-structured:impl-diff-resolve` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
 
 ## hook
 
