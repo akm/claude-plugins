@@ -1,7 +1,8 @@
 """テストの基底クラス。
 
-保存先のディレクトリ (環境変数 DISK_USAGE_TRIAGE_HOME。計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の KTD2) を、
-テストごとの一時ディレクトリにする。手元の `~/.claude/disk-usage-triage/` は読みも書きもしない。
+保存先のディレクトリ (環境変数 DISK_USAGE_TRIAGE_HOME。計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の KTD2) と、
+利用者のホームディレクトリ (環境変数 HOME。設定の `~` で始まるパスを展開する先) を、テストごとの一時ディレクトリにする。
+手元の `~/.claude/disk-usage-triage/` とホームディレクトリは、読みも書きもしない。
 """
 
 import json
@@ -18,7 +19,7 @@ ENTRY = os.path.join(SCRIPTS, "disk_usage_triage.py")
 if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
 
-_ENV_KEYS = ("DISK_USAGE_TRIAGE_HOME",)
+_ENV_KEYS = ("DISK_USAGE_TRIAGE_HOME", "HOME")
 
 
 class TriageCase(unittest.TestCase):
@@ -29,6 +30,8 @@ class TriageCase(unittest.TestCase):
         self._saved = {k: os.environ.get(k) for k in _ENV_KEYS}
         self.home = os.path.join(self.root, "home")  # 保存先のディレクトリ。作らずに始める
         os.environ["DISK_USAGE_TRIAGE_HOME"] = self.home
+        self.user_home = self.make_dir("user-home")  # 利用者のホームディレクトリ
+        os.environ["HOME"] = self.user_home
 
     def tearDown(self):
         for k, v in self._saved.items():
