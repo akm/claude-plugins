@@ -117,7 +117,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - R23. `.tool-versions` は、`~/.tool-versions` と、プロジェクトのディレクトリの下 (ディレクトリ `.git` と `node_modules` の下を除く) から探す。プロジェクトのディレクトリの下にあるアプリの worktree の `.tool-versions` も含める。
 - R24. 次のものを、版の参照として数える。
   - `.tool-versions` の各行の、すべての版。1 行に複数の版が書かれていれば、すべてを数える。
-  - 版が `system` と `path:<ディレクトリ>` の行は数えない。`ref:<git の参照>` は、ディレクトリ `installs` の下の対応するディレクトリに対応させる。
+  - 版が `system` と `path:<ディレクトリ>` の行は数えない。`ref:<git の参照>` は、ディレクトリ `installs/<ツール>/ref-<git の参照>` に対応させる (根拠は KTD10)。git の参照に `/` があるときは、`ref-<最初の / より前の部分>` のディレクトリ (例: `ref:feature/x` なら `ref-feature`) を、参照されている版として数える。
   - プロジェクトのディレクトリの下の Python の仮想環境のファイル `pyvenv.cfg` の `home` が、asdf の Python の版を指していれば、その版。
   - ファイル `~/.asdfrc` に `legacy_version_file = yes` があるときだけ、`.nvmrc` などのほかのツールの版のファイル。
 - R25. どこからも参照されていない版は「消してよい」、参照されている版は「確認が要る」とし、参照しているファイルのパスと、探した範囲を理由に書く。どの版も参照されていないツールも、同じに扱う。参照の探索で読めないディレクトリがあったか、時間内に探すのが完了しなかったときは、参照されていないとは言えないので、どの版も「消してよい」にせず「確認が要る」とし、読めなかったディレクトリか、完了しなかったことを理由に書く。
@@ -217,7 +217,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 
 どれも、計画の承認の前に決める必要はない (deferred)。U1 の結果で決め、計画の R と KTD に反映する。
 
-- `ref:<git の参照>` の版が、`installs` の下でどの名前のディレクトリになるか (R24)。
+- `ref:<git の参照>` の版が、`installs` の下でどの名前のディレクトリになるか (R24)。**U1 で決めた**: `installs/<ツール>/ref-<git の参照>`。R24 に対応のさせ方を、KTD10 に根拠を書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 6)。
 - `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。**U1 で決めた**: 出力の形と読み方は KTD11 に書いた。ボリューム 1,152 個で約 2 秒だった (最初に実行した `docker system df` だけが 9.5 秒) ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。**U1 で決めた**: 領域を確保しただけで書き込んでいない部分 (ext4 の unwritten extent) を、Docker は使用量に数えるが、`Docker.raw` にはディスクが割り当てられていないため。KTD13 に理由を書き、R10 に注記を足した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。**U1 で決めた**: 減る。R47 を、解放するコマンドを案内しないことに直した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
@@ -276,6 +276,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - KTD10. **asdf は、データの場所と参照を Python のスクリプトが読む** (R23〜R27)。
   - データの場所は、環境変数 `ASDF_DATA_DIR`、無ければ `~/.asdf`。版は `installs/<ツール>/<版>` のディレクトリで、使用量は `installs` で `du -k -d 2` を実行して求める。
   - `.tool-versions` は、`#` から行末をコメントとし、行の最初の語をツール、残りを版として読む。プロジェクトのディレクトリは `os.walk` で、時間の上限 (R4) の中で探し、`.git` と `node_modules` の下を探さない。`pyvenv.cfg` を見つけたディレクトリ (仮想環境) の下も探さない。読めなかったディレクトリは引数 `onerror` で集め、R25 の理由に書く。
+  - `ref:<git の参照>` の版のディレクトリの名前 (R24) は、asdf 0.20.2 のソースで確認した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 6)。ファイル `internal/toolversions/toolversions.go` の関数 `FormatForFS` が、種類 `ref` の版を `ref-<git の参照>` にし、ファイル `internal/installs/installs.go` の関数 `InstallPath` が、それを `installs/<ツール>` の下につなぐ。つなぐのは Go の関数 `filepath.Join` なので、git の参照に `/` があると、2 階層のディレクトリになるはず。これはソースから読み取ったことで、試していない。そのため、参照されていないと誤って判定しないように、R24 では最初の階層のディレクトリを参照されている版として数える (2026-11-23 に利用者が決めた)。
   - ほかのツールの版のファイル (R24) は、asdf と同じく、各プラグインの `bin/list-legacy-filenames` のファイル名を探し、`bin/parse-legacy-file` があればそれで版を読む。
   - グローバルなパッケージの名前は、Node.js は `lib/node_modules` の下 (`npm` と `corepack` を除く)、Go は版のディレクトリの下の `bin` から読む (Go のプラグインのファイル `exec-env` が、環境変数 `GOBIN` が未設定のときに設定する場所)。Go のプラグインは、環境変数 `GOPATH` が未設定のとき、`GOPATH` を版のディレクトリの下の `packages` にする (ファイル `~/.asdf/plugins/golang/bin/exec-env`)。Go のプラグインの版を消す処理は、読み取り専用のキャッシュに書き込みの権限を付けてから消すので、`asdf uninstall` で消せる。
   - プラグインを実行している Python の版 (R14) は、`sys.executable` の実パスが `installs/python/<版>/` の下にあるときの、その版。
@@ -759,7 +760,7 @@ disk-usage-triage/
 **Patterns to follow:** U6 の専用の一覧の扱い。
 
 **Test scenarios:**
-- `.tool-versions` の 1 行の複数の版・コメント・`system`・`path:`・`ref:` を、R24 のとおりに数える。
+- `.tool-versions` の 1 行の複数の版・コメント・`system`・`path:`・`ref:` を、R24 のとおりに数える。`ref:v1.2.3` はディレクトリ `ref-v1.2.3` の版を、`ref:feature/x` はディレクトリ `ref-feature` の版を、参照されている版として数える。
 - `.git` と `node_modules` の下の `.tool-versions` は数えない。プロジェクトのディレクトリの下のアプリの worktree の `.tool-versions` は数える。
 - `pyvenv.cfg` の `home` が asdf の Python の版を指していれば、その版を参照として数え、仮想環境の下は探さない。
 - `~/.asdfrc` に `legacy_version_file = yes` が無ければ `.nvmrc` を数えず、あれば、偽のプラグインの `list-legacy-filenames` と `parse-legacy-file` で読んだ版を数える。
