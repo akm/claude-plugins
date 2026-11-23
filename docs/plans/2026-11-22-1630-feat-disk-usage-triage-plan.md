@@ -236,7 +236,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - R11 (「消してよい」をすべて選ぶ) が、表に示していない「その他」の項目も選ぶかを決める (U6)。
 - GNU coreutils の `stat` が PATH で先に見つかると、再確認がすべて `skipped` になる。macOS では `/usr/bin/stat` を絶対パスで呼ぶかを決める (U7)。
 - テストで削除のシェルスクリプトを `/bin/bash` で実行し、macOS の手元でテストを実行するたびに bash 3.2 で動くことを確認するかを決める (U7)。
-- `docker system df -v` が時間の上限を超えたときの扱いを、Goal Capsule の「利用者に判断を求める条件」に入れるかを決める (U1・U11)。
+- `docker system df -v` が時間の上限を超えたときの扱いを、Goal Capsule の「利用者に判断を求める条件」に入れるかを決める (U1・U11)。**U1 で決めた**: 入れない。U1 では約 2 秒で終了し、時間の上限 (R4 のデフォルト値の 300 秒) よりずっと短かった。上限を超えたときは、U11 のテストシナリオのとおり、Docker の一覧を作らずに理由を示す ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - `docker buildx prune -f` は、いま選んでいる builder のキャッシュだけを消す。別の builder を選んでいるときの扱いを決める (U11)。
 - git 2.48 以降で設定 `worktree.useRelativePaths` を使うと、ファイル `.git` に相対パスが書かれる。KTD12 の判別で相対パスを扱う (U12)。
 - MCP ツール `mcp__ccd_host__get_storage_usage` と `mcp__ccd_host__discard_kept_worktree` は、読み込んでから呼び出すツール (Claude Code の deferred のツール) なので、スキルに読み込みの手順を書く (U12)。
