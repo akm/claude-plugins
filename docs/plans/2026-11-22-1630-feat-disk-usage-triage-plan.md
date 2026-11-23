@@ -138,7 +138,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 **worktree**
 
 - R33. アプリの worktree は、Claude Desktop のセッションから使うときだけ扱う。端末の Claude Code から使うときは、扱えないことを示す。
-- R34. アプリの worktree は、Claude が消さない。MCP ツール `mcp__ccd_host__get_storage_usage` で worktree の数と量を示し、設定の画面 Settings › This computer › Storage の Clean up inactive sessions を案内する。一覧で選ぼうとした `.claude/worktrees/` の下の項目は、選んだ項目に入れず (R12)、この案内の対象にする。
+- R34. アプリの worktree は、Claude が消さない。MCP ツール `mcp__ccd_host__get_storage_usage` で worktree の数と量を示し、設定の画面 Settings › This computer › Storage の Clean up inactive sessions を案内する。`get_storage_usage` は、引数 `refresh: true` を付けて呼ぶ (理由は KTD12)。結果の `incomplete` が `true` のときは、数字の一部しか測れていないことを示す。一覧で選ぼうとした `.claude/worktrees/` の下の項目は、選んだ項目に入れず (R12)、この案内の対象にする。
 - R35. 残された worktree は、コミットしていない変更が失われることを示して利用者の同意を得てから、セッションごとに MCP ツール `mcp__ccd_host__discard_kept_worktree` で消す。
 - R36. アプリが作ったものでない git の worktree は「確認が要る」とし、削除のシェルスクリプトで `git worktree remove` (`--force` を付けない) で消す。
 
@@ -221,7 +221,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。**U1 で決めた**: 出力の形と読み方は KTD11 に書いた。ボリューム 1,152 個で約 2 秒だった (最初に実行した `docker system df` だけが 9.5 秒) ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。**U1 で決めた**: 領域を確保しただけで書き込んでいない部分 (ext4 の unwritten extent) を、Docker は使用量に数えるが、`Docker.raw` にはディスクが割り当てられていないため。KTD13 に理由を書き、R10 に注記を足した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。**U1 で決めた**: 減る。R47 を、解放するコマンドを案内しないことに直した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
-- `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。
+- `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。**U1 で決めた**: 残された worktree には、セッションの ID と worktree のパスが含まれる。ほかの worktree のパスは含まれない。R34 に `refresh: true` で呼ぶことを、KTD12 に結果の形と理由を書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 4)。
 - アプリの Terminal パネルで利用者が実行したコマンドに、環境変数 `CLAUDECODE` が付くか (R38)。
 - hook が受け取る `mcp__terminal__run_in_terminal` の入力で、コマンドの文字列がどのキーにあるか (KTD9)。
 - `mcp__terminal__run_in_terminal` が、実行中のコマンドに入力を送れるか (R38)。
@@ -286,7 +286,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - image のすべての `<リポジトリ>:<タグ>` (R29) は、`docker image ls --no-trunc --format json` (タグごとに 1 行) の行を ID でまとめて得る。`docker system df -v` は image ごとに 1 行で、タグを 1 つしか出さないため。
   - ラベルは、ボリュームは `docker volume inspect` の `Labels` から、停止しているコンテナは `docker container inspect` の `Config.Labels` から、JSON のオブジェクトとして読む (2026-11-23 に利用者が決めた。`docker volume ls` と `docker ps -a` の `Labels` は、`key=value` をコンマでつないだ 1 つの文字列で、値にコンマがあると読み間違えるため)。停止しているコンテナの ID は `docker ps -a --no-trunc --format json` から読む。
   - Docker の一覧は 1 つの専用の一覧にする。`docker volume rm` は、1 行に 100 個までの名前を並べる。比較のために、`Docker.raw` の `du -k` を、削除のシェルスクリプトの作成の時と比較の時に測る。
-- KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
+- KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。`get_storage_usage` に引数 `refresh: true` を付けるのは、U1 で、付けずに呼ぶと 2 日前に計算した値が返ったため (ツールの説明には、約 1 分キャッシュするとある。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 4)。結果の形も U1 で確認した。残された worktree は `code.worktrees.kept_after_archive` に 1 つずつあり、R35 で使う `session_id` と worktree のパスを持つ。ほかの worktree のパスは結果に無いが、R34 は数と量だけを使う。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
 - KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` の `du` が減ったときにだけ増えるため。Docker の中の量には、領域を確保しただけで書き込んでいない部分 (ext4 の unwritten extent。例: MySQL の redo ログのファイル) も入る。その部分は仮想ディスクに書かれないので、`Docker.raw` にはディスクが割り当てられていない。そのため、Docker の項目を消して macOS で空く量は、Docker の中の量より少ないことがある (U1 では、この部分がボリュームの合計 174.9 GB のうち 81.3 GB だった。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。R10 の注記は、このことを示す。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
 - KTD14. **Python のスクリプトは、標準出力に JSON を 1 つ出し、必ずキー `errors` を持たせる。** 終了コードは gh-notification-dispatch と同じく、0 は続ける、3 は `errors` を利用者に示して判断を求める、4 は外部のコマンドが失敗した、1・2 はスクリプトの不具合と引数の誤り。サブコマンドの引数・出力のキー・終了コードの SSOT は、各サブコマンドの `--help` にする。
 - KTD15. **スキルは、時間の上限 (R4) を使う処理を行うサブコマンドを、Bash ツールのバックグラウンド (引数 `run_in_background`) で実行し、完了の通知を受けてから出力を読む** (R4)。Bash ツールの時間の上限 (指定しなければ 120 秒、最大 600 秒) は、調べるディレクトリごとの上限 (R4) の合計より短いことがあり、打ち切られると一覧が出ないため。時間の上限を使う処理は、外部のコマンド (KTD4) のほか、KTD5 の `.claude/worktrees` の探索のように Python の中で時間の上限を使う処理も含む。そのようなサブコマンドを足す・変える単位は、そのサブコマンドの `--help` に、バックグラウンドで実行することを書く (KTD14)。
@@ -826,7 +826,7 @@ disk-usage-triage/
 - 変える: `disk-usage-triage/scripts/disk_usage_triage/{lists,script}.py`・`disk-usage-triage/skills/triage/SKILL.md`
 
 **Approach:**
-1. 用意する: `worktree.md` に、`mcp__ccd_host__get_storage_usage` の結果の示し方・設定の画面の案内・残された worktree の削除の同意の取り方 (R35)・端末の Claude Code のときの扱い (R33) を、U1 で確認した MCP ツールの形に合わせて書く。
+1. 用意する: `worktree.md` に、`mcp__ccd_host__get_storage_usage` の呼び方 (引数 `refresh: true`) と結果の示し方 (`incomplete` が `true` のときを含む)・設定の画面の案内・残された worktree の削除の同意の取り方 (R35)・端末の Claude Code のときの扱い (R33) を、U1 で確認した MCP ツールの形に合わせて書く。
 2. テストを書く: Test scenarios のとおり。テストの git のリポジトリは一時ディレクトリに作り、環境変数 `GIT_DIR` などを消してから git を実行する。
 3. 実装する: `worktree.py` に、git の worktree の判定とメインのリポジトリの求め方を書く。`lists.py` で、アプリの worktree の項目を案内の対象にし、`script.py` に `git worktree remove` と順序を足す。
 
@@ -839,7 +839,7 @@ disk-usage-triage/
 - パスに `/.claude/worktrees/` を含む項目は、選ぼうとしても選んだ項目に入らず、削除のシェルスクリプトにも入らない。理由として、R34 の設定の画面の案内の対象であることを返す。
 - 削除のシェルスクリプトで、コミットしていない変更がある worktree は git が拒否し、`failed` を書いて次の項目に進む。
 
-**Verification:** テストがすべて成功する。Claude Desktop で、`get_storage_usage` の量と設定の画面の案内が出る。残された worktree があれば、同意の後にアプリのカードで消せる。
+**Verification:** テストがすべて成功する。Claude Desktop で、`refresh: true` を付けて呼んだ `get_storage_usage` の量と設定の画面の案内が出る。残された worktree があれば、同意の後にアプリのカードで消せる。
 
 ### U13. 文書と通し確認
 
