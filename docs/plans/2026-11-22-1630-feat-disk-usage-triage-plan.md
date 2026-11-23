@@ -78,7 +78,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - R7. 一覧には、使用量の多い順に 30 項目まで示し、残りは「その他 N 項目・合計 X GB」の 1 行にまとめる。利用者が依頼すれば、残りの項目も示す。
 - R8. 使用量は、1 GB 以上は GB、1 GB 未満は MB で、どちらも小数 1 桁で示す。1 GB は 1,000,000,000 バイトとする。
 - R9. 一覧ごとに英字を 1 つ付け、項目の番号を「英字 + 番号」(例: `B12`) にする。前に示した一覧の項目も、番号で指定できる。
-- R10. 選んだ項目は、複数の一覧にまたがって 1 つにまとめて保存し、選ぶたびに、選んだ項目の数と合計の使用量を示す。Docker の項目の量は、Docker の中の量として分けて示す。削除のシェルスクリプトは、選んだ項目から 1 つだけ作る。
+- R10. 選んだ項目は、複数の一覧にまたがって 1 つにまとめて保存し、選ぶたびに、選んだ項目の数と合計の使用量を示す。Docker の項目の量は、Docker の中の量として分けて示す。Docker の一覧と選んだ項目の合計には、Docker の項目を消して macOS で空く量は、Docker の中の量より少ないことがあると注記する (理由は KTD13)。削除のシェルスクリプトは、選んだ項目から 1 つだけ作る。
 - R11. 利用者が依頼したときだけ、一覧の「消してよい」の項目をすべて選ぶ。一覧の最後に、この選び方を示す。
 - R12. 判定が「残す」の項目と、保護の一覧の項目は選べない。それらを含む親のディレクトリも、まとめて消す対象に選べず、下の階層を一覧にするよう示す。
 
@@ -117,7 +117,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - R23. `.tool-versions` は、`~/.tool-versions` と、プロジェクトのディレクトリの下 (ディレクトリ `.git` と `node_modules` の下を除く) から探す。プロジェクトのディレクトリの下にあるアプリの worktree の `.tool-versions` も含める。
 - R24. 次のものを、版の参照として数える。
   - `.tool-versions` の各行の、すべての版。1 行に複数の版が書かれていれば、すべてを数える。
-  - 版が `system` と `path:<ディレクトリ>` の行は数えない。`ref:<git の参照>` は、ディレクトリ `installs` の下の対応するディレクトリに対応させる。
+  - 版が `system` と `path:<ディレクトリ>` の行は数えない。`ref:<git の参照>` は、ディレクトリ `installs/<ツール>/ref-<git の参照>` に対応させる (根拠は KTD10)。git の参照に `/` があるときは、`ref-<最初の / より前の部分>` のディレクトリ (例: `ref:feature/x` なら `ref-feature`) を、参照されている版として数える。
   - プロジェクトのディレクトリの下の Python の仮想環境のファイル `pyvenv.cfg` の `home` が、asdf の Python の版を指していれば、その版。
   - ファイル `~/.asdfrc` に `legacy_version_file = yes` があるときだけ、`.nvmrc` などのほかのツールの版のファイル。
 - R25. どこからも参照されていない版は「消してよい」、参照されている版は「確認が要る」とし、参照しているファイルのパスと、探した範囲を理由に書く。どの版も参照されていないツールも、同じに扱う。参照の探索で読めないディレクトリがあったか、時間内に探すのが完了しなかったときは、参照されていないとは言えないので、どの版も「消してよい」にせず「確認が要る」とし、読めなかったディレクトリか、完了しなかったことを理由に書く。
@@ -138,7 +138,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 **worktree**
 
 - R33. アプリの worktree は、Claude Desktop のセッションから使うときだけ扱う。端末の Claude Code から使うときは、扱えないことを示す。
-- R34. アプリの worktree は、Claude が消さない。MCP ツール `mcp__ccd_host__get_storage_usage` で worktree の数と量を示し、設定の画面 Settings › This computer › Storage の Clean up inactive sessions を案内する。一覧で選ぼうとした `.claude/worktrees/` の下の項目は、選んだ項目に入れず (R12)、この案内の対象にする。
+- R34. アプリの worktree は、Claude が消さない。MCP ツール `mcp__ccd_host__get_storage_usage` で worktree の数と量を示し、設定の画面 Settings › This computer › Storage の Clean up inactive sessions を案内する。`get_storage_usage` は、引数 `refresh: true` を付けて呼ぶ (理由は KTD12)。結果の `incomplete` が `true` のときは、数字の一部しか測れていないことを示す。一覧で選ぼうとした `.claude/worktrees/` の下の項目は、選んだ項目に入れず (R12)、この案内の対象にする。
 - R35. 残された worktree は、コミットしていない変更が失われることを示して利用者の同意を得てから、セッションごとに MCP ツール `mcp__ccd_host__discard_kept_worktree` で消す。
 - R36. アプリが作ったものでない git の worktree は「確認が要る」とし、削除のシェルスクリプトで `git worktree remove` (`--force` を付けない) で消す。
 
@@ -176,7 +176,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - 消した項目ごとの、実行の前と後の使用量。失敗した項目と、実行しなかった項目とその理由。
   - ディスクの空きの、実行の前と後。
   - 空きが増えた量が消した量よりかなり少ないときは、理由の候補 (APFS のスナップショット・Time Machine のローカルスナップショット・クローンのファイル) と、確認するコマンド (`tmutil listlocalsnapshots /` など)。
-- R47. Docker の項目を消したのに `Docker.raw` の `du` が減っていなければ、Docker の中で空いた領域を `Docker.raw` から解放するコマンド `docker run --rm --privileged --pid=host docker/desktop-reclaim-space` を案内する。このコマンドは削除のシェルスクリプトに入れない。U1 で、何もしなくても減ると分かれば、この案内は作らない。
+- R47. 比較では、Docker の中で空いた領域を `Docker.raw` から解放するコマンド (`docker run --rm --privileged --pid=host docker/desktop-reclaim-space`) を案内しない。U1 で、Docker の中でボリュームを消すと、何もしなくても 10 秒以内に `Docker.raw` の `du` が減ることを確認したため ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
 
 ### Key Decisions
 
@@ -191,7 +191,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - KD9. **判定表に無い項目には、Claude が書いたツールのコマンドも使い、Python のスクリプトが検査する** (session-settled: user-directed; chosen over `rm` だけを使うこと・ツールが管理している項目を削除のシェルスクリプトに入れないこと: ツールのコマンドは、使用中のファイル・読み取り専用のファイル・ロックを扱えるため)。Governs R15, R16, R20。
 - KD10. **asdf の版は、プロジェクトのディレクトリなどからの参照で判定し、専用の一覧で示す** (session-settled: user-approved; chosen over ホームディレクトリ全体から参照を探すこと・ツールごとに下の階層を一覧にすること)。Governs R2, R23〜R27。
 - KD11. **記録のキー・適用する範囲・Claude の判定の記録・記録する時機・一覧と削除** (session-settled: user-approved; chosen over パターンをキーにすること・Claude の判定を毎回調べ直すこと・記録の前に毎回選ばせること)。Governs R18〜R22。
-- KD12. **Docker のボリューム・image・ビルドキャッシュ・停止しているコンテナの判定と、`Docker.raw` を縮めるコマンドの扱い** (session-settled: user-approved; chosen over 使われていないボリュームをすべて「消してよい」にすること・`docker image prune -a` でまとめて消すこと・縮めるコマンドを削除のシェルスクリプトに入れること)。Governs R28〜R32, R47。
+- KD12. **Docker のボリューム・image・ビルドキャッシュ・停止しているコンテナの判定と、`Docker.raw` から空いた領域を解放するコマンドを案内しないこと** (session-settled: user-approved; chosen over 使われていないボリュームをすべて「消してよい」にすること・`docker image prune -a` でまとめて消すこと・解放するコマンドを削除のシェルスクリプトに入れること)。解放するコマンドは、計画を作った時点では案内することにしていたが、U1 の結果を受けて、案内しないことにした (2026-11-23 に利用者が決めた)。Governs R28〜R32, R47。
 - KD13. **削除のシェルスクリプトの冒頭の検査・項目ごとの再確認・結果の記録・`--dry-run`・アプリの起動の確認・実行の順序** (session-settled: user-approved; chosen over 最初の失敗で中断すること・結果を記録しないこと)。Governs R17, R38〜R44。
 - KD14. **Claude の実行は、スキルの指示と環境変数の検査に加えて、hook でも拒否する** (session-settled: user-directed; chosen over スキルの指示と環境変数の検査だけにすること)。hook は、実行か読み取りかを区別しない (session-settled: user-approved; chosen over 実行するコマンドだけを拒否すること: コマンドの文字列からは、実行するのかを判断しきれないため)。Governs R45。
 - KD15. **一覧の示し方・番号・選び方・時間の上限・実行後の比較** (session-settled: user-approved; chosen over チェックボックスのある HTML のページで選ぶこと・すべての項目を毎回示すこと・GiB で示すこと)。Governs R4〜R11, R46。
@@ -217,14 +217,14 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 
 どれも、計画の承認の前に決める必要はない (deferred)。U1 の結果で決め、計画の R と KTD に反映する。
 
-- `ref:<git の参照>` の版が、`installs` の下でどの名前のディレクトリになるか (R24)。
-- `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。
-- `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。
-- Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。
-- `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。
-- アプリの Terminal パネルで利用者が実行したコマンドに、環境変数 `CLAUDECODE` が付くか (R38)。
-- hook が受け取る `mcp__terminal__run_in_terminal` の入力で、コマンドの文字列がどのキーにあるか (KTD9)。
-- `mcp__terminal__run_in_terminal` が、実行中のコマンドに入力を送れるか (R38)。
+- `ref:<git の参照>` の版が、`installs` の下でどの名前のディレクトリになるか (R24)。**U1 で決めた**: `installs/<ツール>/ref-<git の参照>`。R24 に対応のさせ方を、KTD10 に根拠を書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 6)。
+- `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。**U1 で決めた**: 出力の形と読み方は KTD11 に書いた。ボリューム 1,152 個で約 2 秒だった (最初に実行した `docker system df` だけが 9.5 秒) ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
+- `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。**U1 で決めた**: 領域を確保しただけで書き込んでいない部分 (ext4 の unwritten extent) を、Docker は使用量に数えるが、`Docker.raw` にはディスクが割り当てられていないため。KTD13 に理由を書き、R10 に注記を足した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
+- Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。**U1 で決めた**: 減る。R47 を、解放するコマンドを案内しないことに直した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
+- `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。**U1 で決めた**: 残された worktree には、セッションの ID と worktree のパスが含まれる。ほかの worktree のパスは含まれない。R34 に `refresh: true` で呼ぶことを、KTD12 に結果の形と理由を書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 4)。
+- アプリの Terminal パネルで利用者が実行したコマンドに、環境変数 `CLAUDECODE` が付くか (R38)。**U1 で決めた**: 付かない。KTD9 に書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。
+- hook が受け取る `mcp__terminal__run_in_terminal` の入力で、コマンドの文字列がどのキーにあるか (KTD9)。**U1 で決めた**: キー `command`。セッションの記録で確認した。hook の標準入力に届く JSON そのものは、U8 の Verification で確認する。KTD9 に書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。
+- `mcp__terminal__run_in_terminal` が、実行中のコマンドに入力を送れるか (R38)。**U1 で決めた**: 送れない。入力待ちのタブに送ろうとすると、アプリが拒否した。計画は変えない ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。
 
 次は、文書のレビューで残った懸念で、括弧の中の単位を実装するときに確認して、直し方を決める (deferred)。
 
@@ -236,7 +236,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - R11 (「消してよい」をすべて選ぶ) が、表に示していない「その他」の項目も選ぶかを決める (U6)。
 - GNU coreutils の `stat` が PATH で先に見つかると、再確認がすべて `skipped` になる。macOS では `/usr/bin/stat` を絶対パスで呼ぶかを決める (U7)。
 - テストで削除のシェルスクリプトを `/bin/bash` で実行し、macOS の手元でテストを実行するたびに bash 3.2 で動くことを確認するかを決める (U7)。
-- `docker system df -v` が時間の上限を超えたときの扱いを、Goal Capsule の「利用者に判断を求める条件」に入れるかを決める (U1・U11)。
+- `docker system df -v` が時間の上限を超えたときの扱いを、Goal Capsule の「利用者に判断を求める条件」に入れるかを決める (U1・U11)。**U1 で決めた**: 入れない。U1 では約 2 秒で終了し、時間の上限 (R4 のデフォルト値の 300 秒) よりずっと短かった。上限を超えたときは、U11 のテストシナリオのとおり、Docker の一覧を作らずに理由を示す ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - `docker buildx prune -f` は、いま選んでいる builder のキャッシュだけを消す。別の builder を選んでいるときの扱いを決める (U11)。
 - git 2.48 以降で設定 `worktree.useRelativePaths` を使うと、ファイル `.git` に相対パスが書かれる。KTD12 の判別で相対パスを扱う (U12)。
 - MCP ツール `mcp__ccd_host__get_storage_usage` と `mcp__ccd_host__discard_kept_worktree` は、読み込んでから呼び出すツール (Claude Code の deferred のツール) なので、スキルに読み込みの手順を書く (U12)。
@@ -254,7 +254,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - 設定と記録が壊れているとき: 書き込まずに終了コード 3 で示し、利用者に直してもらう (R22)。設定か記録を読むサブコマンド (`scan`・`select`・`list show`・`script create` など) も、壊れていれば処理を進めずに終了コード 3 で示す。壊れた記録を空として扱うと、利用者が「残す」と記録した項目が記録なしの判定で示されるため。
   - トリアージのファイル (一覧・選んだ項目) が壊れているとき: そのトリアージを使わずに、新しいトリアージで調べ直すよう示す。
 - KTD3. **Claude から Python のスクリプトに渡すのは、一覧の番号と、型を決めた JSON だけにする。** パスとコマンドは、Python のスクリプトが一覧のファイルから組み立てる (ファイル `docs/solutions/design-patterns/extract-identifiers-in-code-not-llm.md`)。Claude が組み立てる入力 (設定・判定表に無い項目の判定・記録) は、Claude が Write ツールでファイルに書き、引数 `--input-file` で渡す。入力のファイルは、ディレクトリ `~/.claude/disk-usage-triage/inputs/` に置く。hook (KTD8) が拒否するディレクトリ `runs` の下には置かない。知らないキーは誤りにし、値を検査し、Python のスクリプトが求められる値 (パス・使用量) は受け取らない (ファイル `docs/solutions/design-patterns/typed-contract-for-agent-input.md`)。設定のパスは、絶対パスか `~` で始まるパスだけを受け付ける (ファイル `docs/solutions/tooling-decisions/require-explicit-basis-for-relative-paths.md`)。
-- KTD4. **ディレクトリの使用量は、コマンド `du -k -d 1` で測る。** キロバイトの値に 1,024 を掛けてバイトにする。`du` は、読めないディレクトリがあると終了コード 1 を返すが、ほかの結果は出す。標準エラー出力の行が `Operation not permitted` か `Permission denied` だけのときは結果を使い、読めなかったディレクトリを一覧の注記に示す。それ以外の誤りと時間の上限 (R4) のときは、そのディレクトリの結果を出さない。外部のコマンドは 1 つのモジュール (ファイル `disk-usage-triage/scripts/disk_usage_triage/proc.py`) で、標準入力を空にし、時間の上限を付けて実行する。`du` の使用量は、APFS のクローンとハードリンクのために、消して空く量と一致しないことがある。このことを一覧の注記に示す。
+- KTD4. **ディレクトリの使用量は、コマンド `du -k -d 1` で測る。** キロバイトの値に 1,024 を掛けてバイトにする。`du` は、読めないディレクトリがあると終了コード 1 を返すが、ほかの結果は出す。標準エラー出力の行が `Operation not permitted` か `Permission denied` だけのときは結果を使い、読めなかったパス (標準エラー出力の行 `du: <パス>: Operation not permitted` の `<パス>`) を、それを含む一覧の項目に対応させる。読めなかったパスは、項目そのものとは限らず、項目の下の階層にあることがある (U1 で、`~/Library/Containers` の 792 個の項目のうち 321 個で、その下のディレクトリ `Data` が読めなかった。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 1)。一覧の注記には、読めなかったディレクトリを含む項目の番号 (表に示した項目の分) と、「その他」に含まれるそのような項目の数を示し、それらの使用量は実際より少ないと書く。読めなかったパスそのものは、利用者が依頼したときに示す (2026-11-23 に利用者が決めた。すべてのパスを注記に並べると、`~/Library/Containers` では 321 行になり、一覧が読めなくなるため)。それ以外の誤りと時間の上限 (R4) のときは、そのディレクトリの結果を出さない。外部のコマンドは 1 つのモジュール (ファイル `disk-usage-triage/scripts/disk_usage_triage/proc.py`) で、標準入力を空にし、時間の上限を付けて実行する。`du` の使用量は、APFS のクローンとハードリンクのために、消して空く量と一致しないことがある。このことを一覧の注記に示す。
 - KTD5. **判定は、R13 の順に決める。** 判定表は、パッケージの中の JSON のファイル `disk-usage-triage/scripts/disk_usage_triage/judgment-table.json` に置く (プラグイン issue-dispatch のファイル `issue-dispatch/scripts/issue_dispatch/file-kinds.json` と同じ形)。様式の SSOT は、ファイル `disk-usage-triage/references/judgment-table.md`。
   - 判定表の行は、パスのパターン (`~` で始まり、`*` が 1 つの階層の任意の名前に一致する)・判定・理由・影響・消すコマンド・アプリのプロセス名・専用の一覧 (`asdf`・`docker`・`worktree`) を持つ。
   - 複数の行に一致したら、階層の多いパターンの行を使う。
@@ -272,17 +272,23 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 
   デバイス番号と inode 番号は、`uname` が `Darwin` なら `stat -f '%d:%i'`、それ以外なら `stat -c '%d:%i'` で読む。macOS で使う前提だが、CI (Ubuntu) で同じ削除のシェルスクリプトを実行してテストするため。Python のスクリプトは、作るときに `os.stat` で同じ値を求めて書く。結果のファイル `results.tsv` には、タブで区切った行を追記し、1 列目で行の種類を分ける。開始の行 (`run-start`)・終了の行 (`run-end`)・中断の行 (`interrupted`) は、種類・時刻・ディスクの空きを書く。項目の行 (`item`) は、種類・項目の ID・結果 (`ok`・`failed`・`skipped`)・終了コード・時刻・理由を書く。コマンドの出力は、ファイル `log.txt` に書く。
 - KTD8. **hook は、文字列 `disk-usage-triage/runs`・環境変数 `DISK_USAGE_TRIAGE_HOME` で変えたときの `runs` のパス・ファイル名 `disk-usage-triage-delete.sh` のどれかを含むコマンドを拒否する** (session-settled: user-directed; chosen over hook を使わないこと)。R45 と KD14 を実現する。hook の形は、プラグイン review-triage のファイル `review-triage/scripts/review-loop-worker/deny_tmp_hook.py` にならう。このリポジトリで開発するときのコマンド (例: `python3 -m unittest discover -s disk-usage-triage/tests`) を拒否しないように、テストの固定データのディレクトリに `runs` という名前を使わない。このリポジトリの開発では、ファイル名や `runs` のパスを含む文はファイルにして渡し (`git commit -F <ファイル>`・`gh pr create --body-file <ファイル>`)、検索には Bash ツールの `grep` ではなく Grep ツールを使う。Grep ツールは hook が検査する対象 (KTD9) に入らないため。
-- KTD9. **hook は、Bash ツールに加えて、アプリの Terminal パネルにコマンドを送る MCP ツール `mcp__terminal__run_in_terminal` の入力も検査する。** Terminal パネルで実行したコマンドには環境変数 `CLAUDECODE` が付かないことがあり (U1 で確認する)、Bash ツールだけを検査すると、Claude が Terminal パネルから実行するのを拒否できないため。あわせて、Write・Edit・MultiEdit・NotebookEdit ツールの入力のファイルのパスも検査し、KTD8 の文字列を含むパスへの書き込みを拒否する。利用者に要約を示した後に、Claude が削除のシェルスクリプトの中身を書き換えないようにするため (R45)。
+- KTD9. **hook は、Bash ツールに加えて、アプリの Terminal パネルにコマンドを送る MCP ツール `mcp__terminal__run_in_terminal` の入力も検査する。** Terminal パネルで実行したコマンドには環境変数 `CLAUDECODE` が付かず (U1 で確認した)、Bash ツールだけを検査すると、Claude が Terminal パネルから実行するのを拒否できないため。`run_in_terminal` の入力のコマンドの文字列は、キー `command` にある (U1 で、セッションの記録で確認した。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。hook の標準入力に届く JSON そのものは、U8 で、プラグインを入れた状態で確認する (2026-11-23 に利用者が決めた)。あわせて、Write・Edit・MultiEdit・NotebookEdit ツールの入力のファイルのパスも検査し、KTD8 の文字列を含むパスへの書き込みを拒否する。利用者に要約を示した後に、Claude が削除のシェルスクリプトの中身を書き換えないようにするため (R45)。
 - KTD10. **asdf は、データの場所と参照を Python のスクリプトが読む** (R23〜R27)。
   - データの場所は、環境変数 `ASDF_DATA_DIR`、無ければ `~/.asdf`。版は `installs/<ツール>/<版>` のディレクトリで、使用量は `installs` で `du -k -d 2` を実行して求める。
   - `.tool-versions` は、`#` から行末をコメントとし、行の最初の語をツール、残りを版として読む。プロジェクトのディレクトリは `os.walk` で、時間の上限 (R4) の中で探し、`.git` と `node_modules` の下を探さない。`pyvenv.cfg` を見つけたディレクトリ (仮想環境) の下も探さない。読めなかったディレクトリは引数 `onerror` で集め、R25 の理由に書く。
+  - `ref:<git の参照>` の版のディレクトリの名前 (R24) は、asdf 0.20.2 のソースで確認した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 6)。ファイル `internal/toolversions/toolversions.go` の関数 `FormatForFS` が、種類 `ref` の版を `ref-<git の参照>` にし、ファイル `internal/installs/installs.go` の関数 `InstallPath` が、それを `installs/<ツール>` の下につなぐ。つなぐのは Go の関数 `filepath.Join` なので、git の参照に `/` があると、2 階層のディレクトリになるはず。これはソースから読み取ったことで、試していない。そのため、参照されていないと誤って判定しないように、R24 では最初の階層のディレクトリを参照されている版として数える (2026-11-23 に利用者が決めた)。
   - ほかのツールの版のファイル (R24) は、asdf と同じく、各プラグインの `bin/list-legacy-filenames` のファイル名を探し、`bin/parse-legacy-file` があればそれで版を読む。
   - グローバルなパッケージの名前は、Node.js は `lib/node_modules` の下 (`npm` と `corepack` を除く)、Go は版のディレクトリの下の `bin` から読む (Go のプラグインのファイル `exec-env` が、環境変数 `GOBIN` が未設定のときに設定する場所)。Go のプラグインは、環境変数 `GOPATH` が未設定のとき、`GOPATH` を版のディレクトリの下の `packages` にする (ファイル `~/.asdf/plugins/golang/bin/exec-env`)。Go のプラグインの版を消す処理は、読み取り専用のキャッシュに書き込みの権限を付けてから消すので、`asdf uninstall` で消せる。
   - プラグインを実行している Python の版 (R14) は、`sys.executable` の実パスが `installs/python/<版>/` の下にあるときの、その版。
   - R43 の版の指定は、コマンドの実行ファイルが `<データの場所>/shims/` の下にあるとき、shim のファイルの `# asdf-plugin: <ツール> <版>` の行から行う。shim には、そのコマンドを提供するツールと版の組が 1 行ずつ書かれ、複数のツールが並ぶことがある (例: `pnpm` の shim に pnpm と nodejs)。行に現れるツールのうち、`~/.tool-versions` の版がそのツールの行に書かれていないもの (`~/.tool-versions` にツールが無いものを含む) ごとに、そのツールの行に書かれた版から残る版を選んで、環境変数で指定する。行に書かれた版はどれもそのコマンドを提供するので、asdf がどのツールの版を使っても、そのコマンドを実行できる。環境変数の名前は `ASDF_<TOOL>_VERSION` で、ツール名を大文字にし、`-` を `_` にする。残る版が複数あれば、最も新しい版にする。
-- KTD11. **Docker は、コマンド `docker` の JSON の出力を読む** (R28〜R32)。起動の確認は `docker version --format json` で行い、失敗したら R32 にする。使われているかどうかは、`docker system df -v --format json` の、使っているコンテナの数 (ボリュームは `Links`、image は `Containers`) で判定し、名前での突き合わせはしない。`docker ps` は、`--no-trunc` が無いとボリュームの名前を短くして出し、image はコンテナを作ったときのタグで示すので、タグを付け替えた後は突き合わせられないため。ボリュームの使用量・image だけが使っている量 (`UniqueSize`)・コンテナの使用量・ビルドキャッシュの量も、同じ出力から読む。ボリュームのラベルは `docker volume ls --format json` から、停止しているコンテナの ID と Compose のプロジェクト名は `docker ps -a --no-trunc --format json` から読む。出力の形とキーは U1 で確認する。Docker の一覧は 1 つの専用の一覧にする。`docker volume rm` は、1 行に 100 個までの名前を並べる。比較のために、`Docker.raw` の `du -k` を、削除のシェルスクリプトの作成の時と比較の時に測る。
-- KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
-- KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差と R47 の案内で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` が縮んだときにだけ増えるため。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
+- KTD11. **Docker は、コマンド `docker` の JSON の出力を読む** (R28〜R32)。起動の確認は `docker version --format json` で行い、失敗したら R32 にする。出力の形とキーは、U1 で確認した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
+  - 使われているかどうかは、`docker system df -v --format json` の、使っているコンテナの数 (ボリュームは `Links`、image は `Containers`) で判定し、名前での突き合わせはしない。`docker ps` は、`--no-trunc` が無いとボリュームの名前を短くして出し、image はコンテナを作ったときのタグで示すので、タグを付け替えた後は突き合わせられないため。停止しているコンテナが使っているものも、使っているコンテナの数に入る (U1 で確認した)。
+  - ボリュームの使用量・image だけが使っている量 (`UniqueSize`)・コンテナの使用量・ビルドキャッシュの量も、同じ出力から読む。この出力は 1 つの JSON のオブジェクトで、値はすべて文字列。サイズは `"201MB"` のような、単位 (`B`・`kB`・`MB`・`GB` など。1,000 倍ごと) の付いた文字列なので、バイトに直して使う。`UniqueSize` は負の値 (`"-5.404e+06B"` のような形) になることがある。そのときは、その image の空く量の見込みを「不明」と示す (2026-11-23 に利用者が決めた。Docker が出した値が矛盾していて、正しい量が分からないため)。
+  - image のすべての `<リポジトリ>:<タグ>` (R29) は、`docker image ls --no-trunc --format json` (タグごとに 1 行) の行を ID でまとめて得る。`docker system df -v` は image ごとに 1 行で、タグを 1 つしか出さないため。
+  - ラベルは、ボリュームは `docker volume inspect` の `Labels` から、停止しているコンテナは `docker container inspect` の `Config.Labels` から、JSON のオブジェクトとして読む (2026-11-23 に利用者が決めた。`docker volume ls` と `docker ps -a` の `Labels` は、`key=value` をコンマでつないだ 1 つの文字列で、値にコンマがあると読み間違えるため)。停止しているコンテナの ID は `docker ps -a --no-trunc --format json` から読む。
+  - Docker の一覧は 1 つの専用の一覧にする。`docker volume rm` は、1 行に 100 個までの名前を並べる。比較のために、`Docker.raw` の `du -k` を、削除のシェルスクリプトの作成の時と比較の時に測る。
+- KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。`get_storage_usage` に引数 `refresh: true` を付けるのは、U1 で、付けずに呼ぶと 2 日前に計算した値が返ったため (ツールの説明には、約 1 分キャッシュするとある。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 4)。結果の形も U1 で確認した。残された worktree は `code.worktrees.kept_after_archive` に 1 つずつあり、R35 で使う `session_id` と worktree のパスを持つ。ほかの worktree のパスは結果に無いが、R34 は数と量だけを使う。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
+- KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` の `du` が減ったときにだけ増えるため。Docker の中の量には、領域を確保しただけで書き込んでいない部分 (ext4 の unwritten extent。例: MySQL の redo ログのファイル) も入る。その部分は仮想ディスクに書かれないので、`Docker.raw` にはディスクが割り当てられていない。そのため、Docker の項目を消して macOS で空く量は、Docker の中の量より少ないことがある (U1 では、この部分がボリュームの合計 174.9 GB のうち 81.3 GB だった。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。R10 の注記は、このことを示す。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
 - KTD14. **Python のスクリプトは、標準出力に JSON を 1 つ出し、必ずキー `errors` を持たせる。** 終了コードは gh-notification-dispatch と同じく、0 は続ける、3 は `errors` を利用者に示して判断を求める、4 は外部のコマンドが失敗した、1・2 はスクリプトの不具合と引数の誤り。サブコマンドの引数・出力のキー・終了コードの SSOT は、各サブコマンドの `--help` にする。
 - KTD15. **スキルは、時間の上限 (R4) を使う処理を行うサブコマンドを、Bash ツールのバックグラウンド (引数 `run_in_background`) で実行し、完了の通知を受けてから出力を読む** (R4)。Bash ツールの時間の上限 (指定しなければ 120 秒、最大 600 秒) は、調べるディレクトリごとの上限 (R4) の合計より短いことがあり、打ち切られると一覧が出ないため。時間の上限を使う処理は、外部のコマンド (KTD4) のほか、KTD5 の `.claude/worktrees` の探索のように Python の中で時間の上限を使う処理も含む。そのようなサブコマンドを足す・変える単位は、そのサブコマンドの `--help` に、バックグラウンドで実行することを書く (KTD14)。
 
@@ -527,7 +533,7 @@ disk-usage-triage/
 - Edit ツールで `runs` の下の削除のシェルスクリプトを書き換える入力と、Write ツールで同じパスに書く入力は拒否する。`inputs/` の下のファイルへの Write は拒否しない。
 - 入力の JSON が壊れているときは、拒否も許可もせず、誤りを標準エラー出力に書く。
 
-**Verification:** テストがすべて成功する。Claude Desktop で、Claude に削除のシェルスクリプトの実行を Bash ツールで試させると、hook が拒否する (削除のシェルスクリプトは、何もしない内容のものを使う)。
+**Verification:** テストがすべて成功する。Claude Desktop で、Claude に削除のシェルスクリプトの実行を Bash ツールで試させると、hook が拒否する (削除のシェルスクリプトは、何もしない内容のものを使う)。プラグインを入れた状態で、Claude が `mcp__terminal__run_in_terminal` で削除のシェルスクリプトを実行しようとすると hook が拒否し、そのとき hook が受け取った JSON の形が、テストの固定データと合っている (KTD9)。
 
 ### U3. 判定表と保護の一覧
 
@@ -624,7 +630,7 @@ disk-usage-triage/
 **Test scenarios:**
 - `du` の出力から、1 つ下の階層の項目とその使用量 (バイト) を得る。ディレクトリ自身の行は、項目に入れず合計に使う。
 - 空白と日本語を含むパスを正しく読む。
-- 終了コード 1 で、標準エラー出力が `Operation not permitted` の行だけのときは、結果を使い、読めなかったディレクトリを注記として返す。
+- 終了コード 1 で、標準エラー出力が `Operation not permitted` の行だけのときは、結果を使い、読めなかったパスを、それを含む項目に対応させて返す。項目の下の階層のパス (例: `<項目>/Data`) も、その項目に対応する。
 - 終了コード 1 で、ほかの誤りを含むときは、そのディレクトリの結果を返さずに誤りを返す。
 - 時間の上限を超えた `du` (偽の `du` が待機し続ける) は打ち切り、そのディレクトリを「時間内に完了しなかった」として返し、ほかのディレクトリの結果は返す。
 - 実際の `du` で一時ディレクトリを調べると、ファイルを書き込んだディレクトリが、書き込んでいないディレクトリより大きい (macOS と Ubuntu のどちらでも成功する)。
@@ -635,7 +641,7 @@ disk-usage-triage/
 
 **Goal:** 調査の結果を英字と番号の付いた一覧にし、項目の下の階層も一覧にでき、消す項目を選べるようにする。
 
-**Requirements:** R5〜R13, R20。KD15。KTD3, KTD15。
+**Requirements:** R5〜R13, R20。KD15。KTD3, KTD4, KTD15。
 
 **Dependencies:** U4, U5。
 
@@ -654,6 +660,7 @@ disk-usage-triage/
 **Test scenarios:**
 - 最初の一覧は、2 つの調べるディレクトリの項目をまとめて使用量の多い順に並べ、英字 `A` と番号 `A1` から付ける。
 - 31 項目以上のときは 30 項目と「その他」の 1 行になり、`--all` で残りも出る。
+- 読めなかったディレクトリを含む項目があるときは、注記に、表に示した項目のうちのその番号と、「その他」に含まれるそのような項目の数が出る。読めなかったパスそのものは、注記に出ない (KTD4)。
 - 使用量の表示 (R8): 1,000,000,000 バイトは `1.0 GB`、999,000,000 バイトは `999.0 MB`、1,500,000,000 バイトは `1.5 GB` になる。
 - `scan --item A3` は、A3 の下の階層を英字 `B` の一覧にする。`A3` は前の一覧の項目として、その後も指定できる。
 - 専用の一覧を持つ項目を指定すると、下の階層ではなく専用の一覧の種類を返す (専用の一覧そのものは U10〜U12)。
@@ -754,7 +761,7 @@ disk-usage-triage/
 **Patterns to follow:** U6 の専用の一覧の扱い。
 
 **Test scenarios:**
-- `.tool-versions` の 1 行の複数の版・コメント・`system`・`path:`・`ref:` を、R24 のとおりに数える。
+- `.tool-versions` の 1 行の複数の版・コメント・`system`・`path:`・`ref:` を、R24 のとおりに数える。`ref:v1.2.3` はディレクトリ `ref-v1.2.3` の版を、`ref:feature/x` はディレクトリ `ref-feature` の版を、参照されている版として数える。
 - `.git` と `node_modules` の下の `.tool-versions` は数えない。プロジェクトのディレクトリの下のアプリの worktree の `.tool-versions` は数える。
 - `pyvenv.cfg` の `home` が asdf の Python の版を指していれば、その版を参照として数え、仮想環境の下は探さない。
 - `~/.asdfrc` に `legacy_version_file = yes` が無ければ `.nvmrc` を数えず、あれば、偽のプラグインの `list-legacy-filenames` と `parse-legacy-file` で読んだ版を数える。
@@ -775,7 +782,7 @@ disk-usage-triage/
 
 **Goal:** Docker の中身を専用の一覧で示し、ボリューム・image・停止しているコンテナ・ビルドキャッシュの削除を削除のシェルスクリプトに入れる。
 
-**Requirements:** R4, R18, R28〜R32, R43, R47。KD3, KD12。KTD11, KTD15。
+**Requirements:** R4, R10, R18, R28〜R32, R43, R47。KD3, KD12。KTD11, KTD13, KTD15。
 
 **Dependencies:** U9。
 
@@ -786,7 +793,7 @@ disk-usage-triage/
 **Approach:**
 1. 用意する: 偽の `docker` と固定データ。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: `docker.py` に、起動の確認・データの取得・判定・項目のまとめ方を書く。`lists.py` の専用の一覧に Docker を足す。`script.py` に Docker の 4 つの削除と順序を、`compare.py` に `Docker.raw` の比較と R47 の案内を足す。`records.py` で、Docker の 3 種類のキーの記録を判定に使う。
+3. 実装する: `docker.py` に、起動の確認・データの取得・判定・項目のまとめ方を書く。`lists.py` の専用の一覧に Docker を足す。`script.py` に Docker の 4 つの削除と順序を、`compare.py` に `Docker.raw` の比較を足す。`records.py` で、Docker の 3 種類のキーの記録を判定に使う。
 
 **Patterns to follow:** U5 の偽の `du`。
 
@@ -796,14 +803,15 @@ disk-usage-triage/
 - 停止しているコンテナが使っているボリュームと image は「残す」。使っているかは使っているコンテナの数で判定し、タグを別の image に付け替えた後の古い image も、コンテナが使っていれば「残す」になる。
 - 使われていない image のうち、タグが 2 つあるものは 2 つの `<リポジトリ>:<タグ>` を並べた `docker image rm` になり、タグの無いものは `docker image rm <ID>` になる。
 - 記録で「残す」としたリポジトリの image・ボリューム・Compose のプロジェクトのボリュームは「残す」になる。
-- image の空く量の見込みは、その image だけが使っている量になる。
+- image の空く量の見込みは、その image だけが使っている量になる。`UniqueSize` が負の image は、空く量の見込みが「不明」になる。
+- サイズの文字列 (`"0B"`・`"8.29kB"`・`"200.7MB"`・`"2.147GB"`) が、バイトに直される。
+- ラベルのほかの値にコンマがあっても、匿名ボリュームのラベルと Compose のプロジェクト名を正しく読む。
 - ビルドキャッシュは、`docker buildx prune -f` の 1 つの項目になり、`--all` を含まない。
 - 停止しているコンテナは「確認が要る」で、`docker container rm <ID>` になる。
 - 削除のシェルスクリプトで、Docker の項目はコンテナ → ボリューム → image → ビルドキャッシュの順に並び、`docker container rm`・`docker volume rm`・`docker image rm` に `-f`・`--force` が付かない。
 - `docker version` が失敗するときは、Docker の一覧を作らずに理由を返し、終了コードは 0 (ほかの一覧を続けるため)。
 - `docker system df -v` が時間の上限を超えたときは、Docker の一覧を作らずに理由を返す。
-- 選んだ項目の合計で、Docker の項目の量が分けて示される。比較で、Docker の項目は 80% の判定の消した量に含まれず、`Docker.raw` の `du` の前後の差として示される。
-- 比較で、Docker の項目が成功したのに `Docker.raw` の `du` が減っていなければ、R47 のコマンドを案内する (U1 で何もしなくても減ると分かった場合は、このテストと案内を作らない)。
+- 選んだ項目の合計で、Docker の項目の量が分けて示される。Docker の一覧と選んだ項目の合計に、Docker の項目を消して macOS で空く量は Docker の中の量より少ないことがある、という注記が付く。比較で、Docker の項目は 80% の判定の消した量に含まれず、`Docker.raw` の `du` の前後の差として示される。
 
 **Verification:** テストがすべて成功する。Claude Desktop で Docker の一覧が出て、利用者が端末で削除のシェルスクリプトを実行すると、選んだ匿名ボリュームが消え、比較に `Docker.raw` の変化が出る。
 
@@ -820,7 +828,7 @@ disk-usage-triage/
 - 変える: `disk-usage-triage/scripts/disk_usage_triage/{lists,script}.py`・`disk-usage-triage/skills/triage/SKILL.md`
 
 **Approach:**
-1. 用意する: `worktree.md` に、`mcp__ccd_host__get_storage_usage` の結果の示し方・設定の画面の案内・残された worktree の削除の同意の取り方 (R35)・端末の Claude Code のときの扱い (R33) を、U1 で確認した MCP ツールの形に合わせて書く。
+1. 用意する: `worktree.md` に、`mcp__ccd_host__get_storage_usage` の呼び方 (引数 `refresh: true`) と結果の示し方 (`incomplete` が `true` のときを含む)・設定の画面の案内・残された worktree の削除の同意の取り方 (R35)・端末の Claude Code のときの扱い (R33) を、U1 で確認した MCP ツールの形に合わせて書く。
 2. テストを書く: Test scenarios のとおり。テストの git のリポジトリは一時ディレクトリに作り、環境変数 `GIT_DIR` などを消してから git を実行する。
 3. 実装する: `worktree.py` に、git の worktree の判定とメインのリポジトリの求め方を書く。`lists.py` で、アプリの worktree の項目を案内の対象にし、`script.py` に `git worktree remove` と順序を足す。
 
@@ -833,7 +841,7 @@ disk-usage-triage/
 - パスに `/.claude/worktrees/` を含む項目は、選ぼうとしても選んだ項目に入らず、削除のシェルスクリプトにも入らない。理由として、R34 の設定の画面の案内の対象であることを返す。
 - 削除のシェルスクリプトで、コミットしていない変更がある worktree は git が拒否し、`failed` を書いて次の項目に進む。
 
-**Verification:** テストがすべて成功する。Claude Desktop で、`get_storage_usage` の量と設定の画面の案内が出る。残された worktree があれば、同意の後にアプリのカードで消せる。
+**Verification:** テストがすべて成功する。Claude Desktop で、`refresh: true` を付けて呼んだ `get_storage_usage` の量と設定の画面の案内が出る。残された worktree があれば、同意の後にアプリのカードで消せる。
 
 ### U13. 文書と通し確認
 
