@@ -6,6 +6,7 @@
 - 入口 (ファイル `disk-usage-triage/scripts/disk_usage_triage.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの
   --help が、引数・出力・終了コードを示す (計画の KTD14)
 - 入口は、Python の版が 3.11 より古ければ、版を示して終了コード 3 で終了する (計画の節「Assumptions」)
+- ファイル `disk-usage-triage/README.md` のスキルの表が、ディレクトリ `disk-usage-triage/skills/` のスキルをすべて挙げている
 
   python3 -m unittest discover -s disk-usage-triage/tests
 """
@@ -88,6 +89,29 @@ class FilesDocTest(unittest.TestCase):
     def test_default_timeout(self):
         text = section(self.doc, "### `config set` の入力")
         self.assertIn(f"省くと {config.DEFAULT_TIMEOUT_SECONDS}", text)
+
+
+SKILLS = os.path.join(HERE, "..", "skills")
+README = os.path.join(HERE, "..", "README.md")
+
+
+class SkillListingDocTest(unittest.TestCase):
+    """スキルを足したときに、README に書き損ねないこと。"""
+
+    def test_readme_lists_every_skill(self):
+        skills = sorted(name for name in os.listdir(SKILLS) if os.path.isfile(os.path.join(SKILLS, name, "SKILL.md")))
+        self.assertTrue(skills)
+        with open(README, encoding="utf-8") as f:
+            rows = table_rows(f.read(), "| スキル | すること |")
+        listed = sorted(re.match(r"\[([a-z-]+)\]", cells[0]).group(1) for cells in rows)
+        self.assertEqual(listed, skills)
+
+    def test_skill_names_match_directories(self):
+        for name in os.listdir(SKILLS):
+            with self.subTest(skill=name), open(os.path.join(SKILLS, name, "SKILL.md"), encoding="utf-8") as f:
+                front = f.read().split("---\n", 2)[1]
+                self.assertIn(f"name: {name}\n", front)
+                self.assertRegex(front, r"\ndescription: .+\n")
 
 
 GROUPS = ("config",)  # 下にサブコマンドを持つグループ

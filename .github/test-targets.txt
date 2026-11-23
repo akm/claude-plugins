@@ -19,3 +19,4 @@ python doc-structured/tool/tests
 python gh-notification-dispatch/tests
 node slide-deck
 uv slide-deck
+python disk-usage-triage/tests

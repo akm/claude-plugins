@@ -19,6 +19,7 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う |
 | [slide-deck](slide-deck/README.md) | 図を中心にした説明資料を、構成案から PowerPoint のファイルと Google スライドの両方に作り、内容が変わったスライドだけを直す。構成案・PowerPoint のファイル・Google スライドの 3 つのフェーズのスキルと、TypeScript と Python のツールを同梱する (Node.js 24 以上と uv が必要。Google スライドには、Claude のデスクトップアプリの Google スライドのコネクタが必要) |
 | [gh-notification-dispatch](gh-notification-dispatch/README.md) | GitHub の通知から PR のレビューの依頼とマージを判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへ届ける。配信のセッションが 10 分ごとに取得し、Claude Desktop を再起動した後は 1 つの手順で再開する |
+| [disk-usage-triage](disk-usage-triage/README.md) | ディスクの空きが足りないときに、設定したディレクトリの容量の大きい項目を、消してよいかの判定と一緒に一覧で示し、選んだ項目から削除のシェルスクリプトを作る。削除は利用者が端末で実行する (作成中) |
 
 ## 使い方
 
@@ -256,6 +257,13 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── references/               # メッセージと記録のファイルの様式・メッセージの送り方
 │   ├── scripts/                  # スクリプト (gh_notification_dispatch.py とパッケージ gh_notification_dispatch/)
 │   ├── tests/                    # python3 -m unittest discover -s gh-notification-dispatch/tests
+│   └── README.md
+├── disk-usage-triage/            # skill 型 + 同梱スクリプト (作成中)
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/triage/            # 容量の大きい項目を調べて消す (今の版は設定を作る・変えるところまで)
+│   ├── references/               # 保存先のディレクトリのファイルの様式
+│   ├── scripts/                  # スクリプト (disk_usage_triage.py とパッケージ disk_usage_triage/)
+│   ├── tests/                    # python3 -m unittest discover -s disk-usage-triage/tests
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
     ├── .claude-plugin/plugin.json
