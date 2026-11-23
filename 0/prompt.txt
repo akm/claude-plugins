@@ -1,0 +1,21 @@
+Task (from the session that started this one):
+Background (from the session that started this one):
+disk-usage-triage は、ディスクの空きが足りないときに、利用者が設定したディレクトリを `du -d 1` の深さで調べ、項目を判定 (消してよい・確認が要る・残す) と一緒に示し、利用者が選んだ項目から削除のシェルスクリプトを作るプラグイン。削除は利用者が端末でシェルスクリプトを実行し、Claude は実行しない (計画の KD1)。計画は PR #314 で 2026-11-23 にマージ済み (c07e220b)。U1 (実測) は完了し、結果は Issue #310 のコメント、計画の修正 8 個は PR #316 でマージ済み (3f735c4b)。単位の順は U2 → U8 (hook) → U3 → U4 → U5 → U6 → U7 → U9 → U10 → U11 → U12 → U13 (1.0.0) で、単位ごとに PR を作る。Issue #310 は実装が残るので開いたまま。会話は日本語で、リポジトリの CLAUDE.md と利用者の CLAUDE.md の文章の規約に従う。
+
+Task:
+Issue akm/claude-plugins#310 のプラグイン disk-usage-triage の計画 (ファイル `docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md`) の、実装の単位 U2 (節「### U2. 枠と設定」) を実装してください。
+
+やること:
+1. `main` を最新にしたうえで、計画の Goal Capsule・Key Technical Decisions (とくに U2 の Requirements に挙がっている KTD) と U2 の節を読む。U1 の実測の結果 (Issue #310 のコメント https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) と、それを反映した PR #316 の変更も読む。
+2. 新しいブランチで、U2 の Files・Approach・Test scenarios のとおりに、テストを先に書いてから実装する。計画にない振る舞いやフォールバックは足さず、計画と食い違う点や決まっていない点が見つかったら、決めずに利用者に尋ねる。
+3. テストと、リポジトリの検査 (CI と同じもの) を通す。日本語の文章 (コード中のコメント・docstring・文書・コミットメッセージ・PR 本文) は wording-guard の検査 (`wording-guard/scripts/wording_lint.py check --stdin`) と目視で確かめる。
+4. コミットは動機ごとに分ける。push と PR の作成は、PR 本文の下書きを利用者に見せて承認を得てから行う。レビューをどう行うか (review-rally を使うかなど) も利用者に尋ねる。
+
+守ること:
+- 削除を伴う確認は Claude が実行せず、コマンドを示して利用者に端末で実行してもらう。
+- akm/claude-plugins は公開リポジトリ。ほかのプロジェクトの名前を Issue・PR に書かない。
+- 未追跡の `.claude/settings.json` と `.entire/` には触れない。
+
+完了の条件: U2 の Verification を満たす実装の PR を作り、利用者がマージするかどうかを決められる状態にしたこと。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_957dcd90-f21d-493c-aa45-4f56156af3f0

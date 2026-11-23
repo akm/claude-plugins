@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M845J8KZZ1GK2M275D5ZSWSA",
+  "strategy": "manual-commit",
+  "branch": "feat/disk-usage-triage-config-310",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "disk-usage-triage/scripts/disk_usage_triage/__init__.py",
+    "disk-usage-triage/scripts/disk_usage_triage/proc.py",
+    "disk-usage-triage/scripts/disk_usage_triage/store.py",
+    "disk-usage-triage/tests/test_proc.py",
+    "disk-usage-triage/tests/test_store.py",
+    "disk-usage-triage/tests/triage_case.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 72,
+    "cache_creation_tokens": 194463,
+    "cache_read_tokens": 6543044,
+    "output_tokens": 32029,
+    "api_call_count": 36
+  },
+  "redaction": {
+    "replacements": 23,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 22,
+      "key_context": 1,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
