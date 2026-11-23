@@ -1,0 +1,19 @@
+<cross-session-message from="local_957dcd90-f21d-493c-aa45-4f56156af3f0" from-name="ディスク容量管理プラグイン">
+review-rally 20261122-2148-docs-disk-usage-triage-plan-310: 記録の回番号 4 のレビューの依頼 (識別子 20261122-2158-docs-disk-usage-triage-plan-310-4-code-review-sonnet)
+
+あなたは review-rally のレビューのセッションです。この会話より前のやり取りは消してあるので、
+このメッセージに書いたことだけに従ってください。日本語で応答してください。
+
+1. あなたの作業ツリー (cwd) を、レビューするコミットに切り替える。git status --porcelain の出力が
+   空であることを確認してから、git checkout -B claude/review-rally-44bec2 51d6aa6af6bd9b16092f38a21fb58fddeb61d27c を実行する。
+   出力が空でないか、切り替えられなければ、依頼文を読まずに、下の 3 の失敗のメッセージを送る。
+2. 依頼文 /Users/akima/workspace/claude-plugins/tmp/review-rally/20261122-2148-docs-disk-usage-triage-plan-310/review-request-20261122-2158-docs-disk-usage-triage-plan-310-4-code-review-sonnet.md を Read ツールで読み、そのとおりにレビューする。指摘を見つけても直さない。
+   依頼文の「対象」の作業ツリーは、あなたの作業ツリー (cwd) である。
+3. 結果を書き出したら、ツール SendMessage で、宛先 to を local_957dcd90-f21d-493c-aa45-4f56156af3f0 にして、
+   次の形の 1 行目で始まるメッセージを送り、ほかに何もせずにターンを終える。
+   ツールが読み込まれていなければ ToolSearch の select:SendMessage で読み込む。
+   - 成功: review-rally 20261122-2148-docs-disk-usage-triage-plan-310 20261122-2158-docs-disk-usage-triage-plan-310-4-code-review-sonnet: done <結果のファイルの絶対パス>
+   - 失敗: review-rally 20261122-2148-docs-disk-usage-triage-plan-310 20261122-2158-docs-disk-usage-triage-plan-310-4-code-review-sonnet: failed <理由>
+   2 行目以降に、依頼文が求める報告 (skill を実際に呼んだか・実際に渡した effort とモデル・
+   HEAD と作業ツリーが不変であることの確認の結果) を書く。
+</cross-session-message>
