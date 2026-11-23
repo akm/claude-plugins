@@ -176,7 +176,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - 消した項目ごとの、実行の前と後の使用量。失敗した項目と、実行しなかった項目とその理由。
   - ディスクの空きの、実行の前と後。
   - 空きが増えた量が消した量よりかなり少ないときは、理由の候補 (APFS のスナップショット・Time Machine のローカルスナップショット・クローンのファイル) と、確認するコマンド (`tmutil listlocalsnapshots /` など)。
-- R47. Docker の項目を消したのに `Docker.raw` の `du` が減っていなければ、Docker の中で空いた領域を `Docker.raw` から解放するコマンド `docker run --rm --privileged --pid=host docker/desktop-reclaim-space` を案内する。このコマンドは削除のシェルスクリプトに入れない。U1 で、何もしなくても減ると分かれば、この案内は作らない。
+- R47. 比較では、Docker の中で空いた領域を `Docker.raw` から解放するコマンド (`docker run --rm --privileged --pid=host docker/desktop-reclaim-space`) を案内しない。U1 で、Docker の中でボリュームを消すと、何もしなくても 10 秒以内に `Docker.raw` の `du` が減ることを確認したため ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
 
 ### Key Decisions
 
@@ -191,7 +191,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - KD9. **判定表に無い項目には、Claude が書いたツールのコマンドも使い、Python のスクリプトが検査する** (session-settled: user-directed; chosen over `rm` だけを使うこと・ツールが管理している項目を削除のシェルスクリプトに入れないこと: ツールのコマンドは、使用中のファイル・読み取り専用のファイル・ロックを扱えるため)。Governs R15, R16, R20。
 - KD10. **asdf の版は、プロジェクトのディレクトリなどからの参照で判定し、専用の一覧で示す** (session-settled: user-approved; chosen over ホームディレクトリ全体から参照を探すこと・ツールごとに下の階層を一覧にすること)。Governs R2, R23〜R27。
 - KD11. **記録のキー・適用する範囲・Claude の判定の記録・記録する時機・一覧と削除** (session-settled: user-approved; chosen over パターンをキーにすること・Claude の判定を毎回調べ直すこと・記録の前に毎回選ばせること)。Governs R18〜R22。
-- KD12. **Docker のボリューム・image・ビルドキャッシュ・停止しているコンテナの判定と、`Docker.raw` を縮めるコマンドの扱い** (session-settled: user-approved; chosen over 使われていないボリュームをすべて「消してよい」にすること・`docker image prune -a` でまとめて消すこと・縮めるコマンドを削除のシェルスクリプトに入れること)。Governs R28〜R32, R47。
+- KD12. **Docker のボリューム・image・ビルドキャッシュ・停止しているコンテナの判定と、`Docker.raw` から空いた領域を解放するコマンドを案内しないこと** (session-settled: user-approved; chosen over 使われていないボリュームをすべて「消してよい」にすること・`docker image prune -a` でまとめて消すこと・解放するコマンドを削除のシェルスクリプトに入れること)。解放するコマンドは、計画を作った時点では案内することにしていたが、U1 の結果を受けて、案内しないことにした (2026-11-23 に利用者が決めた)。Governs R28〜R32, R47。
 - KD13. **削除のシェルスクリプトの冒頭の検査・項目ごとの再確認・結果の記録・`--dry-run`・アプリの起動の確認・実行の順序** (session-settled: user-approved; chosen over 最初の失敗で中断すること・結果を記録しないこと)。Governs R17, R38〜R44。
 - KD14. **Claude の実行は、スキルの指示と環境変数の検査に加えて、hook でも拒否する** (session-settled: user-directed; chosen over スキルの指示と環境変数の検査だけにすること)。hook は、実行か読み取りかを区別しない (session-settled: user-approved; chosen over 実行するコマンドだけを拒否すること: コマンドの文字列からは、実行するのかを判断しきれないため)。Governs R45。
 - KD15. **一覧の示し方・番号・選び方・時間の上限・実行後の比較** (session-settled: user-approved; chosen over チェックボックスのある HTML のページで選ぶこと・すべての項目を毎回示すこと・GiB で示すこと)。Governs R4〜R11, R46。
@@ -220,7 +220,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - `ref:<git の参照>` の版が、`installs` の下でどの名前のディレクトリになるか (R24)。
 - `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。
 - `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。
-- Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。
+- Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。**U1 で決めた**: 減る。R47 を、解放するコマンドを案内しないことに直した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
 - `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。
 - アプリの Terminal パネルで利用者が実行したコマンドに、環境変数 `CLAUDECODE` が付くか (R38)。
 - hook が受け取る `mcp__terminal__run_in_terminal` の入力で、コマンドの文字列がどのキーにあるか (KTD9)。
@@ -282,7 +282,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - R43 の版の指定は、コマンドの実行ファイルが `<データの場所>/shims/` の下にあるとき、shim のファイルの `# asdf-plugin: <ツール> <版>` の行から行う。shim には、そのコマンドを提供するツールと版の組が 1 行ずつ書かれ、複数のツールが並ぶことがある (例: `pnpm` の shim に pnpm と nodejs)。行に現れるツールのうち、`~/.tool-versions` の版がそのツールの行に書かれていないもの (`~/.tool-versions` にツールが無いものを含む) ごとに、そのツールの行に書かれた版から残る版を選んで、環境変数で指定する。行に書かれた版はどれもそのコマンドを提供するので、asdf がどのツールの版を使っても、そのコマンドを実行できる。環境変数の名前は `ASDF_<TOOL>_VERSION` で、ツール名を大文字にし、`-` を `_` にする。残る版が複数あれば、最も新しい版にする。
 - KTD11. **Docker は、コマンド `docker` の JSON の出力を読む** (R28〜R32)。起動の確認は `docker version --format json` で行い、失敗したら R32 にする。使われているかどうかは、`docker system df -v --format json` の、使っているコンテナの数 (ボリュームは `Links`、image は `Containers`) で判定し、名前での突き合わせはしない。`docker ps` は、`--no-trunc` が無いとボリュームの名前を短くして出し、image はコンテナを作ったときのタグで示すので、タグを付け替えた後は突き合わせられないため。ボリュームの使用量・image だけが使っている量 (`UniqueSize`)・コンテナの使用量・ビルドキャッシュの量も、同じ出力から読む。ボリュームのラベルは `docker volume ls --format json` から、停止しているコンテナの ID と Compose のプロジェクト名は `docker ps -a --no-trunc --format json` から読む。出力の形とキーは U1 で確認する。Docker の一覧は 1 つの専用の一覧にする。`docker volume rm` は、1 行に 100 個までの名前を並べる。比較のために、`Docker.raw` の `du -k` を、削除のシェルスクリプトの作成の時と比較の時に測る。
 - KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
-- KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差と R47 の案内で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` が縮んだときにだけ増えるため。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
+- KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` の `du` が減ったときにだけ増えるため。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
 - KTD14. **Python のスクリプトは、標準出力に JSON を 1 つ出し、必ずキー `errors` を持たせる。** 終了コードは gh-notification-dispatch と同じく、0 は続ける、3 は `errors` を利用者に示して判断を求める、4 は外部のコマンドが失敗した、1・2 はスクリプトの不具合と引数の誤り。サブコマンドの引数・出力のキー・終了コードの SSOT は、各サブコマンドの `--help` にする。
 - KTD15. **スキルは、時間の上限 (R4) を使う処理を行うサブコマンドを、Bash ツールのバックグラウンド (引数 `run_in_background`) で実行し、完了の通知を受けてから出力を読む** (R4)。Bash ツールの時間の上限 (指定しなければ 120 秒、最大 600 秒) は、調べるディレクトリごとの上限 (R4) の合計より短いことがあり、打ち切られると一覧が出ないため。時間の上限を使う処理は、外部のコマンド (KTD4) のほか、KTD5 の `.claude/worktrees` の探索のように Python の中で時間の上限を使う処理も含む。そのようなサブコマンドを足す・変える単位は、そのサブコマンドの `--help` に、バックグラウンドで実行することを書く (KTD14)。
 
@@ -786,7 +786,7 @@ disk-usage-triage/
 **Approach:**
 1. 用意する: 偽の `docker` と固定データ。
 2. テストを書く: Test scenarios のとおり。
-3. 実装する: `docker.py` に、起動の確認・データの取得・判定・項目のまとめ方を書く。`lists.py` の専用の一覧に Docker を足す。`script.py` に Docker の 4 つの削除と順序を、`compare.py` に `Docker.raw` の比較と R47 の案内を足す。`records.py` で、Docker の 3 種類のキーの記録を判定に使う。
+3. 実装する: `docker.py` に、起動の確認・データの取得・判定・項目のまとめ方を書く。`lists.py` の専用の一覧に Docker を足す。`script.py` に Docker の 4 つの削除と順序を、`compare.py` に `Docker.raw` の比較を足す。`records.py` で、Docker の 3 種類のキーの記録を判定に使う。
 
 **Patterns to follow:** U5 の偽の `du`。
 
@@ -803,7 +803,6 @@ disk-usage-triage/
 - `docker version` が失敗するときは、Docker の一覧を作らずに理由を返し、終了コードは 0 (ほかの一覧を続けるため)。
 - `docker system df -v` が時間の上限を超えたときは、Docker の一覧を作らずに理由を返す。
 - 選んだ項目の合計で、Docker の項目の量が分けて示される。比較で、Docker の項目は 80% の判定の消した量に含まれず、`Docker.raw` の `du` の前後の差として示される。
-- 比較で、Docker の項目が成功したのに `Docker.raw` の `du` が減っていなければ、R47 のコマンドを案内する (U1 で何もしなくても減ると分かった場合は、このテストと案内を作らない)。
 
 **Verification:** テストがすべて成功する。Claude Desktop で Docker の一覧が出て、利用者が端末で削除のシェルスクリプトを実行すると、選んだ匿名ボリュームが消え、比較に `Docker.raw` の変化が出る。
 
