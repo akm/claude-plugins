@@ -1,0 +1,738 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M83QQK51QNPXJJDEHHQYF82A",
+  "session_id": "22cba17d-3046-492b-b181-7c688d3b430e",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-23T08:18:04.519267Z",
+  "branch": "feat/disk-usage-triage-310",
+  "checkpoints_count": 20,
+  "save_step_count": 20,
+  "files_touched": [
+    ".github/workflows/doc-structured-bin.yml",
+    ".github/workflows/test.yml",
+    "doc-structured/.claude-plugin/plugin.json",
+    "doc-structured/README.md",
+    "doc-structured/bin/doc-structured",
+    "doc-structured/docs/decisions.md",
+    "doc-structured/docs/release.md",
+    "doc-structured/hook-scripts/guard-generated.py",
+    "doc-structured/hooks/hooks.json",
+    "doc-structured/rules/doc-structured-docs.md",
+    "doc-structured/rules/doc-structured-domains.md",
+    "doc-structured/scripts/plugin-version-notice",
+    "doc-structured/skills/check/SKILL.md",
+    "doc-structured/skills/generate/SKILL.md",
+    "doc-structured/skills/links-fix/SKILL.md",
+    "doc-structured/skills/refs/SKILL.md",
+    "doc-structured/tool/.python-version",
+    "doc-structured/tool/README.md",
+    "doc-structured/tool/pyproject.toml",
+    "doc-structured/tool/src/doc_structured/__init__.py",
+    "doc-structured/tool/src/doc_structured/__main__.py",
+    "doc-structured/tool/src/doc_structured/check.py",
+    "doc-structured/tool/src/doc_structured/cli.py",
+    "doc-structured/tool/src/doc_structured/config.py",
+    "doc-structured/tool/src/doc_structured/cycles.py",
+    "doc-structured/tool/src/doc_structured/dependencies.py",
+    "doc-structured/tool/src/doc_structured/direction.py",
+    "doc-structured/tool/src/doc_structured/documents.py",
+    "doc-structured/tool/src/doc_structured/domains.py",
+    "doc-structured/tool/src/doc_structured/generate.py",
+    "doc-structured/tool/src/doc_structured/generated_header.py",
+    "doc-structured/tool/src/doc_structured/graphs.py",
+    "doc-structured/tool/src/doc_structured/length.py",
+    "doc-structured/tool/src/doc_structured/links.py",
+    "doc-structured/tool/src/doc_structured/links_fix.py",
+    "doc-structured/tool/src/doc_structured/markdown.py",
+    "doc-structured/tool/src/doc_structured/names.py",
+    "doc-structured/tool/src/doc_structured/problems.py",
+    "doc-structured/tool/src/doc_structured/references.py",
+    "doc-structured/tool/src/doc_structured/refs.py",
+    "doc-structured/tool/src/doc_structured/yaml_references.py",
+    "doc-structured/tool/src/doc_structured/yamlio.py",
+    "doc-structured/tool/tests/fixtures/library-loans/.claude/akm-claude-plugins/doc-structured/config.yaml",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/.gitattributes",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/01-catalog/README.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/01-catalog/domain.yaml",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/01-catalog/models.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/01-catalog/terms.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/01-catalog/unclassified_app_terms.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/README.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/concept.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/dependencies.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/design.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/design/overdue_notice.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/domain.yaml",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/functions.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/models.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/reservations/reservation.yaml",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/state-machines-status.yaml",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/terms.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/02-loans/unclassified_app_terms.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/03-members/README.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/03-members/domain.yaml",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/03-members/functions.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/03-members/models.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/03-members/terms.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/README.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/domains/dependencies.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/glossary.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/system/permissions.md",
+    "doc-structured/tool/tests/fixtures/library-loans/docs/system/roles.yaml",
+    "doc-structured/tool/tests/test_bin.py",
+    "doc-structured/tool/tests/test_check.py",
+    "doc-structured/tool/tests/test_cli.py",
+    "doc-structured/tool/tests/test_config.py",
+    "doc-structured/tool/tests/test_cycles.py",
+    "doc-structured/tool/tests/test_dependencies.py",
+    "doc-structured/tool/tests/test_direction.py",
+    "doc-structured/tool/tests/test_documents.py",
+    "doc-structured/tool/tests/test_domains.py",
+    "doc-structured/tool/tests/test_generate.py",
+    "doc-structured/tool/tests/test_generated_header.py",
+    "doc-structured/tool/tests/test_gitattributes.py",
+    "doc-structured/tool/tests/test_hook.py",
+    "doc-structured/tool/tests/test_length.py",
+    "doc-structured/tool/tests/test_links.py",
+    "doc-structured/tool/tests/test_links_fix.py",
+    "doc-structured/tool/tests/test_markdown.py",
+    "doc-structured/tool/tests/test_names.py",
+    "doc-structured/tool/tests/test_plugin_version_notice.py",
+    "doc-structured/tool/tests/test_references.py",
+    "doc-structured/tool/tests/test_refs.py",
+    "doc-structured/tool/tests/test_rules_docs.py",
+    "doc-structured/tool/tests/test_state_machines.py",
+    "doc-structured/tool/tests/test_versions.py",
+    "doc-structured/tool/tests/test_yamlio.py",
+    "doc-structured/tool/tests/tooltest.py",
+    "docs/plans/2026-11-09-2343-feat-slide-deck-plugin-plan.md",
+    "docs/plans/2026-11-13-2156-feat-issue-practice-plugin-plan.md",
+    "gh-notification-dispatch/references/messages.md",
+    "gh-notification-dispatch/scripts/gh_notification_dispatch/events.py",
+    "gh-notification-dispatch/scripts/gh_notification_dispatch/tracked.py",
+    "gh-notification-dispatch/skills/subscribe/SKILL.md",
+    "gh-notification-dispatch/tests/test_events.py",
+    "gh-notification-dispatch/tests/test_outbox.py",
+    "gh-notification-dispatch/tests/test_tick.py",
+    "gh-notification-dispatch/tests/test_tracked.py",
+    "issue-practice/.claude-plugin/plugin.json",
+    "issue-practice/README.md",
+    "issue-practice/references/closing-conditions.md",
+    "issue-practice/references/draft-plan.md",
+    "issue-practice/references/issue-bodies.md",
+    "issue-practice/references/record-comments.md",
+    "issue-practice/references/release-plan-table.md",
+    "issue-practice/references/scenarios.md",
+    "issue-practice/references/start-instruction.md",
+    "issue-practice/references/terms.md",
+    "issue-practice/references/workflow.md",
+    "issue-practice/scripts/issue_practice.py",
+    "issue-practice/scripts/issue_practice/__init__.py",
+    "issue-practice/scripts/issue_practice/bodies.py",
+    "issue-practice/scripts/issue_practice/checkboxes.py",
+    "issue-practice/scripts/issue_practice/closecheck.py",
+    "issue-practice/scripts/issue_practice/draft.py",
+    "issue-practice/scripts/issue_practice/gh.py",
+    "issue-practice/scripts/issue_practice/issues.py",
+    "issue-practice/scripts/issue_practice/managing.py",
+    "issue-practice/scripts/issue_practice/mergeplan.py",
+    "issue-practice/scripts/issue_practice/records.py",
+    "issue-practice/scripts/issue_practice/refs.py",
+    "issue-practice/scripts/issue_practice/releaseops.py",
+    "issue-practice/scripts/issue_practice/releaseplan.py",
+    "issue-practice/skills/managing-issue-close/SKILL.md",
+    "issue-practice/skills/managing-issue-plan/SKILL.md",
+    "issue-practice/skills/managing-issue-plan/references/merge-plan.md",
+    "issue-practice/skills/managing-issue-run/SKILL.md",
+    "issue-practice/skills/new-issue/SKILL.md",
+    "issue-practice/skills/release-close/SKILL.md",
+    "issue-practice/skills/release-issue-plan/SKILL.md",
+    "issue-practice/skills/release-issue-plan/references/release-issue.md",
+    "issue-practice/skills/release-plan/SKILL.md",
+    "issue-practice/skills/release-plan/references/release-plan-issue.md",
+    "issue-practice/skills/release-run/SKILL.md",
+    "issue-practice/skills/working-issue/SKILL.md",
+    "issue-practice/tests/fake-gh",
+    "issue-practice/tests/fakegh_case.py",
+    "issue-practice/tests/fakegithub.py",
+    "issue-practice/tests/fixtures/gh/README.md",
+    "issue-practice/tests/fixtures/gh/api-user.stderr",
+    "issue-practice/tests/fixtures/gh/api-user.stdout",
+    "issue-practice/tests/fixtures/gh/auth-invalid-token.stderr",
+    "issue-practice/tests/fixtures/gh/auth-invalid-token.stdout",
+    "issue-practice/tests/fixtures/gh/auth-not-logged-in.stderr",
+    "issue-practice/tests/fixtures/gh/auth-not-logged-in.stdout",
+    "issue-practice/tests/fixtures/gh/graphql-bad-field.stderr",
+    "issue-practice/tests/fixtures/gh/graphql-bad-field.stdout",
+    "issue-practice/tests/fixtures/gh/graphql-rate-limited.stderr",
+    "issue-practice/tests/fixtures/gh/graphql-rate-limited.stdout",
+    "issue-practice/tests/fixtures/gh/issue-comments-266.stderr",
+    "issue-practice/tests/fixtures/gh/issue-comments-266.stdout",
+    "issue-practice/tests/fixtures/gh/issue-not-found.stderr",
+    "issue-practice/tests/fixtures/gh/issue-not-found.stdout",
+    "issue-practice/tests/fixtures/gh/issue-view-239.stderr",
+    "issue-practice/tests/fixtures/gh/issue-view-239.stdout",
+    "issue-practice/tests/fixtures/gh/issue-view-266.stderr",
+    "issue-practice/tests/fixtures/gh/issue-view-266.stdout",
+    "issue-practice/tests/fixtures/gh/issue-view-pr-271.stderr",
+    "issue-practice/tests/fixtures/gh/issue-view-pr-271.stdout",
+    "issue-practice/tests/fixtures/gh/network-unreachable.stderr",
+    "issue-practice/tests/fixtures/gh/network-unreachable.stdout",
+    "issue-practice/tests/fixtures/gh/pr-view-273.stderr",
+    "issue-practice/tests/fixtures/gh/pr-view-273.stdout",
+    "issue-practice/tests/fixtures/gh/pr-view-48.stderr",
+    "issue-practice/tests/fixtures/gh/pr-view-48.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create-blocked-by-missing.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create-blocked-by-missing.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create-milestone-closed.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create-milestone-closed.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create-milestone-missing.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create-milestone-missing.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-create.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-blocked-by-duplicate.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-blocked-by-duplicate.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-blocked-by-missing.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-blocked-by-missing.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-blocked-by-self.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-blocked-by-self.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-sub-issue-duplicate.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-add-sub-issue-duplicate.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-label-missing.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-label-missing.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-parent-same.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-edit-parent-same.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-list-current.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-list-current.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-blocked-by.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-blocked-by.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-blocking.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-blocking.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-milestone.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-milestone.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-parent.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-parent.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-relations.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-relations.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-sub-issues.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issue-view-sub-issues.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-issues-open.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-issues-open.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-label-create-duplicate.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-label-create-duplicate.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-label-list.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-label-list.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-close.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-close.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-create-duplicate.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-create-duplicate.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-create.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-create.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-rename.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-milestone-rename.stdout",
+    "issue-practice/tests/fixtures/gh/sandbox-milestones-list.stderr",
+    "issue-practice/tests/fixtures/gh/sandbox-milestones-list.stdout",
+    "issue-practice/tests/test_bodies.py",
+    "issue-practice/tests/test_checkboxes.py",
+    "issue-practice/tests/test_closecheck.py",
+    "issue-practice/tests/test_docs.py",
+    "issue-practice/tests/test_draft.py",
+    "issue-practice/tests/test_gh.py",
+    "issue-practice/tests/test_issues.py",
+    "issue-practice/tests/test_managing.py",
+    "issue-practice/tests/test_mergeplan.py",
+    "issue-practice/tests/test_records.py",
+    "issue-practice/tests/test_refs.py",
+    "issue-practice/tests/test_releaseops.py",
+    "issue-practice/tests/test_releaseplan.py",
+    "issue-practice/tests/test_sessions.py",
+    "slide-deck/.claude-plugin/plugin.json",
+    "slide-deck/.gitignore",
+    "slide-deck/.python-version",
+    "slide-deck/README.md",
+    "slide-deck/eslint.config.mjs",
+    "slide-deck/examples/sample/deck.mts",
+    "slide-deck/examples/sample/outline.md",
+    "slide-deck/package-lock.json",
+    "slide-deck/package.json",
+    "slide-deck/pyproject.toml",
+    "slide-deck/python/slide_deck_tools/thumbs_grid.py",
+    "slide-deck/python/tests/test_smoke.py",
+    "slide-deck/python/tests/test_thumbs_grid.py",
+    "slide-deck/references/deck-script.md",
+    "slide-deck/references/google-slides.md",
+    "slide-deck/references/outline-format.md",
+    "slide-deck/skills/build/SKILL.md",
+    "slide-deck/skills/outline/SKILL.md",
+    "slide-deck/skills/publish/SKILL.md",
+    "slide-deck/src/check/deck.ts",
+    "slide-deck/src/check/eslint.deck.config.mjs",
+    "slide-deck/src/cli.ts",
+    "slide-deck/src/data/parts.ts",
+    "slide-deck/src/data/theme.ts",
+    "slide-deck/src/data/types.ts",
+    "slide-deck/src/fit/east-asian-width.ts",
+    "slide-deck/src/fit/estimate.ts",
+    "slide-deck/src/gslides/build.ts",
+    "slide-deck/src/gslides/notes.ts",
+    "slide-deck/src/gslides/plan.ts",
+    "slide-deck/src/gslides/presentation.ts",
+    "slide-deck/src/gslides/requests.ts",
+    "slide-deck/src/index.ts",
+    "slide-deck/src/outline/file.ts",
+    "slide-deck/src/outline/match.ts",
+    "slide-deck/src/outline/parse.ts",
+    "slide-deck/src/outline/url.ts",
+    "slide-deck/src/pptx/build.ts",
+    "slide-deck/src/pptx/write.ts",
+    "slide-deck/src/setup/setup.ts",
+    "slide-deck/tests/cli.test.ts",
+    "slide-deck/tests/data.test.ts",
+    "slide-deck/tests/fit.test.ts",
+    "slide-deck/tests/fixtures/gslides/create.json",
+    "slide-deck/tests/fixtures/gslides/recreate.json",
+    "slide-deck/tests/fixtures/gslides/resume.json",
+    "slide-deck/tests/fixtures/gslides/u11-new.json",
+    "slide-deck/tests/fixtures/gslides/u11-notes.json",
+    "slide-deck/tests/fixtures/outline/errors.md",
+    "slide-deck/tests/fixtures/outline/no-url.md",
+    "slide-deck/tests/fixtures/outline/notes.md",
+    "slide-deck/tests/fixtures/outline/proposals.md",
+    "slide-deck/tests/fixtures/outline/with-url.md",
+    "slide-deck/tests/fixtures/pptx-skill/scripts/apply_theme.js",
+    "slide-deck/tests/fixtures/pptx-skill/scripts/office/validate.py",
+    "slide-deck/tests/gslides.test.ts",
+    "slide-deck/tests/helpers/cache.ts",
+    "slide-deck/tests/outline.test.ts",
+    "slide-deck/tests/pptx.test.ts",
+    "slide-deck/tests/setup.test.ts",
+    "slide-deck/tests/smoke.test.ts",
+    "slide-deck/tsconfig.json",
+    "slide-deck/uv.lock"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "543adfc8dac6",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 826,
+    "cache_creation_tokens": 1081613,
+    "cache_read_tokens": 219377028,
+    "output_tokens": 347499,
+    "api_call_count": 387
+  },
+  "redaction": {
+    "replacements": 93,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 81,
+      "key_context": 12,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-review-triage:review-rally-2026-11-22T05:19:34.991402Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "review-triage:review-rally"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "2d403bba864d",
+      "timestamp": "2026-11-22T05:19:34.991402Z",
+      "native": {
+        "command": "/review-triage:review-rally"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/review-triage:review-rally",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01RtaAu9GFQR43RgDZ2QjfmS",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1119,
+        "end": 1120,
+        "entry_ids": [
+          "d640db96-2273-4884-87a3-ac19bb5f6dcb"
+        ],
+        "tool_use_id": "toolu_01RtaAu9GFQR43RgDZ2QjfmS"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01RtaAu9GFQR43RgDZ2QjfmS"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_011Wnzm98z8gW2qgBJ8hETXW",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1221,
+        "end": 1222,
+        "entry_ids": [
+          "f35df7c8-8bd9-4478-b6a4-57438e9ac14f"
+        ],
+        "tool_use_id": "toolu_011Wnzm98z8gW2qgBJ8hETXW"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_011Wnzm98z8gW2qgBJ8hETXW"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_014rKYT8GopU9cTPuyWbdiDe",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1429,
+        "end": 1430,
+        "entry_ids": [
+          "175fc541-5f8c-4641-8b6e-2ad04307ab9d"
+        ],
+        "tool_use_id": "toolu_014rKYT8GopU9cTPuyWbdiDe"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_014rKYT8GopU9cTPuyWbdiDe"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01EyBFrieu8Nw6z8bQ2zAS4B",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "doc-dag:doc-dag"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1668,
+        "end": 1669,
+        "entry_ids": [
+          "e4b18a2d-9ad1-490d-9f86-8f149065b08f"
+        ],
+        "tool_use_id": "toolu_01EyBFrieu8Nw6z8bQ2zAS4B"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01EyBFrieu8Nw6z8bQ2zAS4B"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: doc-dag:doc-dag",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01EHjr1HXFjgiiHGkmMko9w9",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1720,
+        "end": 1721,
+        "entry_ids": [
+          "d29cdba2-3c7a-43e9-9eec-2f6b72802a54"
+        ],
+        "tool_use_id": "toolu_01EHjr1HXFjgiiHGkmMko9w9"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01EHjr1HXFjgiiHGkmMko9w9"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01J6spQbsj96BE3dcugWCvzh",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1832,
+        "end": 1833,
+        "entry_ids": [
+          "2ca2b3fa-666c-4e83-9135-dbbfc8bd7c02"
+        ],
+        "tool_use_id": "toolu_01J6spQbsj96BE3dcugWCvzh"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01J6spQbsj96BE3dcugWCvzh"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_013GYyx6BVeJP6cCJuaKrhgN",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1946,
+        "end": 1947,
+        "entry_ids": [
+          "b16bcd34-9162-42f2-bf99-0dab1e5a9173"
+        ],
+        "tool_use_id": "toolu_013GYyx6BVeJP6cCJuaKrhgN"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_013GYyx6BVeJP6cCJuaKrhgN"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_019GgSuHvuGSLd58NscHvT7Q",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2026,
+        "end": 2027,
+        "entry_ids": [
+          "0ac5d7b7-f5d1-4d89-bfc2-c9f515cc5972"
+        ],
+        "tool_use_id": "toolu_019GgSuHvuGSLd58NscHvT7Q"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_019GgSuHvuGSLd58NscHvT7Q"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01YQ7rKGshn8uGigsyDNGhjz",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage-fix"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2079,
+        "end": 2080,
+        "entry_ids": [
+          "12fe151d-8322-4722-8ef5-1d3685aa4428"
+        ],
+        "tool_use_id": "toolu_01YQ7rKGshn8uGigsyDNGhjz"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01YQ7rKGshn8uGigsyDNGhjz"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage-fix",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01C4cQ7uqP22odWHYwCCRKpo",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "doc-dag:doc-dag"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2135,
+        "end": 2136,
+        "entry_ids": [
+          "a0a6d35e-cb4d-46ae-890b-f72373edc932"
+        ],
+        "tool_use_id": "toolu_01C4cQ7uqP22odWHYwCCRKpo"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01C4cQ7uqP22odWHYwCCRKpo"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: doc-dag:doc-dag",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01PxGdbwx49eEiboHD2N1EYP",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-request"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2149,
+        "end": 2150,
+        "entry_ids": [
+          "92d36be7-e3ff-4956-b1ab-2f2f86716cbc"
+        ],
+        "tool_use_id": "toolu_01PxGdbwx49eEiboHD2N1EYP"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01PxGdbwx49eEiboHD2N1EYP"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-request",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01YQpvND4TSusu3GkG4isFo9",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "review-triage:review-triage"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "543adfc8dac6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2222,
+        "end": 2223,
+        "entry_ids": [
+          "97f046d5-adf7-4041-b716-ddf1df22a5a6"
+        ],
+        "tool_use_id": "toolu_01YQpvND4TSusu3GkG4isFo9"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01YQpvND4TSusu3GkG4isFo9"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: review-triage:review-triage",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 20
+  }
+}
