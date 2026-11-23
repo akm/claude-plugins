@@ -21,12 +21,22 @@ from .impl_diff import (
     MISSING_IMPLEMENTATION,
     PLANNED_IMPLEMENTED,
     Item,
+    different_keys,
     differences,
     messages,
 )
-from .schema_actual import ActualSchema
-from .schema_diff import LABELS, SchemaTarget, compare
-from .yaml_edit import Document, YamlEditError
+from .schema_actual import ActualColumn, ActualSchema, ActualTable
+from .schema_diff import (
+    DOMAIN_PLACEHOLDER,
+    LABELS,
+    PRIMARY_KEY_NULL_FIX,
+    SchemaTarget,
+    compare,
+    normalize_default,
+    normalize_type,
+)
+from .tables import table_spec
+from .yaml_edit import Document, Double, Flow, YamlEditError
 
 PLANNED = "--planned"
 UNPLANNED = "--unplanned"
@@ -268,6 +278,123 @@ def _unset_planned(files: _Files, case: Case) -> None:
     document.delete_key(_entry_path(document, target), "planned")
 
 
+# PostgreSQL の連番のカラムの、正規化した型から YAML に書く型への対応 (Issue #208 のコメントの 5)
+SERIAL_TYPES = {"integer": "serial", "bigint": "bigserial", "smallint": "smallserial"}
+
+
+@dataclass
+class _ColumnValues:
+    """YAML に書く、カラムの比べる項目の値 (実装から求めたもの)。"""
+
+    type: str
+    nullable: bool
+    default: str | None  # 正規化したデフォルト値。無ければ None
+    references: str | None  # 参照先のカラムの完全な ID。外部キーが無ければ None
+
+
+def _design_tables(project: Project) -> dict:
+    return {table.name: table for domain in project.domains for table in domain.tables}
+
+
+def _first(item_ids: list[str]) -> str:
+    return "先に " + "・".join(item_ids) + " を解消する"
+
+
+def _column_values(project: Project, actual: ActualSchema, table: ActualTable, column: ActualColumn) -> _ColumnValues:
+    """実装のカラムを、YAML に書く値にする。参照先が YAML に無ければ ResolveError。"""
+    type_, _ = normalize_type(column.type, actual.kind)
+    default: str | None
+    if column.owned_sequence:
+        if type_ not in SERIAL_TYPES:
+            raise ResolveError(f"テーブル {table.name} のカラム {column.name} の連番の型 {type_} を、YAML に書けない")
+        type_, default = SERIAL_TYPES[type_], None
+    else:
+        default = normalize_default(column.default, actual.kind, type_) or None
+    keys = [k for k in table.foreign_keys if k.columns == [column.name] and len(k.ref_columns) == 1]
+    if len(keys) > 1:
+        raise ResolveError(f"テーブル {table.name} のカラム {column.name} には外部キーが 2 つ以上あるので、YAML に書けない")
+    references = None
+    if keys:
+        ref_table, ref_column = keys[0].ref_table, keys[0].ref_columns[0]
+        design = _design_tables(project).get(ref_table)
+        if design is None:
+            raise ResolveError(
+                f"テーブル {table.name} のカラム {column.name} の外部キーの参照先のテーブル {ref_table} が YAML に無い。"
+                + _first([f"d-{DOMAIN_PLACEHOLDER}-t-{ref_table}"])
+            )
+        target = next((c for c in design.children if c.name == ref_column), None)
+        if target is None:
+            raise ResolveError(
+                f"テーブル {table.name} のカラム {column.name} の外部キーの参照先のカラム {ref_table}.{ref_column} が YAML に無い。"
+                + _first([f"{design.id}-c-{ref_column}"])
+            )
+        references = target.id
+    return _ColumnValues(type_, not column.not_null, default, references)
+
+
+def _set_or_delete(document: Document, path: tuple, key: str, value, order: tuple[str, ...]) -> None:
+    """値があれば書き、None なら (キーがあれば) 消す。"""
+    if value is None:
+        if key in document.node(path):
+            document.delete_key(path, key)
+    else:
+        document.set_key(path, key, value, order)
+
+
+def _match_table(files: _Files, case: Case) -> None:
+    """テーブルの planned を外し、主キーを実装に合わせる。"""
+    target = case.target
+    document = files.document(_yaml_file(target))
+    path = _table_path(target)
+    if case.case == PLANNED_IMPLEMENTED:
+        document.delete_key(path, "planned")
+    primary_key = target.actual_table.primary_key
+    if case.case == MISMATCH or primary_key != table_spec(target.table_entry).primary_key:
+        existing = {column.name for column in target.table_entry.children}
+        missing = [name for name in primary_key if name not in existing]
+        if missing:
+            raise ResolveError(
+                f"テーブル {target.table_entry.id} の実装の主キーのカラム {'・'.join(missing)} が YAML に無い。"
+                + _first([f"{target.table_entry.id}-c-{name}" for name in missing])
+            )
+        _set_or_delete(document, path, "primary_key", Flow(primary_key) if primary_key else None, TABLE_KEY_ORDER)
+
+
+def _match_column(files: _Files, case: Case, project: Project, actual: ActualSchema) -> None:
+    """カラムの planned を外し、比べる項目のうち違うものを実装の値に書き換える。"""
+    target = case.target
+    column = target.column_entry
+    document = files.document(column.path)
+    path = _column_path(target)
+    if case.case == PLANNED_IMPLEMENTED:
+        document.delete_key(path, "planned")
+    values = _column_values(project, actual, target.actual_table, target.actual_column)
+    different = different_keys(case.item)
+    if values.nullable and column.name in table_spec(target.table_entry).primary_key and "null" in different:
+        raise ResolveError(f"{column.id} は主キーのカラムなので、YAML に nullable: true を書けない。{PRIMARY_KEY_NULL_FIX}")
+    # 連番 (PostgreSQL) は、型 serial などで表し、デフォルト値を書かない
+    serial = target.actual_column.owned_sequence
+    if "type" in different or (serial and "default" in different):
+        document.set_key(path, "type", values.type, COLUMN_KEY_ORDER)
+    if "default" in different:
+        _set_or_delete(document, path, "default", Double(values.default) if values.default is not None else None, COLUMN_KEY_ORDER)
+    if "null" in different:
+        _set_or_delete(document, path, "nullable", True if values.nullable else None, COLUMN_KEY_ORDER)
+    if "references" in different:
+        _set_or_delete(document, path, "references", values.references, COLUMN_KEY_ORDER)
+
+
+def _match_index(files: _Files, case: Case) -> None:
+    """インデックスの planned を外し、一意かどうかを実装に合わせる。"""
+    target = case.target
+    document = files.document(_yaml_file(target))
+    path = _index_path(document, target)
+    if case.case == PLANNED_IMPLEMENTED:
+        document.delete_key(path, "planned")
+    if target.actual_index.unique != target.design_index.unique:
+        _set_or_delete(document, path, "unique", True if target.actual_index.unique else None, INDEX_KEY_ORDER)
+
+
 def resolve(root: Path, project: Project, actual: ActualSchema, request: Request) -> Result:
     """件を 1 つ解消する。解消できなければ、何も書き換えずに ResolveError を投げる。"""
     cases = list_cases(project, actual)
@@ -279,6 +406,13 @@ def resolve(root: Path, project: Project, actual: ActualSchema, request: Request
             _set_planned(files, case)
         elif request.flag == UNPLANNED:
             _unset_planned(files, case)
+        elif case.case in (PLANNED_IMPLEMENTED, MISMATCH):
+            if case.target.kind == "table":
+                _match_table(files, case)
+            elif case.target.kind == "column":
+                _match_column(files, case, project, actual)
+            else:
+                _match_index(files, case)
         else:
             raise NotImplementedError(case.case)
     except YamlEditError as e:
