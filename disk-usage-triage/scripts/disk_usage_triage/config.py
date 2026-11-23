@@ -19,6 +19,7 @@ CONFIG = "config.json"
 KEYS = ("scan_dirs", "project_dirs", "timeout_seconds")  # files.md のキーの表と同じ順序
 PATH_KEYS = ("scan_dirs", "project_dirs")
 DEFAULT_TIMEOUT_SECONDS = 300  # 計画の R4
+MAX_TIMEOUT_SECONDS = 86400  # 計画の R4。macOS では、subprocess に約 24.8 日を超える時間の上限を渡すと例外になる
 
 
 def path():
@@ -48,8 +49,8 @@ def _path_form_error(value):
 
 
 def _timeout_error(value):
-    if type(value) is not int or value < 1:  # 真偽値 (int の派生) と小数も誤りにする
-        return f"timeout_seconds ({_dump(value)}) が 1 以上の整数でない"
+    if type(value) is not int or not 1 <= value <= MAX_TIMEOUT_SECONDS:  # 真偽値 (int の派生) と小数も誤りにする
+        return f"timeout_seconds ({_dump(value)}) が 1 以上 {MAX_TIMEOUT_SECONDS} 以下の整数でない"
     return None
 
 

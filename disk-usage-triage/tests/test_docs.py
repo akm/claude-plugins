@@ -86,6 +86,11 @@ class FilesDocTest(unittest.TestCase):
         self.assertEqual(config.input_shape_errors(examples[0]), [], "例が様式どおりであること")
         self.assertNotIn("version", examples[0])
 
+    def test_max_timeout(self):
+        text = section(self.doc, "## `config.json`")
+        self.assertIn("86,400 (1 日) 以下の整数", text)
+        self.assertEqual(config.MAX_TIMEOUT_SECONDS, 86400)
+
     def test_default_timeout(self):
         text = section(self.doc, "### `config set` の入力")
         self.assertIn(f"省くと {config.DEFAULT_TIMEOUT_SECONDS}", text)

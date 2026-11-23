@@ -99,6 +99,7 @@ BROKEN = {
     "空の配列": '{"version": 1, "scan_dirs": [], "project_dirs": ["~/b"], "timeout_seconds": 300}',
     "相対パス": '{"version": 1, "scan_dirs": ["a"], "project_dirs": ["~/b"], "timeout_seconds": 300}',
     "時間の上限が 0": '{"version": 1, "scan_dirs": ["~/a"], "project_dirs": ["~/b"], "timeout_seconds": 0}',
+    "時間の上限が最大値を超える": '{"version": 1, "scan_dirs": ["~/a"], "project_dirs": ["~/b"], "timeout_seconds": 86401}',
     "時間の上限が真偽値": '{"version": 1, "scan_dirs": ["~/a"], "project_dirs": ["~/b"], "timeout_seconds": true}',
 }
 
@@ -263,6 +264,13 @@ class ConfigSetTimeoutTest(ConfigCase):
         code, payload, stderr = self.config_set(self.valid_input(timeout_seconds=600))
         self.assertEqual(code, 0, stderr)
         self.assertEqual(self.read_home(CONFIG)["timeout_seconds"], 600)
+
+    def test_upper_bound(self):
+        """時間の上限は 86,400 秒 (1 日) 以下 (計画の R4)。macOS では、約 24.8 日を超える値を subprocess に渡すと例外になる。"""
+        self.assertEqual(config.MAX_TIMEOUT_SECONDS, 86400)
+        code, _, stderr = self.config_set(self.valid_input(timeout_seconds=86400))
+        self.assertEqual(code, 0, stderr)
+        self.assert_rejected(self.valid_input(timeout_seconds=86401), "timeout_seconds", "86400")
 
     def test_zero_or_negative_is_rejected(self):
         self.assert_rejected(self.valid_input(timeout_seconds=0), "timeout_seconds")
