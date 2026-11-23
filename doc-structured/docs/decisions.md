@@ -134,7 +134,7 @@ docs/
 
 - ファイル `schema.yaml` に、テーブル・カラム・主キー・外部キー・インデックス・属性との対応を書く。CHECK 制約と部分インデックスの条件 (WHERE) は書かない (実際の制約と条件は `schema-actual.md` に出し、条件の意味は `design.md` に書く)。
 - ドメインごとに、対応表と ER 図を `schema.md` として生成する。ほかのドメインのテーブルは、参照するカラムだけを書いてリンクにする。
-- 全体のスキーマと ER 図 (`docs/system/schema.md`) と、実際のスキーマの ER 図 (`docs/system/schema-actual.md`) も生成する。`schema-actual.md` をコミットするかどうかは、プロジェクトごとに決める。
+- 全体のスキーマと ER 図 (`docs/system/schema.md`) と、実際のスキーマの ER 図 (`docs/system/schema-actual.md`) も生成する。`schema-actual.md` をコミットするかどうかは、プロジェクトごとに決める (設定の `database.schema_actual`。sub-issue 11b で決めた。規則の文書 [rules/doc-structured-impl.md](../rules/doc-structured-impl.md) の「実際のスキーマのファイル」)。
 - 設計と実装の違いは、検査 j で確認する (問 12)。
 - YAML の形式 (ファイル名が `schema` で始まる YAML のトップのキー `tables`・カラムの項目・キーとインデックス・属性との対応・フラグ `planned` と `in_overview`) と、`schema.md`・`docs/system/schema.md` の中身と、検査 h の確認は、sub-issue 11a で決めた (規則の文書 [rules/doc-structured-domains.md](../rules/doc-structured-domains.md) の「テーブルとカラム」と「生成するファイルの中身」。経緯は [#206](https://github.com/akm/claude-plugins/issues/206))。複数のカラムからなる外部キーは [#306](https://github.com/akm/claude-plugins/issues/306)、1 対 1 でない属性とカラムの対応は [#307](https://github.com/akm/claude-plugins/issues/307) で扱う。
 
@@ -260,6 +260,7 @@ docs/
 - 比べない項目: カラムの並び順、制約とインデックスの名前、コメント、所有者と権限、CHECK 制約、部分インデックスの条件 (WHERE)。
 - 差分は、正規化した形どうしの unified diff と、指示の行で示す。
 - 一時的なデータベースにマイグレーションを適用して読む。手元にデータベースが無ければ、スキルは実行できないと伝えて終了する。
+- スキーマについての設定の項目・対応するデータベース (SQLite と、Docker で起動する PostgreSQL)・正規化・比べる範囲・結果の表の当てはめ方・正規化した形・`schema-actual.md` の中身と生成のコマンドは、sub-issue 11b で決めた (規則の文書 [rules/doc-structured-impl.md](../rules/doc-structured-impl.md)。経緯は [#207](https://github.com/akm/claude-plugins/issues/207))。判定と差分の表示の共通部分は、画面のルート (sub-issue 12) でも使う。
 
 ### (3) 分担
 
@@ -302,7 +303,7 @@ docs/
 
 ### (4) 配り方
 
-- 設定はファイル `.claude/akm-claude-plugins/doc-structured/config.yaml`。書くのは、`version` (プロジェクトが使うツールのバージョン)・`paths` (テストコード・マイグレーション・ルート・コードのパス)・導入する範囲。設定ファイルは 1 つのまま。
+- 設定はファイル `.claude/akm-claude-plugins/doc-structured/config.yaml`。書くのは、`version` (プロジェクトが使うツールのバージョン)・`paths` (テストコード・マイグレーション・ルート・コードのパス)・導入する範囲。設定ファイルは 1 つのまま。マイグレーションのパス (`paths.migrations`) と、それを適用するデータベース (`database`) の形は、sub-issue 11b で決めた (規則の文書 [rules/doc-structured-impl.md](../rules/doc-structured-impl.md) の「検査 j」)。
 - 設定の `version` のツールを、手元でも CI でも実行する。スクリプト `bin/doc-structured` は、設定ファイルの `version: 1.2.3` の形の行だけを文字列の一致で取り出す。ツールは起動時に設定の全体を YAML として読み、形が違えばエラーにする。
 - 入口はスクリプト `bin/doc-structured` の 1 つ。スキル・人間・CI が同じスクリプトを実行する。スクリプトは生成したファイルで、バージョンを上げる手順の `generate` で一緒に更新される。変更が少なくて済むように最小にする。
 - 開発中のツールを実際のプロジェクトで実行するために、手元のチェックアウトのツールを使う指定 (環境変数など。開発のためだけに使う) を持つ。指定が無いときは `version` のとおりに取得し、別の方法は試さない。

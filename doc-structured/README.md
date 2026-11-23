@@ -9,7 +9,7 @@ Claude Code で作るアプリケーションの文書を、定義が 1 か所�
 | [bin/doc-structured](bin/doc-structured) | プロジェクトに置くスクリプト (ツールの入口)。プロジェクトが設定したバージョンのツールを取得して実行する |
 | [tool/](tool/) | ツール `doc-structured` の Python パッケージ (コマンド `doc-structured`) とテスト |
 | [rules/](rules/) | 規則の文書。プロジェクトのディレクトリ `.claude/rules/` に置くコピーの元 |
-| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs` |
+| [skills/](skills/) | スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs`・`doc-structured:impl-diff` |
 | [hooks/hooks.json](hooks/hooks.json)・[hook-scripts/](hook-scripts/) | 生成したファイルの直接の編集を拒否する hook (下の節「hook」) |
 | [scripts/plugin-version-notice](scripts/plugin-version-notice) | スキルの前置きで、プラグインと設定のバージョンの違いを 1 行で伝えるスクリプト |
 | [docs/decisions.md](docs/decisions.md) | 文書の構成の決定の一覧 |
@@ -31,20 +31,21 @@ bin/doc-structured version
 
 必要なもの: Python 3.12 以上の `python3`、初回の取得に `git` と GitHub・PyPI への接続。GitHub Actions のランナー `ubuntu-slim` にはどちらもあります (Python 3.12.3)。
 
-ツール `doc-structured` は、起動時に設定ファイルをカレントディレクトリから親へ向かって探し、全体を YAML として読み、形が違えばエラーの文を標準エラー出力に書いて終了コード 1 で終了します。知らないサブコマンドを受け取ったときは、使い方を標準エラー出力に書いて終了コード 2 で終了します (プラグインのバージョンが新しく、ツールが古いときに起きます)。
+ツール `doc-structured` は、起動時に設定ファイルをカレントディレクトリから親へ向かって探し、全体を YAML として読み、形が違えばエラーの文を標準エラー出力に書いて終了コード 1 で終了します。知らないサブコマンドを受け取ったときは、使い方を標準エラー出力に書いて終了コード 2 で終了します (プラグインのバージョンが新しく、ツールが古いときに起きます)。データベースが要るコマンド (検査 j・`impl-diff`・`generate --all`) は、データベースが無いとき、何が無いかと用意の仕方を標準エラー出力に書いて終了コード 3 で終了します。
 
 | コマンド | すること |
 | --- | --- |
 | `doc-structured version` | ツールのバージョンを表示する |
 | `doc-structured --version` | 同じ。設定ファイルは読まない |
-| `doc-structured generate` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する |
-| `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2 |
+| `doc-structured generate [--all]` | ドメインの YAML から、生成するファイルを作り直す。YAML に誤りがあるか、生成するファイルの場所に手で書いたファイル (先頭の記述が無く、空白と BOM 以外の文字があるファイル) があれば、何も書かず、終了コード 1 で終了する。`--all` は、設定に `database.schema_actual: true` があれば、実際のスキーマのファイル `docs/system/schema-actual.md` も生成し直す |
+| `doc-structured check [--light\|--heavy\|--all\|--only <検査>]` | 検査を実行する。指定が無ければ軽い群 (`--light`)。問題があれば終了コード 1、引数の誤りは終了コード 2、データベースが無くて検査 j を実行できなければ終了コード 3 |
+| `doc-structured impl-diff` | 検査 j だけを実行し、設計と実装の正規化した形どうしの unified diff と、指示の行を出力する。何も変えない。差分があれば終了コード 1、YAML に誤りがあれば何もせずに終了コード 1 |
 | `doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...` | 手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文のうち、直し方が 1 つに決まるものを直す。ファイルの指定が無ければ、すべての手書きの Markdown。判断の要るもの (参照先の候補が 0 件か複数のラベル・参照先を最初に指す `[文][ラベル]` の文など) は「パス:行:列: メッセージ」の形で出力し、残れば終了コード 1。`--choose` で、ラベルの参照先を渡す。YAML に誤りがあれば、何も直さずに終了コード 1 |
 | `doc-structured refs <ID>` | その ID と子孫の ID を参照している、手書きの Markdown の箇所を「パス:行:列: <参照している ID> <リンク> (<行が属する ID>)」の形で出力する。生成したファイルと記録は探さない。見つからなくても終了コード 0。ID の形が違えば終了コード 1。YAML に誤りがあっても実行する |
 
-生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-1 (YAML のドメインの依存とモデルの参照の循環)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) にあります。重い群の検査はまだありません。ほかのサブコマンドは、sub-issue ごとに足します。
+生成するファイルと検査の内容は、規則の文書 [rules/doc-structured-domains.md](rules/doc-structured-domains.md) にあります。この版の検査は、軽い群の a (生成し直して差分が無い)・b (手書きの Markdown のリンクとアンカー)・c-1 (YAML のドメインの依存とモデルの参照の循環)・c-2 (手書きの Markdown の参照の循環)・h (YAML の形式と参照先)・i (YAML の参照と手書きの Markdown のリンクの向き)・k (手書きの Markdown の行数) と、重い群の j (設計と実際のスキーマの差分) です。リンク・アンカー・参照の向きと循環・行数の規則は、規則の文書 [rules/doc-structured-docs.md](rules/doc-structured-docs.md) に、検査 j と実際のスキーマのファイルの規則は、規則の文書 [rules/doc-structured-impl.md](rules/doc-structured-impl.md) にあります。ほかのサブコマンドは、sub-issue ごとに足します。
 
-スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
+スキル `doc-structured:generate`・`doc-structured:check`・`doc-structured:links-fix`・`doc-structured:refs`・`doc-structured:impl-diff` は、このコマンドを実行し、直し方が 1 つに決まるものは直し、内容の判断は利用者に質問します。どれも最初に、インストール済みのプラグインのバージョンと設定の `version` が違えば、そのことを 1 行で伝えます。
 
 ## hook
 
@@ -57,7 +58,7 @@ bin/doc-structured version
 
 ## 設定ファイル
 
-ファイル `.claude/akm-claude-plugins/doc-structured/config.yaml` に書きます。今のバージョンが知っているキーは `version` だけで、知らないキーがあるとツールはエラーで終了します。
+ファイル `.claude/akm-claude-plugins/doc-structured/config.yaml` に書きます。今のバージョンが知っているキーは `version`・`paths`・`database` で、知らないキーがあるとツールはエラーで終了します。
 
 ```yaml
 # 図書館の貸出 (架空の題材) の設定
@@ -65,6 +66,18 @@ version: 0.1.0
 ```
 
 `version` は、`version: 1.2.3` の形の 1 行で書きます。引用符を付けたり、同じ行にコメントを書いたりすると、スクリプトが行を見つけられず、ツールもエラーにします。
+
+設計と実際のスキーマの差分を検査 j で確認するプロジェクトは、マイグレーションのパターン (`paths.migrations`) と、適用するデータベース (`database`) も書きます。キーの意味は、規則の文書 [rules/doc-structured-impl.md](rules/doc-structured-impl.md) の節「検査 j」にあります。
+
+```yaml
+# 図書館の貸出 (架空の題材) の設定
+version: 0.11.0
+paths:
+  migrations: migrations/*.sql
+database:
+  kind: sqlite
+  schema_actual: true
+```
 
 ## 開発
 
@@ -76,7 +89,7 @@ DOC_STRUCTURED_CHECKOUT=/path/to/claude-plugins bin/doc-structured version
 
 editable なので、コードを変えた結果はすぐに反映されます。依存を変えたときやチェックアウトの場所を変えたときは、ディレクトリ `…/doc-structured/checkout/` を消すと、次の実行で作り直します。
 
-テストは、Python 3.12 以上の venv にツールを入れてから、リポジトリのルートで実行します。スクリプトのテスト (`tests/test_bin.py`) は、一時的な git のリポジトリにタグを作って取得の動作を確認するので、PyPI への接続が要ります。
+テストは、Python 3.12 以上の venv にツールを入れてから、リポジトリのルートで実行します。スクリプトのテスト (`tests/test_bin.py`) は、一時的な git のリポジトリにタグを作って取得の動作を確認するので、PyPI への接続が要ります。PostgreSQL のテスト (`tests/test_schema_actual_postgresql.py`) は、Docker でイメージ `postgres:17-alpine` のコンテナを起動するので、Docker が要ります。Docker が使えなければ、スキップせずに失敗します。
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e doc-structured/tool
@@ -86,10 +99,10 @@ python3 -m venv .venv && .venv/bin/pip install -e doc-structured/tool
 PATH="$PWD/.venv/bin:$PATH" .venv/bin/python -m unittest discover -s doc-structured/tool/tests
 ```
 
-テストの題材は、架空の「図書館の貸出」のプロジェクト [tool/tests/fixtures/library-loans/](tool/tests/fixtures/library-loans/) です。生成したファイルもコミットしてあり、テスト `tests/test_generate.py` が、生成し直した内容と同じであることを検査します。生成の形を変えたときは、そのディレクトリでツールの `generate` を実行し、生成し直したファイルを同じコミットに含めます。
+テストの題材は、架空の「図書館の貸出」のプロジェクト [tool/tests/fixtures/library-loans/](tool/tests/fixtures/library-loans/) です。生成したファイル (SQLite のマイグレーション `migrations/*.sql` から作る `docs/system/schema-actual.md` を含む) もコミットしてあり、テスト `tests/test_generate.py` が、生成し直した内容と同じであることを検査します。生成の形を変えたときは、そのディレクトリでツールの `generate --all` を実行し、生成し直したファイルを同じコミットに含めます。
 
 ```bash
-(cd doc-structured/tool/tests/fixtures/library-loans && ../../../../../.venv/bin/doc-structured generate)
+(cd doc-structured/tool/tests/fixtures/library-loans && ../../../../../.venv/bin/doc-structured generate --all)
 ```
 
 CI では、ワークフロー `.github/workflows/test.yml` がこのテストを Python 3.12 (ファイル `tool/.python-version`) で実行し、ワークフロー `.github/workflows/doc-structured-bin.yml` がランナー `ubuntu-slim` で、公開済みの新しい 2 つのバージョンについて、スクリプトが設定の `version` のとおりのバージョンを実行することを確認します。

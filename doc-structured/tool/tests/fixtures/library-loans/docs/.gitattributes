@@ -22,4 +22,5 @@
 /domains/dependencies.md merge=binary
 /glossary.md merge=binary
 /system/permissions.md merge=binary
+/system/schema-actual.md merge=binary
 /system/schema.md merge=binary

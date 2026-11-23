@@ -7,8 +7,15 @@
   version   プロジェクトが使うツールのバージョン。「version: 1.2.3」の形の 1 行で書く。
             スクリプト bin/doc-structured がこの行だけを文字列の一致で取り出すので、引用符を付けたり、同じ行にコメントを
             書いたりしてはいけない。この制約もここで検査する
+  paths.migrations
+            マイグレーションの SQL のファイルの glob のパターン 1 つ (リポジトリのルートからの相対。** も使える)
+  database  マイグレーションを適用するデータベース。paths.migrations と、どちらも書くか、どちらも書かない
+    kind           sqlite か postgresql (必須)
+    image          PostgreSQL のコンテナのイメージ。kind が postgresql のときだけ書け、そのときは必須
+    schema_actual  true を書くと、実際のスキーマのファイル docs/system/schema-actual.md を作る (true だけを書ける)
 知らないキーがあればエラーにする (設定がツールより新しいときに、読み飛ばさずに気づけるように)。
-paths と導入する範囲は、それを必要とする sub-issue で足す。
+paths のほかのキーと導入する範囲は、それを必要とする sub-issue で足す。
+paths と database の形は、sub-issue 11b で決めた (決めた経緯は Issue #207 のコメントの 4・10)。
 """
 
 import re
@@ -25,7 +32,10 @@ CONFIG_RELATIVE_PATH = Path(".claude/akm-claude-plugins/doc-structured/config.ya
 # 「version: X.Y.Z」の形の行。スクリプト bin/doc-structured の grep の正規表現と同じにする
 VERSION_LINE_RE = re.compile(r"^version: (\d+\.\d+\.\d+)$", re.MULTILINE)
 
-KNOWN_KEYS = ("version",)
+KNOWN_KEYS = ("version", "paths", "database")
+PATHS_KEYS = ("migrations",)
+DATABASE_KEYS = ("kind", "image", "schema_actual")
+DATABASE_KINDS = ("sqlite", "postgresql")
 
 
 class ConfigError(Exception):
@@ -33,9 +43,21 @@ class ConfigError(Exception):
 
 
 @dataclass(frozen=True)
+class DatabaseConfig:
+    """マイグレーションを適用するデータベース (設定の paths.migrations と database)。"""
+
+    kind: str  # DATABASE_KINDS のどれか
+    image: str | None  # kind が postgresql のときのコンテナのイメージ
+    schema_actual: bool  # docs/system/schema-actual.md を作るか
+    migrations: str  # マイグレーションの glob のパターン
+    migrations_at: tuple[int, int]  # 設定ファイルの paths.migrations の値の位置 (行・列。1 から数える)
+
+
+@dataclass(frozen=True)
 class Config:
     path: Path
     version: str
+    database: DatabaseConfig | None = None
 
     @property
     def root(self) -> Path:
@@ -82,4 +104,62 @@ def load_config(path: Path) -> Config:
     version = data["version"]
     if not isinstance(version, str) or version != version_lines[0]:
         raise ConfigError(f"{path} の version の値 {version!r} は、X.Y.Z の形の文字列でなければならない")
-    return Config(path=path, version=version)
+    return Config(path=path, version=version, database=_load_database(path, data))
+
+
+def _mapping(path: Path, data: CommentedMap, key: str, known: tuple[str, ...]) -> CommentedMap | None:
+    if key not in data:
+        return None
+    value = data[key]
+    if not isinstance(value, CommentedMap):
+        raise ConfigError(f"{path} の {key} は、キーと値のマッピングでなければならない")
+    unknown = [str(k) for k in value if k not in known]
+    if unknown:
+        raise ConfigError(
+            f"{path} の {key} に知らないキーがある: {', '.join(unknown)} "
+            f"(このバージョンのツールが知っているキー: {', '.join(known)})"
+        )
+    return value
+
+
+def _text(path: Path, mapping: CommentedMap, key: str, owner: str) -> str:
+    value = mapping[key]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{path} の {owner}.{key} は、空でない文字列でなければならない")
+    return value
+
+
+def _load_database(path: Path, data: CommentedMap) -> DatabaseConfig | None:
+    paths = _mapping(path, data, "paths", PATHS_KEYS)
+    database = _mapping(path, data, "database", DATABASE_KEYS)
+    has_migrations = paths is not None and "migrations" in paths
+    if not has_migrations and database is None:
+        return None
+    if not has_migrations:
+        raise ConfigError(f"{path} に database があるが、paths.migrations が無い。どちらも書くか、どちらも書かない")
+    if database is None:
+        raise ConfigError(f"{path} に paths.migrations があるが、database が無い。どちらも書くか、どちらも書かない")
+    migrations = _text(path, paths, "migrations", "paths")
+    if migrations.startswith("/"):
+        raise ConfigError(f"{path} の paths.migrations は、リポジトリのルートからの相対パスのパターンで書く: {migrations}")
+    line, column = paths.lc.value("migrations")
+    if "kind" not in database:
+        raise ConfigError(f"{path} の database に kind が無い ({' か '.join(DATABASE_KINDS)} を書く)")
+    kind = database["kind"]
+    if kind not in DATABASE_KINDS:
+        raise ConfigError(f"{path} の database.kind は {' か '.join(DATABASE_KINDS)} でなければならない: {kind}")
+    image = None
+    if kind == "postgresql":
+        if "image" not in database:
+            raise ConfigError(f"{path} の database に image が無い (kind が postgresql のときは、コンテナのイメージを書く。例 postgres:17)")
+        image = _text(path, database, "image", "database")
+    elif "image" in database:
+        raise ConfigError(f"{path} の database.image は、kind が postgresql のときだけ書ける")
+    schema_actual = False
+    if "schema_actual" in database:
+        if database["schema_actual"] is not True:
+            raise ConfigError(f"{path} の database.schema_actual には true だけを書ける (作らないときは、キーを書かない)")
+        schema_actual = True
+    return DatabaseConfig(
+        kind=kind, image=image, schema_actual=schema_actual, migrations=migrations, migrations_at=(line + 1, column + 1)
+    )

@@ -1,2 +1,7 @@
 # 図書館の貸出 (架空の題材) の、doc-structured の設定
 version: 0.2.0
+paths:
+  migrations: migrations/*.sql
+database:
+  kind: sqlite
+  schema_actual: true

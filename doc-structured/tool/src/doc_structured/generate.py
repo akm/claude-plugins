@@ -34,6 +34,8 @@ GITATTRIBUTES_PATH = "docs/.gitattributes"
 DOMAINS_README_PATH = f"{DOMAINS_DIR.as_posix()}/README.md"
 DOMAINS_DEPENDENCIES_PATH = f"{DOMAINS_DIR.as_posix()}/dependencies.md"
 SYSTEM_SCHEMA_PATH = "docs/system/schema.md"
+# 実際のスキーマのファイル。中身はモジュール schema_diff が作り、generate --all だけが生成し直す
+SCHEMA_ACTUAL_PATH = "docs/system/schema-actual.md"
 # 生成したファイルの merge の設定。git の組み込みの merge driver binary は、競合したときに git が ours とする側の内容を残し、
 # 競合のマークを入れない (ファイルは競合の状態のまま)。どの側が ours になるかは git のコマンドによって違い、
 # 残った内容は古いことがあるので、生成し直してから git add する
@@ -645,8 +647,12 @@ def render_gitattributes(paths: list[str], source: str = f"{DOMAINS_DIR.as_posix
     return "\n".join(lines) + "\n"
 
 
-def render_project(project: Project) -> dict[str, str]:
-    """生成するファイルの、リポジトリのルートからの相対パスと内容。"""
+def render_project(project: Project, kept: tuple[str, ...] = ()) -> dict[str, str]:
+    """生成するファイルの、リポジトリのルートからの相対パスと内容。
+
+    kept は、ほかの方法で生成するファイル (generate --all だけが生成し直す docs/system/schema-actual.md) のパス。
+    内容は作らないが、docs/.gitattributes には載せる。
+    """
     outputs: dict[str, str] = {}
     referencing = _referencing_models(project)
     referencing_tables = _referencing_tables(project)
@@ -682,9 +688,17 @@ def render_project(project: Project) -> dict[str, str]:
         outputs[SYSTEM_SCHEMA_PATH] = render_system_schema(project)
     if project.roles or any(True for d in project.domains for _ in d.entries()):
         outputs[GLOSSARY_PATH] = render_glossary(project)
-    if outputs:
-        outputs[GITATTRIBUTES_PATH] = render_gitattributes(list(outputs), _project_source(project))
+    if outputs or kept:
+        outputs[GITATTRIBUTES_PATH] = render_gitattributes([*outputs, *kept], _project_source(project))
     return dict(sorted(outputs.items()))
+
+
+def kept_paths(database) -> tuple[str, ...]:
+    """設定の database (config.DatabaseConfig か None) から、generate --all だけが生成し直すファイルのパス。
+
+    設定に database.schema_actual: true があれば docs/system/schema-actual.md (決めた経緯は Issue #207 のコメントの 10)。
+    """
+    return (SCHEMA_ACTUAL_PATH,) if database is not None and database.schema_actual else ()
 
 
 def generated_files(root: Path) -> dict[str, generated_header.Header]:
@@ -735,10 +749,10 @@ def handwritten_fix(relative: str) -> str:
     return "ファイルの名前を変える。または、内容を手書きの文書に移してから、このファイルを消す"
 
 
-def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[str]]:
+def write_outputs(root: Path, outputs: dict[str, str], kept: tuple[str, ...] = ()) -> tuple[list[str], list[str]]:
     """生成したファイルを書き、生成し直すと無くなるファイルを消す。書いたファイルと消したファイルを返す。
 
-    消すのは、先頭の記述を持つファイル (生成したファイル) だけ。手書きのファイルは消さない。
+    消すのは、先頭の記述を持つファイル (生成したファイル) だけ。手書きのファイルと、kept のファイルは消さない。
     内容が同じファイルは書かない。生成するファイルの場所に手で書いたファイルがあれば、何も書かずに
     HandwrittenFilesError を送出する (呼び出し元が、そのパスの配列から利用者にエラーを伝える)。
     """
@@ -761,7 +775,7 @@ def write_outputs(root: Path, outputs: dict[str, str]) -> tuple[list[str], list[
         written.append(relative)
     deleted: list[str] = []
     for relative in generated_files(root):
-        if relative not in outputs:
+        if relative not in outputs and relative not in kept:
             (root / relative).unlink()
             deleted.append(relative)
     return written, deleted
