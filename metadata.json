@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M847NB3XP8XYBYX6QA0JMVS5",
+  "strategy": "manual-commit",
+  "branch": "feat/disk-usage-triage-config-310",
+  "checkpoints_count": 18,
+  "files_touched": [
+    ".claude-plugin/marketplace.json",
+    ".github/test-targets.txt",
+    "README.md",
+    "disk-usage-triage/.claude-plugin/plugin.json",
+    "disk-usage-triage/README.md",
+    "disk-usage-triage/skills/triage/SKILL.md",
+    "disk-usage-triage/tests/test_docs.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 348,
+    "cache_creation_tokens": 357663,
+    "cache_read_tokens": 46474858,
+    "output_tokens": 199415,
+    "api_call_count": 159
+  },
+  "redaction": {
+    "replacements": 72,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 55,
+      "key_context": 17,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

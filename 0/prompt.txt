@@ -1,0 +1,93 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221。1 (#193)・2 (#194)・3 (#195)・A1 (#214)・4a (#196)・4c (#198)・4b (#197)・A2 (#215)・5 (#200)・6 (#201)・7 (#202)・A3 (#216)・11a (#206)・11b (#207) は完了し、4d (#199) は作らないと決めて閉じた。最新のタグは doc-structured--v0.11.0。11a でテーブルとカラムの設計をファイル名が `schema` で始まる YAML (トップのキー `tables`) に書けるようになり、11b でマイグレーションを一時的なデータベース (SQLite か、Docker で起動する PostgreSQL) に適用した実際のスキーマと設計の差分を、検査 j とサブコマンド・スキル `impl-diff` で示せるようになった (判定と表示の共通部分は `doc_structured/impl_diff.py`、規則は `doc-structured/rules/doc-structured-impl.md`)。11c (#208) は、その差分を 1 件ずつ、人が判断してから解消するサブコマンドとスキル `impl-diff-resolve` を作る。ほかに 12 (#209) なども着手できる。ツールは Python 3.12 以上 + ruamel.yaml + markdown-it-py。未追跡の `.claude/settings.json`・`.entire/` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#208 (sub-issue 11c「設計と実際のスキーマの差分を、1 件ずつ解消したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 208 --comments` (ゴール・入力・成果物と機能・クローズ条件)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧。問 12 の結果の表と、`impl-diff-resolve`・`--planned`・`--unplanned`・`--match-impl` の意味、フラグ `planned` の決定を確かめる)
+- 形式の SSOT であるディレクトリ `doc-structured/rules/` の規則の文書 (特に `doc-structured-impl.md`)、ツール `doc-structured/tool/` (11b の `impl_diff.py`・検査 j と、11a のスキーマの読み込み)、スキル `doc-structured/skills/` (特に `impl-diff`)
+- 前の sub-issue で決めたこと: #206 の決定 https://github.com/akm/claude-plugins/issues/206#issuecomment-7073968595 (`schema` で始まる YAML・カラムの項目・`planned`)、#207 の決定 https://github.com/akm/claude-plugins/issues/207#issuecomment-7079345525 (データベース・設定・正規化・指示の行・比べない項目) と確認のコメント。#207 で分けた #315 (環境変数 `DOC_STRUCTURED_CHECKOUT` を変えても前の venv のツールが実行される) は、確認の途中で同じことが起きうるので知っておく。
+- 共有ノートの引き継ぎのメモ `206-doc-structured-schema.md`・`207-doc-structured-schema-diff.md` があれば読む
+
+進め方:
+- 実装の中で出る判断 (差分の 1 件の ID の形、`--planned`・`--unplanned`・`--match-impl` がそれぞれ YAML をどう書き換えるか、実装にだけあるテーブルやカラムを YAML に足すときの置き場所と定義の文 (definition) の扱い、検査 j が比べない項目の扱い、コメントと記述の順序を保つ書き換えの方法、スキルの質問の形、最後の `impl-diff` での確認の伝え方、手元にデータベースが無いときの伝え方など) は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #208 に書く。
+- 実際のプロジェクトで確かめるときは、チェックアウト `/Users/akima/techno/ikinari-order-v2` を読んでよい (読むだけで変えない。リモートのブランチ `origin/claude/doc-structured-a3-216-0a6cd2` も読んでよい)。確かめるときはスクラッチパッドにコピーして使う。データベースのコンテナを起動するなど、手元の環境を変える操作は利用者に確かめてから行う。公開の場 (Issue・PR・ファイル・コミットメッセージ) には、そのプロジェクトの名前・リポジトリ名・Issue 番号・リンク・ファイルのパスを書かず、「実際のプロジェクト」と書く。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。規則の文書には手順を書かない。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットと PR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。スキルの対話の確認は、タグを公開する前に行う。タグはファイル `doc-structured/docs/release.md` の手順のとおりに付ける。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、タグが公開され、Issue #208 が閉じている。終わったら、呼び出し元のセッション (local_a14f3497-5f91-4f16-aa39-ed64303c4522) に、SendMessage で結果 (PR 番号・決めたこと・別の Issue に分けたもの・片付けの状況・次の sub-issue) を送る。ターンの終わりの自動の通知は報告の代わりにならない (先頭の 400 文字しか届かない)。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+A
+
+---
+
+はい A で
+
+---
+
+はい、推奨のとおりで
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、A で
+
+---
+
+はい、その計画で
+
+---
+
+はい、投稿して
+
+---
+
+はい、その 4 点と文面で
+
+---
+
+案 A
