@@ -222,9 +222,9 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 - `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。**U1 で決めた**: 領域を確保しただけで書き込んでいない部分 (ext4 の unwritten extent) を、Docker は使用量に数えるが、`Docker.raw` にはディスクが割り当てられていないため。KTD13 に理由を書き、R10 に注記を足した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。**U1 で決めた**: 減る。R47 を、解放するコマンドを案内しないことに直した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
 - `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。**U1 で決めた**: 残された worktree には、セッションの ID と worktree のパスが含まれる。ほかの worktree のパスは含まれない。R34 に `refresh: true` で呼ぶことを、KTD12 に結果の形と理由を書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 4)。
-- アプリの Terminal パネルで利用者が実行したコマンドに、環境変数 `CLAUDECODE` が付くか (R38)。
-- hook が受け取る `mcp__terminal__run_in_terminal` の入力で、コマンドの文字列がどのキーにあるか (KTD9)。
-- `mcp__terminal__run_in_terminal` が、実行中のコマンドに入力を送れるか (R38)。
+- アプリの Terminal パネルで利用者が実行したコマンドに、環境変数 `CLAUDECODE` が付くか (R38)。**U1 で決めた**: 付かない。KTD9 に書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。
+- hook が受け取る `mcp__terminal__run_in_terminal` の入力で、コマンドの文字列がどのキーにあるか (KTD9)。**U1 で決めた**: キー `command`。セッションの記録で確認した。hook の標準入力に届く JSON そのものは、U8 の Verification で確認する。KTD9 に書いた ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。
+- `mcp__terminal__run_in_terminal` が、実行中のコマンドに入力を送れるか (R38)。**U1 で決めた**: 送れない。入力待ちのタブに送ろうとすると、アプリが拒否した。計画は変えない ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。
 
 次は、文書のレビューで残った懸念で、括弧の中の単位を実装するときに確認して、直し方を決める (deferred)。
 
@@ -272,7 +272,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 
   デバイス番号と inode 番号は、`uname` が `Darwin` なら `stat -f '%d:%i'`、それ以外なら `stat -c '%d:%i'` で読む。macOS で使う前提だが、CI (Ubuntu) で同じ削除のシェルスクリプトを実行してテストするため。Python のスクリプトは、作るときに `os.stat` で同じ値を求めて書く。結果のファイル `results.tsv` には、タブで区切った行を追記し、1 列目で行の種類を分ける。開始の行 (`run-start`)・終了の行 (`run-end`)・中断の行 (`interrupted`) は、種類・時刻・ディスクの空きを書く。項目の行 (`item`) は、種類・項目の ID・結果 (`ok`・`failed`・`skipped`)・終了コード・時刻・理由を書く。コマンドの出力は、ファイル `log.txt` に書く。
 - KTD8. **hook は、文字列 `disk-usage-triage/runs`・環境変数 `DISK_USAGE_TRIAGE_HOME` で変えたときの `runs` のパス・ファイル名 `disk-usage-triage-delete.sh` のどれかを含むコマンドを拒否する** (session-settled: user-directed; chosen over hook を使わないこと)。R45 と KD14 を実現する。hook の形は、プラグイン review-triage のファイル `review-triage/scripts/review-loop-worker/deny_tmp_hook.py` にならう。このリポジトリで開発するときのコマンド (例: `python3 -m unittest discover -s disk-usage-triage/tests`) を拒否しないように、テストの固定データのディレクトリに `runs` という名前を使わない。このリポジトリの開発では、ファイル名や `runs` のパスを含む文はファイルにして渡し (`git commit -F <ファイル>`・`gh pr create --body-file <ファイル>`)、検索には Bash ツールの `grep` ではなく Grep ツールを使う。Grep ツールは hook が検査する対象 (KTD9) に入らないため。
-- KTD9. **hook は、Bash ツールに加えて、アプリの Terminal パネルにコマンドを送る MCP ツール `mcp__terminal__run_in_terminal` の入力も検査する。** Terminal パネルで実行したコマンドには環境変数 `CLAUDECODE` が付かないことがあり (U1 で確認する)、Bash ツールだけを検査すると、Claude が Terminal パネルから実行するのを拒否できないため。あわせて、Write・Edit・MultiEdit・NotebookEdit ツールの入力のファイルのパスも検査し、KTD8 の文字列を含むパスへの書き込みを拒否する。利用者に要約を示した後に、Claude が削除のシェルスクリプトの中身を書き換えないようにするため (R45)。
+- KTD9. **hook は、Bash ツールに加えて、アプリの Terminal パネルにコマンドを送る MCP ツール `mcp__terminal__run_in_terminal` の入力も検査する。** Terminal パネルで実行したコマンドには環境変数 `CLAUDECODE` が付かず (U1 で確認した)、Bash ツールだけを検査すると、Claude が Terminal パネルから実行するのを拒否できないため。`run_in_terminal` の入力のコマンドの文字列は、キー `command` にある (U1 で、セッションの記録で確認した。[Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 5)。hook の標準入力に届く JSON そのものは、U8 で、プラグインを入れた状態で確認する (2026-11-23 に利用者が決めた)。あわせて、Write・Edit・MultiEdit・NotebookEdit ツールの入力のファイルのパスも検査し、KTD8 の文字列を含むパスへの書き込みを拒否する。利用者に要約を示した後に、Claude が削除のシェルスクリプトの中身を書き換えないようにするため (R45)。
 - KTD10. **asdf は、データの場所と参照を Python のスクリプトが読む** (R23〜R27)。
   - データの場所は、環境変数 `ASDF_DATA_DIR`、無ければ `~/.asdf`。版は `installs/<ツール>/<版>` のディレクトリで、使用量は `installs` で `du -k -d 2` を実行して求める。
   - `.tool-versions` は、`#` から行末をコメントとし、行の最初の語をツール、残りを版として読む。プロジェクトのディレクトリは `os.walk` で、時間の上限 (R4) の中で探し、`.git` と `node_modules` の下を探さない。`pyvenv.cfg` を見つけたディレクトリ (仮想環境) の下も探さない。読めなかったディレクトリは引数 `onerror` で集め、R25 の理由に書く。
@@ -533,7 +533,7 @@ disk-usage-triage/
 - Edit ツールで `runs` の下の削除のシェルスクリプトを書き換える入力と、Write ツールで同じパスに書く入力は拒否する。`inputs/` の下のファイルへの Write は拒否しない。
 - 入力の JSON が壊れているときは、拒否も許可もせず、誤りを標準エラー出力に書く。
 
-**Verification:** テストがすべて成功する。Claude Desktop で、Claude に削除のシェルスクリプトの実行を Bash ツールで試させると、hook が拒否する (削除のシェルスクリプトは、何もしない内容のものを使う)。
+**Verification:** テストがすべて成功する。Claude Desktop で、Claude に削除のシェルスクリプトの実行を Bash ツールで試させると、hook が拒否する (削除のシェルスクリプトは、何もしない内容のものを使う)。プラグインを入れた状態で、Claude が `mcp__terminal__run_in_terminal` で削除のシェルスクリプトを実行しようとすると hook が拒否し、そのとき hook が受け取った JSON の形が、テストの固定データと合っている (KTD9)。
 
 ### U3. 判定表と保護の一覧
 
