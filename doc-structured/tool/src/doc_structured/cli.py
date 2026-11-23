@@ -320,8 +320,14 @@ def run_impl_diff_resolve(config: Config, args: argparse.Namespace) -> int:
         if not cases:
             print("解消する差分は無かった")
         return 0
+    file = None
+    if args.file is not None:
+        file = _relative(config, args.file)
+        if file is None:
+            print(f"doc-structured: --file {args.file} は、リポジトリの外にある", file=sys.stderr)
+            return 1
     request = impl_resolve.Request(
-        args.id, args.flag, args.file,
+        args.id, args.flag, file,
         [tuple(pair) for pair in args.definition], [tuple(pair) for pair in args.model],
         [tuple(pair) for pair in args.attribute],
     )
