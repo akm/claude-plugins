@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from . import generated_header
 from .config import DatabaseConfig
 from .generate import ER_TYPE_FORBIDDEN_RE, _table_row, escape_cell
-from .domains import Entry, Project
+from .domains import Entry, IndexSpec, Project
 from .impl_diff import Item, Location
-from .schema_actual import ActualSchema, ActualTable
+from .schema_actual import ActualColumn, ActualIndex, ActualSchema, ActualTable
 from .tables import column_spec, index_is_planned, is_planned, table_spec
 
 # 比べる項目の名前と、メッセージに書く名前
@@ -210,6 +210,30 @@ def _index_name(table_name: str, index: _Index) -> str:
     return f"{table_name} のインデックス ({', '.join(index.columns)})"
 
 
+# 実装にだけあるテーブルの、件の ID のドメインの部分。足すドメインは利用者が決める (Issue #208 のコメントの 1・10)
+DOMAIN_PLACEHOLDER = "<ドメイン>"
+
+
+def index_id(table_id: str, columns: tuple[str, ...] | list[str]) -> str:
+    """インデックスの件の ID。テーブルの ID の後に「:」と、カラム名をカンマ区切りで書く (Issue #208 のコメントの 1)。"""
+    return f"{table_id}:{','.join(columns)}"
+
+
+@dataclass
+class SchemaTarget:
+    """検査 j の項目が指す、YAML の定義と実際のスキーマの要素。サブコマンド impl-diff-resolve が書き換えに使う。"""
+
+    kind: str  # "table"・"column"・"index"
+    table: str  # テーブル名
+    table_entry: Entry | None  # YAML のテーブル。実装にだけあるテーブルなら None
+    actual_table: ActualTable | None  # 実際のテーブル。実装に無いテーブルなら None
+    column_entry: Entry | None = None  # YAML のカラム
+    actual_column: ActualColumn | None = None
+    index_columns: tuple[str, ...] = ()
+    design_index: IndexSpec | None = None
+    actual_index: ActualIndex | None = None
+
+
 # ---------------------------------------------------------------- 項目と正規化した行
 
 
@@ -261,12 +285,12 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
     actual_facts: list[tuple[str, str, str]] = []
 
     actual_index_lists: dict[str, list[_Index]] = {}
+    actual_index_objects: dict[str, list[ActualIndex]] = {}  # actual_index_lists と同じ順の、実際のインデックス
     actual_column_maps: dict[str, dict[str, _Column]] = {}
     for name, table in actual.tables.items():
         actual_column_maps[name] = _actual_columns(table, kind)
-        actual_index_lists[name] = [
-            _Index(tuple(index.columns), index.unique) for index in table.indexes if not index.has_expression
-        ]
+        actual_index_objects[name] = [index for index in table.indexes if not index.has_expression]
+        actual_index_lists[name] = [_Index(tuple(index.columns), index.unique) for index in actual_index_objects[name]]
         actual_facts += _table_facts(name, actual_column_maps[name], table.primary_key, actual_index_lists[name])
 
     for name in sorted(set(design_tables) | set(actual.tables)):
@@ -275,7 +299,12 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
         actual_columns = actual_column_maps.get(name, {})
         actual_indexes = actual_index_lists.get(name, [])
         if entry is None:
-            items.append(Item(f"テーブル {name}", None, {}))
+            items.append(
+                Item(
+                    f"テーブル {name}", None, {}, id=f"d-{DOMAIN_PLACEHOLDER}-t-{name}",
+                    target=SchemaTarget("table", name, None, actual_table),
+                )
+            )
             continue
         spec = table_spec(entry)
         table_planned = spec.planned
@@ -293,6 +322,8 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
             None if actual_table is None else {"primary_key": ", ".join(actual_table.primary_key)},
             planned=table_planned,
             location=Location(entry.path, entry.line, entry.column),
+            id=entry.id,
+            target=SchemaTarget("table", name, entry, actual_table),
         )
         items.append(item)
         for column in entry.children:
@@ -305,18 +336,40 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
                     planned=column_spec(column).planned,
                     location=Location(column.path, column.line, column.column),
                     fixes={"null": PRIMARY_KEY_NULL_FIX} if column.name in spec.primary_key else {},
+                    id=column.id,
+                    target=SchemaTarget(
+                        "column", name, entry, actual_table, column_entry=column,
+                        actual_column=actual_table.column(column.name) if actual_table is not None else None,
+                    ),
                 )
             )
         for column_name, actual_column in actual_columns.items():
             if not any(column.name == column_name for column in entry.children):
-                item.children.append(Item(f"テーブル {entry.id} のカラム {column_name}", None, _column_values(actual_column)))
+                item.children.append(
+                    Item(
+                        f"テーブル {entry.id} のカラム {column_name}", None, _column_values(actual_column),
+                        id=f"{entry.id}-c-{column_name}",
+                        target=SchemaTarget(
+                            "column", name, entry, actual_table, actual_column=actual_table.column(column_name)
+                        ),
+                    )
+                )
         # 未実装のインデックスも、実装にあるかを確認するために組にする (実装にあれば planned を外す指示を出す)
         all_design = [(index, _Index(tuple(index.columns), index.unique)) for index in spec.indexes]
         pairs, _ = _pair_indexes([d for _, d in all_design], actual_indexes)
         for design_index, actual_index in pairs:
+            raw_actual = None
+            if actual_index is not None:
+                raw_actual = actual_index_objects[name][next(i for i, a in enumerate(actual_indexes) if a is actual_index)]
             if design_index is None:
                 item.children.append(
-                    Item(_index_name(f"テーブル {entry.id}", actual_index), None, {"unique": _yes(actual_index.unique)})
+                    Item(
+                        _index_name(f"テーブル {entry.id}", actual_index), None, {"unique": _yes(actual_index.unique)},
+                        id=index_id(entry.id, actual_index.columns),
+                        target=SchemaTarget(
+                            "index", name, entry, actual_table, index_columns=actual_index.columns, actual_index=raw_actual
+                        ),
+                    )
                 )
                 continue
             spec_index = next(index for index, d in all_design if d is design_index)
@@ -327,6 +380,11 @@ def compare(project: Project, actual: ActualSchema) -> SchemaDiff:
                     None if actual_index is None else {"unique": _yes(actual_index.unique)},
                     planned=spec_index.planned,
                     location=Location(entry.path, spec_index.line, spec_index.column),
+                    id=index_id(entry.id, design_index.columns),
+                    target=SchemaTarget(
+                        "index", name, entry, actual_table, index_columns=design_index.columns, design_index=spec_index,
+                        actual_index=raw_actual,
+                    ),
                 )
             )
     return SchemaDiff(items, _sorted_lines(design_facts), _sorted_lines(actual_facts))

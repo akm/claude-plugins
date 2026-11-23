@@ -10,6 +10,13 @@
                                    実行できなければ終了コード 3
   doc-structured impl-diff         検査 j だけを実行し、設計と実装の正規化した形どうしの unified diff と指示の行を
                                    出力する。何も変えない。差分があれば終了コード 1、データベースが無ければ終了コード 3
+  doc-structured impl-diff-resolve --list
+                                   検査 j の差分の件を、1 行に 1 件「<ID> | 使えるフラグ | メッセージ」の形で、解消する順に出力する
+  doc-structured impl-diff-resolve <ID> --planned|--unplanned|--match-impl [--file <パス>]
+                                   [--definition <ID> <文>]... [--model <テーブルの ID> <モデルの ID>]...
+                                   [--attribute <テーブルかカラムの ID> <属性の ID>]...
+                                   差分の 1 件を、YAML を書き換えて解消する。解消できなければ何も書き換えずに終了コード 1、
+                                   データベースが無ければ終了コード 3
   doc-structured links-fix [<ファイル>...] [--choose <ファイル> <ラベル> <ID か URL>]...
                                    手書きの Markdown の定義の行・ファイルのアンカー・リンクの表示の文を直す。
                                    判断の要るものが残れば終了コード 1
@@ -31,6 +38,7 @@ from .config import CONFIG_RELATIVE_PATH, Config, ConfigError, find_config, load
 from .documents import load_documents
 from .domains import load_project
 from .impl_diff import UNAVAILABLE_EXIT_CODE, ImplementationUnavailable
+from . import impl_resolve
 from .generate import (
     HANDWRITTEN_MESSAGE,
     SCHEMA_ACTUAL_PATH,
@@ -82,6 +90,32 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "impl-diff",
         help="検査 j だけを実行し、設計と実装の差分 (unified diff) と指示の行を出力する。何も変えない",
+    )
+    resolve_parser = subparsers.add_parser(
+        "impl-diff-resolve", help="検査 j の差分の 1 件を、YAML を書き換えて解消する。--list で件の一覧を出力する"
+    )
+    resolve_parser.set_defaults(subparser=resolve_parser)
+    resolve_parser.add_argument("id", nargs="?", metavar="<ID>", help="解消する件の ID (--list が出力する ID)")
+    flags = resolve_parser.add_mutually_exclusive_group()
+    flags.add_argument("--list", action="store_true", help="件の一覧を、解消する順に出力する")
+    flags.add_argument("--planned", dest="flag", action="store_const", const=impl_resolve.PLANNED, help="planned: true を付ける")
+    flags.add_argument("--unplanned", dest="flag", action="store_const", const=impl_resolve.UNPLANNED, help="planned を外す")
+    flags.add_argument(
+        "--match-impl", dest="flag", action="store_const", const=impl_resolve.MATCH_IMPL, help="YAML を実装に合わせる"
+    )
+    resolve_parser.add_argument(
+        "--file", metavar="<パス>", help="実装にだけあるテーブルを足す YAML (省けばドメインのディレクトリの直下の schema.yaml)"
+    )
+    resolve_parser.add_argument(
+        "--definition", nargs=2, action="append", default=[], metavar=("<ID>", "<文>"), help="足すテーブルかカラムの定義の文"
+    )
+    resolve_parser.add_argument(
+        "--model", nargs=2, action="append", default=[], metavar=("<テーブルの ID>", "<モデルの ID>"),
+        help="足すテーブルに対応するモデル",
+    )
+    resolve_parser.add_argument(
+        "--attribute", nargs=2, action="append", default=[], metavar=("<テーブルかカラムの ID>", "<属性の ID>"),
+        help="足すテーブル (中間テーブル) かカラムに対応する属性",
     )
     refs_parser = subparsers.add_parser(
         "refs", help="その ID と子孫の ID を参照している、手書きの Markdown の箇所を出力する"
@@ -248,6 +282,61 @@ def run_impl_diff(config: Config) -> int:
     return 0
 
 
+def run_impl_diff_resolve(config: Config, args: argparse.Namespace) -> int:
+    parser = args.subparser
+    if args.list:
+        if args.id is not None or args.file or args.definition or args.model or args.attribute:
+            parser.error("--list には、ID とほかのオプションを付けられない")
+    elif args.id is None or args.flag is None:
+        parser.error("解消する件の ID と、--planned・--unplanned・--match-impl のどれか 1 つを指定する (件の一覧は --list)")
+    project, problems = load_project(config.root)
+    if problems:
+        for problem in problems:
+            print(problem.format(), file=sys.stderr)
+        print(f"doc-structured: YAML に {len(problems)} 件の誤りがあるので、設計と実装を比べなかった", file=sys.stderr)
+        return 1
+    database = config.database
+    if database is None:
+        print(
+            f"{CONFIG_RELATIVE_PATH.as_posix()}: 設定に paths.migrations と database が無いので、設計と実装を比べられない。"
+            "設定に paths.migrations と database を書く",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        actual = read_schema(config.root, database)
+    except ImplementationUnavailable as e:
+        print(f"doc-structured: 設計と実装を比べられない: {e}", file=sys.stderr)
+        return UNAVAILABLE_EXIT_CODE
+    except MigrationError as e:
+        where = e.path or CONFIG_RELATIVE_PATH.as_posix()
+        print(f"{where}: {e}", file=sys.stderr)
+        print("doc-structured: マイグレーションを適用できないので、設計と実装を比べなかった", file=sys.stderr)
+        return 1
+    if args.list:
+        cases = impl_resolve.list_cases(project, actual)
+        for case in cases:
+            print(case.line())
+        if not cases:
+            print("解消する差分は無かった")
+        return 0
+    request = impl_resolve.Request(
+        args.id, args.flag, args.file,
+        [tuple(pair) for pair in args.definition], [tuple(pair) for pair in args.model],
+        [tuple(pair) for pair in args.attribute],
+    )
+    try:
+        result = impl_resolve.resolve(config.root, project, actual, request)
+    except impl_resolve.ResolveError as e:
+        for line in e.lines:
+            print(line, file=sys.stderr)
+        print("doc-structured: 何も書き換えなかった", file=sys.stderr)
+        return 1
+    for line in result.lines():
+        print(line)
+    return 0
+
+
 def run_refs(config: Config, args: argparse.Namespace) -> int:
     # YAML に誤りがあっても実行する (手書きのファイルの見つけ方と行が属する ID は、YAML の内容を使わないため。
     # 決めた経緯は Issue #198 のコメントの 6)
@@ -284,5 +373,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_refs(config, args)
     if args.command == "impl-diff":
         return run_impl_diff(config)
+    if args.command == "impl-diff-resolve":
+        return run_impl_diff_resolve(config, args)
     # argparse が知らないサブコマンドを拒否するので、ここには来ない
     raise AssertionError(f"知らないサブコマンド: {args.command} (設定: {config.path})")
