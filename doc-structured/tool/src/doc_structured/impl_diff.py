@@ -16,6 +16,7 @@
 
 import difflib
 from dataclasses import dataclass, field
+from typing import Any
 
 from .problems import Problem
 
@@ -52,6 +53,72 @@ class Item:
     children: list["Item"] = field(default_factory=list)
     # 比べる項目の名前から、違うときの直し方への対応。無い項目は「YAML か実装を直す」
     fixes: dict[str, str] = field(default_factory=dict)
+    # サブコマンド impl-diff-resolve に渡す ID (Issue #208 のコメントの 1)。target は、対象ごとのモジュールが書き換えに使う情報
+    id: str = ""
+    target: Any = None
+
+
+# 件の場合 (決定の一覧の検査 j の結果の表で、エラーになる行。決めた経緯は Issue #208 のコメントの 2)
+PLANNED_IMPLEMENTED = "planned_implemented"  # YAML にあり、実装にもあり、planned がある
+MISSING_IMPLEMENTATION = "missing_implementation"  # YAML にあり、実装に無く、planned が無い
+MISSING_DESIGN = "missing_design"  # YAML に無く、実装にある
+MISMATCH = "mismatch"  # どちらにもあり、比べる項目が違う
+
+
+def differences(items: list[Item]) -> list[tuple[Item, str]]:
+    """結果の表でエラーになる項目と、その場合。子は、親が YAML にも実装にもあり、planned でないときだけ見る。"""
+    found: list[tuple[Item, str]] = []
+
+    def visit(item: Item) -> None:
+        if item.design is None:
+            if item.actual is not None:
+                found.append((item, MISSING_DESIGN))
+            return
+        if item.actual is None:
+            if not item.planned:
+                found.append((item, MISSING_IMPLEMENTATION))
+            return
+        if item.planned:
+            found.append((item, PLANNED_IMPLEMENTED))
+            return
+        if different_keys(item):
+            found.append((item, MISMATCH))
+        for child in item.children:
+            visit(child)
+
+    for item in items:
+        visit(item)
+    return found
+
+
+def different_keys(item: Item) -> list[str]:
+    """設計と実装で値が違う、比べる項目の名前。どちらかに無い項目は、空の値として比べる。"""
+    assert item.design is not None and item.actual is not None
+    keys = list(item.design) + [key for key in item.actual if key not in item.design]
+    return [key for key in keys if item.design.get(key, "") != item.actual.get(key, "")]
+
+
+def messages(item: Item, case: str, labels: dict[str, str]) -> list[str]:
+    """件の指示の行のメッセージ。比べる項目が違うときは、違う項目ごとに 1 つ (labels の順)。"""
+    if case == MISSING_DESIGN:
+        return [f"{item.name} が実装にあるが YAML に無い。YAML に足す (または実装を戻す)"]
+    if case == MISSING_IMPLEMENTATION:
+        return [f"{item.name} が実装に無い。planned: true を付けるか、YAML から消す"]
+    if case == PLANNED_IMPLEMENTED:
+        return [f"{item.name} は実装されたので、planned を外す"]
+    assert item.design is not None and item.actual is not None
+    different = different_keys(item)
+    result = []
+    for key, label in labels.items():
+        if key not in different:
+            continue
+        fix = item.fixes.get(key, "YAML か実装を直す")
+        # 英字で始まる名前 (「URL パス」など) は、「の」との間に空白を入れる
+        spaced = f" {label}" if label[:1].isascii() else label
+        design = item.design.get(key, "")
+        actual = item.actual.get(key, "")
+        result.append(f"{item.name} の{spaced}が違う (設計 {_shown(design)}、実装 {_shown(actual)})。{fix}")
+    return result
 
 
 def judge(items: list[Item], labels: dict[str, str], fallback: Location) -> list[Problem]:
@@ -60,38 +127,10 @@ def judge(items: list[Item], labels: dict[str, str], fallback: Location) -> list
     labels は比べる項目の名前から、メッセージに書く名前 (「型」など) への対応。fallback は、YAML に無い項目を報告する位置。
     """
     problems: list[Problem] = []
-
-    def report(item: Item, message: str) -> None:
+    for item, case in differences(items):
         where = item.location or fallback
-        problems.append(Problem(CHECK, where.path, f"{item.name}{message}", where.line, where.column))
-
-    def visit(item: Item) -> None:
-        if item.design is None:
-            if item.actual is not None:
-                report(item, " が実装にあるが YAML に無い。YAML に足す (または実装を戻す)")
-            return
-        if item.actual is None:
-            if not item.planned:
-                report(item, " が実装に無い。planned: true を付けるか、YAML から消す")
-            return
-        if item.planned:
-            report(item, " は実装されたので、planned を外す")
-            return
-        for key, label in labels.items():
-            if key not in item.design and key not in item.actual:
-                continue
-            design = item.design.get(key, "")
-            actual = item.actual.get(key, "")
-            if design != actual:
-                fix = item.fixes.get(key, "YAML か実装を直す")
-                # 英字で始まる名前 (「URL パス」など) は、「の」との間に空白を入れる
-                spaced = f" {label}" if label[:1].isascii() else label
-                report(item, f" の{spaced}が違う (設計 {_shown(design)}、実装 {_shown(actual)})。{fix}")
-        for child in item.children:
-            visit(child)
-
-    for item in items:
-        visit(item)
+        for message in messages(item, case, labels):
+            problems.append(Problem(CHECK, where.path, message, where.line, where.column))
     return problems
 
 

@@ -189,7 +189,10 @@ class WithoutDockerTest(ProjectTestCase):
 
     def test_daemon_not_running(self):
         self.fake_docker()
-        for args in (("impl-diff",), ("check", "--heavy"), ("check", "--all")):
+        for args in (
+            ("impl-diff",), ("check", "--heavy"), ("check", "--all"), ("impl-diff-resolve", "--list"),
+            ("impl-diff-resolve", "d-loans-t-loans", "--match-impl"),
+        ):
             with self.subTest(args=args):
                 result = self.run_tool(*args)
                 self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
