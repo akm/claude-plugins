@@ -261,6 +261,7 @@ docs/
 - 差分は、正規化した形どうしの unified diff と、指示の行で示す。
 - 一時的なデータベースにマイグレーションを適用して読む。手元にデータベースが無ければ、スキルは実行できないと伝えて終了する。
 - スキーマについての設定の項目・対応するデータベース (SQLite と、Docker で起動する PostgreSQL)・正規化・比べる範囲・結果の表の当てはめ方・正規化した形・`schema-actual.md` の中身と生成のコマンドは、sub-issue 11b で決めた (規則の文書 [rules/doc-structured-impl.md](../rules/doc-structured-impl.md)。経緯は [#207](https://github.com/akm/claude-plugins/issues/207))。判定と差分の表示の共通部分は、画面のルート (sub-issue 12) でも使う。
+- 差分の 1 件の単位と ID・3 つのフラグが YAML をどう書き換えるか・件の一覧 (`--list`)・YAML に書く形は、sub-issue 11c で決めた (規則の文書 [rules/doc-structured-impl.md](../rules/doc-structured-impl.md) の節「差分の解消」。経緯は [#208](https://github.com/akm/claude-plugins/issues/208))。
 
 ### (3) 分担
 
@@ -286,7 +287,7 @@ docs/
 | `links-fix` | 定義の無いラベルに定義の行を足す。古い title を書き換える (既存の引用符は書き換えない)。各ファイルで参照先を最初に指す箇所の `[ラベル]` を長い形 (種類 + 名前) に、2 回目以降の ID と書ける形を名前が見える形に書き換える。`--stdin` で Issue と PR の本文を受け取る (問 13)。最初の箇所の `[文][ラベル]` の文は書き換えない |
 | `refs <ID>` | ある ID を参照しているファイルと節を出力する (設定にパスがあれば、コードとテストも) |
 | `impl-diff` | 検査 j だけを実行し、差分を示す。何も変えない |
-| `impl-diff-resolve` | 差分を 1 件ずつ解消する。サブコマンドは `<ID>` と、`--planned`・`--unplanned`・`--match-impl` のどれかを取る。スキルが 1 件ずつ人に質問してから実行する |
+| `impl-diff-resolve` | 差分を 1 件ずつ解消する。サブコマンドは `<ID>` と、`--planned`・`--unplanned`・`--match-impl` のどれかを取る。`--list` で件の一覧を出力する。スキルが 1 件ずつ人に質問してから実行する |
 | `rename <以前の ID> <新しい英語名>` | 名前から ID を作るすべての種類を改名する (下の説明) |
 | `setup` | 新しいプロジェクトに、ディレクトリ・設定・入口のスクリプトを作る。整形ツールを質問し、prettier なら `.prettierignore` に生成したファイルのパターンを書き、それ以外なら除外するパターンの一覧を表示する。選ばれたときだけ Issue と PR のテンプレートを作る (sub-issue 16 で足す選択肢) |
 
