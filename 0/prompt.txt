@@ -1,0 +1,132 @@
+Background (from the session that started this one):
+利用者は、Claude Code で作るアプリケーションの文書の構成を、公開リポジトリ akm/claude-plugins のプラグイン `doc-structured` として作っている。決定はファイル `doc-structured/docs/decisions.md` にあり、進め方は親の Issue #192 と sub-issue #193〜#221。1 (#193)・2 (#194)・3 (#195)・A1 (#214)・4a (#196)・4c (#198)・4b (#197)・A2 (#215)・5 (#200)・6 (#201)・7 (#202)・A3 (#216) は完了し、4d (#199) は作らないと決めて閉じた。最新のタグは doc-structured--v0.9.0。2 でモデル・属性・値の YAML と `refers_to`・検査 a・h・i が、5 で操作・前提・イベント・ロールが、6 で状態の遷移が、7 でドメインの依存 (ドメインごとの `dependencies.md`・`docs/domains/dependencies.md`・読む順の索引 `docs/domains/README.md`) と検査 c-1 (ドメインの循環と、同じドメインのモデルの `refers_to` の循環) ができた。11a (#206) は、テーブルとカラムの設計を `schema.yaml` に書けるようにし、スキーマの文書と ER 図を生成し、テーブルの外部キーをドメインの依存に加え、検査 c-1 で外部キーの循環を検査する。11a の後に 11b (#207) と 12 (#209) が続く。ツールは Python 3.12 以上 + ruamel.yaml + markdown-it-py。未追跡の `.claude/settings.json` と `.entire/` は利用者のもので触らない。
+
+Task:
+GitHub の Issue akm/claude-plugins#206 (sub-issue 11a「テーブルとカラムの設計を YAML に書き、スキーマの文書を生成したい」) を実装し、PR を作ってマージできる状態にする。
+
+最初に読むもの:
+- `gh issue view 206 --comments` (ゴール・入力・この sub-issue で決める形式・成果物と機能・クローズ条件。7 (#202) から引き継いだこと: テーブルの外部キーをドメインの依存に数えること、検査 c-1 で外部キーの循環を検査し報告の形を #202 の決定 9 に合わせること)
+- `gh issue view 192` (親の Issue。すべての sub-issue に共通するクローズ条件と手順。種類を足す sub-issue が前の機能を広げる共通の手順も含む)
+- ファイル `doc-structured/docs/decisions.md` (決定の一覧。スキーマ・テーブル・外部キー・検査 c-1・ドメインの依存 (問 5) の決定を確かめる)
+- 形式の SSOT であるディレクトリ `doc-structured/rules/` の規則の文書、ツール `doc-structured/tool/` (generate・検査 a・h・i・c-1・c-2)、スキル `doc-structured/skills/`
+- 前の sub-issue で決めたこと: Issue #194 のコメント https://github.com/akm/claude-plugins/issues/194#issuecomment-6716205386 (YAML の形式・ID の形・`refers_to`)、#200 の決定 https://github.com/akm/claude-plugins/issues/200#issuecomment-6895117233 、#201 の決定 https://github.com/akm/claude-plugins/issues/201#issuecomment-6902673789 、#202 の決定 https://github.com/akm/claude-plugins/issues/202#issuecomment-6919324832 (ドメインの依存・読む順・検査 c-1)、A1 (#214)・A2 (#215)・A3 (#216) の適用の結果
+- 共有ノートの引き継ぎのメモ `194-doc-structured-generate-check.md`・`200-doc-structured-functions.md`・`201-doc-structured-state-machines.md`・`202-doc-structured-dependencies.md`・`214-a1-apply.md`・`216-a3-apply.md` があれば読む
+
+進め方:
+- Issue の「この sub-issue で決める形式」(`schema.yaml` の項目、種類の記号 `t`・`c`、属性との対応の書き方、フラグ `planned`) と、実装の中で出る判断 (`schema.yaml` の置き場所、生成する `schema.md` と `docs/system/schema.md` の形、ER 図の形、ほかのドメインのテーブルを参照するカラムだけとリンクで出す出し方、`models.md` の「このモデルを参照するテーブル」の形、外部キーの循環のエラーのメッセージ、ドメインの依存の表への出し方など) は、Claude が決めずに利用者に 1 問ずつ尋ねる (背景・選択肢・推奨を添える)。決まった内容は Issue #206 に書く。
+- 実際のプロジェクトのテーブルの設計で形式を確かめるときは、チェックアウト `/Users/akima/techno/ikinari-order-v2` を読んでよい (読むだけで変えない。A3 の動作確認のブランチ `claude/doc-structured-a3-216-0a6cd2` も読んでよい)。公開の場 (Issue・PR・ファイル・コミットメッセージ) には、そのプロジェクトの名前・リポジトリ名・Issue 番号・リンク・ファイルのパスを書かず、「実際のプロジェクト」と書く。
+- 実装計画はドメインで分ける (ユーザーの CLAUDE.md の規約)。
+- 決まり (規約・方針) を足すときは、文面と理由を示して承認を得る。規則の文書には手順を書かない。
+- 日本語の文章は CLAUDE.md の規約に従い、コミットと PR 本文の前に wording-guard でエラー 0 を確かめる。
+- コミットは動機ごとに分ける。push・PR の作成・タグ・マージは利用者に確かめてから行う。スキルの対話の確認は、タグを公開する前に行う。タグはファイル `doc-structured/docs/release.md` の手順のとおりに付ける。
+
+完了の形: クローズ条件をすべて満たす PR がマージされ、タグが公開され、Issue #206 が閉じている。終わったら、呼び出し元のセッション (local_a14f3497-5f91-4f16-aa39-ed64303c4522) に、SendMessage で結果 (PR 番号・決めたこと・別の Issue に分けたもの・片付けの状況・次の sub-issue) を送る。ターンの終わりの自動の通知は報告の代わりにならない (先頭の 400 文字しか届かない)。
+
+Shared notes folder for this group of sessions (outside the repo; read siblings' notes there, leave hand-over notes or large findings there instead of pasting them into messages): /Users/akima/Library/Application Support/Claude/side-session-notes/local_a14f3497-5f91-4f16-aa39-ed64303c4522
+
+---
+
+C
+
+---
+
+N1, D1
+
+---
+
+P1, F1, I1
+現時点では F1 のみをサポートしますが、将来的に F2 もサポートしたいので Issue を作ってください
+
+---
+
+A1 についてですが「カラムの下に、当たる属性の完全な ID を attribute に書ける (省ける)」とありますが、省略したものと対応するものがないもはどのように区別するのでしょうか？
+
+---
+
+A1, B3
+属性とカラムの柔軟なマッピング( 例えば 2つのカラムで１つの属性を表す場合) も将来的にサポートしたいので Issue を作ってください
+
+---
+
+C2, T1
+
+---
+
+1〜3 は案のとおり、G1
+
+---
+
+1〜7 は案のとおり
+
+---
+
+S2 で、表の列と書き方は案のとおり
+
+---
+
+1〜3 は案のとおり
+
+---
+
+R1 の例を見せてください
+
+---
+
+R1
+
+---
+
+2 については、状態や重要なカラムも含めたいですが、良い案はありませんか？
+
+---
+
+X2、1・3・4 は案のとおり
+(X3 は attribute に対応するカラムが多い場合の検討が必要だと思うので、困ったら Issue を作って対応します )
+
+---
+
+OKです
+
+---
+
+M2の方が良さそうです。「当たる」「結ぶ」は使いたくない比喩的な表現ですね。使わずに技術的に正確な表現にして再度確認してもらえますか？
+
+---
+
+OKです
+
+---
+
+1〜4 は案のとおり
+
+---
+
+「会話で尋ねていない部分 (確認をお願いしたい箇所) 」があるなら先に確認した方が良いのでは？
+
+---
+
+はい
+
+---
+
+/mermaid-preview:mermaid-preview 初見の技術者にわかりやすく確認の内容を前提から説明してください
+
+---
+
+表のとおり
+
+---
+
+案のとおり
+
+---
+
+表のとおり
+
+---
+
+このままコミット
+
+---
+
+push して PR を作る
