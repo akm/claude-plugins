@@ -207,6 +207,19 @@ class ConfigSetArrayTest(ConfigCase):
         self.assert_rejected(self.valid_input(scan_dirs=["~", "~/Library/Caches"]), "下にある")
         self.assert_rejected(self.valid_input(scan_dirs=["~/Library/Caches", "~/Library"]), "下にある")
 
+    def test_nested_through_symlink(self):
+        """シンボリックリンクを経由して一方が他方の下にある調べるディレクトリも誤りにする。"""
+        os.symlink(os.path.join(self.user_home, "Library"), os.path.join(self.user_home, "lib-link"))
+        self.assert_rejected(self.valid_input(scan_dirs=["~/lib-link", "~/Library/Caches"]), "下にある")
+
+    def test_case_only_difference_on_case_insensitive_fs(self):
+        """大文字小文字を区別しないファイルシステム (macOS の標準) では、大文字小文字だけが違う書き方も同じディレクトリとする。"""
+        if not os.path.isdir(os.path.join(self.user_home, "library", "caches")):
+            self.skipTest("一時ディレクトリが大文字小文字を区別するファイルシステムにある")
+        self.assert_rejected(self.valid_input(scan_dirs=["~/Library/Caches", "~/library/caches"]), "同じディレクトリ")
+        self.assert_rejected(self.valid_input(scan_dirs=["~/library", "~/Library/Caches"]), "下にある")
+        self.assert_rejected(self.valid_input(scan_dirs=["~/Library/Caches", "~/library"]), "下にある")
+
     def test_sibling_with_common_prefix_is_not_nested(self):
         self.make_dir("user-home", "Library", "CachesOld")
         code, _, stderr = self.config_set(self.valid_input(scan_dirs=["~/Library/Caches", "~/Library/CachesOld"]))

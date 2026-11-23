@@ -108,19 +108,43 @@ def _directory_error(value):
     return None
 
 
+def _identity(path):
+    """ディレクトリの識別子 (デバイス番号と inode 番号の組)。"""
+    st = os.stat(path)
+    return st.st_dev, st.st_ino
+
+
+def _ancestor_identities(real):
+    """実パス real の親のディレクトリを、ルートまでたどった識別子の集合。"""
+    result = set()
+    current = real
+    while True:
+        parent = os.path.dirname(current)
+        if parent == current:
+            return result
+        result.add(_identity(parent))
+        current = parent
+
+
 def _overlap_errors(values):
-    """調べるディレクトリの重複と入れ子の誤りの配列。シンボリックリンクを解決した実パスで比べる。"""
+    """調べるディレクトリの重複と入れ子の誤りの配列。
+
+    同じディレクトリかは、パスの文字列ではなくディレクトリの識別子 (デバイス番号と inode 番号) で比べる。シンボリックリンクと、
+    大文字小文字を区別しないファイルシステム (macOS の標準の APFS) で大文字小文字だけが違う書き方も、同じディレクトリになる。
+    入れ子は、一方の実パスの親をルートまでたどり、もう一方と同じ識別子のディレクトリがあるかで決める。
+    """
     reals = [os.path.realpath(os.path.expanduser(value)) for value in values]
+    identities = [_identity(real) for real in reals]
+    ancestors = [_ancestor_identities(real) for real in reals]
     errors = []
     for i in range(len(values)):
         for j in range(i + 1, len(values)):
-            a, b = reals[i], reals[j]
             left, right = f"scan_dirs[{i}] ({_dump(values[i])})", f"scan_dirs[{j}] ({_dump(values[j])})"
-            if a == b:
-                errors.append(f"{left} と {right} が同じディレクトリ ({a}) を指す")
-            elif os.path.commonpath([a, b]) == a:
+            if identities[i] == identities[j]:
+                errors.append(f"{left} と {right} が同じディレクトリ ({reals[i]}) を指す")
+            elif identities[i] in ancestors[j]:
                 errors.append(f"{right} が {left} の下にある (調べるディレクトリは、一方を他方の下にしない)")
-            elif os.path.commonpath([a, b]) == b:
+            elif identities[j] in ancestors[i]:
                 errors.append(f"{left} が {right} の下にある (調べるディレクトリは、一方を他方の下にしない)")
     return errors
 
