@@ -3,7 +3,7 @@
   "checkpoint_id": "01M84DMX4MMVZ1M7FW2ZARQ610",
   "strategy": "manual-commit",
   "branch": "feat/disk-usage-triage-config-310",
-  "checkpoints_count": 21,
+  "checkpoints_count": 25,
   "files_touched": [
     "disk-usage-triage/references/files.md"
   ],
@@ -14,25 +14,32 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 120,
-    "cache_creation_tokens": 52765,
-    "cache_read_tokens": 20054420,
-    "output_tokens": 21821,
-    "api_call_count": 42
+    "input_tokens": 126,
+    "cache_creation_tokens": 57459,
+    "cache_read_tokens": 22221940,
+    "output_tokens": 25067,
+    "api_call_count": 45
   },
   "redaction": {
-    "replacements": 104,
+    "replacements": 197,
     "layers": {
       "betterleaks": 0,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 0,
       "credentialed_uri": 0,
-      "entropy": 67,
-      "key_context": 37,
+      "entropy": 149,
+      "key_context": 48,
       "provider_token": 0,
       "shell_stdin": 0
     }
