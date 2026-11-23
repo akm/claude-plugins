@@ -200,6 +200,21 @@
         "ref": "main"
       },
       "tags": ["github", "notifications", "pull-request", "sessions", "skills"]
+    },
+    {
+      "name": "disk-usage-triage",
+      "description": "ディスクの空きが足りないときに、設定したディレクトリの容量の大きい項目を、消してよいかの判定と一緒に一覧で示し、選んだ項目から削除のシェルスクリプトを作るスキルと、調査と判定のスクリプト (作成中)",
+      "author": {
+        "name": "akm"
+      },
+      "category": "development",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/akm/claude-plugins",
+        "path": "disk-usage-triage",
+        "ref": "main"
+      },
+      "tags": ["disk", "cleanup", "macos", "docker", "asdf", "skills"]
     }
   ]
 }
