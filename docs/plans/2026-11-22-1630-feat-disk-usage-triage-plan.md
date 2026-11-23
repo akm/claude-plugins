@@ -218,7 +218,7 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
 どれも、計画の承認の前に決める必要はない (deferred)。U1 の結果で決め、計画の R と KTD に反映する。
 
 - `ref:<git の参照>` の版が、`installs` の下でどの名前のディレクトリになるか (R24)。
-- `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。
+- `docker system df -v --format json` の出力の形と、ボリューム 1,143 個のときにかかる時間 (KTD11)。**U1 で決めた**: 出力の形と読み方は KTD11 に書いた。ボリューム 1,152 個で約 2 秒だった (最初に実行した `docker system df` だけが 9.5 秒) ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
 - `docker system df` の合計 (約 206 GB) が `Docker.raw` の `du` (116 GB 前後) より大きい理由 (KTD13)。
 - Docker の中でボリュームを消したときに、`Docker.raw` の `du` が何もしなくても減るか (R47)。**U1 で決めた**: 減る。R47 を、解放するコマンドを案内しないことに直した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 3)。
 - `mcp__ccd_host__get_storage_usage` の結果に、worktree のパスとセッションの ID が含まれるか (R34・R35)。
@@ -280,7 +280,12 @@ Claude Code で git worktree を使うようになり、worktree ごとに Docke
   - グローバルなパッケージの名前は、Node.js は `lib/node_modules` の下 (`npm` と `corepack` を除く)、Go は版のディレクトリの下の `bin` から読む (Go のプラグインのファイル `exec-env` が、環境変数 `GOBIN` が未設定のときに設定する場所)。Go のプラグインは、環境変数 `GOPATH` が未設定のとき、`GOPATH` を版のディレクトリの下の `packages` にする (ファイル `~/.asdf/plugins/golang/bin/exec-env`)。Go のプラグインの版を消す処理は、読み取り専用のキャッシュに書き込みの権限を付けてから消すので、`asdf uninstall` で消せる。
   - プラグインを実行している Python の版 (R14) は、`sys.executable` の実パスが `installs/python/<版>/` の下にあるときの、その版。
   - R43 の版の指定は、コマンドの実行ファイルが `<データの場所>/shims/` の下にあるとき、shim のファイルの `# asdf-plugin: <ツール> <版>` の行から行う。shim には、そのコマンドを提供するツールと版の組が 1 行ずつ書かれ、複数のツールが並ぶことがある (例: `pnpm` の shim に pnpm と nodejs)。行に現れるツールのうち、`~/.tool-versions` の版がそのツールの行に書かれていないもの (`~/.tool-versions` にツールが無いものを含む) ごとに、そのツールの行に書かれた版から残る版を選んで、環境変数で指定する。行に書かれた版はどれもそのコマンドを提供するので、asdf がどのツールの版を使っても、そのコマンドを実行できる。環境変数の名前は `ASDF_<TOOL>_VERSION` で、ツール名を大文字にし、`-` を `_` にする。残る版が複数あれば、最も新しい版にする。
-- KTD11. **Docker は、コマンド `docker` の JSON の出力を読む** (R28〜R32)。起動の確認は `docker version --format json` で行い、失敗したら R32 にする。使われているかどうかは、`docker system df -v --format json` の、使っているコンテナの数 (ボリュームは `Links`、image は `Containers`) で判定し、名前での突き合わせはしない。`docker ps` は、`--no-trunc` が無いとボリュームの名前を短くして出し、image はコンテナを作ったときのタグで示すので、タグを付け替えた後は突き合わせられないため。ボリュームの使用量・image だけが使っている量 (`UniqueSize`)・コンテナの使用量・ビルドキャッシュの量も、同じ出力から読む。ボリュームのラベルは `docker volume ls --format json` から、停止しているコンテナの ID と Compose のプロジェクト名は `docker ps -a --no-trunc --format json` から読む。出力の形とキーは U1 で確認する。Docker の一覧は 1 つの専用の一覧にする。`docker volume rm` は、1 行に 100 個までの名前を並べる。比較のために、`Docker.raw` の `du -k` を、削除のシェルスクリプトの作成の時と比較の時に測る。
+- KTD11. **Docker は、コマンド `docker` の JSON の出力を読む** (R28〜R32)。起動の確認は `docker version --format json` で行い、失敗したら R32 にする。出力の形とキーは、U1 で確認した ([Issue #310 の U1 の結果](https://github.com/akm/claude-plugins/issues/310#issuecomment-7095568105) の項目 2)。
+  - 使われているかどうかは、`docker system df -v --format json` の、使っているコンテナの数 (ボリュームは `Links`、image は `Containers`) で判定し、名前での突き合わせはしない。`docker ps` は、`--no-trunc` が無いとボリュームの名前を短くして出し、image はコンテナを作ったときのタグで示すので、タグを付け替えた後は突き合わせられないため。停止しているコンテナが使っているものも、使っているコンテナの数に入る (U1 で確認した)。
+  - ボリュームの使用量・image だけが使っている量 (`UniqueSize`)・コンテナの使用量・ビルドキャッシュの量も、同じ出力から読む。この出力は 1 つの JSON のオブジェクトで、値はすべて文字列。サイズは `"201MB"` のような、単位 (`B`・`kB`・`MB`・`GB` など。1,000 倍ごと) の付いた文字列なので、バイトに直して使う。`UniqueSize` は負の値 (`"-5.404e+06B"` のような形) になることがある。そのときは、その image の空く量の見込みを「不明」と示す (2026-11-23 に利用者が決めた。Docker が出した値が矛盾していて、正しい量が分からないため)。
+  - image のすべての `<リポジトリ>:<タグ>` (R29) は、`docker image ls --no-trunc --format json` (タグごとに 1 行) の行を ID でまとめて得る。`docker system df -v` は image ごとに 1 行で、タグを 1 つしか出さないため。
+  - ラベルは、ボリュームは `docker volume inspect` の `Labels` から、停止しているコンテナは `docker container inspect` の `Config.Labels` から、JSON のオブジェクトとして読む (2026-11-23 に利用者が決めた。`docker volume ls` と `docker ps -a` の `Labels` は、`key=value` をコンマでつないだ 1 つの文字列で、値にコンマがあると読み間違えるため)。停止しているコンテナの ID は `docker ps -a --no-trunc --format json` から読む。
+  - Docker の一覧は 1 つの専用の一覧にする。`docker volume rm` は、1 行に 100 個までの名前を並べる。比較のために、`Docker.raw` の `du -k` を、削除のシェルスクリプトの作成の時と比較の時に測る。
 - KTD12. **git の worktree は、ディレクトリのファイル `.git` で判別する** (R36)。項目のディレクトリにファイル `.git` があり、中身の `gitdir: <パス>` が指すディレクトリ (相対パスなら項目のディレクトリから解決する) にファイル `commondir` があれば git の worktree とする。共通のディレクトリ (worktree が共有するリポジトリのデータのディレクトリ。git の用語では common dir) は、`commondir` の中身 (相対パスなら `gitdir` が指すディレクトリから解決する) から求める。メインのリポジトリは、共通のディレクトリの名前が `.git` ならその親、そうでなければ (bare リポジトリ。作業ツリーを持たないリポジトリ) 共通のディレクトリとする。消すコマンドは `git -C <メインのリポジトリ> worktree remove <パス>`。パスに `/.claude/worktrees/` を含むものは、アプリの worktree として R34 の案内の対象にする。MCP ツールの呼び出し (R34・R35) はスキルが行い、Python のスクリプトは行わない。Claude Desktop のセッションかどうか (R33) は、スキルが MCP ツール `mcp__ccd_host__get_storage_usage` を使えるかで判断する。
 - KTD13. **比較は、作成の時の値と比較の時の値で行う** (R46・R47)。削除のシェルスクリプトを作るときに、ファイル `before.json` に、選んだ項目の一覧の使用量・一覧を作った時刻・`Docker.raw` の `du` を書く。比較では、選んだ項目を測り直し、`results.tsv` を読む。消した量は、成功した項目のうち Docker の項目を除いたものの、一覧の使用量の合計とする。Docker の項目は、`Docker.raw` の `du` の前後の差で示す。Docker の使用量は Docker Desktop の仮想マシンの中の量で、macOS のディスクの空きは `Docker.raw` の `du` が減ったときにだけ増えるため。ディスクの空きの前と後は、削除のシェルスクリプトが `results.tsv` に書いた値を使う。同じ削除のシェルスクリプトを 2 回以上実行したとき (R41) は、項目の結果は、どれかの実行で `ok` なら `ok`、そうでなければ最後の実行の結果とする。2 回目の実行では、1 回目に消した項目が再確認 (R39) に合わず `skipped` になるため。ディスクの空きは、最初の実行の開始の行の値と、最後の実行の終了の行か中断の行の値を使う。「かなり少ない」は、空きが増えた量が消した量の 80% 未満とする。削除のシェルスクリプトを実行している間も、ほかのプロセス (Docker・ブラウザ・ビルド) がディスクに書き込むので、少しの差では理由の候補を示さないため。
 - KTD14. **Python のスクリプトは、標準出力に JSON を 1 つ出し、必ずキー `errors` を持たせる。** 終了コードは gh-notification-dispatch と同じく、0 は続ける、3 は `errors` を利用者に示して判断を求める、4 は外部のコマンドが失敗した、1・2 はスクリプトの不具合と引数の誤り。サブコマンドの引数・出力のキー・終了コードの SSOT は、各サブコマンドの `--help` にする。
@@ -796,7 +801,9 @@ disk-usage-triage/
 - 停止しているコンテナが使っているボリュームと image は「残す」。使っているかは使っているコンテナの数で判定し、タグを別の image に付け替えた後の古い image も、コンテナが使っていれば「残す」になる。
 - 使われていない image のうち、タグが 2 つあるものは 2 つの `<リポジトリ>:<タグ>` を並べた `docker image rm` になり、タグの無いものは `docker image rm <ID>` になる。
 - 記録で「残す」としたリポジトリの image・ボリューム・Compose のプロジェクトのボリュームは「残す」になる。
-- image の空く量の見込みは、その image だけが使っている量になる。
+- image の空く量の見込みは、その image だけが使っている量になる。`UniqueSize` が負の image は、空く量の見込みが「不明」になる。
+- サイズの文字列 (`"0B"`・`"8.29kB"`・`"200.7MB"`・`"2.147GB"`) が、バイトに直される。
+- ラベルのほかの値にコンマがあっても、匿名ボリュームのラベルと Compose のプロジェクト名を正しく読む。
 - ビルドキャッシュは、`docker buildx prune -f` の 1 つの項目になり、`--all` を含まない。
 - 停止しているコンテナは「確認が要る」で、`docker container rm <ID>` になる。
 - 削除のシェルスクリプトで、Docker の項目はコンテナ → ボリューム → image → ビルドキャッシュの順に並び、`docker container rm`・`docker volume rm`・`docker image rm` に `-f`・`--force` が付かない。
