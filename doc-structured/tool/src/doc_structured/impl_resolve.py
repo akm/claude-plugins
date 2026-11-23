@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import names
-from .domains import Project
+from .domains import Project, load_project
 from .impl_diff import (
     MISMATCH,
     MISSING_DESIGN,
@@ -26,6 +26,7 @@ from .impl_diff import (
 )
 from .schema_actual import ActualSchema
 from .schema_diff import LABELS, SchemaTarget, compare
+from .yaml_edit import Document, YamlEditError
 
 PLANNED = "--planned"
 UNPLANNED = "--unplanned"
@@ -162,9 +163,132 @@ class Result:
         )
 
 
+# YAML に足すキーの順序 (規則の文書の例にならう。Issue #208 のコメントの 3)
+TABLE_KEY_ORDER = ("planned", "definition", "model", "attribute", "primary_key", "columns", "indexes")
+COLUMN_KEY_ORDER = ("type", "nullable", "default", "references", "attribute", "planned", "in_overview", "definition")
+INDEX_KEY_ORDER = ("columns", "unique", "planned")
+
+
+class _Files:
+    """書き換える YAML のファイル。書き換えた後の検査 h が失敗したら、元に戻す。"""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.documents: dict[str, Document] = {}
+        self.originals: dict[str, str | None] = {}  # 書き換える前の中身。作ったファイルは None
+
+    def document(self, relative: str) -> Document:
+        if relative not in self.documents:
+            text = (self.root / relative).read_text(encoding="utf-8")
+            self.originals[relative] = text
+            self.documents[relative] = Document(text)
+        return self.documents[relative]
+
+    def create(self, relative: str, document: Document) -> None:
+        self.originals[relative] = None
+        self.documents[relative] = document
+
+    def write(self) -> tuple[list[str], list[str]]:
+        written, created = [], []
+        for relative, document in self.documents.items():
+            original = self.originals[relative]
+            if original == document.text:
+                continue
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(document.text, encoding="utf-8")
+            (created if original is None else written).append(relative)
+        return sorted(written), sorted(created)
+
+    def restore(self) -> None:
+        for relative, original in self.originals.items():
+            path = self.root / relative
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_text(original, encoding="utf-8")
+
+
+def _table_path(target: SchemaTarget) -> tuple:
+    return ("tables", target.table)
+
+
+def _column_path(target: SchemaTarget) -> tuple:
+    return ("tables", target.table, "columns", target.column_entry.name)
+
+
+def _index_path(document: Document, target: SchemaTarget) -> tuple:
+    """YAML のインデックスの、配列の中の位置までの道筋。カラムの組と一意かどうかで探す (検査 h が、同じものを 2 つ書かないことを確認する)。"""
+    indexes = document.node(("tables", target.table, "indexes"))
+    spec = target.design_index
+    for i, item in enumerate(indexes):
+        if list(item.get("columns") or []) == list(spec.columns) and bool(item.get("unique")) == spec.unique:
+            return ("tables", target.table, "indexes", i)
+    raise ResolveError(f"{target.table} のインデックス ({', '.join(spec.columns)}) が YAML に見つからない (ツールの誤り)")
+
+
+def _entry_path(document: Document, target: SchemaTarget) -> tuple:
+    if target.kind == "table":
+        return _table_path(target)
+    if target.kind == "column":
+        return _column_path(target)
+    return _index_path(document, target)
+
+
+def _key_order(target: SchemaTarget) -> tuple[str, ...]:
+    return {"table": TABLE_KEY_ORDER, "column": COLUMN_KEY_ORDER, "index": INDEX_KEY_ORDER}[target.kind]
+
+
+def _yaml_file(target: SchemaTarget) -> str:
+    entry = target.column_entry if target.kind == "column" else target.table_entry
+    return entry.path
+
+
+def _set_planned(files: _Files, case: Case) -> None:
+    """planned: true を付ける。テーブルに付けるときは、その下のカラムとインデックスの planned を外す
+    (planned のテーブルの下に planned を重ねて書けないため。規則の文書の節「テーブルとカラム」)。"""
+    target = case.target
+    document = files.document(_yaml_file(target))
+    path = _entry_path(document, target)
+    document.set_key(path, "planned", True, _key_order(target))
+    if target.kind != "table":
+        return
+    for name, column in list(document.node(("tables", target.table, "columns")).items()):
+        if isinstance(column, dict) and "planned" in column:
+            document.delete_key(("tables", target.table, "columns", name), "planned")
+    indexes = document.node(path).get("indexes")
+    for i, item in enumerate(indexes or []):
+        if isinstance(item, dict) and "planned" in item:
+            document.delete_key(("tables", target.table, "indexes", i), "planned")
+
+
+def _unset_planned(files: _Files, case: Case) -> None:
+    target = case.target
+    document = files.document(_yaml_file(target))
+    document.delete_key(_entry_path(document, target), "planned")
+
+
 def resolve(root: Path, project: Project, actual: ActualSchema, request: Request) -> Result:
     """件を 1 つ解消する。解消できなければ、何も書き換えずに ResolveError を投げる。"""
     cases = list_cases(project, actual)
     case, domain = find_case(project, cases, request.id)
     check_flag(case, request.flag)
-    raise NotImplementedError(case.case)
+    files = _Files(root)
+    try:
+        if request.flag == PLANNED:
+            _set_planned(files, case)
+        elif request.flag == UNPLANNED:
+            _unset_planned(files, case)
+        else:
+            raise NotImplementedError(case.case)
+    except YamlEditError as e:
+        raise ResolveError(f"{_yaml_file(case.target)}: {e}") from e
+    written, created = files.write()
+    _, problems = load_project(root)
+    if problems:
+        files.restore()
+        raise ResolveError(
+            *[problem.format() for problem in problems],
+            f"書き換えた後の YAML に {len(problems)} 件の誤り (検査 h) があるので、元に戻した",
+        )
+    return Result(written, created)
