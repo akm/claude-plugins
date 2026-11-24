@@ -70,10 +70,14 @@ class TriageCase(unittest.TestCase):
     def write_home(self, name, data):
         self.write_home_text(name, json.dumps(data, ensure_ascii=False))
 
-    def cli(self, *args, env=None):
-        """CLI の入口をサブプロセスで実行する。返り値は (終了コード, 標準出力を JSON として読んだ値か None, 標準エラー出力)。"""
+    def cli(self, *args, env=None, stdin=None):
+        """CLI の入口をサブプロセスで実行する。返り値は (終了コード, 標準出力を JSON として読んだ値か None, 標準エラー出力)。
+
+        stdin は標準入力に渡す文字列。None なら標準入力を空にする。
+        """
         completed = subprocess.run([sys.executable, ENTRY, *args], capture_output=True, text=True,
-                                   stdin=subprocess.DEVNULL, env=dict(os.environ) if env is None else env)
+                                   input=stdin, stdin=subprocess.DEVNULL if stdin is None else None,
+                                   env=dict(os.environ) if env is None else env)
         try:
             payload = json.loads(completed.stdout) if completed.stdout.strip() else None
         except ValueError:

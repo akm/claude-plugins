@@ -1,0 +1,13 @@
+{
+  "session_id": "00000000-0000-4000-8000-000000000000",
+  "transcript_path": "/Users/user/.claude/projects/-Users-user-workspace-project/00000000-0000-4000-8000-000000000000.jsonl",
+  "cwd": "/Users/user/workspace/project",
+  "permission_mode": "auto",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "mcp__terminal__run_in_terminal",
+  "tool_input": {
+    "command": "3",
+    "tab_id": "c1"
+  },
+  "tool_use_id": "toolu_00000000000000000000000000"
+}
