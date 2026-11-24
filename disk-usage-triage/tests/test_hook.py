@@ -2,8 +2,9 @@
 """hook PreToolUse (サブコマンド `hook pre-tool-use`。ファイル `disk-usage-triage/scripts/disk_usage_triage/hook.py`) のテスト。
 
 計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の U8 のテストシナリオと、KTD8・KTD9。CLI の入口をサブプロセスで
-実行し、標準入力に hook の入力の JSON を渡す。MCP ツール `mcp__terminal__run_in_terminal` の入力は、計画の U1 で確認した形を
-固定データ (ディレクトリ `disk-usage-triage/tests/fixtures/hook-input/`) にしたもの。
+実行し、標準入力に hook の入力の JSON を渡す。MCP ツール `mcp__terminal__run_in_terminal` の入力は、U8 の確認で、Claude Desktop
+のセッションの hook が受け取った JSON (2026-11-25) の形を、値を置き換えて固定データ (ディレクトリ
+`disk-usage-triage/tests/fixtures/hook-input/`) にしたもの。`tool_input` の形は、計画の U1 でセッションの記録から読んだ形と同じ。
 
   python3 -m unittest discover -s disk-usage-triage/tests
 """
@@ -50,10 +51,12 @@ def load_fixture(name):
 
 
 def event(tool_name, tool_input):
-    """Bash・Write などの hook の入力。共通のキーは固定データと同じにする。"""
+    """Bash・Write などの hook の入力。共通のキーは固定データと同じにする。キー mcp_server は MCP ツールの入力にだけある。"""
     data = load_fixture("run-in-terminal-new-tab.json")
     data["tool_name"] = tool_name
     data["tool_input"] = tool_input
+    if not tool_name.startswith("mcp__"):
+        del data["mcp_server"]
     return data
 
 
