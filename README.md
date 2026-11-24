@@ -258,9 +258,10 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── scripts/                  # スクリプト (gh_notification_dispatch.py とパッケージ gh_notification_dispatch/)
 │   ├── tests/                    # python3 -m unittest discover -s gh-notification-dispatch/tests
 │   └── README.md
-├── disk-usage-triage/            # skill 型 + 同梱スクリプト (作成中)
+├── disk-usage-triage/            # skill 型 + hooks 型 + 同梱スクリプト (作成中)
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/triage/            # 容量の大きい項目を調べて消す (今の版は設定を作る・変えるところまで)
+│   ├── hooks/hooks.json          # hook PreToolUse (Claude が削除のシェルスクリプトを実行すること・書き換えることを拒否する)
 │   ├── references/               # 保存先のディレクトリのファイルの様式
 │   ├── scripts/                  # スクリプト (disk_usage_triage.py とパッケージ disk_usage_triage/)
 │   ├── tests/                    # python3 -m unittest discover -s disk-usage-triage/tests

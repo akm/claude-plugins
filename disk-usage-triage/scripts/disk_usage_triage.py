@@ -9,6 +9,7 @@ references/files.md にある。
 サブコマンドの一覧:
   config show                       設定を表示する。設定が無いときも、無いことを出力する
   config set --input-file <ファイル>  入力のファイルの内容で、設定の全体を置き換える
+  hook pre-tool-use                 hook PreToolUse が実行する。削除のシェルスクリプトの実行と書き換えを拒否する
 
 終了コード (計画の KTD14):
   0  続ける
@@ -20,6 +21,10 @@ references/files.md にある。
 Python の版が 3.11 より古いときは、引数を解析する前に、版を `errors` に書いて終了コード 3 で終了する (計画の節「Assumptions」)。
 macOS の /usr/bin/python3 は 3.9 のことがあるので、版を確認するまでの部分 (このファイル) は、古い版でも読める書き方にし、
 パッケージは版を確認してから読み込む。
+
+サブコマンド hook は、Claude Code の hook が実行するので、出力は Claude Code の hook の出力の様式にし、キー `errors` を持たない。
+Python の版が古いときも、版を標準出力ではなく標準エラー出力に書く。標準出力の JSON は Claude Code に hook の出力として読まれ、
+hook の誤りとして示されないことがあるため (計画の U8 を実装するときに利用者が決めた。2026-11-24)。
 """
 
 import argparse
@@ -78,6 +83,19 @@ def cmd_config_set(args):
     return _emit_status(config.set_from_file(args.input_file))
 
 
+def cmd_hook_pre_tool_use(args):
+    from disk_usage_triage import hook
+    try:
+        output = hook.pre_tool_use(sys.stdin.read())
+    except hook.InvalidInput as e:
+        # 標準出力には何も書かない。Claude Code は、終了コードが 0 と 2 以外の hook を誤りとして示し、ツールを実行する
+        sys.stderr.write(f"disk-usage-triage: {e}。拒否も許可もしない\n")
+        return EXIT_UNSATISFIED
+    if output is not None:
+        _emit(output)
+    return EXIT_OK
+
+
 # --- 引数 ---------------------------------------------------------------------------------------------------------
 
 def _add(sub, name, func, description, output, exit_help):
@@ -124,13 +142,30 @@ def build_parser():
                         "     調べるディレクトリの重複と入れ子など)・config.json が壊れている"))
     p.add_argument("--input-file", required=True,
                    help="Claude が Write ツールで書いた入力の JSON のファイル (config show の inputs_dir の下に置く)")
+
+    g = groups.add_parser("hook", help="hook が実行する").add_subparsers(dest="command", required=True)
+    _add(g, "pre-tool-use", cmd_hook_pre_tool_use,
+         "hook PreToolUse (ファイル hooks/hooks.json) が実行する。標準入力の hook の入力のツールが、Bash ツールか\n"
+         "mcp__terminal__run_in_terminal なら入力 tool_input のすべての文字列 (コマンドのキー command・タブを開くディレクトリの\n"
+         "キー cwd など) を、Write・Edit・MultiEdit・NotebookEdit なら書き込むファイルのパス (キー file_path・notebook_path) を\n"
+         "検査し、文字列 disk-usage-triage/runs・保存先のディレクトリの下の runs の絶対パス・削除のシェルスクリプトのファイル名\n"
+         "disk-usage-triage-delete.sh のどれかを含めば拒否する。ほかのツールは検査しない。保存先のディレクトリは読みも書きもしない",
+         "  Claude Code の hook の出力の様式 {hookSpecificOutput: {hookEventName (PreToolUse), permissionDecision (deny),\n"
+         "  permissionDecisionReason}}。拒否しないときと、入力が読めないときは、何も出力しない (errors のキーは持たない)",
+         _exit_help("拒否した・拒否しなかった",
+                    "hook の入力が読めない (JSON として読めない・キーの値の型が違う)・Python の版が古い。理由を標準エラー出力\n"
+                    "     に書き、拒否も許可もしない (Claude Code は hook の誤りとして示し、ツールを実行する)"))
     return parser
 
 
 def main(argv=None):
     errors = python_version_errors(sys.version_info)
     if errors:
-        _emit({"errors": errors})
+        if (sys.argv[1:] if argv is None else argv)[:1] == ["hook"]:
+            for error in errors:
+                sys.stderr.write(f"disk-usage-triage: {error}\n")
+        else:
+            _emit({"errors": errors})
         return EXIT_UNSATISFIED
     args = build_parser().parse_args(argv)
     return args.func(args)

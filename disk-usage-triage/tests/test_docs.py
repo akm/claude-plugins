@@ -119,7 +119,7 @@ class SkillListingDocTest(unittest.TestCase):
                 self.assertRegex(front, r"\ndescription: .+\n")
 
 
-GROUPS = ("config",)  # 下にサブコマンドを持つグループ
+GROUPS = ("config", "hook")  # 下にサブコマンドを持つグループ
 
 
 def entry_subcommands():
@@ -187,12 +187,26 @@ def load_entry():
 class PythonVersionTest(unittest.TestCase):
     """Python の版が 3.11 より古ければ、版を示して終了コード 3 で終了する (計画の節「Assumptions」と KTD14)。"""
 
-    def run_main(self, version_info, argv):
+    def run_main(self, version_info, argv, with_stderr=False):
         entry = load_entry()
-        output = io.StringIO()
-        with mock.patch.object(entry.sys, "version_info", version_info), contextlib.redirect_stdout(output):
+        output, error = io.StringIO(), io.StringIO()
+        with mock.patch.object(entry.sys, "version_info", version_info), contextlib.redirect_stdout(output), \
+                contextlib.redirect_stderr(error):
             code = entry.main(argv)
+        if with_stderr:
+            return code, output.getvalue(), error.getvalue()
+        self.assertEqual(error.getvalue(), "")
         return code, output.getvalue()
+
+    def test_old_python_hook_writes_to_stderr(self):
+        """サブコマンド hook では、版の誤りを標準エラー出力に書き、標準出力には何も書かない。標準出力の JSON は Claude Code に
+        hook の出力として読まれ、hook の誤りとして示されないことがあるため (計画の U8 を実装するときに利用者が決めた。2026-11-24)。"""
+        code, output, error = self.run_main((3, 9, 6, "final", 0), ["hook", "pre-tool-use"], with_stderr=True)
+        self.assertEqual(code, 3)
+        self.assertEqual(output, "")
+        self.assertIn("disk-usage-triage", error)
+        self.assertIn("3.11", error)
+        self.assertIn("3.9.6", error, "実際の版を示すこと")
 
     def test_old_python_exits_with_3(self):
         code, output = self.run_main((3, 9, 6, "final", 0), ["config", "show"])
