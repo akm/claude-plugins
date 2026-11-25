@@ -3,6 +3,8 @@
 
 - 文書 `disk-usage-triage/references/files.md` の `config.json` のキーの表と例が、モジュール config の定数と検査に一致する
   (計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の U2)
+- 文書 `disk-usage-triage/references/judgment-table.md` の行のキーの表・例・判定の値・コマンドの種類・置き換える文字列が、
+  モジュール judge の定数と検査に一致する (計画の U3)
 - 入口 (ファイル `disk-usage-triage/scripts/disk_usage_triage.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの
   --help が、引数・出力・終了コードを示す (計画の KTD14)
 - 入口は、Python の版が 3.11 より古ければ、版を示して終了コード 3 で終了する (計画の節「Assumptions」)
@@ -25,7 +27,7 @@ from unittest import mock
 
 from triage_case import ENTRY, HERE
 
-from disk_usage_triage import config  # noqa: E402
+from disk_usage_triage import config, judge  # noqa: E402
 
 REFERENCES = os.path.join(HERE, "..", "references")
 
@@ -94,6 +96,41 @@ class FilesDocTest(unittest.TestCase):
     def test_default_timeout(self):
         text = section(self.doc, "### `config set` の入力")
         self.assertIn(f"省くと {config.DEFAULT_TIMEOUT_SECONDS}", text)
+
+
+class JudgmentTableDocTest(unittest.TestCase):
+    """文書 references/judgment-table.md (判定表の様式の SSOT) と、モジュール judge の定数と検査が一致する (計画の U3)。"""
+
+    def setUp(self):
+        self.doc = read_reference("judgment-table.md")
+
+    def test_row_keys_match_constants(self):
+        rows = table_rows(section(self.doc, "## 行"), "| キー | 値 |")
+        documented = [re.fullmatch(r"`([a-z_]+)`", cells[0]).group(1) for cells in rows]
+        self.assertEqual(documented, list(judge.ROW_KEYS), "文書のキーの表と judge.ROW_KEYS が一致すること (順序も)")
+        required = [cells[0].strip("`") for cells in rows if "必須" in cells[1]]
+        self.assertEqual(required, list(judge.REQUIRED_KEYS), "文書で必須と書いたキーと judge.REQUIRED_KEYS が一致すること")
+
+    def test_example_is_valid(self):
+        examples = json_blocks(section(self.doc, "## 行"))
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(judge.row_errors(examples[0]), [], "例が様式どおりであること")
+
+    def test_judgments_and_dedicated_lists(self):
+        terms = self.doc.split("\n## ", 1)[0]  # 最初の節の前 (この文書で使う語)
+        for value in judge.JUDGMENTS:
+            self.assertIn(f"`{value}`", terms, "語の説明に判定の値を書くこと")
+        keys = {cells[0]: cells[1] for cells in table_rows(section(self.doc, "## 行"), "| キー | 値 |")}
+        self.assertEqual(re.findall(r"`(deletable|review|keep)`", keys["`judgment`"]), list(judge.JUDGMENTS))
+        choices = re.search(r"((?:`[a-z]+`・?)+) のどれか", keys["`dedicated_list`"]).group(1)
+        self.assertEqual(re.findall(r"`([a-z]+)`", choices), list(judge.TABLE_DEDICATED_LISTS))
+
+    def test_command_types_and_placeholders(self):
+        text = section(self.doc, "## 消すコマンド")
+        types = [cells[0].strip("`") for cells in table_rows(text, "| `type` | ほかのキー | 消し方 |")]
+        self.assertEqual(types, list(judge.COMMAND_TYPES))
+        placeholders = [cells[0].strip("`") for cells in table_rows(text, "| 文字列 | 置き換える値 |")]
+        self.assertEqual(placeholders, list(judge.PLACEHOLDERS))
 
 
 SKILLS = os.path.join(HERE, "..", "skills")
