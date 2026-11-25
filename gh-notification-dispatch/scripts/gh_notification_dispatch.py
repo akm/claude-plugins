@@ -19,7 +19,7 @@
   ack <メッセージの ID>                          tick が出力したメッセージが届いたことを記録する
   fail <メッセージの ID> --reason <理由>         tick が出力したメッセージが届かなかったことを記録する
   settle                                         この回のメッセージの結果を集計し、続けて届かなかった回数を更新する
-  schedule record --job-id <ID> --cron <式>      配信のセッションが、作り直した定期の予定を記録する
+  schedule record --job-id <ID> --cron <式> --expires-after-days <日数>  配信のセッションが、作り直した定期の予定を記録する
   schedule clear                                 配信のセッションが、定期の予定を停止したことを記録する
   status                                         配信のセッション・定期の予定とその期限・届かない登録を表示する
   hook session-start                             hook SessionStart が実行する。配信のセッションを開いたときに、再開を促す
@@ -128,7 +128,7 @@ def cmd_settle(args):
 
 
 def cmd_schedule_record(args):
-    return _emit_status(schedule.record(args.job_id, args.cron))
+    return _emit_status(schedule.record(args.job_id, args.cron, args.expires_after_days))
 
 
 def cmd_schedule_clear(args):
@@ -357,7 +357,8 @@ def build_parser():
     g = groups.add_parser("schedule", help="定期の予定を記録する").add_subparsers(dest="command", required=True)
     p = _add(g, "record", cmd_schedule_record,
              "配信のセッションが、ツール CronCreate で作り直した定期の予定 (プロンプト " + schedule.TICK_PROMPT + ") を、\n"
-             "記録のディレクトリの state.json に記録する。期限を今の時刻の 7 日後にし、出した確認の記録を消す。\n"
+             "記録のディレクトリの state.json に記録する。期限を今の時刻の --expires-after-days 日後にし、出した確認の\n"
+             "記録を消す。\n"
              "予定を作った Claude Code のプロセス ID (環境変数 CLAUDE_PID) も記録する。gh は実行しない",
              "  schedule        記録した定期の予定 {state (running), job_id, cron, pid, created_at, expires_at, reminders,\n"
              "                  stopped_at}。記録しなかったときは null\n"
@@ -365,9 +366,12 @@ def build_parser():
              "  not_dispatcher  このセッションが記録と違うセッションだと分かったか (形の誤り・環境変数が無い・\n"
              "                  配信のセッションが記録されていないときは false)\n"
              "  errors          記録しなかった理由の配列",
-             _exit_help("記録した", "ジョブの ID か cron の式の形が違う・環境変数 CLAUDE_PID が無い・" + _NOT_DISPATCHER))
+             _exit_help("記録した", "ジョブの ID か cron の式か日数の形が違う・環境変数 CLAUDE_PID が無い・" + _NOT_DISPATCHER))
     p.add_argument("--job-id", required=True, help="ツール CronCreate が返したジョブの ID")
     p.add_argument("--cron", required=True, help="ツール CronCreate に渡した cron の式 (5 つの欄)")
+    p.add_argument("--expires-after-days", required=True,
+                   help=f"定期の予定が消えるまでの日数 (1 から {schedule.MAX_EXPIRY_DAYS})。ツール CronCreate の結果の文 "
+                        "Auto-expires after <日数> days の日数")
 
     p = _add(g, "clear", cmd_schedule_clear,
              "配信のセッションが、定期の予定を停止したこと (ツール CronDelete で消したこと) を、state.json に記録する。gh は実行しない",
