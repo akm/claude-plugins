@@ -1,7 +1,7 @@
 {
   "name": "gh-notification-dispatch",
   "description": "GitHub の通知から PR のレビューの依頼とマージを 10 分ごとに判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへメッセージで届けるスキルと、再起動の後に再開を伝える hook と、通知の取得と判定のスクリプト",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "akm"
   },

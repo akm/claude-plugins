@@ -7,7 +7,7 @@ description: 配信のセッションとして、GitHub の PR のレビュー�
 
 このスキルを実行するセッションを、配信のセッションと呼ぶ。配信のセッションは、GitHub の通知を定期的に取得し、登録に従ってほかのセッション (受信のセッション) へ届ける。1 台のマシンに 1 つにする。登録は (リポジトリ, 種類, 受信のセッション) の組み合わせで、種類は `review_requested` (PR のレビューの依頼) と `merged` (PR のマージ) の 2 つ。
 
-配信のセッションは、ツール `CronCreate` の定期の予定で、10 分ごとにスキル `tick` を実行する (プロンプト `/gh-notification-dispatch:tick`)。定期の予定は、作ってから 7 日で消える。期限までの残りが 24・6・1 時間を切った回に、`tick` が続けるかを確認する文を出すので、続けるなら `renew` で期限を 7 日後にする。Claude Desktop を再起動した後は、定期の予定が実行されないか、再起動の前の予定が残っていることがある (計画の U1) ので、`resume` で作り直す。配信のセッションを開くと、hook がそのことを伝える。
+配信のセッションは、ツール `CronCreate` の定期の予定で、10 分ごとにスキル `tick` を実行する (プロンプト `/gh-notification-dispatch:tick`)。定期の予定は、作ってから決まった日数で消える。日数は Claude Code の版で違い (v2.1.330 より前は 7 日、v2.1.330 以降は 30 日)、予定を作るときにツール `CronCreate` の結果の文が示す。期限までの残りが 24・6・1 時間を切った回に、`tick` が続けるかを確認する文を出すので、続けるなら `renew` で定期の予定を作り直して期限を延ばす。Claude Desktop を再起動した後は、定期の予定が実行されないか、再起動の前の予定が残っていることがある (計画の U1) ので、`resume` で作り直す。配信のセッションを開くと、hook がそのことを伝える。
 
 スクリプトは `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gh_notification_dispatch.py" <サブコマンド>` で実行する (以下では `gh_notification_dispatch.py <サブコマンド>` と略す)。引数・出力の JSON・終了コードは、サブコマンドの `--help` で確認する。終了コードは、どのサブコマンドも次のとおりに扱う。
 
@@ -36,8 +36,9 @@ description: 配信のセッションとして、GitHub の PR のレビュー�
 
 1. ツール `CronList` で、プロンプトが `/gh-notification-dispatch:tick` の予定を探し、ツール `CronDelete` ですべて消す。Claude Desktop を再起動した後も、再起動の前の予定が残っていることがあるので、消してから作り、定期の予定を 1 つにする (計画の R18)。
 2. ツール `CronCreate` で、`cron` を `7-59/10 * * * *` (毎時 7 分から 10 分ごと)、`prompt` を `/gh-notification-dispatch:tick`、`recurring` を true にして予定を作る。
-3. `gh_notification_dispatch.py schedule record --job-id <ツール CronCreate が返したジョブの ID> --cron "7-59/10 * * * *"` を実行する。終了コード 3 なら、手順 2 で作った予定をツール `CronDelete` で消し、出力の `errors` を利用者に示して中断する。出力の `not_dispatcher` が true なら、このセッションは記録と違うセッションであると伝える。false (配信のセッションが記録されていない・環境変数が無い・ジョブの ID か cron の式の形が違う。環境変数 `CLAUDE_PID` が無いときは、Claude Desktop の更新が要る) なら、手順 1 で前の予定も消したので、原因を直してからこの節をやり直すことを伝え、どうするかを質問する。
-4. `gh_notification_dispatch.py status` を実行し、出力の `notice` (期限と延長の手順) と、ツール `CronCreate` の結果が示す次に実行される時刻を利用者に示す。定期の予定は 7 日で消えること、期限の 24・6・1 時間前に確認を出すことを伝える。
+3. 手順 2 のツール `CronCreate` の結果の文にある `Auto-expires after <日数> days` から、期限の日数を読む。日数は Claude Code の版で違うので、手順 2 の結果の文だけから読み、ツールの説明・このスキルの文・前の予定の日数を使わない。結果の文にこの形の記述が無ければ、記録せずに、手順 2 で作った予定をツール `CronDelete` で消し、結果の文を利用者に示して中断する。手順 1 で前の予定も消したので、配信が停止していることを伝え、どうするかを質問する。
+4. `gh_notification_dispatch.py schedule record --job-id <ツール CronCreate が返したジョブの ID> --cron "7-59/10 * * * *" --expires-after-days <手順 3 の日数>` を実行する。終了コード 3 なら、手順 2 で作った予定をツール `CronDelete` で消し、出力の `errors` を利用者に示して中断する。出力の `not_dispatcher` が true なら、このセッションは記録と違うセッションであると伝える。false (配信のセッションが記録されていない・環境変数が無い・ジョブの ID か cron の式か日数の形が違う。環境変数 `CLAUDE_PID` が無いときは、Claude Desktop の更新が要る) なら、手順 1 で前の予定も消したので、原因を直してからこの節をやり直すことを伝え、どうするかを質問する。
+5. `gh_notification_dispatch.py status` を実行し、出力の `notice` (期限と延長の手順) と、ツール `CronCreate` の結果が示す次に実行される時刻を利用者に示す。定期の予定は手順 3 の日数で消えること、期限の 24・6・1 時間前に確認を出すことを伝える。
 
 ## `start`
 
@@ -55,7 +56,7 @@ Claude Desktop を再起動した後・定期の予定の期限を過ぎた後�
 
 ## `renew`
 
-定期の予定の期限の前に、期限を 7 日後にする。節「定期の予定を作り直す」を行う。
+定期の予定の期限の前に、定期の予定を作り直して期限を延ばす。節「定期の予定を作り直す」を行う。
 
 ## `stop`
 

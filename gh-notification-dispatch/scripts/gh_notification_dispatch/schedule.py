@@ -1,11 +1,13 @@
 """定期の予定の記録と、期限の確認 (計画 docs/plans/2026-11-14-1428-feat-gh-notification-dispatch-plan.md の R16〜R18・KTD9)。
 
 定期の予定そのもの (ツール CronCreate のジョブ) は Claude Code のセッションの中にあり、スクリプトからは作れず、読めない。
-スキル dispatch が作り直した予定のジョブの ID と cron の式を、サブコマンド `schedule record` で記録のディレクトリの
-state.json のキー `schedule` に書き、`schedule clear` で停止したことを書く。様式の SSOT は文書
+スキル dispatch が作り直した予定のジョブの ID と cron の式と期限の日数を、サブコマンド `schedule record` で記録の
+ディレクトリの state.json に渡す。記録はキー `schedule` に書き、`schedule clear` で停止したことを書く。様式の SSOT は文書
 `gh-notification-dispatch/references/records.md`。
 
-期限は、記録した時刻の 7 日後にする (ツール CronCreate の定期の予定が、作ってから 7 日で消えるため)。期限切れは state.json に
+期限は、記録した時刻に、引数で受けた日数を足した時刻にする。日数は、スキル dispatch がツール CronCreate の結果の文
+(`Auto-expires after <日数> days`) から読む。定期の予定が消えるまでの日数は Claude Code の版で違い (v2.1.330 より前は
+7 日、v2.1.330 以降は 30 日)、スクリプトからは分からないため。日数のデフォルト値は持たない。期限切れは state.json に
 書かず、tick・status・hook が、記録の期限と今の時刻を比べて判定する (KTD9)。期限を過ぎた後の tick が来ることに頼れないため。
 """
 
@@ -17,7 +19,7 @@ from . import outbox, store
 
 RUNNING = "running"
 STOPPED = "stopped"
-LIFETIME = datetime.timedelta(days=7)  # ツール CronCreate の定期の予定が消えるまでの期間
+MAX_EXPIRY_DAYS = 365  # 受け付ける日数の上限。読み違えた大きな値を記録して、期限の確認が出なくならないようにする
 REMINDER_HOURS = (24, 6, 1)  # 期限までの残りがこれを切った回に、続けるかを確認する (R17)
 TICK_PROMPT = "/gh-notification-dispatch:tick"
 RENEW_COMMAND = "/gh-notification-dispatch:dispatch renew"
@@ -27,6 +29,7 @@ START_COMMAND = "/gh-notification-dispatch:dispatch start"
 
 _JOB_ID = re.compile(r"[^\s\x00-\x1f\x7f]+")  # 空白と制御文字を含まない 1 文字以上 (CronCreate の ID の形は決めつけない)
 _CRON_FIELD = re.compile(r"[0-9A-Za-z*/,-]+")
+_DAYS = re.compile(r"[0-9]{1,3}")
 
 
 def check_job_id(value):
@@ -42,28 +45,36 @@ def check_cron(value):
     return None
 
 
+def check_expires_after_days(value):
+    if not _DAYS.fullmatch(value or "") or not 1 <= int(value) <= MAX_EXPIRY_DAYS:
+        return f"引数 --expires-after-days の値 {value!r} が、1 から {MAX_EXPIRY_DAYS} までの整数でない"
+    return None
+
+
 def current_pid():
     """スクリプトを実行している Claude Code のプロセス ID (環境変数 CLAUDE_PID)。無いか整数でなければ None。"""
     value = os.environ.get(PID_ENV, "").strip()
     return int(value) if value.isdigit() else None
 
 
-def record(job_id, cron):
-    """作り直した定期の予定を記録する。期限を 7 日後にし、出した確認の記録を消す (R17)。
+def record(job_id, cron, expires_after_days):
+    """作り直した定期の予定を記録する。期限を expires_after_days 日後にし、出した確認の記録を消す (R17)。
 
     予定を作った Claude Code のプロセス ID も記録する。定期の予定はそのプロセスの中だけにあるので、後でプロセス ID が
     違えば、予定を作ったプロセスはもう無い (Claude Desktop を再起動した後など) と判定できる (計画の KTD10)。
     """
     pid = current_pid()
-    errors = [e for e in (check_job_id(job_id), check_cron(cron)) if e]
+    checks = (check_job_id(job_id), check_cron(cron), check_expires_after_days(expires_after_days))
+    errors = [e for e in checks if e]
     if pid is None:
         errors.append(f"環境変数 {PID_ENV} が無いので、定期の予定を作ったプロセスを記録できない ({PID_ENV} は "
                       "Claude Code v2.1.214 以降が設定する。Claude Desktop を更新してから、やり直す)")
     if errors:
         return {"status": "unsatisfied", "schedule": None, "previous": None, "not_dispatcher": False, "errors": errors}
     now = store.now()
+    expires_at = now + datetime.timedelta(days=int(expires_after_days))
     schedule = {"state": RUNNING, "job_id": job_id, "cron": cron, "pid": pid, "created_at": store.format_time(now),
-                "expires_at": store.format_time(now + LIFETIME), "reminders": [], "stopped_at": None}
+                "expires_at": store.format_time(expires_at), "reminders": [], "stopped_at": None}
     return _write(schedule, "schedule record")
 
 
@@ -143,7 +154,7 @@ def reminder_notice(schedule, now, hours):
     remaining = store.parse_time(schedule["expires_at"]) - now
     return {"kind": "reminder", "hours": hours,
             "text": f"定期の予定の期限 ({local_text(schedule['expires_at'])}) まで残り {remaining_text(remaining)}。"
-                    f"配信を続けるなら、{RENEW_COMMAND} で期限を 7 日後にする (期限までは、このまま配信を続ける)。"}
+                    f"配信を続けるなら、{RENEW_COMMAND} で定期の予定を作り直して期限を延ばす (期限までは、このまま配信を続ける)。"}
 
 
 def expired_notice(schedule):

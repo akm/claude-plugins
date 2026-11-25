@@ -17,6 +17,7 @@ DISPATCHER = "local_00000000-0000-4000-8000-000000000000"
 OTHER = "local_00000000-0000-4000-8000-0000000000ff"
 T0 = "2026-11-16T06:00:00Z"
 CRON = "7-59/10 * * * *"
+DAYS = "7"  # 期限の日数。日数を指定しないテストの時刻は、7 日 (Claude Code の v2.1.330 より前の版) で書く
 RECEIVER = "local_00000000-0000-4000-8000-00000000000a"
 REPO = "akm/claude-plugins"
 TEAMS = [{"id": 101, "slug": "reviewers", "name": "reviewers", "organization": {"login": "akm-org", "id": 9}}]
@@ -32,10 +33,11 @@ class ScheduleCase(FakeGhCase):
         self.write_home("state.json", {"version": 1, "dispatcher": {"session_id": DISPATCHER, "name": "配信",
                                                                    "permission_mode": "auto", "recorded_at": T0}})
 
-    def record(self, job_id="a1b2c3d4", cron=CRON, at=None):
+    def record(self, job_id="a1b2c3d4", cron=CRON, at=None, days=DAYS):
         if at:
             self.at(at)
-        code, out, err = self.cli("schedule", "record", "--job-id", job_id, "--cron", cron)
+        code, out, err = self.cli("schedule", "record", "--job-id", job_id, "--cron", cron,
+                                  "--expires-after-days", days)
         self.assertIsNotNone(out, err)
         return code, out
 
@@ -62,6 +64,33 @@ class RecordTest(ScheduleCase):
         self.assertFalse(out["not_dispatcher"])
         self.assertEqual(self.schedule(), expected)
 
+    def test_record_sets_expiry_after_given_days(self):
+        """期限は、ツール CronCreate の結果の文が示す日数の後にする (日数は Claude Code の版で違う)。"""
+        for days, expires_at in (("1", "2026-11-17T06:00:00Z"), ("30", "2026-12-16T06:00:00Z"),
+                                 ("365", "2027-11-16T06:00:00Z")):
+            with self.subTest(days=days):
+                code, out = self.record(days=days)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.schedule()["expires_at"], expires_at)
+
+    def test_invalid_days_are_refused(self):
+        before = self.home_files()
+        for days in ("", "0", "-1", "7.5", "7 days", "\uff17", "366", "9" * 20):
+            with self.subTest(days=days):
+                code, out = self.record(days=days)
+                self.assertEqual(code, 3, out)
+                self.assertFalse(out["not_dispatcher"])
+                self.assertTrue(any("--expires-after-days" in e for e in out["errors"]), out["errors"])
+        self.assertEqual(self.home_files(), before)
+
+    def test_days_are_required(self):
+        """日数のデフォルト値は持たない。引数が無ければ、引数の誤り (終了コード 2) で何も記録しない。"""
+        before = self.home_files()
+        code, _, err = self.cli("schedule", "record", "--job-id", "a1b2c3d4", "--cron", CRON)
+        self.assertEqual(code, 2, err)
+        self.assertIn("--expires-after-days", err)
+        self.assertEqual(self.home_files(), before)
+
     def test_job_id_of_any_printable_form_is_recorded(self):
         """ジョブの ID の形は、ツール CronCreate が決めるので、空白と制御文字を含まなければ記録する。"""
         for job_id in ("2a505916", "cron_1.a:b", "x" * 100):
@@ -71,16 +100,16 @@ class RecordTest(ScheduleCase):
                 self.assertEqual(self.schedule()["job_id"], job_id)
 
     def test_renew_clears_reminders_and_moves_expiry(self):
-        """renew (作り直して記録し直す) の後は、出した確認の記録を消し、期限を 7 日後にする。"""
+        """renew (作り直して記録し直す) の後は、出した確認の記録を消し、期限を作り直した予定の日数の後にする。"""
         self.record()
         state = self.read_home("state.json")
         state["schedule"]["reminders"] = [24, 6]
         self.write_home("state.json", state)
-        code, out = self.record(job_id="e5f6a7b8", at="2026-11-22T20:00:00Z")
+        code, out = self.record(job_id="e5f6a7b8", at="2026-11-22T20:00:00Z", days="30")
         self.assertEqual(code, 0, out)
         self.assertEqual(out["previous"]["reminders"], [24, 6])
         self.assertEqual((self.schedule()["job_id"], self.schedule()["reminders"], self.schedule()["expires_at"]),
-                         ("e5f6a7b8", [], "2026-11-29T20:00:00Z"))
+                         ("e5f6a7b8", [], "2026-12-22T20:00:00Z"))
 
     def test_clear_records_stop(self):
         self.record()
@@ -95,7 +124,7 @@ class RecordTest(ScheduleCase):
         self.record()
         self.as_session(OTHER)
         before = self.home_files()
-        for args in (("record", "--job-id", "ffff0000", "--cron", CRON), ("clear",)):
+        for args in (("record", "--job-id", "ffff0000", "--cron", CRON, "--expires-after-days", DAYS), ("clear",)):
             with self.subTest(command=args[0]):
                 code, out, _ = self.cli("schedule", *args)
                 self.assertEqual(code, 3, out)
@@ -122,7 +151,8 @@ class RecordTest(ScheduleCase):
                 if state is not None:
                     self.write_home("state.json", state)
                 before = self.home_files()
-                for args in (("record", "--job-id", "ffff0000", "--cron", CRON), ("clear",)):
+                record = ("record", "--job-id", "ffff0000", "--cron", CRON, "--expires-after-days", DAYS)
+                for args in (record, ("clear",)):
                     code, out, _ = self.cli("schedule", *args)
                     self.assertEqual(code, 3, out)
                     self.assertFalse(out["not_dispatcher"])
@@ -312,6 +342,26 @@ class ReminderTest(TickScheduleCase):
         del state["schedule"]
         self.write_home("state.json", state)
         self.assertIsNone(self.notice("2026-11-24T06:10:00Z"), "定期の予定を作る前の記録 (手で実行した tick)")
+
+
+class LongExpiryTickTest(TickScheduleCase):
+    """期限が 30 日の定期の予定 (Claude Code の v2.1.330 以降) は、確認と期限切れを 30 日の期限を基準に出す。"""
+
+    def setUp(self):
+        super().setUp()
+        self.assertEqual(self.record(job_id="e5f6a7b8", at=T0, days="30")[0], 0)  # 期限は 2026-12-16T06:00:00Z
+
+    def test_no_notice_around_seven_days(self):
+        for at in ("2026-11-22T07:00:00Z", "2026-11-23T05:10:00Z", "2026-11-23T06:10:00Z"):
+            with self.subTest(at=at):
+                self.assertIsNone(self.notice(at))
+
+    def test_reminder_and_expiry_follow_recorded_expiry(self):
+        notice = self.notice("2026-12-15T07:00:00Z")
+        self.assertEqual((notice["kind"], notice["hours"]), ("reminder", 24))
+        self.assertIn("残り 23 時間 0 分", notice["text"])
+        self.assertNotRegex(notice["text"], "[0-9]+ 日後", "作り直した後の日数は、作り直すまで分からないので示さない")
+        self.assertEqual(self.notice("2026-12-16T06:10:00Z")["kind"], "expired")
 
 
 class ExpiredTickTest(TickScheduleCase):

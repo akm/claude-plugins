@@ -52,7 +52,7 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
     "cron": "7-59/10 * * * *",
     "pid": 40981,
     "created_at": "2026-11-16T05:30:00Z",
-    "expires_at": "2026-11-23T05:30:00Z",
+    "expires_at": "2026-12-16T05:30:00Z",
     "reminders": [24],
     "stopped_at": null
   }
@@ -73,13 +73,13 @@ gh-notification-dispatch のスクリプトが読み書きするファイルの�
 | `schedule.state` | 定期の予定の状態。`running` (動いている) か `stopped` (停止した)。期限切れは書かず、`expires_at` と今の時刻を比べて判定する (計画の KTD9) |
 | `schedule.job_id`・`schedule.cron` | ツール `CronCreate` が返したジョブの ID と、渡した cron の式。`stopped` では null |
 | `schedule.pid` | 予定を作った Claude Code のプロセス ID (環境変数 `CLAUDE_PID`)。定期の予定はそのプロセスの中だけにあるので、`status` は、いまのプロセス ID と違えば、予定を作ったプロセスはもう無い (再起動した後など) として `resume` を勧める (計画の KTD10)。`stopped` では null。この値を足す前の記録には無く、そのときは判定しない |
-| `schedule.created_at`・`schedule.expires_at` | 定期の予定を記録した時刻と、その 7 日後の期限 (ツール `CronCreate` の定期の予定は、作ってから 7 日で消える)。`stopped` では null |
+| `schedule.created_at`・`schedule.expires_at` | 定期の予定を記録した時刻と、期限。期限は、記録した時刻に、定期の予定が消えるまでの日数を足した時刻。日数は、ツール `CronCreate` の結果の文が示す値で、サブコマンド `schedule record` の引数 `--expires-after-days` で受ける (Claude Code の v2.1.330 より前は 7 日、v2.1.330 以降は 30 日)。`stopped` では null |
 | `schedule.reminders` | 期限までの残りが切ったことを、続けるかの確認として出した閾値 (`24`・`6`・`1` 時間) の配列。それぞれの確認を 1 回だけ出すため (計画の R17) |
 | `schedule.stopped_at` | 停止した時刻。`running` では null |
 
 取得の範囲の起点は、`position` の 5 分前と `started_at` の遅いほうにする。起点は、API `GET /notifications` の引数 `since` と、出来事の時刻と比べる値の両方に使う (計画の KTD5)。
 
-`schedule` は、スキル `dispatch` が定期の予定を作り直したときにサブコマンド `schedule record` が書き、停止したときに `schedule clear` が書く。`schedule record` は、`created_at` を今の時刻、`expires_at` をその 7 日後にし、`reminders` を空にする。定期の予定を作る前の記録には `schedule` が無い。
+`schedule` は、スキル `dispatch` が定期の予定を作り直したときにサブコマンド `schedule record` が書き、停止したときに `schedule clear` が書く。`schedule record` は、`created_at` を今の時刻、`expires_at` をその時刻から引数 `--expires-after-days` の日数の後にし、`reminders` を空にする。定期の予定を作る前の記録には `schedule` が無い。
 
 ### `subscriptions.json`
 
