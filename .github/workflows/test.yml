@@ -110,7 +110,7 @@ jobs:
         env:
           TEST_DIR: ${{ matrix.dir }}
         # 既定の 3.11 は、pr-teeth が前提とする下限 (設定の読み込みに Python 3.11 以降の標準ライブラリ tomllib を使う)。
-        # それより新しい版を要るパッケージ (doc-structured のツールなど) は、テストのディレクトリの親の .python-version で指定する
+        # それより新しい版を要るパッケージは、テストのディレクトリの親の .python-version で指定する
         run: |
           parent=$(dirname "$TEST_DIR")
           if [ -f "$parent/.python-version" ]; then
