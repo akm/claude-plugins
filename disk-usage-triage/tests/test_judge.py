@@ -170,6 +170,18 @@ class ProtectionTest(JudgeCase):
         self.assert_protected(upper, "docker")
         self.assert_protected(os.path.join(self.user_home, "LIBRARY", "CONTAINERS", "COM.DOCKER.DOCKER"), "docker")
 
+    def test_same_identity_with_a_different_path(self):
+        """実パスの文字列が違っても、デバイス番号と inode 番号が同じなら、同じ場所として保護する。
+
+        大文字と小文字を区別しないファイルシステムで起きる書き方の違いを、関数 os.path.realpath にシンボリックリンクを
+        解決させないことで、どのファイルシステムでも作る。CI (Linux) でも識別子の比較を検査するため。
+        """
+        env = self.environment()
+        link = os.path.join(self.user_home, "docker-link")
+        os.symlink(self.docker, link)
+        with mock.patch.object(judge.os.path, "realpath", os.path.abspath):
+            self.assert_protected(link, "docker", env)
+
     def test_other_directories_are_not_protected(self):
         for path in (self.make_dir("user-home", "Library", "Caches", "Google"),
                      self.make_dir("user-home", "Library", "Application Support", "Code"),
@@ -255,6 +267,19 @@ class SelectionTest(JudgeCase):
         for path in (self.docker, self.claude_desktop, self.icloud, self.cloud_storage, self.caches):
             self.assertIn(path, paths)
         self.assertNotIn(self.docker_raw, paths)
+
+    def test_parent_with_the_same_identity_is_not_selectable(self):
+        """実パスの文字列が違っても、デバイス番号と inode 番号が同じ親は、保護の一覧の場所を含む親として選べない。
+
+        書き方の違いは、ProtectionTest.test_same_identity_with_a_different_path と同じ方法で作る。
+        """
+        env = self.environment()
+        link = os.path.join(self.user_home, "containers-link")
+        os.symlink(os.path.dirname(self.docker), link)
+        with mock.patch.object(judge.os.path, "realpath", os.path.abspath):
+            blockers = judge.selection_blockers(link, env, timeout=60)
+        self.assertEqual([b["kind"] for b in blockers], ["contains-protected"])
+        self.assertEqual(blockers[0]["path"], self.docker)
 
     def test_missing_location_does_not_block(self):
         """無い場所 (~/Library/CloudStorage が無いマシン) は、含む場所として挙げない。"""
