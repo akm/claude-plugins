@@ -426,10 +426,11 @@ class JudgeOrderTest(JudgeCase):
         self.assertIsNone(result["protection"])
 
     def test_name_placeholder(self):
-        toolchain = self.make_dir("user-home", ".rustup", "toolchains", "1.80.0-aarch64-apple-darwin")
-        rows = [row("~/.rustup/toolchains/*", command=tool("rustup", "toolchain", "uninstall", "{name}"))]
-        self.assertEqual(judge.judge(toolchain, self.environment(), rows)["command"]["args"],
-                         ["rustup", "toolchain", "uninstall", "1.80.0-aarch64-apple-darwin"])
+        udid = "0A1B2C3D-0000-4000-8000-000000000001"
+        device = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", udid)
+        rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
+        self.assertEqual(judge.judge(device, self.environment(), rows)["command"]["args"],
+                         ["xcrun", "simctl", "delete", udid])
 
     def test_rm_row_applies_to_items_below(self):
         """rm の行の下の項目は、行の判定・理由・影響を使い、その項目を rm で消す。"""
@@ -514,7 +515,7 @@ class RowFormatTest(unittest.TestCase):
         for data in (row("~/Library/Caches/Google", judgment="deletable", process_names=["Google Chrome"]),
                      row("~/.android", judgment="keep"),
                      row("~/.asdf/installs", judgment="keep", dedicated_list="asdf"),
-                     row("~/.rustup/toolchains/*", command=tool("rustup", "toolchain", "uninstall", "{name}")),
+                     row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}")),
                      row("~/go/pkg/mod", command=tool("go", "clean", "-modcache", env={"GOMODCACHE": "{path}"}))):
             with self.subTest(pattern=data["pattern"]):
                 self.assertEqual(judge.row_errors(data), [])
