@@ -137,6 +137,12 @@ class ProtectionTest(JudgeCase):
         self.assert_protected(node_modules, "app-worktree")
         self.assert_protected(os.path.dirname(self.app_worktree), "app-worktree-parent")
 
+    def test_app_worktree_names_ignore_case(self):
+        """名前 .claude と worktrees は、大文字と小文字を区別せずに比べる (.Claude/Worktrees の書き方も保護する)。"""
+        feature = self.make_dir("user-home", "workspace", "org", "repo2", ".Claude", "Worktrees", "feature")
+        self.assert_protected(feature, "app-worktree")
+        self.assert_protected(os.path.dirname(feature), "app-worktree-parent")
+
     def test_scan_dirs_and_home(self):
         """調べるディレクトリ (設定の scan_dirs) とホームディレクトリ (環境変数 HOME) は保護し、その下は保護しない。"""
         android = self.make_dir("user-home", ".android")
@@ -217,6 +223,22 @@ class PythonVersionProtectionTest(JudgeCase):
         version_dir = os.path.join(data_dir, "installs", "python", PYTHON_VERSION)
         self.assertEqual(judge.protection(version_dir, env)["kind"], "python")
 
+    def test_asdf_data_dir_written_differently(self):
+        """ASDF_DATA_DIR の書き方が実行ファイルのパスと違っても、識別子で同じ版を求める。
+
+        大文字と小文字だけが違う書き方を、ASDF_DATA_DIR をシンボリックリンクにし、関数 os.path.realpath にシンボリックリンクを
+        解決させないことで、どのファイルシステムでも作る。
+        """
+        data_dir = self.make_dir("asdf-data")
+        link = os.path.join(self.user_home, "asdf-link")
+        os.symlink(data_dir, link)
+        os.environ["ASDF_DATA_DIR"] = link
+        executable = self.make_python(data_dir)
+        with mock.patch.object(judge.os.path, "realpath", os.path.abspath):
+            env = self.environment(executable=executable)
+        version_dir = os.path.join(data_dir, "installs", "python", PYTHON_VERSION)
+        self.assertEqual(judge.protection(version_dir, env)["kind"], "python")
+
     def test_python_outside_asdf_is_not_protected(self):
         data_dir = os.path.join(self.user_home, ".asdf")
         self.make_python(data_dir)
@@ -293,6 +315,14 @@ class SelectionTest(JudgeCase):
         projects = self.make_dir("user-home", "projects")
         worktrees = self.make_dir("user-home", "projects", "org", "repo", ".claude", "worktrees")
         self.make_dir("user-home", "projects", "org", "repo", ".claude", "worktrees", "a")
+        blockers = self.blockers(projects)
+        self.assertEqual([b["kind"] for b in blockers], ["app-worktree-below"])
+        self.assertEqual(blockers[0]["path"], worktrees)
+
+    def test_app_worktree_below_with_different_case(self):
+        """下を探すときも、名前 .claude と worktrees は大文字と小文字を区別しない。"""
+        projects = self.make_dir("user-home", "projects")
+        worktrees = self.make_dir("user-home", "projects", "repo", ".CLAUDE", "worktrees")
         blockers = self.blockers(projects)
         self.assertEqual([b["kind"] for b in blockers], ["app-worktree-below"])
         self.assertEqual(blockers[0]["path"], worktrees)
@@ -502,6 +532,9 @@ class JudgeOrderTest(JudgeCase):
         self.assertEqual(result["dedicated_list"], "worktree")
         self.assertEqual(result["judgment"], "keep")
         self.assertIsNone(judge.judge(self.app_worktree, self.environment(), [])["dedicated_list"])
+        upper = self.make_dir("user-home", "workspace", "org", "repo2", ".Claude", "Worktrees")
+        self.assertEqual(judge.judge(upper, self.environment(), [])["dedicated_list"], "worktree",
+                         "名前の大文字と小文字は区別しないこと")
 
 
 class RowFormatTest(unittest.TestCase):

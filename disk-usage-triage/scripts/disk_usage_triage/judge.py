@@ -117,15 +117,18 @@ def _python_version_dir(executable, home):
     """プラグインを実行している Python が asdf の版なら、その版のディレクトリ。そうでなければ None (KTD10)。
 
     asdf のデータの場所は、環境変数 ASDF_DATA_DIR、無ければ ~/.asdf。Python の実行ファイルの実パスが
-    `<データの場所>/installs/python/<版>/` の下にあるときの、その版。
+    `<データの場所>/installs/python/<版>/` の下にあるときの、その版。`installs/python` のディレクトリは、パスの文字列ではなく
+    識別子で探す。ASDF_DATA_DIR の書き方が、大文字と小文字だけ実行ファイルのパスと違っても、同じ版を求めるため。
     """
     data_dir = os.environ.get("ASDF_DATA_DIR") or os.path.join(home, ".asdf")
-    python_installs = os.path.realpath(os.path.join(data_dir, "installs", "python"))
-    real = os.path.realpath(executable)
-    if not real.startswith(python_installs + os.sep):
+    python_installs = _identity(os.path.join(data_dir, "installs", "python"))
+    if python_installs is None:
         return None
-    version = real[len(python_installs) + 1:].split(os.sep, 1)[0]
-    return os.path.join(python_installs, version)
+    chain = _chain(os.path.realpath(executable))
+    for (path, _), (_, parent_identity) in zip(chain, chain[1:]):
+        if parent_identity == python_installs:
+            return path
+    return None
 
 
 def environment(config):
@@ -155,11 +158,21 @@ def locations(env):
     return [location.public() for location in env.locations]
 
 
+def _is_worktrees_pair(claude, worktrees):
+    """2 つの名前が `.claude` と `worktrees` か。大文字と小文字は区別しない。
+
+    macOS の標準のファイルシステムでは、大文字と小文字だけが違う書き方 (`.Claude/worktrees`) も同じディレクトリを指すため。
+    大文字と小文字を区別するファイルシステムでは、名前だけが違う別のディレクトリも保護するが、保護する項目が増えるだけで、
+    消す対象に選べる項目は増えない。
+    """
+    return claude.casefold() == ".claude" and worktrees.casefold() == "worktrees"
+
+
 def _app_worktree(real):
     """パスがアプリの worktree (`.claude/worktrees/` の下) か、その親の `.claude/worktrees` なら、保護の一覧の項目。"""
     parts = real.split(os.sep)
     for index in range(len(parts) - 1):
-        if parts[index] == ".claude" and parts[index + 1] == "worktrees":
+        if _is_worktrees_pair(parts[index], parts[index + 1]):
             if len(parts) == index + 2:
                 return {"kind": "app-worktree-parent", "path": real, "label": "アプリの worktree の親のディレクトリ"}
             return {"kind": "app-worktree", "path": os.sep.join(parts[:index + 3]), "label": "アプリの worktree"}
@@ -207,9 +220,9 @@ def _search_below(path, timeout, clock):
         if clock() > deadline:
             return found, unreadable, True
         names[:] = [name for name in names if name not in _PRUNED]
-        if os.path.basename(directory) == ".claude" and "worktrees" in names:
-            found.append(os.path.join(directory, "worktrees"))
-            names.remove("worktrees")
+        for name in [name for name in names if _is_worktrees_pair(os.path.basename(directory), name)]:
+            found.append(os.path.join(directory, name))
+            names.remove(name)
     return found, unreadable, False
 
 
@@ -440,7 +453,7 @@ def _command(row, path, matched_path):
 
 def _is_app_worktrees(real):
     parts = real.split(os.sep)
-    return parts[-2:] == [".claude", "worktrees"]
+    return len(parts) >= 2 and _is_worktrees_pair(parts[-2], parts[-1])
 
 
 def judge(path, env, rows):
