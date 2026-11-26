@@ -529,6 +529,12 @@ class RowFormatTest(unittest.TestCase):
         self.assert_error(row("~/a", process_names=["/Applications/x"]), "process_names")
         self.assert_error(row("~/a", judgment="keep", dedicated_list="worktree"), "dedicated_list")
 
+    def test_dedicated_list_rows_must_be_keep(self):
+        """専用の一覧を持つ行の判定は keep に限る (計画の KTD5)。まとめて消す対象に選べないようにするため。"""
+        for judgment in ("deletable", "review"):
+            with self.subTest(judgment=judgment):
+                self.assert_error(row("~/.asdf/installs", judgment=judgment, dedicated_list="asdf"), "keep でない")
+
     def test_sources(self):
         self.assert_error(row("~/a", sources=[]), "sources")
         self.assert_error(row("~/a", sources=[{"url": "http://example.com"}]), "url と checked_on")

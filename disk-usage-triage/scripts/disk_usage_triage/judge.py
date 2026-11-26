@@ -360,8 +360,11 @@ def row_errors(row):
     names = row.get("process_names", [])
     if not isinstance(names, list) or not all(isinstance(n, str) and n and "/" not in n for n in names):
         errors.append("process_names が、/ を含まない空でない文字列の配列でない")
-    if "dedicated_list" in row and row["dedicated_list"] not in TABLE_DEDICATED_LISTS:
-        errors.append(f"dedicated_list が {'・'.join(TABLE_DEDICATED_LISTS)} のどれでもない")
+    if "dedicated_list" in row:
+        if row["dedicated_list"] not in TABLE_DEDICATED_LISTS:
+            errors.append(f"dedicated_list が {'・'.join(TABLE_DEDICATED_LISTS)} のどれでもない")
+        if row.get("judgment") != "keep":
+            errors.append("dedicated_list を持つ行の judgment が keep でない (専用の一覧の行は、まとめて消す対象に選べない)")
     errors += _sources_errors(row.get("sources"))
     return errors
 
