@@ -98,14 +98,6 @@
     "sources": [{"url": "https://developer.apple.com/forums/thread/812408", "checked_on": "2026-11-25"}]
   },
   {
-    "pattern": "~/.rustup/toolchains/*",
-    "judgment": "review",
-    "reason": "rustup が入れたツールチェイン 1 つ",
-    "impact": "そのツールチェインを指定するプロジェクトで、次に cargo を実行したときに再ダウンロードする",
-    "command": {"type": "tool", "args": ["rustup", "toolchain", "uninstall", "{name}"]},
-    "sources": [{"url": "https://rust-lang.github.io/rustup/basics.html", "checked_on": "2026-11-25"}]
-  },
-  {
     "pattern": "~/Library/Caches/ms-playwright",
     "judgment": "deletable",
     "reason": "Playwright がテストに使うブラウザ。npx playwright uninstall は、実行したプロジェクトの Playwright の版で消す範囲が変わるので、rm で消す",

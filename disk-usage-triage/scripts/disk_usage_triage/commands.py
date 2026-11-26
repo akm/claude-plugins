@@ -14,7 +14,6 @@ ALLOWED = (
     ("npm", "cache", "clean"),
     ("pip", "cache", "purge"),
     ("pnpm", "store", "prune"),
-    ("rustup", "toolchain", "uninstall"),
     ("uv", "cache", "clean"),
     ("xcrun", "simctl", "delete"),
 )
