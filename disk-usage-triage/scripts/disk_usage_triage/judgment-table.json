@@ -1,0 +1,152 @@
+[
+  {
+    "pattern": "~/Library/Caches/go-build",
+    "judgment": "deletable",
+    "reason": "Go のビルドキャッシュ。go のコマンドが、次のビルドで作り直す",
+    "impact": "次のビルドとテストが、キャッシュを作り直す分だけ遅くなる。fuzzing が生成した入力 (ディレクトリ fuzz の下) は消さない",
+    "command": {"type": "tool", "args": ["go", "clean", "-cache"], "env": {"GOCACHE": "{path}"}},
+    "sources": [{"url": "https://pkg.go.dev/cmd/go#hdr-Build_and_test_caching", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/go/pkg/mod",
+    "judgment": "deletable",
+    "reason": "Go のモジュールのキャッシュ。ファイルが読み取り専用なので、rm では消せない",
+    "impact": "次のビルドで、要るモジュールを再ダウンロードする (ネットワークと、プライベートなモジュールの認証が要る)",
+    "command": {"type": "tool", "args": ["go", "clean", "-modcache"], "env": {"GOMODCACHE": "{path}"}},
+    "sources": [{"url": "https://go.dev/ref/mod#module-cache", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Caches/Homebrew",
+    "judgment": "deletable",
+    "reason": "Homebrew のダウンロードのキャッシュ。brew cleanup のヘルプが、キャッシュをすべて消す方法として、このディレクトリを消すことを案内している",
+    "impact": "次のインストールと更新で、要るファイルを再ダウンロードする",
+    "command": {"type": "rm"},
+    "sources": [{"url": "https://docs.brew.sh/Manpage", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Caches/pnpm",
+    "judgment": "deletable",
+    "reason": "pnpm のパッケージのメタデータと dlx のキャッシュ。まとめて消す pnpm のコマンドは無い",
+    "impact": "次のインストールでメタデータを再取得し、dlx は次の実行で再インストールする",
+    "command": {"type": "rm"},
+    "sources": [{"url": "https://pnpm.io/10.x/settings#cachedir", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/pnpm/store",
+    "judgment": "deletable",
+    "reason": "pnpm の store。pnpm のコマンドは、どのプロジェクトも参照していないパッケージだけを消す",
+    "impact": "消したパッケージが要るときに再ダウンロードする。今の版の pnpm の store (v10 など) だけを整理し、ほかの版の store は残す",
+    "command": {"type": "tool", "args": ["pnpm", "store", "prune", "--store-dir", "{path}"]},
+    "sources": [{"url": "https://pnpm.io/10.x/cli/store", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/.npm",
+    "judgment": "deletable",
+    "reason": "npm のキャッシュ。npm のコマンドは、この下の _cacache だけを消す (_npx と _logs は残す)",
+    "impact": "次のインストールで再ダウンロードする",
+    "command": {"type": "tool", "args": ["npm", "cache", "clean", "--force", "--cache", "{path}"]},
+    "sources": [{"url": "https://docs.npmjs.com/cli/v11/commands/npm-cache", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/.cache/uv",
+    "judgment": "deletable",
+    "reason": "uv のキャッシュ (wheel・sdist・uvx の環境)",
+    "impact": "再ダウンロードと再ビルドが要る。uv のリンクの方式を symlink にしていると、インストール済みの仮想環境が壊れる",
+    "command": {"type": "tool", "args": ["uv", "cache", "clean", "--cache-dir", "{path}"]},
+    "sources": [{"url": "https://docs.astral.sh/uv/concepts/cache/", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Caches/pip",
+    "judgment": "deletable",
+    "reason": "pip の HTTP と wheel のキャッシュ",
+    "impact": "再ダウンロードと wheel の再ビルドが要る",
+    "command": {"type": "tool", "args": ["pip", "cache", "purge", "--cache-dir", "{path}"]},
+    "sources": [{"url": "https://pip.pypa.io/en/stable/cli/pip_cache/", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Developer/CoreSimulator",
+    "judgment": "keep",
+    "reason": "Simulator のデータ。Apple は、手で消さずに Xcode か simctl で扱うよう案内している。端末 (ディレクトリ Devices の下) は、端末ごとに判定する",
+    "impact": "すべての端末の中のアプリとデータが消える",
+    "command": null,
+    "sources": [{"url": "https://developer.apple.com/forums/thread/812408", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Developer/CoreSimulator/Devices/*",
+    "judgment": "review",
+    "reason": "Simulator の端末 1 つ (ディレクトリの名前は端末の UDID)",
+    "impact": "端末の中のアプリとデータが消える",
+    "command": {"type": "tool", "args": ["xcrun", "simctl", "delete", "{name}"]},
+    "sources": [{"url": "https://developer.apple.com/forums/thread/812408", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Developer/Xcode/DerivedData",
+    "judgment": "deletable",
+    "reason": "Xcode のインデックス・ログ・ビルドの生成物。ソースから作り直せる",
+    "impact": "次のビルドがフルビルドになり、インデックスも作り直す",
+    "command": {"type": "rm"},
+    "process_names": ["Xcode"],
+    "sources": [{"url": "https://help.apple.com/xcode/mac/current/en.lproj/deva52afe8a4.html", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Developer/Xcode/iOS DeviceSupport",
+    "judgment": "review",
+    "reason": "実機のデバッグのために、Xcode が端末からコピーした OS の版ごとのシンボル",
+    "impact": "次に端末を接続したときに、Xcode が再コピーする。古い版のクラッシュログのシンボル化ができなくなる",
+    "command": {"type": "rm"},
+    "process_names": ["Xcode"],
+    "sources": [{"url": "https://developer.apple.com/forums/thread/812408", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Caches/ms-playwright",
+    "judgment": "deletable",
+    "reason": "Playwright がテストに使うブラウザ。npx playwright uninstall は、実行したプロジェクトの Playwright の版で消す範囲が変わるので、rm で消す",
+    "impact": "テストの前に、npx playwright install で再ダウンロードが要る",
+    "command": {"type": "rm"},
+    "sources": [{"url": "https://playwright.dev/docs/browsers", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Caches/Google/Chrome",
+    "judgment": "deletable",
+    "reason": "Google Chrome のキャッシュ",
+    "impact": "次の表示で、Chrome がデータを再取得する",
+    "command": {"type": "rm"},
+    "process_names": ["Google Chrome"],
+    "sources": [{"url": "https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Caches/com.microsoft.VSCode.ShipIt",
+    "judgment": "deletable",
+    "reason": "VS Code の自動更新の作業ディレクトリ (ダウンロードした更新)",
+    "impact": "インストール待ちの更新が消え、VS Code が次の確認で再ダウンロードする",
+    "command": {"type": "rm"},
+    "process_names": ["Code", "ShipIt"],
+    "sources": [{"url": "https://github.com/Squirrel/Squirrel.Mac", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/.android",
+    "judgment": "keep",
+    "reason": "Android SDK の利用者のディレクトリ。デバッグの署名の鍵 (debug.keystore) と adb の鍵 (adbkey) がある。AVD (Android の仮想デバイス) は、Android Studio の Device Manager で消す",
+    "impact": "署名の鍵が変わり、端末に入っているデバッグ版のアプリを更新できなくなる。AVD の中のアプリとデータも消える",
+    "command": null,
+    "sources": [{"url": "https://developer.android.com/studio/publish/app-signing", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/.asdf/installs",
+    "judgment": "keep",
+    "reason": "asdf がインストールした版。版ごとに、参照されているかで判定する",
+    "impact": "すべてのツールのすべての版が消える",
+    "command": null,
+    "dedicated_list": "asdf",
+    "sources": [{"url": "https://asdf-vm.com/manage/versions.html", "checked_on": "2026-11-25"}]
+  },
+  {
+    "pattern": "~/Library/Containers/com.docker.docker",
+    "judgment": "keep",
+    "reason": "Docker Desktop のディレクトリ。中身は Docker の一覧で判定する",
+    "impact": "Docker Desktop のすべての image・コンテナ・ボリュームが消える",
+    "command": null,
+    "dedicated_list": "docker",
+    "sources": [{"url": "https://docs.docker.com/desktop/settings-and-maintenance/settings/", "checked_on": "2026-11-25"}]
+  }
+]

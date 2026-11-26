@@ -262,8 +262,8 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/triage/            # 容量の大きい項目を調べて消す (今の版は設定を作る・変えるところまで)
 │   ├── hooks/hooks.json          # hook PreToolUse (Claude が削除のシェルスクリプトを実行すること・書き換えることを拒否する)
-│   ├── references/               # 保存先のディレクトリのファイルの様式
-│   ├── scripts/                  # スクリプト (disk_usage_triage.py とパッケージ disk_usage_triage/)
+│   ├── references/               # 保存先のディレクトリのファイルの様式・判定表の様式
+│   ├── scripts/                  # スクリプト (disk_usage_triage.py とパッケージ disk_usage_triage/。判定表 judgment-table.json はパッケージの中)
 │   ├── tests/                    # python3 -m unittest discover -s disk-usage-triage/tests
 │   └── README.md
 └── review-triage/                # skill 型 + 同梱ツール
