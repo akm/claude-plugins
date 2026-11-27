@@ -87,7 +87,7 @@ def _target_errors(target, stored):
     if not isinstance(target, dict):
         return ["target が JSON のオブジェクトでない"]
     kind = target.get("kind")
-    if kind not in TARGET_KINDS:
+    if not isinstance(kind, str) or kind not in TARGET_KINDS:  # 配列とオブジェクトは、dict の所属判定で TypeError になる
         return [f"target の kind が {'・'.join(TARGET_KINDS)} のどれでもない"]
     keys = TARGET_KINDS[kind]
     errors = []

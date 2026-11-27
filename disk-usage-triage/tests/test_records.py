@@ -201,7 +201,10 @@ class UserRecordTest(RecordsCase):
                        {"kind": "asdf-version", "tool": "nodejs", "version": ".."},
                        {"kind": "asdf-version", "tool": "nodejs"},
                        {"kind": "docker-volume", "name": "data", "path": "/x"},
-                       {"kind": "volume", "name": "data"}):
+                       {"kind": "volume", "name": "data"},
+                       {"kind": ["docker-volume"], "name": "data"},
+                       {"kind": {"docker-volume": 1}, "name": "data"},
+                       {"kind": None, "name": "data"}):
             with self.subTest(target=target):
                 self.assert_unsatisfied(records.add_user(target, "keep", today=TODAY))
 
@@ -306,6 +309,10 @@ class CorruptRecordsTest(RecordsCase):
             "Claude の根拠が無い": json.dumps({"version": 1, "records": [{**valid, "decided_by": "claude",
                                                                          "reason": "r", "impact": "i"}]}),
             "相対パス": json.dumps({"version": 1, "records": [{**valid, "target": directory("foo")}]}),
+            "kind が配列": json.dumps({"version": 1, "records": [{**valid, "target": {"kind": ["directory"],
+                                                                                    "path": self.target}}]}),
+            "kind がオブジェクト": json.dumps({"version": 1, "records": [{**valid, "target": {"kind": {"a": 1},
+                                                                                        "path": self.target}}]}),
             "日付でない": json.dumps({"version": 1, "records": [{**valid, "decided_on": "2026-13-01"}]}),
             "同じ対象が 2 つ": json.dumps({"version": 1, "records": [valid, valid]}),
         }
@@ -575,6 +582,7 @@ class CliTest(RecordsCase):
                      {"target": directory(self.target), "judgment": "keep", "decided_by": "user"},
                      {"target": directory(self.target)},
                      {"target": directory(self.target), "judgment": "keep", "reason": ""},
+                     {"target": {"kind": ["directory"], "path": self.target}, "judgment": "keep"},
                      [1]):
             with self.subTest(data=data):
                 code, payload, _ = self.cli("records", "add", "--input-file", self.write_input(data))
