@@ -1,8 +1,10 @@
-"""保護の一覧と判定表 (計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の R12〜R15・R17・KD8・KTD5・KTD6)。
+"""保護の一覧・判定表と判定の順 (計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の R12〜R15・R17・R19・KD8・
+KTD5・KTD6・KTD16)。
 
-項目のパスから、判定 (消してよい `deletable`・確認が要る `review`・残す `keep`) を決める。判定の順は計画の R13 で、このモジュールは
-そのうち保護の一覧と判定表を扱う。記録 (R18〜R22) は U4 で、使われているかどうかによる判定 (asdf・Docker・git の worktree) は
-U10〜U12 で、判定の順に足す。
+項目のパスから、判定 (消してよい `deletable`・確認が要る `review`・残す `keep`) を決める。判定の順は計画の R13 で、保護の一覧・
+記録の「残す」・使われているかどうかによる判定・記録のほかの判定・判定表の順に決める。記録の読み書きはモジュール records に
+あり、このモジュールはディレクトリの記録を判定に使う。使われているかどうかによる判定 (asdf・Docker・git の worktree) は、
+U10〜U12 で関数 judge の引数 usage に渡す。
 
 - 保護の一覧 (R14) は、消す対象に選べない場所の一覧。プラグインを実行している Python の版・作業ディレクトリ・調べるディレクトリ
   のように実行の環境で決まる場所を含むので、判定表とは別にこのモジュールのコードに持つ (KTD5)。記録では除けない。
@@ -25,6 +27,8 @@ import sys
 import time
 
 JUDGMENTS = ("deletable", "review", "keep")  # 消してよい・確認が要る・残す
+JUDGMENT_LABELS = {"deletable": "消してよい", "review": "確認が要る", "keep": "残す"}
+DECIDER_LABELS = {"user": "利用者", "claude": "Claude"}
 DEDICATED_LISTS = ("asdf", "docker", "worktree")  # 専用の一覧の種類 (KTD5)
 TABLE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "judgment-table.json")
 
@@ -456,13 +460,102 @@ def _is_app_worktrees(real):
     return len(parts) >= 2 and _is_worktrees_pair(parts[-2], parts[-1])
 
 
-def judge(path, env, rows):
-    """path の判定。保護の一覧、判定表の順に決める (R13 のうち U3 で扱うもの)。
+# --- 記録 -----------------------------------------------------------------------------------------------------------
 
-    返り値: {judgment (JUDGMENTS のどれか。判定なしは None), source ("protected"・"table"・None), pattern (一致した判定表の行の
-    パターン), matched_path (そのパターンに一致したディレクトリ), reason, impact, command (消すコマンド。rm は {type, path}、tool は
-    {type, args, env}), process_names, dedicated_list (DEDICATED_LISTS のどれか。項目そのものが専用の一覧を持つ行に一致したとき
-    と、項目が .claude/worktrees のとき), protection (保護の一覧の項目なら {kind, path, label})}。
+class DirectoryRecords:
+    """ディレクトリの記録 (モジュール records の load の返り値のうち、対象の種類が directory のもの) の索引 (計画の KTD16)。
+
+    記録のパスと項目のパスは、シンボリックリンクを解決したパスの文字列と、ディレクトリの識別子 (デバイス番号と inode 番号) の
+    両方で比べ、どちらかが同じなら同じディレクトリとする。保護の一覧と同じく、利用者が大文字と小文字だけが違う書き方で記録
+    しても、その記録を使うため。記録の識別子は、この索引を作るときに求める (記録には保存しない。ディレクトリを消して作り直すと
+    識別子が変わるため)。
+    """
+
+    def __init__(self, records):
+        self._entries = [(record, record["target"]["path"], _identity(record["target"]["path"]))
+                         for record in records if record["target"]["kind"] == "directory"]
+
+    def find(self, entry):
+        """entry ((実パス, 識別子)) と同じディレクトリの記録。無ければ None。"""
+        real, identity = entry
+        for record, path, record_identity in self._entries:
+            if path == real or (identity is not None and identity == record_identity):
+                return record
+        return None
+
+    def nearest(self, real):
+        """実パス real か、その親のディレクトリの記録のうち、最も近いもの。(何階層上か (real そのものは 0), 記録)。無ければ None。"""
+        for depth, entry in enumerate(_chain(real)):
+            record = self.find(entry)
+            if record is not None:
+                return depth, record
+        return None
+
+
+def _resolved(command, path, real):
+    """記録のコマンドを、記録の対象の項目に使う形にする。rm は {type, path}、tool は {path}・{name} を real で置き換える。"""
+    if command["type"] == "rm":
+        return {"type": "rm", "path": path}
+    return {"type": "tool", "args": [_resolve(arg, real) for arg in command["args"]],
+            "env": {name: _resolve(value, real) for name, value in command.get("env", {}).items()}}
+
+
+def _record_command(record, depth, path, real, matched):
+    """記録で判定が決まった項目の消すコマンド (計画の KTD16)。記録のもの、項目に使う判定表の行のもの、rm の順に選ぶ。"""
+    if record["judgment"] == "keep":
+        return None
+    if record["command"] is not None:
+        return _resolved(record["command"], path, real)
+    if depth == 0 and matched is not None:
+        row_command = matched["row"]["command"]
+        if matched["path"] == real or (row_command is not None and row_command["type"] == "rm"):
+            command = _command(matched["row"], path, matched["path"])
+            if command is not None:
+                return command
+    return {"type": "rm", "path": path}
+
+
+def _from_record(result, path, real, nearest, matched):
+    """記録で決まる判定を result に書いて返す (計画の R13・R19・KTD16)。"""
+    depth, record = nearest
+    record_path = record["target"]["path"]
+    row = matched["row"] if matched is not None else None
+    impact = record["impact"] if record["impact"] is not None else (row["impact"] if row is not None else None)
+    process_names = list(record["process_names"]) or (list(row.get("process_names", [])) if row is not None else [])
+    result.update(source="record", impact=impact, process_names=process_names,
+                  record={"path": record_path, "decided_by": record["decided_by"],
+                          "decided_on": record["decided_on"], "judgment": record["judgment"]})
+    command = record["command"]
+    if depth > 0 and record["judgment"] != "keep" and command is not None and command["type"] == "tool":
+        tool = " ".join(_resolve(arg, record_path) for arg in command["args"])
+        result.update(judgment="keep", reason=f"{record_path} の下の項目。{record_path} は、記録のツールのコマンド ({tool})"
+                                               " でまとめて消し、下の項目だけを消すコマンドは無い")
+        return result
+    who = DECIDER_LABELS[record["decided_by"]]
+    reason = record["reason"] or f"{who}が {record['decided_on']} に「{JUDGMENT_LABELS[record['judgment']]}」と記録した"
+    if depth > 0:
+        reason = f"{record_path} の下の項目。{record_path} の記録: {reason}"
+    result.update(judgment=record["judgment"], reason=reason,
+                  command=_record_command(record, depth, path, real, matched))
+    return result
+
+
+def judge(path, env, rows, records=None, usage=None):
+    """path の判定。保護の一覧・記録の「残す」・使われているかどうかによる判定・記録のほかの判定・判定表の順に決める (R13)。
+
+    records は、ディレクトリの記録の索引 (DirectoryRecords)。None なら記録を使わない。usage は、項目のパスを受け取り、
+    使われているかどうかで決まる判定 ({judgment, reason, impact, command, process_names}) か、決まらなければ None を返す関数
+    (asdf の参照・コンテナの使用・git の worktree。U10〜U12 で渡す)。None なら使わない。
+
+    返り値: {judgment (JUDGMENTS のどれか。判定なしは None), source ("protected"・"record"・"usage"・"table"・None), pattern
+    (一致した判定表の行のパターン), matched_path (そのパターンに一致したディレクトリ), reason, impact, command (消すコマンド。rm は
+    {type, path}、tool は {type, args, env}), process_names, dedicated_list (DEDICATED_LISTS のどれか。項目そのものが専用の一覧を
+    持つ行に一致したときと、項目が .claude/worktrees のとき), protection (保護の一覧の項目なら {kind, path, label}), record
+    (判定を決めた記録。{path (記録のディレクトリ), decided_by, decided_on, judgment}。記録で決めなかったときは None)}。
+
+    記録は、項目そのものか、最も近い親のディレクトリのものを使う (R19)。親の「残す」以外の記録は、判定表に、記録のディレクトリ
+    より下で項目まで (項目そのものを含む) のディレクトリに一致する行があれば使わず、その行を使う (R13)。Claude が書いたツールの
+    コマンドがある記録の下の項目は「残す」にする (R19)。
 
     判定なしの項目は、Claude が調べて判定する。ツールのコマンドの行の下の項目は「残す」にする。ツールのコマンドは一致した
     ディレクトリをまとめて消すので、下の項目だけを消すコマンドが無いため (文書 references/judgment-table.md の節「行を使う項目」)。
@@ -471,7 +564,7 @@ def judge(path, env, rows):
     protected = protection(path, env)
     matched = match_table(path, rows, env)
     result = {"judgment": None, "source": None, "pattern": None, "matched_path": None, "reason": None, "impact": None,
-              "command": None, "process_names": [], "dedicated_list": None, "protection": protected}
+              "command": None, "process_names": [], "dedicated_list": None, "protection": protected, "record": None}
     exact = matched is not None and matched["path"] == real
     if exact:
         result["dedicated_list"] = matched["row"].get("dedicated_list")
@@ -483,6 +576,19 @@ def judge(path, env, rows):
         result.update(judgment="keep", source="protected",
                       reason=f"保護の一覧にある ({protected['label']}: {protected['path']})")
         return result
+    nearest = records.nearest(real) if records is not None else None
+    if nearest is not None and nearest[1]["judgment"] == "keep":
+        return _from_record(result, path, real, nearest, matched)
+    if usage is not None:
+        used = usage(path)
+        if used is not None:
+            result.update(used, source="usage")
+            return result
+    if nearest is not None:
+        depth = nearest[0]
+        table_depth = None if matched is None else len(real.split(os.sep)) - len(matched["path"].split(os.sep))
+        if depth == 0 or table_depth is None or table_depth >= depth:
+            return _from_record(result, path, real, nearest, matched)
     if matched is None:
         return result
     row = matched["row"]

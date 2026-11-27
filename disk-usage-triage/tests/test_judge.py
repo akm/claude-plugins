@@ -631,14 +631,17 @@ class BundledTableTest(unittest.TestCase):
         self.assertEqual(judge.table_errors(self.rows), [])
 
     def test_tool_commands_start_with_allowed_pairs(self):
-        """判定表のツールのコマンドは、すべて KTD6 の許可した組 (実行ファイルとサブコマンド) で始まる。"""
+        """判定表のツールのコマンドは、すべて KTD6 の許可した組 (実行ファイルとサブコマンド) で始まり、組に許可した名前の
+        環境変数だけを付ける (U4 を実装するときに利用者が決めた。2026-11-27)。"""
         for data in self.rows:
             command = data["command"]
             if command is None or command["type"] != "tool":
                 continue
             with self.subTest(pattern=data["pattern"]):
-                self.assertTrue(any(tuple(command["args"][:len(pair)]) == pair for pair in commands.ALLOWED),
-                                f"{command['args']} が commands.ALLOWED の組で始まらない")
+                entry = commands.allowed_entry(command["args"])
+                self.assertIsNotNone(entry, f"{command['args']} が commands.ALLOWED の組で始まらない")
+                for name in command.get("env", {}):
+                    self.assertIn(name, entry["env"], f"環境変数 {name} を組 {entry['args']} に許可していない")
 
     def test_dedicated_list_rows(self):
         """専用の一覧の行 (asdf の installs・Docker Desktop のディレクトリ) がある (計画の U3)。"""
