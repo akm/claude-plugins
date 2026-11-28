@@ -1,0 +1,60 @@
+du: /private/var/db/appinstalld: Operation not permitted
+du: /private/var/db/diskimagesiod: Permission denied
+du: /private/var/db/ExtensibleSSO/Configuration: Operation not permitted
+du: /private/var/db/os_eligibility: Operation not permitted
+du: /private/var/db/Spotlight: Operation not permitted
+du: /private/var/db/locationd/Library: Permission denied
+du: /private/var/db/appstore/Library/Preferences: Permission denied
+du: /private/var/db/modelmanagerd: Permission denied
+du: /private/var/db/terminus: Permission denied
+du: /private/var/db/sysdiagnose/com.apple.sysdiagnose: Operation not permitted
+du: /private/var/db/SoC: Operation not permitted
+du: /private/var/db/DumpPanic: Operation not permitted
+du: /private/var/db/analyticsd: Permission denied
+du: /private/var/db/AppleIntelligencePlatform: Operation not permitted
+du: /private/var/db/rmd: Permission denied
+du: /private/var/db/knowledgegraphd: Permission denied
+du: /private/var/db/coreml: Permission denied
+du: /private/var/db/spinandd: Permission denied
+du: /private/var/db/nsurlsessiond: Permission denied
+du: /private/var/db/com.apple.backgroundtaskmanagement: Operation not permitted
+du: /private/var/db/softwareupdate/Library/WebKit: Permission denied
+du: /private/var/db/softwareupdate/Library/Preferences: Permission denied
+du: /private/var/db/fpsd: Permission denied
+du: /private/var/db/hidd: Permission denied
+du: /private/var/db/installcoordinationd: Operation not permitted
+du: /private/var/db/Spotlight-V100: Operation not permitted
+du: /private/var/db/geod: Permission denied
+du: /private/var/db/oah: Operation not permitted
+du: /private/var/db/reportmemoryexception: Permission denied
+du: /private/var/db/Sandbox: Operation not permitted
+du: /private/var/db/ctkd: Permission denied
+du: /private/var/db/lockdown: Operation not permitted
+du: /private/var/db/biome: Operation not permitted
+du: /private/var/db/KernelExtensionManagement/Staging: Operation not permitted
+du: /private/var/db/datadetectors: Permission denied
+du: /private/var/db/cmiodalassistants: Permission denied
+du: /private/var/db/DifferentialPrivacy: Operation not permitted
+du: /private/var/db/assetsubscriptiond/StagingLogs: Permission denied
+du: /private/var/db/assetsubscriptiond/history: Permission denied
+du: /private/var/db/com.apple.xpc.roleaccountd.staging: Permission denied
+du: /private/var/db/dslocal/nodes/Default: Permission denied
+du: /private/var/db/com.apple.findmy.findmybeaconingd: Permission denied
+du: /private/var/db/sudo: Permission denied
+du: /private/var/db/nearbyd: Permission denied
+du: /private/var/db/com.apple.security.cryptexd: Operation not permitted
+du: /private/var/db/MobileIdentityService: Operation not permitted
+du: /private/var/db/mmaintenanced: Permission denied
+du: /private/var/db/dhcpclient: Permission denied
+du: /private/var/db/timed: Permission denied
+du: /private/var/db/applepay: Permission denied
+du: /private/var/db/SystemKeys: Operation not permitted
+du: /private/var/db/darwindaemon: Permission denied
+du: /private/var/db/audiomxd/Library: Permission denied
+du: /private/var/db/securityagent: Permission denied
+du: /private/var/db/accessoryupdater: Permission denied
+du: /private/var/db/searchparty: Operation not permitted
+du: /private/var/db/CoreDuet: Operation not permitted
+du: /private/var/db/ConfigurationProfiles/Store: Operation not permitted
+du: /private/var/db/fseventsd: Permission denied
+du: /private/var/db/caches/opendirectory: Permission denied

@@ -12,6 +12,7 @@
 ほかの結果は標準出力に出すため。
 """
 
+import os
 import subprocess
 
 ENCODING = "utf-8"
@@ -27,19 +28,22 @@ def _text(value):
     return value
 
 
-def run(args, *, timeout):
+def run(args, *, timeout, extra_env=None):
     """コマンドを引数の配列で実行する。標準入力は空 (/dev/null) にし、timeout 秒で打ち切る。
 
     timeout は省略できない。時間の上限を付けずに外部のコマンドを実行しないため (計画の R4・KTD4)。
+    extra_env は、このプロセスの環境変数に足して (同じ名前は置き換えて) コマンドに渡す環境変数の辞書。ほかの環境変数は
+    引き継ぐ。du に環境変数 LC_ALL を足すために使う (計画の KTD4)。
 
     返り値: {"args" (引数の配列), "exit_code" (打ち切ったときと起動できなかったときは None), "stdout", "stderr" (どちらも
     すべて。打ち切ったときは、それまでに出た分), "timed_out" (打ち切ったか), "start_error" (起動できなかった理由。起動できたら
     None)}
     """
     args = list(args)
+    env = {**os.environ, **extra_env} if extra_env else None  # None なら、このプロセスの環境変数をそのまま渡す
     try:
         completed = subprocess.run(args, capture_output=True, text=True, encoding=ENCODING, errors=ERRORS,
-                                   timeout=timeout, stdin=subprocess.DEVNULL)
+                                   timeout=timeout, stdin=subprocess.DEVNULL, env=env)
     except subprocess.TimeoutExpired as e:
         return {"args": args, "exit_code": None, "stdout": _text(e.stdout), "stderr": _text(e.stderr),
                 "timed_out": True, "start_error": None}

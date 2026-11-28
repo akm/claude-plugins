@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""テストで、du の代わりに実行する偽のコマンド (計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の U5)。
+
+モジュール scan は、環境変数 DISK_USAGE_TRIAGE_DU があれば、そのパスのコマンドを du として実行する (計画の KTD4)。テストは、
+このファイルをテストの Python で起動するシェルスクリプトを作り、そのパスをその環境変数に設定する (ファイル
+disk-usage-triage/tests/fakedu_case.py のクラス FakeDuCase)。
+
+プラグイン gh-notification-dispatch の偽の gh (ファイル gh-notification-dispatch/tests/fake-gh) と同じく、引数ごとの応答を
+環境変数で渡した JSON のファイルで決める。プラグインは別々に配布するので、ファイルは共有しない。
+
+- FAKE_DU_RESPONSES: 応答の指定の JSON のファイル。要素の配列で、受けた引数と同じ args を持つ最初の要素を使う。要素のキー:
+    args    受けた引数 (argv[1:]) と比べる配列。完全に一致したときだけ使う
+    stdout  標準出力に書く文字列。{"fixture": "<場合>"} なら、固定データの <場合>.stdout の中身 (デフォルトは空)
+    stderr  標準エラー出力に書く文字列。{"fixture": "<場合>"} なら、固定データの <場合>.stderr の中身 (デフォルトは空)
+    exit    終了コード (デフォルトは 0)
+    hang    真なら、何も書かずに終了しない (呼び出し元の時間の上限を試す)
+  一致する要素が無ければ、標準エラー出力に引数を書いて終了コード 99 で終了する (指定の漏れを、成功した応答と取り違えないため)
+- FAKE_DU_ARGS: 受けた引数 (キー args) と環境変数 LC_ALL の値 (キー lc_all。無ければ null) を、JSON の 1 行として追記する
+  ファイル
+- FAKE_DU_FIXTURES: 固定データのディレクトリ (デフォルトは disk-usage-triage/tests/fixtures/du)
+"""
+
+import json
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def fixture(name, kind):
+    base = os.environ.get("FAKE_DU_FIXTURES") or os.path.join(HERE, "..", "fixtures", "du")
+    with open(os.path.join(base, f"{name}.{kind}"), "rb") as f:
+        return f.read()
+
+
+def content(value, kind):
+    """応答の指定の stdout・stderr の値を、書き出すバイト列にする。"""
+    if value is None:
+        return b""
+    if isinstance(value, dict):
+        return fixture(value["fixture"], kind)
+    return value.encode("utf-8", errors="surrogateescape")
+
+
+def record(args):
+    path = os.environ.get("FAKE_DU_ARGS")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"args": args, "lc_all": os.environ.get("LC_ALL")}) + "\n")
+
+
+def respond(stdout, stderr, exit_code):
+    sys.stdout.buffer.write(stdout)
+    sys.stdout.buffer.flush()
+    sys.stderr.buffer.write(stderr)
+    sys.stderr.buffer.flush()
+    sys.exit(exit_code)
+
+
+def main():
+    args = sys.argv[1:]
+    record(args)
+    entries = []
+    path = os.environ.get("FAKE_DU_RESPONSES")
+    if path:
+        with open(path, encoding="utf-8") as f:
+            entries = json.load(f)
+    for entry in entries:
+        if entry.get("args") != args:
+            continue
+        if entry.get("hang"):
+            while True:
+                time.sleep(1)
+        respond(content(entry.get("stdout"), "stdout"), content(entry.get("stderr"), "stderr"), int(entry.get("exit", 0)))
+    respond(b"", f"fake-du: 応答の指定に一致しない引数 {args!r}\n".encode("utf-8", errors="surrogateescape"), 99)
+
+
+if __name__ == "__main__":
+    main()

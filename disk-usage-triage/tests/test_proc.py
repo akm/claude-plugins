@@ -6,6 +6,7 @@
   python3 -m unittest discover -s disk-usage-triage/tests
 """
 
+import os
 import sys
 import time
 import unittest
@@ -46,6 +47,18 @@ class RunTest(unittest.TestCase):
         """標準入力を空にして実行する (計画の KTD4)。標準入力を読むコマンドは、すぐにファイルの終端 (EOF) を読む。"""
         result = proc.run(python("import sys; print(repr(sys.stdin.read()))"), timeout=30)
         self.assertEqual(result["stdout"], "''\n")
+
+    def test_extra_env(self):
+        """extra_env の環境変数を足して実行し、ほかの環境変数は引き継ぐ (計画の KTD4。du に LC_ALL を足すため)。
+        このプロセスの環境変数は変えない。"""
+        os.environ["DISK_USAGE_TRIAGE_PROC_KEEP"] = "引き継ぐ"
+        self.addCleanup(os.environ.pop, "DISK_USAGE_TRIAGE_PROC_KEEP", None)
+        code = ("import os\n"
+                "print(os.environ.get('DISK_USAGE_TRIAGE_PROC_KEEP'), os.environ.get('DISK_USAGE_TRIAGE_PROC_ADD'))\n")
+        result = proc.run(python(code), timeout=30, extra_env={"DISK_USAGE_TRIAGE_PROC_ADD": "足す"})
+        self.assertEqual(result["stdout"], "引き継ぐ 足す\n")
+        self.assertNotIn("DISK_USAGE_TRIAGE_PROC_ADD", os.environ)
+        self.assertEqual(proc.run(python(code), timeout=30)["stdout"], "引き継ぐ None\n")
 
     def test_timeout(self):
         """時間の上限を超えたら打ち切り、打ち切ったことを返す (計画の R4)。"""
