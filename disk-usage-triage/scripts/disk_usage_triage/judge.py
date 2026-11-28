@@ -468,18 +468,28 @@ class DirectoryRecords:
     記録のパスと項目のパスは、シンボリックリンクを解決したパスの文字列と、ディレクトリの識別子 (デバイス番号と inode 番号) の
     両方で比べ、どちらかが同じなら同じディレクトリとする。保護の一覧と同じく、利用者が大文字と小文字だけが違う書き方で記録
     しても、その記録を使うため。記録の識別子は、この索引を作るときに求める (記録には保存しない。ディレクトリを消して作り直すと
-    識別子が変わるため)。
+    識別子が変わるため)。記録のパスが、シンボリックリンクを解決すると別のパスになるとき (記録したディレクトリか、その親が、後で
+    シンボリックリンクに置き換わったとき) は、識別子では比べない。リンク先の別のディレクトリに記録を使わないため。
     """
 
     def __init__(self, records):
-        self._entries = [(record, record["target"]["path"], _identity(record["target"]["path"]))
+        self._entries = [(record, record["target"]["path"], _record_identity(record["target"]["path"]))
                          for record in records if record["target"]["kind"] == "directory"]
 
     def find(self, entry):
-        """entry ((実パス, 識別子)) と同じディレクトリの記録。無ければ None。"""
+        """entry ((実パス, 識別子)) と同じディレクトリの記録。無ければ None。
+
+        パスの文字列で一致する記録を先に探し、無ければ識別子で一致する記録を返す。両方で一致する記録が別々にあるときに、記録を
+        置き換える側 (モジュール records) が、パスの文字列で一致する記録を置き換えるようにするため。
+        """
         real, identity = entry
-        for record, path, record_identity in self._entries:
-            if path == real or (identity is not None and identity == record_identity):
+        for record, path, _ in self._entries:
+            if path == real:
+                return record
+        if identity is None:
+            return None
+        for record, _, record_identity in self._entries:
+            if identity == record_identity:
                 return record
         return None
 
@@ -490,6 +500,13 @@ class DirectoryRecords:
             if record is not None:
                 return depth, record
         return None
+
+
+def _record_identity(path):
+    """記録のパス path の識別子。path が、シンボリックリンクを解決しても path のままのときだけ求め、そうでなければ None。"""
+    if os.path.realpath(path) != path:
+        return None
+    return _identity(path)
 
 
 def _resolved(command, path, real):

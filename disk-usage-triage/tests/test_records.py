@@ -137,6 +137,52 @@ class DirectoryKeyTest(RecordsCase):
         self.assertEqual(len(self.stored()), 1)
         self.assertEqual(self.stored()[0]["reason"], "2 回目")
 
+    def test_record_replaced_by_a_symlink_is_not_used_for_the_link_target(self):
+        """記録したディレクトリが後でシンボリックリンクに置き換わったら、リンク先の別のディレクトリに記録を使わない (KTD16)。"""
+        recorded = self.make_dir("user-home", "Library", "Caches", "foo")
+        other = self.make_dir("user-home", "Library", "Caches", "other")
+        self.assert_ok(self.add_user(directory(recorded), "deletable"))
+        os.rmdir(recorded)
+        os.symlink(other, recorded)
+        result = self.judge(other)
+        self.assertIsNone(result["record"])
+        self.assertIsNone(result["judgment"])
+        below = self.make_dir("user-home", "Library", "Caches", "other", "bar")
+        self.assertIsNone(self.judge(below)["record"], "親がシンボリックリンクに置き換わった場合も使わないこと")
+
+    def test_record_matching_the_path_is_replaced_before_one_matching_the_identity(self):
+        """パスの文字列で一致する記録を、識別子で一致する記録より先に置き換える。同じパスの記録が 2 つにならない (KTD16)。"""
+        recorded = self.make_dir("user-home", "Library", "Caches", "foo")
+        other = self.make_dir("user-home", "Library", "Caches", "other")
+        self.assert_ok(self.add_user(directory(recorded), "deletable"))
+        self.assert_ok(self.add_user(directory(other)))
+        os.rmdir(recorded)
+        os.symlink(other, recorded)
+        self.assert_ok(self.add_user(directory(other), reason="2 回目"))
+        stored = {record["target"]["path"]: record for record in self.stored()}
+        self.assertEqual(sorted(stored), sorted([recorded, other]))
+        self.assertEqual(stored[other]["reason"], "2 回目")
+        self.assertEqual(stored[recorded]["judgment"], "deletable")
+
+    def test_path_match_comes_before_identity_match(self):
+        """識別子だけで一致する記録が先に並んでいても、パスの文字列で一致する記録を置き換える (KTD16)。
+
+        書き方の違う同じディレクトリの記録が 2 つある records.json (手で書き換えたもの) を、
+        test_same_identity_with_a_different_path_is_replaced と同じ方法で作る。
+        """
+        target = self.make_dir("user-home", "Library", "Caches", "foo")
+        link = os.path.join(self.user_home, "foo-link")
+        os.symlink(target, link)
+        stored = [{"target": directory(path), "judgment": "keep", "decided_by": "user", "decided_on": TODAY,
+                   "reason": reason, "impact": None, "basis": [], "command": None, "process_names": []}
+                  for path, reason in ((link, "書き方の違う記録"), (target, "パスの文字列で一致する記録"))]
+        self.write_home(records.RECORDS, {"version": 1, "records": stored})
+        with mock.patch.object(records.os.path, "realpath", os.path.abspath), \
+                mock.patch.object(judge.os.path, "realpath", os.path.abspath):
+            self.assert_ok(self.add_user(directory(target), reason="2 回目"))
+        reasons = {record["target"]["path"]: record["reason"] for record in self.stored()}
+        self.assertEqual(reasons, {link: "書き方の違う記録", target: "2 回目"})
+
 
 class UserRecordTest(RecordsCase):
     """利用者の記録 (R18・R21)。"""
