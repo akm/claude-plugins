@@ -35,16 +35,25 @@ class AllowedPairTest(unittest.TestCase):
             self.assertTrue(any(fragment in error for error in errors), f"理由に {fragment!r} を含むこと: {errors}")
         return errors
 
-    def test_allowed_pairs_are_accepted(self):
-        """許可した組で始まるコマンドは、後に引数があっても受け付ける。"""
+    def test_allowed_forms_are_accepted(self):
+        """組の形のコマンドは受け付け、形に引数を足したコマンドは拒否する (R16)。"""
         for entry in commands.ALLOWED:
-            with self.subTest(pair=" ".join(entry["args"])):
-                self.assert_accepted(tool(*entry["args"]))
-                self.assert_accepted(tool(*entry["args"], "--flag", "{path}"))
+            for form in entry["forms"]:
+                with self.subTest(form=form):
+                    self.assert_accepted(tool(*form["args"], env=dict(form["env"]) or None))
+                    self.assert_rejected(tool(*form["args"], "--flag", env=dict(form["env"]) or None), "形")
+
+    def test_command_must_match_a_form(self):
+        """項目を指さないコマンドと、組に続く引数で対象を広げるコマンドは、形と一致しないので拒否する (R16)。"""
+        for command in (tool("xcrun", "simctl", "delete", "all"), tool("go", "clean", "-modcache"),
+                        tool("go", "clean", "-modcache", "-cache", env={"GOMODCACHE": "{path}"}),
+                        tool("brew", "cleanup", "--prune=all"), tool("npm", "cache", "clean", "--force")):
+            with self.subTest(command=command):
+                self.assert_rejected(command, "形のどれとも一致しない")
 
     def test_pairs_added_in_u4(self):
         """U4 で、brew cleanup と uv cache prune を足した (2026-11-27 に利用者が決めた)。"""
-        self.assert_accepted(tool("brew", "cleanup", "--prune=all"))
+        self.assert_accepted(tool("brew", "cleanup", env={"HOMEBREW_CACHE": "{path}"}))
         self.assert_accepted(tool("uv", "cache", "prune", "--cache-dir", "{path}"))
 
     def test_pairs_that_start_other_commands_are_rejected(self):
@@ -111,9 +120,9 @@ class ArgumentTest(unittest.TestCase):
         self.assertTrue(commands.command_errors({"type": "tool", "args": []}))
 
     def test_value_with_spaces_is_accepted(self):
-        """空白は特殊文字ではないので、空白を含む値は拒否しない。"""
-        self.assertEqual(commands.command_errors(tool("xcrun", "simctl", "delete", "iPhone 15 Pro")), [])
-        self.assertEqual(commands.command_errors(tool("xcrun", "simctl", "delete", "日本語 の 名前")), [])
+        """空白は特殊文字ではないので、空白を含む値は値の検査で拒否しない。"""
+        self.assertEqual(commands.value_errors("iPhone 15 Pro", "args[3]"), [])
+        self.assertEqual(commands.value_errors("日本語 の 名前", "args[3]"), [])
 
     def test_path_form_is_rejected(self):
         """パスの形の値 (/・~・. で始まる値と、/ を含む値) は拒否し、項目の場所は {path} で書かせる (R16)。"""
@@ -167,13 +176,13 @@ class CommandShapeTest(unittest.TestCase):
 
 
 class AllowedConstantTest(unittest.TestCase):
-    """定数 ALLOWED の形 (KTD6)。組ごとに、使ってよい環境変数の名前と、確認した文書の URL と日付を持つ。"""
+    """定数 ALLOWED の形 (KTD6)。組ごとに、使ってよい環境変数の名前と、Claude が書ける形と、確認した文書の URL と日付を持つ。"""
 
     def test_entries(self):
         self.assertTrue(commands.ALLOWED)
         for entry in commands.ALLOWED:
             with self.subTest(pair=entry.get("args")):
-                self.assertEqual(set(entry), {"args", "env", "sources"})
+                self.assertEqual(set(entry), {"args", "env", "forms", "sources"})
                 args = entry["args"]
                 self.assertIsInstance(args, tuple)
                 self.assertGreaterEqual(len(args), 2, "実行ファイルだけで許可しないこと (KD17)")
@@ -181,6 +190,13 @@ class AllowedConstantTest(unittest.TestCase):
                 self.assertNotIn(args[0], commands.DOMAIN_EXECUTABLES)
                 self.assertIsInstance(entry["env"], tuple)
                 self.assertTrue(all(re.fullmatch(r"[A-Z_][A-Z0-9_]*", name) for name in entry["env"]))
+                self.assertTrue(entry["forms"])
+                for form in entry["forms"]:
+                    self.assertEqual(set(form), {"args", "env"})
+                    self.assertEqual(form["args"][:len(args)], args, "形は組で始まること")
+                    self.assertTrue(set(form["env"]) <= set(entry["env"]), "形の環境変数は組に許可した名前だけ")
+                    values = list(form["args"]) + list(form["env"].values())
+                    self.assertTrue(any(v in commands.PLACEHOLDERS for v in values), "形は項目を {path} か {name} で指すこと")
                 self.assertTrue(entry["sources"])
                 for source in entry["sources"]:
                     self.assertEqual(set(source), {"url", "checked_on"})

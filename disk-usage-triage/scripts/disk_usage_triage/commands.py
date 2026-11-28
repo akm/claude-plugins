@@ -12,27 +12,38 @@ Claude が書いたコマンドの検査 (関数 command_errors) は、このモ
 
 import json
 
-# 組 (引数の配列の先頭と順に比べる)・使ってよい環境変数の名前・組を確認した文書。環境変数は、キャッシュの場所を指定するもの
-# だけを許可する。名前を限らないと、PATH・NODE_OPTIONS・DYLD_INSERT_LIBRARIES などで別のプログラムを実行させられるため
-# (計画の KTD6。U4 を実装するときに利用者が決めた。2026-11-27)。
+# 組 (引数の配列の先頭と順に比べる)・使ってよい環境変数の名前・Claude が書ける形・組を確認した文書。環境変数は、キャッシュの
+# 場所を指定するものだけを許可する。名前を限らないと、PATH・NODE_OPTIONS・DYLD_INSERT_LIBRARIES などで別のプログラムを実行
+# させられるため (計画の KTD6。U4 を実装するときに利用者が決めた。2026-11-27)。形 (forms) は、引数の配列と環境変数の組で、
+# 判定表のツールのコマンドと同じく、項目を {path} か {name} で指す。Claude が書いたコマンドは、形のどれかと一致しなければ
+# 誤りにする。組に続く引数で、選んだ項目の外を対象にさせないため (計画の R16。2026-11-28 に利用者が決めた)。
 ALLOWED = (
     {"args": ("brew", "cleanup"), "env": ("HOMEBREW_CACHE",),
+     "forms": ({"args": ("brew", "cleanup"), "env": {"HOMEBREW_CACHE": "{path}"}},),
      "sources": ({"url": "https://docs.brew.sh/Manpage", "checked_on": "2026-11-27"},)},
     {"args": ("go", "clean"), "env": ("GOCACHE", "GOMODCACHE"),
+     "forms": ({"args": ("go", "clean", "-cache"), "env": {"GOCACHE": "{path}"}},
+               {"args": ("go", "clean", "-modcache"), "env": {"GOMODCACHE": "{path}"}}),
      "sources": ({"url": "https://pkg.go.dev/cmd/go#hdr-Remove_object_files_and_cached_files", "checked_on": "2026-11-27"},
                  {"url": "https://pkg.go.dev/cmd/go#hdr-Build_and_test_caching", "checked_on": "2026-11-25"},
                  {"url": "https://go.dev/ref/mod#module-cache", "checked_on": "2026-11-25"})},
     {"args": ("npm", "cache", "clean"), "env": (),
+     "forms": ({"args": ("npm", "cache", "clean", "--force", "--cache", "{path}"), "env": {}},),
      "sources": ({"url": "https://docs.npmjs.com/cli/v11/commands/npm-cache", "checked_on": "2026-11-25"},)},
     {"args": ("pip", "cache", "purge"), "env": (),
+     "forms": ({"args": ("pip", "cache", "purge", "--cache-dir", "{path}"), "env": {}},),
      "sources": ({"url": "https://pip.pypa.io/en/stable/cli/pip_cache/", "checked_on": "2026-11-25"},)},
     {"args": ("pnpm", "store", "prune"), "env": (),
+     "forms": ({"args": ("pnpm", "store", "prune", "--store-dir", "{path}"), "env": {}},),
      "sources": ({"url": "https://pnpm.io/10.x/cli/store", "checked_on": "2026-11-25"},)},
     {"args": ("uv", "cache", "clean"), "env": (),
+     "forms": ({"args": ("uv", "cache", "clean", "--cache-dir", "{path}"), "env": {}},),
      "sources": ({"url": "https://docs.astral.sh/uv/concepts/cache/#clearing-the-cache", "checked_on": "2026-11-27"},)},
     {"args": ("uv", "cache", "prune"), "env": (),
+     "forms": ({"args": ("uv", "cache", "prune", "--cache-dir", "{path}"), "env": {}},),
      "sources": ({"url": "https://docs.astral.sh/uv/concepts/cache/#clearing-the-cache", "checked_on": "2026-11-27"},)},
     {"args": ("xcrun", "simctl", "delete"), "env": (),
+     "forms": ({"args": ("xcrun", "simctl", "delete", "{name}"), "env": {}},),
      "sources": ({"url": "https://developer.apple.com/forums/thread/812408", "checked_on": "2026-11-25"},)},
 )
 
@@ -119,6 +130,19 @@ def _env_errors(env, entry):
     return errors
 
 
+def _form_text(form):
+    env = "".join(f"{name}={value} " for name, value in form["env"].items())
+    return env + " ".join(form["args"])
+
+
+def _form_errors(args, env, entry):
+    """コマンド (引数の配列 args と環境変数 env) が、組 entry の形のどれとも一致しないときの誤りの配列。"""
+    if any(list(form["args"]) == args and form["env"] == env for form in entry["forms"]):
+        return []
+    forms = "・".join(_form_text(form) for form in entry["forms"])
+    return [f"コマンドが、組 {' '.join(entry['args'])} の形のどれとも一致しない (書ける形: {forms})"]
+
+
 def command_errors(command):
     """消すコマンド command の誤りの配列 (計画の R16)。
 
@@ -146,4 +170,7 @@ def command_errors(command):
     entry = allowed_entry(args) if all(isinstance(a, str) for a in args) else None
     if "env" in command:
         errors += _env_errors(command["env"], entry)
+    env = command.get("env", {})
+    if entry is not None and isinstance(env, dict):
+        errors += _form_errors(args, env, entry)
     return errors

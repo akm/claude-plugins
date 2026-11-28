@@ -642,6 +642,7 @@ class BundledTableTest(unittest.TestCase):
                 self.assertIsNotNone(entry, f"{command['args']} が commands.ALLOWED の組で始まらない")
                 for name in command.get("env", {}):
                     self.assertIn(name, entry["env"], f"環境変数 {name} を組 {entry['args']} に許可していない")
+                self.assertEqual(commands.command_errors(command), [], "判定表のツールのコマンドは、組の形のどれかであること")
 
     def test_dedicated_list_rows(self):
         """専用の一覧の行 (asdf の installs・Docker Desktop のディレクトリ) がある (計画の U3)。"""
