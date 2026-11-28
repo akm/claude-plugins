@@ -88,6 +88,17 @@ class ConfigShowTest(ConfigCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload["config"]["scan_dirs"], ["/no/such/dir"])
 
+    def test_path_not_utf8(self):
+        """UTF-8 として読めない名前のパス (surrogate のコードポイントを含む文字列) も、標準出力の JSON に書ける (計画の KTD2)。
+
+        標準出力の JSON では、surrogate のコードポイントを JSON のエスケープにするので、読み込むと元の文字列に戻る。
+        """
+        self.write_home_text(CONFIG, '{"version": 1, "scan_dirs": ["/no/such/caf\\udcff"], "project_dirs": ["~/b"], '
+                                     '"timeout_seconds": 300}')
+        code, payload, stderr = self.cli("config", "show")
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(payload["config"]["scan_dirs"], ["/no/such/caf\udcff"])
+
 
 BROKEN = {
     "JSON として読めない": "{",

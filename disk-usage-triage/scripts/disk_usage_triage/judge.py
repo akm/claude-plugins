@@ -20,6 +20,7 @@ U10〜U12 で関数 judge の引数 usage に渡す。
 """
 
 import datetime
+import glob
 import json
 import os
 import re
@@ -232,22 +233,26 @@ def _search_below(path, timeout, clock):
     return found, unreadable, False
 
 
-def selection_blockers(path, env, *, timeout, clock=time.monotonic):
-    """path をまとめて消す対象に選べない理由の配列 (R12・KTD5)。選べるときは空の配列。
-
-    要素は {kind, path, reason}。kind は、protected (path が保護の一覧の項目)・contains-protected (下に保護の一覧の場所がある)・
-    app-worktree-below (下にアプリの worktree のディレクトリがある)・unreadable (下に読めないディレクトリがある)・timeout
-    (下を探すのが時間の上限 timeout 秒を超えた) のどれか。前の種類の理由があれば、後の種類は調べない (下を探すのは時間がかかるため)。
-    判定が「残す」の項目と、それを含む親は、記録を使う判定 (U4) の後に呼び出し元が扱う。
-    """
+def protected_blockers(path, env):
+    """path が保護の一覧の項目なら、選べない理由 (kind protected) の配列。そうでなければ空の配列。"""
     protected = protection(path, env)
-    if protected is not None:
-        return [{"kind": "protected", "path": path,
-                 "reason": f"保護の一覧にある ({protected['label']}: {protected['path']})"}]
-    contained = _contained(path, env)
-    if contained:
-        return [{"kind": "contains-protected", "path": location.path,
-                 "reason": f"下に、保護の一覧の {location.label} ({location.path}) がある"} for location in contained]
+    if protected is None:
+        return []
+    return [{"kind": "protected", "path": path, "reason": f"保護の一覧にある ({protected['label']}: {protected['path']})"}]
+
+
+def contained_blockers(path, env):
+    """path の下にある保護の一覧の場所ごとの、選べない理由 (kind contains-protected) の配列。無ければ空の配列。"""
+    return [{"kind": "contains-protected", "path": location.path,
+             "reason": f"下に、保護の一覧の {location.label} ({location.path}) がある"} for location in _contained(path, env)]
+
+
+def below_blockers(path, *, timeout, clock=time.monotonic):
+    """path の下を探して見つかった、選べない理由の配列 (KTD5)。無ければ空の配列。
+
+    kind は、app-worktree-below (下にアプリの worktree のディレクトリがある)・unreadable (下に読めないディレクトリがある)・
+    timeout (下を探すのが時間の上限 timeout 秒を超えた) のどれか。
+    """
     found, unreadable, timed_out = _search_below(path, timeout, clock)
     blockers = [{"kind": "app-worktree-below", "path": worktrees,
                  "reason": f"下に、アプリの worktree のディレクトリ ({worktrees}) がある"} for worktrees in found]
@@ -258,6 +263,50 @@ def selection_blockers(path, env, *, timeout, clock=time.monotonic):
         blockers.append({"kind": "timeout", "path": path,
                          "reason": f"時間の上限 ({timeout} 秒) までに、下にアプリの worktree が無いことを確認し終えなかった"})
     return blockers
+
+
+def keep_blockers(path, env, rows, records=None):
+    """path の下にある「残す」の項目ごとの、選べない理由 (kind contains-keep) の配列 (計画の R12)。無ければ空の配列。
+
+    「残す」の項目は、記録の「残す」(利用者と Claude。records は DirectoryRecords で、None なら記録を見ない) のディレクトリと、
+    判定表の判定が「残す」の行のパターンに一致し、実際にあるディレクトリ。ツールのコマンドで消すディレクトリの下の項目は、
+    判定が「残す」になるが、ここには含めない。そのディレクトリを消すことが目的のため。判定表のパターンは、関数 match_table と
+    同じく、大文字と小文字を区別して比べる。
+    """
+    _check_absolute(path)
+    real = os.path.realpath(path)
+    blockers = []
+    if records is not None:
+        for record in records.keep_below(real, _identity(real)):
+            blockers.append({"kind": "contains-keep", "path": record["target"]["path"],
+                             "reason": f"下に、{DECIDER_LABELS[record['decided_by']]}が「残す」と記録したディレクトリ "
+                                       f"({record['target']['path']}) がある"})
+    parts = real.split(os.sep)
+    home_parts = os.path.realpath(env.home).split(os.sep)
+    for row in rows:
+        if row["judgment"] != "keep":
+            continue
+        pattern = home_parts + _pattern_parts(row["pattern"])
+        if len(pattern) <= len(parts) or not all(p == "*" or p == q for p, q in zip(pattern, parts)):
+            continue
+        rest = [p if p == "*" else glob.escape(p) for p in pattern[len(parts):]]
+        for found in sorted(glob.glob(os.path.join(glob.escape(real), *rest), include_hidden=True)):
+            if os.path.isdir(found) and not os.path.islink(found):
+                blockers.append({"kind": "contains-keep", "path": found,
+                                 "reason": f"下に、判定表の判定が「残す」のディレクトリ ({found}。行 {row['pattern']}) がある"})
+    return blockers
+
+
+def selection_blockers(path, env, *, timeout, clock=time.monotonic):
+    """path をまとめて消す対象に選べない理由の配列 (R12・KTD5)。選べるときは空の配列。
+
+    要素は {kind, path, reason}。関数 protected_blockers (path が保護の一覧の項目)・contained_blockers (下に保護の一覧の
+    場所がある)・below_blockers (下を探して見つかったもの) の順に調べ、前の種類の理由があれば、後の種類は調べない (下を探すのは
+    時間がかかるため)。判定が「残す」の項目・判定の無い項目・「残す」の項目を含む親 (関数 keep_blockers) は、判定を使う
+    モジュール lists が、計画の KTD5 の順に、この 3 つの関数の間で調べる。
+    """
+    return (protected_blockers(path, env) or contained_blockers(path, env)
+            or below_blockers(path, timeout=timeout, clock=clock))
 
 
 # --- 判定表 ---------------------------------------------------------------------------------------------------------
@@ -494,6 +543,24 @@ class DirectoryRecords:
             if identity == record_identity:
                 return record
         return None
+
+    def keep_below(self, real, identity):
+        """実パス real (識別子 identity) のディレクトリより下にある、判定が「残す」の記録の配列 (計画の R12)。
+
+        記録のディレクトリの親をたどり、real と同じディレクトリ (パスの文字列か識別子が同じ) があれば、下にあるとする。記録の
+        パスが、シンボリックリンクを解決すると別のパスになるときは、識別子では比べない (クラスの docstring と同じ理由)。記録の
+        ディレクトリが無くなっていれば、残すものが無いので含めない。
+        """
+        result = []
+        for record, path, record_identity in self._entries:
+            if record["judgment"] != "keep" or not os.path.isdir(path):
+                continue
+            if path == real or (record_identity is not None and record_identity == identity):
+                continue  # real そのものの記録 (下ではない)
+            stable = os.path.realpath(path) == path
+            if any(r == real or (stable and identity is not None and i == identity) for r, i in _chain(path)[1:]):
+                result.append(record)
+        return result
 
     def nearest(self, real):
         """実パス real か、その親のディレクトリの記録のうち、最も近いもの。(何階層上か (real そのものは 0), 記録)。無ければ None。"""
