@@ -588,6 +588,22 @@ class JudgeWithRecordsTest(RecordsCase):
         self.assertIsNone(result["command"])
         self.assertIn("端末の UDID", result["reason"])
 
+    def test_claude_record_command_whose_name_is_not_a_udid_is_kept(self):
+        """記録の Claude のコマンドの {name} を置き換えられなければ、判定の時も「残す」にする (R16)。
+
+        add_claude は名前を確認してから記録するので、確認を通らない記録は、手で書いた records.json で作る。
+        """
+        target = self.make_dir("user-home", "Library", "Caches", "all")
+        record = {"target": directory(target), "judgment": "deletable", "decided_by": "claude", "decided_on": TODAY,
+                  "reason": "Claude が調べた理由", "impact": "Claude が調べた影響", "basis": ["https://example.com/docs"],
+                  "command": tool("xcrun", "simctl", "delete", "{name}"), "process_names": []}
+        self.write_home(records.RECORDS, {"version": 1, "records": [record]})
+        result = self.judge(target)
+        self.assertEqual(result["judgment"], "keep")
+        self.assertEqual(result["source"], "record")
+        self.assertIsNone(result["command"])
+        self.assertIn("端末の UDID", result["reason"])
+
     def test_claude_record_with_simctl_needs_a_udid_name(self):
         """Claude が xcrun simctl delete {name} を書くときは、項目の名前が端末の UDID の形でなければ記録しない (R16)。"""
         command = tool("xcrun", "simctl", "delete", "{name}")
