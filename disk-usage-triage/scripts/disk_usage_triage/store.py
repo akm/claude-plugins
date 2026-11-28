@@ -20,6 +20,7 @@ import contextlib
 import fcntl
 import json
 import os
+import re
 import tempfile
 
 HOME_ENV = "DISK_USAGE_TRIAGE_HOME"
@@ -27,6 +28,8 @@ DEFAULT_HOME = os.path.join("~", ".claude", "disk-usage-triage")
 VERSION = 1
 LOCK = "lock"
 INPUTS = "inputs"
+
+_SURROGATE = re.compile("[\ud800-\udfff]")
 
 
 class Corrupt(Exception):
@@ -49,6 +52,18 @@ def home():
 def inputs_dir():
     """Claude が Write ツールで入力のファイルを書くディレクトリの絶対パス (計画の KTD3)。"""
     return os.path.join(home(), INPUTS)
+
+
+def dumps(data):
+    """data を JSON の文字列にする。日本語はエスケープせず、surrogate のコードポイントだけを JSON のエスケープ (`\\udcff` の形) にする。
+
+    モジュール proc は、du の出力のうち UTF-8 として読めないバイトを surrogate のコードポイントにして残すので、項目のパスに
+    入ることがある。そのまま UTF-8 で書くと UnicodeEncodeError になるため。JSON の文字列の外 (区切りの記号) には ASCII の文字しか
+    出ないので、置き換えるのは文字列の中だけになる。再度読み込むと、元のパス (surrogate のコードポイントを含む文字列) に戻る
+    (計画の KTD2)。ファイルの書き込みと、入口のファイルの標準出力の JSON の両方に使う。
+    """
+    text = json.dumps(data, ensure_ascii=False, indent=2)
+    return _SURROGATE.sub(lambda match: f"\\u{ord(match.group()):04x}", text)
 
 
 def _read_file(path):
@@ -83,7 +98,7 @@ def _write_atomic(path, data):
     fd, temporary = tempfile.mkstemp(prefix=f".{os.path.basename(path)}.", suffix=".tmp", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write(dumps(data))
             f.write("\n")
             f.flush()
             os.fsync(f.fileno())

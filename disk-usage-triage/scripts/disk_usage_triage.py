@@ -57,7 +57,9 @@ def _exit_help(ok, unsatisfied, failed=_NO_EXTERNAL):
 
 
 def _emit(payload):
-    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2)
+    """標準出力に JSON を書く。UTF-8 として読めない名前のパスも書けるように、モジュール store の関数 dumps で書く (計画の KTD2)。"""
+    from disk_usage_triage import store  # Python の版を確認した後に呼ぶ (関数 main)
+    sys.stdout.write(store.dumps(payload))
     sys.stdout.write("\n")
 
 
@@ -222,8 +224,9 @@ def main(argv=None):
         if (sys.argv[1:] if argv is None else argv)[:1] == ["hook"]:
             for error in errors:
                 sys.stderr.write(f"disk-usage-triage: {error}\n")
-        else:
-            _emit({"errors": errors})
+        else:  # 古い版ではパッケージを読み込まないので、関数 _emit を使わない
+            json.dump({"errors": errors}, sys.stdout, ensure_ascii=False, indent=2)
+            sys.stdout.write("\n")
         return EXIT_UNSATISFIED
     args = build_parser().parse_args(argv)
     return args.func(args)

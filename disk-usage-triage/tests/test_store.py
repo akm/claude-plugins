@@ -82,6 +82,24 @@ class AtomicWriteTest(TriageCase):
         with open(os.path.join(self.home, NAME), encoding="utf-8") as f:
             self.assertIn("値", f.read(), "日本語をエスケープせずに書くこと")
 
+    def test_path_not_utf8_round_trips(self):
+        """UTF-8 として読めない名前のパス (surrogate のコードポイントを含む文字列) も書け、読むと元の文字列に戻る (計画の KTD2)。
+
+        モジュール proc は、du の出力の UTF-8 として読めないバイトを surrogate のコードポイントにして残す。ファイルには、
+        surrogate のコードポイントだけを JSON のエスケープにして書く。
+        """
+        data = {"version": 1, "path": "/Users/u/caf\udcff", "value": "値"}
+        with store.transaction() as tx:
+            tx.write(NAME, data)
+        self.assertEqual(store.read(NAME), data)
+        with open(os.path.join(self.home, NAME), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("caf\\udcff", text)
+        self.assertIn("値", text, "日本語はエスケープしないこと")
+
+    def test_dumps_escapes_only_surrogates(self):
+        self.assertEqual(store.dumps({"a": "\udc80値\udcff"}), '{\n  "a": "\\udc80値\\udcff"\n}')
+
     def test_failed_replace_keeps_original(self):
         """一時ファイルの名前を変える前に例外が起きても、元のファイルが残り、一時ファイルも残らない。"""
         original = {"version": 1, "value": "元"}
