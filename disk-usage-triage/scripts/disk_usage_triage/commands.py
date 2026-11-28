@@ -60,6 +60,11 @@ def _dump(value):
     return json.dumps(value, ensure_ascii=False)
 
 
+# パスの形の値の先頭。これらで始まる値と、/ を含む値は、パスとして受け付けない。項目の場所は {path} で書かせ、Claude が書いた
+# パスで、選んだ項目の外を消させないため (計画の R16。2026-11-28 に利用者が決めた)。
+PATH_PREFIXES = ("/", "~", ".")
+
+
 def value_errors(value, where):
     """引数か環境変数の値 value の誤りの配列。where は誤りの文に書く場所の名前。"""
     if not isinstance(value, str):
@@ -74,8 +79,9 @@ def value_errors(value, where):
         errors.append(f"{where} ({_dump(value)}) が、シェルの特殊文字 ({'・'.join(found)}) を含む")
     if ("{" in value or "}" in value) and value not in PLACEHOLDERS:
         errors.append(f"{where} ({_dump(value)}) の {{ }} が、{' か '.join(PLACEHOLDERS)} の要素全体でない")
-    if value.startswith("~") and value != "~" and not value.startswith("~/"):
-        errors.append(f"{where} ({_dump(value)}) が ~<利用者名> で始まる (~ か ~/ で始める)")
+    if value.startswith(PATH_PREFIXES) or "/" in value:
+        errors.append(f"{where} ({_dump(value)}) がパスの形 ({'・'.join(PATH_PREFIXES)} で始まるか、/ を含む)。"
+                      "項目の場所は {path} と書く")
     return errors
 
 

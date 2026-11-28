@@ -2,7 +2,7 @@
 """Claude が書いたコマンドの検査 (ファイル `disk-usage-triage/scripts/disk_usage_triage/commands.py`) のテスト。
 
 計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の U4 のテストシナリオのうち、R16 の検査。許可する組と
-環境変数の名前は KTD6、引数のパスの書き方 ({path}・{name}・~) は R16 にある。
+環境変数の名前は KTD6、引数の書き方 ({path}・{name}・パスの形の値) は R16 にある。
 
   python3 -m unittest discover -s disk-usage-triage/tests
 """
@@ -110,18 +110,20 @@ class ArgumentTest(unittest.TestCase):
         self.assertTrue(commands.command_errors({"type": "tool", "args": "brew cleanup"}))
         self.assertTrue(commands.command_errors({"type": "tool", "args": []}))
 
-    def test_path_with_spaces_is_accepted(self):
-        """空白は特殊文字ではないので、空白を含むパスは拒否しない。"""
-        self.assertEqual(commands.command_errors(tool("uv", "cache", "clean", "--cache-dir",
-                                                      "~/Library/Application Support/uv cache")), [])
-        self.assertEqual(commands.command_errors(tool("uv", "cache", "clean", "--cache-dir",
-                                                      "/Users/u/Library/Application Support/日本語")), [])
+    def test_value_with_spaces_is_accepted(self):
+        """空白は特殊文字ではないので、空白を含む値は拒否しない。"""
+        self.assertEqual(commands.command_errors(tool("xcrun", "simctl", "delete", "iPhone 15 Pro")), [])
+        self.assertEqual(commands.command_errors(tool("xcrun", "simctl", "delete", "日本語 の 名前")), [])
 
-    def test_home_prefix(self):
-        """~ と ~/ で始まる引数と値は受け付け、~<利用者名> で始まるものは拒否する (R16)。"""
-        self.assertEqual(commands.command_errors(tool("brew", "cleanup", "~")), [])
-        self.assertEqual(commands.command_errors(tool("brew", "cleanup", env={"HOMEBREW_CACHE": "~/cache"})), [])
-        self.assert_rejected_argument("~root/cache", "~<利用者名>")
+    def test_path_form_is_rejected(self):
+        """パスの形の値 (/・~・. で始まる値と、/ を含む値) は拒否し、項目の場所は {path} で書かせる (R16)。"""
+        self.assertEqual(commands.PATH_PREFIXES, ("/", "~", "."))
+        for value in ("~", "~/cache", "~root/cache", "/Users/u/cache", "./cache", "..", ".cache", "cache/sub",
+                      "--cache-dir=/x"):
+            with self.subTest(value=value):
+                self.assert_rejected_argument(value, "パスの形")
+        self.assertEqual(commands.command_errors(tool("uv", "cache", "clean", "--cache-dir", "{path}")), [])
+        self.assertEqual(commands.command_errors(tool("go", "clean", "-modcache", env={"GOMODCACHE": "{path}"})), [])
 
     def test_placeholders(self):
         """{path}・{name} は要素全体にだけ書ける。{ と } は、ほかには書けない。"""
