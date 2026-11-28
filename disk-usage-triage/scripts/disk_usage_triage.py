@@ -10,8 +10,15 @@ references/files.md にある。
   config show                       設定を表示する。設定が無いときも、無いことを出力する
   config set --input-file <ファイル>  入力のファイルの内容で、設定の全体を置き換える
   records list                      記録を、番号を付けて表示する
-  records add --input-file <ファイル>  利用者が「残す」と言った対象を記録する
+  records add --input-file <ファイル>  利用者が「残す」と言った対象を記録する (--run と --item で一覧の項目を指定できる)
   records remove --listing <ID> <番号>...  records list の番号の記録を消す
+  run start                         トリアージを始め、トリアージの ID を出力する
+  scan --run <ID> [--item <番号>]    調べるディレクトリか一覧の項目の下の階層を du で調べ、一覧を作る
+  list show --run <ID> <英字>        一覧を、その時の判定と一緒に表示する
+  select add --run <ID> <番号>...    一覧の項目を、消す項目として選ぶ
+  select remove --run <ID> <番号>... 選んだ項目から外す
+  select show --run <ID>            選んだ項目を表示する
+  judge set --run <ID> <番号> --input-file <ファイル>  一覧の項目に、Claude の判定を記録する
   hook pre-tool-use                 hook PreToolUse が実行する。削除のシェルスクリプトの実行と書き換えを拒否する
 
 終了コード (計画の KTD14):
@@ -94,13 +101,57 @@ def cmd_records_list(args):
 
 
 def cmd_records_add(args):
-    from disk_usage_triage import records
+    from disk_usage_triage import lists, records
+    if (args.run is None) != (args.item is None):
+        args.parser.error("--run と --item は、両方を指定する")
+    if args.item is not None:
+        return _emit_status(lists.add_keep(args.run, args.item, args.input_file))
     return _emit_status(records.add_from_file(args.input_file))
 
 
 def cmd_records_remove(args):
     from disk_usage_triage import records
     return _emit_status(records.remove(args.listing, args.numbers))
+
+
+def cmd_run_start(args):
+    from disk_usage_triage import lists
+    return _emit_status(lists.run_start())
+
+
+def cmd_scan(args):
+    from disk_usage_triage import lists
+    return _emit_status(lists.scan(args.run, args.item))
+
+
+def cmd_list_show(args):
+    from disk_usage_triage import lists
+    return _emit_status(lists.show(args.run, args.letter, all_items=args.all, unreadable=args.unreadable))
+
+
+def cmd_select_add(args):
+    from disk_usage_triage import lists
+    if bool(args.numbers) == (args.all_deletable is not None):
+        args.parser.error("番号か --all-deletable の、どちらか一方を指定する")
+    if args.all and args.all_deletable is None:
+        args.parser.error("--all は、--all-deletable と一緒に指定する")
+    return _emit_status(lists.select_add(args.run, args.numbers, all_deletable=args.all_deletable,
+                                         include_others=args.all))
+
+
+def cmd_select_remove(args):
+    from disk_usage_triage import lists
+    return _emit_status(lists.select_remove(args.run, args.numbers))
+
+
+def cmd_select_show(args):
+    from disk_usage_triage import lists
+    return _emit_status(lists.select_show(args.run))
+
+
+def cmd_judge_set(args):
+    from disk_usage_triage import lists
+    return _emit_status(lists.judge_set(args.run, args.number, args.input_file))
 
 
 def cmd_hook_pre_tool_use(args):
@@ -122,8 +173,30 @@ def _add(sub, name, func, description, output, exit_help):
     parser = sub.add_parser(name, help=description.splitlines()[0], description=description,
                             epilog=f"出力 (標準出力の JSON):\n{output}\n\n{exit_help}",
                             formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.set_defaults(func=func)
+    parser.set_defaults(func=func, parser=parser)
     return parser
+
+
+_BACKGROUND = ("Bash ツールの時間の上限より長くかかることがある。そのため、Bash ツールのバックグラウンド\n"
+               "(引数 run_in_background) で実行し、完了の通知を受けてから出力を読む (計画の KTD15)")
+
+_RUN_HELP = "run start が出力したトリアージの ID (YYYYMMDD-HHMMSS)"
+
+_ITEM_FIELDS = ("number, path, display, bytes, size, judgment, judgment_label, reason,\n"
+                "                   record, impact, command, command_text, process_names, dedicated_list, unreadable_count")
+
+_LIST_OUTPUT = (
+    "  letter           一覧の英字。一覧が無いときは null\n"
+    "  created_at       一覧を作った時刻\n"
+    "  source           何を調べた一覧か。{kind: scan_dirs} か {kind: item, number, path, display}\n"
+    "  table            一覧の表 (Markdown)。スキルはそのまま示す\n"
+    "  notes            表の下に示す注記の配列 (調べたディレクトリごとの使用量・読めなかったディレクトリなど)。スキルはそのまま示す\n"
+    f"  items            表に示した項目の配列。要素は {{{_ITEM_FIELDS}}}。\n"
+    "                   judgment は deletable・review・keep か null (判定なし)。impact と command_text は表に出さない\n"
+    "  others           その他の行 {count, bytes, size, deletable_count, deletable_bytes, unreadable_count}。無ければ null\n")
+
+_LISTS_UNSATISFIED = ("トリアージ・一覧・番号が無いか形が違う・設定か記録 (records.json) が無いか壊れている・\n"
+                      "     一覧のファイルが壊れている (新しいトリアージで調べ直す)")
 
 
 _CONFIG_SHAPE = "{scan_dirs, project_dirs, timeout_seconds}"
@@ -176,7 +249,8 @@ def build_parser():
          _exit_help("表示した (記録が無いときも)", "records.json が壊れている (理由と、ファイルのパスを errors に書く)"))
 
     p = _add(g, "add", cmd_records_add,
-             "引数 --input-file の JSON のファイルの対象を、利用者の「残す」として記録する。同じ対象の記録があれば置き換え、\n"
+             "引数 --input-file の JSON のファイルの対象を、利用者の「残す」として記録する。引数 --run と --item で一覧の項目を\n"
+             "指定すると、入力に target を書かず、その項目のディレクトリを対象にする。同じ対象の記録があれば置き換え、\n"
              "判定・だれが決めたか・日付 (と、入力に書いたときは理由) だけを変える。入力の様式と検査の内容は、文書\n"
              "references/files.md の節「records add の入力」にある。ディレクトリの記録には設定 (config.json) が要る。\n"
              "誤りはすべて errors に書き、1 つでもあれば何も記録しない",
@@ -188,9 +262,12 @@ def build_parser():
              _exit_help("記録した",
                         "入力のファイルを読めない・入力に誤りがある (知らないキー・keep でない判定・存在しないディレクトリ・\n"
                         "     保護の一覧の場所・名前の形の誤りなど)・設定が無いか壊れている (ディレクトリのとき)・\n"
-                        "     records.json が壊れている"))
+                        "     records.json が壊れている・--item のトリアージ・一覧・番号が無いか、一覧のファイルが壊れている"))
     p.add_argument("--input-file", required=True,
                    help="Claude が Write ツールで書いた入力の JSON のファイル (config show の inputs_dir の下に置く)")
+    p.add_argument("--run", help=f"{_RUN_HELP}。--item と一緒に指定する")
+    p.add_argument("--item", metavar="番号",
+                   help="記録する一覧の項目の番号 (例: A3)。指定すると、入力に target を書かず、この項目のディレクトリを記録する")
 
     p = _add(g, "remove", cmd_records_remove,
              "records list で表示した一覧の番号の記録を消す。一覧を表示した後に記録が変わっていれば (一覧の ID が違えば)、\n"
@@ -202,6 +279,119 @@ def build_parser():
                         "一覧を表示した後に記録が変わった・範囲の外の番号がある・records.json が壊れている"))
     p.add_argument("--listing", required=True, help="records list の出力の listing (一覧の ID)")
     p.add_argument("numbers", nargs="+", type=int, metavar="番号", help="records list の出力の number")
+
+    g = groups.add_parser("run", help="トリアージを始める").add_subparsers(dest="command", required=True)
+    _add(g, "start", cmd_run_start,
+         "トリアージ (調べ始めてから、削除の後の比較までの 1 回分の作業) を始める。保存先のディレクトリの下にトリアージの\n"
+         "ディレクトリを作り、トリアージの ID (始めた手元の時刻 YYYYMMDD-HHMMSS) を出力する。ほかのサブコマンドの --run に渡す。\n"
+         "設定 (config.json) が要る",
+         "  run         トリアージの ID。作らなかったときは null\n"
+         "  created_at  始めた時刻。作らなかったときは null\n"
+         "  errors      作らなかった理由の配列",
+         _exit_help("始めた", "設定が無いか壊れている・同じ秒に始めたトリアージがある"))
+
+    p = _add(groups, "scan", cmd_scan,
+             "調べるディレクトリ (設定の scan_dirs) を du で調べ、1 つ下の階層の項目を使用量の多い順に並べた、最初の一覧 (英字 A) を\n"
+             "作る。引数 --item で一覧の項目を指定すると、その 1 つ下の階層を調べて、次の英字の一覧を作る。同じものをもう一度\n"
+             "調べると、そのたびに新しい一覧を作る。一覧は 1 つのトリアージで 26 個 (A〜Z) まで。専用の一覧の項目 (~/.asdf/installs\n"
+             "など) を指定すると、一覧を作らずに dedicated_list を返す。結果を出せた調べるディレクトリが無いときと、--item の項目の\n"
+             "下の階層を調べられなかったときは、一覧を作らない。\n"
+             f"調べるディレクトリごとに時間の上限 (設定の timeout_seconds 秒) があり、全体では\n{_BACKGROUND}",
+             "  run              トリアージの ID\n"
+             "  dedicated_list   --item の項目が専用の一覧の項目なら、その種類 (asdf・docker・worktree)。ほかは null\n"
+             "  item             --item の項目 (items の要素と同じ形)。--item が無いときと、番号が無いときは null\n"
+             + _LIST_OUTPUT +
+             "  unreadable       null (読めなかったパスは list show の --unreadable で出力する)\n"
+             "  errors           一覧を作らなかった理由の配列",
+             _exit_help("一覧を作った・専用の一覧の項目だった",
+                        _LISTS_UNSATISFIED + "・一覧を 26 個作り終えた・\n"
+                        "     du の結果を出せなかった (どの調べるディレクトリも、または --item の項目の下の階層を)",
+                        "使わない (du が失敗したときと、時間の上限を超えたときも、3 で示す)"))
+    p.add_argument("--run", required=True, help=_RUN_HELP)
+    p.add_argument("--item", metavar="番号", help="下の階層を調べる一覧の項目の番号 (例: A3)")
+
+    g = groups.add_parser("list", help="一覧を表示する").add_subparsers(dest="command", required=True)
+    p = _add(g, "show", cmd_list_show,
+             "一覧を、その時の設定・記録・判定表から求めた判定と一緒に表示する (判定は一覧のファイルに保存しない)。表には、使用量の\n"
+             "多い順に 30 項目を示し、残りをその他の行にまとめる。--all を付けると、すべての項目を示す",
+             "  run              トリアージの ID\n"
+             + _LIST_OUTPUT +
+             "  unreadable       --unreadable のときだけ、{items: [{number, display, paths}], unmapped}。表に示した項目 (--all なら\n"
+             "                   すべての項目) の読めなかったパスと、どの項目にも入らない読めなかったパス。ほかは null\n"
+             "  errors           表示しなかった理由の配列",
+             _exit_help("表示した", _LISTS_UNSATISFIED))
+    p.add_argument("--run", required=True, help=_RUN_HELP)
+    p.add_argument("letter", metavar="英字", help="一覧の英字 (例: A)")
+    p.add_argument("--all", action="store_true", help="その他の行にまとめず、すべての項目を示す")
+    p.add_argument("--unreadable", action="store_true", help="読めなかったパスも出力する (利用者が依頼したときだけ使う)")
+
+    g = groups.add_parser("select", help="消す項目を選ぶ・外す・表示する").add_subparsers(dest="command", required=True)
+    p = _add(g, "add", cmd_select_add,
+             "一覧の項目を、消す項目として選ぶ。選んだ項目は、トリアージの中で、複数の一覧にまたがって 1 つにまとめる。\n"
+             "引数 --all-deletable <英字> を付けると、その一覧の表に示した項目 (30 項目まで) のうちの「消してよい」の項目を選び、\n"
+             "--all も付けると、その他の行の項目からも選ぶ。保護の一覧の項目・判定が「残す」か判定の無い項目・保護の一覧の場所か\n"
+             "「残す」の項目を含む項目・下にアプリの worktree があるか、探しきれない項目は選ばず、理由を rejected に書く。\n"
+             "親を選んでいる項目は選ばず、子を選んでいる項目の親を選ぶと、子を外す。形の誤りか存在しない番号が 1 つでもあれば、\n"
+             "何も選ばない。\n"
+             "項目の下にアプリの worktree があるかを、項目ごとに時間の上限 (設定の timeout_seconds 秒) の中で探すので、全体では\n"
+             f"{_BACKGROUND}",
+             "  run               トリアージの ID\n"
+             "  added             選んだ項目の配列。要素は list show の items の要素と同じ形 (影響と消すコマンドを含む)\n"
+             "  already           既に選んでいた項目の配列。要素は {number, display}\n"
+             "  replaced          親を選んだので外した子の配列。要素は {number, display, parent (選んだ親の番号)}\n"
+             "  rejected          選ばなかった項目の配列。要素は {number, display, reasons (理由の配列)}\n"
+             "  others_deletable  --all-deletable で --all が無いときの、その他の行の「消してよい」の項目 {count, bytes, size}。\n"
+             "                    ほかは null\n"
+             "  selection         選んだ項目の全体 {count, bytes, size}。何も選ばなかったとき (終了コード 3) は null\n"
+             "  errors            何も選ばなかった理由の配列",
+             _exit_help("選んだ (選ばなかった項目があっても、rejected に理由を書いて 0 で終了する)",
+                        _LISTS_UNSATISFIED + "・選んだ項目のファイルが壊れている"))
+    p.add_argument("--run", required=True, help=_RUN_HELP)
+    p.add_argument("numbers", nargs="*", metavar="番号", help="選ぶ項目の番号 (例: A3 B12)")
+    p.add_argument("--all-deletable", metavar="英字", help="この一覧の表の「消してよい」の項目を、まとめて選ぶ")
+    p.add_argument("--all", action="store_true", help="--all-deletable で、その他の行の項目からも選ぶ")
+
+    p = _add(g, "remove", cmd_select_remove,
+             "番号の項目を、選んだ項目から外す。選んでいない項目は、何もせずに not_selected に書く。形の誤りか存在しない番号が\n"
+             "1 つでもあれば、何も外さない",
+             "  run           トリアージの ID\n"
+             "  removed       外した項目の配列。要素は {number (選んだときの番号), display, size}\n"
+             "  not_selected  選んでいなかった項目の配列。要素は {number, display, reason}\n"
+             "  selection     選んだ項目の全体 {count, bytes, size}。何も外さなかったとき (終了コード 3) は null\n"
+             "  errors        何も外さなかった理由の配列",
+             _exit_help("外した (選んでいない項目があっても 0)",
+                        "トリアージ・一覧・番号が無いか形が違う・一覧か選んだ項目のファイルが壊れている"))
+    p.add_argument("--run", required=True, help=_RUN_HELP)
+    p.add_argument("numbers", nargs="+", metavar="番号", help="外す項目の番号")
+
+    p = _add(g, "show", cmd_select_show,
+             "選んだ項目を、その時の判定と一緒に表示する",
+             "  run        トリアージの ID\n"
+             "  items      選んだ項目の配列。要素は list show の items の要素から unreadable_count を除いた形\n"
+             "  table      選んだ項目の表 (Markdown)。選んだ項目が無ければ null\n"
+             "  selection  選んだ項目の全体 {count, bytes, size}。表示しなかったときは null\n"
+             "  errors     表示しなかった理由の配列",
+             _exit_help("表示した (選んだ項目が無いときも)",
+                        "トリアージが無い・設定か記録が無いか壊れている・選んだ項目のファイルが壊れている"))
+    p.add_argument("--run", required=True, help=_RUN_HELP)
+
+    g = groups.add_parser("judge", help="Claude の判定を記録する").add_subparsers(dest="command", required=True)
+    p = _add(g, "set", cmd_judge_set,
+             "一覧の項目に、引数 --input-file の JSON のファイルの Claude の判定を記録する。受け付けるのは、判定の無い項目と、\n"
+             "項目そのものの Claude の記録で判定が決まった項目 (調べ直し) だけ。入力の様式と検査の内容は、文書\n"
+             "references/files.md の節「Claude の判定の入力」にある。一覧のファイルは変えない (次の list show から判定が変わる)",
+             "  run       トリアージの ID\n"
+             "  item      記録した後の項目 (list show の items の要素と同じ形)。記録しなかったときは null\n"
+             "  record    記録したもの (records.json の記録の形)。記録しなかったときは null\n"
+             "  previous  置き換えた Claude の記録。無かったときと、記録しなかったときは null\n"
+             "  errors    記録しなかった理由の配列",
+             _exit_help("記録した",
+                        _LISTS_UNSATISFIED + "・保護の一覧・判定表・親の\n"
+                        "     ディレクトリの記録・利用者の記録で判定が決まった項目・入力のファイルを読めないか、入力に誤りがある"))
+    p.add_argument("--run", required=True, help=_RUN_HELP)
+    p.add_argument("number", metavar="番号", help="判定を記録する一覧の項目の番号 (例: A3)")
+    p.add_argument("--input-file", required=True,
+                   help="Claude が Write ツールで書いた入力の JSON のファイル (config show の inputs_dir の下に置く)")
 
     g = groups.add_parser("hook", help="hook が実行する").add_subparsers(dest="command", required=True)
     _add(g, "pre-tool-use", cmd_hook_pre_tool_use,

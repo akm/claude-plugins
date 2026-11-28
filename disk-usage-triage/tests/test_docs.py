@@ -7,6 +7,9 @@
   モジュール judge の定数と検査に一致する (計画の U3)
 - 文書 `disk-usage-triage/references/files.md` の `records.json` のキーの表・対象の表・例と、入力の例が、モジュール records の
   定数と検査に一致する (計画の U4)
+- 文書 `disk-usage-triage/references/files.md` の一覧と選んだ項目のキーの表と例が、モジュール lists の定数と検査に一致する
+  (計画の U6)
+- 時間の上限を使うサブコマンドの --help に、Bash ツールのバックグラウンドで実行することが書いてある (計画の KTD15)
 - 入口 (ファイル `disk-usage-triage/scripts/disk_usage_triage.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの
   --help が、引数・出力・終了コードを示す (計画の KTD14)
 - 入口は、Python の版が 3.11 より古ければ、版を示して終了コード 3 で終了する (計画の節「Assumptions」)
@@ -29,7 +32,7 @@ from unittest import mock
 
 from triage_case import ENTRY, HERE
 
-from disk_usage_triage import config, judge, records  # noqa: E402
+from disk_usage_triage import config, judge, lists, records  # noqa: E402
 
 REFERENCES = os.path.join(HERE, "..", "references")
 
@@ -132,8 +135,10 @@ class RecordsDocTest(unittest.TestCase):
     def test_add_input(self):
         text = section(self.doc, "### `records add` の入力")
         examples = json_blocks(text)
-        self.assertEqual(len(examples), 1)
+        self.assertEqual(len(examples), 2)
         self.assertEqual(records.add_input_errors(examples[0]), [], "例が様式どおりであること")
+        self.assertEqual(records.add_input_errors(examples[1], with_target=False), [],
+                         "2 つ目の例は、--run と --item で対象を指定したときの入力 (計画の KTD3)")
         documented = [cells[0].strip("`") for cells in table_rows(text, "| キー | 値 |")]
         self.assertEqual(documented, list(records.ADD_INPUT_KEYS))
 
@@ -146,6 +151,39 @@ class RecordsDocTest(unittest.TestCase):
         self.assertEqual([cells[0].strip("`") for cells in rows], list(records.CLAUDE_INPUT_KEYS))
         required = [cells[0].strip("`") for cells in rows if "必須" in cells[1]]
         self.assertEqual(required, list(records.CLAUDE_REQUIRED_KEYS))
+
+
+def key_names(text, label=None):
+    """節の本文 text の、見出し行が「| キー | 値 |」の表のキーの配列。label があれば、その文の後の表。"""
+    if label is not None:
+        text = text.split(label, 1)[1]
+    return [re.fullmatch(r"`([a-z_]+)`", cells[0]).group(1) for cells in table_rows(text, "| キー | 値 |")]
+
+
+class ListsDocTest(unittest.TestCase):
+    """文書 references/files.md のトリアージのディレクトリの節 (様式の SSOT) と、モジュール lists の定数と検査が一致する (計画の U6)。"""
+
+    def setUp(self):
+        self.doc = read_reference("files.md")
+
+    def test_list_keys(self):
+        text = section(self.doc, "### `lists/<英字>.json`")
+        self.assertEqual(key_names(text)[:len(lists.LIST_KEYS)], list(lists.LIST_KEYS), "最初の表 (順序も)")
+        self.assertEqual(key_names(text, "調べたディレクトリの結果のキー:")[:len(lists.DIR_KEYS)], list(lists.DIR_KEYS))
+        self.assertEqual(key_names(text, "項目のキー:"), list(lists.ITEM_KEYS))
+
+    def test_list_example_is_valid(self):
+        examples = json_blocks(section(self.doc, "### `lists/<英字>.json`"))
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(lists.list_errors(examples[0], examples[0]["letter"]), [], "例が様式どおりであること")
+
+    def test_selection_keys_and_example(self):
+        text = section(self.doc, "### `selection.json`")
+        self.assertEqual(key_names(text)[:len(lists.SELECTION_KEYS)], list(lists.SELECTION_KEYS))
+        self.assertEqual(key_names(text, "選んだ項目のキー:"), list(lists.SELECTED_KEYS))
+        examples = json_blocks(text)
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(lists.selection_errors(examples[0]), [], "例が様式どおりであること")
 
 
 class JudgmentTableDocTest(unittest.TestCase):
@@ -206,7 +244,7 @@ class SkillListingDocTest(unittest.TestCase):
                 self.assertRegex(front, r"\ndescription: .+\n")
 
 
-GROUPS = ("config", "records", "hook")  # 下にサブコマンドを持つグループ
+GROUPS = ("config", "records", "run", "list", "select", "judge", "hook")  # 下にサブコマンドを持つグループ
 
 
 def entry_subcommands():
@@ -252,6 +290,18 @@ class EntryHelpTest(unittest.TestCase):
                 self.assertIn("終了コード:", text)
                 codes = re.findall(r"^  ([0-9])  ", text.split("終了コード:", 1)[1], re.MULTILINE)
                 self.assertEqual(codes, ["0", "3", "4"], "終了コードは 0・3・4 の 3 つを示すこと")
+
+    def test_background_subcommands(self):
+        """時間の上限を使うサブコマンド (du を実行する scan と、下の階層を探す select add) の --help に、Bash ツールの
+        バックグラウンドで実行することを書く。ほかのサブコマンドには書かない (計画の KTD15)。"""
+        background = {("scan",), ("select", "add")}
+        for entry in entry_subcommands():
+            with self.subTest(command=" ".join(entry)):
+                text = run_entry(*entry, "--help").stdout
+                if entry in background:
+                    self.assertIn("run_in_background", text)
+                else:
+                    self.assertNotIn("run_in_background", text)
 
     def test_docstring_exit_codes(self):
         with open(ENTRY, encoding="utf-8") as f:

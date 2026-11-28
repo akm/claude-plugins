@@ -409,7 +409,7 @@ def claude_input_errors(data):
 
 
 def add_claude(path_, data, *, env, today=None):
-    """Claude の判定を記録する (計画の R20)。path_ は項目のディレクトリの絶対パス (一覧から U6 が求める)、data は入力。
+    """Claude の判定を記録する (計画の R20)。path_ は項目のディレクトリの絶対パス (モジュール lists が一覧のファイルから求める)、data は入力。
 
     利用者の記録がある対象には記録しない。Claude の記録は置き換える。返り値は add_user と同じ。
     """
@@ -436,7 +436,8 @@ def add_claude(path_, data, *, env, today=None):
     return _write(build)
 
 
-def _read_input(input_file):
+def read_input(input_file):
+    """入力のファイルを JSON として読む。返り値は (中身, 誤りの配列)。"""
     try:
         with open(input_file, encoding="utf-8") as f:
             return json.load(f), []
@@ -448,15 +449,24 @@ def _read_input(input_file):
         return None, [f"入力のファイル {input_file} を読めない ({e.strerror})"]
 
 
-def add_input_errors(data):
-    """records add の入力の形の誤りの配列。対象の中身は add_user が検査する。"""
+def add_input_errors(data, with_target=True):
+    """records add の入力の形の誤りの配列。対象の中身は add_user が検査する。
+
+    with_target が偽なら、対象を一覧の番号で指定したとき (引数 --run と --item。計画の KTD3) の入力で、target を書くと誤りにする。
+    """
     if not isinstance(data, dict):
         return ["JSON のオブジェクトでない"]
     errors = []
     unknown = [key for key in data if key not in ADD_INPUT_KEYS]
     if unknown:
         errors.append("知らないキー: " + "・".join(unknown))
-    errors += [f"キー {key} が無い" for key in ("target", "judgment") if key not in data]
+    if with_target:
+        errors += [f"キー {key} が無い" for key in ("target", "judgment") if key not in data]
+    else:
+        if "target" in data:
+            errors.append("対象を引数 --item の番号で指定したので、入力に target を書かない")
+        if "judgment" not in data:
+            errors.append("キー judgment が無い")
     if "judgment" in data and data["judgment"] != "keep":
         errors.append(f"judgment ({_dump(data['judgment'])}) が keep でない (records add は「残す」だけを記録する。"
                       "利用者の「消してよい」は、削除のシェルスクリプトを作るときに記録する)")
@@ -465,15 +475,22 @@ def add_input_errors(data):
     return errors
 
 
-def add_from_file(input_file):
-    """サブコマンド records add。入力のファイルの「残す」を記録する。返り値には display (記録した対象を示す文字列) を足す。"""
+def add_from_file(input_file, item_path=None):
+    """サブコマンド records add。入力のファイルの「残す」を記録する。返り値には display (記録した対象を示す文字列) を足す。
+
+    item_path は、対象を一覧の番号で指定したとき (引数 --run と --item) に、モジュール lists が一覧のファイルから求めた項目の
+    ディレクトリの絶対パス。そのときは、入力に target を書かせず、この項目のディレクトリを対象にする (計画の KTD3)。
+    """
     from . import config
 
-    data, errors = _read_input(input_file)
+    data, errors = read_input(input_file)
     if not errors:
-        errors = add_input_errors(data)
+        errors = add_input_errors(data, with_target=item_path is None)
     env = None
-    if not errors and isinstance(data["target"], dict) and data["target"].get("kind") == "directory":
+    target = None
+    if not errors:
+        target = data["target"] if item_path is None else {"kind": "directory", "path": item_path}
+    if not errors and isinstance(target, dict) and target.get("kind") == "directory":
         try:
             current = config.load()
         except store.Corrupt as e:
@@ -486,7 +503,7 @@ def add_from_file(input_file):
                 env = judge.environment(current)
     if errors:
         return {**_rejected(errors), "display": None}
-    result = add_user(data["target"], "keep", reason=data.get("reason"), env=env)
+    result = add_user(target, "keep", reason=data.get("reason"), env=env)
     result["display"] = display(result["record"]["target"]) if result["record"] is not None else None
     return result
 
