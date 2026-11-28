@@ -532,6 +532,27 @@ def _record_command(record, depth, path, real, matched):
     return {"type": "rm", "path": path}
 
 
+def _whole_directory_tool(record, depth, real, matched):
+    """記録のディレクトリをまとめて消すツールのコマンドを示す文 (計画の R19)。無ければ None。
+
+    記録に Claude が書いたツールのコマンドがあれば、そのコマンド。記録にコマンドが無く、記録のディレクトリそのものに一致した判定表の
+    行にツールのコマンドがあれば、その行のコマンド (KTD16 の決め方で、記録のディレクトリをそのコマンドで消すため)。
+    """
+    record_path = record["target"]["path"]
+    command = record["command"]
+    if command is not None:
+        if command["type"] != "tool":
+            return None
+        return f"記録のツールのコマンド ({' '.join(_resolve(arg, record_path) for arg in command['args'])})"
+    if matched is None:
+        return None
+    row_command = matched["row"]["command"]
+    table_depth = len(real.split(os.sep)) - len(matched["path"].split(os.sep))
+    if table_depth != depth or row_command is None or row_command["type"] != "tool":
+        return None
+    return f"判定表の行のツールのコマンド ({' '.join(_resolve(arg, matched['path']) for arg in row_command['args'])})"
+
+
 def _from_record(result, path, real, nearest, matched):
     """記録で決まる判定を result に書いて返す (計画の R13・R19・KTD16)。"""
     depth, record = nearest
@@ -542,11 +563,10 @@ def _from_record(result, path, real, nearest, matched):
     result.update(source="record", impact=impact, process_names=process_names,
                   record={"path": record_path, "decided_by": record["decided_by"],
                           "decided_on": record["decided_on"], "judgment": record["judgment"]})
-    command = record["command"]
-    if depth > 0 and record["judgment"] != "keep" and command is not None and command["type"] == "tool":
-        tool = " ".join(_resolve(arg, record_path) for arg in command["args"])
-        result.update(judgment="keep", reason=f"{record_path} の下の項目。{record_path} は、記録のツールのコマンド ({tool})"
-                                               " でまとめて消し、下の項目だけを消すコマンドは無い")
+    tool = _whole_directory_tool(record, depth, real, matched) if depth > 0 and record["judgment"] != "keep" else None
+    if tool is not None:
+        result.update(judgment="keep", reason=f"{record_path} の下の項目。{record_path} は、{tool} でまとめて消し、"
+                                               "下の項目だけを消すコマンドは無い")
         return result
     who = DECIDER_LABELS[record["decided_by"]]
     reason = record["reason"] or f"{who}が {record['decided_on']} に「{JUDGMENT_LABELS[record['judgment']]}」と記録した"
@@ -571,8 +591,9 @@ def judge(path, env, rows, records=None, usage=None):
     (判定を決めた記録。{path (記録のディレクトリ), decided_by, decided_on, judgment}。記録で決めなかったときは None)}。
 
     記録は、項目そのものか、最も近い親のディレクトリのものを使う (R19)。親の「残す」以外の記録は、判定表に、記録のディレクトリ
-    より下で項目まで (項目そのものを含む) のディレクトリに一致する行があれば使わず、その行を使う (R13)。Claude が書いたツールの
-    コマンドがある記録の下の項目は「残す」にする (R19)。
+    より下で項目まで (項目そのものを含む) のディレクトリに一致する行があれば使わず、その行を使う (R13)。記録のディレクトリを
+    ツールのコマンドでまとめて消す記録 (Claude が書いたツールのコマンドがあるか、コマンドが無く、記録のディレクトリそのものに
+    一致する判定表の行にツールのコマンドがあるもの) の下の項目は「残す」にする (R19)。
 
     判定なしの項目は、Claude が調べて判定する。ツールのコマンドの行の下の項目は「残す」にする。ツールのコマンドは一致した
     ディレクトリをまとめて消すので、下の項目だけを消すコマンドが無いため (文書 references/judgment-table.md の節「行を使う項目」)。

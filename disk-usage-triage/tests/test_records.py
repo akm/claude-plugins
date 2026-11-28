@@ -548,6 +548,35 @@ class JudgeWithRecordsTest(RecordsCase):
         self.assertIsNone(result["command"])
         self.assertIn("uv cache prune", result["reason"])
 
+    def test_record_deleted_by_a_table_tool_command_keeps_items_below(self):
+        """記録にコマンドが無く、記録のディレクトリそのものに一致する判定表の行にツールのコマンドがあれば、下の項目は「残す」(R19)。"""
+        device = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1")
+        data = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1", "data")
+        rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
+        self.assert_ok(self.add_user(directory(device), "deletable"))
+        self.assertEqual(self.judge(device, rows)["command"],
+                         {"type": "tool", "args": ["xcrun", "simctl", "delete", "UDID1"], "env": {}})
+        result = self.judge(data, rows)
+        self.assertEqual(result["judgment"], "keep")
+        self.assertEqual(result["source"], "record")
+        self.assertIsNone(result["command"])
+        self.assertIn("判定表の行のツールのコマンド (xcrun simctl delete UDID1)", result["reason"])
+
+    def test_record_below_a_table_tool_row_is_deleted_with_rm(self):
+        """ツールのコマンドの行に一致したディレクトリより下の記録では、記録のディレクトリとその下の項目を rm で消す (R19)。
+
+        記録のディレクトリそのものに一致する行が無いため。利用者が、一覧で「残す」と示されたディレクトリを選んで消すと決めたもの。
+        """
+        sub = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1", "sub")
+        below = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1", "sub", "x")
+        rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
+        self.assert_ok(self.add_user(directory(sub), "deletable"))
+        for path in (sub, below):
+            with self.subTest(path=path):
+                result = self.judge(path, rows)
+                self.assertEqual(result["judgment"], "deletable")
+                self.assertEqual(result["command"], {"type": "rm", "path": path})
+
     def test_user_record_without_reason(self):
         target = self.make_dir("user-home", "Library", "Caches", "foo")
         self.assert_ok(self.add_user(directory(target)))
