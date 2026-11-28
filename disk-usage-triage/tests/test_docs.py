@@ -5,6 +5,8 @@
   (計画 docs/plans/2026-11-22-1630-feat-disk-usage-triage-plan.md の U2)
 - 文書 `disk-usage-triage/references/judgment-table.md` の行のキーの表・例・判定の値・コマンドの種類・置き換える文字列が、
   モジュール judge の定数と検査に一致する (計画の U3)
+- 文書 `disk-usage-triage/references/files.md` の `records.json` のキーの表・対象の表・例と、入力の例が、モジュール records の
+  定数と検査に一致する (計画の U4)
 - 入口 (ファイル `disk-usage-triage/scripts/disk_usage_triage.py`) の docstring のサブコマンドの一覧と、サブコマンドごとの
   --help が、引数・出力・終了コードを示す (計画の KTD14)
 - 入口は、Python の版が 3.11 より古ければ、版を示して終了コード 3 で終了する (計画の節「Assumptions」)
@@ -27,7 +29,7 @@ from unittest import mock
 
 from triage_case import ENTRY, HERE
 
-from disk_usage_triage import config, judge  # noqa: E402
+from disk_usage_triage import config, judge, records  # noqa: E402
 
 REFERENCES = os.path.join(HERE, "..", "references")
 
@@ -98,6 +100,54 @@ class FilesDocTest(unittest.TestCase):
         self.assertIn(f"省くと {config.DEFAULT_TIMEOUT_SECONDS}", text)
 
 
+class RecordsDocTest(unittest.TestCase):
+    """文書 references/files.md の記録の節 (様式の SSOT) と、モジュール records の定数と検査が一致する (計画の U4)。"""
+
+    def setUp(self):
+        self.doc = read_reference("files.md")
+
+    def test_top_keys(self):
+        rows = table_rows(section(self.doc, "## `records.json`"), "| キー | 値 |")
+        documented = [re.fullmatch(r"`([a-z_]+)`", cells[0]).group(1) for cells in rows]
+        self.assertEqual(documented[:2], list(records.TOP_KEYS), "最初の表のキーと records.TOP_KEYS が一致すること")
+
+    def test_record_keys_match_constants(self):
+        text = section(self.doc, "## `records.json`").split("記録のキー:", 1)[1]
+        rows = table_rows(text, "| キー | 値 |")
+        documented = [re.fullmatch(r"`([a-z_]+)`", cells[0]).group(1) for cells in rows]
+        self.assertEqual(documented, list(records.RECORD_KEYS), "記録のキーの表と records.RECORD_KEYS が一致すること (順序も)")
+
+    def test_target_kinds_match_constants(self):
+        rows = table_rows(section(self.doc, "### 対象"), "| `kind` | ほかのキー | 対象 |")
+        documented = {cells[0].strip("`"): tuple(re.findall(r"`([a-z_]+)`", cells[1])) for cells in rows}
+        self.assertEqual(list(documented), list(records.TARGET_KINDS), "対象の表と records.TARGET_KINDS が一致すること (順序も)")
+        self.assertEqual(documented, records.TARGET_KINDS)
+
+    def test_record_example_is_valid(self):
+        examples = json_blocks(section(self.doc, "## `records.json`"))
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(records._check_stored(examples[0]), examples[0]["records"], "例が様式どおりであること")
+        self.assertEqual({r["target"]["kind"] for r in examples[0]["records"]} <= set(records.TARGET_KINDS), True)
+
+    def test_add_input(self):
+        text = section(self.doc, "### `records add` の入力")
+        examples = json_blocks(text)
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(records.add_input_errors(examples[0]), [], "例が様式どおりであること")
+        documented = [cells[0].strip("`") for cells in table_rows(text, "| キー | 値 |")]
+        self.assertEqual(documented, list(records.ADD_INPUT_KEYS))
+
+    def test_claude_input(self):
+        text = section(self.doc, "### Claude の判定の入力")
+        examples = json_blocks(text)
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(records.claude_input_errors(examples[0]), [], "例が様式どおりであること")
+        rows = table_rows(text, "| キー | 値 |")
+        self.assertEqual([cells[0].strip("`") for cells in rows], list(records.CLAUDE_INPUT_KEYS))
+        required = [cells[0].strip("`") for cells in rows if "必須" in cells[1]]
+        self.assertEqual(required, list(records.CLAUDE_REQUIRED_KEYS))
+
+
 class JudgmentTableDocTest(unittest.TestCase):
     """文書 references/judgment-table.md (判定表の様式の SSOT) と、モジュール judge の定数と検査が一致する (計画の U3)。"""
 
@@ -156,7 +206,7 @@ class SkillListingDocTest(unittest.TestCase):
                 self.assertRegex(front, r"\ndescription: .+\n")
 
 
-GROUPS = ("config", "hook")  # 下にサブコマンドを持つグループ
+GROUPS = ("config", "records", "hook")  # 下にサブコマンドを持つグループ
 
 
 def entry_subcommands():

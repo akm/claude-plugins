@@ -9,6 +9,9 @@ references/files.md にある。
 サブコマンドの一覧:
   config show                       設定を表示する。設定が無いときも、無いことを出力する
   config set --input-file <ファイル>  入力のファイルの内容で、設定の全体を置き換える
+  records list                      記録を、番号を付けて表示する
+  records add --input-file <ファイル>  利用者が「残す」と言った対象を記録する
+  records remove --listing <ID> <番号>...  records list の番号の記録を消す
   hook pre-tool-use                 hook PreToolUse が実行する。削除のシェルスクリプトの実行と書き換えを拒否する
 
 終了コード (計画の KTD14):
@@ -83,6 +86,21 @@ def cmd_config_set(args):
     return _emit_status(config.set_from_file(args.input_file))
 
 
+def cmd_records_list(args):
+    from disk_usage_triage import records
+    return _emit_status(records.list_records())
+
+
+def cmd_records_add(args):
+    from disk_usage_triage import records
+    return _emit_status(records.add_from_file(args.input_file))
+
+
+def cmd_records_remove(args):
+    from disk_usage_triage import records
+    return _emit_status(records.remove(args.listing, args.numbers))
+
+
 def cmd_hook_pre_tool_use(args):
     from disk_usage_triage import hook
     try:
@@ -142,6 +160,46 @@ def build_parser():
                         "     調べるディレクトリの重複と入れ子など)・config.json が壊れている"))
     p.add_argument("--input-file", required=True,
                    help="Claude が Write ツールで書いた入力の JSON のファイル (config show の inputs_dir の下に置く)")
+
+    g = groups.add_parser("records", help="記録を表示する・足す・消す").add_subparsers(dest="command", required=True)
+    _add(g, "list", cmd_records_list,
+         "記録 (保存先のディレクトリのファイル records.json) を、対象の種類の順 (ディレクトリ・Docker・asdf)、同じ種類の中では\n"
+         "パスか名前の順に並べ、1 から番号を付けて表示する。記録が無いときも誤りにしない。様式は文書 references/files.md の\n"
+         "節「records.json」にある",
+         "  records  記録の配列。要素は records.json の記録に、number (番号) と display (対象を示す文字列。ディレクトリは\n"
+         "           ~ で始まる形、Docker は名前、asdf は「ツール 版」) を足したもの。壊れているときは空の配列\n"
+         "  listing  一覧の ID (記録の中身から求めた値)。records remove に渡す。壊れているときは null\n"
+         "  path     records.json の絶対パス\n"
+         "  errors   記録を読めなかった理由の配列",
+         _exit_help("表示した (記録が無いときも)", "records.json が壊れている (理由と、ファイルのパスを errors に書く)"))
+
+    p = _add(g, "add", cmd_records_add,
+             "引数 --input-file の JSON のファイルの対象を、利用者の「残す」として記録する。同じ対象の記録があれば置き換え、\n"
+             "判定・だれが決めたか・日付 (と、入力に書いたときは理由) だけを変える。入力の様式と検査の内容は、文書\n"
+             "references/files.md の節「records add の入力」にある。ディレクトリの記録には設定 (config.json) が要る。\n"
+             "誤りはすべて errors に書き、1 つでもあれば何も記録しない",
+             "  record    記録したもの (records.json の記録の形)。記録しなかったときは null\n"
+             "  display   記録した対象を示す文字列 (records list と同じ形)。記録しなかったときは null\n"
+             "  previous  置き換えた記録。無かったときと、記録しなかったときは null\n"
+             "  path      records.json の絶対パス\n"
+             "  errors    記録しなかった理由の配列",
+             _exit_help("記録した",
+                        "入力のファイルを読めない・入力に誤りがある (知らないキー・keep でない判定・存在しないディレクトリ・\n"
+                        "     保護の一覧の場所・名前の形の誤りなど)・設定が無いか壊れている (ディレクトリのとき)・\n"
+                        "     records.json が壊れている"))
+    p.add_argument("--input-file", required=True,
+                   help="Claude が Write ツールで書いた入力の JSON のファイル (config show の inputs_dir の下に置く)")
+
+    p = _add(g, "remove", cmd_records_remove,
+             "records list で表示した一覧の番号の記録を消す。一覧を表示した後に記録が変わっていれば (一覧の ID が違えば)、\n"
+             "何も消さない。範囲の外の番号が 1 つでもあれば、何も消さない。同じ番号は 1 つにする",
+             "  removed  消した記録の配列 (records list の要素と同じ形)。消さなかったときは空の配列\n"
+             "  path     records.json の絶対パス\n"
+             "  errors   消さなかった理由の配列",
+             _exit_help("消した",
+                        "一覧を表示した後に記録が変わった・範囲の外の番号がある・records.json が壊れている"))
+    p.add_argument("--listing", required=True, help="records list の出力の listing (一覧の ID)")
+    p.add_argument("numbers", nargs="+", type=int, metavar="番号", help="records list の出力の number")
 
     g = groups.add_parser("hook", help="hook が実行する").add_subparsers(dest="command", required=True)
     _add(g, "pre-tool-use", cmd_hook_pre_tool_use,
