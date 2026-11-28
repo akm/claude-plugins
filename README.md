@@ -15,7 +15,6 @@ akm のチーム共有 Claude Code プラグイン集 (マーケットプレイ�
 | [work-log-gh-comment](work-log-gh-comment/README.md) | 実行したコマンドと出力を、機密を伏せたうえで省略せずに GitHub の Issue / PR へ記録する |
 | [wording-guard](wording-guard/README.md) | これから外へ出す日本語の文章の不自然な表現を、リポジトリの規約が定める原則に照らして見つけ、種類ごとに広げて直す。言い換えを決めた語を用語ファイルに記録し、textlint と hook で検出できる |
 | [session-handoff](session-handoff/README.md) | セッションの引き継ぎ文を GitHub の PR / Issue のコメントかローカルファイルに書き出し、新しいセッションでそれを読んで再開する (モデルの使い分けや、compact せずに作業を継続したいときに使う) |
-| [doc-structured](doc-structured/README.md) | アプリケーションの文書を、列挙できる事実は YAML に書いて人が読む Markdown を生成し、生成物と参照を検査する構成で書く (作成中) |
 | [issue-practice](issue-practice/README.md) | GitHub の Issue の使い方 (リリースの計画と記録・管理 Issue と作業 Issue の分担・PR との対応・クローズ条件・後で行う作業の切り出し) に従って Issue を扱う |
 | [slide-deck](slide-deck/README.md) | 図を中心にした説明資料を、構成案から PowerPoint のファイルと Google スライドの両方に作り、内容が変わったスライドだけを直す。構成案・PowerPoint のファイル・Google スライドの 3 つのフェーズのスキルと、TypeScript と Python のツールを同梱する (Node.js 24 以上と uv が必要。Google スライドには、Claude のデスクトップアプリの Google スライドのコネクタが必要) |
 | [gh-notification-dispatch](gh-notification-dispatch/README.md) | GitHub の通知から PR のレビューの依頼とマージを判定し、(リポジトリ, 種類) で登録した Claude Desktop のセッションへ届ける。配信のセッションが 10 分ごとに取得し、Claude Desktop を再起動した後は 1 つの手順で再開する |
@@ -223,15 +222,6 @@ claude plugin update commit-rules-guard@akm-claude-plugins --scope project
 │   ├── hooks/hooks.json
 │   ├── hook-scripts/             # 引き継ぎ文の保存先を貼ったときに再開を促す
 │   ├── tests/                     # python3 -m unittest discover -s session-handoff/tests
-│   └── README.md
-├── doc-structured/               # skill 型 + 同梱ツール (作成中)
-│   ├── .claude-plugin/plugin.json
-│   ├── skills/generate/          # YAML から文書を生成し直す
-│   ├── skills/check/             # 文書を検査し、直す
-│   ├── rules/                    # 規則の文書 (プロジェクトの .claude/rules/ に置くコピーの元)
-│   ├── scripts/                  # スキルの前置き (プラグインと設定のバージョンの比較)
-│   ├── bin/doc-structured        # プロジェクトに置く、ツールの入口のスクリプト
-│   ├── tool/                     # 生成と検査のツール (Python)。テストは tool/tests/
 │   └── README.md
 ├── issue-practice/               # skill 型 + 同梱スクリプト
 │   ├── .claude-plugin/plugin.json
