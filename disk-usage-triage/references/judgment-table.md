@@ -76,7 +76,7 @@ disk-usage-triage の判定表 (ファイル `disk-usage-triage/scripts/disk_usa
 
 キャッシュの場所を指定できるツールは、`{path}` で場所を指定する。利用者の設定でキャッシュの場所が変わっていると、指定しないコマンドは、選んだ項目と別の場所を消すため。
 
-`args` は、Claude が書いたコマンドと同じく、許可した実行ファイルとサブコマンドの組 (ファイル `disk-usage-triage/scripts/disk_usage_triage/commands.py` の定数 `ALLOWED`。計画の KTD6) で始める。テストが検査する。
+`args` は、Claude が書いたコマンドと同じく、許可した実行ファイルとサブコマンドの組 (ファイル `disk-usage-triage/scripts/disk_usage_triage/commands.py` の定数 `ALLOWED`。計画の KTD6) で始め、引数と環境変数は、その組の形 (定数 `ALLOWED` の `forms`) のどれかと一致させる。テストが検査する。
 
 ## 判定表に書かないもの
 
@@ -88,5 +88,5 @@ disk-usage-triage の判定表 (ファイル `disk-usage-triage/scripts/disk_usa
 ## 行を足すとき
 
 - 消すコマンドを、ツールの文書で確認してから書き、`sources` に文書の URL と確認した日を書く。コマンドは、ツールの版で変わりうるため (計画の節「Risks & Dependencies」)。
-- ツールのコマンドの実行ファイルとサブコマンドの組が `commands.py` の定数 `ALLOWED` に無ければ、足す。
+- ツールのコマンドの実行ファイルとサブコマンドの組が `commands.py` の定数 `ALLOWED` に無ければ、足す。コマンドの書き方 (引数と環境変数) が、その組の形 (`forms`) に無ければ、形も足す。形を足すと、Claude が書いたコマンドもその形で書けるようになる。
 - `python3 -m unittest discover -s disk-usage-triage/tests` で、行の様式を検査する。
