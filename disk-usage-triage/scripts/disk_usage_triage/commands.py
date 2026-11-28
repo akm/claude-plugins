@@ -11,12 +11,18 @@ Claude が書いたコマンドの検査 (関数 command_errors) は、このモ
 """
 
 import json
+import re
 
 # 組 (引数の配列の先頭と順に比べる)・使ってよい環境変数の名前・Claude が書ける形・組を確認した文書。環境変数は、キャッシュの
 # 場所を指定するものだけを許可する。名前を限らないと、PATH・NODE_OPTIONS・DYLD_INSERT_LIBRARIES などで別のプログラムを実行
 # させられるため (計画の KTD6。U4 を実装するときに利用者が決めた。2026-11-27)。形 (forms) は、引数の配列と環境変数の組で、
 # 判定表のツールのコマンドと同じく、項目を {path} か {name} で指す。Claude が書いたコマンドは、形のどれかと一致しなければ
 # 誤りにする。組に続く引数で、選んだ項目の外を対象にさせないため (計画の R16。2026-11-28 に利用者が決めた)。
+# 端末の UDID の形 (xcrun simctl list が示す形)。xcrun simctl delete は、端末の UDID のほかに、端末の名前と all・booted・
+# unavailable も受け付けるので、{name} を置き換える値をこの形に限る。置き換えた後のコマンドが、項目のほかの端末を消す
+# コマンド (xcrun simctl delete all など) にならないようにするため (計画の R16。2026-11-28 に利用者が決めた)
+UDID_PATTERN = r"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+
 ALLOWED = (
     {"args": ("brew", "cleanup"), "env": ("HOMEBREW_CACHE",),
      "forms": ({"args": ("brew", "cleanup"), "env": {"HOMEBREW_CACHE": "{path}"}},),
@@ -43,7 +49,8 @@ ALLOWED = (
      "forms": ({"args": ("uv", "cache", "prune", "--cache-dir", "{path}"), "env": {}},),
      "sources": ({"url": "https://docs.astral.sh/uv/concepts/cache/#clearing-the-cache", "checked_on": "2026-11-27"},)},
     {"args": ("xcrun", "simctl", "delete"), "env": (),
-     "forms": ({"args": ("xcrun", "simctl", "delete", "{name}"), "env": {}},),
+     "forms": ({"args": ("xcrun", "simctl", "delete", "{name}"), "env": {},
+                "name": {"pattern": UDID_PATTERN, "label": "端末の UDID"}},),
      "sources": ({"url": "https://developer.apple.com/forums/thread/812408", "checked_on": "2026-11-25"},)},
 )
 
@@ -141,6 +148,27 @@ def _form_errors(args, env, entry):
         return []
     forms = "・".join(_form_text(form) for form in entry["forms"])
     return [f"コマンドが、組 {' '.join(entry['args'])} の形のどれとも一致しない (書ける形: {forms})"]
+
+
+def name_errors(command, name):
+    """消すコマンド command の {name} を、項目の名前 name に置き換えてよいかの誤りの配列 (計画の R16)。
+
+    組の形が {name} に置き換える値を限るとき (定数 ALLOWED の forms の name) に、名前がその形でなければ誤りにする。判定表の
+    ツールのコマンドと Claude が書いたコマンドの両方に使う。
+    """
+    if not isinstance(command, dict) or command.get("type") != "tool":
+        return []
+    args = command.get("args")
+    if not isinstance(args, list) or "{name}" not in args or not all(isinstance(a, str) for a in args):
+        return []
+    entry = allowed_entry(args)
+    if entry is None:
+        return []
+    for form in entry["forms"]:
+        limit = form.get("name")
+        if limit is not None and list(form["args"]) == args and not re.fullmatch(limit["pattern"], name):
+            return [f"項目の名前 ({_dump(name)}) が、{_form_text(form)} の {{name}} に置き換えられる形 ({limit['label']}) でない"]
+    return []
 
 
 def command_errors(command):

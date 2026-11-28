@@ -462,6 +462,17 @@ class JudgeOrderTest(JudgeCase):
         self.assertEqual(judge.judge(device, self.environment(), rows)["command"]["args"],
                          ["xcrun", "simctl", "delete", udid])
 
+    def test_name_that_is_not_a_udid_is_kept(self):
+        """{name} を置き換える値が端末の UDID の形でなければ、消すコマンドを作らずに「残す」にする (R16)。"""
+        rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
+        for name in ("all", "booted", "unavailable"):
+            with self.subTest(name=name):
+                device = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", name)
+                result = judge.judge(device, self.environment(), rows)
+                self.assertEqual(result["judgment"], "keep")
+                self.assertIsNone(result["command"])
+                self.assertIn("端末の UDID", result["reason"])
+
     def test_rm_row_applies_to_items_below(self):
         """rm の行の下の項目は、行の判定・理由・影響を使い、その項目を rm で消す。"""
         chrome = self.make_dir("user-home", "Library", "Caches", "Google", "Chrome")

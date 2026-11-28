@@ -19,6 +19,7 @@ from test_judge import JudgeCase
 from disk_usage_triage import judge, records, store  # noqa: E402
 
 TODAY = "2026-11-27"
+UDID = "0A1B2C3D-0000-4000-8000-000000000001"  # 端末のディレクトリの名前 (xcrun simctl delete の {name} に置き換える)
 
 
 def directory(path):
@@ -564,25 +565,44 @@ class JudgeWithRecordsTest(RecordsCase):
 
     def test_record_deleted_by_a_table_tool_command_keeps_items_below(self):
         """記録にコマンドが無く、記録のディレクトリそのものに一致する判定表の行にツールのコマンドがあれば、下の項目は「残す」(R19)。"""
-        device = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1")
-        data = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1", "data")
+        device = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", UDID)
+        data = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", UDID, "data")
         rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
         self.assert_ok(self.add_user(directory(device), "deletable"))
         self.assertEqual(self.judge(device, rows)["command"],
-                         {"type": "tool", "args": ["xcrun", "simctl", "delete", "UDID1"], "env": {}})
+                         {"type": "tool", "args": ["xcrun", "simctl", "delete", UDID], "env": {}})
         result = self.judge(data, rows)
         self.assertEqual(result["judgment"], "keep")
         self.assertEqual(result["source"], "record")
         self.assertIsNone(result["command"])
-        self.assertIn("判定表の行のツールのコマンド (xcrun simctl delete UDID1)", result["reason"])
+        self.assertIn(f"判定表の行のツールのコマンド (xcrun simctl delete {UDID})", result["reason"])
+
+    def test_record_on_a_device_whose_name_is_not_a_udid_is_kept(self):
+        """記録で判定が決まる項目も、判定表の行の {name} を置き換えられなければ「残す」にする (R16)。"""
+        device = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "all")
+        rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
+        self.assert_ok(self.add_user(directory(device), "deletable"))
+        result = self.judge(device, rows)
+        self.assertEqual(result["judgment"], "keep")
+        self.assertEqual(result["source"], "record")
+        self.assertIsNone(result["command"])
+        self.assertIn("端末の UDID", result["reason"])
+
+    def test_claude_record_with_simctl_needs_a_udid_name(self):
+        """Claude が xcrun simctl delete {name} を書くときは、項目の名前が端末の UDID の形でなければ記録しない (R16)。"""
+        command = tool("xcrun", "simctl", "delete", "{name}")
+        target = self.make_dir("user-home", "Library", "Caches", "all")
+        self.assert_unsatisfied(self.add_claude(target, claude_input("deletable", command=command)), "端末の UDID")
+        device = self.make_dir("user-home", "Library", "Caches", UDID)
+        self.assert_ok(self.add_claude(device, claude_input("deletable", command=command)))
 
     def test_record_below_a_table_tool_row_is_deleted_with_rm(self):
         """ツールのコマンドの行に一致したディレクトリより下の記録では、記録のディレクトリとその下の項目を rm で消す (R19)。
 
         記録のディレクトリそのものに一致する行が無いため。利用者が、一覧で「残す」と示されたディレクトリを選んで消すと決めたもの。
         """
-        sub = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1", "sub")
-        below = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", "UDID1", "sub", "x")
+        sub = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", UDID, "sub")
+        below = self.make_dir("user-home", "Library", "Developer", "CoreSimulator", "Devices", UDID, "sub", "x")
         rows = [row("~/Library/Developer/CoreSimulator/Devices/*", command=tool("xcrun", "simctl", "delete", "{name}"))]
         self.assert_ok(self.add_user(directory(sub), "deletable"))
         for path in (sub, below):

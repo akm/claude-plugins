@@ -162,6 +162,22 @@ class EnvironmentTest(unittest.TestCase):
         self.assertTrue(commands.command_errors({"type": "tool", "args": ["brew", "cleanup"], "env": ["X=1"]}))
 
 
+class NameTest(unittest.TestCase):
+    """{name} を置き換える値の検査 (R16)。xcrun simctl delete の {name} は、端末の UDID の形に限る。"""
+
+    def test_simctl_name_must_be_a_udid(self):
+        command = tool("xcrun", "simctl", "delete", "{name}")
+        self.assertEqual(commands.name_errors(command, "0A1B2C3D-0000-4000-8000-000000000001"), [])
+        for name in ("all", "booted", "unavailable", "iPhone 15", "0a1b2c3d-0000-4000-8000-000000000001"):
+            with self.subTest(name=name):
+                errors = commands.name_errors(command, name)
+                self.assertTrue(any("端末の UDID" in error for error in errors), errors)
+
+    def test_forms_without_name_limit(self):
+        self.assertEqual(commands.name_errors(tool("uv", "cache", "clean", "--cache-dir", "{path}"), "all"), [])
+        self.assertEqual(commands.name_errors({"type": "rm"}, "all"), [])
+
+
 class CommandShapeTest(unittest.TestCase):
 
     def test_rm(self):
@@ -192,7 +208,11 @@ class AllowedConstantTest(unittest.TestCase):
                 self.assertTrue(all(re.fullmatch(r"[A-Z_][A-Z0-9_]*", name) for name in entry["env"]))
                 self.assertTrue(entry["forms"])
                 for form in entry["forms"]:
-                    self.assertEqual(set(form), {"args", "env"})
+                    self.assertTrue(set(form) <= {"args", "env", "name"})
+                    if "name" in form:
+                        self.assertEqual(set(form["name"]), {"pattern", "label"})
+                        re.compile(form["name"]["pattern"])
+                        self.assertIn("{name}", form["args"], "{name} の値を限る形は {name} を使うこと")
                     self.assertEqual(form["args"][:len(args)], args, "形は組で始まること")
                     self.assertTrue(set(form["env"]) <= set(entry["env"]), "形の環境変数は組に許可した名前だけ")
                     values = list(form["args"]) + list(form["env"].values())

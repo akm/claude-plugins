@@ -416,6 +416,8 @@ def add_claude(path_, data, *, env, today=None):
     errors = claude_input_errors(data)
     normalized, target_errors = _normalize_target({"kind": "directory", "path": path_}, env)
     errors += target_errors
+    if not errors:
+        errors += commands.name_errors(data["command"], os.path.basename(normalized["path"]))
     if errors:
         return _rejected(errors)
     record = {"target": normalized, "judgment": data["judgment"], "decided_by": "claude",

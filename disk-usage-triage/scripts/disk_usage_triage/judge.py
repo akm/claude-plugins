@@ -26,6 +26,8 @@ import re
 import sys
 import time
 
+from . import commands
+
 JUDGMENTS = ("deletable", "review", "keep")  # 消してよい・確認が要る・残す
 JUDGMENT_LABELS = {"deletable": "消してよい", "review": "確認が要る", "keep": "残す"}
 DECIDER_LABELS = {"user": "利用者", "claude": "Claude"}
@@ -553,6 +555,15 @@ def _whole_directory_tool(record, depth, real, matched):
     return f"判定表の行のツールのコマンド ({' '.join(_resolve(arg, matched['path']) for arg in row_command['args'])})"
 
 
+def _name_kept(result, command, name):
+    """コマンド command の {name} を項目の名前 name に置き換えられないとき、result を「残す」にして True を返す (計画の R16)。"""
+    errors = commands.name_errors(command, name)
+    if not errors:
+        return False
+    result.update(judgment="keep", command=None, reason=f"{errors[0]}。消すコマンドを作れないので残す")
+    return True
+
+
 def _from_record(result, path, real, nearest, matched):
     """記録で決まる判定を result に書いて返す (計画の R13・R19・KTD16)。"""
     depth, record = nearest
@@ -568,6 +579,12 @@ def _from_record(result, path, real, nearest, matched):
         result.update(judgment="keep", reason=f"{record_path} の下の項目。{record_path} は、{tool} でまとめて消し、"
                                                "下の項目だけを消すコマンドは無い")
         return result
+    if depth == 0 and record["judgment"] != "keep":
+        template = record["command"]
+        if template is None and matched is not None and matched["path"] == real:
+            template = matched["row"]["command"]
+        if _name_kept(result, template, os.path.basename(real)):
+            return result
     who = DECIDER_LABELS[record["decided_by"]]
     reason = record["reason"] or f"{who}が {record['decided_on']} に「{JUDGMENT_LABELS[record['judgment']]}」と記録した"
     if depth > 0:
@@ -632,6 +649,8 @@ def judge(path, env, rows, records=None, usage=None):
     row = matched["row"]
     result.update(source="table", impact=row["impact"], process_names=list(row.get("process_names", [])))
     command = row["command"]
+    if exact and row["judgment"] != "keep" and _name_kept(result, command, os.path.basename(real)):
+        return result
     if exact or command is None or command["type"] == "rm":
         result.update(judgment=row["judgment"], reason=row["reason"], command=_command(row, path, matched["path"]))
     else:
