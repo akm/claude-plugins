@@ -232,22 +232,26 @@ def _search_below(path, timeout, clock):
     return found, unreadable, False
 
 
-def selection_blockers(path, env, *, timeout, clock=time.monotonic):
-    """path をまとめて消す対象に選べない理由の配列 (R12・KTD5)。選べるときは空の配列。
-
-    要素は {kind, path, reason}。kind は、protected (path が保護の一覧の項目)・contains-protected (下に保護の一覧の場所がある)・
-    app-worktree-below (下にアプリの worktree のディレクトリがある)・unreadable (下に読めないディレクトリがある)・timeout
-    (下を探すのが時間の上限 timeout 秒を超えた) のどれか。前の種類の理由があれば、後の種類は調べない (下を探すのは時間がかかるため)。
-    判定が「残す」の項目と、それを含む親は、記録を使う判定 (U4) の後に呼び出し元が扱う。
-    """
+def protected_blockers(path, env):
+    """path が保護の一覧の項目なら、選べない理由 (kind protected) の配列。そうでなければ空の配列。"""
     protected = protection(path, env)
-    if protected is not None:
-        return [{"kind": "protected", "path": path,
-                 "reason": f"保護の一覧にある ({protected['label']}: {protected['path']})"}]
-    contained = _contained(path, env)
-    if contained:
-        return [{"kind": "contains-protected", "path": location.path,
-                 "reason": f"下に、保護の一覧の {location.label} ({location.path}) がある"} for location in contained]
+    if protected is None:
+        return []
+    return [{"kind": "protected", "path": path, "reason": f"保護の一覧にある ({protected['label']}: {protected['path']})"}]
+
+
+def contained_blockers(path, env):
+    """path の下にある保護の一覧の場所ごとの、選べない理由 (kind contains-protected) の配列。無ければ空の配列。"""
+    return [{"kind": "contains-protected", "path": location.path,
+             "reason": f"下に、保護の一覧の {location.label} ({location.path}) がある"} for location in _contained(path, env)]
+
+
+def below_blockers(path, *, timeout, clock=time.monotonic):
+    """path の下を探して見つかった、選べない理由の配列 (KTD5)。無ければ空の配列。
+
+    kind は、app-worktree-below (下にアプリの worktree のディレクトリがある)・unreadable (下に読めないディレクトリがある)・
+    timeout (下を探すのが時間の上限 timeout 秒を超えた) のどれか。
+    """
     found, unreadable, timed_out = _search_below(path, timeout, clock)
     blockers = [{"kind": "app-worktree-below", "path": worktrees,
                  "reason": f"下に、アプリの worktree のディレクトリ ({worktrees}) がある"} for worktrees in found]
@@ -258,6 +262,17 @@ def selection_blockers(path, env, *, timeout, clock=time.monotonic):
         blockers.append({"kind": "timeout", "path": path,
                          "reason": f"時間の上限 ({timeout} 秒) までに、下にアプリの worktree が無いことを確認し終えなかった"})
     return blockers
+
+
+def selection_blockers(path, env, *, timeout, clock=time.monotonic):
+    """path をまとめて消す対象に選べない理由の配列 (R12・KTD5)。選べるときは空の配列。
+
+    要素は {kind, path, reason}。関数 protected_blockers (path が保護の一覧の項目)・contained_blockers (下に保護の一覧の
+    場所がある)・below_blockers (下を探して見つかったもの) の順に調べ、前の種類の理由があれば、後の種類は調べない (下を探すのは
+    時間がかかるため)。判定が「残す」の項目と、それを含む親は、記録を使う判定 (U4) の後に呼び出し元が扱う。
+    """
+    return (protected_blockers(path, env) or contained_blockers(path, env)
+            or below_blockers(path, timeout=timeout, clock=clock))
 
 
 # --- 判定表 ---------------------------------------------------------------------------------------------------------
