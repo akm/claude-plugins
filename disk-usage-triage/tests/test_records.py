@@ -148,7 +148,21 @@ class DirectoryKeyTest(RecordsCase):
         self.assertIsNone(result["record"])
         self.assertIsNone(result["judgment"])
         below = self.make_dir("user-home", "Library", "Caches", "other", "bar")
-        self.assertIsNone(self.judge(below)["record"], "親がシンボリックリンクに置き換わった場合も使わないこと")
+        self.assertIsNone(self.judge(below)["record"], "リンク先の下の項目にも記録を使わないこと")
+
+    def test_record_whose_parent_is_replaced_by_a_symlink_is_not_used(self):
+        """記録したディレクトリの親が後でシンボリックリンクに置き換わっても、リンク先の別のディレクトリに記録を使わない (KTD16)。"""
+        recorded = self.make_dir("user-home", "Library", "Caches", "foo", "sub")
+        other_sub = self.make_dir("user-home", "Library", "Caches", "other", "sub")
+        self.assert_ok(self.add_user(directory(recorded), "deletable"))
+        parent = os.path.dirname(recorded)
+        os.rmdir(recorded)
+        os.rmdir(parent)
+        os.symlink(os.path.dirname(other_sub), parent)
+        self.assertTrue(os.path.samefile(recorded, other_sub), "記録のパスが、リンク先のディレクトリを指すこと")
+        result = self.judge(other_sub)
+        self.assertIsNone(result["record"])
+        self.assertIsNone(result["judgment"])
 
     def test_record_matching_the_path_is_replaced_before_one_matching_the_identity(self):
         """パスの文字列で一致する記録を、識別子で一致する記録より先に置き換える。同じパスの記録が 2 つにならない (KTD16)。"""
