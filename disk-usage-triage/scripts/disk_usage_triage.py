@@ -328,9 +328,10 @@ def build_parser():
     g = groups.add_parser("select", help="消す項目を選ぶ・外す・表示する").add_subparsers(dest="command", required=True)
     p = _add(g, "add", cmd_select_add,
              "一覧の項目を、消す項目として選ぶ。選んだ項目は、トリアージの中で、複数の一覧にまたがって 1 つにまとめる。\n"
-             "引数 --all-deletable <英字> を付けると、その一覧の表に示した項目 (30 項目まで) のうちの「消してよい」の項目を選び、\n"
-             "--all も付けると、その他の行の項目からも選ぶ。保護の一覧の項目・判定が「残す」か判定の無い項目・保護の一覧の場所か\n"
-             "「残す」の項目を含む項目・下にアプリの worktree があるか、探しきれない項目は選ばず、理由を rejected に書く。\n"
+             "引数 --all-deletable <英字> を付けると、その一覧の番号が 1〜30 の項目 (--all を付けない list show の表の項目) のうちの\n"
+             "「消してよい」の項目を選び、--all も付けると、31 番目以降の項目 (その他の行の項目) からも選ぶ。\n"
+             "保護の一覧の項目・判定が「残す」か判定の無い項目・保護の一覧の場所か「残す」の項目を含む項目・下にアプリの\n"
+             "worktree があるか、探しきれない項目は選ばず、理由を rejected に書く。\n"
              "親を選んでいる項目は選ばず、子を選んでいる項目の親を選ぶと、子を外す。形の誤りか存在しない番号が 1 つでもあれば、\n"
              "何も選ばない。\n"
              "項目の下にアプリの worktree があるかを、項目ごとに時間の上限 (設定の timeout_seconds 秒) の中で探すので、全体では\n"
@@ -340,7 +341,8 @@ def build_parser():
              "  already           既に選んでいた項目の配列。要素は {number, display}\n"
              "  replaced          親を選んだので外した子の配列。要素は {number, display, parent (選んだ親の番号)}\n"
              "  rejected          選ばなかった項目の配列。要素は {number, display, reasons (理由の配列)}\n"
-             "  others_deletable  --all-deletable で --all が無いときの、その他の行の「消してよい」の項目 {count, bytes, size}。\n"
+             "  others_deletable  --all-deletable で --all が無いときの、31 番目以降 (その他の行) の「消してよい」の項目\n"
+             "                    {count, bytes, size}。\n"
              "                    ほかは null\n"
              "  selection         選んだ項目の全体 {count, bytes, size}。何も選ばなかったとき (終了コード 3) は null\n"
              "  errors            何も選ばなかった理由の配列",
@@ -348,8 +350,8 @@ def build_parser():
                         _LISTS_UNSATISFIED + "・選んだ項目のファイルが壊れている"))
     p.add_argument("--run", required=True, help=_RUN_HELP)
     p.add_argument("numbers", nargs="*", metavar="番号", help="選ぶ項目の番号 (例: A3 B12)")
-    p.add_argument("--all-deletable", metavar="英字", help="この一覧の表の「消してよい」の項目を、まとめて選ぶ")
-    p.add_argument("--all", action="store_true", help="--all-deletable で、その他の行の項目からも選ぶ")
+    p.add_argument("--all-deletable", metavar="英字", help="この一覧の番号が 1〜30 の「消してよい」の項目を、まとめて選ぶ")
+    p.add_argument("--all", action="store_true", help="--all-deletable で、31 番目以降 (その他の行) の項目からも選ぶ")
 
     p = _add(g, "remove", cmd_select_remove,
              "番号の項目を、選んだ項目から外す。選んでいない項目は、何もせずに not_selected に書く。形の誤りか存在しない番号が\n"

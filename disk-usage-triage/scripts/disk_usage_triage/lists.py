@@ -428,19 +428,28 @@ def _deletable(judged):
     return [(item, result) for item, result in judged if result["judgment"] == "deletable"]
 
 
-def _deletable_note(letter, shown, others):
-    """「消してよい」の項目をすべて選ぶ選び方の注記 (R11)。表に示した項目だけを選び、その他の行の項目は依頼されたときだけ選ぶ。"""
-    visible, hidden = _deletable(shown), _deletable(others)
+def _deletable_note(letter, judged, all_items):
+    """「消してよい」の項目をすべて選ぶ選び方の注記 (R11)。
+
+    まとめて選ぶのは番号が 1〜30 の項目 (--all を付けない表の項目) の「消してよい」で、31 番目以降 (その他の行の項目) は、
+    そのことも依頼されたときだけ選ぶ (関数 select_add の範囲)。表示している項目では数えない。--all で 31 項目以上を示すと、
+    表にその他の行が無く、表の項目と選ぶ範囲が違うため。そのときは、範囲を番号で書く。
+    """
+    visible, hidden = _deletable(judged[:SHOWN]), _deletable(judged[SHOWN:])
     if not visible and not hidden:
         return []
+    if all_items and len(judged) > SHOWN:
+        first, rest = f" {letter}1〜{letter}{SHOWN} の", f"{letter}{SHOWN + 1} 以降の"  # 英数字の前に空白を入れる
+    else:
+        first, rest = "表の", "その他の行の"
     text = ""
     if visible:
         total = sum(item["bytes"] for item, _ in visible)
-        text = (f"一覧 {letter} の表の「消してよい」の項目 ({len(visible)} 項目・合計 {format_size(total)}) は、"
+        text = (f"一覧 {letter} の{first}「消してよい」の項目 ({len(visible)} 項目・合計 {format_size(total)}) は、"
                 "依頼すればまとめて選べる。")
     if hidden:
         total = sum(item["bytes"] for item, _ in hidden)
-        text += (f"その他の行の「消してよい」の項目 ({len(hidden)} 項目・合計 {format_size(total)}) は、そのことも依頼したとき"
+        text += (f"{rest}「消してよい」の項目 ({len(hidden)} 項目・合計 {format_size(total)}) は、そのことも依頼したとき"
                  "だけ選ぶ。")
     return [text]
 
@@ -469,7 +478,7 @@ def _view(data, ctx, *, all_items=False, unreadable=False):
     shown, others = (judged, []) if all_items else (judged[:SHOWN], judged[SHOWN:])
     hidden_deletable = _deletable(others)
     notes = (_dir_notes(data) + _unreadable_notes(letter, data, shown, others) + [_DU_NOTE]
-             + _deletable_note(letter, shown, others))
+             + _deletable_note(letter, judged, all_items))
     return {"letter": letter, "created_at": data["created_at"], "source": _source_view(data["source"]),
             "table": _table(letter, shown, others), "notes": notes,
             "items": [item_view(_number(letter, item), item, result) for item, result in shown],
@@ -613,7 +622,8 @@ def _blockers(path, result, ctx, clock):
 def select_add(run, numbers=(), *, all_deletable=None, include_others=False, clock=time.monotonic):
     """サブコマンド select add。番号の項目か、一覧 all_deletable の「消してよい」の項目を選ぶ (R10〜R12)。
 
-    all_deletable は、表に示した項目 (R7) だけから選び、include_others が真ならその他の行の項目からも選ぶ (R11)。選べない項目は
+    all_deletable は、番号が 1〜30 の項目 (--all を付けない list show の表の項目。R7) だけから選び、include_others が真なら
+    31 番目以降の項目 (その他の行の項目) からも選ぶ (R11)。選べない項目は
     選ばずに理由を返し、選べる項目は選ぶ。形の誤りか存在しない番号が 1 つでもあれば、何も選ばない (R12)。
     """
     base = {"run": run, "added": [], "already": [], "replaced": [], "rejected": [], "others_deletable": None,

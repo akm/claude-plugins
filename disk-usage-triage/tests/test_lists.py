@@ -238,6 +238,25 @@ class FirstListTest(ListsCase):
         self.assertIn("その他の行の「消してよい」の項目 (1 項目", last)
         self.assertEqual(payload["others"]["deletable_count"], 1)
 
+    def test_deletable_note_with_all(self):
+        """--all で 31 項目以上を示したときも、まとめて選べる数は番号が 1〜30 の項目から数え、範囲を番号で書く。select add
+        --all-deletable が選ぶ範囲と一致させるため (計画の R11)。"""
+        entries = [("Homebrew", 2000), ("pnpm", 1900)] + [(f"app{index:02d}", 1000 - index) for index in range(30)]
+        entries.append(("ms-playwright", 1))
+        run, _ = self.first_list(entries)
+        code, shown, stderr = self.cli("list", "show", "--run", run, "A", "--all")
+        self.assertEqual(code, 0, stderr)
+        last = shown["notes"][-1]
+        self.assertIn(f"一覧 A の A1〜A30 の「消してよい」の項目 (2 項目・合計 {lists.format_size(3900 * KIB)})", last)
+        self.assertIn("A31 以降の「消してよい」の項目 (1 項目", last)
+        self.assertNotIn("表の", last)
+        self.make_dir("user-home", "Library", "Caches", "Homebrew")
+        self.make_dir("user-home", "Library", "Caches", "pnpm")
+        code, payload, stderr = self.cli("select", "add", "--run", run, "--all-deletable", "A")
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(len(payload["added"]), 2, "注記の「依頼すればまとめて選べる」の数と、選んだ数が同じ")
+        self.assertEqual(payload["others_deletable"]["count"], 1)
+
     def test_path_not_utf8(self):
         """UTF-8 として読めない名前の項目も一覧にでき、表では読めないバイトを \\xff の形で示す (計画の KTD2)。"""
         root = self.caches
